@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { useNavigate } from 'react-router-dom'
 import {
   Box,
@@ -34,11 +36,21 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import AddToQueueIcon from '@mui/icons-material/AddToQueue'
 import CheckIcon from '@mui/icons-material/Check'
-import { MoviePoster, RankBadge, getProxiedImageUrl, FALLBACK_POSTER_URL, HeartRating } from '@aperture/ui'
+import AccessTimeIcon from '@mui/icons-material/AccessTime'
+import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import {
+  MoviePoster,
+  RankBadge,
+  getProxiedImageUrl,
+  FALLBACK_POSTER_URL,
+  HeartRating,
+  TrailerModal,
+} from '@aperture/ui'
 import { useAuth } from '@/hooks/useAuth'
 import { useUserRatings } from '@/hooks/useUserRatings'
 import { useWatching } from '@/hooks/useWatching'
 import { useViewMode } from '@/hooks/useViewMode'
+import { formatRuntime } from '@/pages/media-detail/hooks'
 
 interface MovieRecommendation {
   movie_id: string
@@ -56,6 +68,8 @@ interface MovieRecommendation {
     genres: string[]
     overview: string | null
     community_rating: number | null
+    runtime_minutes: number | null
+    tmdb_id: string | null
   }
 }
 
@@ -75,6 +89,9 @@ interface SeriesRecommendation {
     genres: string[]
     overview: string | null
     community_rating: number | null
+    total_seasons: number | null
+    total_episodes: number | null
+    tmdb_id: string | null
   }
 }
 
@@ -87,7 +104,34 @@ interface RunInfo {
 
 type MediaType = 'movies' | 'series'
 
+function recommendationMetaLine(
+  mediaType: MediaType,
+  rec: MovieRecommendation | SeriesRecommendation,
+  t: TFunction
+): string | null {
+  if (mediaType === 'movies' && 'movie' in rec) {
+    const m = rec.movie
+    const rt =
+      m.runtime_minutes != null && m.runtime_minutes > 0 ? formatRuntime(m.runtime_minutes) : ''
+    if (m.year != null && rt) return t('myRecommendations.metaYearRuntime', { year: m.year, runtime: rt })
+    if (rt) return t('myRecommendations.metaRuntimeOnly', { runtime: rt })
+    return m.year != null ? String(m.year) : null
+  }
+  const s = (rec as SeriesRecommendation).series
+  const se =
+    s.total_seasons != null && s.total_episodes != null
+      ? t('myRecommendations.seriesSeasonsEpisodesLine', {
+          seasonPart: t('myRecommendations.seasonsLabel', { count: s.total_seasons }),
+          episodePart: t('myRecommendations.episodesLabel', { count: s.total_episodes }),
+        })
+      : ''
+  if (s.year != null && se) return `${s.year} · ${se}`
+  if (se) return se
+  return s.year != null ? String(s.year) : null
+}
+
 export function MyRecommendationsPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
@@ -125,6 +169,12 @@ export function MyRecommendationsPage() {
   const { viewMode, setViewMode } = useViewMode('recommendations')
   const [regenerating, setRegenerating] = useState(false)
   const [regenerateMessage, setRegenerateMessage] = useState<string | null>(null)
+  const [trailerLoadingId, setTrailerLoadingId] = useState<string | null>(null)
+  const [trailerModal, setTrailerModal] = useState<{
+    open: boolean
+    watchUrl: string | null
+    title: string | null
+  }>({ open: false, watchUrl: null, title: null })
 
   const fetchMovieRecommendations = async () => {
     if (!user) return
@@ -137,10 +187,10 @@ export function MyRecommendationsPage() {
         setMovieRunInfo(data.run)
         setMovieError(null)
       } else {
-        setMovieError('Failed to load movie recommendations')
+        setMovieError(t('myRecommendations.errorLoadMovies'))
       }
     } catch {
-      setMovieError('Could not connect to server')
+      setMovieError(t('myRecommendations.errorConnect'))
     } finally {
       setMovieLoading(false)
     }
@@ -157,10 +207,10 @@ export function MyRecommendationsPage() {
         setSeriesRunInfo(data.run)
         setSeriesError(null)
       } else {
-        setSeriesError('Failed to load series recommendations')
+        setSeriesError(t('myRecommendations.errorLoadSeries'))
       }
     } catch {
-      setSeriesError('Could not connect to server')
+      setSeriesError(t('myRecommendations.errorConnect'))
     } finally {
       setSeriesLoading(false)
     }
@@ -189,8 +239,11 @@ export function MyRecommendationsPage() {
 
       if (response.ok) {
         const data = await response.json()
-        const label = mediaType === 'movies' ? 'movie' : 'series'
-        setRegenerateMessage(`✓ Generated ${data.count} new ${label} recommendations!`)
+        setRegenerateMessage(
+          mediaType === 'movies'
+            ? t('myRecommendations.regenerateSuccessMovie', { count: data.count })
+            : t('myRecommendations.regenerateSuccessSeries', { count: data.count })
+        )
         // Refresh the recommendations list
         if (mediaType === 'movies') {
           setMovieLoading(true)
@@ -201,10 +254,14 @@ export function MyRecommendationsPage() {
         }
       } else {
         const errorData = await response.json()
-        setRegenerateMessage(`✗ ${errorData.error || 'Failed to regenerate'}`)
+        setRegenerateMessage(
+          t('myRecommendations.regenerateError', {
+            message: errorData.error || t('myRecommendations.regenerateFailed'),
+          })
+        )
       }
     } catch {
-      setRegenerateMessage('✗ Could not connect to server')
+      setRegenerateMessage(t('myRecommendations.regenerateError', { message: t('myRecommendations.errorConnect') }))
     } finally {
       setRegenerating(false)
     }
@@ -261,6 +318,27 @@ export function MyRecommendationsPage() {
     }
   }
 
+  const openTrailer = useCallback(async (movieId: string, fallbackTitle?: string) => {
+    setTrailerLoadingId(movieId)
+    try {
+      const res = await fetch(`/api/movies/${movieId}/trailer`, { credentials: 'include' })
+      const data = (await res.json()) as {
+        trailerUrl?: string | null
+        name?: string | null
+        error?: string
+      }
+      if (data.trailerUrl) {
+        setTrailerModal({
+          open: true,
+          watchUrl: data.trailerUrl,
+          title: data.name ?? fallbackTitle ?? null,
+        })
+      }
+    } finally {
+      setTrailerLoadingId(null)
+    }
+  }, [])
+
   const LoadingSkeleton = () => (
     <Box>
       <Grid container spacing={2}>
@@ -281,12 +359,12 @@ export function MyRecommendationsPage() {
           <Box display="flex" alignItems="center" gap={2} mb={{ xs: 0, sm: 1 }}>
             <AutoAwesomeIcon sx={{ color: 'primary.main', fontSize: 32 }} />
             <Typography variant="h4" fontWeight={700}>
-              My Recommendations
+              {t('myRecommendations.pageTitle')}
             </Typography>
           </Box>
           {!isMobile && (
             <Typography variant="body1" color="text.secondary">
-              AI-powered picks personalized for your taste
+              {t('myRecommendations.subtitle')}
             </Typography>
           )}
         </Box>
@@ -310,7 +388,7 @@ export function MyRecommendationsPage() {
       {/* Action buttons row */}
       <Box display="flex" gap={1} mb={2}>
         {isMobile ? (
-          <Tooltip title={regenerating ? 'Regenerating...' : 'Regenerate'}>
+          <Tooltip title={regenerating ? t('myRecommendations.regenerateRegenerating') : t('myRecommendations.regenerate')}>
             <span>
               <IconButton
                 onClick={handleRegenerate}
@@ -330,7 +408,7 @@ export function MyRecommendationsPage() {
             disabled={regenerating}
             size="small"
           >
-            {regenerating ? 'Regenerating...' : 'Regenerate'}
+            {regenerating ? t('myRecommendations.regenerateRegenerating') : t('myRecommendations.regenerate')}
           </Button>
         )}
       </Box>
@@ -350,7 +428,7 @@ export function MyRecommendationsPage() {
           iconPosition="start"
           label={
             <Box display="flex" alignItems="center" gap={1}>
-              <span>Movies</span>
+              <span>{t('myRecommendations.tabMovies')}</span>
               {movieRecommendations.length > 0 && (
                 <Chip
                   label={movieRecommendations.length}
@@ -378,7 +456,7 @@ export function MyRecommendationsPage() {
           iconPosition="start"
           label={
             <Box display="flex" alignItems="center" gap={1}>
-              <span>TV Series</span>
+              <span>{t('myRecommendations.tabSeries')}</span>
               {seriesRecommendations.length > 0 && (
                 <Chip
                   label={seriesRecommendations.length}
@@ -405,9 +483,14 @@ export function MyRecommendationsPage() {
       {/* Run Info */}
       {runInfo && runInfo.created_at && (
         <Typography variant="caption" color="text.secondary" display="block" mb={2}>
-          Last updated: {new Date(runInfo.created_at).toLocaleString()}
+          {t('myRecommendations.lastUpdated', { when: new Date(runInfo.created_at).toLocaleString() })}
           {runInfo.selected_count != null && runInfo.total_candidates != null && (
-            <> • {runInfo.selected_count} picks from {runInfo.total_candidates.toLocaleString()} candidates</>
+            <>
+              {t('myRecommendations.picksFromCandidates', {
+                selected: runInfo.selected_count,
+                total: runInfo.total_candidates.toLocaleString(),
+              })}
+            </>
           )}
         </Typography>
       )}
@@ -435,19 +518,21 @@ export function MyRecommendationsPage() {
         <LoadingSkeleton />
       ) : recommendations.length === 0 ? (
         <Alert severity="info" sx={{ borderRadius: 2 }}>
-          No {mediaType === 'movies' ? 'movie' : 'series'} recommendations generated yet. Your personalized picks will appear here once an admin runs the recommendation job.
+          {mediaType === 'movies' ? t('myRecommendations.emptyMovies') : t('myRecommendations.emptySeries')}
         </Alert>
       ) : viewMode === 'grid' ? (
         <Grid container spacing={2}>
           {recommendations.map((rec, index) => {
             const { id, item, navigateTo } = getItemProps(rec)
             const type = mediaType === 'movies' ? 'movie' : 'series'
+            const metaLine = recommendationMetaLine(mediaType, rec, t)
             return (
               <Grid item xs={6} sm={4} md={3} lg={2} key={id}>
                 <Box position="relative">
                   <MoviePoster
                     title={item.title}
                     year={item.year}
+                    metaLine={metaLine ?? undefined}
                     posterUrl={item.poster_url}
                     genres={item.genres}
                     rating={item.community_rating}
@@ -462,7 +547,35 @@ export function MyRecommendationsPage() {
                     hideWatchingToggle={type !== 'series'}
                     responsive
                     onClick={() => navigate(navigateTo)}
-                  />
+                  >
+                    {type === 'movie' && (
+                      <Tooltip title={t('myRecommendations.watchTrailer')}>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            void openTrailer(id, item.title)
+                          }}
+                          disabled={trailerLoadingId === id}
+                          sx={{
+                            position: 'absolute',
+                            bottom: 8,
+                            left: 8,
+                            zIndex: 4,
+                            bgcolor: 'rgba(0,0,0,0.55)',
+                            color: 'white',
+                            '&:hover': { bgcolor: 'rgba(0,0,0,0.75)' },
+                          }}
+                        >
+                          {trailerLoadingId === id ? (
+                            <CircularProgress size={18} color="inherit" />
+                          ) : (
+                            <PlayArrowIcon fontSize="small" />
+                          )}
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </MoviePoster>
                   <RankBadge rank={index + 1} size="medium" />
                 </Box>
               </Grid>
@@ -479,8 +592,10 @@ export function MyRecommendationsPage() {
 
             const handleOpenTmdb = (e: React.MouseEvent) => {
               e.stopPropagation()
+              const tid = item.tmdb_id
+              if (!tid) return
               const tmdbType = type === 'movie' ? 'movie' : 'tv'
-              window.open(`https://www.themoviedb.org/${tmdbType}/${id}`, '_blank')
+              window.open(`https://www.themoviedb.org/${tmdbType}/${tid}`, '_blank', 'noopener,noreferrer')
             }
 
             const handleWatchingClick = (e: React.MouseEvent) => {
@@ -580,6 +695,28 @@ export function MyRecommendationsPage() {
                             </Typography>
                           </Box>
                         )}
+                        {type === 'movie' && 'runtime_minutes' in item && item.runtime_minutes ? (
+                          <Box display="flex" alignItems="center" gap={0.5}>
+                            <AccessTimeIcon sx={{ fontSize: { xs: 12, md: 14 }, color: 'text.secondary' }} />
+                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
+                              {formatRuntime(item.runtime_minutes)}
+                            </Typography>
+                          </Box>
+                        ) : null}
+                        {type === 'series' &&
+                        'total_seasons' in item &&
+                        item.total_seasons != null &&
+                        item.total_episodes != null ? (
+                          <Box display="flex" alignItems="center" gap={0.5}>
+                            <AccessTimeIcon sx={{ fontSize: { xs: 12, md: 14 }, color: 'text.secondary' }} />
+                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
+                              {t('myRecommendations.seriesSeasonsEpisodesLine', {
+                                seasonPart: t('myRecommendations.seasonsLabel', { count: item.total_seasons }),
+                                episodePart: t('myRecommendations.episodesLabel', { count: item.total_episodes }),
+                              })}
+                            </Typography>
+                          </Box>
+                        ) : null}
                       </Box>
 
                       {/* Genres */}
@@ -611,8 +748,52 @@ export function MyRecommendationsPage() {
                           fontSize: { xs: '0.75rem', md: '0.875rem' },
                         }}
                       >
-                        {item.overview || 'No description available.'}
+                        {item.overview || t('common.noDescription')}
                       </Typography>
+
+                      {/* Desktop: trailer + TMDb */}
+                      {!isMobile && (
+                        <Box display="flex" alignItems="center" gap={0.5} mt={1}>
+                          {type === 'movie' && (
+                            <Tooltip title={t('myRecommendations.watchTrailer')}>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  void openTrailer(id, item.title)
+                                }}
+                                disabled={trailerLoadingId === id}
+                                sx={{
+                                  p: 0.5,
+                                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                  '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.2) },
+                                }}
+                              >
+                                {trailerLoadingId === id ? (
+                                  <CircularProgress size={16} />
+                                ) : (
+                                  <PlayArrowIcon sx={{ fontSize: 18 }} />
+                                )}
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {item.tmdb_id && (
+                            <Tooltip title={t('myRecommendations.viewTmdb')}>
+                              <IconButton
+                                onClick={handleOpenTmdb}
+                                size="small"
+                                sx={{
+                                  p: 0.5,
+                                  backgroundColor: alpha(theme.palette.grey[500], 0.1),
+                                  '&:hover': { backgroundColor: alpha(theme.palette.grey[500], 0.2) },
+                                }}
+                              >
+                                <OpenInNewIcon sx={{ fontSize: 18 }} />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Box>
+                      )}
 
                       {/* Mobile: Inline actions */}
                       {isMobile && (
@@ -623,7 +804,7 @@ export function MyRecommendationsPage() {
                             size="small"
                           />
                           {type === 'series' && (
-                            <Tooltip title={watching ? 'Remove from watching' : 'Add to watching'}>
+                            <Tooltip title={watching ? t('myRecommendations.removeFromWatching') : t('myRecommendations.addToWatching')}>
                               <IconButton
                                 onClick={handleWatchingClick}
                                 size="small"
@@ -643,19 +824,44 @@ export function MyRecommendationsPage() {
                               </IconButton>
                             </Tooltip>
                           )}
-                          <Tooltip title="View on TMDb">
-                            <IconButton
-                              onClick={handleOpenTmdb}
-                              size="small"
-                              sx={{
-                                p: 0.5,
-                                backgroundColor: alpha(theme.palette.grey[500], 0.1),
-                                '&:hover': { backgroundColor: alpha(theme.palette.grey[500], 0.2) },
-                              }}
-                            >
-                              <OpenInNewIcon sx={{ fontSize: 16 }} />
-                            </IconButton>
-                          </Tooltip>
+                          {type === 'movie' && (
+                            <Tooltip title={t('myRecommendations.watchTrailer')}>
+                              <IconButton
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  void openTrailer(id, item.title)
+                                }}
+                                size="small"
+                                disabled={trailerLoadingId === id}
+                                sx={{
+                                  p: 0.5,
+                                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                  '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.2) },
+                                }}
+                              >
+                                {trailerLoadingId === id ? (
+                                  <CircularProgress size={14} />
+                                ) : (
+                                  <PlayArrowIcon sx={{ fontSize: 16 }} />
+                                )}
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {item.tmdb_id && (
+                            <Tooltip title={t('myRecommendations.viewTmdb')}>
+                              <IconButton
+                                onClick={handleOpenTmdb}
+                                size="small"
+                                sx={{
+                                  p: 0.5,
+                                  backgroundColor: alpha(theme.palette.grey[500], 0.1),
+                                  '&:hover': { backgroundColor: alpha(theme.palette.grey[500], 0.2) },
+                                }}
+                              >
+                                <OpenInNewIcon sx={{ fontSize: 16 }} />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </Box>
                       )}
                     </CardContent>
@@ -677,11 +883,11 @@ export function MyRecommendationsPage() {
                       }}
                     >
                       <Typography variant="subtitle2" fontWeight={600} mb={1}>
-                        Match Score: {(rec.final_score * 100).toFixed(0)}%
+                        {t('myRecommendations.matchScore', { pct: (rec.final_score * 100).toFixed(0) })}
                       </Typography>
-                      <ScoreBar label="Similarity" value={rec.similarity_score} color="#6366f1" />
-                      <ScoreBar label="Novelty" value={rec.novelty_score} color="#10b981" />
-                      <ScoreBar label="Rating" value={rec.rating_score} color="#f59e0b" />
+                      <ScoreBar label={t('myRecommendations.scoreSimilarity')} value={rec.similarity_score} color="#6366f1" />
+                      <ScoreBar label={t('myRecommendations.scoreNovelty')} value={rec.novelty_score} color="#10b981" />
+                      <ScoreBar label={t('myRecommendations.scoreRating')} value={rec.rating_score} color="#f59e0b" />
                     </Box>
                   )}
                 </Box>
@@ -698,14 +904,14 @@ export function MyRecommendationsPage() {
                   >
                     <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
                       <Typography variant="caption" fontWeight={700} color="text.primary">
-                        Match Score: {(rec.final_score * 100).toFixed(0)}%
+                        {t('myRecommendations.matchScore', { pct: (rec.final_score * 100).toFixed(0) })}
                       </Typography>
                     </Box>
                     <Box display="flex" gap={1.5}>
                       <Box flex={1}>
                         <Box display="flex" justifyContent="space-between" mb={0.25}>
                           <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                            Similarity
+                            {t('myRecommendations.scoreSimilarity')}
                           </Typography>
                           <Typography variant="caption" fontWeight={600} sx={{ fontSize: '0.65rem' }}>
                             {(rec.similarity_score * 100).toFixed(0)}%
@@ -728,7 +934,7 @@ export function MyRecommendationsPage() {
                       <Box flex={1}>
                         <Box display="flex" justifyContent="space-between" mb={0.25}>
                           <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                            Novelty
+                            {t('myRecommendations.scoreNovelty')}
                           </Typography>
                           <Typography variant="caption" fontWeight={600} sx={{ fontSize: '0.65rem' }}>
                             {(rec.novelty_score * 100).toFixed(0)}%
@@ -751,7 +957,7 @@ export function MyRecommendationsPage() {
                       <Box flex={1}>
                         <Box display="flex" justifyContent="space-between" mb={0.25}>
                           <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                            Rating
+                            {t('myRecommendations.scoreRating')}
                           </Typography>
                           <Typography variant="caption" fontWeight={600} sx={{ fontSize: '0.65rem' }}>
                             {(rec.rating_score * 100).toFixed(0)}%
@@ -779,6 +985,13 @@ export function MyRecommendationsPage() {
           })}
         </Box>
       )}
+
+      <TrailerModal
+        open={trailerModal.open}
+        onClose={() => setTrailerModal({ open: false, watchUrl: null, title: null })}
+        watchUrl={trailerModal.watchUrl}
+        title={trailerModal.title}
+      />
     </Box>
   )
 }

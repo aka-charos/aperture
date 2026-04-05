@@ -266,6 +266,20 @@ export {
   type SeriesTasteSynopsis,
 } from './lib/tasteSeriesSynopsis.js'
 
+// Locales (UI + AI)
+export {
+  DEFAULT_LOCALE,
+  APP_LOCALE_OPTIONS,
+  RTL_LOCALE_CODES,
+  isRtlLocale,
+  isValidAppLocale,
+  normalizeAppLocale,
+  appLocaleToTmdbLanguage,
+  getLocaleInstructionName,
+  buildAiLanguageInstruction,
+  type AppLocaleCode,
+} from './lib/locales.js'
+
 // User Settings
 export {
   getUserSettings,
@@ -277,6 +291,8 @@ export {
   getEffectiveAiExplanationSetting,
   getUserUiPreferences,
   updateUserUiPreferences,
+  resolveEffectiveUiLanguage,
+  resolveEffectiveAiLanguage,
   addBrowseFilterPreset,
   updateBrowseFilterPreset,
   deleteBrowseFilterPreset,
@@ -338,6 +354,9 @@ export {
   detectPathMappings,
   getAiExplanationConfig,
   setAiExplanationConfig,
+  getSystemLanguageDefaults,
+  setSystemLanguageDefaults,
+  type SystemLanguageDefaults,
   getWatchingLibraryConfig,
   setWatchingLibraryConfig,
   getLibraryTitleConfig,
@@ -360,6 +379,31 @@ export {
   // Studio logos settings
   getStudioLogosConfig,
   setStudioLogosConfig,
+  getStreamingDiscoveryEnabled,
+  setStreamingDiscoveryEnabled,
+  getStreamingDiscoveryProviderStrips,
+  setStreamingDiscoveryProviderStrips,
+  getGenreStripMovieIds,
+  setGenreStripMovieIds,
+  getGenreStripSeriesIds,
+  setGenreStripSeriesIds,
+  getGenreStripMovieRows,
+  setGenreStripMovieRows,
+  getGenreStripSeriesRows,
+  setGenreStripSeriesRows,
+  GENRE_STRIP_MAX_ROWS,
+  GENRE_STRIP_MAX_GENRES_PER_ROW,
+  GENRE_STRIP_MAX_EXCLUDE_GENRES_PER_ROW,
+  GENRE_STRIP_DEFAULT_ROW_LIMIT,
+  GENRE_STRIP_MIN_ROW_LIMIT,
+  GENRE_STRIP_MAX_ROW_LIMIT,
+  GENRE_STRIP_MAX_ROW_LABEL_LENGTH,
+  validateGenreStripRows,
+  clampGenreStripRowLimit,
+  sanitizeGenreStripRowLabel,
+  sanitizeGenreStripOriginCountry,
+  sanitizeGenreStripYear,
+  type GenreStripRowConfig,
   type SystemSetting,
   type EmbeddingModel,
   type TextGenerationModel,
@@ -479,13 +523,19 @@ export {
   findTVByTvdbId,
   // Movie functions
   getMovieDetails,
+  getMovieVideos,
+  pickBestYoutubeTrailer,
   getMovieKeywords,
   getMovieCredits,
   getMovieEnrichmentData,
   getMovieEnrichmentByImdbId,
   getMovieEnrichmentByTmdbId,
+  getMovieGenresList,
+  getTVGenresList,
+  getTmdbConfigurationCountries,
   // Series functions
   getTVDetails,
+  getTVVideos,
   getTVKeywords,
   getTVCredits,
   getTVExternalIds,
@@ -507,12 +557,15 @@ export {
   // Types
   type TMDbKeyword,
   type TMDbGenre,
+  type TmdbConfigurationCountry,
   type TMDbCrewMember,
   type TMDbCastMember,
   type TMDbCollection,
   type TMDbCollectionDetails,
   type TMDbCollectionPart,
   type TMDbMovieDetails,
+  type TMDbVideo,
+  type TMDbVideosResponse,
   type TMDbMovieKeywordsResponse,
   type TMDbMovieCreditsResponse,
   type TMDbTVDetails,
@@ -800,9 +853,11 @@ export {
   // Sources
   fetchAllCandidates,
   fetchFilteredCandidates,
+  fetchGenreStripDiscoverCandidates,
   hasDiscoverySources,
   // Filter
   filterCandidates,
+  getCandidateExclusionTmdbIds,
   isInLibrary,
   hasWatched,
   // Scorer
@@ -819,6 +874,7 @@ export {
   createDiscoveryRequest,
   updateDiscoveryRequestStatus,
   getDiscoveryRequests,
+  countDiscoveryRequests,
   hasExistingRequest,
   // Types
   type MediaType,
@@ -836,6 +892,7 @@ export {
   type ScoredCandidate,
   type DiscoveryPipelineResult,
   type DynamicFetchFilters,
+  type GenreStripDiscoverFilters,
   DEFAULT_DISCOVERY_CONFIG,
   // Browse people list
   listPeopleForBrowse,
@@ -855,6 +912,30 @@ export {
   type PersonCreditsGapGroup,
   type CreditsRoleKind,
 } from './discover/index.js'
+
+// JustWatch streaming charts (Discovery expansion)
+export {
+  fetchPopularTitles,
+  fetchSearchTitles,
+  fetchProviders,
+  normalizeJwNode,
+  parsePopularEdges,
+  parseSearchEdges,
+  parseProvidersResponse,
+  attachLibraryMatch,
+  attachTmdbPosterPaths,
+  sortStreamingRowsForDiscovery,
+  getCachedPayload,
+  setCachedPayload,
+  buildCacheKey,
+  streamingCacheTtlMs,
+  loadCachedOrFetch,
+  type JustWatchStreamingRow,
+  type JustWatchProviderOption,
+  type JwTitleNode,
+  PARTNER_PROVIDER_TERMS_US,
+  type PartnerProviderTerm,
+} from './justwatch/index.js'
 
 // Gap analysis (movie collection completeness vs library)
 export {

@@ -2,7 +2,7 @@
  * In-app detail modal for TMDb-only titles (e.g. person credits not in library).
  * Data is loaded from GET /api/discover/tmdb/movie/:id or .../tv/:id.
  */
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState, useEffect, useCallback } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -16,6 +16,7 @@ import {
   CircularProgress,
   Alert,
   Button,
+  Tooltip,
 } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 import StarIcon from '@mui/icons-material/Star'
@@ -28,8 +29,10 @@ import HowToVoteIcon from '@mui/icons-material/HowToVote'
 import TranslateIcon from '@mui/icons-material/Translate'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import AddIcon from '@mui/icons-material/Add'
+import OndemandVideoIcon from '@mui/icons-material/OndemandVideo'
 import { useNavigate } from 'react-router-dom'
-import { getProxiedImageUrl } from '@aperture/ui'
+import { useTranslation } from 'react-i18next'
+import { getProxiedImageUrl, TrailerModal } from '@aperture/ui'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
 
@@ -83,15 +86,45 @@ export function TmdbExternalDetailModal({
   loading,
   error,
   data,
-  sourceLabel = 'TMDb',
+  sourceLabel,
   canRequest = false,
   isRequesting = false,
   seerrAvailable = false,
   seerrPending = false,
   onRequest,
 }: TmdbExternalDetailModalProps) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
+  const displaySourceLabel = sourceLabel ?? t('tmdbExternalModal.defaultSource')
   const [heroImageVisible, setHeroImageVisible] = useState(false)
+  const [trailerLoading, setTrailerLoading] = useState(false)
+  const [trailerModal, setTrailerModal] = useState<{
+    open: boolean
+    watchUrl: string | null
+    title: string | null
+  }>({ open: false, watchUrl: null, title: null })
+
+  const handleOpenTrailer = useCallback(async () => {
+    if (!data) return
+    const path =
+      data.mediaType === 'movie'
+        ? `/api/discover/tmdb/movie/${data.tmdbId}/trailer`
+        : `/api/discover/tmdb/tv/${data.tmdbId}/trailer`
+    setTrailerLoading(true)
+    try {
+      const res = await fetch(path, { credentials: 'include' })
+      const json = (await res.json()) as { trailerUrl?: string | null; name?: string | null }
+      if (json.trailerUrl) {
+        setTrailerModal({
+          open: true,
+          watchUrl: json.trailerUrl,
+          title: json.name ?? data.title,
+        })
+      }
+    } finally {
+      setTrailerLoading(false)
+    }
+  }, [data])
 
   const heroImageUrl = useMemo(() => {
     if (data?.backdropPath) return `${TMDB_IMAGE_BASE}/w1280${data.backdropPath}`
@@ -113,7 +146,9 @@ export function TmdbExternalDetailModal({
     if (!minutes) return null
     const hours = Math.floor(minutes / 60)
     const mins = minutes % 60
-    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`
+    return hours > 0
+      ? t('tmdbExternalModal.runtimeHours', { hours, mins })
+      : t('tmdbExternalModal.runtimeMins', { mins })
   }
 
   const handlePersonClick = (name: string) => {
@@ -143,6 +178,7 @@ export function TmdbExternalDetailModal({
     data?.mediaType === 'movie' ? data.directors : data?.creators ?? []
 
   return (
+    <>
     <Dialog
       open={open}
       onClose={onClose}
@@ -242,7 +278,11 @@ export function TmdbExternalDetailModal({
                           <TvIcon sx={{ fontSize: 16 }} />
                         )
                       }
-                      label={data.mediaType === 'movie' ? 'Movie' : 'TV Series'}
+                      label={
+                        data.mediaType === 'movie'
+                          ? t('tmdbExternalModal.typeMovie')
+                          : t('tmdbExternalModal.typeSeries')
+                      }
                       size="small"
                       sx={{
                         bgcolor: alpha('#8B5CF6', 0.2),
@@ -283,9 +323,9 @@ export function TmdbExternalDetailModal({
                     )}
                     {data.mediaType === 'series' && data.numberOfSeasons != null && (
                       <Typography variant="body2" color="text.secondary">
-                        {data.numberOfSeasons} season{data.numberOfSeasons === 1 ? '' : 's'}
+                        {t('tmdbExternalModal.season', { count: data.numberOfSeasons })}
                         {data.numberOfEpisodes != null
-                          ? ` · ${data.numberOfEpisodes} episodes`
+                          ? ` · ${t('tmdbExternalModal.episodes', { count: data.numberOfEpisodes })}`
                           : ''}
                       </Typography>
                     )}
@@ -310,7 +350,7 @@ export function TmdbExternalDetailModal({
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <HowToVoteIcon fontSize="small" sx={{ color: 'text.secondary' }} />
                         <Typography variant="body2" color="text.secondary">
-                          {data.voteCount.toLocaleString()} votes
+                          {t('tmdbExternalModal.votes', { count: data.voteCount })}
                         </Typography>
                       </Box>
                     )}
@@ -336,7 +376,7 @@ export function TmdbExternalDetailModal({
                   )}
 
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Source: {sourceLabel}
+                    {t('tmdbExternalModal.source', { label: displaySourceLabel })}
                   </Typography>
 
                   {data.overview && (
@@ -354,6 +394,29 @@ export function TmdbExternalDetailModal({
                       alignItems: 'center',
                     }}
                   >
+                    <Tooltip title={t('tmdbExternalModal.trailerTooltip')}>
+                      <span>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="inherit"
+                          startIcon={
+                            trailerLoading ? (
+                              <CircularProgress size={16} color="inherit" />
+                            ) : (
+                              <OndemandVideoIcon />
+                            )
+                          }
+                          disabled={trailerLoading}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            void handleOpenTrailer()
+                          }}
+                        >
+                          {t('tmdbExternalModal.trailer')}
+                        </Button>
+                      </span>
+                    </Tooltip>
                     <Button
                       size="small"
                       variant="outlined"
@@ -363,7 +426,7 @@ export function TmdbExternalDetailModal({
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Open on TMDb
+                      {t('tmdbExternalModal.openOnTmdb')}
                     </Button>
                     {imdbUrl && (
                       <Button
@@ -375,19 +438,19 @@ export function TmdbExternalDetailModal({
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        IMDb
+                        {t('tmdbExternalModal.imdb')}
                       </Button>
                     )}
                     {seerrAvailable && (
                       <Chip
                         size="small"
-                        label="In Seerr"
+                        label={t('tmdbExternalModal.inSeerr')}
                         color="success"
                         variant="outlined"
                       />
                     )}
                     {seerrPending && (
-                      <Chip size="small" label="Requested" color="warning" variant="outlined" />
+                      <Chip size="small" label={t('tmdbExternalModal.requested')} color="warning" variant="outlined" />
                     )}
                     {canRequest && onRequest && (
                       <Button
@@ -407,7 +470,7 @@ export function TmdbExternalDetailModal({
                           onRequest()
                         }}
                       >
-                        {isRequesting ? 'Requesting…' : 'Request'}
+                        {isRequesting ? t('tmdbExternalModal.requesting') : t('tmdbExternalModal.request')}
                       </Button>
                     )}
                   </Box>
@@ -424,7 +487,9 @@ export function TmdbExternalDetailModal({
                         sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}
                       >
                         <MovieIcon fontSize="small" />
-                        {data.mediaType === 'movie' ? 'Director' : 'Created by'}
+                        {data.mediaType === 'movie'
+                          ? t('tmdbExternalModal.director')
+                          : t('tmdbExternalModal.createdBy')}
                       </Typography>
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                         {directorOrCreatorList.map((name) => (
@@ -452,7 +517,7 @@ export function TmdbExternalDetailModal({
                         sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}
                       >
                         <PersonIcon fontSize="small" />
-                        Cast
+                        {t('tmdbExternalModal.cast')}
                       </Typography>
                       <Grid container spacing={1}>
                         {data.castMembers.slice(0, 8).map((cast) => (
@@ -498,7 +563,7 @@ export function TmdbExternalDetailModal({
                                     noWrap
                                     sx={{ fontSize: '0.7rem' }}
                                   >
-                                    as {cast.character}
+                                    {t('tmdbExternalModal.castAs', { character: cast.character })}
                                   </Typography>
                                 )}
                               </Box>
@@ -521,7 +586,7 @@ export function TmdbExternalDetailModal({
                       }}
                     >
                       <PersonIcon sx={{ fontSize: 48, mb: 1, opacity: 0.5 }} />
-                      <Typography variant="body2">Cast information not available</Typography>
+                      <Typography variant="body2">{t('tmdbExternalModal.castUnavailable')}</Typography>
                     </Box>
                   )}
                 </Box>
@@ -531,5 +596,12 @@ export function TmdbExternalDetailModal({
         </DialogContent>
       </Box>
     </Dialog>
+    <TrailerModal
+      open={trailerModal.open}
+      onClose={() => setTrailerModal({ open: false, watchUrl: null, title: null })}
+      watchUrl={trailerModal.watchUrl}
+      title={trailerModal.title}
+    />
+    </>
   )
 }

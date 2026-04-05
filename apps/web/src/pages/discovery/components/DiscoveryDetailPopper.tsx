@@ -4,7 +4,8 @@
  * Modal dialog showing detailed metadata for a discovery candidate
  * with a fanart backdrop and 2-column card layout
  */
-import React from 'react'
+import React, { useState, useCallback, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,10 @@ import {
   IconButton,
   Grid,
   alpha,
+  Button,
+  CircularProgress,
+  Tooltip,
+  Alert,
 } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 import StarIcon from '@mui/icons-material/Star'
@@ -26,37 +31,163 @@ import TvIcon from '@mui/icons-material/Tv'
 import HowToVoteIcon from '@mui/icons-material/HowToVote'
 import SourceIcon from '@mui/icons-material/Source'
 import TranslateIcon from '@mui/icons-material/Translate'
+import OndemandVideoIcon from '@mui/icons-material/OndemandVideo'
 import { useNavigate } from 'react-router-dom'
-import { getProxiedImageUrl } from '@aperture/ui'
+import { getProxiedImageUrl, TrailerModal } from '@aperture/ui'
 import type { DiscoveryCandidate } from '../types'
+import type { ResolveDiscoveryGenreName } from '../hooks'
+import { discoverySourceLabel } from '../discoveryLabels'
+import type { TmdbExternalDetailPayload } from '../../../components/TmdbExternalDetailModal'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
 const FALLBACK_BACKDROP = '/NO_POSTER_FOUND.png'
+
+function mergeDiscoveryWithTmdb(
+  base: DiscoveryCandidate,
+  tmdb: TmdbExternalDetailPayload | null
+): DiscoveryCandidate {
+  if (!tmdb) return base
+  const directorsForDisplay =
+    tmdb.mediaType === 'movie'
+      ? tmdb.directors.length > 0
+        ? tmdb.directors
+        : base.directors
+      : tmdb.creators.length > 0
+        ? tmdb.creators
+        : base.directors
+  return {
+    ...base,
+    title: tmdb.title,
+    originalTitle: tmdb.originalTitle ?? base.originalTitle,
+    tagline: tmdb.tagline ?? base.tagline,
+    overview: tmdb.overview ?? base.overview,
+    posterPath: tmdb.posterPath ?? base.posterPath,
+    backdropPath: tmdb.backdropPath ?? base.backdropPath,
+    releaseYear: tmdb.releaseYear ?? base.releaseYear,
+    runtimeMinutes: tmdb.runtimeMinutes ?? base.runtimeMinutes,
+    voteAverage: tmdb.voteAverage ?? base.voteAverage,
+    voteCount: tmdb.voteCount ?? base.voteCount,
+    genres: tmdb.genres.length > 0 ? tmdb.genres : base.genres,
+    directors: directorsForDisplay,
+    castMembers: tmdb.castMembers.length > 0 ? tmdb.castMembers : base.castMembers,
+    imdbId: tmdb.imdbId ?? base.imdbId,
+    isEnriched: true,
+  }
+}
 
 interface DiscoveryDetailPopperProps {
   candidate: DiscoveryCandidate | null
   open: boolean
   onClose: () => void
+  resolveGenreName: ResolveDiscoveryGenreName
 }
 
 export function DiscoveryDetailPopper({
   candidate,
   open,
   onClose,
+  resolveGenreName,
 }: DiscoveryDetailPopperProps) {
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
+  const [trailerLoading, setTrailerLoading] = useState(false)
+  const [trailerModal, setTrailerModal] = useState<{
+    open: boolean
+    watchUrl: string | null
+    title: string | null
+  }>({ open: false, watchUrl: null, title: null })
+  const [tmdbDetail, setTmdbDetail] = useState<TmdbExternalDetailPayload | null>(null)
+  const [tmdbDetailLoading, setTmdbDetailLoading] = useState(false)
+  const [tmdbDetailError, setTmdbDetailError] = useState<string | null>(null)
 
-  if (!candidate) return null
+  const streamingNeedsTmdbFetch =
+    !!candidate &&
+    (candidate.source === 'justwatch_streaming' || candidate.source === 'tmdb_genre_row') &&
+    candidate.tmdbId > 0
 
-  const backdropUrl = candidate.backdropPath
-    ? `${TMDB_IMAGE_BASE}/w1280${candidate.backdropPath}`
-    : FALLBACK_BACKDROP
+  useEffect(() => {
+    if (!open || !candidate) {
+      setTmdbDetail(null)
+      setTmdbDetailError(null)
+      setTmdbDetailLoading(false)
+      return
+    }
+    if (!streamingNeedsTmdbFetch) {
+      setTmdbDetail(null)
+      setTmdbDetailError(null)
+      setTmdbDetailLoading(false)
+      return
+    }
+    let cancelled = false
+    setTmdbDetail(null)
+    setTmdbDetailError(null)
+    setTmdbDetailLoading(true)
+    const path =
+      candidate.mediaType === 'movie'
+        ? `/api/discover/tmdb/movie/${candidate.tmdbId}`
+        : `/api/discover/tmdb/tv/${candidate.tmdbId}`
+    void fetch(path, { credentials: 'include' })
+      .then(async (res) => {
+        if (!res.ok) {
+          const text = await res.text()
+          throw new Error(text || res.statusText)
+        }
+        return res.json() as Promise<TmdbExternalDetailPayload>
+      })
+      .then((data) => {
+        if (!cancelled) setTmdbDetail(data)
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setTmdbDetailError(e instanceof Error ? e.message : String(e))
+      })
+      .finally(() => {
+        if (!cancelled) setTmdbDetailLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, candidate?.id, candidate?.tmdbId, candidate?.mediaType, streamingNeedsTmdbFetch])
+
+  const displayCandidate = useMemo(() => {
+    if (!candidate) return null
+    return mergeDiscoveryWithTmdb(candidate, tmdbDetail)
+  }, [candidate, tmdbDetail])
+
+  const hideAiMatchSection =
+    candidate?.source === 'justwatch_streaming' || candidate?.source === 'tmdb_genre_row'
+
+  const handleOpenTrailer = useCallback(async () => {
+    if (!displayCandidate) return
+    const path =
+      displayCandidate.mediaType === 'movie'
+        ? `/api/discover/tmdb/movie/${displayCandidate.tmdbId}/trailer`
+        : `/api/discover/tmdb/tv/${displayCandidate.tmdbId}/trailer`
+    setTrailerLoading(true)
+    try {
+      const res = await fetch(path, { credentials: 'include' })
+      const json = (await res.json()) as { trailerUrl?: string | null; name?: string | null }
+      if (json.trailerUrl) {
+        setTrailerModal({
+          open: true,
+          watchUrl: json.trailerUrl,
+          title: json.name ?? displayCandidate.title,
+        })
+      }
+    } finally {
+      setTrailerLoading(false)
+    }
+  }, [displayCandidate])
+
+  const backdropUrl =
+    displayCandidate?.backdropPath != null
+      ? `${TMDB_IMAGE_BASE}/w1280${displayCandidate.backdropPath}`
+      : FALLBACK_BACKDROP
 
   const formatRuntime = (minutes: number | null) => {
     if (!minutes) return null
     const hours = Math.floor(minutes / 60)
     const mins = minutes % 60
-    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`
+    return hours > 0 ? t('discovery.runtimeHm', { hours, mins }) : t('discovery.runtimeM', { mins })
   }
 
   const handlePersonClick = (name: string) => {
@@ -74,21 +205,9 @@ export function DiscoveryDetailPopper({
     height: { xs: 'auto', md: '100%' },
   }
 
-  // Format source label
-  const getSourceLabel = (source: string) => {
-    const labels: Record<string, string> = {
-      tmdb_recommendations: 'TMDb Recommended',
-      tmdb_similar: 'Similar Titles',
-      tmdb_discover: 'TMDb Discover',
-      trakt_trending: 'Trakt Trending',
-      trakt_popular: 'Trakt Popular',
-      trakt_recommendations: 'Trakt Pick',
-      mdblist: 'MDBList',
-    }
-    return labels[source] || source
-  }
-
   return (
+    <>
+    {candidate && displayCandidate ? (
     <Dialog
       open={open}
       onClose={onClose}
@@ -143,15 +262,49 @@ export function DiscoveryDetailPopper({
         </IconButton>
 
         <DialogContent sx={{ position: 'relative', zIndex: 1, py: { xs: 2, md: 4 }, px: { xs: 2, md: 3 } }}>
-          <Grid container spacing={3}>
+          {tmdbDetailError && streamingNeedsTmdbFetch && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              {tmdbDetailError}
+            </Alert>
+          )}
+          {streamingNeedsTmdbFetch && tmdbDetailLoading && (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 2,
+                py: 4,
+                mb: 2,
+              }}
+            >
+              <CircularProgress size={28} />
+              <Typography variant="body2" color="text.secondary">
+                {t('discovery.detail.loadingTmdb')}
+              </Typography>
+            </Box>
+          )}
+          <Grid
+            container
+            spacing={3}
+            sx={{
+              ...(streamingNeedsTmdbFetch && tmdbDetailLoading && !tmdbDetail
+                ? { opacity: 0.35, pointerEvents: 'none' }
+                : {}),
+            }}
+          >
             {/* Left Card - Media Info */}
             <Grid item xs={12} md={6}>
               <Box sx={cardStyle}>
                 {/* Media Type Badge */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                   <Chip
-                    icon={candidate.mediaType === 'movie' ? <MovieIcon sx={{ fontSize: 16 }} /> : <TvIcon sx={{ fontSize: 16 }} />}
-                    label={candidate.mediaType === 'movie' ? 'Movie' : 'TV Series'}
+                    icon={displayCandidate.mediaType === 'movie' ? <MovieIcon sx={{ fontSize: 16 }} /> : <TvIcon sx={{ fontSize: 16 }} />}
+                    label={
+                      displayCandidate.mediaType === 'movie'
+                        ? t('discovery.detail.mediaMovie')
+                        : t('discovery.detail.mediaSeries')
+                    }
                     size="small"
                     sx={{
                       bgcolor: alpha('#8B5CF6', 0.2),
@@ -162,69 +315,74 @@ export function DiscoveryDetailPopper({
 
                 {/* Title */}
                 <Typography variant="h4" fontWeight={700} gutterBottom>
-                  {candidate.title}
+                  {displayCandidate.title}
                 </Typography>
 
                 {/* Original Title (if different) */}
-                {candidate.originalTitle && candidate.originalTitle !== candidate.title && (
+                {displayCandidate.originalTitle && displayCandidate.originalTitle !== displayCandidate.title && (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
                     <TranslateIcon fontSize="small" sx={{ color: 'text.secondary', fontSize: 14 }} />
                     <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                      {candidate.originalTitle}
+                      {displayCandidate.originalTitle}
                     </Typography>
                   </Box>
                 )}
 
                 {/* Tagline */}
-                {candidate.tagline && (
+                {displayCandidate.tagline && (
                   <Typography
                     variant="body1"
                     color="text.secondary"
                     sx={{ fontStyle: 'italic', mb: 2 }}
                   >
-                    "{candidate.tagline}"
+                    "{displayCandidate.tagline}"
                   </Typography>
                 )}
 
                 {/* Meta row */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-                  {candidate.releaseYear && (
+                  {displayCandidate.releaseYear && (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <CalendarTodayIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                      <Typography variant="body2">{candidate.releaseYear}</Typography>
+                      <Typography variant="body2">{displayCandidate.releaseYear}</Typography>
                     </Box>
                   )}
-                  {candidate.runtimeMinutes && (
+                  {displayCandidate.runtimeMinutes && (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <AccessTimeIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                      <Typography variant="body2">{formatRuntime(candidate.runtimeMinutes)}</Typography>
+                      <Typography variant="body2">{formatRuntime(displayCandidate.runtimeMinutes)}</Typography>
                     </Box>
                   )}
-                  {candidate.voteAverage && (
+                  {displayCandidate.voteAverage && (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <StarIcon fontSize="small" sx={{ color: 'warning.main' }} />
                       <Typography variant="body2" fontWeight={600}>
-                        {candidate.voteAverage.toFixed(1)}
+                        {displayCandidate.voteAverage.toFixed(1)}
                       </Typography>
                     </Box>
                   )}
-                  {candidate.voteCount && (
+                  {displayCandidate.voteCount && (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <HowToVoteIcon fontSize="small" sx={{ color: 'text.secondary' }} />
                       <Typography variant="body2" color="text.secondary">
-                        {candidate.voteCount.toLocaleString()} votes
+                        {t('discovery.detail.votes', {
+                          count: displayCandidate.voteCount.toLocaleString(i18n.language),
+                        })}
                       </Typography>
                     </Box>
                   )}
                 </Box>
 
                 {/* Genres */}
-                {candidate.genres.length > 0 && (
+                {displayCandidate.genres.length > 0 && (
                   <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                    {candidate.genres.filter(g => g.name).slice(0, 5).map((genre) => (
+                    {displayCandidate.genres
+                      .filter((g) => resolveGenreName(g.id, g.name))
+                      .slice(0, 5)
+                      .map((genre) => (
                       <Chip
                         key={genre.id}
-                        label={genre.name}
+                        label={resolveGenreName(genre.id, genre.name)}
                         size="small"
                         sx={{
                           bgcolor: alpha('#fff', 0.1),
@@ -236,47 +394,84 @@ export function DiscoveryDetailPopper({
                 )}
 
                 {/* Source */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 2 }}>
-                  <SourceIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                  <Typography variant="body2" color="text.secondary">
-                    Source: {getSourceLabel(candidate.source)}
-                  </Typography>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    mb: 2,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <SourceIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                    <Typography variant="body2" color="text.secondary">
+                      {t('discovery.detail.source', {
+                        label: discoverySourceLabel(displayCandidate.source, t, 'detail'),
+                      })}
+                    </Typography>
+                  </Box>
+                  <Tooltip title={t('discovery.detail.trailerTooltip')}>
+                    <span>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="inherit"
+                        startIcon={
+                          trailerLoading ? (
+                            <CircularProgress size={16} color="inherit" />
+                          ) : (
+                            <OndemandVideoIcon />
+                          )
+                        }
+                        disabled={trailerLoading}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void handleOpenTrailer()
+                        }}
+                      >
+                        {t('discovery.detail.trailer')}
+                      </Button>
+                    </span>
+                  </Tooltip>
                 </Box>
 
                 {/* Overview */}
-                {candidate.overview && (
+                {displayCandidate.overview && (
                   <Typography
                     variant="body1"
                     color="text.secondary"
                     sx={{ lineHeight: 1.7, mb: 2 }}
                   >
-                    {candidate.overview}
+                    {displayCandidate.overview}
                   </Typography>
                 )}
 
-                {/* Match Score Section */}
-                <Box sx={{ mt: 'auto', pt: 2, borderTop: 1, borderColor: alpha('#fff', 0.1) }}>
-                  <Grid container spacing={2}>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">
-                        AI Match Score
-                      </Typography>
-                      <Typography variant="h5" fontWeight={700} color="primary.main">
-                        {(candidate.finalScore * 100).toFixed(0)}%
-                      </Typography>
-                    </Grid>
-                    {candidate.similarityScore !== null && (
+                {/* Match score (AI discovery only; hidden for streaming chart rows) */}
+                {!hideAiMatchSection && (
+                  <Box sx={{ mt: 'auto', pt: 2, borderTop: 1, borderColor: alpha('#fff', 0.1) }}>
+                    <Grid container spacing={2}>
                       <Grid item xs={6}>
                         <Typography variant="body2" color="text.secondary">
-                          Similarity
+                          {t('discovery.detail.aiMatchScore')}
                         </Typography>
-                        <Typography variant="h6" fontWeight={600}>
-                          {(candidate.similarityScore * 100).toFixed(0)}%
+                        <Typography variant="h5" fontWeight={700} color="primary.main">
+                          {(displayCandidate.finalScore * 100).toFixed(0)}%
                         </Typography>
                       </Grid>
-                    )}
-                  </Grid>
-                </Box>
+                      {displayCandidate.similarityScore !== null && (
+                        <Grid item xs={6}>
+                          <Typography variant="body2" color="text.secondary">
+                            {t('discovery.detail.similarity')}
+                          </Typography>
+                          <Typography variant="h6" fontWeight={600}>
+                            {(displayCandidate.similarityScore * 100).toFixed(0)}%
+                          </Typography>
+                        </Grid>
+                      )}
+                    </Grid>
+                  </Box>
+                )}
               </Box>
             </Grid>
 
@@ -284,7 +479,7 @@ export function DiscoveryDetailPopper({
             <Grid item xs={12} md={6}>
               <Box sx={cardStyle}>
                 {/* Directors / Creators */}
-                {candidate.directors.length > 0 && (
+                {displayCandidate.directors.length > 0 && (
                   <Box sx={{ mb: 3 }}>
                     <Typography
                       variant="subtitle2"
@@ -292,10 +487,12 @@ export function DiscoveryDetailPopper({
                       sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}
                     >
                       <MovieIcon fontSize="small" />
-                      {candidate.mediaType === 'movie' ? 'Director' : 'Created By'}
+                      {displayCandidate.mediaType === 'movie'
+                        ? t('discovery.detail.director')
+                        : t('discovery.detail.createdBy')}
                     </Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      {candidate.directors.map((director) => (
+                      {displayCandidate.directors.map((director) => (
                         <Chip
                           key={director}
                           label={director}
@@ -313,7 +510,7 @@ export function DiscoveryDetailPopper({
                 )}
 
                 {/* Cast - 2 column layout */}
-                {candidate.castMembers.length > 0 && (
+                {displayCandidate.castMembers.length > 0 && (
                   <Box>
                     <Typography
                       variant="subtitle2"
@@ -321,10 +518,10 @@ export function DiscoveryDetailPopper({
                       sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}
                     >
                       <PersonIcon fontSize="small" />
-                      Cast
+                      {t('discovery.detail.cast')}
                     </Typography>
                     <Grid container spacing={1}>
-                      {candidate.castMembers.slice(0, 8).map((cast) => (
+                      {displayCandidate.castMembers.slice(0, 8).map((cast) => (
                         <Grid item xs={6} key={cast.id}>
                           <Box
                             onClick={() => handlePersonClick(cast.name)}
@@ -357,7 +554,7 @@ export function DiscoveryDetailPopper({
                               </Typography>
                               {cast.character && (
                                 <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: '0.7rem' }}>
-                                  as {cast.character}
+                                  {t('discovery.detail.castAs', { character: cast.character })}
                                 </Typography>
                               )}
                             </Box>
@@ -369,7 +566,7 @@ export function DiscoveryDetailPopper({
                 )}
 
                 {/* Empty state */}
-                {candidate.castMembers.length === 0 && candidate.directors.length === 0 && (
+                {displayCandidate.castMembers.length === 0 && displayCandidate.directors.length === 0 && (
                   <Box
                     sx={{
                       display: 'flex',
@@ -383,7 +580,7 @@ export function DiscoveryDetailPopper({
                   >
                     <PersonIcon sx={{ fontSize: 48, mb: 1, opacity: 0.5 }} />
                     <Typography variant="body2">
-                      Cast information not available
+                      {t('discovery.detail.castUnavailable')}
                     </Typography>
                   </Box>
                 )}
@@ -393,6 +590,14 @@ export function DiscoveryDetailPopper({
         </DialogContent>
       </Box>
     </Dialog>
+    ) : null}
+    <TrailerModal
+      open={trailerModal.open}
+      onClose={() => setTrailerModal({ open: false, watchUrl: null, title: null })}
+      watchUrl={trailerModal.watchUrl}
+      title={trailerModal.title}
+    />
+    </>
   )
 }
 

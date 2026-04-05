@@ -87,6 +87,21 @@ export interface TMDbMovieDetails {
   production_companies: TMDbProductionCompany[]
 }
 
+export interface TMDbVideo {
+  id: string
+  key: string
+  name: string
+  site: string
+  type: string
+  official: boolean
+  published_at: string
+}
+
+export interface TMDbVideosResponse {
+  id: number
+  results: TMDbVideo[]
+}
+
 export interface TMDbMovieKeywordsResponse {
   id: number
   keywords: TMDbKeyword[]
@@ -294,7 +309,17 @@ export type TMDbTVSimilarResponse = TMDbPaginatedResponse<TMDbTVResult>
 export type TMDbTVDiscoverResponse = TMDbPaginatedResponse<TMDbTVResult>
 
 export interface DiscoverMovieFilters {
-  sortBy?: 'popularity.desc' | 'popularity.asc' | 'vote_average.desc' | 'vote_average.asc' | 'release_date.desc' | 'release_date.asc'
+  sortBy?:
+    | 'popularity.desc'
+    | 'popularity.asc'
+    | 'vote_average.desc'
+    | 'vote_average.asc'
+    | 'vote_count.desc'
+    | 'vote_count.asc'
+    | 'release_date.desc'
+    | 'release_date.asc'
+    | 'primary_release_date.desc'
+    | 'primary_release_date.asc'
   minVoteCount?: number
   minVoteAverage?: number
   releaseDateGte?: string // YYYY-MM-DD
@@ -303,11 +328,21 @@ export interface DiscoverMovieFilters {
   withoutGenres?: number[] // Genre IDs to exclude
   withKeywords?: number[] // Keyword IDs
   withOriginalLanguage?: string // ISO 639-1 code
+  /** ISO 3166-1 alpha-2; TMDb `with_origin_country` (comma-separated if multiple). */
+  withOriginCountry?: string
   page?: number
 }
 
 export interface DiscoverTVFilters {
-  sortBy?: 'popularity.desc' | 'popularity.asc' | 'vote_average.desc' | 'vote_average.asc' | 'first_air_date.desc' | 'first_air_date.asc'
+  sortBy?:
+    | 'popularity.desc'
+    | 'popularity.asc'
+    | 'vote_average.desc'
+    | 'vote_average.asc'
+    | 'vote_count.desc'
+    | 'vote_count.asc'
+    | 'first_air_date.desc'
+    | 'first_air_date.asc'
   minVoteCount?: number
   minVoteAverage?: number
   firstAirDateGte?: string // YYYY-MM-DD
@@ -317,6 +352,8 @@ export interface DiscoverTVFilters {
   withKeywords?: number[] // Keyword IDs
   withNetworks?: number[] // Network IDs
   withOriginalLanguage?: string // ISO 639-1 code
+  /** ISO 3166-1 alpha-2; TMDb `with_origin_country`. */
+  withOriginCountry?: string
   page?: number
 }
 

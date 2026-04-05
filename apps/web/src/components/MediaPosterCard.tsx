@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Box,
   Card,
@@ -46,6 +47,8 @@ export interface MediaPosterCardProps {
   // Library status
   inLibrary?: boolean
   libraryId?: string | null // For linking to detail page
+  /** When false, hide the lower-left "In library" chip (hover overlay unchanged; dimming / link unchanged) */
+  showInLibraryCornerBadge?: boolean
 
   // Seerr status
   seerrStatus?: SeerrStatus
@@ -79,6 +82,7 @@ export function MediaPosterCard({
   rank,
   mediaType,
   inLibrary = false,
+  showInLibraryCornerBadge = true,
   libraryId,
   seerrStatus,
   canRequest = false,
@@ -94,6 +98,7 @@ export function MediaPosterCard({
   onClick,
   compactMeta = false,
 }: MediaPosterCardProps) {
+  const { t } = useTranslation()
   const [hovering, setHovering] = useState(false)
   const [imageError, setImageError] = useState(false)
 
@@ -101,8 +106,8 @@ export function MediaPosterCard({
   const isRequested = seerrStatus?.requested || false
   const requestStatus = seerrStatus?.requestStatus
 
-  // Determine if the item should be greyed out (already requested but not in library)
-  const isGreyedOut = isRequested && !inLibrary
+  // Greyed out: in library (owned / not requestable) or pending Seerr request
+  const isGreyedOut = inLibrary || (isRequested && !inLibrary)
 
   const handleRequest = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -142,14 +147,15 @@ export function MediaPosterCard({
         overflow: 'hidden',
         backgroundColor: 'background.paper',
         transition: 'transform 0.2s, box-shadow 0.2s, opacity 0.2s',
-        cursor: 'pointer',
+        cursor: inLibrary ? 'default' : 'pointer',
         opacity: isGreyedOut ? 0.6 : 1,
         height: compactMeta ? 'auto' : '100%',
         display: 'flex',
         flexDirection: 'column',
         '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: (theme) => `0 12px 24px ${alpha(theme.palette.common.black, 0.3)}`,
+          transform: inLibrary ? 'none' : 'translateY(-4px)',
+          boxShadow: (theme) =>
+            inLibrary ? undefined : `0 12px 24px ${alpha(theme.palette.common.black, 0.3)}`,
         },
       }}
       onClick={handleCardClick}
@@ -225,7 +231,7 @@ export function MediaPosterCard({
             }}
           >
             <Typography variant="caption" fontWeight={600} color="white">
-              {(matchScore * 100).toFixed(0)}% Match
+              {t('mediaPoster.matchPercent', { pct: (matchScore * 100).toFixed(0) })}
             </Typography>
           </Box>
         )}
@@ -248,7 +254,7 @@ export function MediaPosterCard({
           >
             <CheckCircleIcon sx={{ fontSize: 14, color: 'white' }} />
             <Typography variant="caption" fontWeight={600} color="white">
-              In Library
+              {t('mediaPoster.inLibrary')}
             </Typography>
           </Box>
         )}
@@ -273,7 +279,9 @@ export function MediaPosterCard({
           >
             <HourglassEmptyIcon sx={{ fontSize: 14, color: 'white' }} />
             <Typography variant="caption" fontWeight={600} color="white">
-              {requestStatus === 'declined' ? 'Declined' : 'Requested'}
+              {requestStatus === 'declined'
+                ? t('discovery.requestStatusDeclined')
+                : t('discovery.requestStatusRequested')}
             </Typography>
           </Box>
         )}
@@ -297,7 +305,9 @@ export function MediaPosterCard({
               <Box textAlign="center">
                 <HourglassEmptyIcon sx={{ fontSize: 40, color: '#8B5CF6' }} />
                 <Typography variant="caption" color="white" display="block">
-                  {requestStatus === 'declined' ? 'Declined' : 'Requested'}
+                  {requestStatus === 'declined'
+                    ? t('discovery.requestStatusDeclined')
+                    : t('discovery.requestStatusRequested')}
                 </Typography>
               </Box>
             ) : (
@@ -314,7 +324,7 @@ export function MediaPosterCard({
                   <AddIcon sx={{ fontSize: 32 }} />
                 </IconButton>
                 <Typography variant="caption" color="white" display="block" mt={1}>
-                  Request
+                  {t('mediaPoster.request')}
                 </Typography>
               </Box>
             )}
@@ -336,7 +346,7 @@ export function MediaPosterCard({
             <Box textAlign="center">
               <CheckCircleIcon sx={{ fontSize: 40, color: 'success.main' }} />
               <Typography variant="caption" color="white" display="block">
-                In Library
+                {t('mediaPoster.inLibrary')}
               </Typography>
             </Box>
           </Box>
@@ -385,12 +395,12 @@ export function MediaPosterCard({
           <>
             <Box display="flex" alignItems="center" justifyContent="space-between">
               <Typography variant="caption" color="text.secondary">
-                {year || 'TBA'}
+                {year || t('mediaPoster.tba')}
                 {voteAverage && ` • ${voteAverage.toFixed(1)}★`}
               </Typography>
               <Box display="flex" alignItems="center" gap={0.5}>
                 {onShowDetails && (
-                  <Tooltip title="View details">
+                  <Tooltip title={t('mediaPoster.viewDetails')}>
                     <IconButton
                       size="small"
                       onClick={(e) => {
@@ -404,7 +414,7 @@ export function MediaPosterCard({
                     </IconButton>
                   </Tooltip>
                 )}
-                <Tooltip title="View on TMDb">
+                <Tooltip title={t('mediaPoster.viewOnTmdb')}>
                   <IconButton
                     size="small"
                     onClick={(e) => {
@@ -444,7 +454,7 @@ export function MediaPosterCard({
           </>
         ) : (
           <Typography variant="caption" color="text.secondary">
-            {year || 'Unknown year'}
+            {year || t('mediaPoster.unknownYear')}
           </Typography>
         )}
       </CardContent>

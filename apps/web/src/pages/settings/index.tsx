@@ -1,11 +1,12 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState, useEffect, useCallback } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Box,
   Tabs,
   Tab,
   Paper,
   Button,
+  Typography,
 } from '@mui/material'
 import BuildIcon from '@mui/icons-material/Build'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
@@ -19,6 +20,7 @@ import StorageIcon from '@mui/icons-material/Storage'
 import ExtensionIcon from '@mui/icons-material/Extension'
 import HandymanIcon from '@mui/icons-material/Handyman'
 import MemoryIcon from '@mui/icons-material/Memory'
+import CategoryIcon from '@mui/icons-material/Category'
 import { useSettingsData } from './hooks'
 import {
   LibraryConfigSection,
@@ -37,12 +39,16 @@ import {
   OMDbConfigSection,
   MDBListConfigSection,
   SeerrConfigSection,
+  StreamingDiscoverySettings,
+  DiscoveryGenreStripsSettings,
   BackupSection,
   PosterRepairSection,
   LegacyEmbeddingsSection,
   ApiKeysSection,
+  LanguageDefaultsSection,
 } from './components'
 import { ApiErrorAlert } from '../../components/ApiErrorAlert'
+import { useTranslation } from 'react-i18next'
 
 interface TabPanelProps {
   children?: React.ReactNode
@@ -58,12 +64,129 @@ function TabPanel({ children, value, index }: TabPanelProps) {
   )
 }
 
+const ADMIN_MAIN_TAB_KEYS = [
+  'setup',
+  'ai-llm',
+  'ai-recs',
+  'top-picks',
+  'watching',
+  'maintenance',
+  'system',
+] as const
+
+function adminMainIndexFromParam(tab: string | null): number {
+  if (!tab) return 0
+  const idx = ADMIN_MAIN_TAB_KEYS.indexOf(tab as (typeof ADMIN_MAIN_TAB_KEYS)[number])
+  return idx >= 0 ? idx : 0
+}
+
+function adminMainParamFromIndex(index: number): string {
+  return ADMIN_MAIN_TAB_KEYS[index] ?? 'setup'
+}
+
+const SETUP_SUB_KEYS = ['media', 'integrations', 'genre-discovery'] as const
+const AI_SUB_KEYS = ['output', 'features', 'algorithm'] as const
+
+function setupSubIndexFromParam(p: string | null): number {
+  if (p === 'integrations') return 1
+  if (p === 'genre-discovery') return 2
+  return 0
+}
+
+function setupSubParamFromIndex(index: number): string {
+  return SETUP_SUB_KEYS[index] ?? 'media'
+}
+
+function aiSubIndexFromParam(p: string | null): number {
+  if (p === 'features') return 1
+  if (p === 'algorithm') return 2
+  return 0
+}
+
+function aiSubParamFromIndex(index: number): string {
+  return AI_SUB_KEYS[index] ?? 'output'
+}
+
 export function SettingsPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
-  const [tabValue, setTabValue] = useState(0)
-  const [setupSubTab, setSetupSubTab] = useState(0)
-  const [aiSubTab, setAiSubTab] = useState(0)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [tabValue, setTabValue] = useState(() => adminMainIndexFromParam(searchParams.get('tab')))
+  const [setupSubTab, setSetupSubTab] = useState(() => setupSubIndexFromParam(searchParams.get('setupSub')))
+  const [aiSubTab, setAiSubTab] = useState(() => aiSubIndexFromParam(searchParams.get('aiSub')))
+  const [tmdbReady, setTmdbReady] = useState(false)
+  const [tmdbConfigured, setTmdbConfigured] = useState(false)
   const settings = useSettingsData(true) // Admin-only page now
+
+  const fetchTmdbStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/settings/tmdb', { credentials: 'include' })
+      if (!res.ok) {
+        setTmdbConfigured(false)
+        return
+      }
+      const data = (await res.json()) as { isConfigured?: boolean }
+      setTmdbConfigured(Boolean(data.isConfigured))
+    } catch {
+      setTmdbConfigured(false)
+    } finally {
+      setTmdbReady(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchTmdbStatus()
+  }, [fetchTmdbStatus])
+
+  useEffect(() => {
+    setTabValue(adminMainIndexFromParam(searchParams.get('tab')))
+    setSetupSubTab(setupSubIndexFromParam(searchParams.get('setupSub')))
+    setAiSubTab(aiSubIndexFromParam(searchParams.get('aiSub')))
+  }, [searchParams])
+
+  useEffect(() => {
+    if (!tmdbReady || tmdbConfigured) return
+    if (setupSubTab !== 2) return
+    setSetupSubTab(1)
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('setupSub', 'integrations')
+        return next
+      },
+      { replace: true }
+    )
+  }, [tmdbReady, tmdbConfigured, setupSubTab, setSearchParams])
+
+  const updateAdminSettingsParams = (updates: Record<string, string | null>) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        for (const [key, val] of Object.entries(updates)) {
+          if (val === null) next.delete(key)
+          else next.set(key, val)
+        }
+        return next
+      },
+      { replace: true }
+    )
+  }
+
+  const handleMainTabChange = (_: React.SyntheticEvent, v: number) => {
+    setTabValue(v)
+    updateAdminSettingsParams({ tab: adminMainParamFromIndex(v) })
+  }
+
+  const handleSetupSubChange = (_: React.SyntheticEvent, v: number) => {
+    setSetupSubTab(v)
+    updateAdminSettingsParams({ setupSub: setupSubParamFromIndex(v) })
+    if (v === 1 || v === 2) void fetchTmdbStatus()
+  }
+
+  const handleAiSubChange = (_: React.SyntheticEvent, v: number) => {
+    setAiSubTab(v)
+    updateAdminSettingsParams({ aiSub: aiSubParamFromIndex(v) })
+  }
 
   return (
     <Box>
@@ -77,7 +200,7 @@ export function SettingsPage() {
       >
         <Tabs
           value={tabValue}
-          onChange={(_, v) => setTabValue(v)}
+          onChange={handleMainTabChange}
           variant="scrollable"
           scrollButtons="auto"
           sx={{
@@ -92,13 +215,13 @@ export function SettingsPage() {
             },
           }}
         >
-          <Tab icon={<BuildIcon />} iconPosition="start" label="Setup" />
-          <Tab icon={<MemoryIcon />} iconPosition="start" label="AI / LLM" />
-          <Tab icon={<AutoAwesomeIcon />} iconPosition="start" label="AI Recommendations" />
-          <Tab icon={<TrendingUpIcon />} iconPosition="start" label="Top Picks" />
-          <Tab icon={<AddToQueueIcon />} iconPosition="start" label="Shows You Watch" />
-          <Tab icon={<HandymanIcon />} iconPosition="start" label="Maintenance" />
-          <Tab icon={<SettingsIcon />} iconPosition="start" label="System" />
+          <Tab icon={<BuildIcon />} iconPosition="start" label={t('settingsPage.tabSetup')} />
+          <Tab icon={<MemoryIcon />} iconPosition="start" label={t('settingsPage.tabAiLlm')} />
+          <Tab icon={<AutoAwesomeIcon />} iconPosition="start" label={t('settingsPage.tabAiRecs')} />
+          <Tab icon={<TrendingUpIcon />} iconPosition="start" label={t('settingsPage.tabTopPicks')} />
+          <Tab icon={<AddToQueueIcon />} iconPosition="start" label={t('settingsPage.tabWatching')} />
+          <Tab icon={<HandymanIcon />} iconPosition="start" label={t('settingsPage.tabMaintenance')} />
+          <Tab icon={<SettingsIcon />} iconPosition="start" label={t('settingsPage.tabSystem')} />
         </Tabs>
 
         <Box sx={{ p: 3 }}>
@@ -106,13 +229,13 @@ export function SettingsPage() {
           <TabPanel value={tabValue} index={0}>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
               <Button variant="outlined" onClick={() => navigate('/setup', { state: { from: '/admin/settings' } })}>
-                Re-run Setup Wizard
+                {t('settingsPage.rerunSetup')}
               </Button>
             </Box>
             {/* Sub-tabs for Setup */}
             <Tabs
               value={setupSubTab}
-              onChange={(_, v) => setSetupSubTab(v)}
+              onChange={handleSetupSubChange}
               variant="scrollable"
               scrollButtons="auto"
               sx={{
@@ -127,8 +250,19 @@ export function SettingsPage() {
                 },
               }}
             >
-              <Tab icon={<StorageIcon />} iconPosition="start" label="Media Server" />
-              <Tab icon={<ExtensionIcon />} iconPosition="start" label="Integrations" />
+              <Tab icon={<StorageIcon />} iconPosition="start" label={t('settingsPage.subMediaServer')} />
+              <Tab icon={<ExtensionIcon />} iconPosition="start" label={t('settingsPage.subIntegrations')} />
+              <Tab
+                icon={<CategoryIcon />}
+                iconPosition="start"
+                label={t('settingsPage.subGenreDiscovery')}
+                disabled={!tmdbReady || !tmdbConfigured}
+                title={
+                  tmdbReady && !tmdbConfigured
+                    ? t('settingsPage.genreDiscoveryTabDisabled')
+                    : undefined
+                }
+              />
             </Tabs>
 
             {/* Media Server Sub-tab */}
@@ -163,7 +297,24 @@ export function SettingsPage() {
                   <MDBListConfigSection />
                   <SeerrConfigSection />
                 </Box>
+                <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <StreamingDiscoverySettings />
+                </Box>
               </Box>
+            </TabPanel>
+
+            <TabPanel value={setupSubTab} index={2}>
+              {!tmdbReady ? (
+                <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
+                  <Typography color="text.secondary">{t('settingsPage.genreDiscoveryLoading')}</Typography>
+                </Box>
+              ) : !tmdbConfigured ? (
+                <Typography color="text.secondary" sx={{ py: 2 }}>
+                  {t('settingsPage.genreDiscoveryRequiresTmdb')}
+                </Typography>
+              ) : (
+                <DiscoveryGenreStripsSettings />
+              )}
             </TabPanel>
 
           </TabPanel>
@@ -178,7 +329,7 @@ export function SettingsPage() {
             {/* Sub-tabs for AI Recommendations */}
             <Tabs
               value={aiSubTab}
-              onChange={(_, v) => setAiSubTab(v)}
+              onChange={handleAiSubChange}
               variant="scrollable"
               scrollButtons="auto"
               sx={{
@@ -193,9 +344,9 @@ export function SettingsPage() {
                 },
               }}
             >
-              <Tab icon={<OutputIcon />} iconPosition="start" label="Output" />
-              <Tab icon={<PsychologyIcon />} iconPosition="start" label="AI Features" />
-              <Tab icon={<TuneIcon />} iconPosition="start" label="Algorithm" />
+              <Tab icon={<OutputIcon />} iconPosition="start" label={t('settingsPage.subOutput')} />
+              <Tab icon={<PsychologyIcon />} iconPosition="start" label={t('settingsPage.subAiFeatures')} />
+              <Tab icon={<TuneIcon />} iconPosition="start" label={t('settingsPage.subAlgorithm')} />
             </Tabs>
 
             {/* Output Sub-tab */}
@@ -256,6 +407,7 @@ export function SettingsPage() {
           {/* System Tab */}
           <TabPanel value={tabValue} index={6}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <LanguageDefaultsSection />
               {/* API Keys */}
               <ApiKeysSection />
 

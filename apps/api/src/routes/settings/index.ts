@@ -25,10 +25,16 @@ import {
   registerAiOutputHandlers,
   registerTasteProfileHandlers,
   registerLegacyAiModelsHandlers,
+  registerLanguageDefaultsHandlers,
+  registerStreamingDiscoverySettingsHandlers,
+  registerDiscoveryGenreStripsSettingsHandlers,
 } from './handlers/index.js'
 
 const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   // Register all settings handlers
+  registerStreamingDiscoverySettingsHandlers(fastify)
+  registerDiscoveryGenreStripsSettingsHandlers(fastify)
+  registerLanguageDefaultsHandlers(fastify)
   registerMediaServerHandlers(fastify)
   registerLibraryHandlers(fastify)
   registerRecommendationHandlers(fastify)

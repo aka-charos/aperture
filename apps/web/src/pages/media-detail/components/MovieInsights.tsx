@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import {
   Box,
@@ -20,19 +21,26 @@ import ShuffleIcon from '@mui/icons-material/Shuffle'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
-import type { RecommendationInsights } from '../types'
+import type { RecommendationInsights, MediaType } from '../types'
 
 interface MovieInsightsProps {
   insights: RecommendationInsights
+  mediaType?: MediaType
 }
 
-export function MovieInsights({ insights }: MovieInsightsProps) {
+export function MovieInsights({ insights, mediaType = 'movie' }: MovieInsightsProps) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [insightsExpanded, setInsightsExpanded] = useState(true)
 
   if (!insights.isRecommended || !insights.isSelected) {
     return null
   }
+
+  const isSeriesView = mediaType === 'series'
+  const similarityTooltip = isSeriesView
+    ? t('mediaDetail.insights.subtitleSeries')
+    : t('mediaDetail.insights.subtitleMovie')
 
   return (
     <Box sx={{ mt: 4, px: 3 }}>
@@ -73,7 +81,7 @@ export function MovieInsights({ insights }: MovieInsightsProps) {
             </Box>
             <Box>
               <Typography variant="h6" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                Recommended For You
+                {t('mediaDetail.insights.recommendedForYou')}
                 <Chip
                   label={`#${insights.rank}`}
                   size="small"
@@ -86,7 +94,9 @@ export function MovieInsights({ insights }: MovieInsightsProps) {
                 />
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {Math.round((insights.scores?.final || 0) * 100)}% match based on your viewing history
+                {t('mediaDetail.insights.matchSubtitle', {
+                  pct: Math.round((insights.scores?.final || 0) * 100),
+                })}
               </Typography>
             </Box>
           </Box>
@@ -100,21 +110,21 @@ export function MovieInsights({ insights }: MovieInsightsProps) {
           <Box sx={{ p: 3 }}>
             {/* Score Breakdown */}
             <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-              How We Calculated Your Match
+              {t('mediaDetail.insights.howWeCalculated')}
             </Typography>
             <Grid container spacing={3} sx={{ mb: 4 }}>
               {/* Taste Similarity */}
               <Grid item xs={12} sm={6} md={3}>
-                <Tooltip title="How similar this movie is to movies you've enjoyed" arrow>
+                <Tooltip title={similarityTooltip} arrow>
                   <Paper sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                       <TrendingUpIcon sx={{ color: 'info.main', fontSize: 20 }} />
-                      <Typography variant="body2" fontWeight={600}>Taste Match</Typography>
+                      <Typography variant="body2" fontWeight={600}>{t('mediaDetail.insights.tasteMatch')}</Typography>
                     </Box>
                     <Typography variant="h4" fontWeight={700} color="info.main">
                       {insights.scores?.similarity != null
                         ? `${Math.round(insights.scores.similarity * 100)}%`
-                        : 'N/A'}
+                        : t('mediaDetail.insights.na')}
                     </Typography>
                     <LinearProgress
                       variant="determinate"
@@ -127,16 +137,16 @@ export function MovieInsights({ insights }: MovieInsightsProps) {
 
               {/* Novelty Score */}
               <Grid item xs={12} sm={6} md={3}>
-                <Tooltip title="How different this is from what you usually watch - helps you discover new things" arrow>
+                <Tooltip title={t('mediaDetail.insights.tooltipDiscovery')} arrow>
                   <Paper sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                       <HubOutlinedIcon sx={{ color: 'success.main', fontSize: 20 }} />
-                      <Typography variant="body2" fontWeight={600}>Discovery</Typography>
+                      <Typography variant="body2" fontWeight={600}>{t('mediaDetail.insights.discovery')}</Typography>
                     </Box>
                     <Typography variant="h4" fontWeight={700} color="success.main">
                       {insights.scores?.novelty != null
                         ? `${Math.round(insights.scores.novelty * 100)}%`
-                        : 'N/A'}
+                        : t('mediaDetail.insights.na')}
                     </Typography>
                     <LinearProgress
                       variant="determinate"
@@ -149,16 +159,16 @@ export function MovieInsights({ insights }: MovieInsightsProps) {
 
               {/* Rating Score */}
               <Grid item xs={12} sm={6} md={3}>
-                <Tooltip title="Community and critic rating quality" arrow>
+                <Tooltip title={t('mediaDetail.insights.tooltipQuality')} arrow>
                   <Paper sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                       <ThumbUpIcon sx={{ color: 'warning.main', fontSize: 20 }} />
-                      <Typography variant="body2" fontWeight={600}>Quality</Typography>
+                      <Typography variant="body2" fontWeight={600}>{t('mediaDetail.insights.quality')}</Typography>
                     </Box>
                     <Typography variant="h4" fontWeight={700} color="warning.main">
                       {insights.scores?.rating != null
                         ? `${Math.round(insights.scores.rating * 100)}%`
-                        : 'N/A'}
+                        : t('mediaDetail.insights.na')}
                     </Typography>
                     <LinearProgress
                       variant="determinate"
@@ -171,16 +181,16 @@ export function MovieInsights({ insights }: MovieInsightsProps) {
 
               {/* Diversity Score */}
               <Grid item xs={12} sm={6} md={3}>
-                <Tooltip title="How much variety this adds to your recommendations" arrow>
+                <Tooltip title={t('mediaDetail.insights.tooltipVariety')} arrow>
                   <Paper sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                       <ShuffleIcon sx={{ color: 'secondary.main', fontSize: 20 }} />
-                      <Typography variant="body2" fontWeight={600}>Variety</Typography>
+                      <Typography variant="body2" fontWeight={600}>{t('mediaDetail.insights.variety')}</Typography>
                     </Box>
                     <Typography variant="h4" fontWeight={700} color="secondary.main">
                       {insights.scores?.diversity != null
                         ? `${Math.round(insights.scores.diversity * 100)}%`
-                        : 'N/A'}
+                        : t('mediaDetail.insights.na')}
                     </Typography>
                     <LinearProgress
                       variant="determinate"
@@ -196,7 +206,7 @@ export function MovieInsights({ insights }: MovieInsightsProps) {
             {insights.genreAnalysis && (
               <Box sx={{ mb: 4 }}>
                 <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-                  Genre Analysis
+                  {t('mediaDetail.insights.genreAnalysis')}
                 </Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
                   {insights.genreAnalysis.matchingGenres.map((genre) => (
@@ -225,91 +235,107 @@ export function MovieInsights({ insights }: MovieInsightsProps) {
                 </Box>
                 {insights.genreAnalysis.matchingGenres.length > 0 && (
                   <Typography variant="body2" color="text.secondary">
-                    <strong style={{ color: '#4caf50' }}>{insights.genreAnalysis.matchingGenres.length}</strong> genre{insights.genreAnalysis.matchingGenres.length !== 1 ? 's' : ''} you enjoy
+                    <span style={{ color: '#4caf50', fontWeight: 600 }}>
+                      {t('mediaDetail.insights.genresEnjoy', {
+                        count: insights.genreAnalysis.matchingGenres.length,
+                      })}
+                    </span>
                     {insights.genreAnalysis.newGenres.length > 0 && (
-                      <> • <strong style={{ color: '#2196f3' }}>{insights.genreAnalysis.newGenres.length}</strong> new to explore</>
+                      <span style={{ color: '#2196f3', fontWeight: 600 }}>
+                        {t('mediaDetail.insights.newGenresPart', {
+                          count: insights.genreAnalysis.newGenres.length,
+                        })}
+                      </span>
                     )}
                   </Typography>
                 )}
               </Box>
             )}
 
-            {/* Evidence - Movies that contributed to this recommendation */}
+            {/* Evidence - Items that contributed to this recommendation */}
             {insights.evidence && insights.evidence.length > 0 && (
               <Box>
                 <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-                  Why We Think You'll Like This
+                  {t('mediaDetail.insights.whyWeThink')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Based on your history with similar movies:
+                  {isSeriesView
+                    ? t('mediaDetail.insights.basedOnHistorySeries')
+                    : t('mediaDetail.insights.basedOnHistoryMovie')}
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 2 }}>
-                  {insights.evidence.map((ev) => (
-                    <Paper
-                      key={ev.id}
-                      onClick={() => navigate(`/movies/${ev.similar_movie.id}`)}
-                      sx={{
-                        flexShrink: 0,
-                        width: 120,
-                        cursor: 'pointer',
-                        borderRadius: 2,
-                        overflow: 'hidden',
-                        transition: 'transform 0.2s',
-                        '&:hover': { transform: 'scale(1.05)' },
-                        bgcolor: 'background.default',
-                      }}
-                    >
-                      <Box sx={{ height: 160, bgcolor: 'grey.800', position: 'relative' }}>
-                        <Box
-                          component="img"
-                          src={getProxiedImageUrl(ev.similar_movie.poster_url)}
-                          alt={ev.similar_movie.title}
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement
-                            target.src = FALLBACK_POSTER_URL
-                          }}
-                          sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                        {/* Similarity badge */}
-                        <Chip
-                          label={`${Math.round(ev.similarity * 100)}%`}
-                          size="small"
-                          sx={{
-                            position: 'absolute',
-                            top: 4,
-                            right: 4,
-                            height: 20,
-                            fontSize: '0.65rem',
-                            fontWeight: 700,
-                            bgcolor: 'rgba(99, 102, 241, 0.9)',
-                            color: 'white',
-                          }}
-                        />
-                        {/* Evidence type badge */}
-                        <Chip
-                          label={ev.evidence_type === 'favorite' ? '❤️' : ev.evidence_type === 'recent' ? '🕐' : '✓'}
-                          size="small"
-                          sx={{
-                            position: 'absolute',
-                            bottom: 4,
-                            left: 4,
-                            height: 20,
-                            minWidth: 20,
-                            fontSize: '0.7rem',
-                            bgcolor: 'rgba(0,0,0,0.7)',
-                          }}
-                        />
-                      </Box>
-                      <Box sx={{ p: 1 }}>
-                        <Typography variant="caption" fontWeight={500} noWrap display="block">
-                          {ev.similar_movie.title}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {ev.similar_movie.year || 'N/A'}
-                        </Typography>
-                      </Box>
-                    </Paper>
-                  ))}
+                  {insights.evidence.map((ev) => {
+                    const item = ev.similar_movie || ev.similar_series
+                    if (!item) return null
+                    const route = ev.similar_movie
+                      ? `/movies/${item.id}`
+                      : `/series/${item.id}`
+
+                    return (
+                      <Paper
+                        key={ev.id}
+                        onClick={() => navigate(route)}
+                        sx={{
+                          flexShrink: 0,
+                          width: 120,
+                          cursor: 'pointer',
+                          borderRadius: 2,
+                          overflow: 'hidden',
+                          transition: 'transform 0.2s',
+                          '&:hover': { transform: 'scale(1.05)' },
+                          bgcolor: 'background.default',
+                        }}
+                      >
+                        <Box sx={{ height: 160, bgcolor: 'grey.800', position: 'relative' }}>
+                          <Box
+                            component="img"
+                            src={getProxiedImageUrl(item.poster_url)}
+                            alt={item.title}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              target.src = FALLBACK_POSTER_URL
+                            }}
+                            sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                          <Chip
+                            label={`${Math.round(ev.similarity * 100)}%`}
+                            size="small"
+                            sx={{
+                              position: 'absolute',
+                              top: 4,
+                              right: 4,
+                              height: 20,
+                              fontSize: '0.65rem',
+                              fontWeight: 700,
+                              bgcolor: 'rgba(99, 102, 241, 0.9)',
+                              color: 'white',
+                            }}
+                          />
+                          <Chip
+                            label={ev.evidence_type === 'favorite' ? '❤️' : ev.evidence_type === 'recent' ? '🕐' : '✓'}
+                            size="small"
+                            sx={{
+                              position: 'absolute',
+                              bottom: 4,
+                              left: 4,
+                              height: 20,
+                              minWidth: 20,
+                              fontSize: '0.7rem',
+                              bgcolor: 'rgba(0,0,0,0.7)',
+                            }}
+                          />
+                        </Box>
+                        <Box sx={{ p: 1 }}>
+                          <Typography variant="caption" fontWeight={500} noWrap display="block">
+                            {item.title}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {item.year ?? t('mediaDetail.insights.na')}
+                          </Typography>
+                        </Box>
+                      </Paper>
+                    )
+                  })}
                 </Box>
               </Box>
             )}

@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { Link as RouterLink } from 'react-router-dom'
 import {
   Box,
   Typography,
@@ -19,9 +21,13 @@ import {
   Select,
   MenuItem,
   Stack,
+  TablePagination,
 } from '@mui/material'
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck'
-import OpenInNewIcon from '@mui/icons-material/OpenInNew'
+import {
+  TmdbExternalDetailModal,
+  type TmdbExternalDetailPayload,
+} from '../components/TmdbExternalDetailModal'
 
 type SeerrLive = {
   status: 'pending' | 'approved' | 'declined'
@@ -43,46 +49,59 @@ interface DiscoveryRequestRow {
   createdAt: string
   updatedAt: string
   seerrLive: SeerrLive
+  libraryMediaId?: string | null
 }
 
-function statusLabel(row: DiscoveryRequestRow): string {
+function getRequestStatusKey(row: DiscoveryRequestRow): string | null {
   const live = row.seerrLive
   if (live) {
-    if (live.mediaStatus === 'available') return 'Available'
-    if (live.status === 'declined') return 'Declined'
-    if (live.status === 'pending') return 'Pending approval'
+    if (live.mediaStatus === 'available') return 'available'
+    if (live.status === 'declined') return 'declined'
+    if (live.status === 'pending') return 'pendingApproval'
     if (live.mediaStatus === 'processing' || live.mediaStatus === 'partially_available') {
-      return 'Processing'
+      return 'processing'
     }
-    if (live.status === 'approved') return 'Approved'
+    if (live.status === 'approved') return 'approved'
   }
   const s = row.status
-  if (s === 'submitted') return 'Submitted'
-  if (s === 'pending') return 'Pending'
-  if (s === 'approved') return 'Approved'
-  if (s === 'declined') return 'Declined'
-  if (s === 'available') return 'Available'
-  if (s === 'failed') return 'Failed'
-  return s
+  if (s === 'submitted') return 'submitted'
+  if (s === 'pending') return 'pending'
+  if (s === 'approved') return 'approved'
+  if (s === 'declined') return 'declined'
+  if (s === 'available') return 'available'
+  if (s === 'failed') return 'failed'
+  return null
+}
+
+function isRowAvailable(row: DiscoveryRequestRow): boolean {
+  return getRequestStatusKey(row) === 'available'
 }
 
 function statusColor(row: DiscoveryRequestRow): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' {
-  const label = statusLabel(row)
-  if (label === 'Available') return 'success'
-  if (label === 'Declined' || row.status === 'failed') return 'error'
-  if (label === 'Failed') return 'error'
-  if (label === 'Pending approval' || label === 'Pending' || label === 'Submitted') return 'warning'
-  if (label === 'Approved' || label === 'Processing') return 'info'
+  const key = getRequestStatusKey(row)
+  if (key === 'available') return 'success'
+  if (key === 'declined' || key === 'failed' || row.status === 'failed') return 'error'
+  if (key === 'pendingApproval' || key === 'pending' || key === 'submitted') return 'warning'
+  if (key === 'approved' || key === 'processing') return 'info'
   return 'default'
 }
 
 type SourceFilter = 'all' | 'discovery' | 'gap_analysis'
 
 export function MyRequestsPage() {
+  const { t } = useTranslation()
   const [rows, setRows] = useState<DiscoveryRequestRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(25)
+  const [total, setTotal] = useState(0)
+
+  const [tmdbModalOpen, setTmdbModalOpen] = useState(false)
+  const [tmdbModalLoading, setTmdbModalLoading] = useState(false)
+  const [tmdbModalError, setTmdbModalError] = useState<string | null>(null)
+  const [tmdbModalData, setTmdbModalData] = useState<TmdbExternalDetailPayload | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -90,54 +109,97 @@ export function MyRequestsPage() {
     try {
       const u = new URL('/api/seerr/requests', window.location.origin)
       if (sourceFilter !== 'all') u.searchParams.set('source', sourceFilter)
+      u.searchParams.set('limit', String(rowsPerPage))
+      u.searchParams.set('offset', String(page * rowsPerPage))
       const res = await fetch(u.toString(), { credentials: 'include' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || data.message || 'Could not load requests')
+        throw new Error(data.error || data.message || t('myRequests.errorLoad'))
       }
-      const data = await res.json()
-      setRows(data.requests || [])
+      const data = (await res.json()) as {
+        requests?: DiscoveryRequestRow[]
+        total?: number
+      }
+      const list = data.requests || []
+      setRows(list)
+      setTotal(typeof data.total === 'number' ? data.total : list.length)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load requests')
+      setError(e instanceof Error ? e.message : t('myRequests.errorLoad'))
     } finally {
       setLoading(false)
     }
-  }, [sourceFilter])
+  }, [sourceFilter, page, rowsPerPage, t])
 
   useEffect(() => {
     void load()
   }, [load])
 
-  const tmdbUrl = (r: DiscoveryRequestRow) =>
-    r.mediaType === 'movie'
-      ? `https://www.themoviedb.org/movie/${r.tmdbId}`
-      : `https://www.themoviedb.org/tv/${r.tmdbId}`
+  useEffect(() => {
+    if (total === 0) return
+    const maxPage = Math.max(0, Math.ceil(total / rowsPerPage) - 1)
+    if (page > maxPage) setPage(maxPage)
+  }, [total, rowsPerPage, page])
+
+  const openTmdbModal = (r: DiscoveryRequestRow) => {
+    setTmdbModalOpen(true)
+    setTmdbModalLoading(true)
+    setTmdbModalError(null)
+    setTmdbModalData(null)
+    const path = r.mediaType === 'movie' ? 'movie' : 'tv'
+    void fetch(`/api/discover/tmdb/${path}/${r.tmdbId}`, { credentials: 'include' })
+      .then(async (res) => {
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string }
+          throw new Error(j.error || t('myRequests.errorLoadDetails'))
+        }
+        return res.json() as Promise<TmdbExternalDetailPayload>
+      })
+      .then((payload) => setTmdbModalData(payload))
+      .catch((e: unknown) => {
+        setTmdbModalError(e instanceof Error ? e.message : t('myRequests.errorLoadDetails'))
+      })
+      .finally(() => setTmdbModalLoading(false))
+  }
+
+  const closeTmdbModal = () => {
+    setTmdbModalOpen(false)
+    setTmdbModalError(null)
+    setTmdbModalData(null)
+  }
+
+  const formatRequestStatus = (row: DiscoveryRequestRow) => {
+    const key = getRequestStatusKey(row)
+    if (key) return t(`myRequests.requestStatus.${key}`)
+    return t('myRequests.requestStatus.fallback', { status: row.status })
+  }
 
   return (
     <Box sx={{ maxWidth: 1100, mx: 'auto', p: { xs: 2, md: 3 } }}>
       <Box display="flex" alignItems="center" gap={1.5} mb={1}>
         <PlaylistAddCheckIcon color="primary" fontSize="large" />
         <Typography variant="h4" fontWeight={700}>
-          My Requests
+          {t('nav.myRequests')}
         </Typography>
       </Box>
       <Typography variant="body2" color="text.secondary" mb={2}>
-        Content you requested through Discovery or Gap Analysis (admin). Status is synced from Seerr when
-        available.
+        {t('myRequests.pageSubtitle')}
       </Typography>
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mb={3} alignItems={{ sm: 'center' }}>
         <FormControl size="small" sx={{ minWidth: 220 }}>
-          <InputLabel id="req-source-filter">Source</InputLabel>
+          <InputLabel id="req-source-filter">{t('myRequests.source')}</InputLabel>
           <Select
             labelId="req-source-filter"
-            label="Source"
+            label={t('myRequests.source')}
             value={sourceFilter}
-            onChange={(e) => setSourceFilter(e.target.value as SourceFilter)}
+            onChange={(e) => {
+              setPage(0)
+              setSourceFilter(e.target.value as SourceFilter)
+            }}
           >
-            <MenuItem value="all">All</MenuItem>
-            <MenuItem value="discovery">Discovery</MenuItem>
-            <MenuItem value="gap_analysis">Gap Analysis</MenuItem>
+            <MenuItem value="all">{t('myRequests.sourceAll')}</MenuItem>
+            <MenuItem value="discovery">{t('myRequests.sourceDiscovery')}</MenuItem>
+            <MenuItem value="gap_analysis">{t('myRequests.sourceGapAnalysis')}</MenuItem>
           </Select>
         </FormControl>
       </Stack>
@@ -153,10 +215,10 @@ export function MyRequestsPage() {
           <Box display="flex" justifyContent="center" py={6}>
             <CircularProgress />
           </Box>
-        ) : rows.length === 0 ? (
+        ) : total === 0 ? (
           <Box py={6} px={2} textAlign="center">
             <Typography color="text.secondary">
-              No requests yet. When you request titles from Discovery, they will appear here.
+              {t('myRequests.empty')}
             </Typography>
           </Box>
         ) : (
@@ -164,13 +226,13 @@ export function MyRequestsPage() {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Title</TableCell>
-                  <TableCell width={100}>Type</TableCell>
-                  <TableCell width={130}>Source</TableCell>
-                  <TableCell width={140}>Requested</TableCell>
-                  <TableCell width={180}>Status</TableCell>
-                  <TableCell width={160} align="right">
-                    Actions
+                  <TableCell>{t('myRequests.tableTitle')}</TableCell>
+                  <TableCell width={100}>{t('myRequests.tableType')}</TableCell>
+                  <TableCell width={130}>{t('myRequests.tableSource')}</TableCell>
+                  <TableCell width={140}>{t('myRequests.tableRequested')}</TableCell>
+                  <TableCell width={180}>{t('myRequests.tableStatus')}</TableCell>
+                  <TableCell width={180} align="right">
+                    {t('myRequests.tableActions')}
                   </TableCell>
                 </TableRow>
               </TableHead>
@@ -181,21 +243,21 @@ export function MyRequestsPage() {
                       <Typography fontWeight={600}>{r.title}</Typography>
                       {r.seerrRequestId != null && (
                         <Typography variant="caption" color="text.secondary" display="block">
-                          Seerr request #{r.seerrRequestId}
+                          {t('myRequests.seerrRequest', { id: r.seerrRequestId })}
                         </Typography>
                       )}
                     </TableCell>
                     <TableCell>
                       <Chip
                         size="small"
-                        label={r.mediaType === 'movie' ? 'Movie' : 'Series'}
+                        label={r.mediaType === 'movie' ? t('myRequests.typeMovie') : t('myRequests.typeSeries')}
                         variant="outlined"
                       />
                     </TableCell>
                     <TableCell>
                       <Chip
                         size="small"
-                        label={r.source === 'gap_analysis' ? 'Gap Analysis' : 'Discovery'}
+                        label={r.source === 'gap_analysis' ? t('myRequests.sourceGapAnalysis') : t('myRequests.sourceDiscovery')}
                         variant="outlined"
                         color={r.source === 'gap_analysis' ? 'secondary' : 'default'}
                       />
@@ -213,29 +275,40 @@ export function MyRequestsPage() {
                       <Tooltip
                         title={
                           r.seerrLive
-                            ? `Request: ${r.seerrLive.status} · media: ${r.seerrLive.mediaStatus}`
+                            ? t('myRequests.tooltipLive', {
+                                reqStatus: r.seerrLive.status,
+                                mediaStatus: r.seerrLive.mediaStatus,
+                              })
                             : ''
                         }
                       >
                         <Chip
                           size="small"
-                          label={statusLabel(r)}
+                          label={formatRequestStatus(r)}
                           color={statusColor(r)}
                           variant={statusColor(r) === 'default' ? 'outlined' : 'filled'}
                         />
                       </Tooltip>
                     </TableCell>
                     <TableCell align="right">
-                      <Button
-                        size="small"
-                        component="a"
-                        href={tmdbUrl(r)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        endIcon={<OpenInNewIcon fontSize="small" />}
-                      >
-                        View on TMDb
-                      </Button>
+                      {isRowAvailable(r) && r.libraryMediaId ? (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          component={RouterLink}
+                          to={
+                            r.mediaType === 'movie'
+                              ? `/movies/${r.libraryMediaId}`
+                              : `/series/${r.libraryMediaId}`
+                          }
+                        >
+                          {t('myRequests.openInLibrary')}
+                        </Button>
+                      ) : (
+                        <Button size="small" variant="outlined" onClick={() => openTmdbModal(r)}>
+                          {t('myRequests.details')}
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -243,7 +316,32 @@ export function MyRequestsPage() {
             </Table>
           </TableContainer>
         )}
+        {!loading && total > 0 && (
+          <TablePagination
+            component="div"
+            count={total}
+            page={page}
+            onPageChange={(_, newPage) => setPage(newPage)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(e) => {
+              setRowsPerPage(parseInt(e.target.value, 10))
+              setPage(0)
+            }}
+            rowsPerPageOptions={[10, 25, 50, 100]}
+            labelRowsPerPage={t('common.rowsPerPage')}
+          />
+        )}
       </Paper>
+
+      <TmdbExternalDetailModal
+        open={tmdbModalOpen}
+        onClose={closeTmdbModal}
+        loading={tmdbModalLoading}
+        error={tmdbModalError}
+        data={tmdbModalData}
+        sourceLabel="TMDb"
+        canRequest={false}
+      />
     </Box>
   )
 }

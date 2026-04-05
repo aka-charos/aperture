@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Box,
   Card,
@@ -28,6 +29,8 @@ import { SeasonSelectModal, type SeasonInfo } from './SeasonSelectModal'
 import { RequestSeerrOptionsDialog } from '../../../components/RequestSeerrOptionsDialog'
 import type { SeerrRequestOptions } from '../../../types/seerrRequest'
 import type { DiscoveryCandidate, SeerrMediaStatus } from '../types'
+import type { ResolveDiscoveryGenreName } from '../hooks'
+import { discoverySourceLabel } from '../discoveryLabels'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500'
 const FALLBACK_POSTER = '/NO_POSTER_FOUND.png'
@@ -43,6 +46,7 @@ interface DiscoveryListItemProps {
   isRequesting: boolean
   cachedStatus?: SeerrMediaStatus
   fetchTVDetails?: (tmdbId: number) => Promise<{ seasons: SeasonInfo[]; title: string; posterPath?: string } | null>
+  resolveGenreName: ResolveDiscoveryGenreName
 }
 
 export function DiscoveryListItem({
@@ -52,7 +56,9 @@ export function DiscoveryListItem({
   isRequesting,
   cachedStatus,
   fetchTVDetails,
+  resolveGenreName,
 }: DiscoveryListItemProps) {
+  const { t } = useTranslation()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
   const [imageError, setImageError] = useState(false)
@@ -65,24 +71,13 @@ export function DiscoveryListItem({
   const [seasonData, setSeasonData] = useState<{ seasons: SeasonInfo[]; title: string; posterPath?: string } | null>(null)
 
   const posterUrl = candidate.posterPath && !imageError
-    ? `${TMDB_IMAGE_BASE}${candidate.posterPath}`
+    ? candidate.posterPath.startsWith('http')
+      ? candidate.posterPath
+      : `${TMDB_IMAGE_BASE}${candidate.posterPath}`
     : FALLBACK_POSTER
 
   const isRequested = cachedStatus?.requested || false
   const requestStatus = cachedStatus?.requestStatus
-
-  const getSourceLabel = (source: string) => {
-    const labels: Record<string, string> = {
-      tmdb_recommendations: 'TMDb Recommended',
-      tmdb_similar: 'Similar Titles',
-      tmdb_discover: 'Popular',
-      trakt_trending: 'Trending',
-      trakt_popular: 'Popular',
-      trakt_recommendations: 'Trakt Pick',
-      mdblist: 'MDBList',
-    }
-    return labels[source] || source
-  }
 
   const getSourceColor = (source: string) => {
     if (source.startsWith('tmdb')) return '#01b4e4'
@@ -117,12 +112,9 @@ export function DiscoveryListItem({
     await onRequest(candidate, seasons, pendingSeerrOpts ?? undefined)
   }
 
-  // IMDb URL if available, fallback to TMDb
-  const imdbUrl = candidate.imdbId ? `https://www.imdb.com/title/${candidate.imdbId}` : null
   const tmdbUrl = candidate.mediaType === 'movie'
     ? `https://www.themoviedb.org/movie/${candidate.tmdbId}`
     : `https://www.themoviedb.org/tv/${candidate.tmdbId}`
-  const primaryUrl = imdbUrl || tmdbUrl
 
   const matchPercent = Math.round(candidate.finalScore * 100)
 
@@ -148,7 +140,7 @@ export function DiscoveryListItem({
       {/* Main row: Poster + Content + Desktop Actions */}
       <Box sx={{ display: 'flex', flexDirection: 'row' }}>
         <CardActionArea
-          onClick={() => !seasonModalOpen && !optionsDialogOpen && window.open(primaryUrl, '_blank')}
+          onClick={() => !seasonModalOpen && !optionsDialogOpen && setDetailOpen(true)}
           sx={{ display: 'flex', flexGrow: 1, alignItems: 'stretch' }}
         >
           {/* Poster Section */}
@@ -178,7 +170,7 @@ export function DiscoveryListItem({
             {/* Source badge - desktop only */}
             {!isMobile && (
               <Chip
-                label={getSourceLabel(candidate.source)}
+                label={discoverySourceLabel(candidate.source, t)}
                 size="small"
                 sx={{
                   position: 'absolute',
@@ -219,7 +211,13 @@ export function DiscoveryListItem({
               {isRequested && !isMobile && (
                 <Chip
                   icon={requestStatus === 'approved' ? <CheckIcon sx={{ fontSize: 14 }} /> : <HourglassEmptyIcon sx={{ fontSize: 14 }} />}
-                  label={requestStatus === 'approved' ? 'Approved' : requestStatus === 'declined' ? 'Declined' : 'Requested'}
+                  label={
+                    requestStatus === 'approved'
+                      ? t('discovery.requestStatusApproved')
+                      : requestStatus === 'declined'
+                        ? t('discovery.requestStatusDeclined')
+                        : t('discovery.requestStatusRequested')
+                  }
                   size="small"
                   sx={{
                     backgroundColor: requestStatus === 'approved'
@@ -258,13 +256,13 @@ export function DiscoveryListItem({
               )}
               {candidate.runtimeMinutes && !isMobile && (
                 <Typography variant="body2" color="text.secondary">
-                  • {candidate.runtimeMinutes} min
+                  {t('discovery.runtimeMinutes', { minutes: candidate.runtimeMinutes })}
                 </Typography>
               )}
               {/* Mobile: Show source inline */}
               {isMobile && (
                 <Chip
-                  label={getSourceLabel(candidate.source)}
+                  label={discoverySourceLabel(candidate.source, t)}
                   size="small"
                   sx={{
                     backgroundColor: alpha(getSourceColor(candidate.source), 0.15),
@@ -279,11 +277,12 @@ export function DiscoveryListItem({
             </Box>
             
             <Box display="flex" gap={0.5} flexWrap="wrap" mb={{ xs: 0.5, md: 1 }}>
-              {candidate.genres.slice(0, isMobile ? 2 : 4).map((genre) => (
-                genre.name ? (
+              {candidate.genres.slice(0, isMobile ? 2 : 4).map((genre) => {
+                const label = resolveGenreName(genre.id, genre.name)
+                return label ? (
                   <Chip
                     key={genre.id}
-                    label={genre.name}
+                    label={label}
                     size="small"
                     variant="outlined"
                     sx={{
@@ -301,7 +300,7 @@ export function DiscoveryListItem({
                     sx={{ borderRadius: '16px' }}
                   />
                 )
-              ))}
+              })}
               {candidate.genres.length === 0 && (
                 <>
                   <Skeleton variant="rounded" width={60} height={isMobile ? 18 : 22} sx={{ borderRadius: '16px' }} />
@@ -321,14 +320,22 @@ export function DiscoveryListItem({
                 fontSize: { xs: '0.75rem', md: '0.875rem' },
               }}
             >
-              {candidate.overview || 'No description available.'}
+              {candidate.overview || t('discovery.noDescription')}
             </Typography>
 
             {/* Mobile: Inline actions */}
             {isMobile && (
               <Box display="flex" alignItems="center" gap={1} mt={1} onClick={handleActionsClick}>
                 {canRequest && (
-                  <Tooltip title={isRequested ? (requestStatus === 'approved' ? 'Already approved' : 'Already requested') : 'Request this title'}>
+                  <Tooltip
+                    title={
+                      isRequested
+                        ? requestStatus === 'approved'
+                          ? t('discovery.tooltipRequestApproved')
+                          : t('discovery.tooltipRequestPending')
+                        : t('discovery.tooltipRequest')
+                    }
+                  >
                     <span>
                       <IconButton
                         onClick={handleRequest}
@@ -357,7 +364,7 @@ export function DiscoveryListItem({
                     </span>
                   </Tooltip>
                 )}
-                <Tooltip title="View details">
+                <Tooltip title={t('discovery.tooltipViewDetails')}>
                   <IconButton
                     onClick={(e) => {
                       e.stopPropagation()
@@ -373,11 +380,11 @@ export function DiscoveryListItem({
                     <InfoOutlinedIcon sx={{ fontSize: 16 }} />
                   </IconButton>
                 </Tooltip>
-                <Tooltip title={imdbUrl ? 'View on IMDb' : 'View on TMDb'}>
+                <Tooltip title={t('discovery.tooltipViewTmdb')}>
                   <IconButton
                     onClick={(e) => {
                       e.stopPropagation()
-                      window.open(primaryUrl, '_blank')
+                      window.open(tmdbUrl, '_blank', 'noopener,noreferrer')
                     }}
                     size="small"
                     sx={{
@@ -392,7 +399,11 @@ export function DiscoveryListItem({
                 {isRequested && (
                   <Chip
                     icon={requestStatus === 'approved' ? <CheckIcon sx={{ fontSize: 12 }} /> : <HourglassEmptyIcon sx={{ fontSize: 12 }} />}
-                    label={requestStatus === 'approved' ? 'Approved' : 'Requested'}
+                    label={
+                      requestStatus === 'approved'
+                        ? t('discovery.requestStatusApproved')
+                        : t('discovery.requestStatusRequested')
+                    }
                     size="small"
                     sx={{
                       ml: 'auto',
@@ -437,7 +448,7 @@ export function DiscoveryListItem({
                 {matchPercent}%
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Match Score
+                {t('discovery.matchScore')}
               </Typography>
               <LinearProgress
                 variant="determinate"
@@ -458,7 +469,15 @@ export function DiscoveryListItem({
             {/* Actions */}
             <Box display="flex" justifyContent="center" gap={1}>
               {canRequest && (
-                <Tooltip title={isRequested ? (requestStatus === 'approved' ? 'Already approved' : 'Already requested') : 'Request this title'}>
+                <Tooltip
+                  title={
+                    isRequested
+                      ? requestStatus === 'approved'
+                        ? t('discovery.tooltipRequestApproved')
+                        : t('discovery.tooltipRequestPending')
+                      : t('discovery.tooltipRequest')
+                  }
+                >
                   <span>
                     <IconButton
                       onClick={handleRequest}
@@ -486,7 +505,7 @@ export function DiscoveryListItem({
                 </Tooltip>
               )}
               
-              <Tooltip title="View details">
+              <Tooltip title={t('discovery.tooltipViewDetails')}>
                 <IconButton
                   onClick={(e) => {
                     e.stopPropagation()
@@ -501,11 +520,11 @@ export function DiscoveryListItem({
                 </IconButton>
               </Tooltip>
               
-              <Tooltip title={imdbUrl ? 'View on IMDb' : 'View on TMDb'}>
+              <Tooltip title={t('discovery.tooltipViewTmdb')}>
                 <IconButton
                   onClick={(e) => {
                     e.stopPropagation()
-                    window.open(primaryUrl, '_blank')
+                    window.open(tmdbUrl, '_blank', 'noopener,noreferrer')
                   }}
                   sx={{
                     backgroundColor: alpha(theme.palette.grey[500], 0.1),
@@ -539,7 +558,7 @@ export function DiscoveryListItem({
               {matchPercent}%
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              Match Score
+              {t('discovery.matchScore')}
             </Typography>
           </Box>
           <LinearProgress
@@ -565,6 +584,7 @@ export function DiscoveryListItem({
         candidate={candidate}
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
+        resolveGenreName={resolveGenreName}
       />
 
       {/* Season Selection Modal (for series) */}

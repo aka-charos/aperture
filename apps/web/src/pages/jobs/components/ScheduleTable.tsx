@@ -1,4 +1,6 @@
 import React from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import {
   Box,
   Table,
@@ -26,7 +28,13 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import ErrorIcon from '@mui/icons-material/Error'
 import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import BlockIcon from '@mui/icons-material/Block'
-import { JOB_ICONS, JOB_COLORS, formatJobName } from '../constants'
+import {
+  JOB_ICONS,
+  JOB_COLORS,
+  formatJobName,
+  formatRelativePastTime,
+  formatJobDurationMsOrDash,
+} from '../constants'
 import type { Job, JobSchedule } from '../types'
 
 interface ScheduleTableProps {
@@ -37,9 +45,9 @@ interface ScheduleTableProps {
   onToggleEnabled: (jobName: string, enabled: boolean) => void
 }
 
-function getNextRunTime(schedule: JobSchedule | null): string {
+function getNextRunTime(schedule: JobSchedule | null, t: TFunction): string {
   if (!schedule || !schedule.isEnabled || schedule.type === 'manual') {
-    return '—'
+    return t('admin.jobsPage.ui.dash')
   }
   
   const now = new Date()
@@ -63,13 +71,11 @@ function getNextRunTime(schedule: JobSchedule | null): string {
       nextRun.setDate(nextRun.getDate() + daysUntil)
     }
   } else if (schedule.type === 'interval') {
-    const hours = schedule.intervalHours ?? 1
-    const currentHour = now.getHours()
-    const nextHour = Math.ceil(currentHour / hours) * hours
-    nextRun.setHours(nextHour, 0, 0, 0)
-    if (nextRun <= now) {
-      nextRun.setHours(nextHour + hours, 0, 0, 0)
-    }
+    const intervalMins =
+      schedule.intervalMinutes ?? (schedule.intervalHours ?? 1) * 60
+    const ms = intervalMins * 60 * 1000
+    const next = new Date(Math.ceil(now.getTime() / ms) * ms)
+    nextRun.setTime(next.getTime())
   }
   
   // Format relative time
@@ -79,46 +85,17 @@ function getNextRunTime(schedule: JobSchedule | null): string {
   
   if (hours > 24) {
     const days = Math.floor(hours / 24)
-    return `in ${days}d ${hours % 24}h`
-  } else if (hours > 0) {
-    return `in ${hours}h ${minutes}m`
-  } else {
-    return `in ${minutes}m`
+    return t('admin.jobsPage.ui.nextInDaysHours', { days, hours: hours % 24 })
   }
+  if (hours > 0) {
+    return t('admin.jobsPage.ui.nextInHoursMinutes', { hours, minutes })
+  }
+  return t('admin.jobsPage.ui.nextInMinutes', { minutes })
 }
 
-function formatLastRun(lastRun: Job['lastRun']): string {
-  if (!lastRun) return 'Never'
-  
-  const date = new Date(lastRun.startedAt)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  
-  const hours = Math.floor(diff / (1000 * 60 * 60))
-  const days = Math.floor(hours / 24)
-  
-  if (days > 0) {
-    return `${days}d ago`
-  } else if (hours > 0) {
-    return `${hours}h ago`
-  } else {
-    const minutes = Math.floor(diff / (1000 * 60))
-    return minutes > 0 ? `${minutes}m ago` : 'Just now'
-  }
-}
-
-function formatDuration(durationMs: number | null): string {
-  if (!durationMs) return '—'
-  
-  if (durationMs < 1000) {
-    return `${durationMs}ms`
-  } else if (durationMs < 60000) {
-    return `${(durationMs / 1000).toFixed(1)}s`
-  } else {
-    const minutes = Math.floor(durationMs / 60000)
-    const seconds = Math.floor((durationMs % 60000) / 1000)
-    return `${minutes}m ${seconds}s`
-  }
+function formatLastRun(lastRun: Job['lastRun'], t: TFunction): string {
+  if (!lastRun) return t('admin.jobsPage.ui.dateNever')
+  return formatRelativePastTime(lastRun.startedAt, t)
 }
 
 /**
@@ -150,13 +127,11 @@ function getMinutesUntilNextRun(schedule: JobSchedule | null | undefined): numbe
       nextRun.setDate(nextRun.getDate() + daysUntil)
     }
   } else if (schedule.type === 'interval') {
-    const hours = schedule.intervalHours ?? 1
-    const currentHour = now.getHours()
-    const nextHour = Math.ceil((currentHour + 1) / hours) * hours
-    nextRun.setHours(nextHour % 24, 0, 0, 0)
-    if (nextRun <= now) {
-      nextRun.setHours(nextRun.getHours() + hours)
-    }
+    const intervalMins =
+      schedule.intervalMinutes ?? (schedule.intervalHours ?? 1) * 60
+    const ms = intervalMins * 60 * 1000
+    const next = new Date(Math.ceil(now.getTime() / ms) * ms)
+    nextRun.setTime(next.getTime())
   }
   
   return Math.floor((nextRun.getTime() - now.getTime()) / (1000 * 60))
@@ -169,6 +144,7 @@ export function ScheduleTable({
   onRunJob,
   onToggleEnabled,
 }: ScheduleTableProps) {
+  const { t } = useTranslation()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
   
@@ -231,10 +207,10 @@ export function ScheduleTable({
                     </Box>
                     <Box flex={1}>
                       <Typography variant="subtitle2" fontWeight={600}>
-                        {formatJobName(job.name)}
+                        {formatJobName(job.name, t)}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {job.schedule?.formatted || 'Manual only'}
+                        {job.schedule?.formatted || t('admin.jobsPage.ui.manualOnlyShort')}
                       </Typography>
                     </Box>
                   </Stack>
@@ -251,12 +227,12 @@ export function ScheduleTable({
                   {/* Status */}
                   <Stack direction="row" alignItems="center" spacing={2}>
                     <Typography variant="caption" color="text.secondary" sx={{ minWidth: 60 }}>
-                      Status
+                      {t('admin.jobsPage.ui.mobileStatus')}
                     </Typography>
                     {isRunning ? (
                       <Chip
                         size="small"
-                        label="Running"
+                        label={t('admin.jobsPage.ui.statusRunning')}
                         sx={{
                           bgcolor: 'primary.main',
                           color: 'white',
@@ -273,21 +249,21 @@ export function ScheduleTable({
                       <Stack direction="row" spacing={0.5} alignItems="center">
                         <CheckCircleIcon sx={{ fontSize: 14, color: 'success.main' }} />
                         <Typography variant="caption" color="success.main">
-                          OK
+                          {t('admin.jobsPage.ui.statusOk')}
                         </Typography>
                       </Stack>
                     ) : job.lastRun?.status === 'failed' ? (
-                      <Tooltip title={job.lastRun.errorMessage || 'Unknown error'}>
+                      <Tooltip title={job.lastRun.errorMessage || t('admin.jobsPage.ui.unknownError')}>
                         <Stack direction="row" spacing={0.5} alignItems="center">
                           <ErrorIcon sx={{ fontSize: 14, color: 'error.main' }} />
                           <Typography variant="caption" color="error.main">
-                            Failed
+                            {t('admin.jobsPage.ui.statusFailed')}
                           </Typography>
                         </Stack>
                       </Tooltip>
                     ) : (
                       <Typography variant="caption" color="text.secondary">
-                        —
+                        {t('admin.jobsPage.ui.dash')}
                       </Typography>
                     )}
                   </Stack>
@@ -296,12 +272,12 @@ export function ScheduleTable({
                   {!isManual && isEnabled && (
                     <Stack direction="row" alignItems="center" spacing={2}>
                       <Typography variant="caption" color="text.secondary" sx={{ minWidth: 60 }}>
-                        Next Run
+                        {t('admin.jobsPage.ui.mobileNextRun')}
                       </Typography>
                       <Stack direction="row" spacing={0.5} alignItems="center">
                         <AccessTimeIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                         <Typography variant="caption" color="text.secondary">
-                          {getNextRunTime(job.schedule ?? null)}
+                          {getNextRunTime(job.schedule ?? null, t)}
                         </Typography>
                       </Stack>
                     </Stack>
@@ -310,10 +286,10 @@ export function ScheduleTable({
                   {/* Last Run */}
                   <Stack direction="row" alignItems="center" spacing={2}>
                     <Typography variant="caption" color="text.secondary" sx={{ minWidth: 60 }}>
-                      Last Run
+                      {t('admin.jobsPage.ui.mobileLastRun')}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {formatLastRun(job.lastRun)}
+                      {formatLastRun(job.lastRun, t)}
                     </Typography>
                   </Stack>
 
@@ -321,10 +297,10 @@ export function ScheduleTable({
                   {job.lastRun?.durationMs && (
                     <Stack direction="row" alignItems="center" spacing={2}>
                       <Typography variant="caption" color="text.secondary" sx={{ minWidth: 60 }}>
-                        Duration
+                        {t('admin.jobsPage.ui.mobileDuration')}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {formatDuration(job.lastRun.durationMs)}
+                        {formatJobDurationMsOrDash(job.lastRun.durationMs, t)}
                       </Typography>
                     </Stack>
                   )}
@@ -332,7 +308,7 @@ export function ScheduleTable({
 
                 {/* Actions */}
                 <Stack direction="row" spacing={1} justifyContent="flex-end">
-                  <Tooltip title="Run now">
+                  <Tooltip title={t('admin.jobsPage.ui.tooltipRunNow')}>
                     <IconButton
                       size="small"
                       onClick={() => onRunJob(job.name)}
@@ -345,7 +321,7 @@ export function ScheduleTable({
                       <PlayArrowIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Schedule settings">
+                  <Tooltip title={t('admin.jobsPage.ui.tooltipScheduleSettings')}>
                     <IconButton
                       size="small"
                       onClick={() => onConfigClick(job.name)}
@@ -357,7 +333,7 @@ export function ScheduleTable({
                       <SettingsIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="View history">
+                  <Tooltip title={t('admin.jobsPage.ui.tooltipViewHistory')}>
                     <IconButton
                       size="small"
                       onClick={() => onHistoryClick(job.name)}
@@ -384,14 +360,14 @@ export function ScheduleTable({
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Enabled</TableCell>
-            <TableCell>Job</TableCell>
-            <TableCell>Schedule</TableCell>
-            <TableCell>Next Run</TableCell>
-            <TableCell>Last Run</TableCell>
-            <TableCell>Duration</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell align="right">Actions</TableCell>
+            <TableCell>{t('admin.jobsPage.ui.scheduleColEnabled')}</TableCell>
+            <TableCell>{t('admin.jobsPage.ui.scheduleColJob')}</TableCell>
+            <TableCell>{t('admin.jobsPage.ui.scheduleColSchedule')}</TableCell>
+            <TableCell>{t('admin.jobsPage.ui.scheduleColNextRun')}</TableCell>
+            <TableCell>{t('admin.jobsPage.ui.scheduleColLastRun')}</TableCell>
+            <TableCell>{t('admin.jobsPage.ui.scheduleColDuration')}</TableCell>
+            <TableCell>{t('admin.jobsPage.ui.scheduleColStatus')}</TableCell>
+            <TableCell align="right">{t('admin.jobsPage.ui.scheduleColActions')}</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -412,7 +388,7 @@ export function ScheduleTable({
                 {/* Enabled Toggle */}
                 <TableCell>
                   {isManualOnly ? (
-                    <Tooltip title="This job cannot be scheduled">
+                    <Tooltip title={t('admin.jobsPage.ui.tooltipCannotSchedule')}>
                       <BlockIcon fontSize="small" sx={{ color: 'text.disabled', ml: 1 }} />
                     </Tooltip>
                   ) : (
@@ -432,7 +408,7 @@ export function ScheduleTable({
                       {JOB_ICONS[job.name]}
                     </Box>
                     <Typography variant="body2" fontWeight={500}>
-                      {formatJobName(job.name)}
+                      {formatJobName(job.name, t)}
                     </Typography>
                   </Stack>
                 </TableCell>
@@ -440,7 +416,9 @@ export function ScheduleTable({
                 {/* Schedule Type */}
                 <TableCell>
                   <Typography variant="body2" color={isManualOnly ? 'warning.main' : 'text.secondary'}>
-                    {isManualOnly ? 'Manual only (cannot schedule)' : (job.schedule?.formatted || 'Manual only')}
+                    {isManualOnly
+                      ? t('admin.jobsPage.ui.manualOnlyCaption')
+                      : job.schedule?.formatted || t('admin.jobsPage.ui.manualOnlyShort')}
                   </Typography>
                 </TableCell>
                 
@@ -451,7 +429,7 @@ export function ScheduleTable({
                       <AccessTimeIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                     )}
                     <Typography variant="body2" color="text.secondary">
-                      {getNextRunTime(job.schedule ?? null)}
+                      {getNextRunTime(job.schedule ?? null, t)}
                     </Typography>
                   </Stack>
                 </TableCell>
@@ -459,14 +437,14 @@ export function ScheduleTable({
                 {/* Last Run */}
                 <TableCell>
                   <Typography variant="body2" color="text.secondary">
-                    {formatLastRun(job.lastRun)}
+                    {formatLastRun(job.lastRun, t)}
                   </Typography>
                 </TableCell>
                 
                 {/* Duration */}
                 <TableCell>
                   <Typography variant="body2" color="text.secondary">
-                    {formatDuration(job.lastRun?.durationMs ?? null)}
+                    {formatJobDurationMsOrDash(job.lastRun?.durationMs ?? null, t)}
                   </Typography>
                 </TableCell>
                 
@@ -475,7 +453,7 @@ export function ScheduleTable({
                   {isRunning ? (
                     <Chip
                       size="small"
-                      label="Running"
+                      label={t('admin.jobsPage.ui.statusRunning')}
                       sx={{
                         bgcolor: 'primary.main',
                         color: 'white',
@@ -490,21 +468,21 @@ export function ScheduleTable({
                     <Stack direction="row" spacing={0.5} alignItems="center">
                       <CheckCircleIcon sx={{ fontSize: 16, color: 'success.main' }} />
                       <Typography variant="body2" color="success.main">
-                        OK
+                        {t('admin.jobsPage.ui.statusOk')}
                       </Typography>
                     </Stack>
                   ) : job.lastRun?.status === 'failed' ? (
-                    <Tooltip title={job.lastRun.errorMessage || 'Unknown error'}>
+                    <Tooltip title={job.lastRun.errorMessage || t('admin.jobsPage.ui.unknownError')}>
                       <Stack direction="row" spacing={0.5} alignItems="center">
                         <ErrorIcon sx={{ fontSize: 16, color: 'error.main' }} />
                         <Typography variant="body2" color="error.main">
-                          Failed
+                          {t('admin.jobsPage.ui.statusFailed')}
                         </Typography>
                       </Stack>
                     </Tooltip>
                   ) : (
                     <Typography variant="body2" color="text.secondary">
-                      —
+                      {t('admin.jobsPage.ui.dash')}
                     </Typography>
                   )}
                 </TableCell>
@@ -512,7 +490,7 @@ export function ScheduleTable({
                 {/* Actions */}
                 <TableCell align="right">
                   <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                    <Tooltip title="Run now">
+                    <Tooltip title={t('admin.jobsPage.ui.tooltipRunNow')}>
                       <IconButton
                         size="small"
                         onClick={() => onRunJob(job.name)}
@@ -521,7 +499,13 @@ export function ScheduleTable({
                         <PlayArrowIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title={isManualOnly ? "View job info (cannot schedule)" : "Schedule settings"}>
+                    <Tooltip
+                      title={
+                        isManualOnly
+                          ? t('admin.jobsPage.ui.tooltipViewJobInfo')
+                          : t('admin.jobsPage.ui.tooltipScheduleSettings')
+                      }
+                    >
                       <IconButton
                         size="small"
                         onClick={() => onConfigClick(job.name)}
@@ -529,7 +513,7 @@ export function ScheduleTable({
                         <SettingsIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="View history">
+                    <Tooltip title={t('admin.jobsPage.ui.tooltipViewHistory')}>
                       <IconButton
                         size="small"
                         onClick={() => onHistoryClick(job.name)}

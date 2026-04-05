@@ -7,6 +7,8 @@
  * - Expanded Crew (cinematographers, composers, editors)
  */
 
+export { pickBestYoutubeTrailer } from './pickTrailer.js'
+
 // Client utilities
 export {
   tmdbRequest,
@@ -43,6 +45,7 @@ export type { ApiLogCallback } from './client.js'
 // Movie functions
 export {
   getMovieDetails,
+  getMovieVideos,
   getMovieKeywords,
   getMovieCredits,
   getMovieEnrichmentData,
@@ -50,9 +53,12 @@ export {
   getMovieEnrichmentByTmdbId,
 } from './movies.js'
 
+export { getMovieGenresList, getTVGenresList } from './genres.js'
+
 // Series functions
 export {
   getTVDetails,
+  getTVVideos,
   getTVKeywords,
   getTVExternalIds,
   getTVCredits,
@@ -122,6 +128,8 @@ export type {
   TMDbCollectionDetails,
   TMDbCollectionPart,
   TMDbMovieDetails,
+  TMDbVideo,
+  TMDbVideosResponse,
   TMDbMovieKeywordsResponse,
   TMDbMovieCreditsResponse,
   TMDbTVDetails,
@@ -150,6 +158,12 @@ export type {
   DiscoverMovieFilters,
   DiscoverTVFilters,
 } from './types.js'
+
+// Configuration (countries, etc.)
+export {
+  getTmdbConfigurationCountries,
+  type TmdbConfigurationCountry,
+} from './configuration.js'
 
 // Constants
 export { TMDB_IMAGE_BASE_URL, TMDB_API_BASE_URL } from './types.js'

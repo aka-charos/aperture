@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Box,
   Typography,
@@ -24,17 +25,60 @@ import ExploreIcon from '@mui/icons-material/Explore'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
+import LiveTvIcon from '@mui/icons-material/LiveTv'
 import GridViewIcon from '@mui/icons-material/GridView'
 import ViewListIcon from '@mui/icons-material/ViewList'
 import AutorenewIcon from '@mui/icons-material/Autorenew'
-import { useDiscoveryData, useSeerrRequest, useDiscoveryJobStatus, invalidateDiscoveryCache } from './hooks'
-import { DiscoveryCard, DiscoveryFilters, DiscoveryListItem } from './components'
+import {
+  useDiscoveryData,
+  useSeerrRequest,
+  useDiscoveryJobStatus,
+  invalidateDiscoveryCache,
+  useDiscoveryGenres,
+} from './hooks'
+import {
+  DiscoveryCard,
+  DiscoveryFilters,
+  DiscoveryListItem,
+  StreamingDiscoverySection,
+  TmdbGenreRowsSection,
+} from './components'
 import { useViewMode } from '../../hooks/useViewMode'
 import type { DiscoveryCandidate, DiscoveryFilterOptions, MediaType } from './types'
+
+type DiscoveryTab = 'movie' | 'series' | 'streaming'
 import type { SeerrRequestOptions } from '../../types/seerrRequest'
 
 // Local storage key for persisting filter preferences
 const FILTERS_STORAGE_KEY = 'aperture_discovery_filters'
+
+/** Movies / TV only: "popular" = main TMDb Discover pool; "genre" = admin genre strips */
+const BROWSE_SUBTAB_STORAGE_KEY = 'aperture_discovery_browse_subtab'
+type BrowseSubTab = 'popular' | 'genre'
+
+function loadBrowseSubTabs(): { movie: BrowseSubTab; series: BrowseSubTab } {
+  try {
+    const raw = localStorage.getItem(BROWSE_SUBTAB_STORAGE_KEY)
+    if (raw) {
+      const j = JSON.parse(raw) as { movie?: string; series?: string }
+      return {
+        movie: j.movie === 'genre' ? 'genre' : 'popular',
+        series: j.series === 'genre' ? 'genre' : 'popular',
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return { movie: 'popular', series: 'popular' }
+}
+
+function saveBrowseSubTabs(movie: BrowseSubTab, series: BrowseSubTab) {
+  try {
+    localStorage.setItem(BROWSE_SUBTAB_STORAGE_KEY, JSON.stringify({ movie, series }))
+  } catch {
+    // ignore
+  }
+}
 
 function loadFiltersFromStorage(): DiscoveryFilterOptions {
   try {
@@ -57,6 +101,7 @@ function saveFiltersToStorage(filters: DiscoveryFilterOptions) {
 }
 
 export function DiscoveryPage() {
+  const { t } = useTranslation()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
@@ -92,16 +137,24 @@ export function DiscoveryPage() {
       // Invalidate cache and refetch when job completes
       invalidateDiscoveryCache()
       refetchCandidates()
-      setSnackbar({ 
-        open: true, 
-        message: 'New discovery suggestions are ready!', 
-        severity: 'success' 
+      setSnackbar({
+        open: true,
+        message: t('discovery.snackbarReady'),
+        severity: 'success',
       })
     },
   })
   const { viewMode, setViewMode } = useViewMode('discovery')
 
-  const [mediaType, setMediaType] = useState<MediaType>('movie')
+  const [discoveryTab, setDiscoveryTab] = useState<DiscoveryTab>('movie')
+  const initialBrowse = loadBrowseSubTabs()
+  const [browseSubMovie, setBrowseSubMovie] = useState<BrowseSubTab>(initialBrowse.movie)
+  const [browseSubSeries, setBrowseSubSeries] = useState<BrowseSubTab>(initialBrowse.series)
+  const browseSubTab: BrowseSubTab =
+    discoveryTab === 'series' ? browseSubSeries : discoveryTab === 'movie' ? browseSubMovie : 'popular'
+  const genreMediaType: MediaType = discoveryTab === 'series' ? 'series' : 'movie'
+  const { genres: genreOptions, loading: genresLoading, resolveGenreName } =
+    useDiscoveryGenres(genreMediaType)
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
@@ -114,15 +167,31 @@ export function DiscoveryPage() {
     saveFiltersToStorage(newFilters)
   }, [])
 
-  const candidates = mediaType === 'movie' ? movieCandidates : seriesCandidates
-  const run = mediaType === 'movie' ? movieRun : seriesRun
+  const candidates =
+    discoveryTab === 'movie' ? movieCandidates : discoveryTab === 'series' ? seriesCandidates : []
+  const run = discoveryTab === 'movie' ? movieRun : discoveryTab === 'series' ? seriesRun : null
+
+  const handleBrowseSubChange = useCallback(
+    (_: React.SyntheticEvent, v: BrowseSubTab | null) => {
+      if (v == null) return
+      if (discoveryTab === 'movie') {
+        setBrowseSubMovie(v)
+        saveBrowseSubTabs(v, browseSubSeries)
+      } else if (discoveryTab === 'series') {
+        setBrowseSubSeries(v)
+        saveBrowseSubTabs(browseSubMovie, v)
+      }
+    },
+    [discoveryTab, browseSubMovie, browseSubSeries]
+  )
 
   const handleRefresh = async () => {
-    const result = await refresh(mediaType)
+    if (discoveryTab === 'streaming') return
+    const result = await refresh(discoveryTab)
     if (result.success) {
-      setSnackbar({ open: true, message: 'Discovery suggestions refreshed!', severity: 'success' })
+      setSnackbar({ open: true, message: t('discovery.snackbarRefreshed'), severity: 'success' })
     } else {
-      setSnackbar({ open: true, message: result.error || 'Failed to refresh', severity: 'error' })
+      setSnackbar({ open: true, message: result.error || t('discovery.snackbarRefreshFailed'), severity: 'error' })
     }
   }
 
@@ -141,11 +210,15 @@ export function DiscoveryPage() {
     )
     if (result.success) {
       markAsRequested(candidate.tmdbId)
-      setSnackbar({ open: true, message: `Request submitted for "${candidate.title}"`, severity: 'success' })
+      setSnackbar({
+        open: true,
+        message: t('discovery.snackbarRequestSubmitted', { title: candidate.title }),
+        severity: 'success',
+      })
     } else {
-      setSnackbar({ open: true, message: result.error || 'Failed to submit request', severity: 'error' })
+      setSnackbar({ open: true, message: result.error || t('discovery.snackbarRequestFailed'), severity: 'error' })
     }
-  }, [submitRequest, markAsRequested])
+  }, [submitRequest, markAsRequested, t])
 
   // Not enabled state
   if (!loading && status && !status.enabled) {
@@ -154,11 +227,11 @@ export function DiscoveryPage() {
         <Box display="flex" alignItems="center" gap={2} mb={3}>
           <ExploreIcon sx={{ color: 'primary.main', fontSize: 32 }} />
           <Typography variant="h4" fontWeight={700}>
-            Discover
+            {t('discovery.title')}
           </Typography>
         </Box>
         <Alert severity="info" sx={{ borderRadius: 2 }}>
-          Discovery is not enabled for your account. Contact your admin to enable missing content suggestions.
+          {t('discovery.disabledBody')}
         </Alert>
       </Box>
     )
@@ -184,64 +257,77 @@ export function DiscoveryPage() {
           <Box display="flex" alignItems="center" gap={2} mb={{ xs: 0, sm: 1 }}>
             <ExploreIcon sx={{ color: 'primary.main', fontSize: 32 }} />
             <Typography variant="h4" fontWeight={700}>
-              Discover
+              {t('discovery.title')}
             </Typography>
           </Box>
           {!isMobile && (
             <Typography variant="body1" color="text.secondary">
-              AI-powered suggestions for content not in your library
+              {t('discovery.subtitle')}
             </Typography>
           )}
         </Box>
 
-        {/* Grid/List toggle always in upper right */}
-        <ToggleButtonGroup
-          value={viewMode}
-          exclusive
-          onChange={(_, v) => v && setViewMode(v)}
-          size="small"
-        >
-          <ToggleButton value="grid">
-            <GridViewIcon fontSize="small" />
-          </ToggleButton>
-          <ToggleButton value="list">
-            <ViewListIcon fontSize="small" />
-          </ToggleButton>
-        </ToggleButtonGroup>
-      </Box>
-
-      {/* Action buttons row */}
-      <Box display="flex" gap={1} mb={2}>
-        {isMobile ? (
-          <Tooltip title={isJobRunning ? 'Job running...' : refreshing ? 'Refreshing...' : 'Refresh'}>
-            <span>
-              <IconButton
-                onClick={handleRefresh}
-                disabled={refreshing || isJobRunning}
-                size="small"
-                sx={{ border: 1, borderColor: 'divider' }}
-              >
-                {refreshing || isJobRunning ? <CircularProgress size={18} /> : <RefreshIcon fontSize="small" />}
-              </IconButton>
-            </span>
-          </Tooltip>
-        ) : (
-          <Button
-            variant="outlined"
-            startIcon={refreshing || isJobRunning ? <CircularProgress size={16} /> : <RefreshIcon />}
-            onClick={handleRefresh}
-            disabled={refreshing || isJobRunning}
+        {/* Grid/List toggle — main pool only, not genre strips or Streaming */}
+        {discoveryTab !== 'streaming' && browseSubTab === 'popular' && (
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            onChange={(_, v) => v && setViewMode(v)}
             size="small"
+            aria-label={t('discovery.title')}
           >
-            {isJobRunning ? 'Job Running...' : refreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
+            <ToggleButton value="grid" aria-label={t('discovery.gridView')}>
+              <GridViewIcon fontSize="small" />
+            </ToggleButton>
+            <ToggleButton value="list" aria-label={t('discovery.listView')}>
+              <ViewListIcon fontSize="small" />
+            </ToggleButton>
+          </ToggleButtonGroup>
         )}
       </Box>
 
+      {/* Action buttons row — refresh applies to the main discovery pool */}
+      {discoveryTab !== 'streaming' && browseSubTab === 'popular' && (
+        <Box display="flex" gap={1} mb={2}>
+          {isMobile ? (
+            <Tooltip
+              title={
+                isJobRunning ? t('discovery.jobRunning') : refreshing ? t('discovery.refreshing') : t('discovery.refresh')
+              }
+            >
+              <span>
+                <IconButton
+                  onClick={handleRefresh}
+                  disabled={refreshing || isJobRunning}
+                  size="small"
+                  sx={{ border: 1, borderColor: 'divider' }}
+                >
+                  {refreshing || isJobRunning ? <CircularProgress size={18} /> : <RefreshIcon fontSize="small" />}
+                </IconButton>
+              </span>
+            </Tooltip>
+          ) : (
+            <Button
+              variant="outlined"
+              startIcon={refreshing || isJobRunning ? <CircularProgress size={16} /> : <RefreshIcon />}
+              onClick={handleRefresh}
+              disabled={refreshing || isJobRunning}
+              size="small"
+            >
+              {isJobRunning
+                ? t('discovery.jobRunningLabel')
+                : refreshing
+                  ? t('discovery.refreshing')
+                  : t('discovery.refresh')}
+            </Button>
+          )}
+        </Box>
+      )}
+
       {/* Tabs */}
       <Tabs
-        value={mediaType}
-        onChange={(_, v) => setMediaType(v)}
+        value={discoveryTab}
+        onChange={(_, v) => setDiscoveryTab(v)}
         sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}
       >
         <Tab
@@ -250,7 +336,7 @@ export function DiscoveryPage() {
           iconPosition="start"
           label={
             <Box display="flex" alignItems="center" gap={1}>
-              <span>Movies</span>
+              <span>{t('discovery.tabMovies')}</span>
               {movieCandidates.length > 0 && (
                 <Chip
                   label={movieCandidates.length}
@@ -268,7 +354,7 @@ export function DiscoveryPage() {
             </Box>
           }
           sx={{
-            color: mediaType === 'movie' ? '#6366f1' : 'text.secondary',
+            color: discoveryTab === 'movie' ? '#6366f1' : 'text.secondary',
             '&.Mui-selected': { color: '#6366f1' },
           }}
         />
@@ -278,7 +364,7 @@ export function DiscoveryPage() {
           iconPosition="start"
           label={
             <Box display="flex" alignItems="center" gap={1}>
-              <span>TV Series</span>
+              <span>{t('discovery.tabSeries')}</span>
               {seriesCandidates.length > 0 && (
                 <Chip
                   label={seriesCandidates.length}
@@ -296,17 +382,53 @@ export function DiscoveryPage() {
             </Box>
           }
           sx={{
-            color: mediaType === 'series' ? '#ec4899' : 'text.secondary',
+            color: discoveryTab === 'series' ? '#ec4899' : 'text.secondary',
             '&.Mui-selected': { color: '#ec4899' },
           }}
         />
+        {status?.streamingDiscoveryEnabled && (
+          <Tab
+            value="streaming"
+            icon={<LiveTvIcon />}
+            iconPosition="start"
+            label={t('discovery.tabStreaming')}
+            sx={{
+              color: discoveryTab === 'streaming' ? 'primary.main' : 'text.secondary',
+              '&.Mui-selected': { color: 'primary.main' },
+            }}
+          />
+        )}
       </Tabs>
 
-      {/* Filters */}
-      <DiscoveryFilters
-        filters={filters}
-        onFiltersChange={handleFiltersChange}
-      />
+      {/* Movies / TV: browse by overall popularity vs genre strips */}
+      {(discoveryTab === 'movie' || discoveryTab === 'series') && (
+        <Tabs
+          value={browseSubTab}
+          onChange={handleBrowseSubChange}
+          sx={{ borderBottom: 1, borderColor: 'divider', mb: 2, minHeight: 40 }}
+        >
+          <Tab value="popular" label={t('discovery.tabBrowsePopular')} sx={{ textTransform: 'none' }} />
+          <Tab value="genre" label={t('discovery.tabBrowseGenre')} sx={{ textTransform: 'none' }} />
+        </Tabs>
+      )}
+
+      {discoveryTab === 'streaming' ? (
+        <StreamingDiscoverySection requestEnabled={status?.requestEnabled ?? false} />
+      ) : browseSubTab === 'genre' ? (
+        <TmdbGenreRowsSection
+          mediaType={discoveryTab === 'series' ? 'series' : 'movie'}
+          requestEnabled={status?.requestEnabled ?? false}
+          resolveGenreName={resolveGenreName}
+        />
+      ) : (
+        <>
+          {/* Filters — main TMDb Discover pool */}
+          <DiscoveryFilters
+            filters={filters}
+            onFiltersChange={handleFiltersChange}
+            genreOptions={genreOptions}
+            genresLoading={genresLoading}
+          />
 
       {/* Job Running Banner */}
       <Fade in={isJobRunning} timeout={300}>
@@ -317,7 +439,7 @@ export function DiscoveryPage() {
         >
           <Box>
             <Typography variant="body2" fontWeight={500}>
-              Generating new discovery suggestions...
+              {t('discovery.jobBanner')}
             </Typography>
             {jobProgress && (
               <Box sx={{ mt: 1 }}>
@@ -338,22 +460,18 @@ export function DiscoveryPage() {
       {/* Run Info */}
       {run && run.createdAt && (
         <Typography variant="caption" color="text.secondary" display="block" mb={2}>
-          Last updated: {new Date(run.createdAt).toLocaleString()}
+          {t('discovery.lastUpdated', { when: new Date(run.createdAt).toLocaleString() })}
           {run.candidatesStored != null && run.candidatesFetched != null && (
-            <> • {run.candidatesStored} suggestions from {run.candidatesFetched.toLocaleString()} candidates</>
+            <>
+              {' '}
+              •{' '}
+              {t('discovery.runMeta', {
+                stored: run.candidatesStored,
+                fetched: run.candidatesFetched.toLocaleString(),
+              })}
+            </>
           )}
         </Typography>
-      )}
-
-      {/* Request capability notice */}
-      {status?.requestEnabled ? (
-        <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
-          Click on any title to view on TMDb. Hover to request content via Seerr.
-        </Alert>
-      ) : (
-        <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
-          Content requests are not enabled for your account. You can browse suggestions but cannot request them.
-        </Alert>
       )}
 
       {/* Error */}
@@ -368,7 +486,7 @@ export function DiscoveryPage() {
         <LoadingSkeleton />
       ) : candidates.length === 0 ? (
         <Alert severity="info" sx={{ borderRadius: 2 }}>
-          No {mediaType === 'movie' ? 'movie' : 'series'} suggestions yet. Click "Refresh" to generate personalized recommendations based on your watch history.
+          {discoveryTab === 'movie' ? t('discovery.emptyMovie') : t('discovery.emptySeries')}
         </Alert>
       ) : viewMode === 'grid' ? (
         <Grid container spacing={2}>
@@ -381,6 +499,7 @@ export function DiscoveryPage() {
                 isRequesting={isRequesting(candidate.tmdbId)}
                 cachedStatus={seerrStatus[candidate.tmdbId]}
                 fetchTVDetails={fetchTVDetails}
+                resolveGenreName={resolveGenreName}
               />
             </Grid>
           ))}
@@ -396,6 +515,7 @@ export function DiscoveryPage() {
               isRequesting={isRequesting(candidate.tmdbId)}
               cachedStatus={seerrStatus[candidate.tmdbId]}
               fetchTVDetails={fetchTVDetails}
+              resolveGenreName={resolveGenreName}
             />
           ))}
         </Box>
@@ -407,7 +527,7 @@ export function DiscoveryPage() {
           <Box display="flex" alignItems="center" justifyContent="center" gap={2} mb={1}>
             <CircularProgress size={20} />
             <Typography variant="body2" color="text.secondary">
-              Finding more content matching your filters...
+              {t('discovery.expanding')}
             </Typography>
           </Box>
           <LinearProgress
@@ -419,6 +539,8 @@ export function DiscoveryPage() {
           />
         </Box>
       </Fade>
+        </>
+      )}
 
       {/* Snackbar */}
       <Snackbar

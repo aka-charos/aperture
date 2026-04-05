@@ -20,6 +20,7 @@ export {
 export {
   fetchAllCandidates,
   fetchFilteredCandidates,
+  fetchGenreStripDiscoverCandidates,
   enrichFullData,
   enrichBasicData,
   hasDiscoverySources,
@@ -28,11 +29,13 @@ export {
   fetchPersonalizedCandidates,
   mergeWithPool,
   type DynamicFetchFilters,
+  type GenreStripDiscoverFilters,
 } from './sources.js'
 
 // Filter
 export {
   filterCandidates,
+  getCandidateExclusionTmdbIds,
   isInLibrary,
   hasWatched,
 } from './filter.js'
@@ -55,6 +58,7 @@ export {
   createDiscoveryRequest,
   updateDiscoveryRequestStatus,
   getDiscoveryRequests,
+  countDiscoveryRequests,
   hasExistingRequest,
   // Pool storage (shared candidates)
   upsertPoolCandidates,
