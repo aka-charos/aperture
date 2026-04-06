@@ -820,7 +820,7 @@ export async function generateSeriesRecommendationsForAllUsers(jobId?: string): 
       provider_user_id: string
       max_parental_rating: number | null
     }>(
-      `SELECT id, username, provider_user_id, max_parental_rating FROM users WHERE is_enabled = true AND series_enabled = true`
+      `SELECT id, username, provider_user_id, max_parental_rating FROM users WHERE is_enabled = true AND series_enabled = true AND provider_disabled = false`
     )
 
     const totalUsers = result.rows.length
@@ -943,7 +943,7 @@ export async function clearAndRebuildAllSeriesRecommendations(existingJobId?: st
       provider_user_id: string
       max_parental_rating: number | null
     }>(
-      `SELECT id, username, provider_user_id, max_parental_rating FROM users WHERE is_enabled = true AND series_enabled = true`
+      `SELECT id, username, provider_user_id, max_parental_rating FROM users WHERE is_enabled = true AND series_enabled = true AND provider_disabled = false`
     )
     const users = result.rows
     addLog(jobId, 'info', `👥 Regenerating for ${users.length} enabled user(s)`)

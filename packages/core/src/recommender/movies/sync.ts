@@ -783,8 +783,9 @@ export interface SyncWatchHistoryResult {
 }
 
 /**
- * Sync watch history for all users (not just enabled)
- * This is needed for Top Picks which aggregates watch data from all users
+ * Sync watch history for all users (not just Aperture-enabled)
+ * Skips users disabled on the media server (API calls would fail).
+ * This is needed for Top Picks which aggregates watch data from all active users.
  * Auto-imports any Emby/Jellyfin users not yet in our database
  * @param fullSync - If true, performs a full sync regardless of last sync time
  */
@@ -843,10 +844,10 @@ export async function syncWatchHistoryForAllUsers(
       addLog(jobId, 'info', `✅ Imported ${imported} new user(s) from media server`)
     }
 
-    // Step 2: Get ALL users from our database
+    // Step 2: Get users eligible for watch history sync (excludes provider-disabled)
     setJobStep(jobId, 1, 'Finding users')
     const result = await query<{ id: string; provider_user_id: string; username: string }>(
-      'SELECT id, provider_user_id, username FROM users WHERE provider_user_id IS NOT NULL'
+      'SELECT id, provider_user_id, username FROM users WHERE provider_user_id IS NOT NULL AND provider_disabled = false'
     )
 
     const users = result.rows

@@ -5,6 +5,7 @@
  * - Imports new users automatically
  * - Updates email for existing users (if not locked)
  * - Updates admin status
+ * - Updates provider_disabled from media server Policy.IsDisabled
  */
 
 import { randomUUID } from 'crypto'
@@ -60,8 +61,9 @@ export async function syncUsersFromMediaServer(
       email: string | null
       email_locked: boolean
       is_admin: boolean
+      provider_disabled: boolean
     }>(
-      'SELECT provider_user_id, email, email_locked, is_admin FROM users WHERE provider_user_id IS NOT NULL'
+      'SELECT provider_user_id, email, email_locked, is_admin, provider_disabled FROM users WHERE provider_user_id IS NOT NULL'
     )
     const existingUserMap = new Map(
       existingUsers.rows.map(u => [u.provider_user_id, u])
@@ -85,9 +87,9 @@ export async function syncUsersFromMediaServer(
       if (!existing) {
         // New user - import
         await query(
-          `INSERT INTO users (username, provider_user_id, provider, is_admin, is_enabled, movies_enabled, series_enabled, email)
-           VALUES ($1, $2, $3, $4, false, false, false, $5)`,
-          [pu.name, pu.id, providerType, pu.isAdmin || false, pu.email || null]
+          `INSERT INTO users (username, provider_user_id, provider, is_admin, is_enabled, movies_enabled, series_enabled, email, provider_disabled)
+           VALUES ($1, $2, $3, $4, false, false, false, $5, $6)`,
+          [pu.name, pu.id, providerType, pu.isAdmin || false, pu.email || null, !!pu.isDisabled]
         )
         imported++
         addLog(jobId, 'info', `➕ Imported new user: ${pu.name}${pu.email ? ` (${pu.email})` : ''}`)
@@ -109,6 +111,20 @@ export async function syncUsersFromMediaServer(
           updates.push(`email = $${paramIndex}`)
           values.push(pu.email)
           paramIndex++
+        }
+
+        // Sync media-server disabled flag (recommendation jobs skip these users)
+        if (existing.provider_disabled !== !!pu.isDisabled) {
+          updates.push(`provider_disabled = $${paramIndex}`)
+          values.push(!!pu.isDisabled)
+          paramIndex++
+          addLog(
+            jobId,
+            'info',
+            pu.isDisabled
+              ? `🚫 User disabled on media server: ${pu.name}`
+              : `✅ User re-enabled on media server: ${pu.name}`
+          )
         }
 
         if (updates.length > 0) {
