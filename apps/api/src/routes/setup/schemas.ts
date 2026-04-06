@@ -359,7 +359,14 @@ const runJob = {
       name: { 
         type: 'string' as const, 
         description: 'Job name to run',
-        enum: ['sync-movies', 'sync-series', 'enrich-movies', 'enrich-series', 'embed-movies', 'embed-series']
+        enum: [
+          'sync-movies', 'sync-series',
+          'sync-movie-watch-history', 'sync-series-watch-history',
+          'generate-movie-embeddings', 'generate-series-embeddings',
+          'generate-movie-recommendations', 'generate-series-recommendations',
+          'sync-movie-libraries', 'sync-series-libraries',
+          'refresh-top-picks',
+        ],
       },
     },
   },
