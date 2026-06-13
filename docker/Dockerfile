@@ -28,11 +28,8 @@ WORKDIR /app
 # Copy source code
 COPY . .
 
-# Build packages in order
-RUN pnpm --filter @aperture/core build
-RUN pnpm --filter @aperture/ui build
-RUN pnpm --filter @aperture/web build
-RUN pnpm --filter @aperture/api build
+# Build all workspaces; pnpm runs independent packages in parallel
+RUN pnpm -r build
 
 # ===================================================================
 # Stage 3: Production dependencies only
