@@ -23,6 +23,12 @@ import {
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import type { ScheduleType, JobSchedule } from '../types'
 import { formatJobName } from '../constants'
+import type { UpdateJobConfigParams } from '../hooks/useJobsData'
+
+type JobConfigSaveParams = UpdateJobConfigParams & {
+  scheduleType: ScheduleType
+  isEnabled: boolean
+}
 
 interface JobConfigDialogProps {
   open: boolean
@@ -30,15 +36,7 @@ interface JobConfigDialogProps {
   jobName: string
   currentSchedule: JobSchedule | null | undefined
   manualOnly?: boolean
-  onSave: (schedule: {
-    scheduleType: ScheduleType
-    scheduleHour: number | null
-    scheduleMinute: number | null
-    scheduleDayOfWeek: number | null
-    scheduleIntervalHours: number | null
-    scheduleIntervalMinutes: number | null
-    isEnabled: boolean
-  }) => Promise<void>
+  onSave: (schedule: JobConfigSaveParams) => Promise<void>
 }
 
 const WEEKDAY_KEYS = [
@@ -139,7 +137,7 @@ export function JobConfigDialog({
 
     try {
       const subHour = scheduleType === 'interval' && intervalMinutesTotal < 60
-      const payload: Parameters<typeof onSave>[0] = { scheduleType, isEnabled }
+      const payload: JobConfigSaveParams = { scheduleType, isEnabled }
 
       if (scheduleType === 'interval' || scheduleType === 'manual') {
         payload.scheduleHour = null
