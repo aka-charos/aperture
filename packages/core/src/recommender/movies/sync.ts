@@ -46,8 +46,65 @@ const DB_BATCH_SIZE = 100
 export interface SyncMoviesResult {
   added: number
   updated: number
+  removed: number
   total: number
   jobId: string
+}
+
+interface LibraryMovieSyncResult {
+  libraryId: string | null
+  expectedCount: number
+  fetchedCount: number
+  seenProviderIds: Set<string>
+}
+
+async function reconcileRemovedMovies(
+  jobId: string,
+  libraryResults: LibraryMovieSyncResult[]
+): Promise<number> {
+  let totalRemoved = 0
+
+  for (const lib of libraryResults) {
+    if (lib.expectedCount === 0) continue
+    if (lib.fetchedCount !== lib.expectedCount) {
+      addLog(
+        jobId,
+        'warn',
+        `⚠️ Skipping stale movie cleanup for library ${lib.libraryId ?? 'all'}: fetched ${lib.fetchedCount} but expected ${lib.expectedCount}`
+      )
+      continue
+    }
+
+    const seenArray = [...lib.seenProviderIds]
+    const deleteResult = lib.libraryId
+      ? await query<{ id: string }>(
+          `DELETE FROM movies
+           WHERE provider_library_id = $1
+             AND provider_item_id IS NOT NULL
+             AND NOT (provider_item_id = ANY($2::text[]))
+           RETURNING id`,
+          [lib.libraryId, seenArray]
+        )
+      : await query<{ id: string }>(
+          `DELETE FROM movies
+           WHERE provider_item_id IS NOT NULL
+             AND NOT (provider_item_id = ANY($1::text[]))
+           RETURNING id`,
+          [seenArray]
+        )
+
+    const removed = deleteResult.rowCount || 0
+    if (removed > 0) {
+      addLog(
+        jobId,
+        'info',
+        `🗑️ Removed ${removed} stale movies no longer in Emby (library ${lib.libraryId ?? 'all'})`
+      )
+      totalRemoved += removed
+    }
+  }
+
+  return totalRemoved
 }
 
 /**
@@ -494,8 +551,8 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
     if (enabledLibraryIds !== null && enabledLibraryIds.length === 0) {
       addLog(jobId, 'warn', '⚠️ No libraries enabled for sync!')
       addLog(jobId, 'info', '💡 Enable libraries in Settings → Library Configuration')
-      completeJob(jobId, { added: 0, updated: 0, total: 0 })
-      return { added: 0, updated: 0, total: 0, jobId }
+      completeJob(jobId, { added: 0, updated: 0, removed: 0, total: 0 })
+      return { added: 0, updated: 0, removed: 0, total: 0, jobId }
     }
 
     // Determine which libraries to sync
@@ -540,8 +597,8 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
     if (totalMovies === 0) {
       addLog(jobId, 'warn', '⚠️ No movies found in media server library!')
       addLog(jobId, 'info', '💡 Check that your MEDIA_SERVER_API_KEY has access to movie libraries')
-      completeJob(jobId, { added: 0, updated: 0, total: 0 })
-      return { added: 0, updated: 0, total: 0, jobId }
+      completeJob(jobId, { added: 0, updated: 0, removed: 0, total: 0 })
+      return { added: 0, updated: 0, removed: 0, total: 0, jobId }
     }
     updateJobProgress(jobId, 0, totalMovies)
 
@@ -567,6 +624,7 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
     let updated = 0
     let processed = 0
     const startTime = Date.now()
+    const librarySyncResults: LibraryMovieSyncResult[] = []
 
     for (const { libraryId, count } of libraryCounts) {
       if (count === 0) continue
@@ -587,6 +645,13 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
       )
 
       addLog(jobId, 'info', `✅ Fetched ${movies.length} movies, now processing...`)
+
+      librarySyncResults.push({
+        libraryId,
+        expectedCount: count,
+        fetchedCount: movies.length,
+        seenProviderIds: new Set(movies.map((movie) => movie.id)),
+      })
 
       // Prepare movie data
       const preparedMovies: PreparedMovie[] = movies.map((movie) => ({
@@ -625,14 +690,16 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
       }
     }
 
+    const removed = await reconcileRemovedMovies(jobId, librarySyncResults)
+
     const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1)
-    const finalResult = { added, updated, total: processed, jobId }
+    const finalResult = { added, updated, removed, total: processed, jobId }
     completeJob(jobId, finalResult)
 
     addLog(
       jobId,
       'info',
-      `🎉 Sync complete in ${totalDuration}s: ${added} new movies, ${updated} updated, ${processed} total`
+      `🎉 Sync complete in ${totalDuration}s: ${added} new movies, ${updated} updated, ${removed} removed, ${processed} total`
     )
 
     return finalResult
@@ -677,15 +744,41 @@ export async function syncWatchHistoryForUser(
   const excludedSet = new Set(excludedLibraryIds)
 
   // Get all movies we have in our database with their provider IDs and library IDs
-  const allMovies = await query<{ id: string; provider_item_id: string; provider_library_id: string | null }>(
-    'SELECT id, provider_item_id, provider_library_id FROM movies WHERE provider_item_id IS NOT NULL'
+  const allMovies = await query<{
+    id: string
+    provider_item_id: string
+    provider_library_id: string | null
+    tmdb_id: string | null
+    imdb_id: string | null
+  }>(
+    'SELECT id, provider_item_id, provider_library_id, tmdb_id, imdb_id FROM movies WHERE provider_item_id IS NOT NULL'
   )
 
   const providerIdToMovieId = new Map<string, string>()
   const providerIdToLibraryId = new Map<string, string | null>()
+  const movieIdToLibraryId = new Map<string, string | null>()
+  const tmdbIdToMovieId = new Map<string, string>()
+  const imdbIdToMovieId = new Map<string, string>()
   for (const movie of allMovies.rows) {
     providerIdToMovieId.set(movie.provider_item_id, movie.id)
     providerIdToLibraryId.set(movie.provider_item_id, movie.provider_library_id)
+    movieIdToLibraryId.set(movie.id, movie.provider_library_id)
+    if (movie.tmdb_id) tmdbIdToMovieId.set(movie.tmdb_id, movie.id)
+    if (movie.imdb_id) imdbIdToMovieId.set(movie.imdb_id, movie.id)
+  }
+
+  const resolveMovieId = (item: (typeof watchedItems)[number]): string | undefined => {
+    const byProviderId = providerIdToMovieId.get(item.movieId)
+    if (byProviderId) return byProviderId
+    if (item.tmdbId) {
+      const byTmdb = tmdbIdToMovieId.get(item.tmdbId)
+      if (byTmdb) return byTmdb
+    }
+    if (item.imdbId) {
+      const byImdb = imdbIdToMovieId.get(item.imdbId)
+      if (byImdb) return byImdb
+    }
+    return undefined
   }
 
   // Get current watch history for this user
@@ -704,11 +797,15 @@ export async function syncWatchHistoryForUser(
   }[] = []
 
   let excludedCount = 0
+  let fallbackMappedCount = 0
   for (const item of watchedItems) {
-    const movieId = providerIdToMovieId.get(item.movieId)
+    const movieId = resolveMovieId(item)
     if (movieId) {
+      if (!providerIdToMovieId.has(item.movieId)) {
+        fallbackMappedCount++
+      }
       // Check if movie's library is excluded
-      const libraryId = providerIdToLibraryId.get(item.movieId)
+      const libraryId = movieIdToLibraryId.get(movieId)
       if (libraryId && excludedSet.has(libraryId)) {
         excludedCount++
         continue // Skip movies from excluded libraries
@@ -725,6 +822,9 @@ export async function syncWatchHistoryForUser(
   
   if (excludedCount > 0) {
     logger.debug({ userId, excludedCount }, 'Excluded watch history items from excluded libraries')
+  }
+  if (fallbackMappedCount > 0) {
+    logger.debug({ userId, fallbackMappedCount }, 'Mapped watch history via TMDb/IMDb fallback')
   }
 
   const syncedMovieIds = new Set<string>(toSync.map((t) => t.movieId))

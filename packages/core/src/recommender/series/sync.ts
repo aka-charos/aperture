@@ -50,9 +50,109 @@ export interface SyncSeriesResult {
   seriesUpdated: number
   episodesAdded: number
   episodesUpdated: number
+  seriesRemoved: number
+  episodesRemoved: number
   totalSeries: number
   totalEpisodes: number
   jobId: string
+}
+
+interface LibrarySeriesSyncResult {
+  libraryId: string | null
+  expectedSeriesCount: number
+  fetchedSeriesCount: number
+  seenSeriesProviderIds: Set<string>
+  expectedEpisodeCount: number
+  fetchedEpisodeCount: number
+  seenEpisodeProviderIds: Set<string>
+}
+
+async function reconcileRemovedSeries(
+  jobId: string,
+  libraryResults: LibrarySeriesSyncResult[]
+): Promise<{ seriesRemoved: number; episodesRemoved: number }> {
+  let seriesRemoved = 0
+  let episodesRemoved = 0
+
+  for (const lib of libraryResults) {
+    if (lib.expectedSeriesCount > 0) {
+      if (lib.fetchedSeriesCount !== lib.expectedSeriesCount) {
+        addLog(
+          jobId,
+          'warn',
+          `⚠️ Skipping stale series cleanup for library ${lib.libraryId ?? 'all'}: fetched ${lib.fetchedSeriesCount} but expected ${lib.expectedSeriesCount}`
+        )
+      } else {
+        const seenSeries = [...lib.seenSeriesProviderIds]
+        const deleteSeriesResult = lib.libraryId
+          ? await query<{ id: string }>(
+              `DELETE FROM series
+               WHERE provider_library_id = $1
+                 AND provider_item_id IS NOT NULL
+                 AND NOT (provider_item_id = ANY($2::text[]))
+               RETURNING id`,
+              [lib.libraryId, seenSeries]
+            )
+          : await query<{ id: string }>(
+              `DELETE FROM series
+               WHERE provider_item_id IS NOT NULL
+                 AND NOT (provider_item_id = ANY($1::text[]))
+               RETURNING id`,
+              [seenSeries]
+            )
+        const removed = deleteSeriesResult.rowCount || 0
+        if (removed > 0) {
+          addLog(
+            jobId,
+            'info',
+            `🗑️ Removed ${removed} stale series no longer in Emby (library ${lib.libraryId ?? 'all'})`
+          )
+          seriesRemoved += removed
+        }
+      }
+    }
+
+    if (lib.expectedEpisodeCount > 0) {
+      if (lib.fetchedEpisodeCount !== lib.expectedEpisodeCount) {
+        addLog(
+          jobId,
+          'warn',
+          `⚠️ Skipping stale episode cleanup for library ${lib.libraryId ?? 'all'}: fetched ${lib.fetchedEpisodeCount} but expected ${lib.expectedEpisodeCount}`
+        )
+      } else {
+        const seenEpisodes = [...lib.seenEpisodeProviderIds]
+        const deleteEpisodesResult = lib.libraryId
+          ? await query<{ id: string }>(
+              `DELETE FROM episodes e
+               USING series s
+               WHERE e.series_id = s.id
+                 AND s.provider_library_id = $1
+                 AND e.provider_item_id IS NOT NULL
+                 AND NOT (e.provider_item_id = ANY($2::text[]))
+               RETURNING e.id`,
+              [lib.libraryId, seenEpisodes]
+            )
+          : await query<{ id: string }>(
+              `DELETE FROM episodes
+               WHERE provider_item_id IS NOT NULL
+                 AND NOT (provider_item_id = ANY($1::text[]))
+               RETURNING id`,
+              [seenEpisodes]
+            )
+        const removed = deleteEpisodesResult.rowCount || 0
+        if (removed > 0) {
+          addLog(
+            jobId,
+            'info',
+            `🗑️ Removed ${removed} stale episodes no longer in Emby (library ${lib.libraryId ?? 'all'})`
+          )
+          episodesRemoved += removed
+        }
+      }
+    }
+  }
+
+  return { seriesRemoved, episodesRemoved }
 }
 
 /**
@@ -715,6 +815,8 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
         seriesUpdated: 0,
         episodesAdded: 0,
         episodesUpdated: 0,
+        seriesRemoved: 0,
+        episodesRemoved: 0,
         totalSeries: 0,
         totalEpisodes: 0,
       })
@@ -723,6 +825,8 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
         seriesUpdated: 0,
         episodesAdded: 0,
         episodesUpdated: 0,
+        seriesRemoved: 0,
+        episodesRemoved: 0,
         totalSeries: 0,
         totalEpisodes: 0,
         jobId,
@@ -788,6 +892,8 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
         seriesUpdated: 0,
         episodesAdded: 0,
         episodesUpdated: 0,
+        seriesRemoved: 0,
+        episodesRemoved: 0,
         totalSeries: 0,
         totalEpisodes: 0,
       })
@@ -796,6 +902,8 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
         seriesUpdated: 0,
         episodesAdded: 0,
         episodesUpdated: 0,
+        seriesRemoved: 0,
+        episodesRemoved: 0,
         totalSeries: 0,
         totalEpisodes: 0,
         jobId,
@@ -837,11 +945,23 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
     let episodesUpdated = 0
     let processedSeries = 0
     let processedEpisodes = 0
+    const librarySyncResults: LibrarySeriesSyncResult[] = []
 
     // Step 3: Process series
     setJobStep(jobId, 2, 'Processing series', totalSeries)
 
-    for (const { libraryId, seriesCount } of libraryCounts) {
+    for (const { libraryId, seriesCount, episodeCount } of libraryCounts) {
+      const libraryResult: LibrarySeriesSyncResult = {
+        libraryId,
+        expectedSeriesCount: seriesCount,
+        fetchedSeriesCount: 0,
+        seenSeriesProviderIds: new Set<string>(),
+        expectedEpisodeCount: episodeCount,
+        fetchedEpisodeCount: 0,
+        seenEpisodeProviderIds: new Set<string>(),
+      }
+      librarySyncResults.push(libraryResult)
+
       if (seriesCount === 0) continue
 
       addLog(jobId, 'info', `📂 Fetching ${seriesCount} series from library${libraryId ? ` ${libraryId}` : ''}...`)
@@ -862,6 +982,11 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
       )
 
       addLog(jobId, 'info', `✅ Fetched ${seriesList.length} series, now processing...`)
+
+      libraryResult.fetchedSeriesCount = seriesList.length
+      for (const series of seriesList) {
+        libraryResult.seenSeriesProviderIds.add(series.id)
+      }
 
       // Prepare series data
       const preparedSeries: PreparedSeries[] = seriesList.map((series) => ({
@@ -907,6 +1032,19 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
     for (const { libraryId, episodeCount } of libraryCounts) {
       if (episodeCount === 0) continue
 
+      const libraryResult = librarySyncResults.find((lib) => lib.libraryId === libraryId) ?? {
+        libraryId,
+        expectedSeriesCount: 0,
+        fetchedSeriesCount: 0,
+        seenSeriesProviderIds: new Set<string>(),
+        expectedEpisodeCount: episodeCount,
+        fetchedEpisodeCount: 0,
+        seenEpisodeProviderIds: new Set<string>(),
+      }
+      if (!librarySyncResults.includes(libraryResult)) {
+        librarySyncResults.push(libraryResult)
+      }
+
       addLog(
         jobId,
         'info',
@@ -932,6 +1070,11 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
         EPISODE_PAGE_SIZE,
         // Process batch function - prepares and inserts episodes
         async (episodes) => {
+          for (const episode of episodes) {
+            libraryResult.seenEpisodeProviderIds.add(episode.id)
+          }
+          libraryResult.fetchedEpisodeCount += episodes.length
+
           // Prepare episode data, filtering out placeholders and episodes without series
           const preparedEpisodes: PreparedEpisode[] = []
           for (const episode of episodes) {
@@ -1006,12 +1149,16 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
       )
     }
 
+    const { seriesRemoved, episodesRemoved } = await reconcileRemovedSeries(jobId, librarySyncResults)
+
     const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1)
     const finalResult = {
       seriesAdded,
       seriesUpdated,
       episodesAdded,
       episodesUpdated,
+      seriesRemoved,
+      episodesRemoved,
       totalSeries: processedSeries,
       totalEpisodes: processedEpisodes,
       jobId,
@@ -1021,7 +1168,7 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
     addLog(
       jobId,
       'info',
-      `🎉 Sync complete in ${totalDuration}s: ${seriesAdded} new series, ${seriesUpdated} updated | ${episodesAdded} new episodes, ${episodesUpdated} updated`
+      `🎉 Sync complete in ${totalDuration}s: ${seriesAdded} new series, ${seriesUpdated} updated, ${seriesRemoved} removed | ${episodesAdded} new episodes, ${episodesUpdated} updated, ${episodesRemoved} removed`
     )
 
     return finalResult
@@ -1068,19 +1215,74 @@ export async function syncSeriesWatchHistoryForUser(
   const excludedLibraryIds = await getUserExcludedLibraries(userId)
   const excludedSet = new Set(excludedLibraryIds)
 
-  // Get all episodes we have in our database with their provider IDs and series library IDs
-  const allEpisodes = await query<{ id: string; provider_item_id: string; provider_library_id: string | null }>(
-    `SELECT e.id, e.provider_item_id, s.provider_library_id 
-     FROM episodes e 
-     JOIN series s ON e.series_id = s.id 
-     WHERE e.provider_item_id IS NOT NULL`
-  )
+  // Get all series and episodes we have in our database
+  const [allSeries, allEpisodes] = await Promise.all([
+    query<{
+      id: string
+      provider_item_id: string
+      provider_library_id: string | null
+      tmdb_id: string | null
+      imdb_id: string | null
+      tvdb_id: string | null
+    }>(
+      'SELECT id, provider_item_id, provider_library_id, tmdb_id, imdb_id, tvdb_id FROM series WHERE provider_item_id IS NOT NULL'
+    ),
+    query<{
+      id: string
+      provider_item_id: string
+      series_id: string
+      season_number: number
+      episode_number: number
+      provider_library_id: string | null
+    }>(
+      `SELECT e.id, e.provider_item_id, e.series_id, e.season_number, e.episode_number, s.provider_library_id
+       FROM episodes e
+       JOIN series s ON e.series_id = s.id
+       WHERE e.provider_item_id IS NOT NULL`
+    ),
+  ])
+
+  const providerSeriesIdToDbId = new Map<string, string>()
+  const tmdbIdToSeriesId = new Map<string, string>()
+  const imdbIdToSeriesId = new Map<string, string>()
+  const tvdbIdToSeriesId = new Map<string, string>()
+  for (const series of allSeries.rows) {
+    providerSeriesIdToDbId.set(series.provider_item_id, series.id)
+    if (series.tmdb_id) tmdbIdToSeriesId.set(series.tmdb_id, series.id)
+    if (series.imdb_id) imdbIdToSeriesId.set(series.imdb_id, series.id)
+    if (series.tvdb_id) tvdbIdToSeriesId.set(series.tvdb_id, series.id)
+  }
 
   const providerIdToEpisodeId = new Map<string, string>()
-  const providerIdToLibraryId = new Map<string, string | null>()
+  const episodeKeyToId = new Map<string, string>()
+  const episodeIdToLibraryId = new Map<string, string | null>()
   for (const episode of allEpisodes.rows) {
     providerIdToEpisodeId.set(episode.provider_item_id, episode.id)
-    providerIdToLibraryId.set(episode.provider_item_id, episode.provider_library_id)
+    episodeKeyToId.set(
+      `${episode.series_id}:${episode.season_number}:${episode.episode_number}`,
+      episode.id
+    )
+    episodeIdToLibraryId.set(episode.id, episode.provider_library_id)
+  }
+
+  const resolveEpisodeId = (item: (typeof watchedEpisodes)[number]): string | undefined => {
+    const byProviderId = providerIdToEpisodeId.get(item.episodeId)
+    if (byProviderId) return byProviderId
+
+    let seriesDbId = providerSeriesIdToDbId.get(item.seriesId)
+    if (!seriesDbId && item.tmdbId) seriesDbId = tmdbIdToSeriesId.get(item.tmdbId)
+    if (!seriesDbId && item.imdbId) seriesDbId = imdbIdToSeriesId.get(item.imdbId)
+    if (!seriesDbId && item.tvdbId) seriesDbId = tvdbIdToSeriesId.get(item.tvdbId)
+
+    if (
+      seriesDbId &&
+      item.seasonNumber != null &&
+      item.episodeNumber != null
+    ) {
+      return episodeKeyToId.get(`${seriesDbId}:${item.seasonNumber}:${item.episodeNumber}`)
+    }
+
+    return undefined
   }
 
   // Get current episode watch history for this user
@@ -1099,16 +1301,19 @@ export async function syncSeriesWatchHistoryForUser(
   }[] = []
 
   let excludedCount = 0
+  let fallbackMappedCount = 0
   for (const item of watchedEpisodes) {
-    const episodeId = providerIdToEpisodeId.get(item.episodeId)
+    const episodeId = resolveEpisodeId(item)
     if (episodeId) {
-      // Check if episode's series library is excluded
-      const libraryId = providerIdToLibraryId.get(item.episodeId)
+      if (!providerIdToEpisodeId.has(item.episodeId)) {
+        fallbackMappedCount++
+      }
+      const libraryId = episodeIdToLibraryId.get(episodeId)
       if (libraryId && excludedSet.has(libraryId)) {
         excludedCount++
-        continue // Skip episodes from excluded libraries
+        continue
       }
-      
+
       toSync.push({
         episodeId,
         playCount: item.playCount,
@@ -1117,9 +1322,12 @@ export async function syncSeriesWatchHistoryForUser(
       })
     }
   }
-  
+
   if (excludedCount > 0) {
     logger.debug({ userId, excludedCount }, 'Excluded episode watch history items from excluded libraries')
+  }
+  if (fallbackMappedCount > 0) {
+    logger.debug({ userId, fallbackMappedCount }, 'Mapped episode watch history via series/season fallback')
   }
 
   const syncedEpisodeIds = new Set<string>(toSync.map((t) => t.episodeId))
