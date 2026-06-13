@@ -1,5 +1,15 @@
 export { createLogger, getLogger, createChildLogger, type Logger } from './logger.js'
 
+// n8n Webhook Integration
+export {
+  getN8nConfig,
+  setN8nConfig,
+  callN8nWebhook,
+  N8nWebhookError,
+  type N8nWebhookConfig,
+  type N8nIntegrationConfig,
+} from './n8n.js'
+
 export {
   getPool,
   query,
@@ -22,6 +32,7 @@ export {
   // Model Factory (returns AI SDK model instances)
   getEmbeddingModelInstance,
   getChatModelInstance,
+  getChatProviderTools,
   getTextGenerationModelInstance,
   // Capability Checking
   getAICapabilitiesStatus,

@@ -14,3 +14,9 @@ export function formatWatchHistoryRelativeDate(dateStr: string | null, t: TFunct
   if (diffDays < 365) return t('watchHistoryPage.monthsAgo', { count: Math.floor(diffDays / 30) })
   return date.toLocaleDateString()
 }
+
+/** Exact last-played timestamp for tooltips; falls back to the "never" label. */
+export function formatWatchHistoryExactDate(dateStr: string | null, t: TFunction): string {
+  if (!dateStr) return t('watchHistoryPage.dateNever')
+  return new Date(dateStr).toLocaleString()
+}

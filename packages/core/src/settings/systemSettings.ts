@@ -11,6 +11,10 @@ const SENSITIVE_SETTING_KEYS = new Set([
   'tmdb_api_key',
   'omdb_api_key',
   'trakt_client_secret',
+  // JSON blobs containing embedded secrets (API keys, auth header values)
+  'ai_config',
+  'ai_provider_credentials',
+  'n8n_integration',
 ])
 
 /**

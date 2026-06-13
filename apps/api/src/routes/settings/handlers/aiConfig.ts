@@ -657,11 +657,11 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
    */
   fastify.patch<{
     Params: { function: string }
-    Body: { provider: string; model: string; apiKey?: string; baseUrl?: string }
+    Body: { provider: string; model: string; apiKey?: string; baseUrl?: string; useSearchGrounding?: boolean }
   }>('/api/settings/ai/:function', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
     try {
       const fn = request.params.function as AIFunction
-      const { provider, model, apiKey, baseUrl } = request.body
+      const { provider, model, apiKey, baseUrl, useSearchGrounding } = request.body
 
       if (!['embeddings', 'chat', 'textGeneration', 'exploration'].includes(fn)) {
         return reply.status(400).send({ error: 'Invalid function. Must be embeddings, chat, textGeneration, or exploration' })
@@ -670,13 +670,13 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       if (apiKey || baseUrl) {
         const credentialsJson = await getSystemSetting('ai_provider_credentials')
         const credentials = credentialsJson ? JSON.parse(credentialsJson) : {}
-        
+
         credentials[provider] = {
           ...(credentials[provider] || {}),
           ...(apiKey && { apiKey }),
           ...(baseUrl && { baseUrl }),
         }
-        
+
         await setSystemSetting('ai_provider_credentials', JSON.stringify(credentials), 'Stored credentials for AI providers')
       }
 
@@ -685,6 +685,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         model,
         apiKey,
         baseUrl,
+        ...(useSearchGrounding !== undefined && { useSearchGrounding }),
       })
 
       const config = await getFunctionConfig(fn)

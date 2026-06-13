@@ -9,12 +9,12 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { createOllama } from 'ai-sdk-ollama'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { createGoogleGenerativeAI, google } from '@ai-sdk/google'
 import { createGroq } from '@ai-sdk/groq'
 import { createDeepSeek } from '@ai-sdk/deepseek'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { createHuggingFace } from '@ai-sdk/huggingface'
-import type { LanguageModel, EmbeddingModel } from 'ai'
+import type { LanguageModel, EmbeddingModel, ToolSet } from 'ai'
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
 import { createChildLogger } from './logger.js'
 import {
@@ -49,6 +49,7 @@ export interface ProviderConfig {
   model: string
   apiKey?: string
   baseUrl?: string
+  useSearchGrounding?: boolean // Google only: enables native Google Search grounding
 }
 
 export interface AIConfig {
@@ -365,8 +366,34 @@ export async function getChatModelInstance(): Promise<LanguageModel> {
   const modelId = config.model
 
   // All providers use similar API for language models
+  // Google Search grounding is not a model setting in AI SDK v5 — it is a
+  // provider-defined tool. See getChatProviderTools().
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (provider as any)(modelId) as LanguageModel
+}
+
+/**
+ * Get provider-native tools for the chat function (currently Google Search
+ * grounding). In AI SDK v5 these are provider-defined tools that must be
+ * merged into the `tools` passed to streamText/generateText — they cannot be
+ * enabled on the model instance itself.
+ *
+ * The google_search tool definition carries no credentials; the API key from
+ * the model's provider instance is used at request time, so the static
+ * `google` export is safe here.
+ *
+ * Caveat: the Gemini API rejects requests that combine google_search with
+ * function declarations on some models. If chat requests start failing with a
+ * tool-mixing error, disable Search grounding in Settings > AI.
+ */
+export async function getChatProviderTools(): Promise<ToolSet> {
+  const config = await getFunctionConfig('chat')
+
+  if (config?.provider === 'google' && config.useSearchGrounding) {
+    return { google_search: google.tools.googleSearch({}) }
+  }
+
+  return {}
 }
 
 /**

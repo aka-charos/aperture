@@ -13,6 +13,9 @@ import { createPeopleTools } from './people.js'
 import { createHelpTools } from './help.js'
 import { createDiscoveryTools } from './discovery.js'
 
+// Async, conditional on settings — merged separately in the chat handler
+export { createN8nTools } from './n8n.js'
+
 /**
  * Create all assistant tools with the given context
  */

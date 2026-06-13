@@ -24,7 +24,7 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL, HeartRating } from '@aperture/ui'
-import { formatWatchHistoryRelativeDate } from '@/lib/formatWatchHistoryRelativeDate'
+import { formatWatchHistoryRelativeDate, formatWatchHistoryExactDate } from '@/lib/formatWatchHistoryRelativeDate'
 
 interface SeriesWatchHistoryItem {
   series_id: string
@@ -343,12 +343,14 @@ export function WatchHistorySeriesListItem({
             </Box>
 
             {/* Last Watched */}
-            <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
-              <AccessTimeIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-              <Typography variant="caption" color="text.secondary">
-                {formatWatchHistoryRelativeDate(series.last_played_at, t)}
-              </Typography>
-            </Box>
+            <Tooltip title={formatWatchHistoryExactDate(series.last_played_at, t)}>
+              <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
+                <AccessTimeIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                <Typography variant="caption" color="text.secondary">
+                  {formatWatchHistoryRelativeDate(series.last_played_at, t)}
+                </Typography>
+              </Box>
+            </Tooltip>
 
             {/* Actions */}
             <Box display="flex" justifyContent="center" gap={1} alignItems="center">
@@ -427,12 +429,14 @@ export function WatchHistorySeriesListItem({
                 total: series.total_episodes,
               })}
             </Typography>
-            <Box display="flex" alignItems="center" gap={0.5}>
-              <AccessTimeIcon sx={{ fontSize: 12, color: 'text.secondary' }} />
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                {formatWatchHistoryRelativeDate(series.last_played_at, t)}
-              </Typography>
-            </Box>
+            <Tooltip title={formatWatchHistoryExactDate(series.last_played_at, t)}>
+              <Box display="flex" alignItems="center" gap={0.5}>
+                <AccessTimeIcon sx={{ fontSize: 12, color: 'text.secondary' }} />
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                  {formatWatchHistoryRelativeDate(series.last_played_at, t)}
+                </Typography>
+              </Box>
+            </Tooltip>
           </Box>
           <LinearProgress
             variant="determinate"

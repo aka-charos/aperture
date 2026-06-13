@@ -23,6 +23,7 @@ export {
   setFunctionConfig,
   getEmbeddingModelInstance,
   getChatModelInstance,
+  getChatProviderTools,
   getTextGenerationModelInstance,
   getAICapabilitiesStatus,
   isAIFunctionConfigured,
@@ -72,6 +73,13 @@ export {
   type ValidEmbeddingDimension,
   type LegacyEmbeddingsInfo,
   type CustomModel,
+  // n8n Webhook Integration
+  getN8nConfig,
+  setN8nConfig,
+  callN8nWebhook,
+  N8nWebhookError,
+  type N8nWebhookConfig,
+  type N8nIntegrationConfig,
 } from './lib/index.js'
 
 // Migrations
