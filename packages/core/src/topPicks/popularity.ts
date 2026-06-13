@@ -183,6 +183,7 @@ async function getTopMoviesLocalPublic(
       ) as popularity_score
     FROM movie_stats ms
     JOIN movies m ON m.id = ms.movie_id
+    WHERE m.path IS NOT NULL
     ORDER BY popularity_score DESC
     LIMIT $5
   `,
@@ -350,6 +351,9 @@ async function getTopSeriesLocalPublic(
       ) as popularity_score
     FROM series_stats ss
     JOIN series s ON s.id = ss.series_id
+    WHERE EXISTS (
+      SELECT 1 FROM episodes e WHERE e.series_id = s.id AND e.path IS NOT NULL LIMIT 1
+    )
     ORDER BY popularity_score DESC
     LIMIT $5
   `,
@@ -538,7 +542,8 @@ async function matchMDBListMoviesToLibrary(
       id, title, year, poster_url, backdrop_url, overview, genres,
       community_rating, path, imdb_id, tmdb_id, languages
     FROM movies
-    WHERE imdb_id = ANY($1) OR tmdb_id = ANY($2)
+    WHERE (imdb_id = ANY($1) OR tmdb_id = ANY($2))
+      AND path IS NOT NULL
   `,
     [imdbIds, tmdbIds]
   )
@@ -662,7 +667,10 @@ async function matchMDBListSeriesToLibrary(
       id, title, year, poster_url, backdrop_url, overview, genres,
       community_rating, network, imdb_id, tmdb_id, tvdb_id, languages
     FROM series
-    WHERE imdb_id = ANY($1) OR tmdb_id = ANY($2) OR tvdb_id = ANY($3)
+    WHERE (imdb_id = ANY($1) OR tmdb_id = ANY($2) OR tvdb_id = ANY($3))
+      AND EXISTS (
+        SELECT 1 FROM episodes e WHERE e.series_id = series.id AND e.path IS NOT NULL LIMIT 1
+      )
   `,
     [imdbIds, tmdbIds, tvdbIds]
   )
@@ -933,6 +941,7 @@ async function matchTMDBMoviesToLibrary(
       community_rating, path, tmdb_id
     FROM movies
     WHERE tmdb_id = ANY($1)
+      AND path IS NOT NULL
   `,
     [tmdbIds]
   )
@@ -1033,6 +1042,9 @@ async function matchTMDBSeriesToLibrary(
       community_rating, network, tmdb_id
     FROM series
     WHERE tmdb_id = ANY($1)
+      AND EXISTS (
+        SELECT 1 FROM episodes e WHERE e.series_id = series.id AND e.path IS NOT NULL LIMIT 1
+      )
   `,
     [tmdbIds]
   )
@@ -1424,6 +1436,7 @@ async function getTopMoviesLocal(
       ) as popularity_score
     FROM movie_stats ms
     JOIN movies m ON m.id = ms.movie_id
+    WHERE m.path IS NOT NULL
     ORDER BY popularity_score DESC
     LIMIT $5
   `,
@@ -1531,6 +1544,9 @@ async function getTopSeriesLocal(
       ) as popularity_score
     FROM series_stats ss
     JOIN series s ON s.id = ss.series_id
+    WHERE EXISTS (
+      SELECT 1 FROM episodes e WHERE e.series_id = s.id AND e.path IS NOT NULL LIMIT 1
+    )
     ORDER BY popularity_score DESC
     LIMIT $5
   `,
