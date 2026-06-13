@@ -1,0 +1,46 @@
+---
+description: Web UI must use i18n (react-i18next); add keys to English and sync locales
+alwaysApply: true
+---
+
+# Internationalization (web)
+
+## How it works
+
+- **Stack**: `i18next` + `react-i18next` in `apps/web`. The app is wrapped with `I18nextProvider` (`App.tsx`); config lives in `apps/web/src/i18n/config.ts`.
+- **Locales**: `en`, `es`, `de`, `fr`, `it`, `pt`, `ja`, `zh`, `ko`, `hi`, `ar`, `he`. **Fallback** is English. User preference can come from the server via `syncUiLanguageFromServer` / `applyEffectiveUiLanguage` (`syncUiLanguage.ts`), which also sets `document.documentElement.lang`.
+- **Source of truth**: `apps/web/src/i18n/locales/en/translation.json`. Other locales mirror the same nested key structure; missing keys fall back to English at runtime.
+- **Aligning locale files**: After adding or changing keys in English, run from `apps/web`:
+
+  `node scripts/sync-i18n-from-en.mjs`
+
+  This deep-merges new keys into every `locales/<code>/translation.json` (missing strings use English until translated).
+
+- **Project detail**: See `apps/web/src/i18n/CONVENTIONS.md` for `t()` usage, key naming (`namespace.nested.key`), plural keys (`_plural`), and admin/settings prefixes.
+
+## Rules for new code
+
+1. **No user-visible literals** in React/UI code (`apps/web/src/**/*.tsx` and shared UI strings) except proper nouns or data from the API. Use `const { t } = useTranslation()` and `t('…')` (or `Trans` when inline markup is required).
+2. **Add keys to English first**, then run `sync-i18n-from-en.mjs` so all locale JSON files stay structurally in sync. Do not ship UI that only updates `en` without syncing unless you are explicitly deferring translations (structure must still exist in other files).
+3. **Keep keys stable** once released; renames require updating every locale file and any `t()` call sites.
+4. **Adding a new language** is rare: import the new JSON in `config.ts`, add it to `resources` and `supportedLngs`, add `locales/<code>/translation.json`, and run the sync script so structure matches `en`.
+5. **Backend / API**: Prefer stable machine codes or structured data for the client; **user-facing phrases** belong in the web translation files, not duplicated as ad hoc English strings in API responses consumed by the UI.
+
+## Examples
+
+```tsx
+// ❌ BAD — user-facing string not in i18n
+<Button>Save changes</Button>
+
+// ✅ GOOD
+const { t } = useTranslation()
+<Button>{t('common.save')}</Button>
+```
+
+```tsx
+// ❌ BAD — concatenation breaks translation order and gender/plural rules
+{t('jobs.prefix') + name + t('jobs.suffix')}
+
+// ✅ GOOD — single key with interpolation
+{t('jobs.titleFor', { name })}
+```

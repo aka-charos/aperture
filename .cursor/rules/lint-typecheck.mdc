@@ -1,0 +1,97 @@
+---
+description: ESLint and TypeScript validation — run pnpm validate; zero warnings/errors allowed
+alwaysApply: true
+---
+
+# Lint and typecheck
+
+## Required before finishing work
+
+After any TypeScript change in `apps/` or `packages/`:
+
+1. Run **`pnpm validate`** (must pass with **0 errors and 0 warnings**).
+2. Prefer **`pnpm lint:fix`** first for auto-fixable issues, then re-run `pnpm validate`.
+3. Do not commit with failing lint or typecheck — husky pre-commit and CI both enforce this.
+
+## Commands
+
+| Script | What it does |
+|--------|----------------|
+| `pnpm lint` | `eslint . --max-warnings 0` — **warnings fail the build** |
+| `pnpm typecheck` | Builds `packages/*` first, then `pnpm -r typecheck` |
+| `pnpm validate` | `pnpm lint && pnpm typecheck` |
+
+**Why typecheck builds packages first:** `@aperture/core` and `@aperture/ui` expose types from `dist/`. A fresh checkout (and CI) has no `dist/` until those packages are built.
+
+## Enforcement
+
+- **Pre-commit** (husky): `lint-staged` runs `eslint --fix --max-warnings 0` on staged `.ts`/`.tsx`, then full `pnpm validate`.
+- **CI** (`validate` job): runs `pnpm validate` on every push; Docker builds only run after it passes.
+- **Docker**: production `pnpm install` uses `--ignore-scripts` (husky is a devDependency). Do not remove that without updating `docker/Dockerfile`.
+
+## ESLint rules (errors unless noted)
+
+Configured in `eslint.config.mjs`:
+
+- **`@typescript-eslint/no-unused-vars`** — error. Prefix intentionally unused args/vars/catch bindings with `_` (`^_` pattern).
+- **`prefer-const`**, **`no-useless-escape`**, **`no-case-declarations`** — error.
+- **`@typescript-eslint/no-explicit-any`** — warn, but **`--max-warnings 0` treats it as a failure**. Use proper types, generics, or `unknown` + narrowing.
+- **`react-hooks/exhaustive-deps`** (web only) — warn, fails CI. Fix correctly; do not blanket `eslint-disable`.
+- **`react-refresh/only-export-components`** (web only) — warn, fails CI. See file layout below.
+
+## React hooks (`exhaustive-deps`)
+
+Correct patterns (not disables):
+
+- Wrap fetch/load helpers in **`useCallback`** with all referenced values in the dependency array.
+- Declare callbacks **before** `useEffect` hooks that use them.
+- Include **`t`** from `useTranslation()` when used inside callbacks/effects.
+- For mount-only fetches: `useCallback` + `useEffect(() => { void fetch(); }, [fetch])`.
+- Prefer functional `setState` when a callback would otherwise close over stale state.
+
+## Fast refresh (`only-export-components`)
+
+Each file should export **either** React components **or** non-component code, not both.
+
+**Do:**
+
+- `AuthProvider.tsx` — provider component only
+- `useAuth.ts` — hook only (imports context from `auth-context.ts`)
+- `auth-context.ts` — `createContext`, shared types
+- `aiProviderInfo.ts` — constants/types used by components
+- `getToolSkeleton.tsx` — utility that returns JSX, in its own file
+
+**Don't:**
+
+- Export hooks, constants, or `getToolSkeleton` from the same file as a component.
+- Use `eslint-disable` for this rule.
+
+Follow existing splits under `apps/web/src/hooks/` (`*-context.ts`, `*Provider.tsx`, `use*.ts`).
+
+## General conventions
+
+- Remove unused imports; never leave dead code “for later”.
+- Do not add `eslint-disable` unless there is a narrow, documented exception.
+- Use MUI event types (e.g. `SelectChangeEvent<T>`) instead of `any`.
+- Import shared types from `@aperture/core` instead of casting to `any`.
+
+## Examples
+
+```tsx
+// ❌ BAD — unused import, any, missing hook deps
+import { Skeleton } from '@mui/material'
+const handleChange = (e: any) => { ... }
+useEffect(() => { fetchConfig() }, [])
+
+// ✅ GOOD
+const fetchConfig = useCallback(async () => { ... }, [t])
+useEffect(() => { void fetchConfig() }, [fetchConfig])
+```
+
+```tsx
+// ❌ BAD — component + hook in one file
+export function MyProvider() { ... }
+export function useMy() { ... }
+
+// ✅ GOOD — split across my-context.ts, MyProvider.tsx, useMy.ts
+```
