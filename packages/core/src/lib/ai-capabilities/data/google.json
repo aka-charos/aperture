@@ -61,6 +61,40 @@
       "contextWindow": "2M",
       "inputCostPerMillion": 1.25,
       "outputCostPerMillion": 5
+    },
+    {
+      "id": "gemini-2.5-flash",
+      "name": "Gemini 2.5 Flash",
+      "description": "Latest Flash model. Supports native Google Search grounding.",
+      "capabilities": {
+        "supportsToolCalling": true,
+        "supportsToolStreaming": true,
+        "supportsObjectGeneration": true,
+        "supportsEmbeddings": false
+      },
+      "quality": "standard",
+      "speed": "fast",
+      "costTier": "low",
+      "contextWindow": "1M",
+      "inputCostPerMillion": 0.3,
+      "outputCostPerMillion": 2.5
+    },
+    {
+      "id": "gemini-2.5-flash-lite",
+      "name": "Gemini 2.5 Flash Lite",
+      "description": "Fastest, most cost-efficient Gemini model. Supports native Google Search grounding.",
+      "capabilities": {
+        "supportsToolCalling": true,
+        "supportsToolStreaming": true,
+        "supportsObjectGeneration": true,
+        "supportsEmbeddings": false
+      },
+      "quality": "standard",
+      "speed": "fast",
+      "costTier": "low",
+      "contextWindow": "1M",
+      "inputCostPerMillion": 0.1,
+      "outputCostPerMillion": 0.4
     }
   ],
   "textGenerationModels": [],

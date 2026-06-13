@@ -39,6 +39,7 @@ import {
   OMDbConfigSection,
   MDBListConfigSection,
   SeerrConfigSection,
+  N8nConfigSection,
   StreamingDiscoverySettings,
   DiscoveryGenreStripsSettings,
   BackupSection,
@@ -296,6 +297,7 @@ export function SettingsPage() {
                   <OMDbConfigSection />
                   <MDBListConfigSection />
                   <SeerrConfigSection />
+                  <N8nConfigSection />
                 </Box>
                 <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
                   <StreamingDiscoverySettings />

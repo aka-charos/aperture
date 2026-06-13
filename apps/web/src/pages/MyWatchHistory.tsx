@@ -45,6 +45,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useWatching } from '@/hooks/useWatching'
 import { useUserRatings } from '@/hooks/useUserRatings'
 import { useViewMode } from '@/hooks/useViewMode'
+import { formatWatchHistoryRelativeDate, formatWatchHistoryExactDate } from '@/lib/formatWatchHistoryRelativeDate'
 import { WatchHistoryMovieListItem, WatchHistorySeriesListItem } from './watch-history/components'
 
 interface MovieWatchHistoryItem {
@@ -474,6 +475,15 @@ export function MyWatchHistoryPage() {
                           </Tooltip>
                         )}
                       </Box>
+                      {/* Last watched date */}
+                      <Tooltip title={formatWatchHistoryExactDate(item.last_played_at, t)}>
+                        <Box display="flex" alignItems="center" gap={0.5} sx={{ mt: 0.5, width: 'fit-content' }}>
+                          <AccessTimeIcon sx={{ fontSize: 12, color: 'text.secondary' }} />
+                          <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: '0.7rem' }}>
+                            {formatWatchHistoryRelativeDate(item.last_played_at, t)}
+                          </Typography>
+                        </Box>
+                      </Tooltip>
                     </Grid>
                   ))}
                 </Grid>
@@ -636,6 +646,15 @@ export function MyWatchHistoryPage() {
                               },
                             }}
                           />
+                          {/* Last watched date */}
+                          <Tooltip title={formatWatchHistoryExactDate(item.last_played_at, t)}>
+                            <Box display="flex" alignItems="center" gap={0.5} sx={{ mt: 0.5, width: 'fit-content' }}>
+                              <AccessTimeIcon sx={{ fontSize: 12, color: 'text.secondary' }} />
+                              <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: '0.7rem' }}>
+                                {formatWatchHistoryRelativeDate(item.last_played_at, t)}
+                              </Typography>
+                            </Box>
+                          </Tooltip>
                         </Box>
                       </Box>
                     </Grid>
