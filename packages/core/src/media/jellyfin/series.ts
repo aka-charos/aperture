@@ -197,7 +197,7 @@ export async function getSeriesWatchHistory(
     const params = new URLSearchParams({
       IncludeItemTypes: 'Episode',
       Recursive: 'true',
-      Fields: 'UserData,UserDataPlayCount,UserDataLastPlayedDate,SeriesId',
+      Fields: 'UserData,UserDataPlayCount,UserDataLastPlayedDate,SeriesId,ParentIndexNumber,IndexNumber,ProviderIds',
       IsPlayed: 'true',
       UserId: userId,
       StartIndex: String(startIndex),
@@ -223,9 +223,14 @@ export async function getSeriesWatchHistory(
         itemsMap.set(item.Id, {
           episodeId: item.Id,
           seriesId: item.SeriesId,
+          seasonNumber: item.ParentIndexNumber,
+          episodeNumber: item.IndexNumber,
           playCount: item.UserData.PlayCount || 0,
           isFavorite: item.UserData.IsFavorite || false,
           lastPlayedDate: item.UserData.LastPlayedDate,
+          tmdbId: item.ProviderIds?.Tmdb,
+          imdbId: item.ProviderIds?.Imdb,
+          tvdbId: item.ProviderIds?.Tvdb,
         })
       }
     }
@@ -242,7 +247,7 @@ export async function getSeriesWatchHistory(
   const favoritesParams = new URLSearchParams({
     IncludeItemTypes: 'Episode',
     Recursive: 'true',
-    Fields: 'UserData,SeriesId',
+    Fields: 'UserData,SeriesId,ParentIndexNumber,IndexNumber,ProviderIds',
     IsFavorite: 'true',
     UserId: userId,
   })
@@ -258,9 +263,14 @@ export async function getSeriesWatchHistory(
       itemsMap.set(item.Id, {
         episodeId: item.Id,
         seriesId: item.SeriesId,
+        seasonNumber: item.ParentIndexNumber,
+        episodeNumber: item.IndexNumber,
         playCount: 0,
         isFavorite: true,
         lastPlayedDate: item.UserData?.LastPlayedDate,
+        tmdbId: item.ProviderIds?.Tmdb,
+        imdbId: item.ProviderIds?.Imdb,
+        tvdbId: item.ProviderIds?.Tvdb,
       })
       addedFavorites++
     } else {

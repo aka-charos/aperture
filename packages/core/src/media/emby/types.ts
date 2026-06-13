@@ -212,6 +212,12 @@ export interface EmbyEpisode {
   ImageTags?: {
     Primary?: string
   }
+  ProviderIds?: {
+    Imdb?: string
+    Tmdb?: string
+    Tvdb?: string
+    [key: string]: string | undefined
+  }
   UserData?: {
     PlayCount: number
     IsFavorite: boolean

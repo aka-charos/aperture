@@ -126,15 +126,22 @@ export interface WatchedItem {
   isFavorite: boolean
   lastPlayedDate?: string
   userRating?: number
+  tmdbId?: string
+  imdbId?: string
 }
 
 export interface WatchedEpisode {
   episodeId: string
   seriesId: string
+  seasonNumber?: number
+  episodeNumber?: number
   playCount: number
   isFavorite: boolean
   lastPlayedDate?: string
   userRating?: number
+  tmdbId?: string
+  imdbId?: string
+  tvdbId?: string
 }
 
 export interface Series {

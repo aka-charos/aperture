@@ -173,7 +173,7 @@ async function getWatchHistoryFromItems(
     const params = new URLSearchParams({
       IncludeItemTypes: 'Movie',
       Recursive: 'true',
-      Fields: 'UserData,UserDataPlayCount,UserDataLastPlayedDate',
+      Fields: 'UserData,UserDataPlayCount,UserDataLastPlayedDate,ProviderIds',
       IsPlayed: 'true',
       UserId: userId,
       StartIndex: String(startIndex),
@@ -201,6 +201,8 @@ async function getWatchHistoryFromItems(
           playCount: item.UserData.PlayCount || 0,
           isFavorite: item.UserData.IsFavorite || false,
           lastPlayedDate: item.UserData.LastPlayedDate,
+          tmdbId: item.ProviderIds?.Tmdb,
+          imdbId: item.ProviderIds?.Imdb,
         })
       }
     }
@@ -217,7 +219,7 @@ async function getWatchHistoryFromItems(
   const favoritesParams = new URLSearchParams({
     IncludeItemTypes: 'Movie',
     Recursive: 'true',
-    Fields: 'UserData',
+    Fields: 'UserData,ProviderIds',
     IsFavorite: 'true',
     UserId: userId,
   })
@@ -236,6 +238,8 @@ async function getWatchHistoryFromItems(
         playCount: 0,
         isFavorite: true,
         lastPlayedDate: item.UserData?.LastPlayedDate,
+        tmdbId: item.ProviderIds?.Tmdb,
+        imdbId: item.ProviderIds?.Imdb,
       })
       addedFavorites++
     } else {
