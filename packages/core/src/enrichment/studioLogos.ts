@@ -78,16 +78,23 @@ interface StudioToEnrich {
 export async function populateStudiosFromMedia(): Promise<{ studios: number; networks: number }> {
   logger.info('Populating studios_networks table from media...')
 
-  // Insert unique studios from movies (type = 'studio')
+  // Group by (name, type) — DISTINCT on emby_id too would leave duplicate conflict keys
+  // when the same studio name appears with different Emby IDs across titles.
   const studioResult = await query(
     `INSERT INTO studios_networks (name, type, emby_id)
-     SELECT DISTINCT
-       studio_obj->>'name' as name,
+     SELECT
+       name,
        'studio' as type,
-       studio_obj->>'id' as emby_id
-     FROM movies, jsonb_array_elements(studios) as studio_obj
-     WHERE studio_obj->>'name' IS NOT NULL
-       AND studio_obj->>'name' != ''
+       MAX(emby_id) as emby_id
+     FROM (
+       SELECT
+         studio_obj->>'name' as name,
+         studio_obj->>'id' as emby_id
+       FROM movies, jsonb_array_elements(studios) as studio_obj
+       WHERE studio_obj->>'name' IS NOT NULL
+         AND studio_obj->>'name' != ''
+     ) studios
+     GROUP BY name
      ON CONFLICT (name, type) DO UPDATE SET
        emby_id = COALESCE(EXCLUDED.emby_id, studios_networks.emby_id),
        updated_at = NOW()`
@@ -97,13 +104,19 @@ export async function populateStudiosFromMedia(): Promise<{ studios: number; net
   // For series, we treat them as 'network' type since that's more commonly what they represent
   const networkResult = await query(
     `INSERT INTO studios_networks (name, type, emby_id)
-     SELECT DISTINCT
-       studio_obj->>'name' as name,
+     SELECT
+       name,
        'network' as type,
-       studio_obj->>'id' as emby_id
-     FROM series, jsonb_array_elements(studios) as studio_obj
-     WHERE studio_obj->>'name' IS NOT NULL
-       AND studio_obj->>'name' != ''
+       MAX(emby_id) as emby_id
+     FROM (
+       SELECT
+         studio_obj->>'name' as name,
+         studio_obj->>'id' as emby_id
+       FROM series, jsonb_array_elements(studios) as studio_obj
+       WHERE studio_obj->>'name' IS NOT NULL
+         AND studio_obj->>'name' != ''
+     ) networks
+     GROUP BY name
      ON CONFLICT (name, type) DO UPDATE SET
        emby_id = COALESCE(EXCLUDED.emby_id, studios_networks.emby_id),
        updated_at = NOW()`
