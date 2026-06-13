@@ -64,17 +64,21 @@ Import what episodes users have watched.
 1. Queries media server for each enabled user
 2. Fetches watch status for all episodes
 3. Records watched episodes with timestamps
-4. Tracks partial plays (progress percentage)
-5. Calculates series-level progress
+4. Tracks partial plays (playback position and runtime from the media server)
+5. Stores `played`, `playback_position_ticks`, and `runtime_ticks` on each `watch_history` row
 
 ### Episode-Level Tracking
 
 | Data | Description |
 |------|-------------|
-| **Watched** | Boolean completion |
-| **Progress** | Percentage if partially watched |
+| **Played** | Fully watched (`UserData.Played`) |
+| **Playback position** | Resume position in ticks (`playback_position_ticks`) |
+| **Runtime** | Episode runtime in ticks at sync time (`runtime_ticks`) |
+| **Progress** | `playback_position_ticks / runtime_ticks` when both are set |
 | **Play Count** | Number of times watched |
 | **Last Watched** | Most recent play date |
+
+When **New Content Only** is enabled (`include_watched = false`), titles with any episode at **5% or more** progress (or fully played) are excluded from AI recommendations. Partial-only rows are not used for taste-profile building.
 
 ### When to Run
 
@@ -141,7 +145,7 @@ Create personalized picks for each user.
 
 | Factor | Handling |
 |--------|----------|
-| **Partially watched** | Excluded from recommendations |
+| **Partially watched** | Excluded from recommendations at ≥5% episode progress |
 | **Completed series** | Excluded (unless ended) |
 | **Currently watching** | Excluded |
 | **Ended series** | Included in pool |

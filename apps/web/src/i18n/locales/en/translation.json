@@ -1109,7 +1109,7 @@
     "includeWatchedTitle": "Include Watched Content",
     "newContentOnlyTitle": "New Content Only",
     "includeWatchedDesc": "Recommendations may include movies and series you've already watched",
-    "newContentOnlyDesc": "Recommendations will only show content you haven't watched yet",
+    "newContentOnlyDesc": "Recommendations will only show content you haven't fully watched or started (5% or more progress)",
     "watchedRecsFooter": "By default, recommendations only include new content. Enable this if you want rewatching suggestions.",
     "dislikedTitle": "Disliked Content Behavior",
     "dislikedSubtitle": "Choose how content you've rated 1-3 hearts should be handled in recommendations.",

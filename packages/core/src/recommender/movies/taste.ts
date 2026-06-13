@@ -2,6 +2,7 @@ import { createChildLogger } from '../../lib/logger.js'
 import { query } from '../../lib/db.js'
 import { getMovieEmbedding } from './embeddings.js'
 import { averageEmbeddings } from '../shared/index.js'
+import { WATCH_HISTORY_TASTE_SQL } from '../watchedExclusion.js'
 import type { WatchedMovie } from '../types.js'
 
 const logger = createChildLogger('recommender-taste')
@@ -40,8 +41,9 @@ export async function getWatchHistory(userId: string, limit: number): Promise<Wa
     is_favorite: boolean
   }>(
     `SELECT movie_id, last_played_at, play_count, is_favorite
-     FROM watch_history
-     WHERE user_id = $1
+     FROM watch_history wh
+     WHERE wh.user_id = $1
+       AND (${WATCH_HISTORY_TASTE_SQL})
      ORDER BY 
        is_favorite DESC,
        play_count DESC,

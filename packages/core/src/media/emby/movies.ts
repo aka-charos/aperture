@@ -6,6 +6,10 @@ import type { Movie, PaginationOptions, PaginatedResult, WatchedItem } from '../
 import type { EmbyItem, EmbyItemsResponse, EmbyActivityResponse } from './types.js'
 import { mapEmbyItemToMovie } from './mappers.js'
 import { logger, type EmbyProviderBase } from './base.js'
+import { mergeWatchedItems } from '../watchHistoryHelpers.js'
+
+const MOVIE_WATCH_FIELDS =
+  'UserData,UserDataPlayCount,UserDataLastPlayedDate,ProviderIds,RunTimeTicks'
 
 export async function getMovies(
   provider: EmbyProviderBase,
@@ -165,6 +169,12 @@ async function getWatchHistoryFromItems(
 
   const itemsMap = new Map<string, WatchedItem>()
 
+  const upsertMovie = (item: EmbyItem) => {
+    const mapped = watchedItemFromEmbyMovie(item)
+    const existing = itemsMap.get(item.Id)
+    itemsMap.set(item.Id, existing ? mergeWatchedItems(existing, mapped) : mapped)
+  }
+
   // Step 1: Fetch all PLAYED movies (or just recently played for delta sync)
   let startIndex = 0
   const pageSize = 500
@@ -173,14 +183,13 @@ async function getWatchHistoryFromItems(
     const params = new URLSearchParams({
       IncludeItemTypes: 'Movie',
       Recursive: 'true',
-      Fields: 'UserData,UserDataPlayCount,UserDataLastPlayedDate,ProviderIds',
+      Fields: MOVIE_WATCH_FIELDS,
       IsPlayed: 'true',
       UserId: userId,
       StartIndex: String(startIndex),
       Limit: String(pageSize),
     })
 
-    // Delta sync: only get items played since last sync
     if (sinceDate) {
       params.set('MinDateLastSavedForUser', sinceDate.toISOString())
     }
@@ -196,14 +205,7 @@ async function getWatchHistoryFromItems(
 
     for (const item of response.Items) {
       if (item.UserData?.Played) {
-        itemsMap.set(item.Id, {
-          movieId: item.Id,
-          playCount: item.UserData.PlayCount || 0,
-          isFavorite: item.UserData.IsFavorite || false,
-          lastPlayedDate: item.UserData.LastPlayedDate,
-          tmdbId: item.ProviderIds?.Tmdb,
-          imdbId: item.ProviderIds?.Imdb,
-        })
+        upsertMovie(item)
       }
     }
 
@@ -215,7 +217,30 @@ async function getWatchHistoryFromItems(
 
   logger.debug({ userId, playedCount: itemsMap.size }, 'Fetched played movies')
 
-  // Step 2: Fetch all FAVORITES (including unwatched ones)
+  // Step 2: Fetch in-progress / resume movies
+  const resumeParams = new URLSearchParams({
+    IncludeItemTypes: 'Movie',
+    Fields: MOVIE_WATCH_FIELDS,
+    UserId: userId,
+  })
+
+  const resumeResponse = await provider.fetch<EmbyItemsResponse>(
+    `/Users/${userId}/Items/Resume?${resumeParams}`,
+    apiKey
+  )
+
+  let addedResume = 0
+  for (const item of resumeResponse.Items) {
+    const position = item.UserData?.PlaybackPositionTicks ?? 0
+    if (position > 0 && !item.UserData?.Played) {
+      if (!itemsMap.has(item.Id)) addedResume++
+      upsertMovie(item)
+    }
+  }
+
+  logger.debug({ userId, resumeCount: resumeResponse.Items.length, addedResume }, 'Fetched resume movies')
+
+  // Step 3: Fetch all FAVORITES (including unwatched ones)
   const favoritesParams = new URLSearchParams({
     IncludeItemTypes: 'Movie',
     Recursive: 'true',
@@ -232,18 +257,9 @@ async function getWatchHistoryFromItems(
   let addedFavorites = 0
   for (const item of favoritesResponse.Items) {
     if (!itemsMap.has(item.Id)) {
-      // This is a favorite that hasn't been played - add it
-      itemsMap.set(item.Id, {
-        movieId: item.Id,
-        playCount: 0,
-        isFavorite: true,
-        lastPlayedDate: item.UserData?.LastPlayedDate,
-        tmdbId: item.ProviderIds?.Tmdb,
-        imdbId: item.ProviderIds?.Imdb,
-      })
+      itemsMap.set(item.Id, watchedItemFromEmbyMovie(item))
       addedFavorites++
     } else {
-      // Movie is already in the map (played), ensure favorite flag is set
       const existing = itemsMap.get(item.Id)!
       existing.isFavorite = true
     }
@@ -274,6 +290,20 @@ async function getWatchHistoryFromItems(
     'Watch history from Items API complete'
   )
   return allItems
+}
+
+function watchedItemFromEmbyMovie(item: EmbyItem): WatchedItem {
+  return {
+    movieId: item.Id,
+    playCount: item.UserData?.PlayCount || 0,
+    isFavorite: item.UserData?.IsFavorite || false,
+    lastPlayedDate: item.UserData?.LastPlayedDate,
+    tmdbId: item.ProviderIds?.Tmdb,
+    imdbId: item.ProviderIds?.Imdb,
+    played: item.UserData?.Played ?? false,
+    playbackPositionTicks: item.UserData?.PlaybackPositionTicks,
+    runtimeTicks: item.RunTimeTicks,
+  }
 }
 
 /**

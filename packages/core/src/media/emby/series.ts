@@ -12,6 +12,10 @@ import type {
 import type { EmbySeries, EmbyEpisode } from './types.js'
 import { mapEmbyItemToSeries, mapEmbyItemToEpisode } from './mappers.js'
 import { logger, type EmbyProviderBase } from './base.js'
+import { mergeWatchedEpisodes } from '../watchHistoryHelpers.js'
+
+const EPISODE_WATCH_FIELDS =
+  'UserData,UserDataPlayCount,UserDataLastPlayedDate,SeriesId,ParentIndexNumber,IndexNumber,ProviderIds,RunTimeTicks'
 
 export async function getSeries(
   provider: EmbyProviderBase,
@@ -195,6 +199,12 @@ export async function getSeriesWatchHistory(
 
   const itemsMap = new Map<string, WatchedEpisode>()
 
+  const upsertEpisode = (item: EmbyEpisode) => {
+    const mapped = watchedEpisodeFromEmbyItem(item)
+    const existing = itemsMap.get(item.Id)
+    itemsMap.set(item.Id, existing ? mergeWatchedEpisodes(existing, mapped) : mapped)
+  }
+
   // Step 1: Fetch all PLAYED episodes (or just recently played for delta sync)
   let startIndex = 0
   const pageSize = 500
@@ -203,7 +213,7 @@ export async function getSeriesWatchHistory(
     const params = new URLSearchParams({
       IncludeItemTypes: 'Episode',
       Recursive: 'true',
-      Fields: 'UserData,UserDataPlayCount,UserDataLastPlayedDate,SeriesId,ParentIndexNumber,IndexNumber,ProviderIds',
+      Fields: EPISODE_WATCH_FIELDS,
       IsPlayed: 'true',
       UserId: userId,
       StartIndex: String(startIndex),
@@ -226,18 +236,7 @@ export async function getSeriesWatchHistory(
 
     for (const item of response.Items) {
       if (item.UserData?.Played) {
-        itemsMap.set(item.Id, {
-          episodeId: item.Id,
-          seriesId: item.SeriesId,
-          seasonNumber: item.ParentIndexNumber,
-          episodeNumber: item.IndexNumber,
-          playCount: item.UserData.PlayCount || 0,
-          isFavorite: item.UserData.IsFavorite || false,
-          lastPlayedDate: item.UserData.LastPlayedDate,
-          tmdbId: item.ProviderIds?.Tmdb,
-          imdbId: item.ProviderIds?.Imdb,
-          tvdbId: item.ProviderIds?.Tvdb,
-        })
+        upsertEpisode(item)
       }
     }
 
@@ -249,7 +248,33 @@ export async function getSeriesWatchHistory(
 
   logger.debug({ userId, playedCount: itemsMap.size }, 'Fetched played episodes')
 
-  // Step 2: Fetch all FAVORITE episodes (including unwatched ones)
+  // Step 2: Fetch in-progress / resume episodes
+  const resumeParams = new URLSearchParams({
+    IncludeItemTypes: 'Episode',
+    Fields: EPISODE_WATCH_FIELDS,
+    UserId: userId,
+  })
+
+  const resumeResponse = await provider.fetch<{ Items: EmbyEpisode[] }>(
+    `/Users/${userId}/Items/Resume?${resumeParams}`,
+    apiKey
+  )
+
+  let addedResume = 0
+  for (const item of resumeResponse.Items) {
+    const position = item.UserData?.PlaybackPositionTicks ?? 0
+    if (position > 0 && !item.UserData?.Played) {
+      if (!itemsMap.has(item.Id)) addedResume++
+      upsertEpisode(item)
+    }
+  }
+
+  logger.debug(
+    { userId, resumeCount: resumeResponse.Items.length, addedResume },
+    'Fetched resume episodes'
+  )
+
+  // Step 3: Fetch all FAVORITE episodes (including unwatched ones)
   const favoritesParams = new URLSearchParams({
     IncludeItemTypes: 'Episode',
     Recursive: 'true',
@@ -266,18 +291,9 @@ export async function getSeriesWatchHistory(
   let addedFavorites = 0
   for (const item of favoritesResponse.Items) {
     if (!itemsMap.has(item.Id)) {
-      itemsMap.set(item.Id, {
-        episodeId: item.Id,
-        seriesId: item.SeriesId,
-        seasonNumber: item.ParentIndexNumber,
-        episodeNumber: item.IndexNumber,
-        playCount: 0,
-        isFavorite: true,
-        lastPlayedDate: item.UserData?.LastPlayedDate,
-        tmdbId: item.ProviderIds?.Tmdb,
-        imdbId: item.ProviderIds?.Imdb,
-        tvdbId: item.ProviderIds?.Tvdb,
-      })
+      const favorite = watchedEpisodeFromEmbyItem(item)
+      favorite.isFavorite = true
+      itemsMap.set(item.Id, favorite)
       addedFavorites++
     } else {
       const existing = itemsMap.get(item.Id)!
@@ -306,6 +322,24 @@ export async function getSeriesWatchHistory(
 
   logger.info({ userId, totalItems: allItems.length }, 'Series watch history complete')
   return allItems
+}
+
+function watchedEpisodeFromEmbyItem(item: EmbyEpisode): WatchedEpisode {
+  return {
+    episodeId: item.Id,
+    seriesId: item.SeriesId,
+    seasonNumber: item.ParentIndexNumber,
+    episodeNumber: item.IndexNumber,
+    playCount: item.UserData?.PlayCount || 0,
+    isFavorite: item.UserData?.IsFavorite || false,
+    lastPlayedDate: item.UserData?.LastPlayedDate,
+    tmdbId: item.ProviderIds?.Tmdb,
+    imdbId: item.ProviderIds?.Imdb,
+    tvdbId: item.ProviderIds?.Tvdb,
+    played: item.UserData?.Played ?? false,
+    playbackPositionTicks: item.UserData?.PlaybackPositionTicks,
+    runtimeTicks: item.RunTimeTicks,
+  }
 }
 
 /**

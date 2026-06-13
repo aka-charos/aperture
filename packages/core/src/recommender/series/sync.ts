@@ -1233,8 +1233,9 @@ export async function syncSeriesWatchHistoryForUser(
       season_number: number
       episode_number: number
       provider_library_id: string | null
+      runtime_minutes: number | null
     }>(
-      `SELECT e.id, e.provider_item_id, e.series_id, e.season_number, e.episode_number, s.provider_library_id
+      `SELECT e.id, e.provider_item_id, e.series_id, e.season_number, e.episode_number, e.runtime_minutes, s.provider_library_id
        FROM episodes e
        JOIN series s ON e.series_id = s.id
        WHERE e.provider_item_id IS NOT NULL`
@@ -1255,6 +1256,7 @@ export async function syncSeriesWatchHistoryForUser(
   const providerIdToEpisodeId = new Map<string, string>()
   const episodeKeyToId = new Map<string, string>()
   const episodeIdToLibraryId = new Map<string, string | null>()
+  const episodeIdToRuntimeTicks = new Map<string, number>()
   for (const episode of allEpisodes.rows) {
     providerIdToEpisodeId.set(episode.provider_item_id, episode.id)
     episodeKeyToId.set(
@@ -1262,6 +1264,9 @@ export async function syncSeriesWatchHistoryForUser(
       episode.id
     )
     episodeIdToLibraryId.set(episode.id, episode.provider_library_id)
+    if (episode.runtime_minutes) {
+      episodeIdToRuntimeTicks.set(episode.id, episode.runtime_minutes * 600000000)
+    }
   }
 
   const resolveEpisodeId = (item: (typeof watchedEpisodes)[number]): string | undefined => {
@@ -1297,6 +1302,9 @@ export async function syncSeriesWatchHistoryForUser(
     playCount: number
     lastPlayedAt: Date | null
     isFavorite: boolean
+    played: boolean
+    playbackPositionTicks: number | null
+    runtimeTicks: number | null
   }[] = []
 
   let excludedCount = 0
@@ -1318,6 +1326,9 @@ export async function syncSeriesWatchHistoryForUser(
         playCount: item.playCount,
         lastPlayedAt: item.lastPlayedDate ? new Date(item.lastPlayedDate) : null,
         isFavorite: item.isFavorite,
+        played: item.played ?? false,
+        playbackPositionTicks: item.playbackPositionTicks ?? null,
+        runtimeTicks: item.runtimeTicks ?? episodeIdToRuntimeTicks.get(episodeId) ?? null,
       })
     }
   }
@@ -1335,14 +1346,17 @@ export async function syncSeriesWatchHistoryForUser(
   // Bulk upsert watch history using unnest()
   if (toSync.length > 0) {
     const result = await query(
-      `INSERT INTO watch_history (user_id, episode_id, media_type, play_count, last_played_at, is_favorite)
-       SELECT $1, episode_id, 'episode', play_count, last_played_at, is_favorite
-       FROM unnest($2::uuid[], $3::int[], $4::timestamptz[], $5::boolean[])
-         AS t(episode_id, play_count, last_played_at, is_favorite)
+      `INSERT INTO watch_history (user_id, episode_id, media_type, play_count, last_played_at, is_favorite, played, playback_position_ticks, runtime_ticks)
+       SELECT $1, episode_id, 'episode', play_count, last_played_at, is_favorite, played, playback_position_ticks, runtime_ticks
+       FROM unnest($2::uuid[], $3::int[], $4::timestamptz[], $5::boolean[], $6::boolean[], $7::bigint[], $8::bigint[])
+         AS t(episode_id, play_count, last_played_at, is_favorite, played, playback_position_ticks, runtime_ticks)
        ON CONFLICT (user_id, episode_id) WHERE episode_id IS NOT NULL DO UPDATE SET
          play_count = EXCLUDED.play_count,
          last_played_at = EXCLUDED.last_played_at,
          is_favorite = EXCLUDED.is_favorite,
+         played = EXCLUDED.played,
+         playback_position_ticks = EXCLUDED.playback_position_ticks,
+         runtime_ticks = EXCLUDED.runtime_ticks,
          updated_at = NOW()`,
       [
         userId,
@@ -1350,12 +1364,15 @@ export async function syncSeriesWatchHistoryForUser(
         toSync.map((t) => t.playCount),
         toSync.map((t) => t.lastPlayedAt),
         toSync.map((t) => t.isFavorite),
+        toSync.map((t) => t.played),
+        toSync.map((t) => t.playbackPositionTicks),
+        toSync.map((t) => t.runtimeTicks),
       ]
     )
     synced = result.rowCount || toSync.length
   }
 
-  // Remove watch history entries for episodes no longer marked as watched
+  // Remove watch history entries no longer present in Emby (played, resume, or favorites)
   // Only do this on full sync (delta sync only adds/updates)
   let removed = 0
   if (fullSync && existingEpisodeIds.size > 0) {

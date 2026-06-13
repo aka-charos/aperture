@@ -6,6 +6,9 @@ import type { Movie, PaginationOptions, PaginatedResult, WatchedItem } from '../
 import type { JellyfinItem, JellyfinItemsResponse } from './types.js'
 import { mapJellyfinItemToMovie } from './mappers.js'
 import { logger, type JellyfinProviderBase } from './base.js'
+import { mergeWatchedItems } from '../watchHistoryHelpers.js'
+
+const MOVIE_WATCH_FIELDS = 'UserData,ProviderIds,RunTimeTicks'
 
 export async function getMovies(
   provider: JellyfinProviderBase,
@@ -103,6 +106,12 @@ export async function getWatchHistory(
 
   const itemsMap = new Map<string, WatchedItem>()
 
+  const upsertMovie = (item: JellyfinItem) => {
+    const mapped = watchedItemFromJellyfinMovie(item)
+    const existing = itemsMap.get(item.Id)
+    itemsMap.set(item.Id, existing ? mergeWatchedItems(existing, mapped) : mapped)
+  }
+
   // Step 1: Fetch all PLAYED movies (or just recently played for delta sync)
   let startIndex = 0
   const pageSize = 500
@@ -111,7 +120,7 @@ export async function getWatchHistory(
     const params = new URLSearchParams({
       IncludeItemTypes: 'Movie',
       Recursive: 'true',
-      Fields: 'UserData,ProviderIds',
+      Fields: MOVIE_WATCH_FIELDS,
       IsPlayed: 'true',
       UserId: userId,
       StartIndex: String(startIndex),
@@ -134,14 +143,7 @@ export async function getWatchHistory(
 
     for (const item of response.Items) {
       if (item.UserData?.Played) {
-        itemsMap.set(item.Id, {
-          movieId: item.Id,
-          playCount: item.UserData.PlayCount || 0,
-          isFavorite: item.UserData.IsFavorite || false,
-          lastPlayedDate: item.UserData.LastPlayedDate,
-          tmdbId: item.ProviderIds?.Tmdb,
-          imdbId: item.ProviderIds?.Imdb,
-        })
+        upsertMovie(item)
       }
     }
 
@@ -152,6 +154,28 @@ export async function getWatchHistory(
   }
 
   logger.debug({ userId, playedCount: itemsMap.size }, 'Fetched played movies')
+
+  const resumeParams = new URLSearchParams({
+    IncludeItemTypes: 'Movie',
+    Fields: MOVIE_WATCH_FIELDS,
+    UserId: userId,
+  })
+
+  const resumeResponse = await provider.fetch<JellyfinItemsResponse>(
+    `/Users/${userId}/Items/Resume?${resumeParams}`,
+    apiKey
+  )
+
+  let addedResume = 0
+  for (const item of resumeResponse.Items) {
+    const position = item.UserData?.PlaybackPositionTicks ?? 0
+    if (position > 0 && !item.UserData?.Played) {
+      if (!itemsMap.has(item.Id)) addedResume++
+      upsertMovie(item)
+    }
+  }
+
+  logger.debug({ userId, resumeCount: resumeResponse.Items.length, addedResume }, 'Fetched resume movies')
 
   // Step 2: Fetch all FAVORITES (including unwatched ones)
   const favoritesParams = new URLSearchParams({
@@ -170,14 +194,7 @@ export async function getWatchHistory(
   let addedFavorites = 0
   for (const item of favoritesResponse.Items) {
     if (!itemsMap.has(item.Id)) {
-      itemsMap.set(item.Id, {
-        movieId: item.Id,
-        playCount: 0,
-        isFavorite: true,
-        lastPlayedDate: item.UserData?.LastPlayedDate,
-        tmdbId: item.ProviderIds?.Tmdb,
-        imdbId: item.ProviderIds?.Imdb,
-      })
+      itemsMap.set(item.Id, watchedItemFromJellyfinMovie(item))
       addedFavorites++
     } else {
       const existing = itemsMap.get(item.Id)!
@@ -209,6 +226,20 @@ export async function getWatchHistory(
     'Watch history complete'
   )
   return allItems
+}
+
+function watchedItemFromJellyfinMovie(item: JellyfinItem): WatchedItem {
+  return {
+    movieId: item.Id,
+    playCount: item.UserData?.PlayCount || 0,
+    isFavorite: item.UserData?.IsFavorite || false,
+    lastPlayedDate: item.UserData?.LastPlayedDate,
+    tmdbId: item.ProviderIds?.Tmdb,
+    imdbId: item.ProviderIds?.Imdb,
+    played: item.UserData?.Played ?? false,
+    playbackPositionTicks: item.UserData?.PlaybackPositionTicks,
+    runtimeTicks: item.RunTimeTicks,
+  }
 }
 
 /**

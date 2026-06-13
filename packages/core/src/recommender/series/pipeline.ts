@@ -42,6 +42,7 @@ import {
 } from '../../taste-profile/index.js'
 import { getItemFranchise } from '../../taste-profile/franchise.js'
 import { getDislikedSeriesIds } from './taste.js'
+import { WATCH_HISTORY_TASTE_SQL } from '../watchedExclusion.js'
 import { loadConfigForUser } from '../config.js'
 import type { PipelineConfig } from '../types.js'
 
@@ -102,7 +103,7 @@ async function getSeriesWatchHistory(userId: string, limit: number): Promise<Wat
      FROM watch_history wh
      JOIN episodes e ON e.id = wh.episode_id
      JOIN series s ON s.id = e.series_id
-     WHERE wh.user_id = $1 AND wh.media_type = 'episode'
+     WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND (${WATCH_HISTORY_TASTE_SQL})
      GROUP BY e.series_id, s.total_episodes
      ORDER BY MAX(wh.last_played_at) DESC NULLS LAST
      LIMIT $2`,

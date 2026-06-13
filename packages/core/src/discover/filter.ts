@@ -6,6 +6,7 @@
 
 import { createChildLogger } from '../lib/logger.js'
 import { query } from '../lib/db.js'
+import { WATCH_HISTORY_EXCLUDABLE_SQL } from '../recommender/watchedExclusion.js'
 import type { MediaType, RawCandidate } from './types.js'
 
 const logger = createChildLogger('discover:filter')
@@ -45,7 +46,8 @@ async function getWatchedTmdbIds(userId: string, mediaType: MediaType): Promise<
        JOIN movies m ON m.id = wh.movie_id
        WHERE wh.user_id = $1 
          AND wh.media_type = 'movie'
-         AND m.tmdb_id IS NOT NULL`,
+         AND m.tmdb_id IS NOT NULL
+         AND ${WATCH_HISTORY_EXCLUDABLE_SQL}`,
       [userId]
     )
   } else {
@@ -57,7 +59,8 @@ async function getWatchedTmdbIds(userId: string, mediaType: MediaType): Promise<
        JOIN series s ON s.id = e.series_id
        WHERE wh.user_id = $1 
          AND wh.media_type = 'episode'
-         AND s.tmdb_id IS NOT NULL`,
+         AND s.tmdb_id IS NOT NULL
+         AND ${WATCH_HISTORY_EXCLUDABLE_SQL}`,
       [userId]
     )
   }

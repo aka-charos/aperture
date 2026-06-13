@@ -750,19 +750,24 @@ export async function syncWatchHistoryForUser(
     provider_library_id: string | null
     tmdb_id: string | null
     imdb_id: string | null
+    runtime_minutes: number | null
   }>(
-    'SELECT id, provider_item_id, provider_library_id, tmdb_id, imdb_id FROM movies WHERE provider_item_id IS NOT NULL'
+    'SELECT id, provider_item_id, provider_library_id, tmdb_id, imdb_id, runtime_minutes FROM movies WHERE provider_item_id IS NOT NULL'
   )
 
   const providerIdToMovieId = new Map<string, string>()
   const providerIdToLibraryId = new Map<string, string | null>()
   const movieIdToLibraryId = new Map<string, string | null>()
+  const movieIdToRuntimeTicks = new Map<string, number>()
   const tmdbIdToMovieId = new Map<string, string>()
   const imdbIdToMovieId = new Map<string, string>()
   for (const movie of allMovies.rows) {
     providerIdToMovieId.set(movie.provider_item_id, movie.id)
     providerIdToLibraryId.set(movie.provider_item_id, movie.provider_library_id)
     movieIdToLibraryId.set(movie.id, movie.provider_library_id)
+    if (movie.runtime_minutes) {
+      movieIdToRuntimeTicks.set(movie.id, movie.runtime_minutes * 600000000)
+    }
     if (movie.tmdb_id) tmdbIdToMovieId.set(movie.tmdb_id, movie.id)
     if (movie.imdb_id) imdbIdToMovieId.set(movie.imdb_id, movie.id)
   }
@@ -794,6 +799,9 @@ export async function syncWatchHistoryForUser(
     playCount: number
     lastPlayedAt: Date | null
     isFavorite: boolean
+    played: boolean
+    playbackPositionTicks: number | null
+    runtimeTicks: number | null
   }[] = []
 
   let excludedCount = 0
@@ -816,6 +824,9 @@ export async function syncWatchHistoryForUser(
         playCount: item.playCount,
         lastPlayedAt: item.lastPlayedDate ? new Date(item.lastPlayedDate) : null,
         isFavorite: item.isFavorite,
+        played: item.played ?? false,
+        playbackPositionTicks: item.playbackPositionTicks ?? null,
+        runtimeTicks: item.runtimeTicks ?? movieIdToRuntimeTicks.get(movieId) ?? null,
       })
     }
   }
@@ -833,14 +844,17 @@ export async function syncWatchHistoryForUser(
   // Bulk upsert watch history using unnest()
   if (toSync.length > 0) {
     const result = await query(
-      `INSERT INTO watch_history (user_id, movie_id, play_count, last_played_at, is_favorite, media_type)
-       SELECT $1, movie_id, play_count, last_played_at, is_favorite, 'movie'
-       FROM unnest($2::uuid[], $3::int[], $4::timestamptz[], $5::boolean[])
-         AS t(movie_id, play_count, last_played_at, is_favorite)
+      `INSERT INTO watch_history (user_id, movie_id, play_count, last_played_at, is_favorite, media_type, played, playback_position_ticks, runtime_ticks)
+       SELECT $1, movie_id, play_count, last_played_at, is_favorite, 'movie', played, playback_position_ticks, runtime_ticks
+       FROM unnest($2::uuid[], $3::int[], $4::timestamptz[], $5::boolean[], $6::boolean[], $7::bigint[], $8::bigint[])
+         AS t(movie_id, play_count, last_played_at, is_favorite, played, playback_position_ticks, runtime_ticks)
        ON CONFLICT (user_id, movie_id) WHERE movie_id IS NOT NULL DO UPDATE SET
          play_count = EXCLUDED.play_count,
          last_played_at = EXCLUDED.last_played_at,
          is_favorite = EXCLUDED.is_favorite,
+         played = EXCLUDED.played,
+         playback_position_ticks = EXCLUDED.playback_position_ticks,
+         runtime_ticks = EXCLUDED.runtime_ticks,
          updated_at = NOW()`,
       [
         userId,
@@ -848,12 +862,15 @@ export async function syncWatchHistoryForUser(
         toSync.map((t) => t.playCount),
         toSync.map((t) => t.lastPlayedAt),
         toSync.map((t) => t.isFavorite),
+        toSync.map((t) => t.played),
+        toSync.map((t) => t.playbackPositionTicks),
+        toSync.map((t) => t.runtimeTicks),
       ]
     )
     synced = result.rowCount || toSync.length
   }
 
-  // Remove watch history entries for movies no longer marked as watched
+  // Remove watch history entries no longer present in Emby (played, resume, or favorites)
   // Only do this on full sync (delta sync only adds/updates)
   let removed = 0
   if (fullSync && existingMovieIds.size > 0) {

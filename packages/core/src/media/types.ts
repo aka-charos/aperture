@@ -128,6 +128,9 @@ export interface WatchedItem {
   userRating?: number
   tmdbId?: string
   imdbId?: string
+  played?: boolean
+  playbackPositionTicks?: number
+  runtimeTicks?: number
 }
 
 export interface WatchedEpisode {
@@ -142,6 +145,9 @@ export interface WatchedEpisode {
   tmdbId?: string
   imdbId?: string
   tvdbId?: string
+  played?: boolean
+  playbackPositionTicks?: number
+  runtimeTicks?: number
 }
 
 export interface Series {
