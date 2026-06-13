@@ -23,7 +23,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL, HeartRating } from '@aperture/ui'
-import { formatWatchHistoryRelativeDate } from '@/lib/formatWatchHistoryRelativeDate'
+import { formatWatchHistoryRelativeDate, formatWatchHistoryExactDate } from '@/lib/formatWatchHistoryRelativeDate'
 
 interface MovieWatchHistoryItem {
   movie_id: string
@@ -326,12 +326,14 @@ export function WatchHistoryMovieListItem({
             </Box>
 
             {/* Last Watched */}
-            <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
-              <AccessTimeIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-              <Typography variant="caption" color="text.secondary">
-                {formatWatchHistoryRelativeDate(movie.last_played_at, t)}
-              </Typography>
-            </Box>
+            <Tooltip title={formatWatchHistoryExactDate(movie.last_played_at, t)}>
+              <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
+                <AccessTimeIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                <Typography variant="caption" color="text.secondary">
+                  {formatWatchHistoryRelativeDate(movie.last_played_at, t)}
+                </Typography>
+              </Box>
+            </Tooltip>
 
             {/* Actions */}
             <Box display="flex" justifyContent="center" gap={1} alignItems="center">
@@ -403,12 +405,14 @@ export function WatchHistoryMovieListItem({
                 {t('watchHistoryPage.playNoun', { count: movie.play_count })}
               </Typography>
             </Box>
-            <Box display="flex" alignItems="center" gap={0.5}>
-              <AccessTimeIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-              <Typography variant="caption" color="text.secondary">
-                {formatWatchHistoryRelativeDate(movie.last_played_at, t)}
-              </Typography>
-            </Box>
+            <Tooltip title={formatWatchHistoryExactDate(movie.last_played_at, t)}>
+              <Box display="flex" alignItems="center" gap={0.5}>
+                <AccessTimeIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                <Typography variant="caption" color="text.secondary">
+                  {formatWatchHistoryRelativeDate(movie.last_played_at, t)}
+                </Typography>
+              </Box>
+            </Tooltip>
           </Box>
           <LinearProgress
             variant="determinate"

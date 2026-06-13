@@ -28,6 +28,7 @@ import {
   registerLanguageDefaultsHandlers,
   registerStreamingDiscoverySettingsHandlers,
   registerDiscoveryGenreStripsSettingsHandlers,
+  registerN8nHandlers,
 } from './handlers/index.js'
 
 const settingsRoutes: FastifyPluginAsync = async (fastify) => {
@@ -45,6 +46,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   registerAiOutputHandlers(fastify)
   registerTasteProfileHandlers(fastify)
   registerLegacyAiModelsHandlers(fastify)
+  registerN8nHandlers(fastify)
 }
 
 export default settingsRoutes

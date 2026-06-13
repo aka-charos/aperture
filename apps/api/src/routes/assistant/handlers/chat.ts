@@ -9,10 +9,10 @@
 import { Readable } from 'node:stream'
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 'ai'
-import { getChatModelInstance, getEmbeddingModelInstance, getFunctionConfig, getActiveEmbeddingModelId, type AIFunction } from '@aperture/core'
+import { getChatModelInstance, getChatProviderTools, getEmbeddingModelInstance, getFunctionConfig, getActiveEmbeddingModelId, type AIFunction } from '@aperture/core'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
-import { getMediaServerInfo, buildSystemPrompt } from '../helpers/index.js'
-import { createTools } from '../tools/index.js'
+import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess } from '../helpers/index.js'
+import { createTools, createN8nTools } from '../tools/index.js'
 
 interface ChatBody {
   messages: UIMessage[]
@@ -126,8 +126,19 @@ export function registerChatHandler(fastify: FastifyInstance) {
           mediaServer,
         }
 
-        // Create tools with context
-        const tools = createTools(toolContext)
+        // Create tools with context, plus n8n search_web and provider-native
+        // tools (e.g. Google Search grounding) when enabled in settings
+        const tools = {
+          ...createTools(toolContext),
+          ...(await createN8nTools()),
+          ...(await getChatProviderTools()),
+        }
+
+        // Optional n8n pre-processing hook (fails open if n8n is unreachable)
+        const { messages: processedMessages, systemAppend } = await applyN8nPreProcess(messages, {
+          id: user.id,
+          isAdmin: user.isAdmin,
+        })
 
         fastify.log.info({ toolCount: Object.keys(tools).length, model: chatConfig?.model ?? 'unknown' }, 'Starting chat stream')
 
@@ -135,8 +146,8 @@ export function registerChatHandler(fastify: FastifyInstance) {
         // stopWhen allows the model to continue generating text after tool results
         const result = streamText({
           model: chatModel,
-          system: systemPrompt,
-          messages: convertToModelMessages(messages),
+          system: systemAppend ? `${systemPrompt}\n\n${systemAppend}` : systemPrompt,
+          messages: convertToModelMessages(processedMessages),
           tools,
           toolChoice: 'auto',
           stopWhen: stepCountIs(5), // Stop after 5 steps (allows tool calls + follow-up responses)

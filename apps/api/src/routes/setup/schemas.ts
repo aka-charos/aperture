@@ -569,6 +569,7 @@ const updateAIFunctionConfig = {
       model: { type: 'string' as const },
       apiKey: { type: 'string' as const, description: 'API key (optional if already saved)' },
       baseUrl: { type: 'string' as const, description: 'Custom base URL (optional)' },
+      useSearchGrounding: { type: 'boolean' as const, description: 'Enable native Google Search grounding (Google provider, chat function only)' },
     },
     example: {
       provider: 'openai',
