@@ -11,7 +11,8 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  changes:
+  detect-changes:
+    name: Detect Docker Changes
     runs-on: ubuntu-latest
     outputs:
       docker: ${{ steps.filter.outputs.docker }}
@@ -34,7 +35,8 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
 
-  check:
+  validate:
+    name: Lint & Typecheck
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -57,12 +59,13 @@ jobs:
       - name: Validate
         run: pnpm validate
 
-  build-amd64:
-    needs: [changes, check]
+  docker-amd64:
+    name: Build Docker Image (amd64)
+    needs: [detect-changes, validate]
     if: |
       always() &&
-      needs.check.result == 'success' &&
-      (needs.changes.outputs.docker == 'true' || github.event_name == 'workflow_dispatch')
+      needs.validate.result == 'success' &&
+      (needs.detect-changes.outputs.docker == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -113,12 +116,13 @@ jobs:
           cache-to: type=gha,mode=max,scope=amd64
           platforms: linux/amd64
 
-  build-arm64:
-    needs: [changes, check]
+  docker-arm64:
+    name: Build Docker Image (arm64)
+    needs: [detect-changes, validate]
     if: |
       always() &&
-      needs.check.result == 'success' &&
-      (needs.changes.outputs.docker == 'true' || github.event_name == 'workflow_dispatch') &&
+      needs.validate.result == 'success' &&
+      (needs.detect-changes.outputs.docker == 'true' || github.event_name == 'workflow_dispatch') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-24.04-arm
     permissions:
@@ -149,13 +153,14 @@ jobs:
           cache-to: type=gha,mode=max,scope=arm64
           platforms: linux/arm64
 
-  merge:
-    needs: [build-amd64, build-arm64]
+  publish-manifest:
+    name: Publish Multi-Arch Manifest
+    needs: [docker-amd64, docker-arm64]
     if: |
       always() &&
-      needs.build-amd64.result == 'success' &&
-      needs.build-amd64.outputs.needs_merge == 'true' &&
-      needs.build-arm64.result == 'success'
+      needs.docker-amd64.result == 'success' &&
+      needs.docker-amd64.outputs.needs_merge == 'true' &&
+      needs.docker-arm64.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
