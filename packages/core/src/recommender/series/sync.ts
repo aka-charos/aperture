@@ -1,4 +1,5 @@
 import { createChildLogger } from '../../lib/logger.js'
+import { mergeWatchHistorySyncRow } from '../watchHistorySyncRows.js'
 import { query, queryOne } from '../../lib/db.js'
 import { getEnabledTvLibraryIds } from '../../lib/libraryConfig.js'
 import { getMediaServerProvider } from '../../media/index.js'
@@ -1297,15 +1298,18 @@ export async function syncSeriesWatchHistoryForUser(
   const existingEpisodeIds = new Set(existingHistory.rows.map((r) => r.episode_id))
 
   // Prepare bulk data - filter to items we have in our database and not excluded
-  const toSync: {
-    episodeId: string
-    playCount: number
-    lastPlayedAt: Date | null
-    isFavorite: boolean
-    played: boolean
-    playbackPositionTicks: number | null
-    runtimeTicks: number | null
-  }[] = []
+  const toSyncMap = new Map<
+    string,
+    {
+      episodeId: string
+      playCount: number
+      lastPlayedAt: Date | null
+      isFavorite: boolean
+      played: boolean
+      playbackPositionTicks: number | null
+      runtimeTicks: number | null
+    }
+  >()
 
   let excludedCount = 0
   let fallbackMappedCount = 0
@@ -1321,7 +1325,7 @@ export async function syncSeriesWatchHistoryForUser(
         continue
       }
 
-      toSync.push({
+      const row = {
         episodeId,
         playCount: item.playCount,
         lastPlayedAt: item.lastPlayedDate ? new Date(item.lastPlayedDate) : null,
@@ -1329,9 +1333,16 @@ export async function syncSeriesWatchHistoryForUser(
         played: item.played ?? false,
         playbackPositionTicks: item.playbackPositionTicks ?? null,
         runtimeTicks: item.runtimeTicks ?? episodeIdToRuntimeTicks.get(episodeId) ?? null,
-      })
+      }
+      const existing = toSyncMap.get(episodeId)
+      toSyncMap.set(
+        episodeId,
+        existing ? { episodeId, ...mergeWatchHistorySyncRow(existing, row) } : row
+      )
     }
   }
+
+  const toSync = [...toSyncMap.values()]
 
   if (excludedCount > 0) {
     logger.debug({ userId, excludedCount }, 'Excluded episode watch history items from excluded libraries')

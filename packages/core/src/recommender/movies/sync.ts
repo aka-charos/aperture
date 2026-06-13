@@ -1,4 +1,5 @@
 import { createChildLogger } from '../../lib/logger.js'
+import { mergeWatchHistorySyncRow } from '../watchHistorySyncRows.js'
 import { query, queryOne } from '../../lib/db.js'
 import { getEnabledLibraryIds } from '../../lib/libraryConfig.js'
 import { getMediaServerProvider } from '../../media/index.js'
@@ -794,15 +795,18 @@ export async function syncWatchHistoryForUser(
   const existingMovieIds = new Set(existingHistory.rows.map((r) => r.movie_id))
 
   // Prepare bulk data - filter to items we have in our database and not excluded
-  const toSync: {
-    movieId: string
-    playCount: number
-    lastPlayedAt: Date | null
-    isFavorite: boolean
-    played: boolean
-    playbackPositionTicks: number | null
-    runtimeTicks: number | null
-  }[] = []
+  const toSyncMap = new Map<
+    string,
+    {
+      movieId: string
+      playCount: number
+      lastPlayedAt: Date | null
+      isFavorite: boolean
+      played: boolean
+      playbackPositionTicks: number | null
+      runtimeTicks: number | null
+    }
+  >()
 
   let excludedCount = 0
   let fallbackMappedCount = 0
@@ -818,8 +822,8 @@ export async function syncWatchHistoryForUser(
         excludedCount++
         continue // Skip movies from excluded libraries
       }
-      
-      toSync.push({
+
+      const row = {
         movieId,
         playCount: item.playCount,
         lastPlayedAt: item.lastPlayedDate ? new Date(item.lastPlayedDate) : null,
@@ -827,9 +831,16 @@ export async function syncWatchHistoryForUser(
         played: item.played ?? false,
         playbackPositionTicks: item.playbackPositionTicks ?? null,
         runtimeTicks: item.runtimeTicks ?? movieIdToRuntimeTicks.get(movieId) ?? null,
-      })
+      }
+      const existing = toSyncMap.get(movieId)
+      toSyncMap.set(
+        movieId,
+        existing ? { movieId, ...mergeWatchHistorySyncRow(existing, row) } : row
+      )
     }
   }
+
+  const toSync = [...toSyncMap.values()]
   
   if (excludedCount > 0) {
     logger.debug({ userId, excludedCount }, 'Excluded watch history items from excluded libraries')
