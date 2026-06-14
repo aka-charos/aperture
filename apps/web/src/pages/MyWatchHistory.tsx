@@ -38,6 +38,7 @@ import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import AccessTimeIcon from '@mui/icons-material/AccessTime'
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline'
 import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import SortByAlphaIcon from '@mui/icons-material/SortByAlpha'
 import { MoviePoster } from '@aperture/ui'
@@ -52,6 +53,8 @@ interface MovieWatchHistoryItem {
   movie_id: string
   play_count: number
   is_favorite: boolean
+  played: boolean
+  progress_percent: number | null
   last_played_at: string | null
   title: string
   year: number | null
@@ -475,6 +478,17 @@ export function MyWatchHistoryPage() {
                           </Tooltip>
                         )}
                       </Box>
+                      {/* In-progress / resume indicator */}
+                      {!item.played && Math.min(99, item.progress_percent ?? 0) >= 1 && (
+                        <Tooltip title={t('watchHistoryPage.inProgressTooltip', { percent: Math.min(99, item.progress_percent ?? 0) })}>
+                          <Box display="flex" alignItems="center" gap={0.5} sx={{ mt: 0.5, width: 'fit-content' }}>
+                            <PlayCircleOutlineIcon sx={{ fontSize: 12, color: 'warning.main' }} />
+                            <Typography variant="caption" color="warning.main" noWrap sx={{ fontSize: '0.7rem', fontWeight: 600 }}>
+                              {Math.min(99, item.progress_percent ?? 0)}%
+                            </Typography>
+                          </Box>
+                        </Tooltip>
+                      )}
                       {/* Last watched date */}
                       <Tooltip title={formatWatchHistoryExactDate(item.last_played_at, t)}>
                         <Box display="flex" alignItems="center" gap={0.5} sx={{ mt: 0.5, width: 'fit-content' }}>
