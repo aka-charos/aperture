@@ -22,6 +22,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import FavoriteIcon from '@mui/icons-material/Favorite'
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL, HeartRating } from '@aperture/ui'
 import { formatWatchHistoryRelativeDate, formatWatchHistoryExactDate } from '@/lib/formatWatchHistoryRelativeDate'
 
@@ -29,6 +30,8 @@ interface MovieWatchHistoryItem {
   movie_id: string
   play_count: number
   is_favorite: boolean
+  played: boolean
+  progress_percent: number | null
   last_played_at: string | null
   title: string
   year: number | null
@@ -60,6 +63,10 @@ export function WatchHistoryMovieListItem({
 
   // Visual representation of play count (max 10 for the bar)
   const playPercent = Math.min(100, (movie.play_count / 5) * 100)
+
+  // Resume/in-progress indicator from media-server playback progress (0.7.7+)
+  const progressPercent = Math.min(99, movie.progress_percent ?? 0)
+  const inProgress = !movie.played && progressPercent >= 1
 
   const handleRatingClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -335,6 +342,18 @@ export function WatchHistoryMovieListItem({
               </Box>
             </Tooltip>
 
+            {/* In-progress / resume */}
+            {inProgress && (
+              <Tooltip title={t('watchHistoryPage.inProgressTooltip', { percent: progressPercent })}>
+                <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
+                  <PlayCircleOutlineIcon sx={{ fontSize: 14, color: 'warning.main' }} />
+                  <Typography variant="caption" color="warning.main" fontWeight={600}>
+                    {progressPercent}%
+                  </Typography>
+                </Box>
+              </Tooltip>
+            )}
+
             {/* Actions */}
             <Box display="flex" justifyContent="center" gap={1} alignItems="center">
               <HeartRating
@@ -413,6 +432,16 @@ export function WatchHistoryMovieListItem({
                 </Typography>
               </Box>
             </Tooltip>
+            {inProgress && (
+              <Tooltip title={t('watchHistoryPage.inProgressTooltip', { percent: progressPercent })}>
+                <Box display="flex" alignItems="center" gap={0.5}>
+                  <PlayCircleOutlineIcon sx={{ fontSize: 14, color: 'warning.main' }} />
+                  <Typography variant="caption" color="warning.main" fontWeight={600}>
+                    {progressPercent}%
+                  </Typography>
+                </Box>
+              </Tooltip>
+            )}
           </Box>
           <LinearProgress
             variant="determinate"

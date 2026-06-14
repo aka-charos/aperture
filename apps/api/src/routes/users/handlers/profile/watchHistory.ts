@@ -50,6 +50,12 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
            wh.play_count,
            wh.is_favorite,
            wh.last_played_at,
+           wh.played,
+           CASE
+             WHEN wh.runtime_ticks IS NOT NULL AND wh.runtime_ticks > 0 AND wh.playback_position_ticks IS NOT NULL
+             THEN ROUND((wh.playback_position_ticks::numeric / wh.runtime_ticks) * 100)::int
+             ELSE NULL
+           END as progress_percent,
            m.title,
            m.year,
            m.poster_url,
