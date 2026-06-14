@@ -2672,7 +2672,8 @@
     "playLabel_other": "Plays",
     "playNoun_one": "play",
     "playNoun_other": "plays",
-    "completeBadge": "Complete"
+    "completeBadge": "Complete",
+    "inProgressTooltip": "In progress · {{percent}}% watched"
   },
   "topPicksPage": {
     "pageTitle": "Top Picks",
