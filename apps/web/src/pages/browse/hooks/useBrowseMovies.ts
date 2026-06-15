@@ -47,9 +47,12 @@ interface BrowseMoviesResult {
   moviesLoading: boolean
   moviesLoadingMore: boolean
   moviesError: string | null
-  movieSearch: Dispatch<SetStateAction<string>>
-  movieGenre: Dispatch<SetStateAction<string>>
-  collection: Dispatch<SetStateAction<string>>
+  movieSearch: string
+  setMovieSearch: Dispatch<SetStateAction<string>>
+  movieGenre: string
+  setMovieGenre: Dispatch<SetStateAction<string>>
+  collection: string
+  setCollection: Dispatch<SetStateAction<string>>
   movieFilters: MovieFilters
   setMovieFilters: Dispatch<SetStateAction<MovieFilters>>
   movieSortBy: SortField

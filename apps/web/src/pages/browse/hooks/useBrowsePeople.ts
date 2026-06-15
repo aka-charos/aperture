@@ -21,7 +21,8 @@ interface BrowsePeopleResult {
   peopleLoading: boolean
   peopleLoadingMore: boolean
   peopleError: string | null
-  peopleSearch: Dispatch<SetStateAction<string>>
+  peopleSearch: string
+  setPeopleSearch: Dispatch<SetStateAction<string>>
   peopleSortBy: PeopleSortBy
   setPeopleSortBy: Dispatch<SetStateAction<PeopleSortBy>>
   peopleHasMore: boolean

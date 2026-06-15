@@ -26,9 +26,12 @@ interface BrowseSeriesResult {
   seriesLoading: boolean
   seriesLoadingMore: boolean
   seriesError: string | null
-  seriesSearch: Dispatch<SetStateAction<string>>
-  seriesGenre: Dispatch<SetStateAction<string>>
-  network: Dispatch<SetStateAction<string>>
+  seriesSearch: string
+  setSeriesSearch: Dispatch<SetStateAction<string>>
+  seriesGenre: string
+  setSeriesGenre: Dispatch<SetStateAction<string>>
+  network: string
+  setNetwork: Dispatch<SetStateAction<string>>
   seriesFilters: SeriesFilters
   setSeriesFilters: Dispatch<SetStateAction<SeriesFilters>>
   seriesSortBy: SortField
