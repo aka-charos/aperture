@@ -46,7 +46,7 @@ export interface ProviderMetadata {
   explorationModels: ModelMetadata[]
 }
 
-export type AIFunction = 'embeddings' | 'chat' | 'textGeneration' | 'exploration'
+export type AIFunction = 'embeddings' | 'chat' | 'textGeneration' | 'exploration' | 'webSearch'
 
 export interface FunctionPricing {
   provider: string

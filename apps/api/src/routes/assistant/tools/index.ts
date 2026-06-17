@@ -15,6 +15,8 @@ import { createDiscoveryTools } from './discovery.js'
 
 // Async, conditional on settings — merged separately in the chat handler
 export { createN8nTools } from './n8n.js'
+// Discovery presentation tool — added only on discovery-routed turns
+export { createDiscoveryResolveTool, DISCOVERY_PROMPT } from './discoveryResolve.js'
 
 /**
  * Create all assistant tools with the given context

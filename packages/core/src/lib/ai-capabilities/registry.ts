@@ -18,7 +18,7 @@ export function getModel(
   const models =
     functionType === 'embeddings'
       ? provider.embeddingModels
-      : functionType === 'chat'
+      : functionType === 'chat' || functionType === 'webSearch'
         ? provider.chatModels
         : functionType === 'exploration'
           ? provider.explorationModels
@@ -34,6 +34,8 @@ export function getProvidersForFunction(fn: AIFunction): ProviderMetadata[] {
       return p.supportsChat && p.chatModels.some((m) => m.capabilities.supportsToolCalling)
     if (fn === 'textGeneration') return p.supportsTextGeneration
     if (fn === 'exploration') return p.supportsExploration
+    // Web Search needs a grounding-capable provider — Google only for now
+    if (fn === 'webSearch') return p.id === 'google' && p.chatModels.length > 0
     return false
   })
 }
@@ -58,6 +60,10 @@ export function getModelsForFunction(providerId: string, fn: AIFunction): ModelM
       ? provider.explorationModels.filter((m) => m.capabilities.supportsObjectGeneration)
       : provider.chatModels.filter((m) => m.capabilities.supportsObjectGeneration)
   }
+  if (fn === 'webSearch') {
+    // Grounding-capable chat models (Google); tool calling required to ground
+    return provider.chatModels.filter((m) => m.capabilities.supportsToolCalling)
+  }
   return []
 }
 
@@ -69,6 +75,13 @@ export function validateCapabilityForFeature(
   const provider = getProvider(providerId)
   if (!provider) {
     return { supported: false, reason: `Unknown provider: ${providerId}` }
+  }
+
+  if (fn === 'webSearch' && providerId !== 'google') {
+    return {
+      supported: false,
+      reason: 'Web Search requires a grounding-capable provider (Google)',
+    }
   }
 
   const model = getModel(providerId, modelId, fn)

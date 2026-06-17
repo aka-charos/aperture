@@ -49,7 +49,6 @@ export interface ProviderConfig {
   model: string
   apiKey?: string
   baseUrl?: string
-  useSearchGrounding?: boolean // Google only: enables native Google Search grounding
 }
 
 export interface AIConfig {
@@ -57,6 +56,7 @@ export interface AIConfig {
   chat: ProviderConfig | null
   textGeneration: ProviderConfig | null
   exploration: ProviderConfig | null
+  webSearch: ProviderConfig | null
   migratedAt?: string
   migratedFrom?: string
 }
@@ -112,7 +112,7 @@ export async function getAIConfig(): Promise<AIConfig> {
   }
 
   // No config at all - return unconfigured state
-  return { embeddings: null, chat: null, textGeneration: null, exploration: null }
+  return { embeddings: null, chat: null, textGeneration: null, exploration: null, webSearch: null }
 }
 
 /**
@@ -185,6 +185,7 @@ async function migrateFromLegacyOpenAI(): Promise<AIConfig> {
           apiKey,
         }
       : null,
+    webSearch: null, // Optional role — configured separately in Settings > AI
     migratedAt: new Date().toISOString(),
     migratedFrom: 'openai_single_provider',
   }
@@ -366,30 +367,42 @@ export async function getChatModelInstance(): Promise<LanguageModel> {
   const modelId = config.model
 
   // All providers use similar API for language models
-  // Google Search grounding is not a model setting in AI SDK v5 — it is a
-  // provider-defined tool. See getChatProviderTools().
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (provider as any)(modelId) as LanguageModel
 }
 
 /**
- * Get provider-native tools for the chat function (currently Google Search
- * grounding). In AI SDK v5 these are provider-defined tools that must be
- * merged into the `tools` passed to streamText/generateText — they cannot be
- * enabled on the model instance itself.
- *
- * The google_search tool definition carries no credentials; the API key from
- * the model's provider instance is used at request time, so the static
- * `google` export is safe here.
- *
- * Caveat: the Gemini API rejects requests that combine google_search with
- * function declarations on some models. If chat requests start failing with a
- * tool-mixing error, disable Search grounding in Settings > AI.
+ * Get a language model instance for the Web Search role (grounding-capable,
+ * Google only for now). Used by the discovery pipeline to gather web-sourced
+ * candidates in an ISOLATED call — separate from the chat assistant, so
+ * grounding never mixes with the library tools (which the Gemini API rejects).
  */
-export async function getChatProviderTools(): Promise<ToolSet> {
-  const config = await getFunctionConfig('chat')
+export async function getWebSearchModelInstance(): Promise<LanguageModel> {
+  const config = await getFunctionConfig('webSearch')
 
-  if (config?.provider === 'google' && config.useSearchGrounding) {
+  if (!config) {
+    throw new Error(
+      'Web Search provider is not configured. Please configure it in Settings > AI.'
+    )
+  }
+
+  const provider = createProviderInstance(config)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (provider as any)(config.model) as LanguageModel
+}
+
+/**
+ * Provider-native grounding tools for the Web Search role. In AI SDK v5,
+ * Google Search grounding is a provider-defined tool merged into the `tools`
+ * passed to generateText. Grounding is the always-on purpose of this role, so
+ * (unlike the old chat toggle) no flag is needed — configuring the role enables
+ * it. The google_search tool carries no credentials; the configured provider
+ * instance supplies the API key at request time.
+ */
+export async function getWebSearchProviderTools(): Promise<ToolSet> {
+  const config = await getFunctionConfig('webSearch')
+
+  if (config?.provider === 'google') {
     return { google_search: google.tools.googleSearch({}) }
   }
 

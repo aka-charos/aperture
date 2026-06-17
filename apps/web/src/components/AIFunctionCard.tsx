@@ -27,15 +27,12 @@ import {
   DialogContent,
   DialogActions,
   ListItemSecondaryAction,
-  Switch,
-  Tooltip,
 } from '@mui/material'
 import {
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
   CheckCircle as CheckCircleIcon,
   Cloud as CloudIcon,
-  Search as SearchIcon,
   Computer as ComputerIcon,
   Warning as WarningIcon,
   Delete as DeleteIcon,
@@ -48,7 +45,7 @@ import {
   type ProviderType,
 } from './aiProviderInfo'
 
-export type AIFunction = 'embeddings' | 'chat' | 'textGeneration' | 'exploration'
+export type AIFunction = 'embeddings' | 'chat' | 'textGeneration' | 'exploration' | 'webSearch'
 
 export interface ModelInfo {
   id: string
@@ -118,7 +115,6 @@ export function AIFunctionCard({
   const [baseUrl, setBaseUrl] = useState(config?.baseUrl || '')
   const [showApiKey, setShowApiKey] = useState(false)
   const [initialized, setInitialized] = useState(false)
-  const [useSearchGrounding, setUseSearchGrounding] = useState(config?.useSearchGrounding ?? false)
   
   // Custom model dialog state
   const [addModelDialogOpen, setAddModelDialogOpen] = useState(false)
@@ -150,7 +146,6 @@ export function AIFunctionCard({
       if (config.provider) setProvider(config.provider)
       if (config.model) setModel(config.model)
       if (config.baseUrl) setBaseUrl(config.baseUrl)
-      setUseSearchGrounding(config.useSearchGrounding ?? false)
       setInitialized(true)
     }
   }, [config, initialized])
@@ -266,7 +261,6 @@ export function AIFunctionCard({
       model,
       apiKey: apiKey || undefined,
       baseUrl: baseUrl || undefined,
-      useSearchGrounding: provider === 'google' ? useSearchGrounding : undefined,
     }
     
     setSaving(true)
@@ -660,43 +654,6 @@ export function AIFunctionCard({
                 variant="outlined"
               />
             )}
-          </Box>
-        )}
-
-        {/* Google Search Grounding toggle — only for Google chat */}
-        {provider === 'google' && functionType === 'chat' && (
-          <Box
-            sx={{
-              mb: 2,
-              p: 1.5,
-              borderRadius: 2,
-              bgcolor: (theme) => alpha(theme.palette.primary.main, 0.06),
-              border: 1,
-              borderColor: (theme) => alpha(theme.palette.primary.main, 0.2),
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <Box display="flex" alignItems="center" gap={1}>
-              <SearchIcon fontSize="small" color="primary" />
-              <Box>
-                <Typography variant="body2" fontWeight={600}>
-                  Google Search grounding
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Lets the model fetch live web results to ground answers
-                </Typography>
-              </Box>
-            </Box>
-            <Tooltip title={useSearchGrounding ? 'Disable Google Search' : 'Enable Google Search'}>
-              <Switch
-                size="small"
-                checked={useSearchGrounding}
-                onChange={(e) => setUseSearchGrounding(e.target.checked)}
-                color="primary"
-              />
-            </Tooltip>
           </Box>
         )}
 

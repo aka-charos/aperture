@@ -25,7 +25,6 @@ export interface FunctionConfig {
   model: string
   apiKey?: string
   baseUrl?: string
-  useSearchGrounding?: boolean // Google only: enables native Google Search grounding
 }
 
 export const PROVIDER_INFO: Record<ProviderType, ProviderInfo> = {

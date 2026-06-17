@@ -76,6 +76,16 @@ export interface MessageRow {
   created_at: Date
 }
 
+// Web Search discovery candidate — sourced via the Web Search role, then
+// resolved against the local library by the discovery pipeline.
+export interface DiscoveryCandidate {
+  title: string
+  year?: number
+  imdbId?: string
+  tmdbId?: string
+  mediaType: 'movie' | 'series'
+}
+
 // Tool context - passed to all tools
 export interface ToolContext {
   userId: string
@@ -83,4 +93,6 @@ export interface ToolContext {
   embeddingModel: EmbeddingModel<string>
   embeddingModelId: string  // Model ID string for database queries
   mediaServer: MediaServerInfo | null
+  // Populated only on discovery-routed turns; consumed by findCandidatesInLibrary
+  discoveryCandidates?: DiscoveryCandidate[]
 }

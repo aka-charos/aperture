@@ -1759,6 +1759,8 @@
     "cardTextGenDesc": "Generates recommendation explanations, taste profiles, and playlist descriptions.",
     "cardExplorationTitle": "Exploration",
     "cardExplorationDesc": "Powers the Explore page. Uses AI to find meaningful connections from conceptual searches like \"feel-good comedies\".",
+    "cardWebSearchTitle": "Web Search",
+    "cardWebSearchDesc": "Optional. A grounding-capable model (Google) that finds current titles from the web for discovery requests, then matches them against your library. Leave unset to disable web discovery.",
     "embeddingSetsTitle": "Embedding Sets",
     "setsCount": "{{count}} sets",
     "embeddingSetsBody": "You have embeddings stored from multiple models. Inactive sets can be deleted to free up storage. When you switch back to a model with existing embeddings, they will be used immediately without regenerating.",
