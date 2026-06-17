@@ -4,6 +4,7 @@ import {
   HubOutlined as HubOutlinedIcon,
   Memory as MemoryIcon,
   SmartToy as SmartToyIcon,
+  TravelExplore as TravelExploreIcon,
 } from '@mui/icons-material'
 import { useTranslation } from 'react-i18next'
 import { AIFunctionCard, type AIFunction } from './AIFunctionCard'
@@ -14,6 +15,7 @@ export interface AISetupGridConfig {
   chat: FunctionConfig | null
   textGeneration: FunctionConfig | null
   exploration: FunctionConfig | null
+  webSearch?: FunctionConfig | null
 }
 
 interface AISetupCardGridProps {
@@ -83,6 +85,21 @@ export function AISetupCardGrid({ config, onSave, variant }: AISetupCardGridProp
         compact={isSetup}
         isSetup={isSetup}
       />
+
+      {/* Web Search — optional 5th role, admin settings only (not the onboarding wizard) */}
+      {variant === 'settings' && (
+        <AIFunctionCard
+          functionType="webSearch"
+          title={t(`${keyPrefix}.cardWebSearchTitle`)}
+          description={t(`${keyPrefix}.cardWebSearchDesc`)}
+          icon={<TravelExploreIcon />}
+          iconColor="#00bcd4"
+          config={config?.webSearch ?? null}
+          onSave={(c) => onSave('webSearch', c)}
+          compact={isSetup}
+          isSetup={isSetup}
+        />
+      )}
     </Box>
   )
 }

@@ -215,7 +215,7 @@ export async function registerAIHandlers(fastify: FastifyInstance) {
       try {
         const fn = request.params.function as AIFunction
 
-        if (!['embeddings', 'chat', 'textGeneration', 'exploration'].includes(fn)) {
+        if (!['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'].includes(fn)) {
           return reply.status(400).send({ error: 'Invalid function. Must be embeddings, chat, textGeneration, or exploration' })
         }
 
@@ -288,7 +288,7 @@ export async function registerAIHandlers(fastify: FastifyInstance) {
    */
   fastify.patch<{
     Params: { function: string }
-    Body: { provider: string; model: string; apiKey?: string; baseUrl?: string; useSearchGrounding?: boolean }
+    Body: { provider: string; model: string; apiKey?: string; baseUrl?: string }
   }>(
     '/api/setup/ai/:function',
     { schema: setupSchemas.updateAIFunctionConfig },
@@ -298,10 +298,10 @@ export async function registerAIHandlers(fastify: FastifyInstance) {
 
       try {
         const fn = request.params.function as AIFunction
-        const { provider, model, apiKey, baseUrl, useSearchGrounding } = request.body
+        const { provider, model, apiKey, baseUrl } = request.body
 
-        if (!['embeddings', 'chat', 'textGeneration', 'exploration'].includes(fn)) {
-          return reply.status(400).send({ error: 'Invalid function. Must be embeddings, chat, textGeneration, or exploration' })
+        if (!['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'].includes(fn)) {
+          return reply.status(400).send({ error: 'Invalid function. Must be embeddings, chat, textGeneration, exploration, or webSearch' })
         }
 
         if (apiKey || baseUrl) {
@@ -322,7 +322,6 @@ export async function registerAIHandlers(fastify: FastifyInstance) {
           model,
           apiKey,
           baseUrl,
-          ...(useSearchGrounding !== undefined && { useSearchGrounding }),
         })
 
         const config = await getFunctionConfig(fn)

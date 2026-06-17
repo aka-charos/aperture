@@ -43,6 +43,7 @@ export function AISetupStep({ wizard }: AISetupStepProps) {
     chat: null,
     textGeneration: null,
     exploration: null,
+    webSearch: null,
   })
 
   // Fetch current AI config from each function endpoint (setup-safe)

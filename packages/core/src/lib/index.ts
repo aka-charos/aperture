@@ -32,7 +32,8 @@ export {
   // Model Factory (returns AI SDK model instances)
   getEmbeddingModelInstance,
   getChatModelInstance,
-  getChatProviderTools,
+  getWebSearchModelInstance,
+  getWebSearchProviderTools,
   getTextGenerationModelInstance,
   // Capability Checking
   getAICapabilitiesStatus,

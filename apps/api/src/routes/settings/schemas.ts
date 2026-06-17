@@ -639,7 +639,7 @@ export const aiProvidersSchema = {
   querystring: {
     type: 'object' as const,
     properties: {
-      function: { type: 'string' as const, enum: ['embeddings', 'chat', 'textGeneration', 'exploration'] },
+      function: { type: 'string' as const, enum: ['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'] },
     },
     // function is optional - if not provided, returns all providers
   },
@@ -653,7 +653,7 @@ export const aiModelsSchema = {
     type: 'object' as const,
     properties: {
       provider: { type: 'string' as const },
-      function: { type: 'string' as const, enum: ['embeddings', 'chat', 'textGeneration', 'exploration'] },
+      function: { type: 'string' as const, enum: ['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'] },
     },
     required: ['provider', 'function'] as string[],
   },
@@ -686,7 +686,7 @@ export const addCustomModelSchema = {
       provider: { type: 'string' as const },
       modelId: { type: 'string' as const },
       displayName: { type: 'string' as const },
-      function: { type: 'string' as const, enum: ['embeddings', 'chat', 'textGeneration', 'exploration'] },
+      function: { type: 'string' as const, enum: ['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'] },
       contextWindow: { type: 'integer' as const },
       inputPrice: { type: 'number' as const },
       outputPrice: { type: 'number' as const },

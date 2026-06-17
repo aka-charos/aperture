@@ -8,11 +8,13 @@
  */
 import { Readable } from 'node:stream'
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
-import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 'ai'
-import { getChatModelInstance, getChatProviderTools, getEmbeddingModelInstance, getFunctionConfig, getActiveEmbeddingModelId, type AIFunction } from '@aperture/core'
+import { streamText, convertToModelMessages, stepCountIs, type UIMessage, type ToolSet } from 'ai'
+import { getChatModelInstance, getEmbeddingModelInstance, getFunctionConfig, getActiveEmbeddingModelId, type AIFunction } from '@aperture/core'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
-import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess } from '../helpers/index.js'
-import { createTools, createN8nTools } from '../tools/index.js'
+import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText } from '../helpers/index.js'
+import { createTools, createN8nTools, createDiscoveryResolveTool, DISCOVERY_PROMPT } from '../tools/index.js'
+import { gatherWebCandidates } from '../discovery/webCandidates.js'
+import type { ToolContext } from '../types.js'
 
 interface ChatBody {
   messages: UIMessage[]
@@ -118,20 +120,12 @@ export function registerChatHandler(fastify: FastifyInstance) {
         }
 
         // Create tool context
-        const toolContext = {
+        const toolContext: ToolContext = {
           userId: user.id,
           isAdmin: user.isAdmin,
           embeddingModel,
           embeddingModelId, // Format: "provider:model" (e.g., "openai:text-embedding-3-large")
           mediaServer,
-        }
-
-        // Create tools with context, plus n8n search_web and provider-native
-        // tools (e.g. Google Search grounding) when enabled in settings
-        const tools = {
-          ...createTools(toolContext),
-          ...(await createN8nTools()),
-          ...(await getChatProviderTools()),
         }
 
         // Optional n8n pre-processing hook (fails open if n8n is unreachable)
@@ -140,13 +134,33 @@ export function registerChatHandler(fastify: FastifyInstance) {
           isAdmin: user.isAdmin,
         })
 
+        // Route intent: 'discovery' gathers web-sourced candidates (isolated,
+        // on the Web Search role) to resolve against the library; 'library'
+        // (the default) leaves the assistant untouched. Fails open to library.
+        let discoveryTools: ToolSet = {}
+        let discoveryAppend = ''
+        if ((await classifyIntent(processedMessages)) === 'discovery') {
+          toolContext.discoveryCandidates = await gatherWebCandidates(latestUserText(processedMessages))
+          if ((toolContext.discoveryCandidates?.length ?? 0) > 0) {
+            discoveryTools = createDiscoveryResolveTool(toolContext)
+            discoveryAppend = DISCOVERY_PROMPT
+          }
+        }
+
+        // Create tools with context, plus n8n search_web + discovery (when routed)
+        const tools = {
+          ...createTools(toolContext),
+          ...(await createN8nTools()),
+          ...discoveryTools,
+        }
+
         fastify.log.info({ toolCount: Object.keys(tools).length, model: chatConfig?.model ?? 'unknown' }, 'Starting chat stream')
 
         // Stream the response using AI SDK v5
         // stopWhen allows the model to continue generating text after tool results
         const result = streamText({
           model: chatModel,
-          system: systemAppend ? `${systemPrompt}\n\n${systemAppend}` : systemPrompt,
+          system: [systemPrompt, systemAppend, discoveryAppend].filter(Boolean).join('\n\n'),
           messages: convertToModelMessages(processedMessages),
           tools,
           toolChoice: 'auto',
