@@ -47,6 +47,7 @@ import {
   LegacyEmbeddingsSection,
   ApiKeysSection,
   LanguageDefaultsSection,
+  SystemLogsSection,
 } from './components'
 import { ApiErrorAlert } from '../../components/ApiErrorAlert'
 import { useTranslation } from 'react-i18next'
@@ -410,6 +411,10 @@ export function SettingsPage() {
           <TabPanel value={tabValue} index={6}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               <LanguageDefaultsSection />
+
+              {/* Logging verbosity */}
+              <SystemLogsSection />
+
               {/* API Keys */}
               <ApiKeysSection />
 
