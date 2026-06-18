@@ -295,6 +295,49 @@ function createProviderInstance(providerConfig: ProviderConfig): unknown {
 }
 
 // ============================================================================
+// Credential Resolution
+// ============================================================================
+
+/**
+ * Resolve an API key for a provider from the shared per-provider credential
+ * store, falling back to any other configured function that already uses the
+ * same provider. Lets optional roles (e.g. Web Search) reuse a key entered for
+ * another role instead of requiring it to be re-entered — and re-persisted —
+ * per role. Returns undefined if nothing is found (caller decides what to do).
+ */
+async function resolveApiKeyForProvider(provider: ProviderType): Promise<string | undefined> {
+  // 1) Shared per-provider credential store (written by the settings UI)
+  const credsJson = await getSystemSetting('ai_provider_credentials')
+  if (credsJson) {
+    try {
+      const creds = JSON.parse(credsJson) as Record<string, { apiKey?: string }>
+      if (creds[provider]?.apiKey) return creds[provider].apiKey
+    } catch (e) {
+      logger.warn({ error: e }, 'Failed to parse ai_provider_credentials')
+    }
+  }
+
+  // 2) Any other configured function already using this provider
+  const config = await getAIConfig()
+  for (const fn of ['chat', 'embeddings', 'textGeneration', 'exploration'] as AIFunction[]) {
+    const fnConfig = config[fn]
+    if (fnConfig?.provider === provider && fnConfig.apiKey) return fnConfig.apiKey
+  }
+
+  return undefined
+}
+
+/**
+ * Return a provider config guaranteed to carry an API key when one is available
+ * anywhere in the configuration. No-op when the config already has its own key.
+ */
+async function withResolvedCredentials(config: ProviderConfig): Promise<ProviderConfig> {
+  if (config.apiKey) return config
+  const apiKey = await resolveApiKeyForProvider(config.provider)
+  return apiKey ? { ...config, apiKey } : config
+}
+
+// ============================================================================
 // Model Factory Functions
 // ============================================================================
 
@@ -386,9 +429,21 @@ export async function getWebSearchModelInstance(): Promise<LanguageModel> {
     )
   }
 
-  const provider = createProviderInstance(config)
+  // The Web Search role is Google-only for now, and its key is usually entered
+  // once for the chat role and shared. If this role has no key of its own, fall
+  // back to the shared credential store (then any other role on the same
+  // provider) so grounding doesn't fail with a missing-key error.
+  const resolved = await withResolvedCredentials(config)
+  if (!resolved.apiKey) {
+    logger.warn(
+      { provider: resolved.provider },
+      'Web Search role has no API key and none could be resolved for its provider'
+    )
+  }
+
+  const provider = createProviderInstance(resolved)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (provider as any)(config.model) as LanguageModel
+  return (provider as any)(resolved.model) as LanguageModel
 }
 
 /**

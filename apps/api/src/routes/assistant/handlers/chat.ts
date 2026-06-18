@@ -139,9 +139,16 @@ export function registerChatHandler(fastify: FastifyInstance) {
         // (the default) leaves the assistant untouched. Fails open to library.
         let discoveryTools: ToolSet = {}
         let discoveryAppend = ''
-        if ((await classifyIntent(processedMessages)) === 'discovery') {
+        const intent = await classifyIntent(processedMessages)
+        fastify.log.info({ intent }, 'Assistant intent classified')
+        if (intent === 'discovery') {
           toolContext.discoveryCandidates = await gatherWebCandidates(latestUserText(processedMessages))
-          if ((toolContext.discoveryCandidates?.length ?? 0) > 0) {
+          const candidateCount = toolContext.discoveryCandidates?.length ?? 0
+          fastify.log.info(
+            { candidateCount, discoveryEnabled: candidateCount > 0 },
+            'Discovery candidates resolved'
+          )
+          if (candidateCount > 0) {
             discoveryTools = createDiscoveryResolveTool(toolContext)
             discoveryAppend = DISCOVERY_PROMPT
           }
