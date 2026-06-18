@@ -44,6 +44,70 @@
   ],
   "chatModels": [
     {
+      "id": "gpt-5.5",
+      "name": "GPT-5.5",
+      "description": "Latest flagship. Highest capability for complex reasoning, agentic, and tool use.",
+      "capabilities": {
+        "supportsToolCalling": true,
+        "supportsToolStreaming": true,
+        "supportsObjectGeneration": true,
+        "supportsEmbeddings": false
+      },
+      "quality": "premium",
+      "speed": "medium",
+      "costTier": "high",
+      "inputCostPerMillion": 5,
+      "outputCostPerMillion": 30
+    },
+    {
+      "id": "gpt-5.4",
+      "name": "GPT-5.4",
+      "description": "Recommended GPT-5 production model. Strong reasoning with tool calling.",
+      "capabilities": {
+        "supportsToolCalling": true,
+        "supportsToolStreaming": true,
+        "supportsObjectGeneration": true,
+        "supportsEmbeddings": false
+      },
+      "quality": "premium",
+      "speed": "medium",
+      "costTier": "medium",
+      "inputCostPerMillion": 2.5,
+      "outputCostPerMillion": 15
+    },
+    {
+      "id": "gpt-5.4-mini",
+      "name": "GPT-5.4 Mini",
+      "description": "Smaller GPT-5.4. Fast and cost-effective for most tasks.",
+      "capabilities": {
+        "supportsToolCalling": true,
+        "supportsToolStreaming": true,
+        "supportsObjectGeneration": true,
+        "supportsEmbeddings": false
+      },
+      "quality": "standard",
+      "speed": "fast",
+      "costTier": "low",
+      "inputCostPerMillion": 0.75,
+      "outputCostPerMillion": 4.5
+    },
+    {
+      "id": "gpt-5.4-nano",
+      "name": "GPT-5.4 Nano",
+      "description": "Cheapest GPT-5.4. Good for simple, high-volume queries.",
+      "capabilities": {
+        "supportsToolCalling": true,
+        "supportsToolStreaming": true,
+        "supportsObjectGeneration": true,
+        "supportsEmbeddings": false
+      },
+      "quality": "budget",
+      "speed": "fast",
+      "costTier": "low",
+      "inputCostPerMillion": 0.2,
+      "outputCostPerMillion": 1.25
+    },
+    {
       "id": "gpt-4.1-mini",
       "name": "GPT-4.1 Mini",
       "description": "Great balance of capability and cost. Recommended for most use cases.",

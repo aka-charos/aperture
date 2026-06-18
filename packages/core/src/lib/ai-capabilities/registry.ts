@@ -3,6 +3,15 @@ import type { AIFunction, FunctionPricing, ModelMetadata, ProviderMetadata } fro
 
 export const PROVIDERS: ProviderMetadata[] = loadProviders()
 
+/**
+ * Providers that ship no built-in models and rely on user-added custom models.
+ * Their custom chat models are assumed tool-capable, so they qualify for the
+ * Chat Assistant even without a built-in tool-calling model — the same way they
+ * already qualify for Text Generation. Mirrors the custom-model support in the
+ * settings UI (Ollama, OpenAI-Compatible, OpenRouter).
+ */
+const CUSTOM_MODEL_PROVIDERS = new Set(['ollama', 'openai-compatible', 'openrouter'])
+
 export function getProvider(providerId: string): ProviderMetadata | undefined {
   return PROVIDERS.find((p) => p.id === providerId)
 }
@@ -31,7 +40,11 @@ export function getProvidersForFunction(fn: AIFunction): ProviderMetadata[] {
   return PROVIDERS.filter((p) => {
     if (fn === 'embeddings') return p.supportsEmbeddings
     if (fn === 'chat')
-      return p.supportsChat && p.chatModels.some((m) => m.capabilities.supportsToolCalling)
+      return (
+        p.supportsChat &&
+        (p.chatModels.some((m) => m.capabilities.supportsToolCalling) ||
+          CUSTOM_MODEL_PROVIDERS.has(p.id))
+      )
     if (fn === 'textGeneration') return p.supportsTextGeneration
     if (fn === 'exploration') return p.supportsExploration
     // Web Search needs a grounding-capable provider — Google only for now

@@ -29,9 +29,26 @@
   ],
   "chatModels": [
     {
-      "id": "gemini-2.0-flash",
-      "name": "Gemini 2.0 Flash",
-      "description": "Fast and multimodal. Good tool calling support.",
+      "id": "gemini-3.5-flash",
+      "name": "Gemini 3.5 Flash",
+      "description": "Latest Flash (Gemini 3.5). Most intelligent Flash for agentic and coding tasks. Native Google Search grounding.",
+      "capabilities": {
+        "supportsToolCalling": true,
+        "supportsToolStreaming": true,
+        "supportsObjectGeneration": true,
+        "supportsEmbeddings": false
+      },
+      "quality": "premium",
+      "speed": "fast",
+      "costTier": "medium",
+      "contextWindow": "1M",
+      "inputCostPerMillion": 1.5,
+      "outputCostPerMillion": 9
+    },
+    {
+      "id": "gemini-3.1-flash-lite",
+      "name": "Gemini 3.1 Flash Lite",
+      "description": "Latest Flash-Lite (Gemini 3.1). Fastest, most budget-friendly multimodal model. Native Google Search grounding.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -42,8 +59,8 @@
       "speed": "fast",
       "costTier": "low",
       "contextWindow": "1M",
-      "inputCostPerMillion": 0.075,
-      "outputCostPerMillion": 0.3
+      "inputCostPerMillion": 0.25,
+      "outputCostPerMillion": 1.5
     },
     {
       "id": "gemini-1.5-pro",
