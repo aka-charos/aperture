@@ -36,11 +36,13 @@ export async function gatherWebCandidates(queryText: string): Promise<DiscoveryC
     return []
   }
 
+  logger.info({ query: queryText.slice(0, 200) }, 'Discovery routed: gathering web candidates')
+
   try {
     const tools = await getWebSearchProviderTools()
 
     // Pass 1 — grounded free-text suggestions
-    const { text } = await generateText({
+    const pass1 = await generateText({
       model,
       tools,
       prompt:
@@ -49,6 +51,26 @@ export async function gatherWebCandidates(queryText: string): Promise<DiscoveryC
         'Include the IMDb id (tt…) or TMDb id ONLY if it appears in a source you actually used; otherwise omit it.\n\n' +
         `Request: ${queryText}`,
     })
+
+    const { text } = pass1
+
+    // Observability: prove grounding actually ran. Logs the search queries Google
+    // issued and how many web sources came back — grep "web-candidates" to confirm
+    // the Web Search role is doing real searches (vs. answering from training data).
+    const grounding = (
+      pass1.providerMetadata?.google as
+        | { groundingMetadata?: { webSearchQueries?: string[]; groundingChunks?: unknown[] } }
+        | undefined
+    )?.groundingMetadata
+    logger.info(
+      {
+        webSearchQueries: grounding?.webSearchQueries ?? [],
+        groundingChunks: grounding?.groundingChunks?.length ?? 0,
+        sources: pass1.sources?.length ?? 0,
+        textChars: text?.length ?? 0,
+      },
+      'Web search grounding completed'
+    )
 
     if (!text?.trim()) return []
 
@@ -63,6 +85,7 @@ export async function gatherWebCandidates(queryText: string): Promise<DiscoveryC
         text,
     })
 
+    logger.info({ candidateCount: object.candidates.length }, 'Web candidates structured')
     return object.candidates
   } catch (err) {
     logger.warn({ err }, 'Web candidate gathering failed; falling back to library behavior')
