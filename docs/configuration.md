@@ -194,7 +194,7 @@ Aperture uses a **database-first** configuration approach. Most settings are con
 | `PORT` | API server port | `3456` |
 | `NODE_ENV` | Environment mode | `development` |
 | `RUN_MIGRATIONS_ON_START` | Auto-run database migrations | `true` |
-| `QUIET_POLL_LOGS` | Suppress access logs for the web UI's high-frequency poll routes (e.g. `GET /api/jobs/active`). `true` quiets the default set; a comma-separated list of paths quiets exactly those instead. Unset = log every request. | unset |
+| `QUIET_POLL_LOGS` | Default for suppressing access logs on the web UI's high-frequency poll routes (e.g. `GET /api/jobs/active`). `true` quiets the default set; a comma-separated list of paths quiets exactly those instead. Unset = log every request. Overridden at runtime by the **Settings → System → Logging** toggle when set there. | unset |
 
 > **Note**: Path configuration and job schedules are managed through the Setup Wizard and Admin UI, not environment variables.
 

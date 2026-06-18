@@ -4,7 +4,7 @@ import cookie from '@fastify/cookie'
 import swagger from '@fastify/swagger'
 import swaggerUI from '@fastify/swagger-ui'
 import { createLogger } from './lib/logger.js'
-import { getQuietPollConfig } from './config/logging.js'
+import { refreshQuietPollState, shouldLogIncoming, shouldLogCompleted } from './config/logging.js'
 import requestIdPlugin from './plugins/requestId.js'
 import authPlugin from './plugins/auth.js'
 import staticPlugin from './plugins/static.js'
@@ -21,6 +21,10 @@ export async function buildServer(options: ServerOptions = {}): Promise<any> {
 
   const fastify = Fastify({
     loggerInstance: options.logger !== false ? logger : undefined,
+    // Default per-request logging is disabled so we can suppress noisy
+    // high-frequency poll routes at runtime (see the onRequest/onResponse hooks
+    // below and the Settings > System "Quiet poll-route logs" toggle).
+    disableRequestLogging: true,
     requestIdHeader: 'x-request-id',
     requestIdLogLabel: 'requestId',
     ajv: {
@@ -31,18 +35,39 @@ export async function buildServer(options: ServerOptions = {}): Promise<any> {
     },
   })
 
-  // Opt-in: silence access logs for high-frequency poll routes (QUIET_POLL_LOGS).
-  // Default (unset/false) keeps Fastify's per-request logging for every route.
-  // The hook is added before routes register so it applies to all of them.
-  const quietPoll = getQuietPollConfig()
-  if (quietPoll.enabled) {
-    fastify.addHook('onRoute', (routeOptions) => {
-      if (quietPoll.routes.has(routeOptions.url)) {
-        routeOptions.logLevel = 'warn'
-      }
-    })
-    logger.info({ routes: [...quietPoll.routes] }, 'Quiet poll logging enabled for routes')
-  }
+  // Load the quiet-poll-logs setting (DB setting, else QUIET_POLL_LOGS env).
+  await refreshQuietPollState()
+
+  // Custom access logging that reproduces Fastify's default req/res pair, but
+  // can skip the silenced poll routes (failures are always logged). This is the
+  // documented way to customise request logging alongside disableRequestLogging.
+  fastify.addHook('onRequest', (request, _reply, done) => {
+    if (shouldLogIncoming(request.url)) {
+      request.log.info(
+        {
+          req: {
+            method: request.method,
+            url: request.url,
+            host: request.headers.host,
+            remoteAddress: request.ip,
+            remotePort: request.socket.remotePort,
+          },
+        },
+        'incoming request'
+      )
+    }
+    done()
+  })
+
+  fastify.addHook('onResponse', (request, reply, done) => {
+    if (shouldLogCompleted(request.url, reply.statusCode)) {
+      request.log.info(
+        { res: { statusCode: reply.statusCode }, responseTime: reply.elapsedTime },
+        'request completed'
+      )
+    }
+    done()
+  })
 
   // Register CORS
   await fastify.register(cors, {
