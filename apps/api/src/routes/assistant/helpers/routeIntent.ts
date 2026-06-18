@@ -7,8 +7,7 @@
  * regressed by a routing hiccup, and short-circuits obvious cases without an
  * LLM call.
  */
-import { generateObject, type UIMessage } from 'ai'
-import { z } from 'zod'
+import { generateText, type UIMessage } from 'ai'
 import { getChatModelInstance, createChildLogger } from '@aperture/core'
 
 const logger = createChildLogger('route-intent')
@@ -45,19 +44,39 @@ export async function classifyIntent(messages: UIMessage[]): Promise<ChatIntent>
 
   try {
     const model = await getChatModelInstance()
-    const { object } = await generateObject({
+    // Plain text + lenient parsing rather than generateObject: the chat model is
+    // user-selectable (incl. OpenRouter models that don't reliably emit JSON), and
+    // a strict object parse throws NoObjectGeneratedError on a bare "discovery"/
+    // "library" answer. A one-word classification doesn't need structured output.
+    const { text: out } = await generateText({
       model,
-      schema: z.object({ intent: z.enum(['discovery', 'library']) }),
       prompt:
         'Classify a request sent to a personal media-library assistant.\n' +
         "- 'discovery' = open-world / external / current: best-of lists, trending, acclaimed, award winners, new/upcoming releases, or things the user might be missing that are NOT necessarily in their library.\n" +
         "- 'library' = anything about the user's OWN collection, watch history, ratings, stats, or a personalized/conceptual recommendation drawn from what they already own.\n" +
-        'When unsure, answer "library".\n\n' +
+        'Reply with exactly one word — discovery or library — and nothing else. When unsure, reply library.\n\n' +
         `Request: ${text}`,
     })
-    return object.intent
+    return parseIntent(out)
   } catch (err) {
     logger.warn({ err }, 'Intent classification failed; defaulting to library')
     return 'library'
   }
+}
+
+/**
+ * Map a free-text model answer to an intent. Accepts a clean one-word reply
+ * ("discovery", "library", with any surrounding punctuation/quotes) and degrades
+ * gracefully on a verbose answer — biased to the safe 'library' default unless
+ * only 'discovery' is mentioned.
+ */
+export function parseIntent(out: string): ChatIntent {
+  const answer = (out ?? '').toLowerCase()
+  const compact = answer.replace(/[^a-z]/g, '')
+  if (compact === 'discovery') return 'discovery'
+  if (compact === 'library') return 'library'
+
+  const hasDiscovery = /\bdiscovery\b/.test(answer)
+  const hasLibrary = /\blibrary\b/.test(answer)
+  return hasDiscovery && !hasLibrary ? 'discovery' : 'library'
 }
