@@ -4,6 +4,7 @@ import cookie from '@fastify/cookie'
 import swagger from '@fastify/swagger'
 import swaggerUI from '@fastify/swagger-ui'
 import { createLogger } from './lib/logger.js'
+import { getQuietPollConfig } from './config/logging.js'
 import requestIdPlugin from './plugins/requestId.js'
 import authPlugin from './plugins/auth.js'
 import staticPlugin from './plugins/static.js'
@@ -29,6 +30,19 @@ export async function buildServer(options: ServerOptions = {}): Promise<any> {
       },
     },
   })
+
+  // Opt-in: silence access logs for high-frequency poll routes (QUIET_POLL_LOGS).
+  // Default (unset/false) keeps Fastify's per-request logging for every route.
+  // The hook is added before routes register so it applies to all of them.
+  const quietPoll = getQuietPollConfig()
+  if (quietPoll.enabled) {
+    fastify.addHook('onRoute', (routeOptions) => {
+      if (quietPoll.routes.has(routeOptions.url)) {
+        routeOptions.logLevel = 'warn'
+      }
+    })
+    logger.info({ routes: [...quietPoll.routes] }, 'Quiet poll logging enabled for routes')
+  }
 
   // Register CORS
   await fastify.register(cors, {
