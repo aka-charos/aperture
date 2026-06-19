@@ -14,7 +14,7 @@
     {
       "id": "gemini-embedding-001",
       "name": "Gemini Embedding 001",
-      "description": "Google Gemini embedding model for semantic search and retrieval. Default output is 3072 dimensions (matches API when output dimensionality is not set).",
+      "description": "Google Gemini embedding model for semantic search and retrieval. Default output is 3072 dimensions (matches API when output dimensionality is not set). · Free",
       "capabilities": {
         "supportsToolCalling": false,
         "supportsToolStreaming": false,
@@ -31,7 +31,7 @@
     {
       "id": "gemini-3.5-flash",
       "name": "Gemini 3.5 Flash",
-      "description": "Latest Flash (Gemini 3.5). Most intelligent Flash for agentic and coding tasks. Native Google Search grounding.",
+      "description": "Latest Flash (Gemini 3.5). Most intelligent Flash for agentic and coding tasks. Native Google Search grounding. · $1.50 in / $9.00 out per 1M tokens",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -48,7 +48,7 @@
     {
       "id": "gemini-3.1-flash-lite",
       "name": "Gemini 3.1 Flash Lite",
-      "description": "Latest Flash-Lite (Gemini 3.1). Fastest, most budget-friendly multimodal model. Native Google Search grounding.",
+      "description": "Latest Flash-Lite (Gemini 3.1). Fastest, most budget-friendly multimodal model. Native Google Search grounding. · $0.25 in / $1.50 out per 1M tokens",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -65,7 +65,7 @@
     {
       "id": "gemini-1.5-pro",
       "name": "Gemini 1.5 Pro",
-      "description": "Most capable Gemini model.",
+      "description": "Most capable Gemini model. · $1.25 in / $5.00 out per 1M tokens",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -82,7 +82,7 @@
     {
       "id": "gemini-2.5-flash",
       "name": "Gemini 2.5 Flash",
-      "description": "Latest Flash model. Supports native Google Search grounding.",
+      "description": "Latest Flash model. Supports native Google Search grounding. · $0.30 in / $2.50 out per 1M tokens",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -99,7 +99,7 @@
     {
       "id": "gemini-2.5-flash-lite",
       "name": "Gemini 2.5 Flash Lite",
-      "description": "Fastest, most cost-efficient Gemini model. Supports native Google Search grounding.",
+      "description": "Fastest, most cost-efficient Gemini model. Supports native Google Search grounding. · $0.10 in / $0.40 out per 1M tokens",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,

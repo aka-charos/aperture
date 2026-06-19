@@ -79,6 +79,9 @@ const MODEL_ALIASES: Record<string, string[]> = {
   'gemini-2.0-flash': ['gemini-2.0-flash', 'gemini-2.0-flash-exp'],
   'gemini-1.5-pro': ['gemini-1.5-pro'],
   // DeepSeek
+  'deepseek-v4-flash': ['deepseek-v4-flash', 'deepseek-chat', 'deepseek-v3'],
+  'deepseek-v4-pro': ['deepseek-v4-pro'],
+  // Legacy aliases (retiring 2026-07-24) — kept so existing configs still resolve
   'deepseek-chat': ['deepseek-chat', 'deepseek-v3'],
   'deepseek-reasoner': ['deepseek-reasoner', 'deepseek-r1'],
 }
