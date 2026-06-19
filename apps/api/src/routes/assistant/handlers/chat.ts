@@ -155,11 +155,17 @@ export function registerChatHandler(fastify: FastifyInstance) {
         }
 
         // Create tools with context, plus n8n search_web + discovery (when routed)
-        const tools = {
+        const baseTools = {
           ...createTools(toolContext),
           ...(await createN8nTools()),
-          ...discoveryTools,
         }
+        // On discovery turns the discovery tool subsumes findSimilarContent — it adds
+        // the embeddings "Also worth checking" section itself — so drop it to keep web
+        // results primary (otherwise the model tends to call findSimilarContent instead).
+        if (Object.keys(discoveryTools).length > 0) {
+          delete (baseTools as Record<string, unknown>).findSimilarContent
+        }
+        const tools = { ...baseTools, ...discoveryTools }
 
         fastify.log.info({ toolCount: Object.keys(tools).length, model: chatConfig?.model ?? 'unknown' }, 'Starting chat stream')
 
