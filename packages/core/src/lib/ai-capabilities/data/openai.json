@@ -14,7 +14,7 @@
     {
       "id": "text-embedding-3-large",
       "name": "text-embedding-3-large",
-      "description": "Best quality embeddings. Captures nuanced semantic similarities. · $0.13 per 1M tokens",
+      "description": "Best quality embeddings. Captures nuanced semantic similarities.",
       "capabilities": {
         "supportsToolCalling": false,
         "supportsToolStreaming": false,
@@ -29,7 +29,7 @@
     {
       "id": "text-embedding-3-small",
       "name": "text-embedding-3-small",
-      "description": "Good balance of quality and cost. Suitable for most use cases. · $0.02 per 1M tokens",
+      "description": "Good balance of quality and cost. Suitable for most use cases.",
       "capabilities": {
         "supportsToolCalling": false,
         "supportsToolStreaming": false,
@@ -46,7 +46,7 @@
     {
       "id": "gpt-5.5",
       "name": "GPT-5.5",
-      "description": "Latest flagship. Highest capability for complex reasoning, agentic, and tool use. · $5.00 in / $30.00 out per 1M tokens",
+      "description": "Latest flagship. Highest capability for complex reasoning, agentic, and tool use.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -62,7 +62,7 @@
     {
       "id": "gpt-5.4",
       "name": "GPT-5.4",
-      "description": "Recommended GPT-5 production model. Strong reasoning with tool calling. · $2.50 in / $15.00 out per 1M tokens",
+      "description": "Recommended GPT-5 production model. Strong reasoning with tool calling.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -78,7 +78,7 @@
     {
       "id": "gpt-5.4-mini",
       "name": "GPT-5.4 Mini",
-      "description": "Smaller GPT-5.4. Fast and cost-effective for most tasks. · $0.75 in / $4.50 out per 1M tokens",
+      "description": "Smaller GPT-5.4. Fast and cost-effective for most tasks.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -94,7 +94,7 @@
     {
       "id": "gpt-5.4-nano",
       "name": "GPT-5.4 Nano",
-      "description": "Cheapest GPT-5.4. Good for simple, high-volume queries. · $0.20 in / $1.25 out per 1M tokens",
+      "description": "Cheapest GPT-5.4. Good for simple, high-volume queries.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -110,7 +110,7 @@
     {
       "id": "gpt-4.1-mini",
       "name": "GPT-4.1 Mini",
-      "description": "Great balance of capability and cost. Recommended for most use cases. · $0.40 in / $1.60 out per 1M tokens",
+      "description": "Great balance of capability and cost. Recommended for most use cases.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -127,7 +127,7 @@
     {
       "id": "gpt-4.1-nano",
       "name": "GPT-4.1 Nano",
-      "description": "Fastest and cheapest. Good for simple queries. · $0.10 in / $0.40 out per 1M tokens",
+      "description": "Fastest and cheapest. Good for simple queries.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -144,7 +144,7 @@
     {
       "id": "gpt-4.1",
       "name": "GPT-4.1",
-      "description": "Full GPT-4.1 model. Best quality, higher cost. · $2.00 in / $8.00 out per 1M tokens",
+      "description": "Full GPT-4.1 model. Best quality, higher cost.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -161,7 +161,7 @@
     {
       "id": "gpt-4o",
       "name": "GPT-4o",
-      "description": "Multimodal model with vision capabilities. · $2.50 in / $10.00 out per 1M tokens",
+      "description": "Multimodal model with vision capabilities.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -178,7 +178,7 @@
     {
       "id": "gpt-4o-mini",
       "name": "GPT-4o Mini",
-      "description": "Smaller GPT-4o. Good for simpler tasks. · $0.15 in / $0.60 out per 1M tokens",
+      "description": "Smaller GPT-4o. Good for simpler tasks.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -195,7 +195,7 @@
     {
       "id": "o3-mini",
       "name": "o3 Mini",
-      "description": "Reasoning model. Better at complex problems. · $1.10 in / $4.40 out per 1M tokens",
+      "description": "Reasoning model. Better at complex problems.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,

@@ -53,11 +53,30 @@ export interface ModelInfo {
   description?: string
   contextWindow?: string
   embeddingDimensions?: number
+  inputCostPerMillion?: number
+  outputCostPerMillion?: number
   capabilities: {
     supportsToolCalling: boolean
     supportsEmbeddings: boolean
   }
   isCustom?: boolean
+}
+
+/**
+ * Format a model's published price per 1M tokens for the picker, straight from
+ * the catalog's structured cost fields (the single source of truth the Cost
+ * Estimator also uses). Returns null when there is no published price — custom
+ * and local (Ollama / OpenAI-compatible) models — so no price line is shown.
+ */
+function formatModelPrice(m: ModelInfo): string | null {
+  const input = m.inputCostPerMillion
+  if (input == null) return null
+  const output = m.outputCostPerMillion
+  if (input === 0 && (output == null || output === 0)) return 'Free'
+  const usd = (n: number) => `$${n.toFixed(2)}`
+  // Embedding models are billed on input tokens only (no output cost).
+  if (output == null) return `${usd(input)} per 1M tokens`
+  return `${usd(input)} in / ${usd(output)} out per 1M`
 }
 
 export interface AIFunctionCardProps {
@@ -138,6 +157,7 @@ export function AIFunctionCard({
   const isConfigured = Boolean(config)
   const providerInfo = PROVIDER_INFO[provider]
   const selectedModel = models.find(m => m.id === model)
+  const selectedModelPrice = selectedModel ? formatModelPrice(selectedModel) : null
   const supportsCustomModels = provider === 'ollama' || provider === 'openai-compatible' || provider === 'openrouter' || provider === 'huggingface'
 
   // Sync form state when config prop changes (e.g., loaded from DB)
@@ -557,18 +577,31 @@ export function AIFunctionCard({
                 </MenuItem>
               )}
               {/* Built-in models */}
-              {[...models].filter(m => !m.isCustom).sort((a, b) => a.name.localeCompare(b.name)).map((m) => (
-                <MenuItem key={m.id} value={m.id}>
-                  <Box>
-                    <Typography variant="body2">{m.name}</Typography>
-                    {m.description && (
-                      <Typography variant="caption" color="text.secondary">
-                        {m.description}
-                      </Typography>
-                    )}
-                  </Box>
-                </MenuItem>
-              ))}
+              {[...models].filter(m => !m.isCustom).sort((a, b) => a.name.localeCompare(b.name)).map((m) => {
+                const price = formatModelPrice(m)
+                return (
+                  <MenuItem key={m.id} value={m.id}>
+                    <Box>
+                      <Typography variant="body2">{m.name}</Typography>
+                      {m.description && (
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          {m.description}
+                        </Typography>
+                      )}
+                      {price && (
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          display="block"
+                          sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
+                        >
+                          {price}
+                        </Typography>
+                      )}
+                    </Box>
+                  </MenuItem>
+                )
+              })}
               {/* Custom models with delete button */}
               {models.filter(m => m.isCustom).length > 0 && (
                 <MenuItem disabled sx={{ borderTop: 1, borderColor: 'divider', mt: 1, opacity: 0.7 }}>
@@ -638,6 +671,9 @@ export function AIFunctionCard({
           <Box display="flex" gap={1} mb={2} flexWrap="wrap">
             {selectedModel.contextWindow && (
               <Chip label={selectedModel.contextWindow} size="small" variant="outlined" />
+            )}
+            {selectedModelPrice && (
+              <Chip label={selectedModelPrice} size="small" variant="outlined" />
             )}
             {selectedModel.embeddingDimensions && (
               <Chip
