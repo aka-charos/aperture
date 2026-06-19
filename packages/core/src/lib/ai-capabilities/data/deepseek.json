@@ -13,9 +13,9 @@
   "embeddingModels": [],
   "chatModels": [
     {
-      "id": "deepseek-chat",
-      "name": "DeepSeek Chat",
-      "description": "Very cost effective. Good general purpose model.",
+      "id": "deepseek-v4-flash",
+      "name": "DeepSeek V4 Flash",
+      "description": "Fast, very cost-effective general model with optional reasoning. Replaces deepseek-chat / deepseek-reasoner (retiring 2026-07-24). · $0.14 in / $0.28 out per 1M tokens",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -25,14 +25,14 @@
       "quality": "standard",
       "speed": "fast",
       "costTier": "low",
-      "contextWindow": "64K",
+      "contextWindow": "1M",
       "inputCostPerMillion": 0.14,
       "outputCostPerMillion": 0.28
     },
     {
-      "id": "deepseek-reasoner",
-      "name": "DeepSeek Reasoner",
-      "description": "Strong reasoning capabilities.",
+      "id": "deepseek-v4-pro",
+      "name": "DeepSeek V4 Pro",
+      "description": "Highest-capability DeepSeek model for complex reasoning and agentic tasks. · $0.44 in / $0.87 out per 1M tokens",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -40,11 +40,11 @@
         "supportsEmbeddings": false
       },
       "quality": "premium",
-      "speed": "slow",
+      "speed": "medium",
       "costTier": "low",
-      "contextWindow": "64K",
-      "inputCostPerMillion": 0.55,
-      "outputCostPerMillion": 2.19
+      "contextWindow": "1M",
+      "inputCostPerMillion": 0.435,
+      "outputCostPerMillion": 0.87
     }
   ],
   "textGenerationModels": [],
