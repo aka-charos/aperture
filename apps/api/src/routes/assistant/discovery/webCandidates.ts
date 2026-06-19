@@ -25,6 +25,7 @@ const CandidateSchema = z.object({
   imdbId: z.string().optional(),
   tmdbId: z.string().optional(),
   mediaType: z.enum(['movie', 'series']),
+  reason: z.string().optional(),
 })
 
 export async function gatherWebCandidates(queryText: string): Promise<DiscoveryCandidate[]> {
@@ -47,7 +48,7 @@ export async function gatherWebCandidates(queryText: string): Promise<DiscoveryC
       tools,
       prompt:
         'Using current web information, list up to 12 specific movies or TV series that best answer this request. ' +
-        'For each, give the exact title, release year, and whether it is a movie or a series. ' +
+        'For each, give the exact title, release year, whether it is a movie or a series, and one or two sentences explaining why it fits the request. ' +
         'Include the IMDb id (tt…) or TMDb id ONLY if it appears in a source you actually used; otherwise omit it.\n\n' +
         `Request: ${queryText}`,
     })
@@ -80,6 +81,7 @@ export async function gatherWebCandidates(queryText: string): Promise<DiscoveryC
       schema: z.object({ candidates: z.array(CandidateSchema).max(20) }),
       prompt:
         'Extract the movies/series mentioned below into structured candidates. ' +
+        'For each, capture the one or two sentence explanation of why it fits as "reason" (verbatim or lightly condensed from the text). ' +
         'Set imdbId/tmdbId ONLY if explicitly present in the text — never guess or invent an id. ' +
         'Infer mediaType (movie or series) from context.\n\n' +
         text,
