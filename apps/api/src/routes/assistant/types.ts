@@ -84,6 +84,8 @@ export interface DiscoveryCandidate {
   imdbId?: string
   tmdbId?: string
   mediaType: 'movie' | 'series'
+  /** Short grounded rationale (why this title fits the request), from the web search. */
+  reason?: string
 }
 
 // Tool context - passed to all tools
