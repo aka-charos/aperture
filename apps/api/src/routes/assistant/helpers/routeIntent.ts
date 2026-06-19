@@ -17,9 +17,12 @@ export type ChatIntent = 'discovery' | 'library'
 /** Obvious library signals — about the user's own collection/activity. */
 const LIBRARY_HINTS =
   /\b(my|mine|i (?:have|own|watch|rated|like|love)|watch history|watched|how many|in my library|do i have|continue watching|resume)\b/i
-/** Obvious discovery signals — open-world / external / current, or seed-similarity. */
+/**
+ * Obvious discovery signals — open-world / external / current, seed-similarity,
+ * or genre/style/theme exploration ("neo noir movies", "films about heists").
+ */
 const DISCOVERY_HINTS =
-  /\b(best|top \d+|trending|acclaimed|popular|new releases?|latest|coming soon|this year|in \d{4}|oscar|award|critically|similar to|something like|(?:movies|films|shows) like)\b/i
+  /\b(best|top \d+|trending|acclaimed|popular|new releases?|latest|coming soon|this year|in \d{4}|oscar|award|critically|recommend|suggest|similar to|something like|(?:movies|films|shows) (?:like|of|about))\b/i
 
 /** Extract the most recent user message as plain text. */
 export function latestUserText(messages: UIMessage[]): string {
@@ -52,10 +55,10 @@ export async function classifyIntent(messages: UIMessage[]): Promise<ChatIntent>
     const { text: out } = await generateText({
       model,
       prompt:
-        'Classify a request sent to a personal media-library assistant.\n' +
-        "- 'discovery' = open-world / external / current: best-of lists, trending, acclaimed, award winners, new/upcoming releases, or things the user might be missing that are NOT necessarily in their library.\n" +
-        "- 'library' = anything about the user's OWN collection, watch history, ratings, stats, or a personalized/conceptual recommendation drawn from what they already own.\n" +
-        'Reply with exactly one word — discovery or library — and nothing else. When unsure, reply library.\n\n' +
+        'Classify a request sent to a personal media assistant that can search the web for recommendations or search the user\'s OWN library.\n' +
+        '- \'discovery\' = finding or recommending movies/shows by genre, subgenre, style, mood, theme, era, director, or similarity (e.g. "neo noir movies", "feel-good comedies", "movies like Heat", "best sci-fi of 2025"). Choose this for any open-ended exploration or recommendation not tied to the user\'s own collection.\n' +
+        "- 'library' = ONLY requests explicitly about the user's OWN collection or activity: their watch history, ratings, stats, what they own, or what to continue/resume.\n" +
+        'Reply with exactly one word — discovery or library — and nothing else. Prefer discovery for genre/theme exploration and general recommendations; choose library only when the request clearly references the user\'s own collection.\n\n' +
         `Request: ${text}`,
     })
     return parseIntent(out)
