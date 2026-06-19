@@ -285,7 +285,11 @@ export function MediaPosterCard({
           </Box>
         )}
 
-        {/* Hover Overlay with Request Button */}
+        {/* Hover Overlay with Request Button.
+            The scrim is purely visual (pointerEvents: none) so a click on the
+            poster falls through to the card's onClick / link — i.e. opens
+            details — instead of requesting. Only the centered Request control
+            (pointerEvents: auto) triggers a request. */}
         {hovering && canRequest && !inLibrary && (
           <Box
             sx={{
@@ -294,9 +298,9 @@ export function MediaPosterCard({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: alpha('#000', 0.6),
+              backgroundColor: alpha('#000', 0.5),
+              pointerEvents: 'none',
             }}
-            onClick={handleRequest}
           >
             {isRequesting ? (
               <CircularProgress size={40} sx={{ color: 'white' }} />
@@ -310,22 +314,30 @@ export function MediaPosterCard({
                 </Typography>
               </Box>
             ) : (
-              <Box textAlign="center">
-                <IconButton
-                  sx={{
-                    backgroundColor: 'primary.main',
-                    color: 'white',
-                    '&:hover': { backgroundColor: 'primary.dark' },
-                    width: 56,
-                    height: 56,
-                  }}
+              <Tooltip title={t('mediaPoster.request')}>
+                <Box
+                  textAlign="center"
+                  onClick={handleRequest}
+                  sx={{ pointerEvents: 'auto', cursor: 'pointer' }}
                 >
-                  <AddIcon sx={{ fontSize: 32 }} />
-                </IconButton>
-                <Typography variant="caption" color="white" display="block" mt={1}>
-                  {t('mediaPoster.request')}
-                </Typography>
-              </Box>
+                  <IconButton
+                    component="span"
+                    aria-label={t('mediaPoster.request')}
+                    sx={{
+                      backgroundColor: 'primary.main',
+                      color: 'white',
+                      '&:hover': { backgroundColor: 'primary.dark' },
+                      width: 56,
+                      height: 56,
+                    }}
+                  >
+                    <AddIcon sx={{ fontSize: 32 }} />
+                  </IconButton>
+                  <Typography variant="caption" color="white" display="block" mt={1}>
+                    {t('mediaPoster.request')}
+                  </Typography>
+                </Box>
+              </Tooltip>
             )}
           </Box>
         )}
