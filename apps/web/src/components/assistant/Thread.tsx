@@ -83,6 +83,17 @@ function renderToolResult(toolName: string, result: unknown): React.ReactNode {
     return <ToolResultError message={data.error} />
   }
 
+  // Multi-carousel result (discovery: web "Recommendations" + embeddings "Also worth checking")
+  if ('carousels' in data && Array.isArray(data.carousels)) {
+    return (
+      <>
+        {(data.carousels as ContentCarouselData[]).map((c) => (
+          <ContentCarousel key={c.id} data={c} />
+        ))}
+      </>
+    )
+  }
+
   // Content carousel tools (search, similar, recommendations, history, ratings, unwatched, top rated)
   if ('items' in data && Array.isArray(data.items)) {
     return <ContentCarousel data={data as unknown as ContentCarouselData} />

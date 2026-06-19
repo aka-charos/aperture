@@ -17,9 +17,9 @@ export type ChatIntent = 'discovery' | 'library'
 /** Obvious library signals — about the user's own collection/activity. */
 const LIBRARY_HINTS =
   /\b(my|mine|i (?:have|own|watch|rated|like|love)|watch history|watched|how many|in my library|do i have|continue watching|resume)\b/i
-/** Obvious discovery signals — open-world / external / current. */
+/** Obvious discovery signals — open-world / external / current, or seed-similarity. */
 const DISCOVERY_HINTS =
-  /\b(best|top \d+|trending|acclaimed|popular|new releases?|latest|coming soon|this year|in \d{4}|oscar|award|critically)\b/i
+  /\b(best|top \d+|trending|acclaimed|popular|new releases?|latest|coming soon|this year|in \d{4}|oscar|award|critically|similar to|something like|(?:movies|films|shows) like)\b/i
 
 /** Extract the most recent user message as plain text. */
 export function latestUserText(messages: UIMessage[]): string {
@@ -41,6 +41,7 @@ export async function classifyIntent(messages: UIMessage[]): Promise<ChatIntent>
 
   // Heuristic prefilter — skip the LLM on clear cases
   if (LIBRARY_HINTS.test(text) && !DISCOVERY_HINTS.test(text)) return 'library'
+  if (DISCOVERY_HINTS.test(text) && !LIBRARY_HINTS.test(text)) return 'discovery'
 
   try {
     const model = await getChatModelInstance()
