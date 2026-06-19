@@ -15,7 +15,7 @@
     {
       "id": "deepseek-v4-flash",
       "name": "DeepSeek V4 Flash",
-      "description": "Fast, very cost-effective general model with optional reasoning. Replaces deepseek-chat / deepseek-reasoner (retiring 2026-07-24). · $0.14 in / $0.28 out per 1M tokens",
+      "description": "Fast, very cost-effective general model with optional reasoning. Replaces deepseek-chat / deepseek-reasoner (retiring 2026-07-24).",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -32,7 +32,7 @@
     {
       "id": "deepseek-v4-pro",
       "name": "DeepSeek V4 Pro",
-      "description": "Highest-capability DeepSeek model for complex reasoning and agentic tasks. · $0.44 in / $0.87 out per 1M tokens",
+      "description": "Highest-capability DeepSeek model for complex reasoning and agentic tasks.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
