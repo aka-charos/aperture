@@ -9,7 +9,10 @@ const initialFormData: FormData = {
   exampleMovies: [],
 }
 
-export function usePlaylistsData() {
+export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playlist') {
+  // User-facing noun for the (non-i18n) snackbar/error strings below. The components are
+  // i18n-namespaced separately; these transient toasts just swap the word.
+  const noun = outputType === 'collection' ? 'Collection' : 'Playlist'
   const [channels, setChannels] = useState<Channel[]>([])
   const [graphPlaylists, setGraphPlaylists] = useState<GraphPlaylist[]>([])
   const [loading, setLoading] = useState(true)
@@ -49,22 +52,22 @@ export function usePlaylistsData() {
   const [deletingPlaylist, setDeletingPlaylist] = useState<{ id: string; name: string; type: 'channel' | 'graph' } | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
 
-  const fetchChannels = async () => {
+  const fetchChannels = useCallback(async () => {
     try {
-      const response = await fetch('/api/channels', { credentials: 'include' })
+      const response = await fetch(`/api/channels?outputType=${outputType}`, { credentials: 'include' })
       if (response.ok) {
         const data = await response.json()
         setChannels(data.channels)
         setError(null)
       } else {
-        setError('Failed to load playlists')
+        setError(`Failed to load ${noun.toLowerCase()}s`)
       }
     } catch {
       setError('Could not connect to server')
     } finally {
       setLoading(false)
     }
-  }
+  }, [outputType, noun])
 
   const fetchGraphPlaylists = useCallback(async () => {
     try {
@@ -97,8 +100,11 @@ export function usePlaylistsData() {
   useEffect(() => {
     fetchChannels()
     fetchGenres()
-    fetchGraphPlaylists()
-  }, [fetchGraphPlaylists])
+    // Graph playlists are a playlist-only concept; the Collections page doesn't show them.
+    if (outputType === 'playlist') {
+      fetchGraphPlaylists()
+    }
+  }, [fetchChannels, fetchGraphPlaylists, outputType])
 
   const fetchExampleMovies = async (movieIds: string[]): Promise<Movie[]> => {
     if (movieIds.length === 0) return []
@@ -155,6 +161,8 @@ export function usePlaylistsData() {
       genreFilters: formData.genreFilters,
       textPreferences: formData.textPreferences || undefined,
       exampleMovieIds: formData.exampleMovies.map((m) => m.id),
+      // Honoured by POST (create); ignored by PUT (output type is immutable after creation).
+      outputType,
     }
 
     try {
@@ -173,12 +181,12 @@ export function usePlaylistsData() {
         fetchChannels()
         setSnackbar({
           open: true,
-          message: editingChannel ? 'Playlist updated' : 'Playlist created',
+          message: editingChannel ? `${noun} updated` : `${noun} created`,
           severity: 'success',
         })
       }
     } catch {
-      setSnackbar({ open: true, message: 'Failed to save playlist', severity: 'error' })
+      setSnackbar({ open: true, message: `Failed to save ${noun.toLowerCase()}`, severity: 'error' })
     }
   }
 
@@ -213,14 +221,14 @@ export function usePlaylistsData() {
         } else {
           fetchGraphPlaylists()
         }
-        setSnackbar({ open: true, message: 'Playlist deleted', severity: 'success' })
+        setSnackbar({ open: true, message: `${noun} deleted`, severity: 'success' })
         setDeleteDialogOpen(false)
         setDeletingPlaylist(null)
       } else {
-        setSnackbar({ open: true, message: 'Failed to delete playlist', severity: 'error' })
+        setSnackbar({ open: true, message: `Failed to delete ${noun.toLowerCase()}`, severity: 'error' })
       }
     } catch {
-      setSnackbar({ open: true, message: 'Failed to delete playlist', severity: 'error' })
+      setSnackbar({ open: true, message: `Failed to delete ${noun.toLowerCase()}`, severity: 'error' })
     } finally {
       setDeleteLoading(false)
     }
@@ -248,14 +256,14 @@ export function usePlaylistsData() {
         fetchChannels()
         setSnackbar({
           open: true,
-          message: `Playlist created with ${data.itemCount} movies`,
+          message: `${noun} created with ${data.itemCount} movies`,
           severity: 'success',
         })
       } else {
-        setSnackbar({ open: true, message: 'Failed to generate playlist', severity: 'error' })
+        setSnackbar({ open: true, message: `Failed to generate ${noun.toLowerCase()}`, severity: 'error' })
       }
     } catch {
-      setSnackbar({ open: true, message: 'Failed to generate playlist', severity: 'error' })
+      setSnackbar({ open: true, message: `Failed to generate ${noun.toLowerCase()}`, severity: 'error' })
     } finally {
       setGeneratingChannelId(null)
     }
@@ -291,7 +299,7 @@ export function usePlaylistsData() {
         setPlaylistItems(data.items || [])
       }
     } catch {
-      setSnackbar({ open: true, message: 'Failed to load playlist', severity: 'error' })
+      setSnackbar({ open: true, message: `Failed to load ${noun.toLowerCase()}`, severity: 'error' })
     } finally {
       setLoadingPlaylist(false)
     }
@@ -315,7 +323,7 @@ export function usePlaylistsData() {
 
       if (response.ok) {
         setPlaylistItems(playlistItems.filter((item) => item.playlistItemId !== entryId))
-        setSnackbar({ open: true, message: 'Movie removed from playlist', severity: 'success' })
+        setSnackbar({ open: true, message: `Movie removed from ${noun.toLowerCase()}`, severity: 'success' })
       } else {
         setSnackbar({ open: true, message: 'Failed to remove movie', severity: 'error' })
       }
@@ -349,7 +357,7 @@ export function usePlaylistsData() {
         }
         setSnackbar({
           open: true,
-          message: `Added "${movie.title}" to playlist`,
+          message: `Added "${movie.title}" to ${noun.toLowerCase()}`,
           severity: 'success',
         })
       } else {
@@ -376,7 +384,7 @@ export function usePlaylistsData() {
         setGraphPlaylistItems(data.items || [])
       }
     } catch {
-      setSnackbar({ open: true, message: 'Failed to load playlist', severity: 'error' })
+      setSnackbar({ open: true, message: `Failed to load ${noun.toLowerCase()}`, severity: 'error' })
     } finally {
       setLoadingGraphPlaylist(false)
     }

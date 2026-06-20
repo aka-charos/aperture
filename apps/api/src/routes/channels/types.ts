@@ -1,3 +1,5 @@
+export type ChannelOutputType = 'playlist' | 'collection'
+
 export interface ChannelRow {
   id: string
   owner_id: string
@@ -8,6 +10,8 @@ export interface ChannelRow {
   example_movie_ids: string[]
   is_pinned_row: boolean
   playlist_id: string | null
+  output_type: ChannelOutputType
+  collection_id: string | null
   is_active: boolean
   last_generated_at: Date | null
   created_at: Date
@@ -21,6 +25,7 @@ export interface ChannelCreateBody {
   textPreferences?: string
   exampleMovieIds?: string[]
   isPinnedRow?: boolean
+  outputType?: ChannelOutputType
 }
 
 export interface ChannelUpdateBody {

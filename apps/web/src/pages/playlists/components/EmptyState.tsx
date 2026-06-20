@@ -5,10 +5,12 @@ import PlaylistPlayIcon from '@mui/icons-material/PlaylistPlay'
 
 interface EmptyStateProps {
   onCreateClick: () => void
+  i18nNamespace?: string
 }
 
-export function EmptyState({ onCreateClick }: EmptyStateProps) {
+export function EmptyState({ onCreateClick, i18nNamespace = 'playlists' }: EmptyStateProps) {
   const { t } = useTranslation()
+  const pt = (key: string, options?: Record<string, unknown>) => t(`${i18nNamespace}.${key}`, options)
   return (
     <Card
       sx={{
@@ -20,13 +22,13 @@ export function EmptyState({ onCreateClick }: EmptyStateProps) {
     >
       <PlaylistPlayIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
       <Typography variant="h6" mb={1}>
-        {t('playlists.emptyTitle')}
+        {pt('emptyTitle')}
       </Typography>
       <Typography variant="body2" color="text.secondary" mb={3}>
-        {t('playlists.emptyBody')}
+        {pt('emptyBody')}
       </Typography>
       <Button variant="contained" startIcon={<AddIcon />} onClick={onCreateClick}>
-        {t('playlists.createPlaylist')}
+        {pt('createPlaylist')}
       </Button>
     </Card>
   )

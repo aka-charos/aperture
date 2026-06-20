@@ -1,23 +1,41 @@
 import type { FastifyInstance } from 'fastify'
+import { deleteChannelCollection } from '@aperture/core'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
-import type { ChannelRow, ChannelCreateBody, ChannelUpdateBody } from '../types.js'
+import type {
+  ChannelRow,
+  ChannelCreateBody,
+  ChannelUpdateBody,
+  ChannelOutputType,
+} from '../types.js'
 
 export function registerCrudHandlers(fastify: FastifyInstance) {
   /**
    * GET /api/channels
    * List user's channels
    */
-  fastify.get('/api/channels', { preHandler: requireAuth, schema: { tags: ["playlists"] } }, async (request, reply) => {
-    const currentUser = request.user as SessionUser
+  fastify.get<{ Querystring: { outputType?: ChannelOutputType } }>(
+    '/api/channels',
+    { preHandler: requireAuth, schema: { tags: ["playlists"] } },
+    async (request, reply) => {
+      const currentUser = request.user as SessionUser
+      const { outputType } = request.query
 
-    const result = await query<ChannelRow>(
-      `SELECT * FROM channels WHERE owner_id = $1 ORDER BY name ASC`,
-      [currentUser.id]
-    )
+      const params: unknown[] = [currentUser.id]
+      let whereClause = 'owner_id = $1'
+      if (outputType === 'playlist' || outputType === 'collection') {
+        params.push(outputType)
+        whereClause += ' AND output_type = $2'
+      }
 
-    return reply.send({ channels: result.rows })
-  })
+      const result = await query<ChannelRow>(
+        `SELECT * FROM channels WHERE ${whereClause} ORDER BY name ASC`,
+        params
+      )
+
+      return reply.send({ channels: result.rows })
+    }
+  )
 
   /**
    * POST /api/channels
@@ -28,7 +46,7 @@ export function registerCrudHandlers(fastify: FastifyInstance) {
     { preHandler: requireAuth, schema: { tags: ["playlists"] } },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
-      const { name, description, genreFilters, textPreferences, exampleMovieIds, isPinnedRow } =
+      const { name, description, genreFilters, textPreferences, exampleMovieIds, isPinnedRow, outputType } =
         request.body
 
       if (!name) {
@@ -36,8 +54,8 @@ export function registerCrudHandlers(fastify: FastifyInstance) {
       }
 
       const channel = await queryOne<ChannelRow>(
-        `INSERT INTO channels (owner_id, name, description, genre_filters, text_preferences, example_movie_ids, is_pinned_row)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO channels (owner_id, name, description, genre_filters, text_preferences, example_movie_ids, is_pinned_row, output_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
         [
           currentUser.id,
@@ -47,6 +65,7 @@ export function registerCrudHandlers(fastify: FastifyInstance) {
           textPreferences || null,
           exampleMovieIds || [],
           isPinnedRow || false,
+          outputType === 'collection' ? 'collection' : 'playlist',
         ]
       )
 
@@ -181,6 +200,16 @@ export function registerCrudHandlers(fastify: FastifyInstance) {
 
       if (existing.owner_id !== currentUser.id && !currentUser.isAdmin) {
         return reply.status(403).send({ error: 'Forbidden' })
+      }
+
+      // Collections are everyone-visible — remove the Box Set from the media server so deleting
+      // the config doesn't leave an orphan in the library. Best-effort; never blocks the delete.
+      if (existing.output_type === 'collection') {
+        try {
+          await deleteChannelCollection(id)
+        } catch (err) {
+          request.log.error({ err, channelId: id }, 'Failed to delete channel collection')
+        }
       }
 
       await query('DELETE FROM channels WHERE id = $1', [id])

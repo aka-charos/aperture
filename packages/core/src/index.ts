@@ -188,6 +188,8 @@ export {
   updateChannelPlaylist,
   createSharedPlaylist,
   processAllChannels,
+  updateChannelCollection,
+  deleteChannelCollection,
   writeChannelStrm,
   generateAIPreferences,
   generateAIPlaylistName,

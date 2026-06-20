@@ -17,8 +17,14 @@ export async function createOrUpdateCollection(
   provider: EmbyProviderBase,
   apiKey: string,
   name: string,
-  itemIds: string[]
+  itemIds: string[],
+  opts?: { rankAndPin?: boolean }
 ): Promise<CollectionCreateResult> {
+  // Showcase ordering — pinning the collection to the top of the library and rewriting each
+  // member's global sort name to "NN - Title" — is intentional for the Top Picks collection but
+  // undesirable for arbitrary user collections, which opt out with rankAndPin: false.
+  const rankAndPin = opts?.rankAndPin !== false
+
   const params = buildItemSearchParams({
     includeItemTypes: 'BoxSet',
     searchTerm: name,
@@ -58,10 +64,14 @@ export async function createOrUpdateCollection(
 
     collectionId = created.Id
 
-    await setCollectionSortTitle(provider, apiKey, collectionId, name)
+    if (rankAndPin) {
+      await setCollectionSortTitle(provider, apiKey, collectionId, name)
+    }
   }
 
-  await setItemRankSortNames(provider, apiKey, itemIds)
+  if (rankAndPin) {
+    await setItemRankSortNames(provider, apiKey, itemIds)
+  }
 
   return { collectionId }
 }

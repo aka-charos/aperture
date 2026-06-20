@@ -34,6 +34,7 @@ interface PlaylistViewDialogProps {
   onClose: () => void
   onRemoveItem: (entryId: string) => void
   onAddMovie: (movie: Movie) => void
+  i18nNamespace?: string
 }
 
 export function PlaylistViewDialog({
@@ -46,8 +47,10 @@ export function PlaylistViewDialog({
   onClose,
   onRemoveItem,
   onAddMovie,
+  i18nNamespace = 'playlists',
 }: PlaylistViewDialogProps) {
   const { t } = useTranslation()
+  const pt = (key: string, options?: Record<string, unknown>) => t(`${i18nNamespace}.${key}`, options)
   const [addMovieSearch, setAddMovieSearch] = useState('')
   const [addMovieResults, setAddMovieResults] = useState<Movie[]>([])
   const [searchingAddMovies, setSearchingAddMovies] = useState(false)
@@ -104,10 +107,10 @@ export function PlaylistViewDialog({
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Box>
             <Typography variant="h6">
-              {channel?.name ? t('playlists.playlistViewTitle', { name: channel.name }) : ''}
+              {channel?.name ? pt('playlistViewTitle', { name: channel.name }) : ''}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {t('playlists.movieCount', { count: playlistItems.length })}
+              {pt('movieCount', { count: playlistItems.length })}
             </Typography>
           </Box>
           <IconButton onClick={onClose} size="small">
@@ -119,12 +122,12 @@ export function PlaylistViewDialog({
         {/* Add Movie Search */}
         <Box mb={3}>
           <Typography variant="subtitle2" gutterBottom>
-            {t('playlists.addMovieToPlaylist')}
+            {pt('addMovieToPlaylist')}
           </Typography>
           <TextField
             fullWidth
             size="small"
-            placeholder={t('playlists.searchMoviesPlaceholder')}
+            placeholder={pt('searchMoviesPlaceholder')}
             value={addMovieSearch}
             onChange={(e) => setAddMovieSearch(e.target.value)}
             InputProps={{
@@ -192,7 +195,7 @@ export function PlaylistViewDialog({
               {addMovieResults.length > 0 &&
                 addMovieResults.filter((movie) => !playlistItems.some((item) => item.id === movie.provider_item_id)).length === 0 && (
                   <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
-                    {t('playlists.allResultsInPlaylist')}
+                    {pt('allResultsInPlaylist')}
                   </Typography>
                 )}
             </Box>
@@ -208,10 +211,10 @@ export function PlaylistViewDialog({
           <Box textAlign="center" py={4}>
             <PlaylistPlayIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
             <Typography variant="body1" color="text.secondary">
-              {t('playlists.noMoviesInPlaylist')}
+              {pt('noMoviesInPlaylist')}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {t('playlists.noMoviesInPlaylistHint')}
+              {pt('noMoviesInPlaylistHint')}
             </Typography>
           </Box>
         ) : (
@@ -239,11 +242,11 @@ export function PlaylistViewDialog({
                 <Box flexGrow={1}>
                   <Typography variant="body1">{item.title}</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {item.year || t('playlists.unknownYear')}
+                    {item.year || pt('unknownYear')}
                     {item.runtime && ` • ${item.runtime} min`}
                   </Typography>
                 </Box>
-                <Tooltip title={t('playlists.removeFromPlaylist')}>
+                <Tooltip title={pt('removeFromPlaylist')}>
                   <IconButton
                     size="small"
                     color="error"

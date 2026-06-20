@@ -14,6 +14,9 @@ export {
   processAllChannels,
 } from './playlists.js'
 
+// Re-export collection functions
+export { updateChannelCollection, deleteChannelCollection } from './collections.js'
+
 // Re-export STRM functions
 export { writeChannelStrm } from './strm.js'
 
