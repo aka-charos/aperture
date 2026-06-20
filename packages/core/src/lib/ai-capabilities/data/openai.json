@@ -195,7 +195,7 @@
     {
       "id": "o3-mini",
       "name": "o3 Mini",
-      "description": "Reasoning model. Better at complex problems.",
+      "description": "Deprecated (shuts down 2026-10-23). Migrate to GPT-5.5. Reasoning model for complex problems.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
