@@ -802,6 +802,9 @@ export {
   type CreateGraphPlaylistInput,
 } from './graphPlaylists/index.js'
 
+// User Favorites
+export { setFavoritesForUser, type SetFavoritesResult } from './favorites/index.js'
+
 // Seerr Integration
 export {
   // Configuration

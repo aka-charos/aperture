@@ -49,7 +49,11 @@ export async function getFavoriteSeriesIdsForUser(
   return ids
 }
 
-export async function favoriteSeriesItem(
+/**
+ * Mark any item (movie, series, episode, …) as favorite for a user.
+ * The FavoriteItems endpoint is type-agnostic — it only needs the item id.
+ */
+export async function favoriteItem(
   provider: JellyfinProviderBase,
   apiKey: string,
   userId: string,
@@ -59,7 +63,10 @@ export async function favoriteSeriesItem(
   await provider.fetch(path, apiKey, { method: 'POST' })
 }
 
-export async function unfavoriteSeriesItem(
+/**
+ * Remove favorite from any item for a user. Idempotent: 404 means already not a favorite.
+ */
+export async function unfavoriteItem(
   provider: JellyfinProviderBase,
   apiKey: string,
   userId: string,
@@ -77,3 +84,7 @@ export async function unfavoriteSeriesItem(
     throw err
   }
 }
+
+// Series favorites use the same endpoint — kept as named aliases for existing call sites.
+export const favoriteSeriesItem = favoriteItem
+export const unfavoriteSeriesItem = unfavoriteItem

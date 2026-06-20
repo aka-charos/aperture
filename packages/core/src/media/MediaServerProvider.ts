@@ -201,6 +201,16 @@ export interface MediaServerProvider {
    */
   unfavoriteSeriesItem(apiKey: string, userId: string, itemId: string): Promise<void>
 
+  /**
+   * Mark any item (movie, series, …) as favorite for a user
+   */
+  favoriteItem(apiKey: string, userId: string, itemId: string): Promise<void>
+
+  /**
+   * Remove favorite from any item for a user (idempotent)
+   */
+  unfavoriteItem(apiKey: string, userId: string, itemId: string): Promise<void>
+
   // =========================================================================
   // Playlists
   // =========================================================================
