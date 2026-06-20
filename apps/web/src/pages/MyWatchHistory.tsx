@@ -114,6 +114,8 @@ export function MyWatchHistoryPage() {
   // Shared state
   const { viewMode, setViewMode } = useViewMode('watchHistory')
   const [searchQuery, setSearchQuery] = useState('')
+  // Debounced term actually sent to the server so search spans the whole history, not just the loaded page
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
   // Mark unwatched state
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -169,13 +171,14 @@ export function MyWatchHistoryPage() {
     }
   }
 
-  const fetchMovieHistory = useCallback(async (page: number, sort: string) => {
+  const fetchMovieHistory = useCallback(async (page: number, sort: string, search: string) => {
     if (!user) return
-    
+
     setMovieLoading(true)
     try {
+      const searchParam = search ? `&search=${encodeURIComponent(search)}` : ''
       const response = await fetch(
-        `/api/users/${user.id}/watch-history?page=${page}&pageSize=50&sortBy=${sort}`,
+        `/api/users/${user.id}/watch-history?page=${page}&pageSize=50&sortBy=${sort}${searchParam}`,
         { credentials: 'include' }
       )
       if (response.ok) {
@@ -190,13 +193,14 @@ export function MyWatchHistoryPage() {
     }
   }, [user])
 
-  const fetchSeriesHistory = useCallback(async (page: number, sort: string) => {
+  const fetchSeriesHistory = useCallback(async (page: number, sort: string, search: string) => {
     if (!user) return
-    
+
     setSeriesLoading(true)
     try {
+      const searchParam = search ? `&search=${encodeURIComponent(search)}` : ''
       const response = await fetch(
-        `/api/users/${user.id}/series-watch-history?page=${page}&pageSize=50&sortBy=${sort}`,
+        `/api/users/${user.id}/series-watch-history?page=${page}&pageSize=50&sortBy=${sort}${searchParam}`,
         { credentials: 'include' }
       )
       if (response.ok) {
@@ -211,49 +215,44 @@ export function MyWatchHistoryPage() {
     }
   }, [user])
 
-  // Fetch both on mount
+  // Debounce the search box before hitting the server (300ms while typing, immediate when cleared)
   useEffect(() => {
-    fetchMovieHistory(1, movieSortBy)
-    fetchSeriesHistory(1, seriesSortBy)
-  }, [fetchMovieHistory, fetchSeriesHistory, movieSortBy, seriesSortBy])
+    const handle = setTimeout(() => setDebouncedSearch(searchQuery.trim()), searchQuery ? 300 : 0)
+    return () => clearTimeout(handle)
+  }, [searchQuery])
+
+  // Refetch from page 1 whenever the search term or sort changes (also covers initial mount)
+  useEffect(() => {
+    fetchMovieHistory(1, movieSortBy, debouncedSearch)
+  }, [fetchMovieHistory, movieSortBy, debouncedSearch])
+
+  useEffect(() => {
+    fetchSeriesHistory(1, seriesSortBy, debouncedSearch)
+  }, [fetchSeriesHistory, seriesSortBy, debouncedSearch])
 
   const handleMoviePageChange = (_: React.ChangeEvent<unknown>, page: number) => {
-    fetchMovieHistory(page, movieSortBy)
+    fetchMovieHistory(page, movieSortBy, debouncedSearch)
   }
 
   const handleSeriesPageChange = (_: React.ChangeEvent<unknown>, page: number) => {
-    fetchSeriesHistory(page, seriesSortBy)
+    fetchSeriesHistory(page, seriesSortBy, debouncedSearch)
   }
 
   const handleMovieSortChange = (_: React.MouseEvent<HTMLElement>, newSort: 'recent' | 'plays' | 'title' | null) => {
     if (newSort) {
       setMovieSortBy(newSort)
-      fetchMovieHistory(1, newSort)
     }
   }
 
   const handleSeriesSortChange = (_: React.MouseEvent<HTMLElement>, newSort: 'recent' | 'plays' | 'title' | null) => {
     if (newSort) {
       setSeriesSortBy(newSort)
-      fetchSeriesHistory(1, newSort)
     }
   }
 
-  // Filter movies by search query
-  const filteredMovies = searchQuery
-    ? movieHistory.filter((item) =>
-        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.genres?.some((g) => g.toLowerCase().includes(searchQuery.toLowerCase()))
-      )
-    : movieHistory
-
-  // Filter series by search query
-  const filteredSeries = searchQuery
-    ? seriesHistory.filter((item) =>
-        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.genres?.some((g) => g.toLowerCase().includes(searchQuery.toLowerCase()))
-      )
-    : seriesHistory
+  // Search is applied server-side across the whole history; render results as-is.
+  const filteredMovies = movieHistory
+  const filteredSeries = seriesHistory
 
   const isLoading = tabValue === 0 ? movieLoading : seriesLoading
 
