@@ -47,6 +47,7 @@ import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
+import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark'
 
 interface ProviderUser {
   providerUserId: string
@@ -61,6 +62,7 @@ interface ProviderUser {
   seriesEnabled: boolean
   discoverEnabled: boolean
   discoverRequestEnabled: boolean
+  collectionsEnabled: boolean
   aiOverrideAllowed: boolean
 }
 
@@ -357,6 +359,40 @@ export function UsersPage() {
     }
   }
 
+  const handleToggleCollections = async (user: ProviderUser) => {
+    if (!user.apertureUserId) return
+
+    setUpdating(user.providerUserId)
+    try {
+      const newValue = !user.collectionsEnabled
+      const response = await fetch(`/api/users/${user.apertureUserId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ collectionsEnabled: newValue }),
+      })
+
+      if (response.ok) {
+        setProviderUsers((prev) =>
+          prev.map((u) =>
+            u.providerUserId === user.providerUserId
+              ? { ...u, collectionsEnabled: newValue }
+              : u
+          )
+        )
+        setSnackbar({
+          open: true,
+          message: newValue
+            ? t('admin.usersPage.collectionsOn', { name: user.name })
+            : t('admin.usersPage.collectionsOff', { name: user.name }),
+          severity: 'success',
+        })
+      }
+    } finally {
+      setUpdating(null)
+    }
+  }
+
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, user: ProviderUser) => {
     setMenuAnchor(event.currentTarget)
     setMenuUser(user)
@@ -621,6 +657,19 @@ export function UsersPage() {
                         </Stack>
                       </Stack>
 
+                      {/* Collections permission toggle */}
+                      <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
+                        <CollectionsBookmarkIcon fontSize="small" color="action" />
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>{t('admin.usersPage.collections')}</Typography>
+                        <Switch
+                          checked={user.collectionsEnabled}
+                          onChange={() => handleToggleCollections(user)}
+                          disabled={updating === user.providerUserId || user.isDisabled}
+                          color="primary"
+                          size="small"
+                        />
+                      </Stack>
+
                       {/* AI Override toggle (if enabled globally) */}
                       {globalAiConfig?.userOverrideAllowed && (
                         <Stack direction="row" alignItems="center" spacing={1} mb={2}>
@@ -811,6 +860,14 @@ export function UsersPage() {
                   </Box>
                 </Tooltip>
               </TableCell>
+              <TableCell align="center">
+                <Tooltip title={t('admin.usersPage.collectionsColTooltip')}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                    <CollectionsBookmarkIcon fontSize="small" />
+                    {t('admin.usersPage.colCollections')}
+                  </Box>
+                </Tooltip>
+              </TableCell>
               {globalAiConfig?.userOverrideAllowed && (
                 <TableCell align="center">
                   <Tooltip title={t('admin.usersPage.aiOverrideColTooltip')}>
@@ -827,7 +884,7 @@ export function UsersPage() {
           <TableBody>
             {sortedUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={globalAiConfig?.userOverrideAllowed ? 9 : 8} align="center">
+                <TableCell colSpan={globalAiConfig?.userOverrideAllowed ? 10 : 9} align="center">
                   <Typography variant="body2" color="text.secondary" py={4}>
                     {t('admin.usersPage.noUsers', { provider: providerLabel })}
                   </Typography>
@@ -930,6 +987,21 @@ export function UsersPage() {
                           checked={user.discoverRequestEnabled}
                           onChange={() => handleToggleDiscoverRequest(user)}
                           disabled={updating === user.providerUserId || user.isDisabled || !user.discoverEnabled}
+                          color="primary"
+                          size="small"
+                        />
+                      </Tooltip>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">—</Typography>
+                    )}
+                  </TableCell>
+                  <TableCell align="center">
+                    {user.isImported ? (
+                      <Tooltip title={user.collectionsEnabled ? t('admin.usersPage.collectionsToggleOn') : t('admin.usersPage.collectionsToggleOff')}>
+                        <Switch
+                          checked={user.collectionsEnabled}
+                          onChange={() => handleToggleCollections(user)}
+                          disabled={updating === user.providerUserId || user.isDisabled}
                           color="primary"
                           size="small"
                         />

@@ -53,6 +53,12 @@ export function registerCrudHandlers(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Name is required' })
       }
 
+      // Collections are server-wide (visible to everyone), so gate their creation behind an
+      // admin-granted permission. Playlists (per-user) remain open to any user.
+      if (outputType === 'collection' && !currentUser.isAdmin && !currentUser.collectionsEnabled) {
+        return reply.status(403).send({ error: 'You do not have permission to create collections' })
+      }
+
       const channel = await queryOne<ChannelRow>(
         `INSERT INTO channels (owner_id, name, description, genre_filters, text_preferences, example_movie_ids, is_pinned_row, output_type)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)

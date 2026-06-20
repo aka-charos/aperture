@@ -9,6 +9,7 @@ export interface User {
   isAdmin: boolean
   isEnabled: boolean
   canManageWatchHistory: boolean
+  collectionsEnabled: boolean
   avatarUrl: string | null
 }
 

@@ -24,18 +24,19 @@ export function registerProviderHandlers(fastify: FastifyInstance) {
         const providerUsers = await provider.getUsers(apiKey)
 
         // Get existing users from our DB to check import status
-        const existingResult = await query<{ provider_user_id: string; id: string; is_enabled: boolean; movies_enabled: boolean; series_enabled: boolean; discover_enabled: boolean; discover_request_enabled: boolean; ai_explanation_override_allowed: boolean }>(
-          `SELECT provider_user_id, id, is_enabled, movies_enabled, series_enabled, discover_enabled, discover_request_enabled, COALESCE(ai_explanation_override_allowed, false) as ai_explanation_override_allowed FROM users WHERE provider = $1`,
+        const existingResult = await query<{ provider_user_id: string; id: string; is_enabled: boolean; movies_enabled: boolean; series_enabled: boolean; discover_enabled: boolean; discover_request_enabled: boolean; collections_enabled: boolean; ai_explanation_override_allowed: boolean }>(
+          `SELECT provider_user_id, id, is_enabled, movies_enabled, series_enabled, discover_enabled, discover_request_enabled, collections_enabled, COALESCE(ai_explanation_override_allowed, false) as ai_explanation_override_allowed FROM users WHERE provider = $1`,
           [provider.type]
         )
         const existingMap = new Map(
-          existingResult.rows.map((row) => [row.provider_user_id, { 
-            id: row.id, 
+          existingResult.rows.map((row) => [row.provider_user_id, {
+            id: row.id,
             isEnabled: row.is_enabled,
             moviesEnabled: row.movies_enabled,
             seriesEnabled: row.series_enabled,
             discoverEnabled: row.discover_enabled,
             discoverRequestEnabled: row.discover_request_enabled,
+            collectionsEnabled: row.collections_enabled,
             aiOverrideAllowed: row.ai_explanation_override_allowed,
           }])
         )
@@ -57,6 +58,7 @@ export function registerProviderHandlers(fastify: FastifyInstance) {
             seriesEnabled: existing?.seriesEnabled || false,
             discoverEnabled: existing?.discoverEnabled || false,
             discoverRequestEnabled: existing?.discoverRequestEnabled || false,
+            collectionsEnabled: existing?.collectionsEnabled || false,
             aiOverrideAllowed: existing?.aiOverrideAllowed || false,
           }
         })
