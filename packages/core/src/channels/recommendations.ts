@@ -1,6 +1,6 @@
 import { createChildLogger } from '../lib/logger.js'
 import { query, queryOne } from '../lib/db.js'
-import { getMovieEmbedding } from '../recommender/movies/embeddings.js'
+import { getMovieEmbedding, embedText } from '../recommender/movies/embeddings.js'
 import { averageEmbeddings } from '../recommender/shared/embeddings.js'
 import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../lib/ai-provider.js'
 import type { ChannelRecommendation } from './types.js'
@@ -42,22 +42,35 @@ export async function generateChannelRecommendations(
     maxParentalRating: channel.max_parental_rating 
   }, 'Generating channel recommendations')
 
-  // Build channel taste profile from example movies
+  // Build channel taste profile from example movies + free-text preferences.
+  // Both are embedded in the same vector space and averaged together, so a
+  // channel defined only by text preferences still gets a real taste vector
+  // (instead of silently falling back to rating-only ordering).
   let tasteProfile: number[] | null = null
+  const embeddings: number[][] = []
 
   if (channel.example_movie_ids && channel.example_movie_ids.length > 0) {
-    const embeddings: number[][] = []
-
     for (const movieId of channel.example_movie_ids) {
       const emb = await getMovieEmbedding(movieId)
       if (emb) {
         embeddings.push(emb)
       }
     }
+  }
 
-    if (embeddings.length > 0) {
-      tasteProfile = averageEmbeddings(embeddings)
+  if (channel.text_preferences && channel.text_preferences.trim()) {
+    try {
+      const textEmb = await embedText(channel.text_preferences)
+      if (textEmb) {
+        embeddings.push(textEmb)
+      }
+    } catch (err) {
+      logger.warn({ err, channelId }, 'Failed to embed channel text preferences; using example movies only')
     }
+  }
+
+  if (embeddings.length > 0) {
+    tasteProfile = averageEmbeddings(embeddings)
   }
 
   // Get user's watch history to exclude watched movies

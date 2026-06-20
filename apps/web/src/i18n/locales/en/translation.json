@@ -1583,6 +1583,15 @@
     "loadError": "Failed to load streaming discovery settings",
     "saveError": "Failed to save streaming discovery settings"
   },
+  "settingsChannelsWebExpand": {
+    "title": "Channel & collection web expansion",
+    "description": "Manual “Generate” always expands playlists and collections with web-search picks similar to your seed movies (when the Web Search AI role is configured). Enable this to also include that web search in the scheduled auto-refresh — it makes recurring Google grounding calls, so it is off by default.",
+    "enable": "Include web search in scheduled auto-refresh",
+    "save": "Save",
+    "saved": "Web expansion setting saved.",
+    "loadError": "Failed to load web expansion setting",
+    "saveError": "Failed to save web expansion setting"
+  },
   "settingsDiscoveryGenreStrips": {
     "title": "Discovery — genre strips (TMDb)",
     "description": "Each block below is one horizontal strip on Discovery. Up to 24 strips per section; up to 8 genres per strip. Genre names follow your UI locale.",

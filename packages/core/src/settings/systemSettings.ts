@@ -1364,6 +1364,28 @@ export async function setStreamingDiscoveryEnabled(enabled: boolean): Promise<vo
   )
 }
 
+// ============================================================================
+// Channel / Collection web-search expansion (scheduled auto-refresh)
+// ============================================================================
+
+/**
+ * Whether the scheduled channel/collection auto-refresh job should also run Web Search
+ * expansion. Manual "Generate" always expands when the Web Search role is configured; this
+ * setting only gates the recurring cost of the background job. Defaults to false.
+ */
+export async function getChannelsWebExpandOnSchedule(): Promise<boolean> {
+  const v = await getSystemSetting('channels_web_expand_on_schedule')
+  return v === 'true'
+}
+
+export async function setChannelsWebExpandOnSchedule(enabled: boolean): Promise<void> {
+  await setSystemSetting(
+    'channels_web_expand_on_schedule',
+    enabled ? 'true' : 'false',
+    'Include Web Search expansion in scheduled channel/collection auto-refresh (admin)'
+  )
+}
+
 /**
  * Comma-separated JustWatch package technical names for per-provider strips (e.g. nfx,dnp).
  */
