@@ -22,8 +22,14 @@ export async function createOrUpdateCollection(
   provider: JellyfinProviderBase,
   apiKey: string,
   name: string,
-  itemIds: string[]
+  itemIds: string[],
+  opts?: { rankAndPin?: boolean }
 ): Promise<CollectionCreateResult> {
+  // Showcase ordering (pin-to-top sort title + per-member "NN - Title" rank sort names) is
+  // intentional for Top Picks but mutates members' global sort names, so user collections opt
+  // out with rankAndPin: false.
+  const rankAndPin = opts?.rankAndPin !== false
+
   // First, try to find existing collection (Box Set)
   const params = new URLSearchParams({
     IncludeItemTypes: 'BoxSet',
@@ -76,11 +82,15 @@ export async function createOrUpdateCollection(
     collectionId = created.Id
 
     // Set sort title to force collection to sort at top
-    await setCollectionSortTitle(provider, apiKey, collectionId, name)
+    if (rankAndPin) {
+      await setCollectionSortTitle(provider, apiKey, collectionId, name)
+    }
   }
 
   // Set sort names on items to maintain rank order (01, 02, 03, etc.)
-  await setItemRankSortNames(provider, apiKey, itemIds)
+  if (rankAndPin) {
+    await setItemRankSortNames(provider, apiKey, itemIds)
+  }
 
   return { collectionId }
 }

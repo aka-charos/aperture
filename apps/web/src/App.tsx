@@ -22,6 +22,7 @@ import { MoviesPage } from './pages/Movies'
 import { SeriesPage } from './pages/Series'
 import { MovieDetailPage, SeriesDetailPage } from './pages/media-detail'
 import { PlaylistsPage } from './pages/playlists'
+import { CollectionsPage } from './pages/collections'
 import { UserSettingsPage } from './pages/UserSettings'
 import { TopPicksMoviesPage, TopPicksSeriesPage, TopPicksPage } from './pages/top-picks'
 import { BrowsePage } from './pages/Browse'
@@ -160,6 +161,7 @@ function AppRoutes() {
         <Route path="top-picks/movies" element={<TopPicksMoviesPage />} />
         <Route path="top-picks/series" element={<TopPicksSeriesPage />} />
         <Route path="playlists" element={<PlaylistsPage />} />
+        <Route path="collections" element={<CollectionsPage />} />
         <Route path="explore" element={<ExplorePage />} />
         <Route path="discovery" element={<DiscoveryPage />} />
         <Route path="my-requests" element={<MyRequestsPage />} />

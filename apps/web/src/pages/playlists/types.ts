@@ -8,6 +8,8 @@ export interface Channel {
   is_pinned_row: boolean
   is_active: boolean
   playlist_id: string | null
+  output_type?: 'playlist' | 'collection'
+  collection_id?: string | null
   last_generated_at: string | null
 }
 

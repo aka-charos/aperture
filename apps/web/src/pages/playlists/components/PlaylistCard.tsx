@@ -28,6 +28,7 @@ interface PlaylistCardProps {
   onDelete: (channelId: string, channelName: string) => void
   onGenerate: (channelId: string) => void
   onView: (channel: Channel) => void
+  i18nNamespace?: string
 }
 
 export function PlaylistCard({
@@ -37,18 +38,22 @@ export function PlaylistCard({
   onDelete,
   onGenerate,
   onView,
+  i18nNamespace = 'playlists',
 }: PlaylistCardProps) {
   const { t, i18n } = useTranslation()
+  const pt = (key: string, options?: Record<string, unknown>) => t(`${i18nNamespace}.${key}`, options)
   const [previewItems, setPreviewItems] = useState<PlaylistItem[]>([])
   const [loadingPreview, setLoadingPreview] = useState(false)
   const [itemCount, setItemCount] = useState<number | null>(null)
 
   const isGenerating = generatingChannelId === channel.id
-  const hasPlaylist = !!channel.playlist_id
+  // The output lives in playlist_id or collection_id depending on the channel's target.
+  const outputId = channel.output_type === 'collection' ? channel.collection_id : channel.playlist_id
+  const hasPlaylist = !!outputId
 
-  // Fetch preview items when the card mounts (if playlist exists)
+  // Fetch preview items when the card mounts (if the output has been generated)
   useEffect(() => {
-    if (!channel.playlist_id) return
+    if (!outputId) return
 
     const fetchPreview = async () => {
       setLoadingPreview(true)
@@ -69,7 +74,7 @@ export function PlaylistCard({
     }
 
     fetchPreview()
-  }, [channel.id, channel.playlist_id, channel.last_generated_at])
+  }, [channel.id, outputId, channel.last_generated_at])
 
   const handleCardClick = () => {
     if (hasPlaylist) {
@@ -227,14 +232,14 @@ export function PlaylistCard({
                 <>
                   <PlaylistPlayIcon sx={{ fontSize: 40, color: 'text.disabled' }} />
                   <Typography variant="caption" color="text.disabled">
-                    {t('playlists.cardEmptyPlaylist')}
+                    {pt('cardEmptyPlaylist')}
                   </Typography>
                 </>
               ) : (
                 <>
                   <AutoAwesomeIcon sx={{ fontSize: 40, color: 'primary.main', opacity: 0.5 }} />
                   <Typography variant="caption" color="text.secondary">
-                    {t('playlists.cardGeneratePrompt')}
+                    {pt('cardGeneratePrompt')}
                   </Typography>
                 </>
               )}
@@ -257,7 +262,7 @@ export function PlaylistCard({
             >
               <CircularProgress size={32} sx={{ color: 'white' }} />
               <Typography variant="caption" sx={{ color: 'white' }}>
-                {t('playlists.cardGenerating')}
+                {pt('cardGenerating')}
               </Typography>
             </Box>
           )}
@@ -271,7 +276,7 @@ export function PlaylistCard({
             </Typography>
             {itemCount !== null && (
               <Chip
-                label={t('playlists.cardMoviesCount', { count: itemCount })}
+                label={pt('cardMoviesCount', { count: itemCount })}
                 size="small"
                 sx={{
                   bgcolor: 'action.selected',
@@ -327,7 +332,7 @@ export function PlaylistCard({
           {channel.example_movie_ids && channel.example_movie_ids.length > 0 && (
             <Typography variant="caption" color="text.secondary" display="flex" alignItems="center" gap={0.5}>
               <MovieIcon sx={{ fontSize: 14 }} />
-              {t('playlists.cardSeedMovies', { count: channel.example_movie_ids.length })}
+              {pt('cardSeedMovies', { count: channel.example_movie_ids.length })}
             </Typography>
           )}
         </Box>
@@ -349,19 +354,19 @@ export function PlaylistCard({
         <Box display="flex" alignItems="center" gap={1}>
           {channel.last_generated_at ? (
             <Typography variant="caption" color="text.secondary">
-              {t('playlists.cardUpdated', {
+              {pt('cardUpdated', {
                 date: new Date(channel.last_generated_at).toLocaleDateString(i18n.language),
               })}
             </Typography>
           ) : (
             <Typography variant="caption" color="warning.main">
-              {t('playlists.cardNotGenerated')}
+              {pt('cardNotGenerated')}
             </Typography>
           )}
         </Box>
 
         <Box display="flex" gap={0.5}>
-          <Tooltip title={hasPlaylist ? t('playlists.tooltipRefreshPlaylist') : t('playlists.tooltipGeneratePlaylist')}>
+          <Tooltip title={hasPlaylist ? pt('tooltipRefreshPlaylist') : pt('tooltipGeneratePlaylist')}>
             <IconButton
               size="small"
               onClick={handleGenerateClick}
@@ -375,12 +380,12 @@ export function PlaylistCard({
               )}
             </IconButton>
           </Tooltip>
-          <Tooltip title={t('playlists.tooltipEditSettings')}>
+          <Tooltip title={pt('tooltipEditSettings')}>
             <IconButton size="small" onClick={handleEditClick}>
               <EditIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title={t('playlists.tooltipDeletePlaylist')}>
+          <Tooltip title={pt('tooltipDeletePlaylist')}>
             <IconButton size="small" onClick={handleDeleteClick} color="error">
               <DeleteIcon fontSize="small" />
             </IconButton>

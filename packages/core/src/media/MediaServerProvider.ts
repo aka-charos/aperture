@@ -255,11 +255,16 @@ export interface MediaServerProvider {
    * Create or update a collection (Box Set)
    * Collections group items within libraries and appear in the browse view
    * Unlike playlists, collections are not ordered
+   *
+   * @param opts.rankAndPin - When true (default), pins the collection to the top of the library
+   *   and rewrites each member's global sort name to "NN - Title" for showcase ordering (used by
+   *   Top Picks). Pass false for user-generated collections to leave member sort names untouched.
    */
   createOrUpdateCollection(
     apiKey: string,
     name: string,
-    itemIds: string[]
+    itemIds: string[],
+    opts?: { rankAndPin?: boolean }
   ): Promise<CollectionCreateResult>
 
   /**

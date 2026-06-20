@@ -244,9 +244,10 @@ export class EmbyProvider extends EmbyProviderBase implements MediaServerProvide
   async createOrUpdateCollection(
     apiKey: string,
     name: string,
-    itemIds: string[]
+    itemIds: string[],
+    opts?: { rankAndPin?: boolean }
   ): Promise<CollectionCreateResult> {
-    return createOrUpdateCollection(this, apiKey, name, itemIds)
+    return createOrUpdateCollection(this, apiKey, name, itemIds, opts)
   }
 
   async deleteCollection(apiKey: string, collectionId: string): Promise<void> {

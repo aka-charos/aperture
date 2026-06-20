@@ -148,6 +148,7 @@ interface PlaylistDialogProps {
   onSubmit: () => void
   onAddExampleMovie: (movie: Movie) => void
   onRemoveExampleMovie: (movieId: string) => void
+  i18nNamespace?: string
 }
 
 export function PlaylistDialog({
@@ -162,8 +163,10 @@ export function PlaylistDialog({
   onSubmit,
   onAddExampleMovie,
   onRemoveExampleMovie,
+  i18nNamespace = 'playlists',
 }: PlaylistDialogProps) {
   const { t } = useTranslation()
+  const pt = (key: string, options?: Record<string, unknown>) => t(`${i18nNamespace}.${key}`, options)
   const theme = useTheme()
 
   // Movie search state
@@ -227,7 +230,7 @@ export function PlaylistDialog({
     if (!canGenerate) {
       setSnackbar({
         open: true,
-        message: t('playlists.snackbarNeedGenresOrMovies'),
+        message: pt('snackbarNeedGenresOrMovies'),
         severity: 'error',
       })
       return
@@ -248,12 +251,12 @@ export function PlaylistDialog({
       if (response.ok) {
         const data = await response.json()
         setFormData({ ...formData, textPreferences: data.preferences })
-        setSnackbar({ open: true, message: t('playlists.snackbarAIPreferencesOk'), severity: 'success' })
+        setSnackbar({ open: true, message: pt('snackbarAIPreferencesOk'), severity: 'success' })
       } else {
-        setSnackbar({ open: true, message: t('playlists.snackbarAIPreferencesFail'), severity: 'error' })
+        setSnackbar({ open: true, message: pt('snackbarAIPreferencesFail'), severity: 'error' })
       }
     } catch {
-      setSnackbar({ open: true, message: t('playlists.snackbarAIPreferencesFail'), severity: 'error' })
+      setSnackbar({ open: true, message: pt('snackbarAIPreferencesFail'), severity: 'error' })
     } finally {
       setGeneratingAIPreferences(false)
     }
@@ -264,7 +267,7 @@ export function PlaylistDialog({
     if (!canGenerate) {
       setSnackbar({
         open: true,
-        message: t('playlists.snackbarNeedGenresOrMovies'),
+        message: pt('snackbarNeedGenresOrMovies'),
         severity: 'error',
       })
       return
@@ -286,12 +289,12 @@ export function PlaylistDialog({
       if (response.ok) {
         const data = await response.json()
         setFormData({ ...formData, name: data.name })
-        setSnackbar({ open: true, message: t('playlists.snackbarAINameOk'), severity: 'success' })
+        setSnackbar({ open: true, message: pt('snackbarAINameOk'), severity: 'success' })
       } else {
-        setSnackbar({ open: true, message: t('playlists.snackbarAINameFail'), severity: 'error' })
+        setSnackbar({ open: true, message: pt('snackbarAINameFail'), severity: 'error' })
       }
     } catch {
-      setSnackbar({ open: true, message: t('playlists.snackbarAINameFail'), severity: 'error' })
+      setSnackbar({ open: true, message: pt('snackbarAINameFail'), severity: 'error' })
     } finally {
       setGeneratingAIName(false)
     }
@@ -302,7 +305,7 @@ export function PlaylistDialog({
     if (!canGenerate) {
       setSnackbar({
         open: true,
-        message: t('playlists.snackbarNeedGenresOrMovies'),
+        message: pt('snackbarNeedGenresOrMovies'),
         severity: 'error',
       })
       return
@@ -325,12 +328,12 @@ export function PlaylistDialog({
       if (response.ok) {
         const data = await response.json()
         setFormData({ ...formData, description: data.description })
-        setSnackbar({ open: true, message: t('playlists.snackbarAIDescriptionOk'), severity: 'success' })
+        setSnackbar({ open: true, message: pt('snackbarAIDescriptionOk'), severity: 'success' })
       } else {
-        setSnackbar({ open: true, message: t('playlists.snackbarAIDescriptionFail'), severity: 'error' })
+        setSnackbar({ open: true, message: pt('snackbarAIDescriptionFail'), severity: 'error' })
       }
     } catch {
-      setSnackbar({ open: true, message: t('playlists.snackbarAIDescriptionFail'), severity: 'error' })
+      setSnackbar({ open: true, message: pt('snackbarAIDescriptionFail'), severity: 'error' })
     } finally {
       setGeneratingAIDescription(false)
     }
@@ -376,10 +379,10 @@ export function PlaylistDialog({
           </Box>
           <Box>
             <Typography variant="h5" fontWeight={700}>
-              {editingChannel ? t('playlists.dialogEditTitle') : t('playlists.dialogNewTitle')}
+              {editingChannel ? pt('dialogEditTitle') : pt('dialogNewTitle')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {editingChannel ? t('playlists.dialogEditSubtitle') : t('playlists.dialogNewSubtitle')}
+              {editingChannel ? pt('dialogEditSubtitle') : pt('dialogNewSubtitle')}
             </Typography>
           </Box>
         </Box>
@@ -392,8 +395,8 @@ export function PlaylistDialog({
         {/* Genres Section */}
         <Section
           icon={<CategoryIcon fontSize="small" />}
-          title={t('playlists.sectionGenres')}
-          subtitle={t('playlists.sectionGenresSubtitle')}
+          title={pt('sectionGenres')}
+          subtitle={pt('sectionGenresSubtitle')}
           theme={theme}
         >
           <Autocomplete
@@ -407,7 +410,7 @@ export function PlaylistDialog({
             renderInput={(params) => (
               <TextField
                 {...params}
-                placeholder={formData.genreFilters.length === 0 ? t('playlists.searchGenresPlaceholder') : ''}
+                placeholder={formData.genreFilters.length === 0 ? pt('searchGenresPlaceholder') : ''}
                 InputProps={{
                   ...params.InputProps,
                   endAdornment: (
@@ -437,15 +440,15 @@ export function PlaylistDialog({
         {/* Example Movies Section */}
         <Section
           icon={<MovieIcon fontSize="small" />}
-          title={t('playlists.sectionSeedMovies')}
-          subtitle={t('playlists.sectionSeedMoviesSubtitle')}
+          title={pt('sectionSeedMovies')}
+          subtitle={pt('sectionSeedMoviesSubtitle')}
           theme={theme}
         >
           {/* Movie Search */}
           <TextField
             fullWidth
             size="small"
-            placeholder={t('playlists.searchMoviesPlaceholder')}
+            placeholder={pt('searchMoviesPlaceholder')}
             value={movieSearch}
             onChange={(e) => setMovieSearch(e.target.value)}
             InputProps={{
@@ -589,15 +592,15 @@ export function PlaylistDialog({
         {/* Text Preferences Section */}
         <Section
           icon={<TuneIcon fontSize="small" />}
-          title={t('playlists.sectionPreferences')}
-          subtitle={t('playlists.sectionPreferencesSubtitle')}
+          title={pt('sectionPreferences')}
+          subtitle={pt('sectionPreferencesSubtitle')}
           theme={theme}
           aiButton={
             <AIButton
               onClick={handleGenerateAIPreferences}
               loading={generatingAIPreferences}
               disabled={!canGenerate}
-              tooltip={t('playlists.tooltipAIPreferences')}
+              tooltip={pt('tooltipAIPreferences')}
               theme={theme}
             />
           }
@@ -609,21 +612,21 @@ export function PlaylistDialog({
             size="small"
             value={formData.textPreferences}
             onChange={(e) => setFormData({ ...formData, textPreferences: e.target.value })}
-            placeholder={t('playlists.preferencesPlaceholder')}
+            placeholder={pt('preferencesPlaceholder')}
           />
         </Section>
 
         {/* Name Section */}
         <Section
           icon={<TitleIcon fontSize="small" />}
-          title={t('playlists.sectionNameTitle')}
+          title={pt('sectionNameTitle')}
           theme={theme}
           aiButton={
             <AIButton
               onClick={handleGenerateAIName}
               loading={generatingAIName}
               disabled={!canGenerate}
-              tooltip={t('playlists.tooltipGenerateName')}
+              tooltip={pt('tooltipGenerateName')}
               theme={theme}
             />
           }
@@ -633,22 +636,22 @@ export function PlaylistDialog({
             size="small"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            placeholder={t('playlists.nameExamplePlaceholder')}
+            placeholder={pt('nameExamplePlaceholder')}
           />
         </Section>
 
         {/* Description Section */}
         <Section
           icon={<DescriptionIcon fontSize="small" />}
-          title={t('playlists.sectionDescriptionTitle')}
-          subtitle={t('playlists.sectionDescriptionSubtitle')}
+          title={pt('sectionDescriptionTitle')}
+          subtitle={pt('sectionDescriptionSubtitle')}
           theme={theme}
           aiButton={
             <AIButton
               onClick={handleGenerateAIDescription}
               loading={generatingAIDescription}
               disabled={!canGenerate}
-              tooltip={t('playlists.tooltipGenerateDescription')}
+              tooltip={pt('tooltipGenerateDescription')}
               theme={theme}
             />
           }
@@ -660,7 +663,7 @@ export function PlaylistDialog({
             size="small"
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder={t('playlists.descriptionCuratedPlaceholder')}
+            placeholder={pt('descriptionCuratedPlaceholder')}
           />
         </Section>
       </DialogContent>
@@ -675,7 +678,7 @@ export function PlaylistDialog({
           disabled={!formData.name}
           startIcon={<PlaylistPlayIcon />}
         >
-          {editingChannel ? t('playlists.saveChanges') : t('playlists.createPlaylist')}
+          {editingChannel ? pt('saveChanges') : pt('createPlaylist')}
         </Button>
       </DialogActions>
     </Dialog>

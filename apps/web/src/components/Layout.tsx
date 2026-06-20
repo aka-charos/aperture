@@ -25,6 +25,7 @@ import HomeIcon from '@mui/icons-material/Home'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import HistoryIcon from '@mui/icons-material/History'
 import PlaylistPlayIcon from '@mui/icons-material/PlaylistPlay'
+import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import LogoutIcon from '@mui/icons-material/Logout'
 import PersonIcon from '@mui/icons-material/Person'
@@ -60,6 +61,7 @@ const baseUserMenuItems: NavItem[] = [
   { textKey: 'nav.showsYouWatch', icon: <AddToQueueIcon />, path: '/watching', feature: 'watching' },
   { textKey: 'nav.topPicks', icon: <WhatshotIcon />, path: '/top-picks', feature: null },
   { textKey: 'nav.playlists', icon: <PlaylistPlayIcon />, path: '/playlists', feature: null },
+  { textKey: 'nav.collections', icon: <CollectionsBookmarkIcon />, path: '/collections', feature: null },
   { textKey: 'nav.explore', icon: <HubOutlinedIcon />, path: '/explore', feature: null },
   { textKey: 'nav.discover', icon: <ExploreIcon />, path: '/discovery', feature: null },
   { textKey: 'nav.myRequests', icon: <PlaylistAddCheckIcon />, path: '/my-requests', feature: null },
