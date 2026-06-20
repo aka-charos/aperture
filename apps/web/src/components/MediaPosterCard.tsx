@@ -98,7 +98,6 @@ export function MediaPosterCard({
   compactMeta = false,
 }: MediaPosterCardProps) {
   const { t } = useTranslation()
-  const [hovering, setHovering] = useState(false)
   const [imageError, setImageError] = useState(false)
 
   const finalPosterUrl = posterUrl && !imageError ? posterUrl : FALLBACK_POSTER
@@ -136,10 +135,48 @@ export function MediaPosterCard({
   // Determine if we should show extended info (overview, genres, etc.)
   const showExtendedInfo = overview !== undefined || voteAverage !== undefined || genres !== undefined
 
+  // Explicit request control rendered in the card's action area. This replaces
+  // the old full-poster hover overlay, whose click-through scrim made a poster
+  // click ambiguous (it opened details while still showing a big "Request"
+  // button). Now a poster click always opens details, and requesting is a
+  // discrete button — same model as the list view.
+  const showRequestButton = !inLibrary && canRequest && !!onRequest
+  const requestButton = showRequestButton ? (
+    <Tooltip
+      title={
+        isRequested
+          ? requestStatus === 'declined'
+            ? t('discovery.requestStatusDeclined')
+            : t('discovery.requestStatusRequested')
+          : t('mediaPoster.request')
+      }
+    >
+      <span>
+        <IconButton
+          size="small"
+          aria-label={t('mediaPoster.request')}
+          onClick={handleRequest}
+          disabled={isRequesting || isRequested}
+          sx={{ p: 0.5, color: isRequested ? 'text.secondary' : 'primary.main' }}
+        >
+          {isRequesting ? (
+            <CircularProgress size={16} />
+          ) : isRequested ? (
+            requestStatus === 'approved' ? (
+              <CheckCircleIcon sx={{ fontSize: 16 }} />
+            ) : (
+              <HourglassEmptyIcon sx={{ fontSize: 16 }} />
+            )
+          ) : (
+            <AddIcon sx={{ fontSize: 16 }} />
+          )}
+        </IconButton>
+      </span>
+    </Tooltip>
+  ) : null
+
   const cardContent = (
     <Card
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
       sx={{
         position: 'relative',
         borderRadius: 2,
@@ -235,8 +272,8 @@ export function MediaPosterCard({
           </Box>
         )}
 
-        {/* In Library Badge (visible without hover) */}
-        {inLibrary && !hovering && (
+        {/* In Library Badge */}
+        {inLibrary && (
           <Box
             sx={{
               position: 'absolute',
@@ -258,8 +295,8 @@ export function MediaPosterCard({
           </Box>
         )}
 
-        {/* Already Requested Badge (visible without hover, for non-library items) */}
-        {!inLibrary && isRequested && !hovering && (
+        {/* Already Requested Badge (for non-library items) */}
+        {!inLibrary && isRequested && (
           <Box
             sx={{
               position: 'absolute',
@@ -285,83 +322,6 @@ export function MediaPosterCard({
           </Box>
         )}
 
-        {/* Hover Overlay with Request Button.
-            The scrim is purely visual (pointerEvents: none) so a click on the
-            poster falls through to the card's onClick / link — i.e. opens
-            details — instead of requesting. Only the centered Request control
-            (pointerEvents: auto) triggers a request. */}
-        {hovering && canRequest && !inLibrary && (
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: alpha('#000', 0.5),
-              pointerEvents: 'none',
-            }}
-          >
-            {isRequesting ? (
-              <CircularProgress size={40} sx={{ color: 'white' }} />
-            ) : isRequested ? (
-              <Box textAlign="center">
-                <HourglassEmptyIcon sx={{ fontSize: 40, color: '#8B5CF6' }} />
-                <Typography variant="caption" color="white" display="block">
-                  {requestStatus === 'declined'
-                    ? t('discovery.requestStatusDeclined')
-                    : t('discovery.requestStatusRequested')}
-                </Typography>
-              </Box>
-            ) : (
-              <Tooltip title={t('mediaPoster.request')}>
-                <Box
-                  textAlign="center"
-                  onClick={handleRequest}
-                  sx={{ pointerEvents: 'auto', cursor: 'pointer' }}
-                >
-                  <IconButton
-                    component="span"
-                    aria-label={t('mediaPoster.request')}
-                    sx={{
-                      backgroundColor: 'primary.main',
-                      color: 'white',
-                      '&:hover': { backgroundColor: 'primary.dark' },
-                      width: 56,
-                      height: 56,
-                    }}
-                  >
-                    <AddIcon sx={{ fontSize: 32 }} />
-                  </IconButton>
-                  <Typography variant="caption" color="white" display="block" mt={1}>
-                    {t('mediaPoster.request')}
-                  </Typography>
-                </Box>
-              </Tooltip>
-            )}
-          </Box>
-        )}
-
-        {/* Hover Overlay for Library Items - just shows "In Library" */}
-        {hovering && inLibrary && (
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: alpha('#000', 0.5),
-            }}
-          >
-            <Box textAlign="center">
-              <CheckCircleIcon sx={{ fontSize: 40, color: 'success.main' }} />
-              <Typography variant="caption" color="white" display="block">
-                {t('mediaPoster.inLibrary')}
-              </Typography>
-            </Box>
-          </Box>
-        )}
       </Box>
 
       {/* Info */}
@@ -371,8 +331,8 @@ export function MediaPosterCard({
           flexShrink: 0,
           p: 1.5,
           ...(compactMeta && {
-            minHeight: 76,
-            maxHeight: 76,
+            minHeight: 88,
+            maxHeight: 88,
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
@@ -410,6 +370,7 @@ export function MediaPosterCard({
                 {voteAverage && ` • ${voteAverage.toFixed(1)}★`}
               </Typography>
               <Box display="flex" alignItems="center" gap={0.5}>
+                {requestButton}
                 {onShowDetails && (
                   <Tooltip title={t('mediaPoster.viewDetails')}>
                     <IconButton
@@ -464,9 +425,12 @@ export function MediaPosterCard({
             ) : null}
           </>
         ) : (
-          <Typography variant="caption" color="text.secondary">
-            {year || t('mediaPoster.unknownYear')}
-          </Typography>
+          <Box display="flex" alignItems="center" justifyContent="space-between" gap={0.5}>
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {year || t('mediaPoster.unknownYear')}
+            </Typography>
+            {requestButton}
+          </Box>
         )}
       </CardContent>
     </Card>
