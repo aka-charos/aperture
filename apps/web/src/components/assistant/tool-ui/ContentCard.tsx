@@ -2,11 +2,12 @@
  * Single content item card for Tool UI
  * Compact design with poster, title, and action buttons
  */
-import { Box, Typography, Button, Chip, Paper } from '@mui/material'
+import { Box, Typography, Button, Chip, Paper, IconButton, CircularProgress } from '@mui/material'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import InfoIcon from '@mui/icons-material/Info'
 import StarIcon from '@mui/icons-material/Star'
 import FavoriteIcon from '@mui/icons-material/Favorite'
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { RankBadge, getProxiedImageUrl } from '@aperture/ui'
@@ -15,9 +16,12 @@ import type { ContentItem } from './types'
 interface ContentCardProps {
   item: ContentItem
   onPlay?: (id: string, href: string) => void
+  isFavorite?: boolean
+  favoritePending?: boolean
+  onToggleFavorite?: (item: ContentItem) => void
 }
 
-export function ContentCard({ item, onPlay }: ContentCardProps) {
+export function ContentCard({ item, onPlay, isFavorite, favoritePending, onToggleFavorite }: ContentCardProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   
@@ -99,6 +103,36 @@ export function ContentCard({ item, onPlay }: ContentCardProps) {
         )}
         {/* Rank badge */}
         {item.rank && <RankBadge rank={item.rank} size="small" />}
+
+        {/* Favorite toggle */}
+        {onToggleFavorite && (
+          <IconButton
+            size="small"
+            disabled={favoritePending}
+            aria-label={isFavorite ? t('assistantToolUi.removeFavorite') : t('assistantToolUi.favorite')}
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleFavorite(item)
+            }}
+            sx={{
+              position: 'absolute',
+              top: 2,
+              insetInlineEnd: 2,
+              p: 0.25,
+              bgcolor: 'rgba(0, 0, 0, 0.55)',
+              backdropFilter: 'blur(4px)',
+              '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.78)' },
+            }}
+          >
+            {favoritePending ? (
+              <CircularProgress size={14} sx={{ color: '#ec4899' }} />
+            ) : isFavorite ? (
+              <FavoriteIcon sx={{ fontSize: 16, color: '#ec4899' }} />
+            ) : (
+              <FavoriteBorderIcon sx={{ fontSize: 16, color: '#fff' }} />
+            )}
+          </IconButton>
+        )}
       </Box>
 
       {/* Content */}

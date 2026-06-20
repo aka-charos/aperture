@@ -26,6 +26,7 @@ import maintenanceRoutes from './maintenance/index.js'
 import apiErrorsRoutes from './apiErrors/index.js'
 import similarityRoutes from './similarity/index.js'
 import graphPlaylistRoutes from './graphPlaylists/index.js'
+import favoritesRoutes from './favorites/index.js'
 import discoveryRoutes from './discovery/index.js'
 import seerrRoutes from './seerr/index.js'
 import gapAnalysisRoutes from './gap-analysis/index.js'
@@ -113,6 +114,9 @@ const routes: FastifyPluginAsync = async (fastify) => {
 
   // Register graph playlist routes
   await fastify.register(graphPlaylistRoutes)
+
+  // Register favorites routes (mark suggestions as media-server favorites)
+  await fastify.register(favoritesRoutes)
 
   // Register discovery routes (missing content suggestions)
   await fastify.register(discoveryRoutes)

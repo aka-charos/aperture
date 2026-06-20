@@ -52,6 +52,8 @@ import {
   getFavoriteSeriesIdsForUser as fetchFavoriteSeriesIdsForUser,
   favoriteSeriesItem as postFavoriteSeriesItem,
   unfavoriteSeriesItem as deleteFavoriteSeriesItem,
+  favoriteItem as postFavoriteItem,
+  unfavoriteItem as deleteFavoriteItem,
 } from './favorites.js'
 import {
   createOrUpdatePlaylist,
@@ -197,6 +199,14 @@ export class EmbyProvider extends EmbyProviderBase implements MediaServerProvide
 
   async unfavoriteSeriesItem(apiKey: string, userId: string, itemId: string): Promise<void> {
     return deleteFavoriteSeriesItem(this, apiKey, userId, itemId)
+  }
+
+  async favoriteItem(apiKey: string, userId: string, itemId: string): Promise<void> {
+    return postFavoriteItem(this, apiKey, userId, itemId)
+  }
+
+  async unfavoriteItem(apiKey: string, userId: string, itemId: string): Promise<void> {
+    return deleteFavoriteItem(this, apiKey, userId, itemId)
   }
 
   // Playlists
