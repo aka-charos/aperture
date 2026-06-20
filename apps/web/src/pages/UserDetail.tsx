@@ -49,6 +49,7 @@ interface User {
   series_enabled: boolean
   discover_enabled: boolean
   discover_request_enabled: boolean
+  collections_enabled: boolean
   can_manage_watch_history: boolean
   seerr_user_id: number | null
   created_at: string
@@ -116,6 +117,7 @@ function UserSettingsTab({ userId, user }: { userId: string; user: User }) {
   const [canManageWatchHistory, setCanManageWatchHistory] = useState(user.can_manage_watch_history)
   const [discoverEnabled, setDiscoverEnabled] = useState(user.discover_enabled)
   const [discoverRequestEnabled, setDiscoverRequestEnabled] = useState(user.discover_request_enabled)
+  const [collectionsEnabled, setCollectionsEnabled] = useState(user.collections_enabled)
   const [seerrUserIdInput, setSeerrUserIdInput] = useState(
     user.seerr_user_id != null ? String(user.seerr_user_id) : ''
   )
@@ -226,6 +228,27 @@ function UserSettingsTab({ userId, user }: { userId: string; user: User }) {
       setError(err instanceof Error ? err.message : t('admin.userDetail.unknownError'))
     } finally {
       setSavingSeerrId(false)
+    }
+  }
+
+  const handleCollectionsToggle = async (enabled: boolean) => {
+    try {
+      setSavingDiscovery(true)
+      setError(null)
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collectionsEnabled: enabled }),
+        credentials: 'include',
+      })
+      if (!response.ok) throw new Error(t('admin.userDetail.errorUpdatePermission'))
+      setCollectionsEnabled(enabled)
+      setSuccess(t('admin.userDetail.collectionsAccessUpdated'))
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('admin.userDetail.unknownError'))
+    } finally {
+      setSavingDiscovery(false)
     }
   }
 
@@ -394,6 +417,27 @@ function UserSettingsTab({ userId, user }: { userId: string; user: User }) {
               </Box>
             }
             sx={{ alignItems: 'flex-start', ml: 0 }}
+          />
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={collectionsEnabled}
+                onChange={(e) => handleCollectionsToggle(e.target.checked)}
+                disabled={savingDiscovery}
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body1" fontWeight="medium">
+                  {t('admin.userDetail.collectionsTitle')}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {t('admin.userDetail.collectionsHint')}
+                </Typography>
+              </Box>
+            }
+            sx={{ alignItems: 'flex-start', ml: 0, mt: 2 }}
           />
 
           {!discoverEnabled && discoverRequestEnabled && (

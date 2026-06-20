@@ -16,6 +16,7 @@ export const authSchemas = {
       isAdmin: { type: 'boolean', description: 'Whether user has admin privileges' },
       isEnabled: { type: 'boolean', description: 'Whether user account is enabled' },
       canManageWatchHistory: { type: 'boolean', description: 'Whether user can manage their watch history' },
+      collectionsEnabled: { type: 'boolean', description: 'Whether user can create Collections (Box Sets)' },
       avatarUrl: { type: 'string', nullable: true, description: 'URL to user avatar image' },
     },
     example: {
@@ -27,6 +28,7 @@ export const authSchemas = {
       isAdmin: false,
       isEnabled: true,
       canManageWatchHistory: true,
+      collectionsEnabled: false,
       avatarUrl: '/api/users/def4567/avatar',
     },
   },

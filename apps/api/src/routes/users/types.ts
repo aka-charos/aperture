@@ -11,6 +11,7 @@ export interface UserRow {
   series_enabled: boolean
   discover_enabled: boolean
   discover_request_enabled: boolean
+  collections_enabled: boolean
   max_parental_rating: number | null
   can_manage_watch_history: boolean
   seerr_user_id: number | null
@@ -30,6 +31,7 @@ export interface UserUpdateBody {
   seriesEnabled?: boolean
   discoverEnabled?: boolean
   discoverRequestEnabled?: boolean
+  collectionsEnabled?: boolean
   canManageWatchHistory?: boolean
   /** Admin: override Seerr/Seerr numeric user id for request attribution */
   seerrUserId?: number | null

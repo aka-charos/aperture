@@ -12,6 +12,7 @@ export interface SessionUser {
   isAdmin: boolean
   isEnabled: boolean
   canManageWatchHistory: boolean
+  collectionsEnabled: boolean
   avatarUrl: string | null
 }
 
@@ -42,6 +43,7 @@ interface UserRow {
   is_admin: boolean
   is_enabled: boolean
   can_manage_watch_history: boolean
+  collections_enabled: boolean
 }
 
 const SESSION_COOKIE_NAME = 'aperture_session'
@@ -88,7 +90,7 @@ async function getSessionUser(sessionId: string): Promise<SessionUser | null> {
 
   // Get user
   const user = await queryOne<UserRow>(
-    `SELECT id, username, display_name, provider, provider_user_id, is_admin, is_enabled, can_manage_watch_history
+    `SELECT id, username, display_name, provider, provider_user_id, is_admin, is_enabled, can_manage_watch_history, collections_enabled
      FROM users WHERE id = $1`,
     [session.user_id]
   )
@@ -111,6 +113,7 @@ async function getSessionUser(sessionId: string): Promise<SessionUser | null> {
     isAdmin: user.is_admin,
     isEnabled: user.is_enabled,
     canManageWatchHistory: user.can_manage_watch_history,
+    collectionsEnabled: user.collections_enabled,
     avatarUrl,
   }
 }
@@ -139,6 +142,8 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
             isAdmin: apiKeyUser.isAdmin,
             isEnabled: apiKeyUser.isEnabled,
             canManageWatchHistory: apiKeyUser.canManageWatchHistory,
+            // API-key users: admins are allowed via isAdmin; non-admins default to no access.
+            collectionsEnabled: false,
             avatarUrl: `/api/users/${apiKeyUser.userId}/avatar`,
           }
           request.isApiKeyAuth = true

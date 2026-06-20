@@ -61,7 +61,7 @@ const baseUserMenuItems: NavItem[] = [
   { textKey: 'nav.showsYouWatch', icon: <AddToQueueIcon />, path: '/watching', feature: 'watching' },
   { textKey: 'nav.topPicks', icon: <WhatshotIcon />, path: '/top-picks', feature: null },
   { textKey: 'nav.playlists', icon: <PlaylistPlayIcon />, path: '/playlists', feature: null },
-  { textKey: 'nav.collections', icon: <CollectionsBookmarkIcon />, path: '/collections', feature: null },
+  { textKey: 'nav.collections', icon: <CollectionsBookmarkIcon />, path: '/collections', feature: 'collections' },
   { textKey: 'nav.explore', icon: <HubOutlinedIcon />, path: '/explore', feature: null },
   { textKey: 'nav.discover', icon: <ExploreIcon />, path: '/discovery', feature: null },
   { textKey: 'nav.myRequests', icon: <PlaylistAddCheckIcon />, path: '/my-requests', feature: null },
@@ -94,6 +94,10 @@ export function Layout() {
   // Filter menu items based on feature flags
   const userMenuItems = baseUserMenuItems.filter(item => {
     if (item.feature === 'watching' && !watchingEnabled) {
+      return false
+    }
+    // Collections are admin-gated per user (like Discover/Request)
+    if (item.feature === 'collections' && !(user?.isAdmin || user?.collectionsEnabled)) {
       return false
     }
     return true
