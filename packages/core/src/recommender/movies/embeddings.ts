@@ -14,7 +14,7 @@ import {
   getFunctionConfig,
   getActiveEmbeddingTableName,
 } from '../../lib/ai-provider.js'
-import { embedMany } from 'ai'
+import { embed, embedMany } from 'ai'
 import { randomUUID } from 'crypto'
 
 const logger = createChildLogger('embeddings')
@@ -428,6 +428,20 @@ export async function generateMissingEmbeddings(
     failJob(jobId, error)
     throw err
   }
+}
+
+/**
+ * Embed an arbitrary piece of text with the configured embedding model.
+ * Same vector space as movie embeddings, so the result can be blended into a
+ * taste profile or used directly in a similarity search. Returns null for empty text.
+ */
+export async function embedText(text: string): Promise<number[] | null> {
+  const trimmed = text.trim()
+  if (!trimmed) return null
+
+  const embeddingModel = await getEmbeddingModelInstance()
+  const { embedding } = await embed({ model: embeddingModel, value: trimmed })
+  return embedding
 }
 
 /**

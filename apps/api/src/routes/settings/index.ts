@@ -27,6 +27,7 @@ import {
   registerLegacyAiModelsHandlers,
   registerLanguageDefaultsHandlers,
   registerStreamingDiscoverySettingsHandlers,
+  registerChannelsWebExpandSettingsHandlers,
   registerDiscoveryGenreStripsSettingsHandlers,
   registerN8nHandlers,
   registerSystemHandlers,
@@ -35,6 +36,7 @@ import {
 const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   // Register all settings handlers
   registerStreamingDiscoverySettingsHandlers(fastify)
+  registerChannelsWebExpandSettingsHandlers(fastify)
   registerDiscoveryGenreStripsSettingsHandlers(fastify)
   registerLanguageDefaultsHandlers(fastify)
   registerMediaServerHandlers(fastify)

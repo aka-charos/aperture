@@ -1,15 +1,21 @@
 import { createChildLogger } from '../lib/logger.js'
 import { query, queryOne } from '../lib/db.js'
 import { getMediaServerProvider } from '../media/index.js'
-import { getMediaServerApiKey } from '../settings/systemSettings.js'
+import { getMediaServerApiKey, getChannelsWebExpandOnSchedule } from '../settings/systemSettings.js'
 import { generateChannelRecommendations } from './recommendations.js'
+import { gatherWebExpansion } from './webExpand.js'
+import { updateChannelCollection } from './collections.js'
+import type { ChannelUpdateOptions } from './types.js'
 
 const logger = createChildLogger('channels')
 
 /**
  * Update a channel's playlist in the media server
  */
-export async function updateChannelPlaylist(channelId: string): Promise<string> {
+export async function updateChannelPlaylist(
+  channelId: string,
+  opts: ChannelUpdateOptions = {}
+): Promise<{ playlistId: string; itemCount: number }> {
   const provider = await getMediaServerProvider()
   const apiKey = await getMediaServerApiKey()
 
@@ -38,9 +44,12 @@ export async function updateChannelPlaylist(channelId: string): Promise<string> 
     throw new Error(`Channel not found: ${channelId}`)
   }
 
-  // Generate recommendations
+  // Generate recommendations (optionally expanded with web-search similar titles)
   const recommendations = await generateChannelRecommendations(channelId)
-  const itemIds = recommendations.map((r) => r.providerItemId)
+  const expanded = opts.webExpand
+    ? [...recommendations, ...(await gatherWebExpansion(channelId, recommendations))]
+    : recommendations
+  const itemIds = expanded.map((r) => r.providerItemId)
 
   // Create/update playlist
   const result = await provider.createOrUpdatePlaylist(
@@ -71,9 +80,12 @@ export async function updateChannelPlaylist(channelId: string): Promise<string> 
     )
   }
 
-  logger.info({ channelId, playlistId: result.playlistId, itemCount: itemIds.length }, 'Channel playlist updated')
+  logger.info(
+    { channelId, playlistId: result.playlistId, itemCount: itemIds.length, webExpand: !!opts.webExpand },
+    'Channel playlist updated'
+  )
 
-  return result.playlistId
+  return { playlistId: result.playlistId, itemCount: itemIds.length }
 }
 
 /**
@@ -166,28 +178,35 @@ export async function processAllChannels(): Promise<{
   success: number
   failed: number
 }> {
-  const channels = await query<{ id: string; name: string }>(
-    'SELECT id, name FROM channels WHERE is_active = true'
+  const channels = await query<{ id: string; name: string; output_type: string }>(
+    'SELECT id, name, output_type FROM channels WHERE is_active = true'
   )
+
+  // Admin-gated: scheduled auto-refresh only runs web expansion when explicitly enabled.
+  const webExpand = await getChannelsWebExpandOnSchedule()
 
   let success = 0
   let failed = 0
 
   for (const channel of channels.rows) {
     try {
-      await updateChannelPlaylist(channel.id)
+      if (channel.output_type === 'collection') {
+        await updateChannelCollection(channel.id, { webExpand })
+      } else {
+        await updateChannelPlaylist(channel.id, { webExpand })
 
-      // Also update shared playlists
-      const shares = await query<{ shared_with_user_id: string }>(
-        'SELECT shared_with_user_id FROM channel_shares WHERE channel_id = $1',
-        [channel.id]
-      )
+        // Also update shared playlists (local only — shares mirror the owner's channel)
+        const shares = await query<{ shared_with_user_id: string }>(
+          'SELECT shared_with_user_id FROM channel_shares WHERE channel_id = $1',
+          [channel.id]
+        )
 
-      for (const share of shares.rows) {
-        try {
-          await createSharedPlaylist(channel.id, share.shared_with_user_id)
-        } catch (err) {
-          logger.error({ err, channelId: channel.id, userId: share.shared_with_user_id }, 'Failed to create shared playlist')
+        for (const share of shares.rows) {
+          try {
+            await createSharedPlaylist(channel.id, share.shared_with_user_id)
+          } catch (err) {
+            logger.error({ err, channelId: channel.id, userId: share.shared_with_user_id }, 'Failed to create shared playlist')
+          }
         }
       }
 

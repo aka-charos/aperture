@@ -397,6 +397,9 @@ export {
   setStreamingDiscoveryEnabled,
   getStreamingDiscoveryProviderStrips,
   setStreamingDiscoveryProviderStrips,
+  // Channel/collection web-search expansion (scheduled)
+  getChannelsWebExpandOnSchedule,
+  setChannelsWebExpandOnSchedule,
   getGenreStripMovieIds,
   setGenreStripMovieIds,
   getGenreStripSeriesIds,

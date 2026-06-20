@@ -3,6 +3,8 @@ import { query, queryOne } from '../lib/db.js'
 import { getMediaServerProvider } from '../media/index.js'
 import { getMediaServerApiKey } from '../settings/systemSettings.js'
 import { generateChannelRecommendations } from './recommendations.js'
+import { gatherWebExpansion } from './webExpand.js'
+import type { ChannelUpdateOptions } from './types.js'
 
 const logger = createChildLogger('channels')
 
@@ -13,7 +15,10 @@ const logger = createChildLogger('channels')
  * no userId, the result is visible to everyone with library access, and there is no per-viewer
  * sharing. rankAndPin is disabled so member items' global sort names are left untouched.
  */
-export async function updateChannelCollection(channelId: string): Promise<string> {
+export async function updateChannelCollection(
+  channelId: string,
+  opts: ChannelUpdateOptions = {}
+): Promise<{ collectionId: string; itemCount: number }> {
   const provider = await getMediaServerProvider()
   const apiKey = await getMediaServerApiKey()
 
@@ -33,7 +38,10 @@ export async function updateChannelCollection(channelId: string): Promise<string
 
   // Same recommendation engine as playlists (movies, owner taste profile + filters)
   const recommendations = await generateChannelRecommendations(channelId)
-  const itemIds = recommendations.map((r) => r.providerItemId)
+  const expanded = opts.webExpand
+    ? [...recommendations, ...(await gatherWebExpansion(channelId, recommendations))]
+    : recommendations
+  const itemIds = expanded.map((r) => r.providerItemId)
 
   const result = await provider.createOrUpdateCollection(apiKey, channel.name, itemIds, {
     rankAndPin: false,
@@ -45,11 +53,11 @@ export async function updateChannelCollection(channelId: string): Promise<string
   ])
 
   logger.info(
-    { channelId, collectionId: result.collectionId, itemCount: itemIds.length },
+    { channelId, collectionId: result.collectionId, itemCount: itemIds.length, webExpand: !!opts.webExpand },
     'Channel collection updated'
   )
 
-  return result.collectionId
+  return { collectionId: result.collectionId, itemCount: itemIds.length }
 }
 
 /**

@@ -41,6 +41,7 @@ import {
   SeerrConfigSection,
   N8nConfigSection,
   StreamingDiscoverySettings,
+  ChannelsWebExpandSettings,
   DiscoveryGenreStripsSettings,
   BackupSection,
   PosterRepairSection,
@@ -302,6 +303,7 @@ export function SettingsPage() {
                 </Box>
                 <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
                   <StreamingDiscoverySettings />
+                  <ChannelsWebExpandSettings />
                 </Box>
               </Box>
             </TabPanel>

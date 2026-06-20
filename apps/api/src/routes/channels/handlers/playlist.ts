@@ -4,7 +4,6 @@ import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import {
   updateChannelPlaylist,
   updateChannelCollection,
-  generateChannelRecommendations,
   getMediaServerProvider,
   getMediaServerApiKey,
 } from '@aperture/core'
@@ -68,23 +67,22 @@ export function registerPlaylistHandlers(fastify: FastifyInstance) {
       }
 
       try {
-        // Generate recommendations and write them to the channel's target (playlist or collection)
-        const recommendations = await generateChannelRecommendations(id)
-
+        // Manual generate always attempts web-search expansion (no-op unless the Web Search
+        // role is configured). Generate once and use the written item count for the message.
         if (channel.output_type === 'collection') {
-          const collectionId = await updateChannelCollection(id)
+          const { collectionId, itemCount } = await updateChannelCollection(id, { webExpand: true })
           return reply.send({
             collectionId,
-            itemCount: recommendations.length,
-            message: `Collection updated with ${recommendations.length} movies`,
+            itemCount,
+            message: `Collection updated with ${itemCount} movies`,
           })
         }
 
-        const playlistId = await updateChannelPlaylist(id)
+        const { playlistId, itemCount } = await updateChannelPlaylist(id, { webExpand: true })
         return reply.send({
           playlistId,
-          itemCount: recommendations.length,
-          message: `Playlist updated with ${recommendations.length} movies`,
+          itemCount,
+          message: `Playlist updated with ${itemCount} movies`,
         })
       } catch (err) {
         request.log.error({ err, channelId: id }, 'Failed to generate channel output')
