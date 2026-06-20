@@ -406,8 +406,11 @@ export async function getChatModelInstance(): Promise<LanguageModel> {
       'Chat model may not support tool calling')
   }
 
-  const provider = createProviderInstance(config)
-  const modelId = config.model
+  // Borrow a key from the shared store / another role on the same provider
+  // when this role has no key of its own (mirrors getWebSearchModelInstance).
+  const resolved = await withResolvedCredentials(config)
+  const provider = createProviderInstance(resolved)
+  const modelId = resolved.model
 
   // All providers use similar API for language models
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -476,8 +479,11 @@ export async function getTextGenerationModelInstance(): Promise<LanguageModel> {
     )
   }
 
-  const provider = createProviderInstance(config)
-  const modelId = config.model
+  // Borrow a key from the shared store / another role on the same provider
+  // when this role has no key of its own (mirrors getWebSearchModelInstance).
+  const resolved = await withResolvedCredentials(config)
+  const provider = createProviderInstance(resolved)
+  const modelId = resolved.model
 
   // All providers use similar API for language models
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -497,8 +503,11 @@ export async function getExplorationModelInstance(): Promise<LanguageModel> {
     )
   }
 
-  const provider = createProviderInstance(config)
-  const modelId = config.model
+  // Borrow a key from the shared store / another role on the same provider
+  // when this role has no key of its own (mirrors getWebSearchModelInstance).
+  const resolved = await withResolvedCredentials(config)
+  const provider = createProviderInstance(resolved)
+  const modelId = resolved.model
 
   // All providers use similar API for language models
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
