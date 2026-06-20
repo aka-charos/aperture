@@ -26,7 +26,7 @@ async function hydrateCollectionItems(providerItemIds: string[]) {
     poster_url: string | null
     runtime: number | null
   }>(
-    `SELECT provider_item_id, title, year, poster_url, runtime
+    `SELECT provider_item_id, title, year, poster_url, runtime_minutes AS runtime
      FROM movies WHERE provider_item_id = ANY($1)`,
     [providerItemIds]
   )
