@@ -10,7 +10,7 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
    */
   fastify.get<{
     Params: { id: string }
-    Querystring: { page?: string; pageSize?: string; sortBy?: string }
+    Querystring: { page?: string; pageSize?: string; sortBy?: string; search?: string }
   }>(
     '/api/users/:id/watch-history',
     { preHandler: requireAuth, schema: { tags: ['users'] } },
@@ -20,17 +20,25 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
       const page = parseInt(request.query.page || '1', 10)
       const pageSize = Math.min(parseInt(request.query.pageSize || '50', 10), 100)
       const sortBy = request.query.sortBy || 'recent' // recent, plays, title
+      const search = (request.query.search || '').trim()
 
       if (!requireSelfOrAdmin(id, currentUser, reply)) return
 
+      // Optional search across the entire history (title or any genre), not just the current page.
+      // When present, it occupies $2 in both queries.
+      const searchClause = search
+        ? ' AND (m.title ILIKE $2 OR EXISTS (SELECT 1 FROM unnest(m.genres) g WHERE g ILIKE $2))'
+        : ''
+      const searchParams = search ? [`%${search}%`] : []
+
       // Get total count (only from enabled libraries)
       const countResult = await queryOne<{ count: string }>(
-        `SELECT COUNT(*) as count 
+        `SELECT COUNT(*) as count
          FROM watch_history wh
          JOIN movies m ON m.id = wh.movie_id
          JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
-         WHERE wh.user_id = $1 AND lc.is_enabled = true`,
-        [id]
+         WHERE wh.user_id = $1 AND lc.is_enabled = true${searchClause}`,
+        [id, ...searchParams]
       )
       const total = parseInt(countResult?.count || '0', 10)
 
@@ -43,9 +51,11 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
       }
 
       const offset = (page - 1) * pageSize
+      const limitIdx = search ? 3 : 2
+      const offsetIdx = search ? 4 : 3
 
       const result = await query(
-        `SELECT 
+        `SELECT
            wh.movie_id,
            wh.play_count,
            wh.is_favorite,
@@ -65,10 +75,10 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
          FROM watch_history wh
          JOIN movies m ON m.id = wh.movie_id
          JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
-         WHERE wh.user_id = $1 AND lc.is_enabled = true
+         WHERE wh.user_id = $1 AND lc.is_enabled = true${searchClause}
          ORDER BY ${orderBy}
-         LIMIT $2 OFFSET $3`,
-        [id, pageSize, offset]
+         LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+        [id, ...searchParams, pageSize, offset]
       )
 
       return reply.send({
@@ -89,7 +99,7 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
    */
   fastify.get<{
     Params: { id: string }
-    Querystring: { page?: string; pageSize?: string; sortBy?: string }
+    Querystring: { page?: string; pageSize?: string; sortBy?: string; search?: string }
   }>(
     '/api/users/:id/series-watch-history',
     { preHandler: requireAuth, schema: { tags: ['users'] } },
@@ -99,20 +109,28 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
       const page = parseInt(request.query.page || '1', 10)
       const pageSize = Math.min(parseInt(request.query.pageSize || '50', 10), 100)
       const sortBy = request.query.sortBy || 'recent' // recent, plays, title
+      const search = (request.query.search || '').trim()
 
       if (!requireSelfOrAdmin(id, currentUser, reply)) return
 
+      // Optional search across the entire history (title or any genre), not just the current page.
+      // When present, it occupies $2 in both queries.
+      const searchClause = search
+        ? ' AND (s.title ILIKE $2 OR EXISTS (SELECT 1 FROM unnest(s.genres) g WHERE g ILIKE $2))'
+        : ''
+      const searchParams = search ? [`%${search}%`] : []
+
       // Get total count of distinct series watched (only from enabled libraries)
       const countResult = await queryOne<{ count: string }>(
-        `SELECT COUNT(DISTINCT s.id) as count 
+        `SELECT COUNT(DISTINCT s.id) as count
          FROM watch_history wh
          JOIN episodes e ON e.id = wh.episode_id
          JOIN series s ON s.id = e.series_id
          LEFT JOIN library_config lc ON lc.provider_library_id = s.provider_library_id
-         WHERE wh.user_id = $1 
+         WHERE wh.user_id = $1
            AND wh.episode_id IS NOT NULL
-           AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)`,
-        [id]
+           AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)${searchClause}`,
+        [id, ...searchParams]
       )
       const total = parseInt(countResult?.count || '0', 10)
 
@@ -125,10 +143,12 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
       }
 
       const offset = (page - 1) * pageSize
+      const limitIdx = search ? 3 : 2
+      const offsetIdx = search ? 4 : 3
 
       // Group by series to get aggregate watch data
       const result = await query(
-        `SELECT 
+        `SELECT
            s.id as series_id,
            s.title,
            s.year,
@@ -145,13 +165,13 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
          JOIN episodes e ON e.id = wh.episode_id
          JOIN series s ON s.id = e.series_id
          LEFT JOIN library_config lc ON lc.provider_library_id = s.provider_library_id
-         WHERE wh.user_id = $1 
+         WHERE wh.user_id = $1
            AND wh.episode_id IS NOT NULL
-           AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)
+           AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)${searchClause}
          GROUP BY s.id, s.title, s.year, s.poster_url, s.genres, s.community_rating, s.overview
          ORDER BY ${orderBy}
-         LIMIT $2 OFFSET $3`,
-        [id, pageSize, offset]
+         LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+        [id, ...searchParams, pageSize, offset]
       )
 
       return reply.send({
