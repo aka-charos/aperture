@@ -1,6 +1,12 @@
 import { query, queryOne } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
-import { normalizeAppLocale, type AppLocaleCode } from '../lib/locales.js'
+import {
+  APP_LOCALE_OPTIONS,
+  DEFAULT_LOCALE,
+  isValidAppLocale,
+  normalizeAppLocale,
+  type AppLocaleCode,
+} from '../lib/locales.js'
 
 const logger = createChildLogger('system-settings')
 
@@ -914,26 +920,84 @@ export async function setAiExplanationConfig(
 export interface SystemLanguageDefaults {
   defaultUiLanguage: AppLocaleCode
   defaultAiLanguage: AppLocaleCode
+  /** Locales users may choose from for the interface. */
+  enabledUiLanguages: AppLocaleCode[]
+  /** Locales users may choose from for AI output. */
+  enabledAiLanguages: AppLocaleCode[]
+}
+
+const ALL_LOCALE_CODES: AppLocaleCode[] = APP_LOCALE_OPTIONS.map((o) => o.code)
+
+/**
+ * Parse a stored JSON array of locale codes, keeping only valid ones and
+ * guaranteeing the active default is always selectable. Falls back to "all
+ * locales enabled" when unset (backward compatible with pre-allowlist installs).
+ */
+function parseEnabledLocales(raw: string | null, activeDefault: AppLocaleCode): AppLocaleCode[] {
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as unknown
+      if (Array.isArray(parsed)) {
+        const valid = parsed.filter((c): c is AppLocaleCode => isValidAppLocale(c))
+        const unique = [...new Set(valid)]
+        if (unique.length > 0) {
+          return unique.includes(activeDefault) ? unique : [activeDefault, ...unique]
+        }
+      }
+    } catch {
+      // fall through to "all enabled"
+    }
+  }
+  return [...ALL_LOCALE_CODES]
+}
+
+/** Keep only valid, unique codes; never allow an empty list. */
+function sanitizeEnabledLocales(list: AppLocaleCode[]): AppLocaleCode[] {
+  const valid = list.filter((c) => isValidAppLocale(c))
+  const unique = [...new Set(valid)]
+  return unique.length > 0 ? unique : [DEFAULT_LOCALE]
 }
 
 /**
- * Instance-wide default locales when a user has not set an override.
+ * Instance-wide default locales and the allowlists of locales users may pick.
  */
 export async function getSystemLanguageDefaults(): Promise<SystemLanguageDefaults> {
-  const ui = await getSystemSetting('default_ui_language')
-  const ai = await getSystemSetting('default_ai_language')
+  const [ui, ai, enabledUiRaw, enabledAiRaw] = await Promise.all([
+    getSystemSetting('default_ui_language'),
+    getSystemSetting('default_ai_language'),
+    getSystemSetting('enabled_ui_languages'),
+    getSystemSetting('enabled_ai_languages'),
+  ])
+  const defaultUiLanguage = normalizeAppLocale(ui)
+  const defaultAiLanguage = normalizeAppLocale(ai)
   return {
-    defaultUiLanguage: normalizeAppLocale(ui),
-    defaultAiLanguage: normalizeAppLocale(ai),
+    defaultUiLanguage,
+    defaultAiLanguage,
+    enabledUiLanguages: parseEnabledLocales(enabledUiRaw, defaultUiLanguage),
+    enabledAiLanguages: parseEnabledLocales(enabledAiRaw, defaultAiLanguage),
   }
 }
 
 /**
- * Update language defaults (admin).
+ * Update language defaults and allowlists (admin).
  */
 export async function setSystemLanguageDefaults(
   defaults: Partial<SystemLanguageDefaults>
 ): Promise<SystemLanguageDefaults> {
+  if (defaults.enabledUiLanguages !== undefined) {
+    await setSystemSetting(
+      'enabled_ui_languages',
+      JSON.stringify(sanitizeEnabledLocales(defaults.enabledUiLanguages)),
+      'UI languages users may choose from (JSON array of BCP-47 codes)'
+    )
+  }
+  if (defaults.enabledAiLanguages !== undefined) {
+    await setSystemSetting(
+      'enabled_ai_languages',
+      JSON.stringify(sanitizeEnabledLocales(defaults.enabledAiLanguages)),
+      'AI output languages users may choose from (JSON array of BCP-47 codes)'
+    )
+  }
   if (defaults.defaultUiLanguage !== undefined) {
     await setSystemSetting(
       'default_ui_language',

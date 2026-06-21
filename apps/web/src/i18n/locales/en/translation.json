@@ -2044,7 +2044,11 @@
   },
   "language": {
     "defaultsTitle": "Language defaults",
-    "defaultsSubtitle": "Default interface and AI output languages for users who do not set their own overrides.",
+    "defaultsSubtitle": "Choose which interface and AI output languages users can select, and the default for each.",
+    "uiSectionTitle": "Interface (UI)",
+    "aiSectionTitle": "AI output",
+    "availableUi": "Available UI languages",
+    "availableAi": "Available AI languages",
     "defaultUi": "Default UI language",
     "defaultAi": "Default AI language",
     "saveDefaults": "Save defaults",

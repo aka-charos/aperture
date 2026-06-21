@@ -1025,8 +1025,9 @@ export const getLanguageDefaultsSchema = {
 
 export const updateLanguageDefaultsSchema = {
   tags: ['settings'],
-  summary: 'Update system language defaults',
-  description: 'Set default UI and AI languages for users without overrides (admin only).',
+  summary: 'Update system language settings',
+  description:
+    'Set the allowlists of UI and AI languages users may choose from, and the default for each (admin only).',
   body: {
     type: 'object' as const,
     additionalProperties: false,
@@ -1040,6 +1041,20 @@ export const updateLanguageDefaultsSchema = {
         type: 'string' as const,
         enum: [...SUPPORTED_LOCALE_CODES],
         description: 'Default AI synopsis/explanation locale',
+      },
+      enabledUiLanguages: {
+        type: 'array' as const,
+        items: { type: 'string' as const, enum: [...SUPPORTED_LOCALE_CODES] },
+        minItems: 1,
+        uniqueItems: true,
+        description: 'UI locales users may choose from (BCP-47)',
+      },
+      enabledAiLanguages: {
+        type: 'array' as const,
+        items: { type: 'string' as const, enum: [...SUPPORTED_LOCALE_CODES] },
+        minItems: 1,
+        uniqueItems: true,
+        description: 'AI output locales users may choose from (BCP-47)',
       },
     },
   },
