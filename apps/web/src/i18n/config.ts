@@ -16,6 +16,7 @@ import ko from './locales/ko/translation.json'
 import hi from './locales/hi/translation.json'
 import ar from './locales/ar/translation.json'
 import he from './locales/he/translation.json'
+import enOverrides from './overrides.en.json'
 import { isRtlLocale } from './localeDirection'
 
 const i18nInit = i18n
@@ -65,6 +66,11 @@ const i18nInit = i18n
       lookupLocalStorage: 'i18nextLng',
     },
   })
+
+// Local English string overrides. Deep-merged over the bundled defaults so
+// `locales/en/translation.json` stays pristine (upstream-owned, conflict-free).
+// Put only the keys you want to change in `overrides.en.json`.
+i18n.addResourceBundle('en', 'translation', enOverrides, true, true)
 
 void i18nInit.then(() => {
   if (typeof document !== 'undefined') {

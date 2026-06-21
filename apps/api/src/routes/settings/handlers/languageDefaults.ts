@@ -44,7 +44,12 @@ export function registerLanguageDefaultsHandlers(fastify: FastifyInstance) {
    * PATCH /api/settings/language-defaults — admin
    */
   fastify.patch<{
-    Body: { defaultUiLanguage?: string; defaultAiLanguage?: string }
+    Body: {
+      defaultUiLanguage?: string
+      defaultAiLanguage?: string
+      enabledUiLanguages?: string[]
+      enabledAiLanguages?: string[]
+    }
   }>(
     '/api/settings/language-defaults',
     { preHandler: requireAdmin, schema: updateLanguageDefaultsSchema },
@@ -53,7 +58,15 @@ export function registerLanguageDefaultsHandlers(fastify: FastifyInstance) {
       const patch: {
         defaultUiLanguage?: AppLocaleCode
         defaultAiLanguage?: AppLocaleCode
+        enabledUiLanguages?: AppLocaleCode[]
+        enabledAiLanguages?: AppLocaleCode[]
       } = {}
+      if (body.enabledUiLanguages !== undefined) {
+        patch.enabledUiLanguages = body.enabledUiLanguages as AppLocaleCode[]
+      }
+      if (body.enabledAiLanguages !== undefined) {
+        patch.enabledAiLanguages = body.enabledAiLanguages as AppLocaleCode[]
+      }
       if (body.defaultUiLanguage !== undefined) {
         patch.defaultUiLanguage = body.defaultUiLanguage as AppLocaleCode
       }

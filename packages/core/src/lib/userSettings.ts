@@ -422,7 +422,7 @@ export async function resolveEffectiveUiLanguage(userId: string): Promise<AppLoc
   const { getSystemLanguageDefaults } = await import('../settings/systemSettings.js')
   const prefs = await getUserUiPreferences(userId)
   const system = await getSystemLanguageDefaults()
-  if (isValidAppLocale(prefs.uiLanguage)) {
+  if (isValidAppLocale(prefs.uiLanguage) && system.enabledUiLanguages.includes(prefs.uiLanguage)) {
     return prefs.uiLanguage
   }
   return system.defaultUiLanguage
@@ -435,7 +435,7 @@ export async function resolveEffectiveAiLanguage(userId: string): Promise<AppLoc
   const { getSystemLanguageDefaults } = await import('../settings/systemSettings.js')
   const prefs = await getUserUiPreferences(userId)
   const system = await getSystemLanguageDefaults()
-  if (isValidAppLocale(prefs.aiLanguage)) {
+  if (isValidAppLocale(prefs.aiLanguage) && system.enabledAiLanguages.includes(prefs.aiLanguage)) {
     return prefs.aiLanguage
   }
   return system.defaultAiLanguage

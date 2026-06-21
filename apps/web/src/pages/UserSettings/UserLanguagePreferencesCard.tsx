@@ -31,6 +31,8 @@ export function UserLanguagePreferencesCard() {
   const [effectiveAi, setEffectiveAi] = useState<string>('en')
   const [systemUi, setSystemUi] = useState<string>('en')
   const [systemAi, setSystemAi] = useState<string>('en')
+  const [enabledUi, setEnabledUi] = useState<string[] | null>(null)
+  const [enabledAi, setEnabledAi] = useState<string[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -53,6 +55,8 @@ export function UserLanguagePreferencesCard() {
         const data = await defRes.json()
         setSystemUi(data.defaultUiLanguage || 'en')
         setSystemAi(data.defaultAiLanguage || 'en')
+        setEnabledUi(Array.isArray(data.enabledUiLanguages) ? data.enabledUiLanguages : null)
+        setEnabledAi(Array.isArray(data.enabledAiLanguages) ? data.enabledAiLanguages : null)
       }
       if (prefRes.ok) {
         const data = await prefRes.json()
@@ -74,6 +78,16 @@ export function UserLanguagePreferencesCard() {
   useEffect(() => {
     void load()
   }, [load])
+
+  // Only offer locales the admin has enabled (null = no allowlist returned → all).
+  const uiLocales = enabledUi ? locales.filter((l) => enabledUi.includes(l.code)) : locales
+  const aiLocales = enabledAi ? locales.filter((l) => enabledAi.includes(l.code)) : locales
+
+  // If a saved override is no longer offered (admin disabled it), display as
+  // "server default" so the Select stays valid; the effective value already
+  // falls back server-side.
+  const uiValue = uiOverride && uiLocales.some((l) => l.code === uiOverride) ? uiOverride : ''
+  const aiValue = aiOverride && aiLocales.some((l) => l.code === aiOverride) ? aiOverride : ''
 
   const save = async () => {
     setSaving(true)
@@ -142,14 +156,14 @@ export function UserLanguagePreferencesCard() {
               <Select
                 labelId="user-ui-lang"
                 label={t('language.interface')}
-                value={uiOverride === '' ? '' : uiOverride}
+                value={uiValue}
                 onChange={(e) => setUiOverride(e.target.value === '' ? '' : String(e.target.value))}
                 displayEmpty
               >
                 <MenuItem value="">
                   <em>{t('language.serverDefaultUi', { lang: systemUi })}</em>
                 </MenuItem>
-                {locales.map((l) => (
+                {uiLocales.map((l) => (
                   <MenuItem key={l.code} value={l.code}>
                     {l.label} ({l.code})
                   </MenuItem>
@@ -165,14 +179,14 @@ export function UserLanguagePreferencesCard() {
               <Select
                 labelId="user-ai-lang"
                 label={t('language.aiSummaries')}
-                value={aiOverride === '' ? '' : aiOverride}
+                value={aiValue}
                 onChange={(e) => setAiOverride(e.target.value === '' ? '' : String(e.target.value))}
                 displayEmpty
               >
                 <MenuItem value="">
                   <em>{t('language.serverDefaultAi', { lang: systemAi })}</em>
                 </MenuItem>
-                {locales.map((l) => (
+                {aiLocales.map((l) => (
                   <MenuItem key={l.code} value={l.code}>
                     {l.label} ({l.code})
                   </MenuItem>

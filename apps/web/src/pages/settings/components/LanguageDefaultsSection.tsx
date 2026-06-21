@@ -8,9 +8,13 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Checkbox,
+  ListItemText,
+  OutlinedInput,
   Button,
   Alert,
   CircularProgress,
+  type SelectChangeEvent,
 } from '@mui/material'
 import LanguageIcon from '@mui/icons-material/Language'
 import { useTranslation } from 'react-i18next'
@@ -24,10 +28,17 @@ export function LanguageDefaultsSection() {
   const [locales, setLocales] = useState<LocaleRow[]>([])
   const [defaultUi, setDefaultUi] = useState('en')
   const [defaultAi, setDefaultAi] = useState('en')
+  const [enabledUi, setEnabledUi] = useState<string[]>(['en'])
+  const [enabledAi, setEnabledAi] = useState<string[]>(['en'])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  const labelFor = useCallback(
+    (code: string) => locales.find((l) => l.code === code)?.label ?? code,
+    [locales]
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -45,6 +56,8 @@ export function LanguageDefaultsSection() {
         const data = await defRes.json()
         setDefaultUi(data.defaultUiLanguage || 'en')
         setDefaultAi(data.defaultAiLanguage || 'en')
+        setEnabledUi(data.enabledUiLanguages?.length ? data.enabledUiLanguages : ['en'])
+        setEnabledAi(data.enabledAiLanguages?.length ? data.enabledAiLanguages : ['en'])
       } else {
         const err = await defRes.json().catch(() => ({}))
         setError((err as { error?: string }).error || t('language.loadDefaultsFailed'))
@@ -60,6 +73,28 @@ export function LanguageDefaultsSection() {
     void load()
   }, [load])
 
+  // Preserve original locale order so chips/menus read consistently.
+  const orderEnabled = useCallback(
+    (codes: string[]) => locales.map((l) => l.code).filter((c) => codes.includes(c)),
+    [locales]
+  )
+
+  const handleEnabledUiChange = (e: SelectChangeEvent<string[]>) => {
+    const value = e.target.value
+    const next = orderEnabled(typeof value === 'string' ? value.split(',') : value)
+    if (next.length === 0) return // never allow an empty allowlist
+    setEnabledUi(next)
+    if (!next.includes(defaultUi)) setDefaultUi(next[0])
+  }
+
+  const handleEnabledAiChange = (e: SelectChangeEvent<string[]>) => {
+    const value = e.target.value
+    const next = orderEnabled(typeof value === 'string' ? value.split(',') : value)
+    if (next.length === 0) return
+    setEnabledAi(next)
+    if (!next.includes(defaultAi)) setDefaultAi(next[0])
+  }
+
   const save = async () => {
     setSaving(true)
     setError(null)
@@ -72,12 +107,16 @@ export function LanguageDefaultsSection() {
         body: JSON.stringify({
           defaultUiLanguage: defaultUi,
           defaultAiLanguage: defaultAi,
+          enabledUiLanguages: enabledUi,
+          enabledAiLanguages: enabledAi,
         }),
       })
       if (response.ok) {
         const data = await response.json()
         setDefaultUi(data.defaultUiLanguage || 'en')
         setDefaultAi(data.defaultAiLanguage || 'en')
+        setEnabledUi(data.enabledUiLanguages?.length ? data.enabledUiLanguages : ['en'])
+        setEnabledAi(data.enabledAiLanguages?.length ? data.enabledAiLanguages : ['en'])
         await syncUiLanguageFromServer()
         setSuccess(i18n.t('language.defaultsSaved'))
         setTimeout(() => setSuccess(null), 4000)
@@ -119,42 +158,89 @@ export function LanguageDefaultsSection() {
             <CircularProgress />
           </Box>
         ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 400 }}>
-            <FormControl fullWidth size="small">
-              <InputLabel id="admin-default-ui-lang">{t('language.defaultUi')}</InputLabel>
-              <Select
-                labelId="admin-default-ui-lang"
-                label={t('language.defaultUi')}
-                value={defaultUi}
-                onChange={(e) => setDefaultUi(e.target.value)}
-              >
-                {locales.map((l) => (
-                  <MenuItem key={l.code} value={l.code}>
-                    {l.label} ({l.code})
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth size="small">
-              <InputLabel id="admin-default-ai-lang">{t('language.defaultAi')}</InputLabel>
-              <Select
-                labelId="admin-default-ai-lang"
-                label={t('language.defaultAi')}
-                value={defaultAi}
-                onChange={(e) => setDefaultAi(e.target.value)}
-              >
-                {locales.map((l) => (
-                  <MenuItem key={l.code} value={l.code}>
-                    {l.label} ({l.code})
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 440 }}>
+            {/* UI languages */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Typography variant="subtitle2">{t('language.uiSectionTitle')}</Typography>
+              <FormControl fullWidth size="small">
+                <InputLabel id="admin-enabled-ui-lang">{t('language.availableUi')}</InputLabel>
+                <Select
+                  labelId="admin-enabled-ui-lang"
+                  multiple
+                  value={enabledUi}
+                  onChange={handleEnabledUiChange}
+                  input={<OutlinedInput label={t('language.availableUi')} />}
+                  renderValue={(selected) => selected.map(labelFor).join(', ')}
+                >
+                  {locales.map((l) => (
+                    <MenuItem key={l.code} value={l.code}>
+                      <Checkbox checked={enabledUi.includes(l.code)} />
+                      <ListItemText primary={`${l.label} (${l.code})`} />
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl fullWidth size="small">
+                <InputLabel id="admin-default-ui-lang">{t('language.defaultUi')}</InputLabel>
+                <Select
+                  labelId="admin-default-ui-lang"
+                  label={t('language.defaultUi')}
+                  value={defaultUi}
+                  onChange={(e) => setDefaultUi(e.target.value)}
+                >
+                  {orderEnabled(enabledUi).map((code) => (
+                    <MenuItem key={code} value={code}>
+                      {labelFor(code)} ({code})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+
+            {/* AI languages */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Typography variant="subtitle2">{t('language.aiSectionTitle')}</Typography>
+              <FormControl fullWidth size="small">
+                <InputLabel id="admin-enabled-ai-lang">{t('language.availableAi')}</InputLabel>
+                <Select
+                  labelId="admin-enabled-ai-lang"
+                  multiple
+                  value={enabledAi}
+                  onChange={handleEnabledAiChange}
+                  input={<OutlinedInput label={t('language.availableAi')} />}
+                  renderValue={(selected) => selected.map(labelFor).join(', ')}
+                >
+                  {locales.map((l) => (
+                    <MenuItem key={l.code} value={l.code}>
+                      <Checkbox checked={enabledAi.includes(l.code)} />
+                      <ListItemText primary={`${l.label} (${l.code})`} />
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl fullWidth size="small">
+                <InputLabel id="admin-default-ai-lang">{t('language.defaultAi')}</InputLabel>
+                <Select
+                  labelId="admin-default-ai-lang"
+                  label={t('language.defaultAi')}
+                  value={defaultAi}
+                  onChange={(e) => setDefaultAi(e.target.value)}
+                >
+                  {orderEnabled(enabledAi).map((code) => (
+                    <MenuItem key={code} value={code}>
+                      {labelFor(code)} ({code})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+
             <Button
               variant="contained"
               onClick={() => void save()}
               disabled={saving}
               startIcon={saving ? <CircularProgress size={16} /> : undefined}
+              sx={{ alignSelf: 'flex-start' }}
             >
               {saving ? t('common.saving') : t('language.saveDefaults')}
             </Button>
