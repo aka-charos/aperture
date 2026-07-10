@@ -9,7 +9,7 @@
 import { Readable } from 'node:stream'
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { streamText, convertToModelMessages, stepCountIs, type UIMessage, type ToolSet } from 'ai'
-import { getChatModelInstance, getEmbeddingModelInstance, getFunctionConfig, getActiveEmbeddingModelId, type AIFunction } from '@aperture/core'
+import { getChatModelInstance, getEmbeddingModelInstance, getActiveEmbeddingModelId } from '@aperture/core'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText } from '../helpers/index.js'
 import { createTools, createN8nTools, createDiscoveryResolveTool, DISCOVERY_PROMPT } from '../tools/index.js'
@@ -18,7 +18,6 @@ import type { ToolContext } from '../types.js'
 
 interface ChatBody {
   messages: UIMessage[]
-  system?: string
 }
 
 /**
@@ -110,7 +109,6 @@ export function registerChatHandler(fastify: FastifyInstance) {
       try {
         const chatModel = await getChatModelInstance()
         const embeddingModel = await getEmbeddingModelInstance()
-        const chatConfig = await getFunctionConfig('chat' as AIFunction)
         const embeddingModelId = await getActiveEmbeddingModelId()
         const mediaServer = await getMediaServerInfo()
         const systemPrompt = await buildSystemPrompt(user.id, user.isAdmin)
@@ -167,7 +165,13 @@ export function registerChatHandler(fastify: FastifyInstance) {
         }
         const tools = { ...baseTools, ...discoveryTools }
 
-        fastify.log.info({ toolCount: Object.keys(tools).length, model: chatConfig?.model ?? 'unknown' }, 'Starting chat stream')
+        fastify.log.info(
+          {
+            toolCount: Object.keys(tools).length,
+            model: typeof chatModel === 'string' ? chatModel : chatModel.modelId,
+          },
+          'Starting chat stream'
+        )
 
         // Stream the response using AI SDK v5
         // stopWhen allows the model to continue generating text after tool results

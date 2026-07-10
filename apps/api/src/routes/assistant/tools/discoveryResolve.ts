@@ -13,6 +13,7 @@
  */
 import { tool } from 'ai'
 import { z } from 'zod'
+import { nullSafe } from './utils.js'
 import { createChildLogger } from '@aperture/core'
 import { createCarouselResult, type ContentCarousel } from '../schemas/contentCarousel.js'
 import { resolveCandidates } from '../discovery/resolveCandidates.js'
@@ -40,14 +41,14 @@ export function createDiscoveryResolveTool(ctx: ToolContext) {
     findCandidatesInLibrary: tool({
       description:
         "Resolve the web-sourced candidate titles already gathered for this request against the user's library, and — when a specific title is referenced via seedTitle — add related picks from the library by similarity. Call this exactly ONCE. The result includes a 'picks' list with a short 'reason' per title; use those reasons to explain in a sentence or two why each recommendation fits. Present the returned 'Recommendations' as the primary picks and 'Also worth checking' as secondary, and briefly mention any standout titles NOT in the library yet. Only present what this tool returns — never invent titles.",
-      inputSchema: z.object({
+      inputSchema: nullSafe(z.object({
         seedTitle: z
           .string()
           .optional()
           .describe(
             'If the request references a specific title (e.g. "movies similar to X"), the title X — used to add embeddings-based related picks from the library.'
           ),
-      }),
+      })),
       execute: async ({ seedTitle }) => {
         const candidates = ctx.discoveryCandidates ?? []
         const { items: webItems, notInLibrary } = await resolveCandidates(candidates, ctx)

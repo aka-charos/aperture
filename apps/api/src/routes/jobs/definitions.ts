@@ -104,7 +104,9 @@ export const jobDefinitions: JobDefinition[] = [
   {
     name: 'refresh-assistant-suggestions',
     description: 'Refresh personalized assistant suggestions for all users',
-    cron: '0 * * * *', // Every hour
+    // Weekly, Sunday midnight — must match ENV_DEFAULTS in @aperture/core
+    // jobConfig.ts, which is what the runtime scheduler actually uses.
+    cron: '0 0 * * 0',
   },
   // === Metadata Enrichment Job ===
   {
