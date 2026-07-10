@@ -208,7 +208,7 @@ Messages include serialized tool invocations so historical conversations display
 | ---------------------------- | --------------------------------------- | ------------- |
 | `refresh-top-picks`          | Refresh popularity-based libraries      | Daily at 6 AM |
 | `sync-trakt-ratings`         | Sync ratings from Trakt.tv              | Every 6 hours |
-| `refresh-assistant-suggestions` | Regenerate personalized chat prompts | Daily at 7 AM |
+| `refresh-assistant-suggestions` | Regenerate personalized chat prompts | Weekly, Sunday at midnight |
 
 ### Job Scheduling
 

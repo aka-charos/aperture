@@ -165,6 +165,55 @@ export function createPeopleTools(ctx: ToolContext) {
           }
         }
 
+        if (role === 'writer' || role === 'any') {
+          const writerMovies = await query<{
+            id: string
+            writer: string
+            title: string
+            year: number | null
+          }>(
+            `SELECT id, unnest(writers) as writer, title, year FROM movies
+             WHERE EXISTS (SELECT 1 FROM unnest(writers) w WHERE w ILIKE $1)
+             ORDER BY year DESC NULLS LAST LIMIT $2`,
+            [`%${name}%`, (limit ?? 10) * 5]
+          )
+
+          const writerMap = new Map<
+            string,
+            {
+              name: string
+              filmography: Array<{
+                id: string
+                type: 'movie' | 'series'
+                title: string
+                year: number | null
+                role: string | null
+              }>
+            }
+          >()
+
+          for (const row of writerMovies.rows) {
+            if (row.writer.toLowerCase().includes(name.toLowerCase())) {
+              const existing = writerMap.get(row.writer) || {
+                name: row.writer,
+                filmography: [],
+              }
+              existing.filmography.push({
+                id: row.id,
+                type: 'movie',
+                title: row.title,
+                year: row.year,
+                role: 'Writer',
+              })
+              writerMap.set(row.writer, existing)
+            }
+          }
+
+          for (const [, value] of writerMap) {
+            people.push({ ...value, role: 'writer', thumb: null })
+          }
+        }
+
         if (people.length === 0) {
           return {
             id: `people-empty-${Date.now()}`,
