@@ -69,6 +69,13 @@ services:
       # Generate one at: https://randomkeygen.com/ (use "Fort Knox Passwords")
       # ⚠️  IMPORTANT: Keep the quotes! Special characters like # break YAML without them.
       SESSION_SECRET: 'PASTE_YOUR_RANDOM_KEY_HERE'
+      # =========================================================================
+      # OPTIONAL: Runtime UI string overrides
+      # =========================================================================
+      # Directory (inside the container) holding overrides.<lng>.json files.
+      # Pair with VOLUME 4 below. Lets you customize interface text without
+      # rebuilding/pulling a new image.
+      I18N_OVERRIDES_DIR: /config/i18n
     ports:
       - '3456:3456'
     depends_on:
@@ -110,6 +117,18 @@ services:
       # Read-only (:ro) is fine - Aperture only reads, never writes here.
       #
       - /mnt/user/Media:/media:ro
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # VOLUME 4: UI String Overrides (optional)
+      # ─────────────────────────────────────────────────────────────────────────
+      # Customize interface text without rebuilding. Put an `overrides.en.json`
+      # (only the keys you want to change) in this folder; it is deep-merged over
+      # the bundled English at page load. Read-only (:ro) is recommended.
+      #
+      # Unraid Example:
+      #   - Host folder:     /mnt/user/appdata/aperture/i18n
+      #
+      - /mnt/user/appdata/aperture/i18n:/config/i18n:ro
     restart: unless-stopped
 
 # =============================================================================

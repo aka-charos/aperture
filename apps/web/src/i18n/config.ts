@@ -67,16 +67,50 @@ const i18nInit = i18n
     },
   })
 
-// Local English string overrides. Deep-merged over the bundled defaults so
-// `locales/en/translation.json` stays pristine (upstream-owned, conflict-free).
-// Put only the keys you want to change in `overrides.en.json`.
+// Local English string overrides bundled at build time. Deep-merged over the
+// bundled defaults so `locales/en/translation.json` stays pristine
+// (upstream-owned, conflict-free). Put only the keys you want to change in
+// `overrides.en.json`.
 i18n.addResourceBundle('en', 'translation', enOverrides, true, true)
+
+// Runtime string overrides served from a mounted directory on the server
+// (GET /api/i18n/overrides/:lng → I18N_OVERRIDES_DIR/overrides.<lng>.json).
+// These deep-merge on top of everything above, so operators can customize UI
+// strings via a Docker volume without rebuilding the image. Applied per-locale,
+// lazily, the first time a locale becomes active.
+const runtimeOverridesApplied = new Set<string>()
+
+async function applyRuntimeOverrides(rawLng: string | undefined): Promise<void> {
+  const lng = (rawLng || 'en').split('-')[0]
+  if (runtimeOverridesApplied.has(lng)) return
+  runtimeOverridesApplied.add(lng) // mark first so re-entrant events don't refetch
+  try {
+    const res = await fetch(`/api/i18n/overrides/${encodeURIComponent(lng)}`, {
+      credentials: 'include',
+    })
+    if (!res.ok) return
+    const data: unknown = await res.json()
+    if (data && typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length > 0) {
+      i18n.addResourceBundle(lng, 'translation', data, true, true)
+      // Force react-i18next to re-render with the merged strings.
+      void i18n.changeLanguage(i18n.language)
+    }
+  } catch {
+    // Overrides are optional; ignore network/parse errors.
+  }
+}
+
+// Pick up overrides whenever a new locale becomes active (guarded against loops).
+i18n.on('languageChanged', (lng: string) => {
+  void applyRuntimeOverrides(lng)
+})
 
 void i18nInit.then(() => {
   if (typeof document !== 'undefined') {
     document.documentElement.lang = i18n.language
     document.documentElement.dir = isRtlLocale(i18n.language) ? 'rtl' : 'ltr'
   }
+  void applyRuntimeOverrides(i18n.language)
 })
 
 export default i18n
