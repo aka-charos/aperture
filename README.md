@@ -10,6 +10,53 @@ Aperture creates personalized recommendation libraries for your media server use
 
 ---
 
+## About This Fork
+
+This repository ([aka-charos/aperture](https://github.com/aka-charos/aperture)) is a fork of [dgruhin-hrizn/aperture](https://github.com/dgruhin-hrizn/aperture). It tracks upstream (currently v0.7.8) and adds the features below on top. Active development happens on the `dev` branch, which is periodically rebased onto upstream releases.
+
+### Web-grounded discovery
+
+- **Web Search AI role** — a dedicated, optional AI role (admin AI settings) for grounded discovery, fully decoupled from the chat role. Unconfigured, everything behaves exactly like upstream.
+- **Intent-routed chat**: library questions work as before; discovery questions ("a gritty 2010s sci-fi like…") are routed through a grounded pipeline that sources candidate titles from the web (Google Search grounding) and resolves them against your library (IMDb → TMDb → title+year matching, with ID validation).
+- Every web pick includes a **grounded "why it fits" reason**, paired with embeddings-based _"also worth checking"_ suggestions from your own library.
+- Genre/theme exploration routes through the same web-grounded discovery.
+- Discovery thumbnails: explicit **Request** button (no hover overlay); clicking the poster opens details instead of requesting.
+
+### Assistant & chat
+
+- Favorite suggestions straight from chat and **build a playlist from chat picks**.
+- **OpenRouter** support for chat; expanded chat/text-gen model catalog (DeepSeek lineup, Gemini 2.5 Flash / Flash-Lite).
+- Intent classification is robust to models that return non-JSON output.
+- AI roles resolve **shared/sibling API keys** — configure a provider key once and text-gen/chat/exploration reuse it.
+
+### Model catalog & pricing
+
+- Model picker shows **per-1M-token pricing** rendered from structured pricing fields; refreshed prices, retired models dropped.
+
+### Collections & channels
+
+- Generate **Emby Box Sets** from the Channel builder (dedicated page).
+- Channels/Collections honor per-user text preferences and web-search expansion.
+- Admin toggle for **per-user collection-create permission**.
+
+### Language & UI customization
+
+- **Admin language allowlists**: choose which UI and AI languages users may select, and the default for each (unset = all locales, backward compatible).
+- **Runtime UI string overrides**: drop an `overrides.<lng>.json` (partial keys only) into a mounted dir (`I18N_OVERRIDES_DIR`, default `/config/i18n`) to customize any interface text **without rebuilding the image**. A build-time `overrides.en.json` also deep-merges over bundled English, keeping upstream's `translation.json` pristine and rebase-conflict-free.
+
+### Watch history & playback
+
+- Watch-history search spans the **entire history**, not just the loaded page.
+- **In-progress/resume badge** on partially watched movies; last-played dates in grid/thumbnail views with exact-timestamp tooltips.
+
+### Integrations & operations
+
+- **n8n integration**: webhook client with timeout/auth, settings UI, a provider-agnostic `search_web` tool, and an optional pre-processing hook on the chat pipeline (fails open if n8n is unreachable).
+- `QUIET_POLL_LOGS` env var + Settings → System toggle to silence high-frequency poll-route access logs.
+- Discovery observability; AI/n8n credentials redacted from settings logs.
+
+---
+
 ## Quick Start
 
 ### 1. Download the docker-compose file for your platform
