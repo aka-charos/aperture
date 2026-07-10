@@ -32,6 +32,7 @@ import seerrRoutes from './seerr/index.js'
 import gapAnalysisRoutes from './gap-analysis/index.js'
 import apiKeysRoutes from './apiKeys/index.js'
 import logoRoutes from './logo/index.js'
+import i18nRoutes from './i18n/index.js'
 
 const routes: FastifyPluginAsync = async (fastify) => {
   // Register health check routes
@@ -132,6 +133,9 @@ const routes: FastifyPluginAsync = async (fastify) => {
 
   // Register logo route (for Swagger UI branding)
   await fastify.register(logoRoutes)
+
+  // Register i18n routes (runtime UI string overrides from a mounted dir)
+  await fastify.register(i18nRoutes)
 }
 
 export default routes
