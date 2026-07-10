@@ -1,7 +1,11 @@
 import type { ReactNode } from 'react'
-import { Box, Paper, Typography, Avatar, CircularProgress, TextField, IconButton, Button } from '@mui/material'
+import { Box, Paper, Typography, Avatar, CircularProgress, TextField, IconButton, Button, Tooltip } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import SendIcon from '@mui/icons-material/Send'
+import StopIcon from '@mui/icons-material/Stop'
+import ContentCopyIcon from '@mui/icons-material/ContentCopy'
+import CheckIcon from '@mui/icons-material/Check'
+import ReplayIcon from '@mui/icons-material/Replay'
 import SmartToyIcon from '@mui/icons-material/SmartToy'
 import PersonIcon from '@mui/icons-material/Person'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
@@ -11,6 +15,7 @@ import {
   ThreadPrimitive,
   ComposerPrimitive,
   MessagePrimitive,
+  ActionBarPrimitive,
   useComposerRuntime,
 } from '@assistant-ui/react'
 import {
@@ -158,6 +163,45 @@ function UserMessage() {
   )
 }
 
+// Action bar under an assistant message: copy + regenerate.
+// Auto-hides on non-last messages and while the thread is running.
+function AssistantActionBar() {
+  const { t } = useTranslation()
+
+  const iconButtonSx = {
+    color: 'text.secondary',
+    '&:hover': { color: '#818cf8' },
+  }
+
+  return (
+    <ActionBarPrimitive.Root
+      hideWhenRunning
+      autohide="not-last"
+      style={{ display: 'flex', gap: 4, marginTop: 4 }}
+    >
+      <Tooltip title={t('assistant.tooltipCopy')}>
+        <ActionBarPrimitive.Copy asChild>
+          <IconButton size="small" aria-label={t('assistant.tooltipCopy')} sx={iconButtonSx}>
+            <MessagePrimitive.If copied>
+              <CheckIcon sx={{ fontSize: 16 }} />
+            </MessagePrimitive.If>
+            <MessagePrimitive.If copied={false}>
+              <ContentCopyIcon sx={{ fontSize: 16 }} />
+            </MessagePrimitive.If>
+          </IconButton>
+        </ActionBarPrimitive.Copy>
+      </Tooltip>
+      <Tooltip title={t('assistant.tooltipRegenerate')}>
+        <ActionBarPrimitive.Reload asChild>
+          <IconButton size="small" aria-label={t('assistant.tooltipRegenerate')} sx={iconButtonSx}>
+            <ReplayIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        </ActionBarPrimitive.Reload>
+      </Tooltip>
+    </ActionBarPrimitive.Root>
+  )
+}
+
 // Assistant message component
 function AssistantMessage() {
   return (
@@ -254,6 +298,7 @@ function AssistantMessage() {
               },
             }}
           />
+          <AssistantActionBar />
         </Box>
       </Box>
     </MessagePrimitive.Root>
@@ -418,26 +463,47 @@ function Composer() {
               }}
             />
           </ComposerPrimitive.Input>
-          <ComposerPrimitive.Send asChild>
-            <IconButton
-              type="submit"
-              sx={{
-                bgcolor: '#6366f1',
-                color: '#fff',
-                width: 44,
-                height: 44,
-                '&:hover': {
-                  bgcolor: '#4f46e5',
-                },
-                '&:disabled': {
-                  bgcolor: '#3a3a3a',
-                  color: '#666',
-                },
-              }}
-            >
-              <SendIcon />
-            </IconButton>
-          </ComposerPrimitive.Send>
+          <ThreadPrimitive.If running={false}>
+            <ComposerPrimitive.Send asChild>
+              <IconButton
+                type="submit"
+                sx={{
+                  bgcolor: '#6366f1',
+                  color: '#fff',
+                  width: 44,
+                  height: 44,
+                  '&:hover': {
+                    bgcolor: '#4f46e5',
+                  },
+                  '&:disabled': {
+                    bgcolor: '#3a3a3a',
+                    color: '#666',
+                  },
+                }}
+              >
+                <SendIcon />
+              </IconButton>
+            </ComposerPrimitive.Send>
+          </ThreadPrimitive.If>
+          <ThreadPrimitive.If running>
+            <ComposerPrimitive.Cancel asChild>
+              <IconButton
+                type="button"
+                aria-label={t('assistant.tooltipStop')}
+                sx={{
+                  bgcolor: '#6366f1',
+                  color: '#fff',
+                  width: 44,
+                  height: 44,
+                  '&:hover': {
+                    bgcolor: '#4f46e5',
+                  },
+                }}
+              >
+                <StopIcon />
+              </IconButton>
+            </ComposerPrimitive.Cancel>
+          </ThreadPrimitive.If>
         </form>
       </Box>
     </ComposerPrimitive.Root>
