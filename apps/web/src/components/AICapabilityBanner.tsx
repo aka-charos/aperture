@@ -20,11 +20,13 @@ type FeatureContext =
 interface AICapabilityBannerProps {
   context?: FeatureContext
   showWhenConfigured?: boolean  // Show even when properly configured (for debugging)
+  onBeforeNavigate?: () => void // Called before navigating to Settings (e.g. to close a modal)
 }
 
-export function AICapabilityBanner({ 
+export function AICapabilityBanner({
   context = 'general',
   showWhenConfigured = false,
+  onBeforeNavigate,
 }: AICapabilityBannerProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -121,7 +123,10 @@ export function AICapabilityBanner({
               color="inherit"
               size="small"
               startIcon={<SettingsIcon />}
-              onClick={() => navigate('/settings')}
+              onClick={() => {
+                onBeforeNavigate?.()
+                navigate('/settings')
+              }}
             >
               {t('aiCapability.configure')}
             </Button>

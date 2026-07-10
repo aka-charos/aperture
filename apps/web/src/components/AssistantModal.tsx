@@ -27,8 +27,8 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import EditIcon from '@mui/icons-material/Edit'
 import { AssistantRuntimeProvider, useThreadRuntime } from '@assistant-ui/react'
 import { useChatRuntime, AssistantChatTransport } from '@assistant-ui/react-ai-sdk'
-import type { UIMessage } from 'ai'
 import { Thread } from './assistant'
+import { AICapabilityBanner } from './AICapabilityBanner'
 
 interface Conversation {
   id: string
@@ -51,123 +51,40 @@ interface BackendMessage {
   created_at: string
 }
 
-type AssistantRole = 'user' | 'assistant' | 'system'
-
-interface AssistantTextPart {
-  type: 'text'
-  text: string
-}
-
-interface AssistantToolCallPart {
-  type: 'tool-call'
-  toolCallId: string
-  toolName: string
-  args: unknown
-  argsText?: string
-  isError?: boolean
-  result?: unknown
-}
-
-type AssistantMessagePart = AssistantTextPart | AssistantToolCallPart
-
-interface AssistantToolInvocation {
-  state: 'result'
-  toolCallId: string
-  toolName: string
-  args: unknown
-  result?: unknown
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
-}
-
-function normalizeRole(role: string): AssistantRole {
-  if (role === 'user' || role === 'assistant' || role === 'system') {
-    return role
-  }
-  return 'assistant'
-}
-
-function convertToUIMessages(messages: BackendMessage[]): UIMessage[] {
-  return messages.map((msg) => {
-    const content: AssistantMessagePart[] = []
-    const toolInvocations: AssistantToolInvocation[] = []
-    
-    // Add text part if there's content
-    if (msg.content) {
-      content.push({ type: 'text', text: msg.content })
-    }
-    
-    // Add tool-call parts from tool_invocations
-    if (msg.tool_invocations && msg.tool_invocations.length > 0) {
-      for (const invocation of msg.tool_invocations) {
-        // Add to content array (ThreadMessage format)
-        content.push({
-          type: 'tool-call',
-          toolCallId: invocation.toolCallId,
-          toolName: invocation.toolName,
-          args: invocation.args,
-          argsText: JSON.stringify(invocation.args),
-          isError: false,
-          result: invocation.result,
-        })
-        
-        // Also add to toolInvocations array (AI SDK format)
-        toolInvocations.push({
-          state: 'result',
-          toolCallId: invocation.toolCallId,
-          toolName: invocation.toolName,
-          args: invocation.args,
-          result: invocation.result,
-        })
-      }
-    }
-    
-    // Return message with multiple format properties for compatibility
-    return {
-      id: msg.id,
-      role: normalizeRole(msg.role),
-      content,
-      parts: content,
-      ...(toolInvocations.length > 0 && { toolInvocations }),
-    } as unknown as UIMessage
-  })
 }
 
 // Chat thread area that gets remounted when conversation changes
 function ChatThreadArea({
   conversationId,
-  initialMessages,
   historicalMessages,
   suggestions,
   setSavingMessages,
   fetchConversations,
 }: {
   conversationId: string | null
-  initialMessages: UIMessage[]
   historicalMessages: BackendMessage[]
   suggestions: string[]
   setSavingMessages: (saving: boolean) => void
   fetchConversations: () => Promise<void>
 }) {
   // Memoize transport to prevent recreation on re-renders
-  const transport = useRef(new AssistantChatTransport({ 
+  const transport = useRef(new AssistantChatTransport({
     api: '/api/assistant/chat',
     credentials: 'include',
   }))
-  
+
   // Don't pass messages to runtime - it doesn't properly parse tool results
   // Instead, we'll pass historical messages directly to Thread for manual rendering
   const runtime = useChatRuntime({
     transport: transport.current,
   })
-  
+
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <MessageSaver
         conversationId={conversationId}
-        initialMessageCount={initialMessages.length}
         setSavingMessages={setSavingMessages}
         fetchConversations={fetchConversations}
       />
@@ -179,42 +96,52 @@ function ChatThreadArea({
 // Component to handle message saving inside the runtime context
 function MessageSaver({
   conversationId,
-  initialMessageCount,
   setSavingMessages,
   fetchConversations,
 }: {
   conversationId: string | null
-  initialMessageCount: number
   setSavingMessages: (saving: boolean) => void
   fetchConversations: () => Promise<void>
 }) {
   const threadRuntime = useThreadRuntime()
-  const savedCountRef = useRef(initialMessageCount)
+  // The runtime always starts empty (historical messages are rendered
+  // separately, outside the runtime), so live-message counting starts at zero.
+  const savedCountRef = useRef(0)
+  // Id of the last assistant message we persisted - used to detect regenerated
+  // answers, which replace the last message in place (same count, new id).
+  const lastSavedAssistantIdRef = useRef<string | null>(null)
   const isSavingRef = useRef(false)
-  
-  // Reset saved count when initialMessageCount changes (new conversation loaded)
-  useEffect(() => {
-    savedCountRef.current = initialMessageCount
-  }, [initialMessageCount])
-  
+
   useEffect(() => {
     // Subscribe to thread state changes
     const unsubscribe = threadRuntime.subscribe(() => {
       const state = threadRuntime.getState()
-      
+
       // Only save when not currently running (assistant has finished)
       // and we have new messages to save
       if (state.isRunning) return
       if (isSavingRef.current) return
       if (!conversationId) return
-      
+
       const messages = state.messages
-      if (messages.length <= savedCountRef.current) return
-      
-      // Get messages that haven't been saved yet
-      const unsavedMessages = messages.slice(savedCountRef.current)
-      if (unsavedMessages.length === 0) return
-      
+      const lastMessage = messages[messages.length - 1]
+
+      // Get messages that haven't been saved yet (normal turn) ...
+      let unsavedMessages = messages.slice(savedCountRef.current)
+      if (unsavedMessages.length === 0) {
+        // ... or a regenerated answer: append the new variant.
+        if (
+          lastMessage &&
+          lastMessage.role === 'assistant' &&
+          lastSavedAssistantIdRef.current !== null &&
+          lastMessage.id !== lastSavedAssistantIdRef.current
+        ) {
+          unsavedMessages = [lastMessage]
+        } else {
+          return
+        }
+      }
+
       // Convert to backend format
       // ThreadMessage uses 'content' as the parts array
       const messagesToSave = unsavedMessages.map(msg => {
@@ -268,6 +195,9 @@ function MessageSaver({
             })
           }
           savedCountRef.current = messages.length
+          if (lastMessage && lastMessage.role === 'assistant') {
+            lastSavedAssistantIdRef.current = lastMessage.id
+          }
           fetchConversations() // Refresh to update titles
         })
         .catch(err => {
@@ -294,7 +224,6 @@ export function AssistantModal() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [loadingConversations, setLoadingConversations] = useState(false)
   const [savingMessages, setSavingMessages] = useState(false)
-  const [initialMessages, setInitialMessages] = useState<UIMessage[]>([])
   const [historicalMessages, setHistoricalMessages] = useState<BackendMessage[]>([])
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
@@ -359,7 +288,6 @@ export function AssistantModal() {
             const msgData = await msgRes.json()
             const backendMessages = msgData.messages || []
             setHistoricalMessages(backendMessages)
-            setInitialMessages(convertToUIMessages(backendMessages))
             setActiveConversationId(mostRecent.id)
             fetchSuggestions()
             return
@@ -395,7 +323,6 @@ export function AssistantModal() {
 
   const handleNewChat = async () => {
     // Clear messages first to trigger remount with empty state
-    setInitialMessages([])
     setHistoricalMessages([])
     
     // Create a new conversation in the backend
@@ -436,9 +363,6 @@ export function AssistantModal() {
         const backendMessages = data.messages || []
         // Store raw backend messages for historical rendering
         setHistoricalMessages(backendMessages)
-        // Convert backend messages to UIMessage format (for message count tracking)
-        const uiMessages = convertToUIMessages(backendMessages)
-        setInitialMessages(uiMessages)
         // Setting the conversation ID after messages triggers remount with loaded messages
         setActiveConversationId(conversationId)
       }
@@ -457,7 +381,6 @@ export function AssistantModal() {
       if (res.ok) {
         setConversations(prev => prev.filter(c => c.id !== conversationId))
         if (activeConversationId === conversationId) {
-          setInitialMessages([])
           setHistoricalMessages([])
           setActiveConversationId(null)
         }
@@ -774,12 +697,17 @@ export function AssistantModal() {
               </Box>
             </Box>
 
+            {/* AI capability warnings (chat not configured / no tool support).
+                The wrapper collapses when the banner renders nothing. */}
+            <Box sx={{ px: 2, pt: 2, '&:empty': { display: 'none' } }}>
+              <AICapabilityBanner context="chat" onBeforeNavigate={handleClose} />
+            </Box>
+
             {/* Chat Content - Only this part remounts on conversation switch */}
             <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <ChatThreadArea
                 key={activeConversationId || 'new'}
                 conversationId={activeConversationId}
-                initialMessages={initialMessages}
                 historicalMessages={historicalMessages}
                 suggestions={suggestions}
                 setSavingMessages={setSavingMessages}
