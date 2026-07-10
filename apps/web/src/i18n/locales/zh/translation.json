@@ -46,7 +46,8 @@
     "myWatchHistory": "我的观看历史",
     "howItWorks": "使用说明",
     "roleLabelAdmin": "管理员",
-    "roleLabelUser": "用户"
+    "roleLabelUser": "用户",
+    "collections": "Collections"
   },
   "admin": {
     "title": "管理",
@@ -217,7 +218,14 @@
       "requestToggleOn": "关闭内容请求",
       "requestToggleOff": "开启内容请求",
       "enableImportTooltip": "导入并启用 AI 推荐",
-      "enable": "启用"
+      "enable": "启用",
+      "collectionsOn": "{{name}} can now create collections",
+      "collectionsOff": "{{name}} can no longer create collections",
+      "collections": "Collections",
+      "colCollections": "Collections",
+      "collectionsColTooltip": "Allow user to create collections (server-wide Box Sets)",
+      "collectionsToggleOn": "Disable collection creation",
+      "collectionsToggleOff": "Enable collection creation"
     },
     "jobsPage": {
       "title": "后台任务",
@@ -472,7 +480,10 @@
       "dateYesterday": "昨天",
       "dateDaysAgo": "{{count}} 天前",
       "dateWeeksAgo": "{{count}} 周前",
-      "dateMonthsAgo": "{{count}} 个月前"
+      "dateMonthsAgo": "{{count}} 个月前",
+      "collectionsAccessUpdated": "Collection permission updated!",
+      "collectionsTitle": "Allow Creating Collections",
+      "collectionsHint": "User can build server-wide Emby/Jellyfin collections (Box Sets) from the Collections page"
     }
   },
   "login": {
@@ -629,7 +640,11 @@
     "loadDefaultsFailed": "加载语言默认值失败",
     "loadLanguageSettingsFailed": "无法加载语言设置",
     "saveDefaultsFailed": "保存失败",
-    "connectionError": "无法连接到服务器"
+    "connectionError": "无法连接到服务器",
+    "uiSectionTitle": "Interface (UI)",
+    "aiSectionTitle": "AI output",
+    "availableUi": "Available UI languages",
+    "availableAi": "Available AI languages"
   },
   "discovery": {
     "title": "发现",
@@ -1367,7 +1382,14 @@
     "carouselSimilarDescSeries": "找到与此系列相似的 {{count}} 个系列",
     "carouselSimilarDescMovieUnwatched": "找到 {{count}} 部与此电影类似但您尚未看过的电影",
     "carouselSimilarDescSeriesUnwatched": "找到了 {{count}} 个与此系列类似但您尚未观看的系列",
-    "carouselSimilarError": "未能找到类似内容：{{message}}"
+    "carouselSimilarError": "未能找到类似内容：{{message}}",
+    "createPlaylist": "Create playlist",
+    "favorite": "Add to favorites",
+    "removeFavorite": "Remove from favorites",
+    "favoriteAdded": "Added to your favorites",
+    "favoriteRemoved": "Removed from your favorites",
+    "favoriteFailed": "Couldn't update favorites. Please try again.",
+    "favoriteNotInLibrary": "That title isn't in your library, so it can't be favorited."
   },
   "similarityGraph": {
     "loadingFallback": "加载中…",
@@ -1960,7 +1982,9 @@
     "confirmDeleteSet": "删除“{{model}}”的所有嵌入吗？ 此操作无法撤消。",
     "deleteFailed": "删除失败",
     "deleteSetError": "删除嵌入集失败",
-    "saveFailed": "保存失败"
+    "saveFailed": "保存失败",
+    "cardWebSearchTitle": "Web Search",
+    "cardWebSearchDesc": "Optional. A grounding-capable model (Google) that finds current titles from the web for discovery requests, then matches them against your library. Leave unset to disable web discovery."
   },
   "settingsAiExplanation": {
     "loadFailed": "加载AI解释配置失败",
@@ -2308,7 +2332,10 @@
     "suggestion4": "有哪些科幻电影值得推荐？",
     "playOnEmby": "在 Emby 上玩",
     "toolErrorTitle": "工具错误",
-    "toolErrorBody": "{{信息}}"
+    "toolErrorBody": "{{信息}}",
+    "tooltipStop": "Stop generating",
+    "tooltipCopy": "Copy response",
+    "tooltipRegenerate": "Regenerate response"
   },
   "welcomeModal": {
     "title": "欢迎来到光圈",
@@ -2546,7 +2573,11 @@
     "snackbarAINameOk": "AI名称生成",
     "snackbarAINameFail": "生成名称失败",
     "snackbarAIDescriptionOk": "生成AI描述",
-    "snackbarAIDescriptionFail": "无法生成描述"
+    "snackbarAIDescriptionFail": "无法生成描述",
+    "createFromSuggestionsTitle": "Create Playlist from Suggestions",
+    "itemsSelected": "{{count}} selected",
+    "noItemsSelected": "Select at least one title",
+    "createdInLibrary": "Added \"{{name}}\" to your library"
   },
   "myRecommendations": {
     "pageTitle": "我的建议",
@@ -2658,7 +2689,8 @@
     "playLabel_other": "戏剧",
     "playNoun_one": "玩",
     "playNoun_other": "戏剧",
-    "completeBadge": "完全的"
+    "completeBadge": "完全的",
+    "inProgressTooltip": "In progress · {{percent}}% watched"
   },
   "topPicksPage": {
     "pageTitle": "热门精选",
@@ -3666,5 +3698,99 @@
     "sectionBlurb": "每行都是一个 TMDb Discover 条带。 如果一行列出了多个流派，TMDb 将返回与所有流派匹配的标题。 结果排除您图书馆中已有的、已观看或请求的项目。",
     "loadError": "无法加载流派行",
     "emptyStrip": "过滤后没有标题与此行匹配。"
+  },
+  "settingsChannelsWebExpand": {
+    "title": "Channel & collection web expansion",
+    "description": "Manual “Generate” always expands playlists and collections with web-search picks similar to your seed movies (when the Web Search AI role is configured). Enable this to also include that web search in the scheduled auto-refresh — it makes recurring Google grounding calls, so it is off by default.",
+    "enable": "Include web search in scheduled auto-refresh",
+    "save": "Save",
+    "saved": "Web expansion setting saved.",
+    "loadError": "Failed to load web expansion setting",
+    "saveError": "Failed to save web expansion setting"
+  },
+  "collections": {
+    "pageTitle": "Collections",
+    "pageSubtitle": "Build Emby collections from genres and example movies — visible to everyone in your library",
+    "newPlaylist": "New Collection",
+    "deleteTitle": "Delete Collection",
+    "deleteConfirm": "Are you sure you want to delete \"{{name}}\"? This removes the collection from your library and cannot be undone.",
+    "deleting": "Deleting…",
+    "delete": "Delete",
+    "emptyTitle": "No collections yet",
+    "emptyBody": "Create your first collection to group AI-picked movies right in your library",
+    "createPlaylist": "Create Collection",
+    "createFromGraphTitle": "Create Collection from Graph",
+    "playlistName": "Collection Name",
+    "namePlaceholder": "e.g., Galactic Adventures",
+    "descriptionOptional": "Description (optional)",
+    "descriptionPlaceholder": "A brief description of this collection…",
+    "itemsWillBeAdded": "{{count}} items will be added:",
+    "tooltipGenerateName": "Generate a creative name with AI",
+    "tooltipGenerateDescription": "Generate a description with AI",
+    "tooltipGenerateNameShort": "Generate a creative name with AI",
+    "tooltipGenerateDescriptionShort": "Generate a description with AI",
+    "errGenerateName": "Failed to generate name. Please try again.",
+    "errGenerateDescription": "Failed to generate description. Please try again.",
+    "errNameRequired": "Please enter a collection name",
+    "errCreateFailed": "Failed to create collection",
+    "naYear": "N/A",
+    "creating": "Creating…",
+    "similarityPlaylist": "Similarity Collection",
+    "similarityBadgeShort": "Similarity",
+    "moreCount": "+{{count}} more",
+    "metaItemsCreated": "{{count}} items • Created {{date}}",
+    "noItemsInPlaylist": "No items in collection",
+    "playlistViewTitle": "{{name}} - Collection",
+    "movieCount": "{{count}} movies",
+    "addMovieToPlaylist": "Add Movie to Collection",
+    "searchMoviesPlaceholder": "Search for movies to add…",
+    "allResultsInPlaylist": "All results are already in collection",
+    "noMoviesInPlaylist": "No movies in collection yet",
+    "noMoviesInPlaylistHint": "Generate the collection or add movies manually",
+    "unknownYear": "Unknown year",
+    "removeFromPlaylist": "Remove from collection",
+    "cardEmptyPlaylist": "Empty collection",
+    "cardGeneratePrompt": "Generate to see movies",
+    "cardGenerating": "Generating collection…",
+    "cardMoviesCount": "{{count}} movies",
+    "cardSeedMovies_one": "{{count}} seed movie",
+    "cardSeedMovies_other": "{{count}} seed movies",
+    "cardUpdated": "Updated {{date}}",
+    "cardNotGenerated": "Not generated",
+    "tooltipRefreshPlaylist": "Refresh collection",
+    "tooltipGeneratePlaylist": "Generate collection",
+    "tooltipEditSettings": "Edit settings",
+    "tooltipDeletePlaylist": "Delete collection",
+    "graphBadge": "Graph",
+    "graphMovies": "{{count}} movies",
+    "loadingItems": "Loading items…",
+    "cardCreated": "Created {{date}}",
+    "tooltipViewPlaylist": "View collection",
+    "dialogEditTitle": "Edit Collection",
+    "dialogNewTitle": "New Collection",
+    "dialogEditSubtitle": "Update your collection settings",
+    "dialogNewSubtitle": "Create a personalized recommendation collection",
+    "sectionGenres": "Genres",
+    "sectionGenresSubtitle": "Select genres to match",
+    "searchGenresPlaceholder": "Search genres…",
+    "sectionSeedMovies": "Seed Movies",
+    "sectionSeedMoviesSubtitle": "Movies that define this collection's vibe",
+    "sectionPreferences": "Preferences",
+    "sectionPreferencesSubtitle": "Describe your ideal recommendations",
+    "preferencesPlaceholder": "e.g., Dark atmosphere, morally complex characters, twist endings…",
+    "tooltipAIPreferences": "Generate preferences with AI based on genres and movies",
+    "sectionNameTitle": "Collection Name",
+    "nameExamplePlaceholder": "e.g., Neon Noir Nights",
+    "sectionDescriptionTitle": "Description",
+    "sectionDescriptionSubtitle": "Optional",
+    "descriptionCuratedPlaceholder": "A curated collection of…",
+    "saveChanges": "Save Changes",
+    "snackbarNeedGenresOrMovies": "Please select genres or example movies first",
+    "snackbarAIPreferencesOk": "AI preferences generated",
+    "snackbarAIPreferencesFail": "Failed to generate preferences",
+    "snackbarAINameOk": "AI name generated",
+    "snackbarAINameFail": "Failed to generate name",
+    "snackbarAIDescriptionOk": "AI description generated",
+    "snackbarAIDescriptionFail": "Failed to generate description"
   }
 }

@@ -46,7 +46,8 @@
     "myWatchHistory": "Mi historial",
     "howItWorks": "Cómo funciona",
     "roleLabelAdmin": "Administrador",
-    "roleLabelUser": "Usuario"
+    "roleLabelUser": "Usuario",
+    "collections": "Collections"
   },
   "admin": {
     "title": "Administración",
@@ -217,7 +218,14 @@
       "requestToggleOn": "Desactivar solicitudes de contenido",
       "requestToggleOff": "Activar solicitudes de contenido",
       "enableImportTooltip": "Importar y activar para recomendaciones de IA",
-      "enable": "Activar"
+      "enable": "Activar",
+      "collectionsOn": "{{name}} can now create collections",
+      "collectionsOff": "{{name}} can no longer create collections",
+      "collections": "Collections",
+      "colCollections": "Collections",
+      "collectionsColTooltip": "Allow user to create collections (server-wide Box Sets)",
+      "collectionsToggleOn": "Disable collection creation",
+      "collectionsToggleOff": "Enable collection creation"
     },
     "userDetail": {
       "userNotFound": "Usuario no encontrado",
@@ -290,7 +298,10 @@
       "dateYesterday": "Ayer",
       "dateDaysAgo": "hace {{count}} días",
       "dateWeeksAgo": "hace {{count}} semanas",
-      "dateMonthsAgo": "hace {{count}} meses"
+      "dateMonthsAgo": "hace {{count}} meses",
+      "collectionsAccessUpdated": "Collection permission updated!",
+      "collectionsTitle": "Allow Creating Collections",
+      "collectionsHint": "User can build server-wide Emby/Jellyfin collections (Box Sets) from the Collections page"
     },
     "jobsPage": {
       "title": "Trabajos en segundo plano",
@@ -910,7 +921,11 @@
     "loadDefaultsFailed": "Error al cargar los valores predeterminados de idioma",
     "loadLanguageSettingsFailed": "No se pudieron cargar los ajustes de idioma",
     "saveDefaultsFailed": "Error al guardar",
-    "connectionError": "No se pudo conectar al servidor"
+    "connectionError": "No se pudo conectar al servidor",
+    "uiSectionTitle": "Interface (UI)",
+    "aiSectionTitle": "AI output",
+    "availableUi": "Available UI languages",
+    "availableAi": "Available AI languages"
   },
   "discovery": {
     "title": "Descubrir",
@@ -1367,7 +1382,14 @@
     "carouselSimilarDescSeries": "Se encontraron {{count}} series similares a esta serie.",
     "carouselSimilarDescMovieUnwatched": "Encontré {{count}} películas similares a esta que no has visto",
     "carouselSimilarDescSeriesUnwatched": "Encontraste {{count}} series similares a esta serie que no has visto",
-    "carouselSimilarError": "No se pudo encontrar contenido similar: {{message}}"
+    "carouselSimilarError": "No se pudo encontrar contenido similar: {{message}}",
+    "createPlaylist": "Create playlist",
+    "favorite": "Add to favorites",
+    "removeFavorite": "Remove from favorites",
+    "favoriteAdded": "Added to your favorites",
+    "favoriteRemoved": "Removed from your favorites",
+    "favoriteFailed": "Couldn't update favorites. Please try again.",
+    "favoriteNotInLibrary": "That title isn't in your library, so it can't be favorited."
   },
   "similarityGraph": {
     "loadingFallback": "Cargando…",
@@ -1960,7 +1982,9 @@
     "confirmDeleteSet": "¿Eliminar todas las incrustaciones de \"{{model}}\"? Esto no se puede deshacer.",
     "deleteFailed": "No se pudo eliminar",
     "deleteSetError": "No se pudo eliminar el conjunto de incrustaciones",
-    "saveFailed": "No se pudo guardar"
+    "saveFailed": "No se pudo guardar",
+    "cardWebSearchTitle": "Web Search",
+    "cardWebSearchDesc": "Optional. A grounding-capable model (Google) that finds current titles from the web for discovery requests, then matches them against your library. Leave unset to disable web discovery."
   },
   "settingsAiExplanation": {
     "loadFailed": "No se pudo cargar la configuración de explicación de AI",
@@ -2308,7 +2332,10 @@
     "suggestion4": "¿Qué películas de ciencia ficción recomiendas?",
     "playOnEmby": "Jugar en Emby",
     "toolErrorTitle": "Error de herramienta",
-    "toolErrorBody": "{{mensaje}}"
+    "toolErrorBody": "{{mensaje}}",
+    "tooltipStop": "Stop generating",
+    "tooltipCopy": "Copy response",
+    "tooltipRegenerate": "Regenerate response"
   },
   "welcomeModal": {
     "title": "Bienvenido a Apertura",
@@ -2546,7 +2573,11 @@
     "snackbarAINameOk": "Nombre de IA generado",
     "snackbarAINameFail": "No se pudo generar el nombre",
     "snackbarAIDescriptionOk": "Descripción de IA generada",
-    "snackbarAIDescriptionFail": "No se pudo generar la descripción"
+    "snackbarAIDescriptionFail": "No se pudo generar la descripción",
+    "createFromSuggestionsTitle": "Create Playlist from Suggestions",
+    "itemsSelected": "{{count}} selected",
+    "noItemsSelected": "Select at least one title",
+    "createdInLibrary": "Added \"{{name}}\" to your library"
   },
   "myRecommendations": {
     "pageTitle": "Mis recomendaciones",
@@ -2658,7 +2689,8 @@
     "playLabel_other": "juega",
     "playNoun_one": "jugar",
     "playNoun_other": "juega",
-    "completeBadge": "Completa"
+    "completeBadge": "Completa",
+    "inProgressTooltip": "In progress · {{percent}}% watched"
   },
   "topPicksPage": {
     "pageTitle": "Mejores selecciones",
@@ -3666,5 +3698,99 @@
     "sectionBlurb": "Cada fila es una tira de TMDb Discover. Si una fila enumera varios géneros, TMDb devuelve títulos que coinciden con todos ellos. Los resultados excluyen los elementos que ya están en su biblioteca, vistos o solicitados.",
     "loadError": "No se pudo cargar la fila de género",
     "emptyStrip": "Ningún título coincide con esta fila después del filtrado."
+  },
+  "settingsChannelsWebExpand": {
+    "title": "Channel & collection web expansion",
+    "description": "Manual “Generate” always expands playlists and collections with web-search picks similar to your seed movies (when the Web Search AI role is configured). Enable this to also include that web search in the scheduled auto-refresh — it makes recurring Google grounding calls, so it is off by default.",
+    "enable": "Include web search in scheduled auto-refresh",
+    "save": "Save",
+    "saved": "Web expansion setting saved.",
+    "loadError": "Failed to load web expansion setting",
+    "saveError": "Failed to save web expansion setting"
+  },
+  "collections": {
+    "pageTitle": "Collections",
+    "pageSubtitle": "Build Emby collections from genres and example movies — visible to everyone in your library",
+    "newPlaylist": "New Collection",
+    "deleteTitle": "Delete Collection",
+    "deleteConfirm": "Are you sure you want to delete \"{{name}}\"? This removes the collection from your library and cannot be undone.",
+    "deleting": "Deleting…",
+    "delete": "Delete",
+    "emptyTitle": "No collections yet",
+    "emptyBody": "Create your first collection to group AI-picked movies right in your library",
+    "createPlaylist": "Create Collection",
+    "createFromGraphTitle": "Create Collection from Graph",
+    "playlistName": "Collection Name",
+    "namePlaceholder": "e.g., Galactic Adventures",
+    "descriptionOptional": "Description (optional)",
+    "descriptionPlaceholder": "A brief description of this collection…",
+    "itemsWillBeAdded": "{{count}} items will be added:",
+    "tooltipGenerateName": "Generate a creative name with AI",
+    "tooltipGenerateDescription": "Generate a description with AI",
+    "tooltipGenerateNameShort": "Generate a creative name with AI",
+    "tooltipGenerateDescriptionShort": "Generate a description with AI",
+    "errGenerateName": "Failed to generate name. Please try again.",
+    "errGenerateDescription": "Failed to generate description. Please try again.",
+    "errNameRequired": "Please enter a collection name",
+    "errCreateFailed": "Failed to create collection",
+    "naYear": "N/A",
+    "creating": "Creating…",
+    "similarityPlaylist": "Similarity Collection",
+    "similarityBadgeShort": "Similarity",
+    "moreCount": "+{{count}} more",
+    "metaItemsCreated": "{{count}} items • Created {{date}}",
+    "noItemsInPlaylist": "No items in collection",
+    "playlistViewTitle": "{{name}} - Collection",
+    "movieCount": "{{count}} movies",
+    "addMovieToPlaylist": "Add Movie to Collection",
+    "searchMoviesPlaceholder": "Search for movies to add…",
+    "allResultsInPlaylist": "All results are already in collection",
+    "noMoviesInPlaylist": "No movies in collection yet",
+    "noMoviesInPlaylistHint": "Generate the collection or add movies manually",
+    "unknownYear": "Unknown year",
+    "removeFromPlaylist": "Remove from collection",
+    "cardEmptyPlaylist": "Empty collection",
+    "cardGeneratePrompt": "Generate to see movies",
+    "cardGenerating": "Generating collection…",
+    "cardMoviesCount": "{{count}} movies",
+    "cardSeedMovies_one": "{{count}} seed movie",
+    "cardSeedMovies_other": "{{count}} seed movies",
+    "cardUpdated": "Updated {{date}}",
+    "cardNotGenerated": "Not generated",
+    "tooltipRefreshPlaylist": "Refresh collection",
+    "tooltipGeneratePlaylist": "Generate collection",
+    "tooltipEditSettings": "Edit settings",
+    "tooltipDeletePlaylist": "Delete collection",
+    "graphBadge": "Graph",
+    "graphMovies": "{{count}} movies",
+    "loadingItems": "Loading items…",
+    "cardCreated": "Created {{date}}",
+    "tooltipViewPlaylist": "View collection",
+    "dialogEditTitle": "Edit Collection",
+    "dialogNewTitle": "New Collection",
+    "dialogEditSubtitle": "Update your collection settings",
+    "dialogNewSubtitle": "Create a personalized recommendation collection",
+    "sectionGenres": "Genres",
+    "sectionGenresSubtitle": "Select genres to match",
+    "searchGenresPlaceholder": "Search genres…",
+    "sectionSeedMovies": "Seed Movies",
+    "sectionSeedMoviesSubtitle": "Movies that define this collection's vibe",
+    "sectionPreferences": "Preferences",
+    "sectionPreferencesSubtitle": "Describe your ideal recommendations",
+    "preferencesPlaceholder": "e.g., Dark atmosphere, morally complex characters, twist endings…",
+    "tooltipAIPreferences": "Generate preferences with AI based on genres and movies",
+    "sectionNameTitle": "Collection Name",
+    "nameExamplePlaceholder": "e.g., Neon Noir Nights",
+    "sectionDescriptionTitle": "Description",
+    "sectionDescriptionSubtitle": "Optional",
+    "descriptionCuratedPlaceholder": "A curated collection of…",
+    "saveChanges": "Save Changes",
+    "snackbarNeedGenresOrMovies": "Please select genres or example movies first",
+    "snackbarAIPreferencesOk": "AI preferences generated",
+    "snackbarAIPreferencesFail": "Failed to generate preferences",
+    "snackbarAINameOk": "AI name generated",
+    "snackbarAINameFail": "Failed to generate name",
+    "snackbarAIDescriptionOk": "AI description generated",
+    "snackbarAIDescriptionFail": "Failed to generate description"
   }
 }
