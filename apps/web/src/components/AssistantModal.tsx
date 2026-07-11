@@ -1,42 +1,24 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useLocation } from 'react-router-dom'
 import {
   Dialog,
   Drawer,
   Fab,
   Tooltip,
-  Box,
   IconButton,
-  Typography,
   Zoom,
-  List,
-  ListItemButton,
-  ListItemText,
-  ListItemIcon,
-  Divider,
-  CircularProgress,
-  TextField,
-  Snackbar,
-  Alert,
   useMediaQuery,
   useTheme,
 } from '@mui/material'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
-import SmartToyIcon from '@mui/icons-material/SmartToy'
 import CloseIcon from '@mui/icons-material/Close'
 import FullscreenIcon from '@mui/icons-material/Fullscreen'
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit'
-import AddIcon from '@mui/icons-material/Add'
-import ChatIcon from '@mui/icons-material/Chat'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import EditIcon from '@mui/icons-material/Edit'
-import HistoryIcon from '@mui/icons-material/History'
 import VerticalSplitIcon from '@mui/icons-material/VerticalSplit'
 import WebAssetIcon from '@mui/icons-material/WebAsset'
-import { AssistantRuntimeProvider, useThreadRuntime } from '@assistant-ui/react'
-import { useChatRuntime, AssistantChatTransport } from '@assistant-ui/react-ai-sdk'
-import { Thread } from './assistant'
-import { AICapabilityBanner } from './AICapabilityBanner'
+import { AssistantChatSurface } from './assistant/AssistantChatSurface'
+import { useAssistantChat } from './assistant/useAssistantChat'
 import { useAssistantDock } from '@/hooks/useAssistantDock'
 
 // Surface the assistant renders in: blocking dialog or persistent side panel
@@ -45,202 +27,14 @@ type AssistantSurface = 'modal' | 'dock'
 const SURFACE_STORAGE_KEY = 'aperture.assistant.surface'
 const DOCK_WIDTH = 420
 
-interface Conversation {
-  id: string
-  title: string
-  created_at: string
-  updated_at: string
-}
-
-// Message format from our backend
-interface BackendMessage {
-  id: string
-  role: string
-  content: string
-  tool_invocations?: Array<{
-    toolCallId: string
-    toolName: string
-    args: unknown
-    result?: unknown
-  }>
-  created_at: string
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-
-// Chat thread area that gets remounted when conversation changes
-function ChatThreadArea({
-  conversationId,
-  historicalMessages,
-  suggestions,
-  setSavingMessages,
-  fetchConversations,
-  onSaveError,
-}: {
-  conversationId: string | null
-  historicalMessages: BackendMessage[]
-  suggestions: string[]
-  setSavingMessages: (saving: boolean) => void
-  fetchConversations: () => Promise<void>
-  onSaveError: () => void
-}) {
-  // Memoize transport to prevent recreation on re-renders
-  const transport = useRef(new AssistantChatTransport({
-    api: '/api/assistant/chat',
-    credentials: 'include',
-  }))
-
-  // Don't pass messages to runtime - it doesn't properly parse tool results
-  // Instead, we'll pass historical messages directly to Thread for manual rendering
-  const runtime = useChatRuntime({
-    transport: transport.current,
-  })
-
-  return (
-    <AssistantRuntimeProvider runtime={runtime}>
-      <MessageSaver
-        conversationId={conversationId}
-        setSavingMessages={setSavingMessages}
-        fetchConversations={fetchConversations}
-        onSaveError={onSaveError}
-      />
-      <Thread historicalMessages={historicalMessages} suggestions={suggestions} />
-    </AssistantRuntimeProvider>
-  )
-}
-
-// Component to handle message saving inside the runtime context
-function MessageSaver({
-  conversationId,
-  setSavingMessages,
-  fetchConversations,
-  onSaveError,
-}: {
-  conversationId: string | null
-  setSavingMessages: (saving: boolean) => void
-  fetchConversations: () => Promise<void>
-  onSaveError: () => void
-}) {
-  const threadRuntime = useThreadRuntime()
-  // The runtime always starts empty (historical messages are rendered
-  // separately, outside the runtime), so live-message counting starts at zero.
-  const savedCountRef = useRef(0)
-  // Id of the last assistant message we persisted - used to detect regenerated
-  // answers, which replace the last message in place (same count, new id).
-  const lastSavedAssistantIdRef = useRef<string | null>(null)
-  const isSavingRef = useRef(false)
-
-  useEffect(() => {
-    // Subscribe to thread state changes
-    const unsubscribe = threadRuntime.subscribe(() => {
-      const state = threadRuntime.getState()
-
-      // Only save when not currently running (assistant has finished)
-      // and we have new messages to save
-      if (state.isRunning) return
-      if (isSavingRef.current) return
-      if (!conversationId) return
-
-      const messages = state.messages
-      const lastMessage = messages[messages.length - 1]
-
-      // Get messages that haven't been saved yet (normal turn) ...
-      let unsavedMessages = messages.slice(savedCountRef.current)
-      if (unsavedMessages.length === 0) {
-        // ... or a regenerated answer: append the new variant.
-        if (
-          lastMessage &&
-          lastMessage.role === 'assistant' &&
-          lastSavedAssistantIdRef.current !== null &&
-          lastMessage.id !== lastSavedAssistantIdRef.current
-        ) {
-          unsavedMessages = [lastMessage]
-        } else {
-          return
-        }
-      }
-
-      // Convert to backend format
-      // ThreadMessage uses 'content' as the parts array
-      const messagesToSave = unsavedMessages.map(msg => {
-        // Extract text content and tool invocations from message content (parts array)
-        let textContent = ''
-        const toolInvocations: Array<{ toolCallId: string; toolName: string; args: unknown; result?: unknown }> = []
-
-        const contentParts = Array.isArray(msg.content) ? msg.content : []
-        for (const part of contentParts) {
-          if (!isRecord(part) || typeof part.type !== 'string') {
-            continue
-          }
-          if (part.type === 'text' && typeof part.text === 'string') {
-            textContent += part.text
-          } else if (
-            part.type === 'tool-call' &&
-            typeof part.toolCallId === 'string' &&
-            typeof part.toolName === 'string'
-          ) {
-            // In ThreadMessage, the result is embedded directly in the tool-call part
-            toolInvocations.push({
-              toolCallId: part.toolCallId,
-              toolName: part.toolName,
-              args: part.args,
-              result: part.result,
-            })
-          }
-        }
-
-        return {
-          role: msg.role,
-          content: textContent,
-          ...(toolInvocations.length > 0 && { toolInvocations }),
-        }
-      })
-
-      // Save to backend
-      isSavingRef.current = true
-      setSavingMessages(true)
-
-      fetch(`/api/assistant/conversations/${conversationId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ messages: messagesToSave }),
-      })
-        .then((res) => {
-          if (!res.ok) {
-            return res.text().then(text => {
-              console.error('Failed to save messages:', text)
-              onSaveError()
-            })
-          }
-          savedCountRef.current = messages.length
-          if (lastMessage && lastMessage.role === 'assistant') {
-            lastSavedAssistantIdRef.current = lastMessage.id
-          }
-          fetchConversations() // Refresh to update titles
-        })
-        .catch(err => {
-          console.error('Failed to save messages:', err)
-          onSaveError()
-        })
-        .finally(() => {
-          isSavingRef.current = false
-          setSavingMessages(false)
-        })
-    })
-
-    return () => unsubscribe()
-  }, [threadRuntime, conversationId, setSavingMessages, fetchConversations, onSaveError])
-
-  return null
-}
-
-
+/**
+ * Floating assistant: Fab + dialog / dockable side panel. The same chat is
+ * also available as a regular page at /assistant (see pages/assistant).
+ */
 export function AssistantModal() {
   const { t } = useTranslation()
   const theme = useTheme()
+  const location = useLocation()
   // Phones get a forced-fullscreen dialog; the dock needs room next to the library.
   const isSmDown = useMediaQuery(theme.breakpoints.down('sm'))
   const canDock = useMediaQuery(theme.breakpoints.up('md'))
@@ -253,24 +47,15 @@ export function AssistantModal() {
       return 'modal'
     }
   })
-  const [historyOpen, setHistoryOpen] = useState(false)
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
-  const [loadingConversations, setLoadingConversations] = useState(false)
-  const [savingMessages, setSavingMessages] = useState(false)
-  const [historicalMessages, setHistoricalMessages] = useState<BackendMessage[]>([])
-  const [editingConversationId, setEditingConversationId] = useState<string | null>(null)
-  const [editTitle, setEditTitle] = useState('')
-  const [suggestions, setSuggestions] = useState<string[]>([])
-  // Surfaces conversation CRUD / message-save failures that were previously
-  // console-only (same pattern as the ContentCarousel favorite snackbar).
-  // Stores the i18n key, translated at render, so handlers don't depend on t.
-  const [errorKey, setErrorKey] = useState<string | null>(null)
-  const notifyError = useCallback((key: string) => setErrorKey(key), [])
-  const handleSaveError = useCallback(
-    () => notifyError('assistant.errorMessagesSave'),
-    [notifyError]
-  )
+
+  // The dedicated /assistant page renders the same chat; hide the floating
+  // surface there so the chat never shows twice.
+  const onAssistantPage = location.pathname === '/assistant'
+  useEffect(() => {
+    if (onAssistantPage) setOpen(false)
+  }, [onAssistantPage])
+
+  const chat = useAssistantChat(open)
 
   const docked = surface === 'dock' && canDock
   const effectiveFullscreen = fullscreen || isSmDown
@@ -285,114 +70,11 @@ export function AssistantModal() {
     return () => setDockWidth(0)
   }, [open, docked, setDockWidth])
 
-  // Fetch personalized suggestions
-  const fetchSuggestions = useCallback(async () => {
-    try {
-      const res = await fetch('/api/assistant/suggestions', { credentials: 'include' })
-      if (res.ok) {
-        const data = await res.json()
-        setSuggestions(data.suggestions || [])
-      }
-    } catch {
-      // Silently fail - will use default suggestions
-    }
-  }, [])
-
-  // Fetch conversations when modal opens
-  const fetchConversations = useCallback(async () => {
-    setLoadingConversations(true)
-    try {
-      const res = await fetch('/api/assistant/conversations', { credentials: 'include' })
-      if (res.ok) {
-        const data = await res.json()
-        setConversations(data.conversations || [])
-      }
-    } catch (err) {
-      console.error('Failed to fetch conversations:', err)
-    } finally {
-      setLoadingConversations(false)
-    }
-  }, [])
-
-  // Initialize chat when modal opens - load most recent conversation or create new
-  useEffect(() => {
-    if (!open) return
-
-    const initializeChat = async () => {
-      try {
-        // Fetch all conversations
-        const res = await fetch('/api/assistant/conversations', { credentials: 'include' })
-        if (!res.ok) return
-
-        const data = await res.json()
-        const convos: Conversation[] = data.conversations || []
-        setConversations(convos)
-
-        // If we already have an active conversation, keep it
-        if (activeConversationId) {
-          fetchSuggestions()
-          return
-        }
-
-        if (convos.length > 0) {
-          // Load most recent conversation
-          const mostRecent = convos[0]
-          const msgRes = await fetch(`/api/assistant/conversations/${mostRecent.id}`, {
-            credentials: 'include',
-          })
-          if (msgRes.ok) {
-            const msgData = await msgRes.json()
-            const backendMessages = msgData.messages || []
-            setHistoricalMessages(backendMessages)
-            setActiveConversationId(mostRecent.id)
-            fetchSuggestions()
-            return
-          }
-        }
-
-        // No conversations exist - create new one
-        const createRes = await fetch('/api/assistant/conversations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({}),
-        })
-        if (createRes.ok) {
-          const createData = await createRes.json()
-          setActiveConversationId(createData.conversation.id)
-          setConversations(prev => [createData.conversation, ...prev])
-        }
-        fetchSuggestions()
-      } catch (err) {
-        console.error('Failed to initialize chat:', err)
-        notifyError('assistant.errorConversationLoad')
-      }
-    }
-
-    initializeChat()
-  }, [open, activeConversationId, fetchSuggestions, notifyError])
-
   const handleOpen = () => {
     setOpen(true)
   }
   const handleClose = () => setOpen(false)
   const toggleFullscreen = () => setFullscreen(prev => !prev)
-
-  // Re-pull the active conversation from the backend. Used when the thread
-  // remounts (surface toggle) so turns saved since load reappear.
-  const refreshConversation = useCallback(async (conversationId: string) => {
-    try {
-      const res = await fetch(`/api/assistant/conversations/${conversationId}`, {
-        credentials: 'include',
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setHistoricalMessages(data.messages || [])
-      }
-    } catch {
-      // Keep the messages we already have
-    }
-  }, [])
 
   const toggleSurface = () => {
     setSurface(prev => {
@@ -406,409 +88,47 @@ export function AssistantModal() {
     })
     // Moving between Dialog and Drawer remounts the thread, dropping live
     // runtime messages; they're saved server-side after each turn, so re-pull.
-    if (activeConversationId) void refreshConversation(activeConversationId)
+    if (chat.activeConversationId) void chat.refreshConversation(chat.activeConversationId)
   }
 
-  const handleNewChat = async () => {
-    // Clear messages first to trigger remount with empty state
-    setHistoricalMessages([])
-
-    // Create a new conversation in the backend
-    try {
-      const res = await fetch('/api/assistant/conversations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({}),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        // Set to null first to force key change, then set new ID
-        setActiveConversationId(null)
-        // Use setTimeout to ensure React processes the null before setting new ID
-        setTimeout(() => {
-        setActiveConversationId(data.conversation.id)
-        }, 0)
-        fetchConversations()
-      } else {
-        const text = await res.text()
-        console.error('Failed to create conversation:', text)
-        notifyError('assistant.errorConversationCreate')
-      }
-    } catch (err) {
-      console.error('Failed to create conversation:', err)
-      notifyError('assistant.errorConversationCreate')
-    }
-  }
-
-  const handleSelectConversation = async (conversationId: string) => {
-    setHistoryOpen(false)
-    if (conversationId === activeConversationId) return
-
-    try {
-      const res = await fetch(`/api/assistant/conversations/${conversationId}`, {
-        credentials: 'include',
-      })
-      if (res.ok) {
-        const data = await res.json()
-        const backendMessages = data.messages || []
-        // Store raw backend messages for historical rendering
-        setHistoricalMessages(backendMessages)
-        // Setting the conversation ID after messages triggers remount with loaded messages
-        setActiveConversationId(conversationId)
-      } else {
-        console.error('Failed to load conversation:', await res.text())
-        notifyError('assistant.errorConversationLoad')
-      }
-    } catch (err) {
-      console.error('Failed to load conversation:', err)
-      notifyError('assistant.errorConversationLoad')
-    }
-  }
-
-  const handleDeleteConversation = async (conversationId: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    try {
-      const res = await fetch(`/api/assistant/conversations/${conversationId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      })
-      if (res.ok) {
-        setConversations(prev => prev.filter(c => c.id !== conversationId))
-        if (activeConversationId === conversationId) {
-          setHistoricalMessages([])
-          setActiveConversationId(null)
-        }
-      } else {
-        console.error('Failed to delete conversation:', await res.text())
-        notifyError('assistant.errorConversationDelete')
-      }
-    } catch (err) {
-      console.error('Failed to delete conversation:', err)
-      notifyError('assistant.errorConversationDelete')
-    }
-  }
-
-  const handleStartRename = (conversationId: string, currentTitle: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setEditingConversationId(conversationId)
-    setEditTitle(currentTitle)
-  }
-
-  const handleCancelRename = () => {
-    setEditingConversationId(null)
-    setEditTitle('')
-  }
-
-  const handleSaveRename = async (conversationId: string) => {
-    if (!editTitle.trim()) {
-      handleCancelRename()
-      return
-    }
-
-    try {
-      const res = await fetch(`/api/assistant/conversations/${conversationId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ title: editTitle.trim() }),
-      })
-      if (res.ok) {
-        setConversations(prev =>
-          prev.map(c => c.id === conversationId ? { ...c, title: editTitle.trim() } : c)
-        )
-      } else {
-        console.error('Failed to rename conversation:', await res.text())
-        notifyError('assistant.errorConversationRename')
-      }
-    } catch (err) {
-      console.error('Failed to rename conversation:', err)
-      notifyError('assistant.errorConversationRename')
-    }
-    handleCancelRename()
-  }
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr)
-    const now = new Date()
-    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
-
-    if (diffDays === 0) return t('assistant.dateToday')
-    if (diffDays === 1) return t('assistant.dateYesterday')
-    if (diffDays < 7) return t('assistant.dateDaysAgo', { count: diffDays })
-    return date.toLocaleDateString()
-  }
-
-  // Conversation sidebar; rendered inline in desktop fullscreen, inside the
-  // history drawer everywhere else.
-  const sidebarContent = (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* New Chat Button */}
-      <Box sx={{ p: 2 }}>
-        <Box
-          component="button"
-          onClick={handleNewChat}
-          sx={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            p: 1.5,
-            bgcolor: 'rgba(26, 26, 26, 0.6)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: 2,
-            color: '#f5f5f5',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            '&:hover': {
-              bgcolor: 'rgba(37, 37, 37, 0.8)',
-              borderColor: '#6366f1',
-            },
-          }}
-        >
-          <AddIcon fontSize="small" />
-          <Typography variant="body2" fontWeight={500}>
-            {t('assistant.newChat')}
-          </Typography>
-        </Box>
-      </Box>
-
-      <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.1)' }} />
-
-      {/* Conversations List */}
-      <Box sx={{ flex: 1, overflow: 'auto' }}>
-        {loadingConversations ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-            <CircularProgress size={24} />
-          </Box>
-        ) : conversations.length === 0 ? (
-          <Box sx={{ p: 3, textAlign: 'center' }}>
-            <Typography variant="body2" color="text.secondary">
-              {t('assistant.noConversations')}
-            </Typography>
-          </Box>
-        ) : (
-          <List dense sx={{ px: 1 }}>
-            {conversations.map((convo) => (
-              <ListItemButton
-                key={convo.id}
-                selected={convo.id === activeConversationId}
-                onClick={() => editingConversationId !== convo.id && handleSelectConversation(convo.id)}
-                sx={{
-                  borderRadius: 1,
-                  mb: 0.5,
-                  '&.Mui-selected': {
-                    bgcolor: 'rgba(99, 102, 241, 0.15)',
-                  },
-                  '&:hover .action-btn': {
-                    opacity: 1,
-                  },
-                }}
-              >
-                <ListItemIcon sx={{ minWidth: 36 }}>
-                  <ChatIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                </ListItemIcon>
-                {editingConversationId === convo.id ? (
-                  <TextField
-                    size="small"
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleSaveRename(convo.id)
-                      } else if (e.key === 'Escape') {
-                        handleCancelRename()
-                      }
-                    }}
-                    onBlur={() => handleSaveRename(convo.id)}
-                    autoFocus
-                    onClick={(e) => e.stopPropagation()}
-                    sx={{
-                      flex: 1,
-                      '& .MuiInputBase-input': {
-                        py: 0.5,
-                        fontSize: '0.875rem',
-                      },
-                      '& .MuiOutlinedInput-root': {
-                        bgcolor: 'rgba(26, 26, 26, 0.6)',
-                      },
-                    }}
-                  />
-                ) : (
-                  <ListItemText
-                    primary={convo.title}
-                    secondary={formatDate(convo.updated_at)}
-                    primaryTypographyProps={{
-                      noWrap: true,
-                      variant: 'body2',
-                    }}
-                    secondaryTypographyProps={{
-                      variant: 'caption',
-                    }}
-                  />
-                )}
-                {editingConversationId !== convo.id && (
-                  <>
-                    <IconButton
-                      className="action-btn"
-                      size="small"
-                      onClick={(e) => handleStartRename(convo.id, convo.title, e)}
-                      sx={{
-                        opacity: 0,
-                        transition: 'opacity 0.2s',
-                        '&:hover': { color: 'primary.main' },
-                      }}
-                    >
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      className="action-btn"
-                      size="small"
-                      onClick={(e) => handleDeleteConversation(convo.id, e)}
-                      sx={{
-                        opacity: 0,
-                        transition: 'opacity 0.2s',
-                        '&:hover': { color: 'error.main' },
-                      }}
-                    >
-                      <DeleteOutlineIcon fontSize="small" />
-                    </IconButton>
-                  </>
-                )}
-              </ListItemButton>
-            ))}
-          </List>
-        )}
-      </Box>
-
-      {/* Saving indicator */}
-      {savingMessages && (
-        <Box sx={{ p: 1, borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', gap: 1 }}>
-          <CircularProgress size={12} />
-          <Typography variant="caption" color="text.secondary">
-            {t('assistant.saving')}
-          </Typography>
-        </Box>
+  const headerActions = (
+    <>
+      {canDock && (
+        <Tooltip title={docked ? t('assistant.tooltipUndock') : t('assistant.tooltipDock')}>
+          <IconButton onClick={toggleSurface} size="small">
+            {docked ? <WebAssetIcon /> : <VerticalSplitIcon />}
+          </IconButton>
+        </Tooltip>
       )}
-    </Box>
+      {!docked && !isSmDown && (
+        <Tooltip title={fullscreen ? t('assistant.tooltipExitFullscreen') : t('assistant.tooltipFullscreen')}>
+          <IconButton onClick={toggleFullscreen} size="small">
+            {fullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+          </IconButton>
+        </Tooltip>
+      )}
+      <IconButton onClick={handleClose} size="small">
+        <CloseIcon />
+      </IconButton>
+    </>
   )
 
   // Shared chat surface, mounted in exactly one container at a time
   // (Dialog in modal mode, persistent Drawer when docked).
   const chatSurface = (
-    <Box sx={{ display: 'flex', height: '100%' }}>
-      {/* Sidebar - inline only in desktop fullscreen */}
-      {sidebarInline && (
-        <Box
-          sx={{
-            width: 280,
-            flexShrink: 0,
-            borderInlineEnd: '1px solid rgba(255, 255, 255, 0.1)',
-          }}
-        >
-          {sidebarContent}
-        </Box>
-      )}
-
-      {/* Main Chat Area */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
-        {/* Header */}
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            p: 2,
-            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)',
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
-            <Box
-              sx={{
-                width: 36,
-                height: 36,
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                flexShrink: 0,
-              }}
-            >
-              <SmartToyIcon sx={{ fontSize: 20, color: '#fff' }} />
-            </Box>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography variant="subtitle1" fontWeight={600} noWrap>
-                {t('assistant.title')}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" noWrap component="div">
-                {t('assistant.subtitle')}
-              </Typography>
-            </Box>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
-            {!sidebarInline && (
-              <Tooltip title={t('assistant.tooltipConversations')}>
-                <IconButton onClick={() => setHistoryOpen(true)} size="small">
-                  <HistoryIcon />
-                </IconButton>
-              </Tooltip>
-            )}
-            {!sidebarInline && (
-              <Tooltip title={t('assistant.tooltipNewChat')}>
-                <IconButton onClick={handleNewChat} size="small">
-                  <AddIcon />
-                </IconButton>
-              </Tooltip>
-            )}
-            {canDock && (
-              <Tooltip title={docked ? t('assistant.tooltipUndock') : t('assistant.tooltipDock')}>
-                <IconButton onClick={toggleSurface} size="small">
-                  {docked ? <WebAssetIcon /> : <VerticalSplitIcon />}
-                </IconButton>
-              </Tooltip>
-            )}
-            {!docked && !isSmDown && (
-              <Tooltip title={fullscreen ? t('assistant.tooltipExitFullscreen') : t('assistant.tooltipFullscreen')}>
-                <IconButton onClick={toggleFullscreen} size="small">
-                  {fullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-                </IconButton>
-              </Tooltip>
-            )}
-            <IconButton onClick={handleClose} size="small">
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </Box>
-
-        {/* AI capability warnings (chat not configured / no tool support).
-            The wrapper collapses when the banner renders nothing. */}
-        <Box sx={{ px: 2, pt: 2, '&:empty': { display: 'none' } }}>
-          <AICapabilityBanner context="chat" onBeforeNavigate={handleClose} />
-        </Box>
-
-        {/* Chat Content - Only this part remounts on conversation switch */}
-        <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <ChatThreadArea
-            key={activeConversationId || 'new'}
-            conversationId={activeConversationId}
-            historicalMessages={historicalMessages}
-            suggestions={suggestions}
-            setSavingMessages={setSavingMessages}
-            fetchConversations={fetchConversations}
-            onSaveError={handleSaveError}
-          />
-        </Box>
-      </Box>
-    </Box>
+    <AssistantChatSurface
+      chat={chat}
+      sidebarInline={sidebarInline}
+      headerActions={headerActions}
+      onBeforeNavigate={handleClose}
+    />
   )
 
   return (
     <>
       {/* Floating Action Button */}
       <Tooltip title={t('assistant.fabTooltip')} placement="left">
-        <Zoom in={!open}>
+        <Zoom in={!open && !onAssistantPage}>
           <Fab
             color="primary"
             onClick={handleOpen}
@@ -872,40 +192,6 @@ export function AssistantModal() {
       >
         {open && docked ? chatSurface : null}
       </Drawer>
-
-      {/* Conversation history for surfaces without the inline sidebar */}
-      <Drawer
-        anchor="left"
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        sx={{ zIndex: theme.zIndex.modal + 1 }}
-        PaperProps={{
-          sx: {
-            width: 300,
-            maxWidth: '85vw',
-            bgcolor: 'rgba(15, 15, 15, 0.95)',
-            backgroundImage: 'none',
-          },
-        }}
-      >
-        {sidebarContent}
-      </Drawer>
-
-      <Snackbar
-        open={!!errorKey}
-        autoHideDuration={4000}
-        onClose={() => setErrorKey(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={() => setErrorKey(null)}
-          severity="error"
-          variant="filled"
-          sx={{ width: '100%' }}
-        >
-          {errorKey ? t(errorKey) : ''}
-        </Alert>
-      </Snackbar>
     </>
   )
 }

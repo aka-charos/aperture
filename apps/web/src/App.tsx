@@ -34,6 +34,7 @@ import { WatchingPage } from './pages/watching'
 import { PersonDetailPage } from './pages/PersonDetail'
 import { StudioDetailPage } from './pages/StudioDetail'
 import { ExplorePage } from './pages/explore'
+import { AssistantPage } from './pages/assistant'
 import { DiscoveryPage } from './pages/discovery'
 import { MyRequestsPage } from './pages/MyRequests'
 // Admin pages
@@ -158,6 +159,7 @@ function AppRoutes() {
       >
         {/* User Routes */}
         <Route index element={<DashboardPage />} />
+        <Route path="assistant" element={<AssistantPage />} />
         <Route path="recommendations" element={<MyRecommendationsPage />} />
         <Route path="watching" element={<WatchingPage />} />
         <Route path="top-picks" element={<TopPicksPage />} />
