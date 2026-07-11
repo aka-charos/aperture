@@ -2281,7 +2281,10 @@
     "errorConversationLoad": "Couldn't load the conversation. Please try again.",
     "errorConversationDelete": "Couldn't delete the conversation. Please try again.",
     "errorConversationRename": "Couldn't rename the conversation. Please try again.",
-    "errorMessagesSave": "Your latest messages couldn't be saved — they may be missing when you reopen this conversation."
+    "errorMessagesSave": "Your latest messages couldn't be saved — they may be missing when you reopen this conversation.",
+    "tooltipConversations": "Conversations",
+    "tooltipDock": "Dock to the side",
+    "tooltipUndock": "Open as dialog"
   },
   "welcomeModal": {
     "title": "Добро пожаловать в Апертуру",
