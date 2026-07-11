@@ -17,6 +17,7 @@ import {
   MessagePrimitive,
   ActionBarPrimitive,
   useComposerRuntime,
+  useMessage,
 } from '@assistant-ui/react'
 import {
   ContentCarousel,
@@ -163,6 +164,64 @@ function UserMessage() {
   )
 }
 
+// Backend stream errors arrive as "AI_ERROR:<code>:<detail>" (see api
+// helpers/errors.ts). Map each stable code to localized copy; anything
+// unparseable falls back to the generic message with the raw text as detail.
+const STREAM_ERROR_KEYS: Record<string, string> = {
+  not_configured: 'assistant.streamErrorNotConfigured',
+  provider_auth: 'assistant.streamErrorProviderAuth',
+  provider_quota: 'assistant.streamErrorProviderQuota',
+  provider_model: 'assistant.streamErrorProviderModel',
+  provider_unreachable: 'assistant.streamErrorProviderUnreachable',
+  db_unavailable: 'assistant.streamErrorDbUnavailable',
+}
+
+// Shown inside the assistant message when its run failed (message status
+// incomplete/error) — the regenerate button in the action bar stays available.
+function AssistantMessageError() {
+  const { t } = useTranslation()
+  const status = useMessage((m) => m.status)
+  if (status?.type !== 'incomplete' || status.reason !== 'error') return null
+
+  const raw =
+    typeof status.error === 'string'
+      ? status.error
+      : status.error instanceof Error
+        ? status.error.message
+        : ''
+  const match = /^AI_ERROR:([a-z_]+):?([\s\S]*)$/.exec(raw)
+  const key = match ? STREAM_ERROR_KEYS[match[1]] : undefined
+  const detail = (match ? match[2] : raw).trim()
+
+  return (
+    <Box
+      sx={{
+        p: 2,
+        bgcolor: 'rgba(26, 26, 26, 0.7)',
+        borderRadius: 2,
+        my: 1,
+        maxWidth: '90%',
+        borderInlineStart: '3px solid',
+        borderColor: 'error.main',
+      }}
+    >
+      <Typography variant="body2" sx={{ color: 'error.light' }}>
+        {t(key ?? 'assistant.streamErrorGeneric')}
+      </Typography>
+      {detail && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          component="pre"
+          sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap', m: 0, mt: 0.5 }}
+        >
+          {detail}
+        </Typography>
+      )}
+    </Box>
+  )
+}
+
 // Action bar under an assistant message: copy + regenerate.
 // Auto-hides on non-last messages and while the thread is running.
 function AssistantActionBar() {
@@ -298,6 +357,7 @@ function AssistantMessage() {
               },
             }}
           />
+          <AssistantMessageError />
           <AssistantActionBar />
         </Box>
       </Box>

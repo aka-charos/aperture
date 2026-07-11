@@ -3,6 +3,8 @@
  * Handles compatibility issues with local LLMs (Ollama, etc.)
  */
 import { z } from 'zod'
+import type { ToolSet } from 'ai'
+import { toolErrorText } from '../helpers/errors.js'
 
 /**
  * Normalize tool arguments for local LLM compatibility.
@@ -58,5 +60,31 @@ function normalizeToolArgs(obj: unknown): unknown {
  */
 export function nullSafe<T extends z.ZodTypeAny>(schema: T) {
   return z.preprocess(normalizeToolArgs, schema) as unknown as T
+}
+
+/**
+ * Wrap every tool's execute so an uncaught error (DB down, bad SQL, etc.)
+ * becomes a `{ id, error }` payload instead of aborting the stream with a
+ * masked "An error occurred". The frontend renders these via ToolResultError,
+ * and the model sees them as a tool result it can react to. Tools with their
+ * own try/catch (richer carousel error payloads) are unaffected — their
+ * internal handler fires first; this is the backstop for the rest.
+ */
+export function withToolErrorHandling<T extends ToolSet>(tools: T): T {
+  return Object.fromEntries(
+    Object.entries(tools).map(([name, toolDef]) => {
+      const execute = toolDef.execute
+      if (!execute) return [name, toolDef]
+      const guarded: typeof execute = async (input, options) => {
+        try {
+          return await execute(input, options)
+        } catch (err) {
+          console.error(`[${name}] Tool error:`, err)
+          return { id: `error-${Date.now()}`, error: toolErrorText(err) }
+        }
+      }
+      return [name, { ...toolDef, execute: guarded }]
+    })
+  ) as T
 }
 

@@ -15,6 +15,8 @@ import {
   Divider,
   CircularProgress,
   TextField,
+  Snackbar,
+  Alert,
 } from '@mui/material'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import SmartToyIcon from '@mui/icons-material/SmartToy'
@@ -62,12 +64,14 @@ function ChatThreadArea({
   suggestions,
   setSavingMessages,
   fetchConversations,
+  onSaveError,
 }: {
   conversationId: string | null
   historicalMessages: BackendMessage[]
   suggestions: string[]
   setSavingMessages: (saving: boolean) => void
   fetchConversations: () => Promise<void>
+  onSaveError: () => void
 }) {
   // Memoize transport to prevent recreation on re-renders
   const transport = useRef(new AssistantChatTransport({
@@ -87,6 +91,7 @@ function ChatThreadArea({
         conversationId={conversationId}
         setSavingMessages={setSavingMessages}
         fetchConversations={fetchConversations}
+        onSaveError={onSaveError}
       />
       <Thread historicalMessages={historicalMessages} suggestions={suggestions} />
     </AssistantRuntimeProvider>
@@ -98,10 +103,12 @@ function MessageSaver({
   conversationId,
   setSavingMessages,
   fetchConversations,
+  onSaveError,
 }: {
   conversationId: string | null
   setSavingMessages: (saving: boolean) => void
   fetchConversations: () => Promise<void>
+  onSaveError: () => void
 }) {
   const threadRuntime = useThreadRuntime()
   // The runtime always starts empty (historical messages are rendered
@@ -192,6 +199,7 @@ function MessageSaver({
           if (!res.ok) {
             return res.text().then(text => {
               console.error('Failed to save messages:', text)
+              onSaveError()
             })
           }
           savedCountRef.current = messages.length
@@ -202,15 +210,16 @@ function MessageSaver({
         })
         .catch(err => {
           console.error('Failed to save messages:', err)
+          onSaveError()
         })
         .finally(() => {
           isSavingRef.current = false
           setSavingMessages(false)
         })
     })
-    
+
     return () => unsubscribe()
-  }, [threadRuntime, conversationId, setSavingMessages, fetchConversations])
+  }, [threadRuntime, conversationId, setSavingMessages, fetchConversations, onSaveError])
   
   return null
 }
@@ -228,6 +237,15 @@ export function AssistantModal() {
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [suggestions, setSuggestions] = useState<string[]>([])
+  // Surfaces conversation CRUD / message-save failures that were previously
+  // console-only (same pattern as the ContentCarousel favorite snackbar).
+  // Stores the i18n key, translated at render, so handlers don't depend on t.
+  const [errorKey, setErrorKey] = useState<string | null>(null)
+  const notifyError = useCallback((key: string) => setErrorKey(key), [])
+  const handleSaveError = useCallback(
+    () => notifyError('assistant.errorMessagesSave'),
+    [notifyError]
+  )
 
   // Fetch personalized suggestions
   const fetchSuggestions = useCallback(async () => {
@@ -309,11 +327,12 @@ export function AssistantModal() {
         fetchSuggestions()
       } catch (err) {
         console.error('Failed to initialize chat:', err)
+        notifyError('assistant.errorConversationLoad')
       }
     }
-    
+
     initializeChat()
-  }, [open, activeConversationId, fetchSuggestions])
+  }, [open, activeConversationId, fetchSuggestions, notifyError])
 
   const handleOpen = () => {
     setOpen(true)
@@ -345,9 +364,11 @@ export function AssistantModal() {
       } else {
         const text = await res.text()
         console.error('Failed to create conversation:', text)
+        notifyError('assistant.errorConversationCreate')
       }
     } catch (err) {
       console.error('Failed to create conversation:', err)
+      notifyError('assistant.errorConversationCreate')
     }
   }
 
@@ -365,9 +386,13 @@ export function AssistantModal() {
         setHistoricalMessages(backendMessages)
         // Setting the conversation ID after messages triggers remount with loaded messages
         setActiveConversationId(conversationId)
+      } else {
+        console.error('Failed to load conversation:', await res.text())
+        notifyError('assistant.errorConversationLoad')
       }
     } catch (err) {
       console.error('Failed to load conversation:', err)
+      notifyError('assistant.errorConversationLoad')
     }
   }
 
@@ -384,9 +409,13 @@ export function AssistantModal() {
           setHistoricalMessages([])
           setActiveConversationId(null)
         }
+      } else {
+        console.error('Failed to delete conversation:', await res.text())
+        notifyError('assistant.errorConversationDelete')
       }
     } catch (err) {
       console.error('Failed to delete conversation:', err)
+      notifyError('assistant.errorConversationDelete')
     }
   }
 
@@ -415,12 +444,16 @@ export function AssistantModal() {
         body: JSON.stringify({ title: editTitle.trim() }),
       })
       if (res.ok) {
-        setConversations(prev => 
+        setConversations(prev =>
           prev.map(c => c.id === conversationId ? { ...c, title: editTitle.trim() } : c)
         )
+      } else {
+        console.error('Failed to rename conversation:', await res.text())
+        notifyError('assistant.errorConversationRename')
       }
     } catch (err) {
       console.error('Failed to rename conversation:', err)
+      notifyError('assistant.errorConversationRename')
     }
     handleCancelRename()
   }
@@ -712,11 +745,28 @@ export function AssistantModal() {
                 suggestions={suggestions}
                 setSavingMessages={setSavingMessages}
                 fetchConversations={fetchConversations}
+                onSaveError={handleSaveError}
               />
             </Box>
           </Box>
         </Box>
       </Dialog>
+
+      <Snackbar
+        open={!!errorKey}
+        autoHideDuration={4000}
+        onClose={() => setErrorKey(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setErrorKey(null)}
+          severity="error"
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {errorKey ? t(errorKey) : ''}
+        </Alert>
+      </Snackbar>
     </>
   )
 }

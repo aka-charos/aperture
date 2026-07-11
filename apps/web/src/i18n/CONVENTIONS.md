@@ -56,3 +56,4 @@ Filling **all** missing strings (~1.4k per locale × 13 non-English locales) is 
   - Use `withServerMessageDetail(t, message)` from `lib/withServerMessageDetail.ts`, which maps to `common.errors.serverMessage` (`{{message}}` in English; other locales may add a prefix or label).
   - For assistant tool failures, use `assistant.toolErrorTitle` + `assistant.toolErrorBody` (see `ToolResultError`).
 - **Optional**: if an endpoint returns a **stable machine-readable `code`**, you can map `code → i18n key` in a small object next to the caller and show `t('errors.<code>')` with a fallback to `withServerMessageDetail`. Do not invent codes; only map what the API actually returns.
+- **Assistant stream errors** follow this pattern: the chat endpoint emits `AI_ERROR:<code>:<detail>` (codes defined in `apps/api/src/routes/assistant/helpers/errors.ts`), mapped to `assistant.streamError*` keys in `Thread.tsx` with the raw detail shown as debugging context.
