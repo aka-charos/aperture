@@ -74,6 +74,23 @@ export function useAssistantChat(active: boolean) {
     }
   }, [])
 
+  // Re-pull the active conversation from the backend. Used whenever the
+  // thread (re)mounts - reopen, surface toggle - so turns saved since the
+  // first load (possibly from another surface) reappear.
+  const refreshConversation = useCallback(async (conversationId: string) => {
+    try {
+      const res = await fetch(`/api/assistant/conversations/${conversationId}`, {
+        credentials: 'include',
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setHistoricalMessages(data.messages || [])
+      }
+    } catch {
+      // Keep the messages we already have
+    }
+  }, [])
+
   // Initialize chat when the surface becomes active - load most recent
   // conversation or create a new one
   useEffect(() => {
@@ -89,8 +106,11 @@ export function useAssistantChat(active: boolean) {
         const convos: Conversation[] = data.conversations || []
         setConversations(convos)
 
-        // If we already have an active conversation, keep it
+        // If we already have an active conversation, keep it - but re-pull
+        // its messages: turns may have been saved from another surface or a
+        // previous open session since this snapshot was taken.
         if (activeConversationId) {
+          refreshConversation(activeConversationId)
           fetchSuggestions()
           return
         }
@@ -131,23 +151,7 @@ export function useAssistantChat(active: boolean) {
     }
 
     initializeChat()
-  }, [active, activeConversationId, fetchSuggestions, notifyError])
-
-  // Re-pull the active conversation from the backend. Used when the thread
-  // remounts (surface toggle) so turns saved since load reappear.
-  const refreshConversation = useCallback(async (conversationId: string) => {
-    try {
-      const res = await fetch(`/api/assistant/conversations/${conversationId}`, {
-        credentials: 'include',
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setHistoricalMessages(data.messages || [])
-      }
-    } catch {
-      // Keep the messages we already have
-    }
-  }, [])
+  }, [active, activeConversationId, fetchSuggestions, notifyError, refreshConversation])
 
   const handleNewChat = async () => {
     // Clear messages first to trigger remount with empty state
