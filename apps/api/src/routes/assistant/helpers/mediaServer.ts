@@ -36,7 +36,12 @@ export async function getMediaServerInfo(): Promise<MediaServerInfo | null> {
 }
 
 /**
- * Build a play link for content on the media server
+ * Build a play link for content on the media server.
+ *
+ * The `aperturePlay=1` query param marks the URL as a play link so the
+ * frontend can render it as a play button without sniffing the link text
+ * (which breaks in non-English locales). It sits before the hash, so the
+ * media server just serves index.html and the SPA routes on the hash as usual.
  */
 export function buildPlayLink(
   mediaServer: MediaServerInfo | null,
@@ -51,5 +56,5 @@ export function buildPlayLink(
       ? `#!/details?id=${providerItemId}${serverIdParam}`
       : `#!/item?id=${providerItemId}${serverIdParam}`
 
-  return `${mediaServer.baseUrl}/web/index.html${itemPath}`
+  return `${mediaServer.baseUrl}/web/index.html?aperturePlay=1${itemPath}`
 }

@@ -10,6 +10,7 @@ import { SetupProvider } from './hooks/SetupProvider'
 import { useSetupStatus } from './hooks/useSetupStatus'
 import { UserRatingsProvider } from './hooks/UserRatingsProvider'
 import { ViewModeProvider } from './hooks/ViewModeProvider'
+import { AssistantDockProvider } from './hooks/AssistantDockProvider'
 import { Layout } from './components/Layout'
 import { AdminLayout } from './components/AdminLayout'
 import { AssistantModal } from './components/AssistantModal'
@@ -96,8 +97,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     <ViewModeProvider>
       <UserRatingsProvider>
         <WatchingProvider>
-          {children}
-          <AssistantModal />
+          <AssistantDockProvider>
+            {children}
+            <AssistantModal />
+          </AssistantDockProvider>
         </WatchingProvider>
       </UserRatingsProvider>
     </ViewModeProvider>

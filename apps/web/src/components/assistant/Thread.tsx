@@ -38,7 +38,13 @@ import { ToolResultError } from './ToolResultError'
 function MarkdownLink({ href, children }: { href?: string; children?: ReactNode }) {
   const { t } = useTranslation()
   const text = String(children)
-  const isPlayLink = text.toLowerCase().includes('play') || text.includes('▶️')
+  // The backend tags media-server play URLs with aperturePlay=1 (see api
+  // helpers/mediaServer.ts). Text sniffing stays as a fallback for links in
+  // conversations saved before the marker existed — it only matches English.
+  const isPlayLink =
+    href?.includes('aperturePlay=1') ||
+    text.toLowerCase().includes('play') ||
+    text.includes('▶️')
 
   if (isPlayLink && href) {
     return (
@@ -149,7 +155,7 @@ function UserMessage() {
             p: 2,
             bgcolor: '#6366f1',
             borderRadius: 2,
-            borderTopRightRadius: 0,
+            borderStartEndRadius: 0,
           }}
         >
           <Typography variant="body1" sx={{ color: '#fff' }}>
@@ -299,7 +305,7 @@ function AssistantMessage() {
                       p: 2,
                       bgcolor: 'rgba(26, 26, 26, 0.7)',
                       borderRadius: 2,
-                      borderTopLeftRadius: 0,
+                      borderStartStartRadius: 0,
                     }}
                   >
                     <Box
@@ -330,7 +336,7 @@ function AssistantMessage() {
                           my: 2.5,
                         },
                         '& blockquote': {
-                          borderLeft: '3px solid #6366f1',
+                          borderInlineStart: '3px solid #6366f1',
                           pl: 2,
                           my: 1.5,
                           color: '#a1a1aa',
@@ -463,7 +469,7 @@ function LoadingIndicator() {
           p: 2,
           bgcolor: 'rgba(26, 26, 26, 0.7)',
           borderRadius: 2,
-          borderTopLeftRadius: 0,
+          borderStartStartRadius: 0,
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary' }}>
@@ -593,7 +599,7 @@ function HistoricalUserMessage({ message }: { message: HistoricalMessage }) {
           p: 2,
           bgcolor: '#6366f1',
           borderRadius: 2,
-          borderTopRightRadius: 0,
+          borderStartEndRadius: 0,
         }}
       >
         <Typography variant="body1" sx={{ color: '#fff' }}>
@@ -630,7 +636,7 @@ function HistoricalAssistantMessage({ message }: { message: HistoricalMessage })
               p: 2,
               bgcolor: 'rgba(26, 26, 26, 0.7)',
               borderRadius: 2,
-              borderTopLeftRadius: 0,
+              borderStartStartRadius: 0,
               mb: 2,
             }}
           >

@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { 
-  Dialog, 
-  Fab, 
-  Tooltip, 
+import {
+  Dialog,
+  Drawer,
+  Fab,
+  Tooltip,
   Box,
   IconButton,
   Typography,
@@ -17,6 +18,8 @@ import {
   TextField,
   Snackbar,
   Alert,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import SmartToyIcon from '@mui/icons-material/SmartToy'
@@ -27,10 +30,20 @@ import AddIcon from '@mui/icons-material/Add'
 import ChatIcon from '@mui/icons-material/Chat'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import EditIcon from '@mui/icons-material/Edit'
+import HistoryIcon from '@mui/icons-material/History'
+import VerticalSplitIcon from '@mui/icons-material/VerticalSplit'
+import WebAssetIcon from '@mui/icons-material/WebAsset'
 import { AssistantRuntimeProvider, useThreadRuntime } from '@assistant-ui/react'
 import { useChatRuntime, AssistantChatTransport } from '@assistant-ui/react-ai-sdk'
 import { Thread } from './assistant'
 import { AICapabilityBanner } from './AICapabilityBanner'
+import { useAssistantDock } from '@/hooks/useAssistantDock'
+
+// Surface the assistant renders in: blocking dialog or persistent side panel
+// that leaves the rest of the app browsable.
+type AssistantSurface = 'modal' | 'dock'
+const SURFACE_STORAGE_KEY = 'aperture.assistant.surface'
+const DOCK_WIDTH = 420
 
 interface Conversation {
   id: string
@@ -155,7 +168,7 @@ function MessageSaver({
         // Extract text content and tool invocations from message content (parts array)
         let textContent = ''
         const toolInvocations: Array<{ toolCallId: string; toolName: string; args: unknown; result?: unknown }> = []
-        
+
         const contentParts = Array.isArray(msg.content) ? msg.content : []
         for (const part of contentParts) {
           if (!isRecord(part) || typeof part.type !== 'string') {
@@ -177,18 +190,18 @@ function MessageSaver({
             })
           }
         }
-        
+
         return {
           role: msg.role,
           content: textContent,
           ...(toolInvocations.length > 0 && { toolInvocations }),
         }
       })
-      
+
       // Save to backend
       isSavingRef.current = true
       setSavingMessages(true)
-      
+
       fetch(`/api/assistant/conversations/${conversationId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -220,15 +233,27 @@ function MessageSaver({
 
     return () => unsubscribe()
   }, [threadRuntime, conversationId, setSavingMessages, fetchConversations, onSaveError])
-  
+
   return null
 }
 
 
 export function AssistantModal() {
   const { t } = useTranslation()
+  const theme = useTheme()
+  // Phones get a forced-fullscreen dialog; the dock needs room next to the library.
+  const isSmDown = useMediaQuery(theme.breakpoints.down('sm'))
+  const canDock = useMediaQuery(theme.breakpoints.up('md'))
   const [open, setOpen] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
+  const [surface, setSurface] = useState<AssistantSurface>(() => {
+    try {
+      return localStorage.getItem(SURFACE_STORAGE_KEY) === 'dock' ? 'dock' : 'modal'
+    } catch {
+      return 'modal'
+    }
+  })
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [loadingConversations, setLoadingConversations] = useState(false)
@@ -246,6 +271,19 @@ export function AssistantModal() {
     () => notifyError('assistant.errorMessagesSave'),
     [notifyError]
   )
+
+  const docked = surface === 'dock' && canDock
+  const effectiveFullscreen = fullscreen || isSmDown
+  // The conversation sidebar renders inline only in desktop fullscreen; every
+  // other surface (dock, windowed dialog, mobile) reaches it via the drawer.
+  const sidebarInline = !docked && fullscreen && !isSmDown
+
+  // Let Layout reserve space for the dock so the library stays fully visible.
+  const { setDockWidth } = useAssistantDock()
+  useEffect(() => {
+    setDockWidth(open && docked ? DOCK_WIDTH : 0)
+    return () => setDockWidth(0)
+  }, [open, docked, setDockWidth])
 
   // Fetch personalized suggestions
   const fetchSuggestions = useCallback(async () => {
@@ -279,23 +317,23 @@ export function AssistantModal() {
   // Initialize chat when modal opens - load most recent conversation or create new
   useEffect(() => {
     if (!open) return
-    
+
     const initializeChat = async () => {
       try {
         // Fetch all conversations
         const res = await fetch('/api/assistant/conversations', { credentials: 'include' })
         if (!res.ok) return
-        
+
         const data = await res.json()
         const convos: Conversation[] = data.conversations || []
         setConversations(convos)
-        
+
         // If we already have an active conversation, keep it
         if (activeConversationId) {
           fetchSuggestions()
           return
         }
-        
+
         if (convos.length > 0) {
           // Load most recent conversation
           const mostRecent = convos[0]
@@ -311,7 +349,7 @@ export function AssistantModal() {
             return
           }
         }
-        
+
         // No conversations exist - create new one
         const createRes = await fetch('/api/assistant/conversations', {
           method: 'POST',
@@ -340,10 +378,41 @@ export function AssistantModal() {
   const handleClose = () => setOpen(false)
   const toggleFullscreen = () => setFullscreen(prev => !prev)
 
+  // Re-pull the active conversation from the backend. Used when the thread
+  // remounts (surface toggle) so turns saved since load reappear.
+  const refreshConversation = useCallback(async (conversationId: string) => {
+    try {
+      const res = await fetch(`/api/assistant/conversations/${conversationId}`, {
+        credentials: 'include',
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setHistoricalMessages(data.messages || [])
+      }
+    } catch {
+      // Keep the messages we already have
+    }
+  }, [])
+
+  const toggleSurface = () => {
+    setSurface(prev => {
+      const next: AssistantSurface = prev === 'dock' ? 'modal' : 'dock'
+      try {
+        localStorage.setItem(SURFACE_STORAGE_KEY, next)
+      } catch {
+        // Preference just won't persist
+      }
+      return next
+    })
+    // Moving between Dialog and Drawer remounts the thread, dropping live
+    // runtime messages; they're saved server-side after each turn, so re-pull.
+    if (activeConversationId) void refreshConversation(activeConversationId)
+  }
+
   const handleNewChat = async () => {
     // Clear messages first to trigger remount with empty state
     setHistoricalMessages([])
-    
+
     // Create a new conversation in the backend
     try {
       const res = await fetch('/api/assistant/conversations', {
@@ -373,6 +442,7 @@ export function AssistantModal() {
   }
 
   const handleSelectConversation = async (conversationId: string) => {
+    setHistoryOpen(false)
     if (conversationId === activeConversationId) return
 
     try {
@@ -435,7 +505,7 @@ export function AssistantModal() {
       handleCancelRename()
       return
     }
-    
+
     try {
       const res = await fetch(`/api/assistant/conversations/${conversationId}`, {
         method: 'PATCH',
@@ -469,6 +539,271 @@ export function AssistantModal() {
     return date.toLocaleDateString()
   }
 
+  // Conversation sidebar; rendered inline in desktop fullscreen, inside the
+  // history drawer everywhere else.
+  const sidebarContent = (
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* New Chat Button */}
+      <Box sx={{ p: 2 }}>
+        <Box
+          component="button"
+          onClick={handleNewChat}
+          sx={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            p: 1.5,
+            bgcolor: 'rgba(26, 26, 26, 0.6)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: 2,
+            color: '#f5f5f5',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            '&:hover': {
+              bgcolor: 'rgba(37, 37, 37, 0.8)',
+              borderColor: '#6366f1',
+            },
+          }}
+        >
+          <AddIcon fontSize="small" />
+          <Typography variant="body2" fontWeight={500}>
+            {t('assistant.newChat')}
+          </Typography>
+        </Box>
+      </Box>
+
+      <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.1)' }} />
+
+      {/* Conversations List */}
+      <Box sx={{ flex: 1, overflow: 'auto' }}>
+        {loadingConversations ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+            <CircularProgress size={24} />
+          </Box>
+        ) : conversations.length === 0 ? (
+          <Box sx={{ p: 3, textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              {t('assistant.noConversations')}
+            </Typography>
+          </Box>
+        ) : (
+          <List dense sx={{ px: 1 }}>
+            {conversations.map((convo) => (
+              <ListItemButton
+                key={convo.id}
+                selected={convo.id === activeConversationId}
+                onClick={() => editingConversationId !== convo.id && handleSelectConversation(convo.id)}
+                sx={{
+                  borderRadius: 1,
+                  mb: 0.5,
+                  '&.Mui-selected': {
+                    bgcolor: 'rgba(99, 102, 241, 0.15)',
+                  },
+                  '&:hover .action-btn': {
+                    opacity: 1,
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 36 }}>
+                  <ChatIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                </ListItemIcon>
+                {editingConversationId === convo.id ? (
+                  <TextField
+                    size="small"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSaveRename(convo.id)
+                      } else if (e.key === 'Escape') {
+                        handleCancelRename()
+                      }
+                    }}
+                    onBlur={() => handleSaveRename(convo.id)}
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                    sx={{
+                      flex: 1,
+                      '& .MuiInputBase-input': {
+                        py: 0.5,
+                        fontSize: '0.875rem',
+                      },
+                      '& .MuiOutlinedInput-root': {
+                        bgcolor: 'rgba(26, 26, 26, 0.6)',
+                      },
+                    }}
+                  />
+                ) : (
+                  <ListItemText
+                    primary={convo.title}
+                    secondary={formatDate(convo.updated_at)}
+                    primaryTypographyProps={{
+                      noWrap: true,
+                      variant: 'body2',
+                    }}
+                    secondaryTypographyProps={{
+                      variant: 'caption',
+                    }}
+                  />
+                )}
+                {editingConversationId !== convo.id && (
+                  <>
+                    <IconButton
+                      className="action-btn"
+                      size="small"
+                      onClick={(e) => handleStartRename(convo.id, convo.title, e)}
+                      sx={{
+                        opacity: 0,
+                        transition: 'opacity 0.2s',
+                        '&:hover': { color: 'primary.main' },
+                      }}
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      className="action-btn"
+                      size="small"
+                      onClick={(e) => handleDeleteConversation(convo.id, e)}
+                      sx={{
+                        opacity: 0,
+                        transition: 'opacity 0.2s',
+                        '&:hover': { color: 'error.main' },
+                      }}
+                    >
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </>
+                )}
+              </ListItemButton>
+            ))}
+          </List>
+        )}
+      </Box>
+
+      {/* Saving indicator */}
+      {savingMessages && (
+        <Box sx={{ p: 1, borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <CircularProgress size={12} />
+          <Typography variant="caption" color="text.secondary">
+            {t('assistant.saving')}
+          </Typography>
+        </Box>
+      )}
+    </Box>
+  )
+
+  // Shared chat surface, mounted in exactly one container at a time
+  // (Dialog in modal mode, persistent Drawer when docked).
+  const chatSurface = (
+    <Box sx={{ display: 'flex', height: '100%' }}>
+      {/* Sidebar - inline only in desktop fullscreen */}
+      {sidebarInline && (
+        <Box
+          sx={{
+            width: 280,
+            flexShrink: 0,
+            borderInlineEnd: '1px solid rgba(255, 255, 255, 0.1)',
+          }}
+        >
+          {sidebarContent}
+        </Box>
+      )}
+
+      {/* Main Chat Area */}
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+        {/* Header */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            p: 2,
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                flexShrink: 0,
+              }}
+            >
+              <SmartToyIcon sx={{ fontSize: 20, color: '#fff' }} />
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="subtitle1" fontWeight={600} noWrap>
+                {t('assistant.title')}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" noWrap component="div">
+                {t('assistant.subtitle')}
+              </Typography>
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+            {!sidebarInline && (
+              <Tooltip title={t('assistant.tooltipConversations')}>
+                <IconButton onClick={() => setHistoryOpen(true)} size="small">
+                  <HistoryIcon />
+                </IconButton>
+              </Tooltip>
+            )}
+            {!sidebarInline && (
+              <Tooltip title={t('assistant.tooltipNewChat')}>
+                <IconButton onClick={handleNewChat} size="small">
+                  <AddIcon />
+                </IconButton>
+              </Tooltip>
+            )}
+            {canDock && (
+              <Tooltip title={docked ? t('assistant.tooltipUndock') : t('assistant.tooltipDock')}>
+                <IconButton onClick={toggleSurface} size="small">
+                  {docked ? <WebAssetIcon /> : <VerticalSplitIcon />}
+                </IconButton>
+              </Tooltip>
+            )}
+            {!docked && !isSmDown && (
+              <Tooltip title={fullscreen ? t('assistant.tooltipExitFullscreen') : t('assistant.tooltipFullscreen')}>
+                <IconButton onClick={toggleFullscreen} size="small">
+                  {fullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+                </IconButton>
+              </Tooltip>
+            )}
+            <IconButton onClick={handleClose} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </Box>
+
+        {/* AI capability warnings (chat not configured / no tool support).
+            The wrapper collapses when the banner renders nothing. */}
+        <Box sx={{ px: 2, pt: 2, '&:empty': { display: 'none' } }}>
+          <AICapabilityBanner context="chat" onBeforeNavigate={handleClose} />
+        </Box>
+
+        {/* Chat Content - Only this part remounts on conversation switch */}
+        <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <ChatThreadArea
+            key={activeConversationId || 'new'}
+            conversationId={activeConversationId}
+            historicalMessages={historicalMessages}
+            suggestions={suggestions}
+            setSavingMessages={setSavingMessages}
+            fetchConversations={fetchConversations}
+            onSaveError={handleSaveError}
+          />
+        </Box>
+      </Box>
+    </Box>
+  )
+
   return (
     <>
       {/* Floating Action Button */}
@@ -480,7 +815,7 @@ export function AssistantModal() {
             sx={{
               position: 'fixed',
               bottom: 24,
-              right: 24,
+              insetInlineEnd: 24,
               zIndex: 1000,
               background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
               '&:hover': {
@@ -493,264 +828,68 @@ export function AssistantModal() {
         </Zoom>
       </Tooltip>
 
-      {/* Chat Dialog - stable, doesn't remount on conversation switch */}
+      {/* Modal surface - stable, doesn't remount on conversation switch */}
       <Dialog
-          open={open}
-          onClose={handleClose}
+        open={open && !docked}
+        onClose={handleClose}
         maxWidth="lg"
         fullWidth
-        fullScreen={fullscreen}
+        fullScreen={effectiveFullscreen}
         PaperProps={{
           sx: {
-            height: fullscreen ? '100%' : '95vh',
-            maxHeight: fullscreen ? '100%' : '90vh',
+            height: effectiveFullscreen ? '100%' : '95vh',
+            maxHeight: effectiveFullscreen ? '100%' : '90vh',
             bgcolor: 'rgba(15, 15, 15, 0.5)',
             backdropFilter: 'blur(10px)',
             backgroundImage: 'none',
-            borderRadius: fullscreen ? 0 : 3,
+            borderRadius: effectiveFullscreen ? 0 : 3,
             overflow: 'hidden',
             border: '1px solid rgba(255, 255, 255, 0.1)',
           },
         }}
       >
-        <Box sx={{ display: 'flex', height: '100%' }}>
-          {/* Sidebar - only in fullscreen */}
-          {fullscreen && (
-            <Box
-              sx={{
-                width: 280,
-                borderRight: '1px solid rgba(255, 255, 255, 0.1)',
-                display: 'flex',
-                flexDirection: 'column',
-                bgcolor: 'transparent',
-              }}
-            >
-              {/* New Chat Button */}
-              <Box sx={{ p: 2 }}>
-                <Box
-                  component="button"
-                  onClick={handleNewChat}
-                  sx={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                    p: 1.5,
-                    bgcolor: 'rgba(26, 26, 26, 0.6)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: 2,
-                    color: '#f5f5f5',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    '&:hover': {
-                      bgcolor: 'rgba(37, 37, 37, 0.8)',
-                      borderColor: '#6366f1',
-                    },
-                  }}
-                >
-                  <AddIcon fontSize="small" />
-                  <Typography variant="body2" fontWeight={500}>
-                    {t('assistant.newChat')}
-                  </Typography>
-                </Box>
-              </Box>
-
-              <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.1)' }} />
-
-              {/* Conversations List */}
-              <Box sx={{ flex: 1, overflow: 'auto' }}>
-                {loadingConversations ? (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                    <CircularProgress size={24} />
-                  </Box>
-                ) : conversations.length === 0 ? (
-                  <Box sx={{ p: 3, textAlign: 'center' }}>
-                    <Typography variant="body2" color="text.secondary">
-                      {t('assistant.noConversations')}
-                    </Typography>
-                  </Box>
-                ) : (
-                  <List dense sx={{ px: 1 }}>
-                    {conversations.map((convo) => (
-                      <ListItemButton
-                        key={convo.id}
-                        selected={convo.id === activeConversationId}
-                        onClick={() => editingConversationId !== convo.id && handleSelectConversation(convo.id)}
-                        sx={{
-                          borderRadius: 1,
-                          mb: 0.5,
-                          '&.Mui-selected': {
-                            bgcolor: 'rgba(99, 102, 241, 0.15)',
-                          },
-                          '&:hover .action-btn': {
-                            opacity: 1,
-                          },
-                        }}
-                      >
-                        <ListItemIcon sx={{ minWidth: 36 }}>
-                          <ChatIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                        </ListItemIcon>
-                        {editingConversationId === convo.id ? (
-                          <TextField
-                            size="small"
-                            value={editTitle}
-                            onChange={(e) => setEditTitle(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                handleSaveRename(convo.id)
-                              } else if (e.key === 'Escape') {
-                                handleCancelRename()
-                              }
-                            }}
-                            onBlur={() => handleSaveRename(convo.id)}
-                            autoFocus
-                            onClick={(e) => e.stopPropagation()}
-                            sx={{
-                              flex: 1,
-                              '& .MuiInputBase-input': {
-                                py: 0.5,
-                                fontSize: '0.875rem',
-                              },
-                              '& .MuiOutlinedInput-root': {
-                                bgcolor: 'rgba(26, 26, 26, 0.6)',
-                              },
-                            }}
-                          />
-                        ) : (
-                          <ListItemText
-                            primary={convo.title}
-                            secondary={formatDate(convo.updated_at)}
-                            primaryTypographyProps={{
-                              noWrap: true,
-                              variant: 'body2',
-                            }}
-                            secondaryTypographyProps={{
-                              variant: 'caption',
-                            }}
-                          />
-                        )}
-                        {editingConversationId !== convo.id && (
-                          <>
-                            <IconButton
-                              className="action-btn"
-                              size="small"
-                              onClick={(e) => handleStartRename(convo.id, convo.title, e)}
-                              sx={{
-                                opacity: 0,
-                                transition: 'opacity 0.2s',
-                                '&:hover': { color: 'primary.main' },
-                              }}
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                              className="action-btn"
-                              size="small"
-                              onClick={(e) => handleDeleteConversation(convo.id, e)}
-                              sx={{
-                                opacity: 0,
-                                transition: 'opacity 0.2s',
-                                '&:hover': { color: 'error.main' },
-                              }}
-                            >
-                              <DeleteOutlineIcon fontSize="small" />
-                            </IconButton>
-                          </>
-                        )}
-                      </ListItemButton>
-                    ))}
-                  </List>
-                )}
-              </Box>
-
-              {/* Saving indicator */}
-              {savingMessages && (
-                <Box sx={{ p: 1, borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <CircularProgress size={12} />
-                  <Typography variant="caption" color="text.secondary">
-                    {t('assistant.saving')}
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          )}
-
-          {/* Main Chat Area */}
-          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
-            {/* Header */}
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                p: 2,
-                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)',
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Box
-                  sx={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                  }}
-                >
-                  <SmartToyIcon sx={{ fontSize: 20, color: '#fff' }} />
-                </Box>
-                <Box>
-                  <Typography variant="subtitle1" fontWeight={600}>
-                    {t('assistant.title')}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {t('assistant.subtitle')}
-                  </Typography>
-                </Box>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                {!fullscreen && (
-                  <Tooltip title={t('assistant.tooltipNewChat')}>
-                    <IconButton onClick={handleNewChat} size="small">
-                      <AddIcon />
-                    </IconButton>
-                  </Tooltip>
-                )}
-                <Tooltip title={fullscreen ? t('assistant.tooltipExitFullscreen') : t('assistant.tooltipFullscreen')}>
-                  <IconButton onClick={toggleFullscreen} size="small">
-                    {fullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-                  </IconButton>
-                </Tooltip>
-                <IconButton onClick={handleClose} size="small">
-                  <CloseIcon />
-                </IconButton>
-              </Box>
-            </Box>
-
-            {/* AI capability warnings (chat not configured / no tool support).
-                The wrapper collapses when the banner renders nothing. */}
-            <Box sx={{ px: 2, pt: 2, '&:empty': { display: 'none' } }}>
-              <AICapabilityBanner context="chat" onBeforeNavigate={handleClose} />
-            </Box>
-
-            {/* Chat Content - Only this part remounts on conversation switch */}
-            <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <ChatThreadArea
-                key={activeConversationId || 'new'}
-                conversationId={activeConversationId}
-                historicalMessages={historicalMessages}
-                suggestions={suggestions}
-                setSavingMessages={setSavingMessages}
-                fetchConversations={fetchConversations}
-                onSaveError={handleSaveError}
-              />
-            </Box>
-          </Box>
-        </Box>
+        {chatSurface}
       </Dialog>
+
+      {/* Dock surface - persistent side panel without a backdrop, so the
+          library stays browsable while chatting. Layout reserves the width
+          via AssistantDockContext. Children render only while visible so the
+          chat thread is never mounted twice. */}
+      <Drawer
+        variant="persistent"
+        anchor="right"
+        open={open && docked}
+        PaperProps={{
+          sx: {
+            width: DOCK_WIDTH,
+            maxWidth: '100vw',
+            bgcolor: 'rgba(15, 15, 15, 0.85)',
+            backdropFilter: 'blur(16px)',
+            backgroundImage: 'none',
+            borderInlineStart: '1px solid rgba(255, 255, 255, 0.1)',
+          },
+        }}
+      >
+        {open && docked ? chatSurface : null}
+      </Drawer>
+
+      {/* Conversation history for surfaces without the inline sidebar */}
+      <Drawer
+        anchor="left"
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        sx={{ zIndex: theme.zIndex.modal + 1 }}
+        PaperProps={{
+          sx: {
+            width: 300,
+            maxWidth: '85vw',
+            bgcolor: 'rgba(15, 15, 15, 0.95)',
+            backgroundImage: 'none',
+          },
+        }}
+      >
+        {sidebarContent}
+      </Drawer>
 
       <Snackbar
         open={!!errorKey}

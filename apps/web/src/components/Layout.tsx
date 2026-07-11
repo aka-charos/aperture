@@ -41,6 +41,7 @@ import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck'
 import MenuOpenIcon from '@mui/icons-material/MenuOpen'
 import FactCheckIcon from '@mui/icons-material/FactCheck'
 import { useAuth } from '@/hooks/useAuth'
+import { useAssistantDock } from '@/hooks/useAssistantDock'
 import { WelcomeModal } from './WelcomeModal'
 import { useWelcomeModal } from './useWelcomeModal'
 import { ExplorationConfigModal } from './ExplorationConfigModal'
@@ -88,6 +89,8 @@ export function Layout() {
   const [watchingEnabled, setWatchingEnabled] = useState(true) // Default to true until we know
   const { user, logout } = useAuth()
   const { open: welcomeOpen, showWelcome, hideWelcome } = useWelcomeModal()
+  // Space reserved on the inline-end side for the docked AI assistant
+  const { dockWidth } = useAssistantDock()
 
   const drawerWidth = collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH
 
@@ -382,7 +385,7 @@ export function Layout() {
       <AppBar
         position="fixed"
         sx={{
-          width: { md: `calc(100% - ${drawerWidth}px)` },
+          width: { md: `calc(100% - ${drawerWidth + dockWidth}px)` },
           ml: { md: `${drawerWidth}px` },
           transition: theme.transitions.create(['width', 'margin'], {
             easing: theme.transitions.easing.sharp,
@@ -571,6 +574,7 @@ export function Layout() {
           flexGrow: 1,
           p: { xs: 2, sm: 3 },
           width: { md: `calc(100% - ${drawerWidth}px)` },
+          marginInlineEnd: { md: `${dockWidth}px` },
           maxWidth: '100%',
           overflowX: 'hidden',
           mt: '64px',
