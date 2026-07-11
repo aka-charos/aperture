@@ -8,11 +8,20 @@
  */
 import { Readable } from 'node:stream'
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
-import { streamText, convertToModelMessages, stepCountIs, type UIMessage, type ToolSet } from 'ai'
+import {
+  streamText,
+  convertToModelMessages,
+  stepCountIs,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  type UIMessage,
+  type ToolSet,
+} from 'ai'
 import { getChatModelInstance, getEmbeddingModelInstance, getActiveEmbeddingModelId } from '@aperture/core'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
-import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText } from '../helpers/index.js'
+import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText } from '../helpers/index.js'
 import { createTools, createN8nTools, createDiscoveryResolveTool, DISCOVERY_PROMPT } from '../tools/index.js'
+import { withToolErrorHandling } from '../tools/utils.js'
 import { gatherWebCandidates } from '../discovery/webCandidates.js'
 import type { ToolContext } from '../types.js'
 
@@ -163,7 +172,9 @@ export function registerChatHandler(fastify: FastifyInstance) {
         if (Object.keys(discoveryTools).length > 0) {
           delete (baseTools as Record<string, unknown>).findSimilarContent
         }
-        const tools = { ...baseTools, ...discoveryTools }
+        // Backstop: uncaught tool errors become { id, error } payloads instead
+        // of aborting the stream with a masked "An error occurred".
+        const tools = withToolErrorHandling({ ...baseTools, ...discoveryTools })
 
         fastify.log.info(
           {
@@ -196,8 +207,15 @@ export function registerChatHandler(fastify: FastifyInstance) {
           },
         })
 
-        // Get the UI Message Stream Response (Web Response)
-        const webResponse = result.toUIMessageStreamResponse()
+        // Get the UI Message Stream Response (Web Response).
+        // onError replaces the SDK's masked "An error occurred" with a stable
+        // AI_ERROR:<code>:<detail> string the frontend maps to localized copy.
+        const webResponse = result.toUIMessageStreamResponse({
+          onError: (error) => {
+            fastify.log.error({ err: error }, 'Assistant stream error')
+            return assistantErrorText(error)
+          },
+        })
 
         // Forward status + headers to Fastify
         reply.status(webResponse.status)
@@ -221,10 +239,23 @@ export function registerChatHandler(fastify: FastifyInstance) {
           return
         }
 
-        return reply.status(500).send({
-          error: 'Failed to process chat request',
-          message: errorMessage,
+        // Failures before the stream starts (model not configured, DB down
+        // while building the prompt, ...) would surface as a bare 500 the chat
+        // UI swallows silently. Return a UI-message stream instead: `start`
+        // creates the assistant message, `error` carries the coded message the
+        // frontend localizes — same path as mid-stream errors.
+        const errorText = assistantErrorText(err)
+        const webResponse = createUIMessageStreamResponse({
+          stream: createUIMessageStream({
+            execute: ({ writer }) => {
+              writer.write({ type: 'start' })
+              writer.write({ type: 'error', errorText })
+            },
+          }),
         })
+        reply.status(webResponse.status)
+        webResponse.headers.forEach((value: string, key: string) => reply.header(key, value))
+        return reply.send(Readable.fromWeb(webResponse.body! as Parameters<typeof Readable.fromWeb>[0]))
       }
     }
   )
