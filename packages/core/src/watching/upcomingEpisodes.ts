@@ -36,6 +36,35 @@ interface TMDbTVDetailsWithNextEpisode {
   name: string
   next_episode_to_air: TMDbNextEpisode | null
   last_episode_to_air: TMDbNextEpisode | null
+  number_of_episodes: number | null
+  number_of_seasons: number | null
+}
+
+/**
+ * Persist TMDB aired totals onto the series row. The /tv/{id} response is
+ * already in hand when we look up upcoming episodes, so caching the totals
+ * here costs one UPDATE and keeps the watching page's "N aired" info fresh.
+ */
+export async function persistTmdbTotals(
+  seriesId: string,
+  tmdbData: Pick<TMDbTVDetailsWithNextEpisode, 'number_of_episodes' | 'number_of_seasons'> | null
+): Promise<void> {
+  try {
+    if (tmdbData && typeof tmdbData.number_of_episodes === 'number' && tmdbData.number_of_episodes > 0) {
+      await query(
+        `UPDATE series
+         SET tmdb_total_episodes = $2, tmdb_total_seasons = $3, tmdb_totals_synced_at = NOW()
+         WHERE id = $1`,
+        [seriesId, tmdbData.number_of_episodes, tmdbData.number_of_seasons]
+      )
+    } else {
+      // Stamp the sync time even without usable totals so dead/renamed TMDB
+      // ids aren't re-fetched on every request.
+      await query(`UPDATE series SET tmdb_totals_synced_at = NOW() WHERE id = $1`, [seriesId])
+    }
+  } catch (err) {
+    logger.debug({ err, seriesId }, 'Failed to persist TMDB totals')
+  }
 }
 
 /**
@@ -81,7 +110,9 @@ export async function getUpcomingEpisodeForSeries(
   if (tmdbId) {
     try {
       const tmdbData = await tmdbRequest<TMDbTVDetailsWithNextEpisode>(`/tv/${tmdbId}`)
-      
+
+      await persistTmdbTotals(seriesId, tmdbData ?? null)
+
       if (tmdbData?.next_episode_to_air && tmdbData.next_episode_to_air.air_date) {
         return {
           seriesId,
@@ -104,9 +135,14 @@ export async function getUpcomingEpisodeForSeries(
 /**
  * Get upcoming episodes for multiple series
  * Returns a map of seriesId -> UpcomingEpisode
+ *
+ * options.tmdbFallbackIds bounds the live TMDB fallback: only series in the
+ * set are fetched from TMDB when the episodes table has no future episode.
+ * The batch Emby query always covers every id (single cheap query).
  */
 export async function getUpcomingEpisodes(
-  seriesIds: string[]
+  seriesIds: string[],
+  options?: { tmdbFallbackIds?: Set<string> }
 ): Promise<Map<string, UpcomingEpisode>> {
   const result = new Map<string, UpcomingEpisode>()
   
@@ -148,12 +184,14 @@ export async function getUpcomingEpisodes(
   }
 
   // Find series without Emby data that have TMDB IDs
-  const seriesNeedingTmdb = seriesIds.filter((id) => !result.has(id))
-  
+  const seriesNeedingTmdb = seriesIds.filter(
+    (id) => !result.has(id) && (!options?.tmdbFallbackIds || options.tmdbFallbackIds.has(id))
+  )
+
   if (seriesNeedingTmdb.length > 0) {
     // Get TMDB IDs for these series
     const tmdbIds = await query<{ id: string; tmdb_id: string }>(
-      `SELECT id, tmdb_id FROM series 
+      `SELECT id, tmdb_id FROM series
        WHERE id = ANY($1) AND tmdb_id IS NOT NULL`,
       [seriesNeedingTmdb]
     )
@@ -162,7 +200,9 @@ export async function getUpcomingEpisodes(
     for (const row of tmdbIds.rows) {
       try {
         const tmdbData = await tmdbRequest<TMDbTVDetailsWithNextEpisode>(`/tv/${row.tmdb_id}`)
-        
+
+        await persistTmdbTotals(row.id, tmdbData ?? null)
+
         if (tmdbData?.next_episode_to_air && tmdbData.next_episode_to_air.air_date) {
           result.set(row.id, {
             seriesId: row.id,

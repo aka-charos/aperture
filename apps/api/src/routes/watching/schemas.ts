@@ -28,9 +28,10 @@ export const watchingSchemas = {
   // Watching series item
   WatchingSeries: {
     type: 'object',
-    description: 'A series in the watching list with upcoming episode info',
+    description:
+      'A series on the watching page: from the watchlist, from watch history, or both — with progress and upcoming episode info',
     properties: {
-      id: { type: 'string', format: 'uuid', description: 'Watching entry ID' },
+      id: { type: 'string', format: 'uuid', description: 'Watching entry ID (series ID for history-only rows)' },
       seriesId: { type: 'string', format: 'uuid', description: 'Series ID' },
       title: { type: 'string' },
       year: { type: 'integer', nullable: true, description: 'First air year' },
@@ -43,7 +44,19 @@ export const watchingSchemas = {
       status: { type: 'string', nullable: true, description: 'Series status (Continuing, Ended)' },
       totalSeasons: { type: 'integer', nullable: true },
       totalEpisodes: { type: 'integer', nullable: true },
-      addedAt: { type: 'string', format: 'date-time', description: 'When added to watching list' },
+      addedAt: {
+        type: 'string',
+        format: 'date-time',
+        nullable: true,
+        description: 'When added to watching list (null for history-only rows)',
+      },
+      inWatchlist: { type: 'boolean', description: 'Series is in user_watching_series (synced to media-server favorites)' },
+      inHistory: { type: 'boolean', description: 'User has watch history for at least one episode' },
+      episodesWatched: { type: 'integer', description: 'Distinct episodes with watch history' },
+      episodesOnServer: { type: 'integer', description: 'Episodes available on the media server' },
+      tmdbTotalEpisodes: { type: 'integer', nullable: true, description: 'Total aired episodes per TMDB' },
+      tmdbTotalSeasons: { type: 'integer', nullable: true, description: 'Total seasons per TMDB' },
+      lastPlayedAt: { type: 'string', format: 'date-time', nullable: true, description: 'Most recent episode play' },
       upcomingEpisode: { $ref: 'UpcomingEpisode#' },
     },
   },

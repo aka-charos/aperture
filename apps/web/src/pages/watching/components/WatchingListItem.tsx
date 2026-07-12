@@ -24,6 +24,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import StarIcon from '@mui/icons-material/Star'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline'
+import AddToQueueIcon from '@mui/icons-material/AddToQueue'
 import ScheduleIcon from '@mui/icons-material/Schedule'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL, HeartRating } from '@aperture/ui'
@@ -34,6 +35,7 @@ interface WatchingListItemProps {
   userRating: number | null
   onRate: (rating: number | null) => void
   onRemove: (seriesId: string) => Promise<void>
+  onAdd: (seriesId: string) => Promise<void>
 }
 
 function formatAirDate(dateStr: string, t: TFunction, locale: string): string {
@@ -70,7 +72,7 @@ function getCountdownColor(days: number): string {
   return '#6b7280' // Later - gray
 }
 
-export function WatchingListItem({ series, userRating, onRate, onRemove }: WatchingListItemProps) {
+export function WatchingListItem({ series, userRating, onRate, onRemove, onAdd }: WatchingListItemProps) {
   const { t, i18n } = useTranslation()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
@@ -85,6 +87,11 @@ export function WatchingListItem({ series, userRating, onRate, onRemove }: Watch
     onRemove(series.seriesId)
   }
 
+  const handleAddClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onAdd(series.seriesId)
+  }
+
   const handleRatingClick = (e: React.MouseEvent) => {
     e.stopPropagation()
   }
@@ -93,6 +100,52 @@ export function WatchingListItem({ series, userRating, onRate, onRemove }: Watch
   const isAiring = series.status === 'Continuing'
   const daysUntil = upcoming ? getDaysUntil(upcoming.airDate) : null
   const countdownColor = daysUntil !== null ? getCountdownColor(daysUntil) : undefined
+  const showProgress = series.inHistory && series.episodesOnServer > 0
+  const progressPercent = showProgress
+    ? Math.min(100, (series.episodesWatched / series.episodesOnServer) * 100)
+    : 0
+  const isComplete = showProgress && series.episodesWatched >= series.episodesOnServer
+  const sourceLabel = series.inWatchlist
+    ? series.inHistory
+      ? t('watching.sourceBoth')
+      : t('watching.sourceWatchlist')
+    : t('watching.sourceHistory')
+
+  const watchlistActionButton = series.inWatchlist ? (
+    <Tooltip title={t('watching.removeTooltip')}>
+      <IconButton
+        size="small"
+        onClick={handleRemoveClick}
+        sx={{
+          p: isMobile ? 0.5 : undefined,
+          color: 'text.secondary',
+          '&:hover': {
+            color: 'error.main',
+            bgcolor: alpha(theme.palette.error.main, 0.1),
+          },
+        }}
+      >
+        <RemoveCircleOutlineIcon sx={isMobile ? { fontSize: 16 } : undefined} fontSize={isMobile ? undefined : 'small'} />
+      </IconButton>
+    </Tooltip>
+  ) : (
+    <Tooltip title={t('watching.addTooltip')}>
+      <IconButton
+        size="small"
+        onClick={handleAddClick}
+        sx={{
+          p: isMobile ? 0.5 : undefined,
+          color: 'text.secondary',
+          '&:hover': {
+            color: 'primary.main',
+            bgcolor: alpha(theme.palette.primary.main, 0.1),
+          },
+        }}
+      >
+        <AddToQueueIcon sx={isMobile ? { fontSize: 16 } : undefined} fontSize={isMobile ? undefined : 'small'} />
+      </IconButton>
+    </Tooltip>
+  )
 
   return (
     <Box
@@ -229,10 +282,20 @@ export function WatchingListItem({ series, userRating, onRate, onRemove }: Watch
                   • {t('watching.seasons', { count: series.totalSeasons })}
                 </Typography>
               )}
+              <Chip
+                label={sourceLabel}
+                size="small"
+                variant="outlined"
+                sx={{
+                  height: { xs: 18, md: 20 },
+                  fontSize: { xs: '0.6rem', md: '0.65rem' },
+                  color: 'text.secondary',
+                }}
+              />
             </Box>
           </Box>
 
-          {/* Desktop: Rating and Remove button */}
+          {/* Desktop: Rating and Add/Remove button */}
           {!isMobile && (
             <Box display="flex" alignItems="center" gap={1} onClick={handleRatingClick}>
               <HeartRating
@@ -240,21 +303,7 @@ export function WatchingListItem({ series, userRating, onRate, onRemove }: Watch
                 onChange={(rating) => onRate(rating)}
                 size="small"
               />
-              <Tooltip title={t('watching.removeTooltip')}>
-                <IconButton
-                  size="small"
-                  onClick={handleRemoveClick}
-                  sx={{
-                    color: 'text.secondary',
-                    '&:hover': {
-                      color: 'error.main',
-                      bgcolor: alpha(theme.palette.error.main, 0.1),
-                    },
-                  }}
-                >
-                  <RemoveCircleOutlineIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
+              {watchlistActionButton}
             </Box>
           )}
         </Box>
@@ -298,6 +347,39 @@ export function WatchingListItem({ series, userRating, onRate, onRemove }: Watch
           </Typography>
         )}
 
+        {/* Watch progress (history-sourced) */}
+        {showProgress && (
+          <Box sx={{ mt: { xs: 0.75, md: 1 }, maxWidth: 420 }}>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={0.25}>
+              <Typography
+                variant="caption"
+                color={isComplete ? 'success.main' : 'text.secondary'}
+                fontWeight={600}
+              >
+                {t('watching.episodesProgress', {
+                  watched: series.episodesWatched,
+                  total: series.episodesOnServer,
+                })}
+                {series.tmdbTotalEpisodes != null &&
+                  ` · ${t('watching.airedTotal', { count: series.tmdbTotalEpisodes })}`}
+              </Typography>
+              <Typography
+                variant="caption"
+                color={isComplete ? 'success.main' : 'text.secondary'}
+                fontWeight={600}
+              >
+                {Math.round(progressPercent)}%
+              </Typography>
+            </Box>
+            <LinearProgress
+              variant="determinate"
+              value={progressPercent}
+              color={isComplete ? 'success' : 'primary'}
+              sx={{ height: 4, borderRadius: 2 }}
+            />
+          </Box>
+        )}
+
         {/* Mobile: Upcoming episode badge + actions */}
         {isMobile && (
           <Box display="flex" alignItems="center" justifyContent="space-between" mt={1} onClick={handleRatingClick}>
@@ -307,22 +389,7 @@ export function WatchingListItem({ series, userRating, onRate, onRemove }: Watch
                 onChange={(rating) => onRate(rating)}
                 size="small"
               />
-              <Tooltip title={t('watching.removeTooltip')}>
-                <IconButton
-                  size="small"
-                  onClick={handleRemoveClick}
-                  sx={{
-                    p: 0.5,
-                    color: 'text.secondary',
-                    '&:hover': {
-                      color: 'error.main',
-                      bgcolor: alpha(theme.palette.error.main, 0.1),
-                    },
-                  }}
-                >
-                  <RemoveCircleOutlineIcon sx={{ fontSize: 16 }} />
-                </IconButton>
-              </Tooltip>
+              {watchlistActionButton}
             </Box>
             {upcoming && (
               <Box

@@ -10,6 +10,7 @@ import { query, queryOne } from '../../lib/db.js'
 import { requireAuth } from '../../plugins/auth.js'
 import {
   getUpcomingEpisodes,
+  refreshStaleTmdbTotals,
   reconcileWatchingFavoritesForUser,
   favoriteWatchingSeriesOnMediaServer,
   unfavoriteWatchingSeriesOnMediaServer,
@@ -17,8 +18,8 @@ import {
 import { watchingSchemas } from './schemas.js'
 
 interface WatchingSeriesRow {
-  id: string
   series_id: string
+  watching_id: string | null
   title: string
   year: number | null
   poster_url: string | null
@@ -30,8 +31,15 @@ interface WatchingSeriesRow {
   status: string | null
   total_seasons: number | null
   total_episodes: number | null
-  added_at: string
+  added_at: string | null
   tmdb_id: string | null
+  tmdb_total_episodes: number | null
+  tmdb_total_seasons: number | null
+  episodes_watched: string | null
+  episodes_on_server: string
+  last_played_at: string | null
+  in_watchlist: boolean
+  in_history: boolean
 }
 
 interface WatchingSeriesResponse {
@@ -48,7 +56,14 @@ interface WatchingSeriesResponse {
   status: string | null
   totalSeasons: number | null
   totalEpisodes: number | null
-  addedAt: string
+  addedAt: string | null
+  inWatchlist: boolean
+  inHistory: boolean
+  episodesWatched: number
+  episodesOnServer: number
+  tmdbTotalEpisodes: number | null
+  tmdbTotalSeasons: number | null
+  lastPlayedAt: string | null
   upcomingEpisode: {
     seasonNumber: number
     episodeNumber: number
@@ -66,34 +81,61 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
 
   /**
    * GET /api/watching
-   * List user's watching series with upcoming episode info
+   * List the union of the user's watchlist (user_watching_series) and series
+   * from their episode watch history, with progress + upcoming episode info.
+   * Read-only union: history series are NEVER written to user_watching_series
+   * (that table is synced to media-server favorites by the reconcile job).
    */
   fastify.get<{
     Reply: { series: WatchingSeriesResponse[]; total: number }
   }>('/api/watching', { preHandler: requireAuth, schema: { tags: ["watching"] } }, async (request, reply) => {
     const userId = request.user!.id
 
-    // Get user's watching series
     const result = await query<WatchingSeriesRow>(
-      `SELECT uws.id, uws.series_id, uws.added_at,
+      `WITH hist AS (
+         SELECT e.series_id,
+                COUNT(DISTINCT e.id) AS episodes_watched,
+                MAX(wh.last_played_at) AS last_played_at
+         FROM watch_history wh
+         JOIN episodes e ON e.id = wh.episode_id
+         WHERE wh.user_id = $1 AND wh.episode_id IS NOT NULL
+         GROUP BY e.series_id
+       )
+       SELECT s.id AS series_id, uws.id AS watching_id, uws.added_at,
               s.title, s.year, s.poster_url, s.backdrop_url, s.genres,
               s.overview, s.community_rating, s.network, s.status,
-              s.total_seasons, s.total_episodes, s.tmdb_id
-       FROM user_watching_series uws
-       JOIN series s ON s.id = uws.series_id
-       WHERE uws.user_id = $1
-       ORDER BY uws.added_at DESC`,
+              s.total_seasons, s.total_episodes, s.tmdb_id,
+              s.tmdb_total_episodes, s.tmdb_total_seasons,
+              h.episodes_watched, h.last_played_at,
+              (SELECT COUNT(*) FROM episodes e2 WHERE e2.series_id = s.id) AS episodes_on_server,
+              (uws.id IS NOT NULL) AS in_watchlist,
+              (h.series_id IS NOT NULL) AS in_history
+       FROM series s
+       LEFT JOIN user_watching_series uws ON uws.series_id = s.id AND uws.user_id = $1
+       LEFT JOIN hist h ON h.series_id = s.id
+       LEFT JOIN library_config lc ON lc.provider_library_id = s.provider_library_id
+       WHERE uws.id IS NOT NULL
+          OR (h.series_id IS NOT NULL
+              AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true))
+       ORDER BY h.last_played_at DESC NULLS LAST, uws.added_at DESC NULLS LAST`,
       [userId]
     )
 
-    // Get upcoming episodes for all series
+    // Upcoming episodes: the Emby-side batch query covers the full union, but
+    // the live TMDB fallback is limited to watchlist series and history series
+    // that are still airing (ended shows can't have upcoming episodes).
     const seriesIds = result.rows.map((r) => r.series_id)
-    const upcomingEpisodes = await getUpcomingEpisodes(seriesIds)
+    const tmdbFallbackIds = new Set(
+      result.rows
+        .filter((r) => r.in_watchlist || r.status === 'Continuing')
+        .map((r) => r.series_id)
+    )
+    const upcomingEpisodes = await getUpcomingEpisodes(seriesIds, { tmdbFallbackIds })
 
     const series: WatchingSeriesResponse[] = result.rows.map((row) => {
       const upcoming = upcomingEpisodes.get(row.series_id)
       return {
-        id: row.id,
+        id: row.watching_id ?? row.series_id,
         seriesId: row.series_id,
         title: row.title,
         year: row.year,
@@ -107,6 +149,13 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
         totalSeasons: row.total_seasons,
         totalEpisodes: row.total_episodes,
         addedAt: row.added_at,
+        inWatchlist: row.in_watchlist,
+        inHistory: row.in_history,
+        episodesWatched: row.episodes_watched ? parseInt(row.episodes_watched, 10) : 0,
+        episodesOnServer: parseInt(row.episodes_on_server, 10) || 0,
+        tmdbTotalEpisodes: row.tmdb_total_episodes,
+        tmdbTotalSeasons: row.tmdb_total_seasons,
+        lastPlayedAt: row.last_played_at,
         upcomingEpisode: upcoming ? {
           seasonNumber: upcoming.seasonNumber,
           episodeNumber: upcoming.episodeNumber,
@@ -115,6 +164,12 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
           source: upcoming.source,
         } : null,
       }
+    })
+
+    // Refresh stale TMDB aired totals in the background (bounded per request);
+    // never awaited so the response isn't TMDB-bound.
+    void refreshStaleTmdbTotals(seriesIds).catch((err) => {
+      fastify.log.warn({ err, userId }, 'TMDB totals refresh failed')
     })
 
     return reply.send({ series, total: series.length })

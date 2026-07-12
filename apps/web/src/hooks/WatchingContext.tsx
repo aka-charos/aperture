@@ -21,7 +21,13 @@ interface CachedData {
   version: number // For cache invalidation on schema changes
 }
 
-const CACHE_VERSION = 1
+// v2: series list is the watchlist+history union (inWatchlist/inHistory flags)
+const CACHE_VERSION = 2
+
+/** Watchlist membership only — history-sourced rows must not count as "watching" */
+function watchlistIds(series: WatchingSeries[]): Set<string> {
+  return new Set(series.filter((s) => s.inWatchlist).map((s) => s.seriesId))
+}
 
 interface WatchingProviderProps {
   children: ReactNode
@@ -90,7 +96,7 @@ export function WatchingProvider({ children }: WatchingProviderProps) {
       const cached = getCache()
       if (cached) {
         setSeries(cached.series)
-        setWatchingIds(new Set(cached.series.map(s => s.seriesId)))
+        setWatchingIds(watchlistIds(cached.series))
         setLoading(false)
         return
       }
@@ -103,7 +109,7 @@ export function WatchingProvider({ children }: WatchingProviderProps) {
       }
       const data = await response.json()
       setSeries(data.series)
-      setWatchingIds(new Set(data.series.map((s: WatchingSeries) => s.seriesId)))
+      setWatchingIds(watchlistIds(data.series))
       setError(null)
 
       // Cache the result
@@ -158,13 +164,18 @@ export function WatchingProvider({ children }: WatchingProviderProps) {
   }, [fetchWatchingData])
 
   const removeFromWatching = useCallback(async (seriesId: string) => {
-    // Optimistic update
+    // Optimistic update — history-sourced rows stay visible, just leave the watchlist
     setWatchingIds((prev) => {
       const next = new Set(prev)
       next.delete(seriesId)
       return next
     })
-    setSeries((prev) => prev.filter((s) => s.seriesId !== seriesId))
+    setSeries((prev) =>
+      prev.flatMap((s) => {
+        if (s.seriesId !== seriesId) return [s]
+        return s.inHistory ? [{ ...s, inWatchlist: false, addedAt: null }] : []
+      })
+    )
 
     try {
       const response = await fetch(`/api/watching/${seriesId}`, {
