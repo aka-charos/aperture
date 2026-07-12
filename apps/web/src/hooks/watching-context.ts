@@ -32,6 +32,8 @@ export interface WatchingSeries {
   episodesOnServer: number
   tmdbTotalEpisodes: number | null
   tmdbTotalSeasons: number | null
+  /** Aired seasons (per TMDB) with zero episodes on the media server */
+  missingSeasons: number[]
   lastPlayedAt: string | null
   upcomingEpisode: UpcomingEpisode | null
 }

@@ -35,6 +35,7 @@ interface WatchingSeriesRow {
   tmdb_id: string | null
   tmdb_total_episodes: number | null
   tmdb_total_seasons: number | null
+  tmdb_seasons: { season_number: number; episode_count: number; air_date: string | null }[] | null
   episodes_watched: string | null
   episodes_on_server: string
   last_played_at: string | null
@@ -63,6 +64,8 @@ interface WatchingSeriesResponse {
   episodesOnServer: number
   tmdbTotalEpisodes: number | null
   tmdbTotalSeasons: number | null
+  /** Aired seasons (per TMDB) with zero episodes on the media server */
+  missingSeasons: number[]
   lastPlayedAt: string | null
   upcomingEpisode: {
     seasonNumber: number
@@ -105,7 +108,7 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
               s.title, s.year, s.poster_url, s.backdrop_url, s.genres,
               s.overview, s.community_rating, s.network, s.status,
               s.total_seasons, s.total_episodes, s.tmdb_id,
-              s.tmdb_total_episodes, s.tmdb_total_seasons,
+              s.tmdb_total_episodes, s.tmdb_total_seasons, s.tmdb_seasons,
               h.episodes_watched, h.last_played_at,
               (SELECT COUNT(*) FROM episodes e2 WHERE e2.series_id = s.id) AS episodes_on_server,
               (uws.id IS NOT NULL) AS in_watchlist,
@@ -132,8 +135,42 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
     )
     const upcomingEpisodes = await getUpcomingEpisodes(seriesIds, { tmdbFallbackIds })
 
+    // Which seasons exist on the server per series — compared against TMDB's
+    // per-season data to flag aired seasons missing from the library entirely.
+    const serverSeasons = new Map<string, Set<number>>()
+    if (seriesIds.length > 0) {
+      const seasonRows = await query<{ series_id: string; season_number: number }>(
+        `SELECT DISTINCT series_id, season_number FROM episodes WHERE series_id = ANY($1)`,
+        [seriesIds]
+      )
+      for (const r of seasonRows.rows) {
+        let set = serverSeasons.get(r.series_id)
+        if (!set) {
+          set = new Set()
+          serverSeasons.set(r.series_id, set)
+        }
+        set.add(r.season_number)
+      }
+    }
+
+    const today = new Date().toISOString().split('T')[0]
+
     const series: WatchingSeriesResponse[] = result.rows.map((row) => {
       const upcoming = upcomingEpisodes.get(row.series_id)
+      const onServer = serverSeasons.get(row.series_id)
+      // Aired regular seasons (per TMDB) with no episodes on the server.
+      // Specials (season 0) and unaired/announced seasons are ignored.
+      const missingSeasons = (row.tmdb_seasons ?? [])
+        .filter(
+          (s) =>
+            s.season_number >= 1 &&
+            s.episode_count > 0 &&
+            s.air_date !== null &&
+            s.air_date <= today &&
+            !onServer?.has(s.season_number)
+        )
+        .map((s) => s.season_number)
+        .sort((a, b) => a - b)
       return {
         id: row.watching_id ?? row.series_id,
         seriesId: row.series_id,
@@ -155,6 +192,7 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
         episodesOnServer: parseInt(row.episodes_on_server, 10) || 0,
         tmdbTotalEpisodes: row.tmdb_total_episodes,
         tmdbTotalSeasons: row.tmdb_total_seasons,
+        missingSeasons,
         lastPlayedAt: row.last_played_at,
         upcomingEpisode: upcoming ? {
           seasonNumber: upcoming.seasonNumber,
