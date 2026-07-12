@@ -984,7 +984,14 @@
     "seriesCarousel": "Сериал",
     "failedLoadDetails": "Не удалось загрузить детали",
     "creditsFilterMedia": "СМИ",
-    "creditsFilterRole": "Роль"
+    "creditsFilterRole": "Роль",
+    "born": "Born: {{date}}",
+    "bornAge": "Born: {{date}} (age {{age}})",
+    "died": "Died: {{date}}",
+    "diedAge": "Died: {{date}} (aged {{age}})",
+    "biography": "Biography",
+    "bioMore": "More",
+    "bioLess": "Less"
   },
   "search": {
     "title": "Поиск",

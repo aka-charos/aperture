@@ -17,6 +17,7 @@ import type {
   Episode,
   WatchedItem,
   WatchedEpisode,
+  PersonDetails,
   PlaylistCreateResult,
   CollectionCreateResult,
   LibraryCreateResult,
@@ -55,6 +56,7 @@ import {
   favoriteItem as postFavoriteItem,
   unfavoriteItem as deleteFavoriteItem,
 } from './favorites.js'
+import { getPersonDetails } from './persons.js'
 import {
   createOrUpdatePlaylist,
   createPlaylistWithOverview,
@@ -207,6 +209,14 @@ export class JellyfinProvider extends JellyfinProviderBase implements MediaServe
 
   async unfavoriteItem(apiKey: string, userId: string, itemId: string): Promise<void> {
     return deleteFavoriteItem(this, apiKey, userId, itemId)
+  }
+
+  // Persons
+  async getPersonDetails(
+    apiKey: string,
+    opts: { name: string; personId?: string }
+  ): Promise<PersonDetails | null> {
+    return getPersonDetails(this, apiKey, opts)
   }
 
   // Playlists

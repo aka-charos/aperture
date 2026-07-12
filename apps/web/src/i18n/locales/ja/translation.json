@@ -1447,7 +1447,14 @@
     "seriesCarousel": "連続テレビ番組",
     "failedLoadDetails": "詳細のロードに失敗しました",
     "creditsFilterMedia": "メディア",
-    "creditsFilterRole": "役割"
+    "creditsFilterRole": "役割",
+    "born": "Born: {{date}}",
+    "bornAge": "Born: {{date}} (age {{age}})",
+    "died": "Died: {{date}}",
+    "diedAge": "Died: {{date}} (aged {{age}})",
+    "biography": "Biography",
+    "bioMore": "More",
+    "bioLess": "Less"
   },
   "watcherIdentity": {
     "refreshInterval": {

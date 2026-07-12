@@ -1447,7 +1447,14 @@
     "seriesCarousel": "סדרת טלוויזיה",
     "failedLoadDetails": "טעינת הפרטים נכשלה",
     "creditsFilterMedia": "כְּלֵי תִקְשׁוֹרֶת",
-    "creditsFilterRole": "תַפְקִיד"
+    "creditsFilterRole": "תַפְקִיד",
+    "born": "Born: {{date}}",
+    "bornAge": "Born: {{date}} (age {{age}})",
+    "died": "Died: {{date}}",
+    "diedAge": "Died: {{date}} (aged {{age}})",
+    "biography": "Biography",
+    "bioMore": "More",
+    "bioLess": "Less"
   },
   "watcherIdentity": {
     "refreshInterval": {

@@ -218,6 +218,24 @@ export interface Episode {
   guestStars?: Array<{ name: string; role?: string; thumb?: string }>
 }
 
+/**
+ * Person (actor/director/…) item metadata from the media server.
+ * On Person items, Emby/Jellyfin reuse movie fields: PremiereDate = birth date,
+ * EndDate = death date, ProductionLocations[0] = birthplace.
+ */
+export interface PersonDetails {
+  /** Media server Person item id */
+  id: string
+  name: string
+  /** Biography */
+  overview: string | null
+  /** ISO date string */
+  birthDate: string | null
+  /** ISO date string */
+  deathDate: string | null
+  birthPlace: string | null
+}
+
 export interface PlaylistCreateResult {
   playlistId: string
 }

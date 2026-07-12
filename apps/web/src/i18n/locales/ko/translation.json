@@ -1447,7 +1447,14 @@
     "seriesCarousel": "TV 시리즈",
     "failedLoadDetails": "세부정보를 로드하지 못했습니다.",
     "creditsFilterMedia": "메디아",
-    "creditsFilterRole": "역할"
+    "creditsFilterRole": "역할",
+    "born": "Born: {{date}}",
+    "bornAge": "Born: {{date}} (age {{age}})",
+    "died": "Died: {{date}}",
+    "diedAge": "Died: {{date}} (aged {{age}})",
+    "biography": "Biography",
+    "bioMore": "More",
+    "bioLess": "Less"
   },
   "watcherIdentity": {
     "refreshInterval": {

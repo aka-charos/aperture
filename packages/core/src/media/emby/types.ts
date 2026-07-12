@@ -49,6 +49,8 @@ export interface EmbyItem {
   SortName?: string
   ProductionYear?: number
   PremiereDate?: string
+  // Death date on Person items; series end date otherwise
+  EndDate?: string
   Genres?: string[]
   Overview?: string
   Tagline?: string

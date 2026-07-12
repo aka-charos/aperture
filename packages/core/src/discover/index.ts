@@ -95,3 +95,9 @@ export {
 // Person portrait push (media server item id from sync)
 export { findPersonMediaServerItemIdForName } from './personPortraitPush.js'
 
+// Media server person metadata (bio, birth/death, birthplace) with DB cache
+export {
+  getPersonMediaServerDetails,
+  type PersonMediaServerDetails,
+} from './personMediaServerDetails.js'
+

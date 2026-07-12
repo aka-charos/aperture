@@ -931,6 +931,9 @@ export {
   type PersonCreditsGapResult,
   type PersonCreditsGapGroup,
   type CreditsRoleKind,
+  // Media server person metadata (bio, birth/death, birthplace)
+  getPersonMediaServerDetails,
+  type PersonMediaServerDetails,
 } from './discover/index.js'
 
 // JustWatch streaming charts (Discovery expansion)

@@ -5,6 +5,7 @@ import {
   Box,
   Typography,
   Avatar,
+  Button,
   Chip,
   CircularProgress,
   Alert,
@@ -55,6 +56,10 @@ interface PersonData {
   name: string
   imageUrl: string | null
   tmdbFallbackImageUrl?: string | null
+  overview?: string | null
+  birthDate?: string | null
+  deathDate?: string | null
+  birthPlace?: string | null
   movies: ContentItem[]
   series: ContentItem[]
   stats: {
@@ -96,6 +101,31 @@ interface SeerrBatchStatus {
 
 const TMDB_IMG_BASE = 'https://image.tmdb.org/t/p'
 
+/** Bio length above which the biography section collapses behind a More toggle. */
+const BIO_CLAMP_THRESHOLD = 400
+
+// Person dates come from the media server at midnight UTC; format in UTC to avoid day shifts
+function formatPersonDate(iso: string, locale: string): string {
+  return new Date(iso).toLocaleDateString(locale, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  })
+}
+
+function calcAge(birthIso: string, untilIso?: string | null): number | null {
+  const birth = new Date(birthIso)
+  const until = untilIso ? new Date(untilIso) : new Date()
+  if (Number.isNaN(birth.getTime()) || Number.isNaN(until.getTime())) return null
+  let age = until.getUTCFullYear() - birth.getUTCFullYear()
+  const monthDiff = until.getUTCMonth() - birth.getUTCMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && until.getUTCDate() < birth.getUTCDate())) {
+    age--
+  }
+  return age >= 0 ? age : null
+}
+
 function preloadImage(src: string): Promise<void> {
   return new Promise((resolve) => {
     const img = new Image()
@@ -106,7 +136,7 @@ function preloadImage(src: string): Promise<void> {
 }
 
 export function PersonDetailPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { name } = useParams<{ name: string }>()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
@@ -121,6 +151,7 @@ export function PersonDetailPage() {
   >({})
   const [canRequestSeerr, setCanRequestSeerr] = useState(false)
   const [avatarImgVisible, setAvatarImgVisible] = useState(false)
+  const [bioExpanded, setBioExpanded] = useState(false)
   const [optionsDialogOpen, setOptionsDialogOpen] = useState(false)
   const [optionsTargetRow, setOptionsTargetRow] = useState<CreditsGapRow | null>(null)
   const [pendingSeerrOpts, setPendingSeerrOpts] = useState<SeerrRequestOptions | null>(null)
@@ -214,6 +245,7 @@ export function PersonDetailPage() {
   useEffect(() => {
     setCreditsMediaFilter('all')
     setCreditsRoleFilter('actor')
+    setBioExpanded(false)
   }, [name])
 
   const decodedName = useMemo(() => decodeURIComponent(name || ''), [name])
@@ -264,6 +296,12 @@ export function PersonDetailPage() {
       </Box>
     )
   }
+
+  const birthDateText = data.birthDate ? formatPersonDate(data.birthDate, i18n.language) : null
+  const deathDateText = data.deathDate ? formatPersonDate(data.deathDate, i18n.language) : null
+  const currentAge = data.birthDate && !data.deathDate ? calcAge(data.birthDate) : null
+  const ageAtDeath = data.birthDate && data.deathDate ? calcAge(data.birthDate, data.deathDate) : null
+  const bioNeedsClamp = (data.overview?.length ?? 0) > BIO_CLAMP_THRESHOLD
 
   const markCreditsRowRequested = (tmdbId: number) => {
     setSeerrStatuses((prev) => ({
@@ -494,7 +532,42 @@ export function PersonDetailPage() {
                 {decodedName}
               </Typography>
 
-              <Box display="flex" flexWrap="wrap" gap={1}>
+              {birthDateText && (
+                <Typography
+                  variant="body2"
+                  sx={{ textShadow: '0 2px 8px rgba(0,0,0,0.5)', opacity: 0.9 }}
+                >
+                  {currentAge != null
+                    ? t('personDetail.bornAge', { date: birthDateText, age: currentAge })
+                    : t('personDetail.born', { date: birthDateText })}
+                  {data.birthPlace ? ` · ${data.birthPlace}` : ''}
+                </Typography>
+              )}
+              {!birthDateText && data.birthPlace && (
+                <Typography
+                  variant="body2"
+                  sx={{ textShadow: '0 2px 8px rgba(0,0,0,0.5)', opacity: 0.9 }}
+                >
+                  {data.birthPlace}
+                </Typography>
+              )}
+              {deathDateText && (
+                <Typography
+                  variant="body2"
+                  sx={{ textShadow: '0 2px 8px rgba(0,0,0,0.5)', opacity: 0.9 }}
+                >
+                  {ageAtDeath != null
+                    ? t('personDetail.diedAge', { date: deathDateText, age: ageAtDeath })
+                    : t('personDetail.died', { date: deathDateText })}
+                </Typography>
+              )}
+
+              <Box
+                display="flex"
+                flexWrap="wrap"
+                gap={1}
+                mt={birthDateText || data.birthPlace || deathDateText ? 1 : 0}
+              >
                 {data.stats.asActor > 0 && (
                   <Chip
                     icon={<PersonIcon />}
@@ -531,6 +604,41 @@ export function PersonDetailPage() {
 
       {/* Content */}
       <Box sx={{ px: 3, py: 4 }}>
+        {/* Biography */}
+        {data.overview && (
+          <Box mb={4} maxWidth="120ch">
+            <Typography variant="h6" fontWeight={600} gutterBottom>
+              {t('personDetail.biography')}
+            </Typography>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{
+                whiteSpace: 'pre-line',
+                ...(bioNeedsClamp && !bioExpanded
+                  ? {
+                      display: '-webkit-box',
+                      WebkitLineClamp: 4,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }
+                  : {}),
+              }}
+            >
+              {data.overview}
+            </Typography>
+            {bioNeedsClamp && (
+              <Button
+                size="small"
+                onClick={() => setBioExpanded((prev) => !prev)}
+                sx={{ mt: 0.5, minWidth: 0, px: 0 }}
+              >
+                {bioExpanded ? t('personDetail.bioLess') : t('personDetail.bioMore')}
+              </Button>
+            )}
+          </Box>
+        )}
+
         {/* Movies Carousel */}
         {data.movies.length > 0 && (
           <Box mb={4}>
