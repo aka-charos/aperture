@@ -86,6 +86,8 @@ interface AIFeaturesResponse {
   }
   chat: {
     configured: boolean
+    provider: string | null
+    model: string | null
     supportsToolCalling: boolean
     supportsStreaming: boolean
   }
@@ -137,8 +139,8 @@ export function useAICapabilities(): AICapabilitiesResult {
 
   const chat = {
     configured: data?.chat.configured ?? false,
-    provider: null as string | null,
-    model: null as string | null,
+    provider: data?.chat.provider ?? null,
+    model: data?.chat.model ?? null,
     supportsTools: data?.chat.supportsToolCalling ?? false,
     supportsStreaming: data?.chat.supportsStreaming ?? false,
   }

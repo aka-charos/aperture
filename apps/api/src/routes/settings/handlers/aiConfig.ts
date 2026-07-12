@@ -156,6 +156,9 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         },
         chat: {
           configured: capabilities.chat.configured,
+          // Exposed so capability warnings can name the model
+          provider: capabilities.chat.provider,
+          model: capabilities.chat.model,
           supportsToolCalling: capabilities.chat.capabilities?.supportsToolCalling ?? false,
           supportsStreaming: capabilities.chat.capabilities?.supportsToolStreaming ?? false,
         },
