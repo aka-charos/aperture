@@ -30,6 +30,10 @@ export interface UseMediaDetailReturn {
   seasons: Record<number, Episode[]>
   // Movie-specific
   clearWatchStatus: () => void
+  setWatchStatusWatched: () => void
+  isFavorite: boolean | null
+  favoriteLoading: boolean
+  toggleFavorite: () => Promise<boolean>
   // Shared
   updateRating: (rating: number | null) => Promise<void>
 }
@@ -49,6 +53,9 @@ export function useMediaDetail(
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [watchStats, setWatchStats] = useState<WatchStats | null>(null)
+  // null until the media-server favorite status has loaded
+  const [isFavorite, setIsFavorite] = useState<boolean | null>(null)
+  const [favoriteLoading, setFavoriteLoading] = useState(false)
   // Series-specific
   const [seasons, setSeasons] = useState<Record<number, Episode[]>>({})
 
@@ -208,8 +215,53 @@ export function useMediaDetail(
     fetchMedia()
   }, [mediaType, id, userId])
 
+  // Favorite status lives on the media server, not in our DB — fetched separately.
+  useEffect(() => {
+    if (!id || !userId || mediaType !== 'movie') return
+
+    let cancelled = false
+    setIsFavorite(null)
+
+    fetch(`/api/favorites/status?movieId=${id}`, { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { favorite?: boolean } | null) => {
+        if (!cancelled && data) setIsFavorite(data.favorite === true)
+      })
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+    }
+  }, [mediaType, id, userId])
+
+  const toggleFavorite = useCallback(async (): Promise<boolean> => {
+    if (!id || mediaType !== 'movie') return false
+
+    const next = !isFavorite
+    setFavoriteLoading(true)
+    try {
+      const response = await fetch('/api/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ movieIds: [id], favorite: next }),
+      })
+      if (!response.ok) return false
+      setIsFavorite(next)
+      return true
+    } catch {
+      return false
+    } finally {
+      setFavoriteLoading(false)
+    }
+  }, [mediaType, id, isFavorite])
+
   const clearWatchStatus = useCallback(() => {
     setWatchStatus({ isWatched: false, playCount: 0, lastWatched: null })
+  }, [])
+
+  const setWatchStatusWatched = useCallback(() => {
+    setWatchStatus({ isWatched: true, playCount: 1, lastWatched: new Date().toISOString() })
   }, [])
 
   const updateRating = useCallback(
@@ -265,6 +317,10 @@ export function useMediaDetail(
     error,
     seasons,
     clearWatchStatus,
+    setWatchStatusWatched,
+    isFavorite,
+    favoriteLoading,
+    toggleFavorite,
     updateRating,
   }
 }

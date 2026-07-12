@@ -23,8 +23,11 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import AddToQueueIcon from '@mui/icons-material/AddToQueue'
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck'
+import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import FavoriteIcon from '@mui/icons-material/Favorite'
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder'
 import OndemandVideoIcon from '@mui/icons-material/OndemandVideo'
 import type { Media, MediaServerInfo, WatchStatus } from '../types'
 import { isMovie, isSeries } from '../types'
@@ -50,6 +53,10 @@ interface MediaHeroProps {
   canManageWatchHistory?: boolean
   userId?: string
   onMarkedUnwatched?: () => void
+  onMarkedWatched?: () => void
+  isFavorite?: boolean | null
+  favoriteLoading?: boolean
+  onFavoriteToggle?: () => Promise<boolean>
 }
 
 export function MediaHero({
@@ -64,10 +71,15 @@ export function MediaHero({
   canManageWatchHistory,
   userId,
   onMarkedUnwatched,
+  onMarkedWatched,
+  isFavorite,
+  favoriteLoading = false,
+  onFavoriteToggle,
 }: MediaHeroProps) {
   const { t } = useTranslation()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [marking, setMarking] = useState(false)
+  const [markingWatched, setMarkingWatched] = useState(false)
   const [posterOffRatio, setPosterOffRatio] = useState(false)
   const [snackbar, setSnackbar] = useState<{
     open: boolean
@@ -154,6 +166,58 @@ export function MediaHero({
       setMarking(false)
       setConfirmOpen(false)
     }
+  }
+
+  const handleMarkWatched = async () => {
+    if (!userId || !isMovie(media)) return
+
+    setMarkingWatched(true)
+    try {
+      const response = await fetch(`/api/users/${userId}/watch-history/movies/${media.id}`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+
+      if (response.ok) {
+        setSnackbar({
+          open: true,
+          message: t('mediaDetail.hero.snackbarMarkedWatched'),
+          severity: 'success',
+        })
+        onMarkedWatched?.()
+      } else {
+        const error = await response.json()
+        setSnackbar({
+          open: true,
+          message: error.error || t('mediaDetail.hero.snackbarMarkWatchedFailed'),
+          severity: 'error',
+        })
+      }
+    } catch {
+      setSnackbar({
+        open: true,
+        message: t('mediaDetail.hero.snackbarMarkWatchedFailed'),
+        severity: 'error',
+      })
+    } finally {
+      setMarkingWatched(false)
+    }
+  }
+
+  const handleFavoriteToggle = async () => {
+    if (!onFavoriteToggle) return
+
+    const wasFavorite = isFavorite === true
+    const ok = await onFavoriteToggle()
+    setSnackbar({
+      open: true,
+      message: ok
+        ? wasFavorite
+          ? t('mediaDetail.hero.snackbarFavoriteRemoved')
+          : t('mediaDetail.hero.snackbarFavoriteAdded')
+        : t('mediaDetail.hero.snackbarFavoriteFailed'),
+      severity: ok ? 'success' : 'error',
+    })
   }
 
   // Build year display
@@ -455,6 +519,62 @@ export function MediaHero({
             >
               {mediaServer?.type === 'jellyfin' ? t('mediaDetail.hero.openJellyfin') : t('mediaDetail.hero.openEmby')}
             </Button>
+            {/* Movie favorite toggle (synced to the media server) */}
+            {isMovie(media) && onFavoriteToggle && (
+              <Tooltip
+                title={
+                  isFavorite
+                    ? t('mediaDetail.hero.removeFavoriteTooltip')
+                    : t('mediaDetail.hero.addFavoriteTooltip')
+                }
+              >
+                <span>
+                  <Button
+                    variant={isFavorite ? 'contained' : 'outlined'}
+                    color="error"
+                    startIcon={
+                      favoriteLoading ? (
+                        <CircularProgress size={18} color="inherit" />
+                      ) : isFavorite ? (
+                        <FavoriteIcon />
+                      ) : (
+                        <FavoriteBorderIcon />
+                      )
+                    }
+                    onClick={handleFavoriteToggle}
+                    disabled={isFavorite === null || favoriteLoading}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    {isFavorite
+                      ? t('mediaDetail.hero.favorited')
+                      : t('mediaDetail.hero.favorite')}
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
+            {/* Movie mark watched */}
+            {isMovie(media) && watchStatus && !watchStatus.isWatched && canManageWatchHistory && (
+              <Tooltip title={t('mediaDetail.hero.markWatchedTooltip')}>
+                <span>
+                  <Button
+                    variant="outlined"
+                    color="success"
+                    startIcon={
+                      markingWatched ? (
+                        <CircularProgress size={18} color="inherit" />
+                      ) : (
+                        <VisibilityIcon />
+                      )
+                    }
+                    onClick={handleMarkWatched}
+                    disabled={markingWatched}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    {t('mediaDetail.hero.markWatched')}
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
             {/* Movie mark unwatched */}
             {isMovie(media) && watchStatus?.isWatched && canManageWatchHistory && (
               <Tooltip title={t('mediaDetail.hero.markUnwatchedTooltip')}>

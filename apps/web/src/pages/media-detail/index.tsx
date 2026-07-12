@@ -39,6 +39,10 @@ export function MediaDetailPage({ mediaType }: MediaDetailPageProps) {
     error,
     seasons,
     clearWatchStatus,
+    setWatchStatusWatched,
+    isFavorite,
+    favoriteLoading,
+    toggleFavorite,
     updateRating,
   } = useMediaDetail(mediaType, id, user?.id)
 
@@ -85,6 +89,10 @@ export function MediaDetailPage({ mediaType }: MediaDetailPageProps) {
         canManageWatchHistory={user?.isAdmin || user?.canManageWatchHistory || false}
         userId={user?.id}
         onMarkedUnwatched={isMovie(media) ? clearWatchStatus : undefined}
+        onMarkedWatched={isMovie(media) ? setWatchStatusWatched : undefined}
+        isFavorite={isFavorite}
+        favoriteLoading={favoriteLoading}
+        onFavoriteToggle={isMovie(media) && user?.id ? toggleFavorite : undefined}
       />
 
       {/* AI Recommendation Insights */}

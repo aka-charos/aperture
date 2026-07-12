@@ -38,7 +38,7 @@ import {
   refreshLibrary,
   setLibrarySortPreference,
 } from './libraries.js'
-import { getMovies, getMovieById, getWatchHistory, markMovieUnplayed } from './movies.js'
+import { getMovies, getMovieById, getWatchHistory, markMoviePlayed, markMovieUnplayed } from './movies.js'
 import {
   getSeries,
   getSeriesById,
@@ -55,6 +55,7 @@ import {
   unfavoriteSeriesItem as deleteFavoriteSeriesItem,
   favoriteItem as postFavoriteItem,
   unfavoriteItem as deleteFavoriteItem,
+  isItemFavorite as fetchIsItemFavorite,
 } from './favorites.js'
 import { getPersonDetails } from './persons.js'
 import {
@@ -211,6 +212,10 @@ export class EmbyProvider extends EmbyProviderBase implements MediaServerProvide
     return deleteFavoriteItem(this, apiKey, userId, itemId)
   }
 
+  async isItemFavorite(apiKey: string, userId: string, itemId: string): Promise<boolean> {
+    return fetchIsItemFavorite(this, apiKey, userId, itemId)
+  }
+
   // Persons
   async getPersonDetails(
     apiKey: string,
@@ -287,6 +292,10 @@ export class EmbyProvider extends EmbyProviderBase implements MediaServerProvide
   }
 
   // Watch History Management
+  async markMoviePlayed(apiKey: string, userId: string, movieId: string): Promise<void> {
+    return markMoviePlayed(this, apiKey, userId, movieId)
+  }
+
   async markMovieUnplayed(apiKey: string, userId: string, movieId: string): Promise<void> {
     return markMovieUnplayed(this, apiKey, userId, movieId)
   }
