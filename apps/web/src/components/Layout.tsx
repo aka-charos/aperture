@@ -91,8 +91,10 @@ export function Layout() {
   const [watchingEnabled, setWatchingEnabled] = useState(true) // Default to true until we know
   const { user, logout } = useAuth()
   const { open: welcomeOpen, showWelcome, hideWelcome } = useWelcomeModal()
-  // Space reserved on the inline-end side for the docked AI assistant
-  const { dockWidth } = useAssistantDock()
+  // Space reserved on the inline-end side for the docked AI assistant;
+  // while its resize handle is dragged, transitions are dropped so the
+  // content tracks the pointer instead of easing behind it.
+  const { dockWidth, dockResizing } = useAssistantDock()
 
   const drawerWidth = collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH
 
@@ -389,10 +391,12 @@ export function Layout() {
         sx={{
           width: { md: `calc(100% - ${drawerWidth + dockWidth}px)` },
           ml: { md: `${drawerWidth}px` },
-          transition: theme.transitions.create(['width', 'margin'], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.leavingScreen,
-          }),
+          transition: dockResizing
+            ? 'none'
+            : theme.transitions.create(['width', 'margin'], {
+                easing: theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.leavingScreen,
+              }),
         }}
         elevation={0}
       >
@@ -582,10 +586,12 @@ export function Layout() {
           mt: '64px',
           backgroundColor: 'background.default',
           minHeight: 'calc(100vh - 64px)',
-          transition: theme.transitions.create(['width', 'margin'], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.leavingScreen,
-          }),
+          transition: dockResizing
+            ? 'none'
+            : theme.transitions.create(['width', 'margin'], {
+                easing: theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.leavingScreen,
+              }),
         }}
       >
         <Outlet key={i18n.language} />

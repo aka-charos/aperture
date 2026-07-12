@@ -2347,6 +2347,7 @@
     "tooltipRegenerate": "Regenerate response",
     "tooltipConversations": "Conversations",
     "tooltipDock": "Dock to the side",
+    "dockResizeHandle": "Resize assistant panel",
     "tooltipUndock": "Open as dialog",
     "dateToday": "Today",
     "dateYesterday": "Yesterday",
