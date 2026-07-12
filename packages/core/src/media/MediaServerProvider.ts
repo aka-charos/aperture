@@ -9,6 +9,7 @@ import type {
   Episode,
   WatchedItem,
   WatchedEpisode,
+  PersonDetails,
   PlaylistCreateResult,
   CollectionCreateResult,
   LibraryCreateResult,
@@ -210,6 +211,20 @@ export interface MediaServerProvider {
    * Remove favorite from any item for a user (idempotent)
    */
   unfavoriteItem(apiKey: string, userId: string, itemId: string): Promise<void>
+
+  // =========================================================================
+  // Persons
+  // =========================================================================
+
+  /**
+   * Get Person item metadata (biography, birth/death date, birthplace).
+   * Resolves by item id when known (from synced cast personId), else by exact name match.
+   * Returns null when the person is not found on the server.
+   */
+  getPersonDetails(
+    apiKey: string,
+    opts: { name: string; personId?: string }
+  ): Promise<PersonDetails | null>
 
   // =========================================================================
   // Playlists

@@ -1447,7 +1447,14 @@
     "seriesCarousel": "Séries TV",
     "failedLoadDetails": "Échec du chargement des détails",
     "creditsFilterMedia": "Médias",
-    "creditsFilterRole": "Rôle"
+    "creditsFilterRole": "Rôle",
+    "born": "Born: {{date}}",
+    "bornAge": "Born: {{date}} (age {{age}})",
+    "died": "Died: {{date}}",
+    "diedAge": "Died: {{date}} (aged {{age}})",
+    "biography": "Biography",
+    "bioMore": "More",
+    "bioLess": "Less"
   },
   "watcherIdentity": {
     "refreshInterval": {

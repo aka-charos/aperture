@@ -984,7 +984,14 @@
     "seriesCarousel": "TV Series",
     "failedLoadDetails": "Failed to load details",
     "creditsFilterMedia": "Media",
-    "creditsFilterRole": "Role"
+    "creditsFilterRole": "Role",
+    "born": "Born: {{date}}",
+    "bornAge": "Born: {{date}} (age {{age}})",
+    "died": "Died: {{date}}",
+    "diedAge": "Died: {{date}} (aged {{age}})",
+    "biography": "Biography",
+    "bioMore": "More",
+    "bioLess": "Less"
   },
   "search": {
     "title": "Search",

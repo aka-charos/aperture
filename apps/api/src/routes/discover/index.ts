@@ -8,6 +8,7 @@ import {
   listPeopleForBrowse,
   resolveTmdbPersonProfileImageUrl,
   getPersonCreditsGap,
+  getPersonMediaServerDetails,
   findPersonMediaServerItemIdForName,
   pushImageToMediaServer,
 } from '@aperture/core'
@@ -32,6 +33,11 @@ interface PersonResponse {
   imageUrl: string | null
   /** TMDb profile URL when media server has no portrait (optional eager load). */
   tmdbFallbackImageUrl?: string | null
+  /** Person metadata from the media server (null when it has none). */
+  overview: string | null
+  birthDate: string | null
+  deathDate: string | null
+  birthPlace: string | null
   movies: ContentItem[]
   series: ContentItem[]
   stats: {
@@ -289,12 +295,19 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
       const asActorSeries = seriesResults.rows.filter(r => r.is_actor).length
       const asDirectorSeries = seriesResults.rows.filter(r => r.is_director).length
 
-      const tmdbProfile = await resolveTmdbPersonProfileImageUrl(decodedName)
+      const [tmdbProfile, personDetails] = await Promise.all([
+        resolveTmdbPersonProfileImageUrl(decodedName),
+        getPersonMediaServerDetails(decodedName),
+      ])
 
       const response: PersonResponse = {
         name: decodedName,
         imageUrl,
         tmdbFallbackImageUrl: tmdbProfile.imageUrl,
+        overview: personDetails?.overview ?? null,
+        birthDate: personDetails?.birthDate ?? null,
+        deathDate: personDetails?.deathDate ?? null,
+        birthPlace: personDetails?.birthPlace ?? null,
         movies: movieResults.rows.map(r => ({
           id: r.id,
           title: r.title,
