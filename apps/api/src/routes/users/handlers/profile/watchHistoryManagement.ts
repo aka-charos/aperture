@@ -16,6 +16,71 @@ async function canManageWatchHistory(userId: string, currentUser: SessionUser): 
 
 export function registerWatchHistoryManagementHandlers(fastify: FastifyInstance) {
   /**
+   * POST /api/users/:id/watch-history/movies/:movieId
+   * Mark a movie as watched (marks played in Emby and records in Aperture)
+   */
+  fastify.post<{
+    Params: { id: string; movieId: string }
+  }>(
+    '/api/users/:id/watch-history/movies/:movieId',
+    { preHandler: requireAuth, schema: { tags: ['users'] } },
+    async (request, reply) => {
+      const { id, movieId } = request.params
+      const currentUser = request.user as SessionUser
+
+      if (!requireSelfOrAdmin(id, currentUser, reply)) return
+
+      if (!(await canManageWatchHistory(id, currentUser))) {
+        return reply.status(403).send({ error: 'Watch history management is not enabled for this user' })
+      }
+
+      try {
+        const movie = await queryOne<{ provider_item_id: string }>(
+          `SELECT provider_item_id FROM movies WHERE id = $1`,
+          [movieId]
+        )
+        if (!movie) {
+          return reply.status(404).send({ error: 'Movie not found' })
+        }
+
+        const user = await queryOne<{ provider_user_id: string }>(
+          `SELECT provider_user_id FROM users WHERE id = $1`,
+          [id]
+        )
+        if (!user?.provider_user_id) {
+          return reply.status(400).send({ error: 'User has no media server association' })
+        }
+
+        const provider = await getMediaServerProvider()
+        const apiKey = await getMediaServerApiKey()
+
+        if (!apiKey) {
+          return reply.status(500).send({ error: 'Media server API key not configured' })
+        }
+
+        await provider.markMoviePlayed(apiKey, user.provider_user_id, movie.provider_item_id)
+
+        await query(
+          `INSERT INTO watch_history (user_id, movie_id, media_type, play_count, last_played_at, played)
+           VALUES ($1, $2, 'movie', 1, NOW(), true)
+           ON CONFLICT (user_id, movie_id) WHERE movie_id IS NOT NULL DO UPDATE SET
+             play_count = GREATEST(watch_history.play_count, 1),
+             last_played_at = COALESCE(watch_history.last_played_at, NOW()),
+             played = true,
+             updated_at = NOW()`,
+          [id, movieId]
+        )
+
+        fastify.log.info({ userId: id, movieId }, 'Movie marked as watched')
+        return reply.send({ success: true, message: 'Movie marked as watched' })
+      } catch (error) {
+        fastify.log.error({ error, userId: id, movieId }, 'Failed to mark movie as watched')
+        return reply.status(500).send({ error: 'Failed to mark movie as watched' })
+      }
+    }
+  )
+
+  /**
    * DELETE /api/users/:id/watch-history/movies/:movieId
    * Mark a movie as unwatched (removes from Emby and Aperture)
    */

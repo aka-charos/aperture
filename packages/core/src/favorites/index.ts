@@ -83,7 +83,49 @@ export async function setFavoritesForUser(
     updated++
   }
 
+  // Mirror into our own watch history rows so the UI reflects the change
+  // immediately instead of waiting for the next sync job.
+  if (movieIds.length > 0) {
+    await query(
+      'UPDATE watch_history SET is_favorite = $1 WHERE user_id = $2 AND movie_id = ANY($3)',
+      [favorite, userId, movieIds]
+    )
+  }
+
   logger.info({ userId, favorite, updated, skipped }, 'Updated user favorites')
 
   return { updated, skipped }
+}
+
+/**
+ * Whether a movie/series is currently favorited in the user's media-server account.
+ * Items without a provider id (not in the library) report false.
+ */
+export async function getFavoriteStatusForUser(
+  userId: string,
+  item: { movieId?: string; seriesId?: string }
+): Promise<boolean> {
+  const provider = await getMediaServerProvider()
+  const apiKey = await getMediaServerApiKey()
+
+  if (!apiKey) {
+    throw new Error('Media server API key is not configured')
+  }
+
+  const user = await queryOne<{ provider_user_id: string }>(
+    'SELECT provider_user_id FROM users WHERE id = $1',
+    [userId]
+  )
+
+  if (!user?.provider_user_id) {
+    throw new Error('User is not linked to media server')
+  }
+
+  const itemIds = await getProviderItemIds(
+    item.movieId ? [item.movieId] : [],
+    item.seriesId ? [item.seriesId] : []
+  )
+  if (itemIds.length === 0) return false
+
+  return provider.isItemFavorite(apiKey, user.provider_user_id, itemIds[0])
 }

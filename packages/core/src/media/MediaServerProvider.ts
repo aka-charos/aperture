@@ -212,6 +212,11 @@ export interface MediaServerProvider {
    */
   unfavoriteItem(apiKey: string, userId: string, itemId: string): Promise<void>
 
+  /**
+   * Whether an item is currently favorited by a user
+   */
+  isItemFavorite(apiKey: string, userId: string, itemId: string): Promise<boolean>
+
   // =========================================================================
   // Persons
   // =========================================================================
@@ -364,6 +369,11 @@ export interface MediaServerProvider {
   // =========================================================================
   // Watch History Management
   // =========================================================================
+
+  /**
+   * Mark a movie as watched/played
+   */
+  markMoviePlayed(apiKey: string, userId: string, movieId: string): Promise<void>
 
   /**
    * Mark a movie as unwatched/unplayed

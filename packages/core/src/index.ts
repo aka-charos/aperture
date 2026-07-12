@@ -806,7 +806,11 @@ export {
 } from './graphPlaylists/index.js'
 
 // User Favorites
-export { setFavoritesForUser, type SetFavoritesResult } from './favorites/index.js'
+export {
+  setFavoritesForUser,
+  getFavoriteStatusForUser,
+  type SetFavoritesResult,
+} from './favorites/index.js'
 
 // Seerr Integration
 export {

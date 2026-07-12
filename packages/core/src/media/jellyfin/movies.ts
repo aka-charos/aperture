@@ -243,6 +243,27 @@ function watchedItemFromJellyfinMovie(item: JellyfinItem): WatchedItem {
 }
 
 /**
+ * Mark a movie as played/watched in Jellyfin
+ * This calls POST /Users/{UserId}/PlayedItems/{ItemId}
+ */
+export async function markMoviePlayed(
+  provider: JellyfinProviderBase,
+  apiKey: string,
+  userId: string,
+  movieProviderId: string
+): Promise<void> {
+  logger.info({ userId, movieProviderId }, 'Marking movie as played in Jellyfin')
+
+  await provider.fetch(
+    `/Users/${userId}/PlayedItems/${movieProviderId}`,
+    apiKey,
+    { method: 'POST' }
+  )
+
+  logger.info({ userId, movieProviderId }, 'Movie marked as played')
+}
+
+/**
  * Mark a movie as unplayed/unwatched in Jellyfin
  * This calls DELETE /Users/{UserId}/PlayedItems/{ItemId}
  */

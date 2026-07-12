@@ -1,8 +1,37 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { requireAuth, type SessionUser } from '../../plugins/auth.js'
-import { setFavoritesForUser } from '@aperture/core'
+import { setFavoritesForUser, getFavoriteStatusForUser } from '@aperture/core'
 
 const favoritesRoutes: FastifyPluginAsync = async (fastify) => {
+  /**
+   * GET /api/favorites/status
+   * Whether a movie or series is favorited in the current user's media-server account.
+   * Query: movieId or seriesId (exactly one).
+   */
+  fastify.get<{
+    Querystring: { movieId?: string; seriesId?: string }
+  }>(
+    '/api/favorites/status',
+    { preHandler: requireAuth, schema: { tags: ['favorites'] } },
+    async (request, reply) => {
+      const currentUser = request.user as SessionUser
+      const { movieId, seriesId } = request.query
+
+      if ((!movieId && !seriesId) || (movieId && seriesId)) {
+        return reply.status(400).send({ error: 'Provide exactly one of movieId or seriesId' })
+      }
+
+      try {
+        const favorite = await getFavoriteStatusForUser(currentUser.id, { movieId, seriesId })
+        return reply.send({ favorite })
+      } catch (err) {
+        request.log.error({ err, userId: currentUser.id }, 'Failed to fetch favorite status')
+        const message = err instanceof Error ? err.message : 'Failed to fetch favorite status'
+        return reply.status(500).send({ error: message })
+      }
+    }
+  )
+
   /**
    * POST /api/favorites
    * Mark or unmark movies/series as favorites in the current user's media-server account.

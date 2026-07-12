@@ -616,6 +616,12 @@
       "openEmby": "Open in Emby",
       "markUnwatchedTooltip": "Mark as unwatched - removes from watch history",
       "markUnwatched": "Mark Unwatched",
+      "markWatchedTooltip": "Mark as watched - syncs to your media server and watch history",
+      "markWatched": "Mark Watched",
+      "favorite": "Favorite",
+      "favorited": "Favorited",
+      "addFavoriteTooltip": "Add to favorites on your media server",
+      "removeFavoriteTooltip": "Remove from favorites on your media server",
       "outOfTen": "/ 10",
       "critic": "Critic:",
       "seasons_one": "{{count}} Season",
@@ -631,7 +637,12 @@
       "cannotUndo": "This action cannot be undone.",
       "marking": "Marking…",
       "snackbarMarked": "Movie marked as unwatched",
-      "snackbarMarkFailed": "Failed to mark as unwatched"
+      "snackbarMarkFailed": "Failed to mark as unwatched",
+      "snackbarMarkedWatched": "Movie marked as watched",
+      "snackbarMarkWatchedFailed": "Failed to mark as watched",
+      "snackbarFavoriteAdded": "Added to favorites",
+      "snackbarFavoriteRemoved": "Removed from favorites",
+      "snackbarFavoriteFailed": "Failed to update favorite"
     },
     "insights": {
       "recommendedForYou": "Recommended For You",

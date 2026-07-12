@@ -88,6 +88,27 @@ export async function unfavoriteItem(
   }
 }
 
+/**
+ * Whether an item is currently favorited by a user. Unknown items report false.
+ */
+export async function isItemFavorite(
+  provider: EmbyProviderBase,
+  apiKey: string,
+  userId: string,
+  itemId: string
+): Promise<boolean> {
+  const path = `/Users/${encodeURIComponent(userId)}/Items/${encodeURIComponent(itemId)}`
+  try {
+    const item = await provider.fetch<{ UserData?: { IsFavorite?: boolean } }>(path, apiKey)
+    return item.UserData?.IsFavorite === true
+  } catch (err) {
+    if (isEmbyNotFoundError(err)) {
+      return false
+    }
+    throw err
+  }
+}
+
 // Series favorites use the same endpoint — kept as named aliases for existing call sites.
 export const favoriteSeriesItem = favoriteItem
 export const unfavoriteSeriesItem = unfavoriteItem
