@@ -87,7 +87,15 @@ export function MoviePoster({
 }: MoviePosterProps) {
   const [isHovered, setIsHovered] = useState(false)
   const [imageError, setImageError] = useState(false)
+  const [isOffRatio, setIsOffRatio] = useState(false)
   const dimensions = sizeConfig[size]
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth, naturalHeight } = e.currentTarget
+    if (naturalWidth > 0 && naturalHeight > 0) {
+      setIsOffRatio(Math.abs(naturalWidth / naturalHeight - 2 / 3) > 0.02)
+    }
+  }
 
   // Proxy the image URL through our API to avoid mixed content issues
   const proxiedPosterUrl = getProxiedImageUrl(posterUrl)
@@ -138,17 +146,44 @@ export function MoviePoster({
         }}
       >
         {posterUrl && !imageError ? (
-          <Box
-            component="img"
-            src={proxiedPosterUrl}
-            alt={title}
-            onError={() => setImageError(true)}
-            sx={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-            }}
-          />
+          <>
+            {/* Library artwork isn't guaranteed 2:3 — objectFit: 'cover' would crop
+                off-ratio posters top/bottom. Off-ratio posters render with 'contain'
+                plus a blurred fill behind. The blur layer is rendered ONLY for
+                off-ratio images: a grid can hold hundreds of posters, and a
+                composited blur on every one exhausts GPU tile memory (blank,
+                flickering cards). */}
+            {isOffRatio && (
+              <Box
+                component="img"
+                src={proxiedPosterUrl}
+                alt=""
+                aria-hidden
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  filter: 'blur(20px)',
+                  transform: 'scale(1.15)',
+                }}
+              />
+            )}
+            <Box
+              component="img"
+              src={proxiedPosterUrl}
+              alt={title}
+              onLoad={handleImageLoad}
+              onError={() => setImageError(true)}
+              sx={{
+                position: 'relative',
+                width: '100%',
+                height: '100%',
+                objectFit: isOffRatio ? 'contain' : 'cover',
+              }}
+            />
+          </>
         ) : (
           <Box
             component="img"

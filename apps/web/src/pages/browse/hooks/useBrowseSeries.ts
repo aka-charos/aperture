@@ -71,11 +71,16 @@ export function useBrowseSeries({ tabIndex, persistSortPreferences }: UseBrowseS
   const [seriesTotal, setSeriesTotal] = useState(0)
   const seriesObserverRef = useRef<IntersectionObserver | null>(null)
   const seriesLoadMoreRef = useRef<HTMLDivElement | null>(null)
+  // Loaded-count lives in a ref, not state: putting series.length in fetchSeries'
+  // deps recreates the callback after every fetch, and the fetch effect depends
+  // on fetchSeries — an infinite refetch loop (grid flickers content/skeleton).
+  const seriesCountRef = useRef(0)
 
   const resetSeries = useCallback(() => {
     setSeries([])
     setSeriesPage(1)
     setSeriesHasMore(true)
+    seriesCountRef.current = 0
   }, [])
 
   const fetchSeries = useCallback(
@@ -123,8 +128,10 @@ export function useBrowseSeries({ tabIndex, persistSortPreferences }: UseBrowseS
         } else {
           setSeries(data.series)
         }
+        const loadedCount = append ? seriesCountRef.current + data.series.length : data.series.length
+        seriesCountRef.current = loadedCount
         setSeriesTotal(data.total)
-        setSeriesHasMore(data.series.length === PAGE_SIZE && (append ? series.length + data.series.length : data.series.length) < data.total)
+        setSeriesHasMore(data.series.length === PAGE_SIZE && loadedCount < data.total)
         setSeriesError(null)
       } catch {
         setSeriesError(t('browse.errors.connect'))
@@ -133,7 +140,7 @@ export function useBrowseSeries({ tabIndex, persistSortPreferences }: UseBrowseS
         setSeriesLoadingMore(false)
       }
     },
-    [network, series.length, seriesFilters, seriesGenre, seriesRanges, seriesSearch, seriesSortBy, seriesSortOrder, t]
+    [network, seriesFilters, seriesGenre, seriesRanges, seriesSearch, seriesSortBy, seriesSortOrder, t]
   )
 
   const fetchSeriesMetadata = useCallback(async () => {
