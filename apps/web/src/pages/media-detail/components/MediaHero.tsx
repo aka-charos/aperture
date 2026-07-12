@@ -68,6 +68,7 @@ export function MediaHero({
   const { t } = useTranslation()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [marking, setMarking] = useState(false)
+  const [posterOffRatio, setPosterOffRatio] = useState(false)
   const [snackbar, setSnackbar] = useState<{
     open: boolean
     message: string
@@ -191,24 +192,54 @@ export function MediaHero({
             flexShrink: 0,
             borderRadius: 2,
             overflow: 'hidden',
+            position: 'relative',
             alignSelf: { xs: 'center', md: 'flex-start' },
           }}
         >
           {media.poster_url ? (
-            <Box
-              component="img"
-              src={getProxiedImageUrl(media.poster_url)}
-              alt={media.title}
-              onError={(e) => {
-                const target = e.target as HTMLImageElement
-                target.src = FALLBACK_POSTER_URL
-              }}
-              sx={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-              }}
-            />
+            <>
+              {/* Library artwork isn't guaranteed 2:3 — objectFit: 'cover' would crop
+                  off-ratio posters top/bottom. Off-ratio posters render with 'contain'
+                  plus a blurred fill behind. */}
+              {posterOffRatio && (
+                <Box
+                  component="img"
+                  src={getProxiedImageUrl(media.poster_url)}
+                  alt=""
+                  aria-hidden
+                  sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    filter: 'blur(20px)',
+                    transform: 'scale(1.15)',
+                  }}
+                />
+              )}
+              <Box
+                component="img"
+                src={getProxiedImageUrl(media.poster_url)}
+                alt={media.title}
+                onLoad={(e) => {
+                  const { naturalWidth, naturalHeight } = e.currentTarget
+                  if (naturalWidth > 0 && naturalHeight > 0) {
+                    setPosterOffRatio(Math.abs(naturalWidth / naturalHeight - 2 / 3) > 0.02)
+                  }
+                }}
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.src = FALLBACK_POSTER_URL
+                }}
+                sx={{
+                  position: 'relative',
+                  width: '100%',
+                  height: '100%',
+                  objectFit: posterOffRatio ? 'contain' : 'cover',
+                }}
+              />
+            </>
           ) : (
             <Box
               sx={{
