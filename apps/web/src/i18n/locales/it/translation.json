@@ -618,8 +618,8 @@
       "awards": "Premi"
     },
     "similar": {
-      "titleMovies": "Film simili",
-      "titleSeries": "Serie simili",
+      "titleMovies": "Film correlati",
+      "titleSeries": "Serie correlate",
       "tabList": "Lista",
       "tabGraph": "Grafico",
       "tooltipFullscreen": "A schermo intero",
@@ -2359,7 +2359,7 @@
     "stepWelcome": "Benvenuti in Aperture",
     "stepHowAi": "Come funzionano i consigli dell'intelligenza artificiale",
     "stepScoring": "Fattori di punteggio",
-    "stepSimilar": "Film simili",
+    "stepSimilar": "Film correlati",
     "stepData": "I tuoi dati",
     "stepWelcomeP1": "<0>Aperture</0> è il tuo motore personale di consigli sui film basato sull'intelligenza artificiale che impara dalla tua cronologia visualizzazioni per suggerirti i film che adorerai.",
     "stepWelcomeP2": "Si integra con il tuo server multimediale Emby o Jellyfin per comprendere i tuoi gusti e fornire consigli personalizzati direttamente sulla schermata iniziale.",
@@ -2377,7 +2377,7 @@
     "stepScoringCommunityD": "Predilige film con valutazioni elevate per garantire consigli di qualità",
     "stepScoringDiversity": "Diversità dei risultati (20%)",
     "stepScoringDiversityD": "Garantisce varietà in modo da non avere 50 film di supereroi di fila",
-    "stepSimilarP1": "Quando visualizzi la pagina dei dettagli di un film, vedrai <0>\"Film simili\"</0> basati sulla stessa tecnologia AI.",
+    "stepSimilarP1": "Quando visualizzi la pagina dei dettagli di un film, vedrai <0>\"Film correlati\"</0> basati sulla stessa tecnologia AI.",
     "stepSimilarP2": "Questi non sono solo film dello stesso genere, sono film con caratteristiche simili:",
     "stepSimilarLi1": "Temi e argomenti",
     "stepSimilarLi2": "Tono e atmosfera",

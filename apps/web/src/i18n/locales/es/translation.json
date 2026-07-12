@@ -618,8 +618,8 @@
       "awards": "Premios"
     },
     "similar": {
-      "titleMovies": "Películas similares",
-      "titleSeries": "Series similares",
+      "titleMovies": "Películas relacionadas",
+      "titleSeries": "Series relacionadas",
       "tabList": "Lista",
       "tabGraph": "Gráfico",
       "tooltipFullscreen": "Pantalla completa",
@@ -2359,7 +2359,7 @@
     "stepWelcome": "Bienvenido a Apertura",
     "stepHowAi": "Cómo funcionan las recomendaciones de IA",
     "stepScoring": "Factores de puntuación",
-    "stepSimilar": "Películas similares",
+    "stepSimilar": "Películas relacionadas",
     "stepData": "Tus datos",
     "stepWelcomeP1": "<0>Aperture</0> es tu motor personal de recomendación de películas basado en inteligencia artificial que aprende de tu historial de reproducciones para sugerir películas que te encantarán.",
     "stepWelcomeP2": "Se integra con su servidor multimedia Emby o Jellyfin para comprender sus gustos y ofrecer recomendaciones personalizadas directamente en su pantalla de inicio.",
@@ -2377,7 +2377,7 @@
     "stepScoringCommunityD": "Favorece películas altamente calificadas para garantizar recomendaciones de calidad.",
     "stepScoringDiversity": "Diversidad de resultados (20%)",
     "stepScoringDiversityD": "Asegura variedad para no tener 50 películas de superhéroes seguidas",
-    "stepSimilarP1": "Al ver la página de detalles de una película, verá <0>\"Películas similares\"</0> impulsadas por la misma tecnología de inteligencia artificial.",
+    "stepSimilarP1": "Al ver la página de detalles de una película, verá <0>\"Películas relacionadas\"</0> impulsadas por la misma tecnología de inteligencia artificial.",
     "stepSimilarP2": "Estas no son solo películas del mismo género, son películas similares:",
     "stepSimilarLi1": "Temas y materias",
     "stepSimilarLi2": "Tono y atmósfera",

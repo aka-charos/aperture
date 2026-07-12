@@ -618,8 +618,8 @@
       "awards": "수상 내역"
     },
     "similar": {
-      "titleMovies": "비슷한 영화",
-      "titleSeries": "비슷한 시리즈",
+      "titleMovies": "관련 영화",
+      "titleSeries": "관련 시리즈",
       "tabList": "목록",
       "tabGraph": "그래프",
       "tooltipFullscreen": "전체 화면",
@@ -2359,7 +2359,7 @@
     "stepWelcome": "조리개에 오신 것을 환영합니다",
     "stepHowAi": "AI 추천의 작동 방식",
     "stepScoring": "점수 요인",
-    "stepSimilar": "비슷한 영화",
+    "stepSimilar": "관련 영화",
     "stepData": "귀하의 데이터",
     "stepWelcomeP1": "<0>Aperture</0>는 시청 기록을 바탕으로 학습하여 좋아할 만한 영화를 추천하는 개인용 AI 기반 영화 추천 엔진입니다.",
     "stepWelcomeP2": "Emby 또는 Jellyfin 미디어 서버와 통합되어 귀하의 취향을 이해하고 개인화된 권장 사항을 홈 화면에 직접 제공합니다.",
@@ -2377,7 +2377,7 @@
     "stepScoringCommunityD": "품질 추천을 보장하기 위해 높은 등급의 영화를 선호합니다.",
     "stepScoringDiversity": "결과 다양성 (20%)",
     "stepScoringDiversityD": "연속해서 50편의 슈퍼히어로 영화를 볼 수 없도록 다양성을 보장합니다.",
-    "stepSimilarP1": "영화의 세부정보 페이지를 보면 동일한 AI 기술로 구동되는 <0>'유사 영화'</0>가 표시됩니다.",
+    "stepSimilarP1": "영화의 세부정보 페이지를 보면 동일한 AI 기술로 구동되는 <0>'관련 영화'</0>가 표시됩니다.",
     "stepSimilarP2": "이 영화들은 단지 같은 장르의 영화가 아니라 다음과 같은 유사한 영화들입니다.",
     "stepSimilarLi1": "테마 및 주제",
     "stepSimilarLi2": "톤과 분위기",

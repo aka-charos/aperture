@@ -1045,8 +1045,8 @@
       "awards": "奖项"
     },
     "similar": {
-      "titleMovies": "类似电影",
-      "titleSeries": "类似系列",
+      "titleMovies": "相关电影",
+      "titleSeries": "相关系列",
       "tabList": "列表",
       "tabGraph": "图形",
       "tooltipFullscreen": "全屏",
@@ -2359,7 +2359,7 @@
     "stepWelcome": "欢迎来到光圈",
     "stepHowAi": "人工智能推荐的工作原理",
     "stepScoring": "评分因素",
-    "stepSimilar": "类似电影",
+    "stepSimilar": "相关电影",
     "stepData": "您的数据",
     "stepWelcomeP1": "<0>Aperture</0> 是您的个人人工智能电影推荐引擎，它会根据您的观看历史记录推荐您喜欢的电影。",
     "stepWelcomeP2": "它与您的 Emby 或 Jellyfin 媒体服务器集成，了解您的品味并直接向您的主屏幕提供个性化推荐。",
@@ -2377,7 +2377,7 @@
     "stepScoringCommunityD": "偏爱高评价电影以确保推荐质量",
     "stepScoringDiversity": "结果多样性 (20%)",
     "stepScoringDiversityD": "确保多样性，这样您就不会连续观看 50 部超级英雄电影",
-    "stepSimilarP1": "查看电影的详细信息页面时，您会看到由相同 AI 技术提供支持的<0>“类似电影”</0>。",
+    "stepSimilarP1": "查看电影的详细信息页面时，您会看到由相同 AI 技术提供支持的<0>“相关电影”</0>。",
     "stepSimilarP2": "这些不仅仅是同一类型的电影——它们具有以下相似之处：",
     "stepSimilarLi1": "主题和主题",
     "stepSimilarLi2": "语气和气氛",

@@ -186,7 +186,9 @@ export function SimilarMedia({ mediaType, mediaId, mediaTitle, similar }: Simila
         sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}
       >
         <Typography variant="h6" fontWeight={600}>
-          Similar {mediaType === 'movie' ? 'Movies' : 'Series'}
+          {mediaType === 'movie'
+            ? t('mediaDetail.similar.titleMovies')
+            : t('mediaDetail.similar.titleSeries')}
         </Typography>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
