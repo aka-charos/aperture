@@ -21,8 +21,8 @@ interface CachedData {
   version: number // For cache invalidation on schema changes
 }
 
-// v3: adds missingSeasons (v2 introduced the watchlist+history union)
-const CACHE_VERSION = 3
+// v4: status normalized against TMDB (v3 added missingSeasons, v2 the union)
+const CACHE_VERSION = 4
 
 /** Watchlist membership only — history-sourced rows must not count as "watching" */
 function watchlistIds(series: WatchingSeries[]): Set<string> {

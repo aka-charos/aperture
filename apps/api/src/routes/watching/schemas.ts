@@ -41,7 +41,12 @@ export const watchingSchemas = {
       overview: { type: 'string', nullable: true },
       communityRating: { type: 'number', nullable: true },
       network: { type: 'string', nullable: true },
-      status: { type: 'string', nullable: true, description: 'Series status (Continuing, Ended)' },
+      status: {
+        type: 'string',
+        nullable: true,
+        description:
+          'Series status (Continuing, Ended, Canceled) — TMDB status overrides stale media-server status when cached',
+      },
       totalSeasons: { type: 'integer', nullable: true },
       totalEpisodes: { type: 'integer', nullable: true },
       addedAt: {
