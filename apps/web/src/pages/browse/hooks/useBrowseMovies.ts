@@ -93,11 +93,16 @@ export function useBrowseMovies({ tabIndex, persistSortPreferences }: UseBrowseM
   const [movieTotal, setMovieTotal] = useState(0)
   const movieObserverRef = useRef<IntersectionObserver | null>(null)
   const movieLoadMoreRef = useRef<HTMLDivElement | null>(null)
+  // Loaded-count lives in a ref, not state: putting movies.length in fetchMovies'
+  // deps recreates the callback after every fetch, and the fetch effect depends
+  // on fetchMovies — an infinite refetch loop (grid flickers content/skeleton).
+  const movieCountRef = useRef(0)
 
   const resetMovies = useCallback(() => {
     setMovies([])
     setMoviePage(1)
     setMovieHasMore(true)
+    movieCountRef.current = 0
   }, [])
 
   const fetchMovies = useCallback(
@@ -139,8 +144,10 @@ export function useBrowseMovies({ tabIndex, persistSortPreferences }: UseBrowseM
         const data = (await response.json()) as MoviesResponse
         if (append) setMovies((prev) => [...prev, ...data.movies])
         else setMovies(data.movies)
+        const loadedCount = append ? movieCountRef.current + data.movies.length : data.movies.length
+        movieCountRef.current = loadedCount
         setMovieTotal(data.total)
-        setMovieHasMore(data.movies.length === PAGE_SIZE && (append ? movies.length + data.movies.length : data.movies.length) < data.total)
+        setMovieHasMore(data.movies.length === PAGE_SIZE && loadedCount < data.total)
         setMoviesError(null)
       } catch {
         setMoviesError(t('browse.errors.connect'))
@@ -149,7 +156,7 @@ export function useBrowseMovies({ tabIndex, persistSortPreferences }: UseBrowseM
         setMoviesLoadingMore(false)
       }
     },
-    [collection, movieFilters, movieGenre, movieRanges, movieSearch, movieSortBy, movieSortOrder, movies.length, t]
+    [collection, movieFilters, movieGenre, movieRanges, movieSearch, movieSortBy, movieSortOrder, t]
   )
 
   const fetchMovieMetadata = useCallback(async () => {

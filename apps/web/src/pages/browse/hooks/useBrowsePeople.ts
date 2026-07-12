@@ -43,11 +43,16 @@ export function useBrowsePeople({ tabIndex, initialTabIsPeople }: UseBrowsePeopl
   const [peopleTotal, setPeopleTotal] = useState(0)
   const peopleObserverRef = useRef<IntersectionObserver | null>(null)
   const peopleLoadMoreRef = useRef<HTMLDivElement | null>(null)
+  // Loaded-count lives in a ref, not state: putting people.length in fetchPeople's
+  // deps recreates the callback after every fetch, and the fetch effect depends
+  // on fetchPeople — an infinite refetch loop (grid flickers content/skeleton).
+  const peopleCountRef = useRef(0)
 
   const resetPeople = useCallback(() => {
     setPeople([])
     setPeoplePage(1)
     setPeopleHasMore(true)
+    peopleCountRef.current = 0
   }, [])
 
   const fetchPeople = useCallback(
@@ -78,11 +83,10 @@ export function useBrowsePeople({ tabIndex, initialTabIsPeople }: UseBrowsePeopl
         } else {
           setPeople(data.people)
         }
+        const loadedCount = append ? peopleCountRef.current + data.people.length : data.people.length
+        peopleCountRef.current = loadedCount
         setPeopleTotal(data.total)
-        setPeopleHasMore(
-          data.people.length === PAGE_SIZE &&
-            (append ? people.length + data.people.length : data.people.length) < data.total
-        )
+        setPeopleHasMore(data.people.length === PAGE_SIZE && loadedCount < data.total)
         setPeopleError(null)
       } catch {
         setPeopleError(t('browse.errors.connect'))
@@ -91,7 +95,7 @@ export function useBrowsePeople({ tabIndex, initialTabIsPeople }: UseBrowsePeopl
         setPeopleLoadingMore(false)
       }
     },
-    [people.length, peopleSearch, peopleSortBy, t]
+    [peopleSearch, peopleSortBy, t]
   )
 
   useEffect(() => {
