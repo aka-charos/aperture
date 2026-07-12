@@ -27,6 +27,10 @@ import {
   type ModelMetadata,
 } from './ai-capabilities.js'
 import { getOpenRouterModelCapabilities } from './openrouter-capabilities.js'
+import {
+  getOllamaModelCapabilities,
+  getLmStudioModelCapabilities,
+} from './local-model-capabilities.js'
 
 const logger = createChildLogger('ai-provider')
 
@@ -329,6 +333,31 @@ async function resolveApiKeyForProvider(provider: ProviderType): Promise<string 
 }
 
 /**
+ * Resolve a provider's base URL from the shared credential store or any
+ * configured function already using it. Mirrors resolveApiKeyForProvider —
+ * needed when probing local servers without a function config in hand.
+ */
+async function resolveBaseUrlForProvider(provider: ProviderType): Promise<string | undefined> {
+  const credsJson = await getSystemSetting('ai_provider_credentials')
+  if (credsJson) {
+    try {
+      const creds = JSON.parse(credsJson) as Record<string, { baseUrl?: string }>
+      if (creds[provider]?.baseUrl) return creds[provider].baseUrl
+    } catch (e) {
+      logger.warn({ error: e }, 'Failed to parse ai_provider_credentials')
+    }
+  }
+
+  const config = await getAIConfig()
+  for (const fn of ['chat', 'embeddings', 'textGeneration', 'exploration', 'webSearch'] as AIFunction[]) {
+    const fnConfig = config[fn]
+    if (fnConfig?.provider === provider && fnConfig.baseUrl) return fnConfig.baseUrl
+  }
+
+  return undefined
+}
+
+/**
  * Return a provider config guaranteed to carry an API key when one is available
  * anywhere in the configuration. No-op when the config already has its own key.
  */
@@ -545,27 +574,52 @@ export function assumedCustomModelCapabilities(fn: AIFunction): ModelCapabilitie
 }
 
 /**
+ * Live per-model capability sources, by provider:
+ * - OpenRouter: public model catalog (supported parameters per model)
+ * - Ollama: the show endpoint's capabilities list
+ * - openai-compatible: might be LM Studio, whose native REST API reports
+ *   per-model capabilities; other servers just fail the probe harmlessly
+ * Returns null when the source is unavailable or doesn't know the model.
+ */
+async function liveModelCapabilities(
+  providerId: string,
+  modelId: string,
+  fn: AIFunction,
+  baseUrl?: string
+): Promise<ModelCapabilities | null> {
+  // The OpenRouter catalog only describes language models, so never let it
+  // answer for embeddings — the custom-model assumption handles those
+  if (providerId === 'openrouter' && fn !== 'embeddings') {
+    return getOpenRouterModelCapabilities(modelId)
+  }
+  if (providerId === 'ollama') {
+    return getOllamaModelCapabilities(modelId, baseUrl)
+  }
+  if (providerId === 'openai-compatible') {
+    return getLmStudioModelCapabilities(modelId, baseUrl)
+  }
+  return null
+}
+
+/**
  * Resolve a model's capabilities from the best available source:
  * 1. the built-in registry,
- * 2. the provider's live catalog (OpenRouter publishes per-model
- *    supported parameters — real data, not guesses),
+ * 2. the provider's live catalog or a local-server probe (real data,
+ *    not guesses),
  * 3. the custom-model assumption the settings UI already uses.
  * Returns null only for an unknown model on a registry-only provider.
  */
 export async function resolveModelCapabilities(
   providerId: string,
   modelId: string,
-  fn: AIFunction
+  fn: AIFunction,
+  baseUrl?: string
 ): Promise<ModelCapabilities | null> {
   const builtIn = getModel(providerId, modelId, fn)
   if (builtIn) return builtIn.capabilities
 
-  // The OpenRouter catalog only describes language models, so never let it
-  // answer for embeddings — the assumption below handles those
-  if (providerId === 'openrouter' && fn !== 'embeddings') {
-    const live = await getOpenRouterModelCapabilities(modelId)
-    if (live) return live
-  }
+  const live = await liveModelCapabilities(providerId, modelId, fn, baseUrl)
+  if (live) return live
 
   if (CUSTOM_MODEL_PROVIDERS.has(providerId)) {
     return assumedCustomModelCapabilities(fn)
@@ -591,11 +645,19 @@ export async function getAICapabilitiesStatus(): Promise<AICapabilitiesStatus> {
       }
     }
 
+    // Local-server probes need a base URL; it may live in the shared
+    // credential store rather than on this function's config
+    const baseUrl =
+      fnConfig.baseUrl ??
+      (fnConfig.provider === 'ollama' || fnConfig.provider === 'openai-compatible'
+        ? await resolveBaseUrlForProvider(fnConfig.provider)
+        : undefined)
+
     return {
       configured: true,
       provider: fnConfig.provider,
       model: fnConfig.model,
-      capabilities: await resolveModelCapabilities(fnConfig.provider, fnConfig.model, fn),
+      capabilities: await resolveModelCapabilities(fnConfig.provider, fnConfig.model, fn, baseUrl),
     }
   }
 
@@ -1015,18 +1077,24 @@ export async function getModelsForFunctionWithCustom(
   // Get custom models from database (only for ollama and openai-compatible)
   const customModels = await getCustomModels(providerId, fn)
 
+  // Local-server probes need the provider's base URL, which lives in the
+  // shared credential store or on whichever function uses the provider
+  const probeBaseUrl =
+    customModels.length > 0 && (providerId === 'ollama' || providerId === 'openai-compatible')
+      ? await resolveBaseUrlForProvider(providerId as ProviderType)
+      : undefined
+
   // Convert custom models to ModelMetadata format
   const customModelMetadata: ModelMetadata[] = await Promise.all(
     customModels.map(async cm => ({
       id: cm.modelId,
       name: cm.modelId, // Use the model ID as the name
       description: 'Custom model',
-      // Real capabilities from the provider's catalog when available
-      // (OpenRouter), otherwise assume the model fits its function
+      // Real capabilities from the provider's catalog or a local probe when
+      // available, otherwise assume the model fits its function
       capabilities:
-        (providerId === 'openrouter' && fn !== 'embeddings'
-          ? await getOpenRouterModelCapabilities(cm.modelId)
-          : null) ?? assumedCustomModelCapabilities(fn),
+        (await liveModelCapabilities(providerId, cm.modelId, fn, probeBaseUrl)) ??
+        assumedCustomModelCapabilities(fn),
       quality: 'standard' as const,
       costTier: 'free' as const,
       // Include embedding dimensions for custom embedding models
