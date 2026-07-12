@@ -618,8 +618,8 @@
       "awards": "Auszeichnungen"
     },
     "similar": {
-      "titleMovies": "Ähnliche Filme",
-      "titleSeries": "Ähnliche Serien",
+      "titleMovies": "Verwandte Filme",
+      "titleSeries": "Verwandte Serien",
       "tabList": "Liste",
       "tabGraph": "Grafik",
       "tooltipFullscreen": "Vollbild",
@@ -2359,7 +2359,7 @@
     "stepWelcome": "Willkommen bei Aperture",
     "stepHowAi": "Wie KI-Empfehlungen funktionieren",
     "stepScoring": "Bewertungsfaktoren",
-    "stepSimilar": "Ähnliche Filme",
+    "stepSimilar": "Verwandte Filme",
     "stepData": "Deine Daten",
     "stepWelcomeP1": "<0>Aperture</0> ist deine persönliche, KI-gestützte Filmempfehlungsmaschine, die aus deinem Seh-Verlauf lernt, um dir Filme vorzuschlagen, die du lieben wirst.",
     "stepWelcomeP2": "Es integriert sich mit deinem Emby- oder Jellyfin-Medienserver, um deinen Geschmack zu verstehen und dir personalisierte Empfehlungen direkt auf deinem Startbildschirm zu liefern.",
@@ -2377,7 +2377,7 @@
     "stepScoringCommunityD": "Bevorzugt hoch bewertete Filme für qualitativ hochwertige Empfehlungen",
     "stepScoringDiversity": "Ergebnisvielfalt (20%)",
     "stepScoringDiversityD": "Sorgt für Abwechslung, damit du nicht 50 Superheldenfilme hintereinander bekommst",
-    "stepSimilarP1": "Auf der Detailseite eines Films siehst du <0>\"Ähnliche Filme\"</0>, die von derselben KI-Technologie unterstützt werden.",
+    "stepSimilarP1": "Auf der Detailseite eines Films siehst du <0>\"Verwandte Filme\"</0>, die von derselben KI-Technologie unterstützt werden.",
     "stepSimilarP2": "Das sind nicht nur Filme desselben Genres – es sind Filme mit ähnlichen:",
     "stepSimilarLi1": "Themen und Inhalten",
     "stepSimilarLi2": "Ton und Atmosphäre",

@@ -663,8 +663,8 @@
       "watched": "Watched"
     },
     "similar": {
-      "titleMovies": "Similar Movies",
-      "titleSeries": "Similar Series",
+      "titleMovies": "Related Movies",
+      "titleSeries": "Related Series",
       "tabList": "List",
       "tabGraph": "Graph",
       "tooltipFullscreen": "Fullscreen",
@@ -2382,7 +2382,7 @@
     "stepWelcome": "Welcome to Aperture",
     "stepHowAi": "How AI Recommendations Work",
     "stepScoring": "Scoring Factors",
-    "stepSimilar": "Similar Movies",
+    "stepSimilar": "Related Movies",
     "stepData": "Your Data",
     "stepWelcomeP1": "<0>Aperture</0> is your personal AI-powered movie recommendation engine that learns from your watch history to suggest films you'll love.",
     "stepWelcomeP2": "It integrates with your Emby or Jellyfin media server to understand your tastes and deliver personalized recommendations directly to your home screen.",
@@ -2400,7 +2400,7 @@
     "stepScoringCommunityD": "Favors highly-rated films to ensure quality recommendations",
     "stepScoringDiversity": "Result Diversity (20%)",
     "stepScoringDiversityD": "Ensures variety so you don't get 50 superhero movies in a row",
-    "stepSimilarP1": "When viewing a movie's detail page, you'll see <0>\"Similar Movies\"</0> powered by the same AI technology.",
+    "stepSimilarP1": "When viewing a movie's detail page, you'll see <0>\"Related Movies\"</0> powered by the same AI technology.",
     "stepSimilarP2": "These aren't just movies in the same genre — they're films with similar:",
     "stepSimilarLi1": "Themes and subject matter",
     "stepSimilarLi2": "Tone and atmosphere",

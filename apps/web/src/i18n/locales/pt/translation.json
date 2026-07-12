@@ -618,8 +618,8 @@
       "awards": "Prêmios"
     },
     "similar": {
-      "titleMovies": "Filmes semelhantes",
-      "titleSeries": "Séries semelhantes",
+      "titleMovies": "Filmes relacionados",
+      "titleSeries": "Séries relacionadas",
       "tabList": "Lista",
       "tabGraph": "Gráfico",
       "tooltipFullscreen": "Tela cheia",
@@ -2359,7 +2359,7 @@
     "stepWelcome": "Bem vindo ao Aperture",
     "stepHowAi": "Como funcionam as recomendações de IA",
     "stepScoring": "Fatores de pontuação",
-    "stepSimilar": "Filmes semelhantes",
+    "stepSimilar": "Filmes relacionados",
     "stepData": "Seus dados",
     "stepWelcomeP1": "O <0>Aperture</0> é seu mecanismo pessoal de recomendação de filmes com tecnologia de IA que aprende com seu histórico de exibição para sugerir filmes que você vai adorar.",
     "stepWelcomeP2": "Ele se integra ao seu servidor de mídia Emby ou Jellyfin para entender seus gostos e fornecer recomendações personalizadas diretamente na sua tela inicial.",
@@ -2377,7 +2377,7 @@
     "stepScoringCommunityD": "Favorece filmes de alta classificação para garantir recomendações de qualidade",
     "stepScoringDiversity": "Diversidade de Resultados (20%)",
     "stepScoringDiversityD": "Garante variedade para que você não tenha 50 filmes de super-heróis seguidos",
-    "stepSimilarP1": "Ao visualizar a página de detalhes de um filme, você verá <0>\"Filmes semelhantes\"</0> com a mesma tecnologia de IA.",
+    "stepSimilarP1": "Ao visualizar a página de detalhes de um filme, você verá <0>\"Filmes relacionados\"</0> com a mesma tecnologia de IA.",
     "stepSimilarP2": "Estes não são apenas filmes do mesmo gênero - são filmes semelhantes:",
     "stepSimilarLi1": "Temas e assuntos",
     "stepSimilarLi2": "Tom e atmosfera",

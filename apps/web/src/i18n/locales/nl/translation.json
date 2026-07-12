@@ -663,8 +663,8 @@
       "watched": "Bekeken"
     },
     "similar": {
-      "titleMovies": "Soortgelijke films",
-      "titleSeries": "Soortgelijke serie",
+      "titleMovies": "Gerelateerde films",
+      "titleSeries": "Gerelateerde series",
       "tabList": "Lijst",
       "tabGraph": "Grafiek",
       "tooltipFullscreen": "Volledig scherm",
@@ -2293,7 +2293,7 @@
     "stepWelcome": "Welkom bij Apertuur",
     "stepHowAi": "Hoe AI-aanbevelingen werken",
     "stepScoring": "Scorefactoren",
-    "stepSimilar": "Soortgelijke films",
+    "stepSimilar": "Gerelateerde films",
     "stepData": "Uw gegevens",
     "stepWelcomeP1": "<0>Aperture</0> is uw persoonlijke AI-aangedreven motor voor filmaanbevelingen die leert van uw kijkgeschiedenis om films voor te stellen die u leuk vindt.",
     "stepWelcomeP2": "Het integreert met uw Emby- of Jellyfin-mediaserver om uw smaak te begrijpen en gepersonaliseerde aanbevelingen rechtstreeks op uw startscherm te leveren.",
@@ -2311,7 +2311,7 @@
     "stepScoringCommunityD": "Geeft de voorkeur aan hoog gewaardeerde films om kwaliteitsaanbevelingen te garanderen",
     "stepScoringDiversity": "Resultaatdiversiteit (20%)",
     "stepScoringDiversityD": "Zorgt voor afwisseling zodat je geen 50 superheldenfilms achter elkaar krijgt",
-    "stepSimilarP1": "Wanneer u de detailpagina van een film bekijkt, ziet u <0>'Vergelijkbare films'</0>, mogelijk gemaakt door dezelfde AI-technologie.",
+    "stepSimilarP1": "Wanneer u de detailpagina van een film bekijkt, ziet u <0>'Gerelateerde films'</0>, mogelijk gemaakt door dezelfde AI-technologie.",
     "stepSimilarP2": "Dit zijn niet alleen films in hetzelfde genre, het zijn films met soortgelijke:",
     "stepSimilarLi1": "Thema's en onderwerp",
     "stepSimilarLi2": "Toon en sfeer",

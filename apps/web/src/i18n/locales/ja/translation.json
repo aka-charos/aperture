@@ -1045,8 +1045,8 @@
       "awards": "受賞歴"
     },
     "similar": {
-      "titleMovies": "類似の映画",
-      "titleSeries": "類似シリーズ",
+      "titleMovies": "関連映画",
+      "titleSeries": "関連シリーズ",
       "tabList": "リスト",
       "tabGraph": "グラフ",
       "tooltipFullscreen": "全画面表示",
@@ -2359,7 +2359,7 @@
     "stepWelcome": "Apertureへようこそ",
     "stepHowAi": "AI レコメンデーションの仕組み",
     "stepScoring": "得点要素",
-    "stepSimilar": "類似の映画",
+    "stepSimilar": "関連映画",
     "stepData": "あなたのデータ",
     "stepWelcomeP1": "<0>Aperture</0> は、AI を活用した個人的な映画推奨エンジンで、視聴履歴から学習して気に入る映画を提案します。",
     "stepWelcomeP2": "Emby または Jellyfin メディア サーバーと統合して、ユーザーの好みを理解し、パーソナライズされた推奨事項をホーム画面に直接提供します。",
@@ -2377,7 +2377,7 @@
     "stepScoringCommunityD": "高品質の映画を推奨するために高評価の映画を優先します",
     "stepScoringDiversity": "結果の多様性 (20%)",
     "stepScoringDiversityD": "スーパーヒーロー映画を 50 回続けて視聴する必要がないように、多様性を確保します",
-    "stepSimilarP1": "映画の詳細ページを表示すると、同じ AI テクノロジーを利用した<0>「類似映画」</0> が表示されます。",
+    "stepSimilarP1": "映画の詳細ページを表示すると、同じ AI テクノロジーを利用した<0>「関連映画」</0> が表示されます。",
     "stepSimilarP2": "これらは同じジャンルの映画だけではなく、類似した内容の映画です。",
     "stepSimilarLi1": "テーマと主題",
     "stepSimilarLi2": "トーンと雰囲気",
