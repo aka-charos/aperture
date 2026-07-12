@@ -26,6 +26,7 @@ import {
   type ModelCapabilities,
   type ModelMetadata,
 } from './ai-capabilities.js'
+import { getOpenRouterModelCapabilities } from './openrouter-capabilities.js'
 
 const logger = createChildLogger('ai-provider')
 
@@ -519,12 +520,67 @@ export async function getExplorationModelInstance(): Promise<LanguageModel> {
 // ============================================================================
 
 /**
+ * Providers whose models are user-entered rather than registry-defined.
+ * Mirrors the providers accepted by addCustomModel.
+ */
+const CUSTOM_MODEL_PROVIDERS = new Set<string>([
+  'ollama',
+  'openai-compatible',
+  'openrouter',
+  'huggingface',
+])
+
+/**
+ * Capabilities assumed for a user-added custom model when nothing better is
+ * known: the model was added for a specific function, so assume it can do
+ * what that function needs (a chat model is assumed to tool-call, etc.).
+ */
+export function assumedCustomModelCapabilities(fn: AIFunction): ModelCapabilities {
+  return {
+    supportsToolCalling: fn === 'chat',
+    supportsToolStreaming: fn === 'chat',
+    supportsObjectGeneration: fn !== 'embeddings',
+    supportsEmbeddings: fn === 'embeddings',
+  }
+}
+
+/**
+ * Resolve a model's capabilities from the best available source:
+ * 1. the built-in registry,
+ * 2. the provider's live catalog (OpenRouter publishes per-model
+ *    supported parameters — real data, not guesses),
+ * 3. the custom-model assumption the settings UI already uses.
+ * Returns null only for an unknown model on a registry-only provider.
+ */
+export async function resolveModelCapabilities(
+  providerId: string,
+  modelId: string,
+  fn: AIFunction
+): Promise<ModelCapabilities | null> {
+  const builtIn = getModel(providerId, modelId, fn)
+  if (builtIn) return builtIn.capabilities
+
+  // The OpenRouter catalog only describes language models, so never let it
+  // answer for embeddings — the assumption below handles those
+  if (providerId === 'openrouter' && fn !== 'embeddings') {
+    const live = await getOpenRouterModelCapabilities(modelId)
+    if (live) return live
+  }
+
+  if (CUSTOM_MODEL_PROVIDERS.has(providerId)) {
+    return assumedCustomModelCapabilities(fn)
+  }
+
+  return null
+}
+
+/**
  * Get full capabilities status for all AI functions
  */
 export async function getAICapabilitiesStatus(): Promise<AICapabilitiesStatus> {
   const config = await getAIConfig()
 
-  const getFunctionStatus = (fn: AIFunction): FunctionStatus => {
+  const getFunctionStatus = async (fn: AIFunction): Promise<FunctionStatus> => {
     const fnConfig = config[fn]
     if (!fnConfig) {
       return {
@@ -535,19 +591,20 @@ export async function getAICapabilitiesStatus(): Promise<AICapabilitiesStatus> {
       }
     }
 
-    const model = getModel(fnConfig.provider, fnConfig.model, fn)
     return {
       configured: true,
       provider: fnConfig.provider,
       model: fnConfig.model,
-      capabilities: model?.capabilities ?? null,
+      capabilities: await resolveModelCapabilities(fnConfig.provider, fnConfig.model, fn),
     }
   }
 
-  const embeddings = getFunctionStatus('embeddings')
-  const chat = getFunctionStatus('chat')
-  const textGeneration = getFunctionStatus('textGeneration')
-  const exploration = getFunctionStatus('exploration')
+  const [embeddings, chat, textGeneration, exploration] = await Promise.all([
+    getFunctionStatus('embeddings'),
+    getFunctionStatus('chat'),
+    getFunctionStatus('textGeneration'),
+    getFunctionStatus('exploration'),
+  ])
 
   // Determine feature availability
   const features = {
@@ -959,23 +1016,25 @@ export async function getModelsForFunctionWithCustom(
   const customModels = await getCustomModels(providerId, fn)
 
   // Convert custom models to ModelMetadata format
-  const customModelMetadata: ModelMetadata[] = customModels.map(cm => ({
-    id: cm.modelId,
-    name: cm.modelId, // Use the model ID as the name
-    description: 'Custom model',
-    capabilities: {
-      supportsToolCalling: fn === 'chat', // Assume custom chat models support tools
-      supportsToolStreaming: fn === 'chat',
-      supportsObjectGeneration: fn !== 'embeddings',
-      supportsEmbeddings: fn === 'embeddings',
-    },
-    quality: 'standard' as const,
-    costTier: 'free' as const,
-    // Include embedding dimensions for custom embedding models
-    embeddingDimensions: cm.embeddingDimensions,
-    // Mark as custom for UI
-    isCustom: true,
-  }))
+  const customModelMetadata: ModelMetadata[] = await Promise.all(
+    customModels.map(async cm => ({
+      id: cm.modelId,
+      name: cm.modelId, // Use the model ID as the name
+      description: 'Custom model',
+      // Real capabilities from the provider's catalog when available
+      // (OpenRouter), otherwise assume the model fits its function
+      capabilities:
+        (providerId === 'openrouter' && fn !== 'embeddings'
+          ? await getOpenRouterModelCapabilities(cm.modelId)
+          : null) ?? assumedCustomModelCapabilities(fn),
+      quality: 'standard' as const,
+      costTier: 'free' as const,
+      // Include embedding dimensions for custom embedding models
+      embeddingDimensions: cm.embeddingDimensions,
+      // Mark as custom for UI
+      isCustom: true,
+    }))
+  )
 
   // Return built-in models first, then custom models
   return [...builtInModels, ...customModelMetadata]
