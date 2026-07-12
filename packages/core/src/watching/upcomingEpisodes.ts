@@ -31,6 +31,12 @@ interface TMDbNextEpisode {
   episode_number: number
 }
 
+export interface TMDbSeasonSummary {
+  season_number: number
+  episode_count: number
+  air_date: string | null
+}
+
 interface TMDbTVDetailsWithNextEpisode {
   id: number
   name: string
@@ -38,24 +44,37 @@ interface TMDbTVDetailsWithNextEpisode {
   last_episode_to_air: TMDbNextEpisode | null
   number_of_episodes: number | null
   number_of_seasons: number | null
+  seasons?: TMDbSeasonSummary[] | null
 }
 
 /**
- * Persist TMDB aired totals onto the series row. The /tv/{id} response is
- * already in hand when we look up upcoming episodes, so caching the totals
- * here costs one UPDATE and keeps the watching page's "N aired" info fresh.
+ * Persist TMDB aired totals + per-season breakdown onto the series row. The
+ * /tv/{id} response is already in hand when we look up upcoming episodes, so
+ * caching here costs one UPDATE and keeps the watching page's "N aired" and
+ * missing-season info fresh.
  */
 export async function persistTmdbTotals(
   seriesId: string,
-  tmdbData: Pick<TMDbTVDetailsWithNextEpisode, 'number_of_episodes' | 'number_of_seasons'> | null
+  tmdbData: Pick<
+    TMDbTVDetailsWithNextEpisode,
+    'number_of_episodes' | 'number_of_seasons' | 'seasons'
+  > | null
 ): Promise<void> {
   try {
     if (tmdbData && typeof tmdbData.number_of_episodes === 'number' && tmdbData.number_of_episodes > 0) {
+      const seasons = Array.isArray(tmdbData.seasons)
+        ? tmdbData.seasons.map((s) => ({
+            season_number: s.season_number,
+            episode_count: s.episode_count,
+            air_date: s.air_date ?? null,
+          }))
+        : null
       await query(
         `UPDATE series
-         SET tmdb_total_episodes = $2, tmdb_total_seasons = $3, tmdb_totals_synced_at = NOW()
+         SET tmdb_total_episodes = $2, tmdb_total_seasons = $3, tmdb_seasons = $4,
+             tmdb_totals_synced_at = NOW()
          WHERE id = $1`,
-        [seriesId, tmdbData.number_of_episodes, tmdbData.number_of_seasons]
+        [seriesId, tmdbData.number_of_episodes, tmdbData.number_of_seasons, seasons ? JSON.stringify(seasons) : null]
       )
     } else {
       // Stamp the sync time even without usable totals so dead/renamed TMDB

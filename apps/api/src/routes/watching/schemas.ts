@@ -56,6 +56,11 @@ export const watchingSchemas = {
       episodesOnServer: { type: 'integer', description: 'Episodes available on the media server' },
       tmdbTotalEpisodes: { type: 'integer', nullable: true, description: 'Total aired episodes per TMDB' },
       tmdbTotalSeasons: { type: 'integer', nullable: true, description: 'Total seasons per TMDB' },
+      missingSeasons: {
+        type: 'array',
+        items: { type: 'integer' },
+        description: 'Aired seasons (per TMDB) with zero episodes on the media server',
+      },
       lastPlayedAt: { type: 'string', format: 'date-time', nullable: true, description: 'Most recent episode play' },
       upcomingEpisode: { $ref: 'UpcomingEpisode#' },
     },

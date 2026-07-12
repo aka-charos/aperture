@@ -21,8 +21,8 @@ interface CachedData {
   version: number // For cache invalidation on schema changes
 }
 
-// v2: series list is the watchlist+history union (inWatchlist/inHistory flags)
-const CACHE_VERSION = 2
+// v3: adds missingSeasons (v2 introduced the watchlist+history union)
+const CACHE_VERSION = 3
 
 /** Watchlist membership only — history-sourced rows must not count as "watching" */
 function watchlistIds(series: WatchingSeries[]): Set<string> {

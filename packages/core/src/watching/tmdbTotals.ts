@@ -10,7 +10,7 @@
 import { createChildLogger } from '../lib/logger.js'
 import { query } from '../lib/db.js'
 import { tmdbRequest } from '../tmdb/client.js'
-import { persistTmdbTotals } from './upcomingEpisodes.js'
+import { persistTmdbTotals, type TMDbSeasonSummary } from './upcomingEpisodes.js'
 
 const logger = createChildLogger('tmdb-totals')
 
@@ -18,6 +18,7 @@ interface TMDbTVTotals {
   id: number
   number_of_episodes: number | null
   number_of_seasons: number | null
+  seasons?: TMDbSeasonSummary[] | null
 }
 
 const DEFAULT_TTL_HOURS = 24 * 7

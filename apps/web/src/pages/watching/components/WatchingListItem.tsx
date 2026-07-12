@@ -105,6 +105,10 @@ export function WatchingListItem({ series, userRating, onRate, onRemove, onAdd }
     ? Math.min(100, (series.episodesWatched / series.episodesOnServer) * 100)
     : 0
   const isComplete = showProgress && series.episodesWatched >= series.episodesOnServer
+  const missingSeasonsLabel =
+    series.missingSeasons.length > 0
+      ? series.missingSeasons.map((n) => `S${n}`).join(', ')
+      : null
   const sourceLabel = series.inWatchlist
     ? series.inHistory
       ? t('watching.sourceBoth')
@@ -378,6 +382,13 @@ export function WatchingListItem({ series, userRating, onRate, onRemove, onAdd }
               sx={{ height: 4, borderRadius: 2 }}
             />
           </Box>
+        )}
+
+        {/* Aired seasons absent from the server */}
+        {missingSeasonsLabel && (
+          <Typography variant="caption" color="warning.main" fontWeight={600} sx={{ mt: 0.5 }}>
+            {t('watching.missingOnServer', { seasons: missingSeasonsLabel })}
+          </Typography>
         )}
 
         {/* Mobile: Upcoming episode badge + actions */}
