@@ -45,6 +45,7 @@ interface TMDbTVDetailsWithNextEpisode {
   number_of_episodes: number | null
   number_of_seasons: number | null
   seasons?: TMDbSeasonSummary[] | null
+  status?: string | null
 }
 
 /**
@@ -57,7 +58,7 @@ export async function persistTmdbTotals(
   seriesId: string,
   tmdbData: Pick<
     TMDbTVDetailsWithNextEpisode,
-    'number_of_episodes' | 'number_of_seasons' | 'seasons'
+    'number_of_episodes' | 'number_of_seasons' | 'seasons' | 'status'
   > | null
 ): Promise<void> {
   try {
@@ -72,9 +73,15 @@ export async function persistTmdbTotals(
       await query(
         `UPDATE series
          SET tmdb_total_episodes = $2, tmdb_total_seasons = $3, tmdb_seasons = $4,
-             tmdb_totals_synced_at = NOW()
+             tmdb_status = $5, tmdb_totals_synced_at = NOW()
          WHERE id = $1`,
-        [seriesId, tmdbData.number_of_episodes, tmdbData.number_of_seasons, seasons ? JSON.stringify(seasons) : null]
+        [
+          seriesId,
+          tmdbData.number_of_episodes,
+          tmdbData.number_of_seasons,
+          seasons ? JSON.stringify(seasons) : null,
+          tmdbData.status ?? null,
+        ]
       )
     } else {
       // Stamp the sync time even without usable totals so dead/renamed TMDB

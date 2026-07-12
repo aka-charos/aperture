@@ -36,6 +36,7 @@ interface WatchingSeriesRow {
   tmdb_total_episodes: number | null
   tmdb_total_seasons: number | null
   tmdb_seasons: { season_number: number; episode_count: number; air_date: string | null }[] | null
+  tmdb_status: string | null
   episodes_watched: string | null
   episodes_on_server: string
   last_played_at: string | null
@@ -76,6 +77,21 @@ interface WatchingSeriesResponse {
   } | null
 }
 
+/**
+ * Media-server series status is often stale (long-canceled shows still say
+ * "Continuing"), so when TMDB status is cached it wins. TMDB values map onto
+ * the media-server vocabulary the frontend already checks: anything not
+ * ended/canceled counts as "Continuing".
+ */
+function effectiveSeriesStatus(
+  mediaServerStatus: string | null,
+  tmdbStatus: string | null
+): string | null {
+  if (!tmdbStatus) return mediaServerStatus
+  if (tmdbStatus === 'Ended' || tmdbStatus === 'Canceled') return tmdbStatus
+  return 'Continuing'
+}
+
 const watchingRoutes: FastifyPluginAsync = async (fastify) => {
   // Register schemas
   for (const [name, schema] of Object.entries(watchingSchemas)) {
@@ -108,7 +124,7 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
               s.title, s.year, s.poster_url, s.backdrop_url, s.genres,
               s.overview, s.community_rating, s.network, s.status,
               s.total_seasons, s.total_episodes, s.tmdb_id,
-              s.tmdb_total_episodes, s.tmdb_total_seasons, s.tmdb_seasons,
+              s.tmdb_total_episodes, s.tmdb_total_seasons, s.tmdb_seasons, s.tmdb_status,
               h.episodes_watched, h.last_played_at,
               (SELECT COUNT(*) FROM episodes e2 WHERE e2.series_id = s.id) AS episodes_on_server,
               (uws.id IS NOT NULL) AS in_watchlist,
@@ -130,7 +146,10 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
     const seriesIds = result.rows.map((r) => r.series_id)
     const tmdbFallbackIds = new Set(
       result.rows
-        .filter((r) => r.in_watchlist || r.status === 'Continuing')
+        .filter(
+          (r) =>
+            r.in_watchlist || effectiveSeriesStatus(r.status, r.tmdb_status) === 'Continuing'
+        )
         .map((r) => r.series_id)
     )
     const upcomingEpisodes = await getUpcomingEpisodes(seriesIds, { tmdbFallbackIds })
@@ -182,7 +201,7 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
         overview: row.overview,
         communityRating: row.community_rating,
         network: row.network,
-        status: row.status,
+        status: effectiveSeriesStatus(row.status, row.tmdb_status),
         totalSeasons: row.total_seasons,
         totalEpisodes: row.total_episodes,
         addedAt: row.added_at,

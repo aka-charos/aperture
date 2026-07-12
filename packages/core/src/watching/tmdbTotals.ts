@@ -19,6 +19,7 @@ interface TMDbTVTotals {
   number_of_episodes: number | null
   number_of_seasons: number | null
   seasons?: TMDbSeasonSummary[] | null
+  status?: string | null
 }
 
 const DEFAULT_TTL_HOURS = 24 * 7
@@ -39,16 +40,16 @@ export async function refreshStaleTmdbTotals(
     return { refreshed: 0 }
   }
 
-  // A row is stale when never synced, past the TTL, or synced before the
-  // per-season data existed (totals present but tmdb_seasons null). Rows with
-  // null totals AND a sync stamp are failed lookups and stay TTL-gated.
+  // A row is stale when never synced, past the TTL, or synced before newer
+  // fields existed (totals present but tmdb_seasons/tmdb_status null). Rows
+  // with null totals AND a sync stamp are failed lookups and stay TTL-gated.
   const stale = await query<{ id: string; tmdb_id: string }>(
     `SELECT id, tmdb_id FROM series
      WHERE id = ANY($1)
        AND tmdb_id IS NOT NULL
        AND (tmdb_totals_synced_at IS NULL
             OR tmdb_totals_synced_at < NOW() - ($2 || ' hours')::interval
-            OR (tmdb_seasons IS NULL AND tmdb_total_episodes IS NOT NULL))
+            OR ((tmdb_seasons IS NULL OR tmdb_status IS NULL) AND tmdb_total_episodes IS NOT NULL))
      ORDER BY tmdb_totals_synced_at ASC NULLS FIRST
      LIMIT $3`,
     [seriesIds, String(ttlHours), maxFetches]
