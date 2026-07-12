@@ -7,7 +7,11 @@ import { AssistantDockContext } from './assistant-dock-context'
  */
 export function AssistantDockProvider({ children }: { children: ReactNode }) {
   const [dockWidth, setDockWidth] = useState(0)
-  const value = useMemo(() => ({ dockWidth, setDockWidth }), [dockWidth])
+  const [dockResizing, setDockResizing] = useState(false)
+  const value = useMemo(
+    () => ({ dockWidth, setDockWidth, dockResizing, setDockResizing }),
+    [dockWidth, dockResizing]
+  )
 
   return <AssistantDockContext.Provider value={value}>{children}</AssistantDockContext.Provider>
 }

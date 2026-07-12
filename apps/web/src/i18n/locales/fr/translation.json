@@ -2350,6 +2350,7 @@
     "errorMessagesSave": "Your latest messages couldn't be saved — they may be missing when you reopen this conversation.",
     "tooltipConversations": "Conversations",
     "tooltipDock": "Dock to the side",
+    "dockResizeHandle": "Resize assistant panel",
     "tooltipUndock": "Open as dialog"
   },
   "welcomeModal": {

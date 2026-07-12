@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import {
+  Box,
   Dialog,
   Drawer,
   Fab,
@@ -25,7 +26,28 @@ import { useAssistantDock } from '@/hooks/useAssistantDock'
 // that leaves the rest of the app browsable.
 type AssistantSurface = 'modal' | 'dock'
 const SURFACE_STORAGE_KEY = 'aperture.assistant.surface'
-const DOCK_WIDTH = 420
+
+// The dock is user-resizable between these bounds; the width persists.
+const DOCK_WIDTH_STORAGE_KEY = 'aperture.assistant.dockWidth'
+const DOCK_DEFAULT_WIDTH = 420
+const DOCK_MIN_WIDTH = 320
+const DOCK_MAX_WIDTH = 720
+
+/** Keep the dock within bounds and leave the library at least ~a third of the viewport */
+function clampDockWidth(width: number): number {
+  const max = Math.max(DOCK_MIN_WIDTH, Math.min(DOCK_MAX_WIDTH, Math.round(window.innerWidth * 0.66)))
+  return Math.min(Math.max(Math.round(width), DOCK_MIN_WIDTH), max)
+}
+
+function loadStoredDockWidth(): number {
+  try {
+    const stored = Number(localStorage.getItem(DOCK_WIDTH_STORAGE_KEY))
+    if (Number.isFinite(stored) && stored >= DOCK_MIN_WIDTH) return clampDockWidth(stored)
+  } catch {
+    // Fall through to the default
+  }
+  return DOCK_DEFAULT_WIDTH
+}
 
 /**
  * Floating assistant: Fab + dialog / dockable side panel. The same chat is
@@ -63,12 +85,65 @@ export function AssistantModal() {
   // other surface (dock, windowed dialog, mobile) reaches it via the drawer.
   const sidebarInline = !docked && fullscreen && !isSmDown
 
+  // User-resizable dock width, persisted across sessions.
+  const [dockWidth, setLocalDockWidth] = useState(loadStoredDockWidth)
+  // Latest width during a drag, so the pointer-up handler persists the exact
+  // final value even if React hasn't re-rendered since the last move event.
+  const dragWidthRef = useRef(dockWidth)
+  const draggingRef = useRef(false)
+
   // Let Layout reserve space for the dock so the library stays fully visible.
-  const { setDockWidth } = useAssistantDock()
+  const { setDockWidth, setDockResizing } = useAssistantDock()
   useEffect(() => {
-    setDockWidth(open && docked ? DOCK_WIDTH : 0)
+    setDockWidth(open && docked ? dockWidth : 0)
     return () => setDockWidth(0)
-  }, [open, docked, setDockWidth])
+  }, [open, docked, dockWidth, setDockWidth])
+
+  // Re-clamp when the window shrinks so the dock never squeezes out the library.
+  useEffect(() => {
+    if (!(open && docked)) return
+    const onWindowResize = () => setLocalDockWidth(w => clampDockWidth(w))
+    window.addEventListener('resize', onWindowResize)
+    return () => window.removeEventListener('resize', onWindowResize)
+  }, [open, docked])
+
+  const persistDockWidth = (width: number) => {
+    try {
+      localStorage.setItem(DOCK_WIDTH_STORAGE_KEY, String(width))
+    } catch {
+      // Preference just won't persist
+    }
+  }
+
+  const handleResizeStart = (e: React.PointerEvent<HTMLElement>) => {
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    draggingRef.current = true
+    setDockResizing(true)
+  }
+
+  const handleResizeMove = (e: React.PointerEvent<HTMLElement>) => {
+    if (!draggingRef.current) return
+    // The dock sits at the inline-end edge: physical right in LTR (MUI flips
+    // anchor="right" to the left under RTL), so width is the distance from
+    // the pointer to that edge.
+    const width = theme.direction === 'rtl' ? e.clientX : window.innerWidth - e.clientX
+    const clamped = clampDockWidth(width)
+    dragWidthRef.current = clamped
+    setLocalDockWidth(clamped)
+  }
+
+  const handleResizeEnd = () => {
+    if (!draggingRef.current) return
+    draggingRef.current = false
+    setDockResizing(false)
+    persistDockWidth(dragWidthRef.current)
+  }
+
+  const handleResizeReset = () => {
+    setLocalDockWidth(DOCK_DEFAULT_WIDTH)
+    persistDockWidth(DOCK_DEFAULT_WIDTH)
+  }
 
   const handleOpen = () => {
     setOpen(true)
@@ -181,7 +256,7 @@ export function AssistantModal() {
         open={open && docked}
         PaperProps={{
           sx: {
-            width: DOCK_WIDTH,
+            width: dockWidth,
             maxWidth: '100vw',
             bgcolor: 'rgba(15, 15, 15, 0.85)',
             backdropFilter: 'blur(16px)',
@@ -190,7 +265,35 @@ export function AssistantModal() {
           },
         }}
       >
-        {open && docked ? chatSurface : null}
+        {open && docked ? (
+          <>
+            {/* Drag to resize; double-click restores the default width. */}
+            <Box
+              role="separator"
+              aria-orientation="vertical"
+              aria-label={t('assistant.dockResizeHandle')}
+              onPointerDown={handleResizeStart}
+              onPointerMove={handleResizeMove}
+              onPointerUp={handleResizeEnd}
+              onPointerCancel={handleResizeEnd}
+              onDoubleClick={handleResizeReset}
+              sx={{
+                position: 'absolute',
+                insetInlineStart: 0,
+                top: 0,
+                bottom: 0,
+                width: 8,
+                cursor: 'ew-resize',
+                touchAction: 'none',
+                zIndex: 2,
+                '&:hover, &:active': {
+                  bgcolor: 'rgba(139, 92, 246, 0.35)',
+                },
+              }}
+            />
+            {chatSurface}
+          </>
+        ) : null}
       </Drawer>
     </>
   )
