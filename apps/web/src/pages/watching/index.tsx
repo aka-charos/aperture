@@ -35,7 +35,7 @@ import { useUserRatings } from '../../hooks/useUserRatings'
 import { useViewMode } from '../../hooks/useViewMode'
 import { WatchingCard, WatchingListItem, AddSeriesDialog } from './components'
 
-type FilterType = 'all' | 'airing' | 'upcoming'
+type FilterType = 'all' | 'airing' | 'ended' | 'upcoming'
 
 export function WatchingPage() {
   const { t } = useTranslation()
@@ -113,6 +113,7 @@ export function WatchingPage() {
   const filteredSeries = sourceFiltered
     .filter((s) => {
       if (filter === 'airing') return s.status === 'Continuing'
+      if (filter === 'ended') return s.status !== 'Continuing'
       if (filter === 'upcoming') return s.upcomingEpisode !== null
       return true
     })
@@ -135,6 +136,7 @@ export function WatchingPage() {
   const watchlistCount = series.filter((s) => s.inWatchlist).length
   const historyCount = series.filter((s) => s.inHistory).length
   const airingCount = sourceFiltered.filter((s) => s.status === 'Continuing').length
+  const endedCount = sourceFiltered.length - airingCount
   const upcomingCount = sourceFiltered.filter((s) => s.upcomingEpisode !== null).length
 
   if (loading) {
@@ -304,6 +306,9 @@ export function WatchingPage() {
             </ToggleButton>
             <ToggleButton value="airing" sx={{ color: filter === 'airing' ? 'success.main' : undefined }}>
               {t('watching.filterAiring', { count: airingCount })}
+            </ToggleButton>
+            <ToggleButton value="ended" sx={{ color: filter === 'ended' ? 'warning.main' : undefined }}>
+              {t('watching.filterEnded', { count: endedCount })}
             </ToggleButton>
             <ToggleButton value="upcoming" sx={{ color: filter === 'upcoming' ? 'primary.main' : undefined }}>
               {t('watching.filterUpcoming', { count: upcomingCount })}

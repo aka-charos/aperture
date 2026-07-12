@@ -3086,6 +3086,7 @@
     "chipUpcoming": "{{count}} with Upcoming",
     "filterAll": "All ({{count}})",
     "filterAiring": "Airing ({{count}})",
+    "filterEnded": "Ended ({{count}})",
     "filterUpcoming": "Upcoming ({{count}})",
     "filterWatchlist": "Watchlist ({{count}})",
     "filterHistory": "From History ({{count}})",
