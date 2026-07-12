@@ -26,7 +26,7 @@ import {
   type ModelCapabilities,
   type ModelMetadata,
 } from './ai-capabilities.js'
-import { getOpenRouterModelCapabilities } from './openrouter-capabilities.js'
+import { getOpenRouterModelCapabilities, getOpenRouterModelInfo } from './openrouter-capabilities.js'
 import {
   getOllamaModelCapabilities,
   getLmStudioModelCapabilities,
@@ -1063,6 +1063,16 @@ export async function deleteCustomModel(
   return deleted
 }
 
+/** Format a token count the way built-in model metadata does: "1M", "128K" */
+function formatContextWindow(tokens: number): string {
+  if (tokens >= 1_000_000) {
+    const millions = tokens / 1_000_000
+    return `${Number.isInteger(millions) ? millions : Math.round(millions * 10) / 10}M`
+  }
+  if (tokens >= 1_000) return `${Math.round(tokens / 1_000)}K`
+  return String(tokens)
+}
+
 /**
  * Get models for a provider/function including custom models from the database.
  * Use this instead of getModelsForFunction when you need custom models included.
@@ -1086,22 +1096,37 @@ export async function getModelsForFunctionWithCustom(
 
   // Convert custom models to ModelMetadata format
   const customModelMetadata: ModelMetadata[] = await Promise.all(
-    customModels.map(async cm => ({
-      id: cm.modelId,
-      name: cm.modelId, // Use the model ID as the name
-      description: 'Custom model',
-      // Real capabilities from the provider's catalog or a local probe when
-      // available, otherwise assume the model fits its function
-      capabilities:
-        (await liveModelCapabilities(providerId, cm.modelId, fn, probeBaseUrl)) ??
-        assumedCustomModelCapabilities(fn),
-      quality: 'standard' as const,
-      costTier: 'free' as const,
-      // Include embedding dimensions for custom embedding models
-      embeddingDimensions: cm.embeddingDimensions,
-      // Mark as custom for UI
-      isCustom: true,
-    }))
+    customModels.map(async cm => {
+      // OpenRouter's catalog also publishes pricing and context length
+      const catalogInfo =
+        providerId === 'openrouter' ? await getOpenRouterModelInfo(cm.modelId) : null
+
+      return {
+        id: cm.modelId,
+        name: cm.modelId, // Use the model ID as the name
+        description: 'Custom model',
+        // Real capabilities from the provider's catalog or a local probe when
+        // available, otherwise assume the model fits its function
+        capabilities:
+          (await liveModelCapabilities(providerId, cm.modelId, fn, probeBaseUrl)) ??
+          assumedCustomModelCapabilities(fn),
+        quality: 'standard' as const,
+        costTier: 'free' as const,
+        // Include embedding dimensions for custom embedding models
+        embeddingDimensions: cm.embeddingDimensions,
+        ...(catalogInfo?.inputCostPerMillion != null && {
+          inputCostPerMillion: catalogInfo.inputCostPerMillion,
+        }),
+        ...(catalogInfo?.outputCostPerMillion != null && {
+          outputCostPerMillion: catalogInfo.outputCostPerMillion,
+        }),
+        ...(catalogInfo?.contextLength != null && {
+          contextWindow: formatContextWindow(catalogInfo.contextLength),
+        }),
+        // Mark as custom for UI
+        isCustom: true,
+      }
+    })
   )
 
   // Return built-in models first, then custom models

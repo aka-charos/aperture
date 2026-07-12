@@ -79,6 +79,19 @@ function formatModelPrice(m: ModelInfo): string | null {
   return `${usd(input)} in / ${usd(output)} out per 1M`
 }
 
+/** Compact per-item capability badge for the model picker listing */
+function ToolCallingBadge({ label }: { label: string }) {
+  return (
+    <Chip
+      label={label}
+      size="small"
+      color="success"
+      variant="outlined"
+      sx={{ height: 18, fontSize: '0.65rem', flexShrink: 0, '& .MuiChip-label': { px: 0.75 } }}
+    />
+  )
+}
+
 export interface AIFunctionCardProps {
   functionType: AIFunction
   title: string
@@ -581,22 +594,27 @@ export function AIFunctionCard({
                 const price = formatModelPrice(m)
                 return (
                   <MenuItem key={m.id} value={m.id}>
-                    <Box>
-                      <Typography variant="body2">{m.name}</Typography>
-                      {m.description && (
-                        <Typography variant="caption" color="text.secondary" display="block">
-                          {m.description}
-                        </Typography>
-                      )}
-                      {price && (
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          display="block"
-                          sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
-                        >
-                          {price}
-                        </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1, width: '100%' }}>
+                      <Box>
+                        <Typography variant="body2">{m.name}</Typography>
+                        {m.description && (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {m.description}
+                          </Typography>
+                        )}
+                        {price && (
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            display="block"
+                            sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
+                          >
+                            {price}
+                          </Typography>
+                        )}
+                      </Box>
+                      {functionType !== 'embeddings' && m.capabilities.supportsToolCalling && (
+                        <ToolCallingBadge label={t('aiFunctionCard.toolCalling')} />
                       )}
                     </Box>
                   </MenuItem>
@@ -610,14 +628,31 @@ export function AIFunctionCard({
                   </Typography>
                 </MenuItem>
               )}
-              {models.filter(m => m.isCustom).sort((a, b) => a.name.localeCompare(b.name)).map((m) => (
+              {models.filter(m => m.isCustom).sort((a, b) => a.name.localeCompare(b.name)).map((m) => {
+                const price = formatModelPrice(m)
+                return (
                 <MenuItem key={m.id} value={m.id} sx={{ pr: 6 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                     <Box>
-                      <Typography variant="body2" sx={{ fontStyle: 'italic' }}>{m.name}</Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" sx={{ fontStyle: 'italic' }}>{m.name}</Typography>
+                        {functionType !== 'embeddings' && m.capabilities.supportsToolCalling && (
+                          <ToolCallingBadge label={t('aiFunctionCard.toolCalling')} />
+                        )}
+                      </Box>
                       <Typography variant="caption" color="text.secondary">
                         {t('aiFunctionCard.customModelSubtitle')}
                       </Typography>
+                      {price && (
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          display="block"
+                          sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
+                        >
+                          {price}
+                        </Typography>
+                      )}
                     </Box>
                     <ListItemSecondaryAction>
                       <IconButton
@@ -639,7 +674,8 @@ export function AIFunctionCard({
                     </ListItemSecondaryAction>
                   </Box>
                 </MenuItem>
-              ))}
+                )
+              })}
               {/* Add custom model option for self-hosted providers */}
               {supportsCustomModels && (
                 <MenuItem 
