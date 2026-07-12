@@ -11,6 +11,8 @@ export {
   type UpcomingEpisode,
 } from './upcomingEpisodes.js'
 
+export { refreshStaleTmdbTotals } from './tmdbTotals.js'
+
 export {
   reconcileWatchingFavoritesForUser,
   favoriteWatchingSeriesOnMediaServer,

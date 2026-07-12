@@ -7,7 +7,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { Box, Typography, Chip } from '@mui/material'
+import { Box, Typography, Chip, LinearProgress } from '@mui/material'
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import TvIcon from '@mui/icons-material/Tv'
 import { MoviePoster } from '@aperture/ui'
@@ -17,6 +17,7 @@ import type { WatchingSeries, UpcomingEpisode } from '../hooks/useWatchingData'
 interface WatchingCardProps {
   series: WatchingSeries
   onRemove: (seriesId: string) => Promise<void>
+  onAdd: (seriesId: string) => Promise<void>
 }
 
 function formatAirDate(dateStr: string, t: TFunction, locale: string): string {
@@ -39,7 +40,7 @@ function formatEpisodeNumber(ep: UpcomingEpisode): string {
   return `S${String(ep.seasonNumber).padStart(2, '0')}E${String(ep.episodeNumber).padStart(2, '0')}`
 }
 
-export function WatchingCard({ series, onRemove }: WatchingCardProps) {
+export function WatchingCard({ series, onRemove, onAdd }: WatchingCardProps) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
@@ -58,6 +59,11 @@ export function WatchingCard({ series, onRemove }: WatchingCardProps) {
 
   const upcoming = series.upcomingEpisode
   const isAiring = series.status === 'Continuing'
+  const showProgress = series.inHistory && series.episodesOnServer > 0
+  const progressPercent = showProgress
+    ? Math.min(100, (series.episodesWatched / series.episodesOnServer) * 100)
+    : 0
+  const isComplete = showProgress && series.episodesWatched >= series.episodesOnServer
 
   return (
     <Box sx={{ width: '100%' }}>
@@ -71,8 +77,10 @@ export function WatchingCard({ series, onRemove }: WatchingCardProps) {
         overview={series.overview}
         userRating={getRating('series', series.seriesId)}
         onRate={handleRate}
-        isWatching={true}
-        onWatchingToggle={() => onRemove(series.seriesId)}
+        isWatching={series.inWatchlist}
+        onWatchingToggle={() =>
+          series.inWatchlist ? onRemove(series.seriesId) : onAdd(series.seriesId)
+        }
         responsive
         onClick={handleClick}
       >
@@ -92,7 +100,7 @@ export function WatchingCard({ series, onRemove }: WatchingCardProps) {
         />
       </MoviePoster>
 
-      {/* Upcoming episode info - below poster, fixed height */}
+      {/* Upcoming episode + progress info - below poster */}
       <Box
         sx={{
           mt: 1,
@@ -101,7 +109,7 @@ export function WatchingCard({ series, onRemove }: WatchingCardProps) {
           backgroundColor: 'background.paper',
           border: 1,
           borderColor: 'divider',
-          height: 52,
+          minHeight: showProgress ? 78 : 52,
           overflow: 'hidden',
         }}
       >
@@ -129,6 +137,32 @@ export function WatchingCard({ series, onRemove }: WatchingCardProps) {
             <Typography variant="caption" color="text.secondary">
               {t('watching.seriesEnded')}
             </Typography>
+          </Box>
+        )}
+
+        {/* Watch progress (history-sourced) */}
+        {showProgress && (
+          <Box sx={{ mt: 0.75 }}>
+            <Typography
+              variant="caption"
+              color={isComplete ? 'success.main' : 'text.secondary'}
+              fontWeight={600}
+              noWrap
+              display="block"
+            >
+              {t('watching.episodesProgress', {
+                watched: series.episodesWatched,
+                total: series.episodesOnServer,
+              })}
+              {series.tmdbTotalEpisodes != null &&
+                ` · ${t('watching.airedTotal', { count: series.tmdbTotalEpisodes })}`}
+            </Typography>
+            <LinearProgress
+              variant="determinate"
+              value={progressPercent}
+              color={isComplete ? 'success' : 'primary'}
+              sx={{ height: 4, borderRadius: 2, mt: 0.25 }}
+            />
           </Box>
         )}
       </Box>

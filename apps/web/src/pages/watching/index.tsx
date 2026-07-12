@@ -28,6 +28,8 @@ import TvIcon from '@mui/icons-material/Tv'
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import GridViewIcon from '@mui/icons-material/GridView'
 import ViewListIcon from '@mui/icons-material/ViewList'
+import BookmarkIcon from '@mui/icons-material/Bookmark'
+import HistoryIcon from '@mui/icons-material/History'
 import { useWatchingData } from './hooks'
 import { useUserRatings } from '../../hooks/useUserRatings'
 import { useViewMode } from '../../hooks/useViewMode'
@@ -39,7 +41,7 @@ export function WatchingPage() {
   const { t } = useTranslation()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
-  const { series, loading, error, refreshing, removeSeries, refreshLibrary, refetch } = useWatchingData()
+  const { series, loading, error, refreshing, addSeries, removeSeries, refreshLibrary, refetch } = useWatchingData()
   const { getRating, setRating } = useUserRatings()
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [snackbar, setSnackbar] = useState<{
@@ -52,6 +54,7 @@ export function WatchingPage() {
     severity: 'success',
   })
   const [filter, setFilter] = useState<FilterType>('upcoming')
+  const [sources, setSources] = useState({ watchlist: true, history: true })
   const { viewMode, setViewMode } = useViewMode('watching')
 
   const handleRemove = async (seriesId: string) => {
@@ -60,6 +63,15 @@ export function WatchingPage() {
       setSnackbar({ open: true, message: t('watching.removedSuccess'), severity: 'success' })
     } catch {
       setSnackbar({ open: true, message: t('watching.removeFailed'), severity: 'error' })
+    }
+  }
+
+  const handleAdd = async (seriesId: string) => {
+    try {
+      await addSeries(seriesId)
+      setSnackbar({ open: true, message: t('watching.addedSuccess'), severity: 'success' })
+    } catch {
+      setSnackbar({ open: true, message: t('watching.addFailed'), severity: 'error' })
     }
   }
 
@@ -93,7 +105,12 @@ export function WatchingPage() {
     refetch()
   }
 
-  const filteredSeries = series
+  // Source pass first (watchlist / history toggles), then the status tabs
+  const sourceFiltered = series.filter(
+    (s) => (sources.watchlist && s.inWatchlist) || (sources.history && s.inHistory)
+  )
+
+  const filteredSeries = sourceFiltered
     .filter((s) => {
       if (filter === 'airing') return s.status === 'Continuing'
       if (filter === 'upcoming') return s.upcomingEpisode !== null
@@ -101,17 +118,24 @@ export function WatchingPage() {
     })
     .sort((a, b) => {
       // Sort by upcoming episode air date (soonest first)
-      // Series without upcoming episodes go to the end
+      // Series without upcoming episodes follow, most recently watched first
       if (a.upcomingEpisode && b.upcomingEpisode) {
         return new Date(a.upcomingEpisode.airDate).getTime() - new Date(b.upcomingEpisode.airDate).getTime()
       }
       if (a.upcomingEpisode) return -1
       if (b.upcomingEpisode) return 1
-      return 0
+      const aPlayed = a.lastPlayedAt ? new Date(a.lastPlayedAt).getTime() : 0
+      const bPlayed = b.lastPlayedAt ? new Date(b.lastPlayedAt).getTime() : 0
+      if (aPlayed !== bPlayed) return bPlayed - aPlayed
+      const aAdded = a.addedAt ? new Date(a.addedAt).getTime() : 0
+      const bAdded = b.addedAt ? new Date(b.addedAt).getTime() : 0
+      return bAdded - aAdded
     })
 
-  const airingCount = series.filter((s) => s.status === 'Continuing').length
-  const upcomingCount = series.filter((s) => s.upcomingEpisode !== null).length
+  const watchlistCount = series.filter((s) => s.inWatchlist).length
+  const historyCount = series.filter((s) => s.inHistory).length
+  const airingCount = sourceFiltered.filter((s) => s.status === 'Continuing').length
+  const upcomingCount = sourceFiltered.filter((s) => s.upcomingEpisode !== null).length
 
   if (loading) {
     return (
@@ -226,31 +250,46 @@ export function WatchingPage() {
           gap={2}
           mb={3}
         >
-          {/* Stats - hidden on mobile since counts are in tabs */}
-          {!isMobile && (
-            <Box display="flex" gap={1} flexWrap="wrap">
-              <Chip
-                icon={<TvIcon />}
-                label={t('watching.chipSeriesCount', { count: series.length })}
-                variant="outlined"
-                size="small"
-              />
-              <Chip
-                icon={<TvIcon />}
-                label={t('watching.chipAiring', { count: airingCount })}
-                color="success"
-                variant="outlined"
-                size="small"
-              />
-              <Chip
-                icon={<CalendarTodayIcon />}
-                label={t('watching.chipUpcoming', { count: upcomingCount })}
-                color="primary"
-                variant="outlined"
-                size="small"
-              />
-            </Box>
-          )}
+          {/* Source toggles + stats */}
+          <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
+            <Chip
+              icon={<BookmarkIcon />}
+              label={t('watching.filterWatchlist', { count: watchlistCount })}
+              color={sources.watchlist ? 'primary' : 'default'}
+              variant={sources.watchlist ? 'filled' : 'outlined'}
+              size="small"
+              clickable
+              onClick={() => setSources((prev) => ({ ...prev, watchlist: !prev.watchlist }))}
+            />
+            <Chip
+              icon={<HistoryIcon />}
+              label={t('watching.filterHistory', { count: historyCount })}
+              color={sources.history ? 'primary' : 'default'}
+              variant={sources.history ? 'filled' : 'outlined'}
+              size="small"
+              clickable
+              onClick={() => setSources((prev) => ({ ...prev, history: !prev.history }))}
+            />
+            {/* Stats - hidden on mobile since counts are in tabs */}
+            {!isMobile && (
+              <>
+                <Chip
+                  icon={<TvIcon />}
+                  label={t('watching.chipAiring', { count: airingCount })}
+                  color="success"
+                  variant="outlined"
+                  size="small"
+                />
+                <Chip
+                  icon={<CalendarTodayIcon />}
+                  label={t('watching.chipUpcoming', { count: upcomingCount })}
+                  color="primary"
+                  variant="outlined"
+                  size="small"
+                />
+              </>
+            )}
+          </Box>
 
           {/* Filter Controls */}
           <ToggleButtonGroup
@@ -261,7 +300,7 @@ export function WatchingPage() {
             fullWidth={isMobile}
           >
             <ToggleButton value="all">
-              {t('watching.filterAll', { count: series.length })}
+              {t('watching.filterAll', { count: sourceFiltered.length })}
             </ToggleButton>
             <ToggleButton value="airing" sx={{ color: filter === 'airing' ? 'success.main' : undefined }}>
               {t('watching.filterAiring', { count: airingCount })}
@@ -328,6 +367,7 @@ export function WatchingPage() {
               userRating={getRating('series', item.seriesId)}
               onRate={(rating) => setRating('series', item.seriesId, rating)}
               onRemove={handleRemove}
+              onAdd={handleAdd}
             />
           ))}
         </Box>
@@ -336,7 +376,7 @@ export function WatchingPage() {
         <Grid container spacing={2}>
           {filteredSeries.map((item) => (
             <Grid item xs={6} sm={4} md={3} lg={2} key={item.id}>
-              <WatchingCard series={item} onRemove={handleRemove} />
+              <WatchingCard series={item} onRemove={handleRemove} onAdd={handleAdd} />
             </Grid>
           ))}
         </Grid>

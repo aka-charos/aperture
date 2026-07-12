@@ -22,7 +22,17 @@ export interface WatchingSeries {
   status: string | null
   totalSeasons: number | null
   totalEpisodes: number | null
-  addedAt: string
+  /** Null for series that appear only via watch history */
+  addedAt: string | null
+  /** In user_watching_series (synced to media-server favorites) */
+  inWatchlist: boolean
+  /** Has watch history for at least one episode */
+  inHistory: boolean
+  episodesWatched: number
+  episodesOnServer: number
+  tmdbTotalEpisodes: number | null
+  tmdbTotalSeasons: number | null
+  lastPlayedAt: string | null
   upcomingEpisode: UpcomingEpisode | null
 }
 
