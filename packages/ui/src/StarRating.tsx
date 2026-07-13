@@ -17,7 +17,7 @@ const EmptyStar = StarBorder as unknown as React.ComponentType<{
 // same action.
 const RATED_COLOR = '#6366f1' // indigo-500
 const RATED_COLOR_HOVER = '#818cf8' // indigo-400
-const EMPTY_COLOR = 'rgba(99, 102, 241, 0.28)'
+const EMPTY_COLOR = 'rgba(129, 140, 248, 0.75)' // indigo-400 @ 75% — visible-but-unrated
 const EMPTY_COLOR_HOVER = '#a5b4fc' // indigo-300
 
 export interface StarRatingProps {
