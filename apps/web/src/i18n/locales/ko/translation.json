@@ -2826,11 +2826,13 @@
     "sourceHistory": "History",
     "sourceBoth": "Watchlist · History",
     "episodesProgress": "{{watched}}/{{total}} eps",
-    "episodesMissing": "{{count}} not on server",
-    "missingOnServer": "Missing on server: {{seasons}}",
     "addTooltip": "Add to watching list",
     "addedSuccess": "Added to watching list",
-    "addFailed": "Failed to add series"
+    "addFailed": "Failed to add series",
+    "barWatched": "Watched: {{watched}} of {{total}} aired",
+    "barUnwatched": "On server, unwatched: {{count}}",
+    "barMissing": "Missing from server: {{count}}",
+    "barMissingSeasons": "Seasons not on server: {{seasons}}"
   },
   "setup": {
     "step": {
