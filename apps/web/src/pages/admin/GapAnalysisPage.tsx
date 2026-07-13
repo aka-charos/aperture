@@ -152,7 +152,8 @@ export function GapAnalysisPage() {
   const [collectionPartsById, setCollectionPartsById] = useState<Record<number, GapCollectionPartsPayload | undefined>>({})
   const [sortBy, setSortBy] = useState<'most_missing' | 'most_complete' | 'name'>('most_missing')
   const [minMissing, setMinMissing] = useState(0)
-  const [collapsedCollections, setCollapsedCollections] = useState<Set<number>>(new Set())
+  const [expandedCollections, setExpandedCollections] = useState<Set<number>>(new Set())
+  const [partsLoading, setPartsLoading] = useState<Set<number>>(new Set())
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
@@ -273,6 +274,11 @@ export function GapAnalysisPage() {
     }
   }, [displayRunId, loadResults])
 
+  useEffect(() => {
+    setCollectionPartsById({})
+    setExpandedCollections(new Set())
+  }, [displayRunId])
+
   const filteredRows = useMemo(() => {
     if (!search.trim()) return rows
     const q = search.trim().toLowerCase()
@@ -353,47 +359,33 @@ export function GapAnalysisPage() {
     return max
   }, [summaries])
 
-  const collectionIdsForPartsKey = useMemo(
-    () => displaySummariesOrdered.map((s) => s.collectionId).join(','),
-    [displaySummariesOrdered]
-  )
-
-  useEffect(() => {
-    if (!collectionIdsForPartsKey) {
-      setCollectionPartsById({})
-      return
-    }
-    const ids = collectionIdsForPartsKey
-      .split(',')
-      .map((s) => parseInt(s, 10))
-      .filter((n) => Number.isFinite(n))
-    if (ids.length === 0) {
-      setCollectionPartsById({})
-      return
-    }
-    let cancelled = false
-    const u = new URL('/api/admin/gap-analysis/collection-parts', window.location.origin)
-    u.searchParams.set('ids', ids.join(','))
-    void fetch(u.toString(), { credentials: 'include' })
-      .then((r) =>
-        r.ok ? r.json() : Promise.reject(new Error(t('admin.gaps.errorLoadCollectionParts')))
-      )
-      .then((d: { collections?: Record<string, GapCollectionPartsPayload> }) => {
-        if (cancelled) return
-        const next: Record<number, GapCollectionPartsPayload> = {}
-        for (const id of ids) {
-          const p = d.collections?.[String(id)]
-          if (p) next[id] = p
+  const loadCollectionParts = useCallback(async (cid: number) => {
+    setPartsLoading((prev) => {
+      const n = new Set(prev)
+      n.add(cid)
+      return n
+    })
+    try {
+      const u = new URL('/api/admin/gap-analysis/collection-parts', window.location.origin)
+      u.searchParams.set('ids', String(cid))
+      const res = await fetch(u.toString(), { credentials: 'include' })
+      if (res.ok) {
+        const d = (await res.json()) as { collections?: Record<string, GapCollectionPartsPayload> }
+        const p = d.collections?.[String(cid)]
+        if (p) {
+          setCollectionPartsById((prev) => ({ ...prev, [cid]: p }))
         }
-        setCollectionPartsById(next)
+      }
+    } catch {
+      /* grid falls back to missing rows only */
+    } finally {
+      setPartsLoading((prev) => {
+        const n = new Set(prev)
+        n.delete(cid)
+        return n
       })
-      .catch(() => {
-        if (!cancelled) setCollectionPartsById({})
-      })
-    return () => {
-      cancelled = true
     }
-  }, [collectionIdsForPartsKey, t])
+  }, [])
 
   const toggleSelect = (key: string, dimmed: boolean) => {
     if (dimmed) return
@@ -415,13 +407,17 @@ export function GapAnalysisPage() {
 
   const clearSel = () => setSelected(new Set())
 
-  const toggleCollapse = (cid: number) => {
-    setCollapsedCollections((prev) => {
+  const toggleExpand = (cid: number) => {
+    const willExpand = !expandedCollections.has(cid)
+    setExpandedCollections((prev) => {
       const n = new Set(prev)
       if (n.has(cid)) n.delete(cid)
       else n.add(cid)
       return n
     })
+    if (willExpand && !collectionPartsById[cid] && !partsLoading.has(cid)) {
+      void loadCollectionParts(cid)
+    }
   }
 
   const openDetailModal = useCallback((part: GapCollectionPart) => {
@@ -878,14 +874,15 @@ export function GapAnalysisPage() {
 
                     const coveredCount = s.ownedCount + s.seerrCount
                     const ratio = s.totalReleased > 0 ? coveredCount / s.totalReleased : 0
-                    const collapsed = collapsedCollections.has(s.collectionId)
-                    const allParts = getChronologicalParts(s.collectionId, missingRows)
+                    const expanded = expandedCollections.has(s.collectionId)
+                    const partsPending = partsLoading.has(s.collectionId) && !collectionPartsById[s.collectionId]
+                    const allParts = expanded && !partsPending ? getChronologicalParts(s.collectionId, missingRows) : []
 
                     return (
                       <Paper key={s.collectionId} variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
                         {/* Collection header */}
                         <Box
-                          onClick={() => toggleCollapse(s.collectionId)}
+                          onClick={() => toggleExpand(s.collectionId)}
                           sx={{
                             display: 'flex',
                             alignItems: 'center',
@@ -975,13 +972,18 @@ export function GapAnalysisPage() {
                               {t('admin.gaps.requestAll')}
                             </Button>
                             <IconButton size="small">
-                              {collapsed ? <ExpandMoreIcon /> : <ExpandLessIcon />}
+                              {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
                             </IconButton>
                           </Stack>
                         </Box>
 
-                        {/* Poster grid */}
-                        {!collapsed && (
+                        {/* Poster grid — parts are fetched lazily on first expand */}
+                        {expanded && partsPending && (
+                          <Box sx={{ display: 'flex', justifyContent: 'center', px: 2, pb: 3, pt: 1 }}>
+                            <CircularProgress size={28} />
+                          </Box>
+                        )}
+                        {expanded && !partsPending && (
                           <Box sx={{ px: 2, pb: 2 }}>
                             <Grid container spacing={2}>
                               {allParts.map(({ part: p, gapRow, variant }) => {
