@@ -112,6 +112,7 @@ export function useBrowseSeries({ tabIndex, persistSortPreferences }: UseBrowseS
         seriesFilters.contentRatings.forEach((rating) => params.append('contentRating', rating))
         seriesFilters.status.forEach((status) => params.append('status', status))
         seriesFilters.countries.forEach((country) => params.append('country', country))
+        if (seriesFilters.countries.length > 1) params.set('countryMatch', seriesFilters.countryMatch)
         if (seriesFilters.watchStatus !== 'any') params.set('watchStatus', seriesFilters.watchStatus)
         if (seriesFilters.minWatchers !== null && seriesFilters.minWatchers > 0) params.set('minWatchers', String(seriesFilters.minWatchers))
         if (seriesFilters.maxWatchers !== null && seriesFilters.maxWatchers >= 0) params.set('maxWatchers', String(seriesFilters.maxWatchers))

@@ -167,8 +167,11 @@ export function registerListHandler(fastify: FastifyInstance) {
 
       const countries = parseCountryQuery(country)
       if (countries.length > 0) {
+        // 'all' (default) requires every selected country to be present (@> contains);
+        // 'any' matches when at least one overlaps (&&).
+        const countryOperator = request.query.countryMatch === 'any' ? '&&' : '@>'
         whereClause += whereClause ? ' AND ' : ' WHERE '
-        whereClause += `production_countries && $${paramIndex++}::text[]`
+        whereClause += `production_countries ${countryOperator} $${paramIndex++}::text[]`
         params.push(countries)
       }
 

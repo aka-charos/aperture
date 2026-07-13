@@ -180,6 +180,8 @@ export function BrowseMoviesTab({ viewMode, movies, presets }: BrowseMoviesTabPr
             countries={movies.movieCountries}
             selected={movies.movieFilters.countries}
             onChange={(countries) => movies.setMovieFilters((prev) => ({ ...prev, countries }))}
+            match={movies.movieFilters.countryMatch}
+            onMatchChange={(countryMatch) => movies.setMovieFilters((prev) => ({ ...prev, countryMatch }))}
           />
 
           <FilterPopper

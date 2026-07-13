@@ -3881,7 +3881,10 @@
     "sortAz": "A–Z",
     "noMatches": "No countries match \"{{query}}\"",
     "shownCount_one": "{{count}} country",
-    "shownCount_other": "{{count}} countries"
+    "shownCount_other": "{{count}} countries",
+    "matchLabel": "Match",
+    "matchAll": "All",
+    "matchAny": "Any"
   },
   "settingsPosterDisplay": {
     "title": "海报显示",

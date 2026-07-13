@@ -94,6 +94,7 @@ export interface MoviesListQuerystring {
   minMetacritic?: string
   resolution?: string | string[]
   country?: string | string[]
+  countryMatch?: 'all' | 'any'
   watchStatus?: 'any' | 'watched' | 'unwatched'
   minWatchers?: string
   maxWatchers?: string
