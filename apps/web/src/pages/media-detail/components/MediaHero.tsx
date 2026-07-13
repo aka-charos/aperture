@@ -236,6 +236,19 @@ export function MediaHero({
 
   const yearDisplay = getYearDisplay()
 
+  // Shared styling so every action reads as one consistent button group:
+  // fixed height, no per-button text wrapping, no shrinking (they wrap the row instead).
+  const actionBtnSx = {
+    borderRadius: 2,
+    textTransform: 'none' as const,
+    fontWeight: 600,
+    height: 42,
+    px: 2.25,
+    whiteSpace: 'nowrap' as const,
+    flexShrink: 0,
+    minWidth: 'auto',
+  }
+
   return (
     <>
       <Box
@@ -451,14 +464,8 @@ export function MediaHero({
             </Box>
           )}
 
-          {/* Action buttons */}
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: { xs: 'column', sm: 'row' },
-            gap: { xs: 1.5, sm: 2 }, 
-            mb: 3,
-            alignItems: { xs: 'stretch', sm: 'center' }
-          }}>
+          {/* Rating — on its own line so the hearts don't compete with the action buttons */}
+          <Box sx={{ mb: 2.5 }}>
             <HeartRating
               value={userRating}
               onChange={onRatingChange}
@@ -466,6 +473,42 @@ export function MediaHero({
               size="medium"
               showValue
             />
+          </Box>
+
+          {/* Action buttons — one consistent group; the primary "open" action leads,
+              secondary actions follow. Wraps as a whole instead of squishing individual buttons. */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 1.5,
+              mb: 3,
+              alignItems: 'center',
+            }}
+          >
+            {/* Primary CTA: open in media server */}
+            <Button
+              variant="contained"
+              startIcon={<PlayArrowIcon />}
+              onClick={handlePlayOnMediaServer}
+              disabled={!mediaServer?.baseUrl}
+              sx={{
+                ...actionBtnSx,
+                color: 'white',
+                background:
+                  'linear-gradient(135deg, rgba(99, 102, 241, 0.95) 0%, rgba(139, 92, 246, 0.95) 100%)',
+                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)',
+                '&:hover': {
+                  background:
+                    'linear-gradient(135deg, rgba(99, 102, 241, 1) 0%, rgba(139, 92, 246, 1) 100%)',
+                  boxShadow: '0 6px 18px rgba(99, 102, 241, 0.45)',
+                },
+              }}
+            >
+              {mediaServer?.type === 'jellyfin'
+                ? t('mediaDetail.hero.openJellyfin')
+                : t('mediaDetail.hero.openEmby')}
+            </Button>
             {/* Series watching toggle */}
             {isSeries(media) && onWatchingToggle && (
               <Tooltip
@@ -480,8 +523,9 @@ export function MediaHero({
                   startIcon={isWatching ? <PlaylistAddCheckIcon /> : <AddToQueueIcon />}
                   onClick={onWatchingToggle}
                   sx={{
-                    borderRadius: 2,
+                    ...actionBtnSx,
                     ...(isWatching && {
+                      color: 'white',
                       background:
                         'linear-gradient(135deg, rgba(99, 102, 241, 0.9) 0%, rgba(139, 92, 246, 0.9) 100%)',
                     }),
@@ -505,22 +549,13 @@ export function MediaHero({
                     }
                     onClick={handleOpenTrailer}
                     disabled={trailerLoading}
-                    sx={{ borderRadius: 2 }}
+                    sx={actionBtnSx}
                   >
                     {t('mediaDetail.hero.trailer')}
                   </Button>
                 </span>
               </Tooltip>
             )}
-            <Button
-              variant="outlined"
-              startIcon={<PlayArrowIcon />}
-              onClick={handlePlayOnMediaServer}
-              disabled={!mediaServer?.baseUrl}
-              sx={{ borderRadius: 2 }}
-            >
-              {mediaServer?.type === 'jellyfin' ? t('mediaDetail.hero.openJellyfin') : t('mediaDetail.hero.openEmby')}
-            </Button>
             {/* Movie favorite toggle (synced to the media server) */}
             {isMovie(media) && onFavoriteToggle && (
               <Tooltip
@@ -549,7 +584,7 @@ export function MediaHero({
                     }
                     onClick={handleFavoriteToggle}
                     disabled={isFavorite === null || favoriteLoading}
-                    sx={{ borderRadius: 2 }}
+                    sx={actionBtnSx}
                   >
                     {isFavorite
                       ? t('mediaDetail.hero.favorited')
@@ -580,7 +615,7 @@ export function MediaHero({
                     }
                     onClick={handleMarkWatched}
                     disabled={markingWatched}
-                    sx={{ borderRadius: 2 }}
+                    sx={actionBtnSx}
                   >
                     {t('mediaDetail.hero.markWatched')}
                   </Button>
@@ -595,7 +630,7 @@ export function MediaHero({
                   color="warning"
                   startIcon={<VisibilityOffIcon />}
                   onClick={() => setConfirmOpen(true)}
-                  sx={{ borderRadius: 2 }}
+                  sx={actionBtnSx}
                 >
                   {t('mediaDetail.hero.markUnwatched')}
                 </Button>
