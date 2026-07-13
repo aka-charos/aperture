@@ -23,6 +23,7 @@ import { useWatching } from '../../hooks/useWatching'
 import type { ViewMode } from '../../hooks/view-mode-context'
 import {
   BrowseSeriesListItem,
+  CountryFilterPopper,
   FilterPopper,
   FilterPresetManager,
   SortPopper,
@@ -174,12 +175,17 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
             </Select>
           </FormControl>
 
+          <CountryFilterPopper
+            countries={series.seriesCountries}
+            selected={series.seriesFilters.countries}
+            onChange={(countries) => series.setSeriesFilters((prev) => ({ ...prev, countries }))}
+          />
+
           <FilterPopper
             type="series"
             filters={series.seriesFilters}
             onChange={(filters) => series.setSeriesFilters(filters as SeriesFilters)}
             contentRatings={series.seriesContentRatings}
-            countries={series.seriesCountries}
             ranges={series.seriesRanges}
           />
 

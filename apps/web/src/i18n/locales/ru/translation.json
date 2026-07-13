@@ -3858,5 +3858,18 @@
     "snackbarAIDescriptionOk": "AI description generated",
     "snackbarAIDescriptionFail": "Failed to generate description",
     "pageSubtitleNamed": "Build collections from genres and example movies — visible to everyone in {{serverName}}"
+  },
+  "countryFilter": {
+    "label": "Country",
+    "title": "Production Country",
+    "buttonSummary": "{{name}} +{{count}}",
+    "searchPlaceholder": "Search countries…",
+    "clearTooltip": "Clear selected countries",
+    "clearSearch": "Clear search",
+    "sortByCount": "Most titles",
+    "sortAz": "A–Z",
+    "noMatches": "No countries match \"{{query}}\"",
+    "shownCount_one": "{{count}} country",
+    "shownCount_other": "{{count}} countries"
   }
 }

@@ -60,7 +60,6 @@ interface FilterPopperProps {
   onChange: (filters: MovieFilters | SeriesFilters) => void
   contentRatings: { rating: string; count: number }[]
   resolutions?: { resolution: string; count: number }[]
-  countries?: { country: string; count: number }[]
   ranges: {
     year: { min: number; max: number }
     runtime?: { min: number; max: number }
@@ -103,7 +102,6 @@ export function FilterPopper({
   onChange,
   contentRatings,
   resolutions,
-  countries = [],
   ranges,
 }: FilterPopperProps) {
   const { t } = useTranslation()
@@ -116,7 +114,6 @@ export function FilterPopper({
     runtime: true,
     quality: true,
     status: true,
-    origin: true,
     audience: true,
   })
 
@@ -127,15 +124,18 @@ export function FilterPopper({
   }
 
   const handleReset = () => {
+    // Countries live in the dedicated country filter button; only reset what this popper shows.
     if (type === 'movies') {
       onChange({
         ...defaultMovieFilters,
+        countries: filters.countries,
         yearRange: [ranges.year.min, ranges.year.max],
         runtimeRange: ranges.runtime ? [ranges.runtime.min, ranges.runtime.max] : [0, 300],
       })
     } else {
       onChange({
         ...defaultSeriesFilters,
+        countries: filters.countries,
         yearRange: [ranges.year.min, ranges.year.max],
         seasonsRange: ranges.seasons ? [ranges.seasons.min, ranges.seasons.max] : [1, 30],
       })
@@ -162,7 +162,6 @@ export function FilterPopper({
       if (f.metacritic[0] > 0 || f.metacritic[1] < 100) count++
       if (f.contentRatings.length > 0) count++
       if (f.resolutions.length > 0) count++
-      if (f.countries.length > 0) count++
       if (f.watchStatus !== 'any') count++
       if (f.minWatchers !== null) count++
       if (f.maxWatchers !== null) count++
@@ -175,7 +174,6 @@ export function FilterPopper({
       if (f.metacritic[0] > 0 || f.metacritic[1] < 100) count++
       if (f.contentRatings.length > 0) count++
       if (f.status.length > 0) count++
-      if (f.countries.length > 0) count++
       if (f.watchStatus !== 'any') count++
       if (f.minWatchers !== null) count++
       if (f.maxWatchers !== null) count++
@@ -356,28 +354,6 @@ export function FilterPopper({
                         }))}
                         selected={filters.contentRatings}
                         onChange={(selected) => onChange({ ...filters, contentRatings: selected })}
-                      />
-                    </Box>
-                  </Collapse>
-                  <Divider sx={{ my: 1.5 }} />
-                </>
-              )}
-
-              {/* Origin: production countries */}
-              {countries.length > 0 && (
-                <>
-                  <SectionHeader titleKey="filterPopper.sections.productionCountry" section="origin" />
-                  <Collapse in={expandedSections.origin}>
-                    <Box sx={{ py: 1.5, maxHeight: 200, overflow: 'auto' }}>
-                      <ChipToggleGroup
-                        label=""
-                        options={countries.map((c) => ({
-                          value: c.country,
-                          label: c.country,
-                          count: c.count,
-                        }))}
-                        selected={filters.countries}
-                        onChange={(selected) => onChange({ ...filters, countries: selected })}
                       />
                     </Box>
                   </Collapse>
