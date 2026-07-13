@@ -9,6 +9,7 @@ export {
   type MovieFilters,
   type SeriesFilters,
   type WatchStatusFilter,
+  type CountryMatchMode,
 } from './FilterPopper'
 export { CountryFilterPopper } from './CountryFilterPopper'
 export { SortPopper, type SortField, type SortOrder } from './SortPopper'

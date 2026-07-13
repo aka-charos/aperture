@@ -26,6 +26,10 @@ import { ChipToggleGroup } from './ChipToggleGroup'
 
 export type WatchStatusFilter = 'any' | 'watched' | 'unwatched'
 
+// How multiple selected countries are combined: 'all' = must match every
+// selected country (AND), 'any' = match at least one (OR).
+export type CountryMatchMode = 'all' | 'any'
+
 export interface MovieFilters {
   yearRange: [number, number]
   runtimeRange: [number, number]
@@ -35,6 +39,7 @@ export interface MovieFilters {
   contentRatings: string[]
   resolutions: string[]
   countries: string[]
+  countryMatch: CountryMatchMode
   watchStatus: WatchStatusFilter
   minWatchers: number | null
   maxWatchers: number | null
@@ -49,6 +54,7 @@ export interface SeriesFilters {
   contentRatings: string[]
   status: string[]
   countries: string[]
+  countryMatch: CountryMatchMode
   watchStatus: WatchStatusFilter
   minWatchers: number | null
   maxWatchers: number | null
@@ -77,6 +83,7 @@ const defaultMovieFilters: MovieFilters = {
   contentRatings: [],
   resolutions: [],
   countries: [],
+  countryMatch: 'all',
   watchStatus: 'any',
   minWatchers: null,
   maxWatchers: null,
@@ -91,6 +98,7 @@ const defaultSeriesFilters: SeriesFilters = {
   contentRatings: [],
   status: [],
   countries: [],
+  countryMatch: 'all',
   watchStatus: 'any',
   minWatchers: null,
   maxWatchers: null,
@@ -129,6 +137,7 @@ export function FilterPopper({
       onChange({
         ...defaultMovieFilters,
         countries: filters.countries,
+        countryMatch: filters.countryMatch,
         yearRange: [ranges.year.min, ranges.year.max],
         runtimeRange: ranges.runtime ? [ranges.runtime.min, ranges.runtime.max] : [0, 300],
       })
@@ -136,6 +145,7 @@ export function FilterPopper({
       onChange({
         ...defaultSeriesFilters,
         countries: filters.countries,
+        countryMatch: filters.countryMatch,
         yearRange: [ranges.year.min, ranges.year.max],
         seasonsRange: ranges.seasons ? [ranges.seasons.min, ranges.seasons.max] : [1, 30],
       })

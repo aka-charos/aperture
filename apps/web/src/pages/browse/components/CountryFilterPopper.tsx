@@ -25,6 +25,7 @@ import SearchIcon from '@mui/icons-material/Search'
 import CloseIcon from '@mui/icons-material/Close'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import type { CountryOption } from '../types'
+import type { CountryMatchMode } from './FilterPopper'
 
 type CountrySortMode = 'count' | 'name'
 
@@ -32,9 +33,11 @@ interface CountryFilterPopperProps {
   countries: CountryOption[]
   selected: string[]
   onChange: (selected: string[]) => void
+  match: CountryMatchMode
+  onMatchChange: (match: CountryMatchMode) => void
 }
 
-export function CountryFilterPopper({ countries, selected, onChange }: CountryFilterPopperProps) {
+export function CountryFilterPopper({ countries, selected, onChange, match, onMatchChange }: CountryFilterPopperProps) {
   const { t } = useTranslation()
   const theme = useTheme()
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null)
@@ -272,6 +275,26 @@ export function CountryFilterPopper({ countries, selected, onChange }: CountryFi
                       onDelete={() => toggleCountry(country)}
                     />
                   ))}
+                </Box>
+              )}
+
+              {selected.length > 1 && (
+                <Box display="flex" alignItems="center" justifyContent="space-between" gap={1}>
+                  <Typography variant="caption" color="text.secondary">
+                    {t('countryFilter.matchLabel')}
+                  </Typography>
+                  <ToggleButtonGroup
+                    exclusive
+                    size="small"
+                    value={match}
+                    onChange={(_, mode: CountryMatchMode | null) => {
+                      if (mode !== null) onMatchChange(mode)
+                    }}
+                    sx={{ '& .MuiToggleButton-root': { py: 0.25, px: 1, textTransform: 'none' } }}
+                  >
+                    <ToggleButton value="all">{t('countryFilter.matchAll')}</ToggleButton>
+                    <ToggleButton value="any">{t('countryFilter.matchAny')}</ToggleButton>
+                  </ToggleButtonGroup>
                 </Box>
               )}
             </Box>

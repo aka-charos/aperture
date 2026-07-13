@@ -28,7 +28,7 @@ import MoreVertIcon from '@mui/icons-material/MoreVert'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
-import type { MovieFilters, SeriesFilters, WatchStatusFilter } from './FilterPopper'
+import type { CountryMatchMode, MovieFilters, SeriesFilters, WatchStatusFilter } from './FilterPopper'
 
 export interface FilterPreset {
   id: string
@@ -45,6 +45,7 @@ export interface FilterPreset {
     resolutions?: string[]
     status?: string[]
     countries?: string[]
+    countryMatch?: CountryMatchMode
     watchStatus?: WatchStatusFilter
     minWatchers?: number | null
     maxWatchers?: number | null
