@@ -17,9 +17,11 @@ import { useTranslation } from 'react-i18next'
 import AddIcon from '@mui/icons-material/Add'
 import { usePlaylistsData } from './hooks'
 import { PlaylistCard, GraphPlaylistCard, PlaylistDialog, PlaylistViewDialog, GraphPlaylistViewDialog, EmptyState } from './components'
+import { useServerDisplayName } from '../../hooks/useServerDisplayName'
 
 export function PlaylistsPage() {
   const { t } = useTranslation()
+  const serverName = useServerDisplayName()
   const {
     // Data
     channels,
@@ -102,7 +104,9 @@ export function PlaylistsPage() {
             {t('playlists.pageTitle')}
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            {t('playlists.pageSubtitle')}
+            {serverName
+              ? t('playlists.pageSubtitleNamed', { serverName })
+              : t('playlists.pageSubtitle')}
           </Typography>
         </Box>
         <Button 

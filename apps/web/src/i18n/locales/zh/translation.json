@@ -724,7 +724,8 @@
     },
     "tabBrowsePopular": "TMDb 整体受欢迎",
     "tabBrowseGenre": "按类型受欢迎",
-    "tabStreaming": "流媒体"
+    "tabStreaming": "流媒体",
+    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}"
   },
   "mediaPoster": {
     "matchPercent": "{{pct}}% 匹配",
@@ -941,7 +942,8 @@
     },
     "rangeSlider": {
       "valueRange": "{{开始}} – {{结束}}"
-    }
+    },
+    "subtitleLineNamed": "Browse {{serverName}} media library • {{count}} {{kind}}"
   },
   "mediaDetail": {
     "movieNotFound": "未找到电影",
@@ -2623,7 +2625,8 @@
     "createFromSuggestionsTitle": "Create Playlist from Suggestions",
     "itemsSelected": "{{count}} selected",
     "noItemsSelected": "Select at least one title",
-    "createdInLibrary": "Added \"{{name}}\" to your library"
+    "createdInLibrary": "Added \"{{name}}\" to your library",
+    "pageSubtitleNamed": "Create custom recommendation playlists with genres and example movies — available only to you in {{serverName}}"
   },
   "myRecommendations": {
     "pageTitle": "我的建议",
@@ -3849,6 +3852,7 @@
     "snackbarAINameOk": "AI name generated",
     "snackbarAINameFail": "Failed to generate name",
     "snackbarAIDescriptionOk": "AI description generated",
-    "snackbarAIDescriptionFail": "Failed to generate description"
+    "snackbarAIDescriptionFail": "Failed to generate description",
+    "pageSubtitleNamed": "Build collections from genres and example movies — visible to everyone in {{serverName}}"
   }
 }

@@ -785,7 +785,8 @@
     },
     "rangeSlider": {
       "valueRange": "{{התחל}} – {{end}}"
-    }
+    },
+    "subtitleLineNamed": "Browse {{serverName}} media library • {{count}} {{kind}}"
   },
   "login": {
     "title": "ברוך שובך",
@@ -1025,7 +1026,8 @@
     },
     "tabBrowsePopular": "TMDb פופולרי בסך הכל",
     "tabBrowseGenre": "פופולרי לפי ז'אנר",
-    "tabStreaming": "נְהִירָה"
+    "tabStreaming": "נְהִירָה",
+    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}"
   },
   "mediaPoster": {
     "matchPercent": "{{pct}}% התאמה",
@@ -2623,7 +2625,8 @@
     "createFromSuggestionsTitle": "Create Playlist from Suggestions",
     "itemsSelected": "{{count}} selected",
     "noItemsSelected": "Select at least one title",
-    "createdInLibrary": "Added \"{{name}}\" to your library"
+    "createdInLibrary": "Added \"{{name}}\" to your library",
+    "pageSubtitleNamed": "Create custom recommendation playlists with genres and example movies — available only to you in {{serverName}}"
   },
   "myRecommendations": {
     "pageTitle": "ההמלצות שלי",
@@ -3849,6 +3852,7 @@
     "snackbarAINameOk": "AI name generated",
     "snackbarAINameFail": "Failed to generate name",
     "snackbarAIDescriptionOk": "AI description generated",
-    "snackbarAIDescriptionFail": "Failed to generate description"
+    "snackbarAIDescriptionFail": "Failed to generate description",
+    "pageSubtitleNamed": "Build collections from genres and example movies — visible to everyone in {{serverName}}"
   }
 }

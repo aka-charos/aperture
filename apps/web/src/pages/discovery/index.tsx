@@ -43,6 +43,7 @@ import {
   StreamingDiscoverySection,
   TmdbGenreRowsSection,
 } from './components'
+import { useServerDisplayName } from '../../hooks/useServerDisplayName'
 import { useViewMode } from '../../hooks/useViewMode'
 import type { DiscoveryCandidate, DiscoveryFilterOptions, MediaType } from './types'
 
@@ -102,6 +103,7 @@ function saveFiltersToStorage(filters: DiscoveryFilterOptions) {
 
 export function DiscoveryPage() {
   const { t } = useTranslation()
+  const serverName = useServerDisplayName()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
@@ -257,7 +259,9 @@ export function DiscoveryPage() {
           </Box>
           {!isMobile && (
             <Typography variant="body1" color="text.secondary">
-              {t('discovery.subtitle')}
+              {serverName
+                ? t('discovery.subtitleNamed', { serverName })
+                : t('discovery.subtitle')}
             </Typography>
           )}
         </Box>
