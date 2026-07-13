@@ -785,7 +785,8 @@
     },
     "rangeSlider": {
       "valueRange": "{{अंत शुरू}}"
-    }
+    },
+    "subtitleLineNamed": "Browse {{serverName}} media library • {{count}} {{kind}}"
   },
   "login": {
     "title": "वापसी पर स्वागत है",
@@ -1025,7 +1026,8 @@
     },
     "tabBrowsePopular": "टीएमडीबी कुल मिलाकर लोकप्रिय है",
     "tabBrowseGenre": "शैली के अनुसार लोकप्रिय",
-    "tabStreaming": "स्ट्रीमिंग"
+    "tabStreaming": "स्ट्रीमिंग",
+    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}"
   },
   "mediaPoster": {
     "matchPercent": "{{पीसीटी}}% मिलान",
@@ -2623,7 +2625,8 @@
     "createFromSuggestionsTitle": "Create Playlist from Suggestions",
     "itemsSelected": "{{count}} selected",
     "noItemsSelected": "Select at least one title",
-    "createdInLibrary": "Added \"{{name}}\" to your library"
+    "createdInLibrary": "Added \"{{name}}\" to your library",
+    "pageSubtitleNamed": "Create custom recommendation playlists with genres and example movies — available only to you in {{serverName}}"
   },
   "myRecommendations": {
     "pageTitle": "मेरी सिफ़ारिशें",
@@ -3849,6 +3852,7 @@
     "snackbarAINameOk": "AI name generated",
     "snackbarAINameFail": "Failed to generate name",
     "snackbarAIDescriptionOk": "AI description generated",
-    "snackbarAIDescriptionFail": "Failed to generate description"
+    "snackbarAIDescriptionFail": "Failed to generate description",
+    "pageSubtitleNamed": "Build collections from genres and example movies — visible to everyone in {{serverName}}"
   }
 }

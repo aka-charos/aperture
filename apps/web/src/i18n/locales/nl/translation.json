@@ -2109,7 +2109,8 @@
     },
     "tabBrowsePopular": "TMDb is over het algemeen populair",
     "tabBrowseGenre": "Populair per genre",
-    "tabStreaming": "Streamen"
+    "tabStreaming": "Streamen",
+    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}"
   },
   "mediaPoster": {
     "matchPercent": "{{pct}}% overeenkomst",
@@ -2557,7 +2558,8 @@
     "createFromSuggestionsTitle": "Create Playlist from Suggestions",
     "itemsSelected": "{{count}} selected",
     "noItemsSelected": "Select at least one title",
-    "createdInLibrary": "Added \"{{name}}\" to your library"
+    "createdInLibrary": "Added \"{{name}}\" to your library",
+    "pageSubtitleNamed": "Create custom recommendation playlists with genres and example movies — available only to you in {{serverName}}"
   },
   "myRecommendations": {
     "pageTitle": "Mijn aanbevelingen",
@@ -2838,7 +2840,8 @@
       "moviesWatched": "{{bekeken}} / {{totaal}} films bekeken",
       "watched": "Bekeken",
       "allLoaded": "Alle franchises geladen"
-    }
+    },
+    "subtitleLineNamed": "Browse {{serverName}} media library • {{count}} {{kind}}"
   },
   "channels": {
     "title": "Kanalen",
@@ -3849,6 +3852,7 @@
     "snackbarAINameOk": "AI name generated",
     "snackbarAINameFail": "Failed to generate name",
     "snackbarAIDescriptionOk": "AI description generated",
-    "snackbarAIDescriptionFail": "Failed to generate description"
+    "snackbarAIDescriptionFail": "Failed to generate description",
+    "pageSubtitleNamed": "Build collections from genres and example movies — visible to everyone in {{serverName}}"
   }
 }

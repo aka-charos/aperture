@@ -25,9 +25,11 @@ import { BrowsePeopleTab } from './browse/BrowsePeopleTab'
 import { BrowseSeriesTab } from './browse/BrowseSeriesTab'
 import { useBrowseFilterPresets, useBrowseMovies, useBrowsePeople, useBrowseSeries } from './browse/hooks'
 import { useViewMode } from '../hooks/useViewMode'
+import { useServerDisplayName } from '../hooks/useServerDisplayName'
 
 export function BrowsePage() {
   const { t } = useTranslation()
+  const serverName = useServerDisplayName()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
   const [searchParams, setSearchParams] = useSearchParams()
@@ -94,7 +96,8 @@ export function BrowsePage() {
           </Box>
           {!isMobile && (
             <Typography variant="body1" color="text.secondary">
-              {t('browse.subtitleLine', {
+              {t(serverName ? 'browse.subtitleLineNamed' : 'browse.subtitleLine', {
+                ...(serverName ? { serverName } : {}),
                 count:
                   tabIndex === 0
                     ? movies.movieTotal.toLocaleString()

@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next'
 import AddIcon from '@mui/icons-material/Add'
 import { usePlaylistsData } from '../playlists/hooks'
 import { PlaylistCard, PlaylistDialog, PlaylistViewDialog, EmptyState } from '../playlists/components'
+import { useServerDisplayName } from '../../hooks/useServerDisplayName'
 
 // Reuses the Channel builder stack (hook + components) but targets server-wide Emby Collections
 // instead of personal Playlists. The shared components resolve their labels from this namespace.
@@ -24,6 +25,7 @@ const NS = 'collections'
 
 export function CollectionsPage() {
   const { t } = useTranslation()
+  const serverName = useServerDisplayName()
   const {
     channels,
     loading,
@@ -93,7 +95,9 @@ export function CollectionsPage() {
             {t('collections.pageTitle')}
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            {t('collections.pageSubtitle')}
+            {serverName
+              ? t('collections.pageSubtitleNamed', { serverName })
+              : t('collections.pageSubtitle')}
           </Typography>
         </Box>
         <Button

@@ -2101,6 +2101,7 @@
   "discovery": {
     "title": "Discover",
     "subtitle": "AI-powered suggestions for content not in your library",
+    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}",
     "disabledBody": "Discovery is not enabled for your account. Contact your admin to enable missing content suggestions.",
     "refresh": "Refresh",
     "refreshing": "Refreshing…",
@@ -2562,6 +2563,7 @@
   "playlists": {
     "pageTitle": "Playlists",
     "pageSubtitle": "Create custom recommendation playlists with genres and example movies",
+    "pageSubtitleNamed": "Create custom recommendation playlists with genres and example movies — available only to you in {{serverName}}",
     "newPlaylist": "New Playlist",
     "deleteTitle": "Delete Playlist",
     "deleteConfirm": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
@@ -2651,6 +2653,7 @@
   "collections": {
     "pageTitle": "Collections",
     "pageSubtitle": "Build Emby collections from genres and example movies — visible to everyone in your library",
+    "pageSubtitleNamed": "Build collections from genres and example movies — visible to everyone in {{serverName}}",
     "newPlaylist": "New Collection",
     "deleteTitle": "Delete Collection",
     "deleteConfirm": "Are you sure you want to delete \"{{name}}\"? This removes the collection from your library and cannot be undone.",
@@ -2879,6 +2882,7 @@
   "browse": {
     "title": "Browse",
     "subtitleLine": "Browse your synced media library • {{count}} {{kind}}",
+    "subtitleLineNamed": "Browse {{serverName}} media library • {{count}} {{kind}}",
     "subtitleKindMovies": "movies",
     "subtitleKindSeries": "series",
     "subtitleKindPeople": "people",
