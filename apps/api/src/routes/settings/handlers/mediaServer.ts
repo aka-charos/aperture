@@ -83,6 +83,23 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
         const serverTypes = getMediaServerTypes()
         const displayName = ((await getSystemSetting('server_display_name')) ?? '').trim()
 
+        // Name the server reports about itself — the effective default when
+        // no custom display name is set
+        let reportedName = ''
+        if (config.baseUrl && config.apiKey && config.type) {
+          try {
+            const provider = createMediaServerProvider(config.type, config.baseUrl)
+            if ('getServerInfo' in provider) {
+              const info = await (
+                provider as { getServerInfo: (key: string) => Promise<{ id: string; name: string }> }
+              ).getServerInfo(config.apiKey)
+              reportedName = info.name
+            }
+          } catch (err) {
+            fastify.log.warn({ err }, 'Could not fetch media server info for settings')
+          }
+        }
+
         return reply.send({
           config: {
             type: config.type,
@@ -90,6 +107,7 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
             hasApiKey: !!config.apiKey,
             isConfigured: config.isConfigured,
             displayName,
+            reportedName,
           },
           serverTypes,
         })
