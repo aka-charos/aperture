@@ -548,7 +548,18 @@
       "cannotUndo": "لا يمكن التراجع عن هذا الإجراء.",
       "marking": "وضع علامة…",
       "snackbarMarked": "تم وضع علامة على الفيلم على أنه لم تتم مشاهدته",
-      "snackbarMarkFailed": "فشل وضع علامة \"غير مراقب\"."
+      "snackbarMarkFailed": "فشل وضع علامة \"غير مراقب\".",
+      "markWatchedTooltip": "Mark as watched - syncs to your media server and watch history",
+      "markWatched": "Mark Watched",
+      "favorite": "Favorite",
+      "favorited": "Favorited",
+      "addFavoriteTooltip": "Add to favorites on your media server",
+      "removeFavoriteTooltip": "Remove from favorites on your media server",
+      "snackbarMarkedWatched": "Movie marked as watched",
+      "snackbarMarkWatchedFailed": "Failed to mark as watched",
+      "snackbarFavoriteAdded": "Added to favorites",
+      "snackbarFavoriteRemoved": "Removed from favorites",
+      "snackbarFavoriteFailed": "Failed to update favorite"
     },
     "insights": {
       "recommendedForYou": "موصى به لك",
@@ -627,6 +638,15 @@
       "graphHint": "انقر على الملصق للاستكشاف • انقر على ⓘ للحصول على التفاصيل",
       "expandedSubtitle": "عرض موسع • {{count}} عنصر",
       "fallbackCenterTitle": "وسائط"
+    },
+    "missingSeasons": {
+      "title": "Not on your server",
+      "titleNamed": "Not on your {{serverName}}",
+      "seasonChip": "Season {{n}} · {{count}} eps",
+      "request": "Request via Seerr",
+      "requestNamed": "Request availability on {{serverName}}",
+      "requestSuccess": "Request submitted",
+      "requestFailed": "Failed to submit request"
     }
   },
   "browse": {
@@ -1871,7 +1891,10 @@
     "securityWarningTitle": "تحذير أمني",
     "securityWarningBody": "قم بتمكين هذا فقط إذا كان مثيل Aperture الخاص بك موجودًا على شبكة خاصة دون التعرض للإنترنت. إذا كان من الممكن الوصول إلى الخادم الخاص بك عبر الوكيل العكسي أو الإنترنت، فاترك هذا معطلاً لمنع الوصول غير المصرح به.",
     "passwordlessEnabled": "تم تمكين تسجيل الدخول بدون كلمة مرور",
-    "passwordlessDisabled": "تم تعطيل تسجيل الدخول بدون كلمة مرور"
+    "passwordlessDisabled": "تم تعطيل تسجيل الدخول بدون كلمة مرور",
+    "displayName": "Server Display Name",
+    "displayNamePlaceholder": "e.g. Home Cinema",
+    "displayNameHelper": "Used in app text, e.g. “Not on your Home Cinema”. Leave empty to use the name reported by the media server."
   },
   "settingsFileLocations": {
     "title": "مواقع الملفات",
@@ -2788,7 +2811,19 @@
     "noEpisodeData": "لا توجد بيانات الحلقة المتاحة",
     "checkBackSoon": "التحقق مرة أخرى قريبا",
     "seriesComplete": "السلسلة كاملة",
-    "episodesTotal": "{{عدد}} حلقات"
+    "episodesTotal": "{{عدد}} حلقات",
+    "filterEnded": "Ended ({{count}})",
+    "filterWatchlist": "Watchlist ({{count}})",
+    "filterHistory": "From History ({{count}})",
+    "sourceWatchlist": "Watchlist",
+    "sourceHistory": "History",
+    "sourceBoth": "Watchlist · History",
+    "episodesProgress": "{{watched}}/{{total}} eps",
+    "episodesMissing": "{{count}} not on server",
+    "missingOnServer": "Missing on server: {{seasons}}",
+    "addTooltip": "Add to watching list",
+    "addedSuccess": "Added to watching list",
+    "addFailed": "Failed to add series"
   },
   "setup": {
     "step": {

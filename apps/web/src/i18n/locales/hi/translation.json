@@ -548,7 +548,18 @@
       "cannotUndo": "इस एक्शन को वापस नहीं किया जा सकता।",
       "marking": "चिन्हित कर रहा हूँ...",
       "snackbarMarked": "मूवी को न देखी गई के रूप में चिह्नित किया गया",
-      "snackbarMarkFailed": "न देखे गए के रूप में चिह्नित करने में विफल"
+      "snackbarMarkFailed": "न देखे गए के रूप में चिह्नित करने में विफल",
+      "markWatchedTooltip": "Mark as watched - syncs to your media server and watch history",
+      "markWatched": "Mark Watched",
+      "favorite": "Favorite",
+      "favorited": "Favorited",
+      "addFavoriteTooltip": "Add to favorites on your media server",
+      "removeFavoriteTooltip": "Remove from favorites on your media server",
+      "snackbarMarkedWatched": "Movie marked as watched",
+      "snackbarMarkWatchedFailed": "Failed to mark as watched",
+      "snackbarFavoriteAdded": "Added to favorites",
+      "snackbarFavoriteRemoved": "Removed from favorites",
+      "snackbarFavoriteFailed": "Failed to update favorite"
     },
     "insights": {
       "recommendedForYou": "आप के लिए अनुशंसित",
@@ -627,6 +638,15 @@
       "graphHint": "जानने के लिए पोस्टर पर क्लिक करें • विवरण के लिए ⓘ पर क्लिक करें",
       "expandedSubtitle": "विस्तारित दृश्य • {{गिनती}} आइटम",
       "fallbackCenterTitle": "मिडिया"
+    },
+    "missingSeasons": {
+      "title": "Not on your server",
+      "titleNamed": "Not on your {{serverName}}",
+      "seasonChip": "Season {{n}} · {{count}} eps",
+      "request": "Request via Seerr",
+      "requestNamed": "Request availability on {{serverName}}",
+      "requestSuccess": "Request submitted",
+      "requestFailed": "Failed to submit request"
     }
   },
   "browse": {
@@ -1871,7 +1891,10 @@
     "securityWarningTitle": "सुरक्षा चेतावनी",
     "securityWarningBody": "इसे केवल तभी सक्षम करें जब आपका एपर्चर इंस्टेंस बिना इंटरनेट एक्सपोज़र वाले निजी नेटवर्क पर हो। यदि आपका सर्वर रिवर्स प्रॉक्सी या इंटरनेट के माध्यम से पहुंच योग्य है, तो अनधिकृत पहुंच को रोकने के लिए इसे अक्षम छोड़ दें।",
     "passwordlessEnabled": "पासवर्ड रहित लॉगिन सक्षम",
-    "passwordlessDisabled": "पासवर्ड रहित लॉगिन अक्षम"
+    "passwordlessDisabled": "पासवर्ड रहित लॉगिन अक्षम",
+    "displayName": "Server Display Name",
+    "displayNamePlaceholder": "e.g. Home Cinema",
+    "displayNameHelper": "Used in app text, e.g. “Not on your Home Cinema”. Leave empty to use the name reported by the media server."
   },
   "settingsFileLocations": {
     "title": "फ़ाइल स्थान",
@@ -2788,7 +2811,19 @@
     "noEpisodeData": "कोई एपिसोड डेटा उपलब्ध नहीं है",
     "checkBackSoon": "जल्दी वापस जाँच करें",
     "seriesComplete": "शृंखला पूर्ण",
-    "episodesTotal": "{{गिनती}} एपिसोड"
+    "episodesTotal": "{{गिनती}} एपिसोड",
+    "filterEnded": "Ended ({{count}})",
+    "filterWatchlist": "Watchlist ({{count}})",
+    "filterHistory": "From History ({{count}})",
+    "sourceWatchlist": "Watchlist",
+    "sourceHistory": "History",
+    "sourceBoth": "Watchlist · History",
+    "episodesProgress": "{{watched}}/{{total}} eps",
+    "episodesMissing": "{{count}} not on server",
+    "missingOnServer": "Missing on server: {{seasons}}",
+    "addTooltip": "Add to watching list",
+    "addedSuccess": "Added to watching list",
+    "addFailed": "Failed to add series"
   },
   "setup": {
     "step": {

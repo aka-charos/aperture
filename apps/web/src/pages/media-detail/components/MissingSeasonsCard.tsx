@@ -25,6 +25,7 @@ import {
   type SeasonInfo,
 } from '../../discovery/components/SeasonSelectModal'
 import { useSeerrRequest } from '../../discovery/hooks/useSeerrRequest'
+import { useServerDisplayName } from '../../../hooks/useServerDisplayName'
 import type { Series, Episode } from '../types'
 
 interface MissingSeasonsCardProps {
@@ -35,6 +36,7 @@ interface MissingSeasonsCardProps {
 export function MissingSeasonsCard({ series, seasons }: MissingSeasonsCardProps) {
   const { t } = useTranslation()
   const { fetchTVDetails, submitRequest } = useSeerrRequest()
+  const serverName = useServerDisplayName()
   const [canRequest, setCanRequest] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [modalSeasons, setModalSeasons] = useState<SeasonInfo[]>([])
@@ -129,7 +131,9 @@ export function MissingSeasonsCard({ series, seasons }: MissingSeasonsCardProps)
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
           <ReportProblemOutlinedIcon sx={{ color: 'warning.main', fontSize: 20 }} />
           <Typography variant="h6" fontWeight={600}>
-            {t('mediaDetail.missingSeasons.title')}
+            {serverName
+              ? t('mediaDetail.missingSeasons.titleNamed', { serverName })
+              : t('mediaDetail.missingSeasons.title')}
           </Typography>
         </Box>
 
@@ -160,7 +164,9 @@ export function MissingSeasonsCard({ series, seasons }: MissingSeasonsCardProps)
             disabled={loadingSeasons}
             sx={{ borderRadius: 2 }}
           >
-            {t('mediaDetail.missingSeasons.request')}
+            {serverName
+              ? t('mediaDetail.missingSeasons.requestNamed', { serverName })
+              : t('mediaDetail.missingSeasons.request')}
           </Button>
         )}
       </CardContent>

@@ -548,7 +548,18 @@
       "cannotUndo": "Diese Aktion kann nicht rückgängig gemacht werden.",
       "marking": "Markiere…",
       "snackbarMarked": "Film als ungesehen markiert",
-      "snackbarMarkFailed": "Markieren als ungesehen fehlgeschlagen"
+      "snackbarMarkFailed": "Markieren als ungesehen fehlgeschlagen",
+      "markWatchedTooltip": "Mark as watched - syncs to your media server and watch history",
+      "markWatched": "Mark Watched",
+      "favorite": "Favorite",
+      "favorited": "Favorited",
+      "addFavoriteTooltip": "Add to favorites on your media server",
+      "removeFavoriteTooltip": "Remove from favorites on your media server",
+      "snackbarMarkedWatched": "Movie marked as watched",
+      "snackbarMarkWatchedFailed": "Failed to mark as watched",
+      "snackbarFavoriteAdded": "Added to favorites",
+      "snackbarFavoriteRemoved": "Removed from favorites",
+      "snackbarFavoriteFailed": "Failed to update favorite"
     },
     "insights": {
       "recommendedForYou": "Für dich empfohlen",
@@ -627,6 +638,15 @@
       "graphHint": "Poster anklicken zum Erkunden • ⓘ für Details anklicken",
       "expandedSubtitle": "Erweiterte Ansicht • {{count}} Elemente",
       "fallbackCenterTitle": "Medien"
+    },
+    "missingSeasons": {
+      "title": "Not on your server",
+      "titleNamed": "Not on your {{serverName}}",
+      "seasonChip": "Season {{n}} · {{count}} eps",
+      "request": "Request via Seerr",
+      "requestNamed": "Request availability on {{serverName}}",
+      "requestSuccess": "Request submitted",
+      "requestFailed": "Failed to submit request"
     }
   },
   "browse": {
@@ -1871,7 +1891,10 @@
     "securityWarningTitle": "Sicherheitshinweis",
     "securityWarningBody": "Aktiviere dies nur, wenn deine Aperture-Instanz in einem privaten Netzwerk ohne Internetzugang läuft. Wenn dein Server über Reverse Proxy oder das Internet erreichbar ist, lasse es deaktiviert, um unbefugten Zugriff zu verhindern.",
     "passwordlessEnabled": "Passwortloses Login aktiviert",
-    "passwordlessDisabled": "Passwortloses Login deaktiviert"
+    "passwordlessDisabled": "Passwortloses Login deaktiviert",
+    "displayName": "Server Display Name",
+    "displayNamePlaceholder": "e.g. Home Cinema",
+    "displayNameHelper": "Used in app text, e.g. “Not on your Home Cinema”. Leave empty to use the name reported by the media server."
   },
   "settingsFileLocations": {
     "title": "Dateipfade",
@@ -2788,7 +2811,19 @@
     "noEpisodeData": "Keine Episodendaten verfügbar",
     "checkBackSoon": "Schau bald wieder vorbei",
     "seriesComplete": "Serie abgeschlossen",
-    "episodesTotal": "{{count}} Episoden"
+    "episodesTotal": "{{count}} Episoden",
+    "filterEnded": "Ended ({{count}})",
+    "filterWatchlist": "Watchlist ({{count}})",
+    "filterHistory": "From History ({{count}})",
+    "sourceWatchlist": "Watchlist",
+    "sourceHistory": "History",
+    "sourceBoth": "Watchlist · History",
+    "episodesProgress": "{{watched}}/{{total}} eps",
+    "episodesMissing": "{{count}} not on server",
+    "missingOnServer": "Missing on server: {{seasons}}",
+    "addTooltip": "Add to watching list",
+    "addedSuccess": "Added to watching list",
+    "addFailed": "Failed to add series"
   },
   "setup": {
     "step": {

@@ -183,6 +183,7 @@ export interface MediaServerInfo {
   type: string
   serverId: string
   serverName: string
+  displayName?: string
   webClientUrl: string
 }
 

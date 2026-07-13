@@ -33,6 +33,7 @@ interface MediaServerConfig {
   baseUrl: string | null
   hasApiKey: boolean
   isConfigured: boolean
+  displayName?: string
 }
 
 interface ServerType {
@@ -55,6 +56,7 @@ export function MediaServerSection() {
   const [serverType, setServerType] = useState<string>('')
   const [baseUrl, setBaseUrl] = useState<string>('')
   const [apiKey, setApiKey] = useState<string>('')
+  const [displayName, setDisplayName] = useState<string>('')
   const [showApiKey, setShowApiKey] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
 
@@ -107,6 +109,7 @@ export function MediaServerSection() {
         setServerTypes(data.serverTypes || [])
         setServerType(data.config.type || '')
         setBaseUrl(data.config.baseUrl || '')
+        setDisplayName(data.config.displayName || '')
         setApiKey('') // Never pre-fill API key for security
         setHasChanges(false)
       }
@@ -160,11 +163,12 @@ export function MediaServerSection() {
     setSuccess(null)
 
     try {
-      const updates: { type?: string; baseUrl?: string; apiKey?: string } = {}
-      
+      const updates: { type?: string; baseUrl?: string; apiKey?: string; displayName?: string } = {}
+
       if (serverType !== config?.type) updates.type = serverType
       if (baseUrl !== config?.baseUrl) updates.baseUrl = baseUrl
       if (apiKey) updates.apiKey = apiKey // Only send if changed
+      if (displayName !== (config?.displayName ?? '')) updates.displayName = displayName
 
       const response = await fetch('/api/settings/media-server/config', {
         method: 'PATCH',
@@ -189,10 +193,10 @@ export function MediaServerSection() {
     }
   }
 
-  const handleFieldChange = (field: 'type' | 'baseUrl' | 'apiKey', value: string) => {
+  const handleFieldChange = (field: 'type' | 'baseUrl' | 'apiKey' | 'displayName', value: string) => {
     setHasChanges(true)
     setTestResult(null)
-    
+
     switch (field) {
       case 'type':
         setServerType(value)
@@ -202,6 +206,9 @@ export function MediaServerSection() {
         break
       case 'apiKey':
         setApiKey(value)
+        break
+      case 'displayName':
+        setDisplayName(value)
         break
     }
   }
@@ -258,6 +265,16 @@ export function MediaServerSection() {
             onChange={(e) => handleFieldChange('baseUrl', e.target.value)}
             placeholder={t('settingsMediaServer.serverUrlPlaceholder')}
             helperText={t('settingsMediaServer.serverUrlHelper')}
+            fullWidth
+          />
+
+          {/* Display Name */}
+          <TextField
+            label={t('settingsMediaServer.displayName')}
+            value={displayName}
+            onChange={(e) => handleFieldChange('displayName', e.target.value)}
+            placeholder={t('settingsMediaServer.displayNamePlaceholder')}
+            helperText={t('settingsMediaServer.displayNameHelper')}
             fullWidth
           />
 

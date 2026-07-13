@@ -975,7 +975,18 @@
       "cannotUndo": "この操作は元に戻すことができません。",
       "marking": "マーキング…",
       "snackbarMarked": "未視聴としてマークされた映画",
-      "snackbarMarkFailed": "未視聴としてマークできませんでした"
+      "snackbarMarkFailed": "未視聴としてマークできませんでした",
+      "markWatchedTooltip": "Mark as watched - syncs to your media server and watch history",
+      "markWatched": "Mark Watched",
+      "favorite": "Favorite",
+      "favorited": "Favorited",
+      "addFavoriteTooltip": "Add to favorites on your media server",
+      "removeFavoriteTooltip": "Remove from favorites on your media server",
+      "snackbarMarkedWatched": "Movie marked as watched",
+      "snackbarMarkWatchedFailed": "Failed to mark as watched",
+      "snackbarFavoriteAdded": "Added to favorites",
+      "snackbarFavoriteRemoved": "Removed from favorites",
+      "snackbarFavoriteFailed": "Failed to update favorite"
     },
     "insights": {
       "recommendedForYou": "あなたにおすすめ",
@@ -1054,6 +1065,15 @@
       "graphHint": "ポスターをクリックして詳細をご覧ください • ⓘ をクリックすると詳細が表示されます",
       "expandedSubtitle": "展開ビュー • {{count}} 個のアイテム",
       "fallbackCenterTitle": "メディア"
+    },
+    "missingSeasons": {
+      "title": "Not on your server",
+      "titleNamed": "Not on your {{serverName}}",
+      "seasonChip": "Season {{n}} · {{count}} eps",
+      "request": "Request via Seerr",
+      "requestNamed": "Request availability on {{serverName}}",
+      "requestSuccess": "Request submitted",
+      "requestFailed": "Failed to submit request"
     }
   },
   "search": {
@@ -1871,7 +1891,10 @@
     "securityWarningTitle": "セキュリティ警告",
     "securityWarningBody": "Aperture インスタンスがインターネットに公開されていないプライベート ネットワーク上にある場合にのみ、これを有効にします。 リバース プロキシまたはインターネット経由でサーバーにアクセスできる場合は、不正アクセスを防ぐためにこれを無効のままにしておきます。",
     "passwordlessEnabled": "パスワードレスログインが有効になりました",
-    "passwordlessDisabled": "パスワードレスログインが無効になっています"
+    "passwordlessDisabled": "パスワードレスログインが無効になっています",
+    "displayName": "Server Display Name",
+    "displayNamePlaceholder": "e.g. Home Cinema",
+    "displayNameHelper": "Used in app text, e.g. “Not on your Home Cinema”. Leave empty to use the name reported by the media server."
   },
   "settingsFileLocations": {
     "title": "ファイルの場所",
@@ -2788,7 +2811,19 @@
     "noEpisodeData": "エピソードデータがありません",
     "checkBackSoon": "すぐにもう一度確認してください",
     "seriesComplete": "シリーズ完結",
-    "episodesTotal": "{{count}} 話"
+    "episodesTotal": "{{count}} 話",
+    "filterEnded": "Ended ({{count}})",
+    "filterWatchlist": "Watchlist ({{count}})",
+    "filterHistory": "From History ({{count}})",
+    "sourceWatchlist": "Watchlist",
+    "sourceHistory": "History",
+    "sourceBoth": "Watchlist · History",
+    "episodesProgress": "{{watched}}/{{total}} eps",
+    "episodesMissing": "{{count}} not on server",
+    "missingOnServer": "Missing on server: {{seasons}}",
+    "addTooltip": "Add to watching list",
+    "addedSuccess": "Added to watching list",
+    "addFailed": "Failed to add series"
   },
   "setup": {
     "step": {
