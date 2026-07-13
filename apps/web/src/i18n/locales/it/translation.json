@@ -895,7 +895,10 @@
       "title": "Visualizzazione poster",
       "subtitle": "Come vengono mostrati i badge di valutazione sui poster.",
       "showRatingLabel": "Mostra il badge di valutazione sui poster della libreria",
-      "showRatingHelp": "Disattivalo se le locandine della tua libreria includono già una valutazione. Le copertine di Scopri e delle altre fonti TMDb mostrano sempre la valutazione nell’angolo."
+      "showRatingHelp": "Disattivalo se le locandine della tua libreria includono già una valutazione. Le copertine di Scopri e delle altre fonti TMDb mostrano sempre la valutazione nell'angolo. Se non hai scelto, viene usata l'impostazione predefinita del server.",
+      "stateShown": "mostrata",
+      "stateHidden": "nascosta",
+      "resetToDefault": "Ripristina l'impostazione predefinita del server ({{state}})"
     }
   },
   "settingsPage": {
@@ -3879,5 +3882,18 @@
     "noMatches": "No countries match \"{{query}}\"",
     "shownCount_one": "{{count}} country",
     "shownCount_other": "{{count}} countries"
+  },
+  "settingsPosterDisplay": {
+    "title": "Visualizzazione poster",
+    "subtitle": "Imposta il valore predefinito del badge di valutazione sui poster della libreria. I singoli utenti possono modificarlo nelle proprie impostazioni.",
+    "loadFailed": "Impossibile caricare la configurazione di visualizzazione dei poster",
+    "fetchFailed": "Impossibile recuperare la configurazione",
+    "saveFailed": "Impossibile salvare la configurazione",
+    "saved": "Impostazioni di visualizzazione dei poster salvate.",
+    "unknownError": "Errore sconosciuto",
+    "showLabel": "Mostra il badge di valutazione sui poster della libreria",
+    "showCaption": "Predefinito per tutti gli utenti. Disattivalo se il tuo server incorpora le valutazioni nelle locandine. Scopri e le altre copertine TMDb mostrano sempre la loro valutazione.",
+    "saving": "Salvataggio…",
+    "saveChanges": "Salva modifiche"
   }
 }

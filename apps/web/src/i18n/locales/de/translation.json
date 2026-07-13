@@ -895,7 +895,10 @@
       "title": "Poster-Anzeige",
       "subtitle": "Wie Bewertungs-Abzeichen auf Postern angezeigt werden.",
       "showRatingLabel": "Bewertungs-Abzeichen auf Bibliotheks-Postern anzeigen",
-      "showRatingHelp": "Deaktivieren, wenn die Artworks deiner Bibliothek bereits eine Bewertung enthalten. Cover aus Entdecken und anderen TMDb-Quellen zeigen ihre Bewertung immer in der Ecke."
+      "showRatingHelp": "Deaktivieren, wenn die Artworks deiner Bibliothek bereits eine Bewertung enthalten. Cover aus Entdecken und anderen TMDb-Quellen zeigen ihre Bewertung immer in der Ecke. Wenn du nichts ausgewählt hast, wird die Serverstandardeinstellung verwendet.",
+      "stateShown": "angezeigt",
+      "stateHidden": "ausgeblendet",
+      "resetToDefault": "Auf Serverstandard zurücksetzen ({{state}})"
     }
   },
   "settingsPage": {
@@ -3879,5 +3882,18 @@
     "noMatches": "No countries match \"{{query}}\"",
     "shownCount_one": "{{count}} country",
     "shownCount_other": "{{count}} countries"
+  },
+  "settingsPosterDisplay": {
+    "title": "Poster-Anzeige",
+    "subtitle": "Lege die Standardeinstellung für das Bewertungs-Abzeichen auf Bibliotheks-Postern fest. Einzelne Benutzer können sie in ihren eigenen Einstellungen überschreiben.",
+    "loadFailed": "Poster-Anzeige-Konfiguration konnte nicht geladen werden",
+    "fetchFailed": "Konfiguration konnte nicht abgerufen werden",
+    "saveFailed": "Konfiguration konnte nicht gespeichert werden",
+    "saved": "Poster-Anzeige-Einstellungen gespeichert.",
+    "unknownError": "Unbekannter Fehler",
+    "showLabel": "Bewertungs-Abzeichen auf Bibliotheks-Postern anzeigen",
+    "showCaption": "Standard für alle Benutzer. Deaktivieren, wenn dein Server Bewertungen in die Artworks einbrennt. Entdecken und andere TMDb-Cover zeigen ihre Bewertung immer.",
+    "saving": "Wird gespeichert…",
+    "saveChanges": "Änderungen speichern"
   }
 }

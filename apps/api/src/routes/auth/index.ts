@@ -208,17 +208,20 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         getUserUiPreferences,
         resolveEffectiveUiLanguage,
         resolveEffectiveAiLanguage,
+        getPosterDisplayConfig,
       } = await import('@aperture/core')
       const uid = request.user!.id
       const preferences = await getUserUiPreferences(uid)
-      const [effectiveUiLanguage, effectiveAiLanguage] = await Promise.all([
+      const [effectiveUiLanguage, effectiveAiLanguage, posterDisplay] = await Promise.all([
         resolveEffectiveUiLanguage(uid),
         resolveEffectiveAiLanguage(uid),
+        getPosterDisplayConfig(),
       ])
       return reply.send({
         ...preferences,
         effectiveUiLanguage,
         effectiveAiLanguage,
+        posterRatingHiddenByDefault: posterDisplay.hideRatingBadgeByDefault,
       })
     }
   )
@@ -252,16 +255,19 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       }
       
       const preferences = await updateUserUiPreferences(request.user!.id, updates)
-      const { resolveEffectiveUiLanguage, resolveEffectiveAiLanguage } = await import('@aperture/core')
+      const { resolveEffectiveUiLanguage, resolveEffectiveAiLanguage, getPosterDisplayConfig } =
+        await import('@aperture/core')
       const uid = request.user!.id
-      const [effectiveUiLanguage, effectiveAiLanguage] = await Promise.all([
+      const [effectiveUiLanguage, effectiveAiLanguage, posterDisplay] = await Promise.all([
         resolveEffectiveUiLanguage(uid),
         resolveEffectiveAiLanguage(uid),
+        getPosterDisplayConfig(),
       ])
       return reply.send({
         ...preferences,
         effectiveUiLanguage,
         effectiveAiLanguage,
+        posterRatingHiddenByDefault: posterDisplay.hideRatingBadgeByDefault,
       })
     }
   )

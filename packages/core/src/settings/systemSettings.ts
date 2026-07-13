@@ -1052,6 +1052,46 @@ export async function setWatchingLibraryConfig(
 }
 
 // ============================================================================
+// Poster Display Settings (instance-wide default; per-user override lives in
+// user_settings.settings_json.ui.hidePosterRating)
+// ============================================================================
+
+export interface PosterDisplayConfig {
+  /**
+   * Hide the community-rating badge on library posters by default, for all
+   * users. Individual users may still override this in their own preferences.
+   * External/TMDb covers (Discover, etc.) are unaffected.
+   */
+  hideRatingBadgeByDefault: boolean
+}
+
+/**
+ * Get instance-wide poster display defaults.
+ */
+export async function getPosterDisplayConfig(): Promise<PosterDisplayConfig> {
+  const hide = await getSystemSetting('poster_rating_badge_hidden_by_default')
+  return {
+    hideRatingBadgeByDefault: hide === 'true', // Default false (badge shown)
+  }
+}
+
+/**
+ * Set instance-wide poster display defaults (admin).
+ */
+export async function setPosterDisplayConfig(
+  config: Partial<PosterDisplayConfig>
+): Promise<PosterDisplayConfig> {
+  if (config.hideRatingBadgeByDefault !== undefined) {
+    await setSystemSetting(
+      'poster_rating_badge_hidden_by_default',
+      String(config.hideRatingBadgeByDefault),
+      'Hide the community-rating badge on library posters by default (users may override)'
+    )
+  }
+  return getPosterDisplayConfig()
+}
+
+// ============================================================================
 // Library Title Template Settings
 // ============================================================================
 

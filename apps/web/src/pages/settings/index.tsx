@@ -48,6 +48,7 @@ import {
   LegacyEmbeddingsSection,
   ApiKeysSection,
   LanguageDefaultsSection,
+  PosterDisplaySection,
   SystemLogsSection,
 } from './components'
 import { ApiErrorAlert } from '../../components/ApiErrorAlert'
@@ -413,6 +414,9 @@ export function SettingsPage() {
           <TabPanel value={tabValue} index={6}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               <LanguageDefaultsSection />
+
+              {/* Poster display defaults (rating badge) */}
+              <PosterDisplaySection />
 
               {/* Logging verbosity */}
               <SystemLogsSection />

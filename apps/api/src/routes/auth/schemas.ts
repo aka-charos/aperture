@@ -77,8 +77,9 @@ export const authSchemas = {
         description: 'Default tab for Similar Movies/Series on media detail',
       },
       hidePosterRating: {
-        type: 'boolean',
-        description: 'Hide the community-rating badge overlaid on library posters',
+        type: ['boolean', 'null'],
+        description:
+          'Hide the community-rating badge overlaid on library posters. true/false is an explicit override; null inherits the instance default.',
       },
     },
   },
@@ -154,8 +155,9 @@ export const updatePreferencesSchema = {
         description: 'Default tab for Similar Movies/Series on media detail',
       },
       hidePosterRating: {
-        type: 'boolean',
-        description: 'Hide the community-rating badge overlaid on library posters',
+        type: ['boolean', 'null'],
+        description:
+          'Hide the community-rating badge overlaid on library posters. true/false is an explicit override; null inherits the instance default.',
       },
       uiLanguage: {
         type: ['string', 'null'],
