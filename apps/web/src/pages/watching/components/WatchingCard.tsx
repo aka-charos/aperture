@@ -7,11 +7,12 @@
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { Box, Typography, Chip, LinearProgress } from '@mui/material'
+import { Box, Typography, Chip } from '@mui/material'
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import TvIcon from '@mui/icons-material/Tv'
 import { MoviePoster } from '@aperture/ui'
 import { useUserRatings } from '@/hooks/useUserRatings'
+import { EpisodeAvailabilityBar } from './EpisodeAvailabilityBar'
 import type { WatchingSeries, UpcomingEpisode } from '../hooks/useWatchingData'
 
 interface WatchingCardProps {
@@ -59,19 +60,7 @@ export function WatchingCard({ series, onRemove, onAdd }: WatchingCardProps) {
 
   const upcoming = series.upcomingEpisode
   const isAiring = series.status === 'Continuing'
-  const showProgress = series.inHistory && series.episodesOnServer > 0
-  // Progress is measured against episodes aired (per TMDB) when known, so a
-  // library missing episodes can never read as 100% complete.
-  const episodesTotal = Math.max(series.episodesOnServer, series.episodesAired ?? 0)
-  const progressPercent =
-    showProgress && episodesTotal > 0
-      ? Math.min(100, (series.episodesWatched / episodesTotal) * 100)
-      : 0
-  const isComplete = showProgress && series.episodesWatched >= episodesTotal
-  const missingSeasonsLabel =
-    series.missingSeasons.length > 0
-      ? series.missingSeasons.map((n) => `S${n}`).join(', ')
-      : null
+  const showBar = Math.max(series.episodesOnServer, series.episodesAired ?? 0) > 0
 
   return (
     <Box sx={{ width: '100%' }}>
@@ -117,7 +106,7 @@ export function WatchingCard({ series, onRemove, onAdd }: WatchingCardProps) {
           backgroundColor: 'background.paper',
           border: 1,
           borderColor: 'divider',
-          minHeight: showProgress ? 78 : 52,
+          minHeight: showBar ? 70 : 52,
           overflow: 'hidden',
         }}
       >
@@ -148,48 +137,11 @@ export function WatchingCard({ series, onRemove, onAdd }: WatchingCardProps) {
           </Box>
         )}
 
-        {/* Watch progress (history-sourced) */}
-        {showProgress && (
+        {/* Watched / available / missing in one segmented bar */}
+        {showBar && (
           <Box sx={{ mt: 0.75 }}>
-            <Typography
-              variant="caption"
-              color={isComplete ? 'success.main' : 'text.secondary'}
-              fontWeight={600}
-              noWrap
-              display="block"
-            >
-              {t('watching.episodesProgress', {
-                watched: series.episodesWatched,
-                total: episodesTotal,
-              })}
-              {series.episodesMissing > 0 && (
-                <Box component="span" sx={{ color: 'warning.main' }}>
-                  {' · '}
-                  {t('watching.episodesMissing', { count: series.episodesMissing })}
-                </Box>
-              )}
-            </Typography>
-            <LinearProgress
-              variant="determinate"
-              value={progressPercent}
-              color={isComplete ? 'success' : 'primary'}
-              sx={{ height: 4, borderRadius: 2, mt: 0.25 }}
-            />
+            <EpisodeAvailabilityBar series={series} />
           </Box>
-        )}
-
-        {/* Aired seasons absent from the server */}
-        {missingSeasonsLabel && (
-          <Typography
-            variant="caption"
-            color="warning.main"
-            fontWeight={600}
-            noWrap
-            display="block"
-            sx={{ mt: 0.5 }}
-          >
-            {t('watching.missingOnServer', { seasons: missingSeasonsLabel })}
-          </Typography>
         )}
       </Box>
     </Box>

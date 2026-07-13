@@ -28,6 +28,7 @@ import AddToQueueIcon from '@mui/icons-material/AddToQueue'
 import ScheduleIcon from '@mui/icons-material/Schedule'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL, HeartRating } from '@aperture/ui'
+import { EpisodeAvailabilityBar } from './EpisodeAvailabilityBar'
 import type { WatchingSeries, UpcomingEpisode } from '../hooks/useWatchingData'
 
 interface WatchingListItemProps {
@@ -100,19 +101,7 @@ export function WatchingListItem({ series, userRating, onRate, onRemove, onAdd }
   const isAiring = series.status === 'Continuing'
   const daysUntil = upcoming ? getDaysUntil(upcoming.airDate) : null
   const countdownColor = daysUntil !== null ? getCountdownColor(daysUntil) : undefined
-  const showProgress = series.inHistory && series.episodesOnServer > 0
-  // Progress is measured against episodes aired (per TMDB) when known, so a
-  // library missing episodes can never read as 100% complete.
-  const episodesTotal = Math.max(series.episodesOnServer, series.episodesAired ?? 0)
-  const progressPercent =
-    showProgress && episodesTotal > 0
-      ? Math.min(100, (series.episodesWatched / episodesTotal) * 100)
-      : 0
-  const isComplete = showProgress && series.episodesWatched >= episodesTotal
-  const missingSeasonsLabel =
-    series.missingSeasons.length > 0
-      ? series.missingSeasons.map((n) => `S${n}`).join(', ')
-      : null
+  const showBar = Math.max(series.episodesOnServer, series.episodesAired ?? 0) > 0
   const sourceLabel = series.inWatchlist
     ? series.inHistory
       ? t('watching.sourceBoth')
@@ -355,48 +344,11 @@ export function WatchingListItem({ series, userRating, onRate, onRemove, onAdd }
           </Typography>
         )}
 
-        {/* Watch progress (history-sourced) */}
-        {showProgress && (
+        {/* Watched / available / missing in one segmented bar */}
+        {showBar && (
           <Box sx={{ mt: { xs: 0.75, md: 1 }, maxWidth: 420 }}>
-            <Box display="flex" alignItems="center" justifyContent="space-between" mb={0.25}>
-              <Typography
-                variant="caption"
-                color={isComplete ? 'success.main' : 'text.secondary'}
-                fontWeight={600}
-              >
-                {t('watching.episodesProgress', {
-                  watched: series.episodesWatched,
-                  total: episodesTotal,
-                })}
-                {series.episodesMissing > 0 && (
-                  <Box component="span" sx={{ color: 'warning.main' }}>
-                    {' · '}
-                    {t('watching.episodesMissing', { count: series.episodesMissing })}
-                  </Box>
-                )}
-              </Typography>
-              <Typography
-                variant="caption"
-                color={isComplete ? 'success.main' : 'text.secondary'}
-                fontWeight={600}
-              >
-                {Math.round(progressPercent)}%
-              </Typography>
-            </Box>
-            <LinearProgress
-              variant="determinate"
-              value={progressPercent}
-              color={isComplete ? 'success' : 'primary'}
-              sx={{ height: 4, borderRadius: 2 }}
-            />
+            <EpisodeAvailabilityBar series={series} showPercent />
           </Box>
-        )}
-
-        {/* Aired seasons absent from the server */}
-        {missingSeasonsLabel && (
-          <Typography variant="caption" color="warning.main" fontWeight={600} sx={{ mt: 0.5 }}>
-            {t('watching.missingOnServer', { seasons: missingSeasonsLabel })}
-          </Typography>
         )}
 
         {/* Mobile: Upcoming episode badge + actions */}
