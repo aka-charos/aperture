@@ -30,6 +30,10 @@ export interface WatchingSeries {
   inHistory: boolean
   episodesWatched: number
   episodesOnServer: number
+  /** Episodes aired so far per TMDB (null until TMDB season data is cached) */
+  episodesAired: number | null
+  /** Aired episodes not present on the media server */
+  episodesMissing: number
   tmdbTotalEpisodes: number | null
   tmdbTotalSeasons: number | null
   /** Aired seasons (per TMDB) with zero episodes on the media server */

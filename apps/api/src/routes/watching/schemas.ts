@@ -59,6 +59,12 @@ export const watchingSchemas = {
       inHistory: { type: 'boolean', description: 'User has watch history for at least one episode' },
       episodesWatched: { type: 'integer', description: 'Distinct episodes with watch history' },
       episodesOnServer: { type: 'integer', description: 'Episodes available on the media server' },
+      episodesAired: {
+        type: 'integer',
+        nullable: true,
+        description: 'Episodes aired so far per TMDB (null until TMDB season data is cached)',
+      },
+      episodesMissing: { type: 'integer', description: 'Aired episodes not present on the media server' },
       tmdbTotalEpisodes: { type: 'integer', nullable: true, description: 'Total aired episodes per TMDB' },
       tmdbTotalSeasons: { type: 'integer', nullable: true, description: 'Total seasons per TMDB' },
       missingSeasons: {
