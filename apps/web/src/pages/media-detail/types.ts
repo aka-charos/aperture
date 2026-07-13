@@ -83,6 +83,15 @@ export interface Series extends BaseMedia {
   tvdb_id: string | null
   air_days: string[]
   awards: string | null
+  // TMDB season data (cached server-side; null until first fetch)
+  tmdb_total_episodes?: number | null
+  tmdb_total_seasons?: number | null
+  tmdb_seasons?: Array<{
+    season_number: number
+    episode_count: number
+    air_date: string | null
+  }> | null
+  tmdb_status?: string | null
 }
 
 // Union type for any media item

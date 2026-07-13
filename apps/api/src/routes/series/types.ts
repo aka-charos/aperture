@@ -61,6 +61,11 @@ export interface SeriesDetailRow extends SeriesRow {
   letterboxd_score: number | null
   mdblist_score: number | null
   streaming_providers: StreamingProvider[] | null
+  // TMDB season data (cached by the watching-page refresh path)
+  tmdb_total_episodes: number | null
+  tmdb_total_seasons: number | null
+  tmdb_seasons: Array<{ season_number: number; episode_count: number; air_date: string | null }> | null
+  tmdb_status: string | null
 }
 
 export interface SeriesListResponse {

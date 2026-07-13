@@ -60,10 +60,14 @@ export function WatchingCard({ series, onRemove, onAdd }: WatchingCardProps) {
   const upcoming = series.upcomingEpisode
   const isAiring = series.status === 'Continuing'
   const showProgress = series.inHistory && series.episodesOnServer > 0
-  const progressPercent = showProgress
-    ? Math.min(100, (series.episodesWatched / series.episodesOnServer) * 100)
-    : 0
-  const isComplete = showProgress && series.episodesWatched >= series.episodesOnServer
+  // Progress is measured against episodes aired (per TMDB) when known, so a
+  // library missing episodes can never read as 100% complete.
+  const episodesTotal = Math.max(series.episodesOnServer, series.episodesAired ?? 0)
+  const progressPercent =
+    showProgress && episodesTotal > 0
+      ? Math.min(100, (series.episodesWatched / episodesTotal) * 100)
+      : 0
+  const isComplete = showProgress && series.episodesWatched >= episodesTotal
   const missingSeasonsLabel =
     series.missingSeasons.length > 0
       ? series.missingSeasons.map((n) => `S${n}`).join(', ')
@@ -156,10 +160,14 @@ export function WatchingCard({ series, onRemove, onAdd }: WatchingCardProps) {
             >
               {t('watching.episodesProgress', {
                 watched: series.episodesWatched,
-                total: series.episodesOnServer,
+                total: episodesTotal,
               })}
-              {series.tmdbTotalEpisodes != null &&
-                ` · ${t('watching.airedTotal', { count: series.tmdbTotalEpisodes })}`}
+              {series.episodesMissing > 0 && (
+                <Box component="span" sx={{ color: 'warning.main' }}>
+                  {' · '}
+                  {t('watching.episodesMissing', { count: series.episodesMissing })}
+                </Box>
+              )}
             </Typography>
             <LinearProgress
               variant="determinate"

@@ -673,6 +673,13 @@
       "seasonN": "Season {{n}}",
       "watched": "Watched"
     },
+    "missingSeasons": {
+      "title": "Not on your server",
+      "seasonChip": "Season {{n}} · {{count}} eps",
+      "request": "Request via Seerr",
+      "requestSuccess": "Request submitted",
+      "requestFailed": "Failed to submit request"
+    },
     "similar": {
       "titleMovies": "Related Movies",
       "titleSeries": "Related Series",
@@ -3094,7 +3101,7 @@
     "sourceHistory": "History",
     "sourceBoth": "Watchlist · History",
     "episodesProgress": "{{watched}}/{{total}} eps",
-    "airedTotal": "{{count}} aired",
+    "episodesMissing": "{{count}} not on server",
     "missingOnServer": "Missing on server: {{seasons}}",
     "addTooltip": "Add to watching list",
     "addedSuccess": "Added to watching list",

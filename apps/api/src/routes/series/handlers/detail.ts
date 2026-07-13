@@ -6,6 +6,7 @@
 import type { FastifyInstance } from 'fastify'
 import { queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
+import { refreshStaleTmdbTotals } from '@aperture/core/watching'
 import { getSeriesSchema } from '../schemas.js'
 import type { SeriesDetailRow } from '../types.js'
 
@@ -19,6 +20,15 @@ export function registerDetailHandler(fastify: FastifyInstance) {
     async (request, reply) => {
       const { id } = request.params
 
+      // Ensure TMDB season data is cached for this series so the page can
+      // show aired-but-missing seasons. At most one TMDB call; a no-op when
+      // the cache is fresh, and never fatal.
+      try {
+        await refreshStaleTmdbTotals([id], { maxFetches: 1 })
+      } catch (err) {
+        request.log.warn({ err, seriesId: id }, 'TMDB totals refresh failed')
+      }
+
       const series = await queryOne<SeriesDetailRow>(
         `SELECT s.id, s.provider_item_id, s.title, s.original_title, s.year, s.end_year, s.genres, s.overview,
                 s.community_rating, s.critic_rating, s.content_rating, s.status, s.total_seasons, s.total_episodes,
@@ -27,6 +37,7 @@ export function registerDetailHandler(fastify: FastifyInstance) {
                 s.poster_url, s.backdrop_url, s.created_at, s.updated_at,
                 s.keywords, s.rt_critic_score, s.rt_audience_score, s.rt_consensus, s.metacritic_score, s.awards_summary,
                 s.languages, s.letterboxd_score, s.mdblist_score, s.streaming_providers,
+                s.tmdb_total_episodes, s.tmdb_total_seasons, s.tmdb_seasons, s.tmdb_status,
                 (SELECT ROUND(AVG(e.runtime_minutes))::int
                  FROM episodes e
                  WHERE e.series_id = s.id AND e.runtime_minutes IS NOT NULL) AS average_episode_runtime_minutes

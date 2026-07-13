@@ -9,6 +9,7 @@ import {
   MediaHero,
   MediaInfoCard,
   SeasonsList,
+  MissingSeasonsCard,
   SimilarMedia,
   MovieInsights,
 } from './components'
@@ -105,6 +106,8 @@ export function MediaDetailPage({ mediaType }: MediaDetailPageProps) {
           <Grid item xs={12} md={6}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               <MediaInfoCard media={media} watchStats={watchStats} />
+              {/* Aired seasons missing from the server (series only) */}
+              {isSeries(media) && <MissingSeasonsCard series={media} seasons={seasons} />}
               {/* Episodes List (Series only) */}
               {isSeries(media) && Object.keys(seasons).length > 0 && (
                 <SeasonsList seasons={seasons} />

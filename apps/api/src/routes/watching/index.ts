@@ -63,6 +63,10 @@ interface WatchingSeriesResponse {
   inHistory: boolean
   episodesWatched: number
   episodesOnServer: number
+  /** Episodes aired so far per TMDB (null when TMDB season data is not cached yet) */
+  episodesAired: number | null
+  /** Aired episodes not present on the media server */
+  episodesMissing: number
   tmdbTotalEpisodes: number | null
   tmdbTotalSeasons: number | null
   /** Aired seasons (per TMDB) with zero episodes on the media server */
@@ -177,19 +181,34 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
     const series: WatchingSeriesResponse[] = result.rows.map((row) => {
       const upcoming = upcomingEpisodes.get(row.series_id)
       const onServer = serverSeasons.get(row.series_id)
-      // Aired regular seasons (per TMDB) with no episodes on the server.
-      // Specials (season 0) and unaired/announced seasons are ignored.
-      const missingSeasons = (row.tmdb_seasons ?? [])
-        .filter(
-          (s) =>
-            s.season_number >= 1 &&
-            s.episode_count > 0 &&
-            s.air_date !== null &&
-            s.air_date <= today &&
-            !onServer?.has(s.season_number)
-        )
+      // Regular seasons (per TMDB) that started airing. Specials (season 0)
+      // and unaired/announced seasons are ignored.
+      const airedSeasons = (row.tmdb_seasons ?? []).filter(
+        (s) =>
+          s.season_number >= 1 &&
+          s.episode_count > 0 &&
+          s.air_date !== null &&
+          s.air_date <= today
+      )
+      const missingSeasons = airedSeasons
+        .filter((s) => !onServer?.has(s.season_number))
         .map((s) => s.season_number)
         .sort((a, b) => a - b)
+      // Aired episode count: full episode_count per started season, except
+      // the season currently airing — there TMDB's episode_count includes
+      // announced-but-unaired episodes, so cap at (next episode number - 1).
+      let episodesAired: number | null = null
+      if (airedSeasons.length > 0) {
+        episodesAired = airedSeasons.reduce((sum, s) => {
+          if (upcoming && upcoming.seasonNumber === s.season_number) {
+            return sum + Math.min(s.episode_count, Math.max(0, upcoming.episodeNumber - 1))
+          }
+          return sum + s.episode_count
+        }, 0)
+      }
+      const episodesOnServer = parseInt(row.episodes_on_server, 10) || 0
+      const episodesMissing =
+        episodesAired !== null ? Math.max(0, episodesAired - episodesOnServer) : 0
       return {
         id: row.watching_id ?? row.series_id,
         seriesId: row.series_id,
@@ -208,7 +227,9 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
         inWatchlist: row.in_watchlist,
         inHistory: row.in_history,
         episodesWatched: row.episodes_watched ? parseInt(row.episodes_watched, 10) : 0,
-        episodesOnServer: parseInt(row.episodes_on_server, 10) || 0,
+        episodesOnServer,
+        episodesAired,
+        episodesMissing,
         tmdbTotalEpisodes: row.tmdb_total_episodes,
         tmdbTotalSeasons: row.tmdb_total_seasons,
         missingSeasons,
