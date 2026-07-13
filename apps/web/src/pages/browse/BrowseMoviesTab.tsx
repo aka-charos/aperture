@@ -22,6 +22,7 @@ import { useUserRatings } from '../../hooks/useUserRatings'
 import type { ViewMode } from '../../hooks/view-mode-context'
 import {
   BrowseMovieListItem,
+  CountryFilterPopper,
   FilterPopper,
   FilterPresetManager,
   SortPopper,
@@ -175,13 +176,18 @@ export function BrowseMoviesTab({ viewMode, movies, presets }: BrowseMoviesTabPr
             </FormControl>
           )}
 
+          <CountryFilterPopper
+            countries={movies.movieCountries}
+            selected={movies.movieFilters.countries}
+            onChange={(countries) => movies.setMovieFilters((prev) => ({ ...prev, countries }))}
+          />
+
           <FilterPopper
             type="movies"
             filters={movies.movieFilters}
             onChange={(filters) => movies.setMovieFilters(filters as MovieFilters)}
             contentRatings={movies.movieContentRatings}
             resolutions={movies.movieResolutions}
-            countries={movies.movieCountries}
             ranges={movies.movieRanges}
           />
 
