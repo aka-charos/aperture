@@ -152,10 +152,13 @@ export function UserLanguagePreferencesCard() {
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <FormControl fullWidth size="small">
-              <InputLabel id="user-ui-lang">{t('language.interface')}</InputLabel>
+              <InputLabel id="user-ui-lang" shrink>
+                {t('language.interface')}
+              </InputLabel>
               <Select
                 labelId="user-ui-lang"
                 label={t('language.interface')}
+                notched
                 value={uiValue}
                 onChange={(e) => setUiOverride(e.target.value === '' ? '' : String(e.target.value))}
                 displayEmpty
@@ -175,10 +178,13 @@ export function UserLanguagePreferencesCard() {
             </Typography>
 
             <FormControl fullWidth size="small" sx={{ mt: 1 }}>
-              <InputLabel id="user-ai-lang">{t('language.aiSummaries')}</InputLabel>
+              <InputLabel id="user-ai-lang" shrink>
+                {t('language.aiSummaries')}
+              </InputLabel>
               <Select
                 labelId="user-ai-lang"
                 label={t('language.aiSummaries')}
+                notched
                 value={aiValue}
                 onChange={(e) => setAiOverride(e.target.value === '' ? '' : String(e.target.value))}
                 displayEmpty
