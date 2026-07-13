@@ -629,7 +629,7 @@ export function GapAnalysisPage() {
     <Grid container spacing={2}>
       {[...Array(12)].map((_, i) => (
         <Grid item xs={6} sm={4} md={3} lg={2} key={i}>
-          <MoviePoster title="" loading responsive hideRating hideHeartRating hideWatchingToggle hideExploreButton />
+          <MoviePoster title="" loading responsive hideRating hideUserRating hideWatchingToggle hideExploreButton />
         </Grid>
       ))}
     </Grid>
@@ -899,7 +899,7 @@ export function GapAnalysisPage() {
                               posterUrl={s.collectionPosterPath ? `${TMDB_IMG}${s.collectionPosterPath}` : null}
                               responsive
                               hideYear
-                              hideHeartRating
+                              hideUserRating
                               hideWatchingToggle
                               hideExploreButton
                               hideRating
@@ -1006,7 +1006,7 @@ export function GapAnalysisPage() {
                                           posterUrl={p.posterPath ? `${TMDB_IMG}${p.posterPath}` : null}
                                           responsive
                                           hideRating
-                                          hideHeartRating
+                                          hideUserRating
                                           hideWatchingToggle
                                           hideExploreButton
                                           onClick={() => openDetailModal(p)}

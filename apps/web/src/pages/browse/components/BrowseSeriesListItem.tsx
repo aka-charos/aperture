@@ -18,7 +18,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import AddToQueueIcon from '@mui/icons-material/AddToQueue'
 import CheckIcon from '@mui/icons-material/Check'
-import { getProxiedImageUrl, FALLBACK_POSTER_URL, HeartRating } from '@aperture/ui'
+import { getProxiedImageUrl, FALLBACK_POSTER_URL, StarRating } from '@aperture/ui'
 
 interface Series {
   id: string
@@ -263,7 +263,7 @@ export function BrowseSeriesListItem({
               mt={1}
               onClick={handleRatingClick}
             >
-              <HeartRating
+              <StarRating
                 value={userRating}
                 onChange={(rating) => onRate(rating)}
                 size="small"
@@ -334,7 +334,7 @@ export function BrowseSeriesListItem({
             <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
               {t('browse.listItem.yourRating')}
             </Typography>
-            <HeartRating
+            <StarRating
               value={userRating}
               onChange={(rating) => onRate(rating)}
               size="small"

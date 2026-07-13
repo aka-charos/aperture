@@ -21,7 +21,7 @@ import PeopleIcon from '@mui/icons-material/People'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import TvIcon from '@mui/icons-material/Tv'
-import { RankBadge, HeartRating, getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
+import { RankBadge, StarRating, getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
 
 interface PopularSeries {
   seriesId: string
@@ -219,7 +219,7 @@ export function TopPicksSeriesListItem({
             {/* Mobile: Inline actions */}
             {isMobile && (
               <Box display="flex" alignItems="center" gap={1} mt={1} onClick={handleRatingClick}>
-                <HeartRating
+                <StarRating
                   value={userRating}
                   onChange={(rating) => onRate(rating)}
                   size="small"
@@ -307,7 +307,7 @@ export function TopPicksSeriesListItem({
 
             {/* Actions */}
             <Box display="flex" justifyContent="center" gap={1} alignItems="center">
-              <HeartRating
+              <StarRating
                 value={userRating}
                 onChange={(rating) => onRate(rating)}
                 size="small"

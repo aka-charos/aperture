@@ -31,7 +31,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility'
 import ThumbDownIcon from '@mui/icons-material/ThumbDown'
 import CloseIcon from '@mui/icons-material/Close'
 import { useTranslation } from 'react-i18next'
-import { HeartRating } from '@aperture/ui'
+import { StarRating } from '@aperture/ui'
 
 interface AlgorithmWeights {
   similarityWeight: number
@@ -794,7 +794,7 @@ export function AlgorithmSettingsSection({ userId }: Props) {
                             {item.year}
                           </Typography>
                         </Box>
-                        <HeartRating
+                        <StarRating
                           value={item.rating}
                           onChange={(newRating) => newRating && handleRatingChange(item.id, newRating, 'movie')}
                           size="small"
@@ -851,7 +851,7 @@ export function AlgorithmSettingsSection({ userId }: Props) {
                             {item.year}
                           </Typography>
                         </Box>
-                        <HeartRating
+                        <StarRating
                           value={item.rating}
                           onChange={(newRating) => newRating && handleRatingChange(item.id, newRating, 'series')}
                           size="small"

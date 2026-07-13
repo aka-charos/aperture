@@ -23,7 +23,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
-import { getProxiedImageUrl, FALLBACK_POSTER_URL, HeartRating } from '@aperture/ui'
+import { getProxiedImageUrl, FALLBACK_POSTER_URL, StarRating } from '@aperture/ui'
 import { formatWatchHistoryRelativeDate, formatWatchHistoryExactDate } from '@/lib/formatWatchHistoryRelativeDate'
 
 interface SeriesWatchHistoryItem {
@@ -244,7 +244,7 @@ export function WatchHistorySeriesListItem({
             {/* Mobile: Inline actions */}
             {isMobile && (
               <Box display="flex" alignItems="center" gap={1} mt={1} onClick={handleRatingClick}>
-                <HeartRating
+                <StarRating
                   value={userRating}
                   onChange={(rating) => onRate(rating)}
                   size="small"
@@ -354,7 +354,7 @@ export function WatchHistorySeriesListItem({
 
             {/* Actions */}
             <Box display="flex" justifyContent="center" gap={1} alignItems="center">
-              <HeartRating
+              <StarRating
                 value={userRating}
                 onChange={(rating) => onRate(rating)}
                 size="small"

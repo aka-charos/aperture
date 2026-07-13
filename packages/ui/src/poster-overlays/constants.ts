@@ -55,8 +55,8 @@ export const RATING_BADGE_STYLES = {
   fontWeight: 600,
 }
 
-// Heart rating container styles
-export const HEART_RATING_CONTAINER_STYLES = {
+// User rating container styles
+export const RATING_CONTAINER_STYLES = {
   backgroundColor: 'rgba(0, 0, 0, 0.6)',
   borderRadius: '50%',
   padding: 0.5,

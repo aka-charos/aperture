@@ -43,7 +43,7 @@ import {
   RankBadge,
   getProxiedImageUrl,
   FALLBACK_POSTER_URL,
-  HeartRating,
+  StarRating,
   TrailerModal,
 } from '@aperture/ui'
 import { useAuth } from '@/hooks/useAuth'
@@ -798,7 +798,7 @@ export function MyRecommendationsPage() {
                       {/* Mobile: Inline actions */}
                       {isMobile && (
                         <Box display="flex" alignItems="center" gap={1} mt={1} onClick={handleRatingClick}>
-                          <HeartRating
+                          <StarRating
                             value={userRating}
                             onChange={(rating) => handleRate(type, id, rating)}
                             size="small"

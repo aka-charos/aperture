@@ -1,25 +1,33 @@
 import React, { useState, useRef } from 'react'
 import { Box, Typography, Tooltip, IconButton, Popper, Paper, ClickAwayListener, Fade } from '@mui/material'
-import Favorite from '@mui/icons-material/Favorite'
-import FavoriteBorder from '@mui/icons-material/FavoriteBorder'
+import Star from '@mui/icons-material/Star'
+import StarBorder from '@mui/icons-material/StarBorder'
 
-const FilledHeart = Favorite as unknown as React.ComponentType<{ 
+const FilledStar = Star as unknown as React.ComponentType<{
   fontSize?: 'small' | 'medium' | 'large' | 'inherit'
-  sx?: object 
+  sx?: object
 }>
-const EmptyHeart = FavoriteBorder as unknown as React.ComponentType<{ 
+const EmptyStar = StarBorder as unknown as React.ComponentType<{
   fontSize?: 'small' | 'medium' | 'large' | 'inherit'
-  sx?: object 
+  sx?: object
 }>
 
-export interface HeartRatingProps {
+// Indigo accent for the user's personal rating — deliberately distinct from the red
+// "favorite" heart and the gold community-rating star, so the three never read as the
+// same action.
+const RATED_COLOR = '#6366f1' // indigo-500
+const RATED_COLOR_HOVER = '#818cf8' // indigo-400
+const EMPTY_COLOR = 'rgba(99, 102, 241, 0.28)'
+const EMPTY_COLOR_HOVER = '#a5b4fc' // indigo-300
+
+export interface StarRatingProps {
   /** Current rating value (1-10), null if not rated */
   value: number | null
   /** Callback when rating changes */
   onChange?: (rating: number | null) => void
   /** Size variant */
   size?: 'small' | 'medium' | 'large'
-  /** Compact mode - shows only filled hearts count, not interactive */
+  /** Compact mode - shows only the rating badge, not interactive */
   compact?: boolean
   /** Whether the component is read-only */
   readOnly?: boolean
@@ -27,36 +35,38 @@ export interface HeartRatingProps {
   disabled?: boolean
   /** Whether a rating operation is in progress */
   loading?: boolean
-  /** Show the rating number next to hearts */
+  /** Show the rating number next to the star */
   showValue?: boolean
-  /** Max hearts to show in popper (default 10) */
-  maxHearts?: number
+  /** Max stars to show in picker (default 10) */
+  maxStars?: number
+  /** Notified when the rating picker opens/closes (lets a parent keep the control visible) */
+  onOpenChange?: (open: boolean) => void
   /** Additional sx props */
   sx?: object
 }
 
 const sizeConfig = {
-  small: { 
-    iconSize: 'small' as const, 
-    heartSize: 20,
-    popperHeartSize: 16,
-    spacing: 0.25, 
+  small: {
+    iconSize: 'small' as const,
+    starSize: 20,
+    popperStarSize: 16,
+    spacing: 0.25,
     fontSize: '0.75rem',
     popperPadding: 1,
   },
-  medium: { 
-    iconSize: 'medium' as const, 
-    heartSize: 28,
-    popperHeartSize: 20,
-    spacing: 0.5, 
+  medium: {
+    iconSize: 'medium' as const,
+    starSize: 28,
+    popperStarSize: 20,
+    spacing: 0.5,
     fontSize: '0.875rem',
     popperPadding: 1.5,
   },
-  large: { 
-    iconSize: 'large' as const, 
-    heartSize: 36,
-    popperHeartSize: 24,
-    spacing: 0.75, 
+  large: {
+    iconSize: 'large' as const,
+    starSize: 36,
+    popperStarSize: 24,
+    spacing: 0.75,
     fontSize: '1rem',
     popperPadding: 2,
   },
@@ -76,15 +86,15 @@ const ratingLabels: Record<number, string> = {
 }
 
 /**
- * Single heart icon that fills up based on the rating percentage
+ * Single star icon that fills up based on the rating percentage
  */
-function FillableHeart({ 
-  fillPercent, 
-  size, 
+function FillableStar({
+  fillPercent,
+  size,
   onClick,
   disabled,
   interactive,
-}: { 
+}: {
   fillPercent: number
   size: number
   onClick?: () => void
@@ -105,8 +115,8 @@ function FillableHeart({
         } : {},
       }}
     >
-      {/* Background empty heart */}
-      <EmptyHeart
+      {/* Background empty star */}
+      <EmptyStar
         sx={{
           position: 'absolute',
           top: 0,
@@ -114,10 +124,10 @@ function FillableHeart({
           width: size,
           height: size,
           fontSize: size,
-          color: 'rgba(244, 63, 94, 0.25)',
+          color: EMPTY_COLOR,
         }}
       />
-      {/* Filled heart with clip-path for partial fill */}
+      {/* Filled star with clip-path for partial fill */}
       <Box
         sx={{
           position: 'absolute',
@@ -129,12 +139,12 @@ function FillableHeart({
           transition: 'clip-path 0.3s ease',
         }}
       >
-        <FilledHeart
+        <FilledStar
           sx={{
             width: size,
             height: size,
             fontSize: size,
-            color: '#f43f5e',
+            color: RATED_COLOR,
           }}
         />
       </Box>
@@ -142,7 +152,7 @@ function FillableHeart({
   )
 }
 
-export function HeartRating({
+export function StarRating({
   value,
   onChange,
   size = 'medium',
@@ -151,21 +161,27 @@ export function HeartRating({
   disabled = false,
   loading = false,
   showValue = false,
-  maxHearts = 10,
+  maxStars = 10,
+  onOpenChange,
   sx = {},
-}: HeartRatingProps) {
+}: StarRatingProps) {
   const [popperOpen, setPopperOpen] = useState(false)
   const [hoverValue, setHoverValue] = useState<number | null>(null)
   const anchorRef = useRef<HTMLDivElement>(null)
   const config = sizeConfig[size]
-  
-  const isInteractive = !readOnly && !disabled && !loading && !!onChange
-  const fillPercent = value ? (value / maxHearts) * 100 : 0
 
-  // Compact mode - just show a badge with filled hearts
+  const isInteractive = !readOnly && !disabled && !loading && !!onChange
+  const fillPercent = value ? (value / maxStars) * 100 : 0
+
+  const setOpen = (open: boolean) => {
+    setPopperOpen(open)
+    onOpenChange?.(open)
+  }
+
+  // Compact mode - just show a badge with the rating value
   if (compact) {
     if (value === null) return null
-    
+
     return (
       <Tooltip title={`Your rating: ${value}/10 - ${ratingLabels[value]}`} arrow>
         <Box
@@ -173,19 +189,19 @@ export function HeartRating({
             display: 'inline-flex',
             alignItems: 'center',
             gap: 0.5,
-            backgroundColor: 'rgba(244, 63, 94, 0.9)',
+            backgroundColor: RATED_COLOR,
             borderRadius: 1,
             px: 0.75,
             py: 0.25,
             ...sx,
           }}
         >
-          <FilledHeart 
-            fontSize="small" 
-            sx={{ 
+          <FilledStar
+            fontSize="small"
+            sx={{
               color: 'white',
               fontSize: size === 'small' ? 12 : 14,
-            }} 
+            }}
           />
           <Typography
             sx={{
@@ -202,9 +218,9 @@ export function HeartRating({
     )
   }
 
-  const handleHeartClick = () => {
+  const handleStarClick = () => {
     if (isInteractive) {
-      setPopperOpen(true)
+      setOpen(true)
     }
   }
 
@@ -216,12 +232,12 @@ export function HeartRating({
     } else {
       onChange(rating)
     }
-    setPopperOpen(false)
+    setOpen(false)
     setHoverValue(null)
   }
 
   const handleClickAway = () => {
-    setPopperOpen(false)
+    setOpen(false)
     setHoverValue(null)
   }
 
@@ -234,7 +250,7 @@ export function HeartRating({
   }
 
   const displayValue = hoverValue ?? value
-  const displayFillPercent = displayValue ? (displayValue / maxHearts) * 100 : fillPercent
+  const displayFillPercent = displayValue ? (displayValue / maxStars) * 100 : fillPercent
 
   return (
     <ClickAwayListener onClickAway={handleClickAway}>
@@ -248,12 +264,12 @@ export function HeartRating({
           ...sx,
         }}
       >
-        {/* Single fillable heart */}
+        {/* Single fillable star */}
         <Box>
-          <FillableHeart
+          <FillableStar
             fillPercent={popperOpen ? displayFillPercent : fillPercent}
-            size={config.heartSize}
-            onClick={handleHeartClick}
+            size={config.starSize}
+            onClick={handleStarClick}
             disabled={disabled || loading}
             interactive={isInteractive}
           />
@@ -265,7 +281,7 @@ export function HeartRating({
             sx={{
               fontSize: config.fontSize,
               fontWeight: 600,
-              color: value ? '#f43f5e' : 'text.secondary',
+              color: value ? RATED_COLOR : 'text.secondary',
               minWidth: '2em',
             }}
           >
@@ -295,29 +311,29 @@ export function HeartRating({
                 }}
                 onMouseLeave={handleMouseLeave}
               >
-                {/* Hearts row */}
+                {/* Stars row */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-                  {Array.from({ length: maxHearts }, (_, i) => {
-                    const heartValue = i + 1
-                    const isFilled = displayValue !== null && heartValue <= displayValue
-                    const isHovered = hoverValue !== null && heartValue <= hoverValue
-                    
-                    const HeartIcon = isFilled ? FilledHeart : EmptyHeart
-                    
-                    const heartColor = isFilled 
-                      ? isHovered 
-                        ? '#fb7185' // rose-400
-                        : '#f43f5e' // rose-500
+                  {Array.from({ length: maxStars }, (_, i) => {
+                    const starValue = i + 1
+                    const isFilled = displayValue !== null && starValue <= displayValue
+                    const isHovered = hoverValue !== null && starValue <= hoverValue
+
+                    const StarIcon = isFilled ? FilledStar : EmptyStar
+
+                    const starColor = isFilled
+                      ? isHovered
+                        ? RATED_COLOR_HOVER
+                        : RATED_COLOR
                       : isHovered
-                        ? '#fda4af' // rose-300
-                        : 'rgba(244, 63, 94, 0.3)' // faded rose
+                        ? EMPTY_COLOR_HOVER
+                        : EMPTY_COLOR
 
                     return (
                       <IconButton
-                        key={heartValue}
+                        key={starValue}
                         size="small"
-                        onClick={() => handleSelectRating(heartValue)}
-                        onMouseEnter={() => handleMouseEnter(heartValue)}
+                        onClick={() => handleSelectRating(starValue)}
+                        onMouseEnter={() => handleMouseEnter(starValue)}
                         sx={{
                           p: 0.5,
                           transition: 'transform 0.1s ease',
@@ -327,10 +343,10 @@ export function HeartRating({
                           },
                         }}
                       >
-                        <HeartIcon
+                        <StarIcon
                           sx={{
-                            fontSize: config.popperHeartSize,
-                            color: heartColor,
+                            fontSize: config.popperStarSize,
+                            color: starColor,
                             transition: 'color 0.15s ease',
                           }}
                         />
@@ -340,10 +356,10 @@ export function HeartRating({
                 </Box>
 
                 {/* Rating label */}
-                <Box sx={{ 
-                  mt: 1, 
-                  pt: 1, 
-                  borderTop: '1px solid', 
+                <Box sx={{
+                  mt: 1,
+                  pt: 1,
+                  borderTop: '1px solid',
                   borderColor: 'divider',
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -362,7 +378,7 @@ export function HeartRating({
                       sx={{
                         fontSize: config.fontSize,
                         fontWeight: 600,
-                        color: '#f43f5e',
+                        color: RATED_COLOR,
                       }}
                     >
                       {ratingLabels[displayValue]}
