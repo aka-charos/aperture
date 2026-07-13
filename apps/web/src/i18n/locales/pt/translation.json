@@ -641,7 +641,7 @@
     },
     "missingSeasons": {
       "title": "Not on your server",
-      "titleNamed": "Not on your {{serverName}}",
+      "titleNamed": "Not on {{serverName}}",
       "seasonChip": "Season {{n}} · {{count}} eps",
       "request": "Request via Seerr",
       "requestNamed": "Request availability on {{serverName}}",
@@ -1894,7 +1894,7 @@
     "passwordlessDisabled": "Login sem senha desativado",
     "displayName": "Server Display Name",
     "displayNamePlaceholder": "e.g. Home Cinema",
-    "displayNameHelper": "Used in app text, e.g. “Not on your Home Cinema”. Leave empty to use the name reported by the media server."
+    "displayNameHelper": "Used in app text, e.g. “Not on Home Cinema”. Leave empty to use the name reported by the media server."
   },
   "settingsFileLocations": {
     "title": "Locais de arquivos",
