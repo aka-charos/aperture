@@ -895,7 +895,10 @@
       "title": "포스터 표시",
       "subtitle": "포스터에 평점 배지가 표시되는 방식입니다.",
       "showRatingLabel": "라이브러리 포스터에 평점 배지 표시",
-      "showRatingHelp": "라이브러리 아트워크에 이미 평점이 포함되어 있다면 끄세요. 디스커버 및 기타 TMDb 소스의 커버에는 항상 모서리에 평점이 표시됩니다."
+      "showRatingHelp": "라이브러리 아트워크에 이미 평점이 포함되어 있다면 끄세요. 디스커버 및 기타 TMDb 소스의 커버에는 항상 모서리에 평점이 표시됩니다. 선택하지 않은 경우 서버 기본값이 사용됩니다.",
+      "stateShown": "표시",
+      "stateHidden": "숨김",
+      "resetToDefault": "서버 기본값으로 재설정 ({{state}})"
     }
   },
   "settingsPage": {
@@ -3879,5 +3882,18 @@
     "noMatches": "No countries match \"{{query}}\"",
     "shownCount_one": "{{count}} country",
     "shownCount_other": "{{count}} countries"
+  },
+  "settingsPosterDisplay": {
+    "title": "포스터 표시",
+    "subtitle": "라이브러리 포스터의 평점 배지 기본값을 설정합니다. 각 사용자는 자신의 설정에서 이를 재정의할 수 있습니다.",
+    "loadFailed": "포스터 표시 구성을 불러오지 못했습니다",
+    "fetchFailed": "구성을 가져오지 못했습니다",
+    "saveFailed": "구성을 저장하지 못했습니다",
+    "saved": "포스터 표시 설정이 저장되었습니다.",
+    "unknownError": "알 수 없는 오류",
+    "showLabel": "라이브러리 포스터에 평점 배지 표시",
+    "showCaption": "모든 사용자의 기본값입니다. 서버가 평점을 아트워크에 새기는 경우 끄세요. 디스커버 및 기타 TMDb 커버에는 항상 평점이 표시됩니다.",
+    "saving": "저장 중…",
+    "saveChanges": "변경 사항 저장"
   }
 }

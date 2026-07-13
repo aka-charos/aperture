@@ -895,7 +895,10 @@
       "title": "Visualización de pósteres",
       "subtitle": "Cómo se muestran las insignias de valoración en los pósteres.",
       "showRatingLabel": "Mostrar insignia de valoración en los pósteres de la biblioteca",
-      "showRatingHelp": "Desactívalo si las carátulas de tu biblioteca ya incluyen la valoración. Las carátulas de Descubrir y otras fuentes de TMDb siempre muestran su valoración en la esquina."
+      "showRatingHelp": "Desactívalo si las carátulas de tu biblioteca ya incluyen la valoración. Las carátulas de Descubrir y otras fuentes de TMDb siempre muestran su valoración en la esquina. Si no has elegido, se usa el valor predeterminado del servidor.",
+      "stateShown": "visible",
+      "stateHidden": "oculta",
+      "resetToDefault": "Restablecer al valor predeterminado del servidor ({{state}})"
     }
   },
   "settingsPage": {
@@ -3879,5 +3882,18 @@
     "noMatches": "No countries match \"{{query}}\"",
     "shownCount_one": "{{count}} country",
     "shownCount_other": "{{count}} countries"
+  },
+  "settingsPosterDisplay": {
+    "title": "Visualización de pósteres",
+    "subtitle": "Define el valor predeterminado de la insignia de valoración en los pósteres de la biblioteca. Cada usuario puede anularlo en sus propios ajustes.",
+    "loadFailed": "No se pudo cargar la configuración de visualización de pósteres",
+    "fetchFailed": "No se pudo obtener la configuración",
+    "saveFailed": "No se pudo guardar la configuración",
+    "saved": "Ajustes de visualización de pósteres guardados.",
+    "unknownError": "Error desconocido",
+    "showLabel": "Mostrar insignia de valoración en los pósteres de la biblioteca",
+    "showCaption": "Valor predeterminado para todos los usuarios. Desactívalo si tu servidor incrusta las valoraciones en las carátulas. Descubrir y otras carátulas de TMDb siempre muestran su valoración.",
+    "saving": "Guardando…",
+    "saveChanges": "Guardar cambios"
   }
 }

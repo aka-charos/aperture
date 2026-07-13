@@ -1228,7 +1228,10 @@
       "title": "Posterweergave",
       "subtitle": "Hoe beoordelingsbadges op posters worden getoond.",
       "showRatingLabel": "Beoordelingsbadge tonen op bibliotheekposters",
-      "showRatingHelp": "Zet dit uit als de artwork van je bibliotheek al een beoordeling bevat. Covers uit Ontdekken en andere TMDb-bronnen tonen hun beoordeling altijd in de hoek."
+      "showRatingHelp": "Zet dit uit als de artwork van je bibliotheek al een beoordeling bevat. Covers uit Ontdekken en andere TMDb-bronnen tonen hun beoordeling altijd in de hoek. Als je niets hebt gekozen, wordt de serverstandaard gebruikt.",
+      "stateShown": "getoond",
+      "stateHidden": "verborgen",
+      "resetToDefault": "Terugzetten naar serverstandaard ({{state}})"
     }
   },
   "watcherIdentity": {
@@ -3879,5 +3882,18 @@
     "noMatches": "No countries match \"{{query}}\"",
     "shownCount_one": "{{count}} country",
     "shownCount_other": "{{count}} countries"
+  },
+  "settingsPosterDisplay": {
+    "title": "Posterweergave",
+    "subtitle": "Stel de standaard in voor de beoordelingsbadge op bibliotheekposters. Individuele gebruikers kunnen dit in hun eigen instellingen overschrijven.",
+    "loadFailed": "Kan posterweergaveconfiguratie niet laden",
+    "fetchFailed": "Kan configuratie niet ophalen",
+    "saveFailed": "Kan configuratie niet opslaan",
+    "saved": "Posterweergave-instellingen opgeslagen.",
+    "unknownError": "Onbekende fout",
+    "showLabel": "Beoordelingsbadge tonen op bibliotheekposters",
+    "showCaption": "Standaard voor alle gebruikers. Zet dit uit als je server beoordelingen in de artwork brandt. Ontdekken en andere TMDb-covers tonen altijd hun beoordeling.",
+    "saving": "Opslaan…",
+    "saveChanges": "Wijzigingen opslaan"
   }
 }

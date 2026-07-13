@@ -1161,7 +1161,10 @@
       "title": "Poster Display",
       "subtitle": "How rating badges appear on posters.",
       "showRatingLabel": "Show rating badge on library posters",
-      "showRatingHelp": "Turn this off if your library artwork already includes a rating. Covers from Discover and other TMDb sources always show their rating in the corner."
+      "showRatingHelp": "Turn this off if your library artwork already includes a rating. Covers from Discover and other TMDb sources always show their rating in the corner. When you have not chosen, the server default is used.",
+      "stateShown": "shown",
+      "stateHidden": "hidden",
+      "resetToDefault": "Reset to server default ({{state}})"
     },
     "roleAdmin": "Administrator",
     "roleUser": "User",
@@ -2006,6 +2009,19 @@
     "unknownError": "Unknown error",
     "enableTitle": "Enable Shows You Watch",
     "enableCaption": "When disabled, the list and favorites sync are unavailable for all users.",
+    "saving": "Saving…",
+    "saveChanges": "Save Changes"
+  },
+  "settingsPosterDisplay": {
+    "title": "Poster Display",
+    "subtitle": "Set the default for the community-rating badge on library posters. Individual users can override this in their own settings.",
+    "loadFailed": "Failed to load poster display configuration",
+    "fetchFailed": "Failed to fetch config",
+    "saveFailed": "Failed to save config",
+    "saved": "Poster display settings saved.",
+    "unknownError": "Unknown error",
+    "showLabel": "Show rating badge on library posters",
+    "showCaption": "Default for all users. Turn this off if your server burns ratings into the artwork. Discover and other TMDb covers always show their rating.",
     "saving": "Saving…",
     "saveChanges": "Save Changes"
   },

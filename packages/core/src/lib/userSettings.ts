@@ -83,8 +83,11 @@ export interface UserUiPreferences {
   /**
    * Hide the community-rating badge overlaid on library posters (for servers
    * whose artwork already includes a rating). External/TMDb covers unaffected.
+   *
+   * Tri-state: `true`/`false` is an explicit user override; `null`/omitted
+   * inherits the instance-wide default (`poster_rating_badge_hidden_by_default`).
    */
-  hidePosterRating?: boolean
+  hidePosterRating?: boolean | null
   /**
    * BCP-47 UI locale override. Omit or null to use system default.
    */
@@ -444,6 +447,20 @@ export async function resolveEffectiveAiLanguage(userId: string): Promise<AppLoc
     return prefs.aiLanguage
   }
   return system.defaultAiLanguage
+}
+
+/**
+ * Effective "hide library poster rating badge" for a user: an explicit user
+ * override (true/false) wins; otherwise fall back to the instance-wide default.
+ */
+export async function resolveEffectiveHidePosterRating(userId: string): Promise<boolean> {
+  const { getPosterDisplayConfig } = await import('../settings/systemSettings.js')
+  const prefs = await getUserUiPreferences(userId)
+  if (typeof prefs.hidePosterRating === 'boolean') {
+    return prefs.hidePosterRating
+  }
+  const config = await getPosterDisplayConfig()
+  return config.hideRatingBadgeByDefault
 }
 
 /**

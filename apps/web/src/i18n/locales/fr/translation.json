@@ -895,7 +895,10 @@
       "title": "Affichage des affiches",
       "subtitle": "Comment les badges de note apparaissent sur les affiches.",
       "showRatingLabel": "Afficher le badge de note sur les affiches de la bibliothèque",
-      "showRatingHelp": "Désactivez cette option si les visuels de votre bibliothèque incluent déjà une note. Les visuels de Découvrir et des autres sources TMDb affichent toujours leur note dans le coin."
+      "showRatingHelp": "Désactivez cette option si les visuels de votre bibliothèque incluent déjà une note. Les visuels de Découvrir et des autres sources TMDb affichent toujours leur note dans le coin. Si vous n'avez rien choisi, la valeur par défaut du serveur est utilisée.",
+      "stateShown": "affichée",
+      "stateHidden": "masquée",
+      "resetToDefault": "Rétablir la valeur par défaut du serveur ({{state}})"
     }
   },
   "settingsPage": {
@@ -3879,5 +3882,18 @@
     "noMatches": "No countries match \"{{query}}\"",
     "shownCount_one": "{{count}} country",
     "shownCount_other": "{{count}} countries"
+  },
+  "settingsPosterDisplay": {
+    "title": "Affichage des affiches",
+    "subtitle": "Définissez la valeur par défaut du badge de note sur les affiches de la bibliothèque. Chaque utilisateur peut la remplacer dans ses propres paramètres.",
+    "loadFailed": "Échec du chargement de la configuration d'affichage des affiches",
+    "fetchFailed": "Échec de la récupération de la configuration",
+    "saveFailed": "Échec de l'enregistrement de la configuration",
+    "saved": "Paramètres d'affichage des affiches enregistrés.",
+    "unknownError": "Erreur inconnue",
+    "showLabel": "Afficher le badge de note sur les affiches de la bibliothèque",
+    "showCaption": "Valeur par défaut pour tous les utilisateurs. Désactivez-la si votre serveur incruste les notes dans les visuels. Découvrir et les autres visuels TMDb affichent toujours leur note.",
+    "saving": "Enregistrement…",
+    "saveChanges": "Enregistrer les modifications"
   }
 }

@@ -590,7 +590,10 @@
       "title": "海报显示",
       "subtitle": "评分徽章在海报上的显示方式。",
       "showRatingLabel": "在媒体库海报上显示评分徽章",
-      "showRatingHelp": "如果您的媒体库海报本身已包含评分，请关闭此选项。来自“发现”及其他 TMDb 来源的封面始终在角落显示评分。"
+      "showRatingHelp": "如果您的媒体库海报本身已包含评分，请关闭此选项。来自“发现”及其他 TMDb 来源的封面始终在角落显示评分。如果您未做选择，将使用服务器默认设置。",
+      "stateShown": "显示",
+      "stateHidden": "隐藏",
+      "resetToDefault": "重置为服务器默认值（{{state}}）"
     }
   },
   "settingsPage": {
@@ -3879,5 +3882,18 @@
     "noMatches": "No countries match \"{{query}}\"",
     "shownCount_one": "{{count}} country",
     "shownCount_other": "{{count}} countries"
+  },
+  "settingsPosterDisplay": {
+    "title": "海报显示",
+    "subtitle": "设置媒体库海报上评分徽章的默认值。每位用户可在自己的设置中覆盖此项。",
+    "loadFailed": "无法加载海报显示配置",
+    "fetchFailed": "无法获取配置",
+    "saveFailed": "无法保存配置",
+    "saved": "海报显示设置已保存。",
+    "unknownError": "未知错误",
+    "showLabel": "在媒体库海报上显示评分徽章",
+    "showCaption": "所有用户的默认值。如果您的服务器将评分烧录进封面，请关闭此项。“发现”及其他 TMDb 封面始终显示评分。",
+    "saving": "保存中…",
+    "saveChanges": "保存更改"
   }
 }

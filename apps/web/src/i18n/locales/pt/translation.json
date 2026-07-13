@@ -895,7 +895,10 @@
       "title": "Exibição de pôsteres",
       "subtitle": "Como os selos de avaliação aparecem nos pôsteres.",
       "showRatingLabel": "Mostrar selo de avaliação nos pôsteres da biblioteca",
-      "showRatingHelp": "Desative se as artes da sua biblioteca já incluem a avaliação. Capas do Descobrir e de outras fontes do TMDb sempre mostram a avaliação no canto."
+      "showRatingHelp": "Desative se as artes da sua biblioteca já incluem a avaliação. Capas do Descobrir e de outras fontes do TMDb sempre mostram a avaliação no canto. Se você não escolheu, é usado o padrão do servidor.",
+      "stateShown": "visível",
+      "stateHidden": "oculta",
+      "resetToDefault": "Redefinir para o padrão do servidor ({{state}})"
     }
   },
   "settingsPage": {
@@ -3879,5 +3882,18 @@
     "noMatches": "No countries match \"{{query}}\"",
     "shownCount_one": "{{count}} country",
     "shownCount_other": "{{count}} countries"
+  },
+  "settingsPosterDisplay": {
+    "title": "Exibição de pôsteres",
+    "subtitle": "Defina o padrão do selo de avaliação nos pôsteres da biblioteca. Cada usuário pode substituí-lo nas próprias configurações.",
+    "loadFailed": "Falha ao carregar a configuração de exibição de pôsteres",
+    "fetchFailed": "Falha ao obter a configuração",
+    "saveFailed": "Falha ao salvar a configuração",
+    "saved": "Configurações de exibição de pôsteres salvas.",
+    "unknownError": "Erro desconhecido",
+    "showLabel": "Mostrar selo de avaliação nos pôsteres da biblioteca",
+    "showCaption": "Padrão para todos os usuários. Desative se o seu servidor incorpora as avaliações nas artes. Descobrir e outras capas do TMDb sempre mostram a avaliação.",
+    "saving": "Salvando…",
+    "saveChanges": "Salvar alterações"
   }
 }
