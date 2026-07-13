@@ -548,7 +548,18 @@
       "cannotUndo": "לא ניתן לבטל פעולה זו.",
       "marking": "צִיוּן…",
       "snackbarMarked": "הסרט סומן כלא צפייה",
-      "snackbarMarkFailed": "נכשל סימון כלא נצפה"
+      "snackbarMarkFailed": "נכשל סימון כלא נצפה",
+      "markWatchedTooltip": "Mark as watched - syncs to your media server and watch history",
+      "markWatched": "Mark Watched",
+      "favorite": "Favorite",
+      "favorited": "Favorited",
+      "addFavoriteTooltip": "Add to favorites on your media server",
+      "removeFavoriteTooltip": "Remove from favorites on your media server",
+      "snackbarMarkedWatched": "Movie marked as watched",
+      "snackbarMarkWatchedFailed": "Failed to mark as watched",
+      "snackbarFavoriteAdded": "Added to favorites",
+      "snackbarFavoriteRemoved": "Removed from favorites",
+      "snackbarFavoriteFailed": "Failed to update favorite"
     },
     "insights": {
       "recommendedForYou": "מומלץ עבורך",
@@ -627,6 +638,15 @@
       "graphHint": "לחץ על פוסטר כדי לחקור • לחץ על ⓘ לפרטים",
       "expandedSubtitle": "תצוגה מורחבת • {{count}} פריטים",
       "fallbackCenterTitle": "כְּלֵי תִקְשׁוֹרֶת"
+    },
+    "missingSeasons": {
+      "title": "Not on your server",
+      "titleNamed": "Not on your {{serverName}}",
+      "seasonChip": "Season {{n}} · {{count}} eps",
+      "request": "Request via Seerr",
+      "requestNamed": "Request availability on {{serverName}}",
+      "requestSuccess": "Request submitted",
+      "requestFailed": "Failed to submit request"
     }
   },
   "browse": {
@@ -1871,7 +1891,10 @@
     "securityWarningTitle": "אזהרת אבטחה",
     "securityWarningBody": "הפעל זאת רק אם מופע Aperture שלך ​​נמצא ברשת פרטית ללא חשיפה לאינטרנט. אם השרת שלך נגיש באמצעות פרוקסי הפוך או האינטרנט, השאר את זה מושבת כדי למנוע גישה לא מורשית.",
     "passwordlessEnabled": "התחברות ללא סיסמה מופעלת",
-    "passwordlessDisabled": "התחברות ללא סיסמה מושבתת"
+    "passwordlessDisabled": "התחברות ללא סיסמה מושבתת",
+    "displayName": "Server Display Name",
+    "displayNamePlaceholder": "e.g. Home Cinema",
+    "displayNameHelper": "Used in app text, e.g. “Not on your Home Cinema”. Leave empty to use the name reported by the media server."
   },
   "settingsFileLocations": {
     "title": "מיקומי קבצים",
@@ -2788,7 +2811,19 @@
     "noEpisodeData": "אין נתוני פרק זמינים",
     "checkBackSoon": "בדוק שוב בקרוב",
     "seriesComplete": "סדרה שלמה",
-    "episodesTotal": "{{count}} פרקים"
+    "episodesTotal": "{{count}} פרקים",
+    "filterEnded": "Ended ({{count}})",
+    "filterWatchlist": "Watchlist ({{count}})",
+    "filterHistory": "From History ({{count}})",
+    "sourceWatchlist": "Watchlist",
+    "sourceHistory": "History",
+    "sourceBoth": "Watchlist · History",
+    "episodesProgress": "{{watched}}/{{total}} eps",
+    "episodesMissing": "{{count}} not on server",
+    "missingOnServer": "Missing on server: {{seasons}}",
+    "addTooltip": "Add to watching list",
+    "addedSuccess": "Added to watching list",
+    "addFailed": "Failed to add series"
   },
   "setup": {
     "step": {

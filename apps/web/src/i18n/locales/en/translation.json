@@ -675,8 +675,10 @@
     },
     "missingSeasons": {
       "title": "Not on your server",
+      "titleNamed": "Not on your {{serverName}}",
       "seasonChip": "Season {{n}} · {{count}} eps",
       "request": "Request via Seerr",
+      "requestNamed": "Request availability on {{serverName}}",
       "requestSuccess": "Request submitted",
       "requestFailed": "Failed to submit request"
     },
@@ -1679,6 +1681,9 @@
     "serverUrl": "Server URL",
     "serverUrlPlaceholder": "http://emby:8096 or http://jellyfin:8096",
     "serverUrlHelper": "The base URL of your media server",
+    "displayName": "Server Display Name",
+    "displayNamePlaceholder": "e.g. Home Cinema",
+    "displayNameHelper": "Used in app text, e.g. “Not on your Home Cinema”. Leave empty to use the name reported by the media server.",
     "apiKey": "API Key",
     "apiKeyPlaceholder": "Enter API key",
     "helperSaved": "API key is saved. Enter a new key to update it.",

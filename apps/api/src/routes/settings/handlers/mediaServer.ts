@@ -43,6 +43,7 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
 
     let serverId = ''
     let serverName = ''
+    const customDisplayName = ((await getSystemSetting('server_display_name')) ?? '').trim()
 
     if (baseUrl && apiKey && config.type) {
       try {
@@ -64,6 +65,7 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
       type: serverType,
       serverId,
       serverName,
+      displayName: customDisplayName || serverName,
       webClientUrl: baseUrl ? `${baseUrl}/web/index.html` : '',
       isConfigured: config.isConfigured,
     })
@@ -79,6 +81,7 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
       try {
         const config = await getMediaServerConfig()
         const serverTypes = getMediaServerTypes()
+        const displayName = ((await getSystemSetting('server_display_name')) ?? '').trim()
 
         return reply.send({
           config: {
@@ -86,6 +89,7 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
             baseUrl: config.baseUrl,
             hasApiKey: !!config.apiKey,
             isConfigured: config.isConfigured,
+            displayName,
           },
           serverTypes,
         })
@@ -104,10 +108,11 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
       type?: MediaServerType
       baseUrl?: string
       apiKey?: string
+      displayName?: string
     }
   }>('/api/settings/media-server/config', { preHandler: requireAdmin, schema: updateMediaServerConfigSchema }, async (request, reply) => {
     try {
-      const { type, baseUrl, apiKey } = request.body
+      const { type, baseUrl, apiKey, displayName } = request.body
 
       if (type !== undefined) {
         const validTypes = getMediaServerTypes().map(
@@ -130,12 +135,24 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
 
       const config = await setMediaServerConfig({ type, baseUrl, apiKey })
 
+      if (displayName !== undefined) {
+        await setSystemSetting(
+          'server_display_name',
+          displayName.trim(),
+          'Custom media server display name shown in UI text (empty = use the server-reported name)'
+        )
+      }
+
       return reply.send({
         config: {
           type: config.type,
           baseUrl: config.baseUrl,
           hasApiKey: !!config.apiKey,
           isConfigured: config.isConfigured,
+          displayName:
+            displayName !== undefined
+              ? displayName.trim()
+              : ((await getSystemSetting('server_display_name')) ?? '').trim(),
         },
         message: 'Media server configuration updated',
       })

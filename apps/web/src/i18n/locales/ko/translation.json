@@ -548,7 +548,18 @@
       "cannotUndo": "이 작업은 취소할 수 없습니다.",
       "marking": "마킹…",
       "snackbarMarked": "보지 않은 것으로 표시된 영화",
-      "snackbarMarkFailed": "시청하지 않음으로 표시하지 못했습니다."
+      "snackbarMarkFailed": "시청하지 않음으로 표시하지 못했습니다.",
+      "markWatchedTooltip": "Mark as watched - syncs to your media server and watch history",
+      "markWatched": "Mark Watched",
+      "favorite": "Favorite",
+      "favorited": "Favorited",
+      "addFavoriteTooltip": "Add to favorites on your media server",
+      "removeFavoriteTooltip": "Remove from favorites on your media server",
+      "snackbarMarkedWatched": "Movie marked as watched",
+      "snackbarMarkWatchedFailed": "Failed to mark as watched",
+      "snackbarFavoriteAdded": "Added to favorites",
+      "snackbarFavoriteRemoved": "Removed from favorites",
+      "snackbarFavoriteFailed": "Failed to update favorite"
     },
     "insights": {
       "recommendedForYou": "당신에게 추천",
@@ -627,6 +638,15 @@
       "graphHint": "살펴보려면 포스터를 클릭하세요. • 자세한 내용을 보려면 ⓘ를 클릭하세요.",
       "expandedSubtitle": "확장 보기 • 항목 {{count}}개",
       "fallbackCenterTitle": "메디아"
+    },
+    "missingSeasons": {
+      "title": "Not on your server",
+      "titleNamed": "Not on your {{serverName}}",
+      "seasonChip": "Season {{n}} · {{count}} eps",
+      "request": "Request via Seerr",
+      "requestNamed": "Request availability on {{serverName}}",
+      "requestSuccess": "Request submitted",
+      "requestFailed": "Failed to submit request"
     }
   },
   "browse": {
@@ -1871,7 +1891,10 @@
     "securityWarningTitle": "보안 경고",
     "securityWarningBody": "Aperture 인스턴스가 인터넷에 노출되지 않는 개인 네트워크에 있는 경우에만 이 기능을 활성화하세요. 역방향 프록시나 인터넷을 통해 서버에 액세스할 수 있는 경우 무단 액세스를 방지하려면 이 기능을 비활성화된 상태로 두세요.",
     "passwordlessEnabled": "비밀번호 없는 로그인이 활성화되었습니다.",
-    "passwordlessDisabled": "비밀번호 없는 로그인이 비활성화되었습니다."
+    "passwordlessDisabled": "비밀번호 없는 로그인이 비활성화되었습니다.",
+    "displayName": "Server Display Name",
+    "displayNamePlaceholder": "e.g. Home Cinema",
+    "displayNameHelper": "Used in app text, e.g. “Not on your Home Cinema”. Leave empty to use the name reported by the media server."
   },
   "settingsFileLocations": {
     "title": "파일 위치",
@@ -2788,7 +2811,19 @@
     "noEpisodeData": "사용 가능한 에피소드 데이터가 없습니다.",
     "checkBackSoon": "곧 다시 확인하세요",
     "seriesComplete": "시리즈 완료",
-    "episodesTotal": "{{count}}개의 에피소드"
+    "episodesTotal": "{{count}}개의 에피소드",
+    "filterEnded": "Ended ({{count}})",
+    "filterWatchlist": "Watchlist ({{count}})",
+    "filterHistory": "From History ({{count}})",
+    "sourceWatchlist": "Watchlist",
+    "sourceHistory": "History",
+    "sourceBoth": "Watchlist · History",
+    "episodesProgress": "{{watched}}/{{total}} eps",
+    "episodesMissing": "{{count}} not on server",
+    "missingOnServer": "Missing on server: {{seasons}}",
+    "addTooltip": "Add to watching list",
+    "addedSuccess": "Added to watching list",
+    "addFailed": "Failed to add series"
   },
   "setup": {
     "step": {

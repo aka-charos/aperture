@@ -631,7 +631,18 @@
       "cannotUndo": "Это действие невозможно отменить.",
       "marking": "Маркировка…",
       "snackbarMarked": "Фильм помечен как непросмотренный",
-      "snackbarMarkFailed": "Не удалось отметить как непросмотренное"
+      "snackbarMarkFailed": "Не удалось отметить как непросмотренное",
+      "markWatchedTooltip": "Mark as watched - syncs to your media server and watch history",
+      "markWatched": "Mark Watched",
+      "favorite": "Favorite",
+      "favorited": "Favorited",
+      "addFavoriteTooltip": "Add to favorites on your media server",
+      "removeFavoriteTooltip": "Remove from favorites on your media server",
+      "snackbarMarkedWatched": "Movie marked as watched",
+      "snackbarMarkWatchedFailed": "Failed to mark as watched",
+      "snackbarFavoriteAdded": "Added to favorites",
+      "snackbarFavoriteRemoved": "Removed from favorites",
+      "snackbarFavoriteFailed": "Failed to update favorite"
     },
     "insights": {
       "recommendedForYou": "Рекомендуется для вас",
@@ -672,6 +683,15 @@
       "graphHint": "Нажмите на плакат, чтобы изучить • Нажмите ⓘ, чтобы узнать подробности.",
       "expandedSubtitle": "Расширенный вид • Элементов: {{count}}",
       "fallbackCenterTitle": "СМИ"
+    },
+    "missingSeasons": {
+      "title": "Not on your server",
+      "titleNamed": "Not on your {{serverName}}",
+      "seasonChip": "Season {{n}} · {{count}} eps",
+      "request": "Request via Seerr",
+      "requestNamed": "Request availability on {{serverName}}",
+      "requestSuccess": "Request submitted",
+      "requestFailed": "Failed to submit request"
     }
   },
   "imageUpload": {
@@ -1617,7 +1637,10 @@
     "securityWarningTitle": "Предупреждение безопасности",
     "securityWarningBody": "Включайте это только в том случае, если ваш экземпляр Aperture находится в частной сети и не имеет доступа к Интернету. Если ваш сервер доступен через обратный прокси-сервер или Интернет, оставьте этот параметр отключенным, чтобы предотвратить несанкционированный доступ.",
     "passwordlessEnabled": "Включен вход без пароля",
-    "passwordlessDisabled": "Вход без пароля отключен"
+    "passwordlessDisabled": "Вход без пароля отключен",
+    "displayName": "Server Display Name",
+    "displayNamePlaceholder": "e.g. Home Cinema",
+    "displayNameHelper": "Used in app text, e.g. “Not on your Home Cinema”. Leave empty to use the name reported by the media server."
   },
   "settingsFileLocations": {
     "title": "Расположение файлов",
@@ -2932,7 +2955,19 @@
     "noEpisodeData": "Данные по эпизоду отсутствуют.",
     "checkBackSoon": "Зайдите позже",
     "seriesComplete": "Серия завершена",
-    "episodesTotal": "{{count}} серий"
+    "episodesTotal": "{{count}} серий",
+    "filterEnded": "Ended ({{count}})",
+    "filterWatchlist": "Watchlist ({{count}})",
+    "filterHistory": "From History ({{count}})",
+    "sourceWatchlist": "Watchlist",
+    "sourceHistory": "History",
+    "sourceBoth": "Watchlist · History",
+    "episodesProgress": "{{watched}}/{{total}} eps",
+    "episodesMissing": "{{count}} not on server",
+    "missingOnServer": "Missing on server: {{seasons}}",
+    "addTooltip": "Add to watching list",
+    "addedSuccess": "Added to watching list",
+    "addFailed": "Failed to add series"
   },
   "setup": {
     "step": {

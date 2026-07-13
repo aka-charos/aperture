@@ -33,6 +33,7 @@ export interface MediaServerInfo {
   type: string
   serverId: string
   serverName: string
+  displayName: string
   webClientUrl: string
   isConfigured: boolean
 }
@@ -42,6 +43,7 @@ export interface MediaServerConfig {
   baseUrl: string | null
   hasApiKey: boolean
   isConfigured: boolean
+  displayName?: string
 }
 
 export interface MediaServerSecuritySettings {

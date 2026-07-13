@@ -975,7 +975,18 @@
       "cannotUndo": "此操作无法撤消。",
       "marking": "标记…",
       "snackbarMarked": "电影标记为未观看",
-      "snackbarMarkFailed": "无法标记为未观看"
+      "snackbarMarkFailed": "无法标记为未观看",
+      "markWatchedTooltip": "Mark as watched - syncs to your media server and watch history",
+      "markWatched": "Mark Watched",
+      "favorite": "Favorite",
+      "favorited": "Favorited",
+      "addFavoriteTooltip": "Add to favorites on your media server",
+      "removeFavoriteTooltip": "Remove from favorites on your media server",
+      "snackbarMarkedWatched": "Movie marked as watched",
+      "snackbarMarkWatchedFailed": "Failed to mark as watched",
+      "snackbarFavoriteAdded": "Added to favorites",
+      "snackbarFavoriteRemoved": "Removed from favorites",
+      "snackbarFavoriteFailed": "Failed to update favorite"
     },
     "insights": {
       "recommendedForYou": "为您推荐",
@@ -1054,6 +1065,15 @@
       "graphHint": "单击海报进行探索 • 单击 ⓘ 了解详细信息",
       "expandedSubtitle": "扩展视图 • {{count}} 项",
       "fallbackCenterTitle": "媒体"
+    },
+    "missingSeasons": {
+      "title": "Not on your server",
+      "titleNamed": "Not on your {{serverName}}",
+      "seasonChip": "Season {{n}} · {{count}} eps",
+      "request": "Request via Seerr",
+      "requestNamed": "Request availability on {{serverName}}",
+      "requestSuccess": "Request submitted",
+      "requestFailed": "Failed to submit request"
     }
   },
   "search": {
@@ -1871,7 +1891,10 @@
     "securityWarningTitle": "安全警告",
     "securityWarningBody": "仅当您的 Aperture 实例位于不暴露于互联网的专用网络上时才启用此功能。 如果您的服务器可通过反向代理或互联网访问，请将其禁用以防止未经授权的访问。",
     "passwordlessEnabled": "启用无密码登录",
-    "passwordlessDisabled": "无密码登录已禁用"
+    "passwordlessDisabled": "无密码登录已禁用",
+    "displayName": "Server Display Name",
+    "displayNamePlaceholder": "e.g. Home Cinema",
+    "displayNameHelper": "Used in app text, e.g. “Not on your Home Cinema”. Leave empty to use the name reported by the media server."
   },
   "settingsFileLocations": {
     "title": "文件位置",
@@ -2788,7 +2811,19 @@
     "noEpisodeData": "没有可用的剧集数据",
     "checkBackSoon": "请尽快回来查看",
     "seriesComplete": "系列完整",
-    "episodesTotal": "{{count}} 集"
+    "episodesTotal": "{{count}} 集",
+    "filterEnded": "Ended ({{count}})",
+    "filterWatchlist": "Watchlist ({{count}})",
+    "filterHistory": "From History ({{count}})",
+    "sourceWatchlist": "Watchlist",
+    "sourceHistory": "History",
+    "sourceBoth": "Watchlist · History",
+    "episodesProgress": "{{watched}}/{{total}} eps",
+    "episodesMissing": "{{count}} not on server",
+    "missingOnServer": "Missing on server: {{seasons}}",
+    "addTooltip": "Add to watching list",
+    "addedSuccess": "Added to watching list",
+    "addFailed": "Failed to add series"
   },
   "setup": {
     "step": {
