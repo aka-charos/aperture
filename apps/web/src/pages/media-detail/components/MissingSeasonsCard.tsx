@@ -85,7 +85,11 @@ export function MissingSeasonsCard({ series, seasons }: MissingSeasonsCardProps)
     try {
       const details = await fetchTVDetails(tmdbId)
       if (details) {
-        setModalSeasons(details.seasons)
+        // Seerr's season statuses only reflect Seerr requests, not what is
+        // already on the media server — offer only the seasons this card
+        // flagged as missing (aired + absent from the server).
+        const missingNumbers = new Set(missing.map((s) => s.season_number))
+        setModalSeasons(details.seasons.filter((s) => missingNumbers.has(s.seasonNumber)))
         setModalOpen(true)
       } else {
         setSnackbar({
