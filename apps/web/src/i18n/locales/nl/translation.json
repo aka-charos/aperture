@@ -1223,7 +1223,13 @@
     "traktErrStart": "Kan Trakt-verbinding niet starten",
     "traktDisconnected": "Trakt-verbinding is succesvol verbroken",
     "traktErrDisconnect": "Kan Trakt niet loskoppelen",
-    "traktErrSync": "Kan beoordelingen niet synchroniseren"
+    "traktErrSync": "Kan beoordelingen niet synchroniseren",
+    "posterDisplay": {
+      "title": "Posterweergave",
+      "subtitle": "Hoe beoordelingsbadges op posters worden getoond.",
+      "showRatingLabel": "Beoordelingsbadge tonen op bibliotheekposters",
+      "showRatingHelp": "Zet dit uit als de artwork van je bibliotheek al een beoordeling bevat. Covers uit Ontdekken en andere TMDb-bronnen tonen hun beoordeling altijd in de hoek."
+    }
   },
   "watcherIdentity": {
     "refreshInterval": {

@@ -890,7 +890,13 @@
     "traktErrStart": "No se pudo iniciar la conexión Trakt",
     "traktDisconnected": "Trakt se desconectó exitosamente",
     "traktErrDisconnect": "No se pudo desconectar Trakt",
-    "traktErrSync": "No se pudieron sincronizar las calificaciones"
+    "traktErrSync": "No se pudieron sincronizar las calificaciones",
+    "posterDisplay": {
+      "title": "Visualización de pósteres",
+      "subtitle": "Cómo se muestran las insignias de valoración en los pósteres.",
+      "showRatingLabel": "Mostrar insignia de valoración en los pósteres de la biblioteca",
+      "showRatingHelp": "Desactívalo si las carátulas de tu biblioteca ya incluyen la valoración. Las carátulas de Descubrir y otras fuentes de TMDb siempre muestran su valoración en la esquina."
+    }
   },
   "settingsPage": {
     "profileTitle": "Tu perfil",

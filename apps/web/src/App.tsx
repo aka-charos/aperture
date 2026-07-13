@@ -10,6 +10,7 @@ import { SetupProvider } from './hooks/SetupProvider'
 import { useSetupStatus } from './hooks/useSetupStatus'
 import { UserRatingsProvider } from './hooks/UserRatingsProvider'
 import { ViewModeProvider } from './hooks/ViewModeProvider'
+import { PosterPrefsProvider } from './hooks/PosterPrefsProvider'
 import { AssistantDockProvider } from './hooks/AssistantDockProvider'
 import { Layout } from './components/Layout'
 import { AdminLayout } from './components/AdminLayout'
@@ -96,14 +97,16 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   // Include AssistantModal for AI chat on all authenticated pages
   return (
     <ViewModeProvider>
-      <UserRatingsProvider>
-        <WatchingProvider>
-          <AssistantDockProvider>
-            {children}
-            <AssistantModal />
-          </AssistantDockProvider>
-        </WatchingProvider>
-      </UserRatingsProvider>
+      <PosterPrefsProvider>
+        <UserRatingsProvider>
+          <WatchingProvider>
+            <AssistantDockProvider>
+              {children}
+              <AssistantModal />
+            </AssistantDockProvider>
+          </WatchingProvider>
+        </UserRatingsProvider>
+      </PosterPrefsProvider>
     </ViewModeProvider>
   )
 }

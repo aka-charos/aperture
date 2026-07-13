@@ -585,7 +585,13 @@
     "traktErrStart": "Trakt接続の開始に失敗しました",
     "traktDisconnected": "Trakt が正常に切断されました",
     "traktErrDisconnect": "Traktの切断に失敗しました",
-    "traktErrSync": "評価を同期できませんでした"
+    "traktErrSync": "評価を同期できませんでした",
+    "posterDisplay": {
+      "title": "ポスター表示",
+      "subtitle": "ポスター上の評価バッジの表示方法。",
+      "showRatingLabel": "ライブラリのポスターに評価バッジを表示",
+      "showRatingHelp": "ライブラリのアートワークに評価が既に含まれている場合はオフにしてください。ディスカバーやその他のTMDbソースのカバーには、常に隅に評価が表示されます。"
+    }
   },
   "settingsPage": {
     "tabSetup": "セットアップ",

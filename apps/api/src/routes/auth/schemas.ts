@@ -76,6 +76,10 @@ export const authSchemas = {
         enum: ['list', 'graph'],
         description: 'Default tab for Similar Movies/Series on media detail',
       },
+      hidePosterRating: {
+        type: 'boolean',
+        description: 'Hide the community-rating badge overlaid on library posters',
+      },
     },
   },
 
@@ -148,6 +152,10 @@ export const updatePreferencesSchema = {
         type: 'string',
         enum: ['list', 'graph'],
         description: 'Default tab for Similar Movies/Series on media detail',
+      },
+      hidePosterRating: {
+        type: 'boolean',
+        description: 'Hide the community-rating badge overlaid on library posters',
       },
       uiLanguage: {
         type: ['string', 'null'],

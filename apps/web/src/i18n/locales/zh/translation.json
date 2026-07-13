@@ -585,7 +585,13 @@
     "traktErrStart": "无法启动 Trakt 连接",
     "traktDisconnected": "Trakt 已成功断开连接",
     "traktErrDisconnect": "无法断开 Trakt 的连接",
-    "traktErrSync": "无法同步评分"
+    "traktErrSync": "无法同步评分",
+    "posterDisplay": {
+      "title": "海报显示",
+      "subtitle": "评分徽章在海报上的显示方式。",
+      "showRatingLabel": "在媒体库海报上显示评分徽章",
+      "showRatingHelp": "如果您的媒体库海报本身已包含评分，请关闭此选项。来自“发现”及其他 TMDb 来源的封面始终在角落显示评分。"
+    }
   },
   "settingsPage": {
     "tabSetup": "设置向导",

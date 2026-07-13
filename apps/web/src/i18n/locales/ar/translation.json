@@ -890,7 +890,13 @@
     "traktErrStart": "فشل بدء اتصال Trakt",
     "traktDisconnected": "تم قطع اتصال Trakt بنجاح",
     "traktErrDisconnect": "فشل في قطع اتصال Trakt",
-    "traktErrSync": "فشلت مزامنة التقييمات"
+    "traktErrSync": "فشلت مزامنة التقييمات",
+    "posterDisplay": {
+      "title": "عرض الملصقات",
+      "subtitle": "كيفية ظهور شارات التقييم على الملصقات.",
+      "showRatingLabel": "إظهار شارة التقييم على ملصقات المكتبة",
+      "showRatingHelp": "أوقف هذا الخيار إذا كانت أعمال مكتبتك الفنية تتضمن التقييم بالفعل. أغلفة «الاستكشاف» ومصادر TMDb الأخرى تعرض تقييمها دائمًا في الزاوية."
+    }
   },
   "settingsPage": {
     "profileTitle": "ملفّك الشخصي",

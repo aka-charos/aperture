@@ -18,6 +18,7 @@ import { UserProfileTab } from './UserSettings/UserProfileTab'
 import { AiLibraryNamesCard } from './UserSettings/AiLibraryNamesCard'
 import { AiExplanationPreferenceCard } from './UserSettings/AiExplanationPreferenceCard'
 import { SimilarityGraphPrefsCard } from './UserSettings/SimilarityGraphPrefsCard'
+import { PosterDisplayCard } from './UserSettings/PosterDisplayCard'
 import { TraktIntegrationCard } from './UserSettings/TraktIntegrationCard'
 import { useTraktIntegration } from './UserSettings/hooks/useTraktIntegration'
 import { TabPanel } from './UserSettings/TabPanel'
@@ -255,6 +256,9 @@ export function UserSettingsPage() {
               </Grid>
               <Grid item xs={12} lg={6}>
                 <SimilarityGraphPrefsCard />
+              </Grid>
+              <Grid item xs={12} lg={6}>
+                <PosterDisplayCard />
               </Grid>
               <Grid item xs={12} lg={6}>
                 <TraktIntegrationCard

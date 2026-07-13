@@ -6,6 +6,7 @@ import PlaylistAddCheck from '@mui/icons-material/PlaylistAddCheck'
 import HubOutlined from '@mui/icons-material/HubOutlined'
 import { HeartRating } from './HeartRating.js'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL } from './imageUtils.js'
+import { usePosterDisplaySettings } from './posterDisplaySettings.js'
 
 const StarIcon = Star as unknown as React.ComponentType<{ fontSize?: string }>
 const AddToQueueIcon = AddToQueue as unknown as React.ComponentType<{ fontSize?: 'small' | 'medium' | 'large' }>
@@ -88,6 +89,7 @@ export function MoviePoster({
   const [isHovered, setIsHovered] = useState(false)
   const [imageError, setImageError] = useState(false)
   const [isOffRatio, setIsOffRatio] = useState(false)
+  const { hideLibraryRatingBadge } = usePosterDisplaySettings()
   const dimensions = sizeConfig[size]
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -198,7 +200,7 @@ export function MoviePoster({
         )}
 
         {/* Community rating badge - top right */}
-        {!hideRating && rating != null && (
+        {!hideRating && !hideLibraryRatingBadge && rating != null && (
           <Chip
             icon={<StarIcon fontSize="small" />}
             label={Number(rating).toFixed(1)}

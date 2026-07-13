@@ -890,7 +890,13 @@
     "traktErrStart": "הפעלת חיבור Trakt נכשלה",
     "traktDisconnected": "Trakt התנתק בהצלחה",
     "traktErrDisconnect": "ניתוק Trakt נכשל",
-    "traktErrSync": "סנכרון הדירוגים נכשל"
+    "traktErrSync": "סנכרון הדירוגים נכשל",
+    "posterDisplay": {
+      "title": "תצוגת פוסטרים",
+      "subtitle": "כיצד תגי דירוג מוצגים על פוסטרים.",
+      "showRatingLabel": "הצג תג דירוג על פוסטרים של הספרייה",
+      "showRatingHelp": "כבו זאת אם עטיפות הספרייה שלכם כבר כוללות דירוג. עטיפות מ\"גילוי\" וממקורות TMDb אחרים תמיד מציגות את הדירוג בפינה."
+    }
   },
   "settingsPage": {
     "profileTitle": "הפרופיל שלך",
