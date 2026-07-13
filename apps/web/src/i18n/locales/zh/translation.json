@@ -990,7 +990,8 @@
       "snackbarFavoriteRemoved": "Removed from favorites",
       "snackbarFavoriteFailed": "Failed to update favorite",
       "addFavoriteTooltipNamed": "Add to favorites on {{serverName}} — a quick way to bookmark titles you want to come back to",
-      "removeFavoriteTooltipNamed": "Remove from favorites on {{serverName}}"
+      "removeFavoriteTooltipNamed": "Remove from favorites on {{serverName}}",
+      "markWatchedTooltipNamed": "Mark as watched - syncs to {{serverName}} and watch history"
     },
     "insights": {
       "recommendedForYou": "为您推荐",
@@ -1898,7 +1899,8 @@
     "passwordlessDisabled": "无密码登录已禁用",
     "displayName": "Server Display Name",
     "displayNamePlaceholder": "e.g. Home Cinema",
-    "displayNameHelper": "Used in app text, e.g. “Not on Home Cinema”. Leave empty to use the name reported by the media server."
+    "displayNameHelper": "Used in app text, e.g. “Not on Home Cinema”. Leave empty to use the name reported by the media server.",
+    "displayNameHelperDefault": "Currently using “{{name}}” — the name reported by your media server. Enter a custom name to override it."
   },
   "settingsFileLocations": {
     "title": "文件位置",

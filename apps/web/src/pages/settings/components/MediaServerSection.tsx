@@ -34,6 +34,7 @@ interface MediaServerConfig {
   hasApiKey: boolean
   isConfigured: boolean
   displayName?: string
+  reportedName?: string
 }
 
 interface ServerType {
@@ -273,8 +274,12 @@ export function MediaServerSection() {
             label={t('settingsMediaServer.displayName')}
             value={displayName}
             onChange={(e) => handleFieldChange('displayName', e.target.value)}
-            placeholder={t('settingsMediaServer.displayNamePlaceholder')}
-            helperText={t('settingsMediaServer.displayNameHelper')}
+            placeholder={config?.reportedName || t('settingsMediaServer.displayNamePlaceholder')}
+            helperText={
+              !displayName && config?.reportedName
+                ? t('settingsMediaServer.displayNameHelperDefault', { name: config.reportedName })
+                : t('settingsMediaServer.displayNameHelper')
+            }
             fullWidth
           />
 

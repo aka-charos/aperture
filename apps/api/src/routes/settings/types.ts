@@ -44,6 +44,7 @@ export interface MediaServerConfig {
   hasApiKey: boolean
   isConfigured: boolean
   displayName?: string
+  reportedName?: string
 }
 
 export interface MediaServerSecuritySettings {

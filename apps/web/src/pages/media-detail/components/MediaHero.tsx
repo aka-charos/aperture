@@ -560,7 +560,13 @@ export function MediaHero({
             )}
             {/* Movie mark watched */}
             {isMovie(media) && watchStatus && !watchStatus.isWatched && canManageWatchHistory && (
-              <Tooltip title={t('mediaDetail.hero.markWatchedTooltip')}>
+              <Tooltip
+                title={
+                  serverName
+                    ? t('mediaDetail.hero.markWatchedTooltipNamed', { serverName })
+                    : t('mediaDetail.hero.markWatchedTooltip')
+                }
+              >
                 <span>
                   <Button
                     variant="outlined"
