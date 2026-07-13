@@ -635,27 +635,31 @@ export function MyWatchHistoryPage() {
                                 total: item.total_episodes,
                               })}
                             </Typography>
-                            <Typography 
-                              variant="caption" 
+                            <Typography
+                              variant="caption"
                               fontWeight={600}
                               fontSize="0.7rem"
-                              sx={{ 
-                                color: item.episodes_watched === item.total_episodes ? 'success.main' : 'text.secondary' 
+                              sx={{
+                                color: item.total_episodes > 0 && item.episodes_watched === item.total_episodes ? 'success.main' : 'text.secondary'
                               }}
                             >
-                              {Math.round((item.episodes_watched / item.total_episodes) * 100)}%
+                              {item.total_episodes > 0
+                                ? Math.round((item.episodes_watched / item.total_episodes) * 100)
+                                : 0}%
                             </Typography>
                           </Box>
                           <LinearProgress
                             variant="determinate"
-                            value={Math.min((item.episodes_watched / item.total_episodes) * 100, 100)}
+                            value={item.total_episodes > 0
+                              ? Math.min((item.episodes_watched / item.total_episodes) * 100, 100)
+                              : 0}
                             sx={{
                               height: 3,
                               borderRadius: 1,
                               mt: 0.5,
                               backgroundColor: 'grey.800',
                               '& .MuiLinearProgress-bar': {
-                                backgroundColor: item.episodes_watched === item.total_episodes ? 'success.main' : 'primary.main',
+                                backgroundColor: item.total_episodes > 0 && item.episodes_watched === item.total_episodes ? 'success.main' : 'primary.main',
                               },
                             }}
                           />
