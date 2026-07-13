@@ -31,6 +31,7 @@ import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder'
 import OndemandVideoIcon from '@mui/icons-material/OndemandVideo'
 import type { Media, MediaServerInfo, WatchStatus } from '../types'
 import { isMovie, isSeries } from '../types'
+import { useServerDisplayName } from '../../../hooks/useServerDisplayName'
 import { formatRuntime } from '../hooks'
 import {
   HeartRating,
@@ -77,6 +78,7 @@ export function MediaHero({
   onFavoriteToggle,
 }: MediaHeroProps) {
   const { t } = useTranslation()
+  const serverName = useServerDisplayName()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [marking, setMarking] = useState(false)
   const [markingWatched, setMarkingWatched] = useState(false)
@@ -524,8 +526,12 @@ export function MediaHero({
               <Tooltip
                 title={
                   isFavorite
-                    ? t('mediaDetail.hero.removeFavoriteTooltip')
-                    : t('mediaDetail.hero.addFavoriteTooltip')
+                    ? serverName
+                      ? t('mediaDetail.hero.removeFavoriteTooltipNamed', { serverName })
+                      : t('mediaDetail.hero.removeFavoriteTooltip')
+                    : serverName
+                      ? t('mediaDetail.hero.addFavoriteTooltipNamed', { serverName })
+                      : t('mediaDetail.hero.addFavoriteTooltip')
                 }
               >
                 <span>
