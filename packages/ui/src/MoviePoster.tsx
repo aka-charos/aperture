@@ -4,7 +4,7 @@ import Star from '@mui/icons-material/Star'
 import AddToQueue from '@mui/icons-material/AddToQueue'
 import PlaylistAddCheck from '@mui/icons-material/PlaylistAddCheck'
 import HubOutlined from '@mui/icons-material/HubOutlined'
-import { HeartRating } from './HeartRating.js'
+import { StarRating } from './StarRating.js'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL } from './imageUtils.js'
 import { usePosterDisplaySettings } from './posterDisplaySettings.js'
 
@@ -32,8 +32,8 @@ export interface MoviePosterProps {
   showScore?: boolean
   /** Hide the community rating badge */
   hideRating?: boolean
-  /** Hide the heart rating button (e.g., on detail pages where it's shown elsewhere) */
-  hideHeartRating?: boolean
+  /** Hide the user rating button (e.g., on detail pages where it's shown elsewhere) */
+  hideUserRating?: boolean
   /** Whether this series is in user's watching list */
   isWatching?: boolean
   /** Callback when user toggles watching status */
@@ -74,7 +74,7 @@ export function MoviePoster({
   size = 'medium',
   showScore = false,
   hideRating = false,
-  hideHeartRating = false,
+  hideUserRating = false,
   isWatching = false,
   onWatchingToggle,
   hideWatchingToggle = false,
@@ -87,6 +87,7 @@ export function MoviePoster({
   children,
 }: MoviePosterProps) {
   const [isHovered, setIsHovered] = useState(false)
+  const [ratingOpen, setRatingOpen] = useState(false)
   const [imageError, setImageError] = useState(false)
   const [isOffRatio, setIsOffRatio] = useState(false)
   const { hideLibraryRatingBadge } = usePosterDisplaySettings()
@@ -288,11 +289,12 @@ export function MoviePoster({
             </Tooltip>
           )}
           
-          {/* Heart rating button */}
-          {!hideHeartRating && (
+          {/* User rating button — revealed on hover (or while the picker is open) so the
+              poster art stays clean until the user interacts with the card. */}
+          {!hideUserRating && (
             <Box
               onClick={(e) => {
-                // Stop propagation so clicking heart doesn't trigger poster onClick
+                // Stop propagation so clicking the rating doesn't trigger poster onClick
                 e.stopPropagation()
               }}
               sx={{
@@ -303,17 +305,20 @@ export function MoviePoster({
                 alignItems: 'center',
                 justifyContent: 'center',
                 backdropFilter: 'blur(4px)',
-                transition: 'background-color 0.2s ease',
+                opacity: isHovered || ratingOpen ? 1 : 0,
+                pointerEvents: isHovered || ratingOpen ? 'auto' : 'none',
+                transition: 'opacity 0.25s ease, background-color 0.2s ease',
                 '&:hover': {
                   backgroundColor: 'rgba(0, 0, 0, 0.8)',
                 },
               }}
             >
-              <HeartRating
+              <StarRating
                 value={userRating ?? null}
                 onChange={onRate}
                 size="small"
                 readOnly={!onRate}
+                onOpenChange={setRatingOpen}
               />
             </Box>
           )}

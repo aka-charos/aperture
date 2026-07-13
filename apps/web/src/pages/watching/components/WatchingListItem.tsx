@@ -27,7 +27,7 @@ import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline'
 import AddToQueueIcon from '@mui/icons-material/AddToQueue'
 import ScheduleIcon from '@mui/icons-material/Schedule'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
-import { getProxiedImageUrl, FALLBACK_POSTER_URL, HeartRating } from '@aperture/ui'
+import { getProxiedImageUrl, FALLBACK_POSTER_URL, StarRating } from '@aperture/ui'
 import { EpisodeAvailabilityBar } from './EpisodeAvailabilityBar'
 import type { WatchingSeries, UpcomingEpisode } from '../hooks/useWatchingData'
 
@@ -295,7 +295,7 @@ export function WatchingListItem({ series, userRating, onRate, onRemove, onAdd }
           {/* Desktop: Rating and Add/Remove button */}
           {!isMobile && (
             <Box display="flex" alignItems="center" gap={1} onClick={handleRatingClick}>
-              <HeartRating
+              <StarRating
                 value={userRating}
                 onChange={(rating) => onRate(rating)}
                 size="small"
@@ -355,7 +355,7 @@ export function WatchingListItem({ series, userRating, onRate, onRemove, onAdd }
         {isMobile && (
           <Box display="flex" alignItems="center" justifyContent="space-between" mt={1} onClick={handleRatingClick}>
             <Box display="flex" alignItems="center" gap={1}>
-              <HeartRating
+              <StarRating
                 value={userRating}
                 onChange={(rating) => onRate(rating)}
                 size="small"

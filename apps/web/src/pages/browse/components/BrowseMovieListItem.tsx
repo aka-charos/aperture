@@ -16,7 +16,7 @@ import {
 import StarIcon from '@mui/icons-material/Star'
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
-import { getProxiedImageUrl, FALLBACK_POSTER_URL, HeartRating } from '@aperture/ui'
+import { getProxiedImageUrl, FALLBACK_POSTER_URL, StarRating } from '@aperture/ui'
 
 interface Movie {
   id: string
@@ -192,7 +192,7 @@ export function BrowseMovieListItem({
               mt={1}
               onClick={handleRatingClick}
             >
-              <HeartRating
+              <StarRating
                 value={userRating}
                 onChange={(rating) => onRate(rating)}
                 size="small"
@@ -238,7 +238,7 @@ export function BrowseMovieListItem({
             <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
               {t('browse.listItem.yourRating')}
             </Typography>
-            <HeartRating
+            <StarRating
               value={userRating}
               onChange={(rating) => onRate(rating)}
               size="small"

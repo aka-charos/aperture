@@ -34,7 +34,7 @@ import { isMovie, isSeries } from '../types'
 import { useServerDisplayName } from '../../../hooks/useServerDisplayName'
 import { formatRuntime } from '../hooks'
 import {
-  HeartRating,
+  StarRating,
   getProxiedImageUrl,
   FALLBACK_POSTER_URL,
   TrailerModal,
@@ -464,9 +464,10 @@ export function MediaHero({
             </Box>
           )}
 
-          {/* Rating — on its own line so the hearts don't compete with the action buttons */}
+          {/* Your rating (indigo star, distinct from the red favorite heart) — on its own
+              line so it doesn't compete with the action buttons */}
           <Box sx={{ mb: 2.5 }}>
-            <HeartRating
+            <StarRating
               value={userRating}
               onChange={onRatingChange}
               loading={ratingLoading}

@@ -11,7 +11,7 @@ pnpm monorepo, ESM everywhere, no ORM (raw SQL via `pg`):
 - **`packages/core`** (`@aperture/core`) — ALL domain logic. Built with `tsc` → `dist/`. Subpath exports: `.`, `/config`, `/db`, `/media`, `/recommender`, `/strm`, `/channels`, `/jobs`, `/watching`. Root `src/index.ts` is a giant barrel (~1090 lines).
 - **`apps/api`** (`@aperture/api`) — thin Fastify HTTP layer (port 3456): routing, auth, job orchestration. Handlers call core functions; `src/lib/db.ts`, `lib/logger.ts`, `config/env.ts` are pure re-export shims of core.
 - **`apps/web`** (`@aperture/web`) — Vite + React 18 SPA (dev port 3457, proxies `/api` → 3456). MUI 6, react-router 7, i18next (14 locales), d3, recharts. **Never imports `@aperture/core`** (server code would break the bundle — duplicate tiny helpers instead, see `src/i18n/localeDirection.ts`). No central API client: raw `fetch('/api/...', { credentials: 'include' })` everywhere.
-- **`packages/ui`** (`@aperture/ui`) — shared React components (MoviePoster, HeartRating, BaseCarousel, RankBadge, StatusCard, TrailerModal, `getProxiedImageUrl`). Web aliases it to `src/` for hot reload, but typecheck/build use `dist/`.
+- **`packages/ui`** (`@aperture/ui`) — shared React components (MoviePoster, StarRating, BaseCarousel, RankBadge, StatusCard, TrailerModal, `getProxiedImageUrl`). Web aliases it to `src/` for hot reload, but typecheck/build use `dist/`.
 - **`db/migrations/`** — 120 numbered SQL files (`0001`–`0120`). Postgres + pgvector.
 
 ## Commands
