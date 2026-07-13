@@ -553,13 +553,15 @@
       "markWatched": "Mark Watched",
       "favorite": "Favorite",
       "favorited": "Favorited",
-      "addFavoriteTooltip": "Add to favorites on your media server",
+      "addFavoriteTooltip": "Add to favorites on your media server — a quick way to bookmark titles you want to come back to",
       "removeFavoriteTooltip": "Remove from favorites on your media server",
       "snackbarMarkedWatched": "Movie marked as watched",
       "snackbarMarkWatchedFailed": "Failed to mark as watched",
       "snackbarFavoriteAdded": "Added to favorites",
       "snackbarFavoriteRemoved": "Removed from favorites",
-      "snackbarFavoriteFailed": "Failed to update favorite"
+      "snackbarFavoriteFailed": "Failed to update favorite",
+      "addFavoriteTooltipNamed": "Add to favorites on {{serverName}} — a quick way to bookmark titles you want to come back to",
+      "removeFavoriteTooltipNamed": "Remove from favorites on {{serverName}}"
     },
     "insights": {
       "recommendedForYou": "당신에게 추천",
