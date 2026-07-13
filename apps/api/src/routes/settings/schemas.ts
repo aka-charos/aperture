@@ -884,53 +884,56 @@ export const tasteProfileSchema = {
   },
 }
 
-export const addTasteProfileItemSchema = {
+export const rebuildTasteProfileSchema = {
   tags: ['settings'],
-  summary: 'Add taste profile item',
-  description: 'Add a movie or series to taste profile as like or dislike.',
+  summary: 'Rebuild taste profile',
+  description: 'Force-rebuild franchise and genre weights from watch history.',
   body: {
     type: 'object' as const,
-    additionalProperties: true,
+    additionalProperties: false,
     properties: {
-      movieId: { type: 'string' as const, format: 'uuid' },
-      seriesId: { type: 'string' as const, format: 'uuid' },
-      isLike: { type: 'boolean' as const, description: 'True for like, false for dislike' },
+      mediaType: { type: 'string' as const, enum: ['movie', 'series'] },
+      mode: { type: 'string' as const, enum: ['reset', 'merge'] },
     },
-    required: ['isLike'] as string[],
+    required: ['mediaType'] as string[],
   },
 }
 
-export const updateTasteProfileItemSchema = {
+export const updateTasteProfileSettingsSchema = {
   tags: ['settings'],
-  summary: 'Update taste profile item',
-  description: 'Update an item in the taste profile (change like to dislike or vice versa).',
-  params: {
-    type: 'object' as const,
-    properties: {
-      id: { type: 'string' as const, format: 'uuid' },
-    },
-    required: ['id'] as string[],
-  },
+  summary: 'Update taste profile settings',
+  description: 'Update auto-refresh, lock state, and franchise detection thresholds for a taste profile.',
   body: {
     type: 'object' as const,
-    additionalProperties: true,
+    additionalProperties: false,
     properties: {
-      isLike: { type: 'boolean' as const },
+      mediaType: { type: 'string' as const, enum: ['movie', 'series'] },
+      isLocked: { type: 'boolean' as const },
+      refreshIntervalDays: { type: 'integer' as const },
+      minFranchiseItems: { type: 'integer' as const },
+      minFranchiseSize: { type: 'integer' as const },
     },
-    required: ['isLike'] as string[],
+    required: ['mediaType'] as string[],
   },
 }
 
-export const deleteTasteProfileItemSchema = {
+export const deleteFranchisePreferenceSchema = {
   tags: ['settings'],
-  summary: 'Remove taste profile item',
-  description: 'Remove an item from the taste profile.',
+  summary: 'Delete franchise preference',
+  description: 'Remove a franchise from the taste profile weights.',
   params: {
     type: 'object' as const,
     properties: {
-      id: { type: 'string' as const, format: 'uuid' },
+      franchiseName: { type: 'string' as const },
     },
-    required: ['id'] as string[],
+    required: ['franchiseName'] as string[],
+  },
+  querystring: {
+    type: 'object' as const,
+    properties: {
+      mediaType: { type: 'string' as const, enum: ['movie', 'series', 'both'] },
+    },
+    required: ['mediaType'] as string[],
   },
 }
 

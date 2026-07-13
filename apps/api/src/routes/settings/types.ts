@@ -470,35 +470,6 @@ export interface CostInputs {
 }
 
 // =============================================================================
-// Taste Profile Types
-// =============================================================================
-
-export interface TasteProfileItem {
-  id: string
-  type: 'movie' | 'series'
-  mediaId: string
-  title: string
-  year: number | null
-  posterUrl: string | null
-  rating: number | null
-  isLike: boolean
-  createdAt: Date
-}
-
-export interface TasteProfileResponse {
-  likes: TasteProfileItem[]
-  dislikes: TasteProfileItem[]
-  totalLikes: number
-  totalDislikes: number
-}
-
-export interface TasteProfileAddBody {
-  movieId?: string
-  seriesId?: string
-  isLike: boolean
-}
-
-// =============================================================================
 // Custom Interest Types
 // =============================================================================
 

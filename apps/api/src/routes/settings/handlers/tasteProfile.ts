@@ -16,9 +16,9 @@ import type { FastifyInstance } from 'fastify'
 import { requireAuth } from '../../../plugins/auth.js'
 import {
   tasteProfileSchema,
-  addTasteProfileItemSchema,
-  updateTasteProfileItemSchema,
-  deleteTasteProfileItemSchema,
+  rebuildTasteProfileSchema,
+  updateTasteProfileSettingsSchema,
+  deleteFranchisePreferenceSchema,
   addCustomInterestSchema,
   deleteCustomInterestSchema,
 } from '../schemas.js'
@@ -90,7 +90,7 @@ export function registerTasteProfileHandlers(fastify: FastifyInstance) {
    */
   fastify.post<{
     Body: { mediaType: 'movie' | 'series'; mode?: 'reset' | 'merge' }
-  }>('/api/settings/taste-profile/rebuild', { preHandler: requireAuth, schema: addTasteProfileItemSchema }, async (request, reply) => {
+  }>('/api/settings/taste-profile/rebuild', { preHandler: requireAuth, schema: rebuildTasteProfileSchema }, async (request, reply) => {
     try {
       const userId = request.user!.id
       const { mediaType, mode = 'reset' } = request.body
@@ -166,7 +166,7 @@ export function registerTasteProfileHandlers(fastify: FastifyInstance) {
    */
   fastify.patch<{
     Body: { mediaType: 'movie' | 'series'; isLocked?: boolean; refreshIntervalDays?: number; minFranchiseItems?: number; minFranchiseSize?: number }
-  }>('/api/settings/taste-profile', { preHandler: requireAuth, schema: updateTasteProfileItemSchema }, async (request, reply) => {
+  }>('/api/settings/taste-profile', { preHandler: requireAuth, schema: updateTasteProfileSettingsSchema }, async (request, reply) => {
     try {
       const userId = request.user!.id
       const { mediaType, isLocked, refreshIntervalDays, minFranchiseItems, minFranchiseSize } = request.body
@@ -265,7 +265,7 @@ export function registerTasteProfileHandlers(fastify: FastifyInstance) {
   fastify.delete<{
     Params: { franchiseName: string }
     Querystring: { mediaType: 'movie' | 'series' | 'both' }
-  }>('/api/settings/taste-profile/franchises/:franchiseName', { preHandler: requireAuth, schema: deleteTasteProfileItemSchema }, async (request, reply) => {
+  }>('/api/settings/taste-profile/franchises/:franchiseName', { preHandler: requireAuth, schema: deleteFranchisePreferenceSchema }, async (request, reply) => {
     try {
       const userId = request.user!.id
       const { franchiseName } = request.params

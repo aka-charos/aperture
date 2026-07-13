@@ -259,9 +259,17 @@ Rules:
       maxOutputTokens: 400,
     })
 
-    for await (const chunk of result.textStream) {
-      fullText += chunk
-      yield chunk
+    // Consume fullStream (not textStream): under AI SDK v5 textStream silently
+    // drops "error" chunks, so a failed provider call would yield an empty
+    // synopsis instead of triggering the fallback below. fullStream surfaces
+    // the error part, which we re-throw so the catch can emit a fallback.
+    for await (const part of result.fullStream) {
+      if (part.type === 'text-delta') {
+        fullText += part.text
+        yield part.text
+      } else if (part.type === 'error') {
+        throw part.error instanceof Error ? part.error : new Error(String(part.error))
+      }
     }
   } catch (error) {
     logger.error({ error, userId }, 'Failed to stream series synopsis')
