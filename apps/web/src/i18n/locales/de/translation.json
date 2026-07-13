@@ -890,7 +890,13 @@
     "traktErrStart": "Verbindung zu Trakt konnte nicht gestartet werden",
     "traktDisconnected": "Trakt erfolgreich getrennt",
     "traktErrDisconnect": "Trakt konnte nicht getrennt werden",
-    "traktErrSync": "Bewertungen konnten nicht synchronisiert werden"
+    "traktErrSync": "Bewertungen konnten nicht synchronisiert werden",
+    "posterDisplay": {
+      "title": "Poster-Anzeige",
+      "subtitle": "Wie Bewertungs-Abzeichen auf Postern angezeigt werden.",
+      "showRatingLabel": "Bewertungs-Abzeichen auf Bibliotheks-Postern anzeigen",
+      "showRatingHelp": "Deaktivieren, wenn die Artworks deiner Bibliothek bereits eine Bewertung enthalten. Cover aus Entdecken und anderen TMDb-Quellen zeigen ihre Bewertung immer in der Ecke."
+    }
   },
   "settingsPage": {
     "profileTitle": "Dein Profil",

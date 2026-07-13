@@ -81,6 +81,11 @@ export interface UserUiPreferences {
   /** Movie/series detail: Similar Media section tab */
   similarMediaView?: 'list' | 'graph'
   /**
+   * Hide the community-rating badge overlaid on library posters (for servers
+   * whose artwork already includes a rating). External/TMDb covers unaffected.
+   */
+  hidePosterRating?: boolean
+  /**
    * BCP-47 UI locale override. Omit or null to use system default.
    */
   uiLanguage?: string | null

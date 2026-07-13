@@ -890,7 +890,13 @@
     "traktErrStart": "Trakt 연결을 시작하지 못했습니다.",
     "traktDisconnected": "Trakt 연결이 성공적으로 끊어졌습니다.",
     "traktErrDisconnect": "Trakt 연결을 끊지 못했습니다.",
-    "traktErrSync": "평가를 동기화하지 못했습니다."
+    "traktErrSync": "평가를 동기화하지 못했습니다.",
+    "posterDisplay": {
+      "title": "포스터 표시",
+      "subtitle": "포스터에 평점 배지가 표시되는 방식입니다.",
+      "showRatingLabel": "라이브러리 포스터에 평점 배지 표시",
+      "showRatingHelp": "라이브러리 아트워크에 이미 평점이 포함되어 있다면 끄세요. 디스커버 및 기타 TMDb 소스의 커버에는 항상 모서리에 평점이 표시됩니다."
+    }
   },
   "settingsPage": {
     "profileTitle": "내 프로필",

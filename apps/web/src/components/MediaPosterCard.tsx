@@ -18,6 +18,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
+import StarIcon from '@mui/icons-material/Star'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import { RankBadge } from '@aperture/ui'
@@ -235,6 +236,30 @@ export function MediaPosterCard({
         {/* Rank Badge */}
         {rank !== undefined && <RankBadge rank={rank} size="medium" />}
 
+        {/* Community rating badge - top right (below the source chip when both show).
+            These covers come from TMDb, never from library artwork, so the badge is
+            not gated by the hide-poster-rating preference. */}
+        {voteAverage != null && voteAverage > 0 && (
+          <Chip
+            icon={<StarIcon fontSize="small" />}
+            label={voteAverage.toFixed(1)}
+            size="small"
+            sx={{
+              position: 'absolute',
+              top: sourceLabel ? 36 : 8,
+              right: 8,
+              backgroundColor: 'rgba(0, 0, 0, 0.75)',
+              color: 'warning.main',
+              fontWeight: 600,
+              fontSize: '0.7rem',
+              height: 24,
+              '& .MuiChip-icon': {
+                color: 'warning.main',
+              },
+            }}
+          />
+        )}
+
         {/* Source Chip (for Discovery) */}
         {sourceLabel && (
           <Chip
@@ -367,7 +392,6 @@ export function MediaPosterCard({
             <Box display="flex" alignItems="center" justifyContent="space-between">
               <Typography variant="caption" color="text.secondary">
                 {year || t('mediaPoster.tba')}
-                {voteAverage && ` • ${voteAverage.toFixed(1)}★`}
               </Typography>
               <Box display="flex" alignItems="center" gap={0.5}>
                 {requestButton}

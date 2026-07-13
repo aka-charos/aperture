@@ -890,7 +890,13 @@
     "traktErrStart": "Falha ao iniciar a conexão Trakt",
     "traktDisconnected": "Trakt desconectado com sucesso",
     "traktErrDisconnect": "Falha ao desconectar o Trakt",
-    "traktErrSync": "Falha ao sincronizar as classificações"
+    "traktErrSync": "Falha ao sincronizar as classificações",
+    "posterDisplay": {
+      "title": "Exibição de pôsteres",
+      "subtitle": "Como os selos de avaliação aparecem nos pôsteres.",
+      "showRatingLabel": "Mostrar selo de avaliação nos pôsteres da biblioteca",
+      "showRatingHelp": "Desative se as artes da sua biblioteca já incluem a avaliação. Capas do Descobrir e de outras fontes do TMDb sempre mostram a avaliação no canto."
+    }
   },
   "settingsPage": {
     "profileTitle": "Seu perfil",

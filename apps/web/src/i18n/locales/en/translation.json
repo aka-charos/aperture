@@ -1157,6 +1157,12 @@
     "tabWatcherIdentity": "Watcher Identity",
     "tabAlgorithm": "AI Algorithm",
     "tabPreferences": "Preferences",
+    "posterDisplay": {
+      "title": "Poster Display",
+      "subtitle": "How rating badges appear on posters.",
+      "showRatingLabel": "Show rating badge on library posters",
+      "showRatingHelp": "Turn this off if your library artwork already includes a rating. Covers from Discover and other TMDb sources always show their rating in the corner."
+    },
     "roleAdmin": "Administrator",
     "roleUser": "User",
     "mediaServer": "Media Server",

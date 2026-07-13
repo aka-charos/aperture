@@ -9,6 +9,12 @@ export {
   type TrailerModalProps,
 } from './TrailerModal.js'
 export { getProxiedImageUrl, FALLBACK_POSTER_URL } from './imageUtils.js'
+export {
+  PosterDisplaySettingsContext,
+  usePosterDisplaySettings,
+  defaultPosterDisplaySettings,
+  type PosterDisplaySettings,
+} from './posterDisplaySettings.js'
 
 // Carousel
 export {

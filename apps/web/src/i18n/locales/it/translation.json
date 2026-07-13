@@ -890,7 +890,13 @@
     "traktErrStart": "Impossibile avviare la connessione Trakt",
     "traktDisconnected": "Trakt si è disconnesso con successo",
     "traktErrDisconnect": "Impossibile disconnettere Trakt",
-    "traktErrSync": "Impossibile sincronizzare le valutazioni"
+    "traktErrSync": "Impossibile sincronizzare le valutazioni",
+    "posterDisplay": {
+      "title": "Visualizzazione poster",
+      "subtitle": "Come vengono mostrati i badge di valutazione sui poster.",
+      "showRatingLabel": "Mostra il badge di valutazione sui poster della libreria",
+      "showRatingHelp": "Disattivalo se le locandine della tua libreria includono già una valutazione. Le copertine di Scopri e delle altre fonti TMDb mostrano sempre la valutazione nell’angolo."
+    }
   },
   "settingsPage": {
     "profileTitle": "Il tuo profilo",
