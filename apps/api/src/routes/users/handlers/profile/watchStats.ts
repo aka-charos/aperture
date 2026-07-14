@@ -393,6 +393,141 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
           [id]
         )
 
+        // TV watch time (minutes) — episode runtime, falling back to the
+        // watched series' average episode runtime when an episode has none.
+        // The old total only summed movie runtime, so TV time was missing.
+        const tvTimeResult = await queryOne<{ tv_minutes: string }>(
+          `WITH ep_watch AS (
+             SELECT e.runtime_minutes, e.series_id
+             FROM watch_history wh
+             JOIN episodes e ON e.id = wh.episode_id
+             WHERE wh.user_id = $1 AND wh.episode_id IS NOT NULL
+           ),
+           series_avg AS (
+             SELECT series_id, AVG(runtime_minutes) AS avg_rt
+             FROM episodes
+             WHERE runtime_minutes IS NOT NULL
+             GROUP BY series_id
+           )
+           SELECT COALESCE(SUM(COALESCE(ew.runtime_minutes, sa.avg_rt)), 0)::int as tv_minutes
+           FROM ep_watch ew
+           LEFT JOIN series_avg sa ON sa.series_id = ew.series_id`,
+          [id]
+        )
+        const movieWatchTimeMinutes = parseInt(totalsResult?.total_runtime || '0')
+        const tvWatchTimeMinutes = parseInt(tvTimeResult?.tv_minutes || '0')
+
+        // Activity heatmap: day-of-week (0=Sun..6=Sat) x hour-of-day, across
+        // both movies and episodes.
+        const heatmapResult = await query<{ dow: string; hour: string; count: string }>(
+          `SELECT
+             EXTRACT(DOW FROM wh.last_played_at)::int as dow,
+             EXTRACT(HOUR FROM wh.last_played_at)::int as hour,
+             COUNT(*) as count
+           FROM watch_history wh
+           WHERE wh.user_id = $1 AND wh.last_played_at IS NOT NULL
+           GROUP BY 1, 2`,
+          [id]
+        )
+        const activityHeatmap = heatmapResult.rows.map(r => ({
+          dow: parseInt(r.dow),
+          hour: parseInt(r.hour),
+          count: parseInt(r.count),
+        }))
+
+        // Taste vs. the crowd: overall average community rating of watched
+        // movies, plus per-genre averages to surface "guilty pleasures".
+        const avgRatingRow = await queryOne<{ avg_rating: string | null }>(
+          `SELECT ROUND(AVG(m.community_rating)::numeric, 2) as avg_rating
+           FROM watch_history wh
+           JOIN movies m ON m.id = wh.movie_id
+           LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
+           WHERE wh.user_id = $1
+             AND wh.movie_id IS NOT NULL
+             AND m.community_rating IS NOT NULL
+             AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)`,
+          [id]
+        )
+        const avgCommunityRating = avgRatingRow?.avg_rating ? parseFloat(avgRatingRow.avg_rating) : 0
+
+        const genreRatingResult = await query<{ genre: string; count: string; avg_rating: string }>(
+          `WITH watched AS (
+             SELECT m.genres, m.community_rating
+             FROM watch_history wh
+             JOIN movies m ON m.id = wh.movie_id
+             LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
+             WHERE wh.user_id = $1
+               AND wh.movie_id IS NOT NULL
+               AND m.community_rating IS NOT NULL
+               AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)
+           )
+           SELECT g.genre, COUNT(*) as count, ROUND(AVG(w.community_rating)::numeric, 1) as avg_rating
+           FROM watched w, unnest(w.genres) as g(genre)
+           GROUP BY g.genre
+           HAVING COUNT(*) >= 2
+           ORDER BY count DESC`,
+          [id]
+        )
+        // Guilty pleasures = most-watched genres whose average community
+        // rating sits below your overall average.
+        const guiltyPleasureGenres = genreRatingResult.rows
+          .map(r => ({ genre: r.genre, count: parseInt(r.count), avgRating: parseFloat(r.avg_rating) }))
+          .filter(g => avgCommunityRating > 0 && g.avgRating < avgCommunityRating)
+          .slice(0, 6)
+
+        // Busiest single day (movies + episodes combined)
+        const busiestDayRow = await queryOne<{ date: string; count: string }>(
+          `SELECT to_char(date_trunc('day', wh.last_played_at), 'YYYY-MM-DD') as date,
+                  COUNT(*) as count
+           FROM watch_history wh
+           WHERE wh.user_id = $1 AND wh.last_played_at IS NOT NULL
+           GROUP BY date_trunc('day', wh.last_played_at)
+           ORDER BY count DESC
+           LIMIT 1`,
+          [id]
+        )
+        const busiestDay = busiestDayRow
+          ? { date: busiestDayRow.date, count: parseInt(busiestDayRow.count) }
+          : null
+
+        // Rewatch stats: movies played more than once
+        const rewatchCountRow = await queryOne<{ count: string }>(
+          `SELECT COUNT(*) as count
+           FROM watch_history wh
+           JOIN movies m ON m.id = wh.movie_id
+           LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
+           WHERE wh.user_id = $1
+             AND wh.movie_id IS NOT NULL
+             AND wh.play_count > 1
+             AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)`,
+          [id]
+        )
+        const mostRewatchedResult = await query<{
+          id: string
+          title: string
+          poster_url: string | null
+          play_count: string
+        }>(
+          `SELECT m.id, m.title, m.poster_url, wh.play_count
+           FROM watch_history wh
+           JOIN movies m ON m.id = wh.movie_id
+           LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
+           WHERE wh.user_id = $1
+             AND wh.movie_id IS NOT NULL
+             AND wh.play_count > 1
+             AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)
+           ORDER BY wh.play_count DESC, m.title ASC
+           LIMIT 12`,
+          [id]
+        )
+        const totalRewatched = parseInt(rewatchCountRow?.count || '0')
+        const mostRewatched = mostRewatchedResult.rows.map(r => ({
+          movieId: r.id,
+          title: r.title,
+          poster: r.poster_url,
+          playCount: parseInt(r.play_count),
+        }))
+
         return reply.send({
           genreDistribution,
           watchTimeline,
@@ -400,7 +535,9 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
           ratingDistribution,
           totalMovies: parseInt(totalsResult?.total_movies || '0'),
           totalEpisodes: parseInt(totalsResult?.total_episodes || '0'),
-          totalWatchTimeMinutes: parseInt(totalsResult?.total_runtime || '0'),
+          totalWatchTimeMinutes: movieWatchTimeMinutes + tvWatchTimeMinutes,
+          movieWatchTimeMinutes,
+          tvWatchTimeMinutes,
           totalPlays: parseInt(totalsResult?.total_plays || '0'),
           totalFavorites: parseInt(totalsResult?.favorites || '0'),
           totalSeries: parseInt(uniqueSeriesResult?.count || '0'),
@@ -408,7 +545,13 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
           topDirectors,
           topStudios,
           topNetworks,
-          seriesGenreDistribution
+          seriesGenreDistribution,
+          activityHeatmap,
+          avgCommunityRating,
+          guiltyPleasureGenres,
+          busiestDay,
+          totalRewatched,
+          mostRewatched
         })
       } catch (error) {
         fastify.log.error({ error, userId: id }, 'Failed to get watch stats')

@@ -21,6 +21,13 @@ import PersonIcon from '@mui/icons-material/Person'
 import VideocamIcon from '@mui/icons-material/Videocam'
 import BusinessIcon from '@mui/icons-material/Business'
 import LiveTvIcon from '@mui/icons-material/LiveTv'
+import ReplayIcon from '@mui/icons-material/Replay'
+import WhatshotIcon from '@mui/icons-material/Whatshot'
+import StarIcon from '@mui/icons-material/Star'
+import ThumbsUpDownIcon from '@mui/icons-material/ThumbsUpDown'
+import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth'
+import TheatersIcon from '@mui/icons-material/Theaters'
+import { Tooltip as MuiTooltip } from '@mui/material'
 import {
   PieChart,
   Pie,
@@ -48,6 +55,8 @@ interface WatchStats {
   totalMovies: number
   totalEpisodes: number
   totalWatchTimeMinutes: number
+  movieWatchTimeMinutes: number
+  tvWatchTimeMinutes: number
   totalPlays: number
   totalFavorites: number
   totalSeries: number
@@ -56,6 +65,12 @@ interface WatchStats {
   topStudios: { name: string; thumb: string | null; count: number }[]
   topNetworks: { name: string; thumb: string | null; count: number }[]
   seriesGenreDistribution: { genre: string; count: number }[]
+  activityHeatmap: { dow: number; hour: number; count: number }[]
+  avgCommunityRating: number
+  guiltyPleasureGenres: { genre: string; count: number; avgRating: number }[]
+  busiestDay: { date: string; count: number } | null
+  totalRewatched: number
+  mostRewatched: { movieId: string; title: string; poster: string | null; playCount: number }[]
 }
 
 // Rich color palette for charts
@@ -68,7 +83,7 @@ const GENRE_COLORS = [
 const DECADE_COLORS = ['#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#e0e7ff']
 
 export function WatchStatsPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { user } = useAuth()
   const navigate = useNavigate()
   const [stats, setStats] = useState<WatchStats | null>(null)
@@ -109,6 +124,19 @@ export function WatchStatsPage() {
     return t('watchStats.watchTimeHoursMinutes', { hours, minutes: minutes % 60 })
   }
 
+  // Locale-aware short weekday labels, indexed by Postgres DOW (0=Sun..6=Sat).
+  // Jan 1 2023 was a Sunday, so it anchors the mapping.
+  const weekdayShort = (dow: number) =>
+    new Date(Date.UTC(2023, 0, 1 + dow)).toLocaleDateString(i18n.language, {
+      weekday: 'short',
+      timeZone: 'UTC',
+    })
+  const weekdayLong = (dow: number) =>
+    new Date(Date.UTC(2023, 0, 1 + dow)).toLocaleDateString(i18n.language, {
+      weekday: 'long',
+      timeZone: 'UTC',
+    })
+
   if (loading) {
     return (
       <Box>
@@ -138,6 +166,34 @@ export function WatchStatsPage() {
   if (!stats) return null
 
   const hasData = stats.totalMovies > 0 || stats.totalEpisodes > 0
+
+  // Movies vs TV time split (hours)
+  const movieHours = Math.round(stats.movieWatchTimeMinutes / 60)
+  const tvHours = Math.round(stats.tvWatchTimeMinutes / 60)
+  const timeSplitTotal = movieHours + tvHours
+  const timeSplitData = [
+    { key: 'movies', name: t('watchStats.splitMovies'), value: movieHours, color: '#6366f1' },
+    { key: 'tv', name: t('watchStats.splitTv'), value: tvHours, color: '#8b5cf6' },
+  ].filter(d => d.value > 0)
+
+  // Heatmap lookup keyed by "dow-hour", plus peak count for intensity scaling
+  const heatmapMap = new Map<string, number>()
+  let heatmapMax = 0
+  for (const cell of stats.activityHeatmap) {
+    heatmapMap.set(`${cell.dow}-${cell.hour}`, cell.count)
+    if (cell.count > heatmapMax) heatmapMax = cell.count
+  }
+  // Display rows Monday→Sunday (DOW 1..6 then 0)
+  const dayOrder = [1, 2, 3, 4, 5, 6, 0]
+  const hasHeatmap = heatmapMax > 0
+
+  const busiestDayLabel = stats.busiestDay
+    ? new Date(`${stats.busiestDay.date}T00:00:00`).toLocaleDateString(i18n.language, {
+        weekday: 'long',
+        month: 'short',
+        day: 'numeric',
+      })
+    : null
 
   return (
     <Box>
@@ -237,6 +293,63 @@ export function WatchStatsPage() {
                   <Typography variant="caption" color="rgba(255,255,255,0.8)">
                     {t('watchStats.summaryFavorites')}
                   </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+
+          {/* Highlights */}
+          <Grid container spacing={2} mb={4}>
+            <Grid item xs={12} sm={4}>
+              <Card sx={{ borderRadius: 2, height: '100%' }}>
+                <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Avatar sx={{ bgcolor: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>
+                    <WhatshotIcon />
+                  </Avatar>
+                  <Box minWidth={0}>
+                    <Typography variant="caption" color="text.secondary" noWrap>
+                      {busiestDayLabel
+                        ? t('watchStats.busiestDayCount', { count: stats.busiestDay!.count })
+                        : t('watchStats.busiestDayTitle')}
+                    </Typography>
+                    <Typography variant="h6" fontWeight={700} noWrap>
+                      {busiestDayLabel ?? '—'}
+                    </Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={6} sm={4}>
+              <Card sx={{ borderRadius: 2, height: '100%' }}>
+                <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Avatar sx={{ bgcolor: 'rgba(20, 184, 166, 0.15)', color: '#14b8a6' }}>
+                    <ReplayIcon />
+                  </Avatar>
+                  <Box minWidth={0}>
+                    <Typography variant="caption" color="text.secondary" noWrap>
+                      {t('watchStats.summaryRewatched')}
+                    </Typography>
+                    <Typography variant="h6" fontWeight={700}>
+                      {stats.totalRewatched}
+                    </Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={6} sm={4}>
+              <Card sx={{ borderRadius: 2, height: '100%' }}>
+                <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Avatar sx={{ bgcolor: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}>
+                    <StarIcon />
+                  </Avatar>
+                  <Box minWidth={0}>
+                    <Typography variant="caption" color="text.secondary" noWrap>
+                      {t('watchStats.avgCommunityRating')}
+                    </Typography>
+                    <Typography variant="h6" fontWeight={700}>
+                      {stats.avgCommunityRating > 0 ? stats.avgCommunityRating.toFixed(1) : '—'}
+                    </Typography>
+                  </Box>
                 </CardContent>
               </Card>
             </Grid>
@@ -835,6 +948,313 @@ export function WatchStatsPage() {
                   ) : (
                     <Typography variant="body2" color="text.secondary">
                       {t('watchStats.emptyNetworkData')}
+                    </Typography>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+
+          {/* Charts Row 5 - Where Hours Go & Taste vs Crowd */}
+          <Grid container spacing={3} mt={0}>
+            {/* Movies vs TV time split */}
+            <Grid item xs={12} md={6}>
+              <Card sx={{ borderRadius: 2, height: '100%' }}>
+                <CardContent>
+                  <Box display="flex" alignItems="center" gap={1} mb={2}>
+                    <TheatersIcon sx={{ color: 'primary.main' }} />
+                    <Typography variant="h6" fontWeight={600}>
+                      {t('watchStats.sectionWhereHoursGo')}
+                    </Typography>
+                  </Box>
+                  {timeSplitTotal > 0 ? (
+                    <Box display="flex" alignItems="center" gap={2}>
+                      <ResponsiveContainer width="50%" height={200}>
+                        <PieChart>
+                          <Pie
+                            data={timeSplitData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={80}
+                            paddingAngle={2}
+                            dataKey="value"
+                          >
+                            {timeSplitData.map(d => (
+                              <Cell key={d.key} fill={d.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: '#1a1a1a',
+                              border: '1px solid #2a2a2a',
+                              borderRadius: 8,
+                              color: '#f5f5f5',
+                            }}
+                            itemStyle={{ color: '#f5f5f5' }}
+                            formatter={(value, name) => {
+                              const hours = typeof value === 'number' ? value : Number(value)
+                              const pct = timeSplitTotal > 0 ? Math.round((hours / timeSplitTotal) * 100) : 0
+                              return [t('watchStats.splitTooltip', { hours, pct }), name]
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <Box flex={1}>
+                        {timeSplitData.map(d => (
+                          <Box key={d.key} display="flex" alignItems="center" gap={1} mb={1}>
+                            <Box sx={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: d.color }} />
+                            <Typography variant="body2" flex={1} noWrap>
+                              {d.name}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {t('watchStats.watchTimeHoursMinutes', { hours: d.value, minutes: 0 })}
+                            </Typography>
+                          </Box>
+                        ))}
+                        <Typography variant="caption" color="text.secondary">
+                          {formatWatchTime(stats.totalWatchTimeMinutes)}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      {t('watchStats.emptyTimeSplitData')}
+                    </Typography>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Taste vs the crowd */}
+            <Grid item xs={12} md={6}>
+              <Card sx={{ borderRadius: 2, height: '100%' }}>
+                <CardContent>
+                  <Box display="flex" alignItems="center" gap={1} mb={2}>
+                    <ThumbsUpDownIcon sx={{ color: 'secondary.main' }} />
+                    <Typography variant="h6" fontWeight={600}>
+                      {t('watchStats.sectionTasteVsCrowd')}
+                    </Typography>
+                  </Box>
+                  {stats.avgCommunityRating > 0 ? (
+                    <>
+                      <Box display="flex" alignItems="baseline" gap={1} mb={2}>
+                        <Typography variant="h3" fontWeight={700} color="primary.main">
+                          {stats.avgCommunityRating.toFixed(1)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {t('watchStats.avgCommunityRating')}
+                        </Typography>
+                      </Box>
+                      <Typography variant="subtitle2" fontWeight={600}>
+                        {t('watchStats.guiltyPleasuresTitle')}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {t('watchStats.guiltyPleasuresHint')}
+                      </Typography>
+                      {stats.guiltyPleasureGenres.length > 0 ? (
+                        <Box display="flex" flexWrap="wrap" gap={1} mt={1.5}>
+                          {stats.guiltyPleasureGenres.map(g => (
+                            <Chip
+                              key={g.genre}
+                              label={`${g.genre} · ${t('watchStats.guiltyPleasureRating', {
+                                rating: g.avgRating.toFixed(1),
+                              })}`}
+                              size="small"
+                              sx={{
+                                backgroundColor: 'rgba(236, 72, 153, 0.15)',
+                                color: '#f472b6',
+                                fontWeight: 500,
+                              }}
+                            />
+                          ))}
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary" mt={1.5}>
+                          —
+                        </Typography>
+                      )}
+                    </>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      {t('watchStats.emptyTasteData')}
+                    </Typography>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+
+          {/* Charts Row 6 - Activity heatmap */}
+          <Grid container spacing={3} mt={0}>
+            <Grid item xs={12}>
+              <Card sx={{ borderRadius: 2 }}>
+                <CardContent>
+                  <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                    <CalendarViewMonthIcon sx={{ color: 'primary.main' }} />
+                    <Typography variant="h6" fontWeight={600}>
+                      {t('watchStats.sectionWhenYouWatch')}
+                    </Typography>
+                  </Box>
+                  <Typography variant="caption" color="text.secondary">
+                    {t('watchStats.heatmapSubtitle')}
+                  </Typography>
+                  {hasHeatmap ? (
+                    <Box mt={2} sx={{ overflowX: 'auto' }}>
+                      <Box sx={{ display: 'inline-flex', flexDirection: 'column', gap: 0.5, minWidth: 'min-content' }}>
+                        {dayOrder.map(dow => (
+                          <Box key={dow} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ width: 32, flexShrink: 0, textAlign: 'right', pr: 0.5 }}
+                            >
+                              {weekdayShort(dow)}
+                            </Typography>
+                            {Array.from({ length: 24 }, (_, hour) => {
+                              const count = heatmapMap.get(`${dow}-${hour}`) ?? 0
+                              const intensity = count > 0 ? 0.15 + 0.85 * (count / heatmapMax) : 0
+                              return (
+                                <MuiTooltip
+                                  key={hour}
+                                  arrow
+                                  title={t('watchStats.heatmapTooltip', {
+                                    day: weekdayLong(dow),
+                                    hour: `${hour.toString().padStart(2, '0')}:00`,
+                                    count,
+                                  })}
+                                >
+                                  <Box
+                                    sx={{
+                                      width: 16,
+                                      height: 16,
+                                      borderRadius: 0.5,
+                                      flexShrink: 0,
+                                      backgroundColor:
+                                        count > 0 ? `rgba(99, 102, 241, ${intensity})` : 'rgba(148, 163, 184, 0.08)',
+                                    }}
+                                  />
+                                </MuiTooltip>
+                              )
+                            })}
+                          </Box>
+                        ))}
+                        {/* Hour axis */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                          <Box sx={{ width: 32, flexShrink: 0 }} />
+                          {Array.from({ length: 24 }, (_, hour) => (
+                            <Box key={hour} sx={{ width: 16, flexShrink: 0, textAlign: 'center' }}>
+                              {hour % 6 === 0 && (
+                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>
+                                  {hour}
+                                </Typography>
+                              )}
+                            </Box>
+                          ))}
+                        </Box>
+                      </Box>
+                      {/* Legend */}
+                      <Box display="flex" alignItems="center" gap={0.5} mt={1.5}>
+                        <Typography variant="caption" color="text.secondary">
+                          {t('watchStats.heatmapLess')}
+                        </Typography>
+                        {[0.15, 0.4, 0.65, 0.85, 1].map(a => (
+                          <Box
+                            key={a}
+                            sx={{ width: 14, height: 14, borderRadius: 0.5, backgroundColor: `rgba(99, 102, 241, ${a})` }}
+                          />
+                        ))}
+                        <Typography variant="caption" color="text.secondary">
+                          {t('watchStats.heatmapMore')}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary" mt={2}>
+                      {t('watchStats.emptyHeatmapData')}
+                    </Typography>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+
+          {/* Charts Row 7 - Most rewatched */}
+          <Grid container spacing={3} mt={0}>
+            <Grid item xs={12}>
+              <Card sx={{ borderRadius: 2 }}>
+                <CardContent>
+                  <Box display="flex" alignItems="center" gap={1} mb={2}>
+                    <ReplayIcon sx={{ color: '#14b8a6' }} />
+                    <Typography variant="h6" fontWeight={600}>
+                      {t('watchStats.sectionMostRewatched')}
+                    </Typography>
+                  </Box>
+                  {stats.mostRewatched.length > 0 ? (
+                    <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
+                      {stats.mostRewatched.map(item => (
+                        <Box
+                          key={item.movieId}
+                          onClick={() => navigate(`/movies/${item.movieId}`)}
+                          sx={{ width: 120, flexShrink: 0, cursor: 'pointer' }}
+                        >
+                          <Box
+                            sx={{
+                              position: 'relative',
+                              borderRadius: 2,
+                              overflow: 'hidden',
+                              aspectRatio: '2 / 3',
+                              backgroundColor: 'rgba(148, 163, 184, 0.12)',
+                              transition: 'transform 0.2s',
+                              '&:hover': { transform: 'translateY(-4px)' },
+                            }}
+                          >
+                            {item.poster ? (
+                              <Box
+                                component="img"
+                                src={getProxiedImageUrl(item.poster)}
+                                alt={item.title}
+                                sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                              />
+                            ) : (
+                              <Box
+                                sx={{
+                                  width: '100%',
+                                  height: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                <MovieIcon sx={{ color: 'text.secondary' }} />
+                              </Box>
+                            )}
+                            <Chip
+                              label={`×${item.playCount}`}
+                              size="small"
+                              sx={{
+                                position: 'absolute',
+                                top: 6,
+                                right: 6,
+                                height: 22,
+                                fontWeight: 700,
+                                backgroundColor: 'rgba(20, 184, 166, 0.9)',
+                                color: 'white',
+                              }}
+                            />
+                          </Box>
+                          <Typography variant="caption" fontWeight={500} noWrap sx={{ display: 'block', mt: 0.5 }}>
+                            {item.title}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                            {t('watchStats.rewatchPlayCount', { count: item.playCount })}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      {t('watchStats.emptyRewatchData')}
                     </Typography>
                   )}
                 </CardContent>
