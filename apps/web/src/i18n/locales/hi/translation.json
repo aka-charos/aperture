@@ -2752,7 +2752,10 @@
     "playNoun_one": "खेल",
     "playNoun_other": "नाटकों",
     "completeBadge": "पूरा",
-    "inProgressTooltip": "In progress · {{percent}}% watched"
+    "inProgressTooltip": "In progress · {{percent}}% watched",
+    "filterAll": "All",
+    "filterInProgress": "In Progress",
+    "filterCompleted": "Completed"
   },
   "topPicksPage": {
     "pageTitle": "ऊपर उठाता है",

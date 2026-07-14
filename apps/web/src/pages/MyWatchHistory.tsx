@@ -41,6 +41,8 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline'
 import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import SortByAlphaIcon from '@mui/icons-material/SortByAlpha'
+import AllInclusiveIcon from '@mui/icons-material/AllInclusive'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import { MoviePoster } from '@aperture/ui'
 import { useAuth } from '@/hooks/useAuth'
 import { useWatching } from '@/hooks/useWatching'
@@ -113,6 +115,7 @@ export function MyWatchHistoryPage() {
   
   // Shared state
   const { viewMode, setViewMode } = useViewMode('watchHistory')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'in_progress' | 'completed'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   // Debounced term actually sent to the server so search spans the whole history, not just the loaded page
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -171,14 +174,15 @@ export function MyWatchHistoryPage() {
     }
   }
 
-  const fetchMovieHistory = useCallback(async (page: number, sort: string, search: string) => {
+  const fetchMovieHistory = useCallback(async (page: number, sort: string, search: string, filter: string) => {
     if (!user) return
 
     setMovieLoading(true)
     try {
       const searchParam = search ? `&search=${encodeURIComponent(search)}` : ''
+      const filterParam = filter && filter !== 'all' ? `&filter=${filter}` : ''
       const response = await fetch(
-        `/api/users/${user.id}/watch-history?page=${page}&pageSize=50&sortBy=${sort}${searchParam}`,
+        `/api/users/${user.id}/watch-history?page=${page}&pageSize=50&sortBy=${sort}${searchParam}${filterParam}`,
         { credentials: 'include' }
       )
       if (response.ok) {
@@ -193,14 +197,15 @@ export function MyWatchHistoryPage() {
     }
   }, [user])
 
-  const fetchSeriesHistory = useCallback(async (page: number, sort: string, search: string) => {
+  const fetchSeriesHistory = useCallback(async (page: number, sort: string, search: string, filter: string) => {
     if (!user) return
 
     setSeriesLoading(true)
     try {
       const searchParam = search ? `&search=${encodeURIComponent(search)}` : ''
+      const filterParam = filter && filter !== 'all' ? `&filter=${filter}` : ''
       const response = await fetch(
-        `/api/users/${user.id}/series-watch-history?page=${page}&pageSize=50&sortBy=${sort}${searchParam}`,
+        `/api/users/${user.id}/series-watch-history?page=${page}&pageSize=50&sortBy=${sort}${searchParam}${filterParam}`,
         { credentials: 'include' }
       )
       if (response.ok) {
@@ -221,21 +226,21 @@ export function MyWatchHistoryPage() {
     return () => clearTimeout(handle)
   }, [searchQuery])
 
-  // Refetch from page 1 whenever the search term or sort changes (also covers initial mount)
+  // Refetch from page 1 whenever the search term, sort, or status filter changes (also covers initial mount)
   useEffect(() => {
-    fetchMovieHistory(1, movieSortBy, debouncedSearch)
-  }, [fetchMovieHistory, movieSortBy, debouncedSearch])
+    fetchMovieHistory(1, movieSortBy, debouncedSearch, statusFilter)
+  }, [fetchMovieHistory, movieSortBy, debouncedSearch, statusFilter])
 
   useEffect(() => {
-    fetchSeriesHistory(1, seriesSortBy, debouncedSearch)
-  }, [fetchSeriesHistory, seriesSortBy, debouncedSearch])
+    fetchSeriesHistory(1, seriesSortBy, debouncedSearch, statusFilter)
+  }, [fetchSeriesHistory, seriesSortBy, debouncedSearch, statusFilter])
 
   const handleMoviePageChange = (_: React.ChangeEvent<unknown>, page: number) => {
-    fetchMovieHistory(page, movieSortBy, debouncedSearch)
+    fetchMovieHistory(page, movieSortBy, debouncedSearch, statusFilter)
   }
 
   const handleSeriesPageChange = (_: React.ChangeEvent<unknown>, page: number) => {
-    fetchSeriesHistory(page, seriesSortBy, debouncedSearch)
+    fetchSeriesHistory(page, seriesSortBy, debouncedSearch, statusFilter)
   }
 
   const handleMovieSortChange = (_: React.MouseEvent<HTMLElement>, newSort: 'recent' | 'plays' | 'title' | null) => {
@@ -374,6 +379,25 @@ export function MyWatchHistoryPage() {
               {!isMobile && t('watchHistoryPage.sortAZ')}
             </ToggleButton>
           </ToggleButtonGroup>
+          <ToggleButtonGroup
+            value={statusFilter}
+            exclusive
+            onChange={(_, v) => v && setStatusFilter(v)}
+            size="small"
+          >
+            <ToggleButton value="all">
+              <AllInclusiveIcon fontSize="small" sx={{ mr: isMobile ? 0 : 0.5 }} />
+              {!isMobile && t('watchHistoryPage.filterAll')}
+            </ToggleButton>
+            <ToggleButton value="in_progress">
+              <PlayCircleOutlineIcon fontSize="small" sx={{ mr: isMobile ? 0 : 0.5 }} />
+              {!isMobile && t('watchHistoryPage.filterInProgress')}
+            </ToggleButton>
+            <ToggleButton value="completed">
+              <CheckCircleIcon fontSize="small" sx={{ mr: isMobile ? 0 : 0.5 }} />
+              {!isMobile && t('watchHistoryPage.filterCompleted')}
+            </ToggleButton>
+          </ToggleButtonGroup>
         </Box>
         {isLoading && <CircularProgress size={20} />}
       </Box>
@@ -475,6 +499,28 @@ export function MyWatchHistoryPage() {
                               <VisibilityOffIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
+                        )}
+                        {/* In-progress resume bar overlaid on the poster */}
+                        {!item.played && Math.min(99, item.progress_percent ?? 0) >= 1 && (
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              height: 5,
+                              backgroundColor: 'rgba(0,0,0,0.55)',
+                              zIndex: 2,
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                width: `${Math.min(99, item.progress_percent ?? 0)}%`,
+                                height: '100%',
+                                backgroundColor: 'warning.main',
+                              }}
+                            />
+                          </Box>
                         )}
                       </Box>
                       {/* In-progress / resume indicator */}

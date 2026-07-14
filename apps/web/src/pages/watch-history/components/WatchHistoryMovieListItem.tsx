@@ -153,6 +153,29 @@ export function WatchHistoryMovieListItem({
                 }}
               />
             )}
+
+            {/* In-progress resume bar overlaid on the poster */}
+            {inProgress && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: 5,
+                  backgroundColor: 'rgba(0,0,0,0.55)',
+                  zIndex: 2,
+                }}
+              >
+                <Box
+                  sx={{
+                    width: `${progressPercent}%`,
+                    height: '100%',
+                    backgroundColor: 'warning.main',
+                  }}
+                />
+              </Box>
+            )}
           </Box>
 
           {/* Content Section */}

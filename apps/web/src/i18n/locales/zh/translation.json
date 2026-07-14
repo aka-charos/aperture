@@ -2752,7 +2752,10 @@
     "playNoun_one": "玩",
     "playNoun_other": "戏剧",
     "completeBadge": "完全的",
-    "inProgressTooltip": "In progress · {{percent}}% watched"
+    "inProgressTooltip": "In progress · {{percent}}% watched",
+    "filterAll": "All",
+    "filterInProgress": "In Progress",
+    "filterCompleted": "Completed"
   },
   "topPicksPage": {
     "pageTitle": "热门精选",

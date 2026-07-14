@@ -2538,7 +2538,10 @@
     "playNoun_one": "αναπαραγωγή",
     "playNoun_other": "αναπαραγωγές",
     "completeBadge": "Ολοκληρώθηκε",
-    "inProgressTooltip": "Σε εξέλιξη · {{percent}}% παρακολουθήθηκε"
+    "inProgressTooltip": "Σε εξέλιξη · {{percent}}% παρακολουθήθηκε",
+    "filterAll": "All",
+    "filterInProgress": "In Progress",
+    "filterCompleted": "Completed"
   },
   "mediaGraph": {
     "searchPlaceholder": "Αναζήτηση με βάση τη διάθεση, το θέμα ή την περιγραφή…",
