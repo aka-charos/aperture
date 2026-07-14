@@ -218,7 +218,7 @@ export function PlaylistViewDialog({
             </Typography>
           </Box>
         ) : (
-          <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+          <Box>
             {playlistItems.map((item, index) => (
               <Box
                 key={item.playlistItemId}
@@ -266,7 +266,7 @@ export function PlaylistViewDialog({
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Close</Button>
+        <Button onClick={onClose}>{t('common.close')}</Button>
       </DialogActions>
     </Dialog>
   )
