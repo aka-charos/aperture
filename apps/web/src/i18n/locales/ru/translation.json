@@ -3898,5 +3898,17 @@
     "showCaption": "По умолчанию для всех пользователей. Отключите, если ваш сервер встраивает рейтинг в обложки. Обложки «Обзора» и других источников TMDb всегда показывают рейтинг.",
     "saving": "Сохранение…",
     "saveChanges": "Сохранить изменения"
+  },
+  "networkFilter": {
+    "label": "Network",
+    "title": "Network",
+    "searchPlaceholder": "Search networks…",
+    "clearTooltip": "Clear network",
+    "clearSearch": "Clear search",
+    "sortByCount": "Most shows",
+    "sortAz": "A–Z",
+    "noMatches": "No networks match \"{{query}}\"",
+    "shownCount_one": "{{count}} network",
+    "shownCount_other": "{{count}} networks"
   }
 }

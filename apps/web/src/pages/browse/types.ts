@@ -41,6 +41,11 @@ export interface CountryOption {
   count: number
 }
 
+export interface NetworkOption {
+  network: string
+  count: number
+}
+
 export interface FilterRanges {
   year: { min: number; max: number }
   runtime?: { min: number; max: number }

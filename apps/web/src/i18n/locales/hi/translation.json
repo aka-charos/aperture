@@ -3898,5 +3898,17 @@
     "showCaption": "सभी उपयोगकर्ताओं के लिए डिफ़ॉल्ट। यदि आपका सर्वर रेटिंग को आर्टवर्क में शामिल करता है तो इसे बंद करें। डिस्कवर और अन्य TMDb कवर हमेशा अपनी रेटिंग दिखाते हैं।",
     "saving": "सहेजा जा रहा है…",
     "saveChanges": "परिवर्तन सहेजें"
+  },
+  "networkFilter": {
+    "label": "Network",
+    "title": "Network",
+    "searchPlaceholder": "Search networks…",
+    "clearTooltip": "Clear network",
+    "clearSearch": "Clear search",
+    "sortByCount": "Most shows",
+    "sortAz": "A–Z",
+    "noMatches": "No networks match \"{{query}}\"",
+    "shownCount_one": "{{count}} network",
+    "shownCount_other": "{{count}} networks"
   }
 }

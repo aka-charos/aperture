@@ -3898,5 +3898,17 @@
     "showCaption": "Padrão para todos os usuários. Desative se o seu servidor incorpora as avaliações nas artes. Descobrir e outras capas do TMDb sempre mostram a avaliação.",
     "saving": "Salvando…",
     "saveChanges": "Salvar alterações"
+  },
+  "networkFilter": {
+    "label": "Network",
+    "title": "Network",
+    "searchPlaceholder": "Search networks…",
+    "clearTooltip": "Clear network",
+    "clearSearch": "Clear search",
+    "sortByCount": "Most shows",
+    "sortAz": "A–Z",
+    "noMatches": "No networks match \"{{query}}\"",
+    "shownCount_one": "{{count}} network",
+    "shownCount_other": "{{count}} networks"
   }
 }

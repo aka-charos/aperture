@@ -26,6 +26,7 @@ import {
   CountryFilterPopper,
   FilterPopper,
   FilterPresetManager,
+  NetworkFilterPopper,
   SortPopper,
   type SeriesFilters,
 } from './components'
@@ -159,21 +160,11 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
             </Select>
           </FormControl>
 
-          <FormControl size="small" sx={{ width: { xs: '100%', sm: 150 } }}>
-            <InputLabel>{t('browse.labels.network')}</InputLabel>
-            <Select
-              value={series.network}
-              label={t('browse.labels.network')}
-              onChange={(event) => series.setNetwork(event.target.value)}
-            >
-              <MenuItem value="">{t('browse.labels.allNetworks')}</MenuItem>
-              {series.networks.map((networkName) => (
-                <MenuItem key={networkName} value={networkName}>
-                  {networkName}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <NetworkFilterPopper
+            networks={series.networks}
+            selected={series.network}
+            onChange={series.setNetwork}
+          />
 
           <CountryFilterPopper
             countries={series.seriesCountries}

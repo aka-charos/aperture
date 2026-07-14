@@ -3898,5 +3898,17 @@
     "showCaption": "Predefinito per tutti gli utenti. Disattivalo se il tuo server incorpora le valutazioni nelle locandine. Scopri e le altre copertine TMDb mostrano sempre la loro valutazione.",
     "saving": "Salvataggio…",
     "saveChanges": "Salva modifiche"
+  },
+  "networkFilter": {
+    "label": "Network",
+    "title": "Network",
+    "searchPlaceholder": "Search networks…",
+    "clearTooltip": "Clear network",
+    "clearSearch": "Clear search",
+    "sortByCount": "Most shows",
+    "sortAz": "A–Z",
+    "noMatches": "No networks match \"{{query}}\"",
+    "shownCount_one": "{{count}} network",
+    "shownCount_other": "{{count}} networks"
   }
 }

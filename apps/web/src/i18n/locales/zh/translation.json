@@ -3898,5 +3898,17 @@
     "showCaption": "所有用户的默认值。如果您的服务器将评分烧录进封面，请关闭此项。“发现”及其他 TMDb 封面始终显示评分。",
     "saving": "保存中…",
     "saveChanges": "保存更改"
+  },
+  "networkFilter": {
+    "label": "Network",
+    "title": "Network",
+    "searchPlaceholder": "Search networks…",
+    "clearTooltip": "Clear network",
+    "clearSearch": "Clear search",
+    "sortByCount": "Most shows",
+    "sortAz": "A–Z",
+    "noMatches": "No networks match \"{{query}}\"",
+    "shownCount_one": "{{count}} network",
+    "shownCount_other": "{{count}} networks"
   }
 }

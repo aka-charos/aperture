@@ -3898,5 +3898,17 @@
     "showCaption": "Standard für alle Benutzer. Deaktivieren, wenn dein Server Bewertungen in die Artworks einbrennt. Entdecken und andere TMDb-Cover zeigen ihre Bewertung immer.",
     "saving": "Wird gespeichert…",
     "saveChanges": "Änderungen speichern"
+  },
+  "networkFilter": {
+    "label": "Network",
+    "title": "Network",
+    "searchPlaceholder": "Search networks…",
+    "clearTooltip": "Clear network",
+    "clearSearch": "Clear search",
+    "sortByCount": "Most shows",
+    "sortAz": "A–Z",
+    "noMatches": "No networks match \"{{query}}\"",
+    "shownCount_one": "{{count}} network",
+    "shownCount_other": "{{count}} networks"
   }
 }

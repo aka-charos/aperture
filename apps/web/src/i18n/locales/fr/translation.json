@@ -3898,5 +3898,17 @@
     "showCaption": "Valeur par défaut pour tous les utilisateurs. Désactivez-la si votre serveur incruste les notes dans les visuels. Découvrir et les autres visuels TMDb affichent toujours leur note.",
     "saving": "Enregistrement…",
     "saveChanges": "Enregistrer les modifications"
+  },
+  "networkFilter": {
+    "label": "Network",
+    "title": "Network",
+    "searchPlaceholder": "Search networks…",
+    "clearTooltip": "Clear network",
+    "clearSearch": "Clear search",
+    "sortByCount": "Most shows",
+    "sortAz": "A–Z",
+    "noMatches": "No networks match \"{{query}}\"",
+    "shownCount_one": "{{count}} network",
+    "shownCount_other": "{{count}} networks"
   }
 }

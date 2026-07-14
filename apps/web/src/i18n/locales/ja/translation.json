@@ -3898,5 +3898,17 @@
     "showCaption": "全ユーザーの既定値です。サーバーが評価をアートワークに焼き込んでいる場合はオフにしてください。ディスカバーやその他のTMDbカバーには常に評価が表示されます。",
     "saving": "保存中…",
     "saveChanges": "変更を保存"
+  },
+  "networkFilter": {
+    "label": "Network",
+    "title": "Network",
+    "searchPlaceholder": "Search networks…",
+    "clearTooltip": "Clear network",
+    "clearSearch": "Clear search",
+    "sortByCount": "Most shows",
+    "sortAz": "A–Z",
+    "noMatches": "No networks match \"{{query}}\"",
+    "shownCount_one": "{{count}} network",
+    "shownCount_other": "{{count}} networks"
   }
 }

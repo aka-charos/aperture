@@ -3898,5 +3898,17 @@
     "showCaption": "Valor predeterminado para todos los usuarios. Desactívalo si tu servidor incrusta las valoraciones en las carátulas. Descubrir y otras carátulas de TMDb siempre muestran su valoración.",
     "saving": "Guardando…",
     "saveChanges": "Guardar cambios"
+  },
+  "networkFilter": {
+    "label": "Network",
+    "title": "Network",
+    "searchPlaceholder": "Search networks…",
+    "clearTooltip": "Clear network",
+    "clearSearch": "Clear search",
+    "sortByCount": "Most shows",
+    "sortAz": "A–Z",
+    "noMatches": "No networks match \"{{query}}\"",
+    "shownCount_one": "{{count}} network",
+    "shownCount_other": "{{count}} networks"
   }
 }

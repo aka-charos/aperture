@@ -52,11 +52,17 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
       schema: networksSchema,
     },
     async (_request, reply) => {
-      const result = await query<{ network: string }>(
-        `SELECT DISTINCT network FROM series WHERE network IS NOT NULL ORDER BY network`
+      const result = await query<{ network: string; count: number }>(
+        `SELECT network, COUNT(*)::int AS count
+           FROM series
+          WHERE network IS NOT NULL
+          GROUP BY network
+          ORDER BY count DESC, network`
       )
 
-      return reply.send({ networks: result.rows.map((r) => r.network) })
+      return reply.send({
+        networks: result.rows.map((r) => ({ network: r.network, count: r.count })),
+      })
     }
   )
 
