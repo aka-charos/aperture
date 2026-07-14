@@ -16,6 +16,7 @@ import ko from './locales/ko/translation.json'
 import hi from './locales/hi/translation.json'
 import ar from './locales/ar/translation.json'
 import he from './locales/he/translation.json'
+import el from './locales/el/translation.json'
 import enOverrides from './overrides.en.json'
 import { isRtlLocale } from './localeDirection'
 
@@ -41,6 +42,7 @@ const i18nInit = i18n
       hi: { translation: hi },
       ar: { translation: ar },
       he: { translation: he },
+      el: { translation: el },
     },
     fallbackLng: 'en',
     supportedLngs: [
@@ -58,6 +60,7 @@ const i18nInit = i18n
       'hi',
       'ar',
       'he',
+      'el',
     ],
     interpolation: { escapeValue: false },
     detection: {

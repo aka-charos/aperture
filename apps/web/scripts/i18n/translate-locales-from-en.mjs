@@ -24,7 +24,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const localesRoot = join(__dirname, '../../src/i18n/locales')
 const enPath = join(localesRoot, 'en/translation.json')
 
-const ALL_LOCALES = ['es', 'de', 'fr', 'it', 'pt', 'nl', 'ru', 'ja', 'zh', 'ko', 'hi', 'ar', 'he']
+const ALL_LOCALES = ['es', 'de', 'fr', 'it', 'pt', 'nl', 'ru', 'ja', 'zh', 'ko', 'hi', 'ar', 'he', 'el']
 
 const LANG_NAMES = {
   es: 'Spanish',
@@ -40,6 +40,7 @@ const LANG_NAMES = {
   hi: 'Hindi',
   ar: 'Arabic',
   he: 'Hebrew',
+  el: 'Greek',
 }
 
 const BRAND_NAMES = [

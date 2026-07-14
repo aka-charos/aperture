@@ -1012,6 +1012,7 @@ const SUPPORTED_LOCALE_CODES = [
   'hi',
   'ar',
   'he',
+  'el',
 ] as const
 
 export const supportedLocalesSchema = {

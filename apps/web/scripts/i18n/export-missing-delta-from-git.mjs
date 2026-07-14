@@ -18,7 +18,7 @@ const webRoot = join(__dirname, '../..')
 const deltaDir = join(__dirname, 'delta')
 const repoRoot = join(webRoot, '../..')
 
-const LOCALES = ['es', 'de', 'fr', 'it', 'pt', 'nl', 'ru', 'ja', 'zh', 'ko', 'hi', 'ar', 'he']
+const LOCALES = ['es', 'de', 'fr', 'it', 'pt', 'nl', 'ru', 'ja', 'zh', 'ko', 'hi', 'ar', 'he', 'el']
 
 /**
  * Subtree present in `en` but not in `old` (by key path).

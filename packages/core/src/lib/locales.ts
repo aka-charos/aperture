@@ -23,6 +23,7 @@ export const APP_LOCALE_OPTIONS = [
   { code: 'hi' as const, label: 'हिन्दी' },
   { code: 'ar' as const, label: 'العربية' },
   { code: 'he' as const, label: 'עברית' },
+  { code: 'el' as const, label: 'Ελληνικά' },
 ] as const
 
 /** Locales that use right-to-left UI (document `dir` and MUI `direction`). */
@@ -71,6 +72,7 @@ export function appLocaleToTmdbLanguage(code: string | null | undefined): string
     hi: 'hi-IN',
     ar: 'ar-SA',
     he: 'he-IL',
+    el: 'el-GR',
   }
   return map[normalized] ?? 'en-US'
 }
