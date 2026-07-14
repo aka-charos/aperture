@@ -10,7 +10,7 @@ pnpm monorepo, ESM everywhere, no ORM (raw SQL via `pg`):
 
 - **`packages/core`** (`@aperture/core`) — ALL domain logic. Built with `tsc` → `dist/`. Subpath exports: `.`, `/config`, `/db`, `/media`, `/recommender`, `/strm`, `/channels`, `/jobs`, `/watching`. Root `src/index.ts` is a giant barrel (~1090 lines).
 - **`apps/api`** (`@aperture/api`) — thin Fastify HTTP layer (port 3456): routing, auth, job orchestration. Handlers call core functions; `src/lib/db.ts`, `lib/logger.ts`, `config/env.ts` are pure re-export shims of core.
-- **`apps/web`** (`@aperture/web`) — Vite + React 18 SPA (dev port 3457, proxies `/api` → 3456). MUI 6, react-router 7, i18next (14 locales), d3, recharts. **Never imports `@aperture/core`** (server code would break the bundle — duplicate tiny helpers instead, see `src/i18n/localeDirection.ts`). No central API client: raw `fetch('/api/...', { credentials: 'include' })` everywhere.
+- **`apps/web`** (`@aperture/web`) — Vite + React 18 SPA (dev port 3457, proxies `/api` → 3456). MUI 6, react-router 7, i18next (15 locales), d3, recharts. **Never imports `@aperture/core`** (server code would break the bundle — duplicate tiny helpers instead, see `src/i18n/localeDirection.ts`). No central API client: raw `fetch('/api/...', { credentials: 'include' })` everywhere.
 - **`packages/ui`** (`@aperture/ui`) — shared React components (MoviePoster, StarRating, BaseCarousel, RankBadge, StatusCard, TrailerModal, `getProxiedImageUrl`). Web aliases it to `src/` for hot reload, but typecheck/build use `dist/`.
 - **`db/migrations/`** — 120 numbered SQL files (`0001`–`0120`). Postgres + pgvector.
 
@@ -22,7 +22,7 @@ pnpm build              # pnpm -r build (topo order)
 pnpm typecheck          # builds packages/* FIRST, then pnpm -r typecheck
 pnpm lint / validate    # eslint --max-warnings 0 / lint + typecheck
 pnpm db:migrate|db:status
-pnpm --filter @aperture/web i18n:sync   # propagate new en strings to 13 locales
+pnpm --filter @aperture/web i18n:sync   # propagate new en strings to 14 locales
 ```
 
 **Critical:** apps consume the compiled `dist/` of core/ui. After adding/changing any export in `packages/core` or `packages/ui`, run `pnpm --filter "./packages/*" build` or app typecheck fails with TS2305/TS2307.
@@ -99,7 +99,7 @@ Embedding tables are shared consumers: recommender, `/api/similarity` graph, sem
 - Provider tree (App.tsx): `I18nextProvider > RtlProviders > BrowserRouter > SetupProvider > AuthProvider`; authed pages additionally get `ViewModeProvider > UserRatingsProvider > WatchingProvider > AssistantDockProvider` + floating `AssistantModal`.
 - Route table lives in `apps/web/src/App.tsx`; shell is `components/Layout.tsx` (sidebar items feature-gated by watching/collections flags).
 - Hooks pattern: `XProvider.tsx` + `x-context.ts` + `useX.ts` triplets in `src/hooks/`.
-- **New UI string**: add to `src/i18n/locales/en/translation.json` (en is source of truth), use `t('ns.key')`, then `pnpm i18n:sync` to stamp placeholders into the other 13 locales. RTL locales: ar, he — use logical CSS properties. Server error strings: wrap with `lib/withServerMessageDetail.ts`. Authoritative guide: `src/i18n/CONVENTIONS.md`.
+- **New UI string**: add to `src/i18n/locales/en/translation.json` (en is source of truth), use `t('ns.key')`, then `pnpm i18n:sync` to stamp placeholders into the other 14 locales. RTL locales: ar, he — use logical CSS properties. Server error strings: wrap with `lib/withServerMessageDetail.ts`. Authoritative guide: `src/i18n/CONVENTIONS.md`.
 - Client caches to remember when changing API shapes: `WatchingContext` (localStorage, versioned — bump version on shape change), `ViewModeProvider` (localStorage + server prefs).
 
 ## When you touch X, check Y
