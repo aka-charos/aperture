@@ -3898,5 +3898,17 @@
     "showCaption": "Standaard voor alle gebruikers. Zet dit uit als je server beoordelingen in de artwork brandt. Ontdekken en andere TMDb-covers tonen altijd hun beoordeling.",
     "saving": "Opslaan…",
     "saveChanges": "Wijzigingen opslaan"
+  },
+  "networkFilter": {
+    "label": "Network",
+    "title": "Network",
+    "searchPlaceholder": "Search networks…",
+    "clearTooltip": "Clear network",
+    "clearSearch": "Clear search",
+    "sortByCount": "Most shows",
+    "sortAz": "A–Z",
+    "noMatches": "No networks match \"{{query}}\"",
+    "shownCount_one": "{{count}} network",
+    "shownCount_other": "{{count}} networks"
   }
 }

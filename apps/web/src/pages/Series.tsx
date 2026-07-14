@@ -75,8 +75,8 @@ export function SeriesPage() {
           setGenres(data.genres)
         }
         if (networksRes.ok) {
-          const data = await networksRes.json()
-          setNetworks(data.networks)
+          const data = (await networksRes.json()) as { networks: { network: string; count: number }[] }
+          setNetworks(data.networks.map((n) => n.network))
         }
       } catch {
         // Ignore filter fetch errors

@@ -134,7 +134,8 @@ export const genresSchema = {
 export const networksSchema = {
   tags: ['series'],
   summary: 'List networks',
-  description: 'Get all unique networks/streaming services from the series library.',
+  description:
+    'Get all unique networks/streaming services from the series library, each with its series count, sorted by count (most series first).',
 }
 
 // =============================================================================

@@ -12,5 +12,6 @@ export {
   type CountryMatchMode,
 } from './FilterPopper'
 export { CountryFilterPopper } from './CountryFilterPopper'
+export { NetworkFilterPopper } from './NetworkFilterPopper'
 export { SortPopper, type SortField, type SortOrder } from './SortPopper'
 export { FilterPresetManager, type FilterPreset } from './FilterPresetManager'

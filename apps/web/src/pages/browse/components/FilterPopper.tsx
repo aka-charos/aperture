@@ -118,7 +118,7 @@ export function FilterPopper({
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     scores: true,
     year: true,
-    content: true,
+    content: false,
     runtime: true,
     quality: true,
     status: true,
@@ -349,28 +349,6 @@ export function FilterPopper({
 
               <Divider sx={{ my: 1.5 }} />
 
-              {/* Content Rating Section */}
-              {contentRatings.length > 0 && (
-                <>
-                  <SectionHeader titleKey="filterPopper.sections.contentRating" section="content" />
-                  <Collapse in={expandedSections.content}>
-                    <Box sx={{ py: 1.5 }}>
-                      <ChipToggleGroup
-                        label=""
-                        options={contentRatings.map((r) => ({
-                          value: r.rating,
-                          label: r.rating,
-                          count: r.count,
-                        }))}
-                        selected={filters.contentRatings}
-                        onChange={(selected) => onChange({ ...filters, contentRatings: selected })}
-                      />
-                    </Box>
-                  </Collapse>
-                  <Divider sx={{ my: 1.5 }} />
-                </>
-              )}
-
               {/* Watch status & household reach */}
               <SectionHeader titleKey="filterPopper.sections.libraryAudience" section="audience" />
               <Collapse in={expandedSections.audience}>
@@ -505,6 +483,28 @@ export function FilterPopper({
                         ]}
                         selected={(filters as SeriesFilters).status}
                         onChange={(selected) => onChange({ ...filters, status: selected })}
+                      />
+                    </Box>
+                  </Collapse>
+                </>
+              )}
+
+              {/* Content Rating Section — kept last and collapsed by default */}
+              {contentRatings.length > 0 && (
+                <>
+                  <Divider sx={{ my: 1.5 }} />
+                  <SectionHeader titleKey="filterPopper.sections.contentRating" section="content" />
+                  <Collapse in={expandedSections.content}>
+                    <Box sx={{ py: 1.5 }}>
+                      <ChipToggleGroup
+                        label=""
+                        options={contentRatings.map((r) => ({
+                          value: r.rating,
+                          label: r.rating,
+                          count: r.count,
+                        }))}
+                        selected={filters.contentRatings}
+                        onChange={(selected) => onChange({ ...filters, contentRatings: selected })}
                       />
                     </Box>
                   </Collapse>

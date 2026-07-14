@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PAGE_SIZE, defaultSeriesFilters } from '../constants'
-import type { ActiveFilterChip, ContentRating, CountryOption, FilterRanges, Series } from '../types'
+import type { ActiveFilterChip, ContentRating, CountryOption, FilterRanges, NetworkOption, Series } from '../types'
 import type { SeriesFilters, SortField, SortOrder } from '../components'
 import { buildSeriesActiveFilterChips } from '../utils/activeFilterChips'
 
@@ -19,7 +19,7 @@ interface SeriesResponse {
 interface BrowseSeriesResult {
   series: Series[]
   seriesGenres: string[]
-  networks: string[]
+  networks: NetworkOption[]
   seriesContentRatings: ContentRating[]
   seriesCountries: CountryOption[]
   seriesRanges: FilterRanges & { seasons?: { min: number; max: number } }
@@ -49,7 +49,7 @@ export function useBrowseSeries({ tabIndex, persistSortPreferences }: UseBrowseS
   const { t } = useTranslation()
   const [series, setSeries] = useState<Series[]>([])
   const [seriesGenres, setSeriesGenres] = useState<string[]>([])
-  const [networks, setNetworks] = useState<string[]>([])
+  const [networks, setNetworks] = useState<NetworkOption[]>([])
   const [seriesContentRatings, setSeriesContentRatings] = useState<ContentRating[]>([])
   const [seriesCountries, setSeriesCountries] = useState<CountryOption[]>([])
   const [seriesRanges, setSeriesRanges] = useState<FilterRanges & { seasons?: { min: number; max: number } }>({
@@ -159,7 +159,7 @@ export function useBrowseSeries({ tabIndex, persistSortPreferences }: UseBrowseS
         setSeriesGenres(data.genres || [])
       }
       if (networksRes.ok) {
-        const data = (await networksRes.json()) as { networks?: string[] }
+        const data = (await networksRes.json()) as { networks?: NetworkOption[] }
         setNetworks(data.networks || [])
       }
       if (contentRatingsRes.ok) {
