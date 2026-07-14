@@ -2926,7 +2926,10 @@
     "playNoun_one": "play",
     "playNoun_other": "plays",
     "completeBadge": "Complete",
-    "inProgressTooltip": "In progress · {{percent}}% watched"
+    "inProgressTooltip": "In progress · {{percent}}% watched",
+    "filterAll": "All",
+    "filterInProgress": "In Progress",
+    "filterCompleted": "Completed"
   },
   "topPicksPage": {
     "pageTitle": "Top Picks",

@@ -2752,7 +2752,10 @@
     "playNoun_one": "לְשַׂחֵק",
     "playNoun_other": "מחזות",
     "completeBadge": "לְהַשְׁלִים",
-    "inProgressTooltip": "In progress · {{percent}}% watched"
+    "inProgressTooltip": "In progress · {{percent}}% watched",
+    "filterAll": "All",
+    "filterInProgress": "In Progress",
+    "filterCompleted": "Completed"
   },
   "topPicksPage": {
     "pageTitle": "בחירות מובילות",

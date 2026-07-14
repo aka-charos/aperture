@@ -10,7 +10,7 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
    */
   fastify.get<{
     Params: { id: string }
-    Querystring: { page?: string; pageSize?: string; sortBy?: string; search?: string }
+    Querystring: { page?: string; pageSize?: string; sortBy?: string; search?: string; filter?: string }
   }>(
     '/api/users/:id/watch-history',
     { preHandler: requireAuth, schema: { tags: ['users'] } },
@@ -21,6 +21,7 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
       const pageSize = Math.min(parseInt(request.query.pageSize || '50', 10), 100)
       const sortBy = request.query.sortBy || 'recent' // recent, plays, title
       const search = (request.query.search || '').trim()
+      const filter = request.query.filter || 'all' // all, completed, in_progress
 
       if (!requireSelfOrAdmin(id, currentUser, reply)) return
 
@@ -31,13 +32,26 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
         : ''
       const searchParams = search ? [`%${search}%`] : []
 
+      // Watch-status filter (literal SQL, no bound params).
+      // "all" deliberately excludes bookmark-only favorites (favorited but never played),
+      // which otherwise pollute the history with items the user never actually watched.
+      let statusClause: string
+      if (filter === 'completed') {
+        statusClause = ' AND wh.played = true'
+      } else if (filter === 'in_progress') {
+        statusClause = ' AND wh.played = false AND COALESCE(wh.playback_position_ticks, 0) > 0'
+      } else {
+        statusClause =
+          ' AND (wh.played = true OR wh.play_count > 0 OR COALESCE(wh.playback_position_ticks, 0) > 0)'
+      }
+
       // Get total count (only from enabled libraries)
       const countResult = await queryOne<{ count: string }>(
         `SELECT COUNT(*) as count
          FROM watch_history wh
          JOIN movies m ON m.id = wh.movie_id
          JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
-         WHERE wh.user_id = $1 AND lc.is_enabled = true${searchClause}`,
+         WHERE wh.user_id = $1 AND lc.is_enabled = true${searchClause}${statusClause}`,
         [id, ...searchParams]
       )
       const total = parseInt(countResult?.count || '0', 10)
@@ -75,7 +89,7 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
          FROM watch_history wh
          JOIN movies m ON m.id = wh.movie_id
          JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
-         WHERE wh.user_id = $1 AND lc.is_enabled = true${searchClause}
+         WHERE wh.user_id = $1 AND lc.is_enabled = true${searchClause}${statusClause}
          ORDER BY ${orderBy}
          LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
         [id, ...searchParams, pageSize, offset]
@@ -99,7 +113,7 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
    */
   fastify.get<{
     Params: { id: string }
-    Querystring: { page?: string; pageSize?: string; sortBy?: string; search?: string }
+    Querystring: { page?: string; pageSize?: string; sortBy?: string; search?: string; filter?: string }
   }>(
     '/api/users/:id/series-watch-history',
     { preHandler: requireAuth, schema: { tags: ['users'] } },
@@ -110,6 +124,7 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
       const pageSize = Math.min(parseInt(request.query.pageSize || '50', 10), 100)
       const sortBy = request.query.sortBy || 'recent' // recent, plays, title
       const search = (request.query.search || '').trim()
+      const filter = request.query.filter || 'all' // all, completed, in_progress
 
       if (!requireSelfOrAdmin(id, currentUser, reply)) return
 
@@ -120,16 +135,37 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
         : ''
       const searchParams = search ? [`%${search}%`] : []
 
-      // Get total count of distinct series watched (only from enabled libraries)
+      // Aggregate expressions used to classify a series (all literal SQL, no bound params).
+      // An episode counts as "watched" once fully played; "active" also includes in-progress resumes.
+      // Bookmark-only favorites (favorited but never played/resumed) contribute nothing, so a
+      // series with only such rows is excluded from every view — matching the movie behaviour.
+      const watchedExpr = 'COUNT(DISTINCT e.id) FILTER (WHERE wh.played = true OR wh.play_count > 0)'
+      const activeExpr =
+        'COUNT(DISTINCT e.id) FILTER (WHERE wh.played = true OR wh.play_count > 0 OR COALESCE(wh.playback_position_ticks, 0) > 0)'
+      const totalExpr = '(SELECT COUNT(*) FROM episodes WHERE series_id = s.id)'
+      let havingClause: string
+      if (filter === 'completed') {
+        havingClause = `HAVING ${totalExpr} > 0 AND ${watchedExpr} >= ${totalExpr}`
+      } else if (filter === 'in_progress') {
+        havingClause = `HAVING ${activeExpr} > 0 AND ${watchedExpr} < ${totalExpr}`
+      } else {
+        havingClause = `HAVING ${activeExpr} > 0`
+      }
+
+      // Get total count of distinct series matching the filter (only from enabled libraries)
       const countResult = await queryOne<{ count: string }>(
-        `SELECT COUNT(DISTINCT s.id) as count
-         FROM watch_history wh
-         JOIN episodes e ON e.id = wh.episode_id
-         JOIN series s ON s.id = e.series_id
-         LEFT JOIN library_config lc ON lc.provider_library_id = s.provider_library_id
-         WHERE wh.user_id = $1
-           AND wh.episode_id IS NOT NULL
-           AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)${searchClause}`,
+        `SELECT COUNT(*) as count FROM (
+           SELECT s.id
+           FROM watch_history wh
+           JOIN episodes e ON e.id = wh.episode_id
+           JOIN series s ON s.id = e.series_id
+           LEFT JOIN library_config lc ON lc.provider_library_id = s.provider_library_id
+           WHERE wh.user_id = $1
+             AND wh.episode_id IS NOT NULL
+             AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)${searchClause}
+           GROUP BY s.id
+           ${havingClause}
+         ) sub`,
         [id, ...searchParams]
       )
       const total = parseInt(countResult?.count || '0', 10)
@@ -156,8 +192,8 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
            s.genres,
            s.community_rating,
            s.overview,
-           COUNT(DISTINCT e.id) as episodes_watched,
-           (SELECT COUNT(*) FROM episodes WHERE series_id = s.id) as total_episodes,
+           ${watchedExpr} as episodes_watched,
+           ${totalExpr} as total_episodes,
            SUM(wh.play_count)::int as total_plays,
            MAX(wh.last_played_at) as last_played_at,
            BOOL_OR(wh.is_favorite) as is_favorite
@@ -169,6 +205,7 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
            AND wh.episode_id IS NOT NULL
            AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)${searchClause}
          GROUP BY s.id, s.title, s.year, s.poster_url, s.genres, s.community_rating, s.overview
+         ${havingClause}
          ORDER BY ${orderBy}
          LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
         [id, ...searchParams, pageSize, offset]

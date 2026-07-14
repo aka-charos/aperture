@@ -2752,7 +2752,10 @@
     "playNoun_one": "遊ぶ",
     "playNoun_other": "遊ぶ",
     "completeBadge": "完了",
-    "inProgressTooltip": "In progress · {{percent}}% watched"
+    "inProgressTooltip": "In progress · {{percent}}% watched",
+    "filterAll": "All",
+    "filterInProgress": "In Progress",
+    "filterCompleted": "Completed"
   },
   "topPicksPage": {
     "pageTitle": "おすすめ",

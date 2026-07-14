@@ -2752,7 +2752,10 @@
     "playNoun_one": "놀다",
     "playNoun_other": "연극",
     "completeBadge": "완벽한",
-    "inProgressTooltip": "In progress · {{percent}}% watched"
+    "inProgressTooltip": "In progress · {{percent}}% watched",
+    "filterAll": "All",
+    "filterInProgress": "In Progress",
+    "filterCompleted": "Completed"
   },
   "topPicksPage": {
     "pageTitle": "최고 추천 상품",
