@@ -17,6 +17,13 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
 
       if (!requireSelfOrAdmin(id, currentUser, reply)) return
 
+      // Only count genuinely-watched history — played, replayed, or resumed
+      // in progress. Excludes bookmark-only favorites (favorited but never
+      // played), matching the watch history page. `wh` is the watch_history
+      // alias in every query below.
+      const WATCHED =
+        '(wh.played = true OR wh.play_count > 0 OR COALESCE(wh.playback_position_ticks, 0) > 0)'
+
       try {
         // Genre distribution for movies
         const genreResult = await query<{ genre: string; count: string }>(
@@ -25,8 +32,9 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
              FROM watch_history wh
              JOIN movies m ON m.id = wh.movie_id
              LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
-             WHERE wh.user_id = $1 
+             WHERE wh.user_id = $1
                AND wh.movie_id IS NOT NULL
+               AND ${WATCHED}
                AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)
            )
            SELECT g.genre, COUNT(*) as count
@@ -58,8 +66,9 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
              FROM watch_history wh
              JOIN movies m ON m.id = wh.movie_id
              LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
-             WHERE wh.user_id = $1 
+             WHERE wh.user_id = $1
                AND wh.movie_id IS NOT NULL
+               AND ${WATCHED}
                AND wh.last_played_at >= NOW() - INTERVAL '12 months'
                AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)
              GROUP BY date_trunc('month', wh.last_played_at)
@@ -67,8 +76,9 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
            episode_counts AS (
              SELECT date_trunc('month', wh.last_played_at) as month, COUNT(*) as count
              FROM watch_history wh
-             WHERE wh.user_id = $1 
+             WHERE wh.user_id = $1
                AND wh.episode_id IS NOT NULL
+               AND ${WATCHED}
                AND wh.last_played_at >= NOW() - INTERVAL '12 months'
              GROUP BY date_trunc('month', wh.last_played_at)
            )
@@ -97,8 +107,9 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
            FROM watch_history wh
            JOIN movies m ON m.id = wh.movie_id
            LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
-           WHERE wh.user_id = $1 
+           WHERE wh.user_id = $1
              AND wh.movie_id IS NOT NULL
+             AND ${WATCHED}
              AND m.year IS NOT NULL
              AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)
            GROUP BY FLOOR(m.year / 10) * 10
@@ -119,8 +130,9 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
            FROM watch_history wh
            JOIN movies m ON m.id = wh.movie_id
            LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
-           WHERE wh.user_id = $1 
+           WHERE wh.user_id = $1
              AND wh.movie_id IS NOT NULL
+             AND ${WATCHED}
              AND m.community_rating IS NOT NULL
              AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)
            GROUP BY ROUND(m.community_rating * 2) / 2
@@ -141,23 +153,23 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
           total_plays: string
           favorites: string
         }>(
-          `SELECT 
+          `SELECT
              (SELECT COUNT(*) FROM watch_history wh
               JOIN movies m ON m.id = wh.movie_id
               LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
-              WHERE wh.user_id = $1 AND wh.movie_id IS NOT NULL
+              WHERE wh.user_id = $1 AND wh.movie_id IS NOT NULL AND ${WATCHED}
                 AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)) as total_movies,
              (SELECT COUNT(*) FROM watch_history wh
-              WHERE wh.user_id = $1 AND wh.episode_id IS NOT NULL) as total_episodes,
+              WHERE wh.user_id = $1 AND wh.episode_id IS NOT NULL AND ${WATCHED}) as total_episodes,
              (SELECT COALESCE(SUM(m.runtime_minutes), 0) FROM watch_history wh
               JOIN movies m ON m.id = wh.movie_id
               LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
-              WHERE wh.user_id = $1 AND wh.movie_id IS NOT NULL
+              WHERE wh.user_id = $1 AND wh.movie_id IS NOT NULL AND ${WATCHED}
                 AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)) as total_runtime,
              (SELECT COALESCE(SUM(wh.play_count), 0) FROM watch_history wh
               JOIN movies m ON m.id = wh.movie_id
               LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
-              WHERE wh.user_id = $1 AND wh.movie_id IS NOT NULL
+              WHERE wh.user_id = $1 AND wh.movie_id IS NOT NULL AND ${WATCHED}
                 AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)) as total_plays,
              (SELECT COUNT(*) FROM watch_history wh
               JOIN movies m ON m.id = wh.movie_id
@@ -179,9 +191,10 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
              FROM watch_history wh
              JOIN movies m ON m.id = wh.movie_id
              LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
-             WHERE wh.user_id = $1 
+             WHERE wh.user_id = $1
                AND wh.movie_id IS NOT NULL
-               AND m.actors IS NOT NULL 
+               AND ${WATCHED}
+               AND m.actors IS NOT NULL
                AND jsonb_array_length(m.actors) > 0
                AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)
            )
@@ -210,9 +223,10 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
              FROM watch_history wh
              JOIN movies m ON m.id = wh.movie_id
              LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
-             WHERE wh.user_id = $1 
+             WHERE wh.user_id = $1
                AND wh.movie_id IS NOT NULL
-               AND m.directors IS NOT NULL 
+               AND ${WATCHED}
+               AND m.directors IS NOT NULL
                AND array_length(m.directors, 1) > 0
                AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)
            )
@@ -247,9 +261,10 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
              FROM watch_history wh
              JOIN movies m ON m.id = wh.movie_id
              LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
-             WHERE wh.user_id = $1 
+             WHERE wh.user_id = $1
                AND wh.movie_id IS NOT NULL
-               AND m.studios IS NOT NULL 
+               AND ${WATCHED}
+               AND m.studios IS NOT NULL
                AND jsonb_array_length(m.studios) > 0
                AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)
            ),
@@ -317,8 +332,9 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
              FROM watch_history wh
              JOIN episodes e ON e.id = wh.episode_id
              JOIN series s ON s.id = e.series_id
-             WHERE wh.user_id = $1 
+             WHERE wh.user_id = $1
                AND wh.episode_id IS NOT NULL
+               AND ${WATCHED}
                AND s.network IS NOT NULL
                AND s.network != ''
            ),
@@ -368,8 +384,9 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
              FROM watch_history wh
              JOIN episodes e ON e.id = wh.episode_id
              JOIN series s ON s.id = e.series_id
-             WHERE wh.user_id = $1 
+             WHERE wh.user_id = $1
                AND wh.episode_id IS NOT NULL
+               AND ${WATCHED}
            )
            SELECT g.genre, COUNT(*) as count
            FROM watched_series ws, unnest(ws.genres) as g(genre)
@@ -389,7 +406,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
           `SELECT COUNT(DISTINCT e.series_id) as count
            FROM watch_history wh
            JOIN episodes e ON e.id = wh.episode_id
-           WHERE wh.user_id = $1 AND wh.episode_id IS NOT NULL`,
+           WHERE wh.user_id = $1 AND wh.episode_id IS NOT NULL AND ${WATCHED}`,
           [id]
         )
 
@@ -401,7 +418,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
              SELECT e.runtime_minutes, e.series_id
              FROM watch_history wh
              JOIN episodes e ON e.id = wh.episode_id
-             WHERE wh.user_id = $1 AND wh.episode_id IS NOT NULL
+             WHERE wh.user_id = $1 AND wh.episode_id IS NOT NULL AND ${WATCHED}
            ),
            series_avg AS (
              SELECT series_id, AVG(runtime_minutes) AS avg_rt
@@ -444,6 +461,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
            LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
            WHERE wh.user_id = $1
              AND wh.movie_id IS NOT NULL
+             AND ${WATCHED}
              AND m.community_rating IS NOT NULL
              AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)`,
           [id]
@@ -458,6 +476,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
              LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
              WHERE wh.user_id = $1
                AND wh.movie_id IS NOT NULL
+               AND ${WATCHED}
                AND m.community_rating IS NOT NULL
                AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)
            )
