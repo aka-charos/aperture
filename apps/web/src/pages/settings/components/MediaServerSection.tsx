@@ -31,6 +31,7 @@ import WarningIcon from '@mui/icons-material/Warning'
 interface MediaServerConfig {
   type: string | null
   baseUrl: string | null
+  publicUrl: string | null
   hasApiKey: boolean
   isConfigured: boolean
   displayName?: string
@@ -56,6 +57,7 @@ export function MediaServerSection() {
   // Form state
   const [serverType, setServerType] = useState<string>('')
   const [baseUrl, setBaseUrl] = useState<string>('')
+  const [publicUrl, setPublicUrl] = useState<string>('')
   const [apiKey, setApiKey] = useState<string>('')
   const [displayName, setDisplayName] = useState<string>('')
   const [showApiKey, setShowApiKey] = useState(false)
@@ -110,6 +112,7 @@ export function MediaServerSection() {
         setServerTypes(data.serverTypes || [])
         setServerType(data.config.type || '')
         setBaseUrl(data.config.baseUrl || '')
+        setPublicUrl(data.config.publicUrl || '')
         setDisplayName(data.config.displayName || '')
         setApiKey('') // Never pre-fill API key for security
         setHasChanges(false)
@@ -164,10 +167,17 @@ export function MediaServerSection() {
     setSuccess(null)
 
     try {
-      const updates: { type?: string; baseUrl?: string; apiKey?: string; displayName?: string } = {}
+      const updates: {
+        type?: string
+        baseUrl?: string
+        publicUrl?: string
+        apiKey?: string
+        displayName?: string
+      } = {}
 
       if (serverType !== config?.type) updates.type = serverType
       if (baseUrl !== config?.baseUrl) updates.baseUrl = baseUrl
+      if (publicUrl !== (config?.publicUrl ?? '')) updates.publicUrl = publicUrl
       if (apiKey) updates.apiKey = apiKey // Only send if changed
       if (displayName !== (config?.displayName ?? '')) updates.displayName = displayName
 
@@ -194,7 +204,10 @@ export function MediaServerSection() {
     }
   }
 
-  const handleFieldChange = (field: 'type' | 'baseUrl' | 'apiKey' | 'displayName', value: string) => {
+  const handleFieldChange = (
+    field: 'type' | 'baseUrl' | 'publicUrl' | 'apiKey' | 'displayName',
+    value: string
+  ) => {
     setHasChanges(true)
     setTestResult(null)
 
@@ -204,6 +217,9 @@ export function MediaServerSection() {
         break
       case 'baseUrl':
         setBaseUrl(value)
+        break
+      case 'publicUrl':
+        setPublicUrl(value)
         break
       case 'apiKey':
         setApiKey(value)
@@ -266,6 +282,16 @@ export function MediaServerSection() {
             onChange={(e) => handleFieldChange('baseUrl', e.target.value)}
             placeholder={t('settingsMediaServer.serverUrlPlaceholder')}
             helperText={t('settingsMediaServer.serverUrlHelper')}
+            fullWidth
+          />
+
+          {/* Public URL (user-facing links) */}
+          <TextField
+            label={t('settingsMediaServer.publicUrl')}
+            value={publicUrl}
+            onChange={(e) => handleFieldChange('publicUrl', e.target.value)}
+            placeholder={t('settingsMediaServer.publicUrlPlaceholder')}
+            helperText={t('settingsMediaServer.publicUrlHelper')}
             fullWidth
           />
 

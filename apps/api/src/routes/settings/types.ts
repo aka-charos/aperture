@@ -41,6 +41,7 @@ export interface MediaServerInfo {
 export interface MediaServerConfig {
   type: MediaServerType | null
   baseUrl: string | null
+  publicUrl: string | null
   hasApiKey: boolean
   isConfigured: boolean
   displayName?: string

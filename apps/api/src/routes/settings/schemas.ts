@@ -31,6 +31,7 @@ export const updateMediaServerConfigSchema = {
     properties: {
       type: { type: 'string' as const, enum: ['emby', 'jellyfin'], description: 'Server type (Emby or Jellyfin)' },
       baseUrl: { type: 'string' as const, description: 'Server base URL including protocol and port', example: 'http://localhost:8096' },
+      publicUrl: { type: 'string' as const, description: 'Optional public URL used for user-facing links (e.g. "Open in Emby"). Empty string clears it so links fall back to the base URL.', example: 'https://emby.example.com' },
       apiKey: { type: 'string' as const, description: 'API key for server access. Generate from server admin settings.' },
       displayName: { type: 'string' as const, description: 'Custom display name for the server, used in UI text. Empty string falls back to the server-reported name.' },
     },

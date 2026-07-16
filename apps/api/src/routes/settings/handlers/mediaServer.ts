@@ -38,6 +38,8 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
   fastify.get('/api/settings/media-server', { schema: mediaServerInfoSchema }, async (_request, reply) => {
     const config = await getMediaServerConfig()
     const baseUrl = config.baseUrl || ''
+    // User-facing links use the public URL when set; never expose the internal URL to non-admins
+    const publicUrl = config.publicUrl || baseUrl
     const serverType = config.type || 'emby'
     const apiKey = config.apiKey || ''
 
@@ -61,12 +63,12 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
     }
 
     return reply.send({
-      baseUrl,
+      baseUrl: publicUrl,
       type: serverType,
       serverId,
       serverName,
       displayName: customDisplayName || serverName,
-      webClientUrl: baseUrl ? `${baseUrl}/web/index.html` : '',
+      webClientUrl: publicUrl ? `${publicUrl}/web/index.html` : '',
       isConfigured: config.isConfigured,
     })
   })
@@ -104,6 +106,7 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
           config: {
             type: config.type,
             baseUrl: config.baseUrl,
+            publicUrl: config.publicUrl,
             hasApiKey: !!config.apiKey,
             isConfigured: config.isConfigured,
             displayName,
@@ -125,12 +128,13 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
     Body: {
       type?: MediaServerType
       baseUrl?: string
+      publicUrl?: string
       apiKey?: string
       displayName?: string
     }
   }>('/api/settings/media-server/config', { preHandler: requireAdmin, schema: updateMediaServerConfigSchema }, async (request, reply) => {
     try {
-      const { type, baseUrl, apiKey, displayName } = request.body
+      const { type, baseUrl, publicUrl, apiKey, displayName } = request.body
 
       if (type !== undefined) {
         const validTypes = getMediaServerTypes().map(
@@ -151,7 +155,16 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
         }
       }
 
-      const config = await setMediaServerConfig({ type, baseUrl, apiKey })
+      // Empty string is allowed: it clears the public URL (fall back to base URL)
+      if (publicUrl !== undefined && publicUrl !== '') {
+        try {
+          new URL(publicUrl)
+        } catch {
+          return reply.status(400).send({ error: 'Invalid public URL format' })
+        }
+      }
+
+      const config = await setMediaServerConfig({ type, baseUrl, publicUrl, apiKey })
 
       if (displayName !== undefined) {
         await setSystemSetting(
@@ -165,6 +178,7 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
         config: {
           type: config.type,
           baseUrl: config.baseUrl,
+          publicUrl: config.publicUrl,
           hasApiKey: !!config.apiKey,
           isConfigured: config.isConfigured,
           displayName:

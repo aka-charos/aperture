@@ -1435,7 +1435,10 @@
     "securityWarningTitle": "Προειδοποίηση ασφαλείας",
     "securityWarningBody": "Ενεργοποιήστε αυτή τη ρύθμιση μόνο αν η εγκατάστασή σας Aperture βρίσκεται σε ιδιωτικό δίκτυο χωρίς έκθεση στο διαδίκτυο. Αν ο διακομιστής σας είναι προσβάσιμος μέσω reverse proxy ή του διαδικτύου, αφήστε το απενεργοποιημένο για να αποτρέψετε μη εξουσιοδοτημένη πρόσβαση.",
     "passwordlessEnabled": "Η σύνδεση χωρίς κωδικό πρόσβασης ενεργοποιήθηκε",
-    "passwordlessDisabled": "Η σύνδεση χωρίς κωδικό πρόσβασης απενεργοποιήθηκε"
+    "passwordlessDisabled": "Η σύνδεση χωρίς κωδικό πρόσβασης απενεργοποιήθηκε",
+    "publicUrl": "Public URL (optional)",
+    "publicUrlPlaceholder": "https://emby.example.com",
+    "publicUrlHelper": "The URL your users reach the media server at, used for links like “Open in Emby”. Leave empty to use the Server URL."
   },
   "topPicksPage": {
     "pageTitle": "Κορυφαίες επιλογές",
