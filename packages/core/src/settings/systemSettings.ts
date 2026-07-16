@@ -296,6 +296,8 @@ export type MediaServerType = 'emby' | 'jellyfin'
 export interface MediaServerConfig {
   type: MediaServerType | null
   baseUrl: string | null
+  /** Optional public URL for user-facing links (e.g. "Open in Emby"). Falls back to baseUrl when unset. */
+  publicUrl: string | null
   apiKey: string | null
   isConfigured: boolean
 }
@@ -310,6 +312,7 @@ export async function getMediaServerConfig(): Promise<MediaServerConfig> {
   // Try database first
   const dbType = await getSystemSetting('media_server_type')
   const dbBaseUrl = await getSystemSetting('media_server_base_url')
+  const dbPublicUrl = await getSystemSetting('media_server_public_url')
   const dbApiKey = await getSystemSetting('media_server_api_key')
 
   // If any DB settings exist, use them (even if partial)
@@ -317,6 +320,7 @@ export async function getMediaServerConfig(): Promise<MediaServerConfig> {
     return {
       type: isValidMediaServerType(dbType) ? dbType : null,
       baseUrl: dbBaseUrl || null,
+      publicUrl: dbPublicUrl || null,
       apiKey: dbApiKey || null,
       isConfigured: !!(dbType && dbBaseUrl && dbApiKey),
     }
@@ -325,11 +329,13 @@ export async function getMediaServerConfig(): Promise<MediaServerConfig> {
   // Fall back to environment variables
   const envType = process.env.MEDIA_SERVER_TYPE
   const envBaseUrl = process.env.MEDIA_SERVER_BASE_URL
+  const envPublicUrl = process.env.MEDIA_SERVER_PUBLIC_URL
   const envApiKey = process.env.MEDIA_SERVER_API_KEY
 
   return {
     type: isValidMediaServerType(envType) ? envType : null,
     baseUrl: envBaseUrl || null,
+    publicUrl: envPublicUrl || null,
     apiKey: envApiKey || null,
     isConfigured: !!(envType && envBaseUrl && envApiKey),
   }
@@ -341,6 +347,7 @@ export async function getMediaServerConfig(): Promise<MediaServerConfig> {
 export async function setMediaServerConfig(config: {
   type?: MediaServerType
   baseUrl?: string
+  publicUrl?: string
   apiKey?: string
 }): Promise<MediaServerConfig> {
   if (config.type !== undefined) {
@@ -354,6 +361,14 @@ export async function setMediaServerConfig(config: {
 
   if (config.baseUrl !== undefined) {
     await setSystemSetting('media_server_base_url', config.baseUrl, 'Media server base URL')
+  }
+
+  if (config.publicUrl !== undefined) {
+    await setSystemSetting(
+      'media_server_public_url',
+      config.publicUrl,
+      'Public media server URL for user-facing links (empty = use base URL)'
+    )
   }
 
   if (config.apiKey !== undefined) {

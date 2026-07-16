@@ -26,7 +26,8 @@ export async function getMediaServerInfo(): Promise<MediaServerInfo | null> {
     }
 
     return {
-      baseUrl: config.baseUrl,
+      // Play links are user-facing: prefer the public URL when configured
+      baseUrl: config.publicUrl || config.baseUrl,
       type: config.type as 'emby' | 'jellyfin',
       serverId,
     }

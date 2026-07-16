@@ -1909,7 +1909,10 @@
     "displayName": "Server Display Name",
     "displayNamePlaceholder": "e.g. Home Cinema",
     "displayNameHelper": "Used in app text, e.g. “Not on Home Cinema”. Leave empty to use the name reported by the media server.",
-    "displayNameHelperDefault": "Currently using “{{name}}” — the name reported by your media server. Enter a custom name to override it."
+    "displayNameHelperDefault": "Currently using “{{name}}” — the name reported by your media server. Enter a custom name to override it.",
+    "publicUrl": "Public URL (optional)",
+    "publicUrlPlaceholder": "https://emby.example.com",
+    "publicUrlHelper": "The URL your users reach the media server at, used for links like “Open in Emby”. Leave empty to use the Server URL."
   },
   "settingsFileLocations": {
     "title": "ファイルの場所",
