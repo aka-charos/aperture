@@ -43,6 +43,8 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import SortByAlphaIcon from '@mui/icons-material/SortByAlpha'
 import AllInclusiveIcon from '@mui/icons-material/AllInclusive'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import AddToQueueIcon from '@mui/icons-material/AddToQueue'
+import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck'
 import { MoviePoster } from '@aperture/ui'
 import { useAuth } from '@/hooks/useAuth'
 import { useWatching } from '@/hooks/useWatching'
@@ -603,11 +605,14 @@ export function MyWatchHistoryPage() {
                 <Grid container spacing={2}>
                   {filteredSeries.map((item) => (
                     <Grid item xs={6} sm={4} md={3} lg={2} key={item.series_id}>
-                      <Box 
-                        sx={{ 
+                      <Box
+                        sx={{
                           '&:hover .mark-unwatched-btn': {
                             opacity: 1,
-                          }
+                          },
+                          '&:hover .watching-toggle-btn': {
+                            opacity: 1,
+                          },
                         }}
                       >
                         <Box position="relative">
@@ -622,11 +627,50 @@ export function MyWatchHistoryPage() {
                             onRate={(rating) => setRating('series', item.series_id, rating)}
                             responsive
                             hideRating
-                            isWatching={isWatching(item.series_id)}
-                            onWatchingToggle={() => toggleWatching(item.series_id)}
+                            // Replaced by a distinct hover-revealed toggle at the top-right (below).
+                            hideWatchingToggle
                             onClick={() => navigate(`/series/${item.series_id}`)}
                           />
-                          {/* Favorite badge */}
+                          {/* Add/remove from watching list — hover-revealed, top-left */}
+                          <Tooltip
+                            title={isWatching(item.series_id) ? t('watching.removeTooltip') : t('watching.addTooltip')}
+                            arrow
+                          >
+                            <IconButton
+                              className="watching-toggle-btn"
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleWatching(item.series_id)
+                              }}
+                              sx={{
+                                position: 'absolute',
+                                top: 8,
+                                left: 8,
+                                zIndex: 4,
+                                opacity: 0,
+                                color: '#fff',
+                                bgcolor: isWatching(item.series_id)
+                                  ? 'rgba(99, 102, 241, 0.95)'
+                                  : 'rgba(0, 0, 0, 0.7)',
+                                border: '1.5px solid rgba(255, 255, 255, 0.75)',
+                                boxShadow: '0 2px 10px rgba(0, 0, 0, 0.45)',
+                                backdropFilter: 'blur(4px)',
+                                transition: 'opacity 0.2s ease, transform 0.2s ease, background-color 0.2s ease',
+                                '&:hover': {
+                                  bgcolor: isWatching(item.series_id) ? 'rgba(99, 102, 241, 1)' : 'rgba(0, 0, 0, 0.9)',
+                                  transform: 'scale(1.12)',
+                                },
+                              }}
+                            >
+                              {isWatching(item.series_id) ? (
+                                <PlaylistAddCheckIcon fontSize="small" />
+                              ) : (
+                                <AddToQueueIcon fontSize="small" />
+                              )}
+                            </IconButton>
+                          </Tooltip>
+                          {/* Favorite badge — top-right */}
                           {item.is_favorite && (
                             <FavoriteIcon
                               sx={{
@@ -657,7 +701,9 @@ export function MyWatchHistoryPage() {
                                 sx={{
                                   position: 'absolute',
                                   top: 8,
-                                  left: 8,
+                                  // Sits to the right of the watching toggle (top-left group).
+                                  left: 48,
+                                  zIndex: 4,
                                   backgroundColor: 'rgba(0,0,0,0.7)',
                                   color: 'white',
                                   opacity: 0,

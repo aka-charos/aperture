@@ -19,6 +19,11 @@ import {
   ToggleButton,
   IconButton,
   Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
   useTheme,
   useMediaQuery,
 } from '@mui/material'
@@ -41,9 +46,10 @@ export function WatchingPage() {
   const { t } = useTranslation()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
-  const { series, loading, error, refreshing, addSeries, removeSeries, refreshLibrary, refetch } = useWatchingData()
+  const { series, loading, error, refreshing, removeSeries, refreshLibrary, refetch } = useWatchingData()
   const { getRating, setRating } = useUserRatings()
   const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [confirmRemove, setConfirmRemove] = useState<{ seriesId: string; title: string } | null>(null)
   const [snackbar, setSnackbar] = useState<{
     open: boolean
     message: string
@@ -57,21 +63,22 @@ export function WatchingPage() {
   const [sources, setSources] = useState({ watchlist: true, history: true })
   const { viewMode, setViewMode } = useViewMode('watching')
 
+  // Removing a watchlist row also unfavorites the series on the media server, so
+  // confirm before acting instead of removing on the first click.
   const handleRemove = async (seriesId: string) => {
+    const target = series.find((s) => s.seriesId === seriesId)
+    setConfirmRemove({ seriesId, title: target?.title ?? '' })
+  }
+
+  const performRemove = async () => {
+    if (!confirmRemove) return
+    const { seriesId } = confirmRemove
+    setConfirmRemove(null)
     try {
       await removeSeries(seriesId)
       setSnackbar({ open: true, message: t('watching.removedSuccess'), severity: 'success' })
     } catch {
       setSnackbar({ open: true, message: t('watching.removeFailed'), severity: 'error' })
-    }
-  }
-
-  const handleAdd = async (seriesId: string) => {
-    try {
-      await addSeries(seriesId)
-      setSnackbar({ open: true, message: t('watching.addedSuccess'), severity: 'success' })
-    } catch {
-      setSnackbar({ open: true, message: t('watching.addFailed'), severity: 'error' })
     }
   }
 
@@ -372,7 +379,6 @@ export function WatchingPage() {
               userRating={getRating('series', item.seriesId)}
               onRate={(rating) => setRating('series', item.seriesId, rating)}
               onRemove={handleRemove}
-              onAdd={handleAdd}
             />
           ))}
         </Box>
@@ -381,7 +387,7 @@ export function WatchingPage() {
         <Grid container spacing={2}>
           {filteredSeries.map((item) => (
             <Grid item xs={6} sm={4} md={3} lg={2} key={item.id}>
-              <WatchingCard series={item} onRemove={handleRemove} onAdd={handleAdd} />
+              <WatchingCard series={item} onRemove={handleRemove} />
             </Grid>
           ))}
         </Grid>
@@ -389,6 +395,22 @@ export function WatchingPage() {
 
       {/* Add Dialog */}
       <AddSeriesDialog open={addDialogOpen} onClose={handleAddClose} />
+
+      {/* Remove-from-watchlist confirmation (also unfavorites on the media server) */}
+      <Dialog open={confirmRemove !== null} onClose={() => setConfirmRemove(null)}>
+        <DialogTitle>{t('watching.removeConfirmTitle')}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {t('watching.removeConfirmBody', { title: confirmRemove?.title })}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmRemove(null)}>{t('common.cancel')}</Button>
+          <Button color="error" variant="contained" onClick={performRemove}>
+            {t('watching.removeConfirmAction')}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Snackbar */}
       <Snackbar

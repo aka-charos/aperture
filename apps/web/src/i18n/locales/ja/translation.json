@@ -2847,7 +2847,10 @@
     "barWatched": "Watched: {{watched}} of {{total}} aired",
     "barUnwatched": "On server, unwatched: {{count}}",
     "barMissing": "Missing from server: {{count}}",
-    "barMissingSeasons": "Seasons not on server: {{seasons}}"
+    "barMissingSeasons": "Seasons not on server: {{seasons}}",
+    "removeConfirmTitle": "Remove from watchlist?",
+    "removeConfirmBody": "\"{{title}}\" will be removed from your watchlist. Because your watchlist is synced with your media server favorites, this will also remove it from your favorites in Emby/Jellyfin.",
+    "removeConfirmAction": "Remove"
   },
   "setup": {
     "step": {
