@@ -25,7 +25,6 @@ function formatContentItem(
     name: item.title,
     subtitle,
     image: item.poster_url,
-    overview: item.overview ?? null,
     rating: item.community_rating,
     rank,
     actions: [
@@ -60,12 +59,11 @@ export function createRecommendationTools(ctx: ToolContext) {
             year: number | null
             rank: number
             genres: string[]
-            overview: string | null
             poster_url: string | null
             community_rating: number | null
             provider_item_id: string | null
           }>(
-            `SELECT m.id, m.title, m.year, rc.selected_rank as rank, m.genres, m.overview, m.poster_url,
+            `SELECT m.id, m.title, m.year, rc.selected_rank as rank, m.genres, m.poster_url, 
              m.community_rating, m.provider_item_id
              FROM recommendation_candidates rc
              JOIN recommendation_runs rr ON rr.id = rc.run_id
@@ -89,12 +87,11 @@ export function createRecommendationTools(ctx: ToolContext) {
             year: number | null
             rank: number
             genres: string[]
-            overview: string | null
             poster_url: string | null
             community_rating: number | null
             provider_item_id: string | null
           }>(
-            `SELECT s.id, s.title, s.year, rc.selected_rank as rank, s.genres, s.overview, s.poster_url,
+            `SELECT s.id, s.title, s.year, rc.selected_rank as rank, s.genres, s.poster_url,
              s.community_rating, s.provider_item_id
              FROM recommendation_candidates rc
              JOIN recommendation_runs rr ON rr.id = rc.run_id
@@ -152,7 +149,7 @@ export function createRecommendationTools(ctx: ToolContext) {
           params.push(limit)
 
           const movies = await query<MovieResult & { provider_item_id?: string }>(
-            `SELECT id, title, year, genres, overview, community_rating, poster_url, provider_item_id
+            `SELECT id, title, year, genres, community_rating, poster_url, provider_item_id
              FROM movies ${whereClause}
              ORDER BY community_rating DESC LIMIT $${paramIndex}`,
             params
@@ -177,7 +174,7 @@ export function createRecommendationTools(ctx: ToolContext) {
           params.push(limit)
 
           const series = await query<SeriesResult & { provider_item_id?: string }>(
-            `SELECT id, title, year, genres, network, overview, community_rating, poster_url, provider_item_id
+            `SELECT id, title, year, genres, network, community_rating, poster_url, provider_item_id
              FROM series ${whereClause}
              ORDER BY community_rating DESC LIMIT $${paramIndex}`,
             params
@@ -232,7 +229,7 @@ export function createRecommendationTools(ctx: ToolContext) {
           params.push(limit)
 
           const movies = await query<MovieResult & { provider_item_id?: string }>(
-            `SELECT m.id, m.title, m.year, m.genres, m.overview, m.community_rating, m.poster_url, m.provider_item_id
+            `SELECT m.id, m.title, m.year, m.genres, m.community_rating, m.poster_url, m.provider_item_id
              FROM movies m ${whereClause}
              ORDER BY m.community_rating DESC NULLS LAST LIMIT $${paramIndex}`,
             params
@@ -265,7 +262,7 @@ export function createRecommendationTools(ctx: ToolContext) {
           params.push(limit)
 
           const series = await query<SeriesResult & { provider_item_id?: string }>(
-            `SELECT s.id, s.title, s.year, s.genres, s.network, s.overview, s.community_rating, s.poster_url, s.provider_item_id
+            `SELECT s.id, s.title, s.year, s.genres, s.network, s.community_rating, s.poster_url, s.provider_item_id
              FROM series s ${whereClause}
              ORDER BY s.community_rating DESC NULLS LAST LIMIT $${paramIndex}`,
             params

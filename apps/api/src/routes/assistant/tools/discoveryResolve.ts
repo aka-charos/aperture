@@ -26,17 +26,20 @@ const logger = createChildLogger('discovery-resolve')
 /** Appended to the system prompt on discovery-routed turns. */
 export const DISCOVERY_PROMPT =
   'Web-sourced candidate titles for this request have already been gathered. ' +
-  'Call findCandidatesInLibrary exactly once. If the request is about titles similar to a ' +
-  'specific movie or show (e.g. "similar to X", "something like X"), pass that title as ' +
-  'seedTitle so the tool can add related picks from the library. ' +
+  'ALWAYS call findCandidatesInLibrary first (exactly once) — it produces the primary, ' +
+  'reasoned recommendations, even for an open genre/theme/"best of" browse. If the request ' +
+  'is about titles similar to a specific movie or show (e.g. "similar to X", "something like ' +
+  'X"), pass that title as seedTitle so the tool can add related picks from the library. ' +
   'The tool returns a "picks" list with a short "reason" per title (grounded from the web ' +
   'search) — that is your grounding for WHY these fit. Draw on those reasons in your reply. ' +
   'But each per-title reason and synopsis is ALSO rendered on its card, so do NOT restate them ' +
   'as a bulleted per-title list — that would duplicate the cards. Instead, synthesize the ' +
   'reasons into a short intro (one or two sentences) that frames why this set fits the request, ' +
   'then briefly note any standout titles that are NOT in the library yet. Keep it concise. ' +
-  'The "Recommendations" cards are the primary picks and "Also worth checking" is secondary. ' +
-  'Only present what the tool returns — never invent titles.'
+  'For a genre, theme, or "best of" browse you MAY ALSO call getTopRated (passing the genre) ' +
+  'AFTER findCandidatesInLibrary, to add a broader in-library list as a secondary section. ' +
+  'The web "Recommendations" cards are always the primary picks; "Also worth checking" and any ' +
+  'getTopRated list are secondary. Only present titles these tools return — never invent titles.'
 
 export function createDiscoveryResolveTool(ctx: ToolContext) {
   return {
@@ -88,14 +91,20 @@ export function createDiscoveryResolveTool(ctx: ToolContext) {
 
         const carousels: ContentCarousel[] = []
         if (webItems.length > 0) {
+          // Web picks carry a per-title reason + synopsis → render as the rich
+          // vertical list. The embeddings section below stays a horizontal carousel.
           carousels.push(
-            createCarouselResult(`discovery-${Date.now()}`, webItems, { title: 'Recommendations' })
+            createCarouselResult(`discovery-${Date.now()}`, webItems, {
+              title: 'Recommendations',
+              layout: 'list',
+            })
           )
         }
         if (alsoItems.length > 0) {
           carousels.push(
             createCarouselResult(`discovery-also-${Date.now()}`, alsoItems, {
               title: 'Also worth checking',
+              layout: 'carousel',
             })
           )
         }

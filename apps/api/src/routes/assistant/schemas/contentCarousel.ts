@@ -74,6 +74,10 @@ export const ContentCarouselSchema = z.object({
   descriptionKey: ContentCarouselI18nKeySchema.optional().describe('i18n key under assistantToolUi for description'),
   titleParams: I18nParamsSchema,
   descriptionParams: I18nParamsSchema,
+  layout: z
+    .enum(['list', 'carousel'])
+    .optional()
+    .describe("'list' = vertical rich cards (web-search recs); otherwise a horizontal carousel"),
   items: z.array(ContentItemSchema).describe('Content items to display'),
 })
 
@@ -86,6 +90,7 @@ export type CreateCarouselResultOptions = {
   descriptionKey?: ContentCarouselI18nKey
   titleParams?: Record<string, string | number>
   descriptionParams?: Record<string, string | number>
+  layout?: 'list' | 'carousel'
 }
 
 // Helper to create a carousel result
@@ -103,6 +108,7 @@ export function createCarouselResult(
     descriptionKey: o.descriptionKey,
     titleParams: o.titleParams,
     descriptionParams: o.descriptionParams,
+    layout: o.layout,
     items,
   }
 }
