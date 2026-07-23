@@ -166,11 +166,21 @@ export function registerChatHandler(fastify: FastifyInstance) {
           ...createTools(toolContext),
           ...(await createN8nTools()),
         }
-        // On discovery turns the discovery tool subsumes findSimilarContent — it adds
-        // the embeddings "Also worth checking" section itself — so drop it to keep web
-        // results primary (otherwise the model tends to call findSimilarContent instead).
+        // On discovery turns, drop only the tools that directly duplicate what the
+        // discovery tool already produces — query-driven list builders that compete
+        // with the web "Recommendations" and tempt the model to bypass
+        // findCandidatesInLibrary entirely:
+        //   - findSimilarContent: same output as the embeddings "Also worth checking"
+        //   - searchContent / semanticSearch: alternative recommendation lists from the query
+        // Distinct-intent tools (getTopRated / getMyRecommendations / getUnwatched) stay
+        // available so the model can SUPPLEMENT the web picks with broader in-library
+        // coverage (e.g. getTopRated by genre). The prompt mandates calling
+        // findCandidatesInLibrary first so the reasoned web cards are always primary.
         if (Object.keys(discoveryTools).length > 0) {
-          delete (baseTools as Record<string, unknown>).findSimilarContent
+          const DISCOVERY_SUPPRESSED_TOOLS = ['findSimilarContent', 'searchContent', 'semanticSearch']
+          for (const name of DISCOVERY_SUPPRESSED_TOOLS) {
+            delete (baseTools as Record<string, unknown>)[name]
+          }
         }
         // Backstop: uncaught tool errors become { id, error } payloads instead
         // of aborting the stream with a masked "An error occurred".

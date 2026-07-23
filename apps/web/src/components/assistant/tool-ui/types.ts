@@ -79,6 +79,8 @@ export interface ContentCarouselData {
   descriptionKey?: ContentCarouselI18nKey
   titleParams?: Record<string, string | number>
   descriptionParams?: Record<string, string | number>
+  /** 'list' = vertical rich cards (web-search recs); otherwise a horizontal carousel. */
+  layout?: 'list' | 'carousel'
   items: ContentItem[]
 }
 

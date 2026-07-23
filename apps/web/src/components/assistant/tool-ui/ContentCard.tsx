@@ -1,6 +1,11 @@
 /**
- * Single content item card for Tool UI
- * Full-width list layout: poster + title/meta + synopsis + "why it fits" note.
+ * Single content item card for Tool UI.
+ *
+ * Two variants:
+ * - 'compact' (default): the original fixed-width card used in horizontal
+ *   carousels (semantic "Also worth checking", library search/top-rated, etc.).
+ * - 'list': a full-width card used in the vertical web-search recommendations
+ *   list — adds the synopsis and the per-title "why it fits" reason.
  */
 import { Box, Typography, Button, Chip, Paper, IconButton, CircularProgress } from '@mui/material'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
@@ -16,6 +21,8 @@ import type { ContentItem } from './types'
 
 interface ContentCardProps {
   item: ContentItem
+  /** 'compact' = fixed-width carousel card; 'list' = full-width card with synopsis + reason. */
+  variant?: 'compact' | 'list'
   onPlay?: (id: string, href: string) => void
   isFavorite?: boolean
   favoritePending?: boolean
@@ -30,9 +37,17 @@ const clampLines = (lines: number) => ({
   overflow: 'hidden',
 })
 
-export function ContentCard({ item, onPlay, isFavorite, favoritePending, onToggleFavorite }: ContentCardProps) {
+export function ContentCard({
+  item,
+  variant = 'compact',
+  onPlay,
+  isFavorite,
+  favoritePending,
+  onToggleFavorite,
+}: ContentCardProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const isList = variant === 'list'
 
   const detailsAction = item.actions?.find(a => a.id === 'details')
   const playAction = item.actions?.find(a => a.id === 'play')
@@ -57,26 +72,38 @@ export function ContentCard({ item, onPlay, isFavorite, favoritePending, onToggl
     <Paper
       sx={{
         display: 'flex',
-        gap: 1.75,
-        p: 1.75,
-        width: '100%',
+        gap: isList ? 1.75 : 1.5,
+        p: isList ? 1.75 : 1.5,
         bgcolor: '#1a1a1a',
         borderRadius: 2,
         cursor: 'pointer',
-        transition: 'background-color 0.2s, border-color 0.2s',
-        border: '1px solid transparent',
-        '&:hover': {
-          bgcolor: '#212121',
-          borderColor: 'rgba(99, 102, 241, 0.35)',
-        },
+        ...(isList
+          ? {
+              width: '100%',
+              border: '1px solid transparent',
+              transition: 'background-color 0.2s, border-color 0.2s',
+              '&:hover': {
+                bgcolor: '#212121',
+                borderColor: 'rgba(99, 102, 241, 0.35)',
+              },
+            }
+          : {
+              minWidth: 280,
+              maxWidth: 320,
+              transition: 'all 0.2s',
+              '&:hover': {
+                bgcolor: '#252525',
+                transform: 'translateY(-2px)',
+              },
+            }),
       }}
       onClick={handleDetails}
     >
       {/* Poster */}
       <Box
         sx={{
-          width: 80,
-          height: 120,
+          width: isList ? 80 : 60,
+          height: isList ? 120 : 90,
           flexShrink: 0,
           borderRadius: 1,
           overflow: 'hidden',
@@ -147,8 +174,13 @@ export function ContentCard({ item, onPlay, isFavorite, favoritePending, onToggl
       </Box>
 
       {/* Content */}
-      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-        <Typography variant="body2" fontWeight={600} sx={{ color: '#fff', ...clampLines(2) }}>
+      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: isList ? 0.5 : 0 }}>
+        <Typography
+          variant="body2"
+          fontWeight={600}
+          noWrap={!isList}
+          sx={{ color: '#fff', ...(isList ? clampLines(2) : {}) }}
+        >
           {item.name}
         </Typography>
 
@@ -159,7 +191,7 @@ export function ContentCard({ item, onPlay, isFavorite, favoritePending, onToggl
         )}
 
         {/* Ratings row */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: isList ? 0 : 0.5, flexWrap: 'wrap' }}>
           {item.rating != null && (
             <Chip
               icon={<StarIcon sx={{ fontSize: 12 }} />}
@@ -200,18 +232,13 @@ export function ContentCard({ item, onPlay, isFavorite, favoritePending, onToggl
           />
         </Box>
 
-        {/* Synopsis */}
-        {item.overview && (
-          <Typography
-            variant="caption"
-            sx={{ color: '#a1a1aa', lineHeight: 1.45, ...clampLines(3) }}
-          >
+        {/* Synopsis + "why it fits" — list variant only */}
+        {isList && item.overview && (
+          <Typography variant="caption" sx={{ color: '#a1a1aa', lineHeight: 1.45, ...clampLines(3) }}>
             {item.overview}
           </Typography>
         )}
-
-        {/* Why it fits */}
-        {item.reason && (
+        {isList && item.reason && (
           <Box
             sx={{
               display: 'flex',
