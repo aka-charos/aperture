@@ -1,12 +1,10 @@
 /**
- * Content carousel for Tool UI
- * Horizontal scrollable list of content cards
+ * Content list for Tool UI
+ * Vertical stack of rich content cards (poster + synopsis + "why it fits").
  */
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Box, Typography, IconButton, Button, Snackbar, Alert, useTheme } from '@mui/material'
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
-import ChevronRightIcon from '@mui/icons-material/ChevronRight'
+import { Box, Typography, Button, Snackbar, Alert } from '@mui/material'
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd'
 import { ContentCard } from './ContentCard'
 import { CreatePlaylistFromSuggestionsDialog } from './CreatePlaylistFromSuggestionsDialog'
@@ -38,9 +36,6 @@ function useCarouselHeaderText(data: ContentCarouselData) {
 
 export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
   const { t } = useTranslation()
-  const theme = useTheme()
-  const rtl = theme.direction === 'rtl'
-  const scrollRef = useRef<HTMLDivElement>(null)
   const { resolvedTitle, resolvedDescription } = useCarouselHeaderText(data)
 
   const [favorited, setFavorited] = useState<Set<string>>(new Set())
@@ -111,18 +106,6 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
     }
   }
 
-  const scroll = (direction: 'left' | 'right') => {
-    if (scrollRef.current) {
-      const scrollAmount = 300
-      let delta = direction === 'left' ? -scrollAmount : scrollAmount
-      if (rtl) delta = -delta
-      scrollRef.current.scrollBy({
-        left: delta,
-        behavior: 'smooth',
-      })
-    }
-  }
-
   const hasHeader = Boolean(resolvedTitle || resolvedDescription)
   const isEmpty = data.items.length === 0
 
@@ -189,84 +172,18 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
         </Button>
       </Box>
 
-      {/* Carousel container */}
-      <Box sx={{ position: 'relative', overflow: 'hidden' }}>
-        {/* Scroll buttons */}
-        {data.items.length > 2 && (
-          <>
-            <IconButton
-              onClick={() => scroll('left')}
-              aria-label={t('assistantToolUi.scrollCarouselLeft')}
-              sx={{
-                position: 'absolute',
-                insetInlineStart: 4,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                zIndex: 2,
-                bgcolor: 'rgba(0, 0, 0, 0.8)',
-                backdropFilter: 'blur(4px)',
-                '&:hover': {
-                  bgcolor: 'rgba(99, 102, 241, 0.8)',
-                },
-              }}
-              size="small"
-            >
-              <ChevronLeftIcon />
-            </IconButton>
-            <IconButton
-              onClick={() => scroll('right')}
-              aria-label={t('assistantToolUi.scrollCarouselRight')}
-              sx={{
-                position: 'absolute',
-                insetInlineEnd: 4,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                zIndex: 2,
-                bgcolor: 'rgba(0, 0, 0, 0.8)',
-                backdropFilter: 'blur(4px)',
-                '&:hover': {
-                  bgcolor: 'rgba(99, 102, 241, 0.8)',
-                },
-              }}
-              size="small"
-            >
-              <ChevronRightIcon />
-            </IconButton>
-          </>
-        )}
-
-        {/* Scrollable content */}
-        <Box
-          ref={scrollRef}
-          sx={{
-            display: 'flex',
-            gap: 1.5,
-            overflowX: 'auto',
-            overflowY: 'hidden',
-            px: 1,
-            py: 0.5,
-            scrollSnapType: 'x mandatory',
-            scrollBehavior: 'smooth',
-            // Hide scrollbar but keep functionality
-            scrollbarWidth: 'none', // Firefox
-            msOverflowStyle: 'none', // IE/Edge
-            '&::-webkit-scrollbar': {
-              display: 'none', // Chrome/Safari
-            },
-          }}
-        >
-          {data.items.map((item) => (
-            <Box key={item.id} sx={{ scrollSnapAlign: 'start', flexShrink: 0 }}>
-              <ContentCard
-                item={item}
-                onPlay={onPlay}
-                isFavorite={favorited.has(item.id)}
-                favoritePending={pendingFavorites.has(item.id)}
-                onToggleFavorite={handleToggleFavorite}
-              />
-            </Box>
-          ))}
-        </Box>
+      {/* Vertical stacked list of cards */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+        {data.items.map((item) => (
+          <ContentCard
+            key={item.id}
+            item={item}
+            onPlay={onPlay}
+            isFavorite={favorited.has(item.id)}
+            favoritePending={pendingFavorites.has(item.id)}
+            onToggleFavorite={handleToggleFavorite}
+          />
+        ))}
       </Box>
 
       <CreatePlaylistFromSuggestionsDialog

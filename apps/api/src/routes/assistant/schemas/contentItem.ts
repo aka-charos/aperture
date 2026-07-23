@@ -18,6 +18,12 @@ export const ContentItemSchema = z.object({
   name: z.string().describe('Title of the content'),
   subtitle: z.string().optional().describe('Year, genres, or other info'),
   image: z.string().nullable().optional().describe('Poster image URL'),
+  overview: z.string().nullable().optional().describe('Short synopsis/overview from the library'),
+  reason: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Short rationale for why this title fits the request (rendered on the card)'),
   rating: z.number().nullable().optional().describe('Community rating 0-10'),
   userRating: z.number().nullable().optional().describe('User rating 1-10'),
   rank: z.number().optional().describe('Recommendation rank'),

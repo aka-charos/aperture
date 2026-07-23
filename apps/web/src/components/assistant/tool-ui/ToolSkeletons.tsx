@@ -10,30 +10,31 @@ function CardSkeleton() {
     <Paper
       sx={{
         display: 'flex',
-        gap: 1.5,
-        p: 1.5,
+        gap: 1.75,
+        p: 1.75,
+        width: '100%',
         bgcolor: '#1a1a1a',
         borderRadius: 2,
-        minWidth: 280,
-        maxWidth: 320,
       }}
     >
       {/* Poster skeleton */}
       <Skeleton
         variant="rounded"
-        width={60}
-        height={90}
+        width={80}
+        height={120}
         sx={{ bgcolor: '#2a2a2a', flexShrink: 0 }}
       />
       {/* Content skeleton */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-        <Skeleton variant="text" width="80%" height={20} sx={{ bgcolor: '#2a2a2a' }} />
-        <Skeleton variant="text" width="50%" height={16} sx={{ bgcolor: '#2a2a2a' }} />
+        <Skeleton variant="text" width="60%" height={20} sx={{ bgcolor: '#2a2a2a' }} />
+        <Skeleton variant="text" width="35%" height={16} sx={{ bgcolor: '#2a2a2a' }} />
         <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
           <Skeleton variant="rounded" width={40} height={20} sx={{ bgcolor: '#2a2a2a' }} />
           <Skeleton variant="rounded" width={50} height={20} sx={{ bgcolor: '#2a2a2a' }} />
         </Box>
-        <Box sx={{ display: 'flex', gap: 1, mt: 'auto', pt: 1 }}>
+        <Skeleton variant="text" width="100%" height={14} sx={{ bgcolor: '#2a2a2a', mt: 0.5 }} />
+        <Skeleton variant="text" width="90%" height={14} sx={{ bgcolor: '#2a2a2a' }} />
+        <Box sx={{ display: 'flex', gap: 1, mt: 0.75 }}>
           <Skeleton variant="rounded" width={60} height={24} sx={{ bgcolor: '#2a2a2a' }} />
           <Skeleton variant="rounded" width={50} height={24} sx={{ bgcolor: '#2a2a2a' }} />
         </Box>
@@ -42,7 +43,7 @@ function CardSkeleton() {
   )
 }
 
-// Skeleton for content carousel (searchContent, findSimilar, getRecommendations, etc.)
+// Skeleton for content list (searchContent, findSimilar, getRecommendations, etc.)
 export function ContentCarouselSkeleton() {
   const { t } = useTranslation()
   return (
@@ -57,8 +58,8 @@ export function ContentCarouselSkeleton() {
         <Skeleton variant="text" width={150} height={24} sx={{ bgcolor: '#2a2a2a' }} />
         <Skeleton variant="text" width={200} height={16} sx={{ bgcolor: '#2a2a2a' }} />
       </Box>
-      {/* Cards row */}
-      <Box sx={{ display: 'flex', gap: 1.5, px: 1 }}>
+      {/* Cards stack */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
         <CardSkeleton />
         <CardSkeleton />
         <CardSkeleton />
