@@ -2126,7 +2126,10 @@
     "noEpisodeData": "Δεν υπάρχουν διαθέσιμα δεδομένα επεισοδίου",
     "checkBackSoon": "Ελέγξτε ξανά σύντομα",
     "seriesComplete": "Η σειρά ολοκληρώθηκε",
-    "episodesTotal": "{{count}} επεισόδια"
+    "episodesTotal": "{{count}} επεισόδια",
+    "removeConfirmTitle": "Remove from watchlist?",
+    "removeConfirmBody": "\"{{title}}\" will be removed from your watchlist. Because your watchlist is synced with your media server favorites, this will also remove it from your favorites in Emby/Jellyfin.",
+    "removeConfirmAction": "Remove"
   },
   "settingsBackup": {
     "title": "Δημιουργία & Επαναφορά Αντιγράφων Ασφαλείας",

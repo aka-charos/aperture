@@ -24,7 +24,6 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import StarIcon from '@mui/icons-material/Star'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline'
-import AddToQueueIcon from '@mui/icons-material/AddToQueue'
 import ScheduleIcon from '@mui/icons-material/Schedule'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL, StarRating } from '@aperture/ui'
@@ -36,7 +35,6 @@ interface WatchingListItemProps {
   userRating: number | null
   onRate: (rating: number | null) => void
   onRemove: (seriesId: string) => Promise<void>
-  onAdd: (seriesId: string) => Promise<void>
 }
 
 function formatAirDate(dateStr: string, t: TFunction, locale: string): string {
@@ -73,7 +71,7 @@ function getCountdownColor(days: number): string {
   return '#6b7280' // Later - gray
 }
 
-export function WatchingListItem({ series, userRating, onRate, onRemove, onAdd }: WatchingListItemProps) {
+export function WatchingListItem({ series, userRating, onRate, onRemove }: WatchingListItemProps) {
   const { t, i18n } = useTranslation()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
@@ -86,11 +84,6 @@ export function WatchingListItem({ series, userRating, onRate, onRemove, onAdd }
   const handleRemoveClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     onRemove(series.seriesId)
-  }
-
-  const handleAddClick = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    onAdd(series.seriesId)
   }
 
   const handleRatingClick = (e: React.MouseEvent) => {
@@ -108,6 +101,8 @@ export function WatchingListItem({ series, userRating, onRate, onRemove, onAdd }
       : t('watching.sourceWatchlist')
     : t('watching.sourceHistory')
 
+  // History-only rows aren't in the watchlist — nothing to add here, and the only
+  // meaningful action (remove) would strip a media-server favorite.
   const watchlistActionButton = series.inWatchlist ? (
     <Tooltip title={t('watching.removeTooltip')}>
       <IconButton
@@ -125,24 +120,7 @@ export function WatchingListItem({ series, userRating, onRate, onRemove, onAdd }
         <RemoveCircleOutlineIcon sx={isMobile ? { fontSize: 16 } : undefined} fontSize={isMobile ? undefined : 'small'} />
       </IconButton>
     </Tooltip>
-  ) : (
-    <Tooltip title={t('watching.addTooltip')}>
-      <IconButton
-        size="small"
-        onClick={handleAddClick}
-        sx={{
-          p: isMobile ? 0.5 : undefined,
-          color: 'text.secondary',
-          '&:hover': {
-            color: 'primary.main',
-            bgcolor: alpha(theme.palette.primary.main, 0.1),
-          },
-        }}
-      >
-        <AddToQueueIcon sx={isMobile ? { fontSize: 16 } : undefined} fontSize={isMobile ? undefined : 'small'} />
-      </IconButton>
-    </Tooltip>
-  )
+  ) : null
 
   return (
     <Box
