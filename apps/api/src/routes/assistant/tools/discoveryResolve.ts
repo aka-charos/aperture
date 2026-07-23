@@ -29,18 +29,20 @@ export const DISCOVERY_PROMPT =
   'Call findCandidatesInLibrary exactly once. If the request is about titles similar to a ' +
   'specific movie or show (e.g. "similar to X", "something like X"), pass that title as ' +
   'seedTitle so the tool can add related picks from the library. ' +
-  'The tool returns a "picks" list with a short "reason" for each title; when you describe the ' +
-  'recommendations, give a sentence or two for each on why it fits the request, drawing on its ' +
-  'reason. ' +
-  'Present the "Recommendations" set as the primary picks and "Also worth checking" as a ' +
-  'secondary suggestion, and briefly note any standout titles that are not in the library yet. ' +
+  'The tool returns a "picks" list with a short "reason" per title (grounded from the web ' +
+  'search) — that is your grounding for WHY these fit. Draw on those reasons in your reply. ' +
+  'But each per-title reason and synopsis is ALSO rendered on its card, so do NOT restate them ' +
+  'as a bulleted per-title list — that would duplicate the cards. Instead, synthesize the ' +
+  'reasons into a short intro (one or two sentences) that frames why this set fits the request, ' +
+  'then briefly note any standout titles that are NOT in the library yet. Keep it concise. ' +
+  'The "Recommendations" cards are the primary picks and "Also worth checking" is secondary. ' +
   'Only present what the tool returns — never invent titles.'
 
 export function createDiscoveryResolveTool(ctx: ToolContext) {
   return {
     findCandidatesInLibrary: tool({
       description:
-        "Resolve the web-sourced candidate titles already gathered for this request against the user's library, and — when a specific title is referenced via seedTitle — add related picks from the library by similarity. Call this exactly ONCE. The result includes a 'picks' list with a short 'reason' per title; use those reasons to explain in a sentence or two why each recommendation fits. Present the returned 'Recommendations' as the primary picks and 'Also worth checking' as secondary, and briefly mention any standout titles NOT in the library yet. Only present what this tool returns — never invent titles.",
+        "Resolve the web-sourced candidate titles already gathered for this request against the user's library, and — when a specific title is referenced via seedTitle — add related picks from the library by similarity. Call this exactly ONCE. The result includes a 'picks' list with a short 'reason' per title — use those reasons as grounding for why the set fits, but do NOT restate them as a per-title list (they already render on each card). Write a short synthesized intro instead, then briefly mention any standout titles NOT in the library yet. Present the returned 'Recommendations' as the primary picks and 'Also worth checking' as secondary. Only present what this tool returns — never invent titles.",
       inputSchema: nullSafe(z.object({
         seedTitle: z
           .string()
@@ -60,8 +62,9 @@ export function createDiscoveryResolveTool(ctx: ToolContext) {
           mediaType: c.mediaType,
         }))
 
-        // Per-pick rationale from the web search, so the model can explain why each
-        // recommendation fits. Surfaced in its prose — not rendered on the cards.
+        // Per-pick rationale from the web search: grounding for the model's "why".
+        // Also attached to each resolved card (see resolveCandidates), so the model
+        // synthesizes from these rather than restating them per title.
         const notInLibrarySet = new Set(notInLibrary)
         const picks = candidates.map((c) => ({
           title: c.title,

@@ -16,6 +16,8 @@ export interface ContentItem {
   name: string
   subtitle?: string
   image?: string | null
+  overview?: string | null
+  reason?: string | null
   rating?: number | null
   userRating?: number | null
   rank?: number

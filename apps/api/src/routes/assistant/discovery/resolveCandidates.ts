@@ -15,6 +15,7 @@ interface LibraryRow {
   title: string
   year: number | null
   genres: string[] | null
+  overview: string | null
   community_rating: number | null
   poster_url: string | null
   provider_item_id: string | null
@@ -23,7 +24,7 @@ interface LibraryRow {
 }
 
 const COLUMNS =
-  'id, title, year, genres, community_rating, poster_url, provider_item_id, imdb_id, tmdb_id'
+  'id, title, year, genres, overview, community_rating, poster_url, provider_item_id, imdb_id, tmdb_id'
 
 function normalizeTitle(t: string): string {
   return t
@@ -44,7 +45,8 @@ function idMatchValid(row: LibraryRow, cand: DiscoveryCandidate): boolean {
 function toContentItem(
   row: LibraryRow,
   type: 'movie' | 'series',
-  mediaServer: MediaServerInfo | null
+  mediaServer: MediaServerInfo | null,
+  reason?: string | null
 ): ContentItem {
   const genres = (row.genres ?? []).slice(0, 2).join(', ')
   const subtitle = [row.year, genres].filter(Boolean).join(' · ')
@@ -55,6 +57,8 @@ function toContentItem(
     name: row.title,
     subtitle,
     image: row.poster_url,
+    overview: row.overview,
+    reason: reason ?? null,
     rating: row.community_rating,
     actions: [
       {
@@ -90,7 +94,7 @@ export async function resolveCandidates(
     const claim = (row: LibraryRow, cand: DiscoveryCandidate) => {
       if (!usedRowIds.has(row.id)) {
         usedRowIds.add(row.id)
-        items.push(toContentItem(row, mediaType, ctx.mediaServer))
+        items.push(toContentItem(row, mediaType, ctx.mediaServer, cand.reason))
       }
       pending.delete(cand)
     }

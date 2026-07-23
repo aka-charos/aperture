@@ -1,6 +1,6 @@
 /**
  * Single content item card for Tool UI
- * Compact design with poster, title, and action buttons
+ * Full-width list layout: poster + title/meta + synopsis + "why it fits" note.
  */
 import { Box, Typography, Button, Chip, Paper, IconButton, CircularProgress } from '@mui/material'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
@@ -8,6 +8,7 @@ import InfoIcon from '@mui/icons-material/Info'
 import StarIcon from '@mui/icons-material/Star'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder'
+import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { RankBadge, getProxiedImageUrl } from '@aperture/ui'
@@ -21,10 +22,18 @@ interface ContentCardProps {
   onToggleFavorite?: (item: ContentItem) => void
 }
 
+// Truncate multi-line text with an ellipsis after `lines` rows.
+const clampLines = (lines: number) => ({
+  display: '-webkit-box',
+  WebkitLineClamp: lines,
+  WebkitBoxOrient: 'vertical' as const,
+  overflow: 'hidden',
+})
+
 export function ContentCard({ item, onPlay, isFavorite, favoritePending, onToggleFavorite }: ContentCardProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  
+
   const detailsAction = item.actions?.find(a => a.id === 'details')
   const playAction = item.actions?.find(a => a.id === 'play')
 
@@ -48,17 +57,17 @@ export function ContentCard({ item, onPlay, isFavorite, favoritePending, onToggl
     <Paper
       sx={{
         display: 'flex',
-        gap: 1.5,
-        p: 1.5,
+        gap: 1.75,
+        p: 1.75,
+        width: '100%',
         bgcolor: '#1a1a1a',
         borderRadius: 2,
-        minWidth: 280,
-        maxWidth: 320,
         cursor: 'pointer',
-        transition: 'all 0.2s',
+        transition: 'background-color 0.2s, border-color 0.2s',
+        border: '1px solid transparent',
         '&:hover': {
-          bgcolor: '#252525',
-          transform: 'translateY(-2px)',
+          bgcolor: '#212121',
+          borderColor: 'rgba(99, 102, 241, 0.35)',
         },
       }}
       onClick={handleDetails}
@@ -66,8 +75,8 @@ export function ContentCard({ item, onPlay, isFavorite, favoritePending, onToggl
       {/* Poster */}
       <Box
         sx={{
-          width: 60,
-          height: 90,
+          width: 80,
+          height: 120,
           flexShrink: 0,
           borderRadius: 1,
           overflow: 'hidden',
@@ -96,6 +105,8 @@ export function ContentCard({ item, onPlay, isFavorite, favoritePending, onToggl
               justifyContent: 'center',
               color: '#666',
               fontSize: 10,
+              textAlign: 'center',
+              px: 0.5,
             }}
           >
             {t('assistantToolUi.noImage')}
@@ -136,16 +147,11 @@ export function ContentCard({ item, onPlay, isFavorite, favoritePending, onToggl
       </Box>
 
       {/* Content */}
-      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        <Typography
-          variant="body2"
-          fontWeight={600}
-          noWrap
-          sx={{ color: '#fff' }}
-        >
+      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+        <Typography variant="body2" fontWeight={600} sx={{ color: '#fff', ...clampLines(2) }}>
           {item.name}
         </Typography>
-        
+
         {item.subtitle && (
           <Typography variant="caption" color="text.secondary" noWrap>
             {item.subtitle}
@@ -153,7 +159,7 @@ export function ContentCard({ item, onPlay, isFavorite, favoritePending, onToggl
         )}
 
         {/* Ratings row */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
           {item.rating != null && (
             <Chip
               icon={<StarIcon sx={{ fontSize: 12 }} />}
@@ -193,6 +199,36 @@ export function ContentCard({ item, onPlay, isFavorite, favoritePending, onToggl
             }}
           />
         </Box>
+
+        {/* Synopsis */}
+        {item.overview && (
+          <Typography
+            variant="caption"
+            sx={{ color: '#a1a1aa', lineHeight: 1.45, ...clampLines(3) }}
+          >
+            {item.overview}
+          </Typography>
+        )}
+
+        {/* Why it fits */}
+        {item.reason && (
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 0.75,
+              mt: 0.25,
+              p: 1,
+              borderRadius: 1,
+              bgcolor: 'rgba(99, 102, 241, 0.08)',
+              borderInlineStart: '2px solid #6366f1',
+            }}
+          >
+            <LightbulbOutlinedIcon sx={{ fontSize: 15, color: '#818cf8', flexShrink: 0, mt: '1px' }} />
+            <Typography variant="caption" sx={{ color: '#c7c7d1', lineHeight: 1.45 }}>
+              {item.reason}
+            </Typography>
+          </Box>
+        )}
 
         {/* Action buttons */}
         <Box sx={{ display: 'flex', gap: 1, mt: 'auto', pt: 1 }}>
@@ -247,4 +283,3 @@ export function ContentCard({ item, onPlay, isFavorite, favoritePending, onToggl
     </Paper>
   )
 }
-
