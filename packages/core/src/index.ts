@@ -81,6 +81,20 @@ export {
   N8nWebhookError,
   type N8nWebhookConfig,
   type N8nIntegrationConfig,
+  // Tavily Search Integration
+  getTavilyConfig,
+  setTavilyConfig,
+  isTavilyEnabled,
+  tavilySearch,
+  TavilyError,
+  DEFAULT_TAVILY_CONFIG,
+  type TavilyConfig,
+  type TavilySearchParams,
+  type TavilySearchResponse,
+  type TavilySearchResultItem,
+  type TavilySearchDepth,
+  type TavilyTopic,
+  type TavilyTimeRange,
 } from './lib/index.js'
 
 // Migrations

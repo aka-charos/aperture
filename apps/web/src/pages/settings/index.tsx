@@ -40,6 +40,7 @@ import {
   MDBListConfigSection,
   SeerrConfigSection,
   N8nConfigSection,
+  TavilyConfigSection,
   StreamingDiscoverySettings,
   ChannelsWebExpandSettings,
   DiscoveryGenreStripsSettings,
@@ -301,6 +302,7 @@ export function SettingsPage() {
                   <MDBListConfigSection />
                   <SeerrConfigSection />
                   <N8nConfigSection />
+                  <TavilyConfigSection />
                 </Box>
                 <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
                   <StreamingDiscoverySettings />

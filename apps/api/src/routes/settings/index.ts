@@ -30,6 +30,7 @@ import {
   registerChannelsWebExpandSettingsHandlers,
   registerDiscoveryGenreStripsSettingsHandlers,
   registerN8nHandlers,
+  registerTavilyHandlers,
   registerSystemHandlers,
 } from './handlers/index.js'
 
@@ -50,6 +51,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   registerTasteProfileHandlers(fastify)
   registerLegacyAiModelsHandlers(fastify)
   registerN8nHandlers(fastify)
+  registerTavilyHandlers(fastify)
   registerSystemHandlers(fastify)
 }
 

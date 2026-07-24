@@ -1,6 +1,6 @@
 # Aperture — Repo Map
 
-Self-hosted media recommendation & watch-tracking app for Emby/Jellyfin. AI recommendations via pgvector embeddings, plus integrations: TMDB, OMDb, Trakt, Seerr (Jellyseerr/Overseerr), MDBList, JustWatch, n8n.
+Self-hosted media recommendation & watch-tracking app for Emby/Jellyfin. AI recommendations via pgvector embeddings, plus integrations: TMDB, OMDb, Trakt, Seerr (Jellyseerr/Overseerr), MDBList, JustWatch, n8n, Tavily.
 
 > **Keep this map current.** When you add/move/rename a route, page, core module, or table, update the relevant section here in the same change. This file is the primary navigation aid — stale entries cause wrong-file edits.
 
@@ -71,7 +71,7 @@ pnpm --filter @aperture/web i18n:sync   # propagate new en strings to 14 locales
 
 ## Naming traps (easy to edit the wrong module)
 
-- **`discover/` vs `discovery/`** (both in api routes and mirrored in web/core): `discover` = browse people/studios + TMDB-external detail (`/api/discover/*`); `discovery` = missing-content suggestion engine feeding Seerr requests (`/api/discovery/*`). There is also `assistant/discovery/` (web-grounded chat candidates) — unrelated.
+- **`discover/` vs `discovery/`** (both in api routes and mirrored in web/core): `discover` = browse people/studios + TMDB-external detail (`/api/discover/*`); `discovery` = missing-content suggestion engine feeding Seerr requests (`/api/discovery/*`). There is also `assistant/discovery/` (web-grounded chat candidates) — unrelated. Its web grounding is **multi-source** via `assistant/discovery/sources/` (a `WebSearchSource` registry): Google grounding (Gemini `google_search`) + Tavily (core `lib/tavily.ts`, config in `system_settings.tavily_integration`, `/api/settings/tavily`). Sources compose (combined into one structuring pass) and fall back for one another; Tavily errors log under the `tavily` provider in `api_errors`.
 - **Three "similar" systems**: `movies|series/:id/similar` (simple embedding neighbors) vs `/api/similarity/*` (multi-hop graph for Explore) vs `/api/graph-playlists` (playlists built from that graph).
 - **Top Picks config lives in 4 places**: `routes/top-picks/`, `routes/settings/handlers/topPicks.ts`, `routes/setup/handlers/topPicks.ts`, and the `refresh-top-picks`/`auto-request-top-picks` jobs.
 - Version strings drift: `routes/api.ts` says `0.1.0`, `routes/health` hardcodes `0.7.8`.

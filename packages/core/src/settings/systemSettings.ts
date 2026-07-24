@@ -21,6 +21,7 @@ const SENSITIVE_SETTING_KEYS = new Set([
   'ai_config',
   'ai_provider_credentials',
   'n8n_integration',
+  'tavily_integration',
 ])
 
 /**
