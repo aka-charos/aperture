@@ -1,12 +1,17 @@
 /**
  * Discovery presentation tool.
  *
- * Web candidates are gathered before the stream (see discovery/webCandidates)
- * and stashed on the tool context. This tool resolves them against the library
- * and returns them as the primary "Recommendations" carousel. When the request
- * references a specific title (seedTitle), it ALSO adds an "Also worth checking"
- * carousel of embeddings-similar library items (deduped against the web picks),
- * so the user gets both sources in one deterministic result — web first.
+ * This tool gathers the web-sourced candidates itself (inside execute), then
+ * resolves them against the library and returns them as the primary
+ * "Recommendations" carousel. Gathering here — rather than before the stream —
+ * lets the assistant stream its opening line FIRST, then do the slow web work
+ * while the card skeletons show, instead of the whole reply flushing at once
+ * after a long silent wait.
+ *
+ * When the request references a specific title (seedTitle), it ALSO adds an
+ * "Also worth checking" carousel of embeddings-similar library items (deduped
+ * against the web picks), so the user gets both sources in one deterministic
+ * result — web first.
  *
  * Same render path as every other content tool (everything shown is a library
  * item). Only added to the toolset on discovery-routed turns.
@@ -17,6 +22,7 @@ import { nullSafe } from './utils.js'
 import { createChildLogger } from '@aperture/core'
 import { createCarouselResult, type ContentCarousel } from '../schemas/contentCarousel.js'
 import { resolveCandidates } from '../discovery/resolveCandidates.js'
+import { gatherWebCandidates } from '../discovery/webCandidates.js'
 import { findSimilarItems } from './search.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext } from '../types.js'
@@ -25,27 +31,30 @@ const logger = createChildLogger('discovery-resolve')
 
 /** Appended to the system prompt on discovery-routed turns. */
 export const DISCOVERY_PROMPT =
-  'Web-sourced candidate titles for this request have already been gathered. ' +
-  'ALWAYS call findCandidatesInLibrary first (exactly once) — it produces the primary, ' +
-  'reasoned recommendations, even for an open genre/theme/"best of" browse. If the request ' +
-  'is about titles similar to a specific movie or show (e.g. "similar to X", "something like ' +
-  'X"), pass that title as seedTitle so the tool can add related picks from the library. ' +
-  'The tool returns a "picks" list with a short "reason" per title (grounded from the web ' +
-  'search) — that is your grounding for WHY these fit. Draw on those reasons in your reply. ' +
-  'But each per-title reason and synopsis is ALSO rendered on its card, so do NOT restate them ' +
-  'as a bulleted per-title list — that would duplicate the cards. Instead, synthesize the ' +
-  'reasons into a short intro (one or two sentences) that frames why this set fits the request, ' +
-  'then briefly note any standout titles that are NOT in the library yet. Keep it concise. ' +
-  'For a genre, theme, or "best of" browse you MAY ALSO call getTopRated (passing the genre) ' +
-  'AFTER findCandidatesInLibrary, to add a broader in-library list as a secondary section. ' +
-  'The web "Recommendations" cards are always the primary picks; "Also worth checking" and any ' +
+  'This is a recommendation/discovery request. Structure your reply in three beats:\n' +
+  '1. FIRST, before calling any tool, write ONE short, warm sentence that acknowledges the ' +
+  'request — name the referenced title or genre and say you\'ll pull what the library has. ' +
+  'One line only; this is what the user sees while the picks load.\n' +
+  '2. THEN call findCandidatesInLibrary exactly ONCE. It gathers web-sourced picks and matches ' +
+  'them to the library. If the request references a specific title (e.g. "like X", "similar to ' +
+  'X"), pass that title as seedTitle so related library picks are added too. Each pick comes ' +
+  'back with a short grounded "reason", and that reason is ALSO printed on its card — so you ' +
+  'never repeat the reasons title-by-title.\n' +
+  '3. AFTER the cards render, ALWAYS write a short closing paragraph (2-4 sentences). This is ' +
+  'required — never stop at the cards. Do NOT enumerate every title. Instead: call out 2-3 ' +
+  'standouts by name and what ties them to the request, and mention any notable titles from ' +
+  'the returned notInLibrary list that would be worth adding.\n' +
+  'For an open genre/theme/"best of" browse you MAY also call getTopRated (passing the genre) ' +
+  'AFTER findCandidatesInLibrary for a broader in-library list. If findCandidatesInLibrary ' +
+  'returns no matches, fall back to getTopRated or getMyRecommendations so the user still gets ' +
+  'picks. The web "Recommendations" cards are the primary picks; "Also worth checking" and any ' +
   'getTopRated list are secondary. Only present titles these tools return — never invent titles.'
 
-export function createDiscoveryResolveTool(ctx: ToolContext) {
+export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) {
   return {
     findCandidatesInLibrary: tool({
       description:
-        "Resolve the web-sourced candidate titles already gathered for this request against the user's library, and — when a specific title is referenced via seedTitle — add related picks from the library by similarity. Call this exactly ONCE. The result includes a 'picks' list with a short 'reason' per title — use those reasons as grounding for why the set fits, but do NOT restate them as a per-title list (they already render on each card). Write a short synthesized intro instead, then briefly mention any standout titles NOT in the library yet. Present the returned 'Recommendations' as the primary picks and 'Also worth checking' as secondary. Only present what this tool returns — never invent titles.",
+        "Gather web-sourced recommendation candidates for this request and match them to the user's library, returning them as the primary 'Recommendations'. When a specific title is referenced via seedTitle, also add embeddings-similar library picks as 'Also worth checking'. Call this exactly ONCE, first. Each pick includes a short grounded 'reason' that is already shown on its card — synthesize a short closing note rather than repeating them per title. Only present what this tool returns — never invent titles.",
       inputSchema: nullSafe(z.object({
         seedTitle: z
           .string()
@@ -55,7 +64,10 @@ export function createDiscoveryResolveTool(ctx: ToolContext) {
           ),
       })),
       execute: async ({ seedTitle }) => {
-        const candidates = ctx.discoveryCandidates ?? []
+        // Gathered here (not before the stream) so the assistant's opening line
+        // streams first and this slow web work runs behind the card skeletons.
+        const candidates = await gatherWebCandidates(queryText)
+        logger.info({ candidateCount: candidates.length, seedTitle: seedTitle ?? null }, 'Discovery candidates gathered')
         const { items: webItems, notInLibrary } = await resolveCandidates(candidates, ctx)
 
         // Pass leftovers to the model (for commentary) without rendering them as cards
@@ -112,7 +124,10 @@ export function createDiscoveryResolveTool(ctx: ToolContext) {
         if (carousels.length === 0) {
           carousels.push(
             createCarouselResult(`discovery-empty-${Date.now()}`, [], {
-              description: 'None of the web-sourced picks are in your library yet.',
+              description:
+                notInLibraryTitles.length > 0
+                  ? 'None of the web-sourced picks are in your library yet.'
+                  : 'No web-sourced picks were found for this request.',
             })
           )
         }
