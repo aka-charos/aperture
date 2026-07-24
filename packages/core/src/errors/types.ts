@@ -2,7 +2,7 @@
  * API Error Types
  * 
  * Shared types for handling and categorizing API errors
- * from external integrations (OpenAI, TMDb, Trakt, MDBList, OMDb)
+ * from external integrations (OpenAI, Google/Gemini, TMDb, Trakt, MDBList, OMDb)
  */
 
 /**
@@ -43,7 +43,7 @@ export interface ApiErrorDefinition {
  */
 export interface ParsedApiError {
   /** Which external API */
-  provider: 'openai' | 'tmdb' | 'trakt' | 'mdblist' | 'omdb'
+  provider: 'openai' | 'google' | 'tmdb' | 'trakt' | 'mdblist' | 'omdb'
   /** HTTP status code from response */
   httpStatus: number
   /** Provider-specific error code (if available) */

@@ -8,6 +8,7 @@
 import { createChildLogger } from '../lib/logger.js'
 import type { ApiErrorDefinition, ParsedApiError, ApiErrorRecord } from './types.js'
 import { OPENAI_ERRORS, OPENAI_ERROR_PATTERNS } from './openai.js'
+import { GOOGLE_ERRORS, GOOGLE_ERROR_PATTERNS } from './google.js'
 import { TMDB_ERRORS, TMDB_HTTP_TO_STATUS } from './tmdb.js'
 import { TRAKT_ERRORS } from './trakt.js'
 import { MDBLIST_ERRORS } from './mdblist.js'
@@ -52,6 +53,35 @@ function parseOpenAIError(
     return errorDef[0] // Default to first option
   }
   
+  return errorDef
+}
+
+/**
+ * Parse a Google / Gemini error response
+ */
+function parseGoogleError(
+  status: number,
+  errorMessage?: string
+): ApiErrorDefinition {
+  const errorDef = GOOGLE_ERRORS[status]
+
+  if (!errorDef) {
+    return DEFAULT_ERROR
+  }
+
+  // If multiple possible errors for this status, use message patterns
+  if (Array.isArray(errorDef)) {
+    if (errorMessage) {
+      const messageLower = errorMessage.toLowerCase()
+      for (const [pattern, match] of Object.entries(GOOGLE_ERROR_PATTERNS)) {
+        if (match.status === status && messageLower.includes(pattern)) {
+          return errorDef[match.index] || errorDef[0]
+        }
+      }
+    }
+    return errorDef[0] // Default to first option
+  }
+
   return errorDef
 }
 
@@ -123,6 +153,9 @@ export function parseApiError(
   switch (provider) {
     case 'openai':
       definition = parseOpenAIError(status, options.errorMessage)
+      break
+    case 'google':
+      definition = parseGoogleError(status, options.errorMessage)
       break
     case 'tmdb':
       definition = parseTMDbError(status, options.responseBody as { status_code?: number })

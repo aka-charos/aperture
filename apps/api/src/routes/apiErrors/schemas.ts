@@ -14,7 +14,7 @@ export const apiErrorsSchemas = {
       id: { type: 'string', format: 'uuid', description: 'Error record ID' },
       provider: { 
         type: 'string', 
-        enum: ['openai', 'tmdb', 'trakt', 'mdblist', 'omdb'],
+        enum: ['openai', 'google', 'tmdb', 'trakt', 'mdblist', 'omdb'],
         description: 'Which API provider had the error'
       },
       errorType: { type: 'string', description: 'Error classification (rate_limit, auth_error, etc.)' },
@@ -76,7 +76,7 @@ export const getProviderErrorsSchema = {
     properties: {
       provider: { 
         type: 'string', 
-        enum: ['openai', 'tmdb', 'trakt', 'mdblist', 'omdb'],
+        enum: ['openai', 'google', 'tmdb', 'trakt', 'mdblist', 'omdb'],
         description: 'Provider to get errors for'
       },
     },
