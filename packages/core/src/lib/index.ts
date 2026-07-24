@@ -10,6 +10,23 @@ export {
   type N8nIntegrationConfig,
 } from './n8n.js'
 
+// Tavily Search Integration
+export {
+  getTavilyConfig,
+  setTavilyConfig,
+  isTavilyEnabled,
+  tavilySearch,
+  TavilyError,
+  DEFAULT_TAVILY_CONFIG,
+  type TavilyConfig,
+  type TavilySearchParams,
+  type TavilySearchResponse,
+  type TavilySearchResultItem,
+  type TavilySearchDepth,
+  type TavilyTopic,
+  type TavilyTimeRange,
+} from './tavily.js'
+
 export {
   getPool,
   query,

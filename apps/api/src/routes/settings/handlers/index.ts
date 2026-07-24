@@ -18,4 +18,5 @@ export { registerStreamingDiscoverySettingsHandlers } from './streamingDiscovery
 export { registerChannelsWebExpandSettingsHandlers } from './channelsWebExpand.js'
 export { registerDiscoveryGenreStripsSettingsHandlers } from './discoveryGenreStrips.js'
 export { registerN8nHandlers } from './n8n.js'
+export { registerTavilyHandlers } from './tavily.js'
 export { registerSystemHandlers } from './system.js'
