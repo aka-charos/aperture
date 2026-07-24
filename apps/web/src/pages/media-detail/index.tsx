@@ -110,7 +110,7 @@ export function MediaDetailPage({ mediaType }: MediaDetailPageProps) {
               {isSeries(media) && <MissingSeasonsCard series={media} seasons={seasons} />}
               {/* Episodes List (Series only) */}
               {isSeries(media) && Object.keys(seasons).length > 0 && (
-                <SeasonsList seasons={seasons} />
+                <SeasonsList seasons={seasons} series={media} />
               )}
             </Box>
           </Grid>

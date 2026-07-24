@@ -116,6 +116,12 @@ export interface Episode {
   runtime_minutes: number | null
   community_rating: number | null
   poster_url: string | null
+  // Current-user watch state (present on series episodes; optional for forward/back compat)
+  played?: boolean
+  play_count?: number
+  last_played_at?: string | null
+  /** Resume position as a whole percent (0-100), or null when never started */
+  progress_percent?: number | null
 }
 
 export interface WatchStatus {

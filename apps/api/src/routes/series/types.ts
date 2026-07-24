@@ -111,6 +111,12 @@ export interface EpisodeRow {
   runtime_minutes: number | null
   community_rating: number | null
   poster_url: string | null
+  // Current-user watch state (LEFT JOINed from watch_history)
+  played: boolean
+  play_count: number
+  last_played_at: Date | string | null
+  /** Resume position as a whole percent (0-100), or null when never started */
+  progress_percent: number | null
 }
 
 export interface EpisodesResponse {
