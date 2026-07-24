@@ -19,14 +19,19 @@ import type { DiscoveryCandidate } from '../types.js'
 
 const logger = createChildLogger('web-candidates')
 
-const CandidateSchema = z.object({
+// Shared candidate fields. `reason` is the per-title rationale rendered on each
+// card AND used by the assistant to synthesize its reply — so we push hard for it
+// to be present (required schema first). Gemini's structured-output pass tends to
+// drop optional fields, which is exactly why the card notes came back empty.
+const candidateFields = {
   title: z.string(),
   year: z.number().int().optional(),
   imdbId: z.string().optional(),
   tmdbId: z.string().optional(),
   mediaType: z.enum(['movie', 'series']),
-  reason: z.string().optional(),
-})
+}
+const StrictCandidateSchema = z.object({ ...candidateFields, reason: z.string().min(1) })
+const LenientCandidateSchema = z.object({ ...candidateFields, reason: z.string().optional() })
 
 export async function gatherWebCandidates(queryText: string): Promise<DiscoveryCandidate[]> {
   let model: LanguageModel
@@ -48,7 +53,8 @@ export async function gatherWebCandidates(queryText: string): Promise<DiscoveryC
       tools,
       prompt:
         'Using current web information, list up to 12 specific movies or TV series that best answer this request. ' +
-        'For each, give the exact title, release year, whether it is a movie or a series, and one or two sentences explaining why it fits the request. ' +
+        'For EACH title you MUST provide: the exact title, the release year, whether it is a movie or a series, and — most importantly — one or two sentences on WHY it fits this specific request. ' +
+        'The "why" is mandatory for every title and should be concrete (tone, theme, what it shares with the request), not generic praise. A title with no reason is useless — omit it rather than list it without a reason. ' +
         'Include the IMDb id (tt…) or TMDb id ONLY if it appears in a source you actually used; otherwise omit it.\n\n' +
         `Request: ${queryText}`,
     })
@@ -75,20 +81,39 @@ export async function gatherWebCandidates(queryText: string): Promise<DiscoveryC
 
     if (!text?.trim()) return []
 
-    // Pass 2 — structure into typed candidates (no grounding needed)
-    const { object } = await generateObject({
-      model,
-      schema: z.object({ candidates: z.array(CandidateSchema).max(20) }),
-      prompt:
-        'Extract the movies/series mentioned below into structured candidates. ' +
-        'For each, capture the one or two sentence explanation of why it fits as "reason" (verbatim or lightly condensed from the text). ' +
-        'Set imdbId/tmdbId ONLY if explicitly present in the text — never guess or invent an id. ' +
-        'Infer mediaType (movie or series) from context.\n\n' +
-        text,
-    })
+    // Pass 2 — structure into typed candidates (no grounding needed). `reason`
+    // is required first (Gemini drops optional fields, which emptied the cards);
+    // if that trips validation we retry with a lenient schema so a stubborn
+    // omission degrades to "card without a note" instead of killing discovery.
+    const structurePrompt =
+      'Extract the movies/series mentioned below into structured candidates. ' +
+      'For each, capture the explanation of WHY it fits as "reason" (verbatim or lightly condensed from the text — one or two sentences, never empty). ' +
+      'Set imdbId/tmdbId ONLY if explicitly present in the text — never guess or invent an id. ' +
+      'Infer mediaType (movie or series) from context.\n\n' +
+      text
+    const structure = async (candidateSchema: z.ZodTypeAny) => {
+      const { object } = await generateObject({
+        model,
+        schema: z.object({ candidates: z.array(candidateSchema).max(20) }),
+        prompt: structurePrompt,
+      })
+      return object.candidates as DiscoveryCandidate[]
+    }
 
-    logger.info({ candidateCount: object.candidates.length }, 'Web candidates structured')
-    return object.candidates
+    let candidates: DiscoveryCandidate[]
+    try {
+      candidates = await structure(StrictCandidateSchema)
+    } catch (err) {
+      logger.warn({ err }, 'Strict candidate structuring failed; retrying leniently (reasons may be missing)')
+      candidates = await structure(LenientCandidateSchema)
+    }
+
+    const withReason = candidates.filter((c) => c.reason?.trim()).length
+    logger.info(
+      { candidateCount: candidates.length, withReason },
+      'Web candidates structured'
+    )
+    return candidates
   } catch (err) {
     logger.warn({ err }, 'Web candidate gathering failed; falling back to library behavior')
     return []

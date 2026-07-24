@@ -22,7 +22,6 @@ import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText } from '../helpers/index.js'
 import { createTools, createN8nTools, createDiscoveryResolveTool, DISCOVERY_PROMPT } from '../tools/index.js'
 import { withToolErrorHandling } from '../tools/utils.js'
-import { gatherWebCandidates } from '../discovery/webCandidates.js'
 import type { ToolContext } from '../types.js'
 
 interface ChatBody {
@@ -141,24 +140,18 @@ export function registerChatHandler(fastify: FastifyInstance) {
           isAdmin: user.isAdmin,
         })
 
-        // Route intent: 'discovery' gathers web-sourced candidates (isolated,
-        // on the Web Search role) to resolve against the library; 'library'
-        // (the default) leaves the assistant untouched. Fails open to library.
+        // Route intent: 'discovery' adds the findCandidatesInLibrary tool, which
+        // gathers web-sourced candidates itself (inside its execute, on the Web
+        // Search role) so the assistant can stream its opening line before that
+        // slow work runs; 'library' (the default) leaves the assistant untouched.
+        // Fails open to library.
         let discoveryTools: ToolSet = {}
         let discoveryAppend = ''
         const intent = await classifyIntent(processedMessages)
         fastify.log.info({ intent }, 'Assistant intent classified')
         if (intent === 'discovery') {
-          toolContext.discoveryCandidates = await gatherWebCandidates(latestUserText(processedMessages))
-          const candidateCount = toolContext.discoveryCandidates?.length ?? 0
-          fastify.log.info(
-            { candidateCount, discoveryEnabled: candidateCount > 0 },
-            'Discovery candidates resolved'
-          )
-          if (candidateCount > 0) {
-            discoveryTools = createDiscoveryResolveTool(toolContext)
-            discoveryAppend = DISCOVERY_PROMPT
-          }
+          discoveryTools = createDiscoveryResolveTool(toolContext, latestUserText(processedMessages))
+          discoveryAppend = DISCOVERY_PROMPT
         }
 
         // Create tools with context, plus n8n search_web + discovery (when routed)

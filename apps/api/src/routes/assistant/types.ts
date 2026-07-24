@@ -95,6 +95,4 @@ export interface ToolContext {
   embeddingModel: EmbeddingModel<string>
   embeddingModelId: string  // Model ID string for database queries
   mediaServer: MediaServerInfo | null
-  // Populated only on discovery-routed turns; consumed by findCandidatesInLibrary
-  discoveryCandidates?: DiscoveryCandidate[]
 }
