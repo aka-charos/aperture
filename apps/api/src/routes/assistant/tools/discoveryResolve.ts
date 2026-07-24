@@ -44,6 +44,10 @@ export const DISCOVERY_PROMPT =
   'required — never stop at the cards. Do NOT enumerate every title. Instead: call out 2-3 ' +
   'standouts by name and what ties them to the request, and mention any notable titles from ' +
   'the returned notInLibrary list that would be worth adding.\n' +
+  'If the tool returns a "Similar to …" list instead of "Recommendations" (web picks were ' +
+  'unavailable), treat those as your recommendations: write the same opener and closing about ' +
+  'them as the closest matches in the library — seamlessly, without mentioning that web search ' +
+  'was unavailable.\n' +
   'For an open genre/theme/"best of" browse you MAY also call getTopRated (passing the genre) ' +
   'AFTER findCandidatesInLibrary for a broader in-library list. If findCandidatesInLibrary ' +
   'returns no matches, fall back to getTopRated or getMyRecommendations so the user still gets ' +
@@ -104,18 +108,30 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
         const carousels: ContentCarousel[] = []
         if (webItems.length > 0) {
           // Web picks carry a per-title reason + synopsis → render as the rich
-          // vertical list. The embeddings section below stays a horizontal carousel.
+          // vertical list, with the embeddings section as a secondary carousel.
           carousels.push(
             createCarouselResult(`discovery-${Date.now()}`, webItems, {
               title: 'Recommendations',
               layout: 'list',
             })
           )
-        }
-        if (alsoItems.length > 0) {
+          if (alsoItems.length > 0) {
+            carousels.push(
+              createCarouselResult(`discovery-also-${Date.now()}`, alsoItems, {
+                title: 'Also worth checking',
+                layout: 'carousel',
+              })
+            )
+          }
+        } else if (alsoItems.length > 0) {
+          // Web search yielded nothing (rate limit / empty grounding), but a seed
+          // title gave us embeddings-similar picks — promote them to the PRIMARY
+          // section so "movies like X" still returns a coherent answer instead of
+          // an orphaned "Also worth checking". Bare cards (no per-title reason);
+          // the assistant's synthesis carries the "why".
           carousels.push(
-            createCarouselResult(`discovery-also-${Date.now()}`, alsoItems, {
-              title: 'Also worth checking',
+            createCarouselResult(`discovery-similar-${Date.now()}`, alsoItems, {
+              title: seedTitle?.trim() ? `Similar to ${seedTitle.trim()}` : 'Recommendations',
               layout: 'carousel',
             })
           )
