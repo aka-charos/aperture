@@ -10,8 +10,9 @@ import type { TFunction } from 'i18next'
 import { Box, Typography, Chip, IconButton, Tooltip } from '@mui/material'
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import TvIcon from '@mui/icons-material/Tv'
+import StarIcon from '@mui/icons-material/Star'
 import BookmarkRemoveIcon from '@mui/icons-material/BookmarkRemove'
-import { MoviePoster } from '@aperture/ui'
+import { MoviePoster, usePosterDisplaySettings } from '@aperture/ui'
 import { useUserRatings } from '@/hooks/useUserRatings'
 import { EpisodeAvailabilityBar } from './EpisodeAvailabilityBar'
 import type { WatchingSeries, UpcomingEpisode } from '../hooks/useWatchingData'
@@ -45,6 +46,7 @@ export function WatchingCard({ series, onRemove }: WatchingCardProps) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
+  const { hideLibraryRatingBadge } = usePosterDisplaySettings()
 
   const handleClick = () => {
     navigate(`/series/${series.seriesId}`)
@@ -76,18 +78,18 @@ export function WatchingCard({ series, onRemove }: WatchingCardProps) {
         title={series.title}
         year={series.year}
         posterUrl={series.posterUrl}
-        rating={series.communityRating}
         genres={series.genres}
         overview={series.overview}
         userRating={getRating('series', series.seriesId)}
         onRate={handleRate}
-        // The built-in bottom-left toggle is replaced by a distinct hover-revealed
-        // remove button (see below) — history-only rows have no watchlist action.
+        // Rating and the remove action are rendered together in a top-right cluster
+        // below, so they never overlap; the built-in overlays are suppressed here.
+        hideRating
         hideWatchingToggle
         responsive
         onClick={handleClick}
       >
-        {/* Status badge */}
+        {/* Status badge — top-left */}
         <Chip
           label={isAiring ? t('watching.chipAiringShort') : series.status || t('watching.statusEnded')}
           size="small"
@@ -102,38 +104,65 @@ export function WatchingCard({ series, onRemove }: WatchingCardProps) {
           }}
         />
 
-        {/* Remove-from-watchlist — only for watchlist rows; hover-revealed, top-right */}
-        {series.inWatchlist && (
-          <Tooltip title={t('watching.removeTooltip')} arrow>
-            <IconButton
-              className="watching-remove-btn"
+        {/* Top-right cluster: rating stays put; the remove action reveals on hover to
+            its left, so the two never cover each other. */}
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            zIndex: 4,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.75,
+          }}
+        >
+          {/* Remove-from-watchlist — watchlist rows only; hover-revealed */}
+          {series.inWatchlist && (
+            <Tooltip title={t('watching.removeTooltip')} arrow>
+              <IconButton
+                className="watching-remove-btn"
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRemove(series.seriesId)
+                }}
+                sx={{
+                  opacity: 0,
+                  color: '#fff',
+                  bgcolor: 'rgba(99, 102, 241, 0.95)',
+                  border: '1.5px solid rgba(255, 255, 255, 0.75)',
+                  boxShadow: '0 2px 10px rgba(0, 0, 0, 0.45)',
+                  backdropFilter: 'blur(4px)',
+                  transition: 'opacity 0.2s ease, transform 0.2s ease, background-color 0.2s ease',
+                  '&:hover': {
+                    bgcolor: 'error.main',
+                    transform: 'scale(1.12)',
+                  },
+                }}
+              >
+                <BookmarkRemoveIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+
+          {/* Community rating — respects the library rating-badge display setting */}
+          {!hideLibraryRatingBadge && series.communityRating != null && (
+            <Chip
+              icon={<StarIcon sx={{ fontSize: 16 }} />}
+              label={Number(series.communityRating).toFixed(1)}
               size="small"
-              onClick={(e) => {
-                e.stopPropagation()
-                onRemove(series.seriesId)
-              }}
               sx={{
-                position: 'absolute',
-                top: 8,
-                right: 8,
-                zIndex: 4,
-                opacity: 0,
-                color: '#fff',
-                bgcolor: 'rgba(99, 102, 241, 0.95)',
-                border: '1.5px solid rgba(255, 255, 255, 0.75)',
-                boxShadow: '0 2px 10px rgba(0, 0, 0, 0.45)',
-                backdropFilter: 'blur(4px)',
-                transition: 'opacity 0.2s ease, transform 0.2s ease, background-color 0.2s ease',
-                '&:hover': {
-                  bgcolor: 'error.main',
-                  transform: 'scale(1.12)',
-                },
+                backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                color: 'warning.main',
+                fontWeight: 600,
+                fontSize: '0.7rem',
+                height: 24,
+                '& .MuiChip-icon': { color: 'warning.main' },
               }}
-            >
-              <BookmarkRemoveIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        )}
+            />
+          )}
+        </Box>
       </MoviePoster>
 
       {/* Upcoming episode + progress info - below poster */}
