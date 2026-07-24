@@ -26,6 +26,7 @@ import {
 } from '../../discovery/components/SeasonSelectModal'
 import { useSeerrRequest } from '../../discovery/hooks/useSeerrRequest'
 import { useServerDisplayName } from '../../../hooks/useServerDisplayName'
+import { computeMissingSeasons } from '../missingSeasons'
 import type { Series, Episode } from '../types'
 
 interface MissingSeasonsCardProps {
@@ -49,16 +50,7 @@ export function MissingSeasonsCard({ series, seasons }: MissingSeasonsCardProps)
 
   const tmdbId = series.tmdb_id ? parseInt(series.tmdb_id, 10) : null
 
-  const today = new Date().toISOString().split('T')[0]
-  const serverSeasonNumbers = new Set(Object.keys(seasons).map(Number))
-  const missing = (series.tmdb_seasons ?? []).filter(
-    (s) =>
-      s.season_number >= 1 &&
-      s.episode_count > 0 &&
-      s.air_date !== null &&
-      s.air_date <= today &&
-      !serverSeasonNumbers.has(s.season_number)
-  )
+  const missing = computeMissingSeasons(series, seasons)
 
   // Seerr request availability (endpoint reports canRequest=false when Seerr
   // is not configured or requests are disabled for this user)
