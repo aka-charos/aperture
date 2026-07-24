@@ -28,9 +28,9 @@ interface TavilyUpdateBody {
   maxResults?: number
   searchDepth?: TavilySearchDepth
   includeAnswer?: boolean
-  includeImages?: boolean
   topic?: TavilyTopic
   timeRange?: TavilyTimeRange | ''
+  maxContentChars?: number
 }
 
 /** Config for the client, with the API key omitted (only hasApiKey exposed). */
@@ -40,9 +40,9 @@ interface PublicTavilyConfig {
   maxResults: number
   searchDepth: TavilySearchDepth
   includeAnswer: boolean
-  includeImages: boolean
   topic: TavilyTopic
   timeRange: TavilyTimeRange
+  maxContentChars: number
 }
 
 /** Coerce a possibly-empty timeRange ('' from a "None" select) to null. */
@@ -59,6 +59,13 @@ function validateConfig(config: TavilyConfig): string | null {
   if (!Number.isInteger(config.maxResults) || config.maxResults < 1 || config.maxResults > 20) {
     return 'maxResults must be an integer between 1 and 20'
   }
+  if (
+    !Number.isInteger(config.maxContentChars) ||
+    config.maxContentChars < 100 ||
+    config.maxContentChars > 8000
+  ) {
+    return 'maxContentChars must be an integer between 100 and 8000'
+  }
   if (!SEARCH_DEPTHS.includes(config.searchDepth)) return 'searchDepth must be basic or advanced'
   if (!TOPICS.includes(config.topic)) return 'topic must be general or news'
   if (config.timeRange !== null && !TIME_RANGES.includes(config.timeRange)) {
@@ -74,9 +81,9 @@ function toPublicConfig(config: TavilyConfig): PublicTavilyConfig {
     maxResults: config.maxResults,
     searchDepth: config.searchDepth,
     includeAnswer: config.includeAnswer,
-    includeImages: config.includeImages,
     topic: config.topic,
     timeRange: config.timeRange,
+    maxContentChars: config.maxContentChars,
   }
 }
 
@@ -118,9 +125,9 @@ export function registerTavilyHandlers(fastify: FastifyInstance) {
           maxResults: body.maxResults ?? current.maxResults,
           searchDepth: body.searchDepth ?? current.searchDepth,
           includeAnswer: body.includeAnswer ?? current.includeAnswer,
-          includeImages: body.includeImages ?? current.includeImages,
           topic: body.topic ?? current.topic,
           timeRange: normalizeTimeRange(body.timeRange, current.timeRange),
+          maxContentChars: body.maxContentChars ?? current.maxContentChars,
         }
 
         const validationError = validateConfig(newConfig)

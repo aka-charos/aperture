@@ -3998,6 +3998,8 @@
     "testSuccess": "Success — Tavily returned {{count}} results.",
     "testFailed": "Tavily test failed",
     "errSave": "Failed to save configuration",
-    "errConnect": "Could not connect to server"
+    "errConnect": "Could not connect to server",
+    "maxContentChars": "Max characters per result",
+    "maxContentCharsHelper": "Truncate each result snippet to this many characters (100–8000)"
   }
 }
