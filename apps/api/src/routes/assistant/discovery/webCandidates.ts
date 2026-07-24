@@ -12,9 +12,11 @@
  * already configured for grounding — but a Tavily-only setup (no Gemini) falls
  * back to the text-generation, then chat model. `reason` is required first
  * (Gemini drops optional fields, which emptied the cards); a stubborn omission
- * degrades to a lenient schema so a missing note never kills discovery.
+ * degrades to a lenient schema, and if generateObject fails outright (a chat
+ * model that can't emit structured output) we fall back to parsing a JSON array
+ * out of a plain-text answer — so structuring never silently yields nothing.
  */
-import { generateObject, type LanguageModel } from 'ai'
+import { generateObject, generateText, type LanguageModel } from 'ai'
 import { z } from 'zod'
 import {
   getWebSearchModelInstance,
@@ -88,6 +90,40 @@ async function getStructuringModel(
   throw new Error('No model available to structure web candidates')
 }
 
+/**
+ * Tolerant fallback parse: pull the first JSON array out of a model's free-text
+ * answer and coerce each entry into a candidate. Used only when generateObject
+ * fails outright (a chat model that can't emit structured output).
+ */
+function parseCandidatesJson(text: string): DiscoveryCandidate[] {
+  const start = text.indexOf('[')
+  const end = text.lastIndexOf(']')
+  if (start === -1 || end === -1 || end <= start) return []
+
+  let raw: unknown
+  try {
+    raw = JSON.parse(text.slice(start, end + 1))
+  } catch {
+    return []
+  }
+  if (!Array.isArray(raw)) return []
+
+  const out: DiscoveryCandidate[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const o = item as Record<string, unknown>
+    const title = typeof o.title === 'string' ? o.title.trim() : ''
+    if (!title) continue
+    out.push({
+      title,
+      year: typeof o.year === 'number' ? o.year : undefined,
+      mediaType: o.mediaType === 'series' ? 'series' : 'movie',
+      reason: typeof o.reason === 'string' ? o.reason : undefined,
+    })
+  }
+  return out.slice(0, 20)
+}
+
 export async function gatherWebCandidates(queryText: string): Promise<DiscoveryCandidate[]> {
   logger.info({ query: queryText.slice(0, 200) }, 'Discovery routed: gathering web candidates')
 
@@ -135,21 +171,48 @@ export async function gatherWebCandidates(queryText: string): Promise<DiscoveryC
     return object.candidates as DiscoveryCandidate[]
   }
 
+  // Last-resort structuring for models that can't emit structured JSON at all:
+  // ask for a JSON array as plain text and parse it tolerantly.
+  const structureViaText = async (): Promise<DiscoveryCandidate[]> => {
+    const { text } = await generateText({
+      model: structuring.model,
+      maxRetries: SDK_MAX_RETRIES,
+      prompt:
+        structurePrompt +
+        '\n\nRespond with ONLY a JSON array (no prose, no code fences) of objects with keys ' +
+        '"title" (string), "year" (number, optional), "mediaType" ("movie" or "series"), and ' +
+        '"reason" (string). Example: [{"title":"…","year":1999,"mediaType":"movie","reason":"…"}]',
+    })
+    return parseCandidatesJson(text)
+  }
+
   try {
     let candidates: DiscoveryCandidate[]
     try {
       candidates = await structure(StrictCandidateSchema)
-    } catch (err) {
-      logger.warn({ err }, 'Strict candidate structuring failed; retrying leniently (reasons may be missing)')
-      candidates = await structure(LenientCandidateSchema)
+    } catch (strictErr) {
+      logger.warn(
+        { err: strictErr },
+        'Strict candidate structuring failed; retrying leniently (reasons may be missing)'
+      )
+      try {
+        candidates = await structure(LenientCandidateSchema)
+      } catch (lenientErr) {
+        logger.warn(
+          { err: lenientErr },
+          'generateObject structuring failed; falling back to text extraction'
+        )
+        candidates = await structureViaText()
+      }
     }
 
     const withReason = candidates.filter((c) => c.reason?.trim()).length
     logger.info({ candidateCount: candidates.length, withReason }, 'Web candidates structured')
     return candidates
   } catch (err) {
-    // Structuring hard-failed. Record under the structuring model's provider when
-    // known (Gemini web-search role); otherwise log-only (the provider varies).
+    // Structuring hard-failed (incl. the text fallback). Record under the
+    // structuring model's provider when known (Gemini web-search role); otherwise
+    // log-only (the provider varies).
     await recordLlmError(err, {
       context: 'discovery candidate structuring',
       provider: structuring.provider,

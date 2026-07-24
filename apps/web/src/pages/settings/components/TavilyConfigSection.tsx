@@ -34,9 +34,9 @@ interface TavilyPublicConfig {
   maxResults: number
   searchDepth: SearchDepth
   includeAnswer: boolean
-  includeImages: boolean
   topic: Topic
   timeRange: TimeRange | null
+  maxContentChars: number
 }
 
 interface TestResult {
@@ -59,36 +59,41 @@ export function TavilyConfigSection() {
   const [apiKey, setApiKey] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
   const [maxResults, setMaxResults] = useState('5')
+  const [maxContentChars, setMaxContentChars] = useState('1000')
   const [searchDepth, setSearchDepth] = useState<SearchDepth>('basic')
   const [topic, setTopic] = useState<Topic>('general')
   const [timeRange, setTimeRange] = useState<TimeRange>('')
   const [includeAnswer, setIncludeAnswer] = useState(true)
-  const [includeImages, setIncludeImages] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
+
+  // Sync all form fields from a server config — used on load and after save, so a
+  // clamped value shows the persisted number rather than what was typed.
+  const applyConfig = useCallback((c: TavilyPublicConfig) => {
+    setConfig(c)
+    setEnabled(!!c.enabled)
+    setApiKey('')
+    setMaxResults(String(c.maxResults ?? 5))
+    setMaxContentChars(String(c.maxContentChars ?? 1000))
+    setSearchDepth(c.searchDepth ?? 'basic')
+    setTopic(c.topic ?? 'general')
+    setTimeRange((c.timeRange ?? '') as TimeRange)
+    setIncludeAnswer(c.includeAnswer ?? true)
+    setHasChanges(false)
+  }, [])
 
   const fetchConfig = useCallback(async () => {
     try {
       const response = await fetch('/api/settings/tavily', { credentials: 'include' })
       if (response.ok) {
         const data = await response.json()
-        const c: TavilyPublicConfig = data.config
-        setConfig(c)
-        setEnabled(!!c.enabled)
-        setApiKey('')
-        setMaxResults(String(c.maxResults ?? 5))
-        setSearchDepth(c.searchDepth ?? 'basic')
-        setTopic(c.topic ?? 'general')
-        setTimeRange((c.timeRange ?? '') as TimeRange)
-        setIncludeAnswer(c.includeAnswer ?? true)
-        setIncludeImages(!!c.includeImages)
-        setHasChanges(false)
+        applyConfig(data.config)
       }
     } catch {
       setError(t('settingsTavily.loadError'))
     } finally {
       setLoading(false)
     }
-  }, [t])
+  }, [t, applyConfig])
 
   useEffect(() => {
     fetchConfig()
@@ -96,19 +101,16 @@ export function TavilyConfigSection() {
 
   const markChanged = () => setHasChanges(true)
 
-  const buildPayload = () => {
-    const parsedMax = Math.min(20, Math.max(1, parseInt(maxResults || '5', 10) || 5))
-    return {
-      enabled,
-      apiKey: apiKey || undefined,
-      maxResults: parsedMax,
-      searchDepth,
-      topic,
-      timeRange,
-      includeAnswer,
-      includeImages,
-    }
-  }
+  const buildPayload = () => ({
+    enabled,
+    apiKey: apiKey || undefined,
+    maxResults: Math.min(20, Math.max(1, parseInt(maxResults || '5', 10) || 5)),
+    maxContentChars: Math.min(8000, Math.max(100, parseInt(maxContentChars || '1000', 10) || 1000)),
+    searchDepth,
+    topic,
+    timeRange,
+    includeAnswer,
+  })
 
   const handleSave = async () => {
     setSaving(true)
@@ -124,9 +126,7 @@ export function TavilyConfigSection() {
       })
       if (response.ok) {
         const data = await response.json()
-        setConfig(data.config)
-        setApiKey('')
-        setHasChanges(false)
+        applyConfig(data.config)
         setSuccess(t('settingsTavily.saved'))
         setTimeout(() => setSuccess(null), 3000)
       } else {
@@ -287,6 +287,22 @@ export function TavilyConfigSection() {
               helperText={t('settingsTavily.maxResultsHelper')}
             />
             <TextField
+              label={t('settingsTavily.maxContentChars')}
+              type="number"
+              value={maxContentChars}
+              onChange={(e) => {
+                setMaxContentChars(e.target.value)
+                markChanged()
+              }}
+              size="small"
+              fullWidth
+              inputProps={{ min: 100, max: 8000, step: 100 }}
+              helperText={t('settingsTavily.maxContentCharsHelper')}
+            />
+          </Stack>
+
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <TextField
               select
               label={t('settingsTavily.searchDepth')}
               value={searchDepth}
@@ -300,9 +316,6 @@ export function TavilyConfigSection() {
               <MenuItem value="basic">{t('settingsTavily.searchDepthBasic')}</MenuItem>
               <MenuItem value="advanced">{t('settingsTavily.searchDepthAdvanced')}</MenuItem>
             </TextField>
-          </Stack>
-
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <TextField
               select
               label={t('settingsTavily.topic')}
@@ -317,24 +330,25 @@ export function TavilyConfigSection() {
               <MenuItem value="general">{t('settingsTavily.topicGeneral')}</MenuItem>
               <MenuItem value="news">{t('settingsTavily.topicNews')}</MenuItem>
             </TextField>
-            <TextField
-              select
-              label={t('settingsTavily.timeRange')}
-              value={timeRange}
-              onChange={(e) => {
-                setTimeRange(e.target.value as TimeRange)
-                markChanged()
-              }}
-              size="small"
-              fullWidth
-            >
-              <MenuItem value="">{t('settingsTavily.timeRangeNone')}</MenuItem>
-              <MenuItem value="day">{t('settingsTavily.timeRangeDay')}</MenuItem>
-              <MenuItem value="week">{t('settingsTavily.timeRangeWeek')}</MenuItem>
-              <MenuItem value="month">{t('settingsTavily.timeRangeMonth')}</MenuItem>
-              <MenuItem value="year">{t('settingsTavily.timeRangeYear')}</MenuItem>
-            </TextField>
           </Stack>
+
+          <TextField
+            select
+            label={t('settingsTavily.timeRange')}
+            value={timeRange}
+            onChange={(e) => {
+              setTimeRange(e.target.value as TimeRange)
+              markChanged()
+            }}
+            size="small"
+            fullWidth
+          >
+            <MenuItem value="">{t('settingsTavily.timeRangeNone')}</MenuItem>
+            <MenuItem value="day">{t('settingsTavily.timeRangeDay')}</MenuItem>
+            <MenuItem value="week">{t('settingsTavily.timeRangeWeek')}</MenuItem>
+            <MenuItem value="month">{t('settingsTavily.timeRangeMonth')}</MenuItem>
+            <MenuItem value="year">{t('settingsTavily.timeRangeYear')}</MenuItem>
+          </TextField>
 
           <FormControlLabel
             control={
@@ -347,18 +361,6 @@ export function TavilyConfigSection() {
               />
             }
             label={<Typography variant="body2">{t('settingsTavily.includeAnswer')}</Typography>}
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={includeImages}
-                onChange={(e) => {
-                  setIncludeImages(e.target.checked)
-                  markChanged()
-                }}
-              />
-            }
-            label={<Typography variant="body2">{t('settingsTavily.includeImages')}</Typography>}
           />
 
           <FormControlLabel

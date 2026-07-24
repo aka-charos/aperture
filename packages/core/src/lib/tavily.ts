@@ -11,8 +11,8 @@
  * It can run as an additional grounding source, or as a fallback when Google
  * grounding is rate-limited/empty. Config is a single JSON blob in
  * `system_settings` (mirrors the n8n integration); enablement is an explicit
- * `enabled` flag plus a present API key. HTTP failures are recorded to
- * `api_errors` under the 'tavily' provider so they surface in the admin panel.
+ * `enabled` flag plus a present API key. HTTP and network failures are recorded
+ * to `api_errors` under the 'tavily' provider so they surface in the admin panel.
  */
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
 import { createChildLogger } from './logger.js'
@@ -34,12 +34,16 @@ export interface TavilyConfig {
   searchDepth: TavilySearchDepth
   /** Ask Tavily for a synthesized answer to the query (extra grounding text). */
   includeAnswer: boolean
-  /** Include image URLs in results (unused by discovery today; here for parity). */
-  includeImages: boolean
   /** 'general' (default) or 'news' (recency-weighted, good for "trending"). */
   topic: TavilyTopic
   /** Restrict to a recent window (for trending queries); null = no restriction. */
   timeRange: TavilyTimeRange
+  /**
+   * Truncate each web result's snippet to this many characters before it is
+   * handed to the structuring model. Lets an admin trade grounding detail for
+   * token cost/latency independently of maxResults (100–8000).
+   */
+  maxContentChars: number
 }
 
 export const DEFAULT_TAVILY_CONFIG: TavilyConfig = {
@@ -48,9 +52,9 @@ export const DEFAULT_TAVILY_CONFIG: TavilyConfig = {
   maxResults: 5,
   searchDepth: 'basic',
   includeAnswer: true,
-  includeImages: false,
   topic: 'general',
   timeRange: null,
+  maxContentChars: 1000,
 }
 
 const SETTING_KEY = 'tavily_integration'
@@ -60,6 +64,11 @@ const TAVILY_TIMEOUT_MS = 15000
 function clampMaxResults(n: number): number {
   if (!Number.isFinite(n)) return DEFAULT_TAVILY_CONFIG.maxResults
   return Math.min(20, Math.max(1, Math.trunc(n)))
+}
+
+function clampMaxContentChars(n: number): number {
+  if (!Number.isFinite(n)) return DEFAULT_TAVILY_CONFIG.maxContentChars
+  return Math.min(8000, Math.max(100, Math.trunc(n)))
 }
 
 export async function getTavilyConfig(): Promise<TavilyConfig> {
@@ -73,6 +82,9 @@ export async function getTavilyConfig(): Promise<TavilyConfig> {
         ...DEFAULT_TAVILY_CONFIG,
         ...parsed,
         maxResults: clampMaxResults(parsed.maxResults ?? DEFAULT_TAVILY_CONFIG.maxResults),
+        maxContentChars: clampMaxContentChars(
+          parsed.maxContentChars ?? DEFAULT_TAVILY_CONFIG.maxContentChars
+        ),
       }
     } catch (e) {
       logger.error({ error: e }, 'Failed to parse tavily_integration config')
@@ -82,7 +94,11 @@ export async function getTavilyConfig(): Promise<TavilyConfig> {
 }
 
 export async function setTavilyConfig(config: TavilyConfig): Promise<void> {
-  const sanitized: TavilyConfig = { ...config, maxResults: clampMaxResults(config.maxResults) }
+  const sanitized: TavilyConfig = {
+    ...config,
+    maxResults: clampMaxResults(config.maxResults),
+    maxContentChars: clampMaxContentChars(config.maxContentChars),
+  }
   await setSystemSetting(
     SETTING_KEY,
     JSON.stringify(sanitized),
@@ -116,7 +132,6 @@ export interface TavilySearchResponse {
   query: string
   answer?: string
   results: TavilySearchResultItem[]
-  images?: string[]
   responseTime?: number
 }
 
@@ -126,16 +141,15 @@ export interface TavilySearchParams {
   maxResults?: number
   searchDepth?: TavilySearchDepth
   includeAnswer?: boolean
-  includeImages?: boolean
   topic?: TavilyTopic
   timeRange?: TavilyTimeRange
 }
 
 /**
- * Run a Tavily search. Throws {@link TavilyError} on a non-2xx response (also
- * recorded to `api_errors` under the 'tavily' provider, deduped) or on a
- * network/timeout failure. Callers in the fail-open discovery path catch and
- * degrade to the other sources.
+ * Run a Tavily search. Throws {@link TavilyError} on a non-2xx response or a
+ * network/timeout failure — both recorded to `api_errors` under the 'tavily'
+ * provider (deduped). Callers in the fail-open discovery path catch and degrade
+ * to the other sources.
  */
 export async function tavilySearch(
   query: string,
@@ -151,7 +165,6 @@ export async function tavilySearch(
     topic: params.topic ?? DEFAULT_TAVILY_CONFIG.topic,
     max_results: clampMaxResults(params.maxResults ?? DEFAULT_TAVILY_CONFIG.maxResults),
     include_answer: params.includeAnswer ?? DEFAULT_TAVILY_CONFIG.includeAnswer,
-    include_images: params.includeImages ?? DEFAULT_TAVILY_CONFIG.includeImages,
   }
   if (params.timeRange) body.time_range = params.timeRange
 
@@ -167,14 +180,16 @@ export async function tavilySearch(
       signal: AbortSignal.timeout(TAVILY_TIMEOUT_MS),
     })
   } catch (err) {
-    // Network/timeout — no HTTP status to classify; surface as a TavilyError.
+    // Network/timeout — no HTTP status. Record as a synthetic outage (status 0)
+    // so a persistent egress/DNS problem still surfaces in the admin panel.
     const message = err instanceof Error ? err.message : String(err)
+    await recordTavilyError(0, `Network/timeout: ${message}`)
     throw new TavilyError(`Tavily request failed: ${message}`)
   }
 
   if (!response.ok) {
     const bodyText = await response.text().catch(() => '')
-    await recordTavilyHttpError(response.status, bodyText)
+    await recordTavilyError(response.status, bodyText)
     throw new TavilyError(`Tavily returned ${response.status}: ${bodyText.slice(0, 200)}`, response.status)
   }
 
@@ -182,7 +197,6 @@ export async function tavilySearch(
     query?: string
     answer?: string
     results?: Array<{ title?: string; url?: string; content?: string; score?: number }>
-    images?: unknown
     response_time?: number
   }
 
@@ -199,17 +213,14 @@ export async function tavilySearch(
     query: json.query ?? query,
     answer: typeof json.answer === 'string' ? json.answer : undefined,
     results,
-    images: Array.isArray(json.images)
-      ? json.images.filter((i): i is string => typeof i === 'string')
-      : undefined,
     responseTime: json.response_time,
   }
 }
 
-/** Record a Tavily HTTP failure to the api_errors sink (deduped). Never throws. */
-async function recordTavilyHttpError(status: number, bodyText: string): Promise<void> {
+/** Record a Tavily failure (HTTP or network) to the api_errors sink (deduped). Never throws. */
+async function recordTavilyError(status: number, detail: string): Promise<void> {
   try {
-    const parsed = parseApiError('tavily', status, { errorMessage: bodyText.slice(0, 300) })
+    const parsed = parseApiError('tavily', status, { errorMessage: detail.slice(0, 300) })
     const recent = await hasRecentSimilarError('tavily', parsed.definition.type, status)
     if (!recent) await logApiError(parsed)
   } catch (e) {
