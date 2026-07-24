@@ -9,6 +9,7 @@
  */
 import { generateText, type UIMessage } from 'ai'
 import { getChatModelInstance, createChildLogger } from '@aperture/core'
+import { recordLlmError } from './errors.js'
 
 const logger = createChildLogger('route-intent')
 
@@ -63,7 +64,10 @@ export async function classifyIntent(messages: UIMessage[]): Promise<ChatIntent>
     })
     return parseIntent(out)
   } catch (err) {
-    logger.warn({ err }, 'Intent classification failed; defaulting to library')
+    // Surface the failure with its HTTP status instead of hiding it. The chat
+    // model's provider varies (often unsupported by the errors framework), so
+    // this logs only — no api_errors record — before failing open to library.
+    await recordLlmError(err, { context: 'intent classification', logger })
     return 'library'
   }
 }

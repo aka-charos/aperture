@@ -8,6 +8,7 @@
  * ToolResultError renders.
  */
 import { APICallError, LoadAPIKeyError, RetryError } from 'ai'
+import { parseApiError, logApiError, hasRecentSimilarError } from '@aperture/core'
 
 export type AssistantErrorCode =
   | 'not_configured'
@@ -98,4 +99,49 @@ export function toolErrorText(err: unknown): string {
   }
   const detail = errorDetail(err)
   return detail ? `Lookup failed: ${detail}` : 'Lookup failed due to an unexpected error.'
+}
+
+/** Providers the api_errors framework can classify for assistant LLM calls. */
+type LlmErrorProvider = 'google' | 'openai'
+
+/** Minimal pino-compatible logger surface (avoids a hard pino type dependency). */
+interface LlmErrorLogger {
+  warn(obj: object, msg?: string): void
+}
+
+/** HTTP status from the first APICallError in the chain, if the SDK exposed one. */
+function httpStatusOf(err: unknown): number | undefined {
+  for (const e of errorChain(err)) {
+    if (APICallError.isInstance(e)) return e.statusCode
+  }
+  return undefined
+}
+
+/**
+ * Surface a failed assistant LLM call that would otherwise be swallowed by a
+ * fail-open path (discovery web search, intent routing). It ALWAYS logs the
+ * failure — with the HTTP status when the SDK exposes one, so a Gemini 429 is
+ * identifiable — and, for a provider the errors framework understands, records
+ * it to the `api_errors` sink (deduped, like the integration clients) so it
+ * appears in the admin API-errors panel. Never throws: callers stay fail-open.
+ */
+export async function recordLlmError(
+  err: unknown,
+  opts: { context: string; provider?: LlmErrorProvider; logger: LlmErrorLogger }
+): Promise<void> {
+  const { context, provider, logger } = opts
+  const status = httpStatusOf(err)
+  const detail = errorDetail(err)
+  logger.warn({ err, context, provider, httpStatus: status }, `Assistant LLM call failed: ${context}`)
+
+  // Only persist to api_errors when we have a real HTTP status and a provider the
+  // framework can classify (grounding is Google-only; chat may be another provider).
+  if (!provider || typeof status !== 'number') return
+  try {
+    const parsed = parseApiError(provider, status, { errorMessage: detail })
+    const recent = await hasRecentSimilarError(provider, parsed.definition.type, status)
+    if (!recent) await logApiError(parsed)
+  } catch (persistErr) {
+    logger.warn({ err: persistErr, context }, 'Failed to record LLM error to api_errors')
+  }
 }

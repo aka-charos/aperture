@@ -33,7 +33,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 
 interface ApiError {
   id: string
-  provider: 'openai' | 'tmdb' | 'trakt' | 'mdblist' | 'omdb'
+  provider: 'openai' | 'google' | 'tmdb' | 'trakt' | 'mdblist' | 'omdb'
   errorType: 'rate_limit' | 'auth' | 'limit' | 'outage'
   errorCode?: string
   httpStatus: number
@@ -51,7 +51,7 @@ interface ErrorSummaryItem {
 
 interface ApiErrorAlertProps {
   /** Show only errors for a specific provider */
-  provider?: 'openai' | 'tmdb' | 'trakt' | 'mdblist' | 'omdb'
+  provider?: 'openai' | 'google' | 'tmdb' | 'trakt' | 'mdblist' | 'omdb'
   /** Maximum number of errors to display */
   maxErrors?: number
   /** Compact mode for smaller displays */
@@ -61,6 +61,7 @@ interface ApiErrorAlertProps {
 // Provider display names
 const PROVIDER_NAMES: Record<string, string> = {
   openai: 'OpenAI',
+  google: 'Google / Gemini',
   tmdb: 'TMDb',
   trakt: 'Trakt',
   mdblist: 'MDBList',
