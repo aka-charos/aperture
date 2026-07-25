@@ -49,10 +49,15 @@ function ChatThreadArea({
   fetchConversations: () => Promise<void>
   onSaveError: () => void
 }) {
-  // Memoize transport to prevent recreation on re-renders
+  // Memoize transport to prevent recreation on re-renders.
+  // The server rebuilds prior turns from this conversation (the runtime is
+  // remounted empty on every conversation load / id assignment, so history has
+  // to come from the DB, not the runtime). The id is fixed for this mount —
+  // ChatThreadArea is keyed by conversationId — so it's safe to set at creation.
   const transport = useRef(new AssistantChatTransport({
     api: '/api/assistant/chat',
     credentials: 'include',
+    ...(conversationId ? { headers: { 'x-conversation-id': conversationId } } : {}),
   }))
 
   // Don't pass messages to runtime - it doesn't properly parse tool results

@@ -19,7 +19,7 @@ import {
 } from 'ai'
 import { getChatModelInstance, getEmbeddingModelInstance, getActiveEmbeddingModelId } from '@aperture/core'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
-import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText } from '../helpers/index.js'
+import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText, loadConversationHistory } from '../helpers/index.js'
 import { createTools, createN8nTools, createDiscoveryResolveTool, DISCOVERY_PROMPT } from '../tools/index.js'
 import { withToolErrorHandling } from '../tools/utils.js'
 import type { ToolContext } from '../types.js'
@@ -134,8 +134,38 @@ export function registerChatHandler(fastify: FastifyInstance) {
           mediaServer,
         }
 
+        // Rebuild prior turns from the persisted conversation (the source of
+        // truth). The client's chat runtime is remounted — and emptied — whenever
+        // a conversation is (re)loaded or first assigned an id, so a follow-up
+        // would otherwise arrive with no history and the assistant would both
+        // forget and improvise a fresh, unrelated answer. The conversation id is
+        // sent as a header; history is scoped to this user. Falls back to the
+        // client-sent messages when there's no id / no stored history.
+        let baseMessages: UIMessage[] = messages
+        const conversationId =
+          typeof request.headers['x-conversation-id'] === 'string'
+            ? request.headers['x-conversation-id'].trim()
+            : ''
+        if (conversationId) {
+          try {
+            const history = await loadConversationHistory(conversationId, user.id)
+            if (history.length > 0) {
+              // DB history is authoritative for prior turns; append only the newly
+              // typed message (the client's last) to avoid double-counting the
+              // turns it still holds in a continuous, un-remounted session.
+              const lastClientMessage = messages[messages.length - 1]
+              baseMessages = lastClientMessage ? [...history, lastClientMessage] : history
+            }
+          } catch (err) {
+            fastify.log.warn(
+              { err, conversationId },
+              'Failed to load conversation history; using client messages as-is'
+            )
+          }
+        }
+
         // Optional n8n pre-processing hook (fails open if n8n is unreachable)
-        const { messages: processedMessages, systemAppend } = await applyN8nPreProcess(messages, {
+        const { messages: processedMessages, systemAppend } = await applyN8nPreProcess(baseMessages, {
           id: user.id,
           isAdmin: user.isAdmin,
         })
