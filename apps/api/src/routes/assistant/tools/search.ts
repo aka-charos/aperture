@@ -59,6 +59,8 @@ function formatContentItem(
     name: item.title,
     subtitle,
     image: item.poster_url,
+    // For a series this column holds the creators — the card labels it accordingly.
+    director: (item.directors ?? []).slice(0, 2).join(', ') || null,
     rating: item.community_rating,
     rank,
     actions: [
@@ -185,7 +187,7 @@ export async function findSimilarItems(
       : [movie.id, modelId, embeddingStr, limit]
 
     const similar = await query<MovieResult & { provider_item_id?: string }>(
-      `SELECT m.id, m.title, m.year, m.genres, m.community_rating, m.poster_url, m.provider_item_id
+      `SELECT m.id, m.title, m.year, m.genres, m.community_rating, m.poster_url, m.provider_item_id, m.directors
        FROM ${movieEmbeddingTable} e JOIN movies m ON m.id = e.movie_id
        WHERE e.movie_id != $1 AND e.model = $2 ${watchedFilter}
        ORDER BY e.embedding <=> $3::halfvec
@@ -222,7 +224,7 @@ export async function findSimilarItems(
       : [series.id, modelId, embeddingStr, limit]
 
     const similar = await query<SeriesResult & { provider_item_id?: string }>(
-      `SELECT s.id, s.title, s.year, s.genres, s.network, s.community_rating, s.poster_url, s.provider_item_id
+      `SELECT s.id, s.title, s.year, s.genres, s.network, s.community_rating, s.poster_url, s.provider_item_id, s.directors
        FROM ${seriesEmbeddingTable} se
        JOIN series s ON s.id = se.series_id
        WHERE se.series_id != $1
@@ -449,7 +451,7 @@ export function createSearchTools(ctx: ToolContext) {
         if (type === 'movies' || type === 'both') {
           const { whereClause, values, limitIdx } = buildWhere(true)
           const movieResult = await query<MovieResult & { provider_item_id?: string }>(
-            `SELECT id, title, year, genres, community_rating, poster_url, provider_item_id
+            `SELECT id, title, year, genres, community_rating, poster_url, provider_item_id, directors
              FROM movies ${whereClause}
              ORDER BY ${sortColumn} ${order} ${nullsOrder} LIMIT $${limitIdx}`,
             values
@@ -468,7 +470,7 @@ export function createSearchTools(ctx: ToolContext) {
         if (type === 'series' || type === 'both') {
           const { whereClause, values, limitIdx } = buildWhere(false)
           const seriesResult = await query<SeriesResult & { provider_item_id?: string }>(
-            `SELECT id, title, year, genres, network, community_rating, poster_url, provider_item_id
+            `SELECT id, title, year, genres, network, community_rating, poster_url, provider_item_id, directors
              FROM series ${whereClause}
              ORDER BY ${sortColumn !== 'runtime_minutes' ? sortColumn : 'community_rating'} ${order} ${nullsOrder} LIMIT $${limitIdx}`,
             values
@@ -547,7 +549,7 @@ export function createSearchTools(ctx: ToolContext) {
             const movieResults = await query<
               MovieResult & { provider_item_id?: string; similarity: number }
             >(
-              `SELECT m.id, m.title, m.year, m.genres, m.community_rating, m.poster_url, m.provider_item_id,
+              `SELECT m.id, m.title, m.year, m.genres, m.community_rating, m.poster_url, m.provider_item_id, m.directors,
                       1 - (e.embedding <=> $1::halfvec) as similarity
                FROM ${movieTableName} e
                JOIN movies m ON m.id = e.movie_id
@@ -573,7 +575,7 @@ export function createSearchTools(ctx: ToolContext) {
             const seriesResults = await query<
               SeriesResult & { provider_item_id?: string; similarity: number }
             >(
-              `SELECT s.id, s.title, s.year, s.genres, s.network, s.community_rating, s.poster_url, s.provider_item_id,
+              `SELECT s.id, s.title, s.year, s.genres, s.network, s.community_rating, s.poster_url, s.provider_item_id, s.directors,
                       1 - (se.embedding <=> $1::halfvec) as similarity
                FROM ${seriesTableName} se
                JOIN series s ON s.id = se.series_id

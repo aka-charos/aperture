@@ -15,7 +15,8 @@ export interface MovieResult {
   poster_url: string | null
   provider_item_id?: string | null
   runtime?: number | null
-  director?: string | null
+  /** `movies.directors` — director names (the column is an array). */
+  directors?: string[] | null
   cast?: string[] | null
 }
 
@@ -31,6 +32,8 @@ export interface SeriesResult {
   provider_item_id?: string | null
   status?: string | null
   end_year?: number | null
+  /** `series.directors` — for series this column holds the CREATORS/showrunners. */
+  directors?: string[] | null
 }
 
 export interface TasteProfile {
@@ -58,6 +61,8 @@ export interface MediaServerInfo {
   baseUrl: string
   type: 'emby' | 'jellyfin'
   serverId: string
+  /** Operator's display name for the server (falls back to the reported name). */
+  name: string | null
 }
 
 // Conversation types

@@ -19,6 +19,11 @@ export const ContentItemSchema = z.object({
   subtitle: z.string().optional().describe('Year, genres, or other info'),
   image: z.string().nullable().optional().describe('Poster image URL'),
   overview: z.string().nullable().optional().describe('Short synopsis/overview from the library'),
+  director: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Director(s) for a movie, or creator(s) for a series — comma separated'),
   reason: z
     .string()
     .nullable()

@@ -119,7 +119,7 @@ export function registerChatHandler(fastify: FastifyInstance) {
         const embeddingModel = await getEmbeddingModelInstance()
         const embeddingModelId = await getActiveEmbeddingModelId()
         const mediaServer = await getMediaServerInfo()
-        const systemPrompt = await buildSystemPrompt(user.id, user.isAdmin)
+        const systemPrompt = await buildSystemPrompt(user.id, user.isAdmin, mediaServer?.name)
 
         if (!embeddingModelId) {
           return reply.status(500).send({ error: 'Embedding model not configured' })

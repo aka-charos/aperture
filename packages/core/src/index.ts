@@ -827,7 +827,9 @@ export {
 export {
   setFavoritesForUser,
   getFavoriteStatusForUser,
+  getFavoriteStatusesForUser,
   type SetFavoritesResult,
+  type FavoriteStatusesResult,
 } from './favorites/index.js'
 
 // Seerr Integration

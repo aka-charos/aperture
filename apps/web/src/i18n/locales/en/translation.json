@@ -905,6 +905,8 @@
     "favoriteRemoved": "Removed from your favorites",
     "favoriteFailed": "Couldn't update favorites. Please try again.",
     "favoriteNotInLibrary": "That title isn't in your library, so it can't be favorited.",
+    "directedBy": "Dir. {{name}}",
+    "createdBy": "Created by {{name}}",
     "movie": "Movie",
     "series": "Series",
     "details": "Details",

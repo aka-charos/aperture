@@ -18,6 +18,8 @@ export interface ContentItem {
   image?: string | null
   overview?: string | null
   reason?: string | null
+  /** Director(s) for a movie, creator(s) for a series — comma separated. */
+  director?: string | null
   rating?: number | null
   userRating?: number | null
   rank?: number

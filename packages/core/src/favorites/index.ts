@@ -17,6 +17,61 @@ export interface SetFavoritesResult {
   skipped: number
 }
 
+/** Favorited subsets of the requested ids, in our own internal id space. */
+export interface FavoriteStatusesResult {
+  movieIds: string[]
+  seriesIds: string[]
+}
+
+/** One internal id paired with the provider item id it resolves to. */
+interface ProviderIdPair {
+  internalId: string
+  providerItemId: string
+  kind: 'movie' | 'series'
+}
+
+/**
+ * Map internal ids → provider item ids while KEEPING the link back to the
+ * internal id (unlike getProviderItemIds, which flattens it away). Needed to
+ * report per-item status against the ids the caller asked about.
+ */
+async function getProviderIdPairs(
+  movieIds: string[],
+  seriesIds: string[]
+): Promise<ProviderIdPair[]> {
+  const pairs: ProviderIdPair[] = []
+
+  if (movieIds.length > 0) {
+    const movies = await query<{ id: string; provider_item_id: string }>(
+      'SELECT id, provider_item_id FROM movies WHERE id = ANY($1) AND provider_item_id IS NOT NULL',
+      [movieIds]
+    )
+    pairs.push(
+      ...movies.rows.map((m) => ({
+        internalId: m.id,
+        providerItemId: m.provider_item_id,
+        kind: 'movie' as const,
+      }))
+    )
+  }
+
+  if (seriesIds.length > 0) {
+    const series = await query<{ id: string; provider_item_id: string }>(
+      'SELECT id, provider_item_id FROM series WHERE id = ANY($1) AND provider_item_id IS NOT NULL',
+      [seriesIds]
+    )
+    pairs.push(
+      ...series.rows.map((s) => ({
+        internalId: s.id,
+        providerItemId: s.provider_item_id,
+        kind: 'series' as const,
+      }))
+    )
+  }
+
+  return pairs
+}
+
 /**
  * Map internal movie/series ids → provider item ids, skipping any without a provider id.
  */
@@ -128,4 +183,65 @@ export async function getFavoriteStatusForUser(
   if (itemIds.length === 0) return false
 
   return provider.isItemFavorite(apiKey, user.provider_user_id, itemIds[0])
+}
+
+/** Media-server lookups run concurrently, but bounded so a big list can't flood it. */
+const STATUS_CONCURRENCY = 8
+
+/**
+ * Favorite status for MANY items in one call — so a list of cards doesn't need
+ * one HTTP round trip each just to know which hearts are already filled.
+ *
+ * Returns only the favorited ids (a subset of what was asked). Items with no
+ * provider id, or whose lookup fails, are simply absent rather than throwing:
+ * an unknown status must degrade to "not favorited", never to a broken list.
+ */
+export async function getFavoriteStatusesForUser(
+  userId: string,
+  movieIds: string[],
+  seriesIds: string[]
+): Promise<FavoriteStatusesResult> {
+  const result: FavoriteStatusesResult = { movieIds: [], seriesIds: [] }
+  if (movieIds.length === 0 && seriesIds.length === 0) return result
+
+  const provider = await getMediaServerProvider()
+  const apiKey = await getMediaServerApiKey()
+
+  if (!apiKey) {
+    throw new Error('Media server API key is not configured')
+  }
+
+  const user = await queryOne<{ provider_user_id: string }>(
+    'SELECT provider_user_id FROM users WHERE id = $1',
+    [userId]
+  )
+
+  if (!user?.provider_user_id) {
+    throw new Error('User is not linked to media server')
+  }
+
+  const pairs = await getProviderIdPairs(movieIds, seriesIds)
+  const providerUserId = user.provider_user_id
+
+  for (let i = 0; i < pairs.length; i += STATUS_CONCURRENCY) {
+    const batch = pairs.slice(i, i + STATUS_CONCURRENCY)
+    const statuses = await Promise.all(
+      batch.map(async (pair) => {
+        try {
+          return await provider.isItemFavorite(apiKey, providerUserId, pair.providerItemId)
+        } catch (err) {
+          // One unreadable item must not sink the whole list.
+          logger.warn({ err, itemId: pair.providerItemId }, 'Favorite status lookup failed')
+          return false
+        }
+      })
+    )
+    batch.forEach((pair, index) => {
+      if (!statuses[index]) return
+      if (pair.kind === 'movie') result.movieIds.push(pair.internalId)
+      else result.seriesIds.push(pair.internalId)
+    })
+  }
+
+  return result
 }

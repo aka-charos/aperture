@@ -21,10 +21,11 @@ interface LibraryRow {
   provider_item_id: string | null
   imdb_id: string | null
   tmdb_id: string | null
+  directors: string[] | null
 }
 
 const COLUMNS =
-  'id, title, year, genres, overview, community_rating, poster_url, provider_item_id, imdb_id, tmdb_id'
+  'id, title, year, genres, overview, community_rating, poster_url, provider_item_id, imdb_id, tmdb_id, directors'
 
 function normalizeTitle(t: string): string {
   return t
@@ -58,6 +59,8 @@ function toContentItem(
     subtitle,
     image: row.poster_url,
     overview: row.overview,
+    // On `series` this column holds the creators — the card labels it accordingly.
+    director: (row.directors ?? []).slice(0, 2).join(', ') || null,
     reason: reason ?? null,
     rating: row.community_rating,
     actions: [

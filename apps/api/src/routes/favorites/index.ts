@@ -1,6 +1,10 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { requireAuth, type SessionUser } from '../../plugins/auth.js'
-import { setFavoritesForUser, getFavoriteStatusForUser } from '@aperture/core'
+import {
+  setFavoritesForUser,
+  getFavoriteStatusForUser,
+  getFavoriteStatusesForUser,
+} from '@aperture/core'
 
 const favoritesRoutes: FastifyPluginAsync = async (fastify) => {
   /**
@@ -27,6 +31,35 @@ const favoritesRoutes: FastifyPluginAsync = async (fastify) => {
       } catch (err) {
         request.log.error({ err, userId: currentUser.id }, 'Failed to fetch favorite status')
         const message = err instanceof Error ? err.message : 'Failed to fetch favorite status'
+        return reply.status(500).send({ error: message })
+      }
+    }
+  )
+
+  /**
+   * POST /api/favorites/status/bulk
+   * Favorite status for many items at once — one request instead of one per card.
+   * Body: { movieIds?, seriesIds? }. Responds with the favorited SUBSET of those ids.
+   */
+  fastify.post<{
+    Body: { movieIds?: string[]; seriesIds?: string[] }
+  }>(
+    '/api/favorites/status/bulk',
+    { preHandler: requireAuth, schema: { tags: ['favorites'] } },
+    async (request, reply) => {
+      const currentUser = request.user as SessionUser
+      const { movieIds = [], seriesIds = [] } = request.body || {}
+
+      if (movieIds.length === 0 && seriesIds.length === 0) {
+        return reply.send({ movieIds: [], seriesIds: [] })
+      }
+
+      try {
+        const result = await getFavoriteStatusesForUser(currentUser.id, movieIds, seriesIds)
+        return reply.send(result)
+      } catch (err) {
+        request.log.error({ err, userId: currentUser.id }, 'Failed to fetch favorite statuses')
+        const message = err instanceof Error ? err.message : 'Failed to fetch favorite statuses'
         return reply.status(500).send({ error: message })
       }
     }

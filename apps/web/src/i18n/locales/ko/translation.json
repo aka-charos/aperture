@@ -1441,7 +1441,9 @@
     "favoriteAdded": "Added to your favorites",
     "favoriteRemoved": "Removed from your favorites",
     "favoriteFailed": "Couldn't update favorites. Please try again.",
-    "favoriteNotInLibrary": "That title isn't in your library, so it can't be favorited."
+    "favoriteNotInLibrary": "That title isn't in your library, so it can't be favorited.",
+    "directedBy": "Dir. {{name}}",
+    "createdBy": "Created by {{name}}"
   },
   "similarityGraph": {
     "loadingFallback": "로드 중…",
