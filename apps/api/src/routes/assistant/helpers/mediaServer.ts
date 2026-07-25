@@ -1,7 +1,7 @@
 /**
  * Media server helper functions for generating play links
  */
-import { getMediaServerConfig, createMediaServerProvider } from '@aperture/core'
+import { getMediaServerConfig, createMediaServerProvider, getSystemSetting } from '@aperture/core'
 import type { MediaServerInfo } from '../types.js'
 
 /**
@@ -13,6 +13,7 @@ export async function getMediaServerInfo(): Promise<MediaServerInfo | null> {
     if (!config.baseUrl || !config.apiKey || !config.type) return null
 
     let serverId = ''
+    let reportedName = ''
     try {
       const provider = createMediaServerProvider(config.type, config.baseUrl)
       if ('getServerInfo' in provider) {
@@ -20,16 +21,22 @@ export async function getMediaServerInfo(): Promise<MediaServerInfo | null> {
           provider as { getServerInfo: (key: string) => Promise<{ id: string; name: string }> }
         ).getServerInfo(config.apiKey)
         serverId = info.id
+        reportedName = info.name
       }
     } catch {
-      // Server ID is optional for link generation
+      // Server ID/name are optional for link generation
     }
+
+    // Same precedence the rest of the app uses: operator override wins over the
+    // name the server reports (see GET /api/settings/media-server).
+    const customName = ((await getSystemSetting('server_display_name')) ?? '').trim()
 
     return {
       // Play links are user-facing: prefer the public URL when configured
       baseUrl: config.publicUrl || config.baseUrl,
       type: config.type as 'emby' | 'jellyfin',
       serverId,
+      name: customName || reportedName || null,
     }
   } catch {
     return null

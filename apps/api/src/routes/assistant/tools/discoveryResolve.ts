@@ -53,8 +53,10 @@ export const DISCOVERY_PROMPT =
   'never stop at the cards. Do NOT enumerate every title. Instead go DEEP on 2-3 standouts: ' +
   'name them and say something substantive about why they fit — the specific device, tone or ' +
   'idea they share with the request, which one to start with and what to expect from it. ' +
-  'Concrete and confident, never hedged ("is often described as", "critics have noted"). ' +
-  'Then mention any notable titles from the returned notInLibrary list worth adding.\n' +
+  'Concrete and confident, never hedged ("is often described as", "critics have noted").\n' +
+  'HARD RULE: only ever name titles that came back on the cards. Never mention a title ' +
+  'that is not in the library — not as a suggestion, not as "worth adding", not as an aside. ' +
+  'If the web turned up something the library does not have, silently leave it out.\n' +
   'If the tool returns a "Similar to …" list instead of "Recommendations" (web picks were ' +
   'unavailable), treat those as your recommendations: write the same opener and closing about ' +
   'them as the closest matches in the library — seamlessly, without mentioning that web search ' +
@@ -69,7 +71,7 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
   return {
     findCandidatesInLibrary: tool({
       description:
-        "Gather web-sourced recommendation candidates for this request and match them to the user's library, returning them as the primary 'Recommendations'. When a specific title is referenced via seedTitle, also add embeddings-similar library picks as 'Also worth checking'. Call this exactly ONCE, first. Each pick includes a short grounded 'reason' that is already shown on its card — synthesize a short closing note rather than repeating them per title. Only present what this tool returns — never invent titles.",
+        "Gather web-sourced recommendation candidates for this request and match them to the user's library, returning them as the primary 'Recommendations'. When a specific title is referenced via seedTitle, also add embeddings-similar library picks as 'Also worth checking'. Call this exactly ONCE, first. Everything returned is IN the library — titles the library does not have are dropped and must never be mentioned. Each pick includes a short 'reason' that is already shown on its card — synthesize a short closing note rather than repeating them per title. Only present what this tool returns — never invent titles.",
       inputSchema: nullSafe(z.object({
         seedTitle: z
           .string()
@@ -100,13 +102,6 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
         )
         const { items: webItems, notInLibrary } = await resolveCandidates(candidates, ctx)
 
-        // Pass leftovers to the model (for commentary) without rendering them as cards
-        const notInLibraryTitles = notInLibrary.map((c) => ({
-          title: c.title,
-          year: c.year,
-          mediaType: c.mediaType,
-        }))
-
         // Secondary section: embeddings-similar to the referenced title, deduped
         // against the web picks so nothing appears twice. Only when a title was given.
         let alsoItems: ContentItem[] = []
@@ -120,30 +115,30 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
           }
         }
 
-        // Rewrite the notes on whichever list is PRIMARY — the one whose per-title
-        // "why" is displayed prominently — so they read like insight instead of
-        // condensed search copy. One call on a writing model; fails open to the
-        // extractive notes. The embeddings fallback list has no notes at all, so
-        // this is also what gives it a "why" when web search came back empty.
-        const primaryItems = webItems.length > 0 ? webItems : alsoItems
-        const enrichedPrimary = await enrichCardReasons(primaryItems, queryText)
-        const webCards = webItems.length > 0 ? enrichedPrimary : webItems
-        const alsoCards = webItems.length > 0 ? alsoItems : enrichedPrimary
+        // Rewrite the per-title notes so they read like insight instead of condensed
+        // search copy. BOTH sections go through one call: the embeddings picks carry
+        // no rationale of their own, which is why "Also worth checking" used to show
+        // bare cards next to fully-explained ones. Order/length are preserved, so the
+        // two lists split back out cleanly. Fails open to the original notes.
+        const enriched = await enrichCardReasons([...webItems, ...alsoItems], queryText)
+        const webCards = enriched.slice(0, webItems.length)
+        const alsoCards = enriched.slice(webItems.length)
 
-        // Per-pick rationale: grounding for the model's closing synthesis. Prefers
-        // the enriched note so the model's callouts match what the cards say.
+        // Per-pick rationale: grounding for the model's closing synthesis. ONLY
+        // library items — the model must never name something the user can't watch.
         const enrichedByTitle = new Map(
-          webCards
+          [...webCards, ...alsoCards]
             .filter((i) => i.reason)
             .map((i) => [normalizeTitleKey(i.name), i.reason as string])
         )
         const notInLibrarySet = new Set(notInLibrary)
-        const picks = candidates.map((c) => ({
-          title: c.title,
-          year: c.year,
-          reason: enrichedByTitle.get(normalizeTitleKey(c.title)) ?? c.reason,
-          inLibrary: !notInLibrarySet.has(c),
-        }))
+        const picks = candidates
+          .filter((c) => !notInLibrarySet.has(c))
+          .map((c) => ({
+            title: c.title,
+            year: c.year,
+            reason: enrichedByTitle.get(normalizeTitleKey(c.title)) ?? c.reason,
+          }))
 
         const carousels: ContentCarousel[] = []
         if (webCards.length > 0) {
@@ -181,14 +176,17 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
           carousels.push(
             createCarouselResult(`discovery-empty-${Date.now()}`, [], {
               description:
-                notInLibraryTitles.length > 0
-                  ? 'None of the web-sourced picks are in your library yet.'
+                notInLibrary.length > 0
+                  ? 'None of the web-sourced picks are in the library.'
                   : 'No web-sourced picks were found for this request.',
             })
           )
         }
 
-        return { carousels, picks, notInLibrary: notInLibraryTitles }
+        // Deliberately NOT returning the unmatched titles: anything the model can
+        // see, it will eventually mention, and nothing outside the library should
+        // ever reach the user.
+        return { carousels, picks }
       },
     }),
   }

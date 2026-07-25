@@ -7,7 +7,7 @@
  * - a vertical stack of rich cards (when `data.layout === 'list'`) — the
  *   web-search "Recommendations", where each card carries a synopsis + reason.
  */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Box, Typography, IconButton, Button, Snackbar, Alert, useTheme } from '@mui/material'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
@@ -21,6 +21,19 @@ interface ContentCarouselProps {
   data: ContentCarouselData
   onPlay?: (id: string, href: string) => void
 }
+
+/**
+ * Favorite status shared by every carousel on the page, keyed `type:id`.
+ *
+ * Each status lookup costs a media-server round trip, and the chat remounts
+ * carousels constantly (conversation switches, re-renders, historical messages),
+ * so without this a reopened conversation would re-ask for every card it has
+ * ever shown. Session-scoped on purpose: favorites rarely change elsewhere while
+ * the tab is open, and toggling here keeps it current.
+ */
+const favoriteStatusCache = new Map<string, boolean>()
+
+const favoriteKey = (item: Pick<ContentItem, 'id' | 'type'>) => `${item.type}:${item.id}`
 
 function useCarouselHeaderText(data: ContentCarouselData) {
   const { t } = useTranslation()
@@ -63,18 +76,75 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
   const notify = (message: string, severity: 'success' | 'error' | 'info' = 'success') =>
     setSnackbar({ open: true, message, severity })
 
+  // Seed which hearts are already filled. Without this every card renders as
+  // un-favorited on mount, so an item the user already favorited looks like it
+  // isn't — one bulk request for the whole list, and only for items whose status
+  // isn't cached yet. Failure is non-critical: hearts stay empty until clicked.
+  const itemsKey = data.items.map(favoriteKey).join(',')
+  useEffect(() => {
+    if (data.items.length === 0) return
+    let cancelled = false
+
+    const seedFromCache = () => {
+      const known = data.items.filter((item) => favoriteStatusCache.get(favoriteKey(item)))
+      if (known.length > 0) setFavorited(new Set(known.map((item) => item.id)))
+    }
+
+    const unknown = data.items.filter((item) => !favoriteStatusCache.has(favoriteKey(item)))
+    if (unknown.length === 0) {
+      seedFromCache()
+      return
+    }
+
+    fetch('/api/favorites/status/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        movieIds: unknown.filter((i) => i.type === 'movie').map((i) => i.id),
+        seriesIds: unknown.filter((i) => i.type === 'series').map((i) => i.id),
+      }),
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((result) => {
+        if (!result) return
+        const favorites = new Set<string>([
+          ...(result.movieIds ?? []),
+          ...(result.seriesIds ?? []),
+        ])
+        // Cache even if this carousel unmounted — the next one benefits.
+        for (const item of unknown) {
+          favoriteStatusCache.set(favoriteKey(item), favorites.has(item.id))
+        }
+        if (!cancelled) seedFromCache()
+      })
+      .catch(() => {
+        /* leave hearts empty */
+      })
+
+    return () => {
+      cancelled = true
+    }
+    // data.items is re-created on every render; itemsKey is its stable identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemsKey])
+
   // Optimistically toggle one suggestion in/out of the user's media-server favorites.
   const handleToggleFavorite = async (item: ContentItem) => {
     if (pendingFavorites.has(item.id)) return
     const makeFavorite = !favorited.has(item.id)
 
-    const revert = () =>
+    const revert = () => {
+      favoriteStatusCache.set(favoriteKey(item), !makeFavorite)
       setFavorited((prev) => {
         const next = new Set(prev)
         if (makeFavorite) next.delete(item.id)
         else next.add(item.id)
         return next
       })
+    }
+
+    favoriteStatusCache.set(favoriteKey(item), makeFavorite)
 
     setFavorited((prev) => {
       const next = new Set(prev)

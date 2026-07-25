@@ -3244,7 +3244,9 @@
     "carouselSimilarDescSeries": "Βρέθηκαν {{count}} σειρές παρόμοιες με αυτή τη σειρά",
     "carouselSimilarDescMovieUnwatched": "Βρέθηκαν {{count}} ταινίες παρόμοιες με αυτή την ταινία που δεν έχετε παρακολουθήσει",
     "carouselSimilarDescSeriesUnwatched": "Βρέθηκαν {{count}} σειρές παρόμοιες με αυτή τη σειρά που δεν έχετε παρακολουθήσει",
-    "carouselSimilarError": "Αποτυχία εύρεσης παρόμοιου περιεχομένου: {{message}}"
+    "carouselSimilarError": "Αποτυχία εύρεσης παρόμοιου περιεχομένου: {{message}}",
+    "directedBy": "Dir. {{name}}",
+    "createdBy": "Created by {{name}}"
   },
   "dashboard": {
     "greetingMorning": "Καλημέρα",

@@ -14,6 +14,7 @@ import StarIcon from '@mui/icons-material/Star'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder'
 import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined'
+import MovieCreationOutlinedIcon from '@mui/icons-material/MovieCreationOutlined'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { RankBadge, getProxiedImageUrl } from '@aperture/ui'
@@ -190,6 +191,18 @@ export function ContentCard({
           </Typography>
         )}
 
+        {/* Director (movies) / creator (series) — the same DB column serves both */}
+        {item.director && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+            <MovieCreationOutlinedIcon sx={{ fontSize: 12, color: '#71717a', flexShrink: 0 }} />
+            <Typography variant="caption" noWrap sx={{ color: '#a1a1aa', minWidth: 0 }}>
+              {item.type === 'movie'
+                ? t('assistantToolUi.directedBy', { name: item.director })
+                : t('assistantToolUi.createdBy', { name: item.director })}
+            </Typography>
+          </Box>
+        )}
+
         {/* Ratings row */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: isList ? 0 : 0.5, flexWrap: 'wrap' }}>
           {item.rating != null && (
@@ -207,8 +220,10 @@ export function ContentCard({
             />
           )}
           {item.userRating && (
+            // Star, not a heart: the heart on the poster means "favorite", and the
+            // same icon carrying two meanings on one card is what made it ambiguous.
             <Chip
-              icon={<FavoriteIcon sx={{ fontSize: 12 }} />}
+              icon={<StarIcon sx={{ fontSize: 12 }} />}
               label={item.userRating}
               size="small"
               sx={{
@@ -232,18 +247,29 @@ export function ContentCard({
           />
         </Box>
 
-        {/* Synopsis + "why it fits" — list variant only */}
-        {isList && item.overview && (
-          <Typography variant="caption" sx={{ color: '#a1a1aa', lineHeight: 1.45, ...clampLines(3) }}>
+        {/* Synopsis + "why it fits".
+            Rendered in BOTH variants: the secondary "Also worth checking" carousel
+            used to be a row of bare cards sitting next to fully explained ones.
+            Compact just clamps tighter to keep the carousel card size sane. */}
+        {item.overview && (
+          <Typography
+            variant="caption"
+            sx={{
+              color: '#a1a1aa',
+              lineHeight: 1.45,
+              mt: isList ? 0 : 0.5,
+              ...clampLines(isList ? 3 : 2),
+            }}
+          >
             {item.overview}
           </Typography>
         )}
-        {isList && item.reason && (
+        {item.reason && (
           <Box
             sx={{
               display: 'flex',
               gap: 0.75,
-              mt: 0.25,
+              mt: isList ? 0.25 : 0.5,
               p: 1,
               borderRadius: 1,
               bgcolor: 'rgba(99, 102, 241, 0.08)',
@@ -251,7 +277,10 @@ export function ContentCard({
             }}
           >
             <LightbulbOutlinedIcon sx={{ fontSize: 15, color: '#818cf8', flexShrink: 0, mt: '1px' }} />
-            <Typography variant="caption" sx={{ color: '#c7c7d1', lineHeight: 1.45 }}>
+            <Typography
+              variant="caption"
+              sx={{ color: '#c7c7d1', lineHeight: 1.45, ...(isList ? {} : clampLines(4)) }}
+            >
               {item.reason}
             </Typography>
           </Box>

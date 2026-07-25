@@ -74,21 +74,32 @@ RIGHT: Call a tool, cards appear with posters/ratings/play buttons.
 /**
  * Build the complete system prompt for a user session
  */
-export async function buildSystemPrompt(userId: string, isAdmin: boolean): Promise<string> {
+export async function buildSystemPrompt(
+  userId: string,
+  isAdmin: boolean,
+  serverName?: string | null
+): Promise<string> {
   const userContext = await buildUserContext(userId, isAdmin)
   const aiLocale = await resolveEffectiveAiLanguage(userId)
   const languageRules = `## Response language\n${buildAiLanguageInstruction(aiLocale)}\nTool names and JSON field names stay in English; user-visible explanations and chat text follow the language above.`
+
+  // Call the library by its actual name ("what's in Harisflix") instead of the
+  // anonymous "your library" — it is the user's own server and it has a name.
+  const libraryNaming = serverName?.trim()
+    ? `## The library's name\nThe user's media library is called **${serverName.trim()}**. Refer to it by that name — "let me see what ${serverName.trim()} has", "${serverName.trim()} has three of these" — rather than saying "your library" or "the library". Never call it anything else.`
+    : ''
 
   const sections = [
     CRITICAL_RULES, // FIRST - most important
     IDENTITY,
     userContext,
+    libraryNaming,
     FORMATTING_RULES,
     TOOL_SELECTION_RULES,
     BEHAVIOR_RULES,
     ANTIPATTERNS,
     languageRules,
-  ]
+  ].filter(Boolean)
 
   // Add admin context only for admins
   if (isAdmin) {

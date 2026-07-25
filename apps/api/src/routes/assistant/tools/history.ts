@@ -29,11 +29,12 @@ export function createHistoryTools(ctx: ToolContext) {
             genres: string[]
             community_rating: number | null
             provider_item_id: string | null
+            directors: string[] | null
             last_played_at: Date
             play_count: number
           }>(
             `SELECT m.id, m.title, m.year, m.poster_url, m.genres, m.community_rating,
-             m.provider_item_id, wh.last_played_at, wh.play_count
+             m.provider_item_id, m.directors, wh.last_played_at, wh.play_count
              FROM watch_history wh JOIN movies m ON m.id = wh.movie_id
              WHERE wh.user_id = $1 AND wh.movie_id IS NOT NULL
              ORDER BY wh.last_played_at DESC LIMIT $2`,
@@ -52,6 +53,7 @@ export function createHistoryTools(ctx: ToolContext) {
               name: m.title,
               subtitle,
               image: m.poster_url,
+              director: (m.directors ?? []).slice(0, 2).join(', ') || null,
               rating: m.community_rating,
               actions: [
                 { id: 'details', label: 'Details', href: `/movies/${m.id}`, variant: 'secondary' },
@@ -72,16 +74,17 @@ export function createHistoryTools(ctx: ToolContext) {
             genres: string[]
             community_rating: number | null
             provider_item_id: string | null
+            directors: string[] | null
             episodes_watched: string
             last_watched: Date
           }>(
             `SELECT s.id, s.title, s.year, s.poster_url, s.genres, s.community_rating,
-             s.provider_item_id, COUNT(DISTINCT wh.episode_id) as episodes_watched,
+             s.provider_item_id, s.directors, COUNT(DISTINCT wh.episode_id) as episodes_watched,
              MAX(wh.last_played_at) as last_watched
              FROM watch_history wh JOIN episodes e ON e.id = wh.episode_id
              JOIN series s ON s.id = e.series_id
              WHERE wh.user_id = $1 AND wh.episode_id IS NOT NULL
-             GROUP BY s.id, s.title, s.year, s.poster_url, s.genres, s.community_rating, s.provider_item_id 
+             GROUP BY s.id, s.title, s.year, s.poster_url, s.genres, s.community_rating, s.provider_item_id, s.directors
              ORDER BY last_watched DESC LIMIT $2`,
             [ctx.userId, limit]
           )
@@ -100,6 +103,7 @@ export function createHistoryTools(ctx: ToolContext) {
               name: s.title,
               subtitle,
               image: s.poster_url,
+              director: (s.directors ?? []).slice(0, 2).join(', ') || null,
               rating: s.community_rating,
               actions: [
                 { id: 'details', label: 'Details', href: `/series/${s.id}`, variant: 'secondary' },
@@ -153,10 +157,11 @@ export function createHistoryTools(ctx: ToolContext) {
           genres: string[]
           community_rating: number | null
           provider_item_id: string | null
+          directors: string[] | null
           rating: number
         }>(
           `SELECT m.id, m.title, m.year, m.poster_url, m.genres, m.community_rating,
-           m.provider_item_id, ur.rating
+           m.provider_item_id, m.directors, ur.rating
            FROM user_ratings ur JOIN movies m ON m.id = ur.movie_id
            ${whereClause} AND ur.movie_id IS NOT NULL
            ORDER BY ur.rating DESC, ur.updated_at DESC LIMIT $${paramIndex}`,
@@ -174,6 +179,7 @@ export function createHistoryTools(ctx: ToolContext) {
             name: m.title,
             subtitle,
             image: m.poster_url,
+            director: (m.directors ?? []).slice(0, 2).join(', ') || null,
             rating: m.community_rating,
             userRating: m.rating,
             actions: [
@@ -193,10 +199,11 @@ export function createHistoryTools(ctx: ToolContext) {
           genres: string[]
           community_rating: number | null
           provider_item_id: string | null
+          directors: string[] | null
           rating: number
         }>(
           `SELECT s.id, s.title, s.year, s.poster_url, s.genres, s.community_rating,
-           s.provider_item_id, ur.rating
+           s.provider_item_id, s.directors, ur.rating
            FROM user_ratings ur JOIN series s ON s.id = ur.series_id
            ${whereClause} AND ur.series_id IS NOT NULL
            ORDER BY ur.rating DESC, ur.updated_at DESC LIMIT $${paramIndex}`,
@@ -214,6 +221,7 @@ export function createHistoryTools(ctx: ToolContext) {
             name: s.title,
             subtitle,
             image: s.poster_url,
+            director: (s.directors ?? []).slice(0, 2).join(', ') || null,
             rating: s.community_rating,
             userRating: s.rating,
             actions: [
