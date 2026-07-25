@@ -34,7 +34,8 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 const groundingPrompt = (query: string): string =>
   'Using current web information, list up to 12 specific movies or TV series that best answer this request. ' +
   'For EACH title you MUST provide: the exact title, the release year, whether it is a movie or a series, and — most importantly — one or two sentences on WHY it fits this specific request. ' +
-  'The "why" is mandatory for every title and should be concrete (tone, theme, what it shares with the request), not generic praise. A title with no reason is useless — omit it rather than list it without a reason. ' +
+  'The "why" is mandatory for every title and must be CONCRETE and SPECIFIC: the shared structural device, the tonal or thematic link, how the filmmaker themselves framed it, the precise thing it has in common. ' +
+  'Write it directly, not as hedged reportage — prefer "same fragmented structure where identities blur" over "is often described as similar". No generic praise. A title with no real reason is useless: omit it rather than list it without one. ' +
   'Include the IMDb id (tt…) or TMDb id ONLY if it appears in a source you actually used; otherwise omit it.\n\n' +
   `Request: ${query}`
 
