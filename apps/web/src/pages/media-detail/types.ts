@@ -124,6 +124,23 @@ export interface Episode {
   progress_percent?: number | null
 }
 
+/**
+ * Per-season view of what has aired (per TMDB) vs what the media server holds.
+ * Computed server-side so the detail page, the watching page, and the request
+ * flow all agree on what "missing" means.
+ */
+export interface SeasonAvailability {
+  season_number: number
+  episodes_on_server: number
+  /** null for specials / seasons TMDB has no data for */
+  tmdb_episode_count: number | null
+  /** Aired episodes, capped at (next episode - 1) for the season currently airing */
+  aired_episodes: number | null
+  /** aired_episodes - episodes_on_server, floored at 0; always 0 when unknown */
+  missing_episodes: number
+  has_aired: boolean
+}
+
 export interface WatchStatus {
   isWatched: boolean
   playCount: number

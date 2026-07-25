@@ -2841,7 +2841,10 @@
       "legendWatched": "Watched",
       "legendInProgress": "In progress",
       "legendUnwatched": "Not watched",
-      "legendMissing": "Missing"
+      "legendMissing": "Missing",
+      "overallMissing": "{{count}} missing",
+      "seasonMissingSome": "{{count}} missing",
+      "missingFromSeason": "{{count}} aired episodes of Season {{n}} aren't on your server yet."
     },
     "missingSeasons": {
       "title": "Δεν υπάρχει στον διακομιστή σας",
@@ -2850,7 +2853,13 @@
       "request": "Αίτημα μέσω Seerr",
       "requestNamed": "Αίτημα διαθεσιμότητας στο {{serverName}}",
       "requestSuccess": "Το αίτημα υποβλήθηκε",
-      "requestFailed": "Αποτυχία υποβολής αιτήματος"
+      "requestFailed": "Αποτυχία υποβολής αιτήματος",
+      "seasonPartialChip": "Season {{n}} · {{missing}} of {{aired}} missing",
+      "summary": "{{count}} aired episodes aren't available yet.",
+      "completeTitle": "Everything aired is here",
+      "completeBody": "All aired episodes are on your server.",
+      "completeBodyNamed": "All aired episodes are on {{serverName}}.",
+      "requestSeasons": "Request seasons"
     },
     "similar": {
       "titleMovies": "Σχετικές Ταινίες",
