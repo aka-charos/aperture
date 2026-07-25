@@ -7,7 +7,16 @@
  * - 'list': a full-width card used in the vertical web-search recommendations
  *   list — adds the synopsis and the per-title "why it fits" reason.
  */
-import { Box, Typography, Button, Chip, Paper, IconButton, CircularProgress } from '@mui/material'
+import {
+  Box,
+  Typography,
+  Button,
+  Chip,
+  Paper,
+  IconButton,
+  CircularProgress,
+  Tooltip,
+} from '@mui/material'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import InfoIcon from '@mui/icons-material/Info'
 import StarIcon from '@mui/icons-material/Star'
@@ -142,36 +151,6 @@ export function ContentCard({
         )}
         {/* Rank badge */}
         {item.rank && <RankBadge rank={item.rank} size="small" />}
-
-        {/* Favorite toggle */}
-        {onToggleFavorite && (
-          <IconButton
-            size="small"
-            disabled={favoritePending}
-            aria-label={isFavorite ? t('assistantToolUi.removeFavorite') : t('assistantToolUi.favorite')}
-            onClick={(e) => {
-              e.stopPropagation()
-              onToggleFavorite(item)
-            }}
-            sx={{
-              position: 'absolute',
-              top: 2,
-              insetInlineEnd: 2,
-              p: 0.25,
-              bgcolor: 'rgba(0, 0, 0, 0.55)',
-              backdropFilter: 'blur(4px)',
-              '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.78)' },
-            }}
-          >
-            {favoritePending ? (
-              <CircularProgress size={14} sx={{ color: '#ec4899' }} />
-            ) : isFavorite ? (
-              <FavoriteIcon sx={{ fontSize: 16, color: '#ec4899' }} />
-            ) : (
-              <FavoriteBorderIcon sx={{ fontSize: 16, color: '#fff' }} />
-            )}
-          </IconButton>
-        )}
       </Box>
 
       {/* Content */}
@@ -333,6 +312,54 @@ export function ContentCard({
             >
               {t('assistantToolUi.play')}
             </Button>
+          )}
+
+          {/* Favorite toggle. In the action row rather than floating on the
+              poster: as a 16px outline in the artwork's corner it read as part
+              of the image and went unnoticed. */}
+          {onToggleFavorite && (
+            <Tooltip
+              title={
+                isFavorite
+                  ? t('assistantToolUi.removeFavorite')
+                  : t('assistantToolUi.favorite')
+              }
+            >
+              <Box component="span" sx={{ marginInlineStart: 'auto' }}>
+                <IconButton
+                  size="small"
+                  disabled={favoritePending}
+                  aria-label={
+                    isFavorite
+                      ? t('assistantToolUi.removeFavorite')
+                      : t('assistantToolUi.favorite')
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToggleFavorite(item)
+                  }}
+                  sx={{
+                    p: 0.5,
+                    borderRadius: 1,
+                    border: '1px solid',
+                    borderColor: isFavorite ? 'rgba(236, 72, 153, 0.5)' : '#3a3a3a',
+                    bgcolor: isFavorite ? 'rgba(236, 72, 153, 0.12)' : 'transparent',
+                    '&:hover': {
+                      borderColor: '#ec4899',
+                      bgcolor: 'rgba(236, 72, 153, 0.18)',
+                    },
+                  }}
+                >
+                  {favoritePending ? (
+                    <CircularProgress size={15} sx={{ color: '#ec4899' }} />
+                  ) : isFavorite ? (
+                    <FavoriteIcon sx={{ fontSize: 15, color: '#ec4899' }} />
+                  ) : (
+                    <FavoriteBorderIcon sx={{ fontSize: 15, color: '#a1a1aa' }} />
+                  )}
+                </IconButton>
+              </Box>
+            </Tooltip>
           )}
         </Box>
       </Box>

@@ -1399,7 +1399,9 @@
     "errorConversationLoad": "Δεν ήταν δυνατή η φόρτωση της συνομιλίας. Δοκιμάστε ξανά.",
     "errorConversationDelete": "Δεν ήταν δυνατή η διαγραφή της συνομιλίας. Δοκιμάστε ξανά.",
     "errorConversationRename": "Δεν ήταν δυνατή η μετονομασία της συνομιλίας. Δοκιμάστε ξανά.",
-    "errorMessagesSave": "Τα τελευταία σας μηνύματα δεν ήταν δυνατό να αποθηκευτούν — ενδέχεται να λείπουν όταν ανοίξετε ξανά αυτή τη συνομιλία."
+    "errorMessagesSave": "Τα τελευταία σας μηνύματα δεν ήταν δυνατό να αποθηκευτούν — ενδέχεται να λείπουν όταν ανοίξετε ξανά αυτή τη συνομιλία.",
+    "unwatchedOnly": "Only suggest what I haven't watched",
+    "unwatchedOnlyHint": "Titles you've already watched are left out of every suggestion. Stays on until you turn it off."
   },
   "settingsMediaServer": {
     "title": "Διακομιστής πολυμέσων",

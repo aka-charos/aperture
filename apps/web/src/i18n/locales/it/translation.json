@@ -2419,7 +2419,9 @@
     "tooltipConversations": "Conversations",
     "tooltipDock": "Dock to the side",
     "dockResizeHandle": "Resize assistant panel",
-    "tooltipUndock": "Open as dialog"
+    "tooltipUndock": "Open as dialog",
+    "unwatchedOnly": "Only suggest what I haven't watched",
+    "unwatchedOnlyHint": "Titles you've already watched are left out of every suggestion. Stays on until you turn it off."
   },
   "welcomeModal": {
     "title": "Benvenuti in Aperture",

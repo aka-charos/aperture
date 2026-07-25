@@ -5,6 +5,7 @@ import swagger from '@fastify/swagger'
 import swaggerUI from '@fastify/swagger-ui'
 import { createLogger } from './lib/logger.js'
 import { refreshQuietPollState, shouldLogIncoming, shouldLogCompleted } from './config/logging.js'
+import { refreshLogMaskingState, maskHost, maskAddress, maskUrl } from './config/logMasking.js'
 import requestIdPlugin from './plugins/requestId.js'
 import authPlugin from './plugins/auth.js'
 import staticPlugin from './plugins/static.js'
@@ -37,6 +38,8 @@ export async function buildServer(options: ServerOptions = {}): Promise<any> {
 
   // Load the quiet-poll-logs setting (DB setting, else QUIET_POLL_LOGS env).
   await refreshQuietPollState()
+  // Load the log-masking setting (DB setting, else MASK_LOG_URLS env).
+  await refreshLogMaskingState()
 
   // Custom access logging that reproduces Fastify's default req/res pair, but
   // can skip the silenced poll routes (failures are always logged). This is the
@@ -48,8 +51,11 @@ export async function buildServer(options: ServerOptions = {}): Promise<any> {
           req: {
             method: request.method,
             url: request.url,
-            host: request.headers.host,
-            remoteAddress: request.ip,
+            // Host and client address identify the deployment and its users;
+            // both are masked when Settings > System > "Mask server address in
+            // logs" is on, so a log can be shared as-is.
+            host: maskHost(request.headers.host),
+            remoteAddress: maskAddress(request.ip),
             remotePort: request.socket.remotePort,
           },
         },
@@ -109,7 +115,10 @@ export async function buildServer(options: ServerOptions = {}): Promise<any> {
       }
 
       // Log the rejected origin for debugging
-      logger.warn({ origin, appBaseUrl }, 'CORS request rejected - origin not allowed')
+      logger.warn(
+        { origin: maskUrl(origin), appBaseUrl: maskUrl(appBaseUrl) },
+        'CORS request rejected - origin not allowed'
+      )
       cb(new Error('Not allowed by CORS'), false)
     },
     credentials: true,

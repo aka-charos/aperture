@@ -77,7 +77,8 @@ RIGHT: Call a tool, cards appear with posters/ratings/play buttons.
 export async function buildSystemPrompt(
   userId: string,
   isAdmin: boolean,
-  serverName?: string | null
+  serverName?: string | null,
+  excludeWatched = false
 ): Promise<string> {
   const userContext = await buildUserContext(userId, isAdmin)
   const aiLocale = await resolveEffectiveAiLanguage(userId)
@@ -89,11 +90,18 @@ export async function buildSystemPrompt(
     ? `## The library's name\nThe user's media library is called **${serverName.trim()}**. Refer to it by that name — "let me see what ${serverName.trim()} has", "${serverName.trim()} has three of these" — rather than saying "your library" or "the library". Never call it anything else.`
     : ''
 
+  // Composer toggle. The cards are filtered server-side either way; this stops
+  // the model from *talking about* something the filter just removed.
+  const unwatchedOnly = excludeWatched
+    ? '## Unwatched only\nThe user has asked for titles they have NOT watched yet. Pass `excludeWatched: true` to any tool that accepts it, and prefer getUnwatched for open browses. Anything already watched is removed from the cards before you see them, so never name a title that is not on a card, and never suggest a rewatch.'
+    : ''
+
   const sections = [
     CRITICAL_RULES, // FIRST - most important
     IDENTITY,
     userContext,
     libraryNaming,
+    unwatchedOnly,
     FORMATTING_RULES,
     TOOL_SELECTION_RULES,
     BEHAVIOR_RULES,

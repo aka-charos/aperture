@@ -8,9 +8,10 @@
  * better ("Lynch described it as a psychogenic fugue"), because it is then
  * GENERATING from knowledge instead of summarizing a snippet.
  *
- * This pass closes that gap for the cards the user actually sees: one call on a
- * writing model (text-generation → chat — deliberately NOT the cheap structuring
- * model), grounded by the research note plus the library synopsis.
+ * This pass closes that gap for the cards the user actually sees: short
+ * concurrent batches on a writing model (text-generation → chat — deliberately
+ * NOT the cheap structuring model), grounded by the research note plus the
+ * library synopsis.
  *
  * Two deliberate choices:
  * - Line format, not structured output. The writing model is user-selectable and
@@ -36,6 +37,15 @@ const SDK_MAX_RETRIES = 1
 const MAX_SYNOPSIS_CHARS = 240
 /** Guard against a model that ignores the length instruction. */
 const MAX_REASON_CHARS = 320
+/**
+ * Titles per request. One request for the whole list stopped roughly halfway
+ * (24 asked, 12 answered), which silently left the trailing section — "Also
+ * worth checking" — with no notes at all. Small chunks run concurrently, so
+ * this is both more reliable and faster than a single long completion.
+ */
+const BATCH_SIZE = 8
+/** Output budget per title, generous enough that a 30-word answer never truncates. */
+const TOKENS_PER_REASON = 120
 
 /**
  * A model chosen for prose. Text-generation first (its whole purpose), then the
@@ -100,6 +110,46 @@ export function parseReasonLines(text: string): Map<number, string> {
   return out
 }
 
+/** One item plus its position in the caller's list, so chunks can be reassembled. */
+interface IndexedItem {
+  index: number
+  item: ContentItem
+}
+
+/**
+ * Rewrite one chunk. The prompt numbers titles from 1 within the chunk; the
+ * returned indices are translated back to the caller's positions.
+ */
+async function rewriteChunk(
+  model: LanguageModel,
+  queryText: string,
+  chunk: IndexedItem[]
+): Promise<Array<{ index: number; reason: string }>> {
+  const { text } = await generateText({
+    model,
+    maxRetries: SDK_MAX_RETRIES,
+    maxOutputTokens: chunk.length * TOKENS_PER_REASON + 200,
+    prompt: buildPrompt(
+      queryText,
+      chunk.map((entry) => entry.item)
+    ),
+  })
+
+  const byLocalIndex = parseReasonLines(text)
+  const out: Array<{ index: number; reason: string }> = []
+  chunk.forEach((entry, i) => {
+    const reason = byLocalIndex.get(i + 1)
+    if (reason) out.push({ index: entry.index, reason })
+  })
+  return out
+}
+
+function chunkBy<T>(list: T[], size: number): T[][] {
+  const chunks: T[][] = []
+  for (let i = 0; i < list.length; i += size) chunks.push(list.slice(i, i + size))
+  return chunks
+}
+
 /**
  * Return the items with richer `reason` notes. Never throws and never returns
  * fewer items than it was given; any item the model didn't cover keeps its
@@ -111,35 +161,50 @@ export async function enrichCardReasons(
 ): Promise<ContentItem[]> {
   if (items.length === 0) return items
 
+  let model: LanguageModel
   try {
-    const model = await getWritingModel()
-    const { text } = await generateText({
-      model,
-      maxRetries: SDK_MAX_RETRIES,
-      prompt: buildPrompt(queryText, items),
-    })
-
-    const byIndex = parseReasonLines(text)
-    if (byIndex.size === 0) {
-      logger.warn(
-        { items: items.length, replyChars: text?.length ?? 0 },
-        'Reason enrichment produced no parsable lines; keeping original notes'
-      )
-      return items
-    }
-
-    const enriched = items.map((item, i) => {
-      const rewritten = byIndex.get(i + 1)
-      return rewritten ? { ...item, reason: rewritten } : item
-    })
-    logger.info(
-      { items: items.length, rewritten: byIndex.size },
-      'Card reasons enriched'
-    )
-    return enriched
+    model = await getWritingModel()
   } catch (err) {
-    // Enhancement only — log/record and keep the extractive notes.
     await recordLlmError(err, { context: 'discovery reason enrichment', logger })
     return items
   }
+
+  const rewritten = new Map<number, string>()
+  let remaining: IndexedItem[] = items.map((item, index) => ({ index, item }))
+  let firstError: unknown = null
+
+  // Two passes at most: the second only retries titles the first didn't answer
+  // for, so a single dropped chunk costs one extra short call rather than the
+  // whole trailing half of the list.
+  for (let pass = 0; pass < 2 && remaining.length > 0; pass++) {
+    const results = await Promise.all(
+      chunkBy(remaining, BATCH_SIZE).map((chunk) =>
+        rewriteChunk(model, queryText, chunk).catch((err) => {
+          firstError ??= err
+          return [] as Array<{ index: number; reason: string }>
+        })
+      )
+    )
+    for (const { index, reason } of results.flat()) rewritten.set(index, reason)
+    remaining = remaining.filter((entry) => !rewritten.has(entry.index))
+  }
+
+  if (firstError) {
+    // Enhancement only — record it, then ship whatever did come back.
+    await recordLlmError(firstError, { context: 'discovery reason enrichment', logger })
+  }
+
+  if (rewritten.size === 0) {
+    logger.warn({ items: items.length }, 'Reason enrichment produced nothing; keeping original notes')
+    return items
+  }
+
+  logger.info(
+    { items: items.length, rewritten: rewritten.size, missing: remaining.length },
+    'Card reasons enriched'
+  )
+  return items.map((item, i) => {
+    const reason = rewritten.get(i)
+    return reason ? { ...item, reason } : item
+  })
 }

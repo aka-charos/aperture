@@ -26,6 +26,7 @@ import HistoryIcon from '@mui/icons-material/History'
 import { AssistantRuntimeProvider, useThreadRuntime } from '@assistant-ui/react'
 import { useChatRuntime, AssistantChatTransport } from '@assistant-ui/react-ai-sdk'
 import { Thread } from './Thread'
+import { getUnwatchedOnly } from './unwatchedPreference'
 import { AICapabilityBanner } from '../AICapabilityBanner'
 import type { AssistantChatState, BackendMessage } from './useAssistantChat'
 
@@ -54,10 +55,15 @@ function ChatThreadArea({
   // remounted empty on every conversation load / id assignment, so history has
   // to come from the DB, not the runtime). The id is fixed for this mount —
   // ChatThreadArea is keyed by conversationId — so it's safe to set at creation.
+  // Headers are resolved per send, so the composer's "unwatched only" toggle
+  // applies to the next message without rebuilding the transport.
   const transport = useRef(new AssistantChatTransport({
     api: '/api/assistant/chat',
     credentials: 'include',
-    ...(conversationId ? { headers: { 'x-conversation-id': conversationId } } : {}),
+    headers: () => ({
+      ...(conversationId ? { 'x-conversation-id': conversationId } : {}),
+      ...(getUnwatchedOnly() ? { 'x-exclude-watched': 'true' } : {}),
+    }),
   }))
 
   // Don't pass messages to runtime - it doesn't properly parse tool results

@@ -19,7 +19,7 @@ import {
 } from 'ai'
 import { getChatModelInstance, getEmbeddingModelInstance, getActiveEmbeddingModelId } from '@aperture/core'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
-import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText, loadConversationHistory } from '../helpers/index.js'
+import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText, loadConversationHistory, withUnwatchedFilter } from '../helpers/index.js'
 import { createTools, createN8nTools, createDiscoveryResolveTool, DISCOVERY_PROMPT } from '../tools/index.js'
 import { withToolErrorHandling } from '../tools/utils.js'
 import type { ToolContext } from '../types.js'
@@ -119,7 +119,16 @@ export function registerChatHandler(fastify: FastifyInstance) {
         const embeddingModel = await getEmbeddingModelInstance()
         const embeddingModelId = await getActiveEmbeddingModelId()
         const mediaServer = await getMediaServerInfo()
-        const systemPrompt = await buildSystemPrompt(user.id, user.isAdmin, mediaServer?.name)
+        // Composer toggle: only suggest titles the user hasn't watched. Enforced
+        // on tool output (see withUnwatchedFilter) so it holds regardless of
+        // whether the model honours the instruction.
+        const excludeWatched = request.headers['x-exclude-watched'] === 'true'
+        const systemPrompt = await buildSystemPrompt(
+          user.id,
+          user.isAdmin,
+          mediaServer?.name,
+          excludeWatched
+        )
 
         if (!embeddingModelId) {
           return reply.status(500).send({ error: 'Embedding model not configured' })
@@ -132,6 +141,7 @@ export function registerChatHandler(fastify: FastifyInstance) {
           embeddingModel,
           embeddingModelId, // Format: "provider:model" (e.g., "openai:text-embedding-3-large")
           mediaServer,
+          excludeWatched,
         }
 
         // Rebuild prior turns from the persisted conversation (the source of
@@ -206,13 +216,18 @@ export function registerChatHandler(fastify: FastifyInstance) {
           }
         }
         // Backstop: uncaught tool errors become { id, error } payloads instead
-        // of aborting the stream with a masked "An error occurred".
-        const tools = withToolErrorHandling({ ...baseTools, ...discoveryTools })
+        // of aborting the stream with a masked "An error occurred". Wraps the
+        // unwatched filter too, so a failure there can't abort the stream.
+        const allTools = { ...baseTools, ...discoveryTools }
+        const tools = withToolErrorHandling(
+          excludeWatched ? withUnwatchedFilter(allTools, user.id) : allTools
+        )
 
         fastify.log.info(
           {
             toolCount: Object.keys(tools).length,
             model: typeof chatModel === 'string' ? chatModel : chatModel.modelId,
+            excludeWatched,
           },
           'Starting chat stream'
         )
