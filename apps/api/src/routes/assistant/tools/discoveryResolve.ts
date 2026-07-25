@@ -23,11 +23,20 @@ import { createChildLogger } from '@aperture/core'
 import { createCarouselResult, type ContentCarousel } from '../schemas/contentCarousel.js'
 import { resolveCandidates } from '../discovery/resolveCandidates.js'
 import { gatherWebCandidates } from '../discovery/webCandidates.js'
+import { enrichCardReasons } from '../discovery/enrichReasons.js'
 import { findSimilarItems } from './search.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext } from '../types.js'
 
 const logger = createChildLogger('discovery-resolve')
+
+/** Loose title key for comparing a candidate against the referenced seed title. */
+function normalizeTitleKey(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
 
 /** Appended to the system prompt on discovery-routed turns. */
 export const DISCOVERY_PROMPT =
@@ -40,10 +49,12 @@ export const DISCOVERY_PROMPT =
   'X"), pass that title as seedTitle so related library picks are added too. Each pick comes ' +
   'back with a short grounded "reason", and that reason is ALSO printed on its card — so you ' +
   'never repeat the reasons title-by-title.\n' +
-  '3. AFTER the cards render, ALWAYS write a short closing paragraph (2-4 sentences). This is ' +
-  'required — never stop at the cards. Do NOT enumerate every title. Instead: call out 2-3 ' +
-  'standouts by name and what ties them to the request, and mention any notable titles from ' +
-  'the returned notInLibrary list that would be worth adding.\n' +
+  '3. AFTER the cards render, ALWAYS write a closing note (3-6 sentences). This is required — ' +
+  'never stop at the cards. Do NOT enumerate every title. Instead go DEEP on 2-3 standouts: ' +
+  'name them and say something substantive about why they fit — the specific device, tone or ' +
+  'idea they share with the request, which one to start with and what to expect from it. ' +
+  'Concrete and confident, never hedged ("is often described as", "critics have noted"). ' +
+  'Then mention any notable titles from the returned notInLibrary list worth adding.\n' +
   'If the tool returns a "Similar to …" list instead of "Recommendations" (web picks were ' +
   'unavailable), treat those as your recommendations: write the same opener and closing about ' +
   'them as the closest matches in the library — seamlessly, without mentioning that web search ' +
@@ -70,8 +81,23 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
       execute: async ({ seedTitle }) => {
         // Gathered here (not before the stream) so the assistant's opening line
         // streams first and this slow web work runs behind the card skeletons.
-        const candidates = await gatherWebCandidates(queryText)
-        logger.info({ candidateCount: candidates.length, seedTitle: seedTitle ?? null }, 'Discovery candidates gathered')
+        const gathered = await gatherWebCandidates(queryText)
+
+        // "movies like X" must never recommend X back. Web sources list the seed
+        // itself routinely (sometimes with a wrong year, so match on title only).
+        const seedKey = seedTitle?.trim() ? normalizeTitleKey(seedTitle) : ''
+        const candidates = seedKey
+          ? gathered.filter((c) => normalizeTitleKey(c.title) !== seedKey)
+          : gathered
+
+        logger.info(
+          {
+            candidateCount: candidates.length,
+            seedEchoesDropped: gathered.length - candidates.length,
+            seedTitle: seedTitle ?? null,
+          },
+          'Discovery candidates gathered'
+        )
         const { items: webItems, notInLibrary } = await resolveCandidates(candidates, ctx)
 
         // Pass leftovers to the model (for commentary) without rendering them as cards
@@ -79,17 +105,6 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
           title: c.title,
           year: c.year,
           mediaType: c.mediaType,
-        }))
-
-        // Per-pick rationale from the web search: grounding for the model's "why".
-        // Also attached to each resolved card (see resolveCandidates), so the model
-        // synthesizes from these rather than restating them per title.
-        const notInLibrarySet = new Set(notInLibrary)
-        const picks = candidates.map((c) => ({
-          title: c.title,
-          year: c.year,
-          reason: c.reason,
-          inLibrary: !notInLibrarySet.has(c),
         }))
 
         // Secondary section: embeddings-similar to the referenced title, deduped
@@ -105,32 +120,57 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
           }
         }
 
+        // Rewrite the notes on whichever list is PRIMARY — the one whose per-title
+        // "why" is displayed prominently — so they read like insight instead of
+        // condensed search copy. One call on a writing model; fails open to the
+        // extractive notes. The embeddings fallback list has no notes at all, so
+        // this is also what gives it a "why" when web search came back empty.
+        const primaryItems = webItems.length > 0 ? webItems : alsoItems
+        const enrichedPrimary = await enrichCardReasons(primaryItems, queryText)
+        const webCards = webItems.length > 0 ? enrichedPrimary : webItems
+        const alsoCards = webItems.length > 0 ? alsoItems : enrichedPrimary
+
+        // Per-pick rationale: grounding for the model's closing synthesis. Prefers
+        // the enriched note so the model's callouts match what the cards say.
+        const enrichedByTitle = new Map(
+          webCards
+            .filter((i) => i.reason)
+            .map((i) => [normalizeTitleKey(i.name), i.reason as string])
+        )
+        const notInLibrarySet = new Set(notInLibrary)
+        const picks = candidates.map((c) => ({
+          title: c.title,
+          year: c.year,
+          reason: enrichedByTitle.get(normalizeTitleKey(c.title)) ?? c.reason,
+          inLibrary: !notInLibrarySet.has(c),
+        }))
+
         const carousels: ContentCarousel[] = []
-        if (webItems.length > 0) {
+        if (webCards.length > 0) {
           // Web picks carry a per-title reason + synopsis → render as the rich
           // vertical list, with the embeddings section as a secondary carousel.
           carousels.push(
-            createCarouselResult(`discovery-${Date.now()}`, webItems, {
+            createCarouselResult(`discovery-${Date.now()}`, webCards, {
               title: 'Recommendations',
               layout: 'list',
             })
           )
-          if (alsoItems.length > 0) {
+          if (alsoCards.length > 0) {
             carousels.push(
-              createCarouselResult(`discovery-also-${Date.now()}`, alsoItems, {
+              createCarouselResult(`discovery-also-${Date.now()}`, alsoCards, {
                 title: 'Also worth checking',
                 layout: 'carousel',
               })
             )
           }
-        } else if (alsoItems.length > 0) {
+        } else if (alsoCards.length > 0) {
           // Web search yielded nothing (rate limit / empty grounding), but a seed
           // title gave us embeddings-similar picks — promote them to the PRIMARY
           // section so "movies like X" still returns a coherent answer instead of
-          // an orphaned "Also worth checking". Bare cards (no per-title reason);
-          // the assistant's synthesis carries the "why".
+          // an orphaned "Also worth checking". These cards get their "why" from the
+          // enrichment pass above (the embeddings search itself provides none).
           carousels.push(
-            createCarouselResult(`discovery-similar-${Date.now()}`, alsoItems, {
+            createCarouselResult(`discovery-similar-${Date.now()}`, alsoCards, {
               title: seedTitle?.trim() ? `Similar to ${seedTitle.trim()}` : 'Recommendations',
               layout: 'carousel',
             })

@@ -32,6 +32,13 @@ const logger = createChildLogger('web-candidates')
 
 /** SDK-level retries (exp backoff) for 429/5xx on the structuring call. */
 const SDK_MAX_RETRIES = 3
+/**
+ * Cap on candidates returned to the caller. Enforced by truncation AFTER
+ * validation — never as a schema `.max()`. Combining several sources routinely
+ * yields more titles than we want to show, and a schema cap turns that normal
+ * outcome into a hard NoObjectGeneratedError that burns the whole retry ladder.
+ */
+const MAX_CANDIDATES = 20
 
 // Shared candidate fields. `reason` is the per-title rationale rendered on each
 // card AND used by the assistant to synthesize its reply — so we push hard for
@@ -91,6 +98,63 @@ async function getStructuringModel(
 }
 
 /**
+ * Reasons that only restate "this title appeared on a list" instead of
+ * explaining the fit. Listicle sources ("25 movies like X") contribute bare
+ * title lists, and a required `reason` field pressures the model into filling
+ * them with this kind of non-explanation — which then renders as a meaningless
+ * note on the card ("This film is listed as a movie like X").
+ */
+const FILLER_REASON_PATTERNS = [
+  // Passive "this film is listed/mentioned as …" — the shape filler always takes.
+  // Deliberately narrow: an active, substantive sentence that happens to use one
+  // of these verbs ("Included as a companion piece because …") must NOT match.
+  /\b(?:is|are|was|were)\s+(?:also\s+)?(?:listed|mentioned|included|named|referenced|recommended|suggested)\b/i,
+  /\b(?:fans|viewers|users|you)\s+(?:\w+\s+){0,3}might\s+(?:also\s+)?enjoy\b/i,
+]
+
+/** A reason worth printing on a card: says something concrete, not list-filler. */
+function isSubstantiveReason(reason: string | undefined): boolean {
+  const text = (reason ?? '').trim()
+  if (text.length < 30) return false
+  return !FILLER_REASON_PATTERNS.some((re) => re.test(text))
+}
+
+function normalizeTitleKey(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+/**
+ * Post-process structured candidates: dedupe, drop meaningless reasons, order
+ * well-explained picks first, then cap. Ordering matters — the cap should keep
+ * the titles that can actually justify themselves on a card.
+ */
+function refineCandidates(candidates: DiscoveryCandidate[]): DiscoveryCandidate[] {
+  const seen = new Set<string>()
+  const cleaned: DiscoveryCandidate[] = []
+
+  for (const candidate of candidates) {
+    const title = candidate.title?.trim()
+    if (!title) continue
+    const key = `${normalizeTitleKey(title)}|${candidate.mediaType}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    cleaned.push({
+      ...candidate,
+      title,
+      // Better no note than a note that says nothing.
+      reason: isSubstantiveReason(candidate.reason) ? candidate.reason?.trim() : undefined,
+    })
+  }
+
+  const reasoned = cleaned.filter((c) => c.reason)
+  const unreasoned = cleaned.filter((c) => !c.reason)
+  return [...reasoned, ...unreasoned].slice(0, MAX_CANDIDATES)
+}
+
+/**
  * Tolerant fallback parse: pull the first JSON array out of a model's free-text
  * answer and coerce each entry into a candidate. Used only when generateObject
  * fails outright (a chat model that can't emit structured output).
@@ -121,7 +185,7 @@ function parseCandidatesJson(text: string): DiscoveryCandidate[] {
       reason: typeof o.reason === 'string' ? o.reason : undefined,
     })
   }
-  return out.slice(0, 20)
+  return out
 }
 
 export async function gatherWebCandidates(queryText: string): Promise<DiscoveryCandidate[]> {
@@ -156,7 +220,12 @@ export async function gatherWebCandidates(queryText: string): Promise<DiscoveryC
     'The text below is web research about a movie/TV recommendation request, possibly from multiple sources. ' +
     'Extract the specific movies/series it recommends into structured candidates. ' +
     'For each, capture the explanation of WHY it fits as "reason" (verbatim or lightly condensed — one or two sentences, never empty). ' +
+    'CRITICAL: include a title ONLY if the text gives a real reason it fits — something concrete about tone, theme, director, plot or what it shares with the request. ' +
+    'Some sources are bare "movies like X" lists with no explanation at all: OMIT those titles entirely. ' +
+    'Never invent filler such as "this film is listed as similar", "it is mentioned as being similar" or "fans might enjoy it" — a title you cannot justify is worse than one you leave out. ' +
     'Deduplicate titles that appear in more than one source, merging their reasons. ' +
+    'Never include the title the request is ASKING ABOUT as a candidate. ' +
+    `Return at most ${MAX_CANDIDATES} candidates, best-justified first. ` +
     'Set imdbId/tmdbId ONLY if explicitly present in the text — never guess or invent an id. ' +
     'Infer mediaType (movie or series) from context. Ignore any text that is not a concrete movie/series recommendation.\n\n' +
     combined
@@ -165,7 +234,9 @@ export async function gatherWebCandidates(queryText: string): Promise<DiscoveryC
     const { object } = await generateObject({
       model: structuring.model,
       maxRetries: SDK_MAX_RETRIES,
-      schema: z.object({ candidates: z.array(candidateSchema).max(20) }),
+      // No `.max()` here on purpose — see MAX_CANDIDATES. Over-long results are
+      // truncated after validation instead of failing it.
+      schema: z.object({ candidates: z.array(candidateSchema) }),
       prompt: structurePrompt,
     })
     return object.candidates as DiscoveryCandidate[]
@@ -206,9 +277,20 @@ export async function gatherWebCandidates(queryText: string): Promise<DiscoveryC
       }
     }
 
-    const withReason = candidates.filter((c) => c.reason?.trim()).length
-    logger.info({ candidateCount: candidates.length, withReason }, 'Web candidates structured')
-    return candidates
+    const refined = refineCandidates(candidates)
+    const withReason = refined.filter((c) => c.reason).length
+    logger.info(
+      {
+        structured: candidates.length,
+        candidateCount: refined.length,
+        withReason,
+        // structured > candidateCount means dupes/over-cap were trimmed;
+        // withReason < candidateCount means list-filler reasons were stripped.
+        droppedFillerReasons: refined.length - withReason,
+      },
+      'Web candidates structured'
+    )
+    return refined
   } catch (err) {
     // Structuring hard-failed (incl. the text fallback). Record under the
     // structuring model's provider when known (Gemini web-search role); otherwise
