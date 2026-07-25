@@ -16,6 +16,7 @@ import {
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
 import { QUIET_POLL_LOGS_SETTING, refreshQuietPollState } from '../../../config/logging.js'
+import { MASK_LOG_URLS_SETTING, refreshLogMaskingState } from '../../../config/logMasking.js'
 
 export function registerSystemHandlers(fastify: FastifyInstance) {
   /**
@@ -27,7 +28,8 @@ export function registerSystemHandlers(fastify: FastifyInstance) {
     async (_request, reply) => {
       try {
         const quietPollLogs = (await getSystemSetting(QUIET_POLL_LOGS_SETTING)) === 'true'
-        return reply.send({ quietPollLogs })
+        const maskLogUrls = (await getSystemSetting(MASK_LOG_URLS_SETTING)) === 'true'
+        return reply.send({ quietPollLogs, maskLogUrls })
       } catch (err) {
         fastify.log.error({ err }, 'Failed to get logging settings')
         return reply.status(500).send({ error: 'Failed to get logging settings' })
@@ -38,25 +40,47 @@ export function registerSystemHandlers(fastify: FastifyInstance) {
   /**
    * PUT /api/settings/system/logging
    */
-  fastify.put<{ Body: { quietPollLogs?: boolean } }>(
+  fastify.put<{ Body: { quietPollLogs?: boolean; maskLogUrls?: boolean } }>(
     '/api/settings/system/logging',
     { preHandler: requireAdmin, schema: { tags: ['settings'] } },
     async (request, reply) => {
       try {
-        const { quietPollLogs } = request.body
-        if (typeof quietPollLogs !== 'boolean') {
+        const { quietPollLogs, maskLogUrls } = request.body
+        // Each toggle saves on its own, so an older client that only knows
+        // about quietPollLogs can't blank the other one.
+        if (quietPollLogs !== undefined && typeof quietPollLogs !== 'boolean') {
           return reply.status(400).send({ error: 'quietPollLogs must be a boolean' })
         }
+        if (maskLogUrls !== undefined && typeof maskLogUrls !== 'boolean') {
+          return reply.status(400).send({ error: 'maskLogUrls must be a boolean' })
+        }
+        if (quietPollLogs === undefined && maskLogUrls === undefined) {
+          return reply.status(400).send({ error: 'No logging setting supplied' })
+        }
 
-        await setSystemSetting(
-          QUIET_POLL_LOGS_SETTING,
-          quietPollLogs ? 'true' : 'false',
-          'Suppress access logs for high-frequency UI poll routes'
-        )
-        // Apply immediately to the running request-logging hooks.
-        await refreshQuietPollState()
+        if (quietPollLogs !== undefined) {
+          await setSystemSetting(
+            QUIET_POLL_LOGS_SETTING,
+            quietPollLogs ? 'true' : 'false',
+            'Suppress access logs for high-frequency UI poll routes'
+          )
+          // Apply immediately to the running request-logging hooks.
+          await refreshQuietPollState()
+        }
 
-        return reply.send({ quietPollLogs })
+        if (maskLogUrls !== undefined) {
+          await setSystemSetting(
+            MASK_LOG_URLS_SETTING,
+            maskLogUrls ? 'true' : 'false',
+            'Mask the server hostname and client IPs in access logs'
+          )
+          await refreshLogMaskingState()
+        }
+
+        return reply.send({
+          quietPollLogs: (await getSystemSetting(QUIET_POLL_LOGS_SETTING)) === 'true',
+          maskLogUrls: (await getSystemSetting(MASK_LOG_URLS_SETTING)) === 'true',
+        })
       } catch (err) {
         fastify.log.error({ err }, 'Failed to update logging settings')
         return reply.status(500).send({ error: 'Failed to update logging settings' })

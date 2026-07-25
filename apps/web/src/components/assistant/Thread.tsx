@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Box, Paper, Typography, Avatar, CircularProgress, TextField, IconButton, Button, Tooltip } from '@mui/material'
+import { Box, Paper, Typography, Avatar, CircularProgress, TextField, IconButton, Button, Tooltip, Checkbox, FormControlLabel } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import SendIcon from '@mui/icons-material/Send'
 import StopIcon from '@mui/icons-material/Stop'
@@ -33,6 +33,7 @@ import {
   type StudiosData,
 } from './tool-ui'
 import { ToolResultError } from './ToolResultError'
+import { useUnwatchedOnly, setUnwatchedOnly } from './unwatchedPreference'
 
 // Custom link renderer for markdown (needs hooks for i18n)
 function MarkdownLink({ href, children }: { href?: string; children?: ReactNode }) {
@@ -485,7 +486,8 @@ function LoadingIndicator() {
 function Composer() {
   const { t } = useTranslation()
   const composerRuntime = useComposerRuntime()
-  
+  const unwatchedOnly = useUnwatchedOnly()
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     composerRuntime.send()
@@ -501,6 +503,26 @@ function Composer() {
   return (
     <ComposerPrimitive.Root>
       <Box sx={{ p: 2, borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+        {/* Applies to every message in every conversation until turned off —
+            it is a standing preference, not a per-message option. */}
+        <Tooltip title={t('assistant.unwatchedOnlyHint')} placement="top-start">
+          <FormControlLabel
+            sx={{ ml: 0, mb: 1 }}
+            control={
+              <Checkbox
+                size="small"
+                checked={unwatchedOnly}
+                onChange={(e) => setUnwatchedOnly(e.target.checked)}
+                sx={{ p: 0.5, mr: 0.75, color: '#71717a', '&.Mui-checked': { color: '#6366f1' } }}
+              />
+            }
+            label={
+              <Typography variant="caption" sx={{ color: unwatchedOnly ? '#a5b4fc' : '#a1a1aa' }}>
+                {t('assistant.unwatchedOnly')}
+              </Typography>
+            }
+          />
+        </Tooltip>
         <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
           <ComposerPrimitive.Input asChild>
             <TextField

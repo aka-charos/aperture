@@ -100,4 +100,6 @@ export interface ToolContext {
   embeddingModel: EmbeddingModel<string>
   embeddingModelId: string  // Model ID string for database queries
   mediaServer: MediaServerInfo | null
+  /** User asked for unwatched titles only (composer toggle → x-exclude-watched). */
+  excludeWatched?: boolean
 }

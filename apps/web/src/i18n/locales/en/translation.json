@@ -2524,6 +2524,8 @@
     "dateYesterday": "Yesterday",
     "dateDaysAgo": "{{count}}d ago",
     "placeholder": "Ask me anything about movies or shows…",
+    "unwatchedOnly": "Only suggest what I haven't watched",
+    "unwatchedOnlyHint": "Titles you've already watched are left out of every suggestion. Stays on until you turn it off.",
     "thinking": "Thinking…",
     "welcomeTitle": "Hi! I'm Encore",
     "welcomeBody": "Your AI movie and TV recommendation assistant. Ask me to find something to watch, discover similar titles, or explore your personalized picks!",

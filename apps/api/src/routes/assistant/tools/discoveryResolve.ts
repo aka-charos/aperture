@@ -24,6 +24,7 @@ import { createCarouselResult, type ContentCarousel } from '../schemas/contentCa
 import { resolveCandidates } from '../discovery/resolveCandidates.js'
 import { gatherWebCandidates } from '../discovery/webCandidates.js'
 import { enrichCardReasons } from '../discovery/enrichReasons.js'
+import { filterUnwatchedItems } from '../helpers/unwatched.js'
 import { findSimilarItems } from './search.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext } from '../types.js'
@@ -100,7 +101,15 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
           },
           'Discovery candidates gathered'
         )
-        const { items: webItems, notInLibrary } = await resolveCandidates(candidates, ctx)
+        const resolved = await resolveCandidates(candidates, ctx)
+        const { notInLibrary } = resolved
+
+        // "Unwatched only" (composer toggle): drop watched titles here, before
+        // the enrichment pass, so we neither pay to write notes for cards that
+        // are about to disappear nor leak them into `picks`.
+        const webItems = ctx.excludeWatched
+          ? await filterUnwatchedItems(ctx.userId, resolved.items)
+          : resolved.items
 
         // Secondary section: embeddings-similar to the referenced title, deduped
         // against the web picks so nothing appears twice. Only when a title was given.
@@ -108,7 +117,10 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
         if (seedTitle?.trim()) {
           try {
             const webIds = new Set(webItems.map((i) => i.id))
-            const sim = await findSimilarItems(ctx, seedTitle.trim(), { limit: 12 })
+            const sim = await findSimilarItems(ctx, seedTitle.trim(), {
+              limit: 12,
+              excludeWatched: ctx.excludeWatched ?? false,
+            })
             alsoItems = sim.items.filter((i) => !webIds.has(i.id))
           } catch (err) {
             logger.warn({ err }, 'Embeddings supplement failed; continuing with web results only')
@@ -124,16 +136,19 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
         const webCards = enriched.slice(0, webItems.length)
         const alsoCards = enriched.slice(webItems.length)
 
-        // Per-pick rationale: grounding for the model's closing synthesis. ONLY
-        // library items — the model must never name something the user can't watch.
+        // Per-pick rationale: grounding for the model's closing synthesis. Keyed
+        // off the CARDS, so whatever the pipeline dropped — not in the library,
+        // already watched — can never reach the model as something to talk about.
         const enrichedByTitle = new Map(
           [...webCards, ...alsoCards]
             .filter((i) => i.reason)
             .map((i) => [normalizeTitleKey(i.name), i.reason as string])
         )
-        const notInLibrarySet = new Set(notInLibrary)
+        const shownTitleKeys = new Set(
+          [...webCards, ...alsoCards].map((i) => normalizeTitleKey(i.name))
+        )
         const picks = candidates
-          .filter((c) => !notInLibrarySet.has(c))
+          .filter((c) => shownTitleKeys.has(normalizeTitleKey(c.title)))
           .map((c) => ({
             title: c.title,
             year: c.year,
@@ -173,10 +188,14 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
         }
 
         if (carousels.length === 0) {
+          // The all-watched case is a distinct outcome from an empty search —
+          // saying "nothing found" there would be misleading.
+          const allWatched = resolved.items.length > 0 && webItems.length === 0
           carousels.push(
             createCarouselResult(`discovery-empty-${Date.now()}`, [], {
-              description:
-                notInLibrary.length > 0
+              description: allWatched
+                ? 'Every match for this request has already been watched.'
+                : notInLibrary.length > 0
                   ? 'None of the web-sourced picks are in the library.'
                   : 'No web-sourced picks were found for this request.',
             })
