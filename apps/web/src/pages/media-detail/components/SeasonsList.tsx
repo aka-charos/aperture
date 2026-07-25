@@ -8,12 +8,11 @@ import CloudDownloadIcon from '@mui/icons-material/CloudDownload'
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline'
 import { getProxiedImageUrl } from '@aperture/ui'
 import { useServerDisplayName } from '../../../hooks/useServerDisplayName'
-import { computeMissingSeasons } from '../missingSeasons'
-import type { Series, Episode } from '../types'
+import type { Episode, SeasonAvailability } from '../types'
 
 interface SeasonsListProps {
   seasons: Record<number, Episode[]>
-  series: Series
+  seasonAvailability: SeasonAvailability[]
 }
 
 type EpisodeWatchState = 'watched' | 'in-progress' | 'unwatched'
@@ -27,13 +26,18 @@ function episodeWatchState(e: Episode): EpisodeWatchState {
 type SeasonStatus = 'complete' | 'in-progress' | 'not-started'
 
 interface SeasonRollup {
-  total: number
+  /** Episodes on the server */
+  onServer: number
   watched: number
   inProgress: number
+  /** Aired but absent from the server */
+  missing: number
+  /** Bar denominator: everything that has aired, present or not */
+  total: number
   status: SeasonStatus
 }
 
-function rollupSeason(episodes: Episode[]): SeasonRollup {
+function rollupSeason(episodes: Episode[], missing: number): SeasonRollup {
   let watched = 0
   let inProgress = 0
   for (const e of episodes) {
@@ -41,14 +45,14 @@ function rollupSeason(episodes: Episode[]): SeasonRollup {
     if (state === 'watched') watched++
     else if (state === 'in-progress') inProgress++
   }
-  const total = episodes.length
+  const onServer = episodes.length
   const status: SeasonStatus =
-    total > 0 && watched >= total
+    onServer > 0 && watched >= onServer
       ? 'complete'
       : watched > 0 || inProgress > 0
         ? 'in-progress'
         : 'not-started'
-  return { total, watched, inProgress, status }
+  return { onServer, watched, inProgress, missing, total: onServer + missing, status }
 }
 
 interface PresentEntry {
@@ -66,13 +70,16 @@ interface MissingEntry {
 
 type SeasonEntry = PresentEntry | MissingEntry
 
-export function SeasonsList({ seasons, series }: SeasonsListProps) {
+export function SeasonsList({ seasons, seasonAvailability }: SeasonsListProps) {
   const { t } = useTranslation()
   const serverName = useServerDisplayName()
 
-  // Merge on-server seasons with aired-but-absent ones so the rail reads as a
-  // single sequence (S1 done → S2 in progress → S3 missing).
-  const missingSeasons = computeMissingSeasons(series, seasons)
+  const missingBySeason = new Map(
+    seasonAvailability.map((s) => [s.season_number, s.missing_episodes])
+  )
+
+  // Merge on-server seasons with those absent entirely, so the rail reads as a
+  // single sequence (Season 1 done → Season 2 in progress → Season 3 missing).
   const entries: SeasonEntry[] = [
     ...Object.keys(seasons)
       .map(Number)
@@ -80,14 +87,18 @@ export function SeasonsList({ seasons, series }: SeasonsListProps) {
         kind: 'present',
         seasonNumber: sn,
         episodes: seasons[sn],
-        rollup: rollupSeason(seasons[sn]),
+        rollup: rollupSeason(seasons[sn], missingBySeason.get(sn) ?? 0),
       })),
-    ...missingSeasons.map<MissingEntry>((m) => ({
-      kind: 'missing',
-      seasonNumber: m.season_number,
-      episodeCount: m.episode_count,
-    })),
+    ...seasonAvailability
+      .filter((s) => s.episodes_on_server === 0 && s.missing_episodes > 0)
+      .map<MissingEntry>((s) => ({
+        kind: 'missing',
+        seasonNumber: s.season_number,
+        episodeCount: s.missing_episodes,
+      })),
   ].sort((a, b) => a.seasonNumber - b.seasonNumber)
+
+  const totalMissing = seasonAvailability.reduce((sum, s) => sum + s.missing_episodes, 0)
 
   // Ordered list of every on-server episode, used for overall progress and the
   // resume / next-up target.
@@ -160,11 +171,16 @@ export function SeasonsList({ seasons, series }: SeasonsListProps) {
               {t('mediaDetail.seasons.title')}
             </Typography>
             {overallTotal > 0 && (
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                 {t('mediaDetail.seasons.overallProgress', {
                   watched: overallWatched,
                   total: overallTotal,
                 })}
+                {totalMissing > 0 && (
+                  <Typography component="span" variant="caption" color="error.main">
+                    {` · ${t('mediaDetail.seasons.overallMissing', { count: totalMissing })}`}
+                  </Typography>
+                )}
               </Typography>
             )}
           </Box>
@@ -198,15 +214,6 @@ export function SeasonsList({ seasons, series }: SeasonsListProps) {
               label={seasonLabel(entry.seasonNumber)}
               selected={entry.seasonNumber === activeEntry.seasonNumber}
               onSelect={() => setSelectedSeason(entry.seasonNumber)}
-              completeLabel={t('mediaDetail.seasons.statusComplete')}
-              countLabel={
-                entry.kind === 'present'
-                  ? t('mediaDetail.seasons.seasonWatchedCount', {
-                      watched: entry.rollup.watched,
-                      total: entry.rollup.total,
-                    })
-                  : t('mediaDetail.seasons.seasonMissingCount', { count: entry.episodeCount })
-              }
             />
           ))}
         </Box>
@@ -231,10 +238,16 @@ export function SeasonsList({ seasons, series }: SeasonsListProps) {
                 />
               ))}
             </Box>
+            {activeEntry.rollup.missing > 0 && (
+              <MissingEpisodesNote
+                count={activeEntry.rollup.missing}
+                seasonNumber={activeEntry.seasonNumber}
+              />
+            )}
           </>
         )}
 
-        <SeasonsLegend hasMissing={missingSeasons.length > 0} />
+        <SeasonsLegend hasMissing={totalMissing > 0} />
       </CardContent>
     </Card>
   )
@@ -368,31 +381,69 @@ function EpisodeRow({
   )
 }
 
+/** Segmented bar: watched, in progress, on-server-unwatched (track), missing. */
+function ProgressSegments({ rollup, height }: { rollup: SeasonRollup; height: number }) {
+  if (rollup.total === 0) return null
+  const pct = (n: number) => (n / rollup.total) * 100
+  const unwatched = Math.max(0, rollup.onServer - rollup.watched - rollup.inProgress)
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        height,
+        borderRadius: 3,
+        overflow: 'hidden',
+        bgcolor: (theme) => alpha(theme.palette.text.primary, 0.12),
+      }}
+    >
+      {rollup.watched > 0 && (
+        <Box sx={{ width: `${pct(rollup.watched)}%`, bgcolor: 'success.main' }} />
+      )}
+      {rollup.inProgress > 0 && (
+        <Box sx={{ width: `${pct(rollup.inProgress)}%`, bgcolor: 'warning.main' }} />
+      )}
+      {unwatched > 0 && <Box sx={{ width: `${pct(unwatched)}%` }} />}
+      {rollup.missing > 0 && (
+        <Box sx={{ width: `${pct(rollup.missing)}%`, bgcolor: 'error.main' }} />
+      )}
+    </Box>
+  )
+}
+
 function SeasonPill({
   entry,
   label,
   selected,
   onSelect,
-  completeLabel,
-  countLabel,
 }: {
   entry: SeasonEntry
   label: string
   selected: boolean
   onSelect: () => void
-  completeLabel: string
-  countLabel: string
 }) {
+  const { t } = useTranslation()
   const isMissing = entry.kind === 'missing'
+  const hasGap = entry.kind === 'present' && entry.rollup.missing > 0
   const status = entry.kind === 'present' ? entry.rollup.status : 'missing'
-  const watchedPct =
-    entry.kind === 'present' && entry.rollup.total > 0
-      ? (entry.rollup.watched / entry.rollup.total) * 100
-      : 0
-  const inProgressPct =
-    entry.kind === 'present' && entry.rollup.total > 0
-      ? (entry.rollup.inProgress / entry.rollup.total) * 100
-      : 0
+
+  let caption: string
+  let captionColor: string
+  if (isMissing) {
+    caption = t('mediaDetail.seasons.seasonMissingCount', { count: entry.episodeCount })
+    captionColor = 'error.main'
+  } else if (hasGap) {
+    caption = t('mediaDetail.seasons.seasonMissingSome', { count: entry.rollup.missing })
+    captionColor = 'error.main'
+  } else if (status === 'complete') {
+    caption = t('mediaDetail.seasons.statusComplete')
+    captionColor = 'success.main'
+  } else {
+    caption = t('mediaDetail.seasons.seasonWatchedCount', {
+      watched: entry.rollup.watched,
+      total: entry.rollup.onServer,
+    })
+    captionColor = 'text.secondary'
+  }
 
   return (
     <Box
@@ -430,39 +481,20 @@ function SeasonPill({
         >
           {label}
         </Typography>
-        {status === 'complete' && (
+        {status === 'complete' && !hasGap && (
           <CheckCircleIcon sx={{ fontSize: 18, color: 'success.main' }} />
         )}
-        {status === 'missing' && (
+        {(isMissing || hasGap) && (
           <CloudDownloadIcon sx={{ fontSize: 18, color: 'error.main' }} />
         )}
       </Box>
-      <Box
-        sx={{
-          display: 'flex',
-          height: 5,
-          borderRadius: 3,
-          overflow: 'hidden',
-          bgcolor: (theme) => alpha(theme.palette.text.primary, 0.12),
-        }}
-      >
-        {watchedPct > 0 && <Box sx={{ width: `${watchedPct}%`, bgcolor: 'success.main' }} />}
-        {inProgressPct > 0 && (
-          <Box sx={{ width: `${inProgressPct}%`, bgcolor: 'warning.main' }} />
-        )}
-      </Box>
-      <Typography
-        variant="caption"
-        color={
-          status === 'complete'
-            ? 'success.main'
-            : status === 'missing'
-              ? 'error.main'
-              : 'text.secondary'
-        }
-        sx={{ display: 'block', mt: 0.5 }}
-      >
-        {status === 'complete' ? completeLabel : countLabel}
+      {entry.kind === 'present' ? (
+        <ProgressSegments rollup={entry.rollup} height={5} />
+      ) : (
+        <Box sx={{ height: 5, borderRadius: 3, bgcolor: 'error.main', opacity: 0.55 }} />
+      )}
+      <Typography variant="caption" color={captionColor} sx={{ display: 'block', mt: 0.5 }}>
+        {caption}
       </Typography>
     </Box>
   )
@@ -471,32 +503,21 @@ function SeasonPill({
 function SeasonSummary({ rollup }: { rollup: SeasonRollup }) {
   const { t } = useTranslation()
   if (rollup.total === 0) return null
-  const watchedPct = (rollup.watched / rollup.total) * 100
-  const inProgressPct = (rollup.inProgress / rollup.total) * 100
   return (
     <Box>
-      <Box
-        sx={{
-          display: 'flex',
-          height: 6,
-          borderRadius: 3,
-          overflow: 'hidden',
-          bgcolor: (theme) => alpha(theme.palette.text.primary, 0.12),
-          mb: 0.5,
-        }}
-      >
-        {watchedPct > 0 && <Box sx={{ width: `${watchedPct}%`, bgcolor: 'success.main' }} />}
-        {inProgressPct > 0 && (
-          <Box sx={{ width: `${inProgressPct}%`, bgcolor: 'warning.main' }} />
-        )}
-      </Box>
-      <Typography variant="caption" color="text.secondary">
+      <ProgressSegments rollup={rollup} height={6} />
+      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
         {t('mediaDetail.seasons.seasonWatchedCount', {
           watched: rollup.watched,
-          total: rollup.total,
+          total: rollup.onServer,
         })}
         {rollup.inProgress > 0 &&
           ` · ${t('mediaDetail.seasons.seasonInProgressCount', { count: rollup.inProgress })}`}
+        {rollup.missing > 0 && (
+          <Typography component="span" variant="caption" color="error.main">
+            {` · ${t('mediaDetail.seasons.seasonMissingSome', { count: rollup.missing })}`}
+          </Typography>
+        )}
       </Typography>
     </Box>
   )
@@ -535,6 +556,30 @@ function EpisodeStateIndicator({
         flexShrink: 0,
       }}
     />
+  )
+}
+
+/** Aired episodes absent from a season that is otherwise present. */
+function MissingEpisodesNote({ count, seasonNumber }: { count: number; seasonNumber: number }) {
+  const { t } = useTranslation()
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        p: 1.5,
+        borderRadius: 1,
+        border: 1,
+        borderColor: 'error.main',
+        bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
+      }}
+    >
+      <CloudDownloadIcon sx={{ color: 'error.main', fontSize: 20 }} />
+      <Typography variant="body2" color="text.secondary">
+        {t('mediaDetail.seasons.missingFromSeason', { count, n: seasonNumber })}
+      </Typography>
+    </Box>
   )
 }
 
@@ -613,14 +658,7 @@ function SeasonsLegend({ hasMissing }: { hasMissing: boolean }) {
           {t('mediaDetail.seasons.legendUnwatched')}
         </Typography>
       </Box>
-      {hasMissing && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <CloudDownloadIcon sx={{ fontSize: 13, color: 'error.main' }} />
-          <Typography variant="caption" color="text.secondary">
-            {t('mediaDetail.seasons.legendMissing')}
-          </Typography>
-        </Box>
-      )}
+      {hasMissing && swatch('error.main', t('mediaDetail.seasons.legendMissing'))}
     </Box>
   )
 }

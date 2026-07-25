@@ -39,6 +39,7 @@ export function MediaDetailPage({ mediaType }: MediaDetailPageProps) {
     loading,
     error,
     seasons,
+    seasonAvailability,
     clearWatchStatus,
     setWatchStatusWatched,
     isFavorite,
@@ -106,11 +107,13 @@ export function MediaDetailPage({ mediaType }: MediaDetailPageProps) {
           <Grid item xs={12} md={6}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               <MediaInfoCard media={media} watchStats={watchStats} />
-              {/* Aired seasons missing from the server (series only) */}
-              {isSeries(media) && <MissingSeasonsCard series={media} seasons={seasons} />}
+              {/* Aired episodes missing from the server + Seerr requests (series only) */}
+              {isSeries(media) && (
+                <MissingSeasonsCard series={media} seasonAvailability={seasonAvailability} />
+              )}
               {/* Episodes List (Series only) */}
               {isSeries(media) && Object.keys(seasons).length > 0 && (
-                <SeasonsList seasons={seasons} series={media} />
+                <SeasonsList seasons={seasons} seasonAvailability={seasonAvailability} />
               )}
             </Box>
           </Grid>

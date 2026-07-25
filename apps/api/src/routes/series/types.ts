@@ -119,11 +119,33 @@ export interface EpisodeRow {
   progress_percent: number | null
 }
 
+export interface TmdbSeasonSummary {
+  season_number: number
+  episode_count: number
+  air_date: string | null
+}
+
+/** Per-season view of what has aired (TMDB) vs what the media server holds. */
+export interface SeasonAvailability {
+  season_number: number
+  episodes_on_server: number
+  /** null for specials / seasons TMDB has no data for */
+  tmdb_episode_count: number | null
+  /** Aired episodes, capped at (next episode - 1) for the season currently airing */
+  aired_episodes: number | null
+  /** aired_episodes - episodes_on_server, floored at 0; always 0 when unknown */
+  missing_episodes: number
+  has_aired: boolean
+}
+
 export interface EpisodesResponse {
   episodes: EpisodeRow[]
   seasons: Record<number, EpisodeRow[]>
   totalEpisodes: number
   seasonCount: number
+  seasonAvailability: SeasonAvailability[]
+  /** Total aired-but-absent episodes across all seasons */
+  missingEpisodes: number
 }
 
 export interface SeriesWatchStatsResponse {

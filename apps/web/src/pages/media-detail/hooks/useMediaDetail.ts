@@ -9,6 +9,7 @@ import type {
   WatchStatus,
   MovieWatchStats,
   SeriesWatchStats,
+  SeasonAvailability,
 } from '../types'
 import { DEFAULT_SIMILAR_MEDIA_LIMIT } from '../constants'
 
@@ -28,6 +29,7 @@ export interface UseMediaDetailReturn {
   error: string | null
   // Series-specific
   seasons: Record<number, Episode[]>
+  seasonAvailability: SeasonAvailability[]
   // Movie-specific
   clearWatchStatus: () => void
   setWatchStatusWatched: () => void
@@ -58,6 +60,7 @@ export function useMediaDetail(
   const [favoriteLoading, setFavoriteLoading] = useState(false)
   // Series-specific
   const [seasons, setSeasons] = useState<Record<number, Episode[]>>({})
+  const [seasonAvailability, setSeasonAvailability] = useState<SeasonAvailability[]>([])
 
   useEffect(() => {
     const fetchMedia = async () => {
@@ -99,6 +102,7 @@ export function useMediaDetail(
           if (mediaType === 'series' && episodesResponse?.ok) {
             const episodesData = await episodesResponse.json()
             setSeasons(episodesData.seasons || {})
+            setSeasonAvailability(episodesData.seasonAvailability || [])
           }
 
           // Fetch similar items (same default count as graph neighbors)
@@ -316,6 +320,7 @@ export function useMediaDetail(
     loading,
     error,
     seasons,
+    seasonAvailability,
     clearWatchStatus,
     setWatchStatusWatched,
     isFavorite,
