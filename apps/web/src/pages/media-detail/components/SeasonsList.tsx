@@ -1,24 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar,
-  Avatar,
-  Chip,
-  Collapse,
-  IconButton,
-  Button,
-  alpha,
-} from '@mui/material'
+import { Box, Typography, Card, CardContent, Avatar, Chip, Button, alpha } from '@mui/material'
 import StarIcon from '@mui/icons-material/Star'
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
-import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import TvIcon from '@mui/icons-material/Tv'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload'
@@ -122,7 +105,6 @@ export function SeasonsList({ seasons, series }: SeasonsListProps) {
   const [selectedSeason, setSelectedSeason] = useState(
     () => ctaEpisode?.season_number ?? entries[0]?.seasonNumber ?? 1
   )
-  const [expandedEpisode, setExpandedEpisode] = useState<string | null>(null)
 
   if (entries.length === 0) {
     return (
@@ -144,7 +126,7 @@ export function SeasonsList({ seasons, series }: SeasonsListProps) {
   const seasonLabel = (seasonNumber: number) =>
     seasonNumber === 0
       ? t('mediaDetail.seasons.specials')
-      : t('mediaDetail.seasons.seasonShort', { n: seasonNumber })
+      : t('mediaDetail.seasons.seasonN', { n: seasonNumber })
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return null
@@ -158,8 +140,6 @@ export function SeasonsList({ seasons, series }: SeasonsListProps) {
   const handleResume = () => {
     if (!ctaEpisode) return
     setSelectedSeason(ctaEpisode.season_number)
-    // Expand the target so switching seasons gives visible feedback.
-    setExpandedEpisode(ctaEpisode.overview ? ctaEpisode.id : null)
   }
 
   return (
@@ -210,15 +190,7 @@ export function SeasonsList({ seasons, series }: SeasonsListProps) {
         </Box>
 
         {/* Season rail — each season carries its own status at a glance */}
-        <Box
-          sx={{
-            display: 'flex',
-            gap: 1,
-            overflowX: 'auto',
-            pb: 1,
-            mb: 2,
-          }}
-        >
+        <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', pb: 1, mb: 2 }}>
           {entries.map((entry) => (
             <SeasonPill
               key={entry.seasonNumber}
@@ -248,173 +220,151 @@ export function SeasonsList({ seasons, series }: SeasonsListProps) {
         ) : (
           <>
             <SeasonSummary rollup={activeEntry.rollup} />
-            <List disablePadding sx={{ mt: 1.5 }}>
-              {activeEntry.episodes.map((episode) => {
-                const state = episodeWatchState(episode)
-                const isWatched = state === 'watched'
-                const isInProgress = state === 'in-progress'
-                const pct = episode.progress_percent ?? 0
-                const minutesLeft =
-                  isInProgress && episode.runtime_minutes
-                    ? Math.max(1, Math.round(episode.runtime_minutes * (1 - pct / 100)))
-                    : null
-                return (
-                  <Box key={episode.id}>
-                    <ListItem
-                      sx={{
-                        borderRadius: 1,
-                        mb: 1,
-                        bgcolor: 'background.default',
-                        opacity: isWatched ? 0.72 : 1,
-                        border: isInProgress ? 1 : 0,
-                        borderColor: 'warning.main',
-                        cursor: episode.overview ? 'pointer' : 'default',
-                        '&:hover': episode.overview ? { bgcolor: 'action.hover' } : {},
-                      }}
-                      onClick={() => {
-                        if (episode.overview) {
-                          setExpandedEpisode(
-                            expandedEpisode === episode.id ? null : episode.id
-                          )
-                        }
-                      }}
-                    >
-                      <ListItemAvatar>
-                        <Box sx={{ position: 'relative', width: 80, height: 45, mr: 1 }}>
-                          <Avatar
-                            variant="rounded"
-                            src={getProxiedImageUrl(episode.poster_url)}
-                            sx={{ width: 80, height: 45, bgcolor: 'grey.800' }}
-                          >
-                            <TvIcon />
-                          </Avatar>
-                          {isInProgress && (
-                            <Box
-                              sx={{
-                                position: 'absolute',
-                                left: 0,
-                                bottom: 0,
-                                height: 4,
-                                width: `${Math.min(100, Math.max(3, pct))}%`,
-                                bgcolor: 'warning.main',
-                                borderBottomLeftRadius: 4,
-                              }}
-                            />
-                          )}
-                        </Box>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 1,
-                              flexWrap: 'wrap',
-                            }}
-                          >
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                              sx={{ minWidth: 35 }}
-                            >
-                              E{episode.episode_number}
-                            </Typography>
-                            <Typography variant="body1" fontWeight={500}>
-                              {episode.title}
-                            </Typography>
-                            {episode.community_rating && (
-                              <Chip
-                                icon={<StarIcon sx={{ fontSize: 14 }} />}
-                                label={Number(episode.community_rating).toFixed(1)}
-                                size="small"
-                                sx={{
-                                  height: 20,
-                                  '& .MuiChip-label': { px: 0.5, fontSize: '0.7rem' },
-                                  '& .MuiChip-icon': { ml: 0.5, color: 'warning.main' },
-                                }}
-                              />
-                            )}
-                            {episode.id === nextUpId && (
-                              <Chip
-                                label={t('mediaDetail.seasons.nextUp')}
-                                size="small"
-                                color="primary"
-                                variant="outlined"
-                                sx={{ height: 20, '& .MuiChip-label': { px: 0.75, fontSize: '0.7rem' } }}
-                              />
-                            )}
-                          </Box>
-                        }
-                        secondary={
-                          <Box
-                            sx={{ display: 'flex', gap: 2, mt: 0.5, alignItems: 'center' }}
-                          >
-                            {episode.premiere_date && (
-                              <Typography variant="caption" color="text.secondary">
-                                {formatDate(episode.premiere_date)}
-                              </Typography>
-                            )}
-                            {episode.runtime_minutes && !isInProgress && (
-                              <Typography variant="caption" color="text.secondary">
-                                {episode.runtime_minutes}m
-                              </Typography>
-                            )}
-                            {isInProgress && (
-                              <Typography variant="caption" color="warning.main" fontWeight={500}>
-                                {minutesLeft
-                                  ? t('mediaDetail.seasons.continueMinutesLeft', {
-                                      percent: pct,
-                                      mins: minutesLeft,
-                                    })
-                                  : t('mediaDetail.seasons.continuePercent', { percent: pct })}
-                              </Typography>
-                            )}
-                          </Box>
-                        }
-                      />
-                      <EpisodeStateIndicator
-                        state={state}
-                        watchedLabel={t('mediaDetail.seasons.legendWatched')}
-                        unwatchedLabel={t('mediaDetail.seasons.legendUnwatched')}
-                      />
-                      {episode.overview && (
-                        <IconButton size="small" sx={{ ml: 0.5 }}>
-                          {expandedEpisode === episode.id ? (
-                            <ExpandLessIcon />
-                          ) : (
-                            <ExpandMoreIcon />
-                          )}
-                        </IconButton>
-                      )}
-                    </ListItem>
-                    {episode.overview && (
-                      <Collapse in={expandedEpisode === episode.id}>
-                        <Box
-                          sx={{
-                            px: 2,
-                            pb: 2,
-                            ml: 12,
-                            borderLeft: 2,
-                            borderColor: 'primary.main',
-                          }}
-                        >
-                          <Typography variant="body2" color="text.secondary">
-                            {episode.overview}
-                          </Typography>
-                        </Box>
-                      </Collapse>
-                    )}
-                  </Box>
-                )
-              })}
-            </List>
+            <Box sx={{ mt: 1.5 }}>
+              {activeEntry.episodes.map((episode) => (
+                <EpisodeRow
+                  key={episode.id}
+                  episode={episode}
+                  state={episodeWatchState(episode)}
+                  isNextUp={episode.id === nextUpId}
+                  formatDate={formatDate}
+                />
+              ))}
+            </Box>
           </>
         )}
 
         <SeasonsLegend hasMissing={missingSeasons.length > 0} />
       </CardContent>
     </Card>
+  )
+}
+
+function EpisodeRow({
+  episode,
+  state,
+  isNextUp,
+  formatDate,
+}: {
+  episode: Episode
+  state: EpisodeWatchState
+  isNextUp: boolean
+  formatDate: (d: string | null) => string | null
+}) {
+  const { t } = useTranslation()
+  const isWatched = state === 'watched'
+  const isInProgress = state === 'in-progress'
+  const pct = episode.progress_percent ?? 0
+  const minutesLeft =
+    isInProgress && episode.runtime_minutes
+      ? Math.max(1, Math.round(episode.runtime_minutes * (1 - pct / 100)))
+      : null
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        gap: 1.5,
+        p: 1.5,
+        mb: 1,
+        borderRadius: 1,
+        bgcolor: 'background.default',
+        opacity: isWatched ? 0.82 : 1,
+        border: isInProgress ? 1 : 0,
+        borderColor: 'warning.main',
+        alignItems: 'flex-start',
+      }}
+    >
+      {/* Thumbnail with resume bar for in-progress */}
+      <Box sx={{ position: 'relative', width: 80, height: 45, flexShrink: 0 }}>
+        <Avatar
+          variant="rounded"
+          src={getProxiedImageUrl(episode.poster_url)}
+          sx={{ width: 80, height: 45, bgcolor: 'grey.800' }}
+        >
+          <TvIcon />
+        </Avatar>
+        {isInProgress && (
+          <Box
+            sx={{
+              position: 'absolute',
+              left: 0,
+              bottom: 0,
+              height: 4,
+              width: `${Math.min(100, Math.max(3, pct))}%`,
+              bgcolor: 'warning.main',
+              borderBottomLeftRadius: 4,
+            }}
+          />
+        )}
+      </Box>
+
+      {/* Title, meta, and always-visible description */}
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <Typography variant="body2" color="text.secondary" sx={{ minWidth: 35 }}>
+            E{episode.episode_number}
+          </Typography>
+          <Typography variant="body1" fontWeight={500}>
+            {episode.title}
+          </Typography>
+          {episode.community_rating && (
+            <Chip
+              icon={<StarIcon sx={{ fontSize: 14 }} />}
+              label={Number(episode.community_rating).toFixed(1)}
+              size="small"
+              sx={{
+                height: 20,
+                '& .MuiChip-label': { px: 0.5, fontSize: '0.7rem' },
+                '& .MuiChip-icon': { ml: 0.5, color: 'warning.main' },
+              }}
+            />
+          )}
+          {isNextUp && (
+            <Chip
+              label={t('mediaDetail.seasons.nextUp')}
+              size="small"
+              color="primary"
+              variant="outlined"
+              sx={{ height: 20, '& .MuiChip-label': { px: 0.75, fontSize: '0.7rem' } }}
+            />
+          )}
+        </Box>
+        <Box sx={{ display: 'flex', gap: 2, mt: 0.5, alignItems: 'center', flexWrap: 'wrap' }}>
+          {episode.premiere_date && (
+            <Typography variant="caption" color="text.secondary">
+              {formatDate(episode.premiere_date)}
+            </Typography>
+          )}
+          {episode.runtime_minutes && !isInProgress && (
+            <Typography variant="caption" color="text.secondary">
+              {episode.runtime_minutes}m
+            </Typography>
+          )}
+          {isInProgress && (
+            <Typography variant="caption" color="warning.main" fontWeight={500}>
+              {minutesLeft
+                ? t('mediaDetail.seasons.continueMinutesLeft', { percent: pct, mins: minutesLeft })
+                : t('mediaDetail.seasons.continuePercent', { percent: pct })}
+            </Typography>
+          )}
+        </Box>
+        {episode.overview && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            {episode.overview}
+          </Typography>
+        )}
+      </Box>
+
+      {/* Watch-state indicator */}
+      <Box sx={{ flexShrink: 0, mt: 0.5 }}>
+        <EpisodeStateIndicator
+          state={state}
+          watchedLabel={t('mediaDetail.seasons.legendWatched')}
+          unwatchedLabel={t('mediaDetail.seasons.legendUnwatched')}
+        />
+      </Box>
+    </Box>
   )
 }
 
@@ -447,10 +397,11 @@ function SeasonPill({
   return (
     <Box
       component="button"
+      type="button"
       onClick={onSelect}
       sx={{
         flexShrink: 0,
-        minWidth: 128,
+        minWidth: 148,
         textAlign: 'left',
         cursor: 'pointer',
         borderRadius: 1.5,
@@ -458,11 +409,7 @@ function SeasonPill({
         bgcolor: selected ? 'action.selected' : 'transparent',
         border: selected ? 2 : 1,
         borderStyle: isMissing && !selected ? 'dashed' : 'solid',
-        borderColor: selected
-          ? 'primary.main'
-          : isMissing
-            ? 'divider'
-            : 'divider',
+        borderColor: selected ? 'primary.main' : 'divider',
         transition: 'border-color 0.15s',
         '&:hover': { borderColor: selected ? 'primary.main' : 'text.disabled' },
       }}
@@ -487,7 +434,7 @@ function SeasonPill({
           <CheckCircleIcon sx={{ fontSize: 18, color: 'success.main' }} />
         )}
         {status === 'missing' && (
-          <CloudDownloadIcon sx={{ fontSize: 18, color: 'warning.main' }} />
+          <CloudDownloadIcon sx={{ fontSize: 18, color: 'error.main' }} />
         )}
       </Box>
       <Box
@@ -510,7 +457,7 @@ function SeasonPill({
           status === 'complete'
             ? 'success.main'
             : status === 'missing'
-              ? 'warning.main'
+              ? 'error.main'
               : 'text.secondary'
         }
         sx={{ display: 'block', mt: 0.5 }}
@@ -609,11 +556,11 @@ function MissingSeasonPanel({
         p: 2,
         borderRadius: 1.5,
         border: 1,
-        borderColor: 'warning.main',
-        bgcolor: (theme) => alpha(theme.palette.warning.main, 0.08),
+        borderColor: 'error.main',
+        bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
       }}
     >
-      <CloudDownloadIcon sx={{ color: 'warning.main', mt: 0.25 }} />
+      <CloudDownloadIcon sx={{ color: 'error.main', mt: 0.25 }} />
       <Box>
         <Typography variant="body2" fontWeight={500} gutterBottom>
           {serverName
@@ -630,7 +577,7 @@ function MissingSeasonPanel({
 
 function SeasonsLegend({ hasMissing }: { hasMissing: boolean }) {
   const { t } = useTranslation()
-  const item = (color: string, label: string) => (
+  const swatch = (color: string, label: string) => (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
       <Box sx={{ width: 9, height: 9, borderRadius: '2px', bgcolor: color }} />
       <Typography variant="caption" color="text.secondary">
@@ -650,8 +597,8 @@ function SeasonsLegend({ hasMissing }: { hasMissing: boolean }) {
         borderColor: 'divider',
       }}
     >
-      {item('success.main', t('mediaDetail.seasons.legendWatched'))}
-      {item('warning.main', t('mediaDetail.seasons.legendInProgress'))}
+      {swatch('success.main', t('mediaDetail.seasons.legendWatched'))}
+      {swatch('warning.main', t('mediaDetail.seasons.legendInProgress'))}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
         <Box
           sx={{
@@ -668,7 +615,7 @@ function SeasonsLegend({ hasMissing }: { hasMissing: boolean }) {
       </Box>
       {hasMissing && (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <CloudDownloadIcon sx={{ fontSize: 13, color: 'warning.main' }} />
+          <CloudDownloadIcon sx={{ fontSize: 13, color: 'error.main' }} />
           <Typography variant="caption" color="text.secondary">
             {t('mediaDetail.seasons.legendMissing')}
           </Typography>
