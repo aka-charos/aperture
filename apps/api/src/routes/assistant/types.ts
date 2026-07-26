@@ -3,6 +3,7 @@
  */
 
 import type { EmbeddingModel } from 'ai'
+import type { StatusEmitter } from './helpers/status.js'
 
 // Database query result types
 export interface MovieResult {
@@ -102,4 +103,11 @@ export interface ToolContext {
   mediaServer: MediaServerInfo | null
   /** User asked for unwatched titles only (composer toggle → x-exclude-watched). */
   excludeWatched?: boolean
+  /**
+   * Report a coarse progress phase to the chat UI. Only the discovery tool needs
+   * this — it is one tool call hiding nine sequential stages, so the per-tool
+   * wrapper alone would leave the longest stretch of the turn silent. Optional:
+   * absent wherever a tool context is built outside a live stream.
+   */
+  onStatus?: StatusEmitter
 }

@@ -26,6 +26,7 @@ import {
 } from '@aperture/core'
 import { recordLlmError } from '../helpers/errors.js'
 import { gatherFromSources } from './sources/index.js'
+import type { StatusEmitter } from '../helpers/status.js'
 import type { DiscoveryCandidate } from '../types.js'
 
 const logger = createChildLogger('web-candidates')
@@ -188,7 +189,10 @@ function parseCandidatesJson(text: string): DiscoveryCandidate[] {
   return out
 }
 
-export async function gatherWebCandidates(queryText: string): Promise<DiscoveryCandidate[]> {
+export async function gatherWebCandidates(
+  queryText: string,
+  onStatus?: StatusEmitter
+): Promise<DiscoveryCandidate[]> {
   logger.info({ query: queryText.slice(0, 200) }, 'Discovery routed: gathering web candidates')
 
   const results = await gatherFromSources(queryText)
@@ -205,6 +209,9 @@ export async function gatherWebCandidates(queryText: string): Promise<DiscoveryC
     { sources: results.map((r) => r.source), combinedChars: combined.length },
     'Discovery: combined web source material'
   )
+
+  // Gathering is done; from here it's model work turning prose into candidates.
+  onStatus?.('discoveryShortlist')
 
   const googleContributed = results.some((r) => r.source === 'google')
   let structuring: { model: LanguageModel; provider: StructuringProvider }

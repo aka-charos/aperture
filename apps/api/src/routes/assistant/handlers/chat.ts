@@ -19,7 +19,7 @@ import {
 } from 'ai'
 import { getChatModelInstance, getEmbeddingModelInstance, getActiveEmbeddingModelId } from '@aperture/core'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
-import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText, loadConversationHistory, withUnwatchedFilter } from '../helpers/index.js'
+import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText, loadConversationHistory, withUnwatchedFilter, createStatusEmitter, withStatusEvents } from '../helpers/index.js'
 import { createTools, createN8nTools, createDiscoveryResolveTool, DISCOVERY_PROMPT } from '../tools/index.js'
 import { withToolErrorHandling } from '../tools/utils.js'
 import type { ToolContext } from '../types.js'
@@ -123,147 +123,194 @@ export function registerChatHandler(fastify: FastifyInstance) {
         // on tool output (see withUnwatchedFilter) so it holds regardless of
         // whether the model honours the instruction.
         const excludeWatched = request.headers['x-exclude-watched'] === 'true'
-        const systemPrompt = await buildSystemPrompt(
-          user.id,
-          user.isAdmin,
-          mediaServer?.name,
-          excludeWatched
-        )
 
         if (!embeddingModelId) {
           return reply.status(500).send({ error: 'Embedding model not configured' })
         }
 
-        // Create tool context
-        const toolContext: ToolContext = {
-          userId: user.id,
-          isAdmin: user.isAdmin,
-          embeddingModel,
-          embeddingModelId, // Format: "provider:model" (e.g., "openai:text-embedding-3-large")
-          mediaServer,
-          excludeWatched,
-        }
-
-        // Rebuild prior turns from the persisted conversation (the source of
-        // truth). The client's chat runtime is remounted — and emptied — whenever
-        // a conversation is (re)loaded or first assigned an id, so a follow-up
-        // would otherwise arrive with no history and the assistant would both
-        // forget and improvise a fresh, unrelated answer. The conversation id is
-        // sent as a header; history is scoped to this user. Falls back to the
-        // client-sent messages when there's no id / no stored history.
-        let baseMessages: UIMessage[] = messages
         const conversationId =
           typeof request.headers['x-conversation-id'] === 'string'
             ? request.headers['x-conversation-id'].trim()
             : ''
-        if (conversationId) {
-          try {
-            const history = await loadConversationHistory(conversationId, user.id)
-            if (history.length > 0) {
-              // DB history is authoritative for prior turns; append only the newly
-              // typed message (the client's last) to avoid double-counting the
-              // turns it still holds in a continuous, un-remounted session.
-              const lastClientMessage = messages[messages.length - 1]
-              baseMessages = lastClientMessage ? [...history, lastClientMessage] : history
-            }
-          } catch (err) {
-            fastify.log.warn(
-              { err, conversationId },
-              'Failed to load conversation history; using client messages as-is'
-            )
-          }
-        }
 
-        // Optional n8n pre-processing hook (fails open if n8n is unreachable)
-        const { messages: processedMessages, systemAppend } = await applyN8nPreProcess(baseMessages, {
-          id: user.id,
-          isAdmin: user.isAdmin,
-        })
-
-        // Route intent: 'discovery' adds the findCandidatesInLibrary tool, which
-        // gathers web-sourced candidates itself (inside its execute, on the Web
-        // Search role) so the assistant can stream its opening line before that
-        // slow work runs; 'library' (the default) leaves the assistant untouched.
-        // Fails open to library.
-        let discoveryTools: ToolSet = {}
-        let discoveryAppend = ''
-        const intent = await classifyIntent(processedMessages)
-        fastify.log.info({ intent }, 'Assistant intent classified')
-        if (intent === 'discovery') {
-          discoveryTools = createDiscoveryResolveTool(toolContext, latestUserText(processedMessages))
-          discoveryAppend = DISCOVERY_PROMPT
-        }
-
-        // Create tools with context, plus n8n search_web + discovery (when routed)
-        const baseTools = {
-          ...createTools(toolContext),
-          ...(await createN8nTools()),
-        }
-        // On discovery turns, drop only the tools that directly duplicate what the
-        // discovery tool already produces — query-driven list builders that compete
-        // with the web "Recommendations" and tempt the model to bypass
-        // findCandidatesInLibrary entirely:
-        //   - findSimilarContent: same output as the embeddings "Also worth checking"
-        //   - searchContent / semanticSearch: alternative recommendation lists from the query
-        // Distinct-intent tools (getTopRated / getMyRecommendations / getUnwatched) stay
-        // available so the model can SUPPLEMENT the web picks with broader in-library
-        // coverage (e.g. getTopRated by genre). The prompt mandates calling
-        // findCandidatesInLibrary first so the reasoned web cards are always primary.
-        if (Object.keys(discoveryTools).length > 0) {
-          const DISCOVERY_SUPPRESSED_TOOLS = ['findSimilarContent', 'searchContent', 'semanticSearch']
-          for (const name of DISCOVERY_SUPPRESSED_TOOLS) {
-            delete (baseTools as Record<string, unknown>)[name]
-          }
-        }
-        // Backstop: uncaught tool errors become { id, error } payloads instead
-        // of aborting the stream with a masked "An error occurred". Wraps the
-        // unwatched filter too, so a failure there can't abort the stream.
-        const allTools = { ...baseTools, ...discoveryTools }
-        const tools = withToolErrorHandling(
-          excludeWatched ? withUnwatchedFilter(allTools, user.id) : allTools
-        )
-
-        fastify.log.info(
-          {
-            toolCount: Object.keys(tools).length,
-            model: typeof chatModel === 'string' ? chatModel : chatModel.modelId,
-            excludeWatched,
-          },
-          'Starting chat stream'
-        )
-
-        // Stream the response using AI SDK v5
-        // stopWhen allows the model to continue generating text after tool results
-        const result = streamText({
-          model: chatModel,
-          system: [systemPrompt, systemAppend, discoveryAppend].filter(Boolean).join('\n\n'),
-          messages: convertToModelMessages(processedMessages),
-          tools,
-          toolChoice: 'auto',
-          stopWhen: stepCountIs(5), // Stop after 5 steps (allows tool calls + follow-up responses)
-          onStepFinish: (step) => {
-            fastify.log.info(
-              {
-                stepKeys: Object.keys(step),
-                hasText: !!step.text,
-                textLength: step.text?.length,
-                toolCallCount: step.toolCalls?.length ?? 0,
-                toolResultCount: step.toolResults?.length ?? 0,
-              },
-              'Step finished'
-            )
-          },
-        })
-
-        // Get the UI Message Stream Response (Web Response).
         // onError replaces the SDK's masked "An error occurred" with a stable
         // AI_ERROR:<code>:<detail> string the frontend maps to localized copy.
-        const webResponse = result.toUIMessageStreamResponse({
-          onError: (error) => {
-            fastify.log.error({ err: error }, 'Assistant stream error')
-            return assistantErrorText(error)
+        // Needed in BOTH places below: this one covers everything execute does,
+        // the one on toUIMessageStream covers mid-stream model/provider failures.
+        const onStreamError = (error: unknown) => {
+          fastify.log.error({ err: error }, 'Assistant stream error')
+          return assistantErrorText(error)
+        }
+
+        // Everything slow runs INSIDE execute, on an already-open stream, so each
+        // phase can report itself to the UI (transient `data-status` parts) rather
+        // than the user watching one static "Thinking…" through prompt building,
+        // intent routing and the whole discovery pipeline.
+        //
+        // Error behaviour is unchanged in kind: the SDK catches a rejected execute
+        // and enqueues `{ type: 'error', errorText: onError(err) }` — exactly the
+        // `start` + `error` pair the pre-stream failure path (see the catch below)
+        // builds by hand. So a failure while building the prompt or routing intent
+        // still reaches the client as a coded, localizable string.
+        const stream = createUIMessageStream({
+          onError: onStreamError,
+          execute: async ({ writer }) => {
+            // Creates the assistant message client-side; must precede any part.
+            writer.write({ type: 'start' })
+            const emit = createStatusEmitter(writer)
+
+            emit('preparing')
+            const systemPrompt = await buildSystemPrompt(
+              user.id,
+              user.isAdmin,
+              mediaServer?.name,
+              excludeWatched
+            )
+
+            // Create tool context
+            const toolContext: ToolContext = {
+              userId: user.id,
+              isAdmin: user.isAdmin,
+              embeddingModel,
+              embeddingModelId, // Format: "provider:model" (e.g., "openai:text-embedding-3-large")
+              mediaServer,
+              excludeWatched,
+              // Only the discovery tool reads this: it hides nine sequential
+              // stages behind one tool call, so the per-tool wrapper below would
+              // otherwise go quiet for the longest stretch of the turn.
+              onStatus: emit,
+            }
+
+            // Rebuild prior turns from the persisted conversation (the source of
+            // truth). The client's chat runtime is remounted — and emptied — whenever
+            // a conversation is (re)loaded or first assigned an id, so a follow-up
+            // would otherwise arrive with no history and the assistant would both
+            // forget and improvise a fresh, unrelated answer. The conversation id is
+            // sent as a header; history is scoped to this user. Falls back to the
+            // client-sent messages when there's no id / no stored history.
+            let baseMessages: UIMessage[] = messages
+            if (conversationId) {
+              try {
+                const history = await loadConversationHistory(conversationId, user.id)
+                if (history.length > 0) {
+                  // DB history is authoritative for prior turns; append only the newly
+                  // typed message (the client's last) to avoid double-counting the
+                  // turns it still holds in a continuous, un-remounted session.
+                  const lastClientMessage = messages[messages.length - 1]
+                  baseMessages = lastClientMessage ? [...history, lastClientMessage] : history
+                }
+              } catch (err) {
+                fastify.log.warn(
+                  { err, conversationId },
+                  'Failed to load conversation history; using client messages as-is'
+                )
+              }
+            }
+
+            // Optional n8n pre-processing hook (fails open if n8n is unreachable)
+            const { messages: processedMessages, systemAppend } = await applyN8nPreProcess(
+              baseMessages,
+              { id: user.id, isAdmin: user.isAdmin }
+            )
+
+            // Route intent: 'discovery' adds the findCandidatesInLibrary tool, which
+            // gathers web-sourced candidates itself (inside its execute, on the Web
+            // Search role) so the assistant can stream its opening line before that
+            // slow work runs; 'library' (the default) leaves the assistant untouched.
+            // Fails open to library.
+            let discoveryTools: ToolSet = {}
+            let discoveryAppend = ''
+            emit('understanding')
+            const intent = await classifyIntent(processedMessages)
+            fastify.log.info({ intent }, 'Assistant intent classified')
+            if (intent === 'discovery') {
+              discoveryTools = createDiscoveryResolveTool(
+                toolContext,
+                latestUserText(processedMessages)
+              )
+              discoveryAppend = DISCOVERY_PROMPT
+            }
+
+            // Create tools with context, plus n8n search_web + discovery (when routed)
+            const baseTools = {
+              ...createTools(toolContext),
+              ...(await createN8nTools()),
+            }
+            // On discovery turns, drop only the tools that directly duplicate what the
+            // discovery tool already produces — query-driven list builders that compete
+            // with the web "Recommendations" and tempt the model to bypass
+            // findCandidatesInLibrary entirely:
+            //   - findSimilarContent: same output as the embeddings "Also worth checking"
+            //   - searchContent / semanticSearch: alternative recommendation lists from the query
+            // Distinct-intent tools (getTopRated / getMyRecommendations / getUnwatched) stay
+            // available so the model can SUPPLEMENT the web picks with broader in-library
+            // coverage (e.g. getTopRated by genre). The prompt mandates calling
+            // findCandidatesInLibrary first so the reasoned web cards are always primary.
+            if (Object.keys(discoveryTools).length > 0) {
+              const DISCOVERY_SUPPRESSED_TOOLS = [
+                'findSimilarContent',
+                'searchContent',
+                'semanticSearch',
+              ]
+              for (const name of DISCOVERY_SUPPRESSED_TOOLS) {
+                delete (baseTools as Record<string, unknown>)[name]
+              }
+            }
+            // Backstop: uncaught tool errors become { id, error } payloads instead
+            // of aborting the stream with a masked "An error occurred". Wraps the
+            // unwatched filter too, so a failure there can't abort the stream.
+            // withStatusEvents is outermost so entering a tool is reported before
+            // any of that wrapping runs.
+            const allTools = { ...baseTools, ...discoveryTools }
+            const tools = withStatusEvents(
+              withToolErrorHandling(
+                excludeWatched ? withUnwatchedFilter(allTools, user.id) : allTools
+              ),
+              emit
+            )
+
+            fastify.log.info(
+              {
+                toolCount: Object.keys(tools).length,
+                model: typeof chatModel === 'string' ? chatModel : chatModel.modelId,
+                excludeWatched,
+              },
+              'Starting chat stream'
+            )
+
+            // Stream the response using AI SDK v5
+            // stopWhen allows the model to continue generating text after tool results
+            const result = streamText({
+              model: chatModel,
+              system: [systemPrompt, systemAppend, discoveryAppend].filter(Boolean).join('\n\n'),
+              messages: convertToModelMessages(processedMessages),
+              tools,
+              toolChoice: 'auto',
+              stopWhen: stepCountIs(5), // Stop after 5 steps (allows tool calls + follow-up responses)
+              onStepFinish: (step) => {
+                fastify.log.info(
+                  {
+                    stepKeys: Object.keys(step),
+                    hasText: !!step.text,
+                    textLength: step.text?.length,
+                    toolCallCount: step.toolCalls?.length ?? 0,
+                    toolResultCount: step.toolResults?.length ?? 0,
+                  },
+                  'Step finished'
+                )
+                // Tools have returned; whatever comes next is the model writing
+                // prose, which is a meaningfully different wait to sit through.
+                if (step.toolResults?.length) emit('composing')
+              },
+            })
+
+            // sendStart: false — `start` was already written above, and a second
+            // one would open a second assistant message.
+            writer.merge(result.toUIMessageStream({ sendStart: false, onError: onStreamError }))
           },
         })
+
+        const webResponse = createUIMessageStreamResponse({ stream })
 
         // Forward status + headers to Fastify
         reply.status(webResponse.status)
@@ -287,11 +334,12 @@ export function registerChatHandler(fastify: FastifyInstance) {
           return
         }
 
-        // Failures before the stream starts (model not configured, DB down
-        // while building the prompt, ...) would surface as a bare 500 the chat
-        // UI swallows silently. Return a UI-message stream instead: `start`
-        // creates the assistant message, `error` carries the coded message the
-        // frontend localizes — same path as mid-stream errors.
+        // Only pre-flight failures reach here now (resolving the configured
+        // models, opening the stream) — anything thrown inside execute is caught
+        // by the SDK and routed through onStreamError instead. A bare 500 would
+        // be swallowed silently by the chat UI, so return a UI-message stream:
+        // `start` creates the assistant message, `error` carries the coded
+        // message the frontend localizes — same path as mid-stream errors.
         const errorText = assistantErrorText(err)
         const webResponse = createUIMessageStreamResponse({
           stream: createUIMessageStream({
