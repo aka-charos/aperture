@@ -2398,8 +2398,6 @@
     "title": "Ouverture Encore",
     "subtitle": "Recommandations basées sur l'IA",
     "tooltipNewChat": "Nouvelle discussion",
-    "tooltipExitFullscreen": "Quitter le plein écran",
-    "tooltipFullscreen": "Plein écran",
     "dateToday": "Aujourd'hui",
     "dateYesterday": "Hier",
     "dateDaysAgo": "il y a {{count}}j",
@@ -2462,7 +2460,8 @@
       "discoveryRelated": "Finding related titles…",
       "discoveryReasons": "Writing up why each fits…",
       "discoveryAssembling": "Putting your list together…"
-    }
+    },
+    "tooltipOpenFullPage": "Open full page"
   },
   "welcomeModal": {
     "title": "Bienvenue dans Aperture",
@@ -4085,7 +4084,6 @@
     "timeRangeMonth": "Past month",
     "timeRangeYear": "Past year",
     "includeAnswer": "Include synthesized answer",
-    "includeImages": "Include images",
     "saveConfiguration": "Save Configuration",
     "testing": "Testing…",
     "testConnection": "Test",

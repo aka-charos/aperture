@@ -25,10 +25,16 @@ export interface BackendMessage {
  * Conversation state + CRUD shared by every assistant surface (modal, dock,
  * dedicated /assistant page). `active` gates initialization: the floating
  * surface passes its open state, the page passes true.
+ *
+ * `initialConversationId` resumes a specific conversation instead of the most
+ * recent one — how the floating surface hands its thread to the page. Read once,
+ * at mount; later changes don't move an open surface off what it's showing.
  */
-export function useAssistantChat(active: boolean) {
+export function useAssistantChat(active: boolean, initialConversationId?: string) {
   const [conversations, setConversations] = useState<Conversation[]>([])
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(
+    initialConversationId ?? null
+  )
   const [loadingConversations, setLoadingConversations] = useState(false)
   const [savingMessages, setSavingMessages] = useState(false)
   const [historicalMessages, setHistoricalMessages] = useState<BackendMessage[]>([])

@@ -1415,8 +1415,6 @@
     "title": "Aperture Encore",
     "subtitle": "Προτάσεις με τεχνητή νοημοσύνη",
     "tooltipNewChat": "Νέα συνομιλία",
-    "tooltipExitFullscreen": "Έξοδος από πλήρη οθόνη",
-    "tooltipFullscreen": "Πλήρης οθόνη",
     "tooltipStop": "Διακοπή δημιουργίας",
     "tooltipCopy": "Αντιγραφή απάντησης",
     "tooltipRegenerate": "Επαναδημιουργία απάντησης",
@@ -1479,7 +1477,8 @@
       "discoveryRelated": "Finding related titles…",
       "discoveryReasons": "Writing up why each fits…",
       "discoveryAssembling": "Putting your list together…"
-    }
+    },
+    "tooltipOpenFullPage": "Open full page"
   },
   "settingsMediaServer": {
     "title": "Διακομιστής πολυμέσων",
@@ -4085,7 +4084,6 @@
     "timeRangeMonth": "Past month",
     "timeRangeYear": "Past year",
     "includeAnswer": "Include synthesized answer",
-    "includeImages": "Include images",
     "saveConfiguration": "Save Configuration",
     "testing": "Testing…",
     "testConnection": "Test",
