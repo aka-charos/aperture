@@ -3,7 +3,7 @@ import { query, queryOne } from '../lib/db.js'
 import { getMediaServerProvider } from '../media/index.js'
 import { getMediaServerApiKey, getChannelsWebExpandOnSchedule } from '../settings/systemSettings.js'
 import { generateChannelRecommendations } from './recommendations.js'
-import { gatherWebExpansion } from './webExpand.js'
+import { buildChannelItems } from './build.js'
 import { updateChannelCollection } from './collections.js'
 import type { ChannelUpdateOptions } from './types.js'
 
@@ -44,12 +44,10 @@ export async function updateChannelPlaylist(
     throw new Error(`Channel not found: ${channelId}`)
   }
 
-  // Generate recommendations (optionally expanded with web-search similar titles)
-  const recommendations = await generateChannelRecommendations(channelId)
-  const expanded = opts.webExpand
-    ? [...recommendations, ...(await gatherWebExpansion(channelId, recommendations))]
-    : recommendations
-  const itemIds = expanded.map((r) => r.providerItemId)
+  // Generate recommendations (optionally expanded with web-search similar titles), unless the
+  // caller already has an approved list from the preview dialog.
+  const itemIds =
+    opts.itemIds ?? (await buildChannelItems(channelId, opts)).map((r) => r.providerItemId)
 
   // Create/update playlist
   const result = await provider.createOrUpdatePlaylist(
@@ -81,7 +79,13 @@ export async function updateChannelPlaylist(
   }
 
   logger.info(
-    { channelId, playlistId: result.playlistId, itemCount: itemIds.length, webExpand: !!opts.webExpand },
+    {
+      channelId,
+      playlistId: result.playlistId,
+      itemCount: itemIds.length,
+      webExpand: !!opts.webExpand,
+      approved: !!opts.itemIds,
+    },
     'Channel playlist updated'
   )
 

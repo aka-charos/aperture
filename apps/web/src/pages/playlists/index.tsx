@@ -16,7 +16,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import AddIcon from '@mui/icons-material/Add'
 import { usePlaylistsData } from './hooks'
-import { PlaylistCard, GraphPlaylistCard, PlaylistDialog, PlaylistViewDialog, GraphPlaylistViewDialog, EmptyState } from './components'
+import { PlaylistCard, GraphPlaylistCard, PlaylistDialog, PlaylistViewDialog, PlaylistPreviewDialog, GraphPlaylistViewDialog, EmptyState } from './components'
 import { useServerDisplayName } from '../../hooks/useServerDisplayName'
 
 export function PlaylistsPage() {
@@ -36,6 +36,12 @@ export function PlaylistsPage() {
     generatingChannelId,
     snackbar,
     setSnackbar,
+    // Preview (pre-push) state
+    previewChannel,
+    previewItems,
+    loadingPreview,
+    previewError,
+    confirmingPreview,
     // Dialog state
     dialogOpen,
     playlistDialogOpen,
@@ -62,6 +68,9 @@ export function PlaylistsPage() {
     handleDeleteCancel,
     handleDeleteConfirm,
     handleGeneratePlaylist,
+    handleClosePreview,
+    handleRemovePreviewItem,
+    handleConfirmPreview,
     addExampleMovie,
     removeExampleMovie,
     addExampleSeries,
@@ -185,6 +194,18 @@ export function PlaylistsPage() {
         onClose={handleClosePlaylistDialog}
         onRemoveItem={handleRemoveFromPlaylist}
         onAddMovie={handleAddToPlaylist}
+      />
+
+      {/* Pre-push Preview Dialog */}
+      <PlaylistPreviewDialog
+        channel={previewChannel}
+        items={previewItems}
+        loading={loadingPreview}
+        error={previewError}
+        confirming={confirmingPreview}
+        onClose={handleClosePreview}
+        onRemoveItem={handleRemovePreviewItem}
+        onConfirm={handleConfirmPreview}
       />
 
       {/* Graph Playlist View Dialog */}

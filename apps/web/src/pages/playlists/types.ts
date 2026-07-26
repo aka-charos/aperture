@@ -9,6 +9,7 @@ export interface Channel {
   example_movie_ids: string[]
   example_series_ids?: string[]
   media_types?: MediaType[]
+  include_seeds?: boolean
   is_pinned_row: boolean
   is_active: boolean
   playlist_id: string | null
@@ -37,6 +38,21 @@ export interface PlaylistItem {
   runtime: number | null
 }
 
+/**
+ * One proposed entry from /preview — what a generate would write, before anything reaches the
+ * media server. `id` is the provider item id, which is what the confirm call sends back.
+ */
+export interface PreviewItem {
+  id: string
+  itemId: string
+  mediaType: MediaType
+  title: string
+  year: number | null
+  posterUrl: string | null
+  runtime: number | null
+  isSeed: boolean
+}
+
 export interface FormData {
   name: string
   description: string
@@ -45,6 +61,7 @@ export interface FormData {
   exampleMovies: MediaSummary[]
   exampleSeries: MediaSummary[]
   mediaTypes: MediaType[]
+  includeSeeds: boolean
 }
 
 export interface SnackbarState {

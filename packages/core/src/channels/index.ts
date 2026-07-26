@@ -1,5 +1,13 @@
 // Re-export types
-export type { Channel, ChannelRecommendation, ChannelMediaType } from './types.js'
+export type {
+  Channel,
+  ChannelRecommendation,
+  ChannelMediaType,
+  ChannelUpdateOptions,
+} from './types.js'
+
+// Re-export the shared item builder (what a channel would write, without writing it)
+export { buildChannelItems } from './build.js'
 
 // Re-export utilities
 export { weightedRandomSample } from './utils.js'

@@ -4,8 +4,10 @@ import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import {
   updateChannelPlaylist,
   updateChannelCollection,
+  buildChannelItems,
   getMediaServerProvider,
   getMediaServerApiKey,
+  type ChannelRecommendation,
 } from '@aperture/core'
 import type { ChannelRow } from '../types.js'
 
@@ -50,13 +52,49 @@ async function hydrateCollectionItems(providerItemIds: string[]) {
     }))
 }
 
+/**
+ * Add the artwork the preview list needs. buildChannelItems only carries ids/title/year, and the
+ * dialog shows posters, so look the rows up by their Aperture id in the table their media type
+ * points at. Order is preserved — a preview is a proposal for the exact order that gets written.
+ */
+async function hydratePreviewItems(recommendations: ChannelRecommendation[]) {
+  if (recommendations.length === 0) return []
+
+  const movieIds = recommendations.filter((r) => r.mediaType === 'movie').map((r) => r.itemId)
+  const seriesIds = recommendations.filter((r) => r.mediaType === 'series').map((r) => r.itemId)
+
+  const result = await query<{
+    id: string
+    poster_url: string | null
+    runtime: number | null
+  }>(
+    `SELECT id, poster_url, runtime_minutes AS runtime FROM movies WHERE id = ANY($1)
+     UNION ALL
+     SELECT id, poster_url, NULL AS runtime FROM series WHERE id = ANY($2)`,
+    [movieIds, seriesIds]
+  )
+
+  const byId = new Map(result.rows.map((r) => [r.id, r]))
+  return recommendations.map((rec) => ({
+    // The media server speaks provider item ids; that is also what comes back on confirm.
+    id: rec.providerItemId,
+    itemId: rec.itemId,
+    mediaType: rec.mediaType,
+    title: rec.title,
+    year: rec.year,
+    posterUrl: byId.get(rec.itemId)?.poster_url ?? null,
+    runtime: byId.get(rec.itemId)?.runtime ?? null,
+    isSeed: !!rec.isSeed,
+  }))
+}
+
 export function registerPlaylistHandlers(fastify: FastifyInstance) {
   /**
-   * POST /api/channels/:id/generate
-   * Generate/refresh playlist for channel
+   * POST /api/channels/:id/preview
+   * Compute what a generate would write, without touching the media server.
    */
   fastify.post<{ Params: { id: string } }>(
-    '/api/channels/:id/generate',
+    '/api/channels/:id/preview',
     { preHandler: requireAuth, schema: { tags: ["playlists"] } },
     async (request, reply) => {
       const { id } = request.params
@@ -73,10 +111,50 @@ export function registerPlaylistHandlers(fastify: FastifyInstance) {
       }
 
       try {
+        // Same options a manual generate uses, so the preview is what would actually be written.
+        const recommendations = await buildChannelItems(id, { webExpand: true })
+        const items = await hydratePreviewItems(recommendations)
+        return reply.send({ items })
+      } catch (err) {
+        request.log.error({ err, channelId: id }, 'Failed to preview channel output')
+        return reply.status(500).send({ error: 'Failed to preview playlist' })
+      }
+    }
+  )
+
+  /**
+   * POST /api/channels/:id/generate
+   * Generate/refresh playlist for channel. An itemIds body writes exactly that list (the set the
+   * user approved in the preview dialog) instead of sampling a fresh one.
+   */
+  fastify.post<{ Params: { id: string }; Body?: { itemIds?: string[] } }>(
+    '/api/channels/:id/generate',
+    { preHandler: requireAuth, schema: { tags: ["playlists"] } },
+    async (request, reply) => {
+      const { id } = request.params
+      const currentUser = request.user as SessionUser
+      const approvedItemIds = request.body?.itemIds
+
+      const channel = await queryOne<ChannelRow>(`SELECT * FROM channels WHERE id = $1`, [id])
+
+      if (!channel) {
+        return reply.status(404).send({ error: 'Channel not found' })
+      }
+
+      if (channel.owner_id !== currentUser.id && !currentUser.isAdmin) {
+        return reply.status(403).send({ error: 'Forbidden' })
+      }
+
+      try {
         // Manual generate always attempts web-search expansion (no-op unless the Web Search
-        // role is configured). Generate once and use the written item count for the message.
+        // role is configured), except when the caller already approved a list. Generate once and
+        // use the written item count for the message.
+        const opts = approvedItemIds?.length
+          ? { itemIds: approvedItemIds }
+          : { webExpand: true }
+
         if (channel.output_type === 'collection') {
-          const { collectionId, itemCount } = await updateChannelCollection(id, { webExpand: true })
+          const { collectionId, itemCount } = await updateChannelCollection(id, opts)
           return reply.send({
             collectionId,
             itemCount,
@@ -84,7 +162,7 @@ export function registerPlaylistHandlers(fastify: FastifyInstance) {
           })
         }
 
-        const { playlistId, itemCount } = await updateChannelPlaylist(id, { webExpand: true })
+        const { playlistId, itemCount } = await updateChannelPlaylist(id, opts)
         return reply.send({
           playlistId,
           itemCount,

@@ -17,6 +17,8 @@ import {
   ToggleButtonGroup,
   Tooltip,
   Button,
+  Switch,
+  FormControlLabel,
   alpha,
   useTheme,
 } from '@mui/material'
@@ -702,6 +704,31 @@ export function PlaylistDialog({
             />
           </Section>
         )}
+
+        {/* Seed inclusion — the seeds steer the picks either way; this decides whether they also
+            ship inside the result. Off by default, so existing channels are unchanged. */}
+        <Box sx={{ px: 0.5 }}>
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={formData.includeSeeds}
+                onChange={(e) => setFormData({ ...formData, includeSeeds: e.target.checked })}
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body2" fontWeight={500}>
+                  {pt('includeSeedsLabel')}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {pt('includeSeedsHint')}
+                </Typography>
+              </Box>
+            }
+            sx={{ alignItems: 'center', m: 0 }}
+          />
+        </Box>
 
         {/* Text Preferences Section */}
         <Section

@@ -16,7 +16,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import AddIcon from '@mui/icons-material/Add'
 import { usePlaylistsData } from '../playlists/hooks'
-import { PlaylistCard, PlaylistDialog, PlaylistViewDialog, EmptyState } from '../playlists/components'
+import { PlaylistCard, PlaylistDialog, PlaylistViewDialog, PlaylistPreviewDialog, EmptyState } from '../playlists/components'
 import { useServerDisplayName } from '../../hooks/useServerDisplayName'
 
 // Reuses the Channel builder stack (hook + components) but targets server-wide Emby Collections
@@ -38,6 +38,11 @@ export function CollectionsPage() {
     generatingChannelId,
     snackbar,
     setSnackbar,
+    previewChannel,
+    previewItems,
+    loadingPreview,
+    previewError,
+    confirmingPreview,
     dialogOpen,
     playlistDialogOpen,
     viewingChannel,
@@ -55,6 +60,9 @@ export function CollectionsPage() {
     handleDeleteCancel,
     handleDeleteConfirm,
     handleGeneratePlaylist,
+    handleClosePreview,
+    handleRemovePreviewItem,
+    handleConfirmPreview,
     addExampleMovie,
     removeExampleMovie,
     addExampleSeries,
@@ -167,6 +175,19 @@ export function CollectionsPage() {
         onClose={handleClosePlaylistDialog}
         onRemoveItem={handleRemoveFromPlaylist}
         onAddMovie={handleAddToPlaylist}
+        i18nNamespace={NS}
+      />
+
+      {/* Pre-push Preview Dialog */}
+      <PlaylistPreviewDialog
+        channel={previewChannel}
+        items={previewItems}
+        loading={loadingPreview}
+        error={previewError}
+        confirming={confirmingPreview}
+        onClose={handleClosePreview}
+        onRemoveItem={handleRemovePreviewItem}
+        onConfirm={handleConfirmPreview}
         i18nNamespace={NS}
       />
 

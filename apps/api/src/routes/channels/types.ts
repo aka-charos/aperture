@@ -12,6 +12,7 @@ export interface ChannelRow {
   example_movie_ids: string[]
   example_series_ids: string[]
   media_types: ChannelMediaType[]
+  include_seeds: boolean
   is_pinned_row: boolean
   playlist_id: string | null
   output_type: ChannelOutputType
@@ -30,6 +31,7 @@ export interface ChannelCreateBody {
   exampleMovieIds?: string[]
   exampleSeriesIds?: string[]
   mediaTypes?: ChannelMediaType[]
+  includeSeeds?: boolean
   isPinnedRow?: boolean
   outputType?: ChannelOutputType
 }
@@ -42,6 +44,7 @@ export interface ChannelUpdateBody {
   exampleMovieIds?: string[]
   exampleSeriesIds?: string[]
   mediaTypes?: ChannelMediaType[]
+  includeSeeds?: boolean
   isPinnedRow?: boolean
   isActive?: boolean
 }

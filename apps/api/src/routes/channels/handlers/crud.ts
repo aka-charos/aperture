@@ -55,6 +55,7 @@ export function registerCrudHandlers(fastify: FastifyInstance) {
         exampleMovieIds,
         exampleSeriesIds,
         mediaTypes,
+        includeSeeds,
         isPinnedRow,
         outputType,
       } = request.body
@@ -70,8 +71,8 @@ export function registerCrudHandlers(fastify: FastifyInstance) {
       }
 
       const channel = await queryOne<ChannelRow>(
-        `INSERT INTO channels (owner_id, name, description, genre_filters, text_preferences, example_movie_ids, example_series_ids, media_types, is_pinned_row, output_type)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `INSERT INTO channels (owner_id, name, description, genre_filters, text_preferences, example_movie_ids, example_series_ids, media_types, include_seeds, is_pinned_row, output_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`,
         [
           currentUser.id,
@@ -82,6 +83,7 @@ export function registerCrudHandlers(fastify: FastifyInstance) {
           exampleMovieIds || [],
           exampleSeriesIds || [],
           sanitizeMediaTypes(mediaTypes),
+          includeSeeds || false,
           isPinnedRow || false,
           outputType === 'collection' ? 'collection' : 'playlist',
         ]
@@ -155,6 +157,7 @@ export function registerCrudHandlers(fastify: FastifyInstance) {
         exampleMovieIds,
         exampleSeriesIds,
         mediaTypes,
+        includeSeeds,
         isPinnedRow,
         isActive,
       } = request.body
@@ -190,6 +193,10 @@ export function registerCrudHandlers(fastify: FastifyInstance) {
       if (mediaTypes !== undefined) {
         updates.push(`media_types = $${paramIndex++}`)
         values.push(sanitizeMediaTypes(mediaTypes))
+      }
+      if (includeSeeds !== undefined) {
+        updates.push(`include_seeds = $${paramIndex++}`)
+        values.push(includeSeeds)
       }
       if (isPinnedRow !== undefined) {
         updates.push(`is_pinned_row = $${paramIndex++}`)

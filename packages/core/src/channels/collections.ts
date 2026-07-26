@@ -2,8 +2,7 @@ import { createChildLogger } from '../lib/logger.js'
 import { query, queryOne } from '../lib/db.js'
 import { getMediaServerProvider } from '../media/index.js'
 import { getMediaServerApiKey } from '../settings/systemSettings.js'
-import { generateChannelRecommendations } from './recommendations.js'
-import { gatherWebExpansion } from './webExpand.js'
+import { buildChannelItems } from './build.js'
 import type { ChannelUpdateOptions } from './types.js'
 
 const logger = createChildLogger('channels')
@@ -36,12 +35,10 @@ export async function updateChannelCollection(
     throw new Error(`Channel not found: ${channelId}`)
   }
 
-  // Same recommendation engine as playlists (movies, owner taste profile + filters)
-  const recommendations = await generateChannelRecommendations(channelId)
-  const expanded = opts.webExpand
-    ? [...recommendations, ...(await gatherWebExpansion(channelId, recommendations))]
-    : recommendations
-  const itemIds = expanded.map((r) => r.providerItemId)
+  // Same recommendation engine as playlists (owner taste profile + filters), or the exact list the
+  // user approved in the preview dialog.
+  const itemIds =
+    opts.itemIds ?? (await buildChannelItems(channelId, opts)).map((r) => r.providerItemId)
 
   const result = await provider.createOrUpdateCollection(apiKey, channel.name, itemIds, {
     rankAndPin: false,
@@ -53,7 +50,13 @@ export async function updateChannelCollection(
   ])
 
   logger.info(
-    { channelId, collectionId: result.collectionId, itemCount: itemIds.length, webExpand: !!opts.webExpand },
+    {
+      channelId,
+      collectionId: result.collectionId,
+      itemCount: itemIds.length,
+      webExpand: !!opts.webExpand,
+      approved: !!opts.itemIds,
+    },
     'Channel collection updated'
   )
 

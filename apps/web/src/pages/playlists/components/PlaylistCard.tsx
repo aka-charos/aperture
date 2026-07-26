@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Card,
@@ -10,6 +10,7 @@ import {
   CircularProgress,
   Tooltip,
   Skeleton,
+  Button,
   alpha,
 } from '@mui/material'
 import EditIcon from '@mui/icons-material/Edit'
@@ -18,6 +19,7 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import PlaylistPlayIcon from '@mui/icons-material/PlaylistPlay'
 import MovieIcon from '@mui/icons-material/Movie'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { getProxiedImageUrl } from '@aperture/ui'
 import type { Channel, PlaylistItem } from '../types'
 
@@ -45,6 +47,12 @@ export function PlaylistCard({
   const [previewItems, setPreviewItems] = useState<PlaylistItem[]>([])
   const [loadingPreview, setLoadingPreview] = useState(false)
   const [itemCount, setItemCount] = useState<number | null>(null)
+
+  // AI-written descriptions run long, so the card clamps them. Measured rather than guessed from
+  // a character count: the same card is much narrower on a phone than in the 3-up desktop grid.
+  const descriptionRef = useRef<HTMLSpanElement>(null)
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false)
+  const [descriptionOverflowing, setDescriptionOverflowing] = useState(false)
 
   const isGenerating = generatingChannelId === channel.id
   // The output lives in playlist_id or collection_id depending on the channel's target.
@@ -75,6 +83,20 @@ export function PlaylistCard({
 
     fetchPreview()
   }, [channel.id, outputId, channel.last_generated_at])
+
+  // Skipped while expanded — nothing is clamped then, and the last measurement is what keeps the
+  // "show less" control on screen.
+  useEffect(() => {
+    if (descriptionExpanded) return
+    const element = descriptionRef.current
+    if (!element) return
+
+    const measure = () => setDescriptionOverflowing(element.scrollHeight > element.clientHeight + 1)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [descriptionExpanded, channel.description])
 
   const handleCardClick = () => {
     if (hasPlaylist) {
@@ -289,21 +311,52 @@ export function PlaylistCard({
           </Box>
 
           {channel.description && (
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                mb: 1.5,
-                lineHeight: 1.4,
-              }}
-            >
-              {channel.description}
-            </Typography>
+            <Box mb={1.5}>
+              <Typography
+                ref={descriptionRef}
+                variant="body2"
+                color="text.secondary"
+                sx={{
+                  lineHeight: 1.4,
+                  ...(descriptionExpanded
+                    ? {}
+                    : {
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                      }),
+                }}
+              >
+                {channel.description}
+              </Typography>
+              {/* Only shown once something is actually cut off. stopPropagation/preventDefault so
+                  reading the blurb doesn't also open the card's view dialog. */}
+              {(descriptionOverflowing || descriptionExpanded) && (
+                <Button
+                  size="small"
+                  component="span"
+                  onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    setDescriptionExpanded((prev) => !prev)
+                  }}
+                  endIcon={
+                    <ExpandMoreIcon
+                      sx={{
+                        fontSize: 14,
+                        transition: 'transform 0.2s',
+                        transform: descriptionExpanded ? 'rotate(180deg)' : 'none',
+                      }}
+                    />
+                  }
+                  sx={{ minWidth: 0, px: 0.5, py: 0, fontSize: 11, textTransform: 'none' }}
+                >
+                  {descriptionExpanded ? t('common.showLess') : t('common.showMore')}
+                </Button>
+              )}
+            </Box>
           )}
 
           {/* Genres */}
