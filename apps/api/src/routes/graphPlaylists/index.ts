@@ -11,6 +11,11 @@ import {
 } from '@aperture/core'
 import { graphPlaylistsSchemas } from './schemas.js'
 
+/** Core already phrased the failure (bad key, quota, empty model output) — don't flatten it. */
+function aiErrorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message ? err.message : fallback
+}
+
 const graphPlaylistRoutes: FastifyPluginAsync = async (fastify) => {
   // Register schemas
   for (const [name, schema] of Object.entries(graphPlaylistsSchemas)) {
@@ -42,7 +47,9 @@ const graphPlaylistRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.send({ name })
       } catch (err) {
         request.log.error({ err }, 'Failed to generate graph playlist name')
-        return reply.status(500).send({ error: 'Failed to generate playlist name' })
+        return reply
+          .status(500)
+          .send({ error: aiErrorMessage(err, 'Failed to generate playlist name') })
       }
     }
   )
@@ -78,7 +85,9 @@ const graphPlaylistRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.send({ description })
       } catch (err) {
         request.log.error({ err }, 'Failed to generate graph playlist description')
-        return reply.status(500).send({ error: 'Failed to generate playlist description' })
+        return reply
+          .status(500)
+          .send({ error: aiErrorMessage(err, 'Failed to generate playlist description') })
       }
     }
   )

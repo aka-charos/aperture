@@ -70,8 +70,9 @@ export async function generateGraphPlaylistName(
     logger.info({ name: cleanName }, 'Generated graph playlist name')
     return cleanName
   } catch (error) {
+    // Keep the actionable message generatePlaylistText produced (quota, auth, empty output).
     logger.error({ error }, 'Failed to generate graph playlist name')
-    throw new Error('Failed to generate playlist name. Please try again.')
+    throw error instanceof Error ? error : new Error('Failed to generate playlist name.')
   }
 }
 
@@ -110,6 +111,6 @@ export async function generateGraphPlaylistDescription(
     return description
   } catch (error) {
     logger.error({ error }, 'Failed to generate graph playlist description')
-    throw new Error('Failed to generate playlist description. Please try again.')
+    throw error instanceof Error ? error : new Error('Failed to generate playlist description.')
   }
 }

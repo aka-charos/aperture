@@ -1,8 +1,12 @@
 import { generateText } from 'ai'
 import { query } from './db.js'
-import { getTextGenerationModelInstance } from './ai-provider.js'
+import { createChildLogger } from './logger.js'
+import { getFunctionConfig, getTextGenerationModelInstance } from './ai-provider.js'
 import { buildAiLanguageInstruction, DEFAULT_LOCALE, type AppLocaleCode } from './locales.js'
 import { resolveEffectiveAiLanguage } from './userSettings.js'
+import { describeAiFailure } from './aiFailure.js'
+
+const logger = createChildLogger('ai-playlist-generation')
 
 export type PlaylistTextMode = 'channel' | 'graph'
 
@@ -28,8 +32,56 @@ export async function resolvePlaylistAiLocale(userId?: string): Promise<AppLocal
   return userId ? resolveEffectiveAiLanguage(userId) : DEFAULT_LOCALE
 }
 
+/**
+ * Output budgets, deliberately far larger than the visible answer.
+ *
+ * A reasoning model (Gemini 2.5's default thinking, DeepSeek R1, the o-series) spends this
+ * allowance on hidden reasoning BEFORE writing a word, so a budget sized for a 3-word name comes
+ * back empty with finishReason 'length' — which is what made name generation fail intermittently.
+ * Length is governed by the prompt ("2-4 words max"), not by this cap; a cap only truncates.
+ */
+const MAX_OUTPUT_TOKENS: Record<'name' | 'description', number> = {
+  name: 600,
+  description: 1200,
+}
+
+/** No sane playlist name is longer than this; a rambling model gets cut off rather than stored. */
+const NAME_MAX_LENGTH = 120
+
+/**
+ * Pull the name out of a model response.
+ *
+ * Most models answer with the bare name, but some prefix a lead-in ("Here's a great name:") or
+ * format it as a markdown bullet. Anything ending in a colon is treated as a lead-in and skipped.
+ */
 export function cleanPlaylistName(text: string): string {
-  return text.trim().replace(/^["']|["']$/g, '')
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  const candidate = lines.find((line) => !line.endsWith(':')) ?? lines[0] ?? ''
+
+  return candidate
+    .replace(/^(?:[-*•]|\d+[.)])\s+/, '')
+    .replace(/\*\*/g, '')
+    .replace(/^["'“”‘’]+|["'“”‘’]+$/g, '')
+    .trim()
+    .slice(0, NAME_MAX_LENGTH)
+}
+
+/**
+ * Why a call that succeeded at the HTTP level still produced nothing. Each of these needs a
+ * different fix from the operator, so they are worth telling apart.
+ */
+function emptyOutputMessage(finishReason: string): string {
+  if (finishReason === 'length') {
+    return 'The AI model reached its output limit before writing anything. This usually means a reasoning model spent the whole budget thinking — try a non-reasoning model for the Text Generation role in Settings > AI.'
+  }
+  if (finishReason === 'content-filter') {
+    return "The AI provider's content filter blocked this request. Try different seed titles or preferences."
+  }
+  return `The AI model returned an empty response (finish reason: ${finishReason}).`
 }
 
 export async function fetchMoviesBasicByIds(movieIds: string[]): Promise<MovieRowBasic[]> {
@@ -177,6 +229,7 @@ export async function generatePlaylistText(params: {
 }): Promise<string> {
   const aiLocale = await resolvePlaylistAiLocale(params.userId)
   const langBlock = `\n\n${buildAiLanguageInstruction(aiLocale)}`
+  const config = await getFunctionConfig('textGeneration')
   const model = await getTextGenerationModelInstance()
 
   const system =
@@ -184,17 +237,39 @@ export async function generatePlaylistText(params: {
       ? buildPlaylistNameSystemPrompt(params.mode, langBlock)
       : buildPlaylistDescriptionSystemPrompt(params.mode, langBlock, params.descriptionOptions)
 
-  const { text } = await generateText({
-    model,
-    system,
-    prompt: params.prompt,
-    temperature: params.kind === 'name' ? 0.9 : 0.8,
-    maxOutputTokens: params.kind === 'name' ? 50 : 150,
-  })
+  let text: string | undefined
+  let finishReason: string
 
-  if (!text) {
-    throw new Error('No response from AI')
+  try {
+    const result = await generateText({
+      model,
+      system,
+      prompt: params.prompt,
+      temperature: params.kind === 'name' ? 0.9 : 0.8,
+      maxOutputTokens: MAX_OUTPUT_TOKENS[params.kind],
+    })
+    text = result.text
+    finishReason = result.finishReason
+  } catch (error) {
+    // Replace the provider's raw error with something the operator can act on, and put quota /
+    // auth failures in the api_errors sink so they surface as an alert rather than one toast.
+    const message = await describeAiFailure(config?.provider, error)
+    logger.error(
+      { error, provider: config?.provider, model: config?.model, kind: params.kind },
+      'AI playlist text generation failed'
+    )
+    throw new Error(message)
   }
 
-  return params.kind === 'name' ? cleanPlaylistName(text) : text.trim()
+  const output = params.kind === 'name' ? cleanPlaylistName(text ?? '') : (text ?? '').trim()
+
+  if (!output) {
+    logger.warn(
+      { provider: config?.provider, model: config?.model, kind: params.kind, finishReason },
+      'AI playlist text generation returned nothing'
+    )
+    throw new Error(emptyOutputMessage(finishReason))
+  }
+
+  return output
 }
