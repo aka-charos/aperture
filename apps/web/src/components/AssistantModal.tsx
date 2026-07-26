@@ -27,9 +27,13 @@ type AssistantSurface = 'modal' | 'dock'
 const SURFACE_STORAGE_KEY = 'aperture.assistant.surface'
 
 // The dock is user-resizable between these bounds; the width persists.
+// The floor was 320 back when a chat card was a thumbnail beside some text.
+// Cards now carry a fixed 84px meta rail, so 320 left a ~160px prose column —
+// around 25 characters a line, narrower than a newspaper column and unreadable
+// whatever the clamps do.
 const DOCK_WIDTH_STORAGE_KEY = 'aperture.assistant.dockWidth'
 const DOCK_DEFAULT_WIDTH = 420
-const DOCK_MIN_WIDTH = 320
+const DOCK_MIN_WIDTH = 400
 const DOCK_MAX_WIDTH = 720
 
 /** Keep the dock within bounds and leave the library at least ~a third of the viewport */
