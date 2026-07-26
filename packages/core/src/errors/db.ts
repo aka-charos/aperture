@@ -12,6 +12,15 @@ import { toApiErrorRecord } from './handler.js'
 
 const logger = createChildLogger('api-errors-db')
 
+/**
+ * How long a non-dismissed error keeps showing in the UI.
+ *
+ * Errors are only ever cleared by an explicit dismiss or a successful connection test, so without
+ * a window a single old failure stays on screen forever — indistinguishable from a live one. Any
+ * error that is still real gets re-logged the next time the integration is called.
+ */
+const ACTIVE_ERROR_WINDOW = '7 days'
+
 interface ApiErrorRow {
   id: string
   provider: string
@@ -79,6 +88,7 @@ export async function getActiveApiErrors(): Promise<ApiErrorRecord[]> {
   const result = await query<ApiErrorRow>(
     `SELECT * FROM api_errors
      WHERE dismissed_at IS NULL
+       AND created_at > NOW() - INTERVAL '${ACTIVE_ERROR_WINDOW}'
      ORDER BY created_at DESC
      LIMIT 50`
   )
@@ -95,6 +105,7 @@ export async function getActiveErrorsByProvider(
   const result = await query<ApiErrorRow>(
     `SELECT * FROM api_errors
      WHERE provider = $1 AND dismissed_at IS NULL
+       AND created_at > NOW() - INTERVAL '${ACTIVE_ERROR_WINDOW}'
      ORDER BY created_at DESC
      LIMIT 10`,
     [provider]
@@ -112,6 +123,7 @@ export async function getLatestErrorByProvider(
   const result = await queryOne<ApiErrorRow>(
     `SELECT * FROM api_errors
      WHERE provider = $1 AND dismissed_at IS NULL
+       AND created_at > NOW() - INTERVAL '${ACTIVE_ERROR_WINDOW}'
      ORDER BY created_at DESC
      LIMIT 1`,
     [provider]
@@ -146,33 +158,38 @@ export async function dismissErrorsByProvider(
 }
 
 /**
- * Dismiss outage errors for a provider (auto-resolve when service comes back online)
- * This is called when a successful connection is established.
+ * Auto-resolve errors that a successful connection has just disproved.
+ *
+ * Called after a connection test succeeds. Covers 'auth' as well as 'outage': a working request
+ * proves the stored credentials are valid, so a stale "invalid API key" alert must not survive a
+ * successful test. Quota errors ('rate_limit'/'limit') are left alone — they describe a budget
+ * that one successful call does not reset.
  */
-export async function dismissOutageErrors(provider: ApiErrorRecord['provider']): Promise<number> {
+export async function dismissResolvedErrors(provider: ApiErrorRecord['provider']): Promise<number> {
   const result = await query(
     `UPDATE api_errors SET dismissed_at = NOW()
-     WHERE provider = $1 
+     WHERE provider = $1
        AND dismissed_at IS NULL
-       AND error_type = 'outage'`,
+       AND error_type IN ('outage', 'auth')`,
     [provider]
   )
 
   const count = result.rowCount ?? 0
   if (count > 0) {
-    logger.info({ provider, count }, 'Outage errors auto-dismissed after successful connection')
+    logger.info({ provider, count }, 'API errors auto-dismissed after successful connection')
   }
   return count
 }
 
 /**
- * Cleanup old dismissed errors (older than 7 days)
+ * Cleanup dismissed errors older than 7 days, plus anything past the display window that was
+ * never dismissed (nothing reads those rows any more, so they are pure history).
  */
 export async function cleanupOldErrors(): Promise<number> {
   const result = await query(
     `DELETE FROM api_errors
-     WHERE dismissed_at IS NOT NULL
-       AND dismissed_at < NOW() - INTERVAL '7 days'`
+     WHERE (dismissed_at IS NOT NULL AND dismissed_at < NOW() - INTERVAL '7 days')
+        OR (dismissed_at IS NULL AND created_at < NOW() - INTERVAL '30 days')`
   )
 
   const count = result.rowCount ?? 0
@@ -185,6 +202,10 @@ export async function cleanupOldErrors(): Promise<number> {
 /**
  * Check if a similar error exists recently (to avoid duplicates)
  * Returns true if a similar error was logged in the last 5 minutes
+ *
+ * `errorType` must be the type the error will actually be stored with (i.e.
+ * `parseApiError(...).definition.type`) — passing a guess means the guard never matches and every
+ * failed request inserts its own row.
  */
 export async function hasRecentSimilarError(
   provider: ApiErrorRecord['provider'],
@@ -220,15 +241,17 @@ export async function getErrorSummary(): Promise<
     latest_error_type: string | null
     latest_created_at: Date | null
   }>(
-    `SELECT 
+    `SELECT
        provider,
        COUNT(*) as active_count,
-       (SELECT error_type FROM api_errors e2 
-        WHERE e2.provider = e1.provider AND e2.dismissed_at IS NULL 
+       (SELECT error_type FROM api_errors e2
+        WHERE e2.provider = e1.provider AND e2.dismissed_at IS NULL
+          AND e2.created_at > NOW() - INTERVAL '${ACTIVE_ERROR_WINDOW}'
         ORDER BY created_at DESC LIMIT 1) as latest_error_type,
        MAX(created_at) as latest_created_at
      FROM api_errors e1
      WHERE dismissed_at IS NULL
+       AND created_at > NOW() - INTERVAL '${ACTIVE_ERROR_WINDOW}'
      GROUP BY provider
      ORDER BY MAX(created_at) DESC`
   )

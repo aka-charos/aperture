@@ -2645,6 +2645,7 @@
     "resetInHours_one": "resets in {{count}} hour",
     "resetInHours_other": "resets in {{count}} hours",
     "resetAt": "resets at {{when}}",
+    "detectedAt": "detected {{when}}",
     "checkSettings": "Check Settings",
     "learnMore": "Learn More",
     "upgrade": "Upgrade",

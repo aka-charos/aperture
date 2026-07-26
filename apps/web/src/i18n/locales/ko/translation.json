@@ -2519,6 +2519,7 @@
     "resetInHours_one": "{{count}}시간 후에 재설정됩니다",
     "resetInHours_other": "{{count}}시간 후에 재설정됩니다",
     "resetAt": "{{언제}}에 재설정됩니다.",
+    "detectedAt": "detected {{when}}",
     "checkSettings": "설정 확인",
     "learnMore": "자세히 알아보기",
     "upgrade": "치받이",

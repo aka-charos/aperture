@@ -2519,6 +2519,7 @@
     "resetInHours_one": "تتم إعادة التعيين خلال {{count}} ساعة",
     "resetInHours_other": "تتم إعادة التعيين خلال {{count}} ساعة",
     "resetAt": "إعادة التعيين في {{متى}}",
+    "detectedAt": "detected {{when}}",
     "checkSettings": "تحقق من الإعدادات",
     "learnMore": "يتعلم أكثر",
     "upgrade": "يرقي",

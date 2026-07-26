@@ -2477,6 +2477,7 @@
     "resetInHours_one": "wordt over {{count}} uur gereset",
     "resetInHours_other": "wordt over {{count}} uur gereset",
     "resetAt": "wordt gereset op {{when}}",
+    "detectedAt": "detected {{when}}",
     "checkSettings": "Controleer Instellingen",
     "learnMore": "Meer informatie",
     "upgrade": "Upgraden",

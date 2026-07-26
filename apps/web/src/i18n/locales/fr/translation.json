@@ -2519,6 +2519,7 @@
     "resetInHours_one": "se réinitialise dans {{count}} heure",
     "resetInHours_other": "se réinitialise dans {{count}} heures",
     "resetAt": "se réinitialise à {{quand}}",
+    "detectedAt": "detected {{when}}",
     "checkSettings": "Vérifier les paramètres",
     "learnMore": "Apprendre encore plus",
     "upgrade": "Mise à niveau",

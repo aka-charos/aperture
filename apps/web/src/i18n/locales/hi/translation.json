@@ -2519,6 +2519,7 @@
     "resetInHours_one": "{{गिनती}} घंटे में रीसेट हो जाता है",
     "resetInHours_other": "{{गिनती}} घंटों में रीसेट हो जाता है",
     "resetAt": "{{कब}} पर रीसेट होता है",
+    "detectedAt": "detected {{when}}",
     "checkSettings": "सेटिंग्स जांचें",
     "learnMore": "और अधिक जानें",
     "upgrade": "उन्नत करना",

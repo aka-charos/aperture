@@ -2519,6 +2519,7 @@
     "resetInHours_one": "{{count}} 小时后重置",
     "resetInHours_other": "{{count}} 小时后重置",
     "resetAt": "在 {{when}} 重置",
+    "detectedAt": "detected {{when}}",
     "checkSettings": "检查设置",
     "learnMore": "了解更多",
     "upgrade": "升级",

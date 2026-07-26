@@ -2519,6 +2519,7 @@
     "resetInHours_one": "{{count}} 時間後にリセットされます",
     "resetInHours_other": "{{count}} 時間後にリセットされます",
     "resetAt": "{{when}} にリセットされます",
+    "detectedAt": "detected {{when}}",
     "checkSettings": "設定を確認する",
     "learnMore": "もっと詳しく知る",
     "upgrade": "アップグレード",

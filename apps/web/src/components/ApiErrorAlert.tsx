@@ -40,7 +40,7 @@ interface ApiError {
   message: string
   resetAt?: string
   actionUrl?: string
-  createdAt: string
+  createdAt?: string | null
 }
 
 interface ErrorSummaryItem {
@@ -115,6 +115,13 @@ export function ApiErrorAlert({
 
       return t('apiError.resetAt', { when: resetDate.toLocaleString() })
     },
+    [t]
+  )
+
+  // When the failure happened matters: an alert lingers until it is dismissed or a connection test
+  // clears it, so without this a days-old failure reads as a live one.
+  const formatDetectedTime = useCallback(
+    (createdAt: string) => t('apiError.detectedAt', { when: new Date(createdAt).toLocaleString() }),
     [t]
   )
 
@@ -217,6 +224,12 @@ export function ApiErrorAlert({
 
             {!compact && (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+                {error.createdAt && (
+                  <Typography variant="caption" color="text.secondary">
+                    {formatDetectedTime(error.createdAt)}
+                  </Typography>
+                )}
+
                 {error.resetAt && (
                   <Typography variant="caption" color="text.secondary">
                     ⏱️ {formatResetTime(error.resetAt)}

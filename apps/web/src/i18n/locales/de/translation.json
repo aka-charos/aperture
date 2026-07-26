@@ -2519,6 +2519,7 @@
     "resetInHours_one": "setzt in {{count}} Stunde zurück",
     "resetInHours_other": "setzt in {{count}} Stunden zurück",
     "resetAt": "setzt um {{when}} zurück",
+    "detectedAt": "detected {{when}}",
     "checkSettings": "Einstellungen prüfen",
     "learnMore": "Mehr erfahren",
     "upgrade": "Upgrade",

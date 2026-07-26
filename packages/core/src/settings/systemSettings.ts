@@ -1212,10 +1212,10 @@ export async function testOpenAIConnection(): Promise<{ success: boolean; error?
     })
 
     if (response.ok) {
-      // Auto-dismiss any outage errors since connection is successful
-      const { dismissOutageErrors } = await import('../errors/db.js')
-      await dismissOutageErrors('openai').catch((err) =>
-        logger.warn({ err }, 'Failed to dismiss OpenAI outage errors')
+      // Auto-dismiss any auth/outage errors since connection is successful
+      const { dismissResolvedErrors } = await import('../errors/db.js')
+      await dismissResolvedErrors('openai').catch((err) =>
+        logger.warn({ err }, 'Failed to dismiss OpenAI errors')
       )
       return { success: true }
     } else {
@@ -1300,10 +1300,10 @@ export async function testTMDbConnection(
     const response = await fetch(`https://api.themoviedb.org/3/configuration?api_key=${key}`)
 
     if (response.ok) {
-      // Auto-dismiss any outage errors since connection is successful
-      const { dismissOutageErrors } = await import('../errors/db.js')
-      await dismissOutageErrors('tmdb').catch((err) =>
-        logger.warn({ err }, 'Failed to dismiss TMDb outage errors')
+      // Auto-dismiss any auth/outage errors since connection is successful
+      const { dismissResolvedErrors } = await import('../errors/db.js')
+      await dismissResolvedErrors('tmdb').catch((err) =>
+        logger.warn({ err }, 'Failed to dismiss TMDb errors')
       )
       return { success: true }
     } else {
@@ -1412,10 +1412,10 @@ export async function testOMDbConnection(
     if (response.ok) {
       const data = (await response.json()) as { Response?: string; Error?: string }
       if (data.Response === 'True') {
-        // Auto-dismiss any outage errors since connection is successful
-        const { dismissOutageErrors } = await import('../errors/db.js')
-        await dismissOutageErrors('omdb').catch((err) =>
-          logger.warn({ err }, 'Failed to dismiss OMDb outage errors')
+        // Auto-dismiss any auth/outage errors since connection is successful
+        const { dismissResolvedErrors } = await import('../errors/db.js')
+        await dismissResolvedErrors('omdb').catch((err) =>
+          logger.warn({ err }, 'Failed to dismiss OMDb errors')
         )
         return { success: true }
       } else {

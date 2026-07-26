@@ -2519,6 +2519,7 @@
     "resetInHours_one": "מתאפס בעוד {{count}} שעה",
     "resetInHours_other": "מתאפס בעוד {{count}} שעות",
     "resetAt": "מתאפס ב-{{when}}",
+    "detectedAt": "detected {{when}}",
     "checkSettings": "בדוק את ההגדרות",
     "learnMore": "למידע נוסף",
     "upgrade": "שדרוג",
