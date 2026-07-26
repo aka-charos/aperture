@@ -163,6 +163,55 @@ async function fetchCandidatePool(
 }
 
 /**
+ * Resolve a channel's seed ids into recommendation entries.
+ *
+ * Seeds are what the user picked by hand, so nothing is filtered here beyond needing a
+ * provider item id — in particular they are NOT dropped for being watched, which is the whole
+ * point of including them (a seed is usually a film the owner already loves).
+ */
+async function fetchSeedItems(
+  movieIds: string[],
+  seriesIds: string[]
+): Promise<ChannelRecommendation[]> {
+  const seeds: ChannelRecommendation[] = []
+
+  for (const [mediaType, ids] of [
+    ['movie', movieIds],
+    ['series', seriesIds],
+  ] as const) {
+    if (ids.length === 0) continue
+
+    const result = await query<{
+      id: string
+      provider_item_id: string | null
+      title: string
+      year: number | null
+    }>(
+      `SELECT id, provider_item_id, title, year FROM ${MEDIA_SOURCES[mediaType].table} WHERE id = ANY($1)`,
+      [ids]
+    )
+
+    // Preserve the order the seeds were picked in rather than whatever the table returns.
+    const byId = new Map(result.rows.map((r) => [r.id, r]))
+    for (const id of ids) {
+      const row = byId.get(id)
+      if (!row?.provider_item_id) continue
+      seeds.push({
+        mediaType,
+        itemId: row.id,
+        providerItemId: row.provider_item_id,
+        title: row.title,
+        year: row.year,
+        score: 1,
+        isSeed: true,
+      })
+    }
+  }
+
+  return seeds
+}
+
+/**
  * Generate recommendations for a specific channel
  */
 export async function generateChannelRecommendations(
@@ -179,6 +228,7 @@ export async function generateChannelRecommendations(
     example_movie_ids: string[]
     example_series_ids: string[] | null
     media_types: string[] | null
+    include_seeds: boolean
     max_parental_rating: number | null
   }>(
     `SELECT c.*, u.max_parental_rating
@@ -277,16 +327,29 @@ export async function generateChannelRecommendations(
   // Weighted random sampling for variety
   const candidates = weightedRandomSample(pool, limit)
 
+  // Opt-in: put the channel's own seeds in the output, ahead of the picks they inspired. They sit
+  // on top of the limit rather than eating into it — the user asked for these titles by name, so
+  // they should not cost the channel any recommendations.
+  const seeds = channel.include_seeds
+    ? await fetchSeedItems(
+        mediaTypes.includes('movie') ? (channel.example_movie_ids ?? []) : [],
+        mediaTypes.includes('series') ? (channel.example_series_ids ?? []) : []
+      )
+    : []
+  const seedIds = new Set(seeds.map((s) => s.itemId))
+  const result = [...seeds, ...candidates.filter((c) => !seedIds.has(c.itemId))]
+
   logger.info(
     {
       channelId,
       mediaTypes,
-      candidateCount: candidates.length,
-      seriesCount: candidates.filter((c) => c.mediaType === 'series').length,
+      candidateCount: result.length,
+      seedCount: seeds.length,
+      seriesCount: result.filter((c) => c.mediaType === 'series').length,
       topScores: candidates.slice(0, 3).map((c) => c.score.toFixed(3)),
     },
     'Generated channel recommendations with variability'
   )
 
-  return candidates
+  return result
 }

@@ -24,6 +24,8 @@ export interface ChannelRecommendation {
   title: string
   year: number | null
   score: number
+  /** True when the item is one of the channel's own seeds, not a generated pick. */
+  isSeed?: boolean
 }
 
 export interface ChannelUpdateOptions {
@@ -32,4 +34,10 @@ export interface ChannelUpdateOptions {
    * considers similar to the channel's seeds (no-op if the role is unconfigured).
    */
   webExpand?: boolean
+  /**
+   * Exact provider item ids to write, skipping generation entirely. Set when the user has already
+   * seen and edited a preview of the list — the media server then gets what they approved rather
+   * than a freshly sampled (and therefore different) set.
+   */
+  itemIds?: string[]
 }

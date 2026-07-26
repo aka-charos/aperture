@@ -200,7 +200,9 @@ export {
 export {
   generateChannelRecommendations,
   parseChannelMediaTypes,
+  buildChannelItems,
   type ChannelMediaType,
+  type ChannelRecommendation,
   updateChannelPlaylist,
   createSharedPlaylist,
   processAllChannels,

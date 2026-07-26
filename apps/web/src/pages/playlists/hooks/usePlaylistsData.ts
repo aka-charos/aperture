@@ -5,6 +5,7 @@ import type {
   MediaType,
   Movie,
   PlaylistItem,
+  PreviewItem,
   FormData,
   SnackbarState,
   GraphPlaylist,
@@ -19,6 +20,7 @@ const initialFormData: FormData = {
   exampleMovies: [],
   exampleSeries: [],
   mediaTypes: ['movie'],
+  includeSeeds: false,
 }
 
 export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playlist') {
@@ -37,8 +39,14 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
   const [availableGenres, setAvailableGenres] = useState<string[]>([])
   const [loadingGenres, setLoadingGenres] = useState(false)
 
-  // Generation state
+  // Generation state. A generate is a two-step flow: build the list, show it, then write the
+  // approved set to the media server — so nothing lands in the library unseen.
   const [generatingChannelId, setGeneratingChannelId] = useState<string | null>(null)
+  const [previewChannel, setPreviewChannel] = useState<Channel | null>(null)
+  const [previewItems, setPreviewItems] = useState<PreviewItem[]>([])
+  const [loadingPreview, setLoadingPreview] = useState(false)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+  const [confirmingPreview, setConfirmingPreview] = useState(false)
   const [snackbar, setSnackbar] = useState<SnackbarState>({
     open: false,
     message: '',
@@ -164,6 +172,7 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
         exampleSeries,
         // Channels created before series support have no media_types; they are movie-only.
         mediaTypes: channel.media_types?.length ? channel.media_types : ['movie'],
+        includeSeeds: !!channel.include_seeds,
       })
     } else {
       setEditingChannel(null)
@@ -187,6 +196,7 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
       exampleMovieIds: formData.exampleMovies.map((m) => m.id),
       exampleSeriesIds: formData.exampleSeries.map((s) => s.id),
       mediaTypes: formData.mediaTypes,
+      includeSeeds: formData.includeSeeds,
       // Honoured by POST (create); ignored by PUT (output type is immutable after creation).
       outputType,
     }
@@ -269,16 +279,68 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
     handleDeleteClick(playlistId, playlistName, 'graph')
   }
 
+  /**
+   * Step 1 of a generate: build the list and show it. Nothing is written yet, so a preview that
+   * looks wrong can simply be cancelled.
+   */
   const handleGeneratePlaylist = async (channelId: string) => {
+    const channel = channels.find((c) => c.id === channelId) ?? null
+    setPreviewChannel(channel)
+    setPreviewItems([])
+    setPreviewError(null)
+    setLoadingPreview(true)
     setGeneratingChannelId(channelId)
+
     try {
-      const response = await fetch(`/api/channels/${channelId}/generate`, {
+      const response = await fetch(`/api/channels/${channelId}/preview`, {
         method: 'POST',
         credentials: 'include',
       })
 
       if (response.ok) {
         const data = await response.json()
+        setPreviewItems(data.items || [])
+      } else {
+        setPreviewError(`Failed to build the ${noun.toLowerCase()}`)
+      }
+    } catch {
+      setPreviewError(`Failed to build the ${noun.toLowerCase()}`)
+    } finally {
+      setLoadingPreview(false)
+      setGeneratingChannelId(null)
+    }
+  }
+
+  const handleClosePreview = () => {
+    setPreviewChannel(null)
+    setPreviewItems([])
+    setPreviewError(null)
+  }
+
+  /** Drop a title from the proposed list before it is written. */
+  const handleRemovePreviewItem = (itemId: string) => {
+    setPreviewItems((items) => items.filter((item) => item.id !== itemId))
+  }
+
+  /** Step 2: write exactly the approved list to the media server. */
+  const handleConfirmPreview = async () => {
+    if (!previewChannel || previewItems.length === 0) return
+
+    const channelId = previewChannel.id
+    setConfirmingPreview(true)
+    setGeneratingChannelId(channelId)
+
+    try {
+      const response = await fetch(`/api/channels/${channelId}/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ itemIds: previewItems.map((item) => item.id) }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        handleClosePreview()
         fetchChannels()
         setSnackbar({
           open: true,
@@ -291,6 +353,7 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
     } catch {
       setSnackbar({ open: true, message: `Failed to generate ${noun.toLowerCase()}`, severity: 'error' })
     } finally {
+      setConfirmingPreview(false)
       setGeneratingChannelId(null)
     }
   }
@@ -452,6 +515,12 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
     generatingChannelId,
     snackbar,
     setSnackbar,
+    // Preview (pre-push) state
+    previewChannel,
+    previewItems,
+    loadingPreview,
+    previewError,
+    confirmingPreview,
     // Dialog state
     dialogOpen,
     playlistDialogOpen,
@@ -478,6 +547,9 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
     handleDeleteCancel,
     handleDeleteConfirm,
     handleGeneratePlaylist,
+    handleClosePreview,
+    handleRemovePreviewItem,
+    handleConfirmPreview,
     addExampleMovie,
     removeExampleMovie,
     addExampleSeries,
