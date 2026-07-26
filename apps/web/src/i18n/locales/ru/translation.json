@@ -2477,6 +2477,7 @@
     "resetInHours_one": "сбрасывается через {{count}} час",
     "resetInHours_other": "сбрасывается через {{count}} часов",
     "resetAt": "сбрасывается в {{когда}}",
+    "detectedAt": "detected {{when}}",
     "checkSettings": "Проверьте настройки",
     "learnMore": "Узнать больше",
     "upgrade": "Обновление",

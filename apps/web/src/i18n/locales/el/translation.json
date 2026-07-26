@@ -1942,6 +1942,7 @@
     "resetInHours_one": "επαναφέρεται σε {{count}} ώρα",
     "resetInHours_other": "επαναφέρεται σε {{count}} ώρες",
     "resetAt": "επαναφέρεται στις {{when}}",
+    "detectedAt": "detected {{when}}",
     "checkSettings": "Έλεγχος Ρυθμίσεων",
     "learnMore": "Μάθετε Περισσότερα",
     "upgrade": "Αναβάθμιση",

@@ -714,7 +714,7 @@ export {
   getLatestErrorByProvider,
   dismissApiError,
   dismissErrorsByProvider,
-  dismissOutageErrors,
+  dismissResolvedErrors,
   cleanupOldErrors,
   hasRecentSimilarError,
   getErrorSummary,

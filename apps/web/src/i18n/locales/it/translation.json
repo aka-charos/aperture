@@ -2519,6 +2519,7 @@
     "resetInHours_one": "si ripristina tra {{count}} ora",
     "resetInHours_other": "si ripristina tra {{count}} ore",
     "resetAt": "si reimposta alle {{when}}",
+    "detectedAt": "detected {{when}}",
     "checkSettings": "Controlla le Impostazioni",
     "learnMore": "Saperne di più",
     "upgrade": "Aggiornamento",
