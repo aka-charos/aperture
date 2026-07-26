@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import {
   Box,
   Typography,
-  Grid,
   Tabs,
   Tab,
   Breadcrumbs,
@@ -229,30 +228,42 @@ export function SimilarMedia({
       </Box>
 
       {viewMode === 'list' ? (
-        <Grid container spacing={2}>
+        // Tracks come from the container, not the viewport. MUI's breakpoints
+        // are window media queries, and this column is routinely much narrower
+        // than the window implies — the docked assistant takes its width off
+        // the main pane without touching the window, and MediaDetailModal
+        // renders this page inside a dialog. `md={3}` kept four posters across
+        // a half-width column and shrank them to ~110px; auto-fill measures the
+        // space it actually has. The 150px floor reproduces the old column
+        // counts where they were right (2 on a phone, 4 at full desktop width).
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+            gap: 2,
+          }}
+        >
           {similar.map((item) => (
-            <Grid item xs={6} sm={4} md={3} lg={3} key={item.id}>
-              <Box>
-                <MoviePoster
-                  title={item.title}
-                  year={item.year}
-                  posterUrl={item.poster_url}
-                  genres={item.genres}
-                  userRating={getRating(mediaType === 'movie' ? 'movie' : 'series', item.id)}
-                  onRate={(rating) => handleRate(item.id, rating)}
-                  isWatching={mediaType === 'series' ? isWatching(item.id) : undefined}
-                  onWatchingToggle={
-                    mediaType === 'series' ? () => toggleWatching(item.id) : undefined
-                  }
-                  hideWatchingToggle={mediaType === 'movie'}
-                  responsive
-                  onClick={() => openMedia(mediaType, item.id)}
-                />
-                <ConnectionReasonChips reasons={item.reasons} />
-              </Box>
-            </Grid>
+            <Box key={item.id}>
+              <MoviePoster
+                title={item.title}
+                year={item.year}
+                posterUrl={item.poster_url}
+                genres={item.genres}
+                userRating={getRating(mediaType === 'movie' ? 'movie' : 'series', item.id)}
+                onRate={(rating) => handleRate(item.id, rating)}
+                isWatching={mediaType === 'series' ? isWatching(item.id) : undefined}
+                onWatchingToggle={
+                  mediaType === 'series' ? () => toggleWatching(item.id) : undefined
+                }
+                hideWatchingToggle={mediaType === 'movie'}
+                responsive
+                onClick={() => openMedia(mediaType, item.id)}
+              />
+              <ConnectionReasonChips reasons={item.reasons} />
+            </Box>
           ))}
-        </Grid>
+        </Box>
       ) : (
         <>
           {/* Compact graph in Paper */}
