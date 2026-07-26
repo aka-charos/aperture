@@ -1,3 +1,5 @@
+export type MediaType = 'movie' | 'series'
+
 export interface Channel {
   id: string
   name: string
@@ -5,6 +7,8 @@ export interface Channel {
   genre_filters: string[]
   text_preferences: string | null
   example_movie_ids: string[]
+  example_series_ids?: string[]
+  media_types?: MediaType[]
   is_pinned_row: boolean
   is_active: boolean
   playlist_id: string | null
@@ -13,13 +17,16 @@ export interface Channel {
   last_generated_at: string | null
 }
 
-export interface Movie {
+/** Shared shape for a seed/search result — movies and series carry the same display fields. */
+export interface MediaSummary {
   id: string
   title: string
   year: number | null
   poster_url: string | null
   provider_item_id?: string
 }
+
+export type Movie = MediaSummary
 
 export interface PlaylistItem {
   id: string
@@ -35,7 +42,9 @@ export interface FormData {
   description: string
   genreFilters: string[]
   textPreferences: string
-  exampleMovies: Movie[]
+  exampleMovies: MediaSummary[]
+  exampleSeries: MediaSummary[]
+  mediaTypes: MediaType[]
 }
 
 export interface SnackbarState {

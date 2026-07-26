@@ -2674,7 +2674,15 @@
     "itemsSelected": "{{count}} selected",
     "noItemsSelected": "Select at least one title",
     "createdInLibrary": "Added \"{{name}}\" to your library",
-    "pageSubtitleNamed": "Create custom recommendation playlists with genres and example movies — available only to you in {{serverName}}"
+    "pageSubtitleNamed": "Create custom recommendation playlists with genres and example movies — available only to you in {{serverName}}",
+    "sectionMediaTypes": "Media",
+    "sectionMediaTypesSubtitle": "What this playlist can include",
+    "mediaTypeMovies": "Movies",
+    "mediaTypeSeries": "TV shows",
+    "mediaTypeBoth": "Both",
+    "sectionSeedSeries": "Seed TV Shows",
+    "sectionSeedSeriesSubtitle": "Shows that define this playlist's vibe",
+    "searchSeriesPlaceholder": "Search for TV shows to add…"
   },
   "myRecommendations": {
     "pageTitle": "توصياتي",
@@ -3934,7 +3942,15 @@
     "snackbarAINameFail": "Failed to generate name",
     "snackbarAIDescriptionOk": "AI description generated",
     "snackbarAIDescriptionFail": "Failed to generate description",
-    "pageSubtitleNamed": "Build collections from genres and example movies — visible to everyone in {{serverName}}"
+    "pageSubtitleNamed": "Build collections from genres and example movies — visible to everyone in {{serverName}}",
+    "sectionMediaTypes": "Media",
+    "sectionMediaTypesSubtitle": "What this collection can include",
+    "mediaTypeMovies": "Movies",
+    "mediaTypeSeries": "TV shows",
+    "mediaTypeBoth": "Both",
+    "sectionSeedSeries": "Seed TV Shows",
+    "sectionSeedSeriesSubtitle": "Shows that define this collection's vibe",
+    "searchSeriesPlaceholder": "Search for TV shows to add…"
   },
   "countryFilter": {
     "label": "Country",

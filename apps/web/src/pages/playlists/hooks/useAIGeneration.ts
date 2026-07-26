@@ -12,7 +12,10 @@ export function useAIGeneration({ formData, setFormData, setSnackbar }: UseAIGen
   const [generatingName, setGeneratingName] = useState(false)
   const [generatingDescription, setGeneratingDescription] = useState(false)
 
-  const canGenerate = formData.genreFilters.length > 0 || formData.exampleMovies.length > 0
+  const canGenerate =
+    formData.genreFilters.length > 0 ||
+    formData.exampleMovies.length > 0 ||
+    formData.exampleSeries.length > 0
 
   const generatePreferences = useCallback(async () => {
     if (!canGenerate) {
@@ -33,6 +36,7 @@ export function useAIGeneration({ formData, setFormData, setSnackbar }: UseAIGen
         body: JSON.stringify({
           genres: formData.genreFilters,
           exampleMovieIds: formData.exampleMovies.map((m) => m.id),
+          exampleSeriesIds: formData.exampleSeries.map((s) => s.id),
         }),
       })
 
@@ -48,7 +52,7 @@ export function useAIGeneration({ formData, setFormData, setSnackbar }: UseAIGen
     } finally {
       setGeneratingPreferences(false)
     }
-  }, [canGenerate, formData.genreFilters, formData.exampleMovies, setFormData, setSnackbar])
+  }, [canGenerate, formData.genreFilters, formData.exampleMovies, formData.exampleSeries, setFormData, setSnackbar])
 
   const generateName = useCallback(async () => {
     if (!canGenerate) {
@@ -69,6 +73,7 @@ export function useAIGeneration({ formData, setFormData, setSnackbar }: UseAIGen
         body: JSON.stringify({
           genres: formData.genreFilters,
           exampleMovieIds: formData.exampleMovies.map((m) => m.id),
+          exampleSeriesIds: formData.exampleSeries.map((s) => s.id),
           textPreferences: formData.textPreferences || undefined,
         }),
       })
@@ -85,7 +90,7 @@ export function useAIGeneration({ formData, setFormData, setSnackbar }: UseAIGen
     } finally {
       setGeneratingName(false)
     }
-  }, [canGenerate, formData.genreFilters, formData.exampleMovies, formData.textPreferences, setFormData, setSnackbar])
+  }, [canGenerate, formData.genreFilters, formData.exampleMovies, formData.exampleSeries, formData.textPreferences, setFormData, setSnackbar])
 
   const generateDescription = useCallback(async () => {
     if (!canGenerate) {
@@ -106,6 +111,7 @@ export function useAIGeneration({ formData, setFormData, setSnackbar }: UseAIGen
         body: JSON.stringify({
           genres: formData.genreFilters,
           exampleMovieIds: formData.exampleMovies.map((m) => m.id),
+          exampleSeriesIds: formData.exampleSeries.map((s) => s.id),
           textPreferences: formData.textPreferences || undefined,
           playlistName: formData.name || undefined,
         }),
@@ -123,7 +129,7 @@ export function useAIGeneration({ formData, setFormData, setSnackbar }: UseAIGen
     } finally {
       setGeneratingDescription(false)
     }
-  }, [canGenerate, formData.genreFilters, formData.exampleMovies, formData.textPreferences, formData.name, setFormData, setSnackbar])
+  }, [canGenerate, formData.genreFilters, formData.exampleMovies, formData.exampleSeries, formData.textPreferences, formData.name, setFormData, setSnackbar])
 
   return {
     generatingPreferences,

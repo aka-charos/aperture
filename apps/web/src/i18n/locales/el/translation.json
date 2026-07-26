@@ -504,7 +504,15 @@
     "snackbarAINameOk": "Το όνομα AI δημιουργήθηκε",
     "snackbarAINameFail": "Η δημιουργία ονόματος απέτυχε",
     "snackbarAIDescriptionOk": "Η περιγραφή AI δημιουργήθηκε",
-    "snackbarAIDescriptionFail": "Η δημιουργία περιγραφής απέτυχε"
+    "snackbarAIDescriptionFail": "Η δημιουργία περιγραφής απέτυχε",
+    "sectionMediaTypes": "Media",
+    "sectionMediaTypesSubtitle": "What this collection can include",
+    "mediaTypeMovies": "Movies",
+    "mediaTypeSeries": "TV shows",
+    "mediaTypeBoth": "Both",
+    "sectionSeedSeries": "Seed TV Shows",
+    "sectionSeedSeriesSubtitle": "Shows that define this collection's vibe",
+    "searchSeriesPlaceholder": "Search for TV shows to add…"
   },
   "discovery": {
     "title": "Ανακάλυψη",
@@ -1283,7 +1291,15 @@
     "snackbarAINameOk": "Το όνομα AI δημιουργήθηκε",
     "snackbarAINameFail": "Αποτυχία δημιουργίας ονόματος",
     "snackbarAIDescriptionOk": "Η περιγραφή AI δημιουργήθηκε",
-    "snackbarAIDescriptionFail": "Αποτυχία δημιουργίας περιγραφής"
+    "snackbarAIDescriptionFail": "Αποτυχία δημιουργίας περιγραφής",
+    "sectionMediaTypes": "Media",
+    "sectionMediaTypesSubtitle": "What this playlist can include",
+    "mediaTypeMovies": "Movies",
+    "mediaTypeSeries": "TV shows",
+    "mediaTypeBoth": "Both",
+    "sectionSeedSeries": "Seed TV Shows",
+    "sectionSeedSeriesSubtitle": "Shows that define this playlist's vibe",
+    "searchSeriesPlaceholder": "Search for TV shows to add…"
   },
   "channels": {
     "title": "Κανάλια",

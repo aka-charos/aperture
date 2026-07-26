@@ -11,9 +11,12 @@ import type { ChannelRow } from '../types.js'
 
 /**
  * Hydrate collection item IDs (media-server provider item ids) into the same rich shape the
- * playlist view returns. getCollectionItems only yields ids, so we look the movies up in our own
+ * playlist view returns. getCollectionItems only yields ids, so we look the titles up in our own
  * DB and preserve the collection's order. playlistItemId mirrors the item id so the shared view
  * dialog can remove a collection member by that id.
+ *
+ * Both tables are searched: a channel with series in its media types writes series items into the
+ * collection, and a movies-only lookup would silently drop them from the view.
  */
 async function hydrateCollectionItems(providerItemIds: string[]) {
   if (providerItemIds.length === 0) return []
@@ -26,7 +29,10 @@ async function hydrateCollectionItems(providerItemIds: string[]) {
     runtime: number | null
   }>(
     `SELECT provider_item_id, title, year, poster_url, runtime_minutes AS runtime
-     FROM movies WHERE provider_item_id = ANY($1)`,
+     FROM movies WHERE provider_item_id = ANY($1)
+     UNION ALL
+     SELECT provider_item_id, title, year, poster_url, NULL AS runtime
+     FROM series WHERE provider_item_id = ANY($1)`,
     [providerItemIds]
   )
 
@@ -74,7 +80,7 @@ export function registerPlaylistHandlers(fastify: FastifyInstance) {
           return reply.send({
             collectionId,
             itemCount,
-            message: `Collection updated with ${itemCount} movies`,
+            message: `Collection updated with ${itemCount} items`,
           })
         }
 
@@ -82,7 +88,7 @@ export function registerPlaylistHandlers(fastify: FastifyInstance) {
         return reply.send({
           playlistId,
           itemCount,
-          message: `Playlist updated with ${itemCount} movies`,
+          message: `Playlist updated with ${itemCount} items`,
         })
       } catch (err) {
         request.log.error({ err, channelId: id }, 'Failed to generate channel output')

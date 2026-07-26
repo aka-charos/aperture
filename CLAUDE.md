@@ -12,7 +12,7 @@ pnpm monorepo, ESM everywhere, no ORM (raw SQL via `pg`):
 - **`apps/api`** (`@aperture/api`) — thin Fastify HTTP layer (port 3456): routing, auth, job orchestration. Handlers call core functions; `src/lib/db.ts`, `lib/logger.ts`, `config/env.ts` are pure re-export shims of core.
 - **`apps/web`** (`@aperture/web`) — Vite + React 18 SPA (dev port 3457, proxies `/api` → 3456). MUI 6, react-router 7, i18next (15 locales), d3, recharts. **Never imports `@aperture/core`** (server code would break the bundle — duplicate tiny helpers instead, see `src/i18n/localeDirection.ts`). No central API client: raw `fetch('/api/...', { credentials: 'include' })` everywhere.
 - **`packages/ui`** (`@aperture/ui`) — shared React components (MoviePoster, StarRating, BaseCarousel, RankBadge, StatusCard, TrailerModal, `getProxiedImageUrl`). Web aliases it to `src/` for hot reload, but typecheck/build use `dist/`.
-- **`db/migrations/`** — 120 numbered SQL files (`0001`–`0120`). Postgres + pgvector.
+- **`db/migrations/`** — 121 numbered SQL files (`0001`–`0121`). Postgres + pgvector.
 
 ## Commands
 
@@ -46,7 +46,7 @@ pnpm --filter @aperture/web i18n:sync   # propagate new en strings to 14 locales
 | Recommendations | `pages/MyRecommendations.tsx` | `recommendations/` | `recommender/` (movies/, series/, shared/) | `recommendation_*`, embedding tables |
 | Similarity / Explore graph | `pages/explore/`, `components/SimilarityGraph/`, `components/GraphExplorer/` | `similarity/` | `similarity/` (index, reasons, diverse) | embedding tables, `similarity_validation_cache` |
 | Graph playlists | `pages/playlists/` (GraphPlaylist*) | `graphPlaylists/` | `graphPlaylists/` | `graph_playlists` |
-| Playlists/Channels/Collections | `pages/playlists/`, `pages/collections/` | `channels/` | `channels/` | `channels` |
+| Playlists/Channels/Collections | `pages/playlists/`, `pages/collections/` | `channels/` | `channels/` (media-type aware: `channels.media_types` + `example_movie_ids`/`example_series_ids`; `webExpand.ts` resolves web picks against `movies`/`series`) | `channels` |
 | Top Picks | `pages/top-picks/`, admin: `pages/settings/topPicks/` | `top-picks/`, also `settings/handlers/topPicks.ts` + `setup/handlers/topPicks.ts` | `topPicks/` | `top_picks_config` |
 | Watching ("Shows You Watch") | `pages/watching/`, `hooks/WatchingContext.tsx` (localStorage cache v5) | `watching/` | `watching/` (upcomingEpisodes, tmdbTotals, favoriteSync) via `@aperture/core/watching` | `user_watching_series`, `series.tmdb_total_*`/`tmdb_status` |
 | Watch history / stats | `pages/MyWatchHistory.tsx`, `pages/WatchStats.tsx`, `pages/watch-history/` | `users/handlers/profile/watchHistory*.ts`, `watchStats.ts` | `recommender/*/sync.ts` (history sync) | `watch_history` |

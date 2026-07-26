@@ -1,11 +1,11 @@
 // Re-export types
-export type { Channel, ChannelRecommendation } from './types.js'
+export type { Channel, ChannelRecommendation, ChannelMediaType } from './types.js'
 
 // Re-export utilities
 export { weightedRandomSample } from './utils.js'
 
 // Re-export recommendation functions
-export { generateChannelRecommendations } from './recommendations.js'
+export { generateChannelRecommendations, parseChannelMediaTypes } from './recommendations.js'
 
 // Re-export playlist functions
 export {

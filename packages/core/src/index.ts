@@ -199,6 +199,8 @@ export {
 // Channels
 export {
   generateChannelRecommendations,
+  parseChannelMediaTypes,
+  type ChannelMediaType,
   updateChannelPlaylist,
   createSharedPlaylist,
   processAllChannels,
