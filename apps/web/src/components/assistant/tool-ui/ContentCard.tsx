@@ -54,6 +54,25 @@ interface ContentCardProps {
 const RAIL_WIDTH = 84
 const POSTER_HEIGHT = 126
 
+/**
+ * Synopsis budget for list cards, in characters.
+ *
+ * The clamp is applied in lines, but a line is worth ~40 characters in a 420px
+ * dock and ~86 in a 720px one — so a fixed line count quietly hands a narrow
+ * panel a third of the text under the same rule. Converting a character budget
+ * to lines at the measured width keeps the amount of prose roughly steady and
+ * pays for it in card height, which costs nothing in a vertical list where no
+ * two cards have to line up.
+ */
+const LIST_OVERVIEW_CHARS = 320
+/** Average glyph advance at caption size (12px), off the rendered cards. */
+const CAPTION_CHAR_PX = 6.5
+const LIST_OVERVIEW_MIN_LINES = 4
+const LIST_OVERVIEW_MAX_LINES = 8
+/** Carousel cards are a fixed width everywhere, so their clamps can be fixed too. */
+const COMPACT_OVERVIEW_LINES = 3
+const COMPACT_REASON_LINES = 3
+
 // Truncate multi-line text with an ellipsis after `lines` rows.
 const clampLines = (lines: number) => ({
   display: '-webkit-box',
@@ -99,14 +118,16 @@ export function ContentCard({
 
   const { year, rest: genreLine } = splitMeta(item.subtitle)
 
-  // One expand control per card covers both the synopsis and the reason: they
-  // are the same block of prose to a reader, and two separate toggles on a
+  // One expand control per card, covering whatever is clamped: both texts on a
+  // carousel card, the synopsis alone in the list. Two separate toggles on a
   // carousel-sized card is more chrome than text.
   const bodyRef = useRef<HTMLDivElement>(null)
   const overviewRef = useRef<HTMLSpanElement>(null)
   const reasonRef = useRef<HTMLSpanElement>(null)
   const [expanded, setExpanded] = useState(false)
   const [overflowing, setOverflowing] = useState(false)
+  const [listOverviewLines, setListOverviewLines] = useState(LIST_OVERVIEW_MIN_LINES)
+  const overviewLines = isList ? listOverviewLines : COMPACT_OVERVIEW_LINES
 
   // Measured, not estimated from a character count (the PersonDetail bio
   // approach): the same card renders ~600px wide in the vertical list and
@@ -119,8 +140,22 @@ export function ContentCard({
       (element): element is HTMLSpanElement => element !== null
     )
     if (elements.length === 0) return
-    const measure = () =>
+    const measure = () => {
+      const width = bodyRef.current?.clientWidth ?? 0
+      if (isList && width > 0) {
+        setListOverviewLines(
+          Math.min(
+            LIST_OVERVIEW_MAX_LINES,
+            Math.max(LIST_OVERVIEW_MIN_LINES, Math.ceil(LIST_OVERVIEW_CHARS / (width / CAPTION_CHAR_PX)))
+          )
+        )
+      }
+      // Read against the clamp that is currently applied, which on a width
+      // change is still the previous one. Settling it takes a second pass:
+      // a new line count changes the block's own height, so the observer
+      // below fires again and this runs once more with the final clamp.
       setOverflowing(elements.some((element) => element.scrollHeight > element.clientHeight + 1))
+    }
     measure()
     // The column is observed alongside the text: a clamped block that gains a
     // line of hidden content keeps the same box height, so watching the texts
@@ -130,7 +165,7 @@ export function ContentCard({
       if (element) observer.observe(element)
     }
     return () => observer.disconnect()
-  }, [expanded, item.overview, item.reason])
+  }, [expanded, isList, item.overview, item.reason])
 
   // Chat surfaces that own the whole viewport open the item here instead of
   // routing, so the conversation and its scroll position survive a look at a
@@ -344,7 +379,7 @@ export function ContentCard({
             sx={{
               color: '#a1a1aa',
               lineHeight: 1.45,
-              ...(expanded ? {} : clampLines(isList ? 4 : 3)),
+              ...(expanded ? {} : clampLines(overviewLines)),
             }}
           >
             {item.overview}
@@ -366,7 +401,15 @@ export function ContentCard({
             <Typography
               ref={reasonRef}
               variant="caption"
-              sx={{ color: '#c7c7d1', lineHeight: 1.45, ...(expanded ? {} : clampLines(3)) }}
+              sx={{
+                color: '#c7c7d1',
+                lineHeight: 1.45,
+                // Never clamped in the list. It runs one or two model-written
+                // sentences, it is the only text on the card that exists
+                // nowhere else in the app, and three lines cut most of them at
+                // any dock width short of ~640px.
+                ...(expanded || isList ? {} : clampLines(COMPACT_REASON_LINES)),
+              }}
             >
               {item.reason}
             </Typography>
