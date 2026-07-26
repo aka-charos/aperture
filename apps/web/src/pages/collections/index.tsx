@@ -218,7 +218,8 @@ export function CollectionsPage() {
       {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={4000}
+        // Errors now carry the provider's actual reason, which takes longer than 4s to read.
+        autoHideDuration={snackbar.severity === 'error' ? 12000 : 4000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >

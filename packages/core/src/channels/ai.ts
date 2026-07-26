@@ -1,5 +1,6 @@
 import { createChildLogger } from '../lib/logger.js'
-import { getTextGenerationModelInstance } from '../lib/ai-provider.js'
+import { getFunctionConfig, getTextGenerationModelInstance } from '../lib/ai-provider.js'
+import { describeAiFailure } from '../lib/aiFailure.js'
 import { generateText } from 'ai'
 import { queryOne } from '../lib/db.js'
 import { buildAiLanguageInstruction } from '../lib/locales.js'
@@ -100,6 +101,8 @@ export async function generateAIPreferences(
     return 'Please select some genres or example titles to help generate preferences.'
   }
 
+  const config = await getFunctionConfig('textGeneration')
+
   try {
     const aiLocale = await resolveEffectiveAiLanguage(userId)
     const langBlock = `\n\n${buildAiLanguageInstruction(aiLocale)}`
@@ -121,18 +124,20 @@ Focus on:
 Write in first person as if the user is describing what they want. Keep it concise but specific - each paragraph should be 1-2 sentences. Don't use bullet points.${langBlock}`,
       prompt: contextParts.join('\n\n'),
       temperature: 0.7,
-      maxOutputTokens: 500,
+      // Headroom for reasoning models, which spend the budget thinking before they write
+      // anything — the same starvation that used to make this fail at random.
+      maxOutputTokens: 1500,
     })
 
-    if (!text) {
-      throw new Error('No response from AI')
+    if (!text?.trim()) {
+      throw new Error('The AI model returned an empty response.')
     }
 
     logger.info({ userId, preferencesLength: text.length }, 'AI preferences generated')
     return text
   } catch (error) {
-    logger.error({ error, userId }, 'Failed to generate AI preferences')
-    throw new Error('Failed to generate AI preferences. Please try again.')
+    logger.error({ error, userId, provider: config?.provider }, 'Failed to generate AI preferences')
+    throw new Error(await describeAiFailure(config?.provider, error))
   }
 }
 
@@ -167,8 +172,10 @@ export async function generateAIPlaylistName(
       userId,
     })
   } catch (error) {
+    // generatePlaylistText already turned this into an actionable message; keep it rather than
+    // flattening every cause into "please try again".
     logger.error({ error }, 'Failed to generate AI playlist name')
-    throw new Error('Failed to generate playlist name. Please try again.')
+    throw error instanceof Error ? error : new Error('Failed to generate playlist name.')
   }
 }
 
@@ -213,6 +220,6 @@ export async function generateAIPlaylistDescription(
     })
   } catch (error) {
     logger.error({ error }, 'Failed to generate AI playlist description')
-    throw new Error('Failed to generate playlist description. Please try again.')
+    throw error instanceof Error ? error : new Error('Failed to generate playlist description.')
   }
 }

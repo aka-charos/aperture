@@ -6,6 +6,15 @@ import {
   generateAIPlaylistDescription,
 } from '@aperture/core'
 
+/**
+ * Core turns provider failures into an actionable sentence (bad key, quota, empty output from a
+ * reasoning model). Pass it on — the dialog shows it verbatim, and a generic "failed" here is
+ * exactly what left users re-clicking the button with nothing to go on.
+ */
+function aiErrorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message ? err.message : fallback
+}
+
 export function registerAiHandlers(fastify: FastifyInstance) {
   /**
    * POST /api/channels/ai-preferences
@@ -35,7 +44,9 @@ export function registerAiHandlers(fastify: FastifyInstance) {
         return reply.send({ preferences })
       } catch (err) {
         request.log.error({ err, userId: currentUser.id }, 'Failed to generate AI preferences')
-        return reply.status(500).send({ error: 'Failed to generate AI preferences' })
+        return reply
+          .status(500)
+          .send({ error: aiErrorMessage(err, 'Failed to generate AI preferences') })
       }
     }
   )
@@ -70,7 +81,9 @@ export function registerAiHandlers(fastify: FastifyInstance) {
         return reply.send({ name })
       } catch (err) {
         request.log.error({ err }, 'Failed to generate AI playlist name')
-        return reply.status(500).send({ error: 'Failed to generate playlist name' })
+        return reply
+          .status(500)
+          .send({ error: aiErrorMessage(err, 'Failed to generate playlist name') })
       }
     }
   )
@@ -107,7 +120,9 @@ export function registerAiHandlers(fastify: FastifyInstance) {
         return reply.send({ description })
       } catch (err) {
         request.log.error({ err }, 'Failed to generate AI playlist description')
-        return reply.status(500).send({ error: 'Failed to generate playlist description' })
+        return reply
+          .status(500)
+          .send({ error: aiErrorMessage(err, 'Failed to generate playlist description') })
       }
     }
   )

@@ -35,8 +35,30 @@ import DescriptionIcon from '@mui/icons-material/Description'
 import AddIcon from '@mui/icons-material/Add'
 import { getProxiedImageUrl } from '@aperture/ui'
 import { useMediaSearch } from '../hooks'
+import { withServerMessageDetail } from '../../../lib/withServerMessageDetail'
 import type { Channel, MediaSummary, MediaType, FormData, SnackbarState } from '../types'
 import type { Theme } from '@mui/material'
+import type { TFunction } from 'i18next'
+
+/**
+ * The AI routes answer a failure with a sentence worth reading ("Your Google API key is missing
+ * or invalid. Check your API key in Settings > AI."). Show that instead of the flat fallback —
+ * without it, the only signal is "Failed to generate name" and the button gets re-clicked.
+ */
+async function aiFailureMessage(
+  t: TFunction,
+  response: Response,
+  fallback: string
+): Promise<string> {
+  try {
+    const data = await response.json()
+    return typeof data?.error === 'string' && data.error
+      ? withServerMessageDetail(t, data.error)
+      : fallback
+  } catch {
+    return fallback
+  }
+}
 
 // AI button component - defined outside to prevent re-renders
 function AIButton({
@@ -452,7 +474,11 @@ export function PlaylistDialog({
         setFormData({ ...formData, textPreferences: data.preferences })
         setSnackbar({ open: true, message: pt('snackbarAIPreferencesOk'), severity: 'success' })
       } else {
-        setSnackbar({ open: true, message: pt('snackbarAIPreferencesFail'), severity: 'error' })
+        setSnackbar({
+          open: true,
+          message: await aiFailureMessage(t, response, pt('snackbarAIPreferencesFail')),
+          severity: 'error',
+        })
       }
     } catch {
       setSnackbar({ open: true, message: pt('snackbarAIPreferencesFail'), severity: 'error' })
@@ -491,7 +517,11 @@ export function PlaylistDialog({
         setFormData({ ...formData, name: data.name })
         setSnackbar({ open: true, message: pt('snackbarAINameOk'), severity: 'success' })
       } else {
-        setSnackbar({ open: true, message: pt('snackbarAINameFail'), severity: 'error' })
+        setSnackbar({
+          open: true,
+          message: await aiFailureMessage(t, response, pt('snackbarAINameFail')),
+          severity: 'error',
+        })
       }
     } catch {
       setSnackbar({ open: true, message: pt('snackbarAINameFail'), severity: 'error' })
@@ -531,7 +561,11 @@ export function PlaylistDialog({
         setFormData({ ...formData, description: data.description })
         setSnackbar({ open: true, message: pt('snackbarAIDescriptionOk'), severity: 'success' })
       } else {
-        setSnackbar({ open: true, message: pt('snackbarAIDescriptionFail'), severity: 'error' })
+        setSnackbar({
+          open: true,
+          message: await aiFailureMessage(t, response, pt('snackbarAIDescriptionFail')),
+          severity: 'error',
+        })
       }
     } catch {
       setSnackbar({ open: true, message: pt('snackbarAIDescriptionFail'), severity: 'error' })
