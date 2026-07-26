@@ -2,11 +2,12 @@ import type { FastifyInstance } from 'fastify'
 import { deleteChannelCollection } from '@aperture/core'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
-import type {
-  ChannelRow,
-  ChannelCreateBody,
-  ChannelUpdateBody,
-  ChannelOutputType,
+import {
+  sanitizeMediaTypes,
+  type ChannelRow,
+  type ChannelCreateBody,
+  type ChannelUpdateBody,
+  type ChannelOutputType,
 } from '../types.js'
 
 export function registerCrudHandlers(fastify: FastifyInstance) {
@@ -46,8 +47,17 @@ export function registerCrudHandlers(fastify: FastifyInstance) {
     { preHandler: requireAuth, schema: { tags: ["playlists"] } },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
-      const { name, description, genreFilters, textPreferences, exampleMovieIds, isPinnedRow, outputType } =
-        request.body
+      const {
+        name,
+        description,
+        genreFilters,
+        textPreferences,
+        exampleMovieIds,
+        exampleSeriesIds,
+        mediaTypes,
+        isPinnedRow,
+        outputType,
+      } = request.body
 
       if (!name) {
         return reply.status(400).send({ error: 'Name is required' })
@@ -60,8 +70,8 @@ export function registerCrudHandlers(fastify: FastifyInstance) {
       }
 
       const channel = await queryOne<ChannelRow>(
-        `INSERT INTO channels (owner_id, name, description, genre_filters, text_preferences, example_movie_ids, is_pinned_row, output_type)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO channels (owner_id, name, description, genre_filters, text_preferences, example_movie_ids, example_series_ids, media_types, is_pinned_row, output_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING *`,
         [
           currentUser.id,
@@ -70,6 +80,8 @@ export function registerCrudHandlers(fastify: FastifyInstance) {
           genreFilters || [],
           textPreferences || null,
           exampleMovieIds || [],
+          exampleSeriesIds || [],
+          sanitizeMediaTypes(mediaTypes),
           isPinnedRow || false,
           outputType === 'collection' ? 'collection' : 'playlist',
         ]
@@ -135,8 +147,17 @@ export function registerCrudHandlers(fastify: FastifyInstance) {
         return reply.status(403).send({ error: 'Forbidden' })
       }
 
-      const { name, description, genreFilters, textPreferences, exampleMovieIds, isPinnedRow, isActive } =
-        request.body
+      const {
+        name,
+        description,
+        genreFilters,
+        textPreferences,
+        exampleMovieIds,
+        exampleSeriesIds,
+        mediaTypes,
+        isPinnedRow,
+        isActive,
+      } = request.body
 
       const updates: string[] = []
       const values: unknown[] = []
@@ -161,6 +182,14 @@ export function registerCrudHandlers(fastify: FastifyInstance) {
       if (exampleMovieIds !== undefined) {
         updates.push(`example_movie_ids = $${paramIndex++}`)
         values.push(exampleMovieIds)
+      }
+      if (exampleSeriesIds !== undefined) {
+        updates.push(`example_series_ids = $${paramIndex++}`)
+        values.push(exampleSeriesIds)
+      }
+      if (mediaTypes !== undefined) {
+        updates.push(`media_types = $${paramIndex++}`)
+        values.push(sanitizeMediaTypes(mediaTypes))
       }
       if (isPinnedRow !== undefined) {
         updates.push(`is_pinned_row = $${paramIndex++}`)

@@ -1,12 +1,166 @@
 import { createChildLogger } from '../lib/logger.js'
 import { query, queryOne } from '../lib/db.js'
 import { getMovieEmbedding, embedText } from '../recommender/movies/embeddings.js'
+import { getSeriesEmbedding } from '../recommender/series/embeddings.js'
 import { averageEmbeddings } from '../recommender/shared/embeddings.js'
 import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../lib/ai-provider.js'
-import type { ChannelRecommendation } from './types.js'
+import type { ChannelMediaType, ChannelRecommendation } from './types.js'
 import { weightedRandomSample } from './utils.js'
 
 const logger = createChildLogger('channels')
+
+/**
+ * Per-media-type wiring for the otherwise identical candidate queries. Movies and series live in
+ * parallel tables with parallel embedding tables, so everything below is driven off this map
+ * rather than duplicated.
+ */
+const MEDIA_SOURCES: Record<
+  ChannelMediaType,
+  { table: string; embeddingTable: 'embeddings' | 'series_embeddings'; joinColumn: string }
+> = {
+  movie: { table: 'movies', embeddingTable: 'embeddings', joinColumn: 'movie_id' },
+  series: { table: 'series', embeddingTable: 'series_embeddings', joinColumn: 'series_id' },
+}
+
+/** Normalise the stored media_types column: unknown/empty values fall back to movie-only. */
+export function parseChannelMediaTypes(raw: string[] | null | undefined): ChannelMediaType[] {
+  const types = (raw ?? []).filter((t): t is ChannelMediaType => t === 'movie' || t === 'series')
+  return types.length > 0 ? types : ['movie']
+}
+
+/** Movies the user has played. */
+async function getWatchedMovieIds(userId: string): Promise<Set<string>> {
+  const watched = await query<{ movie_id: string }>(
+    'SELECT movie_id FROM watch_history WHERE user_id = $1',
+    [userId]
+  )
+  return new Set(watched.rows.map((r) => r.movie_id))
+}
+
+/**
+ * Series the user has started. Watch history is episode-level, so "watched" means at least one
+ * played episode — the same rule the series recommender uses to skip shows it already knows about.
+ */
+async function getWatchedSeriesIds(userId: string): Promise<Set<string>> {
+  const watched = await query<{ series_id: string }>(
+    `SELECT DISTINCT e.series_id
+     FROM watch_history wh
+     JOIN episodes e ON e.id = wh.episode_id
+     WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND e.series_id IS NOT NULL`,
+    [userId]
+  )
+  return new Set(watched.rows.map((r) => r.series_id))
+}
+
+interface CandidateContext {
+  genreFilters: string[]
+  maxParentalRating: number | null
+  watchedIds: Set<string>
+  poolSize: number
+}
+
+/**
+ * Fetch a candidate pool for one media type, ordered by taste similarity when a taste vector is
+ * available and by community rating otherwise.
+ */
+async function fetchCandidatePool(
+  mediaType: ChannelMediaType,
+  tasteProfile: number[] | null,
+  modelId: string | null,
+  ctx: CandidateContext
+): Promise<ChannelRecommendation[]> {
+  const source = MEDIA_SOURCES[mediaType]
+  const whereClauses: string[] = []
+  const params: unknown[] = []
+  let paramIndex = 1
+
+  // Genre filter
+  if (ctx.genreFilters.length > 0) {
+    whereClauses.push(`t.genres && $${paramIndex++}`)
+    params.push(ctx.genreFilters)
+  }
+
+  // Parental rating filter - filter items based on user's max allowed rating
+  if (ctx.maxParentalRating !== null) {
+    whereClauses.push(`(
+      t.content_rating IS NULL OR
+      COALESCE((SELECT prv.rating_value FROM parental_rating_values prv WHERE prv.rating_name = t.content_rating LIMIT 1), 0) <= $${paramIndex++}
+    )`)
+    params.push(ctx.maxParentalRating)
+  }
+
+  const fetchLimit = ctx.poolSize + ctx.watchedIds.size
+
+  if (tasteProfile && modelId) {
+    const tableName = await getActiveEmbeddingTableName(source.embeddingTable)
+
+    const embeddingWhereClauses = [...whereClauses, `e.model = $${paramIndex++}`]
+    params.push(modelId)
+    const embeddingWhereClause = ` WHERE ${embeddingWhereClauses.join(' AND ')}`
+
+    const vectorStr = `[${tasteProfile.join(',')}]`
+    params.push(vectorStr)
+
+    const result = await query<{
+      id: string
+      provider_item_id: string
+      title: string
+      year: number | null
+      similarity: number
+    }>(
+      `SELECT t.id, t.provider_item_id, t.title, t.year,
+              1 - (e.embedding <=> $${paramIndex}::halfvec) as similarity
+       FROM ${tableName} e
+       JOIN ${source.table} t ON t.id = e.${source.joinColumn}
+       ${embeddingWhereClause}
+       ORDER BY e.embedding <=> $${paramIndex}::halfvec
+       LIMIT $${paramIndex + 1}`,
+      [...params, fetchLimit]
+    )
+
+    return result.rows
+      .filter((r) => !ctx.watchedIds.has(r.id) && !!r.provider_item_id)
+      .slice(0, ctx.poolSize)
+      .map((r) => ({
+        mediaType,
+        itemId: r.id,
+        providerItemId: r.provider_item_id,
+        title: r.title,
+        year: r.year,
+        score: r.similarity,
+      }))
+  }
+
+  // Fallback to rating-based ordering
+  const whereClause = whereClauses.length > 0 ? ` WHERE ${whereClauses.join(' AND ')}` : ''
+
+  const result = await query<{
+    id: string
+    provider_item_id: string
+    title: string
+    year: number | null
+    community_rating: number | null
+  }>(
+    `SELECT t.id, t.provider_item_id, t.title, t.year, t.community_rating
+     FROM ${source.table} t
+     ${whereClause}
+     ORDER BY t.community_rating DESC NULLS LAST
+     LIMIT $${paramIndex}`,
+    [...params, fetchLimit]
+  )
+
+  return result.rows
+    .filter((r) => !ctx.watchedIds.has(r.id) && !!r.provider_item_id)
+    .slice(0, ctx.poolSize)
+    .map((r) => ({
+      mediaType,
+      itemId: r.id,
+      providerItemId: r.provider_item_id,
+      title: r.title,
+      year: r.year,
+      score: r.community_rating ? Number(r.community_rating) / 10 : 0.5,
+    }))
+}
 
 /**
  * Generate recommendations for a specific channel
@@ -23,9 +177,11 @@ export async function generateChannelRecommendations(
     genre_filters: string[]
     text_preferences: string | null
     example_movie_ids: string[]
+    example_series_ids: string[] | null
+    media_types: string[] | null
     max_parental_rating: number | null
   }>(
-    `SELECT c.*, u.max_parental_rating 
+    `SELECT c.*, u.max_parental_rating
      FROM channels c
      JOIN users u ON u.id = c.owner_id
      WHERE c.id = $1`,
@@ -36,22 +192,34 @@ export async function generateChannelRecommendations(
     throw new Error(`Channel not found: ${channelId}`)
   }
 
-  logger.info({ 
-    channelId, 
-    name: channel.name, 
-    maxParentalRating: channel.max_parental_rating 
+  const mediaTypes = parseChannelMediaTypes(channel.media_types)
+
+  logger.info({
+    channelId,
+    name: channel.name,
+    mediaTypes,
+    maxParentalRating: channel.max_parental_rating
   }, 'Generating channel recommendations')
 
-  // Build channel taste profile from example movies + free-text preferences.
-  // Both are embedded in the same vector space and averaged together, so a
-  // channel defined only by text preferences still gets a real taste vector
-  // (instead of silently falling back to rating-only ordering).
+  // Build channel taste profile from example movies + example series + free-text preferences.
+  // All three are embedded in the same vector space and averaged together, so a channel defined
+  // only by text preferences still gets a real taste vector (instead of silently falling back to
+  // rating-only ordering), and a mixed-media channel is steered by both kinds of seed.
   let tasteProfile: number[] | null = null
   const embeddings: number[][] = []
 
   if (channel.example_movie_ids && channel.example_movie_ids.length > 0) {
     for (const movieId of channel.example_movie_ids) {
       const emb = await getMovieEmbedding(movieId)
+      if (emb) {
+        embeddings.push(emb)
+      }
+    }
+  }
+
+  if (channel.example_series_ids && channel.example_series_ids.length > 0) {
+    for (const seriesId of channel.example_series_ids) {
+      const emb = await getSeriesEmbedding(seriesId)
       if (emb) {
         embeddings.push(emb)
       }
@@ -65,7 +233,7 @@ export async function generateChannelRecommendations(
         embeddings.push(textEmb)
       }
     } catch (err) {
-      logger.warn({ err, channelId }, 'Failed to embed channel text preferences; using example movies only')
+      logger.warn({ err, channelId }, 'Failed to embed channel text preferences; using example items only')
     }
   }
 
@@ -73,134 +241,52 @@ export async function generateChannelRecommendations(
     tasteProfile = averageEmbeddings(embeddings)
   }
 
-  // Get user's watch history to exclude watched movies
-  const watched = await query<{ movie_id: string }>(
-    'SELECT movie_id FROM watch_history WHERE user_id = $1',
-    [channel.owner_id]
-  )
-  const watchedIds = new Set(watched.rows.map((r) => r.movie_id))
+  // Get the owner's watch history to exclude what they have already seen, per media type
+  const [watchedMovieIds, watchedSeriesIds] = await Promise.all([
+    mediaTypes.includes('movie') ? getWatchedMovieIds(channel.owner_id) : Promise.resolve(new Set<string>()),
+    mediaTypes.includes('series') ? getWatchedSeriesIds(channel.owner_id) : Promise.resolve(new Set<string>()),
+  ])
 
-  // Build query for candidates
-  const whereClauses: string[] = []
-  const params: unknown[] = []
-  let paramIndex = 1
-
-  // Genre filter
-  if (channel.genre_filters && channel.genre_filters.length > 0) {
-    whereClauses.push(`m.genres && $${paramIndex++}`)
-    params.push(channel.genre_filters)
-  }
-
-  // Parental rating filter - filter movies based on user's max allowed rating
-  if (channel.max_parental_rating !== null) {
-    whereClauses.push(`(
-      m.content_rating IS NULL OR
-      COALESCE((SELECT prv.rating_value FROM parental_rating_values prv WHERE prv.rating_name = m.content_rating LIMIT 1), 0) <= $${paramIndex++}
-    )`)
-    params.push(channel.max_parental_rating)
+  let modelId: string | null = null
+  if (tasteProfile) {
+    modelId = await getActiveEmbeddingModelId()
+    if (!modelId) {
+      logger.warn('No embedding model configured, falling back to rating-based recommendations')
+    }
   }
 
   // Fetch more candidates than needed (3x) to enable variety through weighted sampling
   const poolSize = limit * 3
 
-  let candidates: ChannelRecommendation[]
-
-  if (tasteProfile) {
-    // Get active embedding model for filtering
-    const modelId = await getActiveEmbeddingModelId()
-    if (!modelId) {
-      logger.warn('No embedding model configured, falling back to rating-based recommendations')
-      // Fall through to rating-based ordering
-    } else {
-      // Get the embedding table name
-      const tableName = await getActiveEmbeddingTableName('embeddings')
-      
-      // Add model filter to where clause
-      const embeddingWhereClauses = [...whereClauses, `e.model = $${paramIndex++}`]
-      params.push(modelId)
-      const embeddingWhereClause = embeddingWhereClauses.length > 0 ? ` WHERE ${embeddingWhereClauses.join(' AND ')}` : ''
-      
-      // Use embedding similarity
-      const vectorStr = `[${tasteProfile.join(',')}]`
-      params.push(vectorStr)
-
-      const result = await query<{
-        id: string
-        provider_item_id: string
-        title: string
-        year: number | null
-        similarity: number
-      }>(
-        `SELECT m.id, m.provider_item_id, m.title, m.year,
-                1 - (e.embedding <=> $${paramIndex}::halfvec) as similarity
-         FROM ${tableName} e
-         JOIN movies m ON m.id = e.movie_id
-         ${embeddingWhereClause}
-         ORDER BY e.embedding <=> $${paramIndex}::halfvec
-         LIMIT $${paramIndex + 1}`,
-        [...params, poolSize + watchedIds.size]
-      )
-
-      const pool = result.rows
-        .filter((r) => !watchedIds.has(r.id))
-        .slice(0, poolSize)
-        .map((r) => ({
-          movieId: r.id,
-          providerItemId: r.provider_item_id,
-          title: r.title,
-          year: r.year,
-          score: r.similarity,
-        }))
-
-      // Weighted random sampling for variety
-      candidates = weightedRandomSample(pool, limit)
-      
-      logger.debug(
-        { channelId: channel.id, candidateCount: candidates.length },
-        'Generated channel recommendations'
-      )
-
-      return candidates
-    }
-  }
-  
-  const whereClause = whereClauses.length > 0 ? ` WHERE ${whereClauses.join(' AND ')}` : ''
-
-  // Fallback to rating-based ordering
-  const result = await query<{
-    id: string
-    provider_item_id: string
-    title: string
-    year: number | null
-    community_rating: number | null
-  }>(
-    `SELECT m.id, m.provider_item_id, m.title, m.year, m.community_rating
-     FROM movies m
-     ${whereClause}
-     ORDER BY m.community_rating DESC NULLS LAST
-     LIMIT $${paramIndex}`,
-    [...params, poolSize + watchedIds.size]
+  const pools = await Promise.all(
+    mediaTypes.map((mediaType) =>
+      fetchCandidatePool(mediaType, tasteProfile, modelId, {
+        genreFilters: channel.genre_filters ?? [],
+        maxParentalRating: channel.max_parental_rating,
+        watchedIds: mediaType === 'movie' ? watchedMovieIds : watchedSeriesIds,
+        poolSize,
+      })
+    )
   )
 
-  const pool = result.rows
-    .filter((r) => !watchedIds.has(r.id))
-    .slice(0, poolSize)
-    .map((r) => ({
-      movieId: r.id,
-      providerItemId: r.provider_item_id,
-      title: r.title,
-      year: r.year,
-      score: r.community_rating ? r.community_rating / 10 : 0.5,
-    }))
+  // Merge the per-type pools before sampling. Scores are comparable across media types (both are
+  // cosine similarity against the same taste vector, or both a normalised community rating), so a
+  // mixed channel ends up weighted by actual fit instead of a fixed movie/series quota.
+  const pool = pools.flat()
 
   // Weighted random sampling for variety
-  candidates = weightedRandomSample(pool, limit)
+  const candidates = weightedRandomSample(pool, limit)
 
   logger.info(
-    { channelId, candidateCount: candidates.length, topScores: candidates.slice(0, 3).map((c) => c.score.toFixed(3)) },
+    {
+      channelId,
+      mediaTypes,
+      candidateCount: candidates.length,
+      seriesCount: candidates.filter((c) => c.mediaType === 'series').length,
+      topScores: candidates.slice(0, 3).map((c) => c.score.toFixed(3)),
+    },
     'Generated channel recommendations with variability'
   )
 
   return candidates
 }
-

@@ -1,5 +1,5 @@
 export { usePlaylistsData } from './usePlaylistsData'
-export { useMovieSearch } from './useMovieSearch'
+export { useMediaSearch } from './useMediaSearch'
 export { useAIGeneration } from './useAIGeneration'
 
 

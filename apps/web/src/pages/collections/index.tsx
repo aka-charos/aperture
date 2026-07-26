@@ -57,6 +57,8 @@ export function CollectionsPage() {
     handleGeneratePlaylist,
     addExampleMovie,
     removeExampleMovie,
+    addExampleSeries,
+    removeExampleSeries,
     handleViewPlaylist,
     handleClosePlaylistDialog,
     handleRemoveFromPlaylist,
@@ -149,6 +151,8 @@ export function CollectionsPage() {
         onSubmit={handleSubmit}
         onAddExampleMovie={addExampleMovie}
         onRemoveExampleMovie={removeExampleMovie}
+        onAddExampleSeries={addExampleSeries}
+        onRemoveExampleSeries={removeExampleSeries}
         i18nNamespace={NS}
       />
 

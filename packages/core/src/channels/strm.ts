@@ -48,9 +48,12 @@ export async function writeChannelStrm(channelId: string): Promise<{
   // Generate recommendations
   const recommendations = await generateChannelRecommendations(channelId)
 
-  // Write STRM files
+  // Write STRM files. Only movies: a .strm holds one playable stream URL, and a series item id
+  // resolves to a folder rather than a stream, so a series entry would write an unplayable file.
   const provider = await getMediaServerProvider()
-  for (const rec of recommendations) {
+  const playable = recommendations.filter((rec) => rec.mediaType === 'movie')
+  const skipped = recommendations.length - playable.length
+  for (const rec of playable) {
     const filename = `${rec.title.replace(/[<>:"/\\|?*]/g, '')} (${rec.year || 'Unknown'}) [${rec.providerItemId}].strm`
     const filePath = path.join(localPath, filename)
 
@@ -60,10 +63,13 @@ export async function writeChannelStrm(channelId: string): Promise<{
     await fs.writeFile(filePath, content, 'utf-8')
   }
 
-  logger.info({ channelId, written: recommendations.length, localPath, libraryPath }, 'Channel STRM files written')
+  logger.info(
+    { channelId, written: playable.length, skippedSeries: skipped, localPath, libraryPath },
+    'Channel STRM files written'
+  )
 
   return {
-    written: recommendations.length,
+    written: playable.length,
     libraryPath,
   }
 }

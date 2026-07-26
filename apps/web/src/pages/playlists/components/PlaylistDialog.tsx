@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Dialog,
@@ -13,6 +13,8 @@ import {
   CircularProgress,
   InputAdornment,
   Avatar,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Button,
   alpha,
@@ -21,6 +23,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search'
 import CloseIcon from '@mui/icons-material/Close'
 import MovieIcon from '@mui/icons-material/Movie'
+import TvIcon from '@mui/icons-material/Tv'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import PlaylistPlayIcon from '@mui/icons-material/PlaylistPlay'
 import CategoryIcon from '@mui/icons-material/Category'
@@ -29,7 +32,8 @@ import TitleIcon from '@mui/icons-material/Title'
 import DescriptionIcon from '@mui/icons-material/Description'
 import AddIcon from '@mui/icons-material/Add'
 import { getProxiedImageUrl } from '@aperture/ui'
-import type { Channel, Movie, FormData, SnackbarState } from '../types'
+import { useMediaSearch } from '../hooks'
+import type { Channel, MediaSummary, MediaType, FormData, SnackbarState } from '../types'
 import type { Theme } from '@mui/material'
 
 // AI button component - defined outside to prevent re-renders
@@ -136,6 +140,183 @@ function Section({
   )
 }
 
+/**
+ * Search-and-select strip for a channel's seed titles. Identical behaviour for movies and series —
+ * only the endpoint (via the caller's search hook) and the placeholder icons differ.
+ */
+function SeedPicker({
+  searchPlaceholder,
+  query,
+  onQueryChange,
+  searching,
+  results,
+  selected,
+  onAdd,
+  onRemove,
+  fallbackIcon,
+  emptyPosterIcon,
+  theme,
+}: {
+  searchPlaceholder: string
+  query: string
+  onQueryChange: (value: string) => void
+  searching: boolean
+  results: MediaSummary[]
+  selected: MediaSummary[]
+  onAdd: (item: MediaSummary) => void
+  onRemove: (itemId: string) => void
+  fallbackIcon: React.ReactNode
+  emptyPosterIcon: React.ReactNode
+  theme: Theme
+}) {
+  return (
+    <>
+      <TextField
+        fullWidth
+        size="small"
+        placeholder={searchPlaceholder}
+        value={query}
+        onChange={(e) => onQueryChange(e.target.value)}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon fontSize="small" color="action" />
+            </InputAdornment>
+          ),
+          endAdornment: searching ? (
+            <InputAdornment position="end">
+              <CircularProgress size={16} />
+            </InputAdornment>
+          ) : null,
+        }}
+      />
+
+      {/* Search Results */}
+      {results.length > 0 && (
+        <Box
+          sx={{
+            mt: 1,
+            maxHeight: 180,
+            overflow: 'auto',
+            borderRadius: 1,
+            bgcolor: 'background.default',
+          }}
+        >
+          {results.map((item) => (
+            <Box
+              key={item.id}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                p: 1,
+                cursor: 'pointer',
+                borderRadius: 1,
+                '&:hover': { bgcolor: 'action.hover' },
+              }}
+              onClick={() => onAdd(item)}
+            >
+              <Avatar
+                src={getProxiedImageUrl(item.poster_url)}
+                variant="rounded"
+                sx={{ width: 36, height: 54 }}
+              >
+                {fallbackIcon}
+              </Avatar>
+              <Box flex={1}>
+                <Typography variant="body2" fontWeight={500}>
+                  {item.title}
+                </Typography>
+                {item.year && (
+                  <Typography variant="caption" color="text.secondary">
+                    {item.year}
+                  </Typography>
+                )}
+              </Box>
+              <IconButton size="small" color="primary">
+                <AddIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          ))}
+        </Box>
+      )}
+
+      {/* Selected - Visual Strip */}
+      {selected.length > 0 && (
+        <Box
+          sx={{
+            mt: 2,
+            display: 'flex',
+            gap: 1,
+            overflowX: 'auto',
+            pb: 1,
+            '&::-webkit-scrollbar': { height: 4 },
+            '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
+            '&::-webkit-scrollbar-thumb': {
+              bgcolor: alpha(theme.palette.text.primary, 0.2),
+              borderRadius: 2,
+            },
+          }}
+        >
+          {selected.map((item) => (
+            <Tooltip key={item.id} title={`${item.title}${item.year ? ` (${item.year})` : ''}`}>
+              <Box
+                sx={{
+                  position: 'relative',
+                  flexShrink: 0,
+                  width: 52,
+                  height: 78,
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  '&:hover .remove-btn': { opacity: 1 },
+                }}
+                onClick={() => onRemove(item.id)}
+              >
+                {item.poster_url ? (
+                  <img
+                    src={getProxiedImageUrl(item.poster_url)}
+                    alt={item.title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <Box
+                    sx={{
+                      width: '100%',
+                      height: '100%',
+                      bgcolor: 'action.hover',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {emptyPosterIcon}
+                  </Box>
+                )}
+                <Box
+                  className="remove-btn"
+                  sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    bgcolor: 'rgba(0,0,0,0.6)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: 0,
+                    transition: 'opacity 0.2s',
+                  }}
+                >
+                  <CloseIcon sx={{ color: 'white', fontSize: 20 }} />
+                </Box>
+              </Box>
+            </Tooltip>
+          ))}
+        </Box>
+      )}
+    </>
+  )
+}
+
 interface PlaylistDialogProps {
   open: boolean
   editingChannel: Channel | null
@@ -146,9 +327,25 @@ interface PlaylistDialogProps {
   setSnackbar: React.Dispatch<React.SetStateAction<SnackbarState>>
   onClose: () => void
   onSubmit: () => void
-  onAddExampleMovie: (movie: Movie) => void
+  onAddExampleMovie: (movie: MediaSummary) => void
   onRemoveExampleMovie: (movieId: string) => void
+  onAddExampleSeries: (series: MediaSummary) => void
+  onRemoveExampleSeries: (seriesId: string) => void
   i18nNamespace?: string
+}
+
+/** The three selectable media combinations, mapped to the channel's media_types array. */
+const MEDIA_TYPE_CHOICES: { value: string; mediaTypes: MediaType[] }[] = [
+  { value: 'movie', mediaTypes: ['movie'] },
+  { value: 'series', mediaTypes: ['series'] },
+  { value: 'both', mediaTypes: ['movie', 'series'] },
+]
+
+function mediaChoiceValue(mediaTypes: MediaType[]): string {
+  const wantsMovies = mediaTypes.includes('movie')
+  const wantsSeries = mediaTypes.includes('series')
+  if (wantsMovies && wantsSeries) return 'both'
+  return wantsSeries ? 'series' : 'movie'
 }
 
 export function PlaylistDialog({
@@ -163,67 +360,66 @@ export function PlaylistDialog({
   onSubmit,
   onAddExampleMovie,
   onRemoveExampleMovie,
+  onAddExampleSeries,
+  onRemoveExampleSeries,
   i18nNamespace = 'playlists',
 }: PlaylistDialogProps) {
   const { t } = useTranslation()
   const pt = (key: string, options?: Record<string, unknown>) => t(`${i18nNamespace}.${key}`, options)
   const theme = useTheme()
 
-  // Movie search state
-  const [movieSearch, setMovieSearch] = useState('')
-  const [movieSearchResults, setMovieSearchResults] = useState<Movie[]>([])
-  const [searchingMovies, setSearchingMovies] = useState(false)
+  const showMovies = formData.mediaTypes.includes('movie')
+  const showSeries = formData.mediaTypes.includes('series')
+
+  // Seed search state, one debounced search per media type
+  const {
+    query: movieQuery,
+    setQuery: setMovieQuery,
+    results: movieResults,
+    isSearching: searchingMovies,
+    clear: clearMovieSearch,
+  } = useMediaSearch('movie', { enabled: showMovies })
+  const {
+    query: seriesQuery,
+    setQuery: setSeriesQuery,
+    results: seriesResults,
+    isSearching: searchingSeries,
+    clear: clearSeriesSearch,
+  } = useMediaSearch('series', { enabled: showSeries })
 
   // AI generation state
   const [generatingAIPreferences, setGeneratingAIPreferences] = useState(false)
   const [generatingAIName, setGeneratingAIName] = useState(false)
   const [generatingAIDescription, setGeneratingAIDescription] = useState(false)
 
-  // Debounced movie search
-  const searchMovies = useCallback(async (query: string) => {
-    if (!query || query.length < 2) {
-      setMovieSearchResults([])
-      return
-    }
-
-    setSearchingMovies(true)
-    try {
-      const response = await fetch(`/api/movies?search=${encodeURIComponent(query)}&pageSize=10`, {
-        credentials: 'include',
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setMovieSearchResults(data.movies)
-      }
-    } catch {
-      console.error('Failed to search movies')
-    } finally {
-      setSearchingMovies(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      searchMovies(movieSearch)
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [movieSearch, searchMovies])
-
-  // Reset search when dialog closes
+  // Reset searches when dialog closes
   useEffect(() => {
     if (!open) {
-      setMovieSearch('')
-      setMovieSearchResults([])
+      clearMovieSearch()
+      clearSeriesSearch()
     }
-  }, [open])
+  }, [open, clearMovieSearch, clearSeriesSearch])
 
-  const handleAddMovie = (movie: Movie) => {
+  const handleAddMovie = (movie: MediaSummary) => {
     onAddExampleMovie(movie)
-    setMovieSearch('')
-    setMovieSearchResults([])
+    clearMovieSearch()
   }
 
-  const canGenerate = formData.genreFilters.length > 0 || formData.exampleMovies.length > 0
+  const handleAddSeries = (series: MediaSummary) => {
+    onAddExampleSeries(series)
+    clearSeriesSearch()
+  }
+
+  const handleMediaTypeChange = (value: string | null) => {
+    const choice = MEDIA_TYPE_CHOICES.find((c) => c.value === value)
+    if (!choice) return
+    setFormData({ ...formData, mediaTypes: choice.mediaTypes })
+  }
+
+  const canGenerate =
+    formData.genreFilters.length > 0 ||
+    formData.exampleMovies.length > 0 ||
+    formData.exampleSeries.length > 0
 
   // Generate AI-powered text preferences
   const handleGenerateAIPreferences = async () => {
@@ -245,6 +441,7 @@ export function PlaylistDialog({
         body: JSON.stringify({
           genres: formData.genreFilters,
           exampleMovieIds: formData.exampleMovies.map((m) => m.id),
+          exampleSeriesIds: formData.exampleSeries.map((s) => s.id),
         }),
       })
 
@@ -282,6 +479,7 @@ export function PlaylistDialog({
         body: JSON.stringify({
           genres: formData.genreFilters,
           exampleMovieIds: formData.exampleMovies.map((m) => m.id),
+          exampleSeriesIds: formData.exampleSeries.map((s) => s.id),
           textPreferences: formData.textPreferences || undefined,
         }),
       })
@@ -320,6 +518,7 @@ export function PlaylistDialog({
         body: JSON.stringify({
           genres: formData.genreFilters,
           exampleMovieIds: formData.exampleMovies.map((m) => m.id),
+          exampleSeriesIds: formData.exampleSeries.map((s) => s.id),
           textPreferences: formData.textPreferences || undefined,
           playlistName: formData.name || undefined,
         }),
@@ -437,157 +636,72 @@ export function PlaylistDialog({
           />
         </Section>
 
-        {/* Example Movies Section */}
+        {/* Media Types Section */}
         <Section
-          icon={<MovieIcon fontSize="small" />}
-          title={pt('sectionSeedMovies')}
-          subtitle={pt('sectionSeedMoviesSubtitle')}
+          icon={<TvIcon fontSize="small" />}
+          title={pt('sectionMediaTypes')}
+          subtitle={pt('sectionMediaTypesSubtitle')}
           theme={theme}
         >
-          {/* Movie Search */}
-          <TextField
-            fullWidth
+          <ToggleButtonGroup
+            exclusive
             size="small"
-            placeholder={pt('searchMoviesPlaceholder')}
-            value={movieSearch}
-            onChange={(e) => setMovieSearch(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" color="action" />
-                </InputAdornment>
-              ),
-              endAdornment: searchingMovies ? (
-                <InputAdornment position="end">
-                  <CircularProgress size={16} />
-                </InputAdornment>
-              ) : null,
-            }}
-          />
-
-          {/* Search Results */}
-          {movieSearchResults.length > 0 && (
-            <Box
-              sx={{
-                mt: 1,
-                maxHeight: 180,
-                overflow: 'auto',
-                borderRadius: 1,
-                bgcolor: 'background.default',
-              }}
-            >
-              {movieSearchResults.map((movie) => (
-                <Box
-                  key={movie.id}
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1.5,
-                    p: 1,
-                    cursor: 'pointer',
-                    borderRadius: 1,
-                    '&:hover': { bgcolor: 'action.hover' },
-                  }}
-                  onClick={() => handleAddMovie(movie)}
-                >
-                  <Avatar
-                    src={getProxiedImageUrl(movie.poster_url)}
-                    variant="rounded"
-                    sx={{ width: 36, height: 54 }}
-                  >
-                    <MovieIcon fontSize="small" />
-                  </Avatar>
-                  <Box flex={1}>
-                    <Typography variant="body2" fontWeight={500}>
-                      {movie.title}
-                    </Typography>
-                    {movie.year && (
-                      <Typography variant="caption" color="text.secondary">
-                        {movie.year}
-                      </Typography>
-                    )}
-                  </Box>
-                  <IconButton size="small" color="primary">
-                    <AddIcon fontSize="small" />
-                  </IconButton>
-                </Box>
-              ))}
-            </Box>
-          )}
-
-          {/* Selected Movies - Visual Strip */}
-          {formData.exampleMovies.length > 0 && (
-            <Box
-              sx={{
-                mt: 2,
-                display: 'flex',
-                gap: 1,
-                overflowX: 'auto',
-                pb: 1,
-                '&::-webkit-scrollbar': { height: 4 },
-                '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
-                '&::-webkit-scrollbar-thumb': {
-                  bgcolor: alpha(theme.palette.text.primary, 0.2),
-                  borderRadius: 2,
-                },
-              }}
-            >
-              {formData.exampleMovies.map((movie) => (
-                <Tooltip key={movie.id} title={`${movie.title}${movie.year ? ` (${movie.year})` : ''}`}>
-                  <Box
-                    sx={{
-                      position: 'relative',
-                      flexShrink: 0,
-                      width: 52,
-                      height: 78,
-                      borderRadius: 1,
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      '&:hover .remove-btn': { opacity: 1 },
-                    }}
-                    onClick={() => onRemoveExampleMovie(movie.id)}
-                  >
-                    {movie.poster_url ? (
-                      <img
-                        src={getProxiedImageUrl(movie.poster_url)}
-                        alt={movie.title}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <Box
-                        sx={{
-                          width: '100%',
-                          height: '100%',
-                          bgcolor: 'action.hover',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <MovieIcon sx={{ color: 'text.disabled' }} />
-                      </Box>
-                    )}
-                    <Box
-                      className="remove-btn"
-                      sx={{
-                        position: 'absolute',
-                        inset: 0,
-                        bgcolor: 'rgba(0,0,0,0.6)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        opacity: 0,
-                        transition: 'opacity 0.2s',
-                      }}
-                    >
-                      <CloseIcon sx={{ color: 'white', fontSize: 20 }} />
-                    </Box>
-                  </Box>
-                </Tooltip>
-              ))}
-            </Box>
-          )}
+            value={mediaChoiceValue(formData.mediaTypes)}
+            onChange={(_, value) => handleMediaTypeChange(value)}
+          >
+            <ToggleButton value="movie">{pt('mediaTypeMovies')}</ToggleButton>
+            <ToggleButton value="series">{pt('mediaTypeSeries')}</ToggleButton>
+            <ToggleButton value="both">{pt('mediaTypeBoth')}</ToggleButton>
+          </ToggleButtonGroup>
         </Section>
+
+        {/* Example Movies Section */}
+        {showMovies && (
+          <Section
+            icon={<MovieIcon fontSize="small" />}
+            title={pt('sectionSeedMovies')}
+            subtitle={pt('sectionSeedMoviesSubtitle')}
+            theme={theme}
+          >
+            <SeedPicker
+              searchPlaceholder={pt('searchMoviesPlaceholder')}
+              query={movieQuery}
+              onQueryChange={setMovieQuery}
+              searching={searchingMovies}
+              results={movieResults}
+              selected={formData.exampleMovies}
+              onAdd={handleAddMovie}
+              onRemove={onRemoveExampleMovie}
+              fallbackIcon={<MovieIcon fontSize="small" />}
+              emptyPosterIcon={<MovieIcon sx={{ color: 'text.disabled' }} />}
+              theme={theme}
+            />
+          </Section>
+        )}
+
+        {/* Example Series Section */}
+        {showSeries && (
+          <Section
+            icon={<TvIcon fontSize="small" />}
+            title={pt('sectionSeedSeries')}
+            subtitle={pt('sectionSeedSeriesSubtitle')}
+            theme={theme}
+          >
+            <SeedPicker
+              searchPlaceholder={pt('searchSeriesPlaceholder')}
+              query={seriesQuery}
+              onQueryChange={setSeriesQuery}
+              searching={searchingSeries}
+              results={seriesResults}
+              selected={formData.exampleSeries}
+              onAdd={handleAddSeries}
+              onRemove={onRemoveExampleSeries}
+              fallbackIcon={<TvIcon fontSize="small" />}
+              emptyPosterIcon={<TvIcon sx={{ color: 'text.disabled' }} />}
+              theme={theme}
+            />
+          </Section>
+        )}
 
         {/* Text Preferences Section */}
         <Section

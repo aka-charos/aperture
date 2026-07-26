@@ -7,6 +7,7 @@ import { resolveEffectiveAiLanguage } from '../lib/userSettings.js'
 import {
   fetchMoviesBasicByIds,
   fetchMoviesFullByIds,
+  fetchSeriesWithOverviewByIds,
   generatePlaylistText,
 } from '../lib/ai-playlist-generation.js'
 
@@ -15,7 +16,8 @@ const logger = createChildLogger('channels')
 async function buildPlaylistContext(
   genres: string[],
   exampleMovieIds: string[],
-  textPreferences?: string
+  textPreferences?: string,
+  exampleSeriesIds: string[] = []
 ): Promise<string> {
   const contextParts: string[] = []
 
@@ -31,6 +33,14 @@ async function buildPlaylistContext(
     contextParts.push(`EXAMPLE MOVIES: ${movieList}`)
   }
 
+  if (exampleSeriesIds.length > 0) {
+    const series = await fetchSeriesWithOverviewByIds(exampleSeriesIds)
+    const seriesList = series
+      .map((s) => `"${s.title}" (${s.year || 'N/A'})`)
+      .join(', ')
+    contextParts.push(`EXAMPLE TV SERIES: ${seriesList}`)
+  }
+
   if (textPreferences) {
     contextParts.push(`PREFERENCES: ${textPreferences}`)
   }
@@ -41,9 +51,18 @@ async function buildPlaylistContext(
 export async function generateAIPreferences(
   userId: string,
   genres: string[],
-  exampleMovieIds: string[]
+  exampleMovieIds: string[],
+  exampleSeriesIds: string[] = []
 ): Promise<string> {
-  logger.info({ userId, genres, exampleMovieCount: exampleMovieIds.length }, 'Generating AI preferences')
+  logger.info(
+    {
+      userId,
+      genres,
+      exampleMovieCount: exampleMovieIds.length,
+      exampleSeriesCount: exampleSeriesIds.length,
+    },
+    'Generating AI preferences'
+  )
 
   const tasteProfile = await queryOne<{ taste_synopsis: string | null }>(
     'SELECT taste_synopsis FROM user_preferences WHERE user_id = $1',
@@ -51,6 +70,7 @@ export async function generateAIPreferences(
   )
 
   const exampleMovies = await fetchMoviesFullByIds(exampleMovieIds)
+  const exampleSeries = await fetchSeriesWithOverviewByIds(exampleSeriesIds)
 
   const contextParts: string[] = []
 
@@ -69,8 +89,15 @@ export async function generateAIPreferences(
     contextParts.push(`EXAMPLE MOVIES (defining the playlist's style):\n${movieList}`)
   }
 
+  if (exampleSeries.length > 0) {
+    const seriesList = exampleSeries
+      .map((s) => `- "${s.title}" (${s.year || 'N/A'}) - ${s.genres?.join(', ') || 'Unknown genres'}`)
+      .join('\n')
+    contextParts.push(`EXAMPLE TV SERIES (defining the playlist's style):\n${seriesList}`)
+  }
+
   if (contextParts.length === 0) {
-    return 'Please select some genres or example movies to help generate preferences.'
+    return 'Please select some genres or example titles to help generate preferences.'
   }
 
   try {
@@ -113,11 +140,20 @@ export async function generateAIPlaylistName(
   genres: string[],
   exampleMovieIds: string[],
   textPreferences?: string,
-  userId?: string
+  userId?: string,
+  exampleSeriesIds: string[] = []
 ): Promise<string> {
-  logger.info({ genres, exampleMovieCount: exampleMovieIds.length }, 'Generating AI playlist name')
+  logger.info(
+    { genres, exampleMovieCount: exampleMovieIds.length, exampleSeriesCount: exampleSeriesIds.length },
+    'Generating AI playlist name'
+  )
 
-  const context = await buildPlaylistContext(genres, exampleMovieIds, textPreferences)
+  const context = await buildPlaylistContext(
+    genres,
+    exampleMovieIds,
+    textPreferences,
+    exampleSeriesIds
+  )
 
   if (!context) {
     return 'My Playlist'
@@ -141,11 +177,25 @@ export async function generateAIPlaylistDescription(
   exampleMovieIds: string[],
   textPreferences?: string,
   playlistName?: string,
-  userId?: string
+  userId?: string,
+  exampleSeriesIds: string[] = []
 ): Promise<string> {
-  logger.info({ genres, exampleMovieCount: exampleMovieIds.length, playlistName }, 'Generating AI playlist description')
+  logger.info(
+    {
+      genres,
+      exampleMovieCount: exampleMovieIds.length,
+      exampleSeriesCount: exampleSeriesIds.length,
+      playlistName,
+    },
+    'Generating AI playlist description'
+  )
 
-  const context = await buildPlaylistContext(genres, exampleMovieIds, textPreferences)
+  const context = await buildPlaylistContext(
+    genres,
+    exampleMovieIds,
+    textPreferences,
+    exampleSeriesIds
+  )
 
   if (!context) {
     return 'A curated collection of movies.'

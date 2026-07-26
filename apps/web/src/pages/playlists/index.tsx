@@ -64,6 +64,8 @@ export function PlaylistsPage() {
     handleGeneratePlaylist,
     addExampleMovie,
     removeExampleMovie,
+    addExampleSeries,
+    removeExampleSeries,
     handleViewPlaylist,
     handleClosePlaylistDialog,
     handleRemoveFromPlaylist,
@@ -168,6 +170,8 @@ export function PlaylistsPage() {
         onSubmit={handleSubmit}
         onAddExampleMovie={addExampleMovie}
         onRemoveExampleMovie={removeExampleMovie}
+        onAddExampleSeries={addExampleSeries}
+        onRemoveExampleSeries={removeExampleSeries}
       />
 
       {/* Playlist View/Edit Dialog */}

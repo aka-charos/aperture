@@ -1,5 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { Channel, Movie, PlaylistItem, FormData, SnackbarState, GraphPlaylist, GraphPlaylistItem } from '../types'
+import type {
+  Channel,
+  MediaSummary,
+  MediaType,
+  Movie,
+  PlaylistItem,
+  FormData,
+  SnackbarState,
+  GraphPlaylist,
+  GraphPlaylistItem,
+} from '../types'
 
 const initialFormData: FormData = {
   name: '',
@@ -7,6 +17,8 @@ const initialFormData: FormData = {
   genreFilters: [],
   textPreferences: '',
   exampleMovies: [],
+  exampleSeries: [],
+  mediaTypes: ['movie'],
 }
 
 export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playlist') {
@@ -106,40 +118,52 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
     }
   }, [fetchChannels, fetchGraphPlaylists, outputType])
 
-  const fetchExampleMovies = async (movieIds: string[]): Promise<Movie[]> => {
-    if (movieIds.length === 0) return []
+  // Seed details are fetched one id at a time because /api/movies and /api/series only expose
+  // single-item detail routes; the lists are short (a handful of seeds per channel).
+  const fetchSeedDetails = async (
+    ids: string[],
+    kind: MediaType
+  ): Promise<MediaSummary[]> => {
+    if (ids.length === 0) return []
 
-    const movies: Movie[] = []
-    for (const id of movieIds) {
+    const basePath = kind === 'series' ? '/api/series' : '/api/movies'
+    const items: MediaSummary[] = []
+    for (const id of ids) {
       try {
-        const response = await fetch(`/api/movies/${id}`, { credentials: 'include' })
+        const response = await fetch(`${basePath}/${id}`, { credentials: 'include' })
         if (response.ok) {
-          const movie = await response.json()
-          movies.push({
-            id: movie.id,
-            title: movie.title,
-            year: movie.year,
-            poster_url: movie.poster_url,
+          const item = await response.json()
+          items.push({
+            id: item.id,
+            title: item.title,
+            year: item.year,
+            poster_url: item.poster_url,
           })
         }
       } catch {
-        // Skip failed movie fetches
+        // Skip failed seed fetches
       }
     }
-    return movies
+    return items
   }
 
   const handleOpenDialog = async (channel?: Channel) => {
     if (channel) {
       setEditingChannel(channel)
-      // Fetch example movie details
-      const exampleMovies = await fetchExampleMovies(channel.example_movie_ids || [])
+      // Fetch seed details for both media types
+      const [exampleMovies, exampleSeries] = await Promise.all([
+        fetchSeedDetails(channel.example_movie_ids || [], 'movie'),
+        fetchSeedDetails(channel.example_series_ids || [], 'series'),
+      ])
       setFormData({
         name: channel.name,
         description: channel.description || '',
         genreFilters: channel.genre_filters || [],
         textPreferences: channel.text_preferences || '',
         exampleMovies,
+        exampleSeries,
+        // Channels created before series support have no media_types; they are movie-only.
+        mediaTypes: channel.media_types?.length ? channel.media_types : ['movie'],
       })
     } else {
       setEditingChannel(null)
@@ -161,6 +185,8 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
       genreFilters: formData.genreFilters,
       textPreferences: formData.textPreferences || undefined,
       exampleMovieIds: formData.exampleMovies.map((m) => m.id),
+      exampleSeriesIds: formData.exampleSeries.map((s) => s.id),
+      mediaTypes: formData.mediaTypes,
       // Honoured by POST (create); ignored by PUT (output type is immutable after creation).
       outputType,
     }
@@ -256,7 +282,7 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
         fetchChannels()
         setSnackbar({
           open: true,
-          message: `${noun} created with ${data.itemCount} movies`,
+          message: `${noun} created with ${data.itemCount} items`,
           severity: 'success',
         })
       } else {
@@ -269,7 +295,7 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
     }
   }
 
-  const addExampleMovie = (movie: Movie) => {
+  const addExampleMovie = (movie: MediaSummary) => {
     if (!formData.exampleMovies.find((m) => m.id === movie.id)) {
       setFormData({
         ...formData,
@@ -282,6 +308,22 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
     setFormData({
       ...formData,
       exampleMovies: formData.exampleMovies.filter((m) => m.id !== movieId),
+    })
+  }
+
+  const addExampleSeries = (series: MediaSummary) => {
+    if (!formData.exampleSeries.find((s) => s.id === series.id)) {
+      setFormData({
+        ...formData,
+        exampleSeries: [...formData.exampleSeries, series],
+      })
+    }
+  }
+
+  const removeExampleSeries = (seriesId: string) => {
+    setFormData({
+      ...formData,
+      exampleSeries: formData.exampleSeries.filter((s) => s.id !== seriesId),
     })
   }
 
@@ -323,12 +365,12 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
 
       if (response.ok) {
         setPlaylistItems(playlistItems.filter((item) => item.playlistItemId !== entryId))
-        setSnackbar({ open: true, message: `Movie removed from ${noun.toLowerCase()}`, severity: 'success' })
+        setSnackbar({ open: true, message: `Item removed from ${noun.toLowerCase()}`, severity: 'success' })
       } else {
-        setSnackbar({ open: true, message: 'Failed to remove movie', severity: 'error' })
+        setSnackbar({ open: true, message: 'Failed to remove item', severity: 'error' })
       }
     } catch {
-      setSnackbar({ open: true, message: 'Failed to remove movie', severity: 'error' })
+      setSnackbar({ open: true, message: 'Failed to remove item', severity: 'error' })
     } finally {
       setRemovingItemId(null)
     }
@@ -438,6 +480,8 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
     handleGeneratePlaylist,
     addExampleMovie,
     removeExampleMovie,
+    addExampleSeries,
+    removeExampleSeries,
     handleViewPlaylist,
     handleClosePlaylistDialog,
     handleRemoveFromPlaylist,

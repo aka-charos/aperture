@@ -15,19 +15,21 @@ export function registerAiHandlers(fastify: FastifyInstance) {
     Body: {
       genres: string[]
       exampleMovieIds: string[]
+      exampleSeriesIds?: string[]
     }
   }>(
     '/api/channels/ai-preferences',
     { preHandler: requireAuth, schema: { tags: ["playlists"] } },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
-      const { genres, exampleMovieIds } = request.body
+      const { genres, exampleMovieIds, exampleSeriesIds } = request.body
 
       try {
         const preferences = await generateAIPreferences(
           currentUser.id,
           genres || [],
-          exampleMovieIds || []
+          exampleMovieIds || [],
+          exampleSeriesIds || []
         )
 
         return reply.send({ preferences })
@@ -46,6 +48,7 @@ export function registerAiHandlers(fastify: FastifyInstance) {
     Body: {
       genres: string[]
       exampleMovieIds: string[]
+      exampleSeriesIds?: string[]
       textPreferences?: string
     }
   }>(
@@ -53,14 +56,15 @@ export function registerAiHandlers(fastify: FastifyInstance) {
     { preHandler: requireAuth, schema: { tags: ["playlists"] } },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
-      const { genres, exampleMovieIds, textPreferences } = request.body
+      const { genres, exampleMovieIds, exampleSeriesIds, textPreferences } = request.body
 
       try {
         const name = await generateAIPlaylistName(
           genres || [],
           exampleMovieIds || [],
           textPreferences,
-          currentUser.id
+          currentUser.id,
+          exampleSeriesIds || []
         )
 
         return reply.send({ name })
@@ -79,6 +83,7 @@ export function registerAiHandlers(fastify: FastifyInstance) {
     Body: {
       genres: string[]
       exampleMovieIds: string[]
+      exampleSeriesIds?: string[]
       textPreferences?: string
       playlistName?: string
     }
@@ -87,7 +92,7 @@ export function registerAiHandlers(fastify: FastifyInstance) {
     { preHandler: requireAuth, schema: { tags: ["playlists"] } },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
-      const { genres, exampleMovieIds, textPreferences, playlistName } = request.body
+      const { genres, exampleMovieIds, exampleSeriesIds, textPreferences, playlistName } = request.body
 
       try {
         const description = await generateAIPlaylistDescription(
@@ -95,7 +100,8 @@ export function registerAiHandlers(fastify: FastifyInstance) {
           exampleMovieIds || [],
           textPreferences,
           playlistName,
-          currentUser.id
+          currentUser.id,
+          exampleSeriesIds || []
         )
 
         return reply.send({ description })
