@@ -36,6 +36,38 @@ import { ToolResultError } from './ToolResultError'
 import { useUnwatchedOnly, setUnwatchedOnly } from './unwatchedPreference'
 import { useStatusPhase, setStatusPhase } from './assistantStatus'
 
+/**
+ * Below this thread width the avatar rail is dropped.
+ *
+ * A 36px avatar plus its 12px gap takes 48px out of every row. On a 390px phone
+ * that is a quarter of the line: the card inside it is left with a ~184px prose
+ * column, under 30 characters, and the same 48px is charged again to the card's
+ * own poster rail. Nothing depends on the avatars to tell the two speakers
+ * apart — user messages are right-aligned indigo bubbles.
+ *
+ * Written as a container query rather than a breakpoint because this is not a
+ * phone problem: a 400px dock on a 1920px screen is exactly as narrow, and only
+ * the container knows how much room the thread actually got.
+ */
+const NARROW_THREAD = '@container assistantThread (max-width: 480px)'
+
+/** Shared avatar geometry; the rail collapses on narrow surfaces. */
+const avatarSx = {
+  width: 36,
+  height: 36,
+  flexShrink: 0,
+  [NARROW_THREAD]: { display: 'none' },
+}
+
+/**
+ * Bubbles cap their width so a wide panel doesn't hand the reader 200-character
+ * lines. On a narrow one that cap is pure loss, so it lifts.
+ */
+const bubbleSx = (cap: string) => ({
+  maxWidth: cap,
+  [NARROW_THREAD]: { maxWidth: '100%' },
+})
+
 // Custom link renderer for markdown (needs hooks for i18n)
 function MarkdownLink({ href, children }: { href?: string; children?: ReactNode }) {
   const { t } = useTranslation()
@@ -153,7 +185,7 @@ function UserMessage() {
       <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'flex-end', py: 1.5 }}>
         <Paper
           sx={{
-            maxWidth: '80%',
+            ...bubbleSx('80%'),
             p: 2,
             bgcolor: '#6366f1',
             borderRadius: 2,
@@ -164,7 +196,7 @@ function UserMessage() {
             <MessagePrimitive.Content />
           </Typography>
         </Paper>
-        <Avatar sx={{ bgcolor: '#3a3a3a', width: 36, height: 36 }}>
+        <Avatar sx={{ ...avatarSx, bgcolor: '#3a3a3a' }}>
           <PersonIcon fontSize="small" />
         </Avatar>
       </Box>
@@ -208,7 +240,7 @@ function AssistantMessageError() {
         bgcolor: 'rgba(26, 26, 26, 0.7)',
         borderRadius: 2,
         my: 1,
-        maxWidth: '90%',
+        ...bubbleSx('90%'),
         borderInlineStart: '3px solid',
         borderColor: 'error.main',
       }}
@@ -286,10 +318,8 @@ function AssistantMessage() {
       >
         <Avatar
           sx={{
-            width: 36,
-            height: 36,
+            ...avatarSx,
             background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-            flexShrink: 0,
           }}
         >
           <SmartToyIcon fontSize="small" />
@@ -303,7 +333,7 @@ function AssistantMessage() {
                 return (
                   <Paper
                     sx={{
-                      maxWidth: '90%',
+                      ...bubbleSx('90%'),
                       p: 2,
                       bgcolor: 'rgba(26, 26, 26, 0.7)',
                       borderRadius: 2,
@@ -489,8 +519,7 @@ function LoadingIndicator() {
     <Box sx={{ display: 'flex', gap: 1.5, py: 1.5 }}>
       <Avatar
         sx={{
-          width: 36,
-          height: 36,
+          ...avatarSx,
           background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
         }}
       >
@@ -498,7 +527,7 @@ function LoadingIndicator() {
       </Avatar>
       <Paper
         sx={{
-          maxWidth: '80%',
+          ...bubbleSx('80%'),
           p: 2,
           bgcolor: 'rgba(26, 26, 26, 0.7)',
           borderRadius: 2,
@@ -649,7 +678,7 @@ function HistoricalUserMessage({ message }: { message: HistoricalMessage }) {
     <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'flex-end', py: 1.5 }}>
       <Paper
         sx={{
-          maxWidth: '80%',
+          ...bubbleSx('80%'),
           p: 2,
           bgcolor: '#6366f1',
           borderRadius: 2,
@@ -660,7 +689,7 @@ function HistoricalUserMessage({ message }: { message: HistoricalMessage }) {
           {message.content}
         </Typography>
       </Paper>
-      <Avatar sx={{ bgcolor: '#3a3a3a', width: 36, height: 36 }}>
+      <Avatar sx={{ ...avatarSx, bgcolor: '#3a3a3a' }}>
         <PersonIcon fontSize="small" />
       </Avatar>
     </Box>
@@ -673,10 +702,8 @@ function HistoricalAssistantMessage({ message }: { message: HistoricalMessage })
     <Box sx={{ display: 'flex', gap: 1.5, py: 1.5 }}>
       <Avatar
         sx={{
-          width: 36,
-          height: 36,
+          ...avatarSx,
           background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-          flexShrink: 0,
         }}
       >
         <SmartToyIcon fontSize="small" />
@@ -686,7 +713,7 @@ function HistoricalAssistantMessage({ message }: { message: HistoricalMessage })
         {message.content && (
           <Paper
             sx={{
-              maxWidth: '90%',
+              ...bubbleSx('90%'),
               p: 2,
               bgcolor: 'rgba(26, 26, 26, 0.7)',
               borderRadius: 2,
@@ -748,6 +775,11 @@ export function Thread({ historicalMessages = [], suggestions = [] }: ThreadProp
           flexDirection: 'column',
           gap: 8,
           minWidth: 0,
+          // Query target for NARROW_THREAD. The thread is squeezed by things the
+          // viewport knows nothing about — the dock's width, a dialog on a phone
+          // — so its own box is the only honest source for "how narrow are we".
+          containerName: 'assistantThread',
+          containerType: 'inline-size',
         }}
       >
         {/* Show welcome only if no historical messages */}
