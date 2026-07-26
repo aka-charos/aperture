@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Box,
   Dialog,
@@ -14,8 +14,7 @@ import {
 } from '@mui/material'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import CloseIcon from '@mui/icons-material/Close'
-import FullscreenIcon from '@mui/icons-material/Fullscreen'
-import FullscreenExitIcon from '@mui/icons-material/FullscreenExit'
+import OpenInFullIcon from '@mui/icons-material/OpenInFull'
 import VerticalSplitIcon from '@mui/icons-material/VerticalSplit'
 import WebAssetIcon from '@mui/icons-material/WebAsset'
 import { AssistantChatSurface } from './assistant/AssistantChatSurface'
@@ -50,23 +49,28 @@ function loadStoredDockWidth(): number {
 }
 
 /**
- * Floating assistant: Fab + dialog / dockable side panel. The same chat is
- * also available as a regular page at /assistant (see pages/assistant).
+ * Floating assistant: the Fab opens the dock (a side panel that leaves the
+ * library usable), or the older dialog for anyone who toggles to it. The same
+ * chat is also a regular page at /assistant (see pages/assistant), which the
+ * header's expand button hands off to.
  */
 export function AssistantModal() {
   const { t } = useTranslation()
   const theme = useTheme()
   const location = useLocation()
+  const navigate = useNavigate()
   // Phones get a forced-fullscreen dialog; the dock needs room next to the library.
   const isSmDown = useMediaQuery(theme.breakpoints.down('sm'))
   const canDock = useMediaQuery(theme.breakpoints.up('md'))
   const [open, setOpen] = useState(false)
-  const [fullscreen, setFullscreen] = useState(false)
   const [surface, setSurface] = useState<AssistantSurface>(() => {
     try {
-      return localStorage.getItem(SURFACE_STORAGE_KEY) === 'dock' ? 'dock' : 'modal'
+      // The dock is the default: it leaves the library browsable beside the chat
+      // and can open picks in the main pane. The dialog is opt-in, and only for
+      // people who stored that preference by toggling.
+      return localStorage.getItem(SURFACE_STORAGE_KEY) === 'modal' ? 'modal' : 'dock'
     } catch {
-      return 'modal'
+      return 'dock'
     }
   })
 
@@ -80,10 +84,6 @@ export function AssistantModal() {
   const chat = useAssistantChat(open)
 
   const docked = surface === 'dock' && canDock
-  const effectiveFullscreen = fullscreen || isSmDown
-  // The conversation sidebar renders inline only in desktop fullscreen; every
-  // other surface (dock, windowed dialog, mobile) reaches it via the drawer.
-  const sidebarInline = !docked && fullscreen && !isSmDown
 
   // User-resizable dock width, persisted across sessions.
   const [dockWidth, setLocalDockWidth] = useState(loadStoredDockWidth)
@@ -149,7 +149,18 @@ export function AssistantModal() {
     setOpen(true)
   }
   const handleClose = () => setOpen(false)
-  const toggleFullscreen = () => setFullscreen(prev => !prev)
+
+  // Supersedes the old fullscreen dialog: the same chat filling the viewport,
+  // but with a URL, the app around it, and no backdrop to dismiss. The current
+  // conversation rides along in the route state, so the page resumes it instead
+  // of falling back to "most recently updated" — only sometimes the same thing.
+  const handleOpenFullPage = () => {
+    setOpen(false)
+    navigate(
+      '/assistant',
+      chat.activeConversationId ? { state: { conversationId: chat.activeConversationId } } : undefined
+    )
+  }
 
   const toggleSurface = () => {
     setSurface(prev => {
@@ -175,13 +186,11 @@ export function AssistantModal() {
           </IconButton>
         </Tooltip>
       )}
-      {!docked && !isSmDown && (
-        <Tooltip title={fullscreen ? t('assistant.tooltipExitFullscreen') : t('assistant.tooltipFullscreen')}>
-          <IconButton onClick={toggleFullscreen} size="small">
-            {fullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-          </IconButton>
-        </Tooltip>
-      )}
+      <Tooltip title={t('assistant.tooltipOpenFullPage')}>
+        <IconButton onClick={handleOpenFullPage} size="small">
+          <OpenInFullIcon />
+        </IconButton>
+      </Tooltip>
       <IconButton onClick={handleClose} size="small">
         <CloseIcon />
       </IconButton>
@@ -193,7 +202,10 @@ export function AssistantModal() {
   const chatSurface = (
     <AssistantChatSurface
       chat={chat}
-      sidebarInline={sidebarInline}
+      // Neither floating surface is wide enough to give up 280px to the
+      // conversation list; both reach it through the history toggle. The
+      // dedicated page is the one that shows it inline.
+      sidebarInline={false}
       headerActions={headerActions}
       onBeforeNavigate={handleClose}
       // Docked, the library is right there: clicking a pick routes the main pane
@@ -233,15 +245,15 @@ export function AssistantModal() {
         onClose={handleClose}
         maxWidth="lg"
         fullWidth
-        fullScreen={effectiveFullscreen}
+        fullScreen={isSmDown}
         PaperProps={{
           sx: {
-            height: effectiveFullscreen ? '100%' : '95vh',
-            maxHeight: effectiveFullscreen ? '100%' : '90vh',
+            height: isSmDown ? '100%' : '95vh',
+            maxHeight: isSmDown ? '100%' : '90vh',
             bgcolor: 'rgba(15, 15, 15, 0.5)',
             backdropFilter: 'blur(10px)',
             backgroundImage: 'none',
-            borderRadius: effectiveFullscreen ? 0 : 3,
+            borderRadius: isSmDown ? 0 : 3,
             overflow: 'hidden',
             border: '1px solid rgba(255, 255, 255, 0.1)',
           },
