@@ -82,9 +82,14 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
           ),
       })),
       execute: async ({ seedTitle }) => {
+        // This one tool call runs nine sequential stages, several of them slow, so
+        // it reports its own sub-phases — the per-tool status wrapper only ever
+        // sees "entering findCandidatesInLibrary".
+        const onStatus = ctx.onStatus
+        onStatus?.('discoveryScouting')
         // Gathered here (not before the stream) so the assistant's opening line
         // streams first and this slow web work runs behind the card skeletons.
-        const gathered = await gatherWebCandidates(queryText)
+        const gathered = await gatherWebCandidates(queryText, onStatus)
 
         // "movies like X" must never recommend X back. Web sources list the seed
         // itself routinely (sometimes with a wrong year, so match on title only).
@@ -101,6 +106,7 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
           },
           'Discovery candidates gathered'
         )
+        onStatus?.('discoveryMatching')
         const resolved = await resolveCandidates(candidates, ctx)
         const { notInLibrary } = resolved
 
@@ -115,6 +121,7 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
         // against the web picks so nothing appears twice. Only when a title was given.
         let alsoItems: ContentItem[] = []
         if (seedTitle?.trim()) {
+          onStatus?.('discoveryRelated')
           try {
             const webIds = new Set(webItems.map((i) => i.id))
             const sim = await findSimilarItems(ctx, seedTitle.trim(), {
@@ -132,6 +139,7 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
         // no rationale of their own, which is why "Also worth checking" used to show
         // bare cards next to fully-explained ones. Order/length are preserved, so the
         // two lists split back out cleanly. Fails open to the original notes.
+        onStatus?.('discoveryReasons')
         const enriched = await enrichCardReasons([...webItems, ...alsoItems], queryText)
         const webCards = enriched.slice(0, webItems.length)
         const alsoCards = enriched.slice(webItems.length)
@@ -155,6 +163,7 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
             reason: enrichedByTitle.get(normalizeTitleKey(c.title)) ?? c.reason,
           }))
 
+        onStatus?.('discoveryAssembling')
         const carousels: ContentCarousel[] = []
         if (webCards.length > 0) {
           // Web picks carry a per-title reason + synopsis → render as the rich

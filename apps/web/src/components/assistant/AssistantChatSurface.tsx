@@ -27,6 +27,7 @@ import { AssistantRuntimeProvider, useThreadRuntime } from '@assistant-ui/react'
 import { useChatRuntime, AssistantChatTransport } from '@assistant-ui/react-ai-sdk'
 import { Thread } from './Thread'
 import { getUnwatchedOnly } from './unwatchedPreference'
+import { setStatusPhase } from './assistantStatus'
 import { AICapabilityBanner } from '../AICapabilityBanner'
 import type { AssistantChatState, BackendMessage } from './useAssistantChat'
 
@@ -70,7 +71,25 @@ function ChatThreadArea({
   // Instead, we'll pass historical messages directly to Thread for manual rendering
   const runtime = useChatRuntime({
     transport: transport.current,
+    // The server reports its work phase as transient `data-status` parts so the
+    // loading line can say what's happening instead of just "Thinking…". They
+    // have to be caught here: assistant-ui renders `data-*` parts as null, so
+    // they never reach a message component. Forwarded to a module store that
+    // Thread's LoadingIndicator subscribes to.
+    onData: (part) => {
+      if (part.type !== 'data-status') return
+      const data = part.data
+      const phase = isRecord(data) && typeof data.phase === 'string' ? data.phase : null
+      setStatusPhase(phase)
+    },
   })
+
+  // This component is keyed by conversationId, so this also clears the phase when
+  // the user switches conversations mid-turn.
+  useEffect(() => {
+    setStatusPhase(null)
+    return () => setStatusPhase(null)
+  }, [])
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>

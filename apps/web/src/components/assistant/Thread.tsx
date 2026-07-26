@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Box, Paper, Typography, Avatar, CircularProgress, TextField, IconButton, Button, Tooltip, Checkbox, FormControlLabel } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import SendIcon from '@mui/icons-material/Send'
@@ -34,6 +34,7 @@ import {
 } from './tool-ui'
 import { ToolResultError } from './ToolResultError'
 import { useUnwatchedOnly, setUnwatchedOnly } from './unwatchedPreference'
+import { useStatusPhase, setStatusPhase } from './assistantStatus'
 
 // Custom link renderer for markdown (needs hooks for i18n)
 function MarkdownLink({ href, children }: { href?: string; children?: ReactNode }) {
@@ -450,9 +451,40 @@ function ThreadWelcome({ suggestions }: { suggestions: string[] }) {
   )
 }
 
-// Loading indicator
+/**
+ * How long one phase may sit before the line falls back to a neutral "Still
+ * working…". The server's phases are real signals, but a few are genuinely long
+ * (candidate gathering backs off on a provider rate limit), and a line that
+ * hasn't moved in this long reads as a hang.
+ */
+const PHASE_STALL_MS = 12_000
+
+// Loading indicator — shows the server's current work phase, or "Thinking…"
 function LoadingIndicator() {
   const { t } = useTranslation()
+  const phase = useStatusPhase()
+  const [stalled, setStalled] = useState(false)
+
+  // Restart the stall clock whenever the phase advances.
+  useEffect(() => {
+    setStalled(false)
+    const timer = setTimeout(() => setStalled(true), PHASE_STALL_MS)
+    return () => clearTimeout(timer)
+  }, [phase])
+
+  // This component is mounted only while the thread is running, so unmounting is
+  // the end of the turn — drop the phase so the next one opens on "Thinking…"
+  // rather than the previous answer's last step.
+  useEffect(() => () => setStatusPhase(null), [])
+
+  // defaultValue: a phase the server has added but this locale hasn't picked up
+  // yet degrades to "Thinking…" instead of rendering a raw key.
+  const label = stalled
+    ? t('assistant.status.stillWorking')
+    : phase
+      ? t(`assistant.status.${phase}`, { defaultValue: t('assistant.thinking') })
+      : t('assistant.thinking')
+
   return (
     <Box sx={{ display: 'flex', gap: 1.5, py: 1.5 }}>
       <Avatar
@@ -475,7 +507,7 @@ function LoadingIndicator() {
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary' }}>
           <CircularProgress size={16} />
-          <Typography variant="body2">{t('assistant.thinking')}</Typography>
+          <Typography variant="body2">{label}</Typography>
         </Box>
       </Paper>
     </Box>
