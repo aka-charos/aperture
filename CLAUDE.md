@@ -103,6 +103,7 @@ Embedding tables are shared consumers: recommender, `/api/similarity` graph, sem
 - Hooks pattern: `XProvider.tsx` + `x-context.ts` + `useX.ts` triplets in `src/hooks/`.
 - **New UI string**: add to `src/i18n/locales/en/translation.json` (en is source of truth), use `t('ns.key')`, then `pnpm i18n:sync` to stamp placeholders into the other 14 locales. RTL locales: ar, he — use logical CSS properties. Server error strings: wrap with `lib/withServerMessageDetail.ts`. Authoritative guide: `src/i18n/CONVENTIONS.md`.
 - Client caches to remember when changing API shapes: `WatchingContext` (localStorage, versioned — bump version on shape change), `ViewModeProvider` (localStorage + server prefs).
+- **Item detail in a dialog**: `components/MediaDetailModal.tsx` renders the *route page* `pages/media-detail` (which now takes optional `id`/`onBack`/`onOpenMedia` instead of only reading `useParams`), hosted by `hooks/MediaDetailModalProvider`. Chat cards call `useMediaDetailModal()`; a **null** opener means "no host mounted, navigate instead" — that's how the docked assistant keeps routing the main pane while the /assistant page and the floating dialog open in place (`AssistantChatSurface` prop `openMediaInModal`). Related titles / insight evidence inside the dialog swap the target rather than route, or they'd move the page under the dialog. `MediaBackdrop`'s `mx/mt: -3` is why the dialog content keeps `p: 3`.
 
 ## When you touch X, check Y
 

@@ -26,9 +26,11 @@ import type { RecommendationInsights, MediaType } from '../types'
 interface MovieInsightsProps {
   insights: RecommendationInsights
   mediaType?: MediaType
+  /** Show an evidence item without routing (set when this sits inside a dialog). */
+  onOpenMedia?: (mediaType: MediaType, id: string) => void
 }
 
-export function MovieInsights({ insights, mediaType = 'movie' }: MovieInsightsProps) {
+export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: MovieInsightsProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [insightsExpanded, setInsightsExpanded] = useState(true)
@@ -267,14 +269,16 @@ export function MovieInsights({ insights, mediaType = 'movie' }: MovieInsightsPr
                   {insights.evidence.map((ev) => {
                     const item = ev.similar_movie || ev.similar_series
                     if (!item) return null
-                    const route = ev.similar_movie
-                      ? `/movies/${item.id}`
-                      : `/series/${item.id}`
+                    const evidenceType: MediaType = ev.similar_movie ? 'movie' : 'series'
 
                     return (
                       <Paper
                         key={ev.id}
-                        onClick={() => navigate(route)}
+                        onClick={() =>
+                          onOpenMedia
+                            ? onOpenMedia(evidenceType, item.id)
+                            : navigate(`/${evidenceType === 'movie' ? 'movies' : 'series'}/${item.id}`)
+                        }
                         sx={{
                           flexShrink: 0,
                           width: 120,

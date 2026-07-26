@@ -196,6 +196,10 @@ export function AssistantModal() {
       sidebarInline={sidebarInline}
       headerActions={headerActions}
       onBeforeNavigate={handleClose}
+      // Docked, the library is right there: clicking a pick routes the main pane
+      // and the chat keeps its place beside it. The dialog covers that pane, so
+      // routing behind it would look like nothing happened.
+      openMediaInModal={!docked}
     />
   )
 

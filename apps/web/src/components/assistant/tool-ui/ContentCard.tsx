@@ -37,6 +37,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { RankBadge, getProxiedImageUrl } from '@aperture/ui'
+import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
 import type { ContentItem } from './types'
 
 interface ContentCardProps {
@@ -131,10 +132,18 @@ export function ContentCard({
     return () => observer.disconnect()
   }, [expanded, item.overview, item.reason])
 
+  // Chat surfaces that own the whole viewport open the item here instead of
+  // routing, so the conversation and its scroll position survive a look at a
+  // pick. Docked chat has no opener and routes the main pane as before.
+  const openMediaDetail = useMediaDetailModal()
+
   const handleDetails = () => {
-    if (detailsAction?.href) {
-      navigate(detailsAction.href)
+    if (!detailsAction?.href) return
+    if (openMediaDetail) {
+      openMediaDetail(item.type, item.id)
+      return
     }
+    navigate(detailsAction.href)
   }
 
   const handlePlay = () => {

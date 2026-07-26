@@ -11,6 +11,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { getProxiedImageUrl } from '@aperture/ui'
+import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
 import type { ContentDetailData } from './types'
 
 interface ContentDetailProps {
@@ -20,14 +21,19 @@ interface ContentDetailProps {
 export function ContentDetail({ data }: ContentDetailProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  // See ContentCard: null on surfaces where routing keeps the chat visible.
+  const openMediaDetail = useMediaDetailModal()
 
   const detailsAction = data.actions.find(a => a.id === 'details')
   const playAction = data.actions.find(a => a.id === 'play')
 
   const handleDetails = () => {
-    if (detailsAction?.href) {
-      navigate(detailsAction.href)
+    if (!detailsAction?.href) return
+    if (openMediaDetail) {
+      openMediaDetail(data.type, data.contentId)
+      return
     }
+    navigate(detailsAction.href)
   }
 
   const handlePlay = () => {

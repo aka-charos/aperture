@@ -18,11 +18,30 @@ import type { MediaType } from './types'
 
 interface MediaDetailPageProps {
   mediaType: MediaType
+  /**
+   * Item to show. Defaults to the route param — this is a routed page, but it is
+   * also rendered inside MediaDetailModal, where there is no route to read.
+   */
+  id?: string
+  /** Replaces the back arrow's default history pop (the modal host closes itself). */
+  onBack?: () => void
+  /**
+   * When set, related titles and recommendation evidence open through this
+   * instead of routing — inside the modal, routing would move the page
+   * underneath it and strand the user when they close the dialog.
+   */
+  onOpenMedia?: (mediaType: MediaType, id: string) => void
 }
 
-export function MediaDetailPage({ mediaType }: MediaDetailPageProps) {
+export function MediaDetailPage({
+  mediaType,
+  id: idProp,
+  onBack,
+  onOpenMedia,
+}: MediaDetailPageProps) {
   const { t } = useTranslation()
-  const { id } = useParams<{ id: string }>()
+  const { id: routeId } = useParams<{ id: string }>()
+  const id = idProp ?? routeId
   const navigate = useNavigate()
   const { user } = useAuth()
   const { isWatching, toggleWatching } = useWatching()
@@ -73,7 +92,7 @@ export function MediaDetailPage({ mediaType }: MediaDetailPageProps) {
       <MediaBackdrop
         backdropUrl={media.backdrop_url}
         title={media.title}
-        onBack={() => navigate(-1)}
+        onBack={onBack ?? (() => navigate(-1))}
       />
 
       {/* Hero Section */}
@@ -98,7 +117,9 @@ export function MediaDetailPage({ mediaType }: MediaDetailPageProps) {
       />
 
       {/* AI Recommendation Insights */}
-      {insights && <MovieInsights insights={insights} mediaType={mediaType} />}
+      {insights && (
+        <MovieInsights insights={insights} mediaType={mediaType} onOpenMedia={onOpenMedia} />
+      )}
 
       {/* Main Content */}
       <Box sx={{ mt: 4, px: { xs: 2, sm: 3 } }}>
@@ -125,6 +146,7 @@ export function MediaDetailPage({ mediaType }: MediaDetailPageProps) {
               mediaId={id}
               mediaTitle={media.title}
               similar={similar}
+              onOpenMedia={onOpenMedia}
             />
           </Grid>
         </Grid>

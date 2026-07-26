@@ -29,6 +29,7 @@ import { Thread } from './Thread'
 import { getUnwatchedOnly } from './unwatchedPreference'
 import { setStatusPhase } from './assistantStatus'
 import { AICapabilityBanner } from '../AICapabilityBanner'
+import { MediaDetailModalProvider } from '@/hooks/MediaDetailModalProvider'
 import type { AssistantChatState, BackendMessage } from './useAssistantChat'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -239,6 +240,14 @@ export interface AssistantChatSurfaceProps {
   headerActions?: ReactNode
   /** Forwarded to AICapabilityBanner so the floating surface can close itself before navigating to settings */
   onBeforeNavigate?: () => void
+  /**
+   * Open picked items in a dialog over the chat instead of routing to their page.
+   * Right for surfaces that fill the viewport (the /assistant page, the floating
+   * dialog), where routing would tear down the conversation and lose the reader's
+   * place. Wrong for the dock, which stays put while the main pane shows the item
+   * — pass false there. Defaults to true since the dock is the exception.
+   */
+  openMediaInModal?: boolean
 }
 
 /**
@@ -251,6 +260,7 @@ export function AssistantChatSurface({
   sidebarInline,
   headerActions,
   onBeforeNavigate,
+  openMediaInModal = true,
 }: AssistantChatSurfaceProps) {
   const { t } = useTranslation()
   const theme = useTheme()
@@ -449,7 +459,7 @@ export function AssistantChatSurface({
   )
 
   return (
-    <>
+    <MediaDetailModalProvider enabled={openMediaInModal}>
       <Box sx={{ display: 'flex', height: '100%' }}>
         {/* Sidebar - inline when the surface has room */}
         {sidebarInline && (
@@ -574,6 +584,6 @@ export function AssistantChatSurface({
           {errorKey ? t(errorKey) : ''}
         </Alert>
       </Snackbar>
-    </>
+    </MediaDetailModalProvider>
   )
 }

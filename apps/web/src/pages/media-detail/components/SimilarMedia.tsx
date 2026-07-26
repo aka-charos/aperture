@@ -87,9 +87,17 @@ interface SimilarMediaProps {
   mediaId?: string
   mediaTitle?: string
   similar: SimilarItem[]
+  /** Show the picked item without routing (set when this list is inside a dialog). */
+  onOpenMedia?: (mediaType: MediaType, id: string) => void
 }
 
-export function SimilarMedia({ mediaType, mediaId, mediaTitle, similar }: SimilarMediaProps) {
+export function SimilarMedia({
+  mediaType,
+  mediaId,
+  mediaTitle,
+  similar,
+  onOpenMedia,
+}: SimilarMediaProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
@@ -151,6 +159,14 @@ export function SimilarMedia({ mediaType, mediaId, mediaTitle, similar }: Simila
     [setRating, mediaType]
   )
 
+  const openMedia = (type: MediaType, id: string) => {
+    if (onOpenMedia) {
+      onOpenMedia(type, id)
+      return
+    }
+    navigate(`/${type === 'movie' ? 'movies' : 'series'}/${id}`)
+  }
+
   const handleNodeClick = (node: GraphNode) => {
     // Rabbit hole navigation - click to refocus
     if (!node.isCenter) {
@@ -159,12 +175,8 @@ export function SimilarMedia({ mediaType, mediaId, mediaTitle, similar }: Simila
   }
 
   const handleNodeDoubleClick = (node: GraphNode) => {
-    // Double-click navigates to the detail page
-    if (node.type === 'movie') {
-      navigate(`/movies/${node.id}`)
-    } else {
-      navigate(`/series/${node.id}`)
-    }
+    // Double-click opens the item's detail view
+    openMedia(node.type, node.id)
   }
 
   const handleFullscreenNodeClick = useCallback(
@@ -234,9 +246,7 @@ export function SimilarMedia({ mediaType, mediaId, mediaTitle, similar }: Simila
                   }
                   hideWatchingToggle={mediaType === 'movie'}
                   responsive
-                  onClick={() =>
-                    navigate(`/${mediaType === 'movie' ? 'movies' : 'series'}/${item.id}`)
-                  }
+                  onClick={() => openMedia(mediaType, item.id)}
                 />
                 <ConnectionReasonChips reasons={item.reasons} />
               </Box>
