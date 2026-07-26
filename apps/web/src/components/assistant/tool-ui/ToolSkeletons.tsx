@@ -4,7 +4,9 @@
 import { Box, Paper, Skeleton } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 
-// Skeleton for a single content card (matches compact ContentCard dimensions)
+// Skeleton for a single content card. Mirrors compact ContentCard geometry —
+// same rail width, poster height and card width, so cards don't jump when the
+// real result replaces the placeholder.
 function CardSkeleton() {
   return (
     <Paper
@@ -14,25 +16,26 @@ function CardSkeleton() {
         p: 1.5,
         bgcolor: '#1a1a1a',
         borderRadius: 2,
-        minWidth: 280,
-        maxWidth: 320,
+        minWidth: 300,
+        maxWidth: 340,
       }}
     >
-      {/* Poster skeleton */}
-      <Skeleton
-        variant="rounded"
-        width={60}
-        height={90}
-        sx={{ bgcolor: '#2a2a2a', flexShrink: 0 }}
-      />
-      {/* Content skeleton */}
+      {/* Meta rail skeleton: poster, then ratings and genres */}
+      <Box sx={{ width: 84, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+        <Skeleton variant="rounded" width={84} height={126} sx={{ bgcolor: '#2a2a2a' }} />
+        <Skeleton variant="text" width={44} height={14} sx={{ bgcolor: '#2a2a2a' }} />
+        <Skeleton variant="text" width="100%" height={12} sx={{ bgcolor: '#2a2a2a' }} />
+      </Box>
+      {/* Text column skeleton */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-        <Skeleton variant="text" width="80%" height={20} sx={{ bgcolor: '#2a2a2a' }} />
-        <Skeleton variant="text" width="50%" height={16} sx={{ bgcolor: '#2a2a2a' }} />
-        <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
-          <Skeleton variant="rounded" width={40} height={20} sx={{ bgcolor: '#2a2a2a' }} />
-          <Skeleton variant="rounded" width={50} height={20} sx={{ bgcolor: '#2a2a2a' }} />
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75 }}>
+          <Skeleton variant="text" width="70%" height={20} sx={{ bgcolor: '#2a2a2a', flex: 1 }} />
+          <Skeleton variant="rounded" width={46} height={18} sx={{ bgcolor: '#2a2a2a', flexShrink: 0 }} />
         </Box>
+        <Skeleton variant="text" width="50%" height={16} sx={{ bgcolor: '#2a2a2a' }} />
+        <Skeleton variant="text" width="100%" height={14} sx={{ bgcolor: '#2a2a2a' }} />
+        <Skeleton variant="text" width="95%" height={14} sx={{ bgcolor: '#2a2a2a' }} />
+        <Skeleton variant="text" width="70%" height={14} sx={{ bgcolor: '#2a2a2a' }} />
         <Box sx={{ display: 'flex', gap: 1, mt: 'auto', pt: 1 }}>
           <Skeleton variant="rounded" width={60} height={24} sx={{ bgcolor: '#2a2a2a' }} />
           <Skeleton variant="rounded" width={50} height={24} sx={{ bgcolor: '#2a2a2a' }} />

@@ -3302,7 +3302,9 @@
     "carouselSimilarDescSeriesUnwatched": "Βρέθηκαν {{count}} σειρές παρόμοιες με αυτή τη σειρά που δεν έχετε παρακολουθήσει",
     "carouselSimilarError": "Αποτυχία εύρεσης παρόμοιου περιεχομένου: {{message}}",
     "directedBy": "Dir. {{name}}",
-    "createdBy": "Created by {{name}}"
+    "createdBy": "Created by {{name}}",
+    "showMore": "Show more",
+    "showLess": "Show less"
   },
   "dashboard": {
     "greetingMorning": "Καλημέρα",
