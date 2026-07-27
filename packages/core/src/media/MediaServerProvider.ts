@@ -258,6 +258,19 @@ export interface MediaServerProvider {
   ): Promise<PlaylistCreateResult>
 
   /**
+   * Write a playlist's description without touching its contents.
+   *
+   * Separate from createPlaylistWithOverview because editing a description should not re-write
+   * the item list. Non-fatal in both providers — a stale description never fails the caller.
+   */
+  updatePlaylistOverview(
+    apiKey: string,
+    userId: string,
+    playlistId: string,
+    overview: string
+  ): Promise<void>
+
+  /**
    * Delete a playlist
    */
   deletePlaylist(apiKey: string, playlistId: string): Promise<void>
@@ -289,13 +302,21 @@ export interface MediaServerProvider {
    * @param opts.rankAndPin - When true (default), pins the collection to the top of the library
    *   and rewrites each member's global sort name to "NN - Title" for showcase ordering (used by
    *   Top Picks). Pass false for user-generated collections to leave member sort names untouched.
+   * @param opts.overview - Description to write into the Box Set's Overview, on create and update
+   *   alike. The Collections endpoint takes no Overview, so it costs a separate item update.
    */
   createOrUpdateCollection(
     apiKey: string,
     name: string,
     itemIds: string[],
-    opts?: { rankAndPin?: boolean }
+    opts?: { rankAndPin?: boolean; overview?: string }
   ): Promise<CollectionCreateResult>
+
+  /**
+   * Write a collection's description without touching its contents. Server-wide, so no user
+   * context. Non-fatal in both providers.
+   */
+  updateCollectionOverview(apiKey: string, collectionId: string, overview: string): Promise<void>
 
   /**
    * Delete a collection

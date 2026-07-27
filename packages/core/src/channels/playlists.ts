@@ -28,6 +28,7 @@ export async function updateChannelPlaylist(
     id: string
     owner_id: string
     name: string
+    description: string | null
     playlist_id: string | null
     provider_user_id: string
     display_name: string | null
@@ -49,12 +50,14 @@ export async function updateChannelPlaylist(
   const itemIds =
     opts.itemIds ?? (await buildChannelItems(channelId, opts)).map((r) => r.providerItemId)
 
-  // Create/update playlist
-  const result = await provider.createOrUpdatePlaylist(
+  // Create/update playlist. WithOverview because the description the user wrote belongs on the
+  // playlist in the media server, not only in our own DB.
+  const result = await provider.createPlaylistWithOverview(
     apiKey,
     channel.provider_user_id,
     channel.name,
-    itemIds
+    itemIds,
+    channel.description ?? undefined
   )
 
   // Store playlist ID if new
@@ -110,10 +113,11 @@ export async function createSharedPlaylist(
   const channel = await queryOne<{
     id: string
     name: string
+    description: string | null
     owner_username: string
     owner_display_name: string | null
   }>(
-    `SELECT c.id, c.name, u.username as owner_username, u.display_name as owner_display_name
+    `SELECT c.id, c.name, c.description, u.username as owner_username, u.display_name as owner_display_name
      FROM channels c
      JOIN users u ON u.id = c.owner_id
      WHERE c.id = $1`,
@@ -142,11 +146,13 @@ export async function createSharedPlaylist(
   const ownerName = channel.owner_display_name || channel.owner_username
   const playlistName = `${ownerName} - ${channel.name}`
 
-  const result = await provider.createOrUpdatePlaylist(
+  // A share is a copy of the owner's channel, so it carries the same description.
+  const result = await provider.createPlaylistWithOverview(
     apiKey,
     viewer.provider_user_id,
     playlistName,
-    itemIds
+    itemIds,
+    channel.description ?? undefined
   )
 
   // Store in channel_shares

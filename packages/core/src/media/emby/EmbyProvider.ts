@@ -61,6 +61,7 @@ import { getPersonDetails } from './persons.js'
 import {
   createOrUpdatePlaylist,
   createPlaylistWithOverview,
+  updatePlaylistOverview,
   deletePlaylist,
   getPlaylistItems,
   removePlaylistItems,
@@ -69,6 +70,7 @@ import {
 } from './playlists.js'
 import {
   createOrUpdateCollection,
+  updateCollectionOverview,
   deleteCollection,
   getCollectionItems,
   addCollectionItems,
@@ -244,6 +246,15 @@ export class EmbyProvider extends EmbyProviderBase implements MediaServerProvide
     return createPlaylistWithOverview(this, apiKey, userId, name, itemIds, overview)
   }
 
+  async updatePlaylistOverview(
+    apiKey: string,
+    userId: string,
+    playlistId: string,
+    overview: string
+  ): Promise<void> {
+    return updatePlaylistOverview(this, apiKey, userId, playlistId, overview)
+  }
+
   async deletePlaylist(apiKey: string, playlistId: string): Promise<void> {
     return deletePlaylist(this, apiKey, playlistId)
   }
@@ -270,9 +281,17 @@ export class EmbyProvider extends EmbyProviderBase implements MediaServerProvide
     apiKey: string,
     name: string,
     itemIds: string[],
-    opts?: { rankAndPin?: boolean }
+    opts?: { rankAndPin?: boolean; overview?: string }
   ): Promise<CollectionCreateResult> {
     return createOrUpdateCollection(this, apiKey, name, itemIds, opts)
+  }
+
+  async updateCollectionOverview(
+    apiKey: string,
+    collectionId: string,
+    overview: string
+  ): Promise<void> {
+    return updateCollectionOverview(this, apiKey, collectionId, overview)
   }
 
   async deleteCollection(apiKey: string, collectionId: string): Promise<void> {

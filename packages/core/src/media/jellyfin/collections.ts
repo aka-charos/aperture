@@ -16,6 +16,7 @@ import type { JellyfinProviderBase } from './base.js'
  * @param apiKey - API key for authentication
  * @param name - Collection name
  * @param itemIds - Array of media item IDs to include (in ranked order)
+ * @param opts.overview - Description to write into the Box Set's Overview
  * @returns Collection ID
  */
 export async function createOrUpdateCollection(
@@ -23,7 +24,7 @@ export async function createOrUpdateCollection(
   apiKey: string,
   name: string,
   itemIds: string[],
-  opts?: { rankAndPin?: boolean }
+  opts?: { rankAndPin?: boolean; overview?: string }
 ): Promise<CollectionCreateResult> {
   // Showcase ordering (pin-to-top sort title + per-member "NN - Title" rank sort names) is
   // intentional for Top Picks but mutates members' global sort names, so user collections opt
@@ -92,7 +93,41 @@ export async function createOrUpdateCollection(
     await setItemRankSortNames(provider, apiKey, itemIds)
   }
 
+  // Applied on both branches: editing a collection's description should reach the library, not
+  // just the row that created it. The Collections endpoint takes no Overview, so it is a separate
+  // item update either way.
+  if (opts?.overview) {
+    await updateCollectionOverview(provider, apiKey, collectionId, opts.overview)
+  }
+
   return { collectionId }
+}
+
+/**
+ * Write a collection's description into the Box Set's Overview.
+ *
+ * Collections are server-wide, so unlike a playlist this needs no user context — `/Items/{id}`
+ * is both the fetch and the post path. Non-fatal: a collection with a stale description is far
+ * better than a failed generate.
+ */
+export async function updateCollectionOverview(
+  provider: JellyfinProviderBase,
+  apiKey: string,
+  collectionId: string,
+  overview: string
+): Promise<void> {
+  try {
+    const item = await provider.fetch<Record<string, unknown>>(`/Items/${collectionId}`, apiKey)
+    item.Overview = overview
+
+    await provider.fetch(`/Items/${collectionId}`, apiKey, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(item),
+    })
+  } catch {
+    console.warn(`Failed to set overview for collection ${collectionId}`)
+  }
 }
 
 /**
