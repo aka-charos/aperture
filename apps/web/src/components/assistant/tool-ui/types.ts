@@ -83,6 +83,11 @@ export interface ContentCarouselData {
   descriptionParams?: Record<string, string | number>
   /** 'list' = vertical rich cards (web-search recs); otherwise a horizontal carousel. */
   layout?: 'list' | 'carousel'
+  /**
+   * The user request these cards answer, stamped server-side on every tool
+   * result. Absent on carousels stored before this existed.
+   */
+  request?: string
   items: ContentItem[]
 }
 

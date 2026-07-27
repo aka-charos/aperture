@@ -19,7 +19,7 @@ import {
 } from 'ai'
 import { getChatModelInstance, getEmbeddingModelInstance, getActiveEmbeddingModelId } from '@aperture/core'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
-import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText, loadConversationHistory, withUnwatchedFilter, createStatusEmitter, withStatusEvents } from '../helpers/index.js'
+import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText, loadConversationHistory, withUnwatchedFilter, createStatusEmitter, withStatusEvents, withRequestContext } from '../helpers/index.js'
 import { createTools, createN8nTools, createDiscoveryResolveTool, DISCOVERY_PROMPT } from '../tools/index.js'
 import { withToolErrorHandling } from '../tools/utils.js'
 import type { ToolContext } from '../types.js'
@@ -223,11 +223,12 @@ export function registerChatHandler(fastify: FastifyInstance) {
             emit('understanding')
             const intent = await classifyIntent(processedMessages)
             fastify.log.info({ intent }, 'Assistant intent classified')
+            // What the user actually typed this turn. Drives the discovery search,
+            // and is stamped onto every card list so the UI can act on the request
+            // later (naming a playlist after it) without re-reading the thread.
+            const userRequest = latestUserText(processedMessages)
             if (intent === 'discovery') {
-              discoveryTools = createDiscoveryResolveTool(
-                toolContext,
-                latestUserText(processedMessages)
-              )
+              discoveryTools = createDiscoveryResolveTool(toolContext, userRequest)
               discoveryAppend = DISCOVERY_PROMPT
             }
 
@@ -259,14 +260,18 @@ export function registerChatHandler(fastify: FastifyInstance) {
             // Backstop: uncaught tool errors become { id, error } payloads instead
             // of aborting the stream with a masked "An error occurred". Wraps the
             // unwatched filter too, so a failure there can't abort the stream.
-            // withStatusEvents is outermost so entering a tool is reported before
-            // any of that wrapping runs.
+            // withStatusEvents wraps that so entering a tool is reported before any
+            // of it runs; withRequestContext is outermost because it stamps the
+            // finished result, once the filter has settled which cards remain.
             const allTools = { ...baseTools, ...discoveryTools }
-            const tools = withStatusEvents(
-              withToolErrorHandling(
-                excludeWatched ? withUnwatchedFilter(allTools, user.id) : allTools
+            const tools = withRequestContext(
+              withStatusEvents(
+                withToolErrorHandling(
+                  excludeWatched ? withUnwatchedFilter(allTools, user.id) : allTools
+                ),
+                emit
               ),
-              emit
+              userRequest
             )
 
             fastify.log.info(

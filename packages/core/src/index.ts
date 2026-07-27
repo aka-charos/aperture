@@ -825,6 +825,7 @@ export {
   // Types
   type GraphPlaylist,
   type CreateGraphPlaylistInput,
+  type PlaylistChatContext,
 } from './graphPlaylists/index.js'
 
 // User Favorites

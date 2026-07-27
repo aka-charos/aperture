@@ -7,6 +7,7 @@ export { classifyIntent, latestUserText, type ChatIntent } from './routeIntent.j
 export { loadConversationHistory } from './conversationHistory.js'
 export { withUnwatchedFilter, filterUnwatchedItems } from './unwatched.js'
 export { createStatusEmitter, withStatusEvents, type StatusPhase, type StatusEmitter } from './status.js'
+export { withRequestContext } from './requestContext.js'
 export { classifyAssistantError, assistantErrorText, toolErrorText, recordLlmError, type AssistantErrorCode } from './errors.js'
 
 // Re-export from new prompts module
