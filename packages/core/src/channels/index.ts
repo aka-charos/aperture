@@ -28,6 +28,12 @@ export { updateChannelCollection, deleteChannelCollection } from './collections.
 // Re-export the metadata-only description push (edit + save, without a regenerate)
 export { syncChannelDescription } from './describe.js'
 
+// Re-export the preview rationale writer
+export {
+  generateChannelPickReasons,
+  type ChannelPickReasonInput,
+} from './reasons.js'
+
 // Re-export STRM functions
 export { writeChannelStrm } from './strm.js'
 

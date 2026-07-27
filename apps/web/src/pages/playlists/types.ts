@@ -41,6 +41,10 @@ export interface PlaylistItem {
 /**
  * One proposed entry from /preview — what a generate would write, before anything reaches the
  * media server. `id` is the provider item id, which is what the confirm call sends back.
+ *
+ * `reason` is written for this preview by the text-generation model and exists nowhere else: it
+ * is the only thing on the card explaining why the recommender chose this title for this list.
+ * Absent on seeds (the user picked those) and whenever no writing model is configured.
  */
 export interface PreviewItem {
   id: string
@@ -50,6 +54,10 @@ export interface PreviewItem {
   year: number | null
   posterUrl: string | null
   runtime: number | null
+  overview: string | null
+  rating: number | null
+  genres: string[]
+  reason?: string
   isSeed: boolean
 }
 

@@ -5,6 +5,7 @@ import {
   updateChannelPlaylist,
   updateChannelCollection,
   buildChannelItems,
+  generateChannelPickReasons,
   getMediaServerProvider,
   getMediaServerApiKey,
   type ChannelRecommendation,
@@ -53,9 +54,10 @@ async function hydrateCollectionItems(providerItemIds: string[]) {
 }
 
 /**
- * Add the artwork the preview list needs. buildChannelItems only carries ids/title/year, and the
- * dialog shows posters, so look the rows up by their Aperture id in the table their media type
- * points at. Order is preserved — a preview is a proposal for the exact order that gets written.
+ * Add everything the preview cards show beyond the id/title/year buildChannelItems carries:
+ * artwork, synopsis, community rating and genres, looked up by Aperture id in the table each
+ * item's media type points at. Order is preserved — a preview is a proposal for the exact order
+ * that gets written.
  */
 async function hydratePreviewItems(recommendations: ChannelRecommendation[]) {
   if (recommendations.length === 0) return []
@@ -67,25 +69,66 @@ async function hydratePreviewItems(recommendations: ChannelRecommendation[]) {
     id: string
     poster_url: string | null
     runtime: number | null
+    overview: string | null
+    community_rating: string | number | null
+    genres: string[] | null
   }>(
-    `SELECT id, poster_url, runtime_minutes AS runtime FROM movies WHERE id = ANY($1)
+    `SELECT id, poster_url, runtime_minutes AS runtime, overview, community_rating, genres
+     FROM movies WHERE id = ANY($1)
      UNION ALL
-     SELECT id, poster_url, NULL AS runtime FROM series WHERE id = ANY($2)`,
+     SELECT id, poster_url, NULL AS runtime, overview, community_rating, genres
+     FROM series WHERE id = ANY($2)`,
     [movieIds, seriesIds]
   )
 
   const byId = new Map(result.rows.map((r) => [r.id, r]))
-  return recommendations.map((rec) => ({
-    // The media server speaks provider item ids; that is also what comes back on confirm.
-    id: rec.providerItemId,
-    itemId: rec.itemId,
-    mediaType: rec.mediaType,
-    title: rec.title,
-    year: rec.year,
-    posterUrl: byId.get(rec.itemId)?.poster_url ?? null,
-    runtime: byId.get(rec.itemId)?.runtime ?? null,
-    isSeed: !!rec.isSeed,
-  }))
+  return recommendations.map((rec) => {
+    const row = byId.get(rec.itemId)
+    return {
+      // The media server speaks provider item ids; that is also what comes back on confirm.
+      id: rec.providerItemId,
+      itemId: rec.itemId,
+      mediaType: rec.mediaType,
+      title: rec.title,
+      year: rec.year,
+      posterUrl: row?.poster_url ?? null,
+      runtime: row?.runtime ?? null,
+      overview: row?.overview ?? null,
+      // NUMERIC comes back as a string from pg; the card wants a number to format.
+      rating: row?.community_rating != null ? Number(row.community_rating) : null,
+      genres: row?.genres ?? [],
+      isSeed: !!rec.isSeed,
+    }
+  })
+}
+
+/**
+ * Attach a one-line "why this is here" to each generated pick.
+ *
+ * Seeds are excluded: the user chose those by name and the card already badges them, so asking a
+ * model to justify them would spend tokens explaining their own choice back to them. Failing open
+ * is deliberate — no writing model configured, or a provider that errors, costs the notes and
+ * nothing else.
+ */
+type HydratedPreviewItem = Awaited<ReturnType<typeof hydratePreviewItems>>[number]
+
+async function attachPreviewReasons(
+  channelId: string,
+  items: HydratedPreviewItem[]
+): Promise<Array<HydratedPreviewItem & { reason?: string }>> {
+  const generated = items.filter((item) => !item.isSeed)
+  if (generated.length === 0) return items
+
+  const reasons = await generateChannelPickReasons(
+    channelId,
+    generated.map(({ itemId, title, year, overview }) => ({ itemId, title, year, overview }))
+  )
+
+  if (reasons.size === 0) return items
+  return items.map((item) => {
+    const reason = reasons.get(item.itemId)
+    return reason ? { ...item, reason } : item
+  })
 }
 
 export function registerPlaylistHandlers(fastify: FastifyInstance) {
@@ -113,7 +156,11 @@ export function registerPlaylistHandlers(fastify: FastifyInstance) {
       try {
         // Same options a manual generate uses, so the preview is what would actually be written.
         const recommendations = await buildChannelItems(id, { webExpand: true })
-        const items = await hydratePreviewItems(recommendations)
+        const hydrated = await hydratePreviewItems(recommendations)
+        // Costs one short model call per 8 picks, on a dialog the user is already waiting on.
+        // Worth it: without a rationale the preview asks them to approve a ranked list whose
+        // ranking they cannot see.
+        const items = await attachPreviewReasons(id, hydrated)
         return reply.send({ items })
       } catch (err) {
         request.log.error({ err, channelId: id }, 'Failed to preview channel output')
