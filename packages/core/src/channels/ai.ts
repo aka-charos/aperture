@@ -14,6 +14,9 @@ import {
 
 const logger = createChildLogger('channels')
 
+/** The preferences box holds a paragraph or three; past this it's padding, and it arrives over HTTP. */
+const MAX_USER_NOTES_LENGTH = 2000
+
 async function buildPlaylistContext(
   genres: string[],
   exampleMovieIds: string[],
@@ -49,18 +52,29 @@ async function buildPlaylistContext(
   return contextParts.join('\n')
 }
 
+/**
+ * `userNotes` is whatever the user had already typed into the preferences box. Everything else
+ * here can be derived from the seeds; the notes can't — they're the one angle no amount of
+ * reading the example titles would surface. So they lead the prompt and get their own rule.
+ * Omitted when the caller wants a clean re-roll rather than a refinement.
+ */
 export async function generateAIPreferences(
   userId: string,
   genres: string[],
   exampleMovieIds: string[],
-  exampleSeriesIds: string[] = []
+  exampleSeriesIds: string[] = [],
+  userNotes?: string
 ): Promise<string> {
+  const notes =
+    typeof userNotes === 'string' ? userNotes.trim().slice(0, MAX_USER_NOTES_LENGTH) : ''
+
   logger.info(
     {
       userId,
       genres,
       exampleMovieCount: exampleMovieIds.length,
       exampleSeriesCount: exampleSeriesIds.length,
+      userNotesLength: notes.length,
     },
     'Generating AI preferences'
   )
@@ -74,6 +88,11 @@ export async function generateAIPreferences(
   const exampleSeries = await fetchSeriesWithOverviewByIds(exampleSeriesIds)
 
   const contextParts: string[] = []
+
+  // First, above the taste profile: it's the most specific and most recent thing the user said.
+  if (notes) {
+    contextParts.push(`THE USER'S OWN NOTES (their words, written before they asked for help):\n${notes}`)
+  }
 
   if (tasteProfile?.taste_synopsis) {
     contextParts.push(`USER'S TASTE PROFILE:\n${tasteProfile.taste_synopsis}`)
@@ -107,9 +126,18 @@ export async function generateAIPreferences(
     const aiLocale = await resolveEffectiveAiLanguage(userId)
     const langBlock = `\n\n${buildAiLanguageInstruction(aiLocale)}`
     const model = await getTextGenerationModelInstance()
+
+    // Without this the model treats the notes as one more piece of context and writes over
+    // them — which is the whole complaint: the user types an angle, and it disappears.
+    const notesRule = notes
+      ? `
+
+The user has already written notes of their own (THE USER'S OWN NOTES). Those outrank the genres and the example titles. Keep every angle they raise, including one the examples give no reason to expect, and build the rest around it. Sharpen and expand their wording; never drop it, contradict it, or hand it back word for word.`
+      : ''
+
     const { text } = await generateText({
       model,
-      system: `You are a movie curator helping create a custom playlist. Based on the user's taste profile, selected genres, and example movies, generate 2-3 short preference paragraphs that describe what kind of movies should be included in this playlist.
+      system: `You are a movie curator helping create a custom playlist. Based on the user's taste profile, selected genres, and example movies, generate 2-3 short preference paragraphs that describe what kind of movies should be included in this playlist.${notesRule}
 
 Be specific and actionable. Reference the qualities, themes, and styles evident in the example movies. Consider what makes these movies work together as a collection.
 

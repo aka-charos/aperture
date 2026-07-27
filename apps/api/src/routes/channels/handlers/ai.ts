@@ -19,26 +19,32 @@ export function registerAiHandlers(fastify: FastifyInstance) {
   /**
    * POST /api/channels/ai-preferences
    * Generate AI-powered text preferences based on taste profile, genres, and example movies
+   *
+   * `userNotes` is what the dialog already had in the preferences box, sent only when the user
+   * picks "build on what I wrote". Sending nothing keeps the old behaviour — a fresh take that
+   * ignores the box — which is how a re-roll gets away from an earlier generation.
    */
   fastify.post<{
     Body: {
       genres: string[]
       exampleMovieIds: string[]
       exampleSeriesIds?: string[]
+      userNotes?: string
     }
   }>(
     '/api/channels/ai-preferences',
     { preHandler: requireAuth, schema: { tags: ["playlists"] } },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
-      const { genres, exampleMovieIds, exampleSeriesIds } = request.body
+      const { genres, exampleMovieIds, exampleSeriesIds, userNotes } = request.body
 
       try {
         const preferences = await generateAIPreferences(
           currentUser.id,
           genres || [],
           exampleMovieIds || [],
-          exampleSeriesIds || []
+          exampleSeriesIds || [],
+          userNotes
         )
 
         return reply.send({ preferences })

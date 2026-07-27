@@ -19,6 +19,8 @@ import {
   Button,
   Switch,
   FormControlLabel,
+  Menu,
+  MenuItem,
   alpha,
   useTheme,
 } from '@mui/material'
@@ -61,25 +63,34 @@ async function aiFailureMessage(
 }
 
 // AI button component - defined outside to prevent re-renders
+/**
+ * `menu` turns the one-shot button into a choice. Pass it only when there is a real second
+ * option — an empty preferences box has nothing to build on, so the button stays a plain click.
+ */
 function AIButton({
   onClick,
   loading,
   disabled,
   tooltip,
   theme,
+  menu,
 }: {
   onClick: () => void
   loading: boolean
   disabled: boolean
   tooltip: string
   theme: Theme
+  menu?: { label: string; onClick: () => void }[]
 }) {
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
+  const hasMenu = !!menu && menu.length > 0
+
   return (
     <Tooltip title={tooltip}>
       <span>
         <IconButton
           size="small"
-          onClick={onClick}
+          onClick={(e) => (hasMenu ? setAnchorEl(e.currentTarget) : onClick())}
           disabled={loading || disabled}
           sx={{
             bgcolor: alpha(theme.palette.primary.main, 0.1),
@@ -100,6 +111,27 @@ function AIButton({
             <AutoAwesomeIcon fontSize="small" />
           )}
         </IconButton>
+        {hasMenu && (
+          <Menu
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={() => setAnchorEl(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          >
+            {menu.map((item) => (
+              <MenuItem
+                key={item.label}
+                onClick={() => {
+                  setAnchorEl(null)
+                  item.onClick()
+                }}
+              >
+                {item.label}
+              </MenuItem>
+            ))}
+          </Menu>
+        )}
       </span>
     </Tooltip>
   )
@@ -445,8 +477,18 @@ export function PlaylistDialog({
     formData.exampleMovies.length > 0 ||
     formData.exampleSeries.length > 0
 
-  // Generate AI-powered text preferences
-  const handleGenerateAIPreferences = async () => {
+  // Only offer the choice once there's something in the box worth keeping.
+  const hasPreferences = formData.textPreferences.trim().length > 0
+
+  /**
+   * Generate AI-powered text preferences.
+   *
+   * The result always replaces the box, so `useNotes` decides whether what's in there survives:
+   * it feeds the text back as the strongest signal, keeping a hand-written angle the seed titles
+   * would never suggest. Off — the pre-existing behaviour — ignores the box, which is the only
+   * way to get a genuinely different take once it already holds an earlier generation.
+   */
+  const handleGenerateAIPreferences = async (useNotes = false) => {
     if (!canGenerate) {
       setSnackbar({
         open: true,
@@ -455,6 +497,8 @@ export function PlaylistDialog({
       })
       return
     }
+
+    const notes = useNotes ? formData.textPreferences.trim() : ''
 
     setGeneratingAIPreferences(true)
     try {
@@ -466,13 +510,18 @@ export function PlaylistDialog({
           genres: formData.genreFilters,
           exampleMovieIds: formData.exampleMovies.map((m) => m.id),
           exampleSeriesIds: formData.exampleSeries.map((s) => s.id),
+          userNotes: notes || undefined,
         }),
       })
 
       if (response.ok) {
         const data = await response.json()
         setFormData({ ...formData, textPreferences: data.preferences })
-        setSnackbar({ open: true, message: pt('snackbarAIPreferencesOk'), severity: 'success' })
+        setSnackbar({
+          open: true,
+          message: pt(notes ? 'snackbarAIPreferencesRefinedOk' : 'snackbarAIPreferencesOk'),
+          severity: 'success',
+        })
       } else {
         setSnackbar({
           open: true,
@@ -486,6 +535,11 @@ export function PlaylistDialog({
       setGeneratingAIPreferences(false)
     }
   }
+
+  const preferencesMenu = [
+    { label: pt('aiPreferencesBuildOnNotes'), onClick: () => handleGenerateAIPreferences(true) },
+    { label: pt('aiPreferencesStartFresh'), onClick: () => handleGenerateAIPreferences(false) },
+  ]
 
   // Generate AI-powered playlist name
   const handleGenerateAIName = async () => {
@@ -772,18 +826,22 @@ export function PlaylistDialog({
           theme={theme}
           aiButton={
             <AIButton
-              onClick={handleGenerateAIPreferences}
+              onClick={() => handleGenerateAIPreferences()}
+              menu={hasPreferences ? preferencesMenu : undefined}
               loading={generatingAIPreferences}
               disabled={!canGenerate}
-              tooltip={pt('tooltipAIPreferences')}
+              tooltip={pt(hasPreferences ? 'tooltipAIPreferencesChoose' : 'tooltipAIPreferences')}
               theme={theme}
             />
           }
         >
+          {/* Generated preferences run to 2-3 paragraphs. Two fixed rows made them unreadable and
+              uneditable, so this grows with the text and only scrolls once it's genuinely long. */}
           <TextField
             fullWidth
             multiline
-            rows={2}
+            minRows={4}
+            maxRows={18}
             size="small"
             value={formData.textPreferences}
             onChange={(e) => setFormData({ ...formData, textPreferences: e.target.value })}
@@ -834,7 +892,8 @@ export function PlaylistDialog({
           <TextField
             fullWidth
             multiline
-            rows={2}
+            minRows={2}
+            maxRows={10}
             size="small"
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
