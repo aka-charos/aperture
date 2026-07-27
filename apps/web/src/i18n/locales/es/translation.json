@@ -2729,7 +2729,11 @@
     "previewRemoveItem": "Remove from this list",
     "previewConfirm_one": "Add {{count}} title",
     "previewConfirm_other": "Add {{count}} titles",
-    "previewConfirming": "Adding…"
+    "previewConfirming": "Adding…",
+    "tooltipAIPreferencesChoose": "Generate preferences with AI — keep what you wrote or start over",
+    "aiPreferencesBuildOnNotes": "Build on what I wrote",
+    "aiPreferencesStartFresh": "Start fresh",
+    "snackbarAIPreferencesRefinedOk": "AI preferences generated around your notes"
   },
   "myRecommendations": {
     "pageTitle": "Mis recomendaciones",
@@ -4013,7 +4017,11 @@
     "previewRemoveItem": "Remove from this list",
     "previewConfirm_one": "Add {{count}} title",
     "previewConfirm_other": "Add {{count}} titles",
-    "previewConfirming": "Adding…"
+    "previewConfirming": "Adding…",
+    "tooltipAIPreferencesChoose": "Generate preferences with AI — keep what you wrote or start over",
+    "aiPreferencesBuildOnNotes": "Build on what I wrote",
+    "aiPreferencesStartFresh": "Start fresh",
+    "snackbarAIPreferencesRefinedOk": "AI preferences generated around your notes"
   },
   "countryFilter": {
     "label": "Country",
