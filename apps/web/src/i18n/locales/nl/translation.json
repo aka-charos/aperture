@@ -2691,7 +2691,9 @@
     "tooltipAIPreferencesChoose": "Generate preferences with AI — keep what you wrote or start over",
     "aiPreferencesBuildOnNotes": "Build on what I wrote",
     "aiPreferencesStartFresh": "Start fresh",
-    "snackbarAIPreferencesRefinedOk": "AI preferences generated around your notes"
+    "snackbarAIPreferencesRefinedOk": "AI preferences generated around your notes",
+    "previewSeedReason": "One of your seed titles.",
+    "previewRuntimeMinutes": "{{minutes}} min"
   },
   "myRecommendations": {
     "pageTitle": "Mijn aanbevelingen",
@@ -4021,7 +4023,9 @@
     "tooltipAIPreferencesChoose": "Generate preferences with AI — keep what you wrote or start over",
     "aiPreferencesBuildOnNotes": "Build on what I wrote",
     "aiPreferencesStartFresh": "Start fresh",
-    "snackbarAIPreferencesRefinedOk": "AI preferences generated around your notes"
+    "snackbarAIPreferencesRefinedOk": "AI preferences generated around your notes",
+    "previewSeedReason": "One of your seed titles.",
+    "previewRuntimeMinutes": "{{minutes}} min"
   },
   "countryFilter": {
     "label": "Country",

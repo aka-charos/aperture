@@ -209,6 +209,8 @@ export {
   updateChannelCollection,
   deleteChannelCollection,
   syncChannelDescription,
+  generateChannelPickReasons,
+  type ChannelPickReasonInput,
   writeChannelStrm,
   generateAIPreferences,
   generateAIPlaylistName,

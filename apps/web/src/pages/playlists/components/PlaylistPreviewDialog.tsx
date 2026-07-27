@@ -8,18 +8,12 @@ import {
   Typography,
   IconButton,
   CircularProgress,
-  Avatar,
-  Chip,
-  Tooltip,
   Button,
   Alert,
 } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
-import MovieIcon from '@mui/icons-material/Movie'
-import TvIcon from '@mui/icons-material/Tv'
-import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline'
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck'
-import { getProxiedImageUrl } from '@aperture/ui'
+import { PreviewItemCard } from './PreviewItemCard'
 import type { Channel, PreviewItem } from '../types'
 
 interface PlaylistPreviewDialogProps {
@@ -96,68 +90,21 @@ export function PlaylistPreviewDialog({
             </Typography>
           </Box>
         ) : (
-          <Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
             {seedCount > 0 && (
-              <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+              <Typography variant="caption" color="text.secondary" display="block">
                 {pt('previewSeedNote', { count: seedCount })}
               </Typography>
             )}
             {items.map((item, index) => (
-              <Box
+              <PreviewItemCard
                 key={item.id}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 2,
-                  py: 1.5,
-                  px: 1,
-                  borderBottom: index < items.length - 1 ? 1 : 0,
-                  borderColor: 'divider',
-                  '&:hover': { backgroundColor: 'action.hover' },
-                }}
-              >
-                <Typography variant="body2" color="text.secondary" sx={{ minWidth: 24 }}>
-                  {index + 1}
-                </Typography>
-                <Avatar
-                  src={getProxiedImageUrl(item.posterUrl)}
-                  variant="rounded"
-                  sx={{ width: 40, height: 60 }}
-                >
-                  {item.mediaType === 'series' ? <TvIcon /> : <MovieIcon />}
-                </Avatar>
-                <Box flexGrow={1} minWidth={0}>
-                  <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-                    <Typography variant="body1">{item.title}</Typography>
-                    {item.isSeed && (
-                      <Chip
-                        label={pt('previewSeedBadge')}
-                        size="small"
-                        color="primary"
-                        variant="outlined"
-                        sx={{ height: 20, fontSize: '0.7rem' }}
-                      />
-                    )}
-                  </Box>
-                  <Typography variant="caption" color="text.secondary">
-                    {item.year || pt('unknownYear')}
-                    {item.runtime ? ` • ${item.runtime} min` : ''}
-                    {item.mediaType === 'series' ? ` • ${pt('mediaTypeSeries')}` : ''}
-                  </Typography>
-                </Box>
-                <Tooltip title={pt('previewRemoveItem')}>
-                  <span>
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => onRemoveItem(item.id)}
-                      disabled={confirming}
-                    >
-                      <RemoveCircleOutlineIcon />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-              </Box>
+                item={item}
+                rank={index + 1}
+                onRemove={onRemoveItem}
+                removeDisabled={confirming}
+                pt={pt}
+              />
             ))}
           </Box>
         )}
