@@ -28,8 +28,9 @@ export async function updateChannelCollection(
   const channel = await queryOne<{
     id: string
     name: string
+    description: string | null
     collection_id: string | null
-  }>(`SELECT id, name, collection_id FROM channels WHERE id = $1`, [channelId])
+  }>(`SELECT id, name, description, collection_id FROM channels WHERE id = $1`, [channelId])
 
   if (!channel) {
     throw new Error(`Channel not found: ${channelId}`)
@@ -40,8 +41,11 @@ export async function updateChannelCollection(
   const itemIds =
     opts.itemIds ?? (await buildChannelItems(channelId, opts)).map((r) => r.providerItemId)
 
+  // The description the user wrote is the collection's Overview in the library — without this it
+  // only ever lived in our own DB, and the Box Set showed an empty overview.
   const result = await provider.createOrUpdateCollection(apiKey, channel.name, itemIds, {
     rankAndPin: false,
+    overview: channel.description ?? undefined,
   })
 
   await query(`UPDATE channels SET collection_id = $1, last_generated_at = NOW() WHERE id = $2`, [

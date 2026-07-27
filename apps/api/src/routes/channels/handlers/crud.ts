@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { deleteChannelCollection } from '@aperture/core'
+import { deleteChannelCollection, syncChannelDescription } from '@aperture/core'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import {
@@ -218,6 +218,18 @@ export function registerCrudHandlers(fastify: FastifyInstance) {
          RETURNING *`,
         values
       )
+
+      // Saving a new description is not a generate, so nothing would otherwise carry it to the
+      // media server until the next refresh. Metadata only — the item list is left alone. Awaited
+      // so the library is already correct when the dialog closes, but never allowed to fail the
+      // save (core swallows media-server errors; this catch covers the unexpected).
+      if (description !== undefined && description !== existing.description) {
+        try {
+          await syncChannelDescription(id)
+        } catch (err) {
+          request.log.error({ err, channelId: id }, 'Failed to push channel description')
+        }
+      }
 
       return reply.send({ channel })
     }

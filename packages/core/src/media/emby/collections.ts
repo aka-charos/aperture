@@ -18,7 +18,7 @@ export async function createOrUpdateCollection(
   apiKey: string,
   name: string,
   itemIds: string[],
-  opts?: { rankAndPin?: boolean }
+  opts?: { rankAndPin?: boolean; overview?: string }
 ): Promise<CollectionCreateResult> {
   // Showcase ordering — pinning the collection to the top of the library and rewriting each
   // member's global sort name to "NN - Title" — is intentional for the Top Picks collection but
@@ -73,7 +73,38 @@ export async function createOrUpdateCollection(
     await setItemRankSortNames(provider, apiKey, itemIds)
   }
 
+  // Applied on both branches: editing a collection's description should reach the library, not
+  // just the row that created it. The Collections endpoint takes no Overview, so it is a separate
+  // item update either way.
+  if (opts?.overview) {
+    await updateCollectionOverview(provider, apiKey, collectionId, opts.overview)
+  }
+
   return { collectionId }
+}
+
+/**
+ * Write a collection's description into the Box Set's Overview.
+ *
+ * Collections are server-wide, so unlike a playlist this needs no user context — `/Items/{id}`
+ * is both the fetch and the post path. Non-fatal: a collection with a stale description is far
+ * better than a failed generate.
+ */
+export async function updateCollectionOverview(
+  provider: EmbyProviderBase,
+  apiKey: string,
+  collectionId: string,
+  overview: string
+): Promise<void> {
+  await updateEmbyItemSafely(
+    provider,
+    apiKey,
+    `/Items/${collectionId}`,
+    (item) => {
+      item.Overview = overview
+    },
+    { collectionId, operation: 'updateCollectionOverview' }
+  )
 }
 
 export async function deleteCollection(
