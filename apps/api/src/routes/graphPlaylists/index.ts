@@ -8,6 +8,7 @@ import {
   getGraphPlaylist,
   deleteGraphPlaylist,
   getGraphPlaylistItems,
+  type PlaylistChatContext,
 } from '@aperture/core'
 import { graphPlaylistsSchemas } from './schemas.js'
 
@@ -25,17 +26,23 @@ const graphPlaylistRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * POST /api/graph-playlists/ai-name
    * Generate an AI-powered name for a graph playlist
+   *
+   * `chatContext` is sent only by the assistant's "create playlist from these
+   * suggestions" dialog, which knows what the user asked for and why each pick
+   * was shown. Optional: the similarity-graph explorer posts without it and
+   * keeps the old behaviour.
    */
   fastify.post<{
     Body: {
       movieIds: string[]
       seriesIds: string[]
+      chatContext?: PlaylistChatContext
     }
   }>(
     '/api/graph-playlists/ai-name',
     { preHandler: requireAuth, schema: { tags: ["playlists"] } },
     async (request, reply) => {
-      const { movieIds, seriesIds } = request.body
+      const { movieIds, seriesIds, chatContext } = request.body
 
       if ((!movieIds || movieIds.length === 0) && (!seriesIds || seriesIds.length === 0)) {
         return reply.status(400).send({ error: 'At least one movie or series ID is required' })
@@ -43,7 +50,12 @@ const graphPlaylistRoutes: FastifyPluginAsync = async (fastify) => {
 
       try {
         const currentUser = request.user as SessionUser
-        const name = await generateGraphPlaylistName(movieIds || [], seriesIds || [], currentUser.id)
+        const name = await generateGraphPlaylistName(
+          movieIds || [],
+          seriesIds || [],
+          currentUser.id,
+          chatContext
+        )
         return reply.send({ name })
       } catch (err) {
         request.log.error({ err }, 'Failed to generate graph playlist name')
@@ -63,12 +75,13 @@ const graphPlaylistRoutes: FastifyPluginAsync = async (fastify) => {
       movieIds: string[]
       seriesIds: string[]
       name?: string
+      chatContext?: PlaylistChatContext
     }
   }>(
     '/api/graph-playlists/ai-description',
     { preHandler: requireAuth, schema: { tags: ["playlists"] } },
     async (request, reply) => {
-      const { movieIds, seriesIds, name } = request.body
+      const { movieIds, seriesIds, name, chatContext } = request.body
 
       if ((!movieIds || movieIds.length === 0) && (!seriesIds || seriesIds.length === 0)) {
         return reply.status(400).send({ error: 'At least one movie or series ID is required' })
@@ -80,7 +93,8 @@ const graphPlaylistRoutes: FastifyPluginAsync = async (fastify) => {
           movieIds || [],
           seriesIds || [],
           name,
-          currentUser.id
+          currentUser.id,
+          chatContext
         )
         return reply.send({ description })
       } catch (err) {

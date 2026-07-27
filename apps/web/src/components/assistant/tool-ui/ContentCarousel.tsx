@@ -374,6 +374,7 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         items={data.items}
+        request={data.request}
         onCreated={(name) => notify(t('playlists.createdInLibrary', { name }), 'success')}
       />
 

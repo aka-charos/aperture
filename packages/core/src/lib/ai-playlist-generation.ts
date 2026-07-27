@@ -8,7 +8,59 @@ import { describeAiFailure } from './aiFailure.js'
 
 const logger = createChildLogger('ai-playlist-generation')
 
-export type PlaylistTextMode = 'channel' | 'graph'
+/**
+ * Where the playlist came from. Each mode gets its own brief: a channel is built
+ * from stated preferences, a graph playlist from a similarity exploration, and a
+ * 'chat' playlist from an assistant conversation — where the user's request is
+ * the thing the name has to answer.
+ */
+export type PlaylistTextMode = 'channel' | 'graph' | 'chat'
+
+/**
+ * What the assistant chat knows about a set of picks that the titles alone don't:
+ * the request they answer, and the per-card note explaining each one. Both are
+ * shown to the user already; feeding them back is what lets the namer say
+ * "In Deeper Madness" instead of "Nightmare Fuel".
+ */
+export interface PlaylistChatContext {
+  /** The user's own words that produced these picks. */
+  request?: string
+  /** Per-title rationale as shown on the cards. */
+  reasons?: Array<{ title: string; reason: string }>
+}
+
+/** Caps: this arrives from an HTTP body, and must not be able to swamp the prompt. */
+const MAX_CONTEXT_REQUEST_LENGTH = 400
+const MAX_CONTEXT_REASONS = 8
+const MAX_CONTEXT_REASON_LENGTH = 260
+
+function isChatReason(value: unknown): value is { title: string; reason: string } {
+  if (typeof value !== 'object' || value === null) return false
+  const { title, reason } = value as { title?: unknown; reason?: unknown }
+  return typeof title === 'string' && typeof reason === 'string' && reason.trim().length > 0
+}
+
+/**
+ * The two chat blocks, kept apart so the caller can put the request above the
+ * title list (it's the brief) and the rationale below it (it's the evidence).
+ * Both empty when there's nothing usable — which is how a caller with no chat
+ * context stays in its own mode.
+ */
+export function buildChatContextBlocks(context?: PlaylistChatContext): {
+  requestBlock: string
+  reasonsBlock: string
+} {
+  const request = context?.request?.trim().slice(0, MAX_CONTEXT_REQUEST_LENGTH) ?? ''
+  const reasons = (Array.isArray(context?.reasons) ? context.reasons : [])
+    .filter(isChatReason)
+    .slice(0, MAX_CONTEXT_REASONS)
+    .map((r) => `- ${r.title.trim()}: ${r.reason.trim().slice(0, MAX_CONTEXT_REASON_LENGTH)}`)
+
+  return {
+    requestBlock: request ? `USER REQUEST: "${request}"` : '',
+    reasonsBlock: reasons.length > 0 ? `WHY THESE WERE PICKED:\n${reasons.join('\n')}` : '',
+  }
+}
 
 export interface MovieRowBasic {
   title: string
@@ -124,33 +176,47 @@ export async function fetchSeriesWithOverviewByIds(seriesIds: string[]): Promise
   return result.rows
 }
 
-function buildPlaylistNameSystemPrompt(mode: PlaylistTextMode, langBlock: string): string {
-  const contextLine =
-    mode === 'channel'
-      ? 'Generate a single catchy, memorable playlist name based on the provided context.'
-      : 'Generate a single catchy, memorable playlist name based on the provided movies/shows.'
+const NAME_CONTEXT_LINE: Record<PlaylistTextMode, string> = {
+  channel: 'Generate a single catchy, memorable playlist name based on the provided context.',
+  graph: 'Generate a single catchy, memorable playlist name based on the provided movies/shows.',
+  chat: 'Generate a single catchy, memorable playlist name for a set of titles that were recommended in answer to a request.',
+}
 
-  const modeRules =
-    mode === 'channel'
-      ? `- Capture the mood/vibe of the movies
-- Don't include genre names directly unless cleverly incorporated`
-      : `- Find the common thread: franchise, director, era, mood, theme
-- If it's clearly a franchise (Star Wars, Marvel, etc.), reference it cleverly`
+const NAME_MODE_RULES: Record<PlaylistTextMode, string> = {
+  channel: `- Capture the mood/vibe of the movies
+- Don't include genre names directly unless cleverly incorporated`,
+  graph: `- Find the common thread: franchise, director, era, mood, theme
+- If it's clearly a franchise (Star Wars, Marvel, etc.), reference it cleverly`,
+  chat: `- USER REQUEST is the brief — the name should read as an answer to it, not as a label for a genre
+- Riff on whatever the request anchored on: a title it referenced, an era, a mood, a filmmaker
+- WHY THESE WERE PICKED tells you the specific thread. "Horror" is what they have in common; the thread is why THESE ones
+- Never quote the request back or address the user`,
+}
 
-  const examples =
-    mode === 'channel'
-      ? `- "Neon Noir Nights" (cyberpunk/noir)
+const NAME_EXAMPLES: Record<PlaylistTextMode, string> = {
+  channel: `- "Neon Noir Nights" (cyberpunk/noir)
 - "Popcorn Apocalypse" (action/disaster)
 - "Cozy Crimes" (mystery/comfort)
 - "Starlight Escapes" (sci-fi/adventure)
 - "Midnight Mayhem" (horror/thriller)
-- "Retro Rewind" (80s movies)`
-      : `- "Galaxy Far Away" (Star Wars movies)
+- "Retro Rewind" (80s movies)`,
+  graph: `- "Galaxy Far Away" (Star Wars movies)
 - "Nolan's Mind Games" (Christopher Nolan films)
 - "Caped Crusaders" (superhero movies)
 - "Cozy Mysteries" (detective/mystery)
 - "Midnight Thrills" (horror/thriller mix)
-- "Epic Quests" (adventure/fantasy)`
+- "Epic Quests" (adventure/fantasy)`,
+  chat: `- "In Deeper Madness" (asked for films like In the Mouth of Madness)
+- "One Last Score" (asked for heist movies)
+- "Quiet Towns, Loud Secrets" (asked for slow-burn rural mysteries)
+- "Nobody Sleeps Here" (asked for something to keep them up at night)
+- "The Long Way Home" (asked for road movies about going back)`,
+}
+
+function buildPlaylistNameSystemPrompt(mode: PlaylistTextMode, langBlock: string): string {
+  const contextLine = NAME_CONTEXT_LINE[mode]
+  const modeRules = NAME_MODE_RULES[mode]
+  const examples = NAME_EXAMPLES[mode]
 
   return `You are a creative playlist naming expert. ${contextLine}
 
@@ -173,36 +239,50 @@ export interface PlaylistDescriptionOptions {
   mediaType?: string
 }
 
+const DESCRIPTION_ORIGIN_INTRO: Record<PlaylistTextMode, string> = {
+  channel: '',
+  graph:
+    ' This playlist was created from a similarity graph exploration, so the items are connected by themes, genres, or creative relationships.',
+  chat:
+    ' These titles were recommended in answer to the request below, so the description should read as the answer to that request.',
+}
+
 function buildPlaylistDescriptionSystemPrompt(
   mode: PlaylistTextMode,
   langBlock: string,
   options: PlaylistDescriptionOptions = {}
 ): string {
-  const graphIntro =
-    mode === 'graph'
-      ? ' This playlist was created from a similarity graph exploration, so the items are connected by themes, genres, or creative relationships.'
-      : ''
+  const originIntro = DESCRIPTION_ORIGIN_INTRO[mode]
 
   const connectionRule =
-    mode === 'graph' && options.mediaType
-      ? `- Highlight what connects these ${options.mediaType} (themes, franchises, directors, mood)`
-      : '- Highlight the mood, themes, or experience'
+    mode === 'chat'
+      ? '- Say what connects these in the terms the request cared about, not in genre labels'
+      : mode === 'graph' && options.mediaType
+        ? `- Highlight what connects these ${options.mediaType} (themes, franchises, directors, mood)`
+        : '- Highlight the mood, themes, or experience'
+
+  const requestRule =
+    mode === 'chat' ? '\n- Never quote the request back or address the user ("you asked for…")' : ''
 
   const itemCountRule =
-    mode === 'graph' && options.itemCount !== undefined
+    mode !== 'channel' && options.itemCount !== undefined
       ? `- This collection has ${options.itemCount} items`
       : ''
 
   const examples =
-    mode === 'graph'
-      ? `- "Journey through the complete saga of galactic conflicts and family drama. 12 films that defined a generation."
+    mode === 'chat'
+      ? `- "Cosmic horror where reality itself stops holding still — nightmares that rewrite the world around their victims."
+- "Five heists, five crews, one shared certainty that the last job is always the one that goes wrong."
+- "Small towns with long memories, where the mystery is less about the body than about everyone who knew it."`
+      : mode === 'graph'
+        ? `- "Journey through the complete saga of galactic conflicts and family drama. 12 films that defined a generation."
 - "Dark, atmospheric thrillers where nothing is as it seems. Prepare for twist endings and sleepless nights."
 - "A curated selection of mind-bending narratives from cinema's most innovative directors."`
-      : `- "A pulse-pounding journey through high-stakes heists and impossible escapes. Every film delivers edge-of-your-seat tension."
+        : `- "A pulse-pounding journey through high-stakes heists and impossible escapes. Every film delivers edge-of-your-seat tension."
 - "Heartwarming tales of unlikely friendships and second chances. Perfect for when you need to believe in happy endings."
 - "Dark, atmospheric thrillers where nothing is as it seems. Prepare for twist endings and sleepless nights."`
 
-  return `You are a movie curator writing a brief playlist description.${graphIntro}
+  return `You are a movie curator writing a brief playlist description.${originIntro}
 
 Write 1-2 sentences that capture what makes this collection special.
 
@@ -211,7 +291,7 @@ Rules:
 ${connectionRule}
 - Don't list genres directly - describe the feeling
 - If a playlist name is provided, the description should complement it
-- Write in third person (describe the playlist, not "you")
+- Write in third person (describe the playlist, not "you")${requestRule}
 ${itemCountRule}
 
 Examples:

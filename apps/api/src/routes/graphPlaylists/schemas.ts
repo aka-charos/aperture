@@ -67,6 +67,25 @@ export const graphPlaylistsSchemas = {
       movieIds: { type: 'array', items: { type: 'string', format: 'uuid' }, description: 'Movies in the playlist' },
       seriesIds: { type: 'array', items: { type: 'string', format: 'uuid' }, description: 'Series in the playlist' },
       name: { type: 'string', description: 'Existing name (for description generation)' },
+      chatContext: {
+        type: 'object',
+        description:
+          'Sent by the assistant chat only: what the user asked for and why each pick was shown. Switches the prompt to answer that request instead of describing a graph exploration.',
+        properties: {
+          request: { type: 'string', description: 'The user request these picks answer' },
+          reasons: {
+            type: 'array',
+            description: 'Per-title rationale as shown on the chat cards',
+            items: {
+              type: 'object',
+              properties: {
+                title: { type: 'string' },
+                reason: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
     },
   },
 } as const

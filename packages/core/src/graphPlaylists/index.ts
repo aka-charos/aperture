@@ -4,7 +4,11 @@
  */
 
 // AI generation
-export { generateGraphPlaylistName, generateGraphPlaylistDescription } from './ai.js'
+export {
+  generateGraphPlaylistName,
+  generateGraphPlaylistDescription,
+  type PlaylistChatContext,
+} from './ai.js'
 
 // Playlist operations
 export {

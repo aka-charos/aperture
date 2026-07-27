@@ -1,10 +1,15 @@
 import { createChildLogger } from '../lib/logger.js'
 import {
+  buildChatContextBlocks,
   fetchMoviesWithOverviewByIds,
   fetchSeriesWithOverviewByIds,
   generatePlaylistText,
   type MediaItem,
+  type PlaylistChatContext,
+  type PlaylistTextMode,
 } from '../lib/ai-playlist-generation.js'
+
+export type { PlaylistChatContext } from '../lib/ai-playlist-generation.js'
 
 const logger = createChildLogger('graphPlaylists')
 
@@ -47,10 +52,29 @@ async function buildGraphContext(
   return { context: contextParts.join('\n\n'), items: allItems }
 }
 
+/**
+ * Same endpoint serves the similarity-graph explorer and the assistant chat. The
+ * chat sends what it knows (the request, the per-card notes); the explorer sends
+ * nothing and keeps the graph brief. The request goes above the title list — it's
+ * the brief — and the rationale below it, as evidence.
+ */
+function composePrompt(
+  context: string,
+  chatContext: PlaylistChatContext | undefined,
+  extra = ''
+): { prompt: string; mode: PlaylistTextMode } {
+  const { requestBlock, reasonsBlock } = buildChatContextBlocks(chatContext)
+  return {
+    prompt: [requestBlock, context + extra, reasonsBlock].filter(Boolean).join('\n\n'),
+    mode: requestBlock || reasonsBlock ? 'chat' : 'graph',
+  }
+}
+
 export async function generateGraphPlaylistName(
   movieIds: string[],
   seriesIds: string[],
-  userId?: string
+  userId?: string,
+  chatContext?: PlaylistChatContext
 ): Promise<string> {
   logger.info({ movieCount: movieIds.length, seriesCount: seriesIds.length }, 'Generating graph playlist name')
 
@@ -60,11 +84,13 @@ export async function generateGraphPlaylistName(
     return 'My Collection'
   }
 
+  const { prompt, mode } = composePrompt(context, chatContext)
+
   try {
     const cleanName = await generatePlaylistText({
-      mode: 'graph',
+      mode,
       kind: 'name',
-      prompt: context,
+      prompt,
       userId,
     })
     logger.info({ name: cleanName }, 'Generated graph playlist name')
@@ -80,7 +106,8 @@ export async function generateGraphPlaylistDescription(
   movieIds: string[],
   seriesIds: string[],
   playlistName?: string,
-  userId?: string
+  userId?: string,
+  chatContext?: PlaylistChatContext
 ): Promise<string> {
   logger.info(
     { movieCount: movieIds.length, seriesCount: seriesIds.length, playlistName },
@@ -99,11 +126,13 @@ export async function generateGraphPlaylistDescription(
   const hasSeries = seriesIds.length > 0
   const mediaType = hasMovies && hasSeries ? 'movies and shows' : hasMovies ? 'movies' : 'shows'
 
+  const { prompt, mode } = composePrompt(context, chatContext, nameContext)
+
   try {
     const description = await generatePlaylistText({
-      mode: 'graph',
+      mode,
       kind: 'description',
-      prompt: context + nameContext,
+      prompt,
       userId,
       descriptionOptions: { playlistName, itemCount, mediaType },
     })

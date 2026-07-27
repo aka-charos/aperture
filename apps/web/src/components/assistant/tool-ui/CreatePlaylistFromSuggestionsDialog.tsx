@@ -29,6 +29,8 @@ interface CreatePlaylistFromSuggestionsDialogProps {
   open: boolean
   onClose: () => void
   items: ContentItem[]
+  /** The request these suggestions answered; grounds the AI name/description. */
+  request?: string
   onCreated?: (name: string) => void
 }
 
@@ -36,6 +38,7 @@ export function CreatePlaylistFromSuggestionsDialog({
   open,
   onClose,
   items,
+  request,
   onCreated,
 }: CreatePlaylistFromSuggestionsDialogProps) {
   const { t } = useTranslation()
@@ -61,6 +64,22 @@ export function CreatePlaylistFromSuggestionsDialog({
   const movieIds = selectedItems.filter((i) => i.type === 'movie').map((i) => i.id)
   const seriesIds = selectedItems.filter((i) => i.type === 'series').map((i) => i.id)
 
+  /**
+   * What the chat knows that the title list doesn't: the request these picks
+   * answered, and the note shown on each card. Without it the namer sees eleven
+   * horror films and has no way to tell that the thread is "reality comes apart"
+   * rather than "horror". Built from the SELECTED items, so deselecting a film
+   * also drops its rationale. Omitted entirely when there is nothing to say —
+   * the server then falls back to describing the titles alone.
+   */
+  const chatContext = () => {
+    const reasons = selectedItems
+      .filter((i) => i.reason)
+      .map((i) => ({ title: i.name, reason: i.reason as string }))
+    if (!request && reasons.length === 0) return undefined
+    return { ...(request ? { request } : {}), ...(reasons.length > 0 ? { reasons } : {}) }
+  }
+
   const toggleItem = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
@@ -78,7 +97,7 @@ export function CreatePlaylistFromSuggestionsDialog({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ movieIds, seriesIds }),
+        body: JSON.stringify({ movieIds, seriesIds, chatContext: chatContext() }),
       })
       if (!response.ok) throw new Error('Failed to generate name')
       const data = await response.json()
@@ -98,7 +117,12 @@ export function CreatePlaylistFromSuggestionsDialog({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ movieIds, seriesIds, name: name || undefined }),
+        body: JSON.stringify({
+          movieIds,
+          seriesIds,
+          name: name || undefined,
+          chatContext: chatContext(),
+        }),
       })
       if (!response.ok) throw new Error('Failed to generate description')
       const data = await response.json()
