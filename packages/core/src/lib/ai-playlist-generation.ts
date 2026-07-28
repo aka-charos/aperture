@@ -33,6 +33,21 @@ export interface PlaylistChatContext {
 const MAX_CONTEXT_REQUEST_LENGTH = 400
 const MAX_CONTEXT_REASONS = 8
 const MAX_CONTEXT_REASON_LENGTH = 260
+/** A drafted description runs to a paragraph or two; past this it's padding. */
+const MAX_USER_NOTES_LENGTH = 2000
+
+/**
+ * What the user had already typed into the box the model is about to overwrite.
+ *
+ * Sent only when they explicitly chose to keep it: a re-roll deliberately omits it, since the box
+ * usually holds an earlier generation and feeding that back is how a model never escapes its own
+ * last answer.
+ */
+export function buildUserNotesBlock(userNotes?: string): string {
+  const notes =
+    typeof userNotes === 'string' ? userNotes.trim().slice(0, MAX_USER_NOTES_LENGTH) : ''
+  return notes ? `THE USER'S OWN DRAFT (their words, written before they asked for help):\n${notes}` : ''
+}
 
 function isChatReason(value: unknown): value is { title: string; reason: string } {
   if (typeof value !== 'object' || value === null) return false
@@ -237,6 +252,8 @@ export interface PlaylistDescriptionOptions {
   playlistName?: string
   itemCount?: number
   mediaType?: string
+  /** The caller put a user draft in the prompt (see `buildUserNotesBlock`) — it outranks the rest. */
+  hasUserNotes?: boolean
 }
 
 const DESCRIPTION_ORIGIN_INTRO: Record<PlaylistTextMode, string> = {
@@ -263,6 +280,12 @@ function buildPlaylistDescriptionSystemPrompt(
 
   const requestRule =
     mode === 'chat' ? '\n- Never quote the request back or address the user ("you asked for…")' : ''
+
+  // Deliberately the strongest rule in the prompt: the draft is the one signal the titles cannot
+  // imply, so an angle it raises has to survive even when nothing else here supports it.
+  const notesRule = options.hasUserNotes
+    ? "\n- THE USER'S OWN DRAFT outranks everything else here. Keep every angle it raises, including one the titles give no reason to expect, and build the rest around it. Sharpen and tighten their wording; never drop it, contradict it, or hand it back word for word"
+    : ''
 
   const itemCountRule =
     mode !== 'channel' && options.itemCount !== undefined
@@ -291,7 +314,7 @@ Rules:
 ${connectionRule}
 - Don't list genres directly - describe the feeling
 - If a playlist name is provided, the description should complement it
-- Write in third person (describe the playlist, not "you")${requestRule}
+- Write in third person (describe the playlist, not "you")${requestRule}${notesRule}
 ${itemCountRule}
 
 Examples:

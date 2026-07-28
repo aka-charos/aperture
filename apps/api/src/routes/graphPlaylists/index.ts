@@ -69,6 +69,10 @@ const graphPlaylistRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * POST /api/graph-playlists/ai-description
    * Generate an AI-powered description for a graph playlist
+   *
+   * `userNotes` carries whatever was already in the Description box, and is sent only when the
+   * user picked "build on what I wrote". Optional, so a plain re-roll keeps the old behaviour of
+   * ignoring the box entirely.
    */
   fastify.post<{
     Body: {
@@ -76,12 +80,13 @@ const graphPlaylistRoutes: FastifyPluginAsync = async (fastify) => {
       seriesIds: string[]
       name?: string
       chatContext?: PlaylistChatContext
+      userNotes?: string
     }
   }>(
     '/api/graph-playlists/ai-description',
     { preHandler: requireAuth, schema: { tags: ["playlists"] } },
     async (request, reply) => {
-      const { movieIds, seriesIds, name, chatContext } = request.body
+      const { movieIds, seriesIds, name, chatContext, userNotes } = request.body
 
       if ((!movieIds || movieIds.length === 0) && (!seriesIds || seriesIds.length === 0)) {
         return reply.status(400).send({ error: 'At least one movie or series ID is required' })
@@ -94,7 +99,8 @@ const graphPlaylistRoutes: FastifyPluginAsync = async (fastify) => {
           seriesIds || [],
           name,
           currentUser.id,
-          chatContext
+          chatContext,
+          userNotes
         )
         return reply.send({ description })
       } catch (err) {

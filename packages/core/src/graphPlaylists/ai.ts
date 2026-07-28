@@ -1,6 +1,7 @@
 import { createChildLogger } from '../lib/logger.js'
 import {
   buildChatContextBlocks,
+  buildUserNotesBlock,
   fetchMoviesWithOverviewByIds,
   fetchSeriesWithOverviewByIds,
   generatePlaylistText,
@@ -61,12 +62,17 @@ async function buildGraphContext(
 function composePrompt(
   context: string,
   chatContext: PlaylistChatContext | undefined,
-  extra = ''
-): { prompt: string; mode: PlaylistTextMode } {
+  extra = '',
+  userNotes?: string
+): { prompt: string; mode: PlaylistTextMode; hasUserNotes: boolean } {
   const { requestBlock, reasonsBlock } = buildChatContextBlocks(chatContext)
+  const notesBlock = buildUserNotesBlock(userNotes)
   return {
-    prompt: [requestBlock, context + extra, reasonsBlock].filter(Boolean).join('\n\n'),
+    // The draft leads: it is the most recent and most specific thing the user said, and it
+    // outranks even the request that produced these picks.
+    prompt: [notesBlock, requestBlock, context + extra, reasonsBlock].filter(Boolean).join('\n\n'),
     mode: requestBlock || reasonsBlock ? 'chat' : 'graph',
+    hasUserNotes: Boolean(notesBlock),
   }
 }
 
@@ -102,12 +108,18 @@ export async function generateGraphPlaylistName(
   }
 }
 
+/**
+ * `userNotes` is whatever the user had already typed in the Description box, passed only when they
+ * chose "build on what I wrote". Omitted on a plain re-roll, which is what lets a second click
+ * produce a genuinely different take rather than a rewrite of the first one.
+ */
 export async function generateGraphPlaylistDescription(
   movieIds: string[],
   seriesIds: string[],
   playlistName?: string,
   userId?: string,
-  chatContext?: PlaylistChatContext
+  chatContext?: PlaylistChatContext,
+  userNotes?: string
 ): Promise<string> {
   logger.info(
     { movieCount: movieIds.length, seriesCount: seriesIds.length, playlistName },
@@ -126,7 +138,7 @@ export async function generateGraphPlaylistDescription(
   const hasSeries = seriesIds.length > 0
   const mediaType = hasMovies && hasSeries ? 'movies and shows' : hasMovies ? 'movies' : 'shows'
 
-  const { prompt, mode } = composePrompt(context, chatContext, nameContext)
+  const { prompt, mode, hasUserNotes } = composePrompt(context, chatContext, nameContext, userNotes)
 
   try {
     const description = await generatePlaylistText({
@@ -134,7 +146,7 @@ export async function generateGraphPlaylistDescription(
       kind: 'description',
       prompt,
       userId,
-      descriptionOptions: { playlistName, itemCount, mediaType },
+      descriptionOptions: { playlistName, itemCount, mediaType, hasUserNotes },
     })
     logger.info({ descriptionLength: description.length }, 'Generated graph playlist description')
     return description

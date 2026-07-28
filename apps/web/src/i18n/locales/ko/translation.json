@@ -2735,7 +2735,10 @@
     "aiPreferencesStartFresh": "Start fresh",
     "snackbarAIPreferencesRefinedOk": "AI preferences generated around your notes",
     "previewSeedReason": "One of your seed titles.",
-    "previewRuntimeMinutes": "{{minutes}} min"
+    "previewRuntimeMinutes": "{{minutes}} min",
+    "tooltipGenerateDescriptionChoose": "Generate a description with AI — keep what you wrote or start over",
+    "aiDescriptionBuildOnNotes": "Build on what I wrote",
+    "aiDescriptionStartFresh": "Start fresh"
   },
   "myRecommendations": {
     "pageTitle": "내 추천",
