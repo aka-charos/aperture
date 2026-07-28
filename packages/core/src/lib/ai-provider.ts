@@ -31,6 +31,14 @@ import {
   getOllamaModelCapabilities,
   getLmStudioModelCapabilities,
 } from './local-model-capabilities.js'
+import {
+  classifyQuotaError,
+  clearSlotCooldown,
+  isSlotCoolingDown,
+  markSlotExhausted,
+  type WebSearchKeySlot,
+} from './webSearchQuota.js'
+import { recordWebSearchCall } from './webSearchUsage.js'
 
 const logger = createChildLogger('ai-provider')
 
@@ -54,6 +62,13 @@ export interface ProviderConfig {
   model: string
   apiKey?: string
   baseUrl?: string
+  /**
+   * Second API key, used when `apiKey` runs out of quota. Only the Web Search
+   * role reads it today (Gemini's free tier is the thing that runs out), and it
+   * stays on the role rather than in the shared per-provider credential store —
+   * a spare key is a property of this role, not of the provider.
+   */
+  fallbackApiKey?: string
 }
 
 export interface AIConfig {
@@ -447,13 +462,25 @@ export async function getChatModelInstance(): Promise<LanguageModel> {
   return (provider as any)(modelId) as LanguageModel
 }
 
+/** One usable Web Search key, already turned into a model instance. */
+export interface WebSearchAttempt {
+  slot: WebSearchKeySlot
+  provider: ProviderType
+  modelId: string
+  model: LanguageModel
+}
+
 /**
- * Get a language model instance for the Web Search role (grounding-capable,
- * Google only for now). Used by the discovery pipeline to gather web-sourced
- * candidates in an ISOLATED call — separate from the chat assistant, so
- * grounding never mixes with the library tools (which the Gemini API rejects).
+ * Every API key configured for the Web Search role, as ready-to-use models, in
+ * the order they should be tried: keys currently parked by a 429 go last (but
+ * are never dropped — trying a parked key beats doing nothing at all).
+ *
+ * The Web Search role is Google-only for now, and its key is usually entered
+ * once for the chat role and shared. If this role has no key of its own, fall
+ * back to the shared credential store (then any other role on the same
+ * provider) so grounding doesn't fail with a missing-key error.
  */
-export async function getWebSearchModelInstance(): Promise<LanguageModel> {
+export async function getWebSearchAttempts(): Promise<WebSearchAttempt[]> {
   const config = await getFunctionConfig('webSearch')
 
   if (!config) {
@@ -462,10 +489,6 @@ export async function getWebSearchModelInstance(): Promise<LanguageModel> {
     )
   }
 
-  // The Web Search role is Google-only for now, and its key is usually entered
-  // once for the chat role and shared. If this role has no key of its own, fall
-  // back to the shared credential store (then any other role on the same
-  // provider) so grounding doesn't fail with a missing-key error.
   const resolved = await withResolvedCredentials(config)
   if (!resolved.apiKey) {
     logger.warn(
@@ -474,9 +497,123 @@ export async function getWebSearchModelInstance(): Promise<LanguageModel> {
     )
   }
 
-  const provider = createProviderInstance(resolved)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (provider as any)(resolved.model) as LanguageModel
+  const attempts: WebSearchAttempt[] = []
+  const seenKeys = new Set<string>()
+
+  const addSlot = (slot: WebSearchKeySlot, apiKey: string | undefined) => {
+    // A fallback that repeats the primary key is not a fallback: same Google
+    // project, same quota. Skip it instead of doubling the wasted requests.
+    const dedupeKey = apiKey ?? ''
+    if (seenKeys.has(dedupeKey)) return
+    seenKeys.add(dedupeKey)
+
+    const instance = createProviderInstance({ ...resolved, apiKey })
+    attempts.push({
+      slot,
+      provider: resolved.provider,
+      modelId: resolved.model,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      model: (instance as any)(resolved.model) as LanguageModel,
+    })
+  }
+
+  addSlot('primary', resolved.apiKey)
+  addSlot('fallback', config.fallbackApiKey?.trim() || undefined)
+
+  const ready = attempts.filter((a) => !isSlotCoolingDown(a.slot))
+  const parked = attempts.filter((a) => isSlotCoolingDown(a.slot))
+  return [...ready, ...parked]
+}
+
+/**
+ * Get a language model instance for the Web Search role (grounding-capable,
+ * Google only for now). Used by the discovery pipeline to gather web-sourced
+ * candidates in an ISOLATED call — separate from the chat assistant, so
+ * grounding never mixes with the library tools (which the Gemini API rejects).
+ *
+ * Returns the best key available right now. Callers that can afford a retry
+ * should prefer {@link withWebSearchModel}, which also switches keys mid-call
+ * when the first one 429s and records the call against the usage meter.
+ */
+export async function getWebSearchModelInstance(): Promise<LanguageModel> {
+  const attempts = await getWebSearchAttempts()
+  if (attempts.length === 0) {
+    throw new Error(
+      'Web Search provider is not configured. Please configure it in Settings > AI.'
+    )
+  }
+  return attempts[0].model
+}
+
+/** Token counts as the AI SDK reports them on a generation result. */
+export interface WebSearchUsageTokens {
+  inputTokens?: number
+  outputTokens?: number
+  totalTokens?: number
+}
+
+/** What a {@link withWebSearchModel} callback hands back: the value, and what it cost. */
+export interface WebSearchCallOutcome<T> {
+  value: T
+  usage?: WebSearchUsageTokens
+}
+
+/**
+ * Run a Web Search generation, moving to the fallback API key if the first one
+ * comes back `429 RESOURCE_EXHAUSTED`, and logging every attempt to the usage
+ * meter so the admin panel can show how much of the free tier is gone.
+ *
+ * Only quota failures move to the next key. A 400 or a safety refusal will fail
+ * the same way on any key, and burning the spare key's quota to confirm that
+ * helps nobody — those rethrow immediately, exactly as they did before.
+ *
+ * Throws when every key is exhausted (the last quota error), or when there is no
+ * key at all, so existing fail-open callers keep failing open unchanged.
+ */
+export async function withWebSearchModel<T>(
+  run: (model: LanguageModel, attempt: WebSearchAttempt) => Promise<WebSearchCallOutcome<T>>
+): Promise<T> {
+  const attempts = await getWebSearchAttempts()
+  if (attempts.length === 0) {
+    throw new Error(
+      'Web Search provider is not configured. Please configure it in Settings > AI.'
+    )
+  }
+
+  let lastQuotaError: unknown
+  for (const attempt of attempts) {
+    try {
+      const outcome = await run(attempt.model, attempt)
+      clearSlotCooldown(attempt.slot)
+      await recordWebSearchCall({
+        provider: attempt.provider,
+        model: attempt.modelId,
+        slot: attempt.slot,
+        status: 'ok',
+        ...outcome.usage,
+      })
+      return outcome.value
+    } catch (err) {
+      const quota = classifyQuotaError(err)
+      await recordWebSearchCall({
+        provider: attempt.provider,
+        model: attempt.modelId,
+        slot: attempt.slot,
+        status: quota.isQuota ? 'rate_limited' : 'error',
+      })
+
+      if (!quota.isQuota) throw err
+
+      markSlotExhausted(attempt.slot, quota)
+      lastQuotaError = err
+      logger.warn(
+        { slot: attempt.slot, scope: quota.scope, remaining: attempts.length - attempts.indexOf(attempt) - 1 },
+        'Web Search key is out of quota; trying the next key'
+      )
+    }
+  }
+
+  throw lastQuotaError
 }
 
 /**

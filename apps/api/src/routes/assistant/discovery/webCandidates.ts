@@ -19,10 +19,15 @@
 import { generateObject, generateText, type LanguageModel } from 'ai'
 import { z } from 'zod'
 import {
-  getWebSearchModelInstance,
+  getWebSearchAttempts,
   getTextGenerationModelInstance,
   getChatModelInstance,
   createChildLogger,
+  recordWebSearchCall,
+  classifyQuotaError,
+  markSlotExhausted,
+  type WebSearchKeySlot,
+  type WebSearchUsageTokens,
 } from '@aperture/core'
 import { recordLlmError } from '../helpers/errors.js'
 import { gatherFromSources } from './sources/index.js'
@@ -57,6 +62,14 @@ const LenientCandidateSchema = z.object({ ...candidateFields, reason: z.string()
 /** 'google' when the structuring model is the Gemini web-search role; else unknown. */
 type StructuringProvider = 'google' | undefined
 
+interface StructuringModel {
+  model: LanguageModel
+  provider: StructuringProvider
+  /** Set only for Google: which Web Search key this is, so its calls can be metered. */
+  keySlot?: WebSearchKeySlot
+  modelId?: string
+}
+
 /**
  * Resolve the model for the structuring pass. When Google grounding contributed
  * material this turn it is clearly working, so we prefer it (reliable structured
@@ -65,12 +78,20 @@ type StructuringProvider = 'google' | undefined
  * failing quota. That ordering is what lets Tavily's results survive a Google
  * outage (the fallback case), not just a Google-unconfigured setup.
  */
-async function getStructuringModel(
-  preferGoogle: boolean
-): Promise<{ model: LanguageModel; provider: StructuringProvider }> {
+async function getStructuringModel(preferGoogle: boolean): Promise<StructuringModel> {
   const tryGoogle = async () => {
     try {
-      return { model: await getWebSearchModelInstance(), provider: 'google' as const }
+      // Take the same key withWebSearchModel would start on, and keep hold of
+      // which one it is — structuring spends the same free-tier quota grounding
+      // does, so it has to land on the same meter.
+      const [attempt] = await getWebSearchAttempts()
+      if (!attempt) return null
+      return {
+        model: attempt.model,
+        provider: 'google' as const,
+        keySlot: attempt.slot,
+        modelId: attempt.modelId,
+      }
     } catch {
       return null
     }
@@ -214,7 +235,7 @@ export async function gatherWebCandidates(
   onStatus?.('discoveryShortlist')
 
   const googleContributed = results.some((r) => r.source === 'google')
-  let structuring: { model: LanguageModel; provider: StructuringProvider }
+  let structuring: StructuringModel
   try {
     structuring = await getStructuringModel(googleContributed)
   } catch (err) {
@@ -237,31 +258,72 @@ export async function gatherWebCandidates(
     'Infer mediaType (movie or series) from context. Ignore any text that is not a concrete movie/series recommendation.\n\n' +
     combined
 
-  const structure = async (candidateSchema: z.ZodTypeAny) => {
-    const { object } = await generateObject({
-      model: structuring.model,
-      maxRetries: SDK_MAX_RETRIES,
-      // No `.max()` here on purpose — see MAX_CANDIDATES. Over-long results are
-      // truncated after validation instead of failing it.
-      schema: z.object({ candidates: z.array(candidateSchema) }),
-      prompt: structurePrompt,
+  /**
+   * Put a structuring call on the Web Search meter — but only when structuring
+   * actually ran on the Gemini key. Structuring is a second billed call per
+   * discovery turn, so leaving it out would show the admin roughly half the
+   * requests Google counted. Never throws; a meter must not break the pipeline.
+   */
+  const meterGoogleCall = async (
+    status: 'ok' | 'rate_limited' | 'error',
+    usage?: WebSearchUsageTokens
+  ) => {
+    if (structuring.provider !== 'google' || !structuring.keySlot || !structuring.modelId) return
+    await recordWebSearchCall({
+      provider: 'google',
+      model: structuring.modelId,
+      slot: structuring.keySlot,
+      status,
+      ...usage,
     })
-    return object.candidates as DiscoveryCandidate[]
+  }
+
+  /** Meter a failure, and park the key when the failure was a quota rejection. */
+  const meterGoogleFailure = async (err: unknown) => {
+    const quota = classifyQuotaError(err)
+    await meterGoogleCall(quota.isQuota ? 'rate_limited' : 'error')
+    // Structuring can't switch keys mid-cascade, but the next request can — and
+    // will, because getWebSearchAttempts orders a parked key last.
+    if (quota.isQuota && structuring.keySlot) markSlotExhausted(structuring.keySlot, quota)
+  }
+
+  const structure = async (candidateSchema: z.ZodTypeAny) => {
+    try {
+      const { object, usage } = await generateObject({
+        model: structuring.model,
+        maxRetries: SDK_MAX_RETRIES,
+        // No `.max()` here on purpose — see MAX_CANDIDATES. Over-long results are
+        // truncated after validation instead of failing it.
+        schema: z.object({ candidates: z.array(candidateSchema) }),
+        prompt: structurePrompt,
+      })
+      await meterGoogleCall('ok', usage)
+      return object.candidates as DiscoveryCandidate[]
+    } catch (err) {
+      await meterGoogleFailure(err)
+      throw err
+    }
   }
 
   // Last-resort structuring for models that can't emit structured JSON at all:
   // ask for a JSON array as plain text and parse it tolerantly.
   const structureViaText = async (): Promise<DiscoveryCandidate[]> => {
-    const { text } = await generateText({
-      model: structuring.model,
-      maxRetries: SDK_MAX_RETRIES,
-      prompt:
-        structurePrompt +
-        '\n\nRespond with ONLY a JSON array (no prose, no code fences) of objects with keys ' +
-        '"title" (string), "year" (number, optional), "mediaType" ("movie" or "series"), and ' +
-        '"reason" (string). Example: [{"title":"…","year":1999,"mediaType":"movie","reason":"…"}]',
-    })
-    return parseCandidatesJson(text)
+    try {
+      const { text, usage } = await generateText({
+        model: structuring.model,
+        maxRetries: SDK_MAX_RETRIES,
+        prompt:
+          structurePrompt +
+          '\n\nRespond with ONLY a JSON array (no prose, no code fences) of objects with keys ' +
+          '"title" (string), "year" (number, optional), "mediaType" ("movie" or "series"), and ' +
+          '"reason" (string). Example: [{"title":"…","year":1999,"mediaType":"movie","reason":"…"}]',
+      })
+      await meterGoogleCall('ok', usage)
+      return parseCandidatesJson(text)
+    } catch (err) {
+      await meterGoogleFailure(err)
+      throw err
+    }
   }
 
   try {

@@ -103,6 +103,10 @@ export interface AIFunctionCardProps {
   requiredCapability?: 'toolCalling' | 'embeddings'
   compact?: boolean // For wizard mode
   isSetup?: boolean // Use unauthenticated /api/setup/* endpoints during first-run
+  /** Offer a second API key, used when the first one runs out of quota. */
+  supportsFallbackKey?: boolean
+  /** Extra content rendered just above the Test/Save buttons (e.g. a usage meter). */
+  footer?: React.ReactNode
 }
 
 export function AIFunctionCard({
@@ -116,6 +120,8 @@ export function AIFunctionCard({
   requiredCapability,
   compact = false,
   isSetup = false,
+  supportsFallbackKey = false,
+  footer,
 }: AIFunctionCardProps) {
   const { t } = useTranslation()
   // Use setup endpoints during first-run (no auth), settings endpoints after
@@ -147,6 +153,14 @@ export function AIFunctionCard({
   const [baseUrl, setBaseUrl] = useState(config?.baseUrl || '')
   const [showApiKey, setShowApiKey] = useState(false)
   const [initialized, setInitialized] = useState(false)
+
+  // Fallback key. `fallbackTouched` is what separates "the admin cleared this
+  // box" from "the admin never opened it" — only the former gets sent, so a save
+  // that ignores the field leaves the stored key alone.
+  const [fallbackApiKey, setFallbackApiKey] = useState('')
+  const [fallbackTouched, setFallbackTouched] = useState(false)
+  const [showFallbackKey, setShowFallbackKey] = useState(false)
+  const [hasSavedFallbackKey, setHasSavedFallbackKey] = useState(Boolean(config?.fallbackApiKey))
   
   // Custom model dialog state
   const [addModelDialogOpen, setAddModelDialogOpen] = useState(false)
@@ -182,6 +196,10 @@ export function AIFunctionCard({
       setInitialized(true)
     }
   }, [config, initialized])
+
+  useEffect(() => {
+    setHasSavedFallbackKey(Boolean(config?.fallbackApiKey))
+  }, [config?.fallbackApiKey])
   
   // Check capability warning
   const hasCapabilityWarning = requiredCapability === 'toolCalling' && 
@@ -241,11 +259,11 @@ export function AIFunctionCard({
     }
   }, [provider, baseUrl, providerInfo?.defaultBaseUrl])
 
-  const handleProviderChange = async (newProvider: ProviderType) => {
+  const handleProviderChange = useCallback(async (newProvider: ProviderType) => {
     setProvider(newProvider)
     setModel('')
     setTestResult(null)
-    
+
     // Fetch saved credentials for this provider
     try {
       const res = await fetch(`${apiBase}/credentials/${newProvider}`, { credentials: 'include' })
@@ -261,26 +279,70 @@ export function AIFunctionCard({
       setApiKey('')
       setBaseUrl(PROVIDER_INFO[newProvider]?.defaultBaseUrl || '')
     }
-  }
+  }, [apiBase])
+
+  /**
+   * A role can be restricted to a single provider — Web Search needs Google's
+   * native search grounding, so Google is the only one offered. When the current
+   * selection isn't on the list (an unconfigured card starts on the OpenAI
+   * default), move to what is actually available, or the card would list another
+   * provider's models and save a combination the server rejects.
+   */
+  useEffect(() => {
+    if (loadingProviders || providers.length === 0) return
+    if (providers.some((p) => p.id === provider)) return
+    void handleProviderChange(providers[0].id)
+  }, [loadingProviders, providers, provider, handleProviderChange])
+
+  /** True when this role offers exactly one provider — then it's a label, not a choice. */
+  const providerIsFixed = !loadingProviders && providers.length === 1
+  const fixedProvider = providerIsFixed ? providers[0] : null
+
+  /** The fallback key to exercise: whatever is typed, else whatever is stored. */
+  const effectiveFallbackKey = fallbackTouched
+    ? fallbackApiKey.trim()
+    : (config?.fallbackApiKey ?? '')
 
   const handleTest = async () => {
     setTesting(true)
     setTestResult(null)
     try {
-      const res = await fetch(`${apiBase}/test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          function: functionType,
-          provider,
-          model,
-          apiKey: apiKey || undefined,
-          baseUrl: baseUrl || undefined,
-        }),
-      })
-      const data = await res.json()
-      setTestResult(data)
+      const runTest = async (key: string | undefined) => {
+        const res = await fetch(`${apiBase}/test`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            function: functionType,
+            provider,
+            model,
+            apiKey: key || undefined,
+            baseUrl: baseUrl || undefined,
+          }),
+        })
+        return (await res.json()) as { success: boolean; error?: string }
+      }
+
+      const primary = await runTest(apiKey || undefined)
+      if (!primary.success) {
+        setTestResult(primary)
+        return
+      }
+
+      // A fallback key that doesn't work is worse than no fallback at all — you
+      // find out at the moment the main key runs out. Check it here instead.
+      if (supportsFallbackKey && effectiveFallbackKey) {
+        const fallback = await runTest(effectiveFallbackKey)
+        if (!fallback.success) {
+          setTestResult({
+            success: false,
+            error: t('aiFunctionCard.fallbackKeyFailed', { error: fallback.error ?? '' }),
+          })
+          return
+        }
+      }
+
+      setTestResult(primary)
     } catch {
       setTestResult({ success: false, error: t('aiFunctionCard.connectionFailed') })
     } finally {
@@ -294,8 +356,12 @@ export function AIFunctionCard({
       model,
       apiKey: apiKey || undefined,
       baseUrl: baseUrl || undefined,
+      // Sent only when the admin actually edited the box; see fallbackTouched.
+      ...(supportsFallbackKey && fallbackTouched
+        ? { fallbackApiKey: fallbackApiKey.trim() }
+        : {}),
     }
-    
+
     setSaving(true)
     setError(null)
     setSuccess(null)
@@ -303,6 +369,11 @@ export function AIFunctionCard({
       await onSave(newConfig)
       setSuccess(t('aiFunctionCard.configSaved'))
       setApiKey('') // Clear for security
+      if (fallbackTouched) {
+        setHasSavedFallbackKey(Boolean(fallbackApiKey.trim()))
+        setFallbackApiKey('')
+        setFallbackTouched(false)
+      }
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('aiFunctionCard.failedToSave'))
@@ -510,6 +581,46 @@ export function AIFunctionCard({
 
         {/* Provider & Model Selection */}
         <Box display="flex" flexDirection="column" gap={2} mb={2}>
+          {fixedProvider ? (
+            // One provider means there is nothing to choose. Show which one it is
+            // and why, rather than a dropdown with a single entry.
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                px: 1.5,
+                py: 1,
+                borderRadius: 1,
+                border: 1,
+                borderColor: 'divider',
+                bgcolor: 'action.hover',
+              }}
+            >
+              {PROVIDER_INFO[fixedProvider.id as ProviderType]?.logoPath ? (
+                <Box
+                  component="img"
+                  src={PROVIDER_INFO[fixedProvider.id as ProviderType].logoPath}
+                  alt={fixedProvider.name}
+                  sx={{
+                    width: 20,
+                    height: 20,
+                    objectFit: 'contain',
+                    filter: (theme) =>
+                      theme.palette.mode === 'dark' ? 'brightness(0) invert(1)' : 'none',
+                  }}
+                />
+              ) : (
+                <CloudIcon fontSize="small" />
+              )}
+              <Typography variant="body2" fontWeight={500}>
+                {fixedProvider.name}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+                {t('aiFunctionCard.onlyProvider')}
+              </Typography>
+            </Box>
+          ) : (
           <FormControl size="small" fullWidth>
             <InputLabel>{t('aiFunctionCard.provider')}</InputLabel>
             <Select
@@ -553,6 +664,7 @@ export function AIFunctionCard({
               })}
             </Select>
           </FormControl>
+          )}
 
           <FormControl size="small" fullWidth>
             <InputLabel>{t('aiFunctionCard.model')}</InputLabel>
@@ -783,6 +895,34 @@ export function AIFunctionCard({
           />
         )}
 
+        {/* Fallback API key — a second key to fall back on when the first one
+            hits its quota. Only offered for roles that ask for it. */}
+        {supportsFallbackKey && providerInfo?.requiresApiKey && (
+          <TextField
+            label={t('aiFunctionCard.fallbackApiKey')}
+            type={showFallbackKey ? 'text' : 'password'}
+            value={fallbackTouched ? fallbackApiKey : hasSavedFallbackKey ? '••••••••••••••••' : ''}
+            onChange={(e) => {
+              setFallbackTouched(true)
+              setFallbackApiKey(e.target.value.replace(/•/g, ''))
+            }}
+            size="small"
+            fullWidth
+            placeholder={t('aiFunctionCard.fallbackApiKeyPlaceholder')}
+            sx={{ mb: 2 }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton onClick={() => setShowFallbackKey(!showFallbackKey)} size="small">
+                    {showFallbackKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+            helperText={t('aiFunctionCard.fallbackApiKeyHelp')}
+          />
+        )}
+
         {/* Ollama Instructions */}
         {provider === 'ollama' && (
           <Box sx={{ 
@@ -867,6 +1007,8 @@ export function AIFunctionCard({
             }
           />
         )}
+
+        {footer}
 
         {/* Actions */}
         <Box display="flex" gap={1}>

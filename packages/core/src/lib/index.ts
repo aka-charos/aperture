@@ -50,6 +50,8 @@ export {
   getEmbeddingModelInstance,
   getChatModelInstance,
   getWebSearchModelInstance,
+  getWebSearchAttempts,
+  withWebSearchModel,
   getWebSearchProviderTools,
   getTextGenerationModelInstance,
   // Capability Checking
@@ -105,4 +107,33 @@ export {
   type ValidEmbeddingDimension,
   type LegacyEmbeddingsInfo,
   type CustomModel,
+  type WebSearchAttempt,
+  type WebSearchCallOutcome,
+  type WebSearchUsageTokens,
 } from './ai-provider.js'
+
+// Web Search free-tier quota (Gemini grounding role)
+export {
+  getFreeTierLimits,
+  classifyQuotaError,
+  markSlotExhausted,
+  isSlotCoolingDown,
+  clearSlotCooldown,
+  getSlotCooldownUntil,
+  getSlotCooldowns,
+  WEB_SEARCH_KEY_SLOTS,
+  type WebSearchKeySlot,
+  type FreeTierLimits,
+  type QuotaScope,
+  type QuotaErrorInfo,
+} from './webSearchQuota.js'
+
+export {
+  recordWebSearchCall,
+  getWebSearchUsageSummary,
+  type WebSearchCallStatus,
+  type WebSearchCallRecord,
+  type WebSearchUsageWindow,
+  type WebSearchSlotUsage,
+  type WebSearchUsageSummary,
+} from './webSearchUsage.js'

@@ -15,6 +15,7 @@
  * - GET /api/settings/ai/models - Get available models for provider
  * - POST /api/settings/ai/custom-models - Add custom model
  * - DELETE /api/settings/ai/custom-models - Delete custom model
+ * - GET /api/settings/ai/web-search/usage - Web Search free-tier usage meter
  * - GET /api/settings/ai/pricing - Get AI pricing
  * - GET /api/settings/ai/pricing/status - Get pricing cache status
  * - POST /api/settings/ai/pricing/refresh - Refresh pricing cache
@@ -47,6 +48,7 @@ import {
   deleteCustomModel,
   getSystemSetting,
   setSystemSetting,
+  getWebSearchUsageSummary,
   type AIFunction,
   type ProviderType,
 } from '@aperture/core'
@@ -97,7 +99,13 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       chat?: { provider: ProviderType; model: string; apiKey?: string; baseUrl?: string }
       textGeneration?: { provider: ProviderType; model: string; apiKey?: string; baseUrl?: string }
       exploration?: { provider: ProviderType; model: string; apiKey?: string; baseUrl?: string }
-      webSearch?: { provider: ProviderType; model: string; apiKey?: string; baseUrl?: string }
+      webSearch?: {
+        provider: ProviderType
+        model: string
+        apiKey?: string
+        baseUrl?: string
+        fallbackApiKey?: string
+      }
     }
   }>('/api/settings/ai', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
     try {
@@ -378,6 +386,30 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
     } catch (err) {
       fastify.log.error({ err }, 'Failed to delete custom model')
       return reply.status(500).send({ error: 'Failed to delete custom model' })
+    }
+  })
+
+  /**
+   * GET /api/settings/ai/web-search/usage
+   *
+   * Free-tier meter for the Web Search (Gemini grounding) role: requests in the
+   * last minute and since midnight US/Pacific, per API key, against Google's
+   * published limits for the configured model. Never 500s on a missing table —
+   * the summary degrades to zeroes so the settings page still renders.
+   */
+  fastify.get('/api/settings/ai/web-search/usage', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (_request, reply) => {
+    try {
+      const config = await getFunctionConfig('webSearch')
+      const usage = await getWebSearchUsageSummary(config?.model ?? null)
+      return reply.send({
+        configured: Boolean(config),
+        provider: config?.provider ?? null,
+        hasFallbackKey: Boolean(config?.fallbackApiKey),
+        ...usage,
+      })
+    } catch (err) {
+      fastify.log.error({ err }, 'Failed to get Web Search usage')
+      return reply.status(500).send({ error: 'Failed to get Web Search usage' })
     }
   })
 
@@ -664,11 +696,11 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
    */
   fastify.patch<{
     Params: { function: string }
-    Body: { provider: string; model: string; apiKey?: string; baseUrl?: string }
+    Body: { provider: string; model: string; apiKey?: string; baseUrl?: string; fallbackApiKey?: string }
   }>('/api/settings/ai/:function', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
     try {
       const fn = request.params.function as AIFunction
-      const { provider, model, apiKey, baseUrl } = request.body
+      const { provider, model, apiKey, baseUrl, fallbackApiKey } = request.body
 
       if (!['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'].includes(fn)) {
         return reply.status(400).send({ error: 'Invalid function. Must be embeddings, chat, textGeneration, exploration, or webSearch' })
@@ -687,11 +719,22 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         await setSystemSetting('ai_provider_credentials', JSON.stringify(credentials), 'Stored credentials for AI providers')
       }
 
+      // The primary key survives a keyless save because withResolvedCredentials
+      // finds it again in the shared credential store. The fallback key has no
+      // such store — it lives only here — so an omitted field must mean "leave it
+      // alone", and only an explicit empty string clears it.
+      const existing = await getFunctionConfig(fn)
+      const nextFallbackKey =
+        fallbackApiKey === undefined
+          ? existing?.fallbackApiKey
+          : fallbackApiKey.trim() || undefined
+
       await setFunctionConfig(fn, {
         provider: provider as ProviderType,
         model,
         apiKey,
         baseUrl,
+        fallbackApiKey: nextFallbackKey,
       })
 
       const config = await getFunctionConfig(fn)

@@ -10,11 +10,11 @@
  * Media types follow the channel: a movie-only channel gets movies, a series-only channel gets
  * shows, a mixed channel can get both.
  */
-import { generateObject, generateText, type LanguageModel } from 'ai'
+import { generateObject, generateText } from 'ai'
 import { z } from 'zod'
 import { createChildLogger } from '../lib/logger.js'
 import { query, queryOne } from '../lib/db.js'
-import { getWebSearchModelInstance, getWebSearchProviderTools } from '../lib/ai-provider.js'
+import { withWebSearchModel, getWebSearchProviderTools } from '../lib/ai-provider.js'
 import { parseChannelMediaTypes } from './recommendations.js'
 import type { ChannelMediaType, ChannelRecommendation } from './types.js'
 
@@ -85,14 +85,6 @@ async function gatherSimilarCandidates(
   textPreferences: string | null,
   genres: string[]
 ): Promise<WebCandidate[]> {
-  let model: LanguageModel
-  try {
-    model = await getWebSearchModelInstance()
-  } catch {
-    // Web Search role not configured — expansion is simply off.
-    return []
-  }
-
   const seedList = seeds
     .map((s) => {
       const label = s.year ? `${s.title} (${s.year})` : s.title
@@ -108,53 +100,66 @@ async function gatherSimilarCandidates(
   try {
     const tools = await getWebSearchProviderTools()
 
-    // Pass 1 — grounded similar-title suggestions per seed
-    const pass1 = await generateText({
-      model,
-      tools,
-      prompt:
-        `Using current web information, recommend ${wanted} that are SIMILAR to each of the seed titles below — ` +
-        'same franchise or creator/director, or strongly comparable in theme, tone and style. ' +
-        `Recommend ONLY ${wanted}. ` +
-        `Give about 4-6 similar titles for EACH seed. For each, state the exact title, release year, ` +
-        'and whether it is a movie or a TV series. ' +
-        'Include an IMDb id (tt…) or TMDb id ONLY if it appears in a source you actually used; otherwise omit it.' +
-        prefLine +
-        genreLine +
-        `\n\nSeed titles: ${seedList}`,
+    // Both passes run on the same key, and both count against its quota, so the
+    // whole thing sits inside withWebSearchModel: a 429 on either pass restarts
+    // on the fallback key rather than losing the expansion entirely.
+    return await withWebSearchModel<WebCandidate[]>(async (model) => {
+      // Pass 1 — grounded similar-title suggestions per seed
+      const pass1 = await generateText({
+        model,
+        tools,
+        prompt:
+          `Using current web information, recommend ${wanted} that are SIMILAR to each of the seed titles below — ` +
+          'same franchise or creator/director, or strongly comparable in theme, tone and style. ' +
+          `Recommend ONLY ${wanted}. ` +
+          `Give about 4-6 similar titles for EACH seed. For each, state the exact title, release year, ` +
+          'and whether it is a movie or a TV series. ' +
+          'Include an IMDb id (tt…) or TMDb id ONLY if it appears in a source you actually used; otherwise omit it.' +
+          prefLine +
+          genreLine +
+          `\n\nSeed titles: ${seedList}`,
+      })
+
+      const { text } = pass1
+      const grounding = (
+        pass1.providerMetadata?.google as
+          | { groundingMetadata?: { webSearchQueries?: string[]; groundingChunks?: unknown[] } }
+          | undefined
+      )?.groundingMetadata
+      logger.info(
+        {
+          seeds: seeds.length,
+          mediaTypes,
+          webSearchQueries: grounding?.webSearchQueries ?? [],
+          sources: pass1.sources?.length ?? 0,
+        },
+        'Channel web expansion: grounding completed'
+      )
+
+      if (!text?.trim()) return { value: [], usage: pass1.usage }
+
+      // Pass 2 — structure into typed candidates (no grounding needed)
+      const pass2 = await generateObject({
+        model,
+        schema: z.object({ candidates: z.array(CandidateSchema).max(60) }),
+        prompt:
+          'Extract the titles mentioned below into structured candidates. ' +
+          'Set type to "movie" or "show" based on what the text says it is. ' +
+          'Set imdbId/tmdbId ONLY if explicitly present in the text — never guess or invent an id.\n\n' +
+          text,
+      })
+
+      return {
+        value: pass2.object.candidates,
+        usage: {
+          inputTokens: (pass1.usage.inputTokens ?? 0) + (pass2.usage.inputTokens ?? 0),
+          outputTokens: (pass1.usage.outputTokens ?? 0) + (pass2.usage.outputTokens ?? 0),
+          totalTokens: (pass1.usage.totalTokens ?? 0) + (pass2.usage.totalTokens ?? 0),
+        },
+      }
     })
-
-    const { text } = pass1
-    const grounding = (
-      pass1.providerMetadata?.google as
-        | { groundingMetadata?: { webSearchQueries?: string[]; groundingChunks?: unknown[] } }
-        | undefined
-    )?.groundingMetadata
-    logger.info(
-      {
-        seeds: seeds.length,
-        mediaTypes,
-        webSearchQueries: grounding?.webSearchQueries ?? [],
-        sources: pass1.sources?.length ?? 0,
-      },
-      'Channel web expansion: grounding completed'
-    )
-
-    if (!text?.trim()) return []
-
-    // Pass 2 — structure into typed candidates (no grounding needed)
-    const { object } = await generateObject({
-      model,
-      schema: z.object({ candidates: z.array(CandidateSchema).max(60) }),
-      prompt:
-        'Extract the titles mentioned below into structured candidates. ' +
-        'Set type to "movie" or "show" based on what the text says it is. ' +
-        'Set imdbId/tmdbId ONLY if explicitly present in the text — never guess or invent an id.\n\n' +
-        text,
-    })
-
-    return object.candidates
   } catch (err) {
+    // Includes "Web Search role not configured" — expansion is simply off then.
     logger.warn({ err }, 'Channel web expansion gathering failed; skipping')
     return []
   }

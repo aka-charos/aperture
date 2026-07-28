@@ -9,15 +9,13 @@
  * Grounding has a tight per-minute quota, so back-to-back queries can 429 or
  * return empty text. We (a) set an explicit SDK maxRetries so 429/5xx get real
  * backoff, (b) retry once when grounding returns empty text (a 200 the SDK never
- * retries), and (c) record hard failures via recordLlmError (logs + api_errors
- * under 'google') instead of swallowing them.
+ * retries), (c) run through withWebSearchModel, which moves to the role's
+ * fallback API key when the first one is out of free-tier quota and meters every
+ * call, and (d) record hard failures via recordLlmError (logs + api_errors under
+ * 'google') instead of swallowing them.
  */
-import { generateText, type LanguageModel } from 'ai'
-import {
-  getWebSearchModelInstance,
-  getWebSearchProviderTools,
-  createChildLogger,
-} from '@aperture/core'
+import { generateText } from 'ai'
+import { withWebSearchModel, getWebSearchProviderTools, createChildLogger } from '@aperture/core'
 import { recordLlmError } from '../../helpers/errors.js'
 import type { WebSearchSource, WebSearchSourceResult } from './types.js'
 
@@ -42,53 +40,54 @@ const groundingPrompt = (query: string): string =>
 export const googleGroundingSource: WebSearchSource = {
   id: 'google',
   async gather(query: string): Promise<WebSearchSourceResult | null> {
-    let model: LanguageModel
-    try {
-      model = await getWebSearchModelInstance()
-    } catch {
-      // Web Search role not configured — this source is simply off.
-      return null
-    }
-
     try {
       const tools = await getWebSearchProviderTools()
 
-      // Retry when the grounded response comes back empty (a soft rate-limit /
-      // safety refusal returns a 200 with no text, which the SDK never retries).
-      let text = ''
-      for (let attempt = 1; attempt <= PASS1_MAX_ATTEMPTS; attempt++) {
-        const pass1 = await generateText({
-          model,
-          tools,
-          maxRetries: SDK_MAX_RETRIES,
-          prompt: groundingPrompt(query),
-        })
-        text = pass1.text ?? ''
+      // The empty-text retry sits INSIDE the key loop: an empty response is a
+      // soft refusal worth retrying on the same key, whereas a 429 means this
+      // key is done and withWebSearchModel should move to the next one.
+      const text = await withWebSearchModel(async (model, keyAttempt) => {
+        let text = ''
+        let usage: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | undefined
 
-        // Observability: prove grounding actually ran — the search queries Google
-        // issued and how many web sources came back (grep "web-source-google").
-        const grounding = (
-          pass1.providerMetadata?.google as
-            | { groundingMetadata?: { webSearchQueries?: string[]; groundingChunks?: unknown[] } }
-            | undefined
-        )?.groundingMetadata
-        logger.info(
-          {
-            attempt,
-            webSearchQueries: grounding?.webSearchQueries ?? [],
-            groundingChunks: grounding?.groundingChunks?.length ?? 0,
-            sources: pass1.sources?.length ?? 0,
-            textChars: text.length,
-          },
-          'Google grounding completed'
-        )
+        for (let attempt = 1; attempt <= PASS1_MAX_ATTEMPTS; attempt++) {
+          const pass1 = await generateText({
+            model,
+            tools,
+            maxRetries: SDK_MAX_RETRIES,
+            prompt: groundingPrompt(query),
+          })
+          text = pass1.text ?? ''
+          usage = pass1.usage
 
-        if (text.trim()) break
-        if (attempt < PASS1_MAX_ATTEMPTS) {
-          logger.warn({ attempt }, 'Google grounding returned empty text; retrying')
-          await sleep(PASS1_RETRY_DELAY_MS)
+          // Observability: prove grounding actually ran — the search queries Google
+          // issued and how many web sources came back (grep "web-source-google").
+          const grounding = (
+            pass1.providerMetadata?.google as
+              | { groundingMetadata?: { webSearchQueries?: string[]; groundingChunks?: unknown[] } }
+              | undefined
+          )?.groundingMetadata
+          logger.info(
+            {
+              attempt,
+              keySlot: keyAttempt.slot,
+              webSearchQueries: grounding?.webSearchQueries ?? [],
+              groundingChunks: grounding?.groundingChunks?.length ?? 0,
+              sources: pass1.sources?.length ?? 0,
+              textChars: text.length,
+            },
+            'Google grounding completed'
+          )
+
+          if (text.trim()) break
+          if (attempt < PASS1_MAX_ATTEMPTS) {
+            logger.warn({ attempt }, 'Google grounding returned empty text; retrying')
+            await sleep(PASS1_RETRY_DELAY_MS)
+          }
         }
-      }
+
+        return { value: text, usage }
+      })
 
       if (!text.trim()) {
         logger.warn(
@@ -100,8 +99,11 @@ export const googleGroundingSource: WebSearchSource = {
 
       return { source: 'google', text }
     } catch (err) {
-      // Hard failure (429, safety, 5xx) — recorded under the 'google' provider so
-      // it shows in logs AND the admin API-errors panel. Fail open to null.
+      // Web Search role not configured — this source is simply off, not broken.
+      if (err instanceof Error && /is not configured/i.test(err.message)) return null
+
+      // Hard failure (429 on every key, safety, 5xx) — recorded under the 'google'
+      // provider so it shows in logs AND the admin API-errors panel. Fail open to null.
       await recordLlmError(err, { context: 'discovery web search (google)', provider: 'google', logger })
       return null
     }

@@ -774,6 +774,7 @@
     "connectionSuccess": "Connection successful!",
     "connectionFailedWithError": "Connection failed: {{error}}",
     "provider": "Provider",
+    "onlyProvider": "Only provider for this role",
     "model": "Model",
     "loadingProviders": "Loading…",
     "loadingModels": "Loading models…",
@@ -791,6 +792,10 @@
     "apiKey": "API Key",
     "apiKeyPlaceholder": "Enter your {{provider}} API key",
     "getApiKeyPrefix": "Get your API key from",
+    "fallbackApiKey": "Fallback API Key",
+    "fallbackApiKeyPlaceholder": "Optional second key",
+    "fallbackApiKeyHelp": "Used automatically when the key above runs out of quota. Use a key from a different Google project — the same key shares the same limits.",
+    "fallbackKeyFailed": "The main key works, but the fallback key failed: {{error}}",
     "ollamaInstallTitle": "Install models on your Ollama server",
     "ollamaNotes": {
       "recommended": "recommended",
@@ -1956,8 +1961,8 @@
     "cardTextGenDesc": "Generates recommendation explanations, taste profiles, and playlist descriptions.",
     "cardExplorationTitle": "Exploration",
     "cardExplorationDesc": "Powers the Explore page. Uses AI to find meaningful connections from conceptual searches like \"feel-good comedies\".",
-    "cardWebSearchTitle": "Web Search",
-    "cardWebSearchDesc": "Optional. A grounding-capable model (Google) that finds current titles from the web for discovery requests, then matches them against your library. Leave unset to disable web discovery.",
+    "cardWebSearchTitle": "Google Gemini Web Search",
+    "cardWebSearchDesc": "Optional. Gemini's native search grounding finds current titles from the web for discovery requests, then matches them against your library. Google is the only provider that offers this. Leave unset to disable web discovery.",
     "embeddingSetsTitle": "Embedding Sets",
     "setsCount": "{{count}} sets",
     "embeddingSetsBody": "You have embeddings stored from multiple models. Inactive sets can be deleted to free up storage. When you switch back to a model with existing embeddings, they will be used immediately without regenerating.",
@@ -4109,5 +4114,21 @@
       "repairSuccessWithFailed": "Successfully repaired {{successful}} poster ({{failed}} failed)",
       "repairSuccessWithFailed_plural": "Successfully repaired {{successful}} posters ({{failed}} failed)"
     }
+  },
+  "webSearchUsage": {
+    "title": "Free tier usage",
+    "refresh": "Refresh",
+    "resets": "Daily allowance resets at {{time}}",
+    "noPublishedLimits": "Google publishes no free-tier limits for this model, so the counts below have nothing to measure against.",
+    "requestsToday": "Requests today",
+    "requestsThisMinute": "Requests this minute",
+    "tokensThisMinute": "{{used}} tokens this minute",
+    "tokensThisMinuteWithLimit": "{{used}} / {{limit}} tokens this minute",
+    "rateLimitedToday": "{{count}} rate-limited today",
+    "rateLimitedToday_plural": "{{count}} rate-limited today",
+    "paused": "{{slot}} is paused until {{time}} — Google turned it away for going over quota.",
+    "caveat": "Counted per Aperture request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
+    "slotPrimary": "Main key",
+    "slotFallback": "Fallback key"
   }
 }

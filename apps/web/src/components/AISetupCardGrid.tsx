@@ -8,6 +8,7 @@ import {
 } from '@mui/icons-material'
 import { useTranslation } from 'react-i18next'
 import { AIFunctionCard, type AIFunction } from './AIFunctionCard'
+import { WebSearchUsagePanel } from './WebSearchUsagePanel'
 import type { FunctionConfig } from './aiProviderInfo'
 
 export interface AISetupGridConfig {
@@ -86,7 +87,10 @@ export function AISetupCardGrid({ config, onSave, variant }: AISetupCardGridProp
         isSetup={isSetup}
       />
 
-      {/* Web Search — optional 5th role, admin settings only (not the onboarding wizard) */}
+      {/* Web Search — optional 5th role, admin settings only (not the onboarding
+          wizard). Google-only, because it rides on Gemini's native search
+          grounding, so the card locks its provider and offers a second API key
+          for when the free tier runs out. */}
       {variant === 'settings' && (
         <AIFunctionCard
           functionType="webSearch"
@@ -98,6 +102,8 @@ export function AISetupCardGrid({ config, onSave, variant }: AISetupCardGridProp
           onSave={(c) => onSave('webSearch', c)}
           compact={isSetup}
           isSetup={isSetup}
+          supportsFallbackKey
+          footer={<WebSearchUsagePanel />}
         />
       )}
     </Box>
