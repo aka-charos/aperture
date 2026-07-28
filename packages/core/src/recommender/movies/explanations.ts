@@ -26,8 +26,9 @@ async function getExplanationBatchSize(): Promise<{ batchSize: number; maxTokens
     return { batchSize: 3, maxTokens: 1000 }
   }
 
-  // Large context providers: OpenAI (128K), Anthropic (200K), Google (1M+), DeepSeek (64K)
-  const largeContextProviders = ['openai', 'anthropic', 'google', 'deepseek']
+  // Large context providers: OpenAI (128K), Anthropic (200K), Google (1M+), DeepSeek (64K),
+  // OpenRouter (a router in front of those same large-context models)
+  const largeContextProviders = ['openai', 'anthropic', 'google', 'deepseek', 'openrouter']
   if (largeContextProviders.includes(config.provider)) {
     return { batchSize: 10, maxTokens: 3000 }
   }
