@@ -53,36 +53,42 @@ export function CreatePlaylistDialog({
   const [generatingDescription, setGeneratingDescription] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [nameMenuAnchor, setNameMenuAnchor] = useState<HTMLElement | null>(null)
   const [descriptionMenuAnchor, setDescriptionMenuAnchor] = useState<HTMLElement | null>(null)
 
   // Separate nodes by type
   const movieIds = nodes.filter((n) => n.type === 'movie').map((n) => n.id)
   const seriesIds = nodes.filter((n) => n.type === 'series').map((n) => n.id)
 
-  const handleGenerateName = useCallback(async () => {
-    setGeneratingName(true)
-    setError(null)
+  /** `useNotes` keeps the drafted name as the thing to sharpen — see the description below. */
+  const handleGenerateName = useCallback(
+    async (useNotes = false) => {
+      const notes = useNotes ? name.trim() : ''
+      setGeneratingName(true)
+      setError(null)
 
-    try {
-      const response = await fetch('/api/graph-playlists/ai-name', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ movieIds, seriesIds }),
-      })
+      try {
+        const response = await fetch('/api/graph-playlists/ai-name', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ movieIds, seriesIds, userNotes: notes || undefined }),
+        })
 
-      if (!response.ok) {
-        throw new Error('Failed to generate name')
+        if (!response.ok) {
+          throw new Error('Failed to generate name')
+        }
+
+        const data = await response.json()
+        setName(data.name)
+      } catch {
+        setError(t('playlists.errGenerateName'))
+      } finally {
+        setGeneratingName(false)
       }
-
-      const data = await response.json()
-      setName(data.name)
-    } catch {
-      setError(t('playlists.errGenerateName'))
-    } finally {
-      setGeneratingName(false)
-    }
-  }, [movieIds, seriesIds, t])
+    },
+    [movieIds, seriesIds, name, t]
+  )
 
   /**
    * The result always replaces the box, so `useNotes` decides whether what's in there survives:
@@ -168,12 +174,14 @@ export function CreatePlaylistDialog({
       setName('')
       setDescription('')
       setError(null)
+      setNameMenuAnchor(null)
       setDescriptionMenuAnchor(null)
       onClose()
     }
   }
 
-  // Only offer the choice once there's something in the box worth keeping.
+  // Each sparkle only offers the choice once its own box has something worth keeping.
+  const hasName = name.trim().length > 0
   const hasDescription = description.trim().length > 0
 
   return (
@@ -221,11 +229,17 @@ export function CreatePlaylistDialog({
             <Typography variant="subtitle2" color="text.secondary">
               {t('playlists.playlistName')}
             </Typography>
-            <Tooltip title={t('playlists.tooltipGenerateName')}>
+            <Tooltip
+              title={t(
+                hasName ? 'playlists.tooltipGenerateNameChoose' : 'playlists.tooltipGenerateName'
+              )}
+            >
               <span>
                 <IconButton
                   size="small"
-                  onClick={handleGenerateName}
+                  onClick={(e) =>
+                    hasName ? setNameMenuAnchor(e.currentTarget) : handleGenerateName()
+                  }
                   disabled={generatingName || nodes.length === 0}
                   color="primary"
                 >
@@ -235,6 +249,30 @@ export function CreatePlaylistDialog({
                     <AutoAwesomeIcon fontSize="small" />
                   )}
                 </IconButton>
+                <Menu
+                  anchorEl={nameMenuAnchor}
+                  open={Boolean(nameMenuAnchor)}
+                  onClose={() => setNameMenuAnchor(null)}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                >
+                  <MenuItem
+                    onClick={() => {
+                      setNameMenuAnchor(null)
+                      handleGenerateName(true)
+                    }}
+                  >
+                    {t('playlists.aiBuildOnNotes')}
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => {
+                      setNameMenuAnchor(null)
+                      handleGenerateName(false)
+                    }}
+                  >
+                    {t('playlists.aiStartFresh')}
+                  </MenuItem>
+                </Menu>
               </span>
             </Tooltip>
           </Box>
@@ -291,7 +329,7 @@ export function CreatePlaylistDialog({
                       handleGenerateDescription(true)
                     }}
                   >
-                    {t('playlists.aiDescriptionBuildOnNotes')}
+                    {t('playlists.aiBuildOnNotes')}
                   </MenuItem>
                   <MenuItem
                     onClick={() => {
@@ -299,7 +337,7 @@ export function CreatePlaylistDialog({
                       handleGenerateDescription(false)
                     }}
                   >
-                    {t('playlists.aiDescriptionStartFresh')}
+                    {t('playlists.aiStartFresh')}
                   </MenuItem>
                 </Menu>
               </span>

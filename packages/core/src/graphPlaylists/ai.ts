@@ -76,11 +76,13 @@ function composePrompt(
   }
 }
 
+/** `userNotes` is the drafted name, passed only for "build on what I wrote" — see the description. */
 export async function generateGraphPlaylistName(
   movieIds: string[],
   seriesIds: string[],
   userId?: string,
-  chatContext?: PlaylistChatContext
+  chatContext?: PlaylistChatContext,
+  userNotes?: string
 ): Promise<string> {
   logger.info({ movieCount: movieIds.length, seriesCount: seriesIds.length }, 'Generating graph playlist name')
 
@@ -90,7 +92,7 @@ export async function generateGraphPlaylistName(
     return 'My Collection'
   }
 
-  const { prompt, mode } = composePrompt(context, chatContext)
+  const { prompt, mode, hasUserNotes } = composePrompt(context, chatContext, '', userNotes)
 
   try {
     const cleanName = await generatePlaylistText({
@@ -98,6 +100,7 @@ export async function generateGraphPlaylistName(
       kind: 'name',
       prompt,
       userId,
+      hasUserNotes,
     })
     logger.info({ name: cleanName }, 'Generated graph playlist name')
     return cleanName
@@ -146,7 +149,8 @@ export async function generateGraphPlaylistDescription(
       kind: 'description',
       prompt,
       userId,
-      descriptionOptions: { playlistName, itemCount, mediaType, hasUserNotes },
+      hasUserNotes,
+      descriptionOptions: { playlistName, itemCount, mediaType },
     })
     logger.info({ descriptionLength: description.length }, 'Generated graph playlist description')
     return description

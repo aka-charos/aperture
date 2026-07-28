@@ -31,18 +31,21 @@ const graphPlaylistRoutes: FastifyPluginAsync = async (fastify) => {
    * suggestions" dialog, which knows what the user asked for and why each pick
    * was shown. Optional: the similarity-graph explorer posts without it and
    * keeps the old behaviour.
+   *
+   * `userNotes` is the name already in the box, sent only for "build on what I wrote".
    */
   fastify.post<{
     Body: {
       movieIds: string[]
       seriesIds: string[]
       chatContext?: PlaylistChatContext
+      userNotes?: string
     }
   }>(
     '/api/graph-playlists/ai-name',
     { preHandler: requireAuth, schema: { tags: ["playlists"] } },
     async (request, reply) => {
-      const { movieIds, seriesIds, chatContext } = request.body
+      const { movieIds, seriesIds, chatContext, userNotes } = request.body
 
       if ((!movieIds || movieIds.length === 0) && (!seriesIds || seriesIds.length === 0)) {
         return reply.status(400).send({ error: 'At least one movie or series ID is required' })
@@ -54,7 +57,8 @@ const graphPlaylistRoutes: FastifyPluginAsync = async (fastify) => {
           movieIds || [],
           seriesIds || [],
           currentUser.id,
-          chatContext
+          chatContext,
+          userNotes
         )
         return reply.send({ name })
       } catch (err) {

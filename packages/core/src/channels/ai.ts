@@ -6,6 +6,7 @@ import { queryOne } from '../lib/db.js'
 import { buildAiLanguageInstruction } from '../lib/locales.js'
 import { resolveEffectiveAiLanguage } from '../lib/userSettings.js'
 import {
+  buildUserNotesBlock,
   fetchMoviesBasicByIds,
   fetchMoviesFullByIds,
   fetchSeriesWithOverviewByIds,
@@ -169,12 +170,17 @@ Write in first person as if the user is describing what they want. Keep it conci
   }
 }
 
+/**
+ * `userNotes` is the name the user had already drafted, sent only for "build on what I wrote".
+ * Distinct from `textPreferences`, which is a brief about the titles rather than about the name.
+ */
 export async function generateAIPlaylistName(
   genres: string[],
   exampleMovieIds: string[],
   textPreferences?: string,
   userId?: string,
-  exampleSeriesIds: string[] = []
+  exampleSeriesIds: string[] = [],
+  userNotes?: string
 ): Promise<string> {
   logger.info(
     { genres, exampleMovieCount: exampleMovieIds.length, exampleSeriesCount: exampleSeriesIds.length },
@@ -192,12 +198,16 @@ export async function generateAIPlaylistName(
     return 'My Playlist'
   }
 
+  const notesBlock = buildUserNotesBlock(userNotes)
+
   try {
     return await generatePlaylistText({
       mode: 'channel',
       kind: 'name',
-      prompt: context,
+      // The draft leads — everything below it can be derived from the seeds, and it can't.
+      prompt: [notesBlock, context].filter(Boolean).join('\n\n'),
       userId,
+      hasUserNotes: Boolean(notesBlock),
     })
   } catch (error) {
     // generatePlaylistText already turned this into an actionable message; keep it rather than
@@ -207,13 +217,15 @@ export async function generateAIPlaylistName(
   }
 }
 
+/** `userNotes` is the description the user had already drafted — see `generateAIPlaylistName`. */
 export async function generateAIPlaylistDescription(
   genres: string[],
   exampleMovieIds: string[],
   textPreferences?: string,
   playlistName?: string,
   userId?: string,
-  exampleSeriesIds: string[] = []
+  exampleSeriesIds: string[] = [],
+  userNotes?: string
 ): Promise<string> {
   logger.info(
     {
@@ -237,13 +249,15 @@ export async function generateAIPlaylistDescription(
   }
 
   const nameContext = playlistName ? `\nPLAYLIST NAME: "${playlistName}"` : ''
+  const notesBlock = buildUserNotesBlock(userNotes)
 
   try {
     return await generatePlaylistText({
       mode: 'channel',
       kind: 'description',
-      prompt: context + nameContext,
+      prompt: [notesBlock, context + nameContext].filter(Boolean).join('\n\n'),
       userId,
+      hasUserNotes: Boolean(notesBlock),
       descriptionOptions: { playlistName },
     })
   } catch (error) {

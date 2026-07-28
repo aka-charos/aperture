@@ -228,10 +228,20 @@ const NAME_EXAMPLES: Record<PlaylistTextMode, string> = {
 - "The Long Way Home" (asked for road movies about going back)`,
 }
 
-function buildPlaylistNameSystemPrompt(mode: PlaylistTextMode, langBlock: string): string {
+function buildPlaylistNameSystemPrompt(
+  mode: PlaylistTextMode,
+  langBlock: string,
+  hasUserNotes = false
+): string {
   const contextLine = NAME_CONTEXT_LINE[mode]
   const modeRules = NAME_MODE_RULES[mode]
   const examples = NAME_EXAMPLES[mode]
+
+  // A drafted name is short enough that a model will happily discard it as noise. Say plainly
+  // that it is the starting point, or "generate" quietly means "replace".
+  const notesRule = hasUserNotes
+    ? "\n- THE USER'S OWN DRAFT is the starting point, not one input among several. Keep what it anchors on — a word, a reference, its rhythm — and make it sharper. Never hand it back unchanged, and never swap it for something unrelated"
+    : ''
 
   return `You are a creative playlist naming expert. ${contextLine}
 
@@ -240,7 +250,7 @@ Rules:
 - Be creative and evocative, not generic
 ${modeRules}
 - Can use alliteration, wordplay, or cultural references
-- Don't use generic words like "Collection", "Playlist", "Mix"
+- Don't use generic words like "Collection", "Playlist", "Mix"${notesRule}
 
 Examples of good names:
 ${examples}
@@ -252,8 +262,6 @@ export interface PlaylistDescriptionOptions {
   playlistName?: string
   itemCount?: number
   mediaType?: string
-  /** The caller put a user draft in the prompt (see `buildUserNotesBlock`) — it outranks the rest. */
-  hasUserNotes?: boolean
 }
 
 const DESCRIPTION_ORIGIN_INTRO: Record<PlaylistTextMode, string> = {
@@ -267,7 +275,8 @@ const DESCRIPTION_ORIGIN_INTRO: Record<PlaylistTextMode, string> = {
 function buildPlaylistDescriptionSystemPrompt(
   mode: PlaylistTextMode,
   langBlock: string,
-  options: PlaylistDescriptionOptions = {}
+  options: PlaylistDescriptionOptions = {},
+  hasUserNotes = false
 ): string {
   const originIntro = DESCRIPTION_ORIGIN_INTRO[mode]
 
@@ -283,7 +292,7 @@ function buildPlaylistDescriptionSystemPrompt(
 
   // Deliberately the strongest rule in the prompt: the draft is the one signal the titles cannot
   // imply, so an angle it raises has to survive even when nothing else here supports it.
-  const notesRule = options.hasUserNotes
+  const notesRule = hasUserNotes
     ? "\n- THE USER'S OWN DRAFT outranks everything else here. Keep every angle it raises, including one the titles give no reason to expect, and build the rest around it. Sharpen and tighten their wording; never drop it, contradict it, or hand it back word for word"
     : ''
 
@@ -328,6 +337,8 @@ export async function generatePlaylistText(params: {
   kind: 'name' | 'description'
   prompt: string
   userId?: string
+  /** The prompt carries a user draft (see `buildUserNotesBlock`) — adds the rule that protects it. */
+  hasUserNotes?: boolean
   descriptionOptions?: PlaylistDescriptionOptions
 }): Promise<string> {
   const aiLocale = await resolvePlaylistAiLocale(params.userId)
@@ -337,8 +348,13 @@ export async function generatePlaylistText(params: {
 
   const system =
     params.kind === 'name'
-      ? buildPlaylistNameSystemPrompt(params.mode, langBlock)
-      : buildPlaylistDescriptionSystemPrompt(params.mode, langBlock, params.descriptionOptions)
+      ? buildPlaylistNameSystemPrompt(params.mode, langBlock, params.hasUserNotes)
+      : buildPlaylistDescriptionSystemPrompt(
+          params.mode,
+          langBlock,
+          params.descriptionOptions,
+          params.hasUserNotes
+        )
 
   let text: string | undefined
   let finishReason: string
