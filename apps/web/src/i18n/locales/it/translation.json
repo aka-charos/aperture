@@ -1306,7 +1306,12 @@
     "failedAddCustom": "Impossibile aggiungere il modello personalizzato",
     "failedDeleteCustom": "Impossibile eliminare il modello personalizzato",
     "customModelAdded": "Aggiunto il modello personalizzato \"{{name}}\"!",
-    "customModelDeleted": "Modello personalizzato \"{{name}}\" eliminato"
+    "customModelDeleted": "Modello personalizzato \"{{name}}\" eliminato",
+    "onlyProvider": "Only provider for this role",
+    "fallbackApiKey": "Fallback API Key",
+    "fallbackApiKeyPlaceholder": "Optional second key",
+    "fallbackApiKeyHelp": "Used automatically when the key above runs out of quota. Use a key from a different Google project — the same key shares the same limits.",
+    "fallbackKeyFailed": "The main key works, but the fallback key failed: {{error}}"
   },
   "topPicksOutputConfig": {
     "accordionTitle": "Qual è la differenza tra Libreria, Raccolta e Playlist?",
@@ -4109,5 +4114,21 @@
     "errConnect": "Could not connect to server",
     "maxContentChars": "Max characters per result",
     "maxContentCharsHelper": "Truncate each result snippet to this many characters (100–8000)"
+  },
+  "webSearchUsage": {
+    "title": "Free tier usage",
+    "refresh": "Refresh",
+    "resets": "Daily allowance resets at {{time}}",
+    "noPublishedLimits": "Google publishes no free-tier limits for this model, so the counts below have nothing to measure against.",
+    "requestsToday": "Requests today",
+    "requestsThisMinute": "Requests this minute",
+    "tokensThisMinute": "{{used}} tokens this minute",
+    "tokensThisMinuteWithLimit": "{{used}} / {{limit}} tokens this minute",
+    "rateLimitedToday": "{{count}} rate-limited today",
+    "rateLimitedToday_plural": "{{count}} rate-limited today",
+    "paused": "{{slot}} is paused until {{time}} — Google turned it away for going over quota.",
+    "caveat": "Counted per Aperture request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
+    "slotPrimary": "Main key",
+    "slotFallback": "Fallback key"
   }
 }

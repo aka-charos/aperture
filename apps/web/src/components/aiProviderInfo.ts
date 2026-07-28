@@ -25,6 +25,12 @@ export interface FunctionConfig {
   model: string
   apiKey?: string
   baseUrl?: string
+  /**
+   * Spare key used when the main one runs out of quota. Only the Web Search role
+   * offers it today. Omitted from a save request means "leave it as it is"; an
+   * empty string clears it (see the PATCH handler in settings/aiConfig.ts).
+   */
+  fallbackApiKey?: string
 }
 
 export const PROVIDER_INFO: Record<ProviderType, ProviderInfo> = {
