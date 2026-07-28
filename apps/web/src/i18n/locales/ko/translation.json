@@ -2731,14 +2731,13 @@
     "previewConfirm_other": "Add {{count}} titles",
     "previewConfirming": "Adding…",
     "tooltipAIPreferencesChoose": "Generate preferences with AI — keep what you wrote or start over",
-    "aiPreferencesBuildOnNotes": "Build on what I wrote",
-    "aiPreferencesStartFresh": "Start fresh",
     "snackbarAIPreferencesRefinedOk": "AI preferences generated around your notes",
     "previewSeedReason": "One of your seed titles.",
     "previewRuntimeMinutes": "{{minutes}} min",
     "tooltipGenerateDescriptionChoose": "Generate a description with AI — keep what you wrote or start over",
-    "aiDescriptionBuildOnNotes": "Build on what I wrote",
-    "aiDescriptionStartFresh": "Start fresh"
+    "tooltipGenerateNameChoose": "Generate a name with AI — keep what you wrote or start over",
+    "aiBuildOnNotes": "Build on what I wrote",
+    "aiStartFresh": "Start fresh"
   },
   "myRecommendations": {
     "pageTitle": "내 추천",
@@ -4024,11 +4023,13 @@
     "previewConfirm_other": "Add {{count}} titles",
     "previewConfirming": "Adding…",
     "tooltipAIPreferencesChoose": "Generate preferences with AI — keep what you wrote or start over",
-    "aiPreferencesBuildOnNotes": "Build on what I wrote",
-    "aiPreferencesStartFresh": "Start fresh",
     "snackbarAIPreferencesRefinedOk": "AI preferences generated around your notes",
     "previewSeedReason": "One of your seed titles.",
-    "previewRuntimeMinutes": "{{minutes}} min"
+    "previewRuntimeMinutes": "{{minutes}} min",
+    "tooltipGenerateNameChoose": "Generate a name with AI — keep what you wrote or start over",
+    "tooltipGenerateDescriptionChoose": "Generate a description with AI — keep what you wrote or start over",
+    "aiBuildOnNotes": "Build on what I wrote",
+    "aiStartFresh": "Start fresh"
   },
   "countryFilter": {
     "label": "Country",

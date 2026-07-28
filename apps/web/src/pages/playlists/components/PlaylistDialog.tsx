@@ -537,12 +537,18 @@ export function PlaylistDialog({
   }
 
   const preferencesMenu = [
-    { label: pt('aiPreferencesBuildOnNotes'), onClick: () => handleGenerateAIPreferences(true) },
-    { label: pt('aiPreferencesStartFresh'), onClick: () => handleGenerateAIPreferences(false) },
+    { label: pt('aiBuildOnNotes'), onClick: () => handleGenerateAIPreferences(true) },
+    { label: pt('aiStartFresh'), onClick: () => handleGenerateAIPreferences(false) },
   ]
 
-  // Generate AI-powered playlist name
-  const handleGenerateAIName = async () => {
+  /**
+   * Generate AI-powered playlist name.
+   *
+   * `useNotes` sends whatever name is already in the box, which the prompt then treats as the
+   * starting point to sharpen rather than as one more input to weigh. Off is the pre-existing
+   * behaviour: invent from the seeds alone, which is what a re-roll wants.
+   */
+  const handleGenerateAIName = async (useNotes = false) => {
     if (!canGenerate) {
       setSnackbar({
         open: true,
@@ -563,6 +569,7 @@ export function PlaylistDialog({
           exampleMovieIds: formData.exampleMovies.map((m) => m.id),
           exampleSeriesIds: formData.exampleSeries.map((s) => s.id),
           textPreferences: formData.textPreferences || undefined,
+          userNotes: (useNotes ? formData.name.trim() : '') || undefined,
         }),
       })
 
@@ -584,8 +591,13 @@ export function PlaylistDialog({
     }
   }
 
-  // Generate AI-powered playlist description
-  const handleGenerateAIDescription = async () => {
+  const nameMenu = [
+    { label: pt('aiBuildOnNotes'), onClick: () => handleGenerateAIName(true) },
+    { label: pt('aiStartFresh'), onClick: () => handleGenerateAIName(false) },
+  ]
+
+  /** Generate AI-powered playlist description — same `useNotes` contract as the name above. */
+  const handleGenerateAIDescription = async (useNotes = false) => {
     if (!canGenerate) {
       setSnackbar({
         open: true,
@@ -607,6 +619,7 @@ export function PlaylistDialog({
           exampleSeriesIds: formData.exampleSeries.map((s) => s.id),
           textPreferences: formData.textPreferences || undefined,
           playlistName: formData.name || undefined,
+          userNotes: (useNotes ? formData.description.trim() : '') || undefined,
         }),
       })
 
@@ -627,6 +640,15 @@ export function PlaylistDialog({
       setGeneratingAIDescription(false)
     }
   }
+
+  const descriptionMenu = [
+    { label: pt('aiBuildOnNotes'), onClick: () => handleGenerateAIDescription(true) },
+    { label: pt('aiStartFresh'), onClick: () => handleGenerateAIDescription(false) },
+  ]
+
+  // Each sparkle only offers the choice once its own box has something worth keeping.
+  const hasName = formData.name.trim().length > 0
+  const hasDescription = formData.description.trim().length > 0
 
   return (
     <Dialog
@@ -856,10 +878,11 @@ export function PlaylistDialog({
           theme={theme}
           aiButton={
             <AIButton
-              onClick={handleGenerateAIName}
+              onClick={() => handleGenerateAIName()}
+              menu={hasName ? nameMenu : undefined}
               loading={generatingAIName}
               disabled={!canGenerate}
-              tooltip={pt('tooltipGenerateName')}
+              tooltip={pt(hasName ? 'tooltipGenerateNameChoose' : 'tooltipGenerateName')}
               theme={theme}
             />
           }
@@ -881,10 +904,13 @@ export function PlaylistDialog({
           theme={theme}
           aiButton={
             <AIButton
-              onClick={handleGenerateAIDescription}
+              onClick={() => handleGenerateAIDescription()}
+              menu={hasDescription ? descriptionMenu : undefined}
               loading={generatingAIDescription}
               disabled={!canGenerate}
-              tooltip={pt('tooltipGenerateDescription')}
+              tooltip={pt(
+                hasDescription ? 'tooltipGenerateDescriptionChoose' : 'tooltipGenerateDescription'
+              )}
               theme={theme}
             />
           }

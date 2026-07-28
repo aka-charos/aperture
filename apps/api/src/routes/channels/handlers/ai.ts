@@ -60,6 +60,9 @@ export function registerAiHandlers(fastify: FastifyInstance) {
   /**
    * POST /api/channels/ai-name
    * Generate AI-powered playlist name based on genres, example movies, and preferences
+   *
+   * `userNotes` is the name already in the box, sent only for "build on what I wrote" — same
+   * optional contract as ai-preferences.
    */
   fastify.post<{
     Body: {
@@ -67,13 +70,14 @@ export function registerAiHandlers(fastify: FastifyInstance) {
       exampleMovieIds: string[]
       exampleSeriesIds?: string[]
       textPreferences?: string
+      userNotes?: string
     }
   }>(
     '/api/channels/ai-name',
     { preHandler: requireAuth, schema: { tags: ["playlists"] } },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
-      const { genres, exampleMovieIds, exampleSeriesIds, textPreferences } = request.body
+      const { genres, exampleMovieIds, exampleSeriesIds, textPreferences, userNotes } = request.body
 
       try {
         const name = await generateAIPlaylistName(
@@ -81,7 +85,8 @@ export function registerAiHandlers(fastify: FastifyInstance) {
           exampleMovieIds || [],
           textPreferences,
           currentUser.id,
-          exampleSeriesIds || []
+          exampleSeriesIds || [],
+          userNotes
         )
 
         return reply.send({ name })
@@ -97,6 +102,8 @@ export function registerAiHandlers(fastify: FastifyInstance) {
   /**
    * POST /api/channels/ai-description
    * Generate AI-powered playlist description based on genres, example movies, preferences, and name
+   *
+   * `userNotes` is the description already in the box — see ai-name.
    */
   fastify.post<{
     Body: {
@@ -105,13 +112,15 @@ export function registerAiHandlers(fastify: FastifyInstance) {
       exampleSeriesIds?: string[]
       textPreferences?: string
       playlistName?: string
+      userNotes?: string
     }
   }>(
     '/api/channels/ai-description',
     { preHandler: requireAuth, schema: { tags: ["playlists"] } },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
-      const { genres, exampleMovieIds, exampleSeriesIds, textPreferences, playlistName } = request.body
+      const { genres, exampleMovieIds, exampleSeriesIds, textPreferences, playlistName, userNotes } =
+        request.body
 
       try {
         const description = await generateAIPlaylistDescription(
@@ -120,7 +129,8 @@ export function registerAiHandlers(fastify: FastifyInstance) {
           textPreferences,
           playlistName,
           currentUser.id,
-          exampleSeriesIds || []
+          exampleSeriesIds || [],
+          userNotes
         )
 
         return reply.send({ description })

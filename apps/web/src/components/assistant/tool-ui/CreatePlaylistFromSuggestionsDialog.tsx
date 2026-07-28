@@ -51,6 +51,7 @@ export function CreatePlaylistFromSuggestionsDialog({
   const [generatingDescription, setGeneratingDescription] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [nameMenuAnchor, setNameMenuAnchor] = useState<HTMLElement | null>(null)
   const [descriptionMenuAnchor, setDescriptionMenuAnchor] = useState<HTMLElement | null>(null)
 
   // Pre-select every suggestion whenever the dialog opens ("add all" by default).
@@ -60,6 +61,7 @@ export function CreatePlaylistFromSuggestionsDialog({
       setName('')
       setDescription('')
       setError(null)
+      setNameMenuAnchor(null)
       setDescriptionMenuAnchor(null)
     }
   }, [open, items])
@@ -93,7 +95,9 @@ export function CreatePlaylistFromSuggestionsDialog({
     })
   }
 
-  const handleGenerateName = async () => {
+  /** `useNotes` keeps the drafted name as the thing to sharpen — see the description below. */
+  const handleGenerateName = async (useNotes = false) => {
+    const notes = useNotes ? name.trim() : ''
     setGeneratingName(true)
     setError(null)
     try {
@@ -101,7 +105,12 @@ export function CreatePlaylistFromSuggestionsDialog({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ movieIds, seriesIds, chatContext: chatContext() }),
+        body: JSON.stringify({
+          movieIds,
+          seriesIds,
+          chatContext: chatContext(),
+          userNotes: notes || undefined,
+        }),
       })
       if (!response.ok) throw new Error('Failed to generate name')
       const data = await response.json()
@@ -188,7 +197,8 @@ export function CreatePlaylistFromSuggestionsDialog({
     if (!creating) onClose()
   }
 
-  // Only offer the choice once there's something in the box worth keeping.
+  // Each sparkle only offers the choice once its own box has something worth keeping.
+  const hasName = name.trim().length > 0
   const hasDescription = description.trim().length > 0
 
   return (
@@ -226,11 +236,17 @@ export function CreatePlaylistFromSuggestionsDialog({
             <Typography variant="subtitle2" color="text.secondary">
               {t('playlists.playlistName')}
             </Typography>
-            <Tooltip title={t('playlists.tooltipGenerateName')}>
+            <Tooltip
+              title={t(
+                hasName ? 'playlists.tooltipGenerateNameChoose' : 'playlists.tooltipGenerateName'
+              )}
+            >
               <span>
                 <IconButton
                   size="small"
-                  onClick={handleGenerateName}
+                  onClick={(e) =>
+                    hasName ? setNameMenuAnchor(e.currentTarget) : handleGenerateName()
+                  }
                   disabled={generatingName || selectedItems.length === 0}
                   color="primary"
                 >
@@ -240,6 +256,30 @@ export function CreatePlaylistFromSuggestionsDialog({
                     <AutoAwesomeIcon fontSize="small" />
                   )}
                 </IconButton>
+                <Menu
+                  anchorEl={nameMenuAnchor}
+                  open={Boolean(nameMenuAnchor)}
+                  onClose={() => setNameMenuAnchor(null)}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                >
+                  <MenuItem
+                    onClick={() => {
+                      setNameMenuAnchor(null)
+                      handleGenerateName(true)
+                    }}
+                  >
+                    {t('playlists.aiBuildOnNotes')}
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => {
+                      setNameMenuAnchor(null)
+                      handleGenerateName(false)
+                    }}
+                  >
+                    {t('playlists.aiStartFresh')}
+                  </MenuItem>
+                </Menu>
               </span>
             </Tooltip>
           </Box>
@@ -296,7 +336,7 @@ export function CreatePlaylistFromSuggestionsDialog({
                       handleGenerateDescription(true)
                     }}
                   >
-                    {t('playlists.aiDescriptionBuildOnNotes')}
+                    {t('playlists.aiBuildOnNotes')}
                   </MenuItem>
                   <MenuItem
                     onClick={() => {
@@ -304,7 +344,7 @@ export function CreatePlaylistFromSuggestionsDialog({
                       handleGenerateDescription(false)
                     }}
                   >
-                    {t('playlists.aiDescriptionStartFresh')}
+                    {t('playlists.aiStartFresh')}
                   </MenuItem>
                 </Menu>
               </span>
