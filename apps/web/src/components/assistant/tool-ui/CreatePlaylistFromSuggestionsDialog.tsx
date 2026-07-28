@@ -18,6 +18,8 @@ import {
   Tooltip,
   Alert,
   Checkbox,
+  Menu,
+  MenuItem,
 } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
@@ -49,6 +51,7 @@ export function CreatePlaylistFromSuggestionsDialog({
   const [generatingDescription, setGeneratingDescription] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [descriptionMenuAnchor, setDescriptionMenuAnchor] = useState<HTMLElement | null>(null)
 
   // Pre-select every suggestion whenever the dialog opens ("add all" by default).
   useEffect(() => {
@@ -57,6 +60,7 @@ export function CreatePlaylistFromSuggestionsDialog({
       setName('')
       setDescription('')
       setError(null)
+      setDescriptionMenuAnchor(null)
     }
   }, [open, items])
 
@@ -109,7 +113,14 @@ export function CreatePlaylistFromSuggestionsDialog({
     }
   }
 
-  const handleGenerateDescription = async () => {
+  /**
+   * The result always replaces the box, so `useNotes` decides whether what's in there survives:
+   * it feeds the text back as the strongest signal in the prompt, keeping an angle the titles and
+   * the request would never surface on their own. Off — the pre-existing behaviour — ignores the
+   * box, which is the only way to get a different take once it already holds a generated draft.
+   */
+  const handleGenerateDescription = async (useNotes = false) => {
+    const notes = useNotes ? description.trim() : ''
     setGeneratingDescription(true)
     setError(null)
     try {
@@ -122,6 +133,7 @@ export function CreatePlaylistFromSuggestionsDialog({
           seriesIds,
           name: name || undefined,
           chatContext: chatContext(),
+          userNotes: notes || undefined,
         }),
       })
       if (!response.ok) throw new Error('Failed to generate description')
@@ -175,6 +187,9 @@ export function CreatePlaylistFromSuggestionsDialog({
   const handleClose = () => {
     if (!creating) onClose()
   }
+
+  // Only offer the choice once there's something in the box worth keeping.
+  const hasDescription = description.trim().length > 0
 
   return (
     <Dialog
@@ -244,11 +259,21 @@ export function CreatePlaylistFromSuggestionsDialog({
             <Typography variant="subtitle2" color="text.secondary">
               {t('playlists.descriptionOptional')}
             </Typography>
-            <Tooltip title={t('playlists.tooltipGenerateDescription')}>
+            <Tooltip
+              title={t(
+                hasDescription
+                  ? 'playlists.tooltipGenerateDescriptionChoose'
+                  : 'playlists.tooltipGenerateDescription'
+              )}
+            >
               <span>
                 <IconButton
                   size="small"
-                  onClick={handleGenerateDescription}
+                  onClick={(e) =>
+                    hasDescription
+                      ? setDescriptionMenuAnchor(e.currentTarget)
+                      : handleGenerateDescription()
+                  }
                   disabled={generatingDescription || selectedItems.length === 0}
                   color="primary"
                 >
@@ -258,16 +283,43 @@ export function CreatePlaylistFromSuggestionsDialog({
                     <AutoAwesomeIcon fontSize="small" />
                   )}
                 </IconButton>
+                <Menu
+                  anchorEl={descriptionMenuAnchor}
+                  open={Boolean(descriptionMenuAnchor)}
+                  onClose={() => setDescriptionMenuAnchor(null)}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                >
+                  <MenuItem
+                    onClick={() => {
+                      setDescriptionMenuAnchor(null)
+                      handleGenerateDescription(true)
+                    }}
+                  >
+                    {t('playlists.aiDescriptionBuildOnNotes')}
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => {
+                      setDescriptionMenuAnchor(null)
+                      handleGenerateDescription(false)
+                    }}
+                  >
+                    {t('playlists.aiDescriptionStartFresh')}
+                  </MenuItem>
+                </Menu>
               </span>
             </Tooltip>
           </Box>
+          {/* Grows with the text: a generated description runs past two rows, and this box is
+              also where a hand-written brief gets typed before asking for a rewrite. */}
           <TextField
             fullWidth
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder={t('playlists.descriptionPlaceholder')}
             multiline
-            rows={2}
+            minRows={2}
+            maxRows={10}
             disabled={creating}
             size="small"
           />

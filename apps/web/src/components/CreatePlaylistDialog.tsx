@@ -13,6 +13,8 @@ import {
   CircularProgress,
   Tooltip,
   Alert,
+  Menu,
+  MenuItem,
 } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
@@ -51,6 +53,7 @@ export function CreatePlaylistDialog({
   const [generatingDescription, setGeneratingDescription] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [descriptionMenuAnchor, setDescriptionMenuAnchor] = useState<HTMLElement | null>(null)
 
   // Separate nodes by type
   const movieIds = nodes.filter((n) => n.type === 'movie').map((n) => n.id)
@@ -81,30 +84,45 @@ export function CreatePlaylistDialog({
     }
   }, [movieIds, seriesIds, t])
 
-  const handleGenerateDescription = useCallback(async () => {
-    setGeneratingDescription(true)
-    setError(null)
+  /**
+   * The result always replaces the box, so `useNotes` decides whether what's in there survives:
+   * it feeds the text back as the strongest signal in the prompt, keeping an angle the graph
+   * exploration would never surface on its own. Off — the pre-existing behaviour — ignores the
+   * box, which is the only way to get a different take once it already holds a generated draft.
+   */
+  const handleGenerateDescription = useCallback(
+    async (useNotes = false) => {
+      const notes = useNotes ? description.trim() : ''
+      setGeneratingDescription(true)
+      setError(null)
 
-    try {
-      const response = await fetch('/api/graph-playlists/ai-description', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ movieIds, seriesIds, name: name || undefined }),
-      })
+      try {
+        const response = await fetch('/api/graph-playlists/ai-description', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            movieIds,
+            seriesIds,
+            name: name || undefined,
+            userNotes: notes || undefined,
+          }),
+        })
 
-      if (!response.ok) {
-        throw new Error('Failed to generate description')
+        if (!response.ok) {
+          throw new Error('Failed to generate description')
+        }
+
+        const data = await response.json()
+        setDescription(data.description)
+      } catch {
+        setError(t('playlists.errGenerateDescription'))
+      } finally {
+        setGeneratingDescription(false)
       }
-
-      const data = await response.json()
-      setDescription(data.description)
-    } catch {
-      setError(t('playlists.errGenerateDescription'))
-    } finally {
-      setGeneratingDescription(false)
-    }
-  }, [movieIds, seriesIds, name, t])
+    },
+    [movieIds, seriesIds, name, description, t]
+  )
 
   const handleCreate = useCallback(async () => {
     if (!name.trim()) {
@@ -150,9 +168,13 @@ export function CreatePlaylistDialog({
       setName('')
       setDescription('')
       setError(null)
+      setDescriptionMenuAnchor(null)
       onClose()
     }
   }
+
+  // Only offer the choice once there's something in the box worth keeping.
+  const hasDescription = description.trim().length > 0
 
   return (
     <Dialog
@@ -232,11 +254,21 @@ export function CreatePlaylistDialog({
             <Typography variant="subtitle2" color="text.secondary">
               {t('playlists.descriptionOptional')}
             </Typography>
-            <Tooltip title={t('playlists.tooltipGenerateDescription')}>
+            <Tooltip
+              title={t(
+                hasDescription
+                  ? 'playlists.tooltipGenerateDescriptionChoose'
+                  : 'playlists.tooltipGenerateDescription'
+              )}
+            >
               <span>
                 <IconButton
                   size="small"
-                  onClick={handleGenerateDescription}
+                  onClick={(e) =>
+                    hasDescription
+                      ? setDescriptionMenuAnchor(e.currentTarget)
+                      : handleGenerateDescription()
+                  }
                   disabled={generatingDescription || nodes.length === 0}
                   color="primary"
                 >
@@ -246,16 +278,43 @@ export function CreatePlaylistDialog({
                     <AutoAwesomeIcon fontSize="small" />
                   )}
                 </IconButton>
+                <Menu
+                  anchorEl={descriptionMenuAnchor}
+                  open={Boolean(descriptionMenuAnchor)}
+                  onClose={() => setDescriptionMenuAnchor(null)}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                >
+                  <MenuItem
+                    onClick={() => {
+                      setDescriptionMenuAnchor(null)
+                      handleGenerateDescription(true)
+                    }}
+                  >
+                    {t('playlists.aiDescriptionBuildOnNotes')}
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => {
+                      setDescriptionMenuAnchor(null)
+                      handleGenerateDescription(false)
+                    }}
+                  >
+                    {t('playlists.aiDescriptionStartFresh')}
+                  </MenuItem>
+                </Menu>
               </span>
             </Tooltip>
           </Box>
+          {/* Grows with the text: a generated description runs past two rows, and this box is
+              also where a hand-written brief gets typed before asking for a rewrite. */}
           <TextField
             fullWidth
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder={t('playlists.descriptionPlaceholder')}
             multiline
-            rows={2}
+            minRows={2}
+            maxRows={10}
             disabled={creating}
             size="small"
           />
