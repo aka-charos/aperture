@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import React, { useCallback, useState, useEffect, useRef } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import {
   AppBar,
   Box,
+  Button,
   Drawer,
   IconButton,
   List,
@@ -53,6 +54,12 @@ import { applyEffectiveUiLanguage } from '@/i18n/syncUiLanguage'
 
 const DRAWER_WIDTH = 260
 const DRAWER_WIDTH_COLLAPSED = 72
+/** Shown in the sidebar footer, and in the rail's tooltip where there's no room for it. */
+const APP_VERSION = 'v0.7.8'
+/** Pointer intent: brushing past the rail on the way somewhere else must not open it. */
+const FLYOUT_OPEN_DELAY_MS = 160
+/** Longer than the open delay, so a moment outside the panel doesn't snap it shut. */
+const FLYOUT_CLOSE_DELAY_MS = 240
 
 type NavItem = { textKey: string; icon: React.ReactElement; path: string; feature: string | null }
 
@@ -85,8 +92,24 @@ export function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
+  /**
+   * Below this, 260px of navigation against a ~1000px window leaves the content
+   * column cramped, so the icon rail is the better opening position. Above it,
+   * labelled navigation costs nothing worth having.
+   */
+  const isWideEnoughForLabels = useMediaQuery(theme.breakpoints.up('lg'))
+  /**
+   * A touch screen has no hover — there, "hovering" the rail is a tap that
+   * should navigate. The flyout is for mice and trackpads only.
+   */
+  const pointerCanHover = useMediaQuery('(hover: hover) and (pointer: fine)')
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(!isWideEnoughForLabels)
+  /** Once the user takes a side, their choice holds at every width. */
+  const [hasSidebarPreference, setHasSidebarPreference] = useState(false)
+  /** The rail is temporarily showing its labels over the page. */
+  const [flyout, setFlyout] = useState(false)
+  const flyoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [watchingEnabled, setWatchingEnabled] = useState(true) // Default to true until we know
   const { user, logout } = useAuth()
@@ -96,7 +119,13 @@ export function Layout() {
   // content tracks the pointer instead of easing behind it.
   const { dockWidth, dockResizing } = useAssistantDock()
 
+  /**
+   * The rail's own width. The AppBar and the page are laid out against this and
+   * not against the flyout, which is the point: revealing the labels never
+   * moves the content under the pointer.
+   */
   const drawerWidth = collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH
+  const showLabels = !collapsed || flyout
 
   // Filter menu items based on feature flags
   const userMenuItems = baseUserMenuItems.filter(item => {
@@ -117,8 +146,11 @@ export function Layout() {
         const response = await fetch('/api/auth/me/preferences', { credentials: 'include' })
         if (response.ok) {
           const prefs = await response.json()
+          // Absent until the user has actually toggled the sidebar, which is
+          // what lets the window width decide for everyone else.
           if (prefs.sidebarCollapsed !== undefined) {
             setCollapsed(prefs.sidebarCollapsed)
+            setHasSidebarPreference(true)
           }
           if (prefs.effectiveUiLanguage && typeof prefs.effectiveUiLanguage === 'string') {
             await applyEffectiveUiLanguage(prefs.effectiveUiLanguage)
@@ -147,6 +179,33 @@ export function Layout() {
     fetchWatchingConfig()
   }, [])
 
+  // Until the user has a preference of their own, the window decides — and
+  // keeps deciding, so dragging a window narrow folds the sidebar down with it.
+  useEffect(() => {
+    if (hasSidebarPreference) return
+    setCollapsed(!isWideEnoughForLabels)
+  }, [isWideEnoughForLabels, hasSidebarPreference])
+
+  // An expanded sidebar has nothing to fly out, and a pending timer would
+  // otherwise open one over it.
+  useEffect(() => {
+    if (collapsed) return
+    if (flyoutTimer.current) clearTimeout(flyoutTimer.current)
+    setFlyout(false)
+  }, [collapsed])
+
+  useEffect(
+    () => () => {
+      if (flyoutTimer.current) clearTimeout(flyoutTimer.current)
+    },
+    []
+  )
+
+  const scheduleFlyout = useCallback((next: boolean, delay: number) => {
+    if (flyoutTimer.current) clearTimeout(flyoutTimer.current)
+    flyoutTimer.current = setTimeout(() => setFlyout(next), delay)
+  }, [])
+
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen)
   }
@@ -154,6 +213,8 @@ export function Layout() {
   const handleCollapseToggle = async () => {
     const newCollapsed = !collapsed
     setCollapsed(newCollapsed)
+    setHasSidebarPreference(true)
+    setFlyout(false)
 
     // Persist preference to server
     try {
@@ -174,6 +235,26 @@ export function Layout() {
       setMobileOpen(false)
     }
   }
+
+  // Hovering the rail reveals its labels; tabbing into it does the same without
+  // a delay, or a keyboard user would be navigating by icon alone.
+  const railRevealProps =
+    isMobile || !collapsed
+      ? {}
+      : {
+          ...(pointerCanHover
+            ? {
+                onMouseEnter: () => scheduleFlyout(true, FLYOUT_OPEN_DELAY_MS),
+                onMouseLeave: () => scheduleFlyout(false, FLYOUT_CLOSE_DELAY_MS),
+              }
+            : {}),
+          onFocus: () => scheduleFlyout(true, 0),
+          onBlur: (event: React.FocusEvent<HTMLDivElement>) => {
+            // Fires on every move between items; only a departure counts.
+            if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
+            scheduleFlyout(false, 0)
+          },
+        }
 
   const handleUserMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget)
@@ -211,22 +292,27 @@ export function Layout() {
     return isPathActive(itemPath)
   }
 
-  const drawer = (
+  /**
+   * `labels` is not the same question as "is the sidebar collapsed": the rail
+   * shows its labels while flying out, and the mobile drawer is an overlay you
+   * dismiss, so it always shows them and has nothing to collapse.
+   */
+  const renderDrawer = ({ labels, collapsible }: { labels: boolean; collapsible: boolean }) => (
     <Box sx={{ overflow: 'auto', mt: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Logo */}
       <Box
-        px={collapsed ? 2 : 3}
+        px={labels ? 3 : 2}
         mb={3}
         sx={{
           display: 'flex',
-          justifyContent: collapsed ? 'center' : 'flex-start',
-          cursor: 'pointer',
-          '&:hover': { opacity: 0.8 },
+          justifyContent: labels ? 'flex-start' : 'center',
+          cursor: collapsible ? 'pointer' : 'default',
+          ...(collapsible && { '&:hover': { opacity: 0.8 } }),
           transition: 'opacity 0.2s',
         }}
-        onClick={handleCollapseToggle}
+        onClick={collapsible ? handleCollapseToggle : undefined}
       >
-        {collapsed ? (
+        {!labels ? (
           <Tooltip title={t('nav.expandSidebar')} placement="right">
             <Box
               component="img"
@@ -262,25 +348,25 @@ export function Layout() {
       <List>
         {userMenuItems.map((item) => (
           <ListItem key={item.path} disablePadding>
-            <Tooltip title={collapsed ? t(item.textKey) : ''} placement="right" arrow>
+            <Tooltip title={labels ? '' : t(item.textKey)} placement="right" arrow>
               <ListItemButton
                 selected={isPathActive(item.path)}
                 onClick={() => handleNavClick(item.path)}
                 sx={{
-                  justifyContent: collapsed ? 'center' : 'flex-start',
-                  px: collapsed ? 2 : 3,
+                  justifyContent: labels ? 'flex-start' : 'center',
+                  px: labels ? 3 : 2,
                 }}
               >
                 <ListItemIcon
                   sx={{
                     color: isPathActive(item.path) ? 'primary.main' : 'text.secondary',
-                    minWidth: collapsed ? 0 : 40,
-                    mr: collapsed ? 0 : 1,
+                    minWidth: labels ? 40 : 0,
+                    mr: labels ? 1 : 0,
                   }}
                 >
                   {item.icon}
                 </ListItemIcon>
-                {!collapsed && (
+                {labels && (
                   <ListItemText
                     primary={t(item.textKey)}
                     primaryTypographyProps={{
@@ -304,25 +390,25 @@ export function Layout() {
           <List>
             {adminMenuItems.map((item) => (
               <ListItem key={item.path} disablePadding>
-                <Tooltip title={collapsed ? t(item.textKey) : ''} placement="right" arrow>
+                <Tooltip title={labels ? '' : t(item.textKey)} placement="right" arrow>
                   <ListItemButton
                     selected={isAdminPathActive(item.path)}
                     onClick={() => handleNavClick(item.path)}
                     sx={{
-                      justifyContent: collapsed ? 'center' : 'flex-start',
-                      px: collapsed ? 2 : 3,
+                      justifyContent: labels ? 'flex-start' : 'center',
+                      px: labels ? 3 : 2,
                     }}
                   >
                     <ListItemIcon
                       sx={{
                         color: isAdminPathActive(item.path) ? 'primary.main' : 'text.secondary',
-                        minWidth: collapsed ? 0 : 40,
-                        mr: collapsed ? 0 : 1,
+                        minWidth: labels ? 40 : 0,
+                        mr: labels ? 1 : 0,
                       }}
                     >
                       {item.icon}
                     </ListItemIcon>
-                    {!collapsed && (
+                    {labels && (
                       <ListItemText
                         primary={t(item.textKey)}
                         primaryTypographyProps={{
@@ -340,33 +426,63 @@ export function Layout() {
 
       {/* Collapse toggle and version at bottom */}
       <Box
-        px={collapsed ? 1 : 2}
+        px={labels ? 2 : 1}
         py={1.5}
         sx={{
           borderTop: 1,
           borderColor: 'divider',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: collapsed ? 'center' : 'space-between',
+          gap: 1,
+          justifyContent: labels ? 'space-between' : 'center',
         }}
       >
-        <Tooltip
-          title={collapsed ? t('nav.expandSidebarVersion') : t('nav.collapseSidebar')}
-          placement="right"
-        >
-          <IconButton
-            onClick={handleCollapseToggle}
-            size="small"
-            sx={{
-              color: 'text.secondary',
-              transform: collapsed ? 'rotate(180deg)' : 'none',
-              transition: 'transform 0.2s',
-            }}
-          >
-            <MenuOpenIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-        {!collapsed && (
+        {collapsible &&
+          // Named rather than an icon you have to hover to understand. While
+          // the rail is flying out it offers to make that permanent, which is
+          // the only thing a click there could sensibly mean.
+          (labels ? (
+            <Button
+              onClick={handleCollapseToggle}
+              size="small"
+              color="inherit"
+              startIcon={
+                <MenuOpenIcon
+                  fontSize="small"
+                  sx={{
+                    transform: collapsed ? 'rotate(180deg)' : 'none',
+                    transition: 'transform 0.2s',
+                  }}
+                />
+              }
+              sx={{
+                color: 'text.secondary',
+                textTransform: 'none',
+                minWidth: 0,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
+            </Button>
+          ) : (
+            <Tooltip title={`${t('nav.expandSidebar')} · ${APP_VERSION}`} placement="right">
+              <IconButton
+                onClick={handleCollapseToggle}
+                size="small"
+                aria-label={t('nav.expandSidebar')}
+                sx={{
+                  color: 'text.secondary',
+                  transform: 'rotate(180deg)',
+                  transition: 'transform 0.2s',
+                }}
+              >
+                <MenuOpenIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          ))}
+        {/* Keeps the version on the far side when there is no toggle beside it */}
+        {!collapsible && <Box />}
+        {labels && (
           <Typography
             variant="caption"
             sx={{
@@ -376,7 +492,7 @@ export function Layout() {
               fontSize: '0.7rem',
             }}
           >
-            v0.7.8
+            {APP_VERSION}
           </Typography>
         )}
       </Box>
@@ -530,7 +646,8 @@ export function Layout() {
           }),
         }}
       >
-        {/* Mobile drawer */}
+        {/* Mobile drawer — an overlay you dismiss, so it is always full width
+            and labelled; the desktop rail preference has no say over it */}
         <Drawer
           variant="temporary"
           open={mobileOpen}
@@ -540,36 +657,40 @@ export function Layout() {
             display: { xs: 'block', md: 'none' },
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
-              width: drawerWidth,
-              transition: theme.transitions.create('width', {
-                easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.leavingScreen,
-              }),
+              width: DRAWER_WIDTH,
               overflowX: 'hidden',
             },
           }}
         >
-          {drawer}
+          {renderDrawer({ labels: true, collapsible: false })}
         </Drawer>
 
         {/* Desktop drawer */}
         <Drawer
           variant="permanent"
+          PaperProps={railRevealProps}
           sx={{
             display: { xs: 'none', md: 'block' },
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
-              width: drawerWidth,
+              width: flyout ? DRAWER_WIDTH : drawerWidth,
               transition: theme.transitions.create('width', {
                 easing: theme.transitions.easing.sharp,
                 duration: theme.transitions.duration.leavingScreen,
               }),
               overflowX: 'hidden',
+              // The paper is position:fixed, so the flyout floats over the page
+              // rather than pushing it. The shadow is what says "this is a
+              // layer that will go away", not a sidebar that just resized.
+              ...(flyout && {
+                boxShadow: theme.shadows[8],
+                zIndex: theme.zIndex.drawer + 2,
+              }),
             },
           }}
           open
         >
-          {drawer}
+          {renderDrawer({ labels: showLabels, collapsible: true })}
         </Drawer>
       </Box>
 
