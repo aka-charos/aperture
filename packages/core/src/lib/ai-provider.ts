@@ -28,6 +28,12 @@ import {
 } from './ai-capabilities.js'
 import { getOpenRouterModelCapabilities, getOpenRouterModelInfo } from './openrouter-capabilities.js'
 import {
+  createOpenRouterUsageFetch,
+  fetchOpenRouterKeyStatus,
+  type OpenRouterAccountStatus,
+} from './openrouter-usage.js'
+import { withInferenceContext } from './inferenceContext.js'
+import {
   getOllamaModelCapabilities,
   getLmStudioModelCapabilities,
 } from './local-model-capabilities.js'
@@ -223,15 +229,20 @@ async function migrateFromLegacyOpenAI(): Promise<AIConfig> {
 // Cache providers to avoid recreating them on every call
 const cachedProviders = new Map<string, unknown>()
 
-function getCacheKey(providerConfig: ProviderConfig): string {
-  return `${providerConfig.provider}:${providerConfig.apiKey ?? ''}:${providerConfig.baseUrl ?? ''}`
+function getCacheKey(providerConfig: ProviderConfig, role?: AIFunction): string {
+  return `${providerConfig.provider}:${providerConfig.apiKey ?? ''}:${providerConfig.baseUrl ?? ''}:${role ?? ''}`
 }
 
 /**
- * Create a provider instance based on configuration
+ * Create a provider instance based on configuration.
+ *
+ * `role` is only an attribution label: OpenRouter instances get a fetch that
+ * writes every call to the inference ledger, and the HTTP layer has no other way
+ * to learn which AI function made the request. It is part of the cache key so
+ * two roles sharing one key still get their own (correctly labelled) instance.
  */
-function createProviderInstance(providerConfig: ProviderConfig): unknown {
-  const cacheKey = getCacheKey(providerConfig)
+function createProviderInstance(providerConfig: ProviderConfig, role?: AIFunction): unknown {
+  const cacheKey = getCacheKey(providerConfig, role)
   const cached = cachedProviders.get(cacheKey)
   if (cached) return cached
 
@@ -297,6 +308,19 @@ function createProviderInstance(providerConfig: ProviderConfig): unknown {
       case 'openrouter':
         instance = createOpenRouter({
           apiKey: providerConfig.apiKey,
+          // Every response carries a `usage` object with the credits actually
+          // spent; this fetch reads it and writes the ledger the spend dashboard
+          // is built on. See lib/openrouter-usage.ts.
+          fetch: createOpenRouterUsageFetch(role),
+          // Attribution on openrouter.ai's own activity page, so a shared key's
+          // spend can be traced back to this app.
+          headers: {
+            'HTTP-Referer': 'https://github.com/dgruhin-hrizn/aperture',
+            'X-Title': 'Aperture',
+          },
+          // Documented as always-on now, and accepted-and-ignored when it is.
+          // Stated explicitly so the dependency is visible at the call site.
+          extraBody: { usage: { include: true } },
         })
         break
 
@@ -373,6 +397,17 @@ async function resolveBaseUrlForProvider(provider: ProviderType): Promise<string
 }
 
 /**
+ * OpenRouter's own account view for whichever key this instance is using:
+ * credits left and rolling spend. The key never leaves this module — callers get
+ * the numbers, not the credential. Null when OpenRouter isn't configured at all
+ * or the lookup failed.
+ */
+export async function getOpenRouterAccountStatus(): Promise<OpenRouterAccountStatus | null> {
+  const apiKey = await resolveApiKeyForProvider('openrouter')
+  return fetchOpenRouterKeyStatus(apiKey)
+}
+
+/**
  * Return a provider config guaranteed to carry an API key when one is available
  * anywhere in the configuration. No-op when the config already has its own key.
  */
@@ -398,7 +433,7 @@ export async function getEmbeddingModelInstance(): Promise<EmbeddingModel<string
     )
   }
 
-  const provider = createProviderInstance(config)
+  const provider = createProviderInstance(config, 'embeddings')
   const modelId = config.model
 
   // Different providers have different APIs for embeddings
@@ -454,7 +489,7 @@ export async function getChatModelInstance(): Promise<LanguageModel> {
   // Borrow a key from the shared store / another role on the same provider
   // when this role has no key of its own (mirrors getWebSearchModelInstance).
   const resolved = await withResolvedCredentials(config)
-  const provider = createProviderInstance(resolved)
+  const provider = createProviderInstance(resolved, 'chat')
   const modelId = resolved.model
 
   // All providers use similar API for language models
@@ -507,7 +542,7 @@ export async function getWebSearchAttempts(): Promise<WebSearchAttempt[]> {
     if (seenKeys.has(dedupeKey)) return
     seenKeys.add(dedupeKey)
 
-    const instance = createProviderInstance({ ...resolved, apiKey })
+    const instance = createProviderInstance({ ...resolved, apiKey }, 'webSearch')
     attempts.push({
       slot,
       provider: resolved.provider,
@@ -649,7 +684,7 @@ export async function getTextGenerationModelInstance(): Promise<LanguageModel> {
   // Borrow a key from the shared store / another role on the same provider
   // when this role has no key of its own (mirrors getWebSearchModelInstance).
   const resolved = await withResolvedCredentials(config)
-  const provider = createProviderInstance(resolved)
+  const provider = createProviderInstance(resolved, 'textGeneration')
   const modelId = resolved.model
 
   // All providers use similar API for language models
@@ -673,7 +708,7 @@ export async function getExplorationModelInstance(): Promise<LanguageModel> {
   // Borrow a key from the shared store / another role on the same provider
   // when this role has no key of its own (mirrors getWebSearchModelInstance).
   const resolved = await withResolvedCredentials(config)
-  const provider = createProviderInstance(resolved)
+  const provider = createProviderInstance(resolved, 'exploration')
   const modelId = resolved.model
 
   // All providers use similar API for language models
@@ -1017,8 +1052,19 @@ export async function testProviderConnection(
   providerConfig: ProviderConfig,
   fn: AIFunction
 ): Promise<{ success: boolean; error?: string }> {
+  // A test is a real billable request, so it lands in the ledger like any other.
+  // Labelling it keeps a burst of "Test" clicks from looking like mystery spend.
+  return withInferenceContext({ feature: 'settings.testConnection' }, () =>
+    runProviderConnectionTest(providerConfig, fn)
+  )
+}
+
+async function runProviderConnectionTest(
+  providerConfig: ProviderConfig,
+  fn: AIFunction
+): Promise<{ success: boolean; error?: string }> {
   try {
-    const provider = createProviderInstance(providerConfig)
+    const provider = createProviderInstance(providerConfig, fn)
 
     if (fn === 'embeddings') {
       // Test embedding

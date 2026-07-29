@@ -57,4 +57,12 @@ export interface FunctionPricing {
   inputCostPerMillion: number
   outputCostPerMillion: number
   embeddingDimensions?: number
+  /**
+   * False when nobody could tell us what this model costs — no published price
+   * in the registry, the Helicone table or the provider's own catalog. The costs
+   * above are then 0 as a placeholder, which is NOT the same as free: a UI that
+   * shows "$0.00" for an unpriced model is confidently wrong. Local providers
+   * are `true` (genuinely free), as is any model with a real price.
+   */
+  pricingKnown: boolean
 }

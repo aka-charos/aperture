@@ -17,7 +17,7 @@ import {
   type UIMessage,
   type ToolSet,
 } from 'ai'
-import { getChatModelInstance, getEmbeddingModelInstance, getActiveEmbeddingModelId } from '@aperture/core'
+import { getChatModelInstance, getEmbeddingModelInstance, getActiveEmbeddingModelId, withInferenceContext } from '@aperture/core'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText, loadConversationHistory, withUnwatchedFilter, createStatusEmitter, withStatusEvents, withRequestContext } from '../helpers/index.js'
 import { createTools, createN8nTools, createDiscoveryResolveTool, DISCOVERY_PROMPT } from '../tools/index.js'
@@ -142,6 +142,18 @@ export function registerChatHandler(fastify: FastifyInstance) {
           return assistantErrorText(error)
         }
 
+        // Bill every model this turn runs to the conversation, for the AI spend
+        // dashboard. A chat turn is the one place where several models fire for a
+        // single user action (intent routing, tools, discovery, the completion),
+        // so the conversation total is the only meaningful per-turn cost.
+        // createUIMessageStream invokes `execute` synchronously, so this scope
+        // covers all of it — see core lib/inferenceContext.ts.
+        const inferenceContext = {
+          feature: 'assistant.chat',
+          sessionId: conversationId || undefined,
+          userId: user.id,
+        }
+
         // Everything slow runs INSIDE execute, on an already-open stream, so each
         // phase can report itself to the UI (transient `data-status` parts) rather
         // than the user watching one static "Thinking…" through prompt building,
@@ -152,7 +164,8 @@ export function registerChatHandler(fastify: FastifyInstance) {
         // `start` + `error` pair the pre-stream failure path (see the catch below)
         // builds by hand. So a failure while building the prompt or routing intent
         // still reaches the client as a coded, localizable string.
-        const stream = createUIMessageStream({
+        const stream = withInferenceContext(inferenceContext, () =>
+          createUIMessageStream({
           onError: onStreamError,
           execute: async ({ writer }) => {
             // Creates the assistant message client-side; must precede any part.
@@ -313,7 +326,8 @@ export function registerChatHandler(fastify: FastifyInstance) {
             // one would open a second assistant message.
             writer.merge(result.toUIMessageStream({ sendStart: false, onError: onStreamError }))
           },
-        })
+          })
+        )
 
         const webResponse = createUIMessageStreamResponse({ stream })
 

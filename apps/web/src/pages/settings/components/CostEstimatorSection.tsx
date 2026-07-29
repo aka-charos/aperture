@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react'
+import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Box,
@@ -40,12 +40,31 @@ interface FunctionPricing {
   inputCostPerMillion: number
   outputCostPerMillion: number
   embeddingDimensions?: number
+  /**
+   * False when no price list knows this model. The costs above are then 0 as a
+   * placeholder — showing that as "$0.00" would claim the model is free, which
+   * is how this estimator used to report every OpenRouter configuration.
+   */
+  pricingKnown?: boolean
 }
 
 interface AIPricing {
   embeddings: FunctionPricing | null
   chat: FunctionPricing | null
   textGeneration: FunctionPricing | null
+  exploration: FunctionPricing | null
+  webSearch: FunctionPricing | null
+}
+
+/** How to present a role's money: a real price, genuinely free, or unknown. */
+type PriceState = 'priced' | 'local' | 'unknown'
+
+function priceState(pricing: FunctionPricing | null | undefined): PriceState {
+  if (!pricing) return 'unknown'
+  if (pricing.isLocalProvider) return 'local'
+  // pricingKnown is optional so an older API response degrades to the old
+  // behaviour rather than marking every model unknown.
+  return pricing.pricingKnown === false ? 'unknown' : 'priced'
 }
 
 interface UserEstimates {
@@ -177,18 +196,28 @@ export function CostEstimatorSection() {
     }
   }, [])
 
-  // Handle estimate change with debounce
+  // Handle estimate change with debounce.
+  //
+  // The timer id lives in a ref, not in a returned cleanup function: an event
+  // handler's return value is discarded, so the previous version scheduled a
+  // fresh PATCH on every keystroke and cancelled none of them.
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const handleEstimateChange = useCallback(
     (field: keyof UserEstimates) => (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = Math.max(0, parseInt(e.target.value, 10) || 0)
       const newEstimates = { ...userEstimates, [field]: value }
       setUserEstimates(newEstimates)
-      // Debounce the save
-      const timeout = setTimeout(() => saveUserEstimates(newEstimates), 1000)
-      return () => clearTimeout(timeout)
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      saveTimer.current = setTimeout(() => saveUserEstimates(newEstimates), 1000)
     },
     [userEstimates, saveUserEstimates]
   )
+
+  // Don't leave a pending save behind when the tab is switched away.
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+  }, [])
 
   // Calculate embedding cost for a given number of items and tokens
   const calculateEmbeddingCost = useCallback(
@@ -226,33 +255,42 @@ export function CostEstimatorSection() {
     [pricing]
   )
 
-  // One-time embedding costs (initial library)
+  // One-time embedding costs — for what is still UNEMBEDDED, not for the whole
+  // library. The API already reports the pending counts; billing the totals
+  // instead quoted the full initial cost forever, including on an installation
+  // that finished embedding months ago. Falls back to the totals only when the
+  // pending figures are absent (an older API).
   const oneTimeCosts = useMemo(() => {
     if (!costInputs?.library || !pricing?.embeddings) return []
 
+    const pending = costInputs.embeddings
+    const pendingMovies = pending?.movie.pendingItems ?? costInputs.library.totalMovies
+    const pendingSeries = pending?.series.pendingItems ?? costInputs.library.totalSeries
+    const pendingEpisodes = pending?.series.pendingEpisodes ?? costInputs.library.totalEpisodes
+
     const items: Array<{ categoryKey: OneTimeCategoryKey; count: number; cost: number }> = []
 
-    if (costInputs.library.totalMovies > 0) {
+    if (pendingMovies > 0) {
       items.push({
         categoryKey: 'oneTimeMovies',
-        count: costInputs.library.totalMovies,
-        cost: calculateEmbeddingCost(costInputs.library.totalMovies, TOKENS_PER_MOVIE),
+        count: pendingMovies,
+        cost: calculateEmbeddingCost(pendingMovies, TOKENS_PER_MOVIE),
       })
     }
 
-    if (costInputs.library.totalSeries > 0) {
+    if (pendingSeries > 0) {
       items.push({
         categoryKey: 'oneTimeSeries',
-        count: costInputs.library.totalSeries,
-        cost: calculateEmbeddingCost(costInputs.library.totalSeries, TOKENS_PER_SERIES),
+        count: pendingSeries,
+        cost: calculateEmbeddingCost(pendingSeries, TOKENS_PER_SERIES),
       })
     }
 
-    if (costInputs.library.totalEpisodes > 0) {
+    if (pendingEpisodes > 0) {
       items.push({
         categoryKey: 'oneTimeEpisodes',
-        count: costInputs.library.totalEpisodes,
-        cost: calculateEmbeddingCost(costInputs.library.totalEpisodes, TOKENS_PER_EPISODE),
+        count: pendingEpisodes,
+        cost: calculateEmbeddingCost(pendingEpisodes, TOKENS_PER_EPISODE),
       })
     }
 
@@ -371,6 +409,55 @@ export function CostEstimatorSection() {
     pricing?.chat?.isLocalProvider ||
     pricing?.textGeneration?.isLocalProvider
 
+  // Every role that has a model configured, in the order they're worth reading.
+  const configuredRoles = useMemo(() => {
+    const roles: Array<{ key: keyof AIPricing; labelKey: string }> = [
+      { key: 'embeddings', labelKey: 'fnEmbeddings' },
+      { key: 'textGeneration', labelKey: 'fnTextGeneration' },
+      { key: 'chat', labelKey: 'fnChat' },
+      { key: 'exploration', labelKey: 'fnExploration' },
+      { key: 'webSearch', labelKey: 'fnWebSearch' },
+    ]
+    return roles.flatMap(({ key, labelKey }) => {
+      const rolePricing = pricing?.[key]
+      if (!rolePricing) return []
+      return [
+        {
+          key,
+          label: t(`settingsCostEstimator.${labelKey}`),
+          pricing: rolePricing,
+          state: priceState(rolePricing),
+        },
+      ]
+    })
+  }, [pricing, t])
+
+  // Roles whose model nobody could price. Their rows read "unknown", and the
+  // headline totals get a caveat — an estimate missing a priced model is an
+  // undercount, not a bargain.
+  const unpricedRoles = configuredRoles.filter((r) => r.state === 'unknown')
+
+  /**
+   * Render a money cell for a row funded by `rolePricing`: the amount, a "local"
+   * chip when the provider is free, or a dash when the price is unknown.
+   */
+  const renderCost = (rolePricing: FunctionPricing | null | undefined, cost: number, digits: number) => {
+    const state = priceState(rolePricing)
+    if (state === 'local') {
+      return <Chip label={t('settingsCostEstimator.chipLocal')} size="small" color="success" variant="outlined" />
+    }
+    if (state === 'unknown') {
+      return (
+        <Tooltip title={t('settingsCostEstimator.priceUnknownTooltip')}>
+          <Typography variant="body2" color="text.secondary" component="span">
+            —
+          </Typography>
+        </Tooltip>
+      )
+    }
+    return `$${cost.toFixed(digits)}`
+  }
+
   // Loading state
   if (loading) {
     return (
@@ -415,81 +502,56 @@ export function CostEstimatorSection() {
           <Typography variant="subtitle2" fontWeight={600} gutterBottom>
             {t('settingsCostEstimator.yourConfig')}
           </Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' }, gap: 2 }}>
-            {pricing.embeddings && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                {pricing.embeddings.isLocalProvider ? (
+          {/* Every configured role, not just the three that get cost rows below —
+              exploration and Web Search spend money too, and omitting them from
+              the summary made the configuration look cheaper than it is. */}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+              gap: 2,
+            }}
+          >
+            {configuredRoles.map(({ key, label, pricing: rolePricing, state }) => (
+              <Box key={key} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                {state === 'local' ? (
                   <ComputerIcon fontSize="small" color="success" />
                 ) : (
-                  <CloudIcon fontSize="small" color="primary" />
+                  <CloudIcon fontSize="small" color={state === 'unknown' ? 'disabled' : 'primary'} />
                 )}
                 <Box>
                   <Typography variant="caption" color="text.secondary">
-                    {t('settingsCostEstimator.fnEmbeddings')}
+                    {label}
                   </Typography>
                   <Typography variant="body2">
-                    {pricing.embeddings.providerName} / {pricing.embeddings.modelName}
+                    {rolePricing.providerName} / {rolePricing.modelName}
                   </Typography>
-                  <Typography variant="caption" color={pricing.embeddings.isLocalProvider ? 'success.main' : 'text.secondary'}>
-                    {pricing.embeddings.isLocalProvider
+                  <Typography
+                    variant="caption"
+                    color={
+                      state === 'local'
+                        ? 'success.main'
+                        : state === 'unknown'
+                          ? 'warning.main'
+                          : 'text.secondary'
+                    }
+                  >
+                    {state === 'local'
                       ? t('settingsCostEstimator.localFree')
-                      : t('settingsCostEstimator.embedPricePerM', {
-                          price: `$${pricing.embeddings.inputCostPerMillion}`,
-                        })}
+                      : state === 'unknown'
+                        ? t('settingsCostEstimator.priceUnknown')
+                        : key === 'embeddings'
+                          ? t('settingsCostEstimator.embedPricePerM', {
+                              price: `$${rolePricing.inputCostPerMillion}`,
+                            })
+                          : t('settingsCostEstimator.textGenPricePerM', {
+                              input: `$${rolePricing.inputCostPerMillion}`,
+                              output: `$${rolePricing.outputCostPerMillion}`,
+                            })}
                   </Typography>
                 </Box>
               </Box>
-            )}
-            {pricing.textGeneration && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                {pricing.textGeneration.isLocalProvider ? (
-                  <ComputerIcon fontSize="small" color="success" />
-                ) : (
-                  <CloudIcon fontSize="small" color="primary" />
-                )}
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    {t('settingsCostEstimator.fnTextGeneration')}
-                  </Typography>
-                  <Typography variant="body2">
-                    {pricing.textGeneration.providerName} / {pricing.textGeneration.modelName}
-                  </Typography>
-                  <Typography variant="caption" color={pricing.textGeneration.isLocalProvider ? 'success.main' : 'text.secondary'}>
-                    {pricing.textGeneration.isLocalProvider
-                      ? t('settingsCostEstimator.localFree')
-                      : t('settingsCostEstimator.textGenPricePerM', {
-                          input: `$${pricing.textGeneration.inputCostPerMillion}`,
-                          output: `$${pricing.textGeneration.outputCostPerMillion}`,
-                        })}
-                  </Typography>
-                </Box>
-              </Box>
-            )}
-            {pricing.chat && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                {pricing.chat.isLocalProvider ? (
-                  <ComputerIcon fontSize="small" color="success" />
-                ) : (
-                  <CloudIcon fontSize="small" color="primary" />
-                )}
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    {t('settingsCostEstimator.fnChat')}
-                  </Typography>
-                  <Typography variant="body2">
-                    {pricing.chat.providerName} / {pricing.chat.modelName}
-                  </Typography>
-                  <Typography variant="caption" color={pricing.chat.isLocalProvider ? 'success.main' : 'text.secondary'}>
-                    {pricing.chat.isLocalProvider
-                      ? t('settingsCostEstimator.localFree')
-                      : t('settingsCostEstimator.textGenPricePerM', {
-                          input: `$${pricing.chat.inputCostPerMillion}`,
-                          output: `$${pricing.chat.outputCostPerMillion}`,
-                        })}
-                  </Typography>
-                </Box>
-              </Box>
-            )}
+            ))}
           </Box>
         </CardContent>
       </Card>
@@ -546,6 +608,19 @@ export function CostEstimatorSection() {
         </Alert>
       )}
 
+      {/* An unpriced model makes every total below an undercount. Say so — the
+          alternative is a confident $0.00 that reads as "this is free". */}
+      {unpricedRoles.length > 0 && (
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          <Typography variant="body2">
+            <strong>{t('settingsCostEstimator.unpricedTitle')}</strong>{' '}
+            {t('settingsCostEstimator.unpricedBody', {
+              models: unpricedRoles.map((r) => r.pricing.modelName).join(', '),
+            })}
+          </Typography>
+        </Alert>
+      )}
+
       {/* Cost Breakdown */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3, mb: 3 }}>
         {/* One-Time Costs */}
@@ -558,7 +633,7 @@ export function CostEstimatorSection() {
               </Typography>
             </Box>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-              {t('settingsCostEstimator.initialCaption', {
+              {t('settingsCostEstimator.initialCaptionPending', {
                 movies: costInputs?.library.totalMovies.toLocaleString() ?? '0',
                 series: costInputs?.library.totalSeries.toLocaleString() ?? '0',
                 episodes: costInputs?.library.totalEpisodes.toLocaleString() ?? '0',
@@ -579,7 +654,11 @@ export function CostEstimatorSection() {
                     <TableRow>
                       <TableCell colSpan={3}>
                         <Typography variant="body2" color="text.secondary" textAlign="center">
-                          {t('settingsCostEstimator.noEmbeddingsConfigured')}
+                          {/* Nothing pending means the library is fully embedded —
+                              a different thing from having no embeddings set up. */}
+                          {pricing?.embeddings
+                            ? t('settingsCostEstimator.allEmbedded')
+                            : t('settingsCostEstimator.noEmbeddingsConfigured')}
                         </Typography>
                       </TableCell>
                     </TableRow>
@@ -589,11 +668,7 @@ export function CostEstimatorSection() {
                         <TableCell>{cat(item.categoryKey)}</TableCell>
                         <TableCell align="right">{item.count.toLocaleString()}</TableCell>
                         <TableCell align="right">
-                          {pricing?.embeddings?.isLocalProvider ? (
-                            <Chip label={t('settingsCostEstimator.chipLocal')} size="small" color="success" variant="outlined" />
-                          ) : (
-                            `$${item.cost.toFixed(2)}`
-                          )}
+                          {renderCost(pricing?.embeddings, item.cost, 2)}
                         </TableCell>
                       </TableRow>
                     ))
@@ -606,8 +681,14 @@ export function CostEstimatorSection() {
                     </TableCell>
                     <TableCell align="right">
                       <Chip
-                        label={pricing?.embeddings?.isLocalProvider ? '$0.00' : `$${totalOneTimeCost.toFixed(2)}`}
-                        color={pricing?.embeddings?.isLocalProvider ? 'success' : 'primary'}
+                        label={
+                          priceState(pricing?.embeddings) === 'local'
+                            ? '$0.00'
+                            : priceState(pricing?.embeddings) === 'unknown'
+                              ? t('settingsCostEstimator.priceUnknownShort')
+                              : `$${totalOneTimeCost.toFixed(2)}`
+                        }
+                        color={priceState(pricing?.embeddings) === 'local' ? 'success' : 'primary'}
                         size="small"
                         sx={{ fontWeight: 600 }}
                       />
@@ -648,11 +729,7 @@ export function CostEstimatorSection() {
                       <TableCell>{cat(item.categoryKey)}</TableCell>
                       <TableCell align="right">{item.count}</TableCell>
                       <TableCell align="right">
-                        {pricing?.embeddings?.isLocalProvider ? (
-                          <Chip label={t('settingsCostEstimator.chipLocal')} size="small" color="success" variant="outlined" />
-                        ) : (
-                          `$${item.cost.toFixed(4)}`
-                        )}
+                        {renderCost(pricing?.embeddings, item.cost, 4)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -663,11 +740,7 @@ export function CostEstimatorSection() {
                       <TableCell>{cat(item.categoryKey)}</TableCell>
                       <TableCell align="right">{item.calls.toLocaleString()}</TableCell>
                       <TableCell align="right">
-                        {pricing?.textGeneration?.isLocalProvider ? (
-                          <Chip label={t('settingsCostEstimator.chipLocal')} size="small" color="success" variant="outlined" />
-                        ) : (
-                          `$${item.cost.toFixed(4)}`
-                        )}
+                        {renderCost(pricing?.textGeneration, item.cost, 4)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -687,11 +760,7 @@ export function CostEstimatorSection() {
                         })}
                       </TableCell>
                       <TableCell align="right">
-                        {pricing.chat.isLocalProvider ? (
-                          <Chip label={t('settingsCostEstimator.chipLocal')} size="small" color="success" variant="outlined" />
-                        ) : (
-                          `$${weeklyChatCost.toFixed(4)}`
-                        )}
+                        {renderCost(pricing.chat, weeklyChatCost, 4)}
                       </TableCell>
                     </TableRow>
                   )}
