@@ -129,7 +129,9 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
           [user.id]
         ),
 
-        // Movie recommendations (top 12)
+        // Movie recommendations — the latest completed run only. Reading
+        // across runs backfills the tail with the previous run's picks, which
+        // shows up as the same title twice in one row.
         query<{
           movie_id: string
           title: string
@@ -140,7 +142,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
           runtime_minutes: number | null
         }>(
           `
-          SELECT 
+          SELECT
             rc.movie_id,
             m.title,
             m.year,
@@ -149,20 +151,21 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
             rc.final_score,
             m.runtime_minutes
           FROM recommendation_candidates rc
-          JOIN recommendation_runs rr ON rr.id = rc.run_id
           JOIN movies m ON m.id = rc.movie_id
-          WHERE rr.user_id = $1 
-            AND rr.status = 'completed' 
-            AND rr.media_type = 'movie'
+          WHERE rc.run_id = (
+              SELECT id FROM recommendation_runs
+              WHERE user_id = $1 AND status = 'completed' AND media_type = 'movie'
+              ORDER BY created_at DESC
+              LIMIT 1
+            )
             AND rc.is_selected = true
             AND rc.movie_id IS NOT NULL
-          ORDER BY rr.created_at DESC, rc.selected_rank ASC
-          LIMIT 12
+          ORDER BY rc.selected_rank ASC NULLS LAST
         `,
           [user.id]
         ),
 
-        // Series recommendations (top 12)
+        // Series recommendations — latest completed run only, as above
         query<{
           series_id: string
           title: string
@@ -174,7 +177,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
           total_episodes: number | null
         }>(
           `
-          SELECT 
+          SELECT
             rc.series_id,
             s.title,
             s.year,
@@ -184,15 +187,16 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
             s.total_seasons,
             s.total_episodes
           FROM recommendation_candidates rc
-          JOIN recommendation_runs rr ON rr.id = rc.run_id
           JOIN series s ON s.id = rc.series_id
-          WHERE rr.user_id = $1 
-            AND rr.status = 'completed' 
-            AND rr.media_type = 'series'
+          WHERE rc.run_id = (
+              SELECT id FROM recommendation_runs
+              WHERE user_id = $1 AND status = 'completed' AND media_type = 'series'
+              ORDER BY created_at DESC
+              LIMIT 1
+            )
             AND rc.is_selected = true
             AND rc.series_id IS NOT NULL
-          ORDER BY rr.created_at DESC, rc.selected_rank ASC
-          LIMIT 12
+          ORDER BY rc.selected_rank ASC NULLS LAST
         `,
           [user.id]
         ),
