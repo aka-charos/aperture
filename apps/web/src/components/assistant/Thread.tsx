@@ -18,6 +18,7 @@ import {
   ComposerPrimitive,
   MessagePrimitive,
   ActionBarPrimitive,
+  useAssistantState,
   useComposerRuntime,
   useMessage,
   useThread,
@@ -402,9 +403,17 @@ const ASSISTANT_PART_COMPONENTS = {
  * Reordering the indices rather than reordering with CSS `order` keeps the DOM
  * in reading order, so selection, copy and screen readers agree with the page.
  * Parts within each group keep their relative order.
+ *
+ * The part list MUST come from `useAssistantState` — the same store
+ * `MessagePrimitive.PartByIndex` resolves an index against. `useMessage` is a
+ * second, independent `useSyncExternalStore` subscription (over the legacy
+ * message runtime), and there is no ordering guarantee between two stores: mid-
+ * stream this component handed out an index the api store's part map did not
+ * hold yet, `PartByIndex` threw "Resource not found for lookup" during render,
+ * and with no boundary above it that unmounted the entire app.
  */
 function OrderedMessageParts() {
-  const parts = useMessage((m) => m.content)
+  const parts = useAssistantState(({ message }) => message.parts)
 
   const order = useMemo(() => {
     const text: number[] = []
