@@ -26,6 +26,7 @@ import HistoryIcon from '@mui/icons-material/History'
 import { AssistantRuntimeProvider, useThreadRuntime } from '@assistant-ui/react'
 import { useChatRuntime, AssistantChatTransport } from '@assistant-ui/react-ai-sdk'
 import { Thread } from './Thread'
+import { ThreadErrorBoundary } from './ThreadErrorBoundary'
 import { getUnwatchedOnly } from './unwatchedPreference'
 import { setStatusPhase } from './assistantStatus'
 import { AICapabilityBanner } from '../AICapabilityBanner'
@@ -100,7 +101,11 @@ function ChatThreadArea({
         fetchConversations={fetchConversations}
         onSaveError={onSaveError}
       />
-      <Thread historicalMessages={historicalMessages} suggestions={suggestions} />
+      {/* Inside the provider, so a retry re-renders into the same runtime and
+          the conversation survives. */}
+      <ThreadErrorBoundary>
+        <Thread historicalMessages={historicalMessages} suggestions={suggestions} />
+      </ThreadErrorBoundary>
     </AssistantRuntimeProvider>
   )
 }
