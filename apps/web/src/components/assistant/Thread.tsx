@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { Box, Paper, Typography, Avatar, CircularProgress, TextField, IconButton, Button, Tooltip, Checkbox, FormControlLabel } from '@mui/material'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { Box, Paper, Typography, Avatar, CircularProgress, TextField, IconButton, Button, Tooltip, Checkbox, FormControlLabel, Fab } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import SendIcon from '@mui/icons-material/Send'
 import StopIcon from '@mui/icons-material/Stop'
@@ -9,6 +9,8 @@ import ReplayIcon from '@mui/icons-material/Replay'
 import SmartToyIcon from '@mui/icons-material/SmartToy'
 import PersonIcon from '@mui/icons-material/Person'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import {
@@ -18,7 +20,9 @@ import {
   ActionBarPrimitive,
   useComposerRuntime,
   useMessage,
+  useThread,
 } from '@assistant-ui/react'
+import type { TextMessagePartProps, ToolCallMessagePartProps } from '@assistant-ui/react'
 import {
   ContentCarousel,
   ContentDetail,
@@ -301,14 +305,134 @@ function AssistantActionBar() {
   )
 }
 
+/**
+ * Marks the outer row of an assistant answer. The scroll controls need to find
+ * where the last answer starts, and both the live and the reloaded renderers
+ * carry it so a mixed thread behaves the same either way.
+ */
+const ANSWER_MARKER_PROP = { 'data-aperture-answer': '' }
+
+// Renderers live at module scope so MessagePrimitive.PartByIndex's memo (which
+// compares component identity) survives the re-render every streamed token
+// causes.
+function AssistantTextPart({ text }: TextMessagePartProps) {
+  // Don't render empty text parts
+  if (!text || !text.trim()) return null
+  return (
+    <Paper
+      sx={{
+        ...bubbleSx('90%'),
+        p: 2,
+        mb: 2,
+        bgcolor: 'rgba(26, 26, 26, 0.7)',
+        borderRadius: 2,
+        borderStartStartRadius: 0,
+      }}
+    >
+      <Box
+        sx={{
+          '& p': { my: 1.5 },
+          '& p:first-of-type': { mt: 0 },
+          '& p:last-of-type': { mb: 0 },
+          '& ul, & ol': { pl: 2, my: 1.5 },
+          '& li': { mb: 0.75 },
+          '& strong': { color: '#818cf8' },
+          '& code': {
+            bgcolor: '#2a2a2a',
+            px: 0.5,
+            py: 0.25,
+            borderRadius: 0.5,
+            fontFamily: 'monospace',
+          },
+          '& img': {
+            maxWidth: 120,
+            height: 'auto',
+            borderRadius: 1,
+            display: 'block',
+            my: 1.5,
+          },
+          '& hr': {
+            border: 'none',
+            borderTop: '1px solid #3a3a3a',
+            my: 2.5,
+          },
+          '& blockquote': {
+            borderInlineStart: '3px solid #6366f1',
+            pl: 2,
+            my: 1.5,
+            color: '#a1a1aa',
+            fontStyle: 'italic',
+          },
+          '& h1, & h2, & h3, & h4': {
+            mt: 2,
+            mb: 1,
+            color: '#e4e4e7',
+          },
+        }}
+      >
+        <ReactMarkdown components={{ a: MarkdownLink as Components['a'] }}>{text}</ReactMarkdown>
+      </Box>
+    </Paper>
+  )
+}
+
+function AssistantToolPart({ toolName, result }: ToolCallMessagePartProps) {
+  return (
+    <Box sx={{ maxWidth: '100%', overflow: 'hidden', mb: 2 }}>
+      <ToolUI toolName={toolName} result={result} />
+    </Box>
+  )
+}
+
+const ASSISTANT_PART_COMPONENTS = {
+  Text: AssistantTextPart,
+  tools: { Fallback: AssistantToolPart },
+}
+
+/**
+ * Renders the message's parts with every text part hoisted above everything else.
+ *
+ * The model calls its tools before it writes a word, so the parts arrive
+ * tool-first and a live answer used to show its cards above its prose. The same
+ * answer reloaded from the database showed prose first, because the save path
+ * splits a message into a text column and a tool_invocations column and
+ * HistoricalAssistantMessage renders them in that order. One answer, two
+ * layouts, depending only on whether you had just asked for it.
+ *
+ * Reordering the indices rather than reordering with CSS `order` keeps the DOM
+ * in reading order, so selection, copy and screen readers agree with the page.
+ * Parts within each group keep their relative order.
+ */
+function OrderedMessageParts() {
+  const parts = useMessage((m) => m.content)
+
+  const order = useMemo(() => {
+    const text: number[] = []
+    const rest: number[] = []
+    parts.forEach((part, index) => {
+      ;(part.type === 'text' ? text : rest).push(index)
+    })
+    return [...text, ...rest]
+  }, [parts])
+
+  return (
+    <>
+      {order.map((index) => (
+        <MessagePrimitive.PartByIndex key={index} index={index} components={ASSISTANT_PART_COMPONENTS} />
+      ))}
+    </>
+  )
+}
+
 // Assistant message component
 function AssistantMessage() {
   return (
     <MessagePrimitive.Root>
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          gap: 1.5, 
+      <Box
+        {...ANSWER_MARKER_PROP}
+        sx={{
+          display: 'flex',
+          gap: 1.5,
           py: 1.5,
           // Hide the entire row if content area is empty (no visible children)
           '&:has(.assistant-content:empty)': {
@@ -325,76 +449,7 @@ function AssistantMessage() {
           <SmartToyIcon fontSize="small" />
         </Avatar>
         <Box className="assistant-content" sx={{ flex: 1, minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
-          <MessagePrimitive.Content
-            components={{
-              Text: ({ text }) => {
-                // Don't render empty text parts
-                if (!text || !text.trim()) return null
-                return (
-                  <Paper
-                    sx={{
-                      ...bubbleSx('90%'),
-                      p: 2,
-                      bgcolor: 'rgba(26, 26, 26, 0.7)',
-                      borderRadius: 2,
-                      borderStartStartRadius: 0,
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        '& p': { my: 1.5 },
-                        '& p:first-of-type': { mt: 0 },
-                        '& p:last-of-type': { mb: 0 },
-                        '& ul, & ol': { pl: 2, my: 1.5 },
-                        '& li': { mb: 0.75 },
-                        '& strong': { color: '#818cf8' },
-                        '& code': {
-                          bgcolor: '#2a2a2a',
-                          px: 0.5,
-                          py: 0.25,
-                          borderRadius: 0.5,
-                          fontFamily: 'monospace',
-                        },
-                        '& img': {
-                          maxWidth: 120,
-                          height: 'auto',
-                          borderRadius: 1,
-                          display: 'block',
-                          my: 1.5,
-                        },
-                        '& hr': {
-                          border: 'none',
-                          borderTop: '1px solid #3a3a3a',
-                          my: 2.5,
-                        },
-                        '& blockquote': {
-                          borderInlineStart: '3px solid #6366f1',
-                          pl: 2,
-                          my: 1.5,
-                          color: '#a1a1aa',
-                          fontStyle: 'italic',
-                        },
-                        '& h1, & h2, & h3, & h4': {
-                          mt: 2,
-                          mb: 1,
-                          color: '#e4e4e7',
-                        },
-                      }}
-                    >
-                      <ReactMarkdown components={{ a: MarkdownLink as Components['a'] }}>{text}</ReactMarkdown>
-                    </Box>
-                  </Paper>
-                )
-              },
-              tools: {
-                Fallback: ({ toolName, result }) => (
-                  <Box sx={{ maxWidth: '100%', overflow: 'hidden', mb: 2 }}>
-                    <ToolUI toolName={toolName} result={result} />
-                  </Box>
-                ),
-              },
-            }}
-          />
+          <OrderedMessageParts />
           <AssistantMessageError />
           <AssistantActionBar />
         </Box>
@@ -699,7 +754,7 @@ function HistoricalUserMessage({ message }: { message: HistoricalMessage }) {
 // Render a historical assistant message
 function HistoricalAssistantMessage({ message }: { message: HistoricalMessage }) {
   return (
-    <Box sx={{ display: 'flex', gap: 1.5, py: 1.5 }}>
+    <Box {...ANSWER_MARKER_PROP} sx={{ display: 'flex', gap: 1.5, py: 1.5 }}>
       <Avatar
         sx={{
           ...avatarSx,
@@ -743,6 +798,177 @@ function HistoricalAssistantMessage({ message }: { message: HistoricalMessage })
   )
 }
 
+/** Treat this close to the bottom of the viewport as "at the bottom". */
+const AT_BOTTOM_SLOP = 8
+/**
+ * How far the last answer's top edge must sit above the viewport before the
+ * "back to the answer" control appears — enough slop that it doesn't flicker on
+ * when the answer is already essentially in view.
+ */
+const ANSWER_ABOVE_SLOP = 24
+/** Breathing room left above the answer when jumping to it. */
+const ANSWER_SCROLL_PADDING = 12
+
+/**
+ * Floating scroll controls for the thread, plus the anchor that usually makes
+ * them unnecessary.
+ *
+ * An answer's prose is one screen; its cards are several. Classic chat pins the
+ * viewport to the bottom, which used to be where the prose was — now that it
+ * renders first (see OrderedMessageParts) that pin leaves the reader staring at
+ * the tail of a card list while the actual answer is written far above them.
+ *
+ * So once per turn we scroll the start of the answer to the top of the viewport:
+ * the moment prose appears, or when the turn ends if it never does. The text
+ * then streams downward in full view and the cards follow it, which is the
+ * order it all wants to be read in. The anchor is skipped if the reader has
+ * scrolled away — scrolling is how someone says they're steering, and we don't
+ * take the wheel back.
+ *
+ * The controls then cover what the anchor can't: re-reading an older answer, or
+ * returning to the newest one after wandering up the thread.
+ */
+function ThreadScrollControls({ viewportRef }: { viewportRef: RefObject<HTMLDivElement | null> }) {
+  const { t } = useTranslation()
+  const isRunning = useThread((s) => s.isRunning)
+  // Boolean, not the message — this re-evaluates on every streamed token and
+  // must only re-render the controls when the answer first finds its words.
+  const answerHasText = useThread((s) => {
+    const last = s.messages[s.messages.length - 1]
+    if (last?.role !== 'assistant') return false
+    return last.content.some((part) => part.type === 'text' && part.text.trim().length > 0)
+  })
+  const [{ answerAbove, atBottom }, setPosition] = useState({ answerAbove: false, atBottom: true })
+
+  /** Pixels the viewport must scroll for the last answer to start at its top. */
+  const answerDelta = useCallback((): number | null => {
+    const viewport = viewportRef.current
+    if (!viewport) return null
+    const answers = viewport.querySelectorAll('[data-aperture-answer]')
+    for (let i = answers.length - 1; i >= 0; i--) {
+      const rect = answers[i].getBoundingClientRect()
+      // An answer whose parts haven't arrived yet is display:none (see
+      // AssistantMessage) and reports an empty box at the origin — jumping to
+      // that would be a jump to nowhere. Fall back to the last real one.
+      if (rect.height > 0) return rect.top - viewport.getBoundingClientRect().top
+    }
+    return null
+  }, [viewportRef])
+
+  const scrollToAnswer = useCallback(() => {
+    const viewport = viewportRef.current
+    const delta = answerDelta()
+    if (!viewport || delta === null) return
+    viewport.scrollTo({ top: viewport.scrollTop + delta - ANSWER_SCROLL_PADDING, behavior: 'smooth' })
+  }, [answerDelta, viewportRef])
+
+  const scrollToLatest = useCallback(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' })
+  }, [viewportRef])
+
+  // Content only grows while the viewport is pinned to the bottom, and pinning
+  // scrolls — so a scroll listener catches every change that matters. The
+  // isRunning dependency re-measures across a turn boundary, where the last
+  // answer changes identity without anything scrolling.
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+
+    let frame = 0
+    const measure = () => {
+      frame = 0
+      const delta = answerDelta()
+      const next = {
+        answerAbove: delta !== null && delta < -ANSWER_ABOVE_SLOP,
+        atBottom: viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < AT_BOTTOM_SLOP,
+      }
+      setPosition((prev) =>
+        prev.answerAbove === next.answerAbove && prev.atBottom === next.atBottom ? prev : next
+      )
+    }
+    const schedule = () => {
+      if (frame) return
+      frame = requestAnimationFrame(measure)
+    }
+
+    measure()
+    viewport.addEventListener('scroll', schedule, { passive: true })
+    return () => {
+      viewport.removeEventListener('scroll', schedule)
+      if (frame) cancelAnimationFrame(frame)
+    }
+  }, [answerDelta, viewportRef, isRunning])
+
+  // Starts latched so opening a conversation lands where it always has — at the
+  // bottom — rather than yanking the last saved answer up on arrival. Only a
+  // fresh turn unlatches it.
+  const anchored = useRef(true)
+  useEffect(() => {
+    if (isRunning) anchored.current = false
+  }, [isRunning])
+
+  useEffect(() => {
+    if (anchored.current) return
+    // Still mid-turn with nothing written yet: there's no answer to anchor to.
+    if (isRunning && !answerHasText) return
+
+    const viewport = viewportRef.current
+    if (!viewport) return
+    if (viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight >= AT_BOTTOM_SLOP) return
+
+    const delta = answerDelta()
+    // Only ever scroll up: an answer short enough to already fit needs nothing.
+    if (delta === null || delta >= -ANSWER_ABOVE_SLOP) return
+
+    anchored.current = true
+    scrollToAnswer()
+  }, [isRunning, answerHasText, answerDelta, scrollToAnswer, viewportRef])
+
+  // Mid-turn, before a word is written, the newest thing above the reader is the
+  // *previous* answer — offering to jump there would be answering a question
+  // nobody asked. Down-to-latest stays available throughout.
+  const showAnswerButton = answerAbove && (!isRunning || answerHasText)
+  if (!showAnswerButton && atBottom) return null
+
+  const fabSx = {
+    bgcolor: 'rgba(26, 26, 26, 0.92)',
+    color: 'text.secondary',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    '&:hover': { bgcolor: '#252525', color: '#818cf8' },
+  }
+
+  return (
+    <Box
+      sx={{
+        position: 'absolute',
+        insetInlineEnd: 16,
+        bottom: 16,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1,
+        zIndex: 2,
+      }}
+    >
+      {showAnswerButton && (
+        <Tooltip title={t('assistant.scrollToAnswer')} placement="left">
+          <Fab size="small" onClick={scrollToAnswer} aria-label={t('assistant.scrollToAnswer')} sx={fabSx}>
+            <ArrowUpwardIcon fontSize="small" />
+          </Fab>
+        </Tooltip>
+      )}
+      {!atBottom && (
+        <Tooltip title={t('assistant.scrollToLatest')} placement="left">
+          <Fab size="small" onClick={scrollToLatest} aria-label={t('assistant.scrollToLatest')} sx={fabSx}>
+            <ArrowDownwardIcon fontSize="small" />
+          </Fab>
+        </Tooltip>
+      )}
+    </Box>
+  )
+}
+
 // Props for Thread component
 interface ThreadProps {
   historicalMessages?: HistoricalMessage[]
@@ -752,7 +978,8 @@ interface ThreadProps {
 // Main Thread component
 export function Thread({ historicalMessages = [], suggestions = [] }: ThreadProps) {
   const hasHistoricalMessages = historicalMessages.length > 0
-  
+  const viewportRef = useRef<HTMLDivElement | null>(null)
+
   return (
     <ThreadPrimitive.Root
       style={{
@@ -764,50 +991,58 @@ export function Thread({ historicalMessages = [], suggestions = [] }: ThreadProp
         overflow: 'hidden',
       }}
     >
-      {/* Messages */}
-      <ThreadPrimitive.Viewport
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          padding: 16,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-          minWidth: 0,
-          // Query target for NARROW_THREAD. The thread is squeezed by things the
-          // viewport knows nothing about — the dock's width, a dialog on a phone
-          // — so its own box is the only honest source for "how narrow are we".
-          containerName: 'assistantThread',
-          containerType: 'inline-size',
-        }}
-      >
-        {/* Show welcome only if no historical messages */}
-        {!hasHistoricalMessages && (
-          <ThreadPrimitive.Empty>
-            <ThreadWelcome suggestions={suggestions} />
-          </ThreadPrimitive.Empty>
-        )}
-
-        {/* Render historical messages manually */}
-        {historicalMessages.map((msg) => (
-          msg.role === 'user' 
-            ? <HistoricalUserMessage key={msg.id} message={msg} />
-            : <HistoricalAssistantMessage key={msg.id} message={msg} />
-        ))}
-
-        {/* Runtime handles new messages */}
-        <ThreadPrimitive.Messages
-          components={{
-            UserMessage,
-            AssistantMessage,
+      {/* The scroll controls float over the viewport, so they need a positioned
+          box that is not the viewport itself — the viewport scrolls, and its
+          container-type makes it the containing block for anything inside it. */}
+      <Box sx={{ position: 'relative', flex: 1, minWidth: 0, minHeight: 0, display: 'flex' }}>
+        {/* Messages */}
+        <ThreadPrimitive.Viewport
+          ref={viewportRef}
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            padding: 16,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            minWidth: 0,
+            // Query target for NARROW_THREAD. The thread is squeezed by things the
+            // viewport knows nothing about — the dock's width, a dialog on a phone
+            // — so its own box is the only honest source for "how narrow are we".
+            containerName: 'assistantThread',
+            containerType: 'inline-size',
           }}
-        />
+        >
+          {/* Show welcome only if no historical messages */}
+          {!hasHistoricalMessages && (
+            <ThreadPrimitive.Empty>
+              <ThreadWelcome suggestions={suggestions} />
+            </ThreadPrimitive.Empty>
+          )}
 
-        <ThreadPrimitive.If running>
-          <LoadingIndicator />
-        </ThreadPrimitive.If>
-      </ThreadPrimitive.Viewport>
+          {/* Render historical messages manually */}
+          {historicalMessages.map((msg) => (
+            msg.role === 'user'
+              ? <HistoricalUserMessage key={msg.id} message={msg} />
+              : <HistoricalAssistantMessage key={msg.id} message={msg} />
+          ))}
+
+          {/* Runtime handles new messages */}
+          <ThreadPrimitive.Messages
+            components={{
+              UserMessage,
+              AssistantMessage,
+            }}
+          />
+
+          <ThreadPrimitive.If running>
+            <LoadingIndicator />
+          </ThreadPrimitive.If>
+        </ThreadPrimitive.Viewport>
+
+        <ThreadScrollControls viewportRef={viewportRef} />
+      </Box>
 
       {/* Composer */}
       <Composer />

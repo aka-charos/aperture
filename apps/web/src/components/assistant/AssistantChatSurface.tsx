@@ -160,7 +160,10 @@ function MessageSaver({
       // ThreadMessage uses 'content' as the parts array
       const messagesToSave = unsavedMessages.map(msg => {
         // Extract text content and tool invocations from message content (parts array)
-        let textContent = ''
+        // A model that talks either side of a tool call produces several text
+        // parts; they're kept apart so the reloaded answer reads the way the
+        // live one did, rather than running two paragraphs into one line.
+        const textParts: string[] = []
         const toolInvocations: Array<{ toolCallId: string; toolName: string; args: unknown; result?: unknown }> = []
 
         const contentParts = Array.isArray(msg.content) ? msg.content : []
@@ -169,7 +172,7 @@ function MessageSaver({
             continue
           }
           if (part.type === 'text' && typeof part.text === 'string') {
-            textContent += part.text
+            if (part.text.trim()) textParts.push(part.text)
           } else if (
             part.type === 'tool-call' &&
             typeof part.toolCallId === 'string' &&
@@ -187,7 +190,7 @@ function MessageSaver({
 
         return {
           role: msg.role,
-          content: textContent,
+          content: textParts.join('\n\n'),
           ...(toolInvocations.length > 0 && { toolInvocations }),
         }
       })

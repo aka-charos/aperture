@@ -2552,6 +2552,8 @@
     "placeholder": "Ask me anything about movies or shows…",
     "unwatchedOnly": "Only suggest what I haven't watched",
     "unwatchedOnlyHint": "Titles you've already watched are left out of every suggestion. Stays on until you turn it off.",
+    "scrollToAnswer": "Back to the answer",
+    "scrollToLatest": "Jump to the latest",
     "thinking": "Thinking…",
     "status": {
       "preparing": "Loading your profile…",
