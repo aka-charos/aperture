@@ -83,14 +83,15 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: requireAuth, schema: getDashboardSchema },
     async (request, reply) => {
       const user = request.user as SessionUser
+      const { getTopMovies, getTopSeries } = await import('@aperture/core')
 
       // Run all queries in parallel for performance
       const [
         statsResult,
         movieRecsResult,
         seriesRecsResult,
-        topMoviesResult,
-        topSeriesResult,
+        popularMovies,
+        popularSeries,
         recentMovieWatchesResult,
         recentSeriesWatchesResult,
         recentRatingsResult,
@@ -196,90 +197,17 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
           [user.id]
         ),
 
-        // Top movies (top 12)
-        query<{
-          movie_id: string
-          title: string
-          year: number | null
-          poster_url: string | null
-          genres: string[]
-          popularity_score: number
-          rank: number
-        }>(
-          `
-          WITH movie_popularity AS (
-            SELECT 
-              m.id as movie_id,
-              m.title,
-              m.year,
-              m.poster_url,
-              m.genres,
-              COUNT(DISTINCT wh.user_id) as unique_viewers,
-              SUM(wh.play_count) as play_count,
-              ROW_NUMBER() OVER (ORDER BY COUNT(DISTINCT wh.user_id) DESC, SUM(wh.play_count) DESC) as rank
-            FROM movies m
-            JOIN watch_history wh ON wh.movie_id = m.id
-            WHERE wh.last_played_at > NOW() - INTERVAL '30 days'
-            GROUP BY m.id, m.title, m.year, m.poster_url, m.genres
-            HAVING COUNT(DISTINCT wh.user_id) >= 1
-          )
-          SELECT 
-            movie_id,
-            title,
-            year,
-            poster_url,
-            genres,
-            (unique_viewers * 0.6 + play_count * 0.4)::float as popularity_score,
-            rank::int
-          FROM movie_popularity
-          ORDER BY rank
-          LIMIT 12
-        `,
-          []
-        ),
-
-        // Top series (top 12)
-        query<{
-          series_id: string
-          title: string
-          year: number | null
-          poster_url: string | null
-          genres: string[]
-          popularity_score: number
-          rank: number
-        }>(
-          `
-          WITH series_popularity AS (
-            SELECT 
-              s.id as series_id,
-              s.title,
-              s.year,
-              s.poster_url,
-              s.genres,
-              COUNT(DISTINCT wh.user_id) as unique_viewers,
-              SUM(wh.play_count) as play_count,
-              ROW_NUMBER() OVER (ORDER BY COUNT(DISTINCT wh.user_id) DESC, SUM(wh.play_count) DESC) as rank
-            FROM series s
-            JOIN episodes e ON e.series_id = s.id
-            JOIN watch_history wh ON wh.episode_id = e.id
-            WHERE wh.last_played_at > NOW() - INTERVAL '30 days'
-            GROUP BY s.id, s.title, s.year, s.poster_url, s.genres
-            HAVING COUNT(DISTINCT wh.user_id) >= 1
-          )
-          SELECT 
-            series_id,
-            title,
-            year,
-            poster_url,
-            genres,
-            (unique_viewers * 0.6 + play_count * 0.4)::float as popularity_score,
-            rank::int
-          FROM series_popularity
-          ORDER BY rank
-          LIMIT 12
-        `,
-          []
-        ),
+        // Top picks — same source of truth as the /top-picks page, so the
+        // configured source, weights, filters and list size all apply here
+        // too. A failure there costs the carousel, not the whole dashboard.
+        getTopMovies().catch((err) => {
+          fastify.log.error({ err }, 'Failed to load top picks movies for dashboard')
+          return []
+        }),
+        getTopSeries().catch((err) => {
+          fastify.log.error({ err }, 'Failed to load top picks series for dashboard')
+          return []
+        }),
 
         // Recent movie watches (3)
         query<{
@@ -443,25 +371,25 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       // Build top picks (interleave movies and series)
-      const topMovies = topMoviesResult.rows.map((r) => ({
-        id: r.movie_id,
+      const topMovies = popularMovies.map((m) => ({
+        id: m.movieId,
         type: 'movie' as const,
-        title: r.title,
-        year: r.year,
-        posterUrl: r.poster_url,
-        genres: r.genres || [],
-        rank: r.rank,
-        popularityScore: r.popularity_score,
+        title: m.title,
+        year: m.year,
+        posterUrl: m.posterUrl,
+        genres: m.genres || [],
+        rank: m.rank,
+        popularityScore: m.popularityScore,
       }))
-      const topSeries = topSeriesResult.rows.map((r) => ({
-        id: r.series_id,
+      const topSeries = popularSeries.map((s) => ({
+        id: s.seriesId,
         type: 'series' as const,
-        title: r.title,
-        year: r.year,
-        posterUrl: r.poster_url,
-        genres: r.genres || [],
-        rank: r.rank,
-        popularityScore: r.popularity_score,
+        title: s.title,
+        year: s.year,
+        posterUrl: s.posterUrl,
+        genres: s.genres || [],
+        rank: s.rank,
+        popularityScore: s.popularityScore,
       }))
       const topPicks: DashboardTopPick[] = []
       const maxTopLen = Math.max(topMovies.length, topSeries.length)
