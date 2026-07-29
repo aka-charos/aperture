@@ -597,10 +597,8 @@ export function Layout() {
         <Outlet key={i18n.language} />
       </Box>
 
-      {/* Welcome Modal - shows on first visit */}
-      <WelcomeModal />
-
-      {/* Welcome Modal - manually triggered from menu */}
+      {/* Welcome Modal - opens itself on the recommendations page it explains,
+          and on request from the user menu anywhere */}
       <WelcomeModal open={welcomeOpen} onClose={hideWelcome} />
 
       {/* Exploration Config Modal - prompts admins to configure new AI provider */}
