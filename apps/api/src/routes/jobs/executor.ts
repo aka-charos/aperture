@@ -34,6 +34,7 @@ import {
   syncUsersFromMediaServer,
   createChildLogger,
   runLibraryGapAnalysis,
+  withInferenceContext,
 } from '@aperture/core'
 import { syncAllTraktRatings } from '../trakt/index.js'
 import { refreshAssistantSuggestions } from '../assistant/jobs/refreshSuggestions.js'
@@ -41,7 +42,18 @@ import { activeJobs } from './state.js'
 
 const logger = createChildLogger('jobs-executor')
 
+/**
+ * Run a job, tagging every LLM call it makes — at any depth — with the job that
+ * caused it. Almost all background inference goes through here, so this one
+ * wrapper is what lets the spend dashboard answer "which job is costing me
+ * money" without threading a label through every recommender and enrichment
+ * function. See core `lib/inferenceContext.ts`.
+ */
 export async function runJob(name: string, jobId: string): Promise<void> {
+  return withInferenceContext({ feature: `job:${name}` }, () => executeJob(name, jobId))
+}
+
+async function executeJob(name: string, jobId: string): Promise<void> {
   const startTime = Date.now()
 
   try {

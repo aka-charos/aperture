@@ -163,6 +163,7 @@ export function getPricingForModel(
     inputCostPerMillion: isLocalProvider ? 0 : (model?.inputCostPerMillion ?? 0),
     outputCostPerMillion: isLocalProvider ? 0 : (model?.outputCostPerMillion ?? 0),
     embeddingDimensions: model?.embeddingDimensions,
+    pricingKnown: isLocalProvider || model?.inputCostPerMillion != null,
   }
 }
 
@@ -181,16 +182,22 @@ export async function getPricingForModelAsync(
 
   let inputCostPerMillion = 0
   let outputCostPerMillion = 0
+  // Local providers really are free; everyone else has to be priced by someone.
+  let pricingKnown = isLocalProvider
 
   if (!isLocalProvider) {
     const dynamicPricing = await findModelPricing(providerId, modelId)
     if (dynamicPricing) {
       inputCostPerMillion = dynamicPricing.inputCostPerMillion
       outputCostPerMillion = dynamicPricing.outputCostPerMillion
-    } else {
-      inputCostPerMillion = model?.inputCostPerMillion ?? 0
-      outputCostPerMillion = model?.outputCostPerMillion ?? 0
+      pricingKnown = true
+    } else if (model?.inputCostPerMillion != null) {
+      inputCostPerMillion = model.inputCostPerMillion
+      outputCostPerMillion = model.outputCostPerMillion ?? 0
+      pricingKnown = true
     }
+    // Otherwise the zeros stand as placeholders and pricingKnown stays false —
+    // the caller must present that as "unknown", never as "free".
   }
 
   return {
@@ -202,5 +209,6 @@ export async function getPricingForModelAsync(
     inputCostPerMillion,
     outputCostPerMillion,
     embeddingDimensions: model?.embeddingDimensions,
+    pricingKnown,
   }
 }

@@ -214,6 +214,25 @@ export async function findModelPricing(
     return { inputCostPerMillion: 0, outputCostPerMillion: 0 }
   }
 
+  // OpenRouter prices its own catalog, and it has to: every OpenRouter model is
+  // user-entered (the registry ships none), and the ids are namespaced
+  // (`anthropic/claude-sonnet-4.5`) in a way Helicone's per-vendor table doesn't
+  // match. Without this the lookup falls through to a registry model that does
+  // not exist and every OpenRouter estimate reads $0.00.
+  if (provider === 'openrouter') {
+    const { getOpenRouterModelInfo } = await import('./openrouter-capabilities.js')
+    const info = await getOpenRouterModelInfo(modelId)
+    if (info?.inputCostPerMillion != null && info.outputCostPerMillion != null) {
+      return {
+        inputCostPerMillion: info.inputCostPerMillion,
+        outputCostPerMillion: info.outputCostPerMillion,
+      }
+    }
+    // Catalog unavailable or silent about this model: say so rather than
+    // guessing from another vendor's price list.
+    return null
+  }
+
   const pricingData = await getPricingData()
   if (pricingData.length === 0) {
     return null

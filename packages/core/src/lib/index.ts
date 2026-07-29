@@ -93,6 +93,8 @@ export {
   findModelPricing,
   refreshPricingCache,
   getPricingCacheStatus,
+  // OpenRouter account (credits & rolling spend on the configured key)
+  getOpenRouterAccountStatus,
   // Types
   type ProviderType,
   type ProviderConfig,
@@ -137,3 +139,26 @@ export {
   type WebSearchSlotUsage,
   type WebSearchUsageSummary,
 } from './webSearchUsage.js'
+
+export {
+  withInferenceContext,
+  getInferenceContext,
+  type InferenceContext,
+} from './inferenceContext.js'
+
+export {
+  recordInferenceCall,
+  getInferenceSummary,
+  getRecentInferenceCalls,
+  getInferenceSessions,
+  type InferenceCallStatus,
+  type InferenceCallRecord,
+  type InferenceTotals,
+  type InferenceBreakdownRow,
+  type InferenceDailyRow,
+  type InferenceSummary,
+  type InferenceCallRow,
+  type InferenceSessionRow,
+} from './inferenceUsage.js'
+
+export { type OpenRouterAccountStatus } from './openrouter-usage.js'

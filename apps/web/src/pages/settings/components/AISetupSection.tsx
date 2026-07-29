@@ -23,6 +23,7 @@ import type { AIFunction } from '../../../components/AIFunctionCard'
 import { AISetupCardGrid } from '../../../components/AISetupCardGrid'
 import { type FunctionConfig } from '../../../components/aiProviderInfo'
 import { CostEstimatorSection } from './CostEstimatorSection'
+import { InferenceDashboardSection } from './InferenceDashboardSection'
 
 interface AIConfig {
   embeddings: FunctionConfig | null
@@ -258,6 +259,12 @@ export function AISetupSection() {
 
       {/* Embedding Sets Manager */}
       <EmbeddingSetsManager />
+
+      {/* What it actually cost (OpenRouter only — it's the one provider that
+          reports per-call spend). Renders nothing otherwise, so the estimator
+          below stays the whole story for everyone else. */}
+      <Divider sx={{ my: 4 }} />
+      <InferenceDashboardSection />
 
       {/* Cost Estimator */}
       <Divider sx={{ my: 4 }} />

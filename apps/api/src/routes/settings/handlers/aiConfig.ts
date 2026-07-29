@@ -420,7 +420,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
     try {
       const aiConfig = await getAIConfig()
 
-      const [embeddingsPricing, chatPricing, textGenerationPricing, explorationPricing] = await Promise.all([
+      const [embeddingsPricing, chatPricing, textGenerationPricing, explorationPricing, webSearchPricing] = await Promise.all([
         aiConfig.embeddings
           ? getPricingForModelAsync(aiConfig.embeddings.provider, aiConfig.embeddings.model, 'embeddings')
           : null,
@@ -433,6 +433,11 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         aiConfig.exploration
           ? getPricingForModelAsync(aiConfig.exploration.provider, aiConfig.exploration.model, 'exploration')
           : null,
+        // Optional 5th role. Priced like the rest so the estimator's summary
+        // doesn't quietly omit a model that is spending money.
+        aiConfig.webSearch
+          ? getPricingForModelAsync(aiConfig.webSearch.provider, aiConfig.webSearch.model, 'webSearch')
+          : null,
       ])
 
       return reply.send({
@@ -440,6 +445,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         chat: chatPricing,
         textGeneration: textGenerationPricing,
         exploration: explorationPricing,
+        webSearch: webSearchPricing,
       })
     } catch (err) {
       fastify.log.error({ err }, 'Failed to get AI pricing')
