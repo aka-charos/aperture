@@ -3,8 +3,8 @@
  *
  * Surfaces episodes that have aired (per TMDB) but are absent from the media
  * server — whole seasons and partial gaps alike — and offers the Seerr request
- * flow. The request action stays available even when nothing is missing, so
- * future seasons can still be requested.
+ * flow for exactly those gaps. When every aired episode is already on the
+ * server there is nothing to request, so the card stays hidden.
  */
 
 import { useEffect, useState } from 'react'
@@ -55,11 +55,12 @@ export function MissingSeasonsCard({ series, seasonAvailability }: MissingSeason
   // capped at what has actually aired, so unaired episodes never count).
   const gaps = seasonAvailability.filter((s) => s.missing_episodes > 0)
   const totalMissing = gaps.reduce((sum, s) => sum + s.missing_episodes, 0)
+  const hasGaps = gaps.length > 0
 
   // Seerr request availability (endpoint reports canRequest=false when Seerr
   // is not configured or requests are disabled for this user)
   useEffect(() => {
-    if (!tmdbId) return
+    if (!tmdbId || !hasGaps) return
     let cancelled = false
     fetch(`/api/seerr/status/tv/${tmdbId}`, { credentials: 'include' })
       .then((res) => (res.ok ? res.json() : null))
@@ -70,10 +71,11 @@ export function MissingSeasonsCard({ series, seasonAvailability }: MissingSeason
     return () => {
       cancelled = true
     }
-  }, [tmdbId])
+  }, [tmdbId, hasGaps])
 
-  // Nothing to report and nothing to request — stay out of the way.
-  if (gaps.length === 0 && !canRequest) {
+  // Every aired episode is already on the server — nothing to report and
+  // nothing to request, so stay out of the way.
+  if (!hasGaps) {
     return null
   }
 
@@ -84,15 +86,9 @@ export function MissingSeasonsCard({ series, seasonAvailability }: MissingSeason
       const details = await fetchTVDetails(tmdbId)
       if (details) {
         // Seerr's season statuses only reflect Seerr requests, not what is
-        // already on the media server — preselect the seasons with real gaps,
-        // and fall back to every season when nothing is missing (so future
-        // seasons can still be requested).
+        // already on the media server — offer only the seasons with real gaps.
         const gapNumbers = new Set(gaps.map((s) => s.season_number))
-        const offered =
-          gapNumbers.size > 0
-            ? details.seasons.filter((s) => gapNumbers.has(s.seasonNumber))
-            : details.seasons
-        setModalSeasons(offered)
+        setModalSeasons(details.seasons.filter((s) => gapNumbers.has(s.seasonNumber)))
         setModalOpen(true)
       } else {
         setSnackbar({
@@ -119,72 +115,55 @@ export function MissingSeasonsCard({ series, seasonAvailability }: MissingSeason
     })
   }
 
-  const hasGaps = gaps.length > 0
-
   return (
     <Card
       sx={{
         backgroundColor: 'background.paper',
         borderRadius: 2,
-        ...(hasGaps ? { borderLeft: 3, borderLeftColor: 'error.main' } : {}),
+        borderLeft: 3,
+        borderLeftColor: 'error.main',
       }}
     >
       <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: hasGaps ? 1.5 : 1 }}>
-          {hasGaps ? (
-            <ReportProblemOutlinedIcon sx={{ color: 'error.main', fontSize: 20 }} />
-          ) : (
-            <CloudDownloadIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-          )}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+          <ReportProblemOutlinedIcon sx={{ color: 'error.main', fontSize: 20 }} />
           <Typography variant="h6" fontWeight={600}>
-            {hasGaps
-              ? serverName
-                ? t('mediaDetail.missingSeasons.titleNamed', { serverName })
-                : t('mediaDetail.missingSeasons.title')
-              : t('mediaDetail.missingSeasons.completeTitle')}
+            {serverName
+              ? t('mediaDetail.missingSeasons.titleNamed', { serverName })
+              : t('mediaDetail.missingSeasons.title')}
           </Typography>
         </Box>
 
-        {hasGaps ? (
-          <>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              {t('mediaDetail.missingSeasons.summary', { count: totalMissing })}
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: canRequest ? 2 : 0 }}>
-              {gaps.map((s) => (
-                <Chip
-                  key={s.season_number}
-                  label={
-                    s.episodes_on_server === 0
-                      ? t('mediaDetail.missingSeasons.seasonChip', {
-                          n: s.season_number,
-                          count: s.missing_episodes,
-                        })
-                      : t('mediaDetail.missingSeasons.seasonPartialChip', {
-                          n: s.season_number,
-                          missing: s.missing_episodes,
-                          aired: s.aired_episodes ?? 0,
-                        })
-                  }
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                />
-              ))}
-            </Box>
-          </>
-        ) : (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: canRequest ? 2 : 0 }}>
-            {serverName
-              ? t('mediaDetail.missingSeasons.completeBodyNamed', { serverName })
-              : t('mediaDetail.missingSeasons.completeBody')}
-          </Typography>
-        )}
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          {t('mediaDetail.missingSeasons.summary', { count: totalMissing })}
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: canRequest ? 2 : 0 }}>
+          {gaps.map((s) => (
+            <Chip
+              key={s.season_number}
+              label={
+                s.episodes_on_server === 0
+                  ? t('mediaDetail.missingSeasons.seasonChip', {
+                      n: s.season_number,
+                      count: s.missing_episodes,
+                    })
+                  : t('mediaDetail.missingSeasons.seasonPartialChip', {
+                      n: s.season_number,
+                      missing: s.missing_episodes,
+                      aired: s.aired_episodes ?? 0,
+                    })
+              }
+              size="small"
+              variant="outlined"
+              color="error"
+            />
+          ))}
+        </Box>
 
         {canRequest && (
           <Button
             variant="outlined"
-            color={hasGaps ? 'error' : 'inherit'}
+            color="error"
             size="small"
             startIcon={
               loadingSeasons ? <CircularProgress size={16} color="inherit" /> : <CloudDownloadIcon />
@@ -193,11 +172,9 @@ export function MissingSeasonsCard({ series, seasonAvailability }: MissingSeason
             disabled={loadingSeasons}
             sx={{ borderRadius: 2 }}
           >
-            {hasGaps
-              ? serverName
-                ? t('mediaDetail.missingSeasons.requestNamed', { serverName })
-                : t('mediaDetail.missingSeasons.request')
-              : t('mediaDetail.missingSeasons.requestSeasons')}
+            {serverName
+              ? t('mediaDetail.missingSeasons.requestNamed', { serverName })
+              : t('mediaDetail.missingSeasons.request')}
           </Button>
         )}
       </CardContent>

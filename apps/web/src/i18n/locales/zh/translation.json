@@ -1111,11 +1111,7 @@
       "requestSuccess": "Request submitted",
       "requestFailed": "Failed to submit request",
       "seasonPartialChip": "Season {{n}} · {{missing}} of {{aired}} missing",
-      "summary": "{{count}} aired episodes aren't available yet.",
-      "completeTitle": "Everything aired is here",
-      "completeBody": "All aired episodes are on your server.",
-      "completeBodyNamed": "All aired episodes are on {{serverName}}.",
-      "requestSeasons": "Request seasons"
+      "summary": "{{count}} aired episodes aren't available yet."
     }
   },
   "search": {
