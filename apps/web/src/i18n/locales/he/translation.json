@@ -4266,6 +4266,16 @@
         "detail": "The policy is running in report-only mode, so violations are logged to the browser console but nothing is blocked. Intended for one shakedown deploy, not to be left on.",
         "fix": "Remove CSP_REPORT_ONLY"
       }
-    }
+    },
+    "trustedProxiesTitle": "Trusted proxies",
+    "trustedProxiesHelp": "Addresses allowed to tell Aperture who the real visitor is via X-Forwarded-For. Set this to your reverse proxy or tunnel, never to a public range — anything listed here can claim any client IP it likes.",
+    "trustedProxiesFormat": "Comma-separated IP addresses or CIDR ranges. Also accepts loopback, linklocal and uniquelocal.",
+    "presets": "Presets:",
+    "presetTunnel": "Tunnel on this host",
+    "presetDocker": "Docker network",
+    "presetNone": "Trust none",
+    "savedApplied": "Saved. Real client IPs are in use from the next request.",
+    "saveFailed": "Could not save trusted proxies.",
+    "envManaged": "Trusted proxies are set by the TRUST_PROXY environment variable, so they cannot be edited here. Remove it from your compose file to manage them from this page."
   }
 }

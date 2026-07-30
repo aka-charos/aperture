@@ -4195,7 +4195,7 @@
   },
   "settingsDeployment": {
     "title": "Deployment",
-    "description": "How this instance is reached, and whether the settings that depend on that are correct. These come from environment variables, so changes take effect on restart.",
+    "description": "How this instance is reached, and whether the settings that depend on that are correct. Trusted proxies can be changed here and apply immediately; the rest are read from environment variables at startup.",
     "rows": {
       "mode": "Mode",
       "clientIps": "Client IPs",
@@ -4214,22 +4214,22 @@
     "setupLocalOnly": "Local network only",
     "setupAnywhere": "Reachable from anywhere",
     "allClear": "No problems detected with how this instance is exposed.",
-    "restartNote": "These are read from environment variables at startup. Change them in your compose file or service definition and restart Aperture.",
+    "restartNote": "Trusted proxies apply to the next request, no restart needed. The other values are read from environment variables at startup — change them in your compose file or service definition and restart Aperture.",
     "findings": {
       "proxyHeadersIgnored": {
         "title": "A proxy is forwarding requests, but Aperture is ignoring it",
         "detail": "Requests are arriving with an X-Forwarded-For header while TRUST_PROXY is unset, so every visitor appears to come from the same address. The login rate limiter collapses into one shared bucket — a single attacker can exhaust it for everyone — and first-run setup treats remote visitors as local.",
-        "fix": "TRUST_PROXY=127.0.0.1   # or your proxy container address, e.g. 172.18.0.1"
+        "fix": "Add your proxy address above — for a tunnel on this host, use the \"Tunnel on this host\" preset."
       },
       "allTrafficOneAddress": {
         "title": "Every request so far has come from the same local address",
         "detail": "Normal for a single-machine LAN install. If a reverse proxy or tunnel sits in front of Aperture, this instead means its forwarded client IPs are being discarded.",
-        "fix": "TRUST_PROXY=127.0.0.1   # only if a proxy or tunnel is in front"
+        "fix": "Only if a proxy is in front: add its address above."
       },
       "proxyModeWithoutTrust": {
         "title": "Proxy mode is on but no proxy is trusted",
         "detail": "DEPLOYMENT_MODE says a proxy is in front, yet TRUST_PROXY resolved to off. Client IPs will be wrong, which weakens the login rate limiter and the first-run setup guard.",
-        "fix": "TRUST_PROXY=127.0.0.1"
+        "fix": "Add your proxy address above."
       },
       "trustProxyWideOpen": {
         "title": "X-Forwarded-For is trusted from any source",
@@ -4266,6 +4266,16 @@
         "detail": "The policy is running in report-only mode, so violations are logged to the browser console but nothing is blocked. Intended for one shakedown deploy, not to be left on.",
         "fix": "Remove CSP_REPORT_ONLY"
       }
-    }
+    },
+    "trustedProxiesTitle": "Trusted proxies",
+    "trustedProxiesHelp": "Addresses allowed to tell Aperture who the real visitor is via X-Forwarded-For. Set this to your reverse proxy or tunnel, never to a public range — anything listed here can claim any client IP it likes.",
+    "trustedProxiesFormat": "Comma-separated IP addresses or CIDR ranges. Also accepts loopback, linklocal and uniquelocal.",
+    "presets": "Presets:",
+    "presetTunnel": "Tunnel on this host",
+    "presetDocker": "Docker network",
+    "presetNone": "Trust none",
+    "savedApplied": "Saved. Real client IPs are in use from the next request.",
+    "saveFailed": "Could not save trusted proxies.",
+    "envManaged": "Trusted proxies are set by the TRUST_PROXY environment variable, so they cannot be edited here. Remove it from your compose file to manage them from this page."
   }
 }

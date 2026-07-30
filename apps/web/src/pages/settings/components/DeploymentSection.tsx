@@ -6,10 +6,12 @@ import {
   CardContent,
   Alert,
   AlertTitle,
+  Button,
   Chip,
   CircularProgress,
   Divider,
   Stack,
+  TextField,
 } from '@mui/material'
 import PublicIcon from '@mui/icons-material/Public'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
@@ -39,11 +41,18 @@ interface Finding {
   data?: Record<string, string | number>
 }
 
+interface ProxyTrustState {
+  envManaged: boolean
+  entries: string[]
+  trustsAll: boolean
+  trustsAny: boolean
+}
+
 interface Posture {
   mode: 'direct' | 'proxy'
   production: boolean
   effective: {
-    trustProxy: boolean | number | string[]
+    trustedProxies: ProxyTrustState
     cookieSecure: boolean
     apiDocs: string
     setupRemoteAllowed: boolean
@@ -66,32 +75,72 @@ const SEVERITY_TO_MUI: Record<Severity, 'error' | 'warning' | 'info'> = {
   info: 'info',
 }
 
-function formatTrustProxy(value: boolean | number | string[]): string {
-  if (value === false) return 'off'
-  if (value === true) return 'all (unsafe)'
-  if (Array.isArray(value)) return value.join(', ')
-  return `${value} hop(s)`
+function formatTrustProxy(state: ProxyTrustState): string {
+  if (state.trustsAll) return 'all (unsafe)'
+  if (state.entries.length === 0) return 'off'
+  return state.entries.join(', ')
 }
 
 export function DeploymentSection() {
   const { t } = useTranslation()
   const [posture, setPosture] = useState<Posture | null>(null)
   const [loading, setLoading] = useState(true)
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  const apply = useCallback((next: Posture) => {
+    setPosture(next)
+    setDraft(next.effective.trustedProxies.entries.join(', '))
+  }, [])
 
   const load = useCallback(async () => {
     try {
       const res = await fetch('/api/settings/deployment', { credentials: 'include' })
-      if (res.ok) setPosture(await res.json())
+      if (res.ok) apply(await res.json())
     } catch {
       // Leave the panel empty rather than blocking the rest of the tab.
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [apply])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  const save = async (value: string) => {
+    setSaving(true)
+    setSaveError(null)
+    setSaved(false)
+    try {
+      const res = await fetch('/api/settings/deployment', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          trustedProxies: value
+            .split(',')
+            .map((e) => e.trim())
+            .filter(Boolean),
+        }),
+      })
+      const body = await res.json()
+      if (!res.ok) {
+        setSaveError(body.error || t('settingsDeployment.saveFailed'))
+        return
+      }
+      // The response carries the recomputed posture, so the rows and findings
+      // above update from the same round trip that applied the change.
+      apply(body.posture)
+      setSaved(true)
+    } catch {
+      setSaveError(t('settingsDeployment.saveFailed'))
+    } finally {
+      setSaving(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -105,10 +154,11 @@ export function DeploymentSection() {
 
   if (!posture) return null
 
+  const trust = posture.effective.trustedProxies
+
   // Client IPs are only trustworthy when something is trusted to forward them,
   // or when nothing is in front at all.
-  const resolvesClientIps =
-    posture.effective.trustProxy !== false || posture.observed.forwardedForSeen === 0
+  const resolvesClientIps = trust.trustsAny || posture.observed.forwardedForSeen === 0
 
   const loudFindings = posture.findings.filter((f) => f.severity !== 'info')
 
@@ -130,8 +180,8 @@ export function DeploymentSection() {
     },
     {
       label: t('settingsDeployment.rows.trustedProxies'),
-      value: formatTrustProxy(posture.effective.trustProxy),
-      ok: posture.effective.trustProxy !== true,
+      value: formatTrustProxy(trust),
+      ok: !trust.trustsAll,
     },
     {
       label: t('settingsDeployment.rows.cookies'),
@@ -194,6 +244,85 @@ export function DeploymentSection() {
             </Box>
           ))}
         </Stack>
+
+        <Divider sx={{ my: 2 }} />
+
+        {/* The one setting here that can change on a live server: Fastify
+            consults trustProxy per request when it is a function, so a save
+            applies to the very next request with no restart. */}
+        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+          {t('settingsDeployment.trustedProxiesTitle')}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          {t('settingsDeployment.trustedProxiesHelp')}
+        </Typography>
+
+        {trust.envManaged ? (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            {t('settingsDeployment.envManaged')}
+          </Alert>
+        ) : (
+          <Box sx={{ mb: 2 }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <TextField
+                size="small"
+                fullWidth
+                value={draft}
+                onChange={(e) => {
+                  setDraft(e.target.value)
+                  setSaved(false)
+                  setSaveError(null)
+                }}
+                placeholder="127.0.0.1, 172.18.0.0/16"
+                disabled={saving}
+                error={Boolean(saveError)}
+                helperText={saveError ?? t('settingsDeployment.trustedProxiesFormat')}
+                sx={{ flex: '1 1 320px' }}
+              />
+              <Button
+                variant="contained"
+                onClick={() => void save(draft)}
+                disabled={saving || draft === trust.entries.join(', ')}
+                sx={{ mt: 0.25 }}
+              >
+                {saving ? <CircularProgress size={20} color="inherit" /> : t('common.save')}
+              </Button>
+            </Box>
+
+            <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
+              <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
+                {t('settingsDeployment.presets')}
+              </Typography>
+              <Chip
+                size="small"
+                label={t('settingsDeployment.presetTunnel')}
+                onClick={() => setDraft('127.0.0.1, ::1')}
+                variant="outlined"
+                clickable
+              />
+              <Chip
+                size="small"
+                label={t('settingsDeployment.presetDocker')}
+                onClick={() => setDraft('172.16.0.0/12')}
+                variant="outlined"
+                clickable
+              />
+              <Chip
+                size="small"
+                label={t('settingsDeployment.presetNone')}
+                onClick={() => setDraft('')}
+                variant="outlined"
+                clickable
+              />
+            </Box>
+
+            {saved && (
+              <Alert severity="success" sx={{ mt: 1.5 }}>
+                {t('settingsDeployment.savedApplied')}
+              </Alert>
+            )}
+          </Box>
+        )}
 
         <Divider sx={{ my: 2 }} />
 

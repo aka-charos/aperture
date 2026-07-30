@@ -16,7 +16,6 @@
 
 import {
   deploymentMode,
-  trustProxy,
   useSecureCookies,
   apiDocsMode,
   setupAllowsRemote,
@@ -27,6 +26,7 @@ import {
   type DeploymentMode,
   type ApiDocsMode,
 } from './security.js'
+import { getProxyTrustState, type ProxyTrustState } from './proxyTrust.js'
 
 export type FindingSeverity = 'critical' | 'warning' | 'info'
 
@@ -54,7 +54,7 @@ export interface DeploymentPosture {
   mode: DeploymentMode
   production: boolean
   effective: {
-    trustProxy: boolean | number | string[]
+    trustedProxies: ProxyTrustState
     cookieSecure: boolean
     apiDocs: ApiDocsMode
     setupRemoteAllowed: boolean
@@ -112,13 +112,13 @@ const MIN_SAMPLE = 5
 
 export function getDeploymentPosture(): DeploymentPosture {
   const mode = deploymentMode()
-  const proxy = trustProxy()
+  const proxy = getProxyTrustState()
   const production = isProduction()
   const observed = getObservation()
   const bindHost = process.env.HOST?.trim() || '0.0.0.0'
 
   const findings: DeploymentFinding[] = []
-  const trustsNothing = proxy === false
+  const trustsNothing = !proxy.trustsAny
 
   // --- Evidence-based: what the traffic says -------------------------------
 
@@ -150,7 +150,7 @@ export function getDeploymentPosture(): DeploymentPosture {
 
   // --- Config-based --------------------------------------------------------
 
-  if (proxy === true) {
+  if (proxy.trustsAll) {
     findings.push({ id: 'trustProxyWideOpen', severity: 'warning' })
   }
 
@@ -177,7 +177,7 @@ export function getDeploymentPosture(): DeploymentPosture {
     mode,
     production,
     effective: {
-      trustProxy: proxy,
+      trustedProxies: proxy,
       cookieSecure: useSecureCookies(),
       apiDocs: apiDocsMode(),
       setupRemoteAllowed: setupAllowsRemote(),
@@ -198,15 +198,17 @@ export function getDeploymentPosture(): DeploymentPosture {
  */
 const BOOT_MESSAGES: Record<string, string> = {
   proxyHeadersIgnored:
-    'Requests are arriving with X-Forwarded-For but TRUST_PROXY is not set. Every caller ' +
+    'Requests are arriving with X-Forwarded-For but no proxy is trusted. Every caller ' +
     'therefore shares one apparent address: the login rate limiter collapses to a single ' +
-    'global bucket, and first-run setup sees remote visitors as local. Set TRUST_PROXY to ' +
-    'your proxy address (e.g. TRUST_PROXY=127.0.0.1 for a tunnel on this host).',
+    'global bucket, and first-run setup sees remote visitors as local. Add your proxy under ' +
+    'Settings > System > Deployment (applies immediately), or set TRUST_PROXY=127.0.0.1.',
   allTrafficOneAddress:
     'Every request so far has come from the same local address. If a reverse proxy or tunnel ' +
-    'is in front of Aperture, set TRUST_PROXY to its address so real client IPs are used.',
+    'is in front of Aperture, add its address under Settings > System > Deployment so real ' +
+    'client IPs are used.',
   proxyModeWithoutTrust:
-    'DEPLOYMENT_MODE=proxy but TRUST_PROXY resolved to off. Client IPs will be wrong.',
+    'DEPLOYMENT_MODE=proxy but no proxy address is trusted. Client IPs will be wrong until ' +
+    'one is added under Settings > System > Deployment.',
   trustProxyWideOpen:
     'TRUST_PROXY=true trusts X-Forwarded-For from any source. A caller can then forge their ' +
     'apparent address, which lets them mint a fresh login rate-limit bucket per request and ' +
