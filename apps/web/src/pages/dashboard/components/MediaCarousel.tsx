@@ -72,6 +72,9 @@ export function MediaCarousel({
       isWatching={item.type === 'series' ? isWatching(item.id) : undefined}
       onWatchingToggle={item.type === 'series' ? () => toggleWatching(item.id) : undefined}
       hideWatchingToggle={item.type !== 'series'}
+      // Dashboard posters carry burned-in artwork overlays (language flags, rating
+      // badges) along their bottom edge, so app controls stay out of that corner.
+      watchingTogglePosition="topRight"
       onClick={() => handleItemClick(item)}
       size="medium"
     >

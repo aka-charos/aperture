@@ -105,6 +105,8 @@ export function WatchingCarousel({
             onRate={(rating) => handleRate(item.seriesId, rating)}
             isWatching={true}
             onWatchingToggle={() => toggleWatching(item.seriesId)}
+            // See MediaCarousel: the poster's bottom edge belongs to the artwork.
+            watchingTogglePosition="topRight"
             size="medium"
             onClick={() => handleItemClick(item)}
           >
