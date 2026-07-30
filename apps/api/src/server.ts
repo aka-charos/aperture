@@ -13,12 +13,8 @@ import authPlugin, { requireAdmin } from './plugins/auth.js'
 import staticPlugin from './plugins/static.js'
 import routes from './routes/index.js'
 import { getSwaggerConfig, swaggerUIConfig } from './config/openapi.js'
-import {
-  useSecureCookies,
-  trustProxy,
-  apiDocsMode,
-  helmetOptions,
-} from './config/security.js'
+import { useSecureCookies, apiDocsMode, helmetOptions } from './config/security.js'
+import { buildTrustProxyOption, refreshProxyTrust } from './config/proxyTrust.js'
 import { warnOnWeakSecurityPosture, noteRequest } from './config/deploymentPosture.js'
 
 export interface ServerOptions {
@@ -37,10 +33,14 @@ export async function buildServer(options: ServerOptions = {}): Promise<any> {
     disableRequestLogging: true,
     requestIdHeader: 'x-request-id',
     requestIdLogLabel: 'requestId',
-    // Off unless the operator opts in. Behind a reverse proxy this must be set,
-    // or request.ip is the proxy for every caller and the login rate limiter
-    // buckets the whole internet together. See config/security.ts.
-    trustProxy: trustProxy(),
+    // Off unless configured. Behind a reverse proxy this must be set, or
+    // request.ip is the proxy for every caller and the login rate limiter
+    // buckets the whole internet together.
+    //
+    // Usually a function rather than a value: Fastify consults it per request,
+    // which is what lets Settings > Deployment change trusted proxies without a
+    // restart. See config/proxyTrust.ts.
+    trustProxy: buildTrustProxyOption(),
     ajv: {
       customOptions: {
         // Allow OpenAPI 'example' keyword in schemas for documentation
@@ -48,6 +48,11 @@ export async function buildServer(options: ServerOptions = {}): Promise<any> {
       },
     },
   })
+
+  // Load the stored trusted-proxy list into the matcher the trustProxy function
+  // consults. Must happen before the server accepts traffic, or the first
+  // requests resolve client IPs as if nothing were trusted.
+  await refreshProxyTrust()
 
   warnOnWeakSecurityPosture((msg) => logger.warn(`⚠️  ${msg}`))
 

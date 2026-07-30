@@ -29,6 +29,13 @@ import {
   resetObservation,
   warnOnWeakSecurityPosture,
 } from './deploymentPosture.js'
+import {
+  buildTrustProxyOption,
+  getProxyTrustState,
+  proxyTrustIsEnvManaged,
+  setTrustedProxiesForTest,
+  validateProxyEntries,
+} from './proxyTrust.js'
 import { loginRateLimit } from './rateLimits.js'
 import { requireAdmin } from '../plugins/auth.js'
 
@@ -391,6 +398,114 @@ describe('deployment posture diagnostics', () => {
       assert.equal(warnings.length, loud.length, 'one warning per non-info finding')
       assert.ok(warnings.some((w) => /TRUST_PROXY/.test(w)))
     })
+    resetObservation()
+  })
+})
+
+describe('trusted proxies are editable at runtime', () => {
+  /**
+   * The claim this pins: Fastify accepts a *function* for trustProxy and
+   * consults it per request, so changing the trusted set takes effect on a
+   * live server. An earlier reading of Fastify's source concluded the opposite
+   * — that the value was frozen at construction — and that mistake is why the
+   * admin panel shipped read-only. If this test ever fails, the panel's
+   * promise ("applies immediately") is broken.
+   */
+  async function appWithLiveTrust() {
+    const f = Fastify({ trustProxy: buildTrustProxyOption() })
+    f.get('/', async (req) => ({ ip: req.ip }))
+    return f
+  }
+
+  const seenIp = async (app: Awaited<ReturnType<typeof appWithLiveTrust>>) =>
+    (
+      await app.inject({
+        method: 'GET',
+        url: '/',
+        headers: { 'x-forwarded-for': '203.0.113.77' },
+        remoteAddress: '127.0.0.1',
+      })
+    ).json().ip
+
+  test('a change applies to the very next request, with no restart', async () => {
+    const app = await withEnv({}, async () => {
+      setTrustedProxiesForTest([])
+      return appWithLiveTrust()
+    })
+
+    assert.equal(await seenIp(app), '127.0.0.1', 'nothing trusted yet')
+
+    setTrustedProxiesForTest(['127.0.0.1'])
+    assert.equal(await seenIp(app), '203.0.113.77', 'same server instance, new answer')
+
+    setTrustedProxiesForTest([])
+    assert.equal(await seenIp(app), '127.0.0.1', 'revoking works too')
+
+    await app.close()
+  })
+
+  test('CIDR ranges are honoured, via proxy-addr rather than our own parsing', async () => {
+    const app = await withEnv({}, async () => {
+      setTrustedProxiesForTest(['172.16.0.0/12'])
+      return appWithLiveTrust()
+    })
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/',
+      headers: { 'x-forwarded-for': '198.51.100.4' },
+      remoteAddress: '172.18.0.1',
+    })
+    assert.equal(res.json().ip, '198.51.100.4', '172.18.0.1 falls inside 172.16.0.0/12')
+
+    await app.close()
+  })
+
+  test('TRUST_PROXY keeps ownership when set', () => {
+    withEnv({ TRUST_PROXY: '10.0.0.5' }, () => {
+      assert.equal(proxyTrustIsEnvManaged(), true)
+      const state = getProxyTrustState()
+      assert.deepEqual(state.entries, ['10.0.0.5'])
+      assert.equal(state.envManaged, true, 'the UI must render this read-only')
+      // Static value, not a function: preserves hop counts and `true`, which a
+      // predicate cannot express.
+      assert.deepEqual(buildTrustProxyOption(), ['10.0.0.5'])
+    })
+  })
+
+  test('garbage is rejected at save time, not on every later request', () => {
+    assert.throws(() => validateProxyEntries(['not-an-ip']), /not a valid IP address/)
+    assert.throws(() => validateProxyEntries(['999.1.1.1']), /not a valid IP address/)
+    assert.deepEqual(validateProxyEntries([' 127.0.0.1 ', '', '172.16.0.0/12']), [
+      '127.0.0.1',
+      '172.16.0.0/12',
+    ])
+    // proxy-addr's named presets are legitimate values.
+    assert.deepEqual(validateProxyEntries(['loopback', 'uniquelocal']), [
+      'loopback',
+      'uniquelocal',
+    ])
+  })
+
+  test('saving a proxy clears the "headers ignored" finding', () => {
+    resetObservation()
+    for (let i = 0; i < 4; i++) noteRequest('127.0.0.1', true)
+
+    withEnv({ NODE_ENV: 'production' }, () => {
+      setTrustedProxiesForTest([])
+      assert.ok(
+        getDeploymentPosture().findings.some((f) => f.id === 'proxyHeadersIgnored'),
+        'flagged before'
+      )
+
+      setTrustedProxiesForTest(['127.0.0.1'])
+      assert.ok(
+        !getDeploymentPosture().findings.some((f) => f.id === 'proxyHeadersIgnored'),
+        'and clear immediately after saving'
+      )
+    })
+
+    setTrustedProxiesForTest([])
     resetObservation()
   })
 })
