@@ -40,6 +40,12 @@ export interface MoviePosterProps {
   onWatchingToggle?: () => void
   /** Hide the watching toggle button */
   hideWatchingToggle?: boolean
+  /**
+   * Which corner the watching toggle sits in. Defaults to `bottomLeft`.
+   * `topRight` tucks it under whatever badge already owns that corner (the
+   * community rating or the match score) rather than on top of it.
+   */
+  watchingTogglePosition?: 'bottomLeft' | 'topRight'
   /** Callback when user clicks explore button to view similarity graph */
   onExploreClick?: () => void
   /** Hide the explore button */
@@ -78,6 +84,7 @@ export function MoviePoster({
   isWatching = false,
   onWatchingToggle,
   hideWatchingToggle = false,
+  watchingTogglePosition = 'bottomLeft',
   onExploreClick,
   hideExploreButton = false,
   hideYear = false,
@@ -102,6 +109,16 @@ export function MoviePoster({
 
   // Proxy the image URL through our API to avoid mixed content issues
   const proxiedPosterUrl = getProxiedImageUrl(posterUrl)
+
+  // Both of these render at top/right 8 with height 24, so a top-right watching
+  // toggle has to start below them. They are mutually exclusive in practice, but
+  // either one is enough to push the toggle down.
+  const ratingBadgeVisible = !hideRating && !hideLibraryRatingBadge && rating != null
+  const scoreBadgeVisible = showScore && score !== undefined && score !== null
+  const watchingToggleAnchor =
+    watchingTogglePosition === 'topRight'
+      ? { top: ratingBadgeVisible || scoreBadgeVisible ? 40 : 8, right: 8 }
+      : { bottom: 8, left: 8 }
 
   if (loading) {
     return (
@@ -223,7 +240,7 @@ export function MoviePoster({
           />
         )}
 
-        {/* Watching toggle button - bottom left */}
+        {/* Watching toggle button - bottom left, or top right when asked */}
         {!hideWatchingToggle && onWatchingToggle && (
           <Tooltip title={isWatching ? 'Remove from watching list' : 'Add to watching list'} arrow>
             <IconButton
@@ -234,8 +251,7 @@ export function MoviePoster({
               size="small"
               sx={{
                 position: 'absolute',
-                bottom: 8,
-                left: 8,
+                ...watchingToggleAnchor,
                 zIndex: 4,
                 backgroundColor: isWatching ? 'rgba(99, 102, 241, 0.9)' : 'rgba(0, 0, 0, 0.6)',
                 color: 'white',
