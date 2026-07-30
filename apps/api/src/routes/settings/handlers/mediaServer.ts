@@ -18,6 +18,7 @@ import {
   getMediaServerTypes,
   getSystemSetting,
   setSystemSetting,
+  InvalidServerUrlError,
   type MediaServerType,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
@@ -189,6 +190,12 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
         message: 'Media server configuration updated',
       })
     } catch (err) {
+      // A rejected URL is the admin's input, not a server fault. Without this
+      // it surfaced as an opaque 500 and the actual reason ("must use http://",
+      // "must not embed a username or password") was only in the server log.
+      if (err instanceof InvalidServerUrlError) {
+        return reply.status(400).send({ error: err.message })
+      }
       fastify.log.error({ err }, 'Failed to update media server config')
       return reply.status(500).send({ error: 'Failed to update media server configuration' })
     }

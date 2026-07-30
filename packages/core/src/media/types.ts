@@ -4,6 +4,21 @@
 
 export type MediaServerType = 'emby' | 'jellyfin'
 
+/**
+ * The media server rejected the credentials (HTTP 401).
+ *
+ * Distinct from every other authentication failure — a timeout, a 5xx, an
+ * unreachable host — because only this one says anything about the user. The
+ * login route counts it toward the per-account lockout; the others must not,
+ * or a media server outage locks out every user who retries during it.
+ */
+export class InvalidCredentialsError extends Error {
+  constructor(message = 'Invalid username or password') {
+    super(message)
+    this.name = 'InvalidCredentialsError'
+  }
+}
+
 export interface AuthResult {
   userId: string
   accessToken: string

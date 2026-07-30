@@ -8,15 +8,28 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-// Global error handlers to prevent crashes
+// Global error handlers.
+//
+// These log and then exit: after an uncaught exception the process is in an
+// undefined state, and continuing to serve requests from it risks answering
+// them with half-applied state — including auth decisions. The container
+// restart policy is the recovery mechanism, not a limping process.
+//
+// Fastify's own error handling still catches per-request errors, so reaching
+// here means something escaped the request lifecycle entirely.
+function fatal(label: string, err: unknown): void {
+  console.error(`💥 ${label}:`, err)
+  // Give the logger a tick to flush before the process goes away.
+  setTimeout(() => process.exit(1), 100).unref()
+}
+
 process.on('uncaughtException', (err) => {
-  console.error('💥 Uncaught Exception:', err)
-  // Don't exit - try to keep running
+  fatal('Uncaught Exception', err)
 })
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason)
-  // Don't exit - try to keep running
+  console.error('💥 Unhandled Rejection at:', promise)
+  fatal('Unhandled Rejection', reason)
 })
 
 async function main() {
@@ -88,11 +101,17 @@ async function main() {
   process.on('SIGTERM', () => shutdown('SIGTERM'))
   process.on('SIGINT', () => shutdown('SIGINT'))
 
-  // Start listening
+  // Start listening.
+  //
+  // 0.0.0.0 by default because a container has to accept traffic from outside
+  // itself. But when the only intended front door is a tunnel or reverse proxy
+  // on the same host (cloudflared, for instance), binding the whole interface
+  // leaves the app directly reachable on the LAN — around whatever access
+  // control the front door enforces. Set HOST=127.0.0.1 in that case.
   try {
     const address = await server.listen({
       port: env.PORT,
-      host: '0.0.0.0',
+      host: process.env.HOST?.trim() || '0.0.0.0',
     })
     console.log(`🚀 Aperture API server running at ${address}`)
 

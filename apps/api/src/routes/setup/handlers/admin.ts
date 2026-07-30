@@ -17,6 +17,7 @@ import {
   hasOpenAIApiKey,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
+import { startJob } from '../../jobs/startJob.js'
 import { setupSchemas } from '../schemas.js'
 import { requireSetupWritable } from './status.js'
 import type { SetupProgressBody } from './status.js'
@@ -49,7 +50,16 @@ export async function registerAdminHandlers(fastify: FastifyInstance) {
 
   /**
    * POST /api/admin/setup/run-initial-jobs
-   * Admin-only orchestration endpoint: runs initial jobs in the required order.
+   * Admin-only: start the initial job set.
+   *
+   * NOTE: these are *started* in pipeline order, not run in it — startJob does
+   * not await completion, so all ten are in flight at once and the later stages
+   * (embeddings, recommendations) will find little to do until the syncs ahead
+   * of them finish. Harmless (they no-op rather than corrupt) but ineffective.
+   * The setup wizard does not use this route; it drives one job at a time from
+   * useSetupWizard.ts, polling progress between each. This endpoint currently
+   * has no callers at all and previously always failed — it routed through
+   * fastify.inject with no credentials, so requireAdmin rejected it.
    */
   fastify.post(
     '/api/admin/setup/run-initial-jobs',
@@ -70,21 +80,17 @@ export async function registerAdminHandlers(fastify: FastifyInstance) {
 
       const jobIds: string[] = []
       for (const name of jobs) {
-        const res = await fastify.inject({
-          method: 'POST',
-          url: `/api/jobs/${name}/run`,
-        })
+        const started = startJob(name)
 
-        if (res.statusCode >= 400) {
+        if (!started.ok) {
           return reply.status(500).send({
             error: `Failed to start job ${name}`,
-            statusCode: res.statusCode,
-            body: res.body,
+            statusCode: started.status,
+            body: started.error,
           })
         }
 
-        const parsed = res.json() as { jobId?: string }
-        if (parsed.jobId) jobIds.push(parsed.jobId)
+        jobIds.push(started.jobId)
       }
 
       await markSetupStepCompleted('initialJobs')

@@ -3,9 +3,7 @@
  */
 
 import type { FastifyInstance } from 'fastify'
-import { randomUUID } from 'crypto'
 import {
-  getJobProgress,
   cancelJob as cancelJobCore,
   createChildLogger,
 } from '@aperture/core'
@@ -13,7 +11,7 @@ import { requireAdmin } from '../../../plugins/auth.js'
 import { jobSchemas } from '../schemas.js'
 import { jobDefinitions } from '../definitions.js'
 import { activeJobs } from '../state.js'
-import { runJob } from '../executor.js'
+import { startJob } from '../startJob.js'
 
 const logger = createChildLogger('jobs-run')
 
@@ -28,37 +26,17 @@ export async function registerRunHandlers(fastify: FastifyInstance) {
     async (request, reply) => {
       const { name } = request.params
 
-      const jobDef = jobDefinitions.find((j) => j.name === name)
-      if (!jobDef) {
-        return reply.status(404).send({ error: 'Job not found' })
+      const started = startJob(name)
+      if (!started.ok) {
+        return reply.status(started.status).send({
+          error: started.error,
+          ...(started.jobId ? { jobId: started.jobId } : {}),
+        })
       }
-
-      // Check if job is already running
-      const existingJobId = activeJobs.get(name)
-      if (existingJobId) {
-        const progress = getJobProgress(existingJobId)
-        if (progress?.status === 'running') {
-          return reply.status(409).send({
-            error: 'Job is already running',
-            jobId: existingJobId,
-          })
-        }
-      }
-
-      // Create new job ID
-      const jobId = randomUUID()
-      activeJobs.set(name, jobId)
-
-      logger.info({ job: name, jobId }, `Starting job: ${name}`)
-
-      // Run job in background (don't await)
-      runJob(name, jobId).catch((err) => {
-        logger.error({ err, job: name, jobId }, 'Job failed')
-      })
 
       return reply.send({
         message: `Job ${name} started`,
-        jobId,
+        jobId: started.jobId,
         status: 'running',
       })
     }

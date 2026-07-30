@@ -51,6 +51,7 @@ import {
   LanguageDefaultsSection,
   PosterDisplaySection,
   SystemLogsSection,
+  DeploymentSection,
 } from './components'
 import { ApiErrorAlert } from '../../components/ApiErrorAlert'
 import { useTranslation } from 'react-i18next'
@@ -419,6 +420,10 @@ export function SettingsPage() {
 
               {/* Poster display defaults (rating badge) */}
               <PosterDisplaySection />
+
+              {/* How the instance is reached, and whether the settings that
+                  depend on that (client IPs, cookies, setup access) are right */}
+              <DeploymentSection />
 
               {/* Logging verbosity */}
               <SystemLogsSection />

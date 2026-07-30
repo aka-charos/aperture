@@ -38,9 +38,23 @@ export const authSchemas = {
     type: 'object',
     description: 'Credentials for authentication',
     required: ['username'],
+    // Bounded so unbounded strings are rejected here rather than proxied on to
+    // the media server. Emby and Jellyfin both cap well below these lengths.
+    additionalProperties: false,
     properties: {
-      username: { type: 'string', description: 'Media server username', example: 'john_doe' },
-      password: { type: 'string', description: 'Media server password. May be optional if passwordless login is enabled.', example: 'secret123' },
+      username: {
+        type: 'string',
+        minLength: 1,
+        maxLength: 256,
+        description: 'Media server username',
+        example: 'john_doe',
+      },
+      password: {
+        type: 'string',
+        maxLength: 256,
+        description: 'Media server password. May be optional if passwordless login is enabled.',
+        example: 'secret123',
+      },
     },
   },
 

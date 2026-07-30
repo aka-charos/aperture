@@ -134,6 +134,12 @@ export const jobDefinitions: JobDefinition[] = [
     description: 'Create a full database backup',
     cron: '0 2 * * *', // Daily at 2 AM
   },
+  // === Auth Cleanup Job ===
+  {
+    name: 'cleanup-auth-state',
+    description: 'Delete expired/idle sessions and stale failed-login counters',
+    cron: '30 3 * * *', // Daily at 3:30 AM
+  },
   // === AI Pricing Cache Job ===
   {
     name: 'refresh-ai-pricing',

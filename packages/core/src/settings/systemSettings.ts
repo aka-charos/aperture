@@ -1,5 +1,6 @@
 import { query, queryOne } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
+import { validateServerUrl } from './validateServerUrl.js'
 import {
   APP_LOCALE_OPTIONS,
   DEFAULT_LOCALE,
@@ -361,13 +362,21 @@ export async function setMediaServerConfig(config: {
   }
 
   if (config.baseUrl !== undefined) {
-    await setSystemSetting('media_server_base_url', config.baseUrl, 'Media server base URL')
+    await setSystemSetting(
+      'media_server_base_url',
+      validateServerUrl(config.baseUrl, 'Media server URL'),
+      'Media server base URL'
+    )
   }
 
   if (config.publicUrl !== undefined) {
+    // Optional: empty means "fall back to the base URL", so only validate when set.
+    const publicUrl = config.publicUrl.trim()
+      ? validateServerUrl(config.publicUrl, 'Public media server URL')
+      : ''
     await setSystemSetting(
       'media_server_public_url',
-      config.publicUrl,
+      publicUrl,
       'Public media server URL for user-facing links (empty = use base URL)'
     )
   }
@@ -389,9 +398,13 @@ export async function testMediaServerConnection(config: {
   apiKey: string
 }): Promise<{ success: boolean; serverName?: string; error?: string }> {
   try {
+    // Validated here too, not just in the setter: this runs against a URL the
+    // caller supplies in the request body, before anything is persisted.
+    const baseUrl = validateServerUrl(config.baseUrl, 'Media server URL')
+
     // Import dynamically to avoid circular dependencies
     const { createMediaServerProvider } = await import('../media/index.js')
-    const provider = createMediaServerProvider(config.type, config.baseUrl)
+    const provider = createMediaServerProvider(config.type, baseUrl)
 
     // Try to get server info as a connection test
     if ('getServerInfo' in provider) {
