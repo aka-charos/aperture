@@ -71,6 +71,16 @@ function ChatThreadArea({
 
   // Don't pass messages to runtime - it doesn't properly parse tool results
   // Instead, we'll pass historical messages directly to Thread for manual rendering
+  //
+  // No `cloud` option, deliberately. `useChatRuntime` always calls assistant-ui's
+  // cloud thread-list adapter, which falls back to an `autoCloud` built at module
+  // load from `process.env.NEXT_PUBLIC_ASSISTANT_BASE_URL`. That variable is set
+  // nowhere here and Vite shims no `process`, so the adapter takes its early
+  // return and hands back an InMemoryThreadListAdapter — conversation history is
+  // ours, served from /api/assistant, and nothing is sent to a third party.
+  // Setting that variable, or passing `cloud`, would start shipping thread
+  // contents off-origin; the API's `connect-src 'self'` CSP would block it, which
+  // is the intended safety net rather than a bug to work around.
   const runtime = useChatRuntime({
     transport: transport.current,
     // The server reports its work phase as transient `data-status` parts so the

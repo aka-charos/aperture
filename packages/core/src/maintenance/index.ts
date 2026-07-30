@@ -13,3 +13,5 @@ export {
   type RepairProgress,
 } from './posterRepair.js'
 
+export { cleanupExpiredAuthState, type AuthCleanupResult } from './authCleanup.js'
+

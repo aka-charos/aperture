@@ -32,6 +32,7 @@ import {
   registerN8nHandlers,
   registerTavilyHandlers,
   registerSystemHandlers,
+  registerDeploymentHandlers,
 } from './handlers/index.js'
 
 const settingsRoutes: FastifyPluginAsync = async (fastify) => {
@@ -53,6 +54,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   registerN8nHandlers(fastify)
   registerTavilyHandlers(fastify)
   registerSystemHandlers(fastify)
+  registerDeploymentHandlers(fastify)
 }
 
 export default settingsRoutes

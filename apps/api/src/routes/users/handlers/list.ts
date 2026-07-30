@@ -2,7 +2,12 @@ import type { FastifyInstance } from 'fastify'
 import { createChildLogger } from '@aperture/core'
 import { cleanupUserLibraries } from '@aperture/core/strm'
 import { query, queryOne } from '../../../lib/db.js'
-import { requireAuth, requireAdmin, type SessionUser } from '../../../plugins/auth.js'
+import {
+  requireAuth,
+  requireAdmin,
+  deleteAllUserSessions,
+  type SessionUser,
+} from '../../../plugins/auth.js'
 import type { UserRow, UserListResponse, UserUpdateBody } from '../types.js'
 
 const listLogger = createChildLogger('users-list')
@@ -149,6 +154,15 @@ export function registerListHandlers(fastify: FastifyInstance) {
 
       if (!user) {
         return reply.status(404).send({ error: 'User not found' } as never)
+      }
+
+      // Disabling an account must end its existing sessions, not just block the
+      // next login. Keyed off the written row so it covers every path that can
+      // clear is_enabled, including the movies+series back-compat rule above.
+      if (!user.is_enabled) {
+        await deleteAllUserSessions(id).catch((err: unknown) =>
+          listLogger.error({ err, userId: id }, 'Failed to revoke sessions for disabled user')
+        )
       }
 
       const disableAllRecommendations =

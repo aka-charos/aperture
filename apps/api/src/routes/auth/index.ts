@@ -1,5 +1,11 @@
 import type { FastifyPluginAsync } from 'fastify'
-import { getMediaServerProvider, getMediaServerConfig, getSystemSetting, type AuthResult } from '@aperture/core'
+import {
+  getMediaServerProvider,
+  getMediaServerConfig,
+  getSystemSetting,
+  InvalidCredentialsError,
+  type AuthResult,
+} from '@aperture/core'
 import { queryOne } from '../../lib/db.js'
 import {
   createSession,
@@ -9,6 +15,17 @@ import {
   clearSessionCookie,
   type SessionUser,
 } from '../../plugins/auth.js'
+import {
+  checkLoginLockout,
+  recordFailedLogin,
+  clearLoginAttempts,
+} from '../../lib/loginAttempts.js'
+import { passwordlessLoginPermitted } from '../../config/security.js'
+import {
+  loginRateLimit,
+  loginOptionsRateLimit,
+  authCheckRateLimit,
+} from '../../config/rateLimits.js'
 import {
   authSchemas,
   loginOptionsSchema,
@@ -28,6 +45,16 @@ interface LoginBody {
   password: string
 }
 
+/**
+ * The admin toggle, subject to the deployment-level gate. Resolved through one
+ * helper so /login-options and /login can never disagree about whether a
+ * password is required.
+ */
+async function isPasswordlessLoginEnabled(): Promise<boolean> {
+  if (!passwordlessLoginPermitted()) return false
+  return (await getSystemSetting('allow_passwordless_login')) === 'true'
+}
+
 interface UserRow {
   id: string
   username: string
@@ -36,7 +63,6 @@ interface UserRow {
   provider_user_id: string
   is_admin: boolean
   is_enabled: boolean
-  provider_access_token: string | null
   can_manage_watch_history: boolean
   collections_enabled: boolean
 }
@@ -58,24 +84,32 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * GET /api/auth/login-options
    */
-  fastify.get('/api/auth/login-options', { schema: loginOptionsSchema }, async (_request, reply) => {
-    const allowPasswordlessLogin = await getSystemSetting('allow_passwordless_login')
-    return reply.send({
-      allowPasswordlessLogin: allowPasswordlessLogin === 'true',
-    })
-  })
+  fastify.get(
+    '/api/auth/login-options',
+    {
+      schema: loginOptionsSchema,
+      config: { rateLimit: loginOptionsRateLimit },
+    },
+    async (_request, reply) => {
+      return reply.send({
+        allowPasswordlessLogin: await isPasswordlessLoginEnabled(),
+      })
+    }
+  )
 
   /**
    * POST /api/auth/login
    */
   fastify.post<{ Body: LoginBody; Reply: LoginResponse }>(
     '/api/auth/login',
-    { schema: loginSchema },
+    {
+      schema: loginSchema,
+      config: { rateLimit: loginRateLimit },
+    },
     async (request, reply) => {
       const { username, password } = request.body
 
-      const allowPasswordlessLogin = await getSystemSetting('allow_passwordless_login')
-      const passwordRequired = allowPasswordlessLogin !== 'true'
+      const passwordRequired = !(await isPasswordlessLoginEnabled())
 
       if (!username) {
         return reply.status(400).send({ error: 'Username is required' } as never)
@@ -83,6 +117,14 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (passwordRequired && !password) {
         return reply.status(400).send({ error: 'Password is required' } as never)
+      }
+
+      const lockout = await checkLoginLockout(username)
+      if (lockout.locked) {
+        reply.header('Retry-After', String(lockout.retryAfterSeconds))
+        return reply.status(429).send({
+          error: 'Too many failed attempts for this account. Please try again later.',
+        } as never)
       }
 
       let provider
@@ -97,9 +139,28 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       try {
         authResult = await provider.authenticateByName(username, password || '')
       } catch (err) {
-        fastify.log.warn({ err, username }, 'Authentication failed')
+        // Only a credential rejection counts toward the lockout. A timeout, a
+        // 5xx or an unreachable media server says nothing about the user, and
+        // counting those would turn an upstream outage into an escalating
+        // lockout for every user who retries during it.
+        if (!(err instanceof InvalidCredentialsError)) {
+          fastify.log.error({ err }, 'Media server unreachable during authentication')
+          return reply.status(503).send({
+            error: 'Could not reach the media server. Please try again shortly.',
+          } as never)
+        }
+
+        const failure = await recordFailedLogin(username)
+        fastify.log.warn({ username }, 'Authentication failed: invalid credentials')
+        if (failure.locked) {
+          reply.header('Retry-After', String(failure.retryAfterSeconds))
+        }
+        // Deliberately identical to the lockout-free failure response so the
+        // endpoint does not confirm which usernames exist.
         return reply.status(401).send({ error: 'Invalid username or password' } as never)
       }
+
+      await clearLoginAttempts(username)
 
       const config = await getMediaServerConfig()
       if (!config.apiKey) {
@@ -116,20 +177,21 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
       let user: UserRow
 
+      // authResult.accessToken is deliberately not persisted. It is a live
+      // media-server credential and nothing in the app ever read it back — all
+      // server-side calls use the admin API key from system_settings.
       if (existingUser) {
         const updated = await queryOne<UserRow>(
           `UPDATE users SET
             username = $1,
             is_admin = $2,
-            provider_access_token = $3,
-            max_parental_rating = $4,
+            max_parental_rating = $3,
             updated_at = NOW()
-           WHERE id = $5
+           WHERE id = $4
            RETURNING id, username, display_name, provider, provider_user_id, is_admin, is_enabled, can_manage_watch_history, collections_enabled`,
           [
             authResult.userName,
             authResult.isAdmin,
-            authResult.accessToken,
             providerUser.maxParentalRating ?? null,
             existingUser.id,
           ]
@@ -137,8 +199,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         user = updated!
       } else {
         const created = await queryOne<UserRow>(
-          `INSERT INTO users (username, display_name, provider, provider_user_id, is_admin, provider_access_token, max_parental_rating)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)
+          `INSERT INTO users (username, display_name, provider, provider_user_id, is_admin, max_parental_rating)
+           VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING id, username, display_name, provider, provider_user_id, is_admin, is_enabled, can_manage_watch_history, collections_enabled`,
           [
             authResult.userName,
@@ -146,15 +208,24 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
             provider.type,
             authResult.userId,
             authResult.isAdmin,
-            authResult.accessToken,
             providerUser.maxParentalRating ?? null,
           ]
         )
         user = created!
       }
 
-      const sessionId = await createSession(user.id)
-      setSessionCookie(reply, sessionId)
+      // Authenticating against the media server says nothing about whether an
+      // admin has disabled the account here. Checked after the upsert so the
+      // row reflects the current state, and before any session exists.
+      if (!user.is_enabled) {
+        fastify.log.warn({ userId: user.id }, 'Login refused: account disabled')
+        return reply.status(403).send({
+          error: 'This account has been disabled. Contact your administrator.',
+        } as never)
+      }
+
+      const sessionToken = await createSession(user.id)
+      setSessionCookie(reply, sessionToken)
 
       const avatarUrl = `/api/users/${user.id}/avatar`
 
@@ -336,23 +407,31 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * GET /api/auth/check
    */
-  fastify.get('/api/auth/check', { schema: authCheckSchema }, async (request, reply) => {
-    if (request.user) {
-      return reply.send({ authenticated: true, user: request.user })
+  fastify.get(
+    '/api/auth/check',
+    {
+      schema: authCheckSchema,
+      config: { rateLimit: authCheckRateLimit },
+    },
+    async (request, reply) => {
+      if (request.user) {
+        return reply.send({ authenticated: true, user: request.user })
+      }
+
+      if (request.sessionError) {
+        clearSessionCookie(reply)
+        return reply.send({
+          authenticated: false,
+          user: null,
+          sessionError: true,
+          message:
+            'Your session was invalid. This can happen if the server was reconfigured. Please log in again.',
+        })
+      }
+
+      return reply.send({ authenticated: false, user: null })
     }
-    
-    if (request.sessionError) {
-      clearSessionCookie(reply)
-      return reply.send({ 
-        authenticated: false, 
-        user: null,
-        sessionError: true,
-        message: 'Your session was invalid. This can happen if the server was reconfigured. Please log in again.'
-      })
-    }
-    
-    return reply.send({ authenticated: false, user: null })
-  })
+  )
 }
 
 export default authRoutes

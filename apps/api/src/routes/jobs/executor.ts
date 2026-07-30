@@ -24,6 +24,7 @@ import {
   createBackup,
   refreshPricingCache,
   getPricingCacheStatus,
+  cleanupExpiredAuthState,
   generateDiscoveryForAllUsers,
   DEFAULT_DISCOVERY_CONFIG,
   createJobProgress,
@@ -373,6 +374,13 @@ async function executeJob(name: string, jobId: string): Promise<void> {
           },
           `✅ Database backup complete`
         )
+        break
+      }
+      // === Auth Cleanup Job ===
+      case 'cleanup-auth-state': {
+        const result = await cleanupExpiredAuthState()
+        completeJob(jobId, { ...result })
+        logger.info({ job: name, jobId, ...result }, `✅ Auth cleanup complete`)
         break
       }
       // === AI Pricing Cache Job ===

@@ -9,6 +9,7 @@ import {
 } from '@aperture/core'
 import { setupSchemas } from '../schemas.js'
 import { requireSetupWritable } from './status.js'
+import { startJob } from '../../jobs/startJob.js'
 
 export async function registerJobsHandlers(fastify: FastifyInstance) {
   /**
@@ -46,15 +47,19 @@ export async function registerJobsHandlers(fastify: FastifyInstance) {
         return reply.status(400).send({ error: `Job "${name}" is not allowed during setup` })
       }
 
-      const res = await fastify.inject({
-        method: 'POST',
-        url: `/api/jobs/${name}/run`,
-        headers: {
-          'x-internal-request': 'true',
-        },
-      })
+      const started = startJob(name)
+      if (!started.ok) {
+        return reply.status(started.status).send({
+          error: started.error,
+          ...(started.jobId ? { jobId: started.jobId } : {}),
+        })
+      }
 
-      return reply.status(res.statusCode).send(res.json())
+      return reply.send({
+        message: `Job ${name} started`,
+        jobId: started.jobId,
+        status: 'running',
+      })
     }
   )
 

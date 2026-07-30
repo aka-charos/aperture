@@ -149,6 +149,7 @@ export {
   JellyfinProvider,
   createMediaServerProvider,
   getMediaServerProvider,
+  InvalidCredentialsError,
   type MediaServerProvider,
   type MediaServerType,
   type AuthResult,
@@ -506,6 +507,8 @@ export {
   type StudioLogosConfig,
 } from './settings/systemSettings.js'
 
+export { validateServerUrl, InvalidServerUrlError } from './settings/validateServerUrl.js'
+
 // Top Picks
 export {
   getTopPicksConfig,
@@ -742,6 +745,8 @@ export {
   type RepairResult,
   type ScanResult,
   type RepairProgress,
+  cleanupExpiredAuthState,
+  type AuthCleanupResult,
 } from './maintenance/index.js'
 
 // API Error Handling

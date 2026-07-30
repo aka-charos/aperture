@@ -2,7 +2,7 @@
  * Emby Authentication Module
  */
 
-import type { AuthResult } from '../types.js'
+import { InvalidCredentialsError, type AuthResult } from '../types.js'
 import type { EmbyAuthResponse, EmbySystemInfo } from './types.js'
 import type { EmbyProviderBase } from './base.js'
 
@@ -27,7 +27,7 @@ export async function authenticateByName(
 
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error('Invalid username or password')
+      throw new InvalidCredentialsError()
     }
     throw new Error(`Authentication failed: ${response.status}`)
   }

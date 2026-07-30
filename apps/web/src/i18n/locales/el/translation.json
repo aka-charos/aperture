@@ -4192,5 +4192,80 @@
     "deletedConversation": "(deleted conversation)",
     "recentTitle": "Recent calls",
     "failed": "Failed"
+  },
+  "settingsDeployment": {
+    "title": "Deployment",
+    "description": "How this instance is reached, and whether the settings that depend on that are correct. These come from environment variables, so changes take effect on restart.",
+    "rows": {
+      "mode": "Mode",
+      "clientIps": "Client IPs",
+      "trustedProxies": "Trusted proxies",
+      "cookies": "Session cookie",
+      "setupAccess": "First-run setup",
+      "apiDocs": "API docs",
+      "bindHost": "Listening on"
+    },
+    "modeDirect": "Direct",
+    "modeProxy": "Behind a proxy or tunnel",
+    "clientIpsReal": "Real visitor IPs",
+    "clientIpsCollapsed": "All visitors look identical",
+    "cookiesSecure": "Secure",
+    "cookiesInsecure": "Not Secure",
+    "setupLocalOnly": "Local network only",
+    "setupAnywhere": "Reachable from anywhere",
+    "allClear": "No problems detected with how this instance is exposed.",
+    "restartNote": "These are read from environment variables at startup. Change them in your compose file or service definition and restart Aperture.",
+    "findings": {
+      "proxyHeadersIgnored": {
+        "title": "A proxy is forwarding requests, but Aperture is ignoring it",
+        "detail": "Requests are arriving with an X-Forwarded-For header while TRUST_PROXY is unset, so every visitor appears to come from the same address. The login rate limiter collapses into one shared bucket — a single attacker can exhaust it for everyone — and first-run setup treats remote visitors as local.",
+        "fix": "TRUST_PROXY=127.0.0.1   # or your proxy container address, e.g. 172.18.0.1"
+      },
+      "allTrafficOneAddress": {
+        "title": "Every request so far has come from the same local address",
+        "detail": "Normal for a single-machine LAN install. If a reverse proxy or tunnel sits in front of Aperture, this instead means its forwarded client IPs are being discarded.",
+        "fix": "TRUST_PROXY=127.0.0.1   # only if a proxy or tunnel is in front"
+      },
+      "proxyModeWithoutTrust": {
+        "title": "Proxy mode is on but no proxy is trusted",
+        "detail": "DEPLOYMENT_MODE says a proxy is in front, yet TRUST_PROXY resolved to off. Client IPs will be wrong, which weakens the login rate limiter and the first-run setup guard.",
+        "fix": "TRUST_PROXY=127.0.0.1"
+      },
+      "trustProxyWideOpen": {
+        "title": "X-Forwarded-For is trusted from any source",
+        "detail": "TRUST_PROXY=true accepts a forwarded address from whoever sends it. A caller can forge their apparent IP to get a fresh login rate-limit bucket on every request, and to look local to the first-run setup guard. Name your proxy instead.",
+        "fix": "TRUST_PROXY=127.0.0.1   # or a CIDR, e.g. 172.18.0.0/16"
+      },
+      "boundToAllInterfaces": {
+        "title": "Also reachable directly, bypassing the proxy",
+        "detail": "A proxy is expected in front, but Aperture is listening on every network interface. Anyone who can reach its port directly skips the proxy entirely — including any access control the proxy enforces.",
+        "fix": "HOST=127.0.0.1   # only when the proxy runs on this same host"
+      },
+      "cookieInsecure": {
+        "title": "Session cookie is sent over plain HTTP",
+        "detail": "COOKIE_SECURE=false removes the Secure flag, so the session cookie travels unencrypted and can be captured in transit.",
+        "fix": "Remove COOKIE_SECURE, or set COOKIE_SECURE=true"
+      },
+      "passwordlessPermitted": {
+        "title": "Passwordless login is permitted",
+        "detail": "If the matching admin toggle is also on, any media-server account without a password can be signed into with a username alone. On an internet-facing instance that is a full authentication bypass.",
+        "fix": "Remove ALLOW_PASSWORDLESS_LOGIN"
+      },
+      "docsPublic": {
+        "title": "API documentation is public",
+        "detail": "The OpenAPI spec and Swagger UI are reachable without signing in, mapping every route and request body for anyone who looks.",
+        "fix": "API_DOCS=admin   # or API_DOCS=off"
+      },
+      "setupRemoteAllowed": {
+        "title": "First-run setup is reachable from anywhere",
+        "detail": "Until setup completes, the setup endpoints are unauthenticated by necessity. With this override on, whoever reaches a fresh instance first can configure it and take the admin account.",
+        "fix": "Remove SETUP_ALLOW_REMOTE once setup is finished"
+      },
+      "cspReportOnly": {
+        "title": "Content-Security-Policy is not being enforced",
+        "detail": "The policy is running in report-only mode, so violations are logged to the browser console but nothing is blocked. Intended for one shakedown deploy, not to be left on.",
+        "fix": "Remove CSP_REPORT_ONLY"
+      }
+    }
   }
 }
