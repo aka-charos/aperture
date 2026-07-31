@@ -65,6 +65,7 @@ interface Posture {
     forwardedForSeen: number
     distinctClientIps: number
     allClientIpsLocal: boolean
+    forwardedBy: string[]
   }
   findings: Finding[]
 }
@@ -159,6 +160,13 @@ export function DeploymentSection() {
   // Client IPs are only trustworthy when something is trusted to forward them,
   // or when nothing is in front at all.
   const resolvesClientIps = trust.trustsAny || posture.observed.forwardedForSeen === 0
+
+  // Observed forwarders that are not yet trusted — i.e. the thing to act on.
+  const undetectedProxies = posture.observed.forwardedBy.filter(
+    (addr) => !trust.entries.includes(addr)
+  )
+
+  const hasUnsavedEdit = draft.trim() !== trust.entries.join(', ')
 
   const loudFindings = posture.findings.filter((f) => f.severity !== 'info')
 
@@ -257,6 +265,34 @@ export function DeploymentSection() {
           {t('settingsDeployment.trustedProxiesHelp')}
         </Typography>
 
+        {/* The answer, when we have it. Nobody should have to work out whether
+            their tunnel counts as "on this host" — these are the addresses
+            observed forwarding to us, so the only question left is yes/no. */}
+        {!trust.envManaged && !trust.trustsAny && undetectedProxies.length > 0 && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <AlertTitle>{t('settingsDeployment.detectedTitle')}</AlertTitle>
+            <Typography variant="body2" sx={{ mb: 1.5 }}>
+              {t('settingsDeployment.detectedBody', {
+                addresses: undetectedProxies.join(', '),
+              })}
+            </Typography>
+            <Button
+              variant="contained"
+              size="small"
+              disabled={saving}
+              onClick={() => {
+                const next = undetectedProxies.join(', ')
+                setDraft(next)
+                void save(next)
+              }}
+            >
+              {t('settingsDeployment.detectedAction', {
+                addresses: undetectedProxies.join(', '),
+              })}
+            </Button>
+          </Alert>
+        )}
+
         {trust.envManaged ? (
           <Alert severity="info" sx={{ mb: 2 }}>
             {t('settingsDeployment.envManaged')}
@@ -282,12 +318,21 @@ export function DeploymentSection() {
               <Button
                 variant="contained"
                 onClick={() => void save(draft)}
-                disabled={saving || draft === trust.entries.join(', ')}
+                disabled={saving || !hasUnsavedEdit}
                 sx={{ mt: 0.25 }}
               >
                 {saving ? <CircularProgress size={20} color="inherit" /> : t('common.save')}
               </Button>
             </Box>
+
+            {/* Without this, typing a value (or clicking a preset) leaves the
+                warning below still showing and the panel reads as broken when
+                it is simply unsaved. */}
+            {hasUnsavedEdit && !saveError && (
+              <Alert severity="warning" sx={{ mt: 1.5 }}>
+                {t('settingsDeployment.unsaved')}
+              </Alert>
+            )}
 
             <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
               <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>

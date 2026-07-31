@@ -68,7 +68,11 @@ export async function buildServer(options: ServerOptions = {}): Promise<any> {
     // Cheap sample of what the traffic looks like, so Settings > Deployment can
     // tell a correctly-configured instance from one whose proxy headers are
     // being ignored. Config alone cannot distinguish those two.
-    noteRequest(request.ip, request.headers['x-forwarded-for'] !== undefined)
+    noteRequest(
+      request.ip,
+      request.socket.remoteAddress,
+      request.headers['x-forwarded-for'] !== undefined
+    )
 
     if (shouldLogIncoming(request.url)) {
       request.log.info(
