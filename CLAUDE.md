@@ -144,5 +144,6 @@ Embedding tables are shared consumers: recommender, `/api/similarity` graph, sem
 ## Workflow notes
 
 - Work happens directly on `dev` (no feature branches). `main` is a stale upstream mirror; `.github/workflows/sync-dev.yml` force-resets `dev` to `main` on pushes to `main`. Pushing to `origin/dev` triggers the Docker build — don't push without being asked.
+- **Never open the live site right after a push.** A push only starts the image build; the running instance changes when the operator manually pulls it. So the browser will be showing the *old* build, and "verified" would be a lie. Browser checks (`claude-in-chrome` against the deployed instance — the local dev server can't be started here) happen only when the operator says the new image is deployed. A push is the end of the turn, not the cue for a screenshot.
 - Docker: `docker/Dockerfile` (4-stage; copies built dists + `db/`); compose variants per platform (dev/prod/external-db/windows/unraid/synology/qnap). Runtime data in `data/` (gitignored except `.gitkeep`s); operator i18n overrides mount at `/config/i18n`.
 - Docs for humans live in `docs/` (admin guides, feature docs, screenshots).
