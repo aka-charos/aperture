@@ -48,6 +48,16 @@ export interface DeploymentObservation {
   distinctClientIps: number
   /** Whether every observed client address was loopback or private. */
   allClientIpsLocal: boolean
+  /**
+   * Addresses actually seen forwarding requests to us — the TCP peer on a
+   * connection that carried X-Forwarded-For.
+   *
+   * This is the whole answer to "what do I put in the trusted proxies box".
+   * Nobody should have to know whether their tunnel runs on the host or in a
+   * container: it is observable, and unlike a header the peer address cannot be
+   * forged, because it is the socket we are reading from.
+   */
+  forwardedBy: string[]
 }
 
 export interface DeploymentPosture {
@@ -74,6 +84,7 @@ export interface DeploymentPosture {
 const DISTINCT_IP_CAP = 50
 
 const distinctIps = new Set<string>()
+const forwardedBy = new Set<string>()
 let requestsSeen = 0
 let forwardedForSeen = 0
 let sawNonLocalClient = false
@@ -81,13 +92,29 @@ let sawNonLocalClient = false
 /**
  * Record one request's shape. Called from the access-log hook, so it must stay
  * allocation-light and must never throw.
+ *
+ * `clientIp` is Fastify's resolved `request.ip` (which already accounts for
+ * whatever is trusted); `peerAddress` is the raw socket peer, which is who
+ * physically sent us the bytes.
  */
-export function noteRequest(ip: string | undefined, hasForwardedFor: boolean): void {
+export function noteRequest(
+  clientIp: string | undefined,
+  peerAddress: string | undefined,
+  hasForwardedFor: boolean
+): void {
   requestsSeen++
-  if (hasForwardedFor) forwardedForSeen++
-  if (!ip) return
-  if (distinctIps.size < DISTINCT_IP_CAP) distinctIps.add(ip)
-  if (!sawNonLocalClient && !isTrustedSetupSource(ip)) sawNonLocalClient = true
+
+  if (hasForwardedFor) {
+    forwardedForSeen++
+    // Whoever sent a forwarding header is, by definition, forwarding. Recording
+    // the socket peer rather than anything header-derived is what makes this
+    // safe to offer as a one-click "trust this" in the UI.
+    if (peerAddress && forwardedBy.size < DISTINCT_IP_CAP) forwardedBy.add(peerAddress)
+  }
+
+  if (!clientIp) return
+  if (distinctIps.size < DISTINCT_IP_CAP) distinctIps.add(clientIp)
+  if (!sawNonLocalClient && !isTrustedSetupSource(clientIp)) sawNonLocalClient = true
 }
 
 export function getObservation(): DeploymentObservation {
@@ -96,12 +123,14 @@ export function getObservation(): DeploymentObservation {
     forwardedForSeen,
     distinctClientIps: distinctIps.size,
     allClientIpsLocal: !sawNonLocalClient,
+    forwardedBy: [...forwardedBy],
   }
 }
 
 /** Test seam. */
 export function resetObservation(): void {
   distinctIps.clear()
+  forwardedBy.clear()
   requestsSeen = 0
   forwardedForSeen = 0
   sawNonLocalClient = false

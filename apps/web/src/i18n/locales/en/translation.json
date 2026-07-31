@@ -4217,23 +4217,23 @@
     "restartNote": "Trusted proxies apply to the next request, no restart needed. The other values are read from environment variables at startup — change them in your compose file or service definition and restart Aperture.",
     "findings": {
       "proxyHeadersIgnored": {
-        "title": "A proxy is forwarding requests, but Aperture is ignoring it",
-        "detail": "Requests are arriving with an X-Forwarded-For header while TRUST_PROXY is unset, so every visitor appears to come from the same address. The login rate limiter collapses into one shared bucket — a single attacker can exhaust it for everyone — and first-run setup treats remote visitors as local.",
-        "fix": "Add your proxy address above — for a tunnel on this host, use the \"Tunnel on this host\" preset."
+        "title": "Real visitor addresses are being discarded",
+        "detail": "Something is forwarding requests to Aperture and telling it who the real visitor is, but that source is not trusted, so the information is thrown away and every visitor looks identical. The login rate limit then applies to everyone at once — one attacker can lock out all sign-ins — and first-run setup treats remote visitors as local.",
+        "fix": "Use the \"Trust\" button above, or add the address by hand."
       },
       "allTrafficOneAddress": {
-        "title": "Every request so far has come from the same local address",
-        "detail": "Normal for a single-machine LAN install. If a reverse proxy or tunnel sits in front of Aperture, this instead means its forwarded client IPs are being discarded.",
-        "fix": "Only if a proxy is in front: add its address above."
+        "title": "Every request has come from one address",
+        "detail": "Normal if Aperture is reached directly on your own network. If a tunnel or reverse proxy is in front, it means real visitor addresses are being discarded.",
+        "fix": "Only if something sits in front: add its address above."
       },
       "proxyModeWithoutTrust": {
-        "title": "Proxy mode is on but no proxy is trusted",
-        "detail": "DEPLOYMENT_MODE says a proxy is in front, yet TRUST_PROXY resolved to off. Client IPs will be wrong, which weakens the login rate limiter and the first-run setup guard.",
+        "title": "A proxy is expected, but none is trusted",
+        "detail": "DEPLOYMENT_MODE says a proxy sits in front of Aperture, but no proxy address is trusted, so visitor addresses will be wrong.",
         "fix": "Add your proxy address above."
       },
       "trustProxyWideOpen": {
-        "title": "X-Forwarded-For is trusted from any source",
-        "detail": "TRUST_PROXY=true accepts a forwarded address from whoever sends it. A caller can forge their apparent IP to get a fresh login rate-limit bucket on every request, and to look local to the first-run setup guard. Name your proxy instead.",
+        "title": "Any caller can claim to be any visitor",
+        "detail": "TRUST_PROXY=true accepts a forwarded visitor address from whoever sends it, so anyone can forge theirs — getting a fresh login rate-limit allowance on every attempt, and looking local to the first-run setup guard. Name the proxy instead of trusting everything.",
         "fix": "TRUST_PROXY=127.0.0.1   # or a CIDR, e.g. 172.18.0.0/16"
       },
       "boundToAllInterfaces": {
@@ -4268,14 +4268,18 @@
       }
     },
     "trustedProxiesTitle": "Trusted proxies",
-    "trustedProxiesHelp": "Addresses allowed to tell Aperture who the real visitor is via X-Forwarded-For. Set this to your reverse proxy or tunnel, never to a public range — anything listed here can claim any client IP it likes.",
-    "trustedProxiesFormat": "Comma-separated IP addresses or CIDR ranges. Also accepts loopback, linklocal and uniquelocal.",
-    "presets": "Presets:",
-    "presetTunnel": "Tunnel on this host",
+    "trustedProxiesHelp": "Aperture only sees the address of whatever handed it the request. If a tunnel or reverse proxy sits in front, that address is the proxy — every visitor looks the same. Trusting the proxy lets Aperture read the real visitor address it forwards.",
+    "trustedProxiesFormat": "Leave empty if nothing sits in front of Aperture. Otherwise a comma-separated list of addresses or CIDR ranges.",
+    "presets": "Or set manually:",
+    "presetTunnel": "Same machine",
     "presetDocker": "Docker network",
-    "presetNone": "Trust none",
+    "presetNone": "Nothing in front",
     "savedApplied": "Saved. Real client IPs are in use from the next request.",
     "saveFailed": "Could not save trusted proxies.",
-    "envManaged": "Trusted proxies are set by the TRUST_PROXY environment variable, so they cannot be edited here. Remove it from your compose file to manage them from this page."
+    "envManaged": "Trusted proxies are set by the TRUST_PROXY environment variable, so they cannot be edited here. Remove it from your compose file to manage them from this page.",
+    "detectedTitle": "Aperture can see what is forwarding to it",
+    "detectedBody": "Requests are reaching Aperture from {{addresses}}, carrying a forwarded visitor address. If that is your tunnel or reverse proxy — for Cloudflare Tunnel it is cloudflared — trust it and Aperture will start using real visitor addresses immediately.",
+    "detectedAction": "Trust {{addresses}}",
+    "unsaved": "Not saved yet — click Save to apply this."
   }
 }

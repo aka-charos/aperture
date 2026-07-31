@@ -25,6 +25,7 @@ import {
 } from './security.js'
 import {
   getDeploymentPosture,
+  getObservation,
   noteRequest,
   resetObservation,
   warnOnWeakSecurityPosture,
@@ -330,7 +331,7 @@ describe('deployment posture diagnostics', () => {
 
   test('flags proxy headers arriving while they are being ignored', () => {
     resetObservation()
-    for (let i = 0; i < 3; i++) noteRequest('127.0.0.1', true)
+    for (let i = 0; i < 3; i++) noteRequest('127.0.0.1', '127.0.0.1', true)
 
     const found = ids({ NODE_ENV: 'production' })
     assert.ok(
@@ -342,7 +343,7 @@ describe('deployment posture diagnostics', () => {
 
   test('stays quiet when the same traffic is correctly trusted', () => {
     resetObservation()
-    for (let i = 0; i < 3; i++) noteRequest('203.0.113.5', true)
+    for (let i = 0; i < 3; i++) noteRequest('203.0.113.5', '203.0.113.5', true)
 
     const found = ids({ NODE_ENV: 'production', TRUST_PROXY: '127.0.0.1' })
     assert.ok(!found.includes('proxyHeadersIgnored'))
@@ -352,7 +353,7 @@ describe('deployment posture diagnostics', () => {
 
   test('notices when every caller shares one local address', () => {
     resetObservation()
-    for (let i = 0; i < 8; i++) noteRequest('127.0.0.1', false)
+    for (let i = 0; i < 8; i++) noteRequest('127.0.0.1', '127.0.0.1', false)
 
     const found = ids({ NODE_ENV: 'production' })
     assert.ok(found.includes('allTrafficOneAddress'))
@@ -361,7 +362,7 @@ describe('deployment posture diagnostics', () => {
 
   test('does not draw conclusions from a tiny sample', () => {
     resetObservation()
-    noteRequest('127.0.0.1', false)
+    noteRequest('127.0.0.1', '127.0.0.1', false)
 
     const found = ids({ NODE_ENV: 'production' })
     assert.ok(!found.includes('allTrafficOneAddress'), 'one request proves nothing')
@@ -376,7 +377,7 @@ describe('deployment posture diagnostics', () => {
 
   test('a clean production deployment reports no critical or warning findings', () => {
     resetObservation()
-    for (let i = 0; i < 8; i++) noteRequest(`203.0.113.${i}`, true)
+    for (let i = 0; i < 8; i++) noteRequest(`203.0.113.${i}`, `203.0.113.${i}`, true)
 
     const posture = withEnv(
       { NODE_ENV: 'production', DEPLOYMENT_MODE: 'cloudflared', TRUST_PROXY: '127.0.0.1', HOST: '127.0.0.1' },
@@ -389,7 +390,7 @@ describe('deployment posture diagnostics', () => {
 
   test('boot warnings and the panel are driven by the same findings', () => {
     resetObservation()
-    for (let i = 0; i < 3; i++) noteRequest('127.0.0.1', true)
+    for (let i = 0; i < 3; i++) noteRequest('127.0.0.1', '127.0.0.1', true)
 
     withEnv({ NODE_ENV: 'production' }, () => {
       const warnings: string[] = []
@@ -489,7 +490,7 @@ describe('trusted proxies are editable at runtime', () => {
 
   test('saving a proxy clears the "headers ignored" finding', () => {
     resetObservation()
-    for (let i = 0; i < 4; i++) noteRequest('127.0.0.1', true)
+    for (let i = 0; i < 4; i++) noteRequest('127.0.0.1', '127.0.0.1', true)
 
     withEnv({ NODE_ENV: 'production' }, () => {
       setTrustedProxiesForTest([])
@@ -506,6 +507,50 @@ describe('trusted proxies are editable at runtime', () => {
     })
 
     setTrustedProxiesForTest([])
+    resetObservation()
+  })
+})
+
+describe('the forwarding proxy is detected, not guessed', () => {
+  /**
+   * The panel's whole job: an operator should never have to work out whether
+   * their tunnel counts as "on this host" or "in Docker". The address is
+   * observable, so the UI offers it as a one-click "trust this".
+   */
+  test('reports the socket peer that sent a forwarded request', () => {
+    resetObservation()
+    // cloudflared in its own container, forwarding on the Docker network.
+    for (let i = 0; i < 3; i++) noteRequest('172.18.0.1', '172.18.0.1', true)
+
+    const observed = getObservation()
+    assert.deepEqual(observed.forwardedBy, ['172.18.0.1'])
+    resetObservation()
+  })
+
+  test('does not name anything when nothing is forwarding', () => {
+    resetObservation()
+    for (let i = 0; i < 5; i++) noteRequest('192.168.1.20', '192.168.1.20', false)
+
+    assert.deepEqual(getObservation().forwardedBy, [], 'no proxy, nothing to offer')
+    resetObservation()
+  })
+
+  test('records the peer, not the header, so the offer cannot be forged', () => {
+    resetObservation()
+    // Once a proxy IS trusted, request.ip is the real client while the peer is
+    // still the proxy. The suggestion must follow the peer.
+    noteRequest('203.0.113.50', '127.0.0.1', true)
+
+    assert.deepEqual(getObservation().forwardedBy, ['127.0.0.1'])
+    resetObservation()
+  })
+
+  test('several forwarders are all offered', () => {
+    resetObservation()
+    noteRequest('127.0.0.1', '127.0.0.1', true)
+    noteRequest('172.18.0.1', '172.18.0.1', true)
+
+    assert.deepEqual(getObservation().forwardedBy.sort(), ['127.0.0.1', '172.18.0.1'])
     resetObservation()
   })
 })
@@ -545,7 +590,7 @@ describe('deployment findings are renderable', () => {
     }
 
     resetObservation()
-    for (let i = 0; i < 8; i++) noteRequest('127.0.0.1', true)
+    for (let i = 0; i < 8; i++) noteRequest('127.0.0.1', '127.0.0.1', true)
     collect({ NODE_ENV: 'production' })
     collect({ NODE_ENV: 'production', DEPLOYMENT_MODE: 'cloudflared' })
     collect({ NODE_ENV: 'production', TRUST_PROXY: 'true' })
@@ -558,7 +603,7 @@ describe('deployment findings are renderable', () => {
       CSP_REPORT_ONLY: 'true',
     })
     resetObservation()
-    for (let i = 0; i < 8; i++) noteRequest('127.0.0.1', false)
+    for (let i = 0; i < 8; i++) noteRequest('127.0.0.1', '127.0.0.1', false)
     collect({ NODE_ENV: 'production' })
     resetObservation()
 

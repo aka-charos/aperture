@@ -4276,6 +4276,10 @@
     "presetNone": "Trust none",
     "savedApplied": "Saved. Real client IPs are in use from the next request.",
     "saveFailed": "Could not save trusted proxies.",
-    "envManaged": "Trusted proxies are set by the TRUST_PROXY environment variable, so they cannot be edited here. Remove it from your compose file to manage them from this page."
+    "envManaged": "Trusted proxies are set by the TRUST_PROXY environment variable, so they cannot be edited here. Remove it from your compose file to manage them from this page.",
+    "detectedTitle": "Aperture can see what is forwarding to it",
+    "detectedBody": "Requests are reaching Aperture from {{addresses}}, carrying a forwarded visitor address. If that is your tunnel or reverse proxy — for Cloudflare Tunnel it is cloudflared — trust it and Aperture will start using real visitor addresses immediately.",
+    "detectedAction": "Trust {{addresses}}",
+    "unsaved": "Not saved yet — click Save to apply this."
   }
 }
