@@ -23,6 +23,7 @@ import {
   cspReportOnly,
   isProduction,
   isTrustedSetupSource,
+  LOOPBACK_PROXIES,
   type DeploymentMode,
   type ApiDocsMode,
 } from './security.js'
@@ -61,7 +62,17 @@ export interface DeploymentObservation {
 }
 
 export interface DeploymentPosture {
+  /** What DEPLOYMENT_MODE says. An input, not an observation. */
   mode: DeploymentMode
+  /**
+   * How traffic actually arrives, which is what the panel shows.
+   *
+   * Derived from evidence rather than from DEPLOYMENT_MODE: reporting the env
+   * var meant the panel could sit there claiming "Direct" while the rows
+   * underneath it had detected a proxy and were happily trusting it. Every
+   * other row on that panel describes reality, and this one now does too.
+   */
+  reachedVia: DeploymentMode
   production: boolean
   effective: {
     trustedProxies: ProxyTrustState
@@ -149,6 +160,12 @@ export function getDeploymentPosture(): DeploymentPosture {
   const findings: DeploymentFinding[] = []
   const trustsNothing = !proxy.trustsAny
 
+  // Evidence first, declaration second: something forwarding to us settles the
+  // question outright, and a configured proxy covers the case where the panel
+  // is opened before any forwarded traffic has been sampled.
+  const reachedVia: DeploymentMode =
+    observed.forwardedBy.length > 0 || proxy.trustsAny || mode === 'proxy' ? 'proxy' : 'direct'
+
   // --- Evidence-based: what the traffic says -------------------------------
 
   if (trustsNothing && observed.forwardedForSeen > 0) {
@@ -173,7 +190,16 @@ export function getDeploymentPosture(): DeploymentPosture {
     })
   }
 
-  if (mode === 'proxy' && bindHost === '0.0.0.0') {
+  // Only worth raising when binding to loopback would actually be safe advice,
+  // which means every proxy we know about is itself on loopback. A proxy in its
+  // own container reaches us across a bridge network (172.x), and telling that
+  // operator to set HOST=127.0.0.1 would cut the proxy off from the app
+  // entirely — confidently breaking a working install.
+  const knownProxies = [...new Set([...observed.forwardedBy, ...proxy.entries])]
+  const allProxiesOnLoopback =
+    knownProxies.length > 0 && knownProxies.every((addr) => LOOPBACK_PROXIES.includes(addr))
+
+  if (reachedVia === 'proxy' && bindHost === '0.0.0.0' && allProxiesOnLoopback) {
     findings.push({ id: 'boundToAllInterfaces', severity: 'warning' })
   }
 
@@ -193,7 +219,7 @@ export function getDeploymentPosture(): DeploymentPosture {
       findings.push({ id: 'passwordlessPermitted', severity: 'warning' })
     }
     if (apiDocsMode() === 'public') findings.push({ id: 'docsPublic', severity: 'warning' })
-    if (mode === 'direct' && trustsNothing && observed.forwardedForSeen === 0) {
+    if (reachedVia === 'direct' && trustsNothing && observed.forwardedForSeen === 0) {
       // Nothing wrong — say so, so the panel is not silent on the main question.
       findings.push({ id: 'directModeOk', severity: 'info' })
     }
@@ -204,6 +230,7 @@ export function getDeploymentPosture(): DeploymentPosture {
 
   return {
     mode,
+    reachedVia,
     production,
     effective: {
       trustedProxies: proxy,

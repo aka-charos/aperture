@@ -50,6 +50,7 @@ interface ProxyTrustState {
 
 interface Posture {
   mode: 'direct' | 'proxy'
+  reachedVia: 'direct' | 'proxy'
   production: boolean
   effective: {
     trustedProxies: ProxyTrustState
@@ -161,6 +162,9 @@ export function DeploymentSection() {
   // or when nothing is in front at all.
   const resolvesClientIps = trust.trustsAny || posture.observed.forwardedForSeen === 0
 
+  // Everything we know is forwarding to us: seen on the wire, plus configured.
+  const knownProxies = [...new Set([...posture.observed.forwardedBy, ...trust.entries])]
+
   // Observed forwarders that are not yet trusted — i.e. the thing to act on.
   const undetectedProxies = posture.observed.forwardedBy.filter(
     (addr) => !trust.entries.includes(addr)
@@ -172,11 +176,15 @@ export function DeploymentSection() {
 
   const rows: Array<{ label: string; value: string; ok: boolean }> = [
     {
-      label: t('settingsDeployment.rows.mode'),
+      // Reality, not DEPLOYMENT_MODE. Naming the address is what stops this
+      // reading as jargon — "Proxy or tunnel (172.28.0.1)" explains itself.
+      label: t('settingsDeployment.rows.reachedVia'),
       value:
-        posture.mode === 'proxy'
-          ? t('settingsDeployment.modeProxy')
-          : t('settingsDeployment.modeDirect'),
+        posture.reachedVia === 'proxy'
+          ? knownProxies.length > 0
+            ? t('settingsDeployment.viaProxyNamed', { addresses: knownProxies.join(', ') })
+            : t('settingsDeployment.viaProxy')
+          : t('settingsDeployment.viaDirect'),
       ok: true,
     },
     {

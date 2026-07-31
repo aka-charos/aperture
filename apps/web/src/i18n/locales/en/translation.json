@@ -4197,16 +4197,14 @@
     "title": "Deployment",
     "description": "How this instance is reached, and whether the settings that depend on that are correct. Trusted proxies can be changed here and apply immediately; the rest are read from environment variables at startup.",
     "rows": {
-      "mode": "Mode",
       "clientIps": "Client IPs",
       "trustedProxies": "Trusted proxies",
       "cookies": "Session cookie",
       "setupAccess": "First-run setup",
       "apiDocs": "API docs",
-      "bindHost": "Listening on"
+      "bindHost": "Listening on",
+      "reachedVia": "Reached via"
     },
-    "modeDirect": "Direct",
-    "modeProxy": "Behind a proxy or tunnel",
     "clientIpsReal": "Real visitor IPs",
     "clientIpsCollapsed": "All visitors look identical",
     "cookiesSecure": "Secure",
@@ -4238,8 +4236,8 @@
       },
       "boundToAllInterfaces": {
         "title": "Also reachable directly, bypassing the proxy",
-        "detail": "A proxy is expected in front, but Aperture is listening on every network interface. Anyone who can reach its port directly skips the proxy entirely — including any access control the proxy enforces.",
-        "fix": "HOST=127.0.0.1   # only when the proxy runs on this same host"
+        "detail": "Your proxy runs on this same machine, but Aperture is listening on every network interface — so anything else on your network can reach it directly, going around the proxy and any access control it enforces.",
+        "fix": "HOST=127.0.0.1"
       },
       "cookieInsecure": {
         "title": "Session cookie is sent over plain HTTP",
@@ -4280,6 +4278,9 @@
     "detectedTitle": "Aperture can see what is forwarding to it",
     "detectedBody": "Requests are reaching Aperture from {{addresses}}, carrying a forwarded visitor address. If that is your tunnel or reverse proxy — for Cloudflare Tunnel it is cloudflared — trust it and Aperture will start using real visitor addresses immediately.",
     "detectedAction": "Trust {{addresses}}",
-    "unsaved": "Not saved yet — click Save to apply this."
+    "unsaved": "Not saved yet — click Save to apply this.",
+    "viaDirect": "Direct connection",
+    "viaProxy": "A proxy or tunnel",
+    "viaProxyNamed": "A proxy or tunnel ({{addresses}})"
   }
 }
