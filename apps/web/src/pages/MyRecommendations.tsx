@@ -354,33 +354,16 @@ export function MyRecommendationsPage() {
 
   return (
     <Box>
-      {/* Header */}
-      <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
-        <PageHeading
-          title={t('myRecommendations.pageTitle')}
-          description={t('myRecommendations.subtitle')}
-          icon={<AutoAwesomeIcon sx={{ color: 'primary.main', fontSize: 28 }} />}
-          sx={{ mb: 0 }}
-        />
+      <PageHeading
+        title={t('myRecommendations.pageTitle')}
+        description={t('myRecommendations.subtitle')}
+        icon={<AutoAwesomeIcon sx={{ color: 'primary.main', fontSize: 28 }} />}
+      />
 
-        {/* Grid/List toggle always in upper right */}
-        <ToggleButtonGroup
-          value={viewMode}
-          exclusive
-          onChange={(_, v) => v && setViewMode(v)}
-          size="small"
-        >
-          <ToggleButton value="grid">
-            <GridViewIcon fontSize="small" />
-          </ToggleButton>
-          <ToggleButton value="list">
-            <ViewListIcon fontSize="small" />
-          </ToggleButton>
-        </ToggleButtonGroup>
-      </Box>
-
-      {/* Action buttons row */}
-      <Box display="flex" gap={1} mb={2}>
+      {/* Actions on the left, view toggle on the right. One row: with the title
+          in the app bar, giving the toggle a row of its own left a band of empty
+          space above the buttons. */}
+      <Box display="flex" gap={1} mb={2} alignItems="center">
         {isMobile ? (
           <Tooltip title={regenerating ? t('myRecommendations.regenerateRegenerating') : t('myRecommendations.regenerate')}>
             <span>
@@ -405,6 +388,21 @@ export function MyRecommendationsPage() {
             {regenerating ? t('myRecommendations.regenerateRegenerating') : t('myRecommendations.regenerate')}
           </Button>
         )}
+
+        <ToggleButtonGroup
+          value={viewMode}
+          exclusive
+          onChange={(_, v) => v && setViewMode(v)}
+          size="small"
+          sx={{ marginInlineStart: 'auto' }}
+        >
+          <ToggleButton value="grid">
+            <GridViewIcon fontSize="small" />
+          </ToggleButton>
+          <ToggleButton value="list">
+            <ViewListIcon fontSize="small" />
+          </ToggleButton>
+        </ToggleButtonGroup>
       </Box>
 
       {/* Tabs */}
