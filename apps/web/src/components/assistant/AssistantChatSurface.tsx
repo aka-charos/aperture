@@ -323,7 +323,7 @@ export function AssistantChatSurface({
   const sidebarContent = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* New Chat Button */}
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ p: 1.25 }}>
         <Box
           component="button"
           onClick={handleNewChat}
@@ -332,7 +332,7 @@ export function AssistantChatSurface({
             display: 'flex',
             alignItems: 'center',
             gap: 1,
-            p: 1.5,
+            p: 1,
             bgcolor: 'rgba(26, 26, 26, 0.6)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
             borderRadius: 2,
@@ -483,7 +483,11 @@ export function AssistantChatSurface({
         {sidebarInline && (
           <Box
             sx={{
-              width: 280,
+              // Keyed on the window, like the decision to show it inline at all
+              // (see AssistantPage). Between md and lg the thread is the scarce
+              // thing, and 280px of truncated conversation titles is not worth
+              // what it takes out of the answer beside it.
+              width: { md: 232, lg: 280 },
               flexShrink: 0,
               borderInlineEnd: '1px solid rgba(255, 255, 255, 0.1)',
             }}
@@ -500,16 +504,17 @@ export function AssistantChatSurface({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              p: 2,
+              px: 1.5,
+              py: 1,
               borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
               background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)',
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
               <Box
                 sx={{
-                  width: 36,
-                  height: 36,
+                  width: 32,
+                  height: 32,
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
@@ -518,13 +523,22 @@ export function AssistantChatSurface({
                   flexShrink: 0,
                 }}
               >
-                <SmartToyIcon sx={{ fontSize: 20, color: '#fff' }} />
+                <SmartToyIcon sx={{ fontSize: 18, color: '#fff' }} />
               </Box>
               <Box sx={{ minWidth: 0 }}>
-                <Typography variant="subtitle1" fontWeight={600} noWrap>
+                <Typography variant="subtitle2" fontWeight={600} noWrap>
                   {t('assistant.title')}
                 </Typography>
-                <Typography variant="caption" color="text.secondary" noWrap component="div">
+                {/* The tagline is orientation, not information. On a short
+                    surface the answer below needs the line more than the
+                    header does. */}
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  noWrap
+                  component="div"
+                  sx={{ display: { xs: 'none', sm: 'block' }, lineHeight: 1.3 }}
+                >
                   {t('assistant.subtitle')}
                 </Typography>
               </Box>
@@ -550,7 +564,7 @@ export function AssistantChatSurface({
 
           {/* AI capability warnings (chat not configured / no tool support).
               The wrapper collapses when the banner renders nothing. */}
-          <Box sx={{ px: 2, pt: 2, '&:empty': { display: 'none' } }}>
+          <Box sx={{ px: 1.5, pt: 1.5, '&:empty': { display: 'none' } }}>
             <AICapabilityBanner context="chat" onBeforeNavigate={onBeforeNavigate} />
           </Box>
 

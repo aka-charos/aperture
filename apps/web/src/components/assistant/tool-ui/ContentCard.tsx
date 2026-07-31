@@ -38,6 +38,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { RankBadge, getProxiedImageUrl } from '@aperture/ui'
 import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
+import { COMPACT_THREAD } from '../density'
 import type { ContentItem } from './types'
 
 interface ContentCardProps {
@@ -203,6 +204,10 @@ export function ContentCard({
         ...(isList
           ? {
               width: '100%',
+              // A list card is as wide as the thread, so on a compact one its
+              // padding is the difference between reading two cards at a time
+              // and reading one.
+              [COMPACT_THREAD]: { p: 1.25, gap: 1.25 },
               border: '1px solid transparent',
               transition: 'background-color 0.2s, border-color 0.2s',
               '&:hover': {
@@ -392,6 +397,7 @@ export function ContentCard({
               gap: 0.75,
               mt: 0.25,
               p: 1,
+              [COMPACT_THREAD]: { p: 0.75 },
               borderRadius: 1,
               bgcolor: 'rgba(99, 102, 241, 0.08)',
               borderInlineStart: '2px solid #6366f1',
@@ -449,7 +455,7 @@ export function ContentCard({
         )}
 
         {/* Action buttons */}
-        <Box sx={{ display: 'flex', gap: 1, mt: 'auto', pt: 1 }}>
+        <Box sx={{ display: 'flex', gap: 1, mt: 'auto', pt: 1, [COMPACT_THREAD]: { pt: 0.75 } }}>
           <Button
             size="small"
             variant="outlined"
