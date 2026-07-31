@@ -150,9 +150,9 @@ export function WatchingPage() {
   if (loading) {
     return (
       <Box>
-        <Typography variant="h4" fontWeight={700} mb={4}>
-          {t('nav.showsYouWatch')}
-        </Typography>
+        {/* Publishes too, so the bar isn't blank while the list loads and the
+            title doesn't jump from the page into the bar when it arrives. */}
+        <PageHeading title={t('nav.showsYouWatch')} sx={{ mb: 4 }} />
         <Box display="flex" flexDirection="column" gap={2}>
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} variant="rectangular" height={150} sx={{ borderRadius: 3 }} />

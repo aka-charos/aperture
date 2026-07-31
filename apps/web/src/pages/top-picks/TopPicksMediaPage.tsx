@@ -141,8 +141,15 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
   if (loading) {
     return (
       <Box>
-        <Skeleton variant="text" width={300} height={48} sx={{ mb: 1 }} />
-        <Skeleton variant="text" width={200} height={24} sx={{ mb: 4 }} />
+        {/* The real title, not a skeleton — it's known before the fetch, and it
+            has to publish or the app bar sits blank through the whole load. Only
+            the "in the last N days" clause waits on config. */}
+        <PageHeading
+          title={t(isMovie ? 'topPicksPage.pageTitleMovies' : 'topPicksPage.pageTitleSeries')}
+          description={t(isMovie ? 'topPicksPage.subtitleMovies' : 'topPicksPage.subtitleSeries')}
+          icon={headerIcon}
+          sx={{ mb: 4 }}
+        />
         <Grid container spacing={2}>
           {[...Array(10)].map((_, i) => (
             <Grid item xs={6} sm={4} md={3} lg={2} key={i}>
