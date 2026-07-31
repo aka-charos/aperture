@@ -248,39 +248,18 @@ export function DiscoveryPage() {
 
   return (
     <Box>
-      {/* Header */}
-      <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
-        <PageHeading
-          title={t('discovery.title')}
-          description={
-            serverName ? t('discovery.subtitleNamed', { serverName }) : t('discovery.subtitle')
-          }
-          icon={<ExploreIcon sx={{ color: 'primary.main', fontSize: 28 }} />}
-          sx={{ mb: 0 }}
-        />
+      <PageHeading
+        title={t('discovery.title')}
+        description={
+          serverName ? t('discovery.subtitleNamed', { serverName }) : t('discovery.subtitle')
+        }
+        icon={<ExploreIcon sx={{ color: 'primary.main', fontSize: 28 }} />}
+      />
 
-        {/* Grid/List toggle — main pool only, not genre strips or Streaming */}
-        {discoveryTab !== 'streaming' && browseSubTab === 'popular' && (
-          <ToggleButtonGroup
-            value={viewMode}
-            exclusive
-            onChange={(_, v) => v && setViewMode(v)}
-            size="small"
-            aria-label={t('discovery.title')}
-          >
-            <ToggleButton value="grid" aria-label={t('discovery.gridView')}>
-              <GridViewIcon fontSize="small" />
-            </ToggleButton>
-            <ToggleButton value="list" aria-label={t('discovery.listView')}>
-              <ViewListIcon fontSize="small" />
-            </ToggleButton>
-          </ToggleButtonGroup>
-        )}
-      </Box>
-
-      {/* Action buttons row — refresh applies to the main discovery pool */}
+      {/* Refresh on the left, view toggle on the right — both apply to the main
+          discovery pool only, so they share one row and one condition. */}
       {discoveryTab !== 'streaming' && browseSubTab === 'popular' && (
-        <Box display="flex" gap={1} mb={2}>
+        <Box display="flex" gap={1} mb={2} alignItems="center">
           {isMobile ? (
             <Tooltip
               title={
@@ -313,6 +292,22 @@ export function DiscoveryPage() {
                   : t('discovery.refresh')}
             </Button>
           )}
+
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            onChange={(_, v) => v && setViewMode(v)}
+            size="small"
+            aria-label={t('discovery.title')}
+            sx={{ marginInlineStart: 'auto' }}
+          >
+            <ToggleButton value="grid" aria-label={t('discovery.gridView')}>
+              <GridViewIcon fontSize="small" />
+            </ToggleButton>
+            <ToggleButton value="list" aria-label={t('discovery.listView')}>
+              <ViewListIcon fontSize="small" />
+            </ToggleButton>
+          </ToggleButtonGroup>
         </Box>
       )}
 

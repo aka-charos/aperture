@@ -164,39 +164,12 @@ export function WatchingPage() {
 
   return (
     <Box>
-      {/* Header */}
-      <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems="flex-start"
-        gap={2}
-        mb={2}
-      >
-        <PageHeading
-          title={t('nav.showsYouWatch')}
-          description={t('watching.subtitle')}
-          sx={{ mb: 0 }}
-        />
-        <Box display="flex" gap={1} alignItems="center">
-          {/* Grid/List toggle always in upper right */}
-          <ToggleButtonGroup
-            value={viewMode}
-            exclusive
-            onChange={(_, value) => value && setViewMode(value)}
-            size="small"
-          >
-            <ToggleButton value="grid">
-              <GridViewIcon fontSize="small" />
-            </ToggleButton>
-            <ToggleButton value="list">
-              <ViewListIcon fontSize="small" />
-            </ToggleButton>
-          </ToggleButtonGroup>
-        </Box>
-      </Box>
+      <PageHeading title={t('nav.showsYouWatch')} description={t('watching.subtitle')} />
 
-      {/* Action buttons row */}
-      <Box display="flex" gap={1} mb={2}>
+      {/* Actions on the left, view toggle on the right. One row: with the title
+          in the app bar, giving the toggle a row of its own left a band of empty
+          space above the buttons. */}
+      <Box display="flex" gap={1} mb={2} alignItems="center">
         {isMobile ? (
           <>
             <Tooltip title={refreshing ? t('watching.tooltipSyncing') : t('watching.tooltipSyncFavorites')}>
@@ -243,6 +216,21 @@ export function WatchingPage() {
             </Button>
           </>
         )}
+
+        <ToggleButtonGroup
+          value={viewMode}
+          exclusive
+          onChange={(_, value) => value && setViewMode(value)}
+          size="small"
+          sx={{ marginInlineStart: 'auto' }}
+        >
+          <ToggleButton value="grid">
+            <GridViewIcon fontSize="small" />
+          </ToggleButton>
+          <ToggleButton value="list">
+            <ViewListIcon fontSize="small" />
+          </ToggleButton>
+        </ToggleButtonGroup>
       </Box>
 
       {/* Stats & Controls */}

@@ -282,35 +282,35 @@ export function MyWatchHistoryPage() {
 
   return (
     <Box>
-      {/* Header */}
-      <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={3}>
-        <PageHeading
-          title={t('watchHistoryPage.title')}
-          description={t('watchHistoryPage.subtitleStats', {
-            movies: moviePagination.total.toLocaleString(),
-            series: seriesPagination.total.toLocaleString(),
-          })}
-          icon={<HistoryIcon sx={{ color: 'primary.main', fontSize: 28 }} />}
-          sx={{ mb: 0 }}
-        />
-        {/* Grid/List toggle always in upper right */}
-        <ToggleButtonGroup
-          value={viewMode}
-          exclusive
-          onChange={(_, v) => v && setViewMode(v)}
-          size="small"
-        >
-          <ToggleButton value="grid"><GridViewIcon fontSize="small" /></ToggleButton>
-          <ToggleButton value="list"><ViewListIcon fontSize="small" /></ToggleButton>
-        </ToggleButtonGroup>
-      </Box>
+      <PageHeading
+        title={t('watchHistoryPage.title')}
+        description={t('watchHistoryPage.subtitleStats', {
+          movies: moviePagination.total.toLocaleString(),
+          series: seriesPagination.total.toLocaleString(),
+        })}
+        icon={<HistoryIcon sx={{ color: 'primary.main', fontSize: 28 }} />}
+      />
 
-      {/* Tabs */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs 
-          value={tabValue} 
+      {/* Tabs, with the view toggle riding the same rule. It used to sit beside
+          the title; on its own that left an empty band above the tabs. */}
+      <Box
+        sx={{
+          borderBottom: 1,
+          borderColor: 'divider',
+          mb: 3,
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: 2,
+        }}
+      >
+        <Tabs
+          value={tabValue}
           onChange={(_, v) => setTabValue(v)}
+          variant="scrollable"
+          scrollButtons="auto"
           sx={{
+            flex: 1,
+            minWidth: 0,
             '& .MuiTab-root': {
               textTransform: 'none',
               fontWeight: 500,
@@ -337,6 +337,16 @@ export function MyWatchHistoryPage() {
             }}
           />
         </Tabs>
+        <ToggleButtonGroup
+          value={viewMode}
+          exclusive
+          onChange={(_, v) => v && setViewMode(v)}
+          size="small"
+          sx={{ flexShrink: 0, mb: 0.75 }}
+        >
+          <ToggleButton value="grid"><GridViewIcon fontSize="small" /></ToggleButton>
+          <ToggleButton value="list"><ViewListIcon fontSize="small" /></ToggleButton>
+        </ToggleButtonGroup>
       </Box>
 
       {/* Controls */}
