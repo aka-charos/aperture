@@ -20,6 +20,7 @@ import { StatusCard } from '@aperture/ui'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import WarningIcon from '@mui/icons-material/Warning'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import { usePageHeader } from '@/hooks/usePageHeader'
 
 interface HealthResponse {
   ok: boolean
@@ -40,6 +41,7 @@ interface Stats {
 
 export function AdminDashboard() {
   const { t } = useTranslation()
+  usePageHeader(t('admin.title'), t('admin.subtitle'))
   const navigate = useNavigate()
   const [health, setHealth] = useState<HealthResponse | null>(null)
   const [healthLoading, setHealthLoading] = useState(true)

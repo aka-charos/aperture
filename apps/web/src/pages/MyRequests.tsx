@@ -28,6 +28,7 @@ import {
   TmdbExternalDetailModal,
   type TmdbExternalDetailPayload,
 } from '../components/TmdbExternalDetailModal'
+import { PageHeading } from '@/components/PageHeading'
 
 type SeerrLive = {
   status: 'pending' | 'approved' | 'declined'
@@ -175,15 +176,11 @@ export function MyRequestsPage() {
 
   return (
     <Box sx={{ maxWidth: 1100, mx: 'auto', p: { xs: 2, md: 3 } }}>
-      <Box display="flex" alignItems="center" gap={1.5} mb={1}>
-        <PlaylistAddCheckIcon color="primary" fontSize="large" />
-        <Typography variant="h4" fontWeight={700}>
-          {t('nav.myRequests')}
-        </Typography>
-      </Box>
-      <Typography variant="body2" color="text.secondary" mb={2}>
-        {t('myRequests.pageSubtitle')}
-      </Typography>
+      <PageHeading
+        title={t('nav.myRequests')}
+        description={t('myRequests.pageSubtitle')}
+        icon={<PlaylistAddCheckIcon color="primary" />}
+      />
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mb={3} alignItems={{ sm: 'center' }}>
         <FormControl size="small" sx={{ minWidth: 220 }}>

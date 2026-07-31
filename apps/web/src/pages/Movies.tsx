@@ -19,6 +19,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search'
 import { MoviePoster } from '@aperture/ui'
 import { useUserRatings } from '../hooks/useUserRatings'
+import { PageHeading } from '@/components/PageHeading'
 
 interface Movie {
   id: string
@@ -120,12 +121,11 @@ export function MoviesPage() {
 
   return (
     <Box>
-      <Typography variant="h4" fontWeight={700} mb={1}>
-        {t('browse.movies.title')}
-      </Typography>
-      <Typography variant="body1" color="text.secondary" mb={4}>
-        {t('browse.movies.subtitle')}
-      </Typography>
+      <PageHeading
+        title={t('browse.movies.title')}
+        description={t('browse.movies.subtitle')}
+        sx={{ mb: 4 }}
+      />
 
       {/* Filters */}
       <Box display="flex" gap={2} mb={4} flexWrap="wrap" alignItems="center">

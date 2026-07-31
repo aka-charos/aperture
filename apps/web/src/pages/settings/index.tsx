@@ -55,6 +55,7 @@ import {
 } from './components'
 import { ApiErrorAlert } from '../../components/ApiErrorAlert'
 import { useTranslation } from 'react-i18next'
+import { usePageHeader } from '@/hooks/usePageHeader'
 
 interface TabPanelProps {
   children?: React.ReactNode
@@ -115,6 +116,7 @@ function aiSubParamFromIndex(index: number): string {
 
 export function SettingsPage() {
   const { t } = useTranslation()
+  usePageHeader(t('admin.settings'))
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [tabValue, setTabValue] = useState(() => adminMainIndexFromParam(searchParams.get('tab')))

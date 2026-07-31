@@ -49,6 +49,8 @@ import { useWelcomeModal } from './useWelcomeModal'
 import { ExplorationConfigModal } from './ExplorationConfigModal'
 import { RunningJobsWidget } from './RunningJobsWidget'
 import { GlobalSearch } from './GlobalSearch'
+import { AppBarPageHeading } from './PageHeading'
+import { PageHeaderProvider } from '@/hooks/PageHeaderProvider'
 import { useTranslation } from 'react-i18next'
 import { applyEffectiveUiLanguage } from '@/i18n/syncUiLanguage'
 
@@ -86,7 +88,19 @@ const adminMenuItems: { textKey: string; icon: React.ReactElement; path: string 
   { textKey: 'nav.gapAnalysis', icon: <FactCheckIcon />, path: '/admin/gaps' },
 ]
 
+/**
+ * The app shell. Wrapped rather than wrapping inline so the provider sits above
+ * the bar and the outlet both — the bar reads what the page under it publishes.
+ */
 export function Layout() {
+  return (
+    <PageHeaderProvider>
+      <AppShell />
+    </PageHeaderProvider>
+  )
+}
+
+function AppShell() {
   const { t, i18n } = useTranslation()
   const theme = useTheme()
   const navigate = useNavigate()
@@ -557,6 +571,11 @@ export function Layout() {
             </Typography>
           </Box>
 
+          {/* The page's own title, at md+. It claims the flex space that used to
+              be an empty spacer — the bar was 64px of chrome for three
+              right-aligned controls while every page repeated the same words
+              below it. */}
+          <AppBarPageHeading />
           <Box sx={{ flexGrow: 1 }} />
 
           {/* Running Jobs Widget (admin only) */}

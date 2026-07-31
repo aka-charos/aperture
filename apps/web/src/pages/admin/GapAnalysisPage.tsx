@@ -43,6 +43,7 @@ import {
   type TmdbExternalDetailPayload,
 } from '../../components/TmdbExternalDetailModal'
 import type { SeerrRequestOptions } from '../../types/seerrRequest'
+import { PageHeading } from '@/components/PageHeading'
 
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w500'
 const BULK_CONFIRM_THRESHOLD = 5
@@ -679,15 +680,12 @@ export function GapAnalysisPage() {
 
   return (
     <Box sx={{ maxWidth: 1400, mx: 'auto', p: { xs: 2, md: 3 }, pb: 10 }}>
-      <Box display="flex" alignItems="center" gap={1.5} mb={1}>
-        <FactCheckIcon color="primary" fontSize="large" />
-        <Typography variant="h4" fontWeight={700}>
-          {t('admin.gaps.pageTitle')}
-        </Typography>
-      </Box>
-      <Typography variant="body2" color="text.secondary" mb={3}>
-        {t('admin.gaps.pageSubtitle')}
-      </Typography>
+      <PageHeading
+        title={t('admin.gaps.pageTitle')}
+        description={t('admin.gaps.pageSubtitle')}
+        icon={<FactCheckIcon color="primary" />}
+        sx={{ mb: 3 }}
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>

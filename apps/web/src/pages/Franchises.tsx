@@ -32,6 +32,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import { MoviePoster } from '@aperture/ui'
 import { useUserRatings } from '../hooks/useUserRatings'
+import { PageHeading } from '@/components/PageHeading'
 
 interface FranchiseMovie {
   id: string
@@ -197,12 +198,11 @@ export function FranchisesPage() {
 
   return (
     <Box>
-      <Typography variant="h4" fontWeight={700} mb={1}>
-        {t('browse.franchises.title')}
-      </Typography>
-      <Typography variant="body1" color="text.secondary" mb={4}>
-        {t('browse.franchises.subtitle')}
-      </Typography>
+      <PageHeading
+        title={t('browse.franchises.title')}
+        description={t('browse.franchises.subtitle')}
+        sx={{ mb: 4 }}
+      />
 
       {/* Stats Cards */}
       <Grid container spacing={2} mb={4}>

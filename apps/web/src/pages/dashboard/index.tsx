@@ -1,4 +1,4 @@
-import { Box, Typography, Grid, Alert, Button } from '@mui/material'
+import { Box, Grid, Alert, Button } from '@mui/material'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
@@ -12,6 +12,7 @@ import {
   RecentRatingsList,
   RecentWatchesList,
 } from './components'
+import { PageHeading } from '@/components/PageHeading'
 
 export function DashboardPage() {
   const { t } = useTranslation()
@@ -41,14 +42,11 @@ export function DashboardPage() {
         gap: { xs: 2, sm: 0 },
         mb: 3 
       }}>
-        <Box>
-          <Typography variant="h4" fontWeight={700}>
-            {greeting}, {user?.displayName || user?.username}
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            {t('dashboard.subtitle')}
-          </Typography>
-        </Box>
+        <PageHeading
+          title={`${greeting}, ${user?.displayName || user?.username || ''}`}
+          description={t('dashboard.subtitle')}
+          sx={{ mb: 0 }}
+        />
         <Button
           variant="outlined"
           size="small"

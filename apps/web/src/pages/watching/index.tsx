@@ -39,6 +39,7 @@ import { useWatchingData } from './hooks'
 import { useUserRatings } from '../../hooks/useUserRatings'
 import { useViewMode } from '../../hooks/useViewMode'
 import { WatchingCard, WatchingListItem, AddSeriesDialog } from './components'
+import { PageHeading } from '@/components/PageHeading'
 
 type FilterType = 'all' | 'airing' | 'ended' | 'upcoming'
 
@@ -171,16 +172,11 @@ export function WatchingPage() {
         gap={2}
         mb={2}
       >
-        <Box>
-          <Typography variant="h4" fontWeight={700} mb={{ xs: 0, sm: 0.5 }}>
-            {t('nav.showsYouWatch')}
-          </Typography>
-          {!isMobile && (
-            <Typography variant="body2" color="text.secondary">
-              {t('watching.subtitle')}
-            </Typography>
-          )}
-        </Box>
+        <PageHeading
+          title={t('nav.showsYouWatch')}
+          description={t('watching.subtitle')}
+          sx={{ mb: 0 }}
+        />
         <Box display="flex" gap={1} alignItems="center">
           {/* Grid/List toggle always in upper right */}
           <ToggleButtonGroup

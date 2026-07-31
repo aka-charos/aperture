@@ -52,6 +52,7 @@ import { useUserRatings } from '@/hooks/useUserRatings'
 import { useViewMode } from '@/hooks/useViewMode'
 import { formatWatchHistoryRelativeDate, formatWatchHistoryExactDate } from '@/lib/formatWatchHistoryRelativeDate'
 import { WatchHistoryMovieListItem, WatchHistorySeriesListItem } from './watch-history/components'
+import { PageHeading } from '@/components/PageHeading'
 
 interface MovieWatchHistoryItem {
   movie_id: string
@@ -283,22 +284,15 @@ export function MyWatchHistoryPage() {
     <Box>
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={3}>
-        <Box>
-          <Box display="flex" alignItems="center" gap={2} mb={{ xs: 0, sm: 1 }}>
-            <HistoryIcon sx={{ color: 'primary.main', fontSize: 32 }} />
-            <Typography variant="h4" fontWeight={700}>
-              {t('watchHistoryPage.title')}
-            </Typography>
-          </Box>
-          {!isMobile && (
-            <Typography variant="body1" color="text.secondary">
-              {t('watchHistoryPage.subtitleStats', {
-                movies: moviePagination.total.toLocaleString(),
-                series: seriesPagination.total.toLocaleString(),
-              })}
-            </Typography>
-          )}
-        </Box>
+        <PageHeading
+          title={t('watchHistoryPage.title')}
+          description={t('watchHistoryPage.subtitleStats', {
+            movies: moviePagination.total.toLocaleString(),
+            series: seriesPagination.total.toLocaleString(),
+          })}
+          icon={<HistoryIcon sx={{ color: 'primary.main', fontSize: 28 }} />}
+          sx={{ mb: 0 }}
+        />
         {/* Grid/List toggle always in upper right */}
         <ToggleButtonGroup
           value={viewMode}

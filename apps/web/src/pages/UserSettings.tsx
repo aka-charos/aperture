@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { Box, Grid, Paper, Tab, Tabs, Typography } from '@mui/material'
+import { Box, Grid, Paper, Tab, Tabs } from '@mui/material'
 import SettingsIcon from '@mui/icons-material/Settings'
 import PersonIcon from '@mui/icons-material/Person'
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary'
@@ -26,6 +26,7 @@ import {
   userSettingsTabIndexFromParam,
   userSettingsTabParamFromIndex,
 } from './UserSettings/tabHelpers'
+import { PageHeading } from '@/components/PageHeading'
 
 export function UserSettingsPage() {
   const { t } = useTranslation()
@@ -157,15 +158,12 @@ export function UserSettingsPage() {
       <Box sx={{ mb: 3 }}>
         <Breadcrumbs />
 
-        <Box display="flex" alignItems="center" gap={2} mb={1}>
-          <SettingsIcon sx={{ color: 'primary.main', fontSize: 32 }} />
-          <Typography variant="h4" fontWeight={700}>
-            {t('userSettings.pageTitle')}
-          </Typography>
-        </Box>
-        <Typography variant="body1" color="text.secondary">
-          {t('userSettings.pageSubtitle')}
-        </Typography>
+        <PageHeading
+          title={t('userSettings.pageTitle')}
+          description={t('userSettings.pageSubtitle')}
+          icon={<SettingsIcon sx={{ color: 'primary.main', fontSize: 28 }} />}
+          sx={{ mb: 0 }}
+        />
       </Box>
 
       <Paper sx={{ backgroundColor: 'background.paper', borderRadius: 2 }} elevation={0}>

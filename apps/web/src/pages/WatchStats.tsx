@@ -46,6 +46,7 @@ import {
 import { getProxiedImageUrl } from '@aperture/ui'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslation } from 'react-i18next'
+import { PageHeading } from '@/components/PageHeading'
 
 interface WatchStats {
   genreDistribution: { genre: string; count: number; percentage: number }[]
@@ -198,17 +199,12 @@ export function WatchStatsPage() {
   return (
     <Box>
       {/* Header */}
-      <Box mb={4}>
-        <Box display="flex" alignItems="center" gap={2} mb={1}>
-          <InsightsIcon sx={{ color: 'primary.main', fontSize: 32 }} />
-          <Typography variant="h4" fontWeight={700}>
-            {t('watchStats.title')}
-          </Typography>
-        </Box>
-        <Typography variant="body1" color="text.secondary">
-          {t('watchStats.subtitle')}
-        </Typography>
-      </Box>
+      <PageHeading
+        title={t('watchStats.title')}
+        description={t('watchStats.subtitle')}
+        icon={<InsightsIcon sx={{ color: 'primary.main', fontSize: 28 }} />}
+        sx={{ mb: 4 }}
+      />
 
       {!hasData ? (
         <Alert severity="info" sx={{ borderRadius: 2 }}>

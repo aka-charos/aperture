@@ -89,18 +89,24 @@ export function AdminLayout() {
   return (
     <Box>
       {/* Admin Header */}
+      {/* Deliberately does NOT publish to the app bar: each admin page under
+          this layout publishes its own title, which is more use than repeating
+          "Administration" on all five. The block stays for narrow screens, where
+          the bar has no room and the tab strip alone is thin orientation. */}
       <Box sx={{ mb: 3 }}>
         <Breadcrumbs />
-        
-        <Box display="flex" alignItems="center" gap={2} mb={1}>
-          <AdminPanelSettingsIcon sx={{ color: 'primary.main', fontSize: 32 }} />
-          <Typography variant="h4" fontWeight={700}>
-            {t('admin.title')}
+
+        <Box sx={{ display: { xs: 'block', md: 'none' } }}>
+          <Box display="flex" alignItems="center" gap={2} mb={1}>
+            <AdminPanelSettingsIcon sx={{ color: 'primary.main', fontSize: 32 }} />
+            <Typography variant="h4" fontWeight={700}>
+              {t('admin.title')}
+            </Typography>
+          </Box>
+          <Typography variant="body1" color="text.secondary">
+            {t('admin.subtitle')}
           </Typography>
         </Box>
-        <Typography variant="body1" color="text.secondary">
-          {t('admin.subtitle')}
-        </Typography>
       </Box>
 
       {/* Tab Navigation */}

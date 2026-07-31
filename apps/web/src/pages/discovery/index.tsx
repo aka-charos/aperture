@@ -49,6 +49,7 @@ import type { DiscoveryCandidate, DiscoveryFilterOptions, MediaType } from './ty
 
 type DiscoveryTab = 'movie' | 'series' | 'streaming'
 import type { SeerrRequestOptions } from '../../types/seerrRequest'
+import { PageHeading } from '@/components/PageHeading'
 
 // Local storage key for persisting filter preferences
 const FILTERS_STORAGE_KEY = 'aperture_discovery_filters'
@@ -221,12 +222,11 @@ export function DiscoveryPage() {
   if (!loading && status && !status.enabled) {
     return (
       <Box>
-        <Box display="flex" alignItems="center" gap={2} mb={3}>
-          <ExploreIcon sx={{ color: 'primary.main', fontSize: 32 }} />
-          <Typography variant="h4" fontWeight={700}>
-            {t('discovery.title')}
-          </Typography>
-        </Box>
+        <PageHeading
+          title={t('discovery.title')}
+          icon={<ExploreIcon sx={{ color: 'primary.main', fontSize: 28 }} />}
+          sx={{ mb: 3 }}
+        />
         <Alert severity="info" sx={{ borderRadius: 2 }}>
           {t('discovery.disabledBody')}
         </Alert>
@@ -250,21 +250,14 @@ export function DiscoveryPage() {
     <Box>
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
-        <Box>
-          <Box display="flex" alignItems="center" gap={2} mb={{ xs: 0, sm: 1 }}>
-            <ExploreIcon sx={{ color: 'primary.main', fontSize: 32 }} />
-            <Typography variant="h4" fontWeight={700}>
-              {t('discovery.title')}
-            </Typography>
-          </Box>
-          {!isMobile && (
-            <Typography variant="body1" color="text.secondary">
-              {serverName
-                ? t('discovery.subtitleNamed', { serverName })
-                : t('discovery.subtitle')}
-            </Typography>
-          )}
-        </Box>
+        <PageHeading
+          title={t('discovery.title')}
+          description={
+            serverName ? t('discovery.subtitleNamed', { serverName }) : t('discovery.subtitle')
+          }
+          icon={<ExploreIcon sx={{ color: 'primary.main', fontSize: 28 }} />}
+          sx={{ mb: 0 }}
+        />
 
         {/* Grid/List toggle — main pool only, not genre strips or Streaming */}
         {discoveryTab !== 'streaming' && browseSubTab === 'popular' && (

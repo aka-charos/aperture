@@ -22,6 +22,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import { MoviePoster, RankBadge } from '@aperture/ui'
 import { useUserRatings } from '../../hooks/useUserRatings'
 import { useWatching } from '../../hooks/useWatching'
+import { PageHeading } from '@/components/PageHeading'
 
 type TopPicksMediaType = 'movie' | 'series'
 type ViewMode = 'grid' | 'list'
@@ -157,16 +158,15 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={4} flexWrap="wrap" gap={2}>
         <Box>
-          <Box display="flex" alignItems="center" gap={2} mb={1}>
-            {headerIcon}
-            <Typography variant="h4" fontWeight={700}>
-              {t(isMovie ? 'topPicksPage.pageTitleMovies' : 'topPicksPage.pageTitleSeries')}
-            </Typography>
-          </Box>
-          <Typography variant="body1" color="text.secondary">
-            {t(isMovie ? 'topPicksPage.subtitleMovies' : 'topPicksPage.subtitleSeries')}
-            {config && t('topPicksPage.inLastDays', { count: config.timeWindowDays })}
-          </Typography>
+          <PageHeading
+            title={t(isMovie ? 'topPicksPage.pageTitleMovies' : 'topPicksPage.pageTitleSeries')}
+            description={
+              t(isMovie ? 'topPicksPage.subtitleMovies' : 'topPicksPage.subtitleSeries') +
+              (config ? t('topPicksPage.inLastDays', { count: config.timeWindowDays }) : '')
+            }
+            icon={headerIcon}
+            sx={{ mb: 0 }}
+          />
           {config?.lastRefreshedAt && (
             <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
               {t('topPicksPage.lastUpdated', {

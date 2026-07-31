@@ -1,6 +1,5 @@
 import {
   Box,
-  Typography,
   Grid,
   Button,
   Skeleton,
@@ -18,6 +17,7 @@ import AddIcon from '@mui/icons-material/Add'
 import { usePlaylistsData } from './hooks'
 import { PlaylistCard, GraphPlaylistCard, PlaylistDialog, PlaylistViewDialog, PlaylistPreviewDialog, GraphPlaylistViewDialog, EmptyState } from './components'
 import { useServerDisplayName } from '../../hooks/useServerDisplayName'
+import { PageHeading } from '@/components/PageHeading'
 
 export function PlaylistsPage() {
   const { t } = useTranslation()
@@ -86,9 +86,7 @@ export function PlaylistsPage() {
   if (loading) {
     return (
       <Box>
-        <Typography variant="h4" fontWeight={700} mb={4}>
-          {t('playlists.pageTitle')}
-        </Typography>
+        <PageHeading title={t('playlists.pageTitle')} sx={{ mb: 4 }} />
         <Grid container spacing={3}>
           {Array.from({ length: 3 }).map((_, i) => (
             <Grid item xs={12} sm={6} md={4} key={i}>
@@ -110,16 +108,15 @@ export function PlaylistsPage() {
         gap={{ xs: 2, sm: 0 }}
         mb={4}
       >
-        <Box>
-          <Typography variant="h4" fontWeight={700} mb={1}>
-            {t('playlists.pageTitle')}
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            {serverName
+        <PageHeading
+          title={t('playlists.pageTitle')}
+          description={
+            serverName
               ? t('playlists.pageSubtitleNamed', { serverName })
-              : t('playlists.pageSubtitle')}
-          </Typography>
-        </Box>
+              : t('playlists.pageSubtitle')
+          }
+          sx={{ mb: 0 }}
+        />
         <Button 
           variant="contained" 
           startIcon={<AddIcon />} 

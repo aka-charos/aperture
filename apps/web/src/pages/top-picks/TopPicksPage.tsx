@@ -12,8 +12,6 @@ import {
   ToggleButtonGroup,
   Tabs,
   Tab,
-  useTheme,
-  useMediaQuery,
 } from '@mui/material'
 import WhatshotIcon from '@mui/icons-material/Whatshot'
 import MovieIcon from '@mui/icons-material/Movie'
@@ -26,6 +24,7 @@ import { useUserRatings } from '../../hooks/useUserRatings'
 import { useWatching } from '../../hooks/useWatching'
 import { useViewMode } from '../../hooks/useViewMode'
 import { TopPicksMovieListItem, TopPicksSeriesListItem } from './components'
+import { PageHeading } from '@/components/PageHeading'
 
 interface PopularMovie {
   movieId: string
@@ -71,8 +70,6 @@ interface TopPicksConfig {
 
 export function TopPicksPage() {
   const { t } = useTranslation()
-  const theme = useTheme()
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { getRating, setRating } = useUserRatings()
@@ -336,29 +333,24 @@ export function TopPicksPage() {
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={3}>
         <Box>
-          <Box display="flex" alignItems="center" gap={2} mb={{ xs: 0, sm: 1 }}>
-            <WhatshotIcon sx={{ color: '#f97316', fontSize: 32 }} />
-            <Typography variant="h4" fontWeight={700}>
-              {t('topPicksPage.pageTitle')}
+          <PageHeading
+            title={t('topPicksPage.pageTitle')}
+            description={
+              config
+                ? t('topPicksPage.rankedSubtitle', {
+                    days: tabIndex === 0 ? config.moviesTimeWindowDays : config.seriesTimeWindowDays,
+                  })
+                : t('topPicksPage.rankedSubtitleNoWindow')
+            }
+            icon={<WhatshotIcon sx={{ color: '#f97316', fontSize: 28 }} />}
+            sx={{ mb: 0 }}
+          />
+          {config?.lastRefreshedAt && (
+            <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
+              {t('topPicksPage.lastRefreshed', {
+                date: new Date(config.lastRefreshedAt).toLocaleDateString(),
+              })}
             </Typography>
-          </Box>
-          {!isMobile && (
-            <>
-              <Typography variant="body1" color="text.secondary">
-                {config
-                  ? t('topPicksPage.rankedSubtitle', {
-                      days: tabIndex === 0 ? config.moviesTimeWindowDays : config.seriesTimeWindowDays,
-                    })
-                  : t('topPicksPage.rankedSubtitleNoWindow')}
-              </Typography>
-              {config?.lastRefreshedAt && (
-                <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
-                  {t('topPicksPage.lastRefreshed', {
-                    date: new Date(config.lastRefreshedAt).toLocaleDateString(),
-                  })}
-                </Typography>
-              )}
-            </>
           )}
         </Box>
         {/* Grid/List toggle always in upper right */}

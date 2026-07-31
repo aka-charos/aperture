@@ -8,9 +8,6 @@ import {
   Tabs,
   ToggleButton,
   ToggleButtonGroup,
-  Typography,
-  useMediaQuery,
-  useTheme,
 } from '@mui/material'
 import MovieIcon from '@mui/icons-material/Movie'
 import PersonIcon from '@mui/icons-material/Person'
@@ -26,12 +23,11 @@ import { BrowseSeriesTab } from './browse/BrowseSeriesTab'
 import { useBrowseFilterPresets, useBrowseMovies, useBrowsePeople, useBrowseSeries } from './browse/hooks'
 import { useViewMode } from '../hooks/useViewMode'
 import { useServerDisplayName } from '../hooks/useServerDisplayName'
+import { PageHeading } from '@/components/PageHeading'
 
 export function BrowsePage() {
   const { t } = useTranslation()
   const serverName = useServerDisplayName()
-  const theme = useTheme()
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
   const [searchParams, setSearchParams] = useSearchParams()
   const initialTabIndex = browseTabFromSearchParam(searchParams.get('tab'))
   const [tabIndex, setTabIndex] = useState(initialTabIndex)
@@ -87,33 +83,26 @@ export function BrowsePage() {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={3}>
-        <Box>
-          <Box display="flex" alignItems="center" gap={2} mb={{ xs: 0, sm: 1 }}>
-            <VideoLibraryIcon sx={{ color: 'primary.main', fontSize: 32 }} />
-            <Typography variant="h4" fontWeight={700}>
-              {t('browse.title')}
-            </Typography>
-          </Box>
-          {!isMobile && (
-            <Typography variant="body1" color="text.secondary">
-              {t(serverName ? 'browse.subtitleLineNamed' : 'browse.subtitleLine', {
-                ...(serverName ? { serverName } : {}),
-                count:
-                  tabIndex === 0
-                    ? movies.movieTotal.toLocaleString()
-                    : tabIndex === 1
-                      ? series.seriesTotal.toLocaleString()
-                      : people.peopleTotal.toLocaleString(),
-                kind:
-                  tabIndex === 0
-                    ? t('browse.subtitleKindMovies')
-                    : tabIndex === 1
-                      ? t('browse.subtitleKindSeries')
-                      : t('browse.subtitleKindPeople'),
-              })}
-            </Typography>
-          )}
-        </Box>
+        <PageHeading
+          title={t('browse.title')}
+          description={t(serverName ? 'browse.subtitleLineNamed' : 'browse.subtitleLine', {
+            ...(serverName ? { serverName } : {}),
+            count:
+              tabIndex === 0
+                ? movies.movieTotal.toLocaleString()
+                : tabIndex === 1
+                  ? series.seriesTotal.toLocaleString()
+                  : people.peopleTotal.toLocaleString(),
+            kind:
+              tabIndex === 0
+                ? t('browse.subtitleKindMovies')
+                : tabIndex === 1
+                  ? t('browse.subtitleKindSeries')
+                  : t('browse.subtitleKindPeople'),
+          })}
+          icon={<VideoLibraryIcon sx={{ color: 'primary.main', fontSize: 28 }} />}
+          sx={{ mb: 0 }}
+        />
 
         <ToggleButtonGroup value={currentViewMode} exclusive onChange={handleViewModeChange} size="small">
           <ToggleButton value="grid">

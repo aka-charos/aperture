@@ -1,6 +1,5 @@
 import {
   Box,
-  Typography,
   Grid,
   Button,
   Skeleton,
@@ -18,6 +17,7 @@ import AddIcon from '@mui/icons-material/Add'
 import { usePlaylistsData } from '../playlists/hooks'
 import { PlaylistCard, PlaylistDialog, PlaylistViewDialog, PlaylistPreviewDialog, EmptyState } from '../playlists/components'
 import { useServerDisplayName } from '../../hooks/useServerDisplayName'
+import { PageHeading } from '@/components/PageHeading'
 
 // Reuses the Channel builder stack (hook + components) but targets server-wide Emby Collections
 // instead of personal Playlists. The shared components resolve their labels from this namespace.
@@ -76,9 +76,7 @@ export function CollectionsPage() {
   if (loading) {
     return (
       <Box>
-        <Typography variant="h4" fontWeight={700} mb={4}>
-          {t('collections.pageTitle')}
-        </Typography>
+        <PageHeading title={t('collections.pageTitle')} sx={{ mb: 4 }} />
         <Grid container spacing={3}>
           {Array.from({ length: 3 }).map((_, i) => (
             <Grid item xs={12} sm={6} md={4} key={i}>
@@ -100,16 +98,15 @@ export function CollectionsPage() {
         gap={{ xs: 2, sm: 0 }}
         mb={4}
       >
-        <Box>
-          <Typography variant="h4" fontWeight={700} mb={1}>
-            {t('collections.pageTitle')}
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            {serverName
+        <PageHeading
+          title={t('collections.pageTitle')}
+          description={
+            serverName
               ? t('collections.pageSubtitleNamed', { serverName })
-              : t('collections.pageSubtitle')}
-          </Typography>
-        </Box>
+              : t('collections.pageSubtitle')
+          }
+          sx={{ mb: 0 }}
+        />
         <Button
           variant="contained"
           startIcon={<AddIcon />}
