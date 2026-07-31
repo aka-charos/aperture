@@ -12,6 +12,7 @@ import { useJobsData, useEnrichmentStatus, useDiscoveryPrerequisites } from './h
 import { MOVIE_JOB_CATEGORIES, SERIES_JOB_CATEGORIES, GLOBAL_JOB_CATEGORIES } from './constants'
 import { JobCard, JobConfigDialog, JobHistoryDialog, CancelDialog, LoadingSkeleton, ScheduleTable } from './components'
 import type { JobCategory } from './types'
+import { PageHeading } from '@/components/PageHeading'
 
 interface TabPanelProps {
   children?: React.ReactNode
@@ -203,30 +204,29 @@ export function JobsPage() {
     <Box>
       {/* Header */}
       <Box mb={3}>
-        <Stack direction="row" alignItems="center" spacing={2} mb={1}>
-          <Typography variant="h4" fontWeight={700}>
-            {t('admin.jobsPage.title')}
-          </Typography>
-          {runningCount > 0 && (
-            <Chip
-              label={t('admin.jobsPage.runningChip', { count: runningCount })}
-              size="small"
-              sx={{
-                bgcolor: 'primary.main',
-                color: 'white',
-                fontWeight: 600,
-                animation: 'pulse 2s infinite',
-                '@keyframes pulse': {
-                  '0%, 100%': { opacity: 1 },
-                  '50%': { opacity: 0.7 },
-                },
-              }}
-            />
-          )}
-        </Stack>
-        <Typography variant="body1" color="text.secondary">
-          {t('admin.jobsPage.subtitle')}
-        </Typography>
+        <PageHeading
+          title={t('admin.jobsPage.title')}
+          description={t('admin.jobsPage.subtitle')}
+          sx={{ mb: runningCount > 0 ? 1 : 0 }}
+        />
+        {/* Stays on the page rather than riding into the bar with the title —
+            it's live state, and the bar already carries the jobs widget. */}
+        {runningCount > 0 && (
+          <Chip
+            label={t('admin.jobsPage.runningChip', { count: runningCount })}
+            size="small"
+            sx={{
+              bgcolor: 'primary.main',
+              color: 'white',
+              fontWeight: 600,
+              animation: 'pulse 2s infinite',
+              '@keyframes pulse': {
+                '0%, 100%': { opacity: 1 },
+                '50%': { opacity: 0.7 },
+              },
+            }}
+          />
+        )}
       </Box>
 
       {error && (

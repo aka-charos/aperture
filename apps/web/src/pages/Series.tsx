@@ -20,6 +20,7 @@ import SearchIcon from '@mui/icons-material/Search'
 import { MoviePoster } from '@aperture/ui'
 import { useUserRatings } from '../hooks/useUserRatings'
 import { useWatching } from '../hooks/useWatching'
+import { PageHeading } from '@/components/PageHeading'
 
 interface Series {
   id: string
@@ -120,12 +121,11 @@ export function SeriesPage() {
 
   return (
     <Box>
-      <Typography variant="h4" fontWeight={700} mb={1}>
-        {t('browse.series.title')}
-      </Typography>
-      <Typography variant="body1" color="text.secondary" mb={4}>
-        {t('browse.series.subtitle')}
-      </Typography>
+      <PageHeading
+        title={t('browse.series.title')}
+        description={t('browse.series.subtitle')}
+        sx={{ mb: 4 }}
+      />
 
       {/* Filters */}
       <Box display="flex" gap={2} mb={4} flexWrap="wrap" alignItems="center">

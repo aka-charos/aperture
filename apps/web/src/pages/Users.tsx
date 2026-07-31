@@ -48,6 +48,7 @@ import TvIcon from '@mui/icons-material/Tv'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
 import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark'
+import { usePageHeader } from '@/hooks/usePageHeader'
 
 interface ProviderUser {
   providerUserId: string
@@ -73,6 +74,7 @@ interface GlobalAiConfig {
 
 export function UsersPage() {
   const { t } = useTranslation()
+  usePageHeader(t('admin.users'))
   const navigate = useNavigate()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))

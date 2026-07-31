@@ -50,6 +50,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useUserRatings } from '@/hooks/useUserRatings'
 import { useWatching } from '@/hooks/useWatching'
 import { useViewMode } from '@/hooks/useViewMode'
+import { PageHeading } from '@/components/PageHeading'
 import { formatRuntime } from '@/pages/media-detail/hooks'
 
 interface MovieRecommendation {
@@ -355,19 +356,12 @@ export function MyRecommendationsPage() {
     <Box>
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
-        <Box>
-          <Box display="flex" alignItems="center" gap={2} mb={{ xs: 0, sm: 1 }}>
-            <AutoAwesomeIcon sx={{ color: 'primary.main', fontSize: 32 }} />
-            <Typography variant="h4" fontWeight={700}>
-              {t('myRecommendations.pageTitle')}
-            </Typography>
-          </Box>
-          {!isMobile && (
-            <Typography variant="body1" color="text.secondary">
-              {t('myRecommendations.subtitle')}
-            </Typography>
-          )}
-        </Box>
+        <PageHeading
+          title={t('myRecommendations.pageTitle')}
+          description={t('myRecommendations.subtitle')}
+          icon={<AutoAwesomeIcon sx={{ color: 'primary.main', fontSize: 28 }} />}
+          sx={{ mb: 0 }}
+        />
 
         {/* Grid/List toggle always in upper right */}
         <ToggleButtonGroup

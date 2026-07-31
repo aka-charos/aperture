@@ -266,6 +266,12 @@ export interface AssistantChatSurfaceProps {
    * — pass false there. Defaults to true since the dock is the exception.
    */
   openMediaInModal?: boolean
+  /**
+   * Draw the surface's own title bar. The /assistant page turns it off at the
+   * widths where the app bar carries the same words — the floating dock and
+   * dialog have no app bar of their own, so they always need it.
+   */
+  showHeader?: boolean
 }
 
 /**
@@ -279,6 +285,7 @@ export function AssistantChatSurface({
   headerActions,
   onBeforeNavigate,
   openMediaInModal = true,
+  showHeader = true,
 }: AssistantChatSurfaceProps) {
   const { t } = useTranslation()
   const theme = useTheme()
@@ -499,6 +506,7 @@ export function AssistantChatSurface({
         {/* Main Chat Area */}
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
           {/* Header */}
+          {showHeader && (
           <Box
             sx={{
               display: 'flex',
@@ -561,6 +569,7 @@ export function AssistantChatSurface({
               {headerActions}
             </Box>
           </Box>
+          )}
 
           {/* AI capability warnings (chat not configured / no tool support).
               The wrapper collapses when the banner renders nothing. */}

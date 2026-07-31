@@ -30,6 +30,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import { MoviePoster } from '@aperture/ui'
 import { useUserRatings } from '../hooks/useUserRatings'
 import { useWatching } from '../hooks/useWatching'
+import { PageHeading } from '@/components/PageHeading'
 
 interface SearchResult {
   id: string
@@ -206,12 +207,11 @@ export function SearchPage() {
 
   return (
     <Box>
-      <Typography variant="h4" fontWeight={700} mb={1}>
-        {t('search.title')}
-      </Typography>
-      <Typography variant="body1" color="text.secondary" mb={4}>
-        {t('search.subtitle')}
-      </Typography>
+      <PageHeading
+        title={t('search.title')}
+        description={t('search.subtitle')}
+        sx={{ mb: 4 }}
+      />
 
       {/* Search Input */}
       <Box mb={3}>

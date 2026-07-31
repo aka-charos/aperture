@@ -35,6 +35,7 @@ import {
 import { CONNECTION_COLORS, type ConnectionType } from '../../components/SimilarityGraph/types'
 import { connectionTypeLabel } from '../../i18n/connectionTypeLabel'
 import { GraphExplorer } from '../../components/GraphExplorer'
+import { usePageHeader } from '@/hooks/usePageHeader'
 
 type GraphSource = 'ai-movies' | 'ai-series' | 'watching' | 'top-movies' | 'top-series'
 type MediaFilter = 'movie' | 'series' | 'both'
@@ -54,6 +55,9 @@ function randomItem<T>(arr: T[]): T {
 
 export function ExplorePage() {
   const { t } = useTranslation()
+  // No in-page block: the graph fills the viewport and breaks out of the
+  // layout padding, so the bar is the only place a title fits.
+  usePageHeader(t('nav.explore'))
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
