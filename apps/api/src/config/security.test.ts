@@ -369,10 +369,15 @@ describe('deployment posture diagnostics', () => {
     resetObservation()
   })
 
-  test('proxy mode still bound to all interfaces is flagged', () => {
+  test('declaring proxy mode alone is not enough to advise a bind host', () => {
+    // DEPLOYMENT_MODE says a proxy is in front, but nothing has been observed
+    // forwarding and nothing is trusted, so its address is unknown. Suggesting
+    // HOST=127.0.0.1 here would be a guess, and a wrong guess severs a proxy
+    // that lives in another container. Silence is the correct output.
     resetObservation()
     const found = ids({ NODE_ENV: 'production', DEPLOYMENT_MODE: 'cloudflared' })
-    assert.ok(found.includes('boundToAllInterfaces'))
+    assert.ok(!found.includes('boundToAllInterfaces'))
+    assert.ok(found.includes('proxyModeWithoutTrust'), 'the real problem is still reported')
   })
 
   test('a clean production deployment reports no critical or warning findings', () => {
@@ -551,6 +556,84 @@ describe('the forwarding proxy is detected, not guessed', () => {
     noteRequest('172.18.0.1', '172.18.0.1', true)
 
     assert.deepEqual(getObservation().forwardedBy.sort(), ['127.0.0.1', '172.18.0.1'])
+    resetObservation()
+  })
+})
+
+describe('"reached via" describes reality, not DEPLOYMENT_MODE', () => {
+  /**
+   * The panel used to render the DEPLOYMENT_MODE env var here, so it could sit
+   * there saying "Direct" while the rows underneath had already detected a
+   * proxy and were trusting it. Nobody sets that variable, so it said "Direct"
+   * essentially always — a row that was wrong precisely when it mattered.
+   */
+  test('a detected forwarder makes it "proxy" with no env var set', () => {
+    resetObservation()
+    for (let i = 0; i < 3; i++) noteRequest('172.28.0.1', '172.28.0.1', true)
+
+    withEnv({ NODE_ENV: 'production' }, () => {
+      setTrustedProxiesForTest([])
+      const posture = getDeploymentPosture()
+      assert.equal(posture.mode, 'direct', 'DEPLOYMENT_MODE genuinely is unset')
+      assert.equal(posture.reachedVia, 'proxy', 'but traffic says otherwise, and that wins')
+    })
+    resetObservation()
+  })
+
+  test('trusting a proxy is enough, before any traffic is sampled', () => {
+    resetObservation()
+    withEnv({ NODE_ENV: 'production' }, () => {
+      setTrustedProxiesForTest(['172.28.0.1'])
+      assert.equal(getDeploymentPosture().reachedVia, 'proxy')
+      setTrustedProxiesForTest([])
+    })
+  })
+
+  test('nothing in front stays "direct"', () => {
+    resetObservation()
+    for (let i = 0; i < 5; i++) noteRequest('192.168.1.20', '192.168.1.20', false)
+
+    withEnv({ NODE_ENV: 'production' }, () => {
+      setTrustedProxiesForTest([])
+      assert.equal(getDeploymentPosture().reachedVia, 'direct')
+    })
+    resetObservation()
+  })
+})
+
+describe('the bind-host advice cannot break a container setup', () => {
+  /**
+   * "Set HOST=127.0.0.1" is correct when the proxy shares the host, and
+   * catastrophic when it does not: a proxy in its own container reaches Aperture
+   * across a bridge network, so binding to loopback cuts it off completely. The
+   * finding is therefore gated on every known proxy being on loopback.
+   */
+  test('stays silent when the proxy is on a container network', () => {
+    resetObservation()
+    for (let i = 0; i < 3; i++) noteRequest('203.0.113.9', '172.28.0.1', true)
+
+    withEnv({ NODE_ENV: 'production' }, () => {
+      setTrustedProxiesForTest(['172.28.0.1'])
+      const ids = getDeploymentPosture().findings.map((f) => f.id)
+      assert.ok(
+        !ids.includes('boundToAllInterfaces'),
+        'advising HOST=127.0.0.1 here would sever the proxy from the app'
+      )
+      setTrustedProxiesForTest([])
+    })
+    resetObservation()
+  })
+
+  test('still fires when the proxy really is on this host', () => {
+    resetObservation()
+    for (let i = 0; i < 3; i++) noteRequest('203.0.113.9', '127.0.0.1', true)
+
+    withEnv({ NODE_ENV: 'production' }, () => {
+      setTrustedProxiesForTest(['127.0.0.1'])
+      const ids = getDeploymentPosture().findings.map((f) => f.id)
+      assert.ok(ids.includes('boundToAllInterfaces'), 'here the advice is sound')
+      setTrustedProxiesForTest([])
+    })
     resetObservation()
   })
 })

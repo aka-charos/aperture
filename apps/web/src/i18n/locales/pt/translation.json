@@ -4203,7 +4203,8 @@
       "cookies": "Session cookie",
       "setupAccess": "First-run setup",
       "apiDocs": "API docs",
-      "bindHost": "Listening on"
+      "bindHost": "Listening on",
+      "reachedVia": "Reached via"
     },
     "modeDirect": "Direct",
     "modeProxy": "Behind a proxy or tunnel",
@@ -4280,6 +4281,9 @@
     "detectedTitle": "Aperture can see what is forwarding to it",
     "detectedBody": "Requests are reaching Aperture from {{addresses}}, carrying a forwarded visitor address. If that is your tunnel or reverse proxy — for Cloudflare Tunnel it is cloudflared — trust it and Aperture will start using real visitor addresses immediately.",
     "detectedAction": "Trust {{addresses}}",
-    "unsaved": "Not saved yet — click Save to apply this."
+    "unsaved": "Not saved yet — click Save to apply this.",
+    "viaDirect": "Direct connection",
+    "viaProxy": "A proxy or tunnel",
+    "viaProxyNamed": "A proxy or tunnel ({{addresses}})"
   }
 }
