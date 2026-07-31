@@ -40,27 +40,16 @@ import {
 import { ToolResultError } from './ToolResultError'
 import { useUnwatchedOnly, setUnwatchedOnly } from './unwatchedPreference'
 import { useStatusPhase, setStatusPhase } from './assistantStatus'
+import { NARROW_THREAD, COMPACT_THREAD } from './density'
 
-/**
- * Below this thread width the avatar rail is dropped.
- *
- * A 36px avatar plus its 12px gap takes 48px out of every row. On a 390px phone
- * that is a quarter of the line: the card inside it is left with a ~184px prose
- * column, under 30 characters, and the same 48px is charged again to the card's
- * own poster rail. Nothing depends on the avatars to tell the two speakers
- * apart — user messages are right-aligned indigo bubbles.
- *
- * Written as a container query rather than a breakpoint because this is not a
- * phone problem: a 400px dock on a 1920px screen is exactly as narrow, and only
- * the container knows how much room the thread actually got.
- */
-const NARROW_THREAD = '@container assistantThread (max-width: 480px)'
-
-/** Shared avatar geometry; the rail collapses on narrow surfaces. */
+/** Shared avatar geometry; it shrinks on a compact thread and goes on a narrow one. */
 const avatarSx = {
   width: 36,
   height: 36,
   flexShrink: 0,
+  [COMPACT_THREAD]: { width: 28, height: 28 },
+  // Listed after the compact rule on purpose: both match below 480px, and the
+  // later one wins.
   [NARROW_THREAD]: { display: 'none' },
 }
 
@@ -70,8 +59,24 @@ const avatarSx = {
  */
 const bubbleSx = (cap: string) => ({
   maxWidth: cap,
-  [NARROW_THREAD]: { maxWidth: '100%' },
+  p: 2,
+  [COMPACT_THREAD]: { p: 1.5 },
+  [NARROW_THREAD]: { maxWidth: '100%', p: 1.5 },
 })
+
+/**
+ * One message's row. The gutter between rows is most of what a chat spends its
+ * height on, so it closes up along with everything else.
+ */
+const messageRowSx = {
+  display: 'flex',
+  gap: 1.5,
+  py: 1.5,
+  [COMPACT_THREAD]: { gap: 1, py: 0.75 },
+}
+
+/** Air below a text bubble or a card block, before the next one. */
+const partGapSx = { mb: 2, [COMPACT_THREAD]: { mb: 1.25 } }
 
 // Custom link renderer for markdown (needs hooks for i18n)
 function MarkdownLink({ href, children }: { href?: string; children?: ReactNode }) {
@@ -187,11 +192,10 @@ function ToolUI({ toolName, result }: { toolName: string; result: unknown }) {
 function UserMessage() {
   return (
     <MessagePrimitive.Root>
-      <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'flex-end', py: 1.5 }}>
+      <Box sx={{ ...messageRowSx, justifyContent: 'flex-end' }}>
         <Paper
           sx={{
             ...bubbleSx('80%'),
-            p: 2,
             bgcolor: '#6366f1',
             borderRadius: 2,
             borderStartEndRadius: 0,
@@ -241,7 +245,6 @@ function AssistantMessageError() {
   return (
     <Box
       sx={{
-        p: 2,
         bgcolor: 'rgba(26, 26, 26, 0.7)',
         borderRadius: 2,
         my: 1,
@@ -323,8 +326,7 @@ function AssistantTextPart({ text }: TextMessagePartProps) {
     <Paper
       sx={{
         ...bubbleSx('90%'),
-        p: 2,
-        mb: 2,
+        ...partGapSx,
         bgcolor: 'rgba(26, 26, 26, 0.7)',
         borderRadius: 2,
         borderStartStartRadius: 0,
@@ -379,7 +381,7 @@ function AssistantTextPart({ text }: TextMessagePartProps) {
 
 function AssistantToolPart({ toolName, result }: ToolCallMessagePartProps) {
   return (
-    <Box sx={{ maxWidth: '100%', overflow: 'hidden', mb: 2 }}>
+    <Box sx={{ maxWidth: '100%', overflow: 'hidden', ...partGapSx }}>
       <ToolUI toolName={toolName} result={result} />
     </Box>
   )
@@ -440,9 +442,7 @@ function AssistantMessage() {
       <Box
         {...ANSWER_MARKER_PROP}
         sx={{
-          display: 'flex',
-          gap: 1.5,
-          py: 1.5,
+          ...messageRowSx,
           // Hide the entire row if content area is empty (no visible children)
           '&:has(.assistant-content:empty)': {
             display: 'none',
@@ -580,7 +580,7 @@ function LoadingIndicator() {
       : t('assistant.thinking')
 
   return (
-    <Box sx={{ display: 'flex', gap: 1.5, py: 1.5 }}>
+    <Box sx={messageRowSx}>
       <Avatar
         sx={{
           ...avatarSx,
@@ -592,7 +592,6 @@ function LoadingIndicator() {
       <Paper
         sx={{
           ...bubbleSx('80%'),
-          p: 2,
           bgcolor: 'rgba(26, 26, 26, 0.7)',
           borderRadius: 2,
           borderStartStartRadius: 0,
@@ -627,12 +626,12 @@ function Composer() {
 
   return (
     <ComposerPrimitive.Root>
-      <Box sx={{ p: 2, borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+      <Box sx={{ px: 1.5, py: 1.25, borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
         {/* Applies to every message in every conversation until turned off —
             it is a standing preference, not a per-message option. */}
         <Tooltip title={t('assistant.unwatchedOnlyHint')} placement="top-start">
           <FormControlLabel
-            sx={{ ml: 0, mb: 1 }}
+            sx={{ ml: 0, mb: 0.25 }}
             control={
               <Checkbox
                 size="small"
@@ -671,7 +670,7 @@ function Composer() {
                   },
                 },
                 '& .MuiInputBase-input': {
-                  py: 1.5,
+                  py: 1.25,
                 },
               }}
             />
@@ -683,8 +682,8 @@ function Composer() {
                 sx={{
                   bgcolor: '#6366f1',
                   color: '#fff',
-                  width: 44,
-                  height: 44,
+                  width: 40,
+                  height: 40,
                   '&:hover': {
                     bgcolor: '#4f46e5',
                   },
@@ -706,8 +705,8 @@ function Composer() {
                 sx={{
                   bgcolor: '#6366f1',
                   color: '#fff',
-                  width: 44,
-                  height: 44,
+                  width: 40,
+                  height: 40,
                   '&:hover': {
                     bgcolor: '#4f46e5',
                   },
@@ -739,11 +738,10 @@ interface HistoricalMessage {
 // Render a historical user message
 function HistoricalUserMessage({ message }: { message: HistoricalMessage }) {
   return (
-    <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'flex-end', py: 1.5 }}>
+    <Box sx={{ ...messageRowSx, justifyContent: 'flex-end' }}>
       <Paper
         sx={{
           ...bubbleSx('80%'),
-          p: 2,
           bgcolor: '#6366f1',
           borderRadius: 2,
           borderStartEndRadius: 0,
@@ -763,7 +761,7 @@ function HistoricalUserMessage({ message }: { message: HistoricalMessage }) {
 // Render a historical assistant message
 function HistoricalAssistantMessage({ message }: { message: HistoricalMessage }) {
   return (
-    <Box {...ANSWER_MARKER_PROP} sx={{ display: 'flex', gap: 1.5, py: 1.5 }}>
+    <Box {...ANSWER_MARKER_PROP} sx={messageRowSx}>
       <Avatar
         sx={{
           ...avatarSx,
@@ -778,11 +776,10 @@ function HistoricalAssistantMessage({ message }: { message: HistoricalMessage })
           <Paper
             sx={{
               ...bubbleSx('90%'),
-              p: 2,
+              ...partGapSx,
               bgcolor: 'rgba(26, 26, 26, 0.7)',
               borderRadius: 2,
               borderStartStartRadius: 0,
-              mb: 2,
             }}
           >
             <Box
@@ -798,7 +795,7 @@ function HistoricalAssistantMessage({ message }: { message: HistoricalMessage })
         )}
         {/* Render tool results */}
         {message.tool_invocations?.map((invocation) => (
-          <Box key={invocation.toolCallId} sx={{ maxWidth: '100%', overflow: 'hidden', mb: 2 }}>
+          <Box key={invocation.toolCallId} sx={{ maxWidth: '100%', overflow: 'hidden', ...partGapSx }}>
             <ToolUI toolName={invocation.toolName} result={invocation.result} />
           </Box>
         ))}
@@ -1011,10 +1008,13 @@ export function Thread({ historicalMessages = [], suggestions = [] }: ThreadProp
             flex: 1,
             overflowY: 'auto',
             overflowX: 'hidden',
-            padding: 16,
+            // A plain value rather than a responsive one: this element *is* the
+            // query container, and a container cannot style itself off its own
+            // width. The rows inside it carry the density instead.
+            padding: 12,
             display: 'flex',
             flexDirection: 'column',
-            gap: 8,
+            gap: 4,
             minWidth: 0,
             // Query target for NARROW_THREAD. The thread is squeezed by things the
             // viewport knows nothing about — the dock's width, a dialog on a phone

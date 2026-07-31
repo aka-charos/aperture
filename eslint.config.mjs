@@ -4,7 +4,11 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 
 export default tseslint.config(
-  { ignores: ['**/dist', '**/node_modules', '**/*.js', '**/*.mjs'] },
+  // `.claude/worktrees/*` holds whole checkouts of this repo that agent sessions
+  // work in. They are git-ignored, but eslint walks them anyway and lints every
+  // source file a second time — against this config rather than their own, so a
+  // branch that adds or removes a plugin fails the lint of the tree beside it.
+  { ignores: ['**/dist', '**/node_modules', '**/.claude/**', '**/*.js', '**/*.mjs'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],

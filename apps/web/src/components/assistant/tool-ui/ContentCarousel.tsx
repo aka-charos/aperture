@@ -15,6 +15,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd'
 import { ContentCard } from './ContentCard'
 import { CreatePlaylistFromSuggestionsDialog } from './CreatePlaylistFromSuggestionsDialog'
+import { COMPACT_THREAD } from '../density'
 import type { ContentCarouselData, ContentItem } from './types'
 
 interface ContentCarouselProps {
@@ -212,6 +213,7 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
         justifyContent: 'space-between',
         gap: 1,
         mb: 1.5,
+        [COMPACT_THREAD]: { mb: 1 },
       }}
     >
       <Box sx={{ minWidth: 0 }}>
@@ -269,13 +271,13 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
   }
 
   return (
-    <Box sx={{ my: 2, width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
+    <Box sx={{ my: 2, [COMPACT_THREAD]: { my: 1.25 }, width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
       {/* Header row: title/description + create-playlist action */}
       {renderHeader()}
 
       {isList ? (
         /* Vertical stacked list of rich cards (web-search recommendations) */
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, [COMPACT_THREAD]: { gap: 1 } }}>
           {data.items.map((item) => (
             <ContentCard
               key={item.id}
