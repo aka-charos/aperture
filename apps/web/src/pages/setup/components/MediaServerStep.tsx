@@ -31,6 +31,7 @@ import {
   Warning as WarningIcon,
 } from '@mui/icons-material'
 import { useTranslation } from 'react-i18next'
+import { useLogoUrl, DEFAULT_LOGO_RASTER_URL } from '@/lib/branding'
 import type { SetupWizardContext } from '../types'
 
 interface MediaServerStepProps {
@@ -39,6 +40,8 @@ interface MediaServerStepProps {
 
 export function MediaServerStep({ wizard }: MediaServerStepProps) {
   const { t } = useTranslation()
+  // Drawn at 72px, where the bundled raster beats the bundled SVG.
+  const logoUrl = useLogoUrl(DEFAULT_LOGO_RASTER_URL)
   const {
     error,
     testSuccess,
@@ -115,7 +118,7 @@ export function MediaServerStep({ wizard }: MediaServerStepProps) {
       >
         <Box
           component="img"
-          src="/aperture.png"
+          src={logoUrl}
           alt={t('setup.page.altLogo')}
           sx={{ width: 72, height: 72, mb: 2 }}
         />

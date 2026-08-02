@@ -50,24 +50,53 @@ export function setAppName(name: string | null | undefined): void {
   void i18n.changeLanguage(i18n.language)
 }
 
+/** Artwork bundled in the image, used unless the operator mounted their own. */
+export const DEFAULT_LOGO_URL = '/aperture.svg'
+/** Raster fallback for the one place that draws the logo large. */
+export const DEFAULT_LOGO_RASTER_URL = '/aperture.png'
+
+let logoUrl: string | null = null
+
+/** The mounted logo's URL, or null when the bundled artwork is in use. */
+export function getCustomLogoUrl(): string | null {
+  return logoUrl
+}
+
+function setCustomLogoUrl(url: string | null): void {
+  if (url === logoUrl) return
+  logoUrl = url
+  emit()
+}
+
+interface BrandingResponse {
+  appName?: unknown
+  logo?: { url?: unknown } | null
+}
+
 /**
- * Load the configured name. Called once at startup, before the app renders, and
- * again after an admin saves.
+ * Load the configured name and any mounted artwork. Called once at startup,
+ * before the app renders, and again after an admin saves.
  *
- * Failure is silent and leaves the default in place: an unreachable API is
+ * One request covers both: the logo is only ever needed alongside the name, and
+ * a second round trip would buy nothing.
+ *
+ * Failure is silent and leaves the defaults in place: an unreachable API is
  * already going to be obvious from the page itself, and a blank brand would be
  * a worse way to find out.
  */
-export async function loadAppName(): Promise<void> {
+export async function loadBranding(): Promise<void> {
   try {
     const response = await fetch('/api/branding', { credentials: 'include' })
     if (!response.ok) return
-    const data: unknown = await response.json()
-    if (data && typeof data === 'object' && typeof (data as { appName?: unknown }).appName === 'string') {
-      setAppName((data as { appName: string }).appName)
+    const data = (await response.json()) as BrandingResponse | null
+    if (!data || typeof data !== 'object') return
+
+    if (typeof data.appName === 'string') {
+      setAppName(data.appName)
     }
+    setCustomLogoUrl(typeof data.logo?.url === 'string' ? data.logo.url : null)
   } catch {
-    // Keep the default.
+    // Keep the defaults.
   }
 }
 
@@ -79,4 +108,12 @@ function subscribe(listener: () => void): () => void {
 /** For the handful of places that need the raw name rather than a translation. */
 export function useAppName(): string {
   return useSyncExternalStore(subscribe, getAppName, getAppName)
+}
+
+/**
+ * The logo to draw. Resolves to the bundled artwork until (and unless) the
+ * branding call reports a mounted file, so nothing flashes an empty box.
+ */
+export function useLogoUrl(fallback: string = DEFAULT_LOGO_URL): string {
+  return useSyncExternalStore(subscribe, getCustomLogoUrl, getCustomLogoUrl) ?? fallback
 }

@@ -76,6 +76,12 @@ services:
       # Pair with VOLUME 4 below. Lets you customize interface text without
       # rebuilding/pulling a new image.
       I18N_OVERRIDES_DIR: /config/i18n
+      # =========================================================================
+      # OPTIONAL: Custom logo and favicon
+      # =========================================================================
+      # Directory (inside the container) holding logo.* and favicon.* files.
+      # Pair with VOLUME 5 below. Lets you rebrand the UI without rebuilding.
+      BRANDING_DIR: /config/branding
     ports:
       - '3456:3456'
     depends_on:
@@ -129,6 +135,23 @@ services:
       #   - Host folder:     /mnt/user/appdata/aperture/i18n
       #
       - /mnt/user/appdata/aperture/i18n:/config/i18n:ro
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # VOLUME 5: Logo & Favicon (optional)
+      # ─────────────────────────────────────────────────────────────────────────
+      # Replace the bundled artwork without rebuilding. Put `logo.svg` and/or
+      # `favicon.svg` in this folder (png/webp also work, plus ico for the
+      # favicon); they are picked up on the next page load, no restart needed.
+      #
+      # Use square artwork. SVG is best — it stays sharp everywhere the logo is
+      # drawn (28-72px) and at every size a browser scales the favicon to. For
+      # raster, 512x512 covers both; keep the favicon simple enough to still
+      # read at 16px.
+      #
+      # Unraid Example:
+      #   - Host folder:     /mnt/user/appdata/aperture/branding
+      #
+      - /mnt/user/appdata/aperture/branding:/config/branding:ro
     restart: unless-stopped
 
 # =============================================================================

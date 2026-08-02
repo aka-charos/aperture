@@ -36,13 +36,28 @@ export function BrandingSection() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
+  // Artwork is mounted, not uploaded, so all this card can do is report what the
+  // server found. Showing it here anyway: this is where an admin comes looking.
+  const [artwork, setArtwork] = useState<{ logo: string | null; favicon: string | null }>({
+    logo: null,
+    favicon: null,
+  })
+
   const fetchConfig = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch('/api/branding', { credentials: 'include' })
       if (!response.ok) throw new Error(t('settingsBranding.fetchFailed'))
-      const data = (await response.json()) as { appName?: string }
+      const data = (await response.json()) as {
+        appName?: string
+        logo?: { filename?: string } | null
+        favicon?: { filename?: string } | null
+      }
       setValue(data.appName ?? DEFAULT_APP_NAME)
+      setArtwork({
+        logo: data.logo?.filename ?? null,
+        favicon: data.favicon?.filename ?? null,
+      })
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('settingsBranding.unknownError'))
@@ -151,6 +166,34 @@ export function BrandingSection() {
               >
                 {t('settingsBranding.reset', { name: DEFAULT_APP_NAME })}
               </Button>
+            </Box>
+
+            <Divider />
+
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>
+                {t('settingsBranding.artworkTitle')}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {t('settingsBranding.artworkHelp')}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                {t('settingsBranding.artworkSizing')}
+              </Typography>
+              <Stack spacing={0.5} sx={{ mt: 1.5 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {t('settingsBranding.artworkLogo')}{' '}
+                  {artwork.logo
+                    ? t('settingsBranding.artworkFound', { file: artwork.logo })
+                    : t('settingsBranding.artworkBundled')}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {t('settingsBranding.artworkFavicon')}{' '}
+                  {artwork.favicon
+                    ? t('settingsBranding.artworkFound', { file: artwork.favicon })
+                    : t('settingsBranding.artworkBundled')}
+                </Typography>
+              </Stack>
             </Box>
           </Stack>
         )}

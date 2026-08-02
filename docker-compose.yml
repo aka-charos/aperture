@@ -38,6 +38,9 @@ services:
       # Directory (inside the container) with runtime UI string overrides,
       # e.g. overrides.en.json. Pair with the i18n-overrides volume below.
       I18N_OVERRIDES_DIR: /config/i18n
+      # Directory (inside the container) holding a custom logo/favicon,
+      # e.g. logo.svg. Pair with the branding volume below.
+      BRANDING_DIR: /config/branding
     ports:
       - '3456:3456'
     depends_on:
@@ -62,6 +65,13 @@ services:
       # deep-merged over the bundled English at page load. See I18N_OVERRIDES_DIR.
       # ─────────────────────────────────────────────────────────────────────────
       - ./data/i18n:/config/i18n:ro
+      # ─────────────────────────────────────────────────────────────────────────
+      # Logo & Favicon - replace the bundled artwork without rebuilding.
+      # Drop `logo.svg` and/or `favicon.svg` (png/webp, plus ico for the
+      # favicon, also work) in ./data/branding and they are picked up on the
+      # next page load. Square artwork; 512x512 if raster. See BRANDING_DIR.
+      # ─────────────────────────────────────────────────────────────────────────
+      - ./data/branding:/config/branding:ro
     restart: unless-stopped
 
 volumes:
