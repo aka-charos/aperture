@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import cookie from '@fastify/cookie'
+import multipart from '@fastify/multipart'
 import helmet from '@fastify/helmet'
 import rateLimit from '@fastify/rate-limit'
 import swagger from '@fastify/swagger'
@@ -20,6 +21,9 @@ import { warnOnWeakSecurityPosture, noteRequest } from './config/deploymentPostu
 export interface ServerOptions {
   logger?: boolean
 }
+
+/** Ceiling for any multipart upload; individual routes may cap lower. */
+const MAX_UPLOAD_FILE_SIZE = 10 * 1024 * 1024
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function buildServer(options: ServerOptions = {}): Promise<any> {
@@ -167,6 +171,21 @@ export async function buildServer(options: ServerOptions = {}): Promise<any> {
       sameSite: 'lax',
       secure: useSecureCookies(),
       path: '/',
+    },
+  })
+
+  // Multipart support for file uploads.
+  //
+  // This has to be registered at the root. A plugin-scoped registration is
+  // invisible to sibling plugins: the parser and `request.file()` land in the
+  // scope that registered them and go no further. It previously lived inside
+  // the image routes, which left every multipart POST under /api/backup and
+  // /api/setup/backup failing with 415 before the handler ever ran.
+  //
+  // Routes needing a tighter bound pass their own `limits` to `request.file()`.
+  await fastify.register(multipart, {
+    limits: {
+      fileSize: MAX_UPLOAD_FILE_SIZE,
     },
   })
 
