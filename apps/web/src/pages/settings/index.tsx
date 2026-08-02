@@ -50,6 +50,7 @@ import {
   ApiKeysSection,
   LanguageDefaultsSection,
   PosterDisplaySection,
+  BrandingSection,
   SystemLogsSection,
   DeploymentSection,
 } from './components'
@@ -418,6 +419,9 @@ export function SettingsPage() {
           {/* System Tab */}
           <TabPanel value={tabValue} index={6}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {/* What this instance calls itself, everywhere in the UI */}
+              <BrandingSection />
+
               <LanguageDefaultsSection />
 
               {/* Poster display defaults (rating badge) */}

@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Aperture",
+    "appName": "{{appName}}",
     "save": "حفظ",
     "saving": "جارٍ الحفظ…",
     "loading": "جارٍ التحميل…",
@@ -212,7 +212,7 @@
       "aiOverrideColTooltip": "السماح للمستخدم بالتحكّم في تفضيل شرح الذكاء الاصطناعي",
       "disabledOnServer": "معطّل على خادم الوسائط",
       "activeStatus": "نشط",
-      "importedTooltip": "تم استيراد المستخدم إلى Aperture",
+      "importedTooltip": "تم استيراد المستخدم إلى {{appName}}",
       "notImportedTooltip": "لم يُستورد بعد",
       "discoverToggleOn": "إيقاف اقتراحات الاكتشاف",
       "discoverToggleOff": "تفعيل اقتراحات الاكتشاف",
@@ -254,7 +254,7 @@
       "discoveryAccessUpdated": "تم تحديث صلاحية الوصول إلى الاكتشاف!",
       "discoveryRequestUpdated": "تم تحديث صلاحية طلب الاكتشاف!",
       "watchHistoryTitle": "إدارة سجلّ المشاهدة",
-      "watchHistoryBody": "اسمح لهذا المستخدم بتمييز الأفلام والمسلسلات كغير مشاهَدة. سيُحدَّث خادم الوسائط (Emby/Jellyfin) وقاعدة بيانات Aperture معًا.",
+      "watchHistoryBody": "اسمح لهذا المستخدم بتمييز الأفلام والمسلسلات كغير مشاهَدة. سيُحدَّث خادم الوسائط (Emby/Jellyfin) وقاعدة بيانات {{appName}} معًا.",
       "watchHistoryToggleTitle": "السماح بإدارة سجلّ المشاهدة",
       "watchHistoryToggleHint": "يمكن للمستخدم تمييز العناصر كغير مشاهَدة من صفحة سجلّ المشاهدة وصفحات تفاصيل الأفلام",
       "discoveryTitle": "صلاحيات الاكتشاف",
@@ -331,7 +331,7 @@
           "description": "مهام تعلّم آلي للأفلام"
         },
         "movieLib": {
-          "title": "مكتبات Aperture",
+          "title": "مكتبات {{appName}}",
           "description": "بناء مكتبات توصيات الذكاء الاصطناعي في خادم الوسائط"
         },
         "seriesSync": {
@@ -343,7 +343,7 @@
           "description": "مهام تعلّم آلي للمسلسلات التلفزيونية"
         },
         "seriesLib": {
-          "title": "مكتبات Aperture",
+          "title": "مكتبات {{appName}}",
           "description": "بناء مكتبات توصيات الذكاء الاصطناعي في خادم الوسائط"
         },
         "globalMeta": {
@@ -364,8 +364,8 @@
         }
       },
       "jobNames": {
-        "syncMovieLibraries": "بناء مكتبات أفلام Aperture",
-        "syncSeriesLibraries": "بناء مكتبات مسلسلات Aperture",
+        "syncMovieLibraries": "بناء مكتبات أفلام {{appName}}",
+        "syncSeriesLibraries": "بناء مكتبات مسلسلات {{appName}}",
         "fullResetMovieRecommendations": "إعادة ضبط كاملة لتوصيات الأفلام",
         "fullResetSeriesRecommendations": "إعادة ضبط كاملة لتوصيات المسلسلات"
       },
@@ -545,7 +545,7 @@
       "noTrailer": "لم يتم العثور على مقطورة",
       "failedTrailer": "فشل تحميل المقطع الدعائي",
       "confirmUnwatchedTitle": "وضع علامة \"غير مراقب\"؟",
-      "confirmUnwatchedBody": "سيؤدي هذا إلى وضع علامة على \"{{title}}\" على أنه لم تتم مشاهدته في خادم الوسائط الخاص بك وإزالته من سجل المشاهدة الخاص بـ Aperture.",
+      "confirmUnwatchedBody": "سيؤدي هذا إلى وضع علامة على \"{{title}}\" على أنه لم تتم مشاهدته في خادم الوسائط الخاص بك وإزالته من سجل المشاهدة الخاص بـ {{appName}}.",
       "cannotUndo": "لا يمكن التراجع عن هذا الإجراء.",
       "marking": "وضع علامة…",
       "snackbarMarked": "تم وضع علامة على الفيلم على أنه لم تتم مشاهدته",
@@ -863,7 +863,7 @@
     "aiExplanationTitle": "تفضيلات شرح الذكاء الاصطناعي",
     "aiExplanationSubtitle": "اختر ما إذا كنت تريد تضمين التفسيرات التي تم إنشاؤها بواسطة الذكاء الاصطناعي في أوصاف توصياتك.",
     "aiExplanationIncludeTitle": "تضمين تفسيرات الذكاء الاصطناعي",
-    "aiExplanationIncludeBody": "عند التمكين، تتضمن كل توصية \"لماذا اختارت Aperture هذا لك\"",
+    "aiExplanationIncludeBody": "عند التمكين، تتضمن كل توصية \"لماذا اختارت {{appName}} هذا لك\"",
     "aiExplanationReset": "إعادة التعيين إلى الوضع الافتراضي ({{state}})",
     "stateEnabled": "ممكّن",
     "stateDisabled": "عاجز",
@@ -900,7 +900,7 @@
     "traktSyncing": "جارٍ المزامنة…",
     "traktDisconnect": "قطع الاتصال",
     "traktConnect": "الاتصال بالتراكت",
-    "traktFooter": "تعمل المزامنة على استيراد تقييمات Trakt (1-10) كتقييمات لنبض القلب في Aperture. سيكون للمحتوى ذو التصنيف الأعلى تأثير أكبر على توصياتك.",
+    "traktFooter": "تعمل المزامنة على استيراد تقييمات Trakt (1-10) كتقييمات لنبض القلب في {{appName}}. سيكون للمحتوى ذو التصنيف الأعلى تأثير أكبر على توصياتك.",
     "errLoadUserSettings": "فشل تحميل إعدادات المستخدم",
     "errConnectServer": "تعذر الاتصال بالخادم",
     "libraryNamesSaved": "تم حفظ أسماء المكتبات! وسيتم استخدامها لتحديثات المكتبة المستقبلية.",
@@ -1638,7 +1638,7 @@
     "errReset": "فشلت إعادة التعيين",
     "successReset": "إعادة تعيين إعدادات الخوارزمية إلى الإعدادات الافتراضية",
     "masterTitle": "أوزان الخوارزمية المخصصة",
-    "masterSubtitle": "قم بضبط كيفية قيام Aperture بإنشاء توصيات لك. عند التعطيل، يتم استخدام الإعدادات الافتراضية التي تم تكوينها بواسطة المسؤول.",
+    "masterSubtitle": "قم بضبط كيفية قيام {{appName}} بإنشاء توصيات لك. عند التعطيل، يتم استخدام الإعدادات الافتراضية التي تم تكوينها بواسطة المسؤول.",
     "labelUsingCustomWeights": "استخدام الأوزان المخصصة",
     "labelUsingDefaultWeights": "استخدام الأوزان الافتراضية",
     "descCustomActive": "إعدادات الخوارزمية المخصصة الخاصة بك نشطة",
@@ -1707,7 +1707,7 @@
   "settingsApiKeys": {
     "title": "مفاتيح واجهة برمجة التطبيقات",
     "createButton": "إنشاء مفتاح API",
-    "subtitle": "تسمح مفاتيح API بالوصول البرمجي إلى Aperture API. تظهر المفاتيح مرة واحدة فقط عند إنشائها.",
+    "subtitle": "تسمح مفاتيح API بالوصول البرمجي إلى {{appName}} API. تظهر المفاتيح مرة واحدة فقط عند إنشائها.",
     "empty": "لم يتم العثور على مفاتيح API. قم بإنشاء مفتاح API الأول الخاص بك لتمكين الوصول البرمجي.",
     "colName": "اسم",
     "colPrefix": "بادئة المفتاح",
@@ -1936,7 +1936,7 @@
     "allowPasswordlessLogin": "السماح بتسجيل الدخول بدون كلمة مرور",
     "allowPasswordlessHelper": "قم بتمكين هذا إذا لم يكن لدى مستخدمي خادم الوسائط الخاص بك كلمات مرور معينة",
     "securityWarningTitle": "تحذير أمني",
-    "securityWarningBody": "قم بتمكين هذا فقط إذا كان مثيل Aperture الخاص بك موجودًا على شبكة خاصة دون التعرض للإنترنت. إذا كان من الممكن الوصول إلى الخادم الخاص بك عبر الوكيل العكسي أو الإنترنت، فاترك هذا معطلاً لمنع الوصول غير المصرح به.",
+    "securityWarningBody": "قم بتمكين هذا فقط إذا كان مثيل {{appName}} الخاص بك موجودًا على شبكة خاصة دون التعرض للإنترنت. إذا كان من الممكن الوصول إلى الخادم الخاص بك عبر الوكيل العكسي أو الإنترنت، فاترك هذا معطلاً لمنع الوصول غير المصرح به.",
     "passwordlessEnabled": "تم تمكين تسجيل الدخول بدون كلمة مرور",
     "passwordlessDisabled": "تم تعطيل تسجيل الدخول بدون كلمة مرور",
     "displayName": "Server Display Name",
@@ -1949,15 +1949,15 @@
   },
   "settingsFileLocations": {
     "title": "مواقع الملفات",
-    "subtitle": "قم بتكوين المكان الذي يرى فيه خادم الوسائط الخاص بك مكتبات وملفات الوسائط الخاصة بـ Aperture",
+    "subtitle": "قم بتكوين المكان الذي يرى فيه خادم الوسائط الخاص بك مكتبات وملفات الوسائط الخاصة بـ {{appName}}",
     "detectPaths": "الكشف التلقائي عن المسارات",
     "detecting": "جارٍ الكشف…",
-    "detectCaption": "اكتشاف المسارات تلقائيًا عن طريق مقارنة ملفات خادم الوسائط مع حوامل Aperture",
+    "detectCaption": "اكتشاف المسارات تلقائيًا عن طريق مقارنة ملفات خادم الوسائط مع حوامل {{appName}}",
     "detectedMapping": "تعيين المسار المكتشف:",
     "mediaServerSample": "خادم الوسائط:",
     "apertureSample": "فتحة:",
     "apertureLibrariesPath": "مسار مكتبات الفتحة",
-    "apertureLibrariesHelper": "حيث يرى خادم الوسائط الخاص بك مخرجات Aperture (المجلد المثبت كـ /aperture-libraries في Aperture)",
+    "apertureLibrariesHelper": "حيث يرى خادم الوسائط الخاص بك مخرجات {{appName}} (المجلد المثبت كـ /aperture-libraries في {{appName}})",
     "mediaServerPathPrefix": "بادئة مسار خادم الوسائط",
     "mediaServerPathPrefixHelper": "المسار الأساسي حيث يرى خادم الوسائط ملفات الوسائط الخاصة بك (المستخدمة للارتباطات الرمزية)",
     "loadError": "فشل تحميل التكوين",
@@ -2007,13 +2007,13 @@
     "explainSymlinksTitle": "الروابط الرمزية",
     "explainSymlinksIntro": "يقوم بإنشاء روابط رمزية تشير إلى ملفات الوسائط الأصلية الخاصة بك. تشغيل أسرع، نفس الجودة.",
     "requiresLabel": "يتطلب:",
-    "explainSymlinksRequires": "يجب أن يصل كل من Aperture وخادم الوسائط الخاص بك إلى نفس مسارات نظام الملفات.",
+    "explainSymlinksRequires": "يجب أن يصل كل من {{appName}} وخادم الوسائط الخاص بك إلى نفس مسارات نظام الملفات.",
     "explainStrmTitle": "ملفات STRM",
     "explainStrmIntro": "ينشئ ملفات .strm تحتوي على مسارات أو عناوين URL متدفقة. يعمل في كافة تكوينات الشبكة.",
     "bestForLabel": "الأفضل لـ:",
     "explainStrmBestFor": "إعدادات Docker، أو الأجهزة المختلفة، أو عندما تختلف المسارات بين الأنظمة.",
     "symlinkWarningTitle": "مهم:",
-    "symlinkWarningBody": "تتطلب الروابط الرمزية أن يتمكن Aperture من الوصول إلى ملفات الوسائط الخاصة بك بنفس المسارات التي يستخدمها خادم الوسائط الخاص بك. إذا كنت تقوم بتشغيل Aperture في Docker، فتأكد من تطابق وحدات التخزين.",
+    "symlinkWarningBody": "تتطلب الروابط الرمزية أن يتمكن {{appName}} من الوصول إلى ملفات الوسائط الخاصة بك بنفس المسارات التي يستخدمها خادم الوسائط الخاص بك. إذا كنت تقوم بتشغيل {{appName}} في Docker، فتأكد من تطابق وحدات التخزين.",
     "saving": "توفير…",
     "saveChanges": "حفظ التغييرات"
   },
@@ -2045,7 +2045,7 @@
   },
   "settingsAiSetup": {
     "pageTitle": "تكوين مزود الذكاء الاصطناعي",
-    "pageSubtitle": "قم بتكوين موفري الذكاء الاصطناعي لميزات مختلفة. توصي Aperture باستخدام OpenAI لجميع الوظائف الأربع، ولكن لا تتردد في استكشاف موفري الخدمة والنماذج الأخرى.",
+    "pageSubtitle": "قم بتكوين موفري الذكاء الاصطناعي لميزات مختلفة. توصي {{appName}} باستخدام OpenAI لجميع الوظائف الأربع، ولكن لا تتردد في استكشاف موفري الخدمة والنماذج الأخرى.",
     "cardEmbeddingsTitle": "التضمين",
     "cardEmbeddingsDesc": "تحويل النص إلى ناقلات للبحث الدلالي والتوصيات. أبعاد أعلى = جودة أفضل.",
     "cardChatTitle": "مساعد الدردشة",
@@ -2074,7 +2074,7 @@
     "saved": "تم حفظ إعدادات شرح الذكاء الاصطناعي!",
     "unknownError": "خطأ غير معروف",
     "title": "شرح الذكاء الاصطناعي في التوصيات",
-    "subtitle": "التحكم في ظهور التفسيرات التي تم إنشاؤها بواسطة الذكاء الاصطناعي (\"لماذا اختارت Aperture هذا لك\") في أوصاف التوصيات",
+    "subtitle": "التحكم في ظهور التفسيرات التي تم إنشاؤها بواسطة الذكاء الاصطناعي (\"لماذا اختارت {{appName}} هذا لك\") في أوصاف التوصيات",
     "includeTitle": "تضمين تفسيرات الذكاء الاصطناعي",
     "includeDesc": "عند التمكين، تتضمن كل توصية شرحًا مخصصًا لسبب اختيارها",
     "overrideTitle": "السماح بالتجاوزات لكل مستخدم",
@@ -2495,9 +2495,9 @@
     "stepScoringP2": "Your taste profile then applies boosts on top: franchises you keep coming back to, genres you've asked for more of, and any custom interests you've added are pushed up the list.",
     "subtitle": "How your AI recommendations are made",
     "stepSimilar": "Related Titles",
-    "stepWelcomeP1": "<0>Aperture</0> builds a personal recommendation list for both movies and TV series, learning from what you actually watch and rate.",
+    "stepWelcomeP1": "<0>{{appName}}</0> builds a personal recommendation list for both movies and TV series, learning from what you actually watch and rate.",
     "stepWelcomeP2": "It reads your library, watch history and ratings from your Emby or Jellyfin server. The list is rebuilt on a schedule, and the refresh button on this page regenerates it on demand.",
-    "stepHowAiP1": "Aperture uses <0>AI embeddings</0> to understand titles at a deep level:",
+    "stepHowAiP1": "{{appName}} uses <0>AI embeddings</0> to understand titles at a deep level:",
     "stepHowAiLi1": "<0>Semantic understanding:</0> Every movie and series becomes a vector — a long list of numbers capturing its themes, tone, genre and style.",
     "stepHowAiLi2": "<0>Taste profile:</0> Your watch history, ratings and favorites are combined into a single \"taste fingerprint\".",
     "stepHowAiLi3": "<0>Vector similarity:</0> Candidates are found by how close they sit to that fingerprint, not by matching genre labels.",
@@ -2513,7 +2513,7 @@
     "stepSimilarP1": "Open any movie or series and you'll find <0>Related titles</0>, powered by the same embeddings.",
     "stepSimilarP2": "These aren't just titles in the same genre — they're ones that share:",
     "stepSimilarP3": "So \"Inception\" leads to other mind-bending films that share its cerebral nature, not just other Christopher Nolan movies. The Explore page turns the same connections into a graph you can wander through, and the AI assistant searches them in plain language.",
-    "stepDataP1": "Aperture syncs with your media server to work out what you like:",
+    "stepDataP1": "{{appName}} syncs with your media server to work out what you like:",
     "stepDataLi1": "<0>Watch history:</0> what you've watched, how often, and how recently",
     "stepDataLi2": "<0>Ratings and favorites:</0> the ratings you give here and the favorites you set on your server both feed the profile, and a low rating can keep a title out of the list entirely",
     "stepDataLi3": "<0>Recency:</0> recent watches count for more than older ones",
@@ -2522,7 +2522,7 @@
   "explorationConfig": {
     "title": "ميزة جديدة: الاستكشاف بالذكاء الاصطناعي",
     "subtitle": "قم بتكوين الذكاء الاصطناعي المخصص لصفحة الاستكشاف",
-    "bodyP1": "تدعم Aperture الآن <0>موفر Exploration AI</0> المخصص لإنشاء الرسم البياني الدلالي لصفحة الاستكشاف.",
+    "bodyP1": "تدعم {{appName}} الآن <0>موفر Exploration AI</0> المخصص لإنشاء الرسم البياني الدلالي لصفحة الاستكشاف.",
     "feature1Title": "الفهم المفاهيمي",
     "feature1Body": "استخدم نموذجًا أكثر فعالية لفهم طلبات البحث مثل \"الأفلام الكوميدية التي تبعث على الشعور بالسعادة\" أو \"الخيال العلمي المذهل\"",
     "feature2Title": "اتصالات أفضل للرسم البياني",
@@ -2845,8 +2845,8 @@
     "episodesProgressFull": "{{شاهدت}} / {{الإجمالي}} حلقة",
     "episodesShort": "{{شاهدت}}/{{الإجمالي}} الحلقة",
     "confirmTitle": "وضع علامة \"غير مراقب\"؟",
-    "confirmMovieBody": "سيؤدي هذا إلى وضع علامة على \"{{title}}\" على أنه لم تتم مشاهدته في خادم الوسائط الخاص بك وإزالته من سجل المشاهدة الخاص بـ Aperture.",
-    "confirmSeriesBody": "سيؤدي هذا إلى وضع علامة على جميع حلقات \"{{title}}\" على أنها لم تتم مشاهدتها في خادم الوسائط الخاص بك وإزالتها من سجل المشاهدة في Aperture.",
+    "confirmMovieBody": "سيؤدي هذا إلى وضع علامة على \"{{title}}\" على أنه لم تتم مشاهدته في خادم الوسائط الخاص بك وإزالته من سجل المشاهدة الخاص بـ {{appName}}.",
+    "confirmSeriesBody": "سيؤدي هذا إلى وضع علامة على جميع حلقات \"{{title}}\" على أنها لم تتم مشاهدتها في خادم الوسائط الخاص بك وإزالتها من سجل المشاهدة في {{appName}}.",
     "cannotUndo": "لا يمكن التراجع عن هذا الإجراء.",
     "markUnwatched": "مارك غير مراقب",
     "marking": "وضع علامة…",
@@ -3003,9 +3003,9 @@
       }
     },
     "page": {
-      "brandName": "Aperture",
+      "brandName": "{{appName}}",
       "exitWizardTooltip": "الخروج من معالج الإعداد",
-      "altLogo": "Aperture"
+      "altLogo": "{{appName}}"
     },
     "initialJobs": {
       "syncMovies": {
@@ -3041,11 +3041,11 @@
         "description": "إنشاء توصيات مسلسلات تلفزيونية مخصصة لكل مستخدم"
       },
       "syncMovieLibraries": {
-        "name": "بناء مكتبات أفلام Aperture",
+        "name": "بناء مكتبات أفلام {{appName}}",
         "description": "إنشاء مكتبات أفلام توصيات AI في خادم الوسائط الخاص بك"
       },
       "syncSeriesLibraries": {
-        "name": "بناء مكتبات سلسلة Aperture",
+        "name": "بناء مكتبات سلسلة {{appName}}",
         "description": "إنشاء مكتبات سلسلة توصيات AI في خادم الوسائط الخاص بك"
       },
       "refreshTopPicks": {
@@ -3070,14 +3070,14 @@
     "mediaServer": {
       "tagline": "اكتشاف المفضلة لديك المقبل. في كل مرة.",
       "title": "قم بتوصيل خادم الوسائط الخاص بك",
-      "subtitle": "تتكامل Aperture مع خادم Emby أو Jellyfin الخاص بك لتحليل عادات المشاهدة وإنشاء توصيات مخصصة.",
+      "subtitle": "تتكامل {{appName}} مع خادم Emby أو Jellyfin الخاص بك لتحليل عادات المشاهدة وإنشاء توصيات مخصصة.",
       "connectedTitle": "خادم الوسائط متصل",
       "apiKeyLabel": "مفتاح واجهة برمجة التطبيقات:",
       "connectedTo": "متصل بـ {{name}}!",
       "connectedFallback": "خادم الوسائط",
       "reconfigure": "الاتصال بخادم مختلف",
-      "needApiKeyShort": "هل تحتاج إلى مفتاح API؟ في لوحة تحكم خادم الوسائط، انتقل إلى الإعدادات → مفاتيح API وقم بإنشاء مفتاح جديد لـ Aperture.",
-      "needApiKeyLong": "هل تحتاج إلى مفتاح API؟ في لوحة تحكم خادم الوسائط، انتقل إلى الإعدادات → مفاتيح API وقم بإنشاء مفتاح جديد لـ Aperture. يتيح ذلك الوصول الآمن للقراءة فقط إلى البيانات الوصفية لمكتبتك وسجل المشاهدة.",
+      "needApiKeyShort": "هل تحتاج إلى مفتاح API؟ في لوحة تحكم خادم الوسائط، انتقل إلى الإعدادات → مفاتيح API وقم بإنشاء مفتاح جديد لـ {{appName}}.",
+      "needApiKeyLong": "هل تحتاج إلى مفتاح API؟ في لوحة تحكم خادم الوسائط، انتقل إلى الإعدادات → مفاتيح API وقم بإنشاء مفتاح جديد لـ {{appName}}. يتيح ذلك الوصول الآمن للقراءة فقط إلى البيانات الوصفية لمكتبتك وسجل المشاهدة.",
       "discoverScanning": "مسح…",
       "discoverServers": "اكتشف الخوادم",
       "discoverScanningNetwork": "جارٍ فحص الشبكة…",
@@ -3098,15 +3098,15 @@
       "passwordlessLabel": "السماح بتسجيل الدخول بدون كلمة مرور",
       "passwordlessHelper": "قم بتمكين هذا إذا لم يكن لدى مستخدمي خادم الوسائط الخاص بك كلمات مرور معينة",
       "securityWarningTitle": "تحذير أمني",
-      "securityWarningBody": "قم بتمكين هذا فقط إذا كان مثيل Aperture الخاص بك موجودًا على شبكة خاصة دون التعرض للإنترنت. إذا كان من الممكن الوصول إلى الخادم الخاص بك عبر الوكيل العكسي أو الإنترنت، فاترك هذا معطلاً لمنع الوصول غير المصرح به.",
+      "securityWarningBody": "قم بتمكين هذا فقط إذا كان مثيل {{appName}} الخاص بك موجودًا على شبكة خاصة دون التعرض للإنترنت. إذا كان من الممكن الوصول إلى الخادم الخاص بك عبر الوكيل العكسي أو الإنترنت، فاترك هذا معطلاً لمنع الوصول غير المصرح به.",
       "continue": "يكمل",
       "saveContinue": "حفظ ومتابعة",
       "noServersInfo": "لم يتم العثور على خوادم"
     },
     "libraries": {
       "title": "حدد المكتبات للتحليل",
-      "body": "اختر مكتبات الوسائط التي يجب أن تتضمنها Aperture عند إنشاء التوصيات. سيتم تحليل المحتوى من المكتبات الممكّنة فقط لعرض الأنماط وإدراجه في الاقتراحات المدعومة بالذكاء الاصطناعي. يمكنك تمكين مكتبات متعددة من كل نوع.",
-      "whatNext": "ماذا سيحدث بعد ذلك: ستقوم Aperture بمزامنة البيانات الوصفية من هذه المكتبات، وتحليل أوجه التشابه في المحتوى باستخدام تضمينات الذكاء الاصطناعي، وتتبع سجل المشاهدة لفهم تفضيلات كل مستخدم.",
+      "body": "اختر مكتبات الوسائط التي يجب أن تتضمنها {{appName}} عند إنشاء التوصيات. سيتم تحليل المحتوى من المكتبات الممكّنة فقط لعرض الأنماط وإدراجه في الاقتراحات المدعومة بالذكاء الاصطناعي. يمكنك تمكين مكتبات متعددة من كل نوع.",
+      "whatNext": "ماذا سيحدث بعد ذلك: ستقوم {{appName}} بمزامنة البيانات الوصفية من هذه المكتبات، وتحليل أوجه التشابه في المحتوى باستخدام تضمينات الذكاء الاصطناعي، وتتبع سجل المشاهدة لفهم تفضيلات كل مستخدم.",
       "refresh": "تحديث المكتبات",
       "enableAll": "تمكين الكل",
       "disableAll": "تعطيل الكل",
@@ -3119,7 +3119,7 @@
     },
     "validate": {
       "title": "التحقق من صحة الإعداد",
-      "subtitle": "التحقق من أن Aperture يمكنه الوصول إلى جميع المسارات المطلوبة ومن إمكانية الوصول إلى خادم الوسائط الخاص بك.",
+      "subtitle": "التحقق من أن {{appName}} يمكنه الوصول إلى جميع المسارات المطلوبة ومن إمكانية الوصول إلى خادم الوسائط الخاص بك.",
       "running": "جارٍ إجراء عمليات التحقق من الصحة…",
       "errorPrefix": "خطأ:",
       "allPassed": "مرت جميع الشيكات! الإعداد الخاص بك جاهز للبدء.",
@@ -3131,7 +3131,7 @@
     },
     "restore": {
       "title": "استعادة من النسخة الاحتياطية",
-      "subtitle": "إذا كان لديك نسخة احتياطية سابقة لـ Aperture، فيمكنك استعادتها هنا. يعد هذا مفيدًا عند الترحيل إلى خادم جديد أو التعافي من الفشل.",
+      "subtitle": "إذا كان لديك نسخة احتياطية سابقة لـ {{appName}}، فيمكنك استعادتها هنا. يعد هذا مفيدًا عند الترحيل إلى خادم جديد أو التعافي من الفشل.",
       "errLoad": "فشل في تحميل النسخ الاحتياطية المتاحة",
       "errUpload": "فشل تحميل النسخة الاحتياطية",
       "errRestore": "فشل في استعادة النسخة الاحتياطية",
@@ -3146,7 +3146,7 @@
       "startFreshBody": "إعداد الفتحة من الصفر. هذا هو الخيار الموصى به لعمليات التثبيت الجديدة.",
       "continueSetup": "متابعة الإعداد",
       "restoreCardTitle": "استعادة من النسخة الاحتياطية",
-      "restoreCardBody": "قم باستعادة جميع بياناتك من تثبيت Aperture سابق.",
+      "restoreCardBody": "قم باستعادة جميع بياناتك من تثبيت {{appName}} سابق.",
       "uploading": "جارٍ التحميل...",
       "uploadBackupFile": "تحميل ملف النسخ الاحتياطي",
       "availableBackups": "النسخ الاحتياطية المتاحة ({{count}})",
@@ -3181,18 +3181,18 @@
       "setupCompleteFallback": "اكتمل الإعداد.",
       "manageUsersLink": "إدارة المستخدمين في المسؤول → المستخدمين",
       "back": "خلف",
-      "bodyParagraph": "اختر المستخدمين الذين يجب أن يتلقوا توصيات الذكاء الاصطناعي المخصصة. لكل مستخدم، يمكنك تمكين التوصيات للأفلام أو المسلسلات التلفزيونية أو كليهما. تقوم Aperture بتحليل سجل المشاهدة لكل مستخدم على حدة لإنشاء اقتراحات مخصصة تظهر في مكتبات التوصيات الشخصية الخاصة بهم.",
+      "bodyParagraph": "اختر المستخدمين الذين يجب أن يتلقوا توصيات الذكاء الاصطناعي المخصصة. لكل مستخدم، يمكنك تمكين التوصيات للأفلام أو المسلسلات التلفزيونية أو كليهما. تقوم {{appName}} بتحليل سجل المشاهدة لكل مستخدم على حدة لإنشاء اقتراحات مخصصة تظهر في مكتبات التوصيات الشخصية الخاصة بهم.",
       "noUsersWarning": "لم يتم العثور على مستخدمين على خادم الوسائط الخاص بك. يرجى التأكد من أن خادم الوسائط الخاص بك يحتوي على حسابات مستخدمين نشطة، ثم انقر فوق زر التحديث لإعادة تحميل القائمة.",
       "adminSectionTitle": "المستخدمون الإداريون ({{count}})",
-      "adminInfoCaption": "تم تمكين المستخدمين الإداريين تلقائيًا للتأكد من أنه يمكنك تسجيل الدخول وإدارة Aperture. يجب أن يظل مشرف واحد على الأقل ممكّنًا للحفاظ على إمكانية الوصول إلى لوحة تحكم المشرف.",
+      "adminInfoCaption": "تم تمكين المستخدمين الإداريين تلقائيًا للتأكد من أنه يمكنك تسجيل الدخول وإدارة {{appName}}. يجب أن يظل مشرف واحد على الأقل ممكّنًا للحفاظ على إمكانية الوصول إلى لوحة تحكم المشرف.",
       "otherUsersTitle": "مستخدمون آخرون ({{count}})",
       "otherUsersCaption": "قم بتمكين التوصيات لأفراد العائلة أو المستخدمين الآخرين على خادم الوسائط الخاص بك. سيحصل كل مستخدم ممكّن على توصياته المخصصة بناءً على سجل المشاهدة الخاص به.",
-      "noteWarning": "لن يتلقى المستخدمون الذين تم تعطيل كل من الأفلام والمسلسلات أي توصيات ولن يتمكنوا من تسجيل الدخول إلى Aperture. يمكنك دائمًا تغيير هذه الإعدادات لاحقًا في المسؤول → المستخدمون.",
+      "noteWarning": "لن يتلقى المستخدمون الذين تم تعطيل كل من الأفلام والمسلسلات أي توصيات ولن يتمكنوا من تسجيل الدخول إلى {{appName}}. يمكنك دائمًا تغيير هذه الإعدادات لاحقًا في المسؤول → المستخدمون.",
       "paginationRange": "{{من}}-{{إلى}} من {{count}}"
     },
     "complete": {
       "title": "اكتمل الإعداد!",
-      "subtitle": "قامت Aperture بإنشاء مكتبات توصيات مخصصة في خادم الوسائط الخاص بك.",
+      "subtitle": "قامت {{appName}} بإنشاء مكتبات توصيات مخصصة في خادم الوسائط الخاص بك.",
       "issuesAlert": "تم تخطي بعض المستخدمين أو واجهوا مشكلات. يحتاج المستخدمون إلى سجل المشاهدة حتى يتم إنشاء التوصيات. سوف يتلقون توصيات بعد مشاهدة المزيد من المحتوى وتشغيل المزامنة التالية.",
       "librariesCreatedIn": "المكتبات التي تم إنشاؤها في {{name}}",
       "mediaServerFallback": "خادم الوسائط",
@@ -3211,9 +3211,9 @@
       "loginPrimary": "قم بتسجيل الدخول باستخدام بيانات اعتماد مسؤول Media Server الخاص بك",
       "loginSecondary": "استخدم نفس اسم المستخدم وكلمة المرور اللذين تستخدمهما لـ Emby/Jellyfin",
       "openServerPrimary": "افتح خادم الوسائط الخاص بك لرؤية المكتبات الجديدة",
-      "openServerSecondary": "ستظهر مكتبات \"AI Picks\" الجديدة لكل مستخدم ممكّن في Aperture",
+      "openServerSecondary": "ستظهر مكتبات \"AI Picks\" الجديدة لكل مستخدم ممكّن في {{appName}}",
       "schedulesTitle": "الجداول التلقائية",
-      "schedulesIntro": "تقوم Aperture بتشغيل وظائف الخلفية للحفاظ على التوصيات متجددة. يمكن تعديل الجداول الافتراضية في المسؤول → الوظائف.",
+      "schedulesIntro": "تقوم {{appName}} بتشغيل وظائف الخلفية للحفاظ على التوصيات متجددة. يمكن تعديل الجداول الافتراضية في المسؤول → الوظائف.",
       "schedWatchHistory": "شاهد التاريخ",
       "schedWatchHistoryDesc": "كل ساعتين — يتتبع ما يشاهده المستخدمون",
       "schedLibraryScan": "مسح المكتبة",
@@ -3257,7 +3257,7 @@
       "itemsProcessed": "{{عدد}} عنصر",
       "errorPrefix": "خطأ:",
       "title": "تهيئة مكتبتك",
-      "body": "ستقوم Aperture الآن بمزامنة مكتبة الوسائط الخاصة بك، وتحليل المحتوى باستخدام الذكاء الاصطناعي، وإنشاء توصيات مخصصة. تتم هذه العملية عبر عدة خطوات وقد تستغرق بضع دقائق حسب حجم مكتبتك.",
+      "body": "ستقوم {{appName}} الآن بمزامنة مكتبة الوسائط الخاصة بك، وتحليل المحتوى باستخدام الذكاء الاصطناعي، وإنشاء توصيات مخصصة. تتم هذه العملية عبر عدة خطوات وقد تستغرق بضع دقائق حسب حجم مكتبتك.",
       "whatHappensTitle": "ماذا يحدث أثناء التهيئة:",
       "bulletSyncMedia": "مزامنة الوسائط - استيراد البيانات التعريفية للأفلام والمسلسلات التلفزيونية من خادم الوسائط الخاص بك",
       "bulletWatchHistory": "مزامنة سجل المشاهدة - قم باستيراد سجل العرض لفهم التفضيلات",
@@ -3296,7 +3296,7 @@
       "noteAdvanced": "يمكن تخصيص الإعدادات المتقدمة مثل أوزان خوارزمية الشعبية والنوافذ الزمنية وجداول التحديث لاحقًا في المسؤول → الإعدادات → أفضل الاختيارات.",
       "noteLabel": "ملحوظة:",
       "outputConfig": "تكوين الإخراج",
-      "symlinkWarning": "تتطلب الروابط الرمزية أن يتمكن Aperture من الوصول إلى ملفات الوسائط الخاصة بك بنفس المسارات التي يستخدمها خادم الوسائط الخاص بك. إذا كانت المسارات تختلف بين الأنظمة (على سبيل المثال، حاويات Docker)، فاستخدم ملفات STRM بدلاً من ذلك.",
+      "symlinkWarning": "تتطلب الروابط الرمزية أن يتمكن {{appName}} من الوصول إلى ملفات الوسائط الخاصة بك بنفس المسارات التي يستخدمها خادم الوسائط الخاص بك. إذا كانت المسارات تختلف بين الأنظمة (على سبيل المثال، حاويات Docker)، فاستخدم ملفات STRM بدلاً من ذلك.",
       "symlinkLabel": "الروابط الرمزية",
       "back": "خلف",
       "saveContinue": "حفظ ومتابعة",
@@ -3305,10 +3305,10 @@
     },
     "fileLocations": {
       "title": "مواقع الملفات",
-      "body": "قم بتكوين المكان الذي يرى فيه خادم الوسائط الخاص بك ملفات مكتبة Aperture. يجب أن تتطابق هذه المسارات مع كيفية وصول خادم الوسائط إلى وحدات التخزين المثبتة في تكوين Docker الخاص بك.",
+      "body": "قم بتكوين المكان الذي يرى فيه خادم الوسائط الخاص بك ملفات مكتبة {{appName}}. يجب أن تتطابق هذه المسارات مع كيفية وصول خادم الوسائط إلى وحدات التخزين المثبتة في تكوين Docker الخاص بك.",
       "saved": "تم حفظ مواقع الملفات!",
       "autoDetectTitle": "الكشف التلقائي عن المسارات",
-      "autoDetectBody": "يمكن لـ Aperture اكتشاف المسارات الصحيحة تلقائيًا من خلال مقارنة كيفية رؤية خادم الوسائط للملفات مع كيفية رؤية Aperture لها.",
+      "autoDetectBody": "يمكن لـ {{appName}} اكتشاف المسارات الصحيحة تلقائيًا من خلال مقارنة كيفية رؤية خادم الوسائط للملفات مع كيفية رؤية {{appName}} لها.",
       "detecting": "جارٍ الكشف...",
       "detectButton": "كشف المسارات تلقائيا",
       "pathsDetected": "تم اكتشاف المسارات بنجاح!",
@@ -3320,7 +3320,7 @@
       "howToFindTitle": "كيفية العثور على هذه المسارات:",
       "howToFindBody": "افتح أي فيلم في خادم الوسائط الخاص بك، وانتقل إلى معلومات الوسائط، وانظر إلى مسار الملف. إذا كان يعرض /mnt/Movies/SomeMovie/file.mkv، فإن بادئة مسار الوسائط الخاصة بك هي /mnt/.",
       "apertureLibsPath": "مسار مكتبات الفتحة",
-      "apertureLibsHelp": "أين يرى خادم الوسائط الخاص بك مكتبات إخراج Aperture؟",
+      "apertureLibsHelp": "أين يرى خادم الوسائط الخاص بك مكتبات إخراج {{appName}}؟",
       "helperApertureLibs": "المسار الذي يرى فيه خادم الوسائط الخاص بك /aperture-libraries",
       "mediaPrefixTitle": "بادئة مسار خادم الوسائط",
       "mediaPrefixHelp": "أين يرى خادم الوسائط الخاص بك ملفات الوسائط الأصلية؟",
@@ -3336,8 +3336,8 @@
     },
     "aiRecs": {
       "title": "تكوين مكتبات توصيات الذكاء الاصطناعي",
-      "body": "تقوم Aperture بإنشاء مكتبات افتراضية في خادم الوسائط الخاص بك تحتوي على توصيات مخصصة لكل مستخدم. قم بتكوين كيفية إنشاء هذه المكتبات وتخصيص صور الغلاف الخاصة بها بشكل اختياري.",
-      "strmVsSymlink": "STRM مقابل Symlinks: تعمل ملفات STRM عالميًا وتدعم عناوين URL المتدفقة، بينما توفر Symlinks وصولاً مباشرًا إلى الملفات (أفضل للتشغيل المحلي) ولكنها تتطلب Aperture للوصول إلى ملفات الوسائط الخاصة بك بنفس المسارات مثل خادم الوسائط الخاص بك. بالنسبة للمسلسلات التلفزيونية، يوصى باستخدام الارتباطات الرمزية للحصول على أداء أفضل.",
+      "body": "تقوم {{appName}} بإنشاء مكتبات افتراضية في خادم الوسائط الخاص بك تحتوي على توصيات مخصصة لكل مستخدم. قم بتكوين كيفية إنشاء هذه المكتبات وتخصيص صور الغلاف الخاصة بها بشكل اختياري.",
+      "strmVsSymlink": "STRM مقابل Symlinks: تعمل ملفات STRM عالميًا وتدعم عناوين URL المتدفقة، بينما توفر Symlinks وصولاً مباشرًا إلى الملفات (أفضل للتشغيل المحلي) ولكنها تتطلب {{appName}} للوصول إلى ملفات الوسائط الخاصة بك بنفس المسارات مثل خادم الوسائط الخاص بك. بالنسبة للمسلسلات التلفزيونية، يوصى باستخدام الارتباطات الرمزية للحصول على أداء أفضل.",
       "moviesLibrary": "مكتبة الأفلام",
       "seriesLibrary": "مكتبة المسلسلات",
       "imageSet": "مجموعة الصور",
@@ -3374,8 +3374,8 @@
       "needKeyLink": "platform.openai.com/api-keys",
       "needKeyBeforeLink": "يزور",
       "needKeyAfterLink": "لإنشاء واحدة. تحصل الحسابات الجديدة على أرصدة مجانية بقيمة 5 دولارات. تكاليف الاستخدام النموذجية ~ 0.10-0.50 دولار شهريًا.",
-      "bodyLead": "تستخدم Aperture الذكاء الاصطناعي لتشغيل محرك التوصيات الخاص بها. قم بتكوين موفري الذكاء الاصطناعي أدناه.",
-      "bodyBold": "توصي Aperture باستخدام OpenAI",
+      "bodyLead": "تستخدم {{appName}} الذكاء الاصطناعي لتشغيل محرك التوصيات الخاص بها. قم بتكوين موفري الذكاء الاصطناعي أدناه.",
+      "bodyBold": "توصي {{appName}} باستخدام OpenAI",
       "bodyTail": "للحصول على أفضل تجربة، ولكن يمكنك استكشاف مقدمي خدمات آخرين بما في ذلك النماذج المحلية."
     }
   },
@@ -3519,7 +3519,7 @@
       "playlist": "قائمة التشغيل",
       "symlinks": "الروابط الرمزية",
       "strmFiles": "ملفات STRM",
-      "symlinkWarning": "تتطلب <strong>الروابط الرمزية</strong> أن يتمكن Aperture من الوصول إلى ملفات الوسائط الخاصة بك بنفس المسارات التي يستخدمها خادم الوسائط لديك. إذا كانت المسارات تختلف بين الأنظمة (على سبيل المثال، حاويات Docker)، فاستخدم ملفات STRM بدلاً من ذلك."
+      "symlinkWarning": "تتطلب <strong>الروابط الرمزية</strong> أن يتمكن {{appName}} من الوصول إلى ملفات الوسائط الخاصة بك بنفس المسارات التي يستخدمها خادم الوسائط لديك. إذا كانت المسارات تختلف بين الأنظمة (على سبيل المثال، حاويات Docker)، فاستخدم ملفات STRM بدلاً من ذلك."
     },
     "localAlgorithm": {
       "title": "خوارزمية الشعبية المحلية",
@@ -3532,7 +3532,7 @@
     "autoRequest": {
       "title": "الطلب التلقائي للمحتوى المفقود",
       "subtitle": "طلب محتوى Top Picks المفقود تلقائيًا من خلال Seerr. يعمل فقط مع المصادر الخارجية (TMDB، MDBList).",
-      "infoLine1": "عند التمكين، ستقوم Aperture بفحص قائمة أفضل الاختيارات الخاصة بك بشكل دوري بحثًا عن العناصر غير الموجودة في مكتبتك وإرسال الطلبات تلقائيًا إلى Seerr.",
+      "infoLine1": "عند التمكين، ستقوم {{appName}} بفحص قائمة أفضل الاختيارات الخاصة بك بشكل دوري بحثًا عن العناصر غير الموجودة في مكتبتك وإرسال الطلبات تلقائيًا إلى Seerr.",
       "infoLine2": "تأكد من تكوين Seerr في <1>الإعدادات → عمليات التكامل</1>.",
       "moviesSection": "أفلام",
       "seriesSection": "مسلسل",
@@ -3623,7 +3623,7 @@
     },
     "posterRepair": {
       "title": "إصلاح الملصق المفقود",
-      "description": "قم بمسح مكتبة Emby الخاصة بك بحثًا عن الأفلام والمسلسلات التي تحتوي على صور الملصقات المفقودة. تقوم هذه الأداة بإحضار الملصقات البديلة من TMDB وتحميلها مباشرةً إلى Emby — ولا يتم تخزين أي صور في Aperture.",
+      "description": "قم بمسح مكتبة Emby الخاصة بك بحثًا عن الأفلام والمسلسلات التي تحتوي على صور الملصقات المفقودة. تقوم هذه الأداة بإحضار الملصقات البديلة من TMDB وتحميلها مباشرةً إلى Emby — ولا يتم تخزين أي صور في {{appName}}.",
       "scan": "البحث عن الملصقات المفقودة",
       "scanning": "مسح...",
       "repairSelected": "إصلاح {{count}} تم التحديد",
@@ -4141,7 +4141,7 @@
     "rateLimitedToday": "{{count}} rate-limited today",
     "rateLimitedToday_plural": "{{count}} rate-limited today",
     "paused": "{{slot}} is paused until {{time}} — Google turned it away for going over quota.",
-    "caveat": "Counted per Aperture request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
+    "caveat": "Counted per {{appName}} request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
     "slotPrimary": "Main key",
     "slotFallback": "Fallback key"
   },
@@ -4215,16 +4215,16 @@
     "setupLocalOnly": "Local network only",
     "setupAnywhere": "Reachable from anywhere",
     "allClear": "No problems detected with how this instance is exposed.",
-    "restartNote": "These are read from environment variables at startup. Change them in your compose file or service definition and restart Aperture.",
+    "restartNote": "These are read from environment variables at startup. Change them in your compose file or service definition and restart {{appName}}.",
     "findings": {
       "proxyHeadersIgnored": {
-        "title": "A proxy is forwarding requests, but Aperture is ignoring it",
+        "title": "A proxy is forwarding requests, but {{appName}} is ignoring it",
         "detail": "Requests are arriving with an X-Forwarded-For header while TRUST_PROXY is unset, so every visitor appears to come from the same address. The login rate limiter collapses into one shared bucket — a single attacker can exhaust it for everyone — and first-run setup treats remote visitors as local.",
         "fix": "TRUST_PROXY=127.0.0.1   # or your proxy container address, e.g. 172.18.0.1"
       },
       "allTrafficOneAddress": {
         "title": "Every request so far has come from the same local address",
-        "detail": "Normal for a single-machine LAN install. If a reverse proxy or tunnel sits in front of Aperture, this instead means its forwarded client IPs are being discarded.",
+        "detail": "Normal for a single-machine LAN install. If a reverse proxy or tunnel sits in front of {{appName}}, this instead means its forwarded client IPs are being discarded.",
         "fix": "TRUST_PROXY=127.0.0.1   # only if a proxy or tunnel is in front"
       },
       "proxyModeWithoutTrust": {
@@ -4239,7 +4239,7 @@
       },
       "boundToAllInterfaces": {
         "title": "Also reachable directly, bypassing the proxy",
-        "detail": "A proxy is expected in front, but Aperture is listening on every network interface. Anyone who can reach its port directly skips the proxy entirely — including any access control the proxy enforces.",
+        "detail": "A proxy is expected in front, but {{appName}} is listening on every network interface. Anyone who can reach its port directly skips the proxy entirely — including any access control the proxy enforces.",
         "fix": "HOST=127.0.0.1   # only when the proxy runs on this same host"
       },
       "cookieInsecure": {
@@ -4269,7 +4269,7 @@
       }
     },
     "trustedProxiesTitle": "Trusted proxies",
-    "trustedProxiesHelp": "Addresses allowed to tell Aperture who the real visitor is via X-Forwarded-For. Set this to your reverse proxy or tunnel, never to a public range — anything listed here can claim any client IP it likes.",
+    "trustedProxiesHelp": "Addresses allowed to tell {{appName}} who the real visitor is via X-Forwarded-For. Set this to your reverse proxy or tunnel, never to a public range — anything listed here can claim any client IP it likes.",
     "trustedProxiesFormat": "Comma-separated IP addresses or CIDR ranges. Also accepts loopback, linklocal and uniquelocal.",
     "presets": "Presets:",
     "presetTunnel": "Tunnel on this host",
@@ -4278,12 +4278,23 @@
     "savedApplied": "Saved. Real client IPs are in use from the next request.",
     "saveFailed": "Could not save trusted proxies.",
     "envManaged": "Trusted proxies are set by the TRUST_PROXY environment variable, so they cannot be edited here. Remove it from your compose file to manage them from this page.",
-    "detectedTitle": "Aperture can see what is forwarding to it",
-    "detectedBody": "Requests are reaching Aperture from {{addresses}}, carrying a forwarded visitor address. If that is your tunnel or reverse proxy — for Cloudflare Tunnel it is cloudflared — trust it and Aperture will start using real visitor addresses immediately.",
+    "detectedTitle": "{{appName}} can see what is forwarding to it",
+    "detectedBody": "Requests are reaching {{appName}} from {{addresses}}, carrying a forwarded visitor address. If that is your tunnel or reverse proxy — for Cloudflare Tunnel it is cloudflared — trust it and {{appName}} will start using real visitor addresses immediately.",
     "detectedAction": "Trust {{addresses}}",
     "unsaved": "Not saved yet — click Save to apply this.",
     "viaDirect": "Direct connection",
     "viaProxy": "A proxy or tunnel",
     "viaProxyNamed": "A proxy or tunnel ({{addresses}})"
+  },
+  "settingsBranding": {
+    "title": "Instance name",
+    "subtitle": "The name shown throughout the app — in the sidebar, the browser tab, the sign-in page, and anywhere the interface refers to itself.",
+    "label": "Name",
+    "helper": "Up to {{max}} characters. Leave it blank to go back to the default.",
+    "reset": "Reset to {{name}}",
+    "saved": "Instance name updated",
+    "fetchFailed": "Failed to load the instance name",
+    "saveFailed": "Failed to save the instance name",
+    "unknownError": "Something went wrong"
   }
 }

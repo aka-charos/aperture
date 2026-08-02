@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Aperture",
+    "appName": "{{appName}}",
     "save": "保存",
     "saving": "正在保存…",
     "loading": "加载中…",
@@ -212,7 +212,7 @@
       "aiOverrideColTooltip": "允许用户控制自己的 AI 说明偏好",
       "disabledOnServer": "在媒体服务器上已禁用",
       "activeStatus": "已启用",
-      "importedTooltip": "已导入到 Aperture 的用户",
+      "importedTooltip": "已导入到 {{appName}} 的用户",
       "notImportedTooltip": "尚未导入",
       "discoverToggleOn": "关闭发现推荐",
       "discoverToggleOff": "开启发现推荐",
@@ -255,7 +255,7 @@
           "description": "电影相关的机器学习任务"
         },
         "movieLib": {
-          "title": "Aperture 媒体库",
+          "title": "{{appName}} 媒体库",
           "description": "在媒体服务器中构建 AI 推荐库"
         },
         "seriesSync": {
@@ -267,7 +267,7 @@
           "description": "电视剧相关的机器学习任务"
         },
         "seriesLib": {
-          "title": "Aperture 媒体库",
+          "title": "{{appName}} 媒体库",
           "description": "在媒体服务器中构建 AI 推荐库"
         },
         "globalMeta": {
@@ -288,8 +288,8 @@
         }
       },
       "jobNames": {
-        "syncMovieLibraries": "构建 Aperture 电影库",
-        "syncSeriesLibraries": "构建 Aperture 剧集库",
+        "syncMovieLibraries": "构建 {{appName}} 电影库",
+        "syncSeriesLibraries": "构建 {{appName}} 剧集库",
         "fullResetMovieRecommendations": "完全重置电影推荐",
         "fullResetSeriesRecommendations": "完全重置剧集推荐"
       },
@@ -436,7 +436,7 @@
       "discoveryAccessUpdated": "发现访问权限已更新！",
       "discoveryRequestUpdated": "发现请求权限已更新！",
       "watchHistoryTitle": "观看历史管理",
-      "watchHistoryBody": "允许此用户将电影和剧集标记为未观看。将同时更新媒体服务器（Emby/Jellyfin）与 Aperture 数据库。",
+      "watchHistoryBody": "允许此用户将电影和剧集标记为未观看。将同时更新媒体服务器（Emby/Jellyfin）与 {{appName}} 数据库。",
       "watchHistoryToggleTitle": "允许管理观看历史",
       "watchHistoryToggleHint": "用户可在观看历史页与详情页将条目标为未观看",
       "discoveryTitle": "发现权限",
@@ -535,7 +535,7 @@
     "aiExplanationTitle": "AI解释偏好",
     "aiExplanationSubtitle": "选择是否在推荐描述中包含 AI 生成的解释。",
     "aiExplanationIncludeTitle": "包括人工智能解释",
-    "aiExplanationIncludeBody": "启用后，每条建议都包含“为什么 Aperture 为您选择了这个”",
+    "aiExplanationIncludeBody": "启用后，每条建议都包含“为什么 {{appName}} 为您选择了这个”",
     "aiExplanationReset": "重置为默认值 ({{state}})",
     "stateEnabled": "启用",
     "stateDisabled": "残疾人",
@@ -572,7 +572,7 @@
     "traktSyncing": "正在同步...",
     "traktDisconnect": "断开",
     "traktConnect": "连接到 Trakt",
-    "traktFooter": "同步会将您的 Trakt 评分 (1-10) 导入为 Aperture 中的心率评分。 评分较高的内容将对您的推荐产生更大的影响。",
+    "traktFooter": "同步会将您的 Trakt 评分 (1-10) 导入为 {{appName}} 中的心率评分。 评分较高的内容将对您的推荐产生更大的影响。",
     "errLoadUserSettings": "无法加载用户设置",
     "errConnectServer": "无法连接到服务器",
     "libraryNamesSaved": "库名称已保存！ 它们将用于未来的库更新。",
@@ -983,7 +983,7 @@
       "noTrailer": "没有找到拖车",
       "failedTrailer": "无法加载拖车",
       "confirmUnwatchedTitle": "标记为未观看？",
-      "confirmUnwatchedBody": "这会在您的媒体服务器中将“{{title}}”标记为未观看，并将其从 Aperture 观看历史记录中删除。",
+      "confirmUnwatchedBody": "这会在您的媒体服务器中将“{{title}}”标记为未观看，并将其从 {{appName}} 观看历史记录中删除。",
       "cannotUndo": "此操作无法撤消。",
       "marking": "标记…",
       "snackbarMarked": "电影标记为未观看",
@@ -1638,7 +1638,7 @@
     "errReset": "重置失败",
     "successReset": "算法设置重置为默认值",
     "masterTitle": "自定义算法权重",
-    "masterSubtitle": "微调 Aperture 为您生成推荐的方式。 禁用后，将使用管理员配置的默认值。",
+    "masterSubtitle": "微调 {{appName}} 为您生成推荐的方式。 禁用后，将使用管理员配置的默认值。",
     "labelUsingCustomWeights": "使用自定义权重",
     "labelUsingDefaultWeights": "使用默认权重",
     "descCustomActive": "您的个性化算法设置已激活",
@@ -1707,7 +1707,7 @@
   "settingsApiKeys": {
     "title": "API 密钥",
     "createButton": "创建 API 密钥",
-    "subtitle": "API 密钥允许以编程方式访问 Aperture API。 密钥在创建时仅显示一次。",
+    "subtitle": "API 密钥允许以编程方式访问 {{appName}} API。 密钥在创建时仅显示一次。",
     "empty": "未找到 API 密钥。 创建您的第一个 API 密钥以启用编程访问。",
     "colName": "姓名",
     "colPrefix": "按键前缀",
@@ -1936,7 +1936,7 @@
     "allowPasswordlessLogin": "允许无密码登录",
     "allowPasswordlessHelper": "如果您的媒体服务器用户没有设置密码，请启用此功能",
     "securityWarningTitle": "安全警告",
-    "securityWarningBody": "仅当您的 Aperture 实例位于不暴露于互联网的专用网络上时才启用此功能。 如果您的服务器可通过反向代理或互联网访问，请将其禁用以防止未经授权的访问。",
+    "securityWarningBody": "仅当您的 {{appName}} 实例位于不暴露于互联网的专用网络上时才启用此功能。 如果您的服务器可通过反向代理或互联网访问，请将其禁用以防止未经授权的访问。",
     "passwordlessEnabled": "启用无密码登录",
     "passwordlessDisabled": "无密码登录已禁用",
     "displayName": "Server Display Name",
@@ -1949,15 +1949,15 @@
   },
   "settingsFileLocations": {
     "title": "文件位置",
-    "subtitle": "配置媒体服务器查看 Aperture 库和媒体文件的位置",
+    "subtitle": "配置媒体服务器查看 {{appName}} 库和媒体文件的位置",
     "detectPaths": "自动检测路径",
     "detecting": "检测…",
-    "detectCaption": "通过将媒体服务器文件与 Aperture 的安装进行比较来自动检测路径",
+    "detectCaption": "通过将媒体服务器文件与 {{appName}} 的安装进行比较来自动检测路径",
     "detectedMapping": "检测到的路径映射：",
     "mediaServerSample": "媒体服务器：",
     "apertureSample": "光圈：",
-    "apertureLibrariesPath": "Aperture 库路径",
-    "apertureLibrariesHelper": "您的媒体服务器在其中查看 Aperture 的输出（在 Aperture 中安装为 /aperture-libraries 的文件夹）",
+    "apertureLibrariesPath": "{{appName}} 库路径",
+    "apertureLibrariesHelper": "您的媒体服务器在其中查看 {{appName}} 的输出（在 {{appName}} 中安装为 /aperture-libraries 的文件夹）",
     "mediaServerPathPrefix": "媒体服务器路径前缀",
     "mediaServerPathPrefixHelper": "媒体服务器查看媒体文件的基本路径（用于符号链接）",
     "loadError": "加载配置失败",
@@ -2007,13 +2007,13 @@
     "explainSymlinksTitle": "符号链接",
     "explainSymlinksIntro": "创建指向原始媒体文件的符号链接。 播放速度更快，质量相同。",
     "requiresLabel": "要求：",
-    "explainSymlinksRequires": "Aperture 和您的媒体服务器必须访问相同的文件系统路径。",
+    "explainSymlinksRequires": "{{appName}} 和您的媒体服务器必须访问相同的文件系统路径。",
     "explainStrmTitle": "STRM 文件",
     "explainStrmIntro": "创建包含路径或流 URL 的 .strm 文件。 适用于所有网络配置。",
     "bestForLabel": "最适合：",
     "explainStrmBestFor": "Docker 设置、不同的机器或系统之间的路径不同时。",
     "symlinkWarningTitle": "重要的：",
-    "symlinkWarningBody": "符号链接要求 Aperture 可以通过与媒体服务器使用的完全相同的路径访问您的媒体文件。 如果您在 Docker 中运行 Aperture，请确保卷安装匹配。",
+    "symlinkWarningBody": "符号链接要求 {{appName}} 可以通过与媒体服务器使用的完全相同的路径访问您的媒体文件。 如果您在 Docker 中运行 {{appName}}，请确保卷安装匹配。",
     "saving": "保存…",
     "saveChanges": "保存更改"
   },
@@ -2045,7 +2045,7 @@
   },
   "settingsAiSetup": {
     "pageTitle": "AI提供商配置",
-    "pageSubtitle": "为不同的功能配置 AI 提供程序。 Aperture 建议使用 OpenAI 来实现所有四种功能，但请随意探索其他提供商和模型。",
+    "pageSubtitle": "为不同的功能配置 AI 提供程序。 {{appName}} 建议使用 OpenAI 来实现所有四种功能，但请随意探索其他提供商和模型。",
     "cardEmbeddingsTitle": "嵌入",
     "cardEmbeddingsDesc": "将文本转换为向量以进行语义搜索和推荐。 更高的尺寸=更好的质量。",
     "cardChatTitle": "聊天助手",
@@ -2074,7 +2074,7 @@
     "saved": "AI解释设置已保存！",
     "unknownError": "未知错误",
     "title": "推荐中的AI解释",
-    "subtitle": "控制 AI 生成的解释（“为什么 Aperture 为您选择这个”）是否出现在推荐描述中",
+    "subtitle": "控制 AI 生成的解释（“为什么 {{appName}} 为您选择这个”）是否出现在推荐描述中",
     "includeTitle": "包括人工智能解释",
     "includeDesc": "启用后，每个推荐都会包含对其选择原因的个性化解释",
     "overrideTitle": "允许每用户覆盖",
@@ -2495,9 +2495,9 @@
     "stepScoringP2": "Your taste profile then applies boosts on top: franchises you keep coming back to, genres you've asked for more of, and any custom interests you've added are pushed up the list.",
     "subtitle": "How your AI recommendations are made",
     "stepSimilar": "Related Titles",
-    "stepWelcomeP1": "<0>Aperture</0> builds a personal recommendation list for both movies and TV series, learning from what you actually watch and rate.",
+    "stepWelcomeP1": "<0>{{appName}}</0> builds a personal recommendation list for both movies and TV series, learning from what you actually watch and rate.",
     "stepWelcomeP2": "It reads your library, watch history and ratings from your Emby or Jellyfin server. The list is rebuilt on a schedule, and the refresh button on this page regenerates it on demand.",
-    "stepHowAiP1": "Aperture uses <0>AI embeddings</0> to understand titles at a deep level:",
+    "stepHowAiP1": "{{appName}} uses <0>AI embeddings</0> to understand titles at a deep level:",
     "stepHowAiLi1": "<0>Semantic understanding:</0> Every movie and series becomes a vector — a long list of numbers capturing its themes, tone, genre and style.",
     "stepHowAiLi2": "<0>Taste profile:</0> Your watch history, ratings and favorites are combined into a single \"taste fingerprint\".",
     "stepHowAiLi3": "<0>Vector similarity:</0> Candidates are found by how close they sit to that fingerprint, not by matching genre labels.",
@@ -2513,7 +2513,7 @@
     "stepSimilarP1": "Open any movie or series and you'll find <0>Related titles</0>, powered by the same embeddings.",
     "stepSimilarP2": "These aren't just titles in the same genre — they're ones that share:",
     "stepSimilarP3": "So \"Inception\" leads to other mind-bending films that share its cerebral nature, not just other Christopher Nolan movies. The Explore page turns the same connections into a graph you can wander through, and the AI assistant searches them in plain language.",
-    "stepDataP1": "Aperture syncs with your media server to work out what you like:",
+    "stepDataP1": "{{appName}} syncs with your media server to work out what you like:",
     "stepDataLi1": "<0>Watch history:</0> what you've watched, how often, and how recently",
     "stepDataLi2": "<0>Ratings and favorites:</0> the ratings you give here and the favorites you set on your server both feed the profile, and a low rating can keep a title out of the list entirely",
     "stepDataLi3": "<0>Recency:</0> recent watches count for more than older ones",
@@ -2522,7 +2522,7 @@
   "explorationConfig": {
     "title": "新功能：探索人工智能",
     "subtitle": "为探索页面配置专用AI",
-    "bodyP1": "Aperture 现在支持专门的<0>Exploration AI 提供程序</0>来生成“探索”页面的语义图。",
+    "bodyP1": "{{appName}} 现在支持专门的<0>Exploration AI 提供程序</0>来生成“探索”页面的语义图。",
     "feature1Title": "概念理解",
     "feature1Body": "使用更强大的模型来理解“感觉良好的喜剧”或“令人费解的科幻小说”等查询",
     "feature2Title": "更好的图形连接",
@@ -2543,12 +2543,12 @@
       "generate-recommendations": "生成建议",
       "full-reset-movie-recommendations": "完全重置电影推荐",
       "full-reset-series-recommendations": "全面重置系列推荐",
-      "sync-movie-libraries": "构建 Aperture 电影库",
+      "sync-movie-libraries": "构建 {{appName}} 电影库",
       "sync-series": "同步系列",
       "generate-series-embeddings": "生成系列嵌入",
       "sync-series-watch-history": "同步系列观看历史",
       "generate-series-recommendations": "生成系列推荐",
-      "sync-series-libraries": "构建 Aperture 系列库",
+      "sync-series-libraries": "构建 {{appName}} 系列库",
       "refresh-top-picks": "令人耳目一新的热门精选",
       "auto-request-top-picks": "自动请求热门精选"
     },
@@ -2845,8 +2845,8 @@
     "episodesProgressFull": "{{观看}} / {{总计}} 集",
     "episodesShort": "{{观看}}/{{总计}} eps",
     "confirmTitle": "标记为未观看？",
-    "confirmMovieBody": "这会在您的媒体服务器中将“{{title}}”标记为未观看，并将其从 Aperture 观看历史记录中删除。",
-    "confirmSeriesBody": "这会将“{{title}}”的所有剧集在您的媒体服务器中标记为未观看，并将其从您的 Aperture 观看历史记录中删除。",
+    "confirmMovieBody": "这会在您的媒体服务器中将“{{title}}”标记为未观看，并将其从 {{appName}} 观看历史记录中删除。",
+    "confirmSeriesBody": "这会将“{{title}}”的所有剧集在您的媒体服务器中标记为未观看，并将其从您的 {{appName}} 观看历史记录中删除。",
     "cannotUndo": "此操作无法撤消。",
     "markUnwatched": "马克未受关注",
     "marking": "标记…",
@@ -3003,9 +3003,9 @@
       }
     },
     "page": {
-      "brandName": "Aperture",
+      "brandName": "{{appName}}",
       "exitWizardTooltip": "退出设置向导",
-      "altLogo": "Aperture"
+      "altLogo": "{{appName}}"
     },
     "initialJobs": {
       "syncMovies": {
@@ -3041,11 +3041,11 @@
         "description": "为每个用户创建个性化的电视剧推荐"
       },
       "syncMovieLibraries": {
-        "name": "构建 Aperture 电影库",
+        "name": "构建 {{appName}} 电影库",
         "description": "在媒体服务器中创建人工智能推荐电影库"
       },
       "syncSeriesLibraries": {
-        "name": "构建 Aperture 系列库",
+        "name": "构建 {{appName}} 系列库",
         "description": "在媒体服务器中创建人工智能推荐系列库"
       },
       "refreshTopPicks": {
@@ -3070,14 +3070,14 @@
     "mediaServer": {
       "tagline": "发现您的下一个最爱。 每次。",
       "title": "连接您的媒体服务器",
-      "subtitle": "Aperture 与 Emby 或 Jellyfin 服务器集成，可分析观看习惯并生成个性化推荐。",
+      "subtitle": "{{appName}} 与 Emby 或 Jellyfin 服务器集成，可分析观看习惯并生成个性化推荐。",
       "connectedTitle": "媒体服务器已连接",
       "apiKeyLabel": "API 密钥：",
       "connectedTo": "已连接至 {{name}}！",
       "connectedFallback": "媒体服务器",
       "reconfigure": "连接到不同的服务器",
-      "needApiKeyShort": "需要 API 密钥吗？ 在媒体服务器仪表板中，转至设置 → API 密钥并为 Aperture 创建新密钥。",
-      "needApiKeyLong": "需要 API 密钥吗？ 在媒体服务器仪表板中，转至设置 → API 密钥并为 Aperture 创建新密钥。 这允许对您的图书馆元数据和观看历史记录进行安全的只读访问。",
+      "needApiKeyShort": "需要 API 密钥吗？ 在媒体服务器仪表板中，转至设置 → API 密钥并为 {{appName}} 创建新密钥。",
+      "needApiKeyLong": "需要 API 密钥吗？ 在媒体服务器仪表板中，转至设置 → API 密钥并为 {{appName}} 创建新密钥。 这允许对您的图书馆元数据和观看历史记录进行安全的只读访问。",
       "discoverScanning": "扫描…",
       "discoverServers": "发现服务器",
       "discoverScanningNetwork": "扫描网络...",
@@ -3098,15 +3098,15 @@
       "passwordlessLabel": "允许无密码登录",
       "passwordlessHelper": "如果您的媒体服务器用户没有设置密码，请启用此功能",
       "securityWarningTitle": "安全警告",
-      "securityWarningBody": "仅当您的 Aperture 实例位于不暴露于互联网的专用网络上时才启用此功能。 如果您的服务器可通过反向代理或互联网访问，请将其禁用以防止未经授权的访问。",
+      "securityWarningBody": "仅当您的 {{appName}} 实例位于不暴露于互联网的专用网络上时才启用此功能。 如果您的服务器可通过反向代理或互联网访问，请将其禁用以防止未经授权的访问。",
       "continue": "继续",
       "saveContinue": "保存并继续",
       "noServersInfo": "未找到服务器"
     },
     "libraries": {
       "title": "选择要分析的库",
-      "body": "选择 Aperture 在生成推荐时应包含的媒体库。 仅分析启用的库中的内容的观看模式并包含在人工智能支持的建议中。 您可以启用每种类型的多个库。",
-      "whatNext": "接下来会发生什么：Aperture 将同步这些库中的元数据，使用 AI 嵌入分析内容相似性，并跟踪观看历史记录以了解每个用户的偏好。",
+      "body": "选择 {{appName}} 在生成推荐时应包含的媒体库。 仅分析启用的库中的内容的观看模式并包含在人工智能支持的建议中。 您可以启用每种类型的多个库。",
+      "whatNext": "接下来会发生什么：{{appName}} 将同步这些库中的元数据，使用 AI 嵌入分析内容相似性，并跟踪观看历史记录以了解每个用户的偏好。",
       "refresh": "刷新库",
       "enableAll": "全部启用",
       "disableAll": "全部禁用",
@@ -3119,7 +3119,7 @@
     },
     "validate": {
       "title": "验证设置",
-      "subtitle": "检查 Aperture 是否可以访问所有必需的路径并且您的媒体服务器是否可以访问。",
+      "subtitle": "检查 {{appName}} 是否可以访问所有必需的路径并且您的媒体服务器是否可以访问。",
       "running": "运行验证检查...",
       "errorPrefix": "错误：",
       "allPassed": "所有检查均通过！ 您的设置已准备就绪。",
@@ -3131,7 +3131,7 @@
     },
     "restore": {
       "title": "从备份恢复",
-      "subtitle": "如果您有以前的 Aperture 备份，可以在此处恢复。 这在迁移到新服务器或从故障中恢复时非常有用。",
+      "subtitle": "如果您有以前的 {{appName}} 备份，可以在此处恢复。 这在迁移到新服务器或从故障中恢复时非常有用。",
       "errLoad": "无法加载可用备份",
       "errUpload": "上传备份失败",
       "errRestore": "恢复备份失败",
@@ -3143,10 +3143,10 @@
       "uploadBackup": "上传备份",
       "errLoadGeneric": "无法加载备份",
       "startFreshTitle": "重新开始",
-      "startFreshBody": "从头开始设置 Aperture。 这是新安装的推荐选项。",
+      "startFreshBody": "从头开始设置 {{appName}}。 这是新安装的推荐选项。",
       "continueSetup": "继续设置",
       "restoreCardTitle": "从备份恢复",
-      "restoreCardBody": "恢复之前安装的 Aperture 中的所有数据。",
+      "restoreCardBody": "恢复之前安装的 {{appName}} 中的所有数据。",
       "uploading": "正在上传...",
       "uploadBackupFile": "上传备份文件",
       "availableBackups": "可用备份 ({{count}})",
@@ -3181,18 +3181,18 @@
       "setupCompleteFallback": "设置完成。",
       "manageUsersLink": "在“管理”→“用户”中管理用户",
       "back": "后退",
-      "bodyParagraph": "选择哪些用户应该收到个性化的人工智能推荐。 对于每个用户，您可以启用电影、电视剧或两者的推荐。 Aperture 单独分析每个用户的观看历史记录，生成量身定制的建议，并显示在他们的个人推荐库中。",
+      "bodyParagraph": "选择哪些用户应该收到个性化的人工智能推荐。 对于每个用户，您可以启用电影、电视剧或两者的推荐。 {{appName}} 单独分析每个用户的观看历史记录，生成量身定制的建议，并显示在他们的个人推荐库中。",
       "noUsersWarning": "在您的媒体服务器上找不到用户。 请确保您的媒体服务器具有活动用户帐户，然后单击刷新按钮重新加载列表。",
       "adminSectionTitle": "管理员用户 ({{count}})",
-      "adminInfoCaption": "管理员用户已自动启用，以确保您可以登录和管理 Aperture。 至少一名管理员必须保持启用状态才能维持对管理仪表板的访问。",
+      "adminInfoCaption": "管理员用户已自动启用，以确保您可以登录和管理 {{appName}}。 至少一名管理员必须保持启用状态才能维持对管理仪表板的访问。",
       "otherUsersTitle": "其他用户 ({{count}})",
       "otherUsersCaption": "启用对媒体服务器上的家庭成员或其他用户的推荐。 每个启用的用户都将根据其观看历史记录获得自己的个性化推荐。",
-      "noteWarning": "禁用电影和连续剧的用户将不会收到任何推荐，也无法登录 Aperture。 您稍后可以随时在“管理”→“用户”中更改这些设置。",
+      "noteWarning": "禁用电影和连续剧的用户将不会收到任何推荐，也无法登录 {{appName}}。 您稍后可以随时在“管理”→“用户”中更改这些设置。",
       "paginationRange": "{{从}}-{{到}}，共 {{count}} 个"
     },
     "complete": {
       "title": "设置完成！",
-      "subtitle": "Aperture 已在您的媒体服务器中创建了个性化推荐库。",
+      "subtitle": "{{appName}} 已在您的媒体服务器中创建了个性化推荐库。",
       "issuesAlert": "一些用户被跳过或遇到问题。 用户需要观看历史记录才能生成推荐。 他们将在观看更多内容并运行下一次同步后收到推荐。",
       "librariesCreatedIn": "在 {{name}} 创建的库",
       "mediaServerFallback": "媒体服务器",
@@ -3211,9 +3211,9 @@
       "loginPrimary": "使用您的媒体服务器管理员凭据登录",
       "loginSecondary": "使用与 Emby/Jellyfin 相同的用户名和密码",
       "openServerPrimary": "打开您的媒体服务器以查看新库",
-      "openServerSecondary": "新的“AI Picks”库将为 Aperture 中的每个启用的用户显示",
+      "openServerSecondary": "新的“AI Picks”库将为 {{appName}} 中的每个启用的用户显示",
       "schedulesTitle": "自动时间表",
-      "schedulesIntro": "Aperture 运行后台作业以保持推荐的新鲜度。 可以在管理 → 作业中修改默认计划。",
+      "schedulesIntro": "{{appName}} 运行后台作业以保持推荐的新鲜度。 可以在管理 → 作业中修改默认计划。",
       "schedWatchHistory": "观看历史",
       "schedWatchHistoryDesc": "每 2 小时 — 跟踪用户正在观看的内容",
       "schedLibraryScan": "图书馆扫描",
@@ -3236,7 +3236,7 @@
       "featUserPrefsDesc": "每个用户都可以自定义他们的推荐偏好和设置",
       "backToJobs": "返回职位",
       "finishSetup": "完成设置",
-      "finishHint": "单击“完成”将禁用公共设置向导、保护 Aperture 并重定向到登录。"
+      "finishHint": "单击“完成”将禁用公共设置向导、保护 {{appName}} 并重定向到登录。"
     },
     "initialJobsStep": {
       "newLibraryChip": "新图书馆",
@@ -3257,7 +3257,7 @@
       "itemsProcessed": "{{count}} 件",
       "errorPrefix": "错误：",
       "title": "初始化你的库",
-      "body": "Aperture 现在将同步您的媒体库、使用 AI 分析内容并生成个性化推荐。 此过程需要执行几个步骤，并且可能需要几分钟时间，具体取决于您的库大小。",
+      "body": "{{appName}} 现在将同步您的媒体库、使用 AI 分析内容并生成个性化推荐。 此过程需要执行几个步骤，并且可能需要几分钟时间，具体取决于您的库大小。",
       "whatHappensTitle": "初始化期间会发生什么：",
       "bulletSyncMedia": "同步媒体 — 从媒体服务器导入电影和电视剧元数据",
       "bulletWatchHistory": "同步观看历史记录 — 导入观看历史记录以了解偏好",
@@ -3296,7 +3296,7 @@
       "noteAdvanced": "高级设置（例如流行度算法权重、时间窗口和刷新计划）可以稍后在管理 → 设置 → 热门精选中进行自定义。",
       "noteLabel": "笔记：",
       "outputConfig": "输出配置",
-      "symlinkWarning": "符号链接要求 Aperture 可以通过与媒体服务器使用的完全相同的路径访问您的媒体文件。 如果系统（例如 Docker 容器）之间的路径不同，请改用 STRM 文件。",
+      "symlinkWarning": "符号链接要求 {{appName}} 可以通过与媒体服务器使用的完全相同的路径访问您的媒体文件。 如果系统（例如 Docker 容器）之间的路径不同，请改用 STRM 文件。",
       "symlinkLabel": "符号链接",
       "back": "后退",
       "saveContinue": "保存并继续",
@@ -3305,10 +3305,10 @@
     },
     "fileLocations": {
       "title": "文件位置",
-      "body": "配置媒体服务器查看 Aperture 库文件的位置。 这些路径必须与您的媒体服务器访问 Docker 配置中安装的卷的方式匹配。",
+      "body": "配置媒体服务器查看 {{appName}} 库文件的位置。 这些路径必须与您的媒体服务器访问 Docker 配置中安装的卷的方式匹配。",
       "saved": "文件位置已保存！",
       "autoDetectTitle": "自动检测路径",
-      "autoDetectBody": "Aperture 可以通过比较媒体服务器查看文件的方式与 Aperture 查看文件的方式来自动检测正确的路径。",
+      "autoDetectBody": "{{appName}} 可以通过比较媒体服务器查看文件的方式与 {{appName}} 查看文件的方式来自动检测正确的路径。",
       "detecting": "检测...",
       "detectButton": "自动检测路径",
       "pathsDetected": "路径检测成功！",
@@ -3319,8 +3319,8 @@
       "orManual": "或者手动配置",
       "howToFindTitle": "如何找到这些路径：",
       "howToFindBody": "打开媒体服务器中的任何电影，转到媒体信息，然后查看文件路径。 如果显示 /mnt/Movies/SomeMovie/file.mkv，则您的媒体路径前缀是 /mnt/。",
-      "apertureLibsPath": "Aperture 库路径",
-      "apertureLibsHelp": "您的媒体服务器在哪里查看 Aperture 的输出库？",
+      "apertureLibsPath": "{{appName}} 库路径",
+      "apertureLibsHelp": "您的媒体服务器在哪里查看 {{appName}} 的输出库？",
       "helperApertureLibs": "媒体服务器看到 /aperture-libraries 的路径",
       "mediaPrefixTitle": "媒体服务器路径前缀",
       "mediaPrefixHelp": "您的媒体服务器在哪里看到您的原始媒体文件？",
@@ -3336,8 +3336,8 @@
     },
     "aiRecs": {
       "title": "配置AI推荐库",
-      "body": "Aperture 在您的媒体服务器中创建虚拟库，其中包含针对每个用户的个性化推荐。 配置这些库的创建方式，并可选择自定义其封面图像。",
-      "strmVsSymlink": "STRM 与符号链接：STRM 文件通用并支持流 URL，而符号链接提供直接文件访问（更适合本地播放），但要求 Aperture 在与媒体服务器相同的路径中访问媒体文件。 对于电视剧，建议使用符号链接以获得更好的性能。",
+      "body": "{{appName}} 在您的媒体服务器中创建虚拟库，其中包含针对每个用户的个性化推荐。 配置这些库的创建方式，并可选择自定义其封面图像。",
+      "strmVsSymlink": "STRM 与符号链接：STRM 文件通用并支持流 URL，而符号链接提供直接文件访问（更适合本地播放），但要求 {{appName}} 在与媒体服务器相同的路径中访问媒体文件。 对于电视剧，建议使用符号链接以获得更好的性能。",
       "moviesLibrary": "电影库",
       "seriesLibrary": "系列库",
       "imageSet": "图像集",
@@ -3374,8 +3374,8 @@
       "needKeyLink": "platform.openai.com/api-keys",
       "needKeyBeforeLink": "访问",
       "needKeyAfterLink": "创建一个。 新帐户可获得 5 美元的免费积分。 典型使用成本约为每月 0.10-0.50 美元。",
-      "bodyLead": "Aperture 使用人工智能为其推荐引擎提供动力。 在下面配置您的 AI 提供商。",
-      "bodyBold": "Aperture 建议使用 OpenAI",
+      "bodyLead": "{{appName}} 使用人工智能为其推荐引擎提供动力。 在下面配置您的 AI 提供商。",
+      "bodyBold": "{{appName}} 建议使用 OpenAI",
       "bodyTail": "为了获得最佳体验，但您可以探索其他提供商，包括本地模型。"
     }
   },
@@ -3519,7 +3519,7 @@
       "playlist": "播放列表",
       "symlinks": "符号链接",
       "strmFiles": "STRM 文件",
-      "symlinkWarning": "<strong>符号链接</strong>要求 Aperture 可以通过与媒体服务器使用的完全相同的路径访问您的媒体文件。 如果系统（例如 Docker 容器）之间的路径不同，请改用 STRM 文件。"
+      "symlinkWarning": "<strong>符号链接</strong>要求 {{appName}} 可以通过与媒体服务器使用的完全相同的路径访问您的媒体文件。 如果系统（例如 Docker 容器）之间的路径不同，请改用 STRM 文件。"
     },
     "localAlgorithm": {
       "title": "本地流行度算法",
@@ -3532,7 +3532,7 @@
     "autoRequest": {
       "title": "自动请求缺失的内容",
       "subtitle": "通过 Seerr 自动请求缺失的热门精选内容。 仅适用于外部源（TMDB、MDBList）。",
-      "infoLine1": "启用后，Aperture 将定期检查您的首选列表中是否有不在您的库中的项目，并自动向 Seerr 提交请求。",
+      "infoLine1": "启用后，{{appName}} 将定期检查您的首选列表中是否有不在您的库中的项目，并自动向 Seerr 提交请求。",
       "infoLine2": "确保在<1>设置→集成</1>中配置了 Seerr。",
       "moviesSection": "电影",
       "seriesSection": "系列",
@@ -3623,7 +3623,7 @@
     },
     "posterRepair": {
       "title": "缺失的海报修复",
-      "description": "扫描您的 Emby 库，查找缺少海报图像的电影和连续剧。 该工具从 TMDB 获取替换海报并将其直接上传到 Emby — Aperture 中不存储任何图像。",
+      "description": "扫描您的 Emby 库，查找缺少海报图像的电影和连续剧。 该工具从 TMDB 获取替换海报并将其直接上传到 Emby — {{appName}} 中不存储任何图像。",
       "scan": "扫描丢失的海报",
       "scanning": "扫描...",
       "repairSelected": "修复已选择的 {{count}} 个",
@@ -4141,7 +4141,7 @@
     "rateLimitedToday": "{{count}} rate-limited today",
     "rateLimitedToday_plural": "{{count}} rate-limited today",
     "paused": "{{slot}} is paused until {{time}} — Google turned it away for going over quota.",
-    "caveat": "Counted per Aperture request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
+    "caveat": "Counted per {{appName}} request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
     "slotPrimary": "Main key",
     "slotFallback": "Fallback key"
   },
@@ -4215,16 +4215,16 @@
     "setupLocalOnly": "Local network only",
     "setupAnywhere": "Reachable from anywhere",
     "allClear": "No problems detected with how this instance is exposed.",
-    "restartNote": "These are read from environment variables at startup. Change them in your compose file or service definition and restart Aperture.",
+    "restartNote": "These are read from environment variables at startup. Change them in your compose file or service definition and restart {{appName}}.",
     "findings": {
       "proxyHeadersIgnored": {
-        "title": "A proxy is forwarding requests, but Aperture is ignoring it",
+        "title": "A proxy is forwarding requests, but {{appName}} is ignoring it",
         "detail": "Requests are arriving with an X-Forwarded-For header while TRUST_PROXY is unset, so every visitor appears to come from the same address. The login rate limiter collapses into one shared bucket — a single attacker can exhaust it for everyone — and first-run setup treats remote visitors as local.",
         "fix": "TRUST_PROXY=127.0.0.1   # or your proxy container address, e.g. 172.18.0.1"
       },
       "allTrafficOneAddress": {
         "title": "Every request so far has come from the same local address",
-        "detail": "Normal for a single-machine LAN install. If a reverse proxy or tunnel sits in front of Aperture, this instead means its forwarded client IPs are being discarded.",
+        "detail": "Normal for a single-machine LAN install. If a reverse proxy or tunnel sits in front of {{appName}}, this instead means its forwarded client IPs are being discarded.",
         "fix": "TRUST_PROXY=127.0.0.1   # only if a proxy or tunnel is in front"
       },
       "proxyModeWithoutTrust": {
@@ -4239,7 +4239,7 @@
       },
       "boundToAllInterfaces": {
         "title": "Also reachable directly, bypassing the proxy",
-        "detail": "A proxy is expected in front, but Aperture is listening on every network interface. Anyone who can reach its port directly skips the proxy entirely — including any access control the proxy enforces.",
+        "detail": "A proxy is expected in front, but {{appName}} is listening on every network interface. Anyone who can reach its port directly skips the proxy entirely — including any access control the proxy enforces.",
         "fix": "HOST=127.0.0.1   # only when the proxy runs on this same host"
       },
       "cookieInsecure": {
@@ -4269,7 +4269,7 @@
       }
     },
     "trustedProxiesTitle": "Trusted proxies",
-    "trustedProxiesHelp": "Addresses allowed to tell Aperture who the real visitor is via X-Forwarded-For. Set this to your reverse proxy or tunnel, never to a public range — anything listed here can claim any client IP it likes.",
+    "trustedProxiesHelp": "Addresses allowed to tell {{appName}} who the real visitor is via X-Forwarded-For. Set this to your reverse proxy or tunnel, never to a public range — anything listed here can claim any client IP it likes.",
     "trustedProxiesFormat": "Comma-separated IP addresses or CIDR ranges. Also accepts loopback, linklocal and uniquelocal.",
     "presets": "Presets:",
     "presetTunnel": "Tunnel on this host",
@@ -4278,12 +4278,23 @@
     "savedApplied": "Saved. Real client IPs are in use from the next request.",
     "saveFailed": "Could not save trusted proxies.",
     "envManaged": "Trusted proxies are set by the TRUST_PROXY environment variable, so they cannot be edited here. Remove it from your compose file to manage them from this page.",
-    "detectedTitle": "Aperture can see what is forwarding to it",
-    "detectedBody": "Requests are reaching Aperture from {{addresses}}, carrying a forwarded visitor address. If that is your tunnel or reverse proxy — for Cloudflare Tunnel it is cloudflared — trust it and Aperture will start using real visitor addresses immediately.",
+    "detectedTitle": "{{appName}} can see what is forwarding to it",
+    "detectedBody": "Requests are reaching {{appName}} from {{addresses}}, carrying a forwarded visitor address. If that is your tunnel or reverse proxy — for Cloudflare Tunnel it is cloudflared — trust it and {{appName}} will start using real visitor addresses immediately.",
     "detectedAction": "Trust {{addresses}}",
     "unsaved": "Not saved yet — click Save to apply this.",
     "viaDirect": "Direct connection",
     "viaProxy": "A proxy or tunnel",
     "viaProxyNamed": "A proxy or tunnel ({{addresses}})"
+  },
+  "settingsBranding": {
+    "title": "Instance name",
+    "subtitle": "The name shown throughout the app — in the sidebar, the browser tab, the sign-in page, and anywhere the interface refers to itself.",
+    "label": "Name",
+    "helper": "Up to {{max}} characters. Leave it blank to go back to the default.",
+    "reset": "Reset to {{name}}",
+    "saved": "Instance name updated",
+    "fetchFailed": "Failed to load the instance name",
+    "saveFailed": "Failed to save the instance name",
+    "unknownError": "Something went wrong"
   }
 }

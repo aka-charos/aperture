@@ -17,6 +17,7 @@ import AttachMoneyIcon from '@mui/icons-material/AttachMoney'
 import ExploreIcon from '@mui/icons-material/Explore'
 import SendIcon from '@mui/icons-material/Send'
 import type { JobCategory } from './types'
+import { getAppName } from '@/lib/branding'
 
 export const MOVIE_JOB_CATEGORIES: JobCategory[] = [
   {
@@ -148,17 +149,30 @@ const JOB_DISPLAY_NAME_KEYS: Record<string, string> = {
   'full-reset-series-recommendations': 'admin.jobsPage.jobNames.fullResetSeriesRecommendations',
 }
 
-const JOB_DISPLAY_NAMES_LEGACY: Record<string, string> = {
-  'sync-movie-libraries': 'Build Aperture Movie Libraries',
-  'sync-series-libraries': 'Build Aperture Series Libraries',
-  'full-reset-movie-recommendations': 'Full Reset Movie Recommendations',
-  'full-reset-series-recommendations': 'Full Reset Series Recommendations',
+// Only reached when a caller has no `t` to hand; the translated names above are
+// the normal path. A function rather than a const because the brand is fetched
+// after this module is imported — baked in at import time it would always read
+// as the default, however the instance is named.
+function legacyJobName(name: string): string | undefined {
+  switch (name) {
+    case 'sync-movie-libraries':
+      return `Build ${getAppName()} Movie Libraries`
+    case 'sync-series-libraries':
+      return `Build ${getAppName()} Series Libraries`
+    case 'full-reset-movie-recommendations':
+      return 'Full Reset Movie Recommendations'
+    case 'full-reset-series-recommendations':
+      return 'Full Reset Series Recommendations'
+    default:
+      return undefined
+  }
 }
 
 export function formatJobName(name: string, t?: TFunction): string {
   const key = JOB_DISPLAY_NAME_KEYS[name as keyof typeof JOB_DISPLAY_NAME_KEYS]
   if (t && key) return t(key)
-  if (JOB_DISPLAY_NAMES_LEGACY[name]) return JOB_DISPLAY_NAMES_LEGACY[name]
+  const legacy = legacyJobName(name)
+  if (legacy) return legacy
   return name
     .split('-')
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))

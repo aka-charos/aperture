@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Aperture",
+    "appName": "{{appName}}",
     "save": "Enregistrer",
     "saving": "Enregistrement…",
     "loading": "Chargement…",
@@ -212,7 +212,7 @@
       "aiOverrideColTooltip": "Autoriser le contrôle de la préférence d'explications IA",
       "disabledOnServer": "Désactivé sur le serveur multimédia",
       "activeStatus": "Actif",
-      "importedTooltip": "Utilisateur importé dans Aperture",
+      "importedTooltip": "Utilisateur importé dans {{appName}}",
       "notImportedTooltip": "Pas encore importé",
       "discoverToggleOn": "Désactiver les suggestions de découverte",
       "discoverToggleOff": "Activer les suggestions de découverte",
@@ -254,7 +254,7 @@
       "discoveryAccessUpdated": "Autorisation d'accès à la découverte mise à jour !",
       "discoveryRequestUpdated": "Autorisation de demandes mise à jour !",
       "watchHistoryTitle": "Gestion de l'historique",
-      "watchHistoryBody": "Permet à cet utilisateur de marquer films et séries comme non vus. Le serveur multimédia (Emby/Jellyfin) et la base Aperture seront mis à jour.",
+      "watchHistoryBody": "Permet à cet utilisateur de marquer films et séries comme non vus. Le serveur multimédia (Emby/Jellyfin) et la base {{appName}} seront mis à jour.",
       "watchHistoryToggleTitle": "Autoriser la gestion de l'historique",
       "watchHistoryToggleHint": "L'utilisateur peut marquer du contenu comme non vu depuis l'historique et les fiches",
       "discoveryTitle": "Autorisations de découverte",
@@ -331,7 +331,7 @@
           "description": "Tâches d'apprentissage automatique pour les films"
         },
         "movieLib": {
-          "title": "Bibliothèques Aperture",
+          "title": "Bibliothèques {{appName}}",
           "description": "Créer des bibliothèques de recommandation IA sur le serveur multimédia"
         },
         "seriesSync": {
@@ -343,7 +343,7 @@
           "description": "Tâches d'apprentissage automatique pour les séries"
         },
         "seriesLib": {
-          "title": "Bibliothèques Aperture",
+          "title": "Bibliothèques {{appName}}",
           "description": "Créer des bibliothèques de recommandation IA sur le serveur multimédia"
         },
         "globalMeta": {
@@ -364,8 +364,8 @@
         }
       },
       "jobNames": {
-        "syncMovieLibraries": "Construire les bibliothèques de films Aperture",
-        "syncSeriesLibraries": "Construire les bibliothèques de séries Aperture",
+        "syncMovieLibraries": "Construire les bibliothèques de films {{appName}}",
+        "syncSeriesLibraries": "Construire les bibliothèques de séries {{appName}}",
         "fullResetMovieRecommendations": "Réinitialisation complète des recommandations films",
         "fullResetSeriesRecommendations": "Réinitialisation complète des recommandations séries"
       },
@@ -545,7 +545,7 @@
       "noTrailer": "Aucune bande-annonce trouvée",
       "failedTrailer": "Échec du chargement de la remorque",
       "confirmUnwatchedTitle": "Marquer comme non surveillé ?",
-      "confirmUnwatchedBody": "Cela marquera « {{title}} » comme non regardé sur votre serveur multimédia et le supprimera de votre historique de visionnage Aperture.",
+      "confirmUnwatchedBody": "Cela marquera « {{title}} » comme non regardé sur votre serveur multimédia et le supprimera de votre historique de visionnage {{appName}}.",
       "cannotUndo": "Cette action ne peut pas être annulée.",
       "marking": "Marquage…",
       "snackbarMarked": "Film marqué comme non regardé",
@@ -863,7 +863,7 @@
     "aiExplanationTitle": "Préférence d'explication de l'IA",
     "aiExplanationSubtitle": "Choisissez si vous souhaitez inclure des explications générées par l'IA dans vos descriptions de recommandations.",
     "aiExplanationIncludeTitle": "Inclure des explications sur l'IA",
-    "aiExplanationIncludeBody": "Lorsqu'elle est activée, chaque recommandation inclut « Pourquoi Aperture a choisi cela pour vous »",
+    "aiExplanationIncludeBody": "Lorsqu'elle est activée, chaque recommandation inclut « Pourquoi {{appName}} a choisi cela pour vous »",
     "aiExplanationReset": "Réinitialiser aux valeurs par défaut ({{state}})",
     "stateEnabled": "Activé",
     "stateDisabled": "Désactivé",
@@ -900,7 +900,7 @@
     "traktSyncing": "Synchronisation…",
     "traktDisconnect": "Déconnecter",
     "traktConnect": "Connectez-vous à Trakt",
-    "traktFooter": "La synchronisation importe vos notes Trakt (1-10) en tant que notes cardiaques dans Aperture. Un contenu mieux noté aura plus d'influence sur vos recommandations.",
+    "traktFooter": "La synchronisation importe vos notes Trakt (1-10) en tant que notes cardiaques dans {{appName}}. Un contenu mieux noté aura plus d'influence sur vos recommandations.",
     "errLoadUserSettings": "Échec du chargement des paramètres utilisateur",
     "errConnectServer": "Impossible de se connecter au serveur",
     "libraryNamesSaved": "Noms de bibliothèque enregistrés ! Ils seront utilisés pour les futures mises à jour de la bibliothèque.",
@@ -1638,7 +1638,7 @@
     "errReset": "Échec de la réinitialisation",
     "successReset": "Paramètres de l'algorithme réinitialisés aux valeurs par défaut",
     "masterTitle": "Pondérations d'algorithme personnalisées",
-    "masterSubtitle": "Affinez la manière dont Aperture génère des recommandations pour vous. Lorsqu'elles sont désactivées, les valeurs par défaut configurées par l'administrateur sont utilisées.",
+    "masterSubtitle": "Affinez la manière dont {{appName}} génère des recommandations pour vous. Lorsqu'elles sont désactivées, les valeurs par défaut configurées par l'administrateur sont utilisées.",
     "labelUsingCustomWeights": "Utilisation de poids personnalisés",
     "labelUsingDefaultWeights": "Utilisation des poids par défaut",
     "descCustomActive": "Vos paramètres d'algorithme personnalisés sont actifs",
@@ -1707,7 +1707,7 @@
   "settingsApiKeys": {
     "title": "Clés API",
     "createButton": "Créer une clé API",
-    "subtitle": "Les clés API permettent un accès par programmation à l'API Aperture. Les clés ne sont affichées qu'une seule fois lors de leur création.",
+    "subtitle": "Les clés API permettent un accès par programmation à l'API {{appName}}. Les clés ne sont affichées qu'une seule fois lors de leur création.",
     "empty": "Aucune clé API trouvée. Créez votre première clé API pour activer l'accès par programmation.",
     "colName": "Nom",
     "colPrefix": "Préfixe de clé",
@@ -1936,7 +1936,7 @@
     "allowPasswordlessLogin": "Autoriser la connexion sans mot de passe",
     "allowPasswordlessHelper": "Activez cette option si les utilisateurs de votre serveur multimédia n'ont pas de mot de passe défini",
     "securityWarningTitle": "Avertissement de sécurité",
-    "securityWarningBody": "Activez cette option uniquement si votre instance Aperture se trouve sur un réseau privé sans exposition à Internet. Si votre serveur est accessible via un proxy inverse ou Internet, laissez cette option désactivée pour empêcher tout accès non autorisé.",
+    "securityWarningBody": "Activez cette option uniquement si votre instance {{appName}} se trouve sur un réseau privé sans exposition à Internet. Si votre serveur est accessible via un proxy inverse ou Internet, laissez cette option désactivée pour empêcher tout accès non autorisé.",
     "passwordlessEnabled": "Connexion sans mot de passe activée",
     "passwordlessDisabled": "Connexion sans mot de passe désactivée",
     "displayName": "Server Display Name",
@@ -1949,15 +1949,15 @@
   },
   "settingsFileLocations": {
     "title": "Emplacements des fichiers",
-    "subtitle": "Configurer l'endroit où votre serveur multimédia voit les bibliothèques et les fichiers multimédias d'Aperture",
+    "subtitle": "Configurer l'endroit où votre serveur multimédia voit les bibliothèques et les fichiers multimédias d'{{appName}}",
     "detectPaths": "Détection automatique des chemins",
     "detecting": "Détection…",
-    "detectCaption": "Détectez automatiquement les chemins en comparant les fichiers du serveur multimédia avec les montages d'Aperture",
+    "detectCaption": "Détectez automatiquement les chemins en comparant les fichiers du serveur multimédia avec les montages d'{{appName}}",
     "detectedMapping": "Mappage de chemin détecté :",
     "mediaServerSample": "Serveur multimédia :",
     "apertureSample": "Ouverture:",
     "apertureLibrariesPath": "Chemin des bibliothèques d'ouverture",
-    "apertureLibrariesHelper": "Où votre serveur multimédia voit la sortie d'Aperture (le dossier monté en tant que /aperture-libraries dans Aperture)",
+    "apertureLibrariesHelper": "Où votre serveur multimédia voit la sortie d'{{appName}} (le dossier monté en tant que /aperture-libraries dans {{appName}})",
     "mediaServerPathPrefix": "Préfixe du chemin du serveur multimédia",
     "mediaServerPathPrefixHelper": "Chemin de base où votre serveur multimédia voit vos fichiers multimédias (utilisé pour les liens symboliques)",
     "loadError": "Échec du chargement de la configuration",
@@ -2007,13 +2007,13 @@
     "explainSymlinksTitle": "Liens symboliques",
     "explainSymlinksIntro": "Crée des liens symboliques pointant vers vos fichiers multimédias d'origine. Lecture plus rapide, même qualité.",
     "requiresLabel": "Nécessite :",
-    "explainSymlinksRequires": "Aperture et votre serveur multimédia doivent accéder aux mêmes chemins de système de fichiers.",
+    "explainSymlinksRequires": "{{appName}} et votre serveur multimédia doivent accéder aux mêmes chemins de système de fichiers.",
     "explainStrmTitle": "Fichiers STRM",
     "explainStrmIntro": "Crée des fichiers .strm contenant des chemins ou des URL de streaming. Fonctionne dans toutes les configurations réseau.",
     "bestForLabel": "Idéal pour :",
     "explainStrmBestFor": "Configurations Docker, différentes machines ou lorsque les chemins diffèrent entre les systèmes.",
     "symlinkWarningTitle": "Important:",
-    "symlinkWarningBody": "Les liens symboliques nécessitent qu'Aperture puisse accéder à vos fichiers multimédias exactement par les mêmes chemins que ceux utilisés par votre serveur multimédia. Si vous exécutez Aperture dans Docker, assurez-vous que les montages de volume correspondent.",
+    "symlinkWarningBody": "Les liens symboliques nécessitent qu'{{appName}} puisse accéder à vos fichiers multimédias exactement par les mêmes chemins que ceux utilisés par votre serveur multimédia. Si vous exécutez {{appName}} dans Docker, assurez-vous que les montages de volume correspondent.",
     "saving": "Économie…",
     "saveChanges": "Enregistrer les modifications"
   },
@@ -2045,7 +2045,7 @@
   },
   "settingsAiSetup": {
     "pageTitle": "Configuration du fournisseur d'IA",
-    "pageSubtitle": "Configurez les fournisseurs d'IA pour différentes fonctionnalités. Aperture recommande d'utiliser OpenAI pour les quatre fonctions, mais n'hésitez pas à explorer d'autres fournisseurs et modèles.",
+    "pageSubtitle": "Configurez les fournisseurs d'IA pour différentes fonctionnalités. {{appName}} recommande d'utiliser OpenAI pour les quatre fonctions, mais n'hésitez pas à explorer d'autres fournisseurs et modèles.",
     "cardEmbeddingsTitle": "Intégrations",
     "cardEmbeddingsDesc": "Convertit le texte en vecteurs pour la recherche sémantique et les recommandations. Dimensions plus élevées = meilleure qualité.",
     "cardChatTitle": "Assistant de discussion",
@@ -2074,7 +2074,7 @@
     "saved": "Paramètres d'explication de l'IA enregistrés !",
     "unknownError": "Erreur inconnue",
     "title": "Explication de l'IA dans les recommandations",
-    "subtitle": "Contrôler si les explications générées par l'IA (« Pourquoi Aperture a choisi ceci pour vous ») apparaissent dans les descriptions des recommandations.",
+    "subtitle": "Contrôler si les explications générées par l'IA (« Pourquoi {{appName}} a choisi ceci pour vous ») apparaissent dans les descriptions des recommandations.",
     "includeTitle": "Inclure des explications sur l'IA",
     "includeDesc": "Lorsqu'elle est activée, chaque recommandation comprend une explication personnalisée de la raison pour laquelle elle a été sélectionnée",
     "overrideTitle": "Autoriser les remplacements par utilisateur",
@@ -2478,8 +2478,8 @@
     "threadCrashRetry": "Try again"
   },
   "welcomeModal": {
-    "title": "Bienvenue dans Aperture",
-    "stepWelcome": "Bienvenue dans Aperture",
+    "title": "Bienvenue dans {{appName}}",
+    "stepWelcome": "Bienvenue dans {{appName}}",
     "stepHowAi": "Comment fonctionnent les recommandations d'IA",
     "stepScoring": "Facteurs de notation",
     "stepData": "Vos données",
@@ -2495,9 +2495,9 @@
     "stepScoringP2": "Your taste profile then applies boosts on top: franchises you keep coming back to, genres you've asked for more of, and any custom interests you've added are pushed up the list.",
     "subtitle": "How your AI recommendations are made",
     "stepSimilar": "Related Titles",
-    "stepWelcomeP1": "<0>Aperture</0> builds a personal recommendation list for both movies and TV series, learning from what you actually watch and rate.",
+    "stepWelcomeP1": "<0>{{appName}}</0> builds a personal recommendation list for both movies and TV series, learning from what you actually watch and rate.",
     "stepWelcomeP2": "It reads your library, watch history and ratings from your Emby or Jellyfin server. The list is rebuilt on a schedule, and the refresh button on this page regenerates it on demand.",
-    "stepHowAiP1": "Aperture uses <0>AI embeddings</0> to understand titles at a deep level:",
+    "stepHowAiP1": "{{appName}} uses <0>AI embeddings</0> to understand titles at a deep level:",
     "stepHowAiLi1": "<0>Semantic understanding:</0> Every movie and series becomes a vector — a long list of numbers capturing its themes, tone, genre and style.",
     "stepHowAiLi2": "<0>Taste profile:</0> Your watch history, ratings and favorites are combined into a single \"taste fingerprint\".",
     "stepHowAiLi3": "<0>Vector similarity:</0> Candidates are found by how close they sit to that fingerprint, not by matching genre labels.",
@@ -2513,7 +2513,7 @@
     "stepSimilarP1": "Open any movie or series and you'll find <0>Related titles</0>, powered by the same embeddings.",
     "stepSimilarP2": "These aren't just titles in the same genre — they're ones that share:",
     "stepSimilarP3": "So \"Inception\" leads to other mind-bending films that share its cerebral nature, not just other Christopher Nolan movies. The Explore page turns the same connections into a graph you can wander through, and the AI assistant searches them in plain language.",
-    "stepDataP1": "Aperture syncs with your media server to work out what you like:",
+    "stepDataP1": "{{appName}} syncs with your media server to work out what you like:",
     "stepDataLi1": "<0>Watch history:</0> what you've watched, how often, and how recently",
     "stepDataLi2": "<0>Ratings and favorites:</0> the ratings you give here and the favorites you set on your server both feed the profile, and a low rating can keep a title out of the list entirely",
     "stepDataLi3": "<0>Recency:</0> recent watches count for more than older ones",
@@ -2522,7 +2522,7 @@
   "explorationConfig": {
     "title": "Nouvelle fonctionnalité : IA d'exploration",
     "subtitle": "Configurer une IA dédiée pour la page Explorer",
-    "bodyP1": "Aperture prend désormais en charge un <0>fournisseur d'IA d'exploration</0> dédié pour la génération de graphiques sémantiques de la page Explorer.",
+    "bodyP1": "{{appName}} prend désormais en charge un <0>fournisseur d'IA d'exploration</0> dédié pour la génération de graphiques sémantiques de la page Explorer.",
     "feature1Title": "Compréhension conceptuelle",
     "feature1Body": "Utilisez un modèle plus puissant pour comprendre des requêtes telles que « comédies réconfortantes » ou « science-fiction hallucinante »",
     "feature2Title": "De meilleures connexions graphiques",
@@ -2543,12 +2543,12 @@
       "generate-recommendations": "Générer des recommandations",
       "full-reset-movie-recommendations": "Recommandations de films de réinitialisation complète",
       "full-reset-series-recommendations": "Recommandations de la série de réinitialisation complète",
-      "sync-movie-libraries": "Création de bibliothèques de films à Aperture",
+      "sync-movie-libraries": "Création de bibliothèques de films à {{appName}}",
       "sync-series": "Série de synchronisation",
       "generate-series-embeddings": "Génération d'intégrations de séries",
       "sync-series-watch-history": "Synchronisation de l'historique des vidéos regardées",
       "generate-series-recommendations": "Génération de recommandations de séries",
-      "sync-series-libraries": "Création de bibliothèques de la série Aperture",
+      "sync-series-libraries": "Création de bibliothèques de la série {{appName}}",
       "refresh-top-picks": "Meilleurs choix rafraîchissants",
       "auto-request-top-picks": "Meilleurs choix de demande automatique"
     },
@@ -2845,8 +2845,8 @@
     "episodesProgressFull": "{{regardé}} / {{total}} épisodes",
     "episodesShort": "{{regardé}}/{{total}} eps",
     "confirmTitle": "Marquer comme non surveillé ?",
-    "confirmMovieBody": "Cela marquera « {{title}} » comme non regardé sur votre serveur multimédia et le supprimera de votre historique de visionnage Aperture.",
-    "confirmSeriesBody": "Cela marquera tous les épisodes de « {{title}} » comme non regardés sur votre serveur multimédia et les supprimera de votre historique de visionnage Aperture.",
+    "confirmMovieBody": "Cela marquera « {{title}} » comme non regardé sur votre serveur multimédia et le supprimera de votre historique de visionnage {{appName}}.",
+    "confirmSeriesBody": "Cela marquera tous les épisodes de « {{title}} » comme non regardés sur votre serveur multimédia et les supprimera de votre historique de visionnage {{appName}}.",
     "cannotUndo": "Cette action ne peut pas être annulée.",
     "markUnwatched": "Marquer comme non surveillé",
     "marking": "Marquage…",
@@ -3003,9 +3003,9 @@
       }
     },
     "page": {
-      "brandName": "Aperture",
+      "brandName": "{{appName}}",
       "exitWizardTooltip": "Quitter l'assistant de configuration",
-      "altLogo": "Aperture"
+      "altLogo": "{{appName}}"
     },
     "initialJobs": {
       "syncMovies": {
@@ -3041,11 +3041,11 @@
         "description": "Création de recommandations de séries télévisées personnalisées pour chaque utilisateur"
       },
       "syncMovieLibraries": {
-        "name": "Créer des bibliothèques de films Aperture",
+        "name": "Créer des bibliothèques de films {{appName}}",
         "description": "Création de bibliothèques de films de recommandation IA sur votre serveur multimédia"
       },
       "syncSeriesLibraries": {
-        "name": "Créer des bibliothèques de séries Aperture",
+        "name": "Créer des bibliothèques de séries {{appName}}",
         "description": "Création de bibliothèques de séries de recommandations AI dans votre serveur multimédia"
       },
       "refreshTopPicks": {
@@ -3070,14 +3070,14 @@
     "mediaServer": {
       "tagline": "Découvrez votre prochain favori. À chaque fois.",
       "title": "Connectez votre serveur multimédia",
-      "subtitle": "Aperture s'intègre à votre serveur Emby ou Jellyfin pour analyser les habitudes de visionnage et générer des recommandations personnalisées.",
+      "subtitle": "{{appName}} s'intègre à votre serveur Emby ou Jellyfin pour analyser les habitudes de visionnage et générer des recommandations personnalisées.",
       "connectedTitle": "Serveur multimédia connecté",
       "apiKeyLabel": "Clé API :",
       "connectedTo": "Connecté à {{name}} !",
       "connectedFallback": "serveur multimédia",
       "reconfigure": "Connectez-vous à un autre serveur",
-      "needApiKeyShort": "Besoin d'une clé API ? Dans le tableau de bord de votre serveur multimédia, accédez à Paramètres → Clés API et créez une nouvelle clé pour Aperture.",
-      "needApiKeyLong": "Besoin d'une clé API ? Dans le tableau de bord de votre serveur multimédia, accédez à Paramètres → Clés API et créez une nouvelle clé pour Aperture. Cela permet un accès sécurisé en lecture seule aux métadonnées de votre bibliothèque et à l'historique des vidéos regardées.",
+      "needApiKeyShort": "Besoin d'une clé API ? Dans le tableau de bord de votre serveur multimédia, accédez à Paramètres → Clés API et créez une nouvelle clé pour {{appName}}.",
+      "needApiKeyLong": "Besoin d'une clé API ? Dans le tableau de bord de votre serveur multimédia, accédez à Paramètres → Clés API et créez une nouvelle clé pour {{appName}}. Cela permet un accès sécurisé en lecture seule aux métadonnées de votre bibliothèque et à l'historique des vidéos regardées.",
       "discoverScanning": "Balayage…",
       "discoverServers": "Découvrez les serveurs",
       "discoverScanningNetwork": "Réseau de numérisation…",
@@ -3098,15 +3098,15 @@
       "passwordlessLabel": "Autoriser la connexion sans mot de passe",
       "passwordlessHelper": "Activez cette option si les utilisateurs de votre serveur multimédia n'ont pas de mot de passe défini",
       "securityWarningTitle": "Avertissement de sécurité",
-      "securityWarningBody": "Activez cette option uniquement si votre instance Aperture se trouve sur un réseau privé sans exposition à Internet. Si votre serveur est accessible via un proxy inverse ou Internet, laissez cette option désactivée pour empêcher tout accès non autorisé.",
+      "securityWarningBody": "Activez cette option uniquement si votre instance {{appName}} se trouve sur un réseau privé sans exposition à Internet. Si votre serveur est accessible via un proxy inverse ou Internet, laissez cette option désactivée pour empêcher tout accès non autorisé.",
       "continue": "Continuer",
       "saveContinue": "Enregistrer et continuer",
       "noServersInfo": "Aucun serveur trouvé"
     },
     "libraries": {
       "title": "Sélectionnez les bibliothèques à analyser",
-      "body": "Choisissez les bibliothèques multimédias qu’Aperture doit inclure lors de la génération de recommandations. Seul le contenu des bibliothèques activées sera analysé pour les modèles d'affichage et inclus dans les suggestions basées sur l'IA. Vous pouvez activer plusieurs bibliothèques de chaque type.",
-      "whatNext": "Que se passe-t-il ensuite : Aperture synchronisera les métadonnées de ces bibliothèques, analysera les similitudes de contenu à l'aide de l'intégration de l'IA et suivra l'historique des vidéos regardées pour comprendre les préférences de chaque utilisateur.",
+      "body": "Choisissez les bibliothèques multimédias qu’{{appName}} doit inclure lors de la génération de recommandations. Seul le contenu des bibliothèques activées sera analysé pour les modèles d'affichage et inclus dans les suggestions basées sur l'IA. Vous pouvez activer plusieurs bibliothèques de chaque type.",
+      "whatNext": "Que se passe-t-il ensuite : {{appName}} synchronisera les métadonnées de ces bibliothèques, analysera les similitudes de contenu à l'aide de l'intégration de l'IA et suivra l'historique des vidéos regardées pour comprendre les préférences de chaque utilisateur.",
       "refresh": "Actualiser les bibliothèques",
       "enableAll": "Activer tout",
       "disableAll": "Désactiver tout",
@@ -3119,7 +3119,7 @@
     },
     "validate": {
       "title": "Valider la configuration",
-      "subtitle": "Vérifiez qu'Aperture peut accéder à tous les chemins requis et que votre serveur multimédia est accessible.",
+      "subtitle": "Vérifiez qu'{{appName}} peut accéder à tous les chemins requis et que votre serveur multimédia est accessible.",
       "running": "Exécution de contrôles de validation…",
       "errorPrefix": "Erreur:",
       "allPassed": "Tous les contrôles ont été réussis ! Votre configuration est prête à fonctionner.",
@@ -3131,7 +3131,7 @@
     },
     "restore": {
       "title": "Restaurer à partir d'une sauvegarde",
-      "subtitle": "Si vous disposez d’une sauvegarde Aperture précédente, vous pouvez la restaurer ici. Ceci est utile lors de la migration vers un nouveau serveur ou de la récupération après une panne.",
+      "subtitle": "Si vous disposez d’une sauvegarde {{appName}} précédente, vous pouvez la restaurer ici. Ceci est utile lors de la migration vers un nouveau serveur ou de la récupération après une panne.",
       "errLoad": "Échec du chargement des sauvegardes disponibles",
       "errUpload": "Échec du téléchargement de la sauvegarde",
       "errRestore": "Échec de la restauration de la sauvegarde",
@@ -3143,10 +3143,10 @@
       "uploadBackup": "Télécharger une sauvegarde",
       "errLoadGeneric": "Échec du chargement des sauvegardes",
       "startFreshTitle": "Repartir à neuf",
-      "startFreshBody": "Configurez Aperture à partir de zéro. C'est l'option recommandée pour les nouvelles installations.",
+      "startFreshBody": "Configurez {{appName}} à partir de zéro. C'est l'option recommandée pour les nouvelles installations.",
       "continueSetup": "Continuer la configuration",
       "restoreCardTitle": "Restaurer à partir d'une sauvegarde",
-      "restoreCardBody": "Restaurez toutes vos données d'une installation précédente d'Aperture.",
+      "restoreCardBody": "Restaurez toutes vos données d'une installation précédente d'{{appName}}.",
       "uploading": "Téléchargement...",
       "uploadBackupFile": "Télécharger le fichier de sauvegarde",
       "availableBackups": "Sauvegardes disponibles ({{count}})",
@@ -3181,18 +3181,18 @@
       "setupCompleteFallback": "La configuration est terminée.",
       "manageUsersLink": "Gérer les utilisateurs dans Admin → Utilisateurs",
       "back": "Dos",
-      "bodyParagraph": "Choisissez quels utilisateurs doivent recevoir des recommandations personnalisées d'IA. Pour chaque utilisateur, vous pouvez activer les recommandations pour les films, les séries télévisées ou les deux. Aperture analyse l'historique des vidéos regardées de chaque utilisateur individuellement pour générer des suggestions personnalisées qui apparaissent dans leurs bibliothèques de recommandations personnelles.",
+      "bodyParagraph": "Choisissez quels utilisateurs doivent recevoir des recommandations personnalisées d'IA. Pour chaque utilisateur, vous pouvez activer les recommandations pour les films, les séries télévisées ou les deux. {{appName}} analyse l'historique des vidéos regardées de chaque utilisateur individuellement pour générer des suggestions personnalisées qui apparaissent dans leurs bibliothèques de recommandations personnelles.",
       "noUsersWarning": "Aucun utilisateur trouvé sur votre serveur multimédia. Veuillez vous assurer que votre serveur multimédia dispose de comptes d'utilisateurs actifs, puis cliquez sur le bouton Actualiser pour recharger la liste.",
       "adminSectionTitle": "Utilisateurs administrateurs ({{count}})",
-      "adminInfoCaption": "Les utilisateurs administrateurs ont été automatiquement activés pour garantir que vous puissiez vous connecter et gérer Aperture. Au moins un administrateur doit rester activé pour conserver l'accès au tableau de bord d'administration.",
+      "adminInfoCaption": "Les utilisateurs administrateurs ont été automatiquement activés pour garantir que vous puissiez vous connecter et gérer {{appName}}. Au moins un administrateur doit rester activé pour conserver l'accès au tableau de bord d'administration.",
       "otherUsersTitle": "Autres utilisateurs ({{count}})",
       "otherUsersCaption": "Activez les recommandations pour les membres de la famille ou d'autres utilisateurs sur votre serveur multimédia. Chaque utilisateur activé recevra ses propres recommandations personnalisées en fonction de son historique de visualisation.",
-      "noteWarning": "Les utilisateurs dont les films et les séries sont désactivés ne recevront aucune recommandation et ne pourront pas se connecter à Aperture. Vous pourrez toujours modifier ces paramètres ultérieurement dans Admin → Utilisateurs.",
+      "noteWarning": "Les utilisateurs dont les films et les séries sont désactivés ne recevront aucune recommandation et ne pourront pas se connecter à {{appName}}. Vous pourrez toujours modifier ces paramètres ultérieurement dans Admin → Utilisateurs.",
       "paginationRange": "{{from}}-{{to}} sur {{count}}"
     },
     "complete": {
       "title": "Configuration terminée !",
-      "subtitle": "Aperture a créé des bibliothèques de recommandations personnalisées sur votre serveur multimédia.",
+      "subtitle": "{{appName}} a créé des bibliothèques de recommandations personnalisées sur votre serveur multimédia.",
       "issuesAlert": "Certains utilisateurs ont été ignorés ou ont rencontré des problèmes. Les utilisateurs ont besoin d'un historique de surveillance pour que les recommandations soient générées. Ils recevront des recommandations après avoir visionné davantage de contenu et effectué la prochaine synchronisation.",
       "librariesCreatedIn": "Bibliothèques créées en {{name}}",
       "mediaServerFallback": "Serveur multimédia",
@@ -3211,9 +3211,9 @@
       "loginPrimary": "Connectez-vous avec vos informations d'identification d'administrateur Media Server",
       "loginSecondary": "Utilisez le même nom d'utilisateur et le même mot de passe que vous utilisez pour Emby/Jellyfin",
       "openServerPrimary": "Ouvrez votre serveur multimédia pour voir les nouvelles bibliothèques",
-      "openServerSecondary": "De nouvelles bibliothèques « AI Picks » apparaîtront pour chaque utilisateur activé dans Aperture",
+      "openServerSecondary": "De nouvelles bibliothèques « AI Picks » apparaîtront pour chaque utilisateur activé dans {{appName}}",
       "schedulesTitle": "Horaires automatiques",
-      "schedulesIntro": "Aperture exécute des tâches en arrière-plan pour maintenir les recommandations à jour. Les plannings par défaut peuvent être modifiés dans Admin → Tâches.",
+      "schedulesIntro": "{{appName}} exécute des tâches en arrière-plan pour maintenir les recommandations à jour. Les plannings par défaut peuvent être modifiés dans Admin → Tâches.",
       "schedWatchHistory": "Regarder l'historique",
       "schedWatchHistoryDesc": "Toutes les 2 heures : suit ce que les utilisateurs regardent",
       "schedLibraryScan": "Analyse de la bibliothèque",
@@ -3236,7 +3236,7 @@
       "featUserPrefsDesc": "Chaque utilisateur peut personnaliser ses préférences et paramètres de recommandation",
       "backToJobs": "Retour aux emplois",
       "finishSetup": "Terminer la configuration",
-      "finishHint": "Cliquer sur Terminer désactivera l’assistant de configuration public, sécurisera Aperture et redirigera vers la connexion."
+      "finishHint": "Cliquer sur Terminer désactivera l’assistant de configuration public, sécurisera {{appName}} et redirigera vers la connexion."
     },
     "initialJobsStep": {
       "newLibraryChip": "Nouvelle bibliothèque",
@@ -3257,7 +3257,7 @@
       "itemsProcessed": "{{count}} articles",
       "errorPrefix": "Erreur:",
       "title": "Initialisez votre bibliothèque",
-      "body": "Aperture synchronisera désormais votre bibliothèque multimédia, analysera le contenu avec l'IA et générera des recommandations personnalisées. Ce processus se déroule en plusieurs étapes et peut prendre quelques minutes en fonction de la taille de votre bibliothèque.",
+      "body": "{{appName}} synchronisera désormais votre bibliothèque multimédia, analysera le contenu avec l'IA et générera des recommandations personnalisées. Ce processus se déroule en plusieurs étapes et peut prendre quelques minutes en fonction de la taille de votre bibliothèque.",
       "whatHappensTitle": "Que se passe-t-il lors de l'initialisation :",
       "bulletSyncMedia": "Synchroniser les médias — Importez les métadonnées de films et de séries télévisées depuis votre serveur multimédia",
       "bulletWatchHistory": "Synchroniser l'historique des vidéos regardées : importez l'historique de visualisation pour comprendre les préférences",
@@ -3296,7 +3296,7 @@
       "noteAdvanced": "Les paramètres avancés tels que les pondérations de l'algorithme de popularité, les fenêtres horaires et les programmes d'actualisation peuvent être personnalisés ultérieurement dans Admin → Paramètres → Meilleurs choix.",
       "noteLabel": "Note:",
       "outputConfig": "Configuration de sortie",
-      "symlinkWarning": "Les liens symboliques nécessitent qu'Aperture puisse accéder à vos fichiers multimédias exactement par les mêmes chemins que ceux utilisés par votre serveur multimédia. Si les chemins diffèrent entre les systèmes (par exemple, les conteneurs Docker), utilisez plutôt les fichiers STRM.",
+      "symlinkWarning": "Les liens symboliques nécessitent qu'{{appName}} puisse accéder à vos fichiers multimédias exactement par les mêmes chemins que ceux utilisés par votre serveur multimédia. Si les chemins diffèrent entre les systèmes (par exemple, les conteneurs Docker), utilisez plutôt les fichiers STRM.",
       "symlinkLabel": "Liens symboliques",
       "back": "Dos",
       "saveContinue": "Enregistrer et continuer",
@@ -3305,10 +3305,10 @@
     },
     "fileLocations": {
       "title": "Emplacements des fichiers",
-      "body": "Configurez l'endroit où votre serveur multimédia voit les fichiers de bibliothèque d'Aperture. Ces chemins doivent correspondre à la manière dont votre serveur multimédia accède aux volumes montés dans votre configuration Docker.",
+      "body": "Configurez l'endroit où votre serveur multimédia voit les fichiers de bibliothèque d'{{appName}}. Ces chemins doivent correspondre à la manière dont votre serveur multimédia accède aux volumes montés dans votre configuration Docker.",
       "saved": "Emplacements des fichiers enregistrés !",
       "autoDetectTitle": "Détection automatique des chemins",
-      "autoDetectBody": "Aperture peut détecter automatiquement les chemins corrects en comparant la façon dont votre serveur multimédia voit les fichiers avec la façon dont Aperture les voit.",
+      "autoDetectBody": "{{appName}} peut détecter automatiquement les chemins corrects en comparant la façon dont votre serveur multimédia voit les fichiers avec la façon dont {{appName}} les voit.",
       "detecting": "Détection...",
       "detectButton": "Détecter automatiquement les chemins",
       "pathsDetected": "Chemins détectés avec succès !",
@@ -3320,7 +3320,7 @@
       "howToFindTitle": "Comment trouver ces chemins :",
       "howToFindBody": "Ouvrez n'importe quel film sur votre serveur multimédia, accédez à Media Info et regardez le chemin du fichier. S'il affiche /mnt/Movies/SomeMovie/file.mkv, le préfixe de votre chemin multimédia est /mnt/.",
       "apertureLibsPath": "Chemin des bibliothèques d’ouverture",
-      "apertureLibsHelp": "Où votre serveur multimédia voit-il les bibliothèques de sortie d'Aperture ?",
+      "apertureLibsHelp": "Où votre serveur multimédia voit-il les bibliothèques de sortie d'{{appName}} ?",
       "helperApertureLibs": "Chemin où votre serveur multimédia voit /aperture-libraries",
       "mediaPrefixTitle": "Préfixe du chemin du serveur multimédia",
       "mediaPrefixHelp": "Où votre serveur multimédia voit-il vos fichiers multimédias originaux ?",
@@ -3336,8 +3336,8 @@
     },
     "aiRecs": {
       "title": "Configurer les bibliothèques de recommandations IA",
-      "body": "Aperture crée des bibliothèques virtuelles sur votre serveur multimédia contenant des recommandations personnalisées pour chaque utilisateur. Configurez la façon dont ces bibliothèques sont créées et personnalisez éventuellement leurs images de couverture.",
-      "strmVsSymlink": "STRM vs Symlinks : les fichiers STRM fonctionnent universellement et prennent en charge les URL de streaming, tandis que les Symlinks fournissent un accès direct aux fichiers (meilleur pour la lecture locale) mais nécessitent qu'Aperture accède à vos fichiers multimédias par les mêmes chemins que votre serveur multimédia. Pour les séries télévisées, les liens symboliques sont recommandés pour de meilleures performances.",
+      "body": "{{appName}} crée des bibliothèques virtuelles sur votre serveur multimédia contenant des recommandations personnalisées pour chaque utilisateur. Configurez la façon dont ces bibliothèques sont créées et personnalisez éventuellement leurs images de couverture.",
+      "strmVsSymlink": "STRM vs Symlinks : les fichiers STRM fonctionnent universellement et prennent en charge les URL de streaming, tandis que les Symlinks fournissent un accès direct aux fichiers (meilleur pour la lecture locale) mais nécessitent qu'{{appName}} accède à vos fichiers multimédias par les mêmes chemins que votre serveur multimédia. Pour les séries télévisées, les liens symboliques sont recommandés pour de meilleures performances.",
       "moviesLibrary": "Bibliothèque de films",
       "seriesLibrary": "Bibliothèque de séries",
       "imageSet": "Ensemble d'images",
@@ -3374,8 +3374,8 @@
       "needKeyLink": "platform.openai.com/api-keys",
       "needKeyBeforeLink": "Visite",
       "needKeyAfterLink": "pour en créer un. Les nouveaux comptes bénéficient de crédits gratuits de 5 $. L'utilisation typique coûte environ 0,10 à 0,50 $/mois.",
-      "bodyLead": "Aperture utilise l'IA pour alimenter son moteur de recommandation. Configurez vos fournisseurs d'IA ci-dessous.",
-      "bodyBold": "Aperture recommande d'utiliser OpenAI",
+      "bodyLead": "{{appName}} utilise l'IA pour alimenter son moteur de recommandation. Configurez vos fournisseurs d'IA ci-dessous.",
+      "bodyBold": "{{appName}} recommande d'utiliser OpenAI",
       "bodyTail": "pour la meilleure expérience, mais vous pouvez explorer d'autres fournisseurs, y compris des modèles locaux."
     }
   },
@@ -3519,7 +3519,7 @@
       "playlist": "Liste de lecture",
       "symlinks": "Liens symboliques",
       "strmFiles": "Fichiers STRM",
-      "symlinkWarning": "Les <strong>liens symboliques</strong> nécessitent qu'Aperture puisse accéder à vos fichiers multimédias exactement par les mêmes chemins que ceux utilisés par votre serveur multimédia. Si les chemins diffèrent entre les systèmes (par exemple, les conteneurs Docker), utilisez plutôt les fichiers STRM."
+      "symlinkWarning": "Les <strong>liens symboliques</strong> nécessitent qu'{{appName}} puisse accéder à vos fichiers multimédias exactement par les mêmes chemins que ceux utilisés par votre serveur multimédia. Si les chemins diffèrent entre les systèmes (par exemple, les conteneurs Docker), utilisez plutôt les fichiers STRM."
     },
     "localAlgorithm": {
       "title": "Algorithme de popularité locale",
@@ -3532,7 +3532,7 @@
     "autoRequest": {
       "title": "Demande automatique de contenu manquant",
       "subtitle": "Demandez automatiquement le contenu Top Picks manquant via Seerr. Fonctionne uniquement avec des sources externes (TMDB, MDBList).",
-      "infoLine1": "Lorsqu'elle est activée, Aperture vérifiera périodiquement votre liste de meilleurs choix pour les éléments qui ne figurent pas dans votre bibliothèque et soumettra automatiquement les demandes à Seerr.",
+      "infoLine1": "Lorsqu'elle est activée, {{appName}} vérifiera périodiquement votre liste de meilleurs choix pour les éléments qui ne figurent pas dans votre bibliothèque et soumettra automatiquement les demandes à Seerr.",
       "infoLine2": "Assurez-vous que Seerr est configuré dans <1>Paramètres → Intégrations</1>.",
       "moviesSection": "Films",
       "seriesSection": "Série",
@@ -3623,7 +3623,7 @@
     },
     "posterRepair": {
       "title": "Réparation d'affiche manquante",
-      "description": "Scannez votre bibliothèque Emby à la recherche de films et de séries avec des images d'affiche manquantes. Cet outil récupère les affiches de remplacement depuis TMDB et les télécharge directement sur Emby : aucune image n'est stockée dans Aperture.",
+      "description": "Scannez votre bibliothèque Emby à la recherche de films et de séries avec des images d'affiche manquantes. Cet outil récupère les affiches de remplacement depuis TMDB et les télécharge directement sur Emby : aucune image n'est stockée dans {{appName}}.",
       "scan": "Rechercher les affiches manquantes",
       "scanning": "Balayage...",
       "repairSelected": "Réparer {{count}} Sélectionné",
@@ -4141,7 +4141,7 @@
     "rateLimitedToday": "{{count}} rate-limited today",
     "rateLimitedToday_plural": "{{count}} rate-limited today",
     "paused": "{{slot}} is paused until {{time}} — Google turned it away for going over quota.",
-    "caveat": "Counted per Aperture request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
+    "caveat": "Counted per {{appName}} request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
     "slotPrimary": "Main key",
     "slotFallback": "Fallback key"
   },
@@ -4215,16 +4215,16 @@
     "setupLocalOnly": "Local network only",
     "setupAnywhere": "Reachable from anywhere",
     "allClear": "No problems detected with how this instance is exposed.",
-    "restartNote": "These are read from environment variables at startup. Change them in your compose file or service definition and restart Aperture.",
+    "restartNote": "These are read from environment variables at startup. Change them in your compose file or service definition and restart {{appName}}.",
     "findings": {
       "proxyHeadersIgnored": {
-        "title": "A proxy is forwarding requests, but Aperture is ignoring it",
+        "title": "A proxy is forwarding requests, but {{appName}} is ignoring it",
         "detail": "Requests are arriving with an X-Forwarded-For header while TRUST_PROXY is unset, so every visitor appears to come from the same address. The login rate limiter collapses into one shared bucket — a single attacker can exhaust it for everyone — and first-run setup treats remote visitors as local.",
         "fix": "TRUST_PROXY=127.0.0.1   # or your proxy container address, e.g. 172.18.0.1"
       },
       "allTrafficOneAddress": {
         "title": "Every request so far has come from the same local address",
-        "detail": "Normal for a single-machine LAN install. If a reverse proxy or tunnel sits in front of Aperture, this instead means its forwarded client IPs are being discarded.",
+        "detail": "Normal for a single-machine LAN install. If a reverse proxy or tunnel sits in front of {{appName}}, this instead means its forwarded client IPs are being discarded.",
         "fix": "TRUST_PROXY=127.0.0.1   # only if a proxy or tunnel is in front"
       },
       "proxyModeWithoutTrust": {
@@ -4239,7 +4239,7 @@
       },
       "boundToAllInterfaces": {
         "title": "Also reachable directly, bypassing the proxy",
-        "detail": "A proxy is expected in front, but Aperture is listening on every network interface. Anyone who can reach its port directly skips the proxy entirely — including any access control the proxy enforces.",
+        "detail": "A proxy is expected in front, but {{appName}} is listening on every network interface. Anyone who can reach its port directly skips the proxy entirely — including any access control the proxy enforces.",
         "fix": "HOST=127.0.0.1   # only when the proxy runs on this same host"
       },
       "cookieInsecure": {
@@ -4269,7 +4269,7 @@
       }
     },
     "trustedProxiesTitle": "Trusted proxies",
-    "trustedProxiesHelp": "Addresses allowed to tell Aperture who the real visitor is via X-Forwarded-For. Set this to your reverse proxy or tunnel, never to a public range — anything listed here can claim any client IP it likes.",
+    "trustedProxiesHelp": "Addresses allowed to tell {{appName}} who the real visitor is via X-Forwarded-For. Set this to your reverse proxy or tunnel, never to a public range — anything listed here can claim any client IP it likes.",
     "trustedProxiesFormat": "Comma-separated IP addresses or CIDR ranges. Also accepts loopback, linklocal and uniquelocal.",
     "presets": "Presets:",
     "presetTunnel": "Tunnel on this host",
@@ -4278,12 +4278,23 @@
     "savedApplied": "Saved. Real client IPs are in use from the next request.",
     "saveFailed": "Could not save trusted proxies.",
     "envManaged": "Trusted proxies are set by the TRUST_PROXY environment variable, so they cannot be edited here. Remove it from your compose file to manage them from this page.",
-    "detectedTitle": "Aperture can see what is forwarding to it",
-    "detectedBody": "Requests are reaching Aperture from {{addresses}}, carrying a forwarded visitor address. If that is your tunnel or reverse proxy — for Cloudflare Tunnel it is cloudflared — trust it and Aperture will start using real visitor addresses immediately.",
+    "detectedTitle": "{{appName}} can see what is forwarding to it",
+    "detectedBody": "Requests are reaching {{appName}} from {{addresses}}, carrying a forwarded visitor address. If that is your tunnel or reverse proxy — for Cloudflare Tunnel it is cloudflared — trust it and {{appName}} will start using real visitor addresses immediately.",
     "detectedAction": "Trust {{addresses}}",
     "unsaved": "Not saved yet — click Save to apply this.",
     "viaDirect": "Direct connection",
     "viaProxy": "A proxy or tunnel",
     "viaProxyNamed": "A proxy or tunnel ({{addresses}})"
+  },
+  "settingsBranding": {
+    "title": "Instance name",
+    "subtitle": "The name shown throughout the app — in the sidebar, the browser tab, the sign-in page, and anywhere the interface refers to itself.",
+    "label": "Name",
+    "helper": "Up to {{max}} characters. Leave it blank to go back to the default.",
+    "reset": "Reset to {{name}}",
+    "saved": "Instance name updated",
+    "fetchFailed": "Failed to load the instance name",
+    "saveFailed": "Failed to save the instance name",
+    "unknownError": "Something went wrong"
   }
 }
