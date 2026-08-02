@@ -47,6 +47,8 @@ postgres-data/
 # Data directories (keep structure, ignore contents)
 data/strm/*
 !data/strm/.gitkeep
+data/branding/*
+!data/branding/.gitkeep
 
 # Turbo
 .turbo/

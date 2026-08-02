@@ -5,11 +5,15 @@ import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { getAppName, DEFAULT_APP_NAME } from '@aperture/core'
+import { resolveBrandingAsset, brandingAssetUrl } from '../lib/brandingAssets.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 /** Rewritten on the way out; matches the built file as well as the source. */
 const TITLE_TAG = /<title>[\s\S]*?<\/title>/i
+
+/** The bundled `<link rel="icon">`, replaced when artwork is mounted. */
+const ICON_LINK_TAG = /<link\b[^>]*\brel=["']icon["'][^>]*>/i
 
 function escapeHtml(value: string): string {
   return value
@@ -44,12 +48,17 @@ const staticPlugin: FastifyPluginAsync = async (fastify) => {
   const indexTemplate = fs.existsSync(indexPath) ? fs.readFileSync(indexPath, 'utf8') : null
 
   /**
-   * Serve the SPA shell with the instance's name already in the <title>.
+   * Serve the SPA shell with the instance's name already in the <title> and any
+   * mounted favicon already in the <link>.
    *
    * The client sets `document.title` too, but only once `/api/branding` answers
    * — which is one round-trip after first paint. On a renamed instance that
    * showed the wrong name in the tab (and in a bookmark taken right then) for
    * every cold load, so the name is stamped in here on the way out instead.
+   *
+   * The favicon gets the same treatment for a stronger reason: browsers request
+   * it off the parsed HTML before React runs, and they cache what they get. A
+   * client-side swap means the bundled icon is fetched and remembered first.
    */
   async function sendIndex(reply: FastifyReply) {
     if (!indexTemplate) {
@@ -65,12 +74,27 @@ const staticPlugin: FastifyPluginAsync = async (fastify) => {
       fastify.log.warn({ err }, 'Failed to read instance name for index.html')
     }
 
+    let html = indexTemplate.replace(TITLE_TAG, `<title>${escapeHtml(appName)}</title>`)
+
+    try {
+      const favicon = await resolveBrandingAsset('favicon')
+      if (favicon) {
+        html = html.replace(
+          ICON_LINK_TAG,
+          `<link rel="icon" type="${escapeHtml(favicon.mimeType)}" href="${escapeHtml(brandingAssetUrl(favicon))}" />`
+        )
+      }
+    } catch (err) {
+      // An unreadable mount just means the bundled icon stays.
+      fastify.log.warn({ err }, 'Failed to resolve mounted favicon for index.html')
+    }
+
     return reply
       .type('text/html; charset=utf-8')
       // The shell references hashed asset filenames, so it must never be the
       // stale thing a browser holds onto after a deploy.
       .header('Cache-Control', 'no-cache')
-      .send(indexTemplate.replace(TITLE_TAG, `<title>${escapeHtml(appName)}</title>`))
+      .send(html)
   }
 
   // Register static file serving

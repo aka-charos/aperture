@@ -14,13 +14,14 @@ import {
 import { useTheme } from '@mui/material/styles'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslation } from 'react-i18next'
-import { useAppName } from '@/lib/branding'
+import { useAppName, useLogoUrl } from '@/lib/branding'
 
 export function LoginPage() {
   const { t } = useTranslation()
   // The visible wordmark is `common.appName`; this is the logo's alt text, which
   // has no translation to interpolate into.
   const appName = useAppName()
+  const logoUrl = useLogoUrl()
   const theme = useTheme()
   const navigate = useNavigate()
   const { login, user, sessionError, clearSessionError } = useAuth()
@@ -218,7 +219,7 @@ export function LoginPage() {
             >
               <Box
                 component="img"
-                src="/aperture.svg"
+                src={logoUrl}
                 alt={appName}
                 sx={{ width: 46, height: 46 }}
               />

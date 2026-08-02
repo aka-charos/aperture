@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useSetupWizard } from './hooks/useSetupWizard'
 import { useSetupStatus } from '../../hooks/useSetupStatus'
 import { useTranslation } from 'react-i18next'
+import { useLogoUrl } from '@/lib/branding'
 import { STEP_ORDER_IDS } from './constants'
 import {
   RestoreStep,
@@ -25,6 +26,7 @@ export function SetupPage() {
   const { t } = useTranslation()
   const wizard = useSetupWizard()
   const { status } = useSetupStatus()
+  const logoUrl = useLogoUrl()
   const navigate = useNavigate()
   const location = useLocation()
   const { activeStep, stepId } = wizard
@@ -91,7 +93,7 @@ export function SetupPage() {
       >
         <Box
           component="img"
-          src="/aperture.svg"
+          src={logoUrl}
           alt={t('setup.page.altLogo')}
           sx={{ width: 32, height: 32 }}
         />
