@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Aperture",
+    "appName": "{{appName}}",
     "save": "שמירה",
     "saving": "שומר…",
     "loading": "טוען…",
@@ -212,7 +212,7 @@
       "aiOverrideColTooltip": "אפשר למשתמש לשלוט בהעדפת הסברי ה־AI",
       "disabledOnServer": "מושבת בשרת המדיה",
       "activeStatus": "פעיל",
-      "importedTooltip": "המשתמש יובא ל־Aperture",
+      "importedTooltip": "המשתמש יובא ל־{{appName}}",
       "notImportedTooltip": "עדיין לא יובא",
       "discoverToggleOn": "השבת הצעות Discover",
       "discoverToggleOff": "הפעל הצעות Discover",
@@ -254,7 +254,7 @@
       "discoveryAccessUpdated": "הרשאת גישה ל־Discover עודכנה!",
       "discoveryRequestUpdated": "הרשאת בקשת תוכן עודכנה!",
       "watchHistoryTitle": "ניהול היסטוריית צפייה",
-      "watchHistoryBody": "אפשר למשתמש זה לסמן סרטים וסדרות כלא נצפו. הפעולה תעדכן גם את שרת המדיה (Emby/Jellyfin) וגם את מסד הנתונים של Aperture.",
+      "watchHistoryBody": "אפשר למשתמש זה לסמן סרטים וסדרות כלא נצפו. הפעולה תעדכן גם את שרת המדיה (Emby/Jellyfin) וגם את מסד הנתונים של {{appName}}.",
       "watchHistoryToggleTitle": "אפשר ניהול היסטוריית צפייה",
       "watchHistoryToggleHint": "המשתמש יכול לסמן פריטים כלא נצפו מדף היסטוריית הצפייה ומדפי פרטי סרט",
       "discoveryTitle": "הרשאות Discover",
@@ -331,7 +331,7 @@
           "description": "משימות למידת מכונה לסרטים"
         },
         "movieLib": {
-          "title": "ספריות Aperture",
+          "title": "ספריות {{appName}}",
           "description": "בניית ספריות המלצות AI בשרת המדיה"
         },
         "seriesSync": {
@@ -343,7 +343,7 @@
           "description": "משימות למידת מכונה לסדרות"
         },
         "seriesLib": {
-          "title": "ספריות Aperture",
+          "title": "ספריות {{appName}}",
           "description": "בניית ספריות המלצות AI בשרת המדיה"
         },
         "globalMeta": {
@@ -364,8 +364,8 @@
         }
       },
       "jobNames": {
-        "syncMovieLibraries": "בניית ספריות סרטים של Aperture",
-        "syncSeriesLibraries": "בניית ספריות סדרות של Aperture",
+        "syncMovieLibraries": "בניית ספריות סרטים של {{appName}}",
+        "syncSeriesLibraries": "בניית ספריות סדרות של {{appName}}",
         "fullResetMovieRecommendations": "איפוס מלא של המלצות סרטים",
         "fullResetSeriesRecommendations": "איפוס מלא של המלצות סדרות"
       },
@@ -545,7 +545,7 @@
       "noTrailer": "לא נמצא טריילר",
       "failedTrailer": "טעינת הקרוואן נכשלה",
       "confirmUnwatchedTitle": "לסמן כלא נצפה?",
-      "confirmUnwatchedBody": "פעולה זו תסמן את \"{{title}}\" כלא נצפה בשרת המדיה שלך ותסיר אותו מהיסטוריית הצפייה שלך ב- Aperture.",
+      "confirmUnwatchedBody": "פעולה זו תסמן את \"{{title}}\" כלא נצפה בשרת המדיה שלך ותסיר אותו מהיסטוריית הצפייה שלך ב- {{appName}}.",
       "cannotUndo": "לא ניתן לבטל פעולה זו.",
       "marking": "צִיוּן…",
       "snackbarMarked": "הסרט סומן כלא צפייה",
@@ -863,7 +863,7 @@
     "aiExplanationTitle": "העדפת הסבר בינה מלאכותית",
     "aiExplanationSubtitle": "בחר אם לכלול הסברים שנוצרו בינה מלאכותית בתיאורי ההמלצות שלך.",
     "aiExplanationIncludeTitle": "כלול הסברים בינה מלאכותית",
-    "aiExplanationIncludeBody": "כאשר מופעל, כל המלצה כוללת \"למה Aperture בחרה את זה בשבילך\"",
+    "aiExplanationIncludeBody": "כאשר מופעל, כל המלצה כוללת \"למה {{appName}} בחרה את זה בשבילך\"",
     "aiExplanationReset": "איפוס לברירת מחדל ({{state}})",
     "stateEnabled": "מופעל",
     "stateDisabled": "נָכֶה",
@@ -900,7 +900,7 @@
     "traktSyncing": "מסנכרן...",
     "traktDisconnect": "לְנַתֵק",
     "traktConnect": "התחבר ל-Trakt",
-    "traktFooter": "סנכרון מייבא את דירוגי ה-Trakt שלך (1-10) כדירוגי לב ב- Aperture. לתוכן בעל דירוג גבוה יותר תהיה השפעה רבה יותר על ההמלצות שלך.",
+    "traktFooter": "סנכרון מייבא את דירוגי ה-Trakt שלך (1-10) כדירוגי לב ב- {{appName}}. לתוכן בעל דירוג גבוה יותר תהיה השפעה רבה יותר על ההמלצות שלך.",
     "errLoadUserSettings": "טעינת הגדרות המשתמש נכשלה",
     "errConnectServer": "לא ניתן להתחבר לשרת",
     "libraryNamesSaved": "שמות הספרייה נשמרו! הם ישמשו עבור עדכוני ספרייה עתידיים.",
@@ -1638,7 +1638,7 @@
     "errReset": "האיפוס נכשל",
     "successReset": "הגדרות האלגוריתם אופסו לברירות המחדל",
     "masterTitle": "משקלי אלגוריתם מותאמים אישית",
-    "masterSubtitle": "כוונן את האופן שבו Aperture מייצר עבורך המלצות. כאשר מושבת, נעשה שימוש בברירות המחדל המוגדרות על ידי מנהל.",
+    "masterSubtitle": "כוונן את האופן שבו {{appName}} מייצר עבורך המלצות. כאשר מושבת, נעשה שימוש בברירות המחדל המוגדרות על ידי מנהל.",
     "labelUsingCustomWeights": "שימוש במשקלים מותאמים אישית",
     "labelUsingDefaultWeights": "שימוש במשקלי ברירת מחדל",
     "descCustomActive": "הגדרות האלגוריתם המותאמות אישית שלך פעילות",
@@ -1707,7 +1707,7 @@
   "settingsApiKeys": {
     "title": "מפתחות API",
     "createButton": "צור מפתח API",
-    "subtitle": "מפתחות API מאפשרים גישה פרוגרמטית ל-API של Aperture. מפתחות מוצגים פעם אחת בלבד בעת יצירתם.",
+    "subtitle": "מפתחות API מאפשרים גישה פרוגרמטית ל-API של {{appName}}. מפתחות מוצגים פעם אחת בלבד בעת יצירתם.",
     "empty": "לא נמצאו מפתחות API. צור את מפתח ה-API הראשון שלך כדי לאפשר גישה פרוגרמטית.",
     "colName": "שֵׁם",
     "colPrefix": "קידומת מפתח",
@@ -1936,7 +1936,7 @@
     "allowPasswordlessLogin": "אפשר כניסה ללא סיסמה",
     "allowPasswordlessHelper": "הפעל זאת אם למשתמשי שרת המדיה שלך אין סיסמאות מוגדרות",
     "securityWarningTitle": "אזהרת אבטחה",
-    "securityWarningBody": "הפעל זאת רק אם מופע Aperture שלך ​​נמצא ברשת פרטית ללא חשיפה לאינטרנט. אם השרת שלך נגיש באמצעות פרוקסי הפוך או האינטרנט, השאר את זה מושבת כדי למנוע גישה לא מורשית.",
+    "securityWarningBody": "הפעל זאת רק אם מופע {{appName}} שלך ​​נמצא ברשת פרטית ללא חשיפה לאינטרנט. אם השרת שלך נגיש באמצעות פרוקסי הפוך או האינטרנט, השאר את זה מושבת כדי למנוע גישה לא מורשית.",
     "passwordlessEnabled": "התחברות ללא סיסמה מופעלת",
     "passwordlessDisabled": "התחברות ללא סיסמה מושבתת",
     "displayName": "Server Display Name",
@@ -1949,15 +1949,15 @@
   },
   "settingsFileLocations": {
     "title": "מיקומי קבצים",
-    "subtitle": "הגדר היכן שרת המדיה שלך רואה את הספריות וקובצי המדיה של Aperture",
+    "subtitle": "הגדר היכן שרת המדיה שלך רואה את הספריות וקובצי המדיה של {{appName}}",
     "detectPaths": "זיהוי אוטומטי של נתיבים",
     "detecting": "מזהה...",
-    "detectCaption": "זיהוי נתיבים באופן אוטומטי על-ידי השוואת קבצי שרת מדיה עם הרכיבים של Aperture",
+    "detectCaption": "זיהוי נתיבים באופן אוטומטי על-ידי השוואת קבצי שרת מדיה עם הרכיבים של {{appName}}",
     "detectedMapping": "מיפוי נתיב שזוהה:",
     "mediaServerSample": "שרת מדיה:",
     "apertureSample": "צוֹהַר:",
     "apertureLibrariesPath": "נתיב ספריות צמצם",
-    "apertureLibrariesHelper": "היכן שרת המדיה שלך רואה את הפלט של Aperture (התיקיה המותקנת בתור /aperture-libraries ב- Aperture)",
+    "apertureLibrariesHelper": "היכן שרת המדיה שלך רואה את הפלט של {{appName}} (התיקיה המותקנת בתור /aperture-libraries ב- {{appName}})",
     "mediaServerPathPrefix": "קידומת נתיב שרת מדיה",
     "mediaServerPathPrefixHelper": "נתיב בסיס שבו שרת המדיה שלך רואה את קובצי המדיה שלך (משמש לקישורים סימליים)",
     "loadError": "טעינת התצורה נכשלה",
@@ -2007,13 +2007,13 @@
     "explainSymlinksTitle": "סימלינקים",
     "explainSymlinksIntro": "יוצר קישורים סמליים המצביעים על קבצי המדיה המקוריים שלך. השמעה מהירה יותר, אותה איכות.",
     "requiresLabel": "דורש:",
-    "explainSymlinksRequires": "גם Aperture וגם שרת המדיה שלך חייבים לגשת לאותם נתיבים של מערכת קבצים.",
+    "explainSymlinksRequires": "גם {{appName}} וגם שרת המדיה שלך חייבים לגשת לאותם נתיבים של מערכת קבצים.",
     "explainStrmTitle": "קבצי STRM",
     "explainStrmIntro": "יוצר קובצי Strm המכילים נתיבים או כתובות URL זורמות. עובד בכל תצורות הרשת.",
     "bestForLabel": "הטוב ביותר עבור:",
     "explainStrmBestFor": "הגדרות Docker, מכונות שונות, או כאשר נתיבים שונים בין מערכות.",
     "symlinkWarningTitle": "חָשׁוּב:",
-    "symlinkWarningBody": "קישורי סימול מחייבים ש-Aperture תוכל לגשת לקבצי המדיה שלך באותם נתיבים בדיוק שבהם משתמש שרת המדיה שלך. אם אתה מפעיל את Aperture ב-Docker, ודא שהתועלות של עוצמת הקול תואמות.",
+    "symlinkWarningBody": "קישורי סימול מחייבים ש-{{appName}} תוכל לגשת לקבצי המדיה שלך באותם נתיבים בדיוק שבהם משתמש שרת המדיה שלך. אם אתה מפעיל את {{appName}} ב-Docker, ודא שהתועלות של עוצמת הקול תואמות.",
     "saving": "חִסָכוֹן…",
     "saveChanges": "שמור שינויים"
   },
@@ -2045,7 +2045,7 @@
   },
   "settingsAiSetup": {
     "pageTitle": "תצורת ספק AI",
-    "pageSubtitle": "הגדר ספקי AI עבור תכונות שונות. Aperture ממליצה להשתמש ב-OpenAI עבור כל ארבע הפונקציות, אך אל תהסס לחקור ספקים ודגמים אחרים.",
+    "pageSubtitle": "הגדר ספקי AI עבור תכונות שונות. {{appName}} ממליצה להשתמש ב-OpenAI עבור כל ארבע הפונקציות, אך אל תהסס לחקור ספקים ודגמים אחרים.",
     "cardEmbeddingsTitle": "הטבעות",
     "cardEmbeddingsDesc": "ממיר טקסט לוקטורים לחיפוש סמנטי והמלצות. מידות גבוהות יותר = איכות טובה יותר.",
     "cardChatTitle": "עוזר צ'אט",
@@ -2074,7 +2074,7 @@
     "saved": "הגדרות הסבר בינה מלאכותית נשמרו!",
     "unknownError": "שגיאה לא ידועה",
     "title": "הסבר בינה מלאכותית בהמלצות",
-    "subtitle": "שליטה אם הסברים שנוצרו בינה מלאכותית (\"למה Aperture בחר את זה בשבילך\") יופיעו בתיאורי המלצות",
+    "subtitle": "שליטה אם הסברים שנוצרו בינה מלאכותית (\"למה {{appName}} בחר את זה בשבילך\") יופיעו בתיאורי המלצות",
     "includeTitle": "כלול הסברים בינה מלאכותית",
     "includeDesc": "כאשר היא מופעלת, כל המלצה כוללת הסבר מותאם אישית מדוע היא נבחרה",
     "overrideTitle": "אפשר עקיפות לכל משתמש",
@@ -2478,8 +2478,8 @@
     "threadCrashRetry": "Try again"
   },
   "welcomeModal": {
-    "title": "ברוכים הבאים ל- Aperture",
-    "stepWelcome": "ברוכים הבאים ל- Aperture",
+    "title": "ברוכים הבאים ל- {{appName}}",
+    "stepWelcome": "ברוכים הבאים ל- {{appName}}",
     "stepHowAi": "כיצד פועלות המלצות AI",
     "stepScoring": "גורמי ניקוד",
     "stepData": "הנתונים שלך",
@@ -2495,9 +2495,9 @@
     "stepScoringP2": "Your taste profile then applies boosts on top: franchises you keep coming back to, genres you've asked for more of, and any custom interests you've added are pushed up the list.",
     "subtitle": "How your AI recommendations are made",
     "stepSimilar": "Related Titles",
-    "stepWelcomeP1": "<0>Aperture</0> builds a personal recommendation list for both movies and TV series, learning from what you actually watch and rate.",
+    "stepWelcomeP1": "<0>{{appName}}</0> builds a personal recommendation list for both movies and TV series, learning from what you actually watch and rate.",
     "stepWelcomeP2": "It reads your library, watch history and ratings from your Emby or Jellyfin server. The list is rebuilt on a schedule, and the refresh button on this page regenerates it on demand.",
-    "stepHowAiP1": "Aperture uses <0>AI embeddings</0> to understand titles at a deep level:",
+    "stepHowAiP1": "{{appName}} uses <0>AI embeddings</0> to understand titles at a deep level:",
     "stepHowAiLi1": "<0>Semantic understanding:</0> Every movie and series becomes a vector — a long list of numbers capturing its themes, tone, genre and style.",
     "stepHowAiLi2": "<0>Taste profile:</0> Your watch history, ratings and favorites are combined into a single \"taste fingerprint\".",
     "stepHowAiLi3": "<0>Vector similarity:</0> Candidates are found by how close they sit to that fingerprint, not by matching genre labels.",
@@ -2513,7 +2513,7 @@
     "stepSimilarP1": "Open any movie or series and you'll find <0>Related titles</0>, powered by the same embeddings.",
     "stepSimilarP2": "These aren't just titles in the same genre — they're ones that share:",
     "stepSimilarP3": "So \"Inception\" leads to other mind-bending films that share its cerebral nature, not just other Christopher Nolan movies. The Explore page turns the same connections into a graph you can wander through, and the AI assistant searches them in plain language.",
-    "stepDataP1": "Aperture syncs with your media server to work out what you like:",
+    "stepDataP1": "{{appName}} syncs with your media server to work out what you like:",
     "stepDataLi1": "<0>Watch history:</0> what you've watched, how often, and how recently",
     "stepDataLi2": "<0>Ratings and favorites:</0> the ratings you give here and the favorites you set on your server both feed the profile, and a low rating can keep a title out of the list entirely",
     "stepDataLi3": "<0>Recency:</0> recent watches count for more than older ones",
@@ -2522,7 +2522,7 @@
   "explorationConfig": {
     "title": "תכונה חדשה: Exploration AI",
     "subtitle": "הגדר בינה מלאכותית ייעודית עבור דף חקור",
-    "bodyP1": "Aperture תומך כעת ב<0>ספק AI ייעודי של Exploration</0> ליצירת הגרפים הסמנטיים של דף Explore.",
+    "bodyP1": "{{appName}} תומך כעת ב<0>ספק AI ייעודי של Exploration</0> ליצירת הגרפים הסמנטיים של דף Explore.",
     "feature1Title": "הבנה מושגית",
     "feature1Body": "השתמש במודל חזק יותר כדי להבין שאילתות כמו \"קומדיות להרגשה טובה\" או \"מדע בדיוני מכופף\"",
     "feature2Title": "חיבורי גרפים טובים יותר",
@@ -2543,12 +2543,12 @@
       "generate-recommendations": "הפקת המלצות",
       "full-reset-movie-recommendations": "איפוס מלא המלצות סרטים",
       "full-reset-series-recommendations": "המלצות סדרת איפוס מלא",
-      "sync-movie-libraries": "בניית ספריות סרטי Aperture",
+      "sync-movie-libraries": "בניית ספריות סרטי {{appName}}",
       "sync-series": "סדרת סינכרון",
       "generate-series-embeddings": "יצירת הטמעות סדרה",
       "sync-series-watch-history": "מסנכרן את היסטוריית הצפייה של סדרות",
       "generate-series-recommendations": "הפקת המלצות לסדרות",
-      "sync-series-libraries": "בניית ספריות מסדרת Aperture",
+      "sync-series-libraries": "בניית ספריות מסדרת {{appName}}",
       "refresh-top-picks": "הבחירות המובילות מרעננות",
       "auto-request-top-picks": "בקשה אוטומטית לבחירות מובילות"
     },
@@ -2845,8 +2845,8 @@
     "episodesProgressFull": "{{נצפים}} / {{סה\"כ}} פרקים",
     "episodesShort": "{{watched}}/{{total}} פרקים",
     "confirmTitle": "לסמן כלא נצפה?",
-    "confirmMovieBody": "פעולה זו תסמן את \"{{title}}\" כלא נצפה בשרת המדיה שלך ותסיר אותו מהיסטוריית הצפייה שלך ב- Aperture.",
-    "confirmSeriesBody": "פעולה זו תסמן את כל הפרקים של \"{{title}}\" כבלתי נצפים בשרת המדיה שלך ותסיר אותם מהיסטוריית הצפייה שלך ב- Aperture.",
+    "confirmMovieBody": "פעולה זו תסמן את \"{{title}}\" כלא נצפה בשרת המדיה שלך ותסיר אותו מהיסטוריית הצפייה שלך ב- {{appName}}.",
+    "confirmSeriesBody": "פעולה זו תסמן את כל הפרקים של \"{{title}}\" כבלתי נצפים בשרת המדיה שלך ותסיר אותם מהיסטוריית הצפייה שלך ב- {{appName}}.",
     "cannotUndo": "לא ניתן לבטל פעולה זו.",
     "markUnwatched": "מארק לא נצפה",
     "marking": "צִיוּן…",
@@ -3003,9 +3003,9 @@
       }
     },
     "page": {
-      "brandName": "Aperture",
+      "brandName": "{{appName}}",
       "exitWizardTooltip": "צא מאשף ההתקנה",
-      "altLogo": "Aperture"
+      "altLogo": "{{appName}}"
     },
     "initialJobs": {
       "syncMovies": {
@@ -3041,11 +3041,11 @@
         "description": "יצירת המלצות לסדרות טלוויזיה מותאמות אישית לכל משתמש"
       },
       "syncMovieLibraries": {
-        "name": "בניית ספריות סרטי Aperture",
+        "name": "בניית ספריות סרטי {{appName}}",
         "description": "יצירת ספריות סרטי המלצות בינה מלאכותית בשרת המדיה שלך"
       },
       "syncSeriesLibraries": {
-        "name": "בניית ספריות מסדרת Aperture",
+        "name": "בניית ספריות מסדרת {{appName}}",
         "description": "יצירת ספריות סדרת המלצות בינה מלאכותית בשרת המדיה שלך"
       },
       "refreshTopPicks": {
@@ -3070,14 +3070,14 @@
     "mediaServer": {
       "tagline": "גלה את המועדף הבא שלך. בכל פעם.",
       "title": "חבר את שרת המדיה שלך",
-      "subtitle": "Aperture משתלב עם שרת Emby או Jellyfin שלך כדי לנתח הרגלי צפייה ולייצר המלצות מותאמות אישית.",
+      "subtitle": "{{appName}} משתלב עם שרת Emby או Jellyfin שלך כדי לנתח הרגלי צפייה ולייצר המלצות מותאמות אישית.",
       "connectedTitle": "שרת מדיה מחובר",
       "apiKeyLabel": "מפתח API:",
       "connectedTo": "מחובר אל {{name}}!",
       "connectedFallback": "שרת מדיה",
       "reconfigure": "התחבר לשרת אחר",
-      "needApiKeyShort": "צריך מפתח API? בלוח המחוונים של שרת המדיה שלך, עבור אל הגדרות ← מפתחות API וצור מפתח חדש עבור Aperture.",
-      "needApiKeyLong": "צריך מפתח API? בלוח המחוונים של שרת המדיה שלך, עבור אל הגדרות ← מפתחות API וצור מפתח חדש עבור Aperture. זה מאפשר גישה מאובטחת לקריאה בלבד למטא-נתונים של הספרייה ולהיסטוריית הצפייה שלך.",
+      "needApiKeyShort": "צריך מפתח API? בלוח המחוונים של שרת המדיה שלך, עבור אל הגדרות ← מפתחות API וצור מפתח חדש עבור {{appName}}.",
+      "needApiKeyLong": "צריך מפתח API? בלוח המחוונים של שרת המדיה שלך, עבור אל הגדרות ← מפתחות API וצור מפתח חדש עבור {{appName}}. זה מאפשר גישה מאובטחת לקריאה בלבד למטא-נתונים של הספרייה ולהיסטוריית הצפייה שלך.",
       "discoverScanning": "סורק...",
       "discoverServers": "גלה שרתים",
       "discoverScanningNetwork": "סורק רשת...",
@@ -3098,15 +3098,15 @@
       "passwordlessLabel": "אפשר כניסה ללא סיסמה",
       "passwordlessHelper": "הפעל זאת אם למשתמשי שרת המדיה שלך אין סיסמאות מוגדרות",
       "securityWarningTitle": "אזהרת אבטחה",
-      "securityWarningBody": "הפעל זאת רק אם מופע Aperture שלך ​​נמצא ברשת פרטית ללא חשיפה לאינטרנט. אם השרת שלך נגיש באמצעות פרוקסי הפוך או האינטרנט, השאר את זה מושבת כדי למנוע גישה לא מורשית.",
+      "securityWarningBody": "הפעל זאת רק אם מופע {{appName}} שלך ​​נמצא ברשת פרטית ללא חשיפה לאינטרנט. אם השרת שלך נגיש באמצעות פרוקסי הפוך או האינטרנט, השאר את זה מושבת כדי למנוע גישה לא מורשית.",
       "continue": "לְהַמשִׁיך",
       "saveContinue": "שמור והמשך",
       "noServersInfo": "לא נמצאו שרתים"
     },
     "libraries": {
       "title": "בחר ספריות לניתוח",
-      "body": "בחר אילו ספריות מדיה Aperture צריך לכלול בעת הפקת המלצות. רק תוכן מספריות מופעלות ינותח עבור דפוסי צפייה וייכלל בהצעות המופעלות על ידי AI. אתה יכול להפעיל מספר ספריות מכל סוג.",
-      "whatNext": "מה קורה לאחר מכן: Aperture תסנכרן מטא נתונים מספריות אלה, תנתח קווי דמיון בתוכן באמצעות הטמעות בינה מלאכותית, ותעקוב אחר היסטוריית הצפייה כדי להבין את ההעדפות של כל משתמש.",
+      "body": "בחר אילו ספריות מדיה {{appName}} צריך לכלול בעת הפקת המלצות. רק תוכן מספריות מופעלות ינותח עבור דפוסי צפייה וייכלל בהצעות המופעלות על ידי AI. אתה יכול להפעיל מספר ספריות מכל סוג.",
+      "whatNext": "מה קורה לאחר מכן: {{appName}} תסנכרן מטא נתונים מספריות אלה, תנתח קווי דמיון בתוכן באמצעות הטמעות בינה מלאכותית, ותעקוב אחר היסטוריית הצפייה כדי להבין את ההעדפות של כל משתמש.",
       "refresh": "רענן ספריות",
       "enableAll": "אפשר הכל",
       "disableAll": "השבת הכל",
@@ -3119,7 +3119,7 @@
     },
     "validate": {
       "title": "אמת את ההגדרה",
-      "subtitle": "בדיקה ש- Aperture יכולה לגשת לכל הנתיבים הנדרשים וששרת המדיה שלך נגיש.",
+      "subtitle": "בדיקה ש- {{appName}} יכולה לגשת לכל הנתיבים הנדרשים וששרת המדיה שלך נגיש.",
       "running": "מפעיל בדיקות אימות...",
       "errorPrefix": "שְׁגִיאָה:",
       "allPassed": "כל הצ'קים עברו! ההגדרה שלך מוכנה להפעלה.",
@@ -3131,7 +3131,7 @@
     },
     "restore": {
       "title": "שחזר מגיבוי",
-      "subtitle": "אם יש לך גיבוי קודם של Aperture, תוכל לשחזר אותו כאן. זה שימושי בעת הגירה לשרת חדש או התאוששות מתקלה.",
+      "subtitle": "אם יש לך גיבוי קודם של {{appName}}, תוכל לשחזר אותו כאן. זה שימושי בעת הגירה לשרת חדש או התאוששות מתקלה.",
       "errLoad": "טעינת הגיבויים הזמינים נכשלה",
       "errUpload": "העלאת הגיבוי נכשלה",
       "errRestore": "שחזור הגיבוי נכשל",
@@ -3143,10 +3143,10 @@
       "uploadBackup": "העלה גיבוי",
       "errLoadGeneric": "טעינת הגיבויים נכשלה",
       "startFreshTitle": "התחל טרי",
-      "startFreshBody": "הגדר את Aperture מאפס. זוהי האפשרות המומלצת עבור התקנות חדשות.",
+      "startFreshBody": "הגדר את {{appName}} מאפס. זוהי האפשרות המומלצת עבור התקנות חדשות.",
       "continueSetup": "המשך בהגדרה",
       "restoreCardTitle": "שחזר מגיבוי",
-      "restoreCardBody": "שחזר את כל הנתונים שלך מהתקנה קודמת של Aperture.",
+      "restoreCardBody": "שחזר את כל הנתונים שלך מהתקנה קודמת של {{appName}}.",
       "uploading": "מעלה...",
       "uploadBackupFile": "העלה קובץ גיבוי",
       "availableBackups": "גיבויים זמינים ({{count}})",
@@ -3181,18 +3181,18 @@
       "setupCompleteFallback": "ההגדרה הושלמה.",
       "manageUsersLink": "נהל משתמשים ב-Admin → משתמשים",
       "back": "בְּחֲזָרָה",
-      "bodyParagraph": "בחר אילו משתמשים צריכים לקבל המלצות AI מותאמות אישית. עבור כל משתמש, אתה יכול להפעיל המלצות עבור סרטים, סדרות טלוויזיה או שניהם. Aperture מנתח את היסטוריית הצפייה של כל משתמש בנפרד כדי ליצור הצעות מותאמות המופיעות בספריות ההמלצות האישיות שלו.",
+      "bodyParagraph": "בחר אילו משתמשים צריכים לקבל המלצות AI מותאמות אישית. עבור כל משתמש, אתה יכול להפעיל המלצות עבור סרטים, סדרות טלוויזיה או שניהם. {{appName}} מנתח את היסטוריית הצפייה של כל משתמש בנפרד כדי ליצור הצעות מותאמות המופיעות בספריות ההמלצות האישיות שלו.",
       "noUsersWarning": "לא נמצאו משתמשים בשרת המדיה שלך. אנא ודא שלשרת המדיה שלך יש חשבונות משתמש פעילים, ולאחר מכן לחץ על לחצן הרענון כדי לטעון מחדש את הרשימה.",
       "adminSectionTitle": "מנהלי משתמשים ({{count}})",
-      "adminInfoCaption": "משתמשי מנהל מערכת הופעלו אוטומטית כדי להבטיח שתוכל להתחבר ולנהל את Aperture. לפחות מנהל מערכת אחד חייב להישאר מופעל כדי לשמור על גישה ללוח המחוונים של מנהל המערכת.",
+      "adminInfoCaption": "משתמשי מנהל מערכת הופעלו אוטומטית כדי להבטיח שתוכל להתחבר ולנהל את {{appName}}. לפחות מנהל מערכת אחד חייב להישאר מופעל כדי לשמור על גישה ללוח המחוונים של מנהל המערכת.",
       "otherUsersTitle": "משתמשים אחרים ({{count}})",
       "otherUsersCaption": "אפשר המלצות עבור בני משפחה או משתמשים אחרים בשרת המדיה שלך. כל משתמש מופעל יקבל המלצות מותאמות אישית משלו על סמך היסטוריית הצפייה שלו.",
-      "noteWarning": "משתמשים עם סרטים וסדרות מושבתים לא יקבלו המלצות ולא יוכלו להיכנס ל-Aperture. אתה תמיד יכול לשנות את ההגדרות האלה מאוחר יותר ב-Admin ← משתמשים.",
+      "noteWarning": "משתמשים עם סרטים וסדרות מושבתים לא יקבלו המלצות ולא יוכלו להיכנס ל-{{appName}}. אתה תמיד יכול לשנות את ההגדרות האלה מאוחר יותר ב-Admin ← משתמשים.",
       "paginationRange": "{{from}}-{{to}} מתוך {{count}}"
     },
     "complete": {
       "title": "ההתקנה הושלמה!",
-      "subtitle": "Aperture יצרה ספריות המלצות מותאמות אישית בשרת המדיה שלך.",
+      "subtitle": "{{appName}} יצרה ספריות המלצות מותאמות אישית בשרת המדיה שלך.",
       "issuesAlert": "חלק מהמשתמשים דילגו או שהיו להם בעיות. משתמשים צריכים היסטוריית צפייה כדי להפיק המלצות. הם יקבלו המלצות לאחר צפייה בתכנים נוספים והפעלת הסנכרון הבא.",
       "librariesCreatedIn": "ספריות שנוצרו ב-{{name}}",
       "mediaServerFallback": "שרת מדיה",
@@ -3211,9 +3211,9 @@
       "loginPrimary": "התחבר עם אישורי המנהל של Media Server שלך",
       "loginSecondary": "השתמש באותו שם משתמש וסיסמה שאתה משתמש עבור Emby/Jellyfin",
       "openServerPrimary": "פתח את שרת המדיה שלך כדי לראות את הספריות החדשות",
-      "openServerSecondary": "ספריות 'בחירות AI' חדשות יופיעו עבור כל משתמש מופעל ב-Aperture",
+      "openServerSecondary": "ספריות 'בחירות AI' חדשות יופיעו עבור כל משתמש מופעל ב-{{appName}}",
       "schedulesTitle": "לוחות זמנים אוטומטיים",
-      "schedulesIntro": "Aperture מפעיל עבודות רקע כדי לשמור על המלצות טריות. ניתן לשנות את לוחות הזמנים המוגדרים כברירת מחדל בניהול → משרות.",
+      "schedulesIntro": "{{appName}} מפעיל עבודות רקע כדי לשמור על המלצות טריות. ניתן לשנות את לוחות הזמנים המוגדרים כברירת מחדל בניהול → משרות.",
       "schedWatchHistory": "צפה בהיסטוריה",
       "schedWatchHistoryDesc": "כל שעתיים - עוקב אחר מה המשתמשים צופים",
       "schedLibraryScan": "סריקת ספרייה",
@@ -3257,7 +3257,7 @@
       "itemsProcessed": "{{count}} פריטים",
       "errorPrefix": "שְׁגִיאָה:",
       "title": "אתחל את הספרייה שלך",
-      "body": "Aperture תסנכרן כעת את ספריית המדיה שלך, תנתח תוכן עם AI ויפיק המלצות מותאמות אישית. תהליך זה עובר מספר שלבים ועשוי להימשך מספר דקות בהתאם לגודל הספרייה שלך.",
+      "body": "{{appName}} תסנכרן כעת את ספריית המדיה שלך, תנתח תוכן עם AI ויפיק המלצות מותאמות אישית. תהליך זה עובר מספר שלבים ועשוי להימשך מספר דקות בהתאם לגודל הספרייה שלך.",
       "whatHappensTitle": "מה קורה במהלך האתחול:",
       "bulletSyncMedia": "סנכרון מדיה — ייבא מטא נתונים של סרטים וסדרות טלוויזיה משרת המדיה שלך",
       "bulletWatchHistory": "סנכרן היסטוריית צפייה — ייבא היסטוריית צפייה כדי להבין העדפות",
@@ -3296,7 +3296,7 @@
       "noteAdvanced": "ניתן להתאים הגדרות מתקדמות כמו משקלי אלגוריתם פופולריות, חלונות זמן ולוחות רענון מאוחר יותר ב-Admin ← הגדרות ← בחירות מובילות.",
       "noteLabel": "פֶּתֶק:",
       "outputConfig": "תצורת פלט",
-      "symlinkWarning": "קישורי סימול מחייבים ש-Aperture תוכל לגשת לקבצי המדיה שלך באותם נתיבים בדיוק שבהם משתמש שרת המדיה שלך. אם הנתיבים שונים בין מערכות (למשל, מכולות Docker), השתמשו בקבצי STRM במקום זאת.",
+      "symlinkWarning": "קישורי סימול מחייבים ש-{{appName}} תוכל לגשת לקבצי המדיה שלך באותם נתיבים בדיוק שבהם משתמש שרת המדיה שלך. אם הנתיבים שונים בין מערכות (למשל, מכולות Docker), השתמשו בקבצי STRM במקום זאת.",
       "symlinkLabel": "סימלינקים",
       "back": "בְּחֲזָרָה",
       "saveContinue": "שמור והמשך",
@@ -3305,10 +3305,10 @@
     },
     "fileLocations": {
       "title": "מיקומי קבצים",
-      "body": "קבע היכן שרת המדיה שלך רואה את קבצי הספרייה של Aperture. נתיבים אלה חייבים להתאים לאופן שבו שרת המדיה שלך ניגש לאמצעי האחסון המותקן בתצורת Docker שלך.",
+      "body": "קבע היכן שרת המדיה שלך רואה את קבצי הספרייה של {{appName}}. נתיבים אלה חייבים להתאים לאופן שבו שרת המדיה שלך ניגש לאמצעי האחסון המותקן בתצורת Docker שלך.",
       "saved": "מיקומי הקבצים נשמרו!",
       "autoDetectTitle": "זיהוי אוטומטי של נתיבים",
-      "autoDetectBody": "Aperture יכולה לזהות באופן אוטומטי את הנתיבים הנכונים על ידי השוואת האופן שבו שרת המדיה שלך רואה קבצים עם האופן שבו Aperture רואה אותם.",
+      "autoDetectBody": "{{appName}} יכולה לזהות באופן אוטומטי את הנתיבים הנכונים על ידי השוואת האופן שבו שרת המדיה שלך רואה קבצים עם האופן שבו {{appName}} רואה אותם.",
       "detecting": "מזהה...",
       "detectButton": "זיהוי נתיבים באופן אוטומטי",
       "pathsDetected": "נתיבים זוהו בהצלחה!",
@@ -3320,7 +3320,7 @@
       "howToFindTitle": "איך למצוא את הנתיבים האלה:",
       "howToFindBody": "פתח כל סרט בשרת המדיה שלך, עבור אל מידע מדיה והסתכל על נתיב הקובץ. אם הוא מציג /mnt/Movies/SomeMovie/file.mkv, קידומת נתיב המדיה שלך היא /mnt/.",
       "apertureLibsPath": "נתיב ספריות צמצם",
-      "apertureLibsHelp": "היכן שרת המדיה שלך רואה את ספריות הפלט של Aperture?",
+      "apertureLibsHelp": "היכן שרת המדיה שלך רואה את ספריות הפלט של {{appName}}?",
       "helperApertureLibs": "נתיב שבו שרת המדיה שלך רואה /aperture-libraries",
       "mediaPrefixTitle": "קידומת נתיב שרת מדיה",
       "mediaPrefixHelp": "היכן שרת המדיה שלך רואה את קבצי המדיה המקוריים שלך?",
@@ -3336,8 +3336,8 @@
     },
     "aiRecs": {
       "title": "הגדר ספריות המלצות AI",
-      "body": "Aperture יוצר ספריות וירטואליות בשרת המדיה שלך המכילות המלצות מותאמות אישית לכל משתמש. הגדר את אופן היצירה של ספריות אלה ואפשר להתאים אישית את תמונות הכריכה שלהן.",
-      "strmVsSymlink": "STRM לעומת סימלינקים: קובצי STRM פועלים באופן אוניברסלי ותומכים בכתובות URL זורמות, בעוד ש-Symlinks מספקים גישה ישירה לקבצים (עדיף להפעלה מקומית) אך דורשים מ- Aperture לגשת לקבצי המדיה שלך באותם נתיבים כמו שרת המדיה שלך. עבור סדרות טלוויזיה, סימלינקים מומלצים לביצועים טובים יותר.",
+      "body": "{{appName}} יוצר ספריות וירטואליות בשרת המדיה שלך המכילות המלצות מותאמות אישית לכל משתמש. הגדר את אופן היצירה של ספריות אלה ואפשר להתאים אישית את תמונות הכריכה שלהן.",
+      "strmVsSymlink": "STRM לעומת סימלינקים: קובצי STRM פועלים באופן אוניברסלי ותומכים בכתובות URL זורמות, בעוד ש-Symlinks מספקים גישה ישירה לקבצים (עדיף להפעלה מקומית) אך דורשים מ- {{appName}} לגשת לקבצי המדיה שלך באותם נתיבים כמו שרת המדיה שלך. עבור סדרות טלוויזיה, סימלינקים מומלצים לביצועים טובים יותר.",
       "moviesLibrary": "ספריית סרטים",
       "seriesLibrary": "ספריית סדרות",
       "imageSet": "סט תמונה",
@@ -3374,8 +3374,8 @@
       "needKeyLink": "platform.openai.com/api-keys",
       "needKeyBeforeLink": "לְבַקֵר",
       "needKeyAfterLink": "ליצור אחד. חשבונות חדשים מקבלים זיכויים של $5 בחינם. שימוש טיפוסי עולה ~$0.10-0.50 לחודש.",
-      "bodyLead": "Aperture משתמש בבינה מלאכותית כדי להפעיל את מנוע ההמלצות שלה. הגדר את ספקי הבינה המלאכותית שלך למטה.",
-      "bodyBold": "Aperture ממליץ להשתמש ב-OpenAI",
+      "bodyLead": "{{appName}} משתמש בבינה מלאכותית כדי להפעיל את מנוע ההמלצות שלה. הגדר את ספקי הבינה המלאכותית שלך למטה.",
+      "bodyBold": "{{appName}} ממליץ להשתמש ב-OpenAI",
       "bodyTail": "לחוויה הטובה ביותר, אבל אתה יכול לחקור ספקים אחרים כולל דגמים מקומיים."
     }
   },
@@ -3519,7 +3519,7 @@
       "playlist": "רשימת השמעה",
       "symlinks": "סימלינקים",
       "strmFiles": "קבצי STRM",
-      "symlinkWarning": "<strong>קישורים סימנים</strong> דורשים ש-Aperture תוכל לגשת לקבצי המדיה שלך באותם נתיבים בדיוק שבהם משתמש שרת המדיה שלך. אם הנתיבים שונים בין מערכות (למשל, מכולות Docker), השתמשו בקבצי STRM במקום זאת."
+      "symlinkWarning": "<strong>קישורים סימנים</strong> דורשים ש-{{appName}} תוכל לגשת לקבצי המדיה שלך באותם נתיבים בדיוק שבהם משתמש שרת המדיה שלך. אם הנתיבים שונים בין מערכות (למשל, מכולות Docker), השתמשו בקבצי STRM במקום זאת."
     },
     "localAlgorithm": {
       "title": "אלגוריתם פופולריות מקומית",
@@ -3532,7 +3532,7 @@
     "autoRequest": {
       "title": "בקשה אוטומטית של תוכן חסר",
       "subtitle": "בקש אוטומטית תוכן חסר בחירות מובילות דרך Seerr. עובד רק עם מקורות חיצוניים (TMDB, MDBList).",
-      "infoLine1": "כאשר היא מופעלת, Aperture תבדוק מעת לעת את רשימת הבחירות המובילות שלך עבור פריטים שאינם בספרייה שלך ותשלח אוטומטית בקשות ל-Seerr.",
+      "infoLine1": "כאשר היא מופעלת, {{appName}} תבדוק מעת לעת את רשימת הבחירות המובילות שלך עבור פריטים שאינם בספרייה שלך ותשלח אוטומטית בקשות ל-Seerr.",
       "infoLine2": "ודא ש-Seerr מוגדר ב<1>הגדרות → אינטגרציות</1>.",
       "moviesSection": "סרטים",
       "seriesSection": "סִדרָה",
@@ -3623,7 +3623,7 @@
     },
     "posterRepair": {
       "title": "חסר תיקון פוסטר",
-      "description": "סרוק את ספריית Emby שלך לאיתור סרטים וסדרות עם תמונות פוסטרים חסרות. כלי זה מביא פוסטרים חלופיים מ-TMDB ומעלה אותם ישירות לאמבי - אין תמונות מאוחסנות ב- Aperture.",
+      "description": "סרוק את ספריית Emby שלך לאיתור סרטים וסדרות עם תמונות פוסטרים חסרות. כלי זה מביא פוסטרים חלופיים מ-TMDB ומעלה אותם ישירות לאמבי - אין תמונות מאוחסנות ב- {{appName}}.",
       "scan": "סרוק לאיתור פוסטרים חסרים",
       "scanning": "סורק...",
       "repairSelected": "תיקון {{count}} נבחר",
@@ -4141,7 +4141,7 @@
     "rateLimitedToday": "{{count}} rate-limited today",
     "rateLimitedToday_plural": "{{count}} rate-limited today",
     "paused": "{{slot}} is paused until {{time}} — Google turned it away for going over quota.",
-    "caveat": "Counted per Aperture request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
+    "caveat": "Counted per {{appName}} request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
     "slotPrimary": "Main key",
     "slotFallback": "Fallback key"
   },
@@ -4215,16 +4215,16 @@
     "setupLocalOnly": "Local network only",
     "setupAnywhere": "Reachable from anywhere",
     "allClear": "No problems detected with how this instance is exposed.",
-    "restartNote": "These are read from environment variables at startup. Change them in your compose file or service definition and restart Aperture.",
+    "restartNote": "These are read from environment variables at startup. Change them in your compose file or service definition and restart {{appName}}.",
     "findings": {
       "proxyHeadersIgnored": {
-        "title": "A proxy is forwarding requests, but Aperture is ignoring it",
+        "title": "A proxy is forwarding requests, but {{appName}} is ignoring it",
         "detail": "Requests are arriving with an X-Forwarded-For header while TRUST_PROXY is unset, so every visitor appears to come from the same address. The login rate limiter collapses into one shared bucket — a single attacker can exhaust it for everyone — and first-run setup treats remote visitors as local.",
         "fix": "TRUST_PROXY=127.0.0.1   # or your proxy container address, e.g. 172.18.0.1"
       },
       "allTrafficOneAddress": {
         "title": "Every request so far has come from the same local address",
-        "detail": "Normal for a single-machine LAN install. If a reverse proxy or tunnel sits in front of Aperture, this instead means its forwarded client IPs are being discarded.",
+        "detail": "Normal for a single-machine LAN install. If a reverse proxy or tunnel sits in front of {{appName}}, this instead means its forwarded client IPs are being discarded.",
         "fix": "TRUST_PROXY=127.0.0.1   # only if a proxy or tunnel is in front"
       },
       "proxyModeWithoutTrust": {
@@ -4239,7 +4239,7 @@
       },
       "boundToAllInterfaces": {
         "title": "Also reachable directly, bypassing the proxy",
-        "detail": "A proxy is expected in front, but Aperture is listening on every network interface. Anyone who can reach its port directly skips the proxy entirely — including any access control the proxy enforces.",
+        "detail": "A proxy is expected in front, but {{appName}} is listening on every network interface. Anyone who can reach its port directly skips the proxy entirely — including any access control the proxy enforces.",
         "fix": "HOST=127.0.0.1   # only when the proxy runs on this same host"
       },
       "cookieInsecure": {
@@ -4269,7 +4269,7 @@
       }
     },
     "trustedProxiesTitle": "Trusted proxies",
-    "trustedProxiesHelp": "Addresses allowed to tell Aperture who the real visitor is via X-Forwarded-For. Set this to your reverse proxy or tunnel, never to a public range — anything listed here can claim any client IP it likes.",
+    "trustedProxiesHelp": "Addresses allowed to tell {{appName}} who the real visitor is via X-Forwarded-For. Set this to your reverse proxy or tunnel, never to a public range — anything listed here can claim any client IP it likes.",
     "trustedProxiesFormat": "Comma-separated IP addresses or CIDR ranges. Also accepts loopback, linklocal and uniquelocal.",
     "presets": "Presets:",
     "presetTunnel": "Tunnel on this host",
@@ -4278,12 +4278,23 @@
     "savedApplied": "Saved. Real client IPs are in use from the next request.",
     "saveFailed": "Could not save trusted proxies.",
     "envManaged": "Trusted proxies are set by the TRUST_PROXY environment variable, so they cannot be edited here. Remove it from your compose file to manage them from this page.",
-    "detectedTitle": "Aperture can see what is forwarding to it",
-    "detectedBody": "Requests are reaching Aperture from {{addresses}}, carrying a forwarded visitor address. If that is your tunnel or reverse proxy — for Cloudflare Tunnel it is cloudflared — trust it and Aperture will start using real visitor addresses immediately.",
+    "detectedTitle": "{{appName}} can see what is forwarding to it",
+    "detectedBody": "Requests are reaching {{appName}} from {{addresses}}, carrying a forwarded visitor address. If that is your tunnel or reverse proxy — for Cloudflare Tunnel it is cloudflared — trust it and {{appName}} will start using real visitor addresses immediately.",
     "detectedAction": "Trust {{addresses}}",
     "unsaved": "Not saved yet — click Save to apply this.",
     "viaDirect": "Direct connection",
     "viaProxy": "A proxy or tunnel",
     "viaProxyNamed": "A proxy or tunnel ({{addresses}})"
+  },
+  "settingsBranding": {
+    "title": "Instance name",
+    "subtitle": "The name shown throughout the app — in the sidebar, the browser tab, the sign-in page, and anywhere the interface refers to itself.",
+    "label": "Name",
+    "helper": "Up to {{max}} characters. Leave it blank to go back to the default.",
+    "reset": "Reset to {{name}}",
+    "saved": "Instance name updated",
+    "fetchFailed": "Failed to load the instance name",
+    "saveFailed": "Failed to save the instance name",
+    "unknownError": "Something went wrong"
   }
 }

@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Aperture",
+    "appName": "{{appName}}",
     "save": "Redden",
     "saving": "Besparing…",
     "loading": "Laden…",
@@ -212,7 +212,7 @@
       "aiOverrideColTooltip": "Laat de gebruiker zijn/haar AI-uitlegvoorkeur bepalen",
       "disabledOnServer": "Uitgeschakeld op mediaserver",
       "activeStatus": "Actief",
-      "importedTooltip": "Gebruiker geïmporteerd in Aperture",
+      "importedTooltip": "Gebruiker geïmporteerd in {{appName}}",
       "notImportedTooltip": "Nog niet geïmporteerd",
       "discoverToggleOn": "Schakel ontdekkingssuggesties uit",
       "discoverToggleOff": "Schakel ontdekkingssuggesties in",
@@ -254,7 +254,7 @@
       "discoveryAccessUpdated": "Toegangsrechten voor detectie bijgewerkt!",
       "discoveryRequestUpdated": "Toestemming voor ontdekkingsverzoek bijgewerkt!",
       "watchHistoryTitle": "Kijk Geschiedenisbeheer",
-      "watchHistoryBody": "Laat deze gebruiker films en series markeren als niet bekeken. Hierdoor worden zowel de mediaserver (Emby/Jellyfin) als de database van Aperture bijgewerkt.",
+      "watchHistoryBody": "Laat deze gebruiker films en series markeren als niet bekeken. Hierdoor worden zowel de mediaserver (Emby/Jellyfin) als de database van {{appName}} bijgewerkt.",
       "watchHistoryToggleTitle": "Beheer van kijkgeschiedenis toestaan",
       "watchHistoryToggleHint": "De gebruiker kan items als niet-bekeken markeren op de pagina Kijkgeschiedenis en filmdetailpagina's",
       "discoveryTitle": "Ontdekkingsrechten",
@@ -331,7 +331,7 @@
           "description": "Machine learning-taken voor films"
         },
         "movieLib": {
-          "title": "Aperture-bibliotheken",
+          "title": "{{appName}}-bibliotheken",
           "description": "Bouw AI-aanbevelingsbibliotheken op uw mediaserver"
         },
         "seriesSync": {
@@ -343,7 +343,7 @@
           "description": "Machine learning-taken voor tv-series"
         },
         "seriesLib": {
-          "title": "Aperture-bibliotheken",
+          "title": "{{appName}}-bibliotheken",
           "description": "Bouw AI-aanbevelingsbibliotheken op uw mediaserver"
         },
         "globalMeta": {
@@ -364,8 +364,8 @@
         }
       },
       "jobNames": {
-        "syncMovieLibraries": "Bouw Aperture-filmbibliotheken",
-        "syncSeriesLibraries": "Bouw bibliotheken uit de Aperture-serie",
+        "syncMovieLibraries": "Bouw {{appName}}-filmbibliotheken",
+        "syncSeriesLibraries": "Bouw bibliotheken uit de {{appName}}-serie",
         "fullResetMovieRecommendations": "Volledige resetfilmaanbevelingen",
         "fullResetSeriesRecommendations": "Aanbevelingen voor de volledige resetreeks"
       },
@@ -653,7 +653,7 @@
       "noTrailer": "Geen aanhangwagen gevonden",
       "failedTrailer": "Kan de trailer niet laden",
       "confirmUnwatchedTitle": "Markeren als niet bekeken?",
-      "confirmUnwatchedBody": "Hierdoor wordt \"{{title}}\" op uw mediaserver als niet bekeken gemarkeerd en uit uw Aperture-kijkgeschiedenis verwijderd.",
+      "confirmUnwatchedBody": "Hierdoor wordt \"{{title}}\" op uw mediaserver als niet bekeken gemarkeerd en uit uw {{appName}}-kijkgeschiedenis verwijderd.",
       "cannotUndo": "Deze actie kan niet ongedaan worden gemaakt.",
       "marking": "Markering…",
       "snackbarMarked": "Film gemarkeerd als niet bekeken",
@@ -1230,7 +1230,7 @@
     "aiExplanationTitle": "AI Uitleg Voorkeur",
     "aiExplanationSubtitle": "Kies of u door AI gegenereerde uitleg wilt opnemen in uw aanbevelingsbeschrijvingen.",
     "aiExplanationIncludeTitle": "Voeg AI-uitleg toe",
-    "aiExplanationIncludeBody": "Indien ingeschakeld, bevat elke aanbeveling 'Waarom Aperture dit voor u heeft uitgekozen'",
+    "aiExplanationIncludeBody": "Indien ingeschakeld, bevat elke aanbeveling 'Waarom {{appName}} dit voor u heeft uitgekozen'",
     "aiExplanationReset": "Terugzetten naar standaard ({{state}})",
     "stateEnabled": "Ingeschakeld",
     "stateDisabled": "Gehandicapt",
@@ -1267,7 +1267,7 @@
     "traktSyncing": "Synchroniseren...",
     "traktDisconnect": "Verbreek de verbinding",
     "traktConnect": "Maak verbinding met Trakt",
-    "traktFooter": "Bij het synchroniseren worden uw Trakt-beoordelingen (1-10) geïmporteerd als hartbeoordelingen in Aperture. Content met een hogere beoordeling heeft meer invloed op uw aanbevelingen.",
+    "traktFooter": "Bij het synchroniseren worden uw Trakt-beoordelingen (1-10) geïmporteerd als hartbeoordelingen in {{appName}}. Content met een hogere beoordeling heeft meer invloed op uw aanbevelingen.",
     "errLoadUserSettings": "Kan gebruikersinstellingen niet laden",
     "errConnectServer": "Kan geen verbinding maken met de server",
     "libraryNamesSaved": "Bibliotheeknamen opgeslagen! Ze zullen worden gebruikt voor toekomstige bibliotheekupdates.",
@@ -1407,7 +1407,7 @@
     "errReset": "Kan niet resetten",
     "successReset": "Algoritme-instellingen worden teruggezet naar de standaardwaarden",
     "masterTitle": "Aangepaste algoritmegewichten",
-    "masterSubtitle": "Verfijn hoe Aperture aanbevelingen voor u genereert. Indien uitgeschakeld, worden door de beheerder geconfigureerde standaardinstellingen gebruikt.",
+    "masterSubtitle": "Verfijn hoe {{appName}} aanbevelingen voor u genereert. Indien uitgeschakeld, worden door de beheerder geconfigureerde standaardinstellingen gebruikt.",
     "labelUsingCustomWeights": "Aangepaste gewichten gebruiken",
     "labelUsingDefaultWeights": "Standaardgewichten gebruiken",
     "descCustomActive": "Uw gepersonaliseerde algoritme-instellingen zijn actief",
@@ -1476,7 +1476,7 @@
   "settingsApiKeys": {
     "title": "API-sleutels",
     "createButton": "Maak een API-sleutel",
-    "subtitle": "API-sleutels bieden programmatische toegang tot de Aperture API. Sleutels worden slechts één keer weergegeven wanneer ze worden gemaakt.",
+    "subtitle": "API-sleutels bieden programmatische toegang tot de {{appName}} API. Sleutels worden slechts één keer weergegeven wanneer ze worden gemaakt.",
     "empty": "Geen API-sleutels gevonden. Maak uw eerste API-sleutel om programmatische toegang mogelijk te maken.",
     "colName": "Naam",
     "colPrefix": "Sleutelvoorvoegsel",
@@ -1705,7 +1705,7 @@
     "allowPasswordlessLogin": "Sta wachtwoordloos inloggen toe",
     "allowPasswordlessHelper": "Schakel dit in als uw mediaservergebruikers geen wachtwoorden hebben ingesteld",
     "securityWarningTitle": "Beveiligingswaarschuwing",
-    "securityWarningBody": "Schakel dit alleen in als uw Aperture-instantie zich op een privénetwerk bevindt zonder internetblootstelling. Als uw server toegankelijk is via reverse proxy of internet, laat deze dan uitgeschakeld om ongeautoriseerde toegang te voorkomen.",
+    "securityWarningBody": "Schakel dit alleen in als uw {{appName}}-instantie zich op een privénetwerk bevindt zonder internetblootstelling. Als uw server toegankelijk is via reverse proxy of internet, laat deze dan uitgeschakeld om ongeautoriseerde toegang te voorkomen.",
     "passwordlessEnabled": "Wachtwoordloos inloggen ingeschakeld",
     "passwordlessDisabled": "Wachtwoordloos inloggen uitgeschakeld",
     "displayName": "Server Display Name",
@@ -1718,15 +1718,15 @@
   },
   "settingsFileLocations": {
     "title": "Bestandslocaties",
-    "subtitle": "Configureer waar uw mediaserver de bibliotheken en mediabestanden van Aperture ziet",
+    "subtitle": "Configureer waar uw mediaserver de bibliotheken en mediabestanden van {{appName}} ziet",
     "detectPaths": "Paden automatisch detecteren",
     "detecting": "Detecteren…",
-    "detectCaption": "Detecteer automatisch paden door mediaserverbestanden te vergelijken met de mounts van Aperture",
+    "detectCaption": "Detecteer automatisch paden door mediaserverbestanden te vergelijken met de mounts van {{appName}}",
     "detectedMapping": "Gedetecteerde padtoewijzing:",
     "mediaServerSample": "Mediaserver:",
     "apertureSample": "Opening:",
-    "apertureLibrariesPath": "Aperture Bibliothekenpad",
-    "apertureLibrariesHelper": "Waar uw mediaserver de uitvoer van Aperture ziet (de map die is aangekoppeld als /aperture-libraries in Aperture)",
+    "apertureLibrariesPath": "{{appName}} Bibliothekenpad",
+    "apertureLibrariesHelper": "Waar uw mediaserver de uitvoer van {{appName}} ziet (de map die is aangekoppeld als /aperture-libraries in {{appName}})",
     "mediaServerPathPrefix": "Voorvoegsel mediaserverpad",
     "mediaServerPathPrefixHelper": "Basispad waar uw mediaserver uw mediabestanden ziet (gebruikt voor symlinks)",
     "loadError": "Kan configuratie niet laden",
@@ -1776,13 +1776,13 @@
     "explainSymlinksTitle": "Symlinks",
     "explainSymlinksIntro": "Creëert symbolische links die naar uw originele mediabestanden verwijzen. Sneller afspelen, dezelfde kwaliteit.",
     "requiresLabel": "Vereist:",
-    "explainSymlinksRequires": "Zowel Aperture als uw mediaserver moeten toegang hebben tot dezelfde bestandssysteempaden.",
+    "explainSymlinksRequires": "Zowel {{appName}} als uw mediaserver moeten toegang hebben tot dezelfde bestandssysteempaden.",
     "explainStrmTitle": "STRM-bestanden",
     "explainStrmIntro": "Creëert .strm-bestanden met paden of streaming-URL's. Werkt in alle netwerkconfiguraties.",
     "bestForLabel": "Beste voor:",
     "explainStrmBestFor": "Docker-instellingen, verschillende machines of wanneer paden tussen systemen verschillen.",
     "symlinkWarningTitle": "Belangrijk:",
-    "symlinkWarningBody": "Symlinks vereisen dat Aperture toegang heeft tot uw mediabestanden via exact dezelfde paden die uw mediaserver gebruikt. Als u Aperture in Docker gebruikt, zorg er dan voor dat de volumemounts overeenkomen.",
+    "symlinkWarningBody": "Symlinks vereisen dat {{appName}} toegang heeft tot uw mediabestanden via exact dezelfde paden die uw mediaserver gebruikt. Als u {{appName}} in Docker gebruikt, zorg er dan voor dat de volumemounts overeenkomen.",
     "saving": "Besparing…",
     "saveChanges": "Wijzigingen opslaan"
   },
@@ -1814,7 +1814,7 @@
   },
   "settingsAiSetup": {
     "pageTitle": "Configuratie van AI-provider",
-    "pageSubtitle": "Configureer AI-providers voor verschillende functies. Aperture raadt aan om OpenAI voor alle vier de functies te gebruiken, maar verken gerust andere aanbieders en modellen.",
+    "pageSubtitle": "Configureer AI-providers voor verschillende functies. {{appName}} raadt aan om OpenAI voor alle vier de functies te gebruiken, maar verken gerust andere aanbieders en modellen.",
     "cardEmbeddingsTitle": "Inbedding",
     "cardEmbeddingsDesc": "Converteert tekst naar vectoren voor semantisch zoeken en aanbevelingen. Hogere afmetingen = betere kwaliteit.",
     "cardChatTitle": "Chat-assistent",
@@ -1843,7 +1843,7 @@
     "saved": "AI-uitleginstellingen opgeslagen!",
     "unknownError": "Onbekende fout",
     "title": "AI-uitleg in aanbevelingen",
-    "subtitle": "Bepaal of door AI gegenereerde uitleg ('Waarom Aperture dit voor u heeft uitgekozen') wordt weergegeven in de beschrijvingen van aanbevelingen",
+    "subtitle": "Bepaal of door AI gegenereerde uitleg ('Waarom {{appName}} dit voor u heeft uitgekozen') wordt weergegeven in de beschrijvingen van aanbevelingen",
     "includeTitle": "Voeg AI-uitleg toe",
     "includeDesc": "Indien ingeschakeld, bevat elke aanbeveling een persoonlijke uitleg waarom deze is geselecteerd",
     "overrideTitle": "Overschrijvingen per gebruiker toestaan",
@@ -2453,9 +2453,9 @@
     "stepScoringP2": "Your taste profile then applies boosts on top: franchises you keep coming back to, genres you've asked for more of, and any custom interests you've added are pushed up the list.",
     "subtitle": "How your AI recommendations are made",
     "stepSimilar": "Related Titles",
-    "stepWelcomeP1": "<0>Aperture</0> builds a personal recommendation list for both movies and TV series, learning from what you actually watch and rate.",
+    "stepWelcomeP1": "<0>{{appName}}</0> builds a personal recommendation list for both movies and TV series, learning from what you actually watch and rate.",
     "stepWelcomeP2": "It reads your library, watch history and ratings from your Emby or Jellyfin server. The list is rebuilt on a schedule, and the refresh button on this page regenerates it on demand.",
-    "stepHowAiP1": "Aperture uses <0>AI embeddings</0> to understand titles at a deep level:",
+    "stepHowAiP1": "{{appName}} uses <0>AI embeddings</0> to understand titles at a deep level:",
     "stepHowAiLi1": "<0>Semantic understanding:</0> Every movie and series becomes a vector — a long list of numbers capturing its themes, tone, genre and style.",
     "stepHowAiLi2": "<0>Taste profile:</0> Your watch history, ratings and favorites are combined into a single \"taste fingerprint\".",
     "stepHowAiLi3": "<0>Vector similarity:</0> Candidates are found by how close they sit to that fingerprint, not by matching genre labels.",
@@ -2471,7 +2471,7 @@
     "stepSimilarP1": "Open any movie or series and you'll find <0>Related titles</0>, powered by the same embeddings.",
     "stepSimilarP2": "These aren't just titles in the same genre — they're ones that share:",
     "stepSimilarP3": "So \"Inception\" leads to other mind-bending films that share its cerebral nature, not just other Christopher Nolan movies. The Explore page turns the same connections into a graph you can wander through, and the AI assistant searches them in plain language.",
-    "stepDataP1": "Aperture syncs with your media server to work out what you like:",
+    "stepDataP1": "{{appName}} syncs with your media server to work out what you like:",
     "stepDataLi1": "<0>Watch history:</0> what you've watched, how often, and how recently",
     "stepDataLi2": "<0>Ratings and favorites:</0> the ratings you give here and the favorites you set on your server both feed the profile, and a low rating can keep a title out of the list entirely",
     "stepDataLi3": "<0>Recency:</0> recent watches count for more than older ones",
@@ -2480,7 +2480,7 @@
   "explorationConfig": {
     "title": "Nieuwe functie: verkennings-AI",
     "subtitle": "Configureer een speciale AI voor de Explore-pagina",
-    "bodyP1": "Aperture ondersteunt nu een speciale <0>Exploration AI-provider</0> voor het genereren van semantische grafieken op de Explore-pagina.",
+    "bodyP1": "{{appName}} ondersteunt nu een speciale <0>Exploration AI-provider</0> voor het genereren van semantische grafieken op de Explore-pagina.",
     "feature1Title": "Conceptueel begrip",
     "feature1Body": "Gebruik een krachtiger model om zoekopdrachten als 'feelgood-komedies' of 'verbijsterende sciencefiction' te begrijpen",
     "feature2Title": "Betere grafiekverbindingen",
@@ -2501,12 +2501,12 @@
       "generate-recommendations": "Aanbevelingen genereren",
       "full-reset-movie-recommendations": "Volledige resetfilmaanbevelingen",
       "full-reset-series-recommendations": "Aanbevelingen voor de volledige resetreeks",
-      "sync-movie-libraries": "Aperture-filmbibliotheken bouwen",
+      "sync-movie-libraries": "{{appName}}-filmbibliotheken bouwen",
       "sync-series": "Serie synchroniseren",
       "generate-series-embeddings": "Serie-inbedding genereren",
       "sync-series-watch-history": "Series-kijkgeschiedenis synchroniseren",
       "generate-series-recommendations": "Aanbevelingen voor series genereren",
-      "sync-series-libraries": "Bibliotheken uit de Aperture-serie bouwen",
+      "sync-series-libraries": "Bibliotheken uit de {{appName}}-serie bouwen",
       "refresh-top-picks": "Verfrissende topkeuzes",
       "auto-request-top-picks": "Topkeuzes automatisch aanvragen"
     },
@@ -2803,8 +2803,8 @@
     "episodesProgressFull": "{{bekeken}} / {{totaal}} afleveringen",
     "episodesShort": "{{bekeken}}/{{totaal}} afleveringen",
     "confirmTitle": "Markeren als niet bekeken?",
-    "confirmMovieBody": "Hierdoor wordt \"{{title}}\" op uw mediaserver als niet bekeken gemarkeerd en uit uw Aperture-kijkgeschiedenis verwijderd.",
-    "confirmSeriesBody": "Hierdoor worden alle afleveringen van \"{{title}}\" op uw mediaserver als niet bekeken gemarkeerd en uit uw Aperture-kijkgeschiedenis verwijderd.",
+    "confirmMovieBody": "Hierdoor wordt \"{{title}}\" op uw mediaserver als niet bekeken gemarkeerd en uit uw {{appName}}-kijkgeschiedenis verwijderd.",
+    "confirmSeriesBody": "Hierdoor worden alle afleveringen van \"{{title}}\" op uw mediaserver als niet bekeken gemarkeerd en uit uw {{appName}}-kijkgeschiedenis verwijderd.",
     "cannotUndo": "Deze actie kan niet ongedaan worden gemaakt.",
     "markUnwatched": "Markeer niet bekeken",
     "marking": "Markering…",
@@ -3172,9 +3172,9 @@
       }
     },
     "page": {
-      "brandName": "Aperture",
+      "brandName": "{{appName}}",
       "exitWizardTooltip": "Sluit de installatiewizard af",
-      "altLogo": "Aperture"
+      "altLogo": "{{appName}}"
     },
     "initialJobs": {
       "syncMovies": {
@@ -3210,11 +3210,11 @@
         "description": "Het creëren van gepersonaliseerde tv-serie-aanbevelingen voor elke gebruiker"
       },
       "syncMovieLibraries": {
-        "name": "Bouw Aperture-filmbibliotheken",
+        "name": "Bouw {{appName}}-filmbibliotheken",
         "description": "Het creëren van AI-aanbevelingsfilmbibliotheken op uw mediaserver"
       },
       "syncSeriesLibraries": {
-        "name": "Bouw bibliotheken uit de Aperture-serie",
+        "name": "Bouw bibliotheken uit de {{appName}}-serie",
         "description": "Bibliotheken van AI-aanbevelingsreeksen maken op uw mediaserver"
       },
       "refreshTopPicks": {
@@ -3239,14 +3239,14 @@
     "mediaServer": {
       "tagline": "Ontdek je volgende favoriet. Elke keer.",
       "title": "Sluit uw mediaserver aan",
-      "subtitle": "Aperture kan worden geïntegreerd met uw Emby- of Jellyfin-server om kijkgedrag te analyseren en gepersonaliseerde aanbevelingen te genereren.",
+      "subtitle": "{{appName}} kan worden geïntegreerd met uw Emby- of Jellyfin-server om kijkgedrag te analyseren en gepersonaliseerde aanbevelingen te genereren.",
       "connectedTitle": "Mediaserver verbonden",
       "apiKeyLabel": "API-sleutel:",
       "connectedTo": "Verbonden met {{naam}}!",
       "connectedFallback": "mediaserver",
       "reconfigure": "Maak verbinding met een andere server",
-      "needApiKeyShort": "Een API-sleutel nodig? Ga in uw mediaserverdashboard naar Instellingen → API-sleutels en maak een nieuwe sleutel voor Aperture.",
-      "needApiKeyLong": "Een API-sleutel nodig? Ga in uw mediaserverdashboard naar Instellingen → API-sleutels en maak een nieuwe sleutel voor Aperture. Dit biedt veilige alleen-lezen toegang tot de metadata en kijkgeschiedenis van uw bibliotheek.",
+      "needApiKeyShort": "Een API-sleutel nodig? Ga in uw mediaserverdashboard naar Instellingen → API-sleutels en maak een nieuwe sleutel voor {{appName}}.",
+      "needApiKeyLong": "Een API-sleutel nodig? Ga in uw mediaserverdashboard naar Instellingen → API-sleutels en maak een nieuwe sleutel voor {{appName}}. Dit biedt veilige alleen-lezen toegang tot de metadata en kijkgeschiedenis van uw bibliotheek.",
       "discoverScanning": "Scannen…",
       "discoverServers": "Ontdek Servers",
       "discoverScanningNetwork": "Netwerk scannen…",
@@ -3267,15 +3267,15 @@
       "passwordlessLabel": "Sta wachtwoordloos inloggen toe",
       "passwordlessHelper": "Schakel dit in als uw mediaservergebruikers geen wachtwoorden hebben ingesteld",
       "securityWarningTitle": "Beveiligingswaarschuwing",
-      "securityWarningBody": "Schakel dit alleen in als uw Aperture-instantie zich op een privénetwerk bevindt zonder internetblootstelling. Als uw server toegankelijk is via reverse proxy of internet, laat deze dan uitgeschakeld om ongeautoriseerde toegang te voorkomen.",
+      "securityWarningBody": "Schakel dit alleen in als uw {{appName}}-instantie zich op een privénetwerk bevindt zonder internetblootstelling. Als uw server toegankelijk is via reverse proxy of internet, laat deze dan uitgeschakeld om ongeautoriseerde toegang te voorkomen.",
       "continue": "Doorgaan",
       "saveContinue": "Opslaan en doorgaan",
       "noServersInfo": "Geen servers gevonden"
     },
     "libraries": {
       "title": "Selecteer Bibliotheken om te analyseren",
-      "body": "Kies welke mediabibliotheken Aperture moet gebruiken bij het genereren van aanbevelingen. Alleen inhoud uit ingeschakelde bibliotheken wordt geanalyseerd op kijkpatronen en opgenomen in AI-aangedreven suggesties. U kunt meerdere bibliotheken van elk type ingeschakeld hebben.",
-      "whatNext": "Wat er vervolgens gebeurt: Aperture synchroniseert metagegevens uit deze bibliotheken, analyseert overeenkomsten in de inhoud met behulp van AI-insluitingen en houdt de kijkgeschiedenis bij om de voorkeuren van elke gebruiker te begrijpen.",
+      "body": "Kies welke mediabibliotheken {{appName}} moet gebruiken bij het genereren van aanbevelingen. Alleen inhoud uit ingeschakelde bibliotheken wordt geanalyseerd op kijkpatronen en opgenomen in AI-aangedreven suggesties. U kunt meerdere bibliotheken van elk type ingeschakeld hebben.",
+      "whatNext": "Wat er vervolgens gebeurt: {{appName}} synchroniseert metagegevens uit deze bibliotheken, analyseert overeenkomsten in de inhoud met behulp van AI-insluitingen en houdt de kijkgeschiedenis bij om de voorkeuren van elke gebruiker te begrijpen.",
       "refresh": "Bibliotheken vernieuwen",
       "enableAll": "Schakel alles in",
       "disableAll": "Schakel alles uit",
@@ -3288,7 +3288,7 @@
     },
     "validate": {
       "title": "Valideer de installatie",
-      "subtitle": "Controleren of Aperture toegang heeft tot alle vereiste paden en of uw mediaserver bereikbaar is.",
+      "subtitle": "Controleren of {{appName}} toegang heeft tot alle vereiste paden en of uw mediaserver bereikbaar is.",
       "running": "Validatiecontroles uitvoeren…",
       "errorPrefix": "Fout:",
       "allPassed": "Alle controles geslaagd! Uw installatie is klaar voor gebruik.",
@@ -3300,7 +3300,7 @@
     },
     "restore": {
       "title": "Herstellen vanuit back-up",
-      "subtitle": "Als u een eerdere Aperture-back-up hebt, kunt u deze hier herstellen. Dit is handig bij het migreren naar een nieuwe server of bij het herstellen van een storing.",
+      "subtitle": "Als u een eerdere {{appName}}-back-up hebt, kunt u deze hier herstellen. Dit is handig bij het migreren naar een nieuwe server of bij het herstellen van een storing.",
       "errLoad": "Kan beschikbare back-ups niet laden",
       "errUpload": "Kan back-up niet uploaden",
       "errRestore": "Kan back-up niet herstellen",
@@ -3312,10 +3312,10 @@
       "uploadBackup": "Back-up uploaden",
       "errLoadGeneric": "Kan back-ups niet laden",
       "startFreshTitle": "Begin fris",
-      "startFreshBody": "Stel Aperture helemaal opnieuw in. Dit is de aanbevolen optie voor nieuwe installaties.",
+      "startFreshBody": "Stel {{appName}} helemaal opnieuw in. Dit is de aanbevolen optie voor nieuwe installaties.",
       "continueSetup": "Ga door met instellen",
       "restoreCardTitle": "Herstellen vanuit back-up",
-      "restoreCardBody": "Herstel al uw gegevens van een eerdere Aperture-installatie.",
+      "restoreCardBody": "Herstel al uw gegevens van een eerdere {{appName}}-installatie.",
       "uploading": "Uploaden...",
       "uploadBackupFile": "Back-upbestand uploaden",
       "availableBackups": "Beschikbare back-ups ({{count}})",
@@ -3350,18 +3350,18 @@
       "setupCompleteFallback": "De installatie is voltooid.",
       "manageUsersLink": "Beheer gebruikers in Beheer → Gebruikers",
       "back": "Rug",
-      "bodyParagraph": "Kies welke gebruikers gepersonaliseerde AI-aanbevelingen moeten ontvangen. Voor elke gebruiker kunt u aanbevelingen inschakelen voor films, tv-series of beide. Aperture analyseert de kijkgeschiedenis van elke gebruiker afzonderlijk om op maat gemaakte suggesties te genereren die in hun persoonlijke aanbevelingsbibliotheken verschijnen.",
+      "bodyParagraph": "Kies welke gebruikers gepersonaliseerde AI-aanbevelingen moeten ontvangen. Voor elke gebruiker kunt u aanbevelingen inschakelen voor films, tv-series of beide. {{appName}} analyseert de kijkgeschiedenis van elke gebruiker afzonderlijk om op maat gemaakte suggesties te genereren die in hun persoonlijke aanbevelingsbibliotheken verschijnen.",
       "noUsersWarning": "Er zijn geen gebruikers gevonden op uw mediaserver. Zorg ervoor dat uw mediaserver actieve gebruikersaccounts heeft en klik vervolgens op de knop Vernieuwen om de lijst opnieuw te laden.",
       "adminSectionTitle": "Beheerders ({{count}})",
-      "adminInfoCaption": "Beheerders zijn automatisch ingeschakeld om ervoor te zorgen dat u zich kunt aanmelden en Aperture kunt beheren. Er moet ten minste één beheerder ingeschakeld blijven om toegang tot het beheerdersdashboard te behouden.",
+      "adminInfoCaption": "Beheerders zijn automatisch ingeschakeld om ervoor te zorgen dat u zich kunt aanmelden en {{appName}} kunt beheren. Er moet ten minste één beheerder ingeschakeld blijven om toegang tot het beheerdersdashboard te behouden.",
       "otherUsersTitle": "Andere gebruikers ({{count}})",
       "otherUsersCaption": "Schakel aanbevelingen in voor familieleden of andere gebruikers op uw mediaserver. Elke ingeschakelde gebruiker krijgt zijn eigen gepersonaliseerde aanbevelingen op basis van zijn kijkgeschiedenis.",
-      "noteWarning": "Gebruikers waarbij zowel Films als Series zijn uitgeschakeld, ontvangen geen aanbevelingen en kunnen niet inloggen bij Aperture. U kunt deze instellingen altijd later wijzigen in Beheer → Gebruikers.",
+      "noteWarning": "Gebruikers waarbij zowel Films als Series zijn uitgeschakeld, ontvangen geen aanbevelingen en kunnen niet inloggen bij {{appName}}. U kunt deze instellingen altijd later wijzigen in Beheer → Gebruikers.",
       "paginationRange": "{{van}}-{{tot}} van {{count}}"
     },
     "complete": {
       "title": "Installatie voltooid!",
-      "subtitle": "Aperture heeft gepersonaliseerde aanbevelingsbibliotheken op uw mediaserver gemaakt.",
+      "subtitle": "{{appName}} heeft gepersonaliseerde aanbevelingsbibliotheken op uw mediaserver gemaakt.",
       "issuesAlert": "Sommige gebruikers werden overgeslagen of hadden problemen. Gebruikers hebben kijkgeschiedenis nodig om aanbevelingen te kunnen genereren. Ze ontvangen aanbevelingen nadat ze meer inhoud hebben bekeken en de volgende synchronisatie hebben uitgevoerd.",
       "librariesCreatedIn": "Bibliotheken gemaakt in {{name}}",
       "mediaServerFallback": "Mediaserver",
@@ -3380,9 +3380,9 @@
       "loginPrimary": "Meld u aan met uw Media Server-beheerdersreferenties",
       "loginSecondary": "Gebruik dezelfde gebruikersnaam en hetzelfde wachtwoord als voor Emby/Jellyfin",
       "openServerPrimary": "Open uw mediaserver om de nieuwe bibliotheken te bekijken",
-      "openServerSecondary": "Voor elke ingeschakelde gebruiker in Aperture verschijnen nieuwe 'AI Picks'-bibliotheken",
+      "openServerSecondary": "Voor elke ingeschakelde gebruiker in {{appName}} verschijnen nieuwe 'AI Picks'-bibliotheken",
       "schedulesTitle": "Automatische schema's",
-      "schedulesIntro": "Aperture voert achtergrondtaken uit om de aanbevelingen actueel te houden. Standaardschema's kunnen worden gewijzigd in Beheer → Taken.",
+      "schedulesIntro": "{{appName}} voert achtergrondtaken uit om de aanbevelingen actueel te houden. Standaardschema's kunnen worden gewijzigd in Beheer → Taken.",
       "schedWatchHistory": "Bekijk Geschiedenis",
       "schedWatchHistoryDesc": "Elke 2 uur: houdt bij waar gebruikers naar kijken",
       "schedLibraryScan": "Bibliotheek scannen",
@@ -3405,7 +3405,7 @@
       "featUserPrefsDesc": "Elke gebruiker kan zijn aanbevelingsvoorkeuren en -instellingen aanpassen",
       "backToJobs": "Terug naar Vacatures",
       "finishSetup": "Voltooi de installatie",
-      "finishHint": "Als u op Voltooien klikt, wordt de openbare installatiewizard uitgeschakeld, wordt Aperture beveiligd en wordt u doorgestuurd naar inloggen."
+      "finishHint": "Als u op Voltooien klikt, wordt de openbare installatiewizard uitgeschakeld, wordt {{appName}} beveiligd en wordt u doorgestuurd naar inloggen."
     },
     "initialJobsStep": {
       "newLibraryChip": "Nieuwe bibliotheek",
@@ -3426,7 +3426,7 @@
       "itemsProcessed": "{{count}} artikelen",
       "errorPrefix": "Fout:",
       "title": "Initialiseer uw bibliotheek",
-      "body": "Aperture synchroniseert nu uw mediabibliotheek, analyseert inhoud met AI en genereert gepersonaliseerde aanbevelingen. Dit proces doorloopt verschillende stappen en kan enkele minuten duren, afhankelijk van de grootte van uw bibliotheek.",
+      "body": "{{appName}} synchroniseert nu uw mediabibliotheek, analyseert inhoud met AI en genereert gepersonaliseerde aanbevelingen. Dit proces doorloopt verschillende stappen en kan enkele minuten duren, afhankelijk van de grootte van uw bibliotheek.",
       "whatHappensTitle": "Wat gebeurt er tijdens de initialisatie:",
       "bulletSyncMedia": "Media synchroniseren: importeer metagegevens van films en tv-series vanaf uw mediaserver",
       "bulletWatchHistory": "Synchroniseer kijkgeschiedenis: importeer de kijkgeschiedenis om voorkeuren te begrijpen",
@@ -3465,7 +3465,7 @@
       "noteAdvanced": "Geavanceerde instellingen zoals de gewichten van populariteitsalgoritmen, tijdvensters en vernieuwingsschema's kunnen later worden aangepast in Beheerder → Instellingen → Topkeuzes.",
       "noteLabel": "Opmerking:",
       "outputConfig": "Uitgangsconfiguratie",
-      "symlinkWarning": "Symlinks vereisen dat Aperture toegang heeft tot uw mediabestanden via exact dezelfde paden die uw mediaserver gebruikt. Als paden tussen systemen verschillen (bijvoorbeeld Docker-containers), gebruik dan STRM-bestanden.",
+      "symlinkWarning": "Symlinks vereisen dat {{appName}} toegang heeft tot uw mediabestanden via exact dezelfde paden die uw mediaserver gebruikt. Als paden tussen systemen verschillen (bijvoorbeeld Docker-containers), gebruik dan STRM-bestanden.",
       "symlinkLabel": "Symlinks",
       "back": "Rug",
       "saveContinue": "Opslaan en doorgaan",
@@ -3474,10 +3474,10 @@
     },
     "fileLocations": {
       "title": "Bestandslocaties",
-      "body": "Configureer waar uw mediaserver de bibliotheekbestanden van Aperture ziet. Deze paden moeten overeenkomen met de manier waarop uw mediaserver toegang krijgt tot de volumes die zijn gekoppeld in uw Docker-configuratie.",
+      "body": "Configureer waar uw mediaserver de bibliotheekbestanden van {{appName}} ziet. Deze paden moeten overeenkomen met de manier waarop uw mediaserver toegang krijgt tot de volumes die zijn gekoppeld in uw Docker-configuratie.",
       "saved": "Bestandslocaties opgeslagen!",
       "autoDetectTitle": "Paden automatisch detecteren",
-      "autoDetectBody": "Aperture kan automatisch de juiste paden detecteren door te vergelijken hoe uw mediaserver bestanden ziet met hoe Aperture ze ziet.",
+      "autoDetectBody": "{{appName}} kan automatisch de juiste paden detecteren door te vergelijken hoe uw mediaserver bestanden ziet met hoe {{appName}} ze ziet.",
       "detecting": "Detecteren...",
       "detectButton": "Paden automatisch detecteren",
       "pathsDetected": "Paden zijn succesvol gedetecteerd!",
@@ -3488,8 +3488,8 @@
       "orManual": "Of handmatig configureren",
       "howToFindTitle": "Zo vindt u deze paden:",
       "howToFindBody": "Open een film op uw mediaserver, ga naar Media Info en kijk naar het bestandspad. Als /mnt/Movies/SomeMovie/file.mkv wordt weergegeven, is uw mediapadvoorvoegsel /mnt/.",
-      "apertureLibsPath": "Aperture Bibliothekenpad",
-      "apertureLibsHelp": "Waar ziet uw mediaserver de uitvoerbibliotheken van Aperture?",
+      "apertureLibsPath": "{{appName}} Bibliothekenpad",
+      "apertureLibsHelp": "Waar ziet uw mediaserver de uitvoerbibliotheken van {{appName}}?",
       "helperApertureLibs": "Pad waar uw mediaserver /aperture-libraries ziet",
       "mediaPrefixTitle": "Voorvoegsel mediaserverpad",
       "mediaPrefixHelp": "Waar ziet uw mediaserver uw originele mediabestanden?",
@@ -3505,8 +3505,8 @@
     },
     "aiRecs": {
       "title": "Configureer AI-aanbevelingsbibliotheken",
-      "body": "Aperture creëert virtuele bibliotheken op uw mediaserver met gepersonaliseerde aanbevelingen voor elke gebruiker. Configureer hoe deze bibliotheken worden gemaakt en pas optioneel hun omslagafbeeldingen aan.",
-      "strmVsSymlink": "STRM versus Symlinks: STRM-bestanden werken universeel en ondersteunen streaming-URL's, terwijl Symlinks directe bestandstoegang bieden (beter voor lokaal afspelen), maar Aperture vereisen om toegang te krijgen tot uw mediabestanden op dezelfde paden als uw mediaserver. Voor tv-series worden symlinks aanbevolen voor betere prestaties.",
+      "body": "{{appName}} creëert virtuele bibliotheken op uw mediaserver met gepersonaliseerde aanbevelingen voor elke gebruiker. Configureer hoe deze bibliotheken worden gemaakt en pas optioneel hun omslagafbeeldingen aan.",
+      "strmVsSymlink": "STRM versus Symlinks: STRM-bestanden werken universeel en ondersteunen streaming-URL's, terwijl Symlinks directe bestandstoegang bieden (beter voor lokaal afspelen), maar {{appName}} vereisen om toegang te krijgen tot uw mediabestanden op dezelfde paden als uw mediaserver. Voor tv-series worden symlinks aanbevolen voor betere prestaties.",
       "moviesLibrary": "Filmbibliotheek",
       "seriesLibrary": "Seriebibliotheek",
       "imageSet": "Afbeelding ingesteld",
@@ -3543,8 +3543,8 @@
       "needKeyLink": "platform.openai.com/api-keys",
       "needKeyBeforeLink": "Bezoek",
       "needKeyAfterLink": "om er een te creëren. Nieuwe accounts krijgen $ 5 gratis credits. Typische gebruikskosten ~$0,10-0,50/maand.",
-      "bodyLead": "Aperture gebruikt AI om zijn aanbevelingsengine aan te drijven. Configureer hieronder uw AI-providers.",
-      "bodyBold": "Aperture raadt het gebruik van OpenAI aan",
+      "bodyLead": "{{appName}} gebruikt AI om zijn aanbevelingsengine aan te drijven. Configureer hieronder uw AI-providers.",
+      "bodyBold": "{{appName}} raadt het gebruik van OpenAI aan",
       "bodyTail": "voor de beste ervaring, maar u kunt ook andere aanbieders verkennen, waaronder lokale modellen."
     }
   },
@@ -3688,7 +3688,7 @@
       "playlist": "Afspeellijst",
       "symlinks": "Symlinks",
       "strmFiles": "STRM-bestanden",
-      "symlinkWarning": "<strong>Symlinks</strong> vereisen dat Aperture toegang heeft tot uw mediabestanden via exact dezelfde paden die uw mediaserver gebruikt. Als paden tussen systemen verschillen (bijvoorbeeld Docker-containers), gebruik dan STRM-bestanden."
+      "symlinkWarning": "<strong>Symlinks</strong> vereisen dat {{appName}} toegang heeft tot uw mediabestanden via exact dezelfde paden die uw mediaserver gebruikt. Als paden tussen systemen verschillen (bijvoorbeeld Docker-containers), gebruik dan STRM-bestanden."
     },
     "localAlgorithm": {
       "title": "Lokaal populariteitsalgoritme",
@@ -3701,7 +3701,7 @@
     "autoRequest": {
       "title": "Ontbrekende inhoud automatisch aanvragen",
       "subtitle": "Vraag automatisch ontbrekende Top Picks-inhoud aan via Seerr. Werkt alleen met externe bronnen (TMDB, MDBList).",
-      "infoLine1": "Indien ingeschakeld, controleert Aperture periodiek uw Top Picks-lijst op items die niet in uw bibliotheek staan ​​en dient het automatisch verzoeken in bij Seerr.",
+      "infoLine1": "Indien ingeschakeld, controleert {{appName}} periodiek uw Top Picks-lijst op items die niet in uw bibliotheek staan ​​en dient het automatisch verzoeken in bij Seerr.",
       "infoLine2": "Zorg ervoor dat Seerr is geconfigureerd in <1>Instellingen → Integraties</1>.",
       "moviesSection": "Films",
       "seriesSection": "Serie",
@@ -3792,7 +3792,7 @@
     },
     "posterRepair": {
       "title": "Reparatie van poster ontbreekt",
-      "description": "Scan uw Emby-bibliotheek op films en series met ontbrekende posterafbeeldingen. Deze tool haalt vervangende posters op uit TMDB en uploadt ze rechtstreeks naar Emby. Er worden geen afbeeldingen opgeslagen in Aperture.",
+      "description": "Scan uw Emby-bibliotheek op films en series met ontbrekende posterafbeeldingen. Deze tool haalt vervangende posters op uit TMDB en uploadt ze rechtstreeks naar Emby. Er worden geen afbeeldingen opgeslagen in {{appName}}.",
       "scan": "Scannen op ontbrekende posters",
       "scanning": "Scannen...",
       "repairSelected": "Reparatie {{count}} geselecteerd",
@@ -4141,7 +4141,7 @@
     "rateLimitedToday": "{{count}} rate-limited today",
     "rateLimitedToday_plural": "{{count}} rate-limited today",
     "paused": "{{slot}} is paused until {{time}} — Google turned it away for going over quota.",
-    "caveat": "Counted per Aperture request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
+    "caveat": "Counted per {{appName}} request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
     "slotPrimary": "Main key",
     "slotFallback": "Fallback key"
   },
@@ -4215,16 +4215,16 @@
     "setupLocalOnly": "Local network only",
     "setupAnywhere": "Reachable from anywhere",
     "allClear": "No problems detected with how this instance is exposed.",
-    "restartNote": "These are read from environment variables at startup. Change them in your compose file or service definition and restart Aperture.",
+    "restartNote": "These are read from environment variables at startup. Change them in your compose file or service definition and restart {{appName}}.",
     "findings": {
       "proxyHeadersIgnored": {
-        "title": "A proxy is forwarding requests, but Aperture is ignoring it",
+        "title": "A proxy is forwarding requests, but {{appName}} is ignoring it",
         "detail": "Requests are arriving with an X-Forwarded-For header while TRUST_PROXY is unset, so every visitor appears to come from the same address. The login rate limiter collapses into one shared bucket — a single attacker can exhaust it for everyone — and first-run setup treats remote visitors as local.",
         "fix": "TRUST_PROXY=127.0.0.1   # or your proxy container address, e.g. 172.18.0.1"
       },
       "allTrafficOneAddress": {
         "title": "Every request so far has come from the same local address",
-        "detail": "Normal for a single-machine LAN install. If a reverse proxy or tunnel sits in front of Aperture, this instead means its forwarded client IPs are being discarded.",
+        "detail": "Normal for a single-machine LAN install. If a reverse proxy or tunnel sits in front of {{appName}}, this instead means its forwarded client IPs are being discarded.",
         "fix": "TRUST_PROXY=127.0.0.1   # only if a proxy or tunnel is in front"
       },
       "proxyModeWithoutTrust": {
@@ -4239,7 +4239,7 @@
       },
       "boundToAllInterfaces": {
         "title": "Also reachable directly, bypassing the proxy",
-        "detail": "A proxy is expected in front, but Aperture is listening on every network interface. Anyone who can reach its port directly skips the proxy entirely — including any access control the proxy enforces.",
+        "detail": "A proxy is expected in front, but {{appName}} is listening on every network interface. Anyone who can reach its port directly skips the proxy entirely — including any access control the proxy enforces.",
         "fix": "HOST=127.0.0.1   # only when the proxy runs on this same host"
       },
       "cookieInsecure": {
@@ -4269,7 +4269,7 @@
       }
     },
     "trustedProxiesTitle": "Trusted proxies",
-    "trustedProxiesHelp": "Addresses allowed to tell Aperture who the real visitor is via X-Forwarded-For. Set this to your reverse proxy or tunnel, never to a public range — anything listed here can claim any client IP it likes.",
+    "trustedProxiesHelp": "Addresses allowed to tell {{appName}} who the real visitor is via X-Forwarded-For. Set this to your reverse proxy or tunnel, never to a public range — anything listed here can claim any client IP it likes.",
     "trustedProxiesFormat": "Comma-separated IP addresses or CIDR ranges. Also accepts loopback, linklocal and uniquelocal.",
     "presets": "Presets:",
     "presetTunnel": "Tunnel on this host",
@@ -4278,12 +4278,23 @@
     "savedApplied": "Saved. Real client IPs are in use from the next request.",
     "saveFailed": "Could not save trusted proxies.",
     "envManaged": "Trusted proxies are set by the TRUST_PROXY environment variable, so they cannot be edited here. Remove it from your compose file to manage them from this page.",
-    "detectedTitle": "Aperture can see what is forwarding to it",
-    "detectedBody": "Requests are reaching Aperture from {{addresses}}, carrying a forwarded visitor address. If that is your tunnel or reverse proxy — for Cloudflare Tunnel it is cloudflared — trust it and Aperture will start using real visitor addresses immediately.",
+    "detectedTitle": "{{appName}} can see what is forwarding to it",
+    "detectedBody": "Requests are reaching {{appName}} from {{addresses}}, carrying a forwarded visitor address. If that is your tunnel or reverse proxy — for Cloudflare Tunnel it is cloudflared — trust it and {{appName}} will start using real visitor addresses immediately.",
     "detectedAction": "Trust {{addresses}}",
     "unsaved": "Not saved yet — click Save to apply this.",
     "viaDirect": "Direct connection",
     "viaProxy": "A proxy or tunnel",
     "viaProxyNamed": "A proxy or tunnel ({{addresses}})"
+  },
+  "settingsBranding": {
+    "title": "Instance name",
+    "subtitle": "The name shown throughout the app — in the sidebar, the browser tab, the sign-in page, and anywhere the interface refers to itself.",
+    "label": "Name",
+    "helper": "Up to {{max}} characters. Leave it blank to go back to the default.",
+    "reset": "Reset to {{name}}",
+    "saved": "Instance name updated",
+    "fetchFailed": "Failed to load the instance name",
+    "saveFailed": "Failed to save the instance name",
+    "unknownError": "Something went wrong"
   }
 }

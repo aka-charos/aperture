@@ -33,6 +33,7 @@ import gapAnalysisRoutes from './gap-analysis/index.js'
 import apiKeysRoutes from './apiKeys/index.js'
 import logoRoutes from './logo/index.js'
 import i18nRoutes from './i18n/index.js'
+import brandingRoutes from './branding/index.js'
 import inferenceRoutes from './inference/index.js'
 
 const routes: FastifyPluginAsync = async (fastify) => {
@@ -137,6 +138,10 @@ const routes: FastifyPluginAsync = async (fastify) => {
 
   // Register i18n routes (runtime UI string overrides from a mounted dir)
   await fastify.register(i18nRoutes)
+
+  // Register branding routes (the instance's display name; GET is public
+  // because the login page and setup wizard render it before any session)
+  await fastify.register(brandingRoutes)
 
   // Register inference routes (AI spend ledger, admin dashboard)
   await fastify.register(inferenceRoutes)

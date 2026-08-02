@@ -1121,6 +1121,60 @@ export async function setPosterDisplayConfig(
 }
 
 // ============================================================================
+// Branding
+// ============================================================================
+
+/** What the product calls itself when an operator hasn't renamed it. */
+export const DEFAULT_APP_NAME = 'Aperture'
+
+/**
+ * Longest name the UI can render without breaking. The app bar, the sidebar
+ * wordmark and the login card all show it on one line.
+ */
+export const APP_NAME_MAX_LENGTH = 40
+
+const APP_NAME_SETTING = 'app_name'
+
+/**
+ * Normalize an operator-supplied name.
+ *
+ * Returns null when there's nothing usable left, which callers treat as "reset
+ * to the default" rather than "store an empty brand". Control characters are
+ * stripped rather than rejected: the value is interpolated into UI strings and
+ * the browser tab title, and a stray newline pasted from a doc shouldn't be a
+ * validation error the admin has to decipher.
+ */
+export function normalizeAppName(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  // eslint-disable-next-line no-control-regex
+  const cleaned = raw.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!cleaned) return null
+  return cleaned.slice(0, APP_NAME_MAX_LENGTH)
+}
+
+/**
+ * The instance's display name. Falls back to the default, so callers never have
+ * to deal with an unset or blank brand.
+ */
+export async function getAppName(): Promise<string> {
+  return normalizeAppName(await getSystemSetting(APP_NAME_SETTING)) ?? DEFAULT_APP_NAME
+}
+
+/**
+ * Set the instance's display name (admin). A blank value clears the setting and
+ * restores the default rather than leaving the UI nameless.
+ */
+export async function setAppName(raw: unknown): Promise<string> {
+  const name = normalizeAppName(raw)
+  await setSystemSetting(
+    APP_NAME_SETTING,
+    name ?? DEFAULT_APP_NAME,
+    'Display name shown throughout the UI in place of the default product name'
+  )
+  return name ?? DEFAULT_APP_NAME
+}
+
+// ============================================================================
 // Library Title Template Settings
 // ============================================================================
 

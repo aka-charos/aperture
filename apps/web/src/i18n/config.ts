@@ -62,7 +62,15 @@ const i18nInit = i18n
       'he',
       'el',
     ],
-    interpolation: { escapeValue: false },
+    interpolation: {
+      escapeValue: false,
+      // Every brand-facing string says `{{appName}}` rather than the product
+      // name, so an operator can rename the instance and have all 15 locales
+      // follow. Seeded with the default here and overwritten once
+      // `/api/branding` answers (see lib/branding.ts) — without a seed the
+      // placeholder would render raw for the first frame.
+      defaultVariables: { appName: 'Aperture' },
+    },
     detection: {
       order: ['localStorage', 'navigator'],
       caches: ['localStorage'],

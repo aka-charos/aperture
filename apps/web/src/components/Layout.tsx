@@ -51,6 +51,7 @@ import { RunningJobsWidget } from './RunningJobsWidget'
 import { GlobalSearch } from './GlobalSearch'
 import { AppBarPageHeading } from './PageHeading'
 import { PageHeaderProvider } from '@/hooks/PageHeaderProvider'
+import { useAppName } from '@/lib/branding'
 import { useTranslation } from 'react-i18next'
 import { applyEffectiveUiLanguage } from '@/i18n/syncUiLanguage'
 
@@ -102,6 +103,8 @@ export function Layout() {
 
 function AppShell() {
   const { t, i18n } = useTranslation()
+  // Alt text can't go through a translation the way the visible wordmark does.
+  const appName = useAppName()
   const theme = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
@@ -331,7 +334,7 @@ function AppShell() {
             <Box
               component="img"
               src="/aperture.svg"
-              alt="Aperture"
+              alt={appName}
               sx={{ width: 40, height: 40 }}
             />
           </Tooltip>
@@ -340,7 +343,7 @@ function AppShell() {
             <Box
               component="img"
               src="/aperture.svg"
-              alt="Aperture"
+              alt={appName}
               sx={{ width: 40, height: 40 }}
             />
             <Typography
@@ -555,7 +558,7 @@ function AppShell() {
             <Box
               component="img"
               src="/aperture.svg"
-              alt="Aperture"
+              alt={appName}
               sx={{ width: 28, height: 28 }}
             />
             <Typography

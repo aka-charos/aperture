@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Aperture",
+    "appName": "{{appName}}",
     "save": "Guardar",
     "saving": "Guardando…",
     "loading": "Cargando…",
@@ -212,7 +212,7 @@
       "aiOverrideColTooltip": "Permitir controlar la preferencia de explicaciones de IA",
       "disabledOnServer": "Desactivado en el servidor multimedia",
       "activeStatus": "Activo",
-      "importedTooltip": "Usuario importado en Aperture",
+      "importedTooltip": "Usuario importado en {{appName}}",
       "notImportedTooltip": "Aún no importado",
       "discoverToggleOn": "Desactivar sugerencias de descubrimiento",
       "discoverToggleOff": "Activar sugerencias de descubrimiento",
@@ -254,7 +254,7 @@
       "discoveryAccessUpdated": "¡Permiso de acceso a descubrimiento actualizado!",
       "discoveryRequestUpdated": "¡Permiso de solicitudes actualizado!",
       "watchHistoryTitle": "Gestión del historial",
-      "watchHistoryBody": "Permite a este usuario marcar películas y series como no vistas. Se actualizará el servidor multimedia (Emby/Jellyfin) y la base de datos de Aperture.",
+      "watchHistoryBody": "Permite a este usuario marcar películas y series como no vistas. Se actualizará el servidor multimedia (Emby/Jellyfin) y la base de datos de {{appName}}.",
       "watchHistoryToggleTitle": "Permitir gestión del historial",
       "watchHistoryToggleHint": "El usuario puede marcar contenido como no visto desde el historial y las fichas",
       "discoveryTitle": "Permisos de descubrimiento",
@@ -331,7 +331,7 @@
           "description": "Tareas de aprendizaje automático para películas"
         },
         "movieLib": {
-          "title": "Bibliotecas Aperture",
+          "title": "Bibliotecas {{appName}}",
           "description": "Crear bibliotecas de recomendación IA en el servidor multimedia"
         },
         "seriesSync": {
@@ -343,7 +343,7 @@
           "description": "Tareas de aprendizaje automático para series"
         },
         "seriesLib": {
-          "title": "Bibliotecas Aperture",
+          "title": "Bibliotecas {{appName}}",
           "description": "Crear bibliotecas de recomendación IA en el servidor multimedia"
         },
         "globalMeta": {
@@ -364,8 +364,8 @@
         }
       },
       "jobNames": {
-        "syncMovieLibraries": "Construir bibliotecas de películas Aperture",
-        "syncSeriesLibraries": "Construir bibliotecas de series Aperture",
+        "syncMovieLibraries": "Construir bibliotecas de películas {{appName}}",
+        "syncSeriesLibraries": "Construir bibliotecas de series {{appName}}",
         "fullResetMovieRecommendations": "Reinicio total de recomendaciones de películas",
         "fullResetSeriesRecommendations": "Reinicio total de recomendaciones de series"
       },
@@ -545,7 +545,7 @@
       "noTrailer": "No se encontró ningún tráiler",
       "failedTrailer": "No se pudo cargar el remolque",
       "confirmUnwatchedTitle": "¿Marcar como no observado?",
-      "confirmUnwatchedBody": "Esto marcará \"{{title}}\" como no visto en tu servidor de medios y lo eliminará de tu historial de reproducciones de Aperture.",
+      "confirmUnwatchedBody": "Esto marcará \"{{title}}\" como no visto en tu servidor de medios y lo eliminará de tu historial de reproducciones de {{appName}}.",
       "cannotUndo": "Esta acción no se puede deshacer.",
       "marking": "Calificación…",
       "snackbarMarked": "Película marcada como no vista",
@@ -863,7 +863,7 @@
     "aiExplanationTitle": "Preferencia de explicación de IA",
     "aiExplanationSubtitle": "Elija si desea incluir explicaciones generadas por IA en las descripciones de sus recomendaciones.",
     "aiExplanationIncludeTitle": "Incluir explicaciones de IA",
-    "aiExplanationIncludeBody": "Cuando está habilitada, cada recomendación incluye \"¿Por qué Aperture eligió esto para usted?\"",
+    "aiExplanationIncludeBody": "Cuando está habilitada, cada recomendación incluye \"¿Por qué {{appName}} eligió esto para usted?\"",
     "aiExplanationReset": "Restablecer valores predeterminados ({{state}})",
     "stateEnabled": "Activada",
     "stateDisabled": "Desactivada",
@@ -900,7 +900,7 @@
     "traktSyncing": "Sincronizando…",
     "traktDisconnect": "Desconectar",
     "traktConnect": "Conéctate a Trakt",
-    "traktFooter": "La sincronización importa tus calificaciones de Trakt (1-10) como calificaciones cardíacas en Aperture. El contenido mejor calificado tendrá más influencia en sus recomendaciones.",
+    "traktFooter": "La sincronización importa tus calificaciones de Trakt (1-10) como calificaciones cardíacas en {{appName}}. El contenido mejor calificado tendrá más influencia en sus recomendaciones.",
     "errLoadUserSettings": "No se pudo cargar la configuración del usuario",
     "errConnectServer": "No se pudo conectar al servidor",
     "libraryNamesSaved": "¡Nombres de biblioteca guardados! Se utilizarán para futuras actualizaciones de la biblioteca.",
@@ -1638,7 +1638,7 @@
     "errReset": "No se pudo restablecer",
     "successReset": "La configuración del algoritmo se restablece a los valores predeterminados",
     "masterTitle": "Pesos de algoritmos personalizados",
-    "masterSubtitle": "Ajusta cómo Aperture genera recomendaciones para ti. Cuando está deshabilitado, se utilizan los valores predeterminados configurados por el administrador.",
+    "masterSubtitle": "Ajusta cómo {{appName}} genera recomendaciones para ti. Cuando está deshabilitado, se utilizan los valores predeterminados configurados por el administrador.",
     "labelUsingCustomWeights": "Usar pesos personalizados",
     "labelUsingDefaultWeights": "Usar pesos predeterminados",
     "descCustomActive": "La configuración de su algoritmo personalizado está activa",
@@ -1707,7 +1707,7 @@
   "settingsApiKeys": {
     "title": "Claves API",
     "createButton": "Crear clave API",
-    "subtitle": "Las claves API permiten el acceso programático a la API de Aperture. Las claves se muestran solo una vez cuando se crean.",
+    "subtitle": "Las claves API permiten el acceso programático a la API de {{appName}}. Las claves se muestran solo una vez cuando se crean.",
     "empty": "No se encontraron claves API. Cree su primera clave API para habilitar el acceso programático.",
     "colName": "Nombre",
     "colPrefix": "Prefijo clave",
@@ -1936,7 +1936,7 @@
     "allowPasswordlessLogin": "Permitir inicio de sesión sin contraseña",
     "allowPasswordlessHelper": "Habilite esto si los usuarios de su servidor de medios no tienen contraseñas configuradas.",
     "securityWarningTitle": "Advertencia de seguridad",
-    "securityWarningBody": "Habilite esto solo si su instancia de Aperture está en una red privada sin exposición a Internet. Si se puede acceder a su servidor mediante proxy inverso o Internet, déjelo desactivado para evitar el acceso no autorizado.",
+    "securityWarningBody": "Habilite esto solo si su instancia de {{appName}} está en una red privada sin exposición a Internet. Si se puede acceder a su servidor mediante proxy inverso o Internet, déjelo desactivado para evitar el acceso no autorizado.",
     "passwordlessEnabled": "Inicio de sesión sin contraseña habilitado",
     "passwordlessDisabled": "Inicio de sesión sin contraseña deshabilitado",
     "displayName": "Server Display Name",
@@ -1949,15 +1949,15 @@
   },
   "settingsFileLocations": {
     "title": "Ubicaciones de archivos",
-    "subtitle": "Configure dónde ve su servidor multimedia las bibliotecas y archivos multimedia de Aperture",
+    "subtitle": "Configure dónde ve su servidor multimedia las bibliotecas y archivos multimedia de {{appName}}",
     "detectPaths": "Rutas de detección automática",
     "detecting": "Detectora…",
-    "detectCaption": "Detecta rutas automáticamente comparando archivos del servidor de medios con las monturas de Aperture",
+    "detectCaption": "Detecta rutas automáticamente comparando archivos del servidor de medios con las monturas de {{appName}}",
     "detectedMapping": "Mapeo de ruta detectado:",
     "mediaServerSample": "Servidor de medios:",
     "apertureSample": "Abertura:",
     "apertureLibrariesPath": "Ruta de bibliotecas de apertura",
-    "apertureLibrariesHelper": "Dónde su servidor de medios ve la salida de Aperture (la carpeta montada como /aperture-libraries en Aperture)",
+    "apertureLibrariesHelper": "Dónde su servidor de medios ve la salida de {{appName}} (la carpeta montada como /aperture-libraries en {{appName}})",
     "mediaServerPathPrefix": "Prefijo de ruta del servidor multimedia",
     "mediaServerPathPrefixHelper": "Ruta base donde su servidor multimedia ve sus archivos multimedia (utilizada para enlaces simbólicos)",
     "loadError": "No se pudo cargar la configuración",
@@ -2007,13 +2007,13 @@
     "explainSymlinksTitle": "Enlaces simbólicos",
     "explainSymlinksIntro": "Crea enlaces simbólicos que apuntan a sus archivos multimedia originales. Reproducción más rápida, misma calidad.",
     "requiresLabel": "Requiere:",
-    "explainSymlinksRequires": "Tanto Aperture como su servidor de medios deben acceder a las mismas rutas del sistema de archivos.",
+    "explainSymlinksRequires": "Tanto {{appName}} como su servidor de medios deben acceder a las mismas rutas del sistema de archivos.",
     "explainStrmTitle": "Archivos STRM",
     "explainStrmIntro": "Crea archivos .strm que contienen rutas o URL de transmisión. Funciona en todas las configuraciones de red.",
     "bestForLabel": "La mejor para:",
     "explainStrmBestFor": "Configuraciones de Docker, diferentes máquinas o cuando las rutas difieren entre sistemas.",
     "symlinkWarningTitle": "Importante:",
-    "symlinkWarningBody": "Los enlaces simbólicos requieren que Aperture pueda acceder a sus archivos multimedia exactamente en las mismas rutas que utiliza su servidor multimedia. Si está ejecutando Aperture en Docker, asegúrese de que los montajes de volumen coincidan.",
+    "symlinkWarningBody": "Los enlaces simbólicos requieren que {{appName}} pueda acceder a sus archivos multimedia exactamente en las mismas rutas que utiliza su servidor multimedia. Si está ejecutando {{appName}} en Docker, asegúrese de que los montajes de volumen coincidan.",
     "saving": "Ahorro…",
     "saveChanges": "Guardar cambios"
   },
@@ -2045,7 +2045,7 @@
   },
   "settingsAiSetup": {
     "pageTitle": "Configuración del proveedor de IA",
-    "pageSubtitle": "Configure proveedores de IA para diferentes funciones. Aperture recomienda usar OpenAI para las cuatro funciones, pero siéntete libre de explorar otros proveedores y modelos.",
+    "pageSubtitle": "Configure proveedores de IA para diferentes funciones. {{appName}} recomienda usar OpenAI para las cuatro funciones, pero siéntete libre de explorar otros proveedores y modelos.",
     "cardEmbeddingsTitle": "Incrustaciones",
     "cardEmbeddingsDesc": "Convierte texto en vectores para búsqueda semántica y recomendaciones. Dimensiones más altas = mejor calidad.",
     "cardChatTitle": "Asistente de chat",
@@ -2074,7 +2074,7 @@
     "saved": "¡Se han guardado los ajustes de explicación de la IA!",
     "unknownError": "Error desconocido",
     "title": "Explicación de la IA en recomendaciones",
-    "subtitle": "Controle si las explicaciones generadas por IA (\"Por qué Aperture eligió esto para usted\") aparecen en las descripciones de las recomendaciones.",
+    "subtitle": "Controle si las explicaciones generadas por IA (\"Por qué {{appName}} eligió esto para usted\") aparecen en las descripciones de las recomendaciones.",
     "includeTitle": "Incluir explicaciones de IA",
     "includeDesc": "Cuando está habilitada, cada recomendación incluye una explicación personalizada de por qué fue seleccionada.",
     "overrideTitle": "Permitir anulaciones por usuario",
@@ -2495,9 +2495,9 @@
     "stepScoringP2": "Your taste profile then applies boosts on top: franchises you keep coming back to, genres you've asked for more of, and any custom interests you've added are pushed up the list.",
     "subtitle": "How your AI recommendations are made",
     "stepSimilar": "Related Titles",
-    "stepWelcomeP1": "<0>Aperture</0> builds a personal recommendation list for both movies and TV series, learning from what you actually watch and rate.",
+    "stepWelcomeP1": "<0>{{appName}}</0> builds a personal recommendation list for both movies and TV series, learning from what you actually watch and rate.",
     "stepWelcomeP2": "It reads your library, watch history and ratings from your Emby or Jellyfin server. The list is rebuilt on a schedule, and the refresh button on this page regenerates it on demand.",
-    "stepHowAiP1": "Aperture uses <0>AI embeddings</0> to understand titles at a deep level:",
+    "stepHowAiP1": "{{appName}} uses <0>AI embeddings</0> to understand titles at a deep level:",
     "stepHowAiLi1": "<0>Semantic understanding:</0> Every movie and series becomes a vector — a long list of numbers capturing its themes, tone, genre and style.",
     "stepHowAiLi2": "<0>Taste profile:</0> Your watch history, ratings and favorites are combined into a single \"taste fingerprint\".",
     "stepHowAiLi3": "<0>Vector similarity:</0> Candidates are found by how close they sit to that fingerprint, not by matching genre labels.",
@@ -2513,7 +2513,7 @@
     "stepSimilarP1": "Open any movie or series and you'll find <0>Related titles</0>, powered by the same embeddings.",
     "stepSimilarP2": "These aren't just titles in the same genre — they're ones that share:",
     "stepSimilarP3": "So \"Inception\" leads to other mind-bending films that share its cerebral nature, not just other Christopher Nolan movies. The Explore page turns the same connections into a graph you can wander through, and the AI assistant searches them in plain language.",
-    "stepDataP1": "Aperture syncs with your media server to work out what you like:",
+    "stepDataP1": "{{appName}} syncs with your media server to work out what you like:",
     "stepDataLi1": "<0>Watch history:</0> what you've watched, how often, and how recently",
     "stepDataLi2": "<0>Ratings and favorites:</0> the ratings you give here and the favorites you set on your server both feed the profile, and a low rating can keep a title out of the list entirely",
     "stepDataLi3": "<0>Recency:</0> recent watches count for more than older ones",
@@ -2522,7 +2522,7 @@
   "explorationConfig": {
     "title": "Nueva característica: IA de exploración",
     "subtitle": "Configure una IA dedicada para la página Explorar",
-    "bodyP1": "Aperture ahora admite un <0>proveedor de IA de exploración</0> dedicado para la generación de gráficos semánticos de la página Explorar.",
+    "bodyP1": "{{appName}} ahora admite un <0>proveedor de IA de exploración</0> dedicado para la generación de gráficos semánticos de la página Explorar.",
     "feature1Title": "Comprensión conceptual",
     "feature1Body": "Utilice un modelo más potente para comprender consultas como \"comedias para sentirse bien\" o \"ciencia ficción alucinante\".",
     "feature2Title": "Mejores conexiones de gráficos",
@@ -2543,12 +2543,12 @@
       "generate-recommendations": "Generando recomendaciones",
       "full-reset-movie-recommendations": "Recomendaciones de películas con reinicio completo",
       "full-reset-series-recommendations": "Recomendaciones de la serie de reinicio completo",
-      "sync-movie-libraries": "Creación de bibliotecas de películas de Aperture",
+      "sync-movie-libraries": "Creación de bibliotecas de películas de {{appName}}",
       "sync-series": "Serie de sincronización",
       "generate-series-embeddings": "Generando incrustaciones de series",
       "sync-series-watch-history": "Sincronización del historial de visualización de series",
       "generate-series-recommendations": "Generando recomendaciones de series",
-      "sync-series-libraries": "Creación de bibliotecas de la serie Aperture",
+      "sync-series-libraries": "Creación de bibliotecas de la serie {{appName}}",
       "refresh-top-picks": "Mejores selecciones refrescantes",
       "auto-request-top-picks": "Solicitud automática de mejores selecciones"
     },
@@ -2845,8 +2845,8 @@
     "episodesProgressFull": "{{vistos}} / {{total}} episodios",
     "episodesShort": "{{visto}}/{{total}} episodios",
     "confirmTitle": "¿Marcar como no observado?",
-    "confirmMovieBody": "Esto marcará \"{{title}}\" como no visto en tu servidor de medios y lo eliminará de tu historial de reproducciones de Aperture.",
-    "confirmSeriesBody": "Esto marcará todos los episodios de \"{{title}}\" como no vistos en tu servidor de medios y los eliminará de tu historial de visualización de Aperture.",
+    "confirmMovieBody": "Esto marcará \"{{title}}\" como no visto en tu servidor de medios y lo eliminará de tu historial de reproducciones de {{appName}}.",
+    "confirmSeriesBody": "Esto marcará todos los episodios de \"{{title}}\" como no vistos en tu servidor de medios y los eliminará de tu historial de visualización de {{appName}}.",
     "cannotUndo": "Esta acción no se puede deshacer.",
     "markUnwatched": "Marcar como no observado",
     "marking": "Calificación…",
@@ -3003,9 +3003,9 @@
       }
     },
     "page": {
-      "brandName": "Aperture",
+      "brandName": "{{appName}}",
       "exitWizardTooltip": "Salir del asistente de configuración",
-      "altLogo": "Aperture"
+      "altLogo": "{{appName}}"
     },
     "initialJobs": {
       "syncMovies": {
@@ -3041,11 +3041,11 @@
         "description": "Creación de recomendaciones de series de TV personalizadas para cada usuario"
       },
       "syncMovieLibraries": {
-        "name": "Construir bibliotecas de películas de Aperture",
+        "name": "Construir bibliotecas de películas de {{appName}}",
         "description": "Creación de bibliotecas de películas recomendadas por IA en su servidor de medios"
       },
       "syncSeriesLibraries": {
-        "name": "Construir bibliotecas de la serie Aperture",
+        "name": "Construir bibliotecas de la serie {{appName}}",
         "description": "Creación de bibliotecas de series de recomendaciones de IA en su servidor de medios"
       },
       "refreshTopPicks": {
@@ -3070,14 +3070,14 @@
     "mediaServer": {
       "tagline": "Descubre tu próximo favorito. Cada vez.",
       "title": "Conecte su servidor multimedia",
-      "subtitle": "Aperture se integra con su servidor Emby o Jellyfin para analizar los hábitos de visualización y generar recomendaciones personalizadas.",
+      "subtitle": "{{appName}} se integra con su servidor Emby o Jellyfin para analizar los hábitos de visualización y generar recomendaciones personalizadas.",
       "connectedTitle": "Servidor multimedia conectado",
       "apiKeyLabel": "Clave API:",
       "connectedTo": "¡Conectado a {{nombre}}!",
       "connectedFallback": "servidor de medios",
       "reconfigure": "Conéctese a un servidor diferente",
-      "needApiKeyShort": "¿Necesita una clave API? En el panel de su servidor de medios, vaya a Configuración → Claves API y cree una nueva clave para Aperture.",
-      "needApiKeyLong": "¿Necesita una clave API? En el panel de su servidor de medios, vaya a Configuración → Claves API y cree una nueva clave para Aperture. Esto permite un acceso seguro de solo lectura a los metadatos de su biblioteca y al historial de reproducciones.",
+      "needApiKeyShort": "¿Necesita una clave API? En el panel de su servidor de medios, vaya a Configuración → Claves API y cree una nueva clave para {{appName}}.",
+      "needApiKeyLong": "¿Necesita una clave API? En el panel de su servidor de medios, vaya a Configuración → Claves API y cree una nueva clave para {{appName}}. Esto permite un acceso seguro de solo lectura a los metadatos de su biblioteca y al historial de reproducciones.",
       "discoverScanning": "Exploración…",
       "discoverServers": "Descubrir Servidores",
       "discoverScanningNetwork": "Escaneando red…",
@@ -3098,15 +3098,15 @@
       "passwordlessLabel": "Permitir inicio de sesión sin contraseña",
       "passwordlessHelper": "Habilite esto si los usuarios de su servidor de medios no tienen contraseñas configuradas.",
       "securityWarningTitle": "Advertencia de seguridad",
-      "securityWarningBody": "Habilite esto solo si su instancia de Aperture está en una red privada sin exposición a Internet. Si se puede acceder a su servidor mediante proxy inverso o Internet, déjelo desactivado para evitar el acceso no autorizado.",
+      "securityWarningBody": "Habilite esto solo si su instancia de {{appName}} está en una red privada sin exposición a Internet. Si se puede acceder a su servidor mediante proxy inverso o Internet, déjelo desactivado para evitar el acceso no autorizado.",
       "continue": "Continuar",
       "saveContinue": "Guardar y continuar",
       "noServersInfo": "No se encontraron servidores"
     },
     "libraries": {
       "title": "Seleccionar bibliotecas para analizar",
-      "body": "Elija qué bibliotecas multimedia debe incluir Aperture al generar recomendaciones. Solo se analizará el contenido de las bibliotecas habilitadas para detectar patrones de visualización y se incluirá en sugerencias impulsadas por IA. Puede tener habilitadas varias bibliotecas de cada tipo.",
-      "whatNext": "Qué sucede a continuación: Aperture sincronizará los metadatos de estas bibliotecas, analizará las similitudes de contenido mediante incrustaciones de IA y realizará un seguimiento del historial de reproducciones para comprender las preferencias de cada usuario.",
+      "body": "Elija qué bibliotecas multimedia debe incluir {{appName}} al generar recomendaciones. Solo se analizará el contenido de las bibliotecas habilitadas para detectar patrones de visualización y se incluirá en sugerencias impulsadas por IA. Puede tener habilitadas varias bibliotecas de cada tipo.",
+      "whatNext": "Qué sucede a continuación: {{appName}} sincronizará los metadatos de estas bibliotecas, analizará las similitudes de contenido mediante incrustaciones de IA y realizará un seguimiento del historial de reproducciones para comprender las preferencias de cada usuario.",
       "refresh": "Actualizar bibliotecas",
       "enableAll": "Habilitar todo",
       "disableAll": "Deshabilitar todo",
@@ -3119,7 +3119,7 @@
     },
     "validate": {
       "title": "Validar configuración",
-      "subtitle": "Verificando que Aperture pueda acceder a todas las rutas requeridas y que su servidor de medios sea accesible.",
+      "subtitle": "Verificando que {{appName}} pueda acceder a todas las rutas requeridas y que su servidor de medios sea accesible.",
       "running": "Ejecutando comprobaciones de validación...",
       "errorPrefix": "Error:",
       "allPassed": "¡Todos los controles pasaron! Su configuración está lista para funcionar.",
@@ -3131,7 +3131,7 @@
     },
     "restore": {
       "title": "Restaurar desde copia de seguridad",
-      "subtitle": "Si tienes una copia de seguridad anterior de Aperture, puedes restaurarla aquí. Esto es útil al migrar a un nuevo servidor o al recuperarse de una falla.",
+      "subtitle": "Si tienes una copia de seguridad anterior de {{appName}}, puedes restaurarla aquí. Esto es útil al migrar a un nuevo servidor o al recuperarse de una falla.",
       "errLoad": "No se pudieron cargar las copias de seguridad disponibles",
       "errUpload": "No se pudo cargar la copia de seguridad",
       "errRestore": "No se pudo restaurar la copia de seguridad",
@@ -3143,10 +3143,10 @@
       "uploadBackup": "Subir copia de seguridad",
       "errLoadGeneric": "No se pudieron cargar las copias de seguridad",
       "startFreshTitle": "Empezar de nuevo",
-      "startFreshBody": "Configura Aperture desde cero. Esta es la opción recomendada para nuevas instalaciones.",
+      "startFreshBody": "Configura {{appName}} desde cero. Esta es la opción recomendada para nuevas instalaciones.",
       "continueSetup": "Continuar configuración",
       "restoreCardTitle": "Restaurar desde copia de seguridad",
-      "restoreCardBody": "Restaura todos tus datos de una instalación anterior de Aperture.",
+      "restoreCardBody": "Restaura todos tus datos de una instalación anterior de {{appName}}.",
       "uploading": "Subiendo...",
       "uploadBackupFile": "Cargar archivo de copia de seguridad",
       "availableBackups": "Copias de seguridad disponibles ({{count}})",
@@ -3181,18 +3181,18 @@
       "setupCompleteFallback": "La configuración está completa.",
       "manageUsersLink": "Administrar usuarios en Admin → Usuarios",
       "back": "Atrás",
-      "bodyParagraph": "Elija qué usuarios deben recibir recomendaciones personalizadas de IA. Para cada usuario, puede habilitar recomendaciones de películas, series de televisión o ambas. Aperture analiza el historial de visualización de cada usuario individualmente para generar sugerencias personalizadas que aparecen en sus bibliotecas de recomendaciones personales.",
+      "bodyParagraph": "Elija qué usuarios deben recibir recomendaciones personalizadas de IA. Para cada usuario, puede habilitar recomendaciones de películas, series de televisión o ambas. {{appName}} analiza el historial de visualización de cada usuario individualmente para generar sugerencias personalizadas que aparecen en sus bibliotecas de recomendaciones personales.",
       "noUsersWarning": "No se encontraron usuarios en su servidor de medios. Asegúrese de que su servidor de medios tenga cuentas de usuario activas y luego haga clic en el botón Actualizar para recargar la lista.",
       "adminSectionTitle": "Usuarios administradoras ({{count}})",
-      "adminInfoCaption": "Los usuarios administradores se han habilitado automáticamente para garantizar que puedas iniciar sesión y administrar Aperture. Al menos un administrador debe permanecer habilitado para mantener el acceso al panel de administración.",
+      "adminInfoCaption": "Los usuarios administradores se han habilitado automáticamente para garantizar que puedas iniciar sesión y administrar {{appName}}. Al menos un administrador debe permanecer habilitado para mantener el acceso al panel de administración.",
       "otherUsersTitle": "Otras usuarias ({{count}})",
       "otherUsersCaption": "Habilite recomendaciones para familiares u otros usuarios en su servidor de medios. Cada usuario habilitado obtendrá sus propias recomendaciones personalizadas basadas en su historial de visualización.",
-      "noteWarning": "Los usuarios que tengan deshabilitadas tanto Películas como Series no recibirán ninguna recomendación y no podrán iniciar sesión en Aperture. Siempre puedes cambiar esta configuración más adelante en Administrador → Usuarios.",
+      "noteWarning": "Los usuarios que tengan deshabilitadas tanto Películas como Series no recibirán ninguna recomendación y no podrán iniciar sesión en {{appName}}. Siempre puedes cambiar esta configuración más adelante en Administrador → Usuarios.",
       "paginationRange": "{{from}}-{{to}} de {{count}}"
     },
     "complete": {
       "title": "¡Configuración completa!",
-      "subtitle": "Aperture ha creado bibliotecas de recomendaciones personalizadas en su servidor de medios.",
+      "subtitle": "{{appName}} ha creado bibliotecas de recomendaciones personalizadas en su servidor de medios.",
       "issuesAlert": "Algunos usuarios fueron omitidos o tuvieron problemas. Los usuarios necesitan un historial de visualización para generar recomendaciones. Recibirán recomendaciones después de ver más contenido y ejecutar la siguiente sincronización.",
       "librariesCreatedIn": "Bibliotecas creadas en {{name}}",
       "mediaServerFallback": "Servidor de medios",
@@ -3211,9 +3211,9 @@
       "loginPrimary": "Inicie sesión con sus credenciales de administrador de Media Server",
       "loginSecondary": "Utilice el mismo nombre de usuario y contraseña que utiliza para Emby/Jellyfin",
       "openServerPrimary": "Abra su servidor de medios para ver las nuevas bibliotecas.",
-      "openServerSecondary": "Aparecerán nuevas bibliotecas 'AI Picks' para cada usuario habilitado en Aperture",
+      "openServerSecondary": "Aparecerán nuevas bibliotecas 'AI Picks' para cada usuario habilitado en {{appName}}",
       "schedulesTitle": "Horarios automáticos",
-      "schedulesIntro": "Aperture ejecuta trabajos en segundo plano para mantener actualizadas las recomendaciones. Los horarios predeterminados se pueden modificar en Admin → Trabajos.",
+      "schedulesIntro": "{{appName}} ejecuta trabajos en segundo plano para mantener actualizadas las recomendaciones. Los horarios predeterminados se pueden modificar en Admin → Trabajos.",
       "schedWatchHistory": "Ver historial",
       "schedWatchHistoryDesc": "Cada 2 horas: realiza un seguimiento de lo que ven los usuarios",
       "schedLibraryScan": "Escaneo de biblioteca",
@@ -3236,7 +3236,7 @@
       "featUserPrefsDesc": "Cada usuario puede personalizar sus preferencias y configuraciones de recomendación.",
       "backToJobs": "Volver a Empleos",
       "finishSetup": "Finalizar la configuración",
-      "finishHint": "Al hacer clic en Finalizar se desactivará el asistente de configuración pública, se protegerá Aperture y se redireccionará para iniciar sesión."
+      "finishHint": "Al hacer clic en Finalizar se desactivará el asistente de configuración pública, se protegerá {{appName}} y se redireccionará para iniciar sesión."
     },
     "initialJobsStep": {
       "newLibraryChip": "Nueva biblioteca",
@@ -3257,7 +3257,7 @@
       "itemsProcessed": "{{count}} artículos",
       "errorPrefix": "Error:",
       "title": "Inicialice su biblioteca",
-      "body": "Aperture ahora sincronizará su biblioteca multimedia, analizará contenido con IA y generará recomendaciones personalizadas. Este proceso consta de varios pasos y puede tardar unos minutos dependiendo del tamaño de su biblioteca.",
+      "body": "{{appName}} ahora sincronizará su biblioteca multimedia, analizará contenido con IA y generará recomendaciones personalizadas. Este proceso consta de varios pasos y puede tardar unos minutos dependiendo del tamaño de su biblioteca.",
       "whatHappensTitle": "Qué sucede durante la inicialización:",
       "bulletSyncMedia": "Sincronizar medios: importe metadatos de películas y series de televisión desde su servidor de medios",
       "bulletWatchHistory": "Sincronizar el historial de visualización: importe el historial de visualización para comprender las preferencias",
@@ -3296,7 +3296,7 @@
       "noteAdvanced": "Las configuraciones avanzadas, como los pesos de los algoritmos de popularidad, las ventanas de tiempo y los programas de actualización, se pueden personalizar más adelante en Administrador → Configuración → Selecciones principales.",
       "noteLabel": "Nota:",
       "outputConfig": "Configuración de salida",
-      "symlinkWarning": "Los enlaces simbólicos requieren que Aperture pueda acceder a sus archivos multimedia exactamente en las mismas rutas que utiliza su servidor multimedia. Si las rutas difieren entre sistemas (por ejemplo, contenedores Docker), utilice archivos STRM en su lugar.",
+      "symlinkWarning": "Los enlaces simbólicos requieren que {{appName}} pueda acceder a sus archivos multimedia exactamente en las mismas rutas que utiliza su servidor multimedia. Si las rutas difieren entre sistemas (por ejemplo, contenedores Docker), utilice archivos STRM en su lugar.",
       "symlinkLabel": "Enlaces simbólicos",
       "back": "Atrás",
       "saveContinue": "Guardar y continuar",
@@ -3305,10 +3305,10 @@
     },
     "fileLocations": {
       "title": "Ubicaciones de archivos",
-      "body": "Configure dónde ve su servidor de medios los archivos de la biblioteca de Aperture. Estas rutas deben coincidir con la forma en que su servidor de medios accede a los volúmenes montados en su configuración de Docker.",
+      "body": "Configure dónde ve su servidor de medios los archivos de la biblioteca de {{appName}}. Estas rutas deben coincidir con la forma en que su servidor de medios accede a los volúmenes montados en su configuración de Docker.",
       "saved": "¡Ubicaciones de archivos guardadas!",
       "autoDetectTitle": "Rutas de detección automática",
-      "autoDetectBody": "Aperture puede detectar automáticamente las rutas correctas comparando cómo su servidor de medios ve los archivos con cómo los ve Aperture.",
+      "autoDetectBody": "{{appName}} puede detectar automáticamente las rutas correctas comparando cómo su servidor de medios ve los archivos con cómo los ve {{appName}}.",
       "detecting": "Detectora...",
       "detectButton": "Detectar rutas automáticamente",
       "pathsDetected": "¡Rutas detectadas con éxito!",
@@ -3320,7 +3320,7 @@
       "howToFindTitle": "Cómo encontrar estos caminos:",
       "howToFindBody": "Abra cualquier película en su servidor de medios, vaya a Información de medios y observe la ruta del archivo. Si muestra /mnt/Movies/SomeMovie/file.mkv, el prefijo de su ruta multimedia es /mnt/.",
       "apertureLibsPath": "Ruta de bibliotecas de apertura",
-      "apertureLibsHelp": "¿Dónde ve su servidor de medios las bibliotecas de salida de Aperture?",
+      "apertureLibsHelp": "¿Dónde ve su servidor de medios las bibliotecas de salida de {{appName}}?",
       "helperApertureLibs": "Ruta donde su servidor de medios ve /aperture-libraries",
       "mediaPrefixTitle": "Prefijo de ruta del servidor multimedia",
       "mediaPrefixHelp": "¿Dónde ve su servidor de medios sus archivos multimedia originales?",
@@ -3336,8 +3336,8 @@
     },
     "aiRecs": {
       "title": "Configurar bibliotecas de recomendaciones de IA",
-      "body": "Aperture crea bibliotecas virtuales en su servidor de medios que contienen recomendaciones personalizadas para cada usuario. Configure cómo se crean estas bibliotecas y, opcionalmente, personalice sus imágenes de portada.",
-      "strmVsSymlink": "STRM frente a enlaces simbólicos: los archivos STRM funcionan universalmente y admiten URL de transmisión, mientras que los enlaces simbólicos brindan acceso directo a archivos (mejor para reproducción local) pero requieren que Aperture acceda a sus archivos multimedia en las mismas rutas que su servidor multimedia. Para series de televisión, se recomiendan enlaces simbólicos para un mejor rendimiento.",
+      "body": "{{appName}} crea bibliotecas virtuales en su servidor de medios que contienen recomendaciones personalizadas para cada usuario. Configure cómo se crean estas bibliotecas y, opcionalmente, personalice sus imágenes de portada.",
+      "strmVsSymlink": "STRM frente a enlaces simbólicos: los archivos STRM funcionan universalmente y admiten URL de transmisión, mientras que los enlaces simbólicos brindan acceso directo a archivos (mejor para reproducción local) pero requieren que {{appName}} acceda a sus archivos multimedia en las mismas rutas que su servidor multimedia. Para series de televisión, se recomiendan enlaces simbólicos para un mejor rendimiento.",
       "moviesLibrary": "Biblioteca de películas",
       "seriesLibrary": "Biblioteca de series",
       "imageSet": "Conjunto de imágenes",
@@ -3374,8 +3374,8 @@
       "needKeyLink": "platform.openai.com/api-keys",
       "needKeyBeforeLink": "Visita",
       "needKeyAfterLink": "para crear uno. Las cuentas nuevas obtienen $5 de crédito gratis. El uso típico cuesta ~$0,10-0,50/mes.",
-      "bodyLead": "Aperture utiliza IA para impulsar su motor de recomendaciones. Configure sus proveedores de IA a continuación.",
-      "bodyBold": "Aperture recomienda usar OpenAI",
+      "bodyLead": "{{appName}} utiliza IA para impulsar su motor de recomendaciones. Configure sus proveedores de IA a continuación.",
+      "bodyBold": "{{appName}} recomienda usar OpenAI",
       "bodyTail": "para obtener la mejor experiencia, pero puede explorar otros proveedores, incluidos modelos locales."
     }
   },
@@ -3519,7 +3519,7 @@
       "playlist": "Lista de reproducción",
       "symlinks": "Enlaces simbólicos",
       "strmFiles": "Archivos STRM",
-      "symlinkWarning": "Los <strong>enlaces simbólicos</strong> requieren que Aperture pueda acceder a sus archivos multimedia exactamente en las mismas rutas que utiliza su servidor multimedia. Si las rutas difieren entre sistemas (por ejemplo, contenedores Docker), utilice archivos STRM en su lugar."
+      "symlinkWarning": "Los <strong>enlaces simbólicos</strong> requieren que {{appName}} pueda acceder a sus archivos multimedia exactamente en las mismas rutas que utiliza su servidor multimedia. Si las rutas difieren entre sistemas (por ejemplo, contenedores Docker), utilice archivos STRM en su lugar."
     },
     "localAlgorithm": {
       "title": "Algoritmo de popularidad local",
@@ -3532,7 +3532,7 @@
     "autoRequest": {
       "title": "Solicitar automáticamente contenido faltante",
       "subtitle": "Solicite automáticamente el contenido Top Picks que falta a través de Seerr. Sólo funciona con fuentes externas (TMDB, MDBList).",
-      "infoLine1": "Cuando esté habilitado, Aperture revisará periódicamente su lista de mejores opciones en busca de artículos que no estén en su biblioteca y enviará automáticamente solicitudes a Seerr.",
+      "infoLine1": "Cuando esté habilitado, {{appName}} revisará periódicamente su lista de mejores opciones en busca de artículos que no estén en su biblioteca y enviará automáticamente solicitudes a Seerr.",
       "infoLine2": "Asegúrese de que Seerr esté configurado en <1>Configuración → Integraciones</1>.",
       "moviesSection": "Cine",
       "seriesSection": "Serie",
@@ -3623,7 +3623,7 @@
     },
     "posterRepair": {
       "title": "Reparación de carteles faltantes",
-      "description": "Escanee su biblioteca de Emby en busca de películas y series a las que les falten imágenes de carteles. Esta herramienta busca carteles de reemplazo de TMDB y los carga directamente en Emby; no se almacenan imágenes en Aperture.",
+      "description": "Escanee su biblioteca de Emby en busca de películas y series a las que les falten imágenes de carteles. Esta herramienta busca carteles de reemplazo de TMDB y los carga directamente en Emby; no se almacenan imágenes en {{appName}}.",
       "scan": "Escanear en busca de carteles faltantes",
       "scanning": "Exploración...",
       "repairSelected": "Reparar {{count}} Seleccionado",
@@ -4141,7 +4141,7 @@
     "rateLimitedToday": "{{count}} rate-limited today",
     "rateLimitedToday_plural": "{{count}} rate-limited today",
     "paused": "{{slot}} is paused until {{time}} — Google turned it away for going over quota.",
-    "caveat": "Counted per Aperture request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
+    "caveat": "Counted per {{appName}} request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
     "slotPrimary": "Main key",
     "slotFallback": "Fallback key"
   },
@@ -4215,16 +4215,16 @@
     "setupLocalOnly": "Local network only",
     "setupAnywhere": "Reachable from anywhere",
     "allClear": "No problems detected with how this instance is exposed.",
-    "restartNote": "These are read from environment variables at startup. Change them in your compose file or service definition and restart Aperture.",
+    "restartNote": "These are read from environment variables at startup. Change them in your compose file or service definition and restart {{appName}}.",
     "findings": {
       "proxyHeadersIgnored": {
-        "title": "A proxy is forwarding requests, but Aperture is ignoring it",
+        "title": "A proxy is forwarding requests, but {{appName}} is ignoring it",
         "detail": "Requests are arriving with an X-Forwarded-For header while TRUST_PROXY is unset, so every visitor appears to come from the same address. The login rate limiter collapses into one shared bucket — a single attacker can exhaust it for everyone — and first-run setup treats remote visitors as local.",
         "fix": "TRUST_PROXY=127.0.0.1   # or your proxy container address, e.g. 172.18.0.1"
       },
       "allTrafficOneAddress": {
         "title": "Every request so far has come from the same local address",
-        "detail": "Normal for a single-machine LAN install. If a reverse proxy or tunnel sits in front of Aperture, this instead means its forwarded client IPs are being discarded.",
+        "detail": "Normal for a single-machine LAN install. If a reverse proxy or tunnel sits in front of {{appName}}, this instead means its forwarded client IPs are being discarded.",
         "fix": "TRUST_PROXY=127.0.0.1   # only if a proxy or tunnel is in front"
       },
       "proxyModeWithoutTrust": {
@@ -4239,7 +4239,7 @@
       },
       "boundToAllInterfaces": {
         "title": "Also reachable directly, bypassing the proxy",
-        "detail": "A proxy is expected in front, but Aperture is listening on every network interface. Anyone who can reach its port directly skips the proxy entirely — including any access control the proxy enforces.",
+        "detail": "A proxy is expected in front, but {{appName}} is listening on every network interface. Anyone who can reach its port directly skips the proxy entirely — including any access control the proxy enforces.",
         "fix": "HOST=127.0.0.1   # only when the proxy runs on this same host"
       },
       "cookieInsecure": {
@@ -4269,7 +4269,7 @@
       }
     },
     "trustedProxiesTitle": "Trusted proxies",
-    "trustedProxiesHelp": "Addresses allowed to tell Aperture who the real visitor is via X-Forwarded-For. Set this to your reverse proxy or tunnel, never to a public range — anything listed here can claim any client IP it likes.",
+    "trustedProxiesHelp": "Addresses allowed to tell {{appName}} who the real visitor is via X-Forwarded-For. Set this to your reverse proxy or tunnel, never to a public range — anything listed here can claim any client IP it likes.",
     "trustedProxiesFormat": "Comma-separated IP addresses or CIDR ranges. Also accepts loopback, linklocal and uniquelocal.",
     "presets": "Presets:",
     "presetTunnel": "Tunnel on this host",
@@ -4278,12 +4278,23 @@
     "savedApplied": "Saved. Real client IPs are in use from the next request.",
     "saveFailed": "Could not save trusted proxies.",
     "envManaged": "Trusted proxies are set by the TRUST_PROXY environment variable, so they cannot be edited here. Remove it from your compose file to manage them from this page.",
-    "detectedTitle": "Aperture can see what is forwarding to it",
-    "detectedBody": "Requests are reaching Aperture from {{addresses}}, carrying a forwarded visitor address. If that is your tunnel or reverse proxy — for Cloudflare Tunnel it is cloudflared — trust it and Aperture will start using real visitor addresses immediately.",
+    "detectedTitle": "{{appName}} can see what is forwarding to it",
+    "detectedBody": "Requests are reaching {{appName}} from {{addresses}}, carrying a forwarded visitor address. If that is your tunnel or reverse proxy — for Cloudflare Tunnel it is cloudflared — trust it and {{appName}} will start using real visitor addresses immediately.",
     "detectedAction": "Trust {{addresses}}",
     "unsaved": "Not saved yet — click Save to apply this.",
     "viaDirect": "Direct connection",
     "viaProxy": "A proxy or tunnel",
     "viaProxyNamed": "A proxy or tunnel ({{addresses}})"
+  },
+  "settingsBranding": {
+    "title": "Instance name",
+    "subtitle": "The name shown throughout the app — in the sidebar, the browser tab, the sign-in page, and anywhere the interface refers to itself.",
+    "label": "Name",
+    "helper": "Up to {{max}} characters. Leave it blank to go back to the default.",
+    "reset": "Reset to {{name}}",
+    "saved": "Instance name updated",
+    "fetchFailed": "Failed to load the instance name",
+    "saveFailed": "Failed to save the instance name",
+    "unknownError": "Something went wrong"
   }
 }

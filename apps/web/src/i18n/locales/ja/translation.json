@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Aperture",
+    "appName": "{{appName}}",
     "save": "保存",
     "saving": "保存中…",
     "loading": "読み込み中…",
@@ -212,7 +212,7 @@
       "aiOverrideColTooltip": "AI 説明の設定をユーザーが変更できるようにする",
       "disabledOnServer": "メディアサーバーで無効",
       "activeStatus": "有効",
-      "importedTooltip": "Aperture に取り込み済みのユーザー",
+      "importedTooltip": "{{appName}} に取り込み済みのユーザー",
       "notImportedTooltip": "未取り込み",
       "discoverToggleOn": "発見の提案を無効にする",
       "discoverToggleOff": "発見の提案を有効にする",
@@ -255,7 +255,7 @@
           "description": "映画向けの機械学習タスク"
         },
         "movieLib": {
-          "title": "Aperture ライブラリ",
+          "title": "{{appName}} ライブラリ",
           "description": "メディアサーバーに AI おすすめライブラリを構築します"
         },
         "seriesSync": {
@@ -267,7 +267,7 @@
           "description": "TV シリーズ向けの機械学習タスク"
         },
         "seriesLib": {
-          "title": "Aperture ライブラリ",
+          "title": "{{appName}} ライブラリ",
           "description": "メディアサーバーに AI おすすめライブラリを構築します"
         },
         "globalMeta": {
@@ -288,8 +288,8 @@
         }
       },
       "jobNames": {
-        "syncMovieLibraries": "Aperture 映画ライブラリを構築",
-        "syncSeriesLibraries": "Aperture シリーズライブラリを構築",
+        "syncMovieLibraries": "{{appName}} 映画ライブラリを構築",
+        "syncSeriesLibraries": "{{appName}} シリーズライブラリを構築",
         "fullResetMovieRecommendations": "映画おすすめを完全リセット",
         "fullResetSeriesRecommendations": "シリーズおすすめを完全リセット"
       },
@@ -436,7 +436,7 @@
       "discoveryAccessUpdated": "発見へのアクセス権限を更新しました！",
       "discoveryRequestUpdated": "発見のリクエスト権限を更新しました！",
       "watchHistoryTitle": "視聴履歴の管理",
-      "watchHistoryBody": "このユーザーが映画とシリーズを未視聴に戻せるようにします。メディアサーバー（Emby/Jellyfin）と Aperture のデータベースの両方が更新されます。",
+      "watchHistoryBody": "このユーザーが映画とシリーズを未視聴に戻せるようにします。メディアサーバー（Emby/Jellyfin）と {{appName}} のデータベースの両方が更新されます。",
       "watchHistoryToggleTitle": "視聴履歴の管理を許可",
       "watchHistoryToggleHint": "視聴履歴ページと作品詳細から未視聴に戻せます",
       "discoveryTitle": "発見の権限",
@@ -535,7 +535,7 @@
     "aiExplanationTitle": "AI説明の好み",
     "aiExplanationSubtitle": "AI が生成した説明を推奨事項の説明に含めるかどうかを選択します。",
     "aiExplanationIncludeTitle": "AIの説明を含める",
-    "aiExplanationIncludeBody": "有効にすると、各推奨事項に「Aperture がこれを選んだ理由」が含まれます。",
+    "aiExplanationIncludeBody": "有効にすると、各推奨事項に「{{appName}} がこれを選んだ理由」が含まれます。",
     "aiExplanationReset": "デフォルトにリセット ({{state}})",
     "stateEnabled": "有効",
     "stateDisabled": "無効",
@@ -572,7 +572,7 @@
     "traktSyncing": "同期中…",
     "traktDisconnect": "切断する",
     "traktConnect": "Traktに接続する",
-    "traktFooter": "同期すると、Trakt 評価 (1 ～ 10) が心拍数として Aperture にインポートされます。 評価の高いコンテンツほど、おすすめに対する影響力が大きくなります。",
+    "traktFooter": "同期すると、Trakt 評価 (1 ～ 10) が心拍数として {{appName}} にインポートされます。 評価の高いコンテンツほど、おすすめに対する影響力が大きくなります。",
     "errLoadUserSettings": "ユーザー設定のロードに失敗しました",
     "errConnectServer": "サーバーに接続できませんでした",
     "libraryNamesSaved": "ライブラリ名が保存されました! これらは将来のライブラリの更新に使用されます。",
@@ -983,7 +983,7 @@
       "noTrailer": "トレーラーが見つかりませんでした",
       "failedTrailer": "トレーラーのロードに失敗しました",
       "confirmUnwatchedTitle": "未視聴としてマークしますか?",
-      "confirmUnwatchedBody": "これにより、メディア サーバー内で「{{title}}」が未視聴としてマークされ、Aperture の視聴履歴から削除されます。",
+      "confirmUnwatchedBody": "これにより、メディア サーバー内で「{{title}}」が未視聴としてマークされ、{{appName}} の視聴履歴から削除されます。",
       "cannotUndo": "この操作は元に戻すことができません。",
       "marking": "マーキング…",
       "snackbarMarked": "未視聴としてマークされた映画",
@@ -1638,7 +1638,7 @@
     "errReset": "リセットに失敗しました",
     "successReset": "アルゴリズム設定がデフォルトにリセットされる",
     "masterTitle": "カスタムアルゴリズムの重み",
-    "masterSubtitle": "Aperture が推奨事項を生成する方法を微調整します。 無効にすると、管理者が構成したデフォルトが使用されます。",
+    "masterSubtitle": "{{appName}} が推奨事項を生成する方法を微調整します。 無効にすると、管理者が構成したデフォルトが使用されます。",
     "labelUsingCustomWeights": "カスタムウェイトの使用",
     "labelUsingDefaultWeights": "デフォルトの重みの使用",
     "descCustomActive": "パーソナライズされたアルゴリズム設定が有効になっています",
@@ -1707,7 +1707,7 @@
   "settingsApiKeys": {
     "title": "APIキー",
     "createButton": "APIキーの作成",
-    "subtitle": "API キーを使用すると、プログラムによる Aperture API へのアクセスが可能になります。 キーは作成時に 1 回だけ表示されます。",
+    "subtitle": "API キーを使用すると、プログラムによる {{appName}} API へのアクセスが可能になります。 キーは作成時に 1 回だけ表示されます。",
     "empty": "API キーが見つかりません。 最初の API キーを作成して、プログラムによるアクセスを有効にします。",
     "colName": "名前",
     "colPrefix": "キープレフィックス",
@@ -1936,7 +1936,7 @@
     "allowPasswordlessLogin": "パスワードなしのログインを許可する",
     "allowPasswordlessHelper": "メディアサーバーユーザーがパスワードを設定していない場合は、これを有効にします",
     "securityWarningTitle": "セキュリティ警告",
-    "securityWarningBody": "Aperture インスタンスがインターネットに公開されていないプライベート ネットワーク上にある場合にのみ、これを有効にします。 リバース プロキシまたはインターネット経由でサーバーにアクセスできる場合は、不正アクセスを防ぐためにこれを無効のままにしておきます。",
+    "securityWarningBody": "{{appName}} インスタンスがインターネットに公開されていないプライベート ネットワーク上にある場合にのみ、これを有効にします。 リバース プロキシまたはインターネット経由でサーバーにアクセスできる場合は、不正アクセスを防ぐためにこれを無効のままにしておきます。",
     "passwordlessEnabled": "パスワードレスログインが有効になりました",
     "passwordlessDisabled": "パスワードレスログインが無効になっています",
     "displayName": "Server Display Name",
@@ -1949,15 +1949,15 @@
   },
   "settingsFileLocations": {
     "title": "ファイルの場所",
-    "subtitle": "メディアサーバーが Aperture のライブラリとメディアファイルを参照する場所を設定する",
+    "subtitle": "メディアサーバーが {{appName}} のライブラリとメディアファイルを参照する場所を設定する",
     "detectPaths": "パスの自動検出",
     "detecting": "検出中…",
-    "detectCaption": "メディアサーバーファイルと Aperture のマウントを比較してパスを自動的に検出します",
+    "detectCaption": "メディアサーバーファイルと {{appName}} のマウントを比較してパスを自動的に検出します",
     "detectedMapping": "検出されたパス マッピング:",
     "mediaServerSample": "メディアサーバー:",
     "apertureSample": "絞り:",
-    "apertureLibrariesPath": "Aperture ライブラリのパス",
-    "apertureLibrariesHelper": "メディアサーバーが Aperture の出力を参照する場所 (Aperture に /aperture-libraries としてマウントされたフォルダー)",
+    "apertureLibrariesPath": "{{appName}} ライブラリのパス",
+    "apertureLibrariesHelper": "メディアサーバーが {{appName}} の出力を参照する場所 ({{appName}} に /aperture-libraries としてマウントされたフォルダー)",
     "mediaServerPathPrefix": "メディアサーバーパスプレフィックス",
     "mediaServerPathPrefixHelper": "メディアサーバーがメディアファイルを認識するベースパス (シンボリックリンクに使用)",
     "loadError": "構成のロードに失敗しました",
@@ -2007,13 +2007,13 @@
     "explainSymlinksTitle": "シンボリックリンク",
     "explainSymlinksIntro": "オリジナルのメディア ファイルを指すシンボリック リンクを作成します。 同じ品質でより高速な再生。",
     "requiresLabel": "必要：",
-    "explainSymlinksRequires": "Aperture とメディアサーバーの両方が同じファイルシステムパスにアクセスする必要があります。",
+    "explainSymlinksRequires": "{{appName}} とメディアサーバーの両方が同じファイルシステムパスにアクセスする必要があります。",
     "explainStrmTitle": "STRMファイル",
     "explainStrmIntro": "パスまたはストリーミング URL を含む .strm ファイルを作成します。 すべてのネットワーク構成で動作します。",
     "bestForLabel": "以下に最適:",
     "explainStrmBestFor": "Docker セットアップ、異なるマシン、またはシステム間でパスが異なる場合。",
     "symlinkWarningTitle": "重要：",
-    "symlinkWarningBody": "シンボリックリンクでは、Aperture がメディア サーバーが使用するのとまったく同じパスでメディア ファイルにアクセスできる必要があります。 Docker で Aperture を実行している場合は、ボリューム マウントが一致していることを確認してください。",
+    "symlinkWarningBody": "シンボリックリンクでは、{{appName}} がメディア サーバーが使用するのとまったく同じパスでメディア ファイルにアクセスできる必要があります。 Docker で {{appName}} を実行している場合は、ボリューム マウントが一致していることを確認してください。",
     "saving": "保存中…",
     "saveChanges": "変更を保存"
   },
@@ -2045,7 +2045,7 @@
   },
   "settingsAiSetup": {
     "pageTitle": "AI プロバイダーの構成",
-    "pageSubtitle": "さまざまな機能に合わせて AI プロバイダーを構成します。 Aperture では、4 つの機能すべてに OpenAI を使用することを推奨していますが、他のプロバイダーやモデルを自由に試してみてください。",
+    "pageSubtitle": "さまざまな機能に合わせて AI プロバイダーを構成します。 {{appName}} では、4 つの機能すべてに OpenAI を使用することを推奨していますが、他のプロバイダーやモデルを自由に試してみてください。",
     "cardEmbeddingsTitle": "埋め込み",
     "cardEmbeddingsDesc": "セマンティック検索と推奨のためにテキストをベクトルに変換します。 次元が高いほど品質が高くなります。",
     "cardChatTitle": "チャットアシスタント",
@@ -2074,7 +2074,7 @@
     "saved": "AI解説設定が保存されました！",
     "unknownError": "不明なエラー",
     "title": "推奨事項における AI の説明",
-    "subtitle": "AI が生成した説明 (「Aperture がこれを選んだ理由」) を推奨事項の説明に表示するかどうかを制御します",
+    "subtitle": "AI が生成した説明 (「{{appName}} がこれを選んだ理由」) を推奨事項の説明に表示するかどうかを制御します",
     "includeTitle": "AIの説明を含める",
     "includeDesc": "有効にすると、各推奨事項に、その推奨事項が選択された理由に関する個別の説明が含まれます。",
     "overrideTitle": "ユーザーごとの上書きを許可する",
@@ -2478,8 +2478,8 @@
     "threadCrashRetry": "Try again"
   },
   "welcomeModal": {
-    "title": "Apertureへようこそ",
-    "stepWelcome": "Apertureへようこそ",
+    "title": "{{appName}}へようこそ",
+    "stepWelcome": "{{appName}}へようこそ",
     "stepHowAi": "AI レコメンデーションの仕組み",
     "stepScoring": "得点要素",
     "stepData": "あなたのデータ",
@@ -2495,9 +2495,9 @@
     "stepScoringP2": "Your taste profile then applies boosts on top: franchises you keep coming back to, genres you've asked for more of, and any custom interests you've added are pushed up the list.",
     "subtitle": "How your AI recommendations are made",
     "stepSimilar": "Related Titles",
-    "stepWelcomeP1": "<0>Aperture</0> builds a personal recommendation list for both movies and TV series, learning from what you actually watch and rate.",
+    "stepWelcomeP1": "<0>{{appName}}</0> builds a personal recommendation list for both movies and TV series, learning from what you actually watch and rate.",
     "stepWelcomeP2": "It reads your library, watch history and ratings from your Emby or Jellyfin server. The list is rebuilt on a schedule, and the refresh button on this page regenerates it on demand.",
-    "stepHowAiP1": "Aperture uses <0>AI embeddings</0> to understand titles at a deep level:",
+    "stepHowAiP1": "{{appName}} uses <0>AI embeddings</0> to understand titles at a deep level:",
     "stepHowAiLi1": "<0>Semantic understanding:</0> Every movie and series becomes a vector — a long list of numbers capturing its themes, tone, genre and style.",
     "stepHowAiLi2": "<0>Taste profile:</0> Your watch history, ratings and favorites are combined into a single \"taste fingerprint\".",
     "stepHowAiLi3": "<0>Vector similarity:</0> Candidates are found by how close they sit to that fingerprint, not by matching genre labels.",
@@ -2513,7 +2513,7 @@
     "stepSimilarP1": "Open any movie or series and you'll find <0>Related titles</0>, powered by the same embeddings.",
     "stepSimilarP2": "These aren't just titles in the same genre — they're ones that share:",
     "stepSimilarP3": "So \"Inception\" leads to other mind-bending films that share its cerebral nature, not just other Christopher Nolan movies. The Explore page turns the same connections into a graph you can wander through, and the AI assistant searches them in plain language.",
-    "stepDataP1": "Aperture syncs with your media server to work out what you like:",
+    "stepDataP1": "{{appName}} syncs with your media server to work out what you like:",
     "stepDataLi1": "<0>Watch history:</0> what you've watched, how often, and how recently",
     "stepDataLi2": "<0>Ratings and favorites:</0> the ratings you give here and the favorites you set on your server both feed the profile, and a low rating can keep a title out of the list entirely",
     "stepDataLi3": "<0>Recency:</0> recent watches count for more than older ones",
@@ -2522,7 +2522,7 @@
   "explorationConfig": {
     "title": "新機能: 探索 AI",
     "subtitle": "Explore ページ専用の AI を構成する",
-    "bodyP1": "Aperture は、Explore ページのセマンティック グラフ生成のための専用の <0>Exploration AI プロバイダ</0> をサポートするようになりました。",
+    "bodyP1": "{{appName}} は、Explore ページのセマンティック グラフ生成のための専用の <0>Exploration AI プロバイダ</0> をサポートするようになりました。",
     "feature1Title": "概念的な理解",
     "feature1Body": "より強力なモデルを使用して、「楽しいコメディ」や「心を揺さぶる SF」などのクエリを理解する",
     "feature2Title": "より良いグラフ接続",
@@ -2543,12 +2543,12 @@
       "generate-recommendations": "推奨事項の生成",
       "full-reset-movie-recommendations": "フルリセットムービーのおすすめ",
       "full-reset-series-recommendations": "フルリセットシリーズの推奨事項",
-      "sync-movie-libraries": "Aperture ムービー ライブラリの構築",
+      "sync-movie-libraries": "{{appName}} ムービー ライブラリの構築",
       "sync-series": "同期シリーズ",
       "generate-series-embeddings": "シリーズ埋め込みの生成",
       "sync-series-watch-history": "シリーズの視聴履歴を同期しています",
       "generate-series-recommendations": "シリーズ推奨事項の生成",
-      "sync-series-libraries": "Aperture シリーズ ライブラリの構築",
+      "sync-series-libraries": "{{appName}} シリーズ ライブラリの構築",
       "refresh-top-picks": "爽やかなトップピック",
       "auto-request-top-picks": "トップピックの自動リクエスト"
     },
@@ -2845,8 +2845,8 @@
     "episodesProgressFull": "{{視聴済み}} / {{合計}} エピソード",
     "episodesShort": "{{視聴済み}}/{{合計}} eps",
     "confirmTitle": "未視聴としてマークしますか?",
-    "confirmMovieBody": "これにより、メディア サーバー内で「{{title}}」が未視聴としてマークされ、Aperture の視聴履歴から削除されます。",
-    "confirmSeriesBody": "これにより、「{{title}}」のすべてのエピソードがメディア サーバー内で未視聴としてマークされ、Aperture の視聴履歴から削除されます。",
+    "confirmMovieBody": "これにより、メディア サーバー内で「{{title}}」が未視聴としてマークされ、{{appName}} の視聴履歴から削除されます。",
+    "confirmSeriesBody": "これにより、「{{title}}」のすべてのエピソードがメディア サーバー内で未視聴としてマークされ、{{appName}} の視聴履歴から削除されます。",
     "cannotUndo": "この操作は元に戻すことができません。",
     "markUnwatched": "未視聴としてマークする",
     "marking": "マーキング…",
@@ -3003,9 +3003,9 @@
       }
     },
     "page": {
-      "brandName": "Aperture",
+      "brandName": "{{appName}}",
       "exitWizardTooltip": "セットアップウィザードを終了する",
-      "altLogo": "Aperture"
+      "altLogo": "{{appName}}"
     },
     "initialJobs": {
       "syncMovies": {
@@ -3041,11 +3041,11 @@
         "description": "ユーザーごとにパーソナライズされた TV シリーズの推奨事項を作成する"
       },
       "syncMovieLibraries": {
-        "name": "Aperture ムービー ライブラリを構築する",
+        "name": "{{appName}} ムービー ライブラリを構築する",
         "description": "メディア サーバーに AI レコメンデーション ムービー ライブラリを作成する"
       },
       "syncSeriesLibraries": {
-        "name": "Aperture シリーズのライブラリを構築する",
+        "name": "{{appName}} シリーズのライブラリを構築する",
         "description": "メディア サーバーに AI レコメンデーション シリーズ ライブラリを作成する"
       },
       "refreshTopPicks": {
@@ -3070,14 +3070,14 @@
     "mediaServer": {
       "tagline": "次のお気に入りを見つけてください。 毎回。",
       "title": "メディアサーバーに接続する",
-      "subtitle": "Aperture は Emby または Jellyfin サーバーと統合して、視聴習慣を分析し、パーソナライズされた推奨事項を生成します。",
+      "subtitle": "{{appName}} は Emby または Jellyfin サーバーと統合して、視聴習慣を分析し、パーソナライズされた推奨事項を生成します。",
       "connectedTitle": "メディアサーバーが接続されました",
       "apiKeyLabel": "APIキー:",
       "connectedTo": "{{name}} に接続しました!",
       "connectedFallback": "メディアサーバー",
       "reconfigure": "別のサーバーに接続する",
-      "needApiKeyShort": "API キーが必要ですか? メディアサーバーのダッシュボードで、「設定」→「API キー」に移動し、Aperture の新しいキーを作成します。",
-      "needApiKeyLong": "API キーが必要ですか? メディアサーバーのダッシュボードで、「設定」→「API キー」に移動し、Aperture の新しいキーを作成します。 これにより、ライブラリのメタデータと視聴履歴への安全な読み取り専用アクセスが可能になります。",
+      "needApiKeyShort": "API キーが必要ですか? メディアサーバーのダッシュボードで、「設定」→「API キー」に移動し、{{appName}} の新しいキーを作成します。",
+      "needApiKeyLong": "API キーが必要ですか? メディアサーバーのダッシュボードで、「設定」→「API キー」に移動し、{{appName}} の新しいキーを作成します。 これにより、ライブラリのメタデータと視聴履歴への安全な読み取り専用アクセスが可能になります。",
       "discoverScanning": "走査…",
       "discoverServers": "サーバーの検出",
       "discoverScanningNetwork": "ネットワークをスキャン中…",
@@ -3098,15 +3098,15 @@
       "passwordlessLabel": "パスワードなしのログインを許可する",
       "passwordlessHelper": "メディアサーバーユーザーがパスワードを設定していない場合は、これを有効にします",
       "securityWarningTitle": "セキュリティ警告",
-      "securityWarningBody": "Aperture インスタンスがインターネットに公開されていないプライベート ネットワーク上にある場合にのみ、これを有効にします。 リバース プロキシまたはインターネット経由でサーバーにアクセスできる場合は、不正アクセスを防ぐためにこれを無効のままにしておきます。",
+      "securityWarningBody": "{{appName}} インスタンスがインターネットに公開されていないプライベート ネットワーク上にある場合にのみ、これを有効にします。 リバース プロキシまたはインターネット経由でサーバーにアクセスできる場合は、不正アクセスを防ぐためにこれを無効のままにしておきます。",
       "continue": "続く",
       "saveContinue": "保存して続行",
       "noServersInfo": "サーバーが見つかりませんでした"
     },
     "libraries": {
       "title": "分析するライブラリの選択",
-      "body": "レコメンデーションを生成するときに Aperture に含めるメディア ライブラリを選択します。 有効なライブラリのコンテンツのみが表示パターンについて分析され、AI による提案に含まれます。 各タイプの複数のライブラリを有効にすることができます。",
-      "whatNext": "次に何が起こるか: Aperture はこれらのライブラリからメタデータを同期し、AI 埋め込みを使用してコンテンツの類似性を分析し、視聴履歴を追跡して各ユーザーの好みを理解します。",
+      "body": "レコメンデーションを生成するときに {{appName}} に含めるメディア ライブラリを選択します。 有効なライブラリのコンテンツのみが表示パターンについて分析され、AI による提案に含まれます。 各タイプの複数のライブラリを有効にすることができます。",
+      "whatNext": "次に何が起こるか: {{appName}} はこれらのライブラリからメタデータを同期し、AI 埋め込みを使用してコンテンツの類似性を分析し、視聴履歴を追跡して各ユーザーの好みを理解します。",
       "refresh": "ライブラリを更新する",
       "enableAll": "すべてを有効にする",
       "disableAll": "すべて無効にする",
@@ -3119,7 +3119,7 @@
     },
     "validate": {
       "title": "セットアップの検証",
-      "subtitle": "Aperture が必要なすべてのパスにアクセスでき、メディア サーバーに到達できることを確認します。",
+      "subtitle": "{{appName}} が必要なすべてのパスにアクセスでき、メディア サーバーに到達できることを確認します。",
       "running": "検証チェックを実行しています…",
       "errorPrefix": "エラー：",
       "allPassed": "すべてのチェックに合格しました。 セットアップの準備は完了です。",
@@ -3131,7 +3131,7 @@
     },
     "restore": {
       "title": "バックアップから復元",
-      "subtitle": "以前の Aperture バックアップがある場合は、ここで復元できます。 これは、新しいサーバーに移行する場合や障害から回復する場合に役立ちます。",
+      "subtitle": "以前の {{appName}} バックアップがある場合は、ここで復元できます。 これは、新しいサーバーに移行する場合や障害から回復する場合に役立ちます。",
       "errLoad": "利用可能なバックアップのロードに失敗しました",
       "errUpload": "バックアップのアップロードに失敗しました",
       "errRestore": "バックアップの復元に失敗しました",
@@ -3143,10 +3143,10 @@
       "uploadBackup": "バックアップをアップロードする",
       "errLoadGeneric": "バックアップのロードに失敗しました",
       "startFreshTitle": "新たに始める",
-      "startFreshBody": "Aperture を最初からセットアップします。 これは、新規インストールの場合に推奨されるオプションです。",
+      "startFreshBody": "{{appName}} を最初からセットアップします。 これは、新規インストールの場合に推奨されるオプションです。",
       "continueSetup": "セットアップを続行する",
       "restoreCardTitle": "バックアップから復元",
-      "restoreCardBody": "以前の Aperture インストールからすべてのデータを復元します。",
+      "restoreCardBody": "以前の {{appName}} インストールからすべてのデータを復元します。",
       "uploading": "アップロード中...",
       "uploadBackupFile": "バックアップファイルをアップロードする",
       "availableBackups": "利用可能なバックアップ ({{count}})",
@@ -3181,18 +3181,18 @@
       "setupCompleteFallback": "セットアップが完了しました。",
       "manageUsersLink": "「管理者」→「ユーザー」でユーザーを管理します",
       "back": "戻る",
-      "bodyParagraph": "パーソナライズされた AI 推奨事項を受け取るユーザーを選択します。 ユーザーごとに、映画、テレビ シリーズ、またはその両方のおすすめを有効にすることができます。 Aperture は各ユーザーの視聴履歴を個別に分析し、個人用のおすすめライブラリに表示されるカスタマイズされた提案を生成します。",
+      "bodyParagraph": "パーソナライズされた AI 推奨事項を受け取るユーザーを選択します。 ユーザーごとに、映画、テレビ シリーズ、またはその両方のおすすめを有効にすることができます。 {{appName}} は各ユーザーの視聴履歴を個別に分析し、個人用のおすすめライブラリに表示されるカスタマイズされた提案を生成します。",
       "noUsersWarning": "メディアサーバー上にユーザーが見つかりませんでした。 メディア サーバーにアクティブなユーザー アカウントがあることを確認してから、更新ボタンをクリックしてリストを再読み込みしてください。",
       "adminSectionTitle": "管理者ユーザー ({{count}})",
-      "adminInfoCaption": "管理者ユーザーは自動的に有効になり、Aperture にログインして管理できるようになります。 管理者ダッシュボードへのアクセスを維持するには、少なくとも 1 人の管理者が有効な状態を維持する必要があります。",
+      "adminInfoCaption": "管理者ユーザーは自動的に有効になり、{{appName}} にログインして管理できるようになります。 管理者ダッシュボードへのアクセスを維持するには、少なくとも 1 人の管理者が有効な状態を維持する必要があります。",
       "otherUsersTitle": "他のユーザー ({{count}})",
       "otherUsersCaption": "メディア サーバー上で家族や他のユーザーへのおすすめを有効にします。 有効な各ユーザーは、視聴履歴に基づいて独自にパーソナライズされた推奨事項を取得します。",
-      "noteWarning": "映画とシリーズの両方が無効になっているユーザーは、おすすめを受け取らず、Aperture にログインできません。 これらの設定は、後から「管理者」→「ユーザー」でいつでも変更できます。",
+      "noteWarning": "映画とシリーズの両方が無効になっているユーザーは、おすすめを受け取らず、{{appName}} にログインできません。 これらの設定は、後から「管理者」→「ユーザー」でいつでも変更できます。",
       "paginationRange": "{{count}} 件中 {{from}}-{{to}}"
     },
     "complete": {
       "title": "セットアップ完了！",
-      "subtitle": "Aperture は、メディアサーバーにパーソナライズされた推奨ライブラリを作成しました。",
+      "subtitle": "{{appName}} は、メディアサーバーにパーソナライズされた推奨ライブラリを作成しました。",
       "issuesAlert": "一部のユーザーはスキップされたり、問題が発生したりしました。 おすすめを生成するにはユーザーの視聴履歴が必要です。 さらにコンテンツを視聴し、次の同期を実行すると、推奨事項が表示されます。",
       "librariesCreatedIn": "{{name}} で作成されたライブラリ",
       "mediaServerFallback": "メディアサーバー",
@@ -3211,9 +3211,9 @@
       "loginPrimary": "メディアサーバー管理者の資格情報を使用してログインします。",
       "loginSecondary": "Emby/Jellyfin に使用するものと同じユーザー名とパスワードを使用してください",
       "openServerPrimary": "メディアサーバーを開いて新しいライブラリを確認します",
-      "openServerSecondary": "新しい「AI Picks」ライブラリが Aperture の有効なユーザーごとに表示されます",
+      "openServerSecondary": "新しい「AI Picks」ライブラリが {{appName}} の有効なユーザーごとに表示されます",
       "schedulesTitle": "自動スケジュール",
-      "schedulesIntro": "Aperture はバックグラウンド ジョブを実行して、推奨事項を最新の状態に保ちます。 デフォルトのスケジュールは、「管理」→「ジョブ」で変更できます。",
+      "schedulesIntro": "{{appName}} はバックグラウンド ジョブを実行して、推奨事項を最新の状態に保ちます。 デフォルトのスケジュールは、「管理」→「ジョブ」で変更できます。",
       "schedWatchHistory": "視聴履歴",
       "schedWatchHistoryDesc": "2 時間ごと — ユーザーが見ているものを追跡します",
       "schedLibraryScan": "ライブラリスキャン",
@@ -3236,7 +3236,7 @@
       "featUserPrefsDesc": "各ユーザーは推奨設定と設定をカスタマイズできます",
       "backToJobs": "求人に戻る",
       "finishSetup": "セットアップを完了する",
-      "finishHint": "「完了」をクリックすると、パブリックセットアップウィザードが無効になり、Aperture が保護され、ログインにリダイレクトされます。"
+      "finishHint": "「完了」をクリックすると、パブリックセットアップウィザードが無効になり、{{appName}} が保護され、ログインにリダイレクトされます。"
     },
     "initialJobsStep": {
       "newLibraryChip": "新しい図書館",
@@ -3257,7 +3257,7 @@
       "itemsProcessed": "{{count}} 個のアイテム",
       "errorPrefix": "エラー：",
       "title": "ライブラリを初期化する",
-      "body": "Aperture はメディア ライブラリを同期し、AI でコンテンツを分析し、パーソナライズされた推奨事項を生成します。 このプロセスはいくつかのステップを経て実行され、ライブラリのサイズによっては数分かかる場合があります。",
+      "body": "{{appName}} はメディア ライブラリを同期し、AI でコンテンツを分析し、パーソナライズされた推奨事項を生成します。 このプロセスはいくつかのステップを経て実行され、ライブラリのサイズによっては数分かかる場合があります。",
       "whatHappensTitle": "初期化中に何が起こるか:",
       "bulletSyncMedia": "メディアの同期 — メディア サーバーから映画とテレビ シリーズのメタデータをインポートします",
       "bulletWatchHistory": "視聴履歴を同期する — 視聴履歴をインポートして好みを理解する",
@@ -3296,7 +3296,7 @@
       "noteAdvanced": "人気アルゴリズムの重み付け、時間枠、更新スケジュールなどの詳細設定は、後から「管理」→「設定」→「トップピック」でカスタマイズできます。",
       "noteLabel": "注記：",
       "outputConfig": "出力構成",
-      "symlinkWarning": "シンボリックリンクでは、Aperture がメディア サーバーが使用するのとまったく同じパスでメディア ファイルにアクセスできる必要があります。 システム間でパスが異なる場合 (Docker コンテナなど)、代わりに STRM ファイルを使用してください。",
+      "symlinkWarning": "シンボリックリンクでは、{{appName}} がメディア サーバーが使用するのとまったく同じパスでメディア ファイルにアクセスできる必要があります。 システム間でパスが異なる場合 (Docker コンテナなど)、代わりに STRM ファイルを使用してください。",
       "symlinkLabel": "シンボリックリンク",
       "back": "戻る",
       "saveContinue": "保存して続行",
@@ -3305,22 +3305,22 @@
     },
     "fileLocations": {
       "title": "ファイルの場所",
-      "body": "メディアサーバーが Aperture のライブラリファイルを参照する場所を設定します。 これらのパスは、メディア サーバーが Docker 構成にマウントされたボリュームにアクセスする方法と一致する必要があります。",
+      "body": "メディアサーバーが {{appName}} のライブラリファイルを参照する場所を設定します。 これらのパスは、メディア サーバーが Docker 構成にマウントされたボリュームにアクセスする方法と一致する必要があります。",
       "saved": "ファイルの場所が保存されました!",
       "autoDetectTitle": "パスの自動検出",
-      "autoDetectBody": "Aperture は、メディアサーバーがファイルを認識する方法と Aperture がファイルを認識する方法を比較することにより、正しいパスを自動的に検出できます。",
+      "autoDetectBody": "{{appName}} は、メディアサーバーがファイルを認識する方法と {{appName}} がファイルを認識する方法を比較することにより、正しいパスを自動的に検出できます。",
       "detecting": "検出中...",
       "detectButton": "パスを自動的に検出する",
       "pathsDetected": "パスが正常に検出されました。",
       "mediaServerSees": "メディアサーバーは以下を参照します。",
-      "apertureSees": "Aperture は以下を参照します。",
+      "apertureSees": "{{appName}} は以下を参照します。",
       "detectedPrefix": "検出されたプレフィックス:",
       "hideManual": "手動構成を非表示にする",
       "orManual": "または手動で設定する",
       "howToFindTitle": "これらのパスを見つける方法:",
       "howToFindBody": "メディア サーバー内の任意のムービーを開き、[メディア情報] に移動して、ファイル パスを確認します。 /mnt/Movies/SomeMovie/file.mkv と表示されている場合、メディア パスのプレフィックスは /mnt/ です。",
-      "apertureLibsPath": "Aperture ライブラリのパス",
-      "apertureLibsHelp": "メディアサーバーは Aperture の出力ライブラリをどこで参照しますか?",
+      "apertureLibsPath": "{{appName}} ライブラリのパス",
+      "apertureLibsHelp": "メディアサーバーは {{appName}} の出力ライブラリをどこで参照しますか?",
       "helperApertureLibs": "メディアサーバーが /aperture-libraries を認識するパス",
       "mediaPrefixTitle": "メディアサーバーパスプレフィックス",
       "mediaPrefixHelp": "メディア サーバーは元のメディア ファイルをどこで確認しますか?",
@@ -3336,8 +3336,8 @@
     },
     "aiRecs": {
       "title": "AI レコメンデーション ライブラリの構成",
-      "body": "Aperture は、各ユーザー向けにパーソナライズされた推奨事項を含む仮想ライブラリをメディアサーバーに作成します。 これらのライブラリの作成方法を構成し、必要に応じてカバー画像をカスタマイズします。",
-      "strmVsSymlink": "STRM とシンボリックリンク: STRM ファイルは汎用的に機能し、ストリーミング URL をサポートします。一方、シンボリックリンクはファイルへの直接アクセス (ローカル再生に適しています) を提供しますが、Aperture がメディアサーバーと同じパスにあるメディアファイルにアクセスする必要があります。 TV シリーズの場合、パフォーマンスを向上させるためにシンボリックリンクを使用することをお勧めします。",
+      "body": "{{appName}} は、各ユーザー向けにパーソナライズされた推奨事項を含む仮想ライブラリをメディアサーバーに作成します。 これらのライブラリの作成方法を構成し、必要に応じてカバー画像をカスタマイズします。",
+      "strmVsSymlink": "STRM とシンボリックリンク: STRM ファイルは汎用的に機能し、ストリーミング URL をサポートします。一方、シンボリックリンクはファイルへの直接アクセス (ローカル再生に適しています) を提供しますが、{{appName}} がメディアサーバーと同じパスにあるメディアファイルにアクセスする必要があります。 TV シリーズの場合、パフォーマンスを向上させるためにシンボリックリンクを使用することをお勧めします。",
       "moviesLibrary": "映画ライブラリ",
       "seriesLibrary": "シリーズライブラリ",
       "imageSet": "画像セット",
@@ -3374,8 +3374,8 @@
       "needKeyLink": "platform.openai.com/api-keys",
       "needKeyBeforeLink": "訪問",
       "needKeyAfterLink": "作成します。 新しいアカウントには 5 ドルの無料クレジットが付与されます。 通常の使用料金は月額約 0.10 ～ 0.50 ドルです。",
-      "bodyLead": "Aperture は AI を使用してレコメンデーション エンジンを強化します。 以下で AI プロバイダーを構成します。",
-      "bodyBold": "Aperture は OpenAI の使用を推奨しています",
+      "bodyLead": "{{appName}} は AI を使用してレコメンデーション エンジンを強化します。 以下で AI プロバイダーを構成します。",
+      "bodyBold": "{{appName}} は OpenAI の使用を推奨しています",
       "bodyTail": "最高のエクスペリエンスを得るには、ローカル モデルを含む他のプロバイダーを検討することもできます。"
     }
   },
@@ -3519,7 +3519,7 @@
       "playlist": "プレイリスト",
       "symlinks": "シンボリックリンク",
       "strmFiles": "STRMファイル",
-      "symlinkWarning": "<strong>シンボリックリンク</strong>では、Aperture がメディア サーバーが使用するのとまったく同じパスでメディア ファイルにアクセスできる必要があります。 システム間でパスが異なる場合 (Docker コンテナなど)、代わりに STRM ファイルを使用してください。"
+      "symlinkWarning": "<strong>シンボリックリンク</strong>では、{{appName}} がメディア サーバーが使用するのとまったく同じパスでメディア ファイルにアクセスできる必要があります。 システム間でパスが異なる場合 (Docker コンテナなど)、代わりに STRM ファイルを使用してください。"
     },
     "localAlgorithm": {
       "title": "ローカル人気アルゴリズム",
@@ -3532,7 +3532,7 @@
     "autoRequest": {
       "title": "不足しているコンテンツの自動リクエスト",
       "subtitle": "Seerr を通じて不足している Top Picks コンテンツを自動的にリクエストします。 外部ソース (TMDB、MDBList) でのみ動作します。",
-      "infoLine1": "有効にすると、Aperture はライブラリにないアイテムがないか Top Picks リストを定期的にチェックし、リクエストを Seerr に自動的に送信します。",
+      "infoLine1": "有効にすると、{{appName}} はライブラリにないアイテムがないか Top Picks リストを定期的にチェックし、リクエストを Seerr に自動的に送信します。",
       "infoLine2": "Seerr が <1>[設定] → [統合]</1> で設定されていることを確認してください。",
       "moviesSection": "映画",
       "seriesSection": "シリーズ",
@@ -3623,7 +3623,7 @@
     },
     "posterRepair": {
       "title": "紛失したポスターの修復",
-      "description": "Emby ライブラリをスキャンして、ポスター画像が欠落している映画やシリーズを探します。 このツールは、TMDB から代替ポスターを取得し、Emby に直接アップロードします。画像は Aperture に保存されません。",
+      "description": "Emby ライブラリをスキャンして、ポスター画像が欠落している映画やシリーズを探します。 このツールは、TMDB から代替ポスターを取得し、Emby に直接アップロードします。画像は {{appName}} に保存されません。",
       "scan": "紛失したポスターをスキャンする",
       "scanning": "走査...",
       "repairSelected": "{{count}} 個の修復が選択されました",
@@ -4141,7 +4141,7 @@
     "rateLimitedToday": "{{count}} rate-limited today",
     "rateLimitedToday_plural": "{{count}} rate-limited today",
     "paused": "{{slot}} is paused until {{time}} — Google turned it away for going over quota.",
-    "caveat": "Counted per Aperture request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
+    "caveat": "Counted per {{appName}} request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
     "slotPrimary": "Main key",
     "slotFallback": "Fallback key"
   },
@@ -4215,16 +4215,16 @@
     "setupLocalOnly": "Local network only",
     "setupAnywhere": "Reachable from anywhere",
     "allClear": "No problems detected with how this instance is exposed.",
-    "restartNote": "These are read from environment variables at startup. Change them in your compose file or service definition and restart Aperture.",
+    "restartNote": "These are read from environment variables at startup. Change them in your compose file or service definition and restart {{appName}}.",
     "findings": {
       "proxyHeadersIgnored": {
-        "title": "A proxy is forwarding requests, but Aperture is ignoring it",
+        "title": "A proxy is forwarding requests, but {{appName}} is ignoring it",
         "detail": "Requests are arriving with an X-Forwarded-For header while TRUST_PROXY is unset, so every visitor appears to come from the same address. The login rate limiter collapses into one shared bucket — a single attacker can exhaust it for everyone — and first-run setup treats remote visitors as local.",
         "fix": "TRUST_PROXY=127.0.0.1   # or your proxy container address, e.g. 172.18.0.1"
       },
       "allTrafficOneAddress": {
         "title": "Every request so far has come from the same local address",
-        "detail": "Normal for a single-machine LAN install. If a reverse proxy or tunnel sits in front of Aperture, this instead means its forwarded client IPs are being discarded.",
+        "detail": "Normal for a single-machine LAN install. If a reverse proxy or tunnel sits in front of {{appName}}, this instead means its forwarded client IPs are being discarded.",
         "fix": "TRUST_PROXY=127.0.0.1   # only if a proxy or tunnel is in front"
       },
       "proxyModeWithoutTrust": {
@@ -4239,7 +4239,7 @@
       },
       "boundToAllInterfaces": {
         "title": "Also reachable directly, bypassing the proxy",
-        "detail": "A proxy is expected in front, but Aperture is listening on every network interface. Anyone who can reach its port directly skips the proxy entirely — including any access control the proxy enforces.",
+        "detail": "A proxy is expected in front, but {{appName}} is listening on every network interface. Anyone who can reach its port directly skips the proxy entirely — including any access control the proxy enforces.",
         "fix": "HOST=127.0.0.1   # only when the proxy runs on this same host"
       },
       "cookieInsecure": {
@@ -4269,7 +4269,7 @@
       }
     },
     "trustedProxiesTitle": "Trusted proxies",
-    "trustedProxiesHelp": "Addresses allowed to tell Aperture who the real visitor is via X-Forwarded-For. Set this to your reverse proxy or tunnel, never to a public range — anything listed here can claim any client IP it likes.",
+    "trustedProxiesHelp": "Addresses allowed to tell {{appName}} who the real visitor is via X-Forwarded-For. Set this to your reverse proxy or tunnel, never to a public range — anything listed here can claim any client IP it likes.",
     "trustedProxiesFormat": "Comma-separated IP addresses or CIDR ranges. Also accepts loopback, linklocal and uniquelocal.",
     "presets": "Presets:",
     "presetTunnel": "Tunnel on this host",
@@ -4278,12 +4278,23 @@
     "savedApplied": "Saved. Real client IPs are in use from the next request.",
     "saveFailed": "Could not save trusted proxies.",
     "envManaged": "Trusted proxies are set by the TRUST_PROXY environment variable, so they cannot be edited here. Remove it from your compose file to manage them from this page.",
-    "detectedTitle": "Aperture can see what is forwarding to it",
-    "detectedBody": "Requests are reaching Aperture from {{addresses}}, carrying a forwarded visitor address. If that is your tunnel or reverse proxy — for Cloudflare Tunnel it is cloudflared — trust it and Aperture will start using real visitor addresses immediately.",
+    "detectedTitle": "{{appName}} can see what is forwarding to it",
+    "detectedBody": "Requests are reaching {{appName}} from {{addresses}}, carrying a forwarded visitor address. If that is your tunnel or reverse proxy — for Cloudflare Tunnel it is cloudflared — trust it and {{appName}} will start using real visitor addresses immediately.",
     "detectedAction": "Trust {{addresses}}",
     "unsaved": "Not saved yet — click Save to apply this.",
     "viaDirect": "Direct connection",
     "viaProxy": "A proxy or tunnel",
     "viaProxyNamed": "A proxy or tunnel ({{addresses}})"
+  },
+  "settingsBranding": {
+    "title": "Instance name",
+    "subtitle": "The name shown throughout the app — in the sidebar, the browser tab, the sign-in page, and anywhere the interface refers to itself.",
+    "label": "Name",
+    "helper": "Up to {{max}} characters. Leave it blank to go back to the default.",
+    "reset": "Reset to {{name}}",
+    "saved": "Instance name updated",
+    "fetchFailed": "Failed to load the instance name",
+    "saveFailed": "Failed to save the instance name",
+    "unknownError": "Something went wrong"
   }
 }
