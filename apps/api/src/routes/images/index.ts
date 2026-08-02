@@ -17,13 +17,11 @@ import {
   type EntityType,
 } from '@aperture/core'
 import { requireAuth, requireAdmin, type SessionUser } from '../../plugins/auth.js'
-import multipart from '@fastify/multipart'
 import staticPlugin from '@fastify/static'
 import { imageSchemas } from './schemas.js'
 
 const VALID_ENTITY_TYPES: EntityType[] = ['library', 'collection', 'playlist']
 const VALID_IMAGE_TYPES = ['Primary', 'Backdrop', 'Banner']
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 
 interface ImageParams {
@@ -41,12 +39,8 @@ initUploads().catch((err) => {
 })
 
 const imageRoutes: FastifyPluginAsync = async (fastify) => {
-  // Register multipart support for file uploads
-  await fastify.register(multipart, {
-    limits: {
-      fileSize: MAX_FILE_SIZE,
-    },
-  })
+  // Multipart is registered at the root (see server.ts) so every plugin that
+  // accepts uploads can see it, not just this one.
 
   // Serve uploaded images statically
   await fastify.register(staticPlugin, {
