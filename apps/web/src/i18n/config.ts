@@ -27,22 +27,28 @@ const i18nInit = i18n
     react: {
       useSuspense: false,
     },
+    // Cloned rather than handed over directly: addResourceBundle(deep=true)
+    // (used by applyRuntimeOverrides below) mutates the stored resource
+    // object in place, and JSON module imports are singletons — without
+    // cloning, any other module that imports the same locale file (e.g. the
+    // admin Translations page reading "the bundled default") would see
+    // runtime overrides bleed into what should be the pristine default.
     resources: {
-      en: { translation: en },
-      es: { translation: es },
-      de: { translation: de },
-      fr: { translation: fr },
-      it: { translation: it },
-      pt: { translation: pt },
-      nl: { translation: nl },
-      ru: { translation: ru },
-      ja: { translation: ja },
-      zh: { translation: zh },
-      ko: { translation: ko },
-      hi: { translation: hi },
-      ar: { translation: ar },
-      he: { translation: he },
-      el: { translation: el },
+      en: { translation: structuredClone(en) },
+      es: { translation: structuredClone(es) },
+      de: { translation: structuredClone(de) },
+      fr: { translation: structuredClone(fr) },
+      it: { translation: structuredClone(it) },
+      pt: { translation: structuredClone(pt) },
+      nl: { translation: structuredClone(nl) },
+      ru: { translation: structuredClone(ru) },
+      ja: { translation: structuredClone(ja) },
+      zh: { translation: structuredClone(zh) },
+      ko: { translation: structuredClone(ko) },
+      hi: { translation: structuredClone(hi) },
+      ar: { translation: structuredClone(ar) },
+      he: { translation: structuredClone(he) },
+      el: { translation: structuredClone(el) },
     },
     fallbackLng: 'en',
     supportedLngs: [

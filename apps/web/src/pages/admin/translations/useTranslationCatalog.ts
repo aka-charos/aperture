@@ -48,11 +48,14 @@ let cachedDefaults: Record<string, Record<string, string>> | null = null
  * runtime (that also includes the operator file layer and DB overrides).
  * This is the baseline "Reset to default" reverts to.
  *
- * Deliberately does not read the live i18next instance: by the time this
- * page mounts, applyRuntimeOverrides() (i18n/config.ts) has already mutated
- * resource bundles in place via addResourceBundle(..., true, true), so the
- * live instance would return already-overridden values instead of the
- * pristine baseline this page needs.
+ * Deliberately imports the locale JSON directly rather than reading the live
+ * i18next instance, so this stays correct independent of i18next's internal
+ * state (init order, which locales have been activated this session, etc).
+ * This only stays pristine because i18n/config.ts clones each locale tree
+ * before handing it to i18next.init() — addResourceBundle(..., true, true)
+ * (used by applyRuntimeOverrides) mutates its stored resource object in
+ * place, and JSON module imports are singletons, so an unlocked clone there
+ * would corrupt the same object this file imports.
  */
 export function getBundledDefaults(): Record<string, Record<string, string>> {
   if (cachedDefaults) return cachedDefaults
