@@ -1168,3 +1168,17 @@ export {
   type ApiKeyWithUser,
   type CreateApiKeyResult,
 } from './apiKeys.js'
+
+// i18n Overrides
+export {
+  getOverridesForLocale,
+  getOverridesTreeForLocale,
+  mergeFileAndDbOverrides,
+  listAllOverrides,
+  upsertOverride,
+  bulkUpsertOverrides,
+  isValidOverrideKey,
+  type I18nOverrideRow,
+  type BulkOverrideInput,
+  type BulkOverrideResult,
+} from './i18nOverrides.js'

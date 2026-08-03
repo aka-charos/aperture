@@ -45,6 +45,7 @@ import { UserDetailPage } from './pages/UserDetail'
 import { JobsPage } from './pages/jobs'
 import { SettingsPage } from './pages/settings'
 import { GapAnalysisPage } from './pages/admin/GapAnalysisPage'
+import { TranslationsPage } from './pages/admin/translations/TranslationsPage'
 import { Box, CircularProgress } from '@mui/material'
 
 function SetupGuard({ children }: { children: React.ReactNode }) {
@@ -200,6 +201,7 @@ function AppRoutes() {
           <Route path="users/:id" element={<UserDetailPage />} />
           <Route path="jobs" element={<JobsPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="translations" element={<TranslationsPage />} />
           <Route path="gaps" element={<GapAnalysisPage />} />
         </Route>
       </Route>

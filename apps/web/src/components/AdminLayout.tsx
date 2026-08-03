@@ -14,6 +14,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard'
 import PeopleIcon from '@mui/icons-material/People'
 import WorkIcon from '@mui/icons-material/Work'
 import SettingsIcon from '@mui/icons-material/Settings'
+import TranslateIcon from '@mui/icons-material/Translate'
 import { Breadcrumbs } from './Breadcrumbs'
 import { useTranslation } from 'react-i18next'
 
@@ -28,6 +29,7 @@ const adminTabs: AdminTab[] = [
   { labelKey: 'admin.users', path: '/admin/users', icon: <PeopleIcon /> },
   { labelKey: 'admin.jobs', path: '/admin/jobs', icon: <WorkIcon /> },
   { labelKey: 'admin.settings', path: '/admin/settings', icon: <SettingsIcon /> },
+  { labelKey: 'admin.translations', path: '/admin/translations', icon: <TranslateIcon /> },
 ]
 
 export function AdminLayout() {

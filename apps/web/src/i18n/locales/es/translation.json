@@ -485,6 +485,48 @@
         "resultItemsCount_one": "{{count}} artículo",
         "resultItemsCount_other": "{{count}} artículos"
       }
+    },
+    "translations": "Translations",
+    "translationsPage": {
+      "title": "Translations",
+      "subtitle": "Edit UI text strings and their translations across all locales, or bulk edit via CSV.",
+      "loadFailed": "Failed to load translations",
+      "searchPlaceholder": "Search keys or English text…",
+      "namespaceLabel": "Namespace",
+      "namespaceAll": "All namespaces",
+      "onlyOverridden": "Only overridden",
+      "exportCsv": "Export CSV",
+      "importCsv": "Import CSV",
+      "colKey": "Key",
+      "colDefault": "English (default)",
+      "colOverrides": "Overrides",
+      "colActions": "Actions",
+      "noResults": "No matching keys",
+      "saveFailed": "Failed to save translation",
+      "resetToDefault": "Reset to default",
+      "defaultValueLabel": "Default:",
+      "tokenMismatchMissing": "Missing: {{tokens}}",
+      "tokenMismatchExtra": "Unexpected: {{tokens}}",
+      "close": "Close",
+      "import": {
+        "missingKeyColumn": "CSV must have a \"key\" column",
+        "error": "Failed to import translations",
+        "title": "Import translations from CSV",
+        "chooseFile": "Choose CSV file",
+        "updateLabel": "{{count}} to update",
+        "resetLabel": "{{count}} to reset",
+        "unchangedLabel": "{{count}} unchanged",
+        "skippedLabel": "{{count}} skipped (unknown key)",
+        "tokenWarningCount": "{{count}} token warnings",
+        "unrecognizedColumns": "Ignored unrecognized column(s): {{columns}}",
+        "tokenWarning": "interpolation tokens don't match English",
+        "skippedUnknownKey": "Unknown key, skipped",
+        "moreRows": "+{{count}} more",
+        "success": "Imported: {{upserted}} updated, {{deleted}} reset",
+        "cancel": "Cancel",
+        "importing": "Importing…",
+        "confirm": "Import"
+      }
     }
   },
   "home": {
@@ -4295,6 +4337,13 @@
     "saved": "Instance name updated",
     "fetchFailed": "Failed to load the instance name",
     "saveFailed": "Failed to save the instance name",
-    "unknownError": "Something went wrong"
+    "unknownError": "Something went wrong",
+    "artworkTitle": "Logo & favicon",
+    "artworkHelp": "Set by mounting a folder rather than uploading here. Put logo.svg and/or favicon.svg in the folder mapped to /config/branding (./data/branding in the bundled compose file) — png and webp work too, plus ico for the favicon. A new file is picked up on the next page load, with no restart.",
+    "artworkSizing": "Use square artwork. SVG is best: it stays sharp everywhere the logo is drawn (28–72px) and at every size a browser scales the favicon to. For raster, 512 × 512px covers both — keep the favicon simple enough to still read at 16px.",
+    "artworkLogo": "Logo:",
+    "artworkFavicon": "Favicon:",
+    "artworkFound": "using {{file}}",
+    "artworkBundled": "using the bundled artwork"
   }
 }
