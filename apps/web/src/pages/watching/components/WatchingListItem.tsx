@@ -29,6 +29,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL, StarRating } from '@aperture/ui'
 import { EpisodeAvailabilityBar } from './EpisodeAvailabilityBar'
 import type { WatchingSeries, UpcomingEpisode } from '../hooks/useWatchingData'
+import { palette } from '@/theme'
 
 interface WatchingListItemProps {
   series: WatchingSeries
@@ -66,8 +67,8 @@ function getDaysUntil(dateStr: string): number {
 
 function getCountdownColor(days: number): string {
   if (days <= 0) return '#10b981' // Today - green
-  if (days === 1) return '#f59e0b' // Tomorrow - amber
-  if (days <= 3) return '#3b82f6' // Soon - blue
+  if (days === 1) return palette.warning.main // Tomorrow - amber
+  if (days <= 3) return palette.info.main // Soon - blue
   return '#6b7280' // Later - gray
 }
 
@@ -238,7 +239,7 @@ export function WatchingListItem({ series, userRating, onRate, onRemove }: Watch
               )}
               {series.communityRating && (
                 <Box display="flex" alignItems="center" gap={0.5}>
-                  <StarIcon sx={{ fontSize: { xs: 12, md: 14 }, color: '#fbbf24' }} />
+                  <StarIcon sx={{ fontSize: { xs: 12, md: 14 }, color: theme.palette.warning.light }} />
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                     {Number(series.communityRating).toFixed(1)}
                   </Typography>

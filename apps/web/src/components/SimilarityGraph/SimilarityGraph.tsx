@@ -6,6 +6,7 @@ import { getProxiedImageUrl } from '@aperture/ui'
 import type { GraphNode, GraphEdge, GraphData, ConnectionReason, LoadingStatus, ConnectionType } from './types'
 import { CONNECTION_COLORS } from './types'
 import { connectionTypeLabel } from '../../i18n/connectionTypeLabel'
+import { palette } from '@/theme'
 
 // Node dimensions (2:3 poster ratio)
 const NODE_WIDTH = 100
@@ -184,7 +185,7 @@ export const SimilarityGraph = memo(function SimilarityGraph({
     const getNodeWidth = (d: GraphNode) => d.isCenter ? centerNodeWidth : (d.isPrimary ? primaryNodeWidth : nodeWidth)
     const getNodeHeight = (d: GraphNode) => d.isCenter ? centerNodeHeight : (d.isPrimary ? primaryNodeHeight : nodeHeight)
     const getNodeTitleHeight = (d: GraphNode) => d.isPrimary && d.primaryLabel ? TITLE_HEIGHT + PRIMARY_LABEL_HEIGHT : TITLE_HEIGHT
-    const getNodeStroke = (d: GraphNode) => d.isCenter ? '#8B5CF6' : (d.isPrimary ? '#F59E0B' : '#333')
+    const getNodeStroke = (d: GraphNode) => d.isCenter ? palette.secondary.main : (d.isPrimary ? palette.warning.main : '#333')
     const getNodeStrokeWidth = (d: GraphNode) => d.isCenter ? 2 : (d.isPrimary ? 2 : 1)
 
     // Create zoom behavior
@@ -318,7 +319,7 @@ export const SimilarityGraph = memo(function SimilarityGraph({
       .text((d) => d.primaryLabel || '')
       .attr('text-anchor', 'middle')
       .attr('y', (d) => getNodeHeight(d) / 2 + 40)
-      .attr('fill', '#F59E0B')
+      .attr('fill', palette.warning.main)
       .attr('font-size', '7px')
       .attr('font-weight', 500)
 

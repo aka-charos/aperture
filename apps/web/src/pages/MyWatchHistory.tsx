@@ -323,8 +323,8 @@ export function MyWatchHistoryPage() {
             iconPosition="start" 
             label={t('watchHistoryPage.tabMovies', { total: moviePagination.total.toLocaleString() })}
             sx={{
-              color: tabValue === 0 ? '#6366f1' : 'text.secondary',
-              '&.Mui-selected': { color: '#6366f1' },
+              color: tabValue === 0 ? theme.palette.primary.main : 'text.secondary',
+              '&.Mui-selected': { color: theme.palette.primary.main },
             }}
           />
           <Tab 

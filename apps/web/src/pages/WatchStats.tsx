@@ -28,6 +28,7 @@ import ThumbsUpDownIcon from '@mui/icons-material/ThumbsUpDown'
 import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth'
 import TheatersIcon from '@mui/icons-material/Theaters'
 import { Tooltip as MuiTooltip } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import {
   PieChart,
   Pie,
@@ -47,6 +48,7 @@ import { getProxiedImageUrl } from '@aperture/ui'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslation } from 'react-i18next'
 import { PageHeading } from '@/components/PageHeading'
+import { palette, gradients } from '@/theme'
 
 interface WatchStats {
   genreDistribution: { genre: string; count: number; percentage: number }[]
@@ -76,14 +78,15 @@ interface WatchStats {
 
 // Rich color palette for charts
 const GENRE_COLORS = [
-  '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316',
-  '#eab308', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6',
+  palette.primary.main, palette.secondary.main, '#ec4899', '#f43f5e', '#f97316',
+  '#eab308', palette.success.main, '#14b8a6', '#06b6d4', palette.info.main,
   '#a855f7', '#d946ef', '#f472b6', '#fb7185', '#fb923c',
 ]
 
-const DECADE_COLORS = ['#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#e0e7ff']
+const DECADE_COLORS = [palette.primary.main, palette.primary.light, '#a5b4fc', '#c7d2fe', '#e0e7ff']
 
 export function WatchStatsPage() {
+  const theme = useTheme()
   const { t, i18n } = useTranslation()
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -173,8 +176,8 @@ export function WatchStatsPage() {
   const tvHours = Math.round(stats.tvWatchTimeMinutes / 60)
   const timeSplitTotal = movieHours + tvHours
   const timeSplitData = [
-    { key: 'movies', name: t('watchStats.splitMovies'), value: movieHours, color: '#6366f1' },
-    { key: 'tv', name: t('watchStats.splitTv'), value: tvHours, color: '#8b5cf6' },
+    { key: 'movies', name: t('watchStats.splitMovies'), value: movieHours, color: theme.palette.primary.main },
+    { key: 'tv', name: t('watchStats.splitTv'), value: tvHours, color: theme.palette.secondary.main },
   ].filter(d => d.value > 0)
 
   // Heatmap lookup keyed by "dow-hour", plus peak count for intensity scaling
@@ -215,7 +218,7 @@ export function WatchStatsPage() {
           {/* Summary Cards */}
           <Grid container spacing={2} mb={4}>
             <Grid item xs={6} sm={4} md={2}>
-              <Card sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', borderRadius: 2 }}>
+              <Card sx={{ background: gradients.primary, borderRadius: 2 }}>
                 <CardContent sx={{ textAlign: 'center', py: 2 }}>
                   <MovieIcon sx={{ fontSize: 32, color: 'white', mb: 1 }} />
                   <Typography variant="h4" fontWeight={700} color="white">
@@ -228,7 +231,7 @@ export function WatchStatsPage() {
               </Card>
             </Grid>
             <Grid item xs={6} sm={4} md={2}>
-              <Card sx={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', borderRadius: 2 }}>
+              <Card sx={{ background: gradients.secondary, borderRadius: 2 }}>
                 <CardContent sx={{ textAlign: 'center', py: 2 }}>
                   <TvIcon sx={{ fontSize: 32, color: 'white', mb: 1 }} />
                   <Typography variant="h4" fontWeight={700} color="white">
@@ -267,7 +270,7 @@ export function WatchStatsPage() {
               </Card>
             </Grid>
             <Grid item xs={6} sm={4} md={2}>
-              <Card sx={{ background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', borderRadius: 2 }}>
+              <Card sx={{ background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`, borderRadius: 2 }}>
                 <CardContent sx={{ textAlign: 'center', py: 2 }}>
                   <PlayArrowIcon sx={{ fontSize: 32, color: 'white', mb: 1 }} />
                   <Typography variant="h4" fontWeight={700} color="white">
@@ -280,7 +283,7 @@ export function WatchStatsPage() {
               </Card>
             </Grid>
             <Grid item xs={6} sm={4} md={2}>
-              <Card sx={{ background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', borderRadius: 2 }}>
+              <Card sx={{ background: `linear-gradient(135deg, ${theme.palette.error.main} 0%, ${theme.palette.error.dark} 100%)`, borderRadius: 2 }}>
                 <CardContent sx={{ textAlign: 'center', py: 2 }}>
                   <FavoriteIcon sx={{ fontSize: 32, color: 'white', mb: 1 }} />
                   <Typography variant="h4" fontWeight={700} color="white">
@@ -299,7 +302,7 @@ export function WatchStatsPage() {
             <Grid item xs={12} sm={4}>
               <Card sx={{ borderRadius: 2, height: '100%' }}>
                 <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Avatar sx={{ bgcolor: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>
+                  <Avatar sx={{ bgcolor: 'rgba(239, 68, 68, 0.15)', color: theme.palette.error.main }}>
                     <WhatshotIcon />
                   </Avatar>
                   <Box minWidth={0}>
@@ -335,7 +338,7 @@ export function WatchStatsPage() {
             <Grid item xs={6} sm={4}>
               <Card sx={{ borderRadius: 2, height: '100%' }}>
                 <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Avatar sx={{ bgcolor: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}>
+                  <Avatar sx={{ bgcolor: 'rgba(245, 158, 11, 0.15)', color: theme.palette.warning.main }}>
                     <StarIcon />
                   </Avatar>
                   <Box minWidth={0}>
@@ -377,14 +380,14 @@ export function WatchStatsPage() {
                               <Cell key={`cell-${index}`} fill={GENRE_COLORS[index % GENRE_COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: '#1a1a1a', 
-                              border: '1px solid #2a2a2a',
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: theme.palette.background.paper,
+                              border: `1px solid ${theme.palette.divider}`,
                               borderRadius: 8,
-                              color: '#f5f5f5',
+                              color: theme.palette.text.primary,
                             }}
-                            itemStyle={{ color: '#f5f5f5' }}
+                            itemStyle={{ color: theme.palette.text.primary }}
                             formatter={(value, _name, props) => {
                               const payload = props.payload as { genre: string; percentage: number } | undefined
                               const count = typeof value === 'number' ? value : Number(value)
@@ -439,37 +442,37 @@ export function WatchStatsPage() {
                   {stats.watchTimeline.length > 0 ? (
                     <ResponsiveContainer width="100%" height={200}>
                       <AreaChart data={stats.watchTimeline}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-                        <XAxis 
-                          dataKey="month" 
-                          stroke="#666" 
+                        <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                        <XAxis
+                          dataKey="month"
+                          stroke="#666"
                           fontSize={11}
                           tickFormatter={(value) => value.split(' ')[0]}
                         />
                         <YAxis stroke="#666" fontSize={11} />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: '#1a1a1a', 
-                            border: '1px solid #2a2a2a',
-                            borderRadius: 8 
-                          }} 
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: theme.palette.background.paper,
+                            border: `1px solid ${theme.palette.divider}`,
+                            borderRadius: 8
+                          }}
                         />
                         <Legend />
-                        <Area 
-                          type="monotone" 
-                          dataKey="movies" 
+                        <Area
+                          type="monotone"
+                          dataKey="movies"
                           stackId="1"
-                          stroke="#6366f1" 
-                          fill="#6366f1" 
+                          stroke={theme.palette.primary.main}
+                          fill={theme.palette.primary.main}
                           fillOpacity={0.6}
                           name={t('watchStats.chartMovies')}
                         />
-                        <Area 
-                          type="monotone" 
-                          dataKey="episodes" 
+                        <Area
+                          type="monotone"
+                          dataKey="episodes"
                           stackId="1"
-                          stroke="#8b5cf6" 
-                          fill="#8b5cf6" 
+                          stroke={theme.palette.secondary.main}
+                          fill={theme.palette.secondary.main}
                           fillOpacity={0.6}
                           name={t('watchStats.chartEpisodes')}
                         />
@@ -497,17 +500,17 @@ export function WatchStatsPage() {
                   {stats.decadeDistribution.length > 0 ? (
                     <ResponsiveContainer width="100%" height={200}>
                       <BarChart data={stats.decadeDistribution} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+                        <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                         <XAxis type="number" stroke="#666" fontSize={11} />
                         <YAxis type="category" dataKey="decade" stroke="#666" fontSize={11} width={50} />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: '#1a1a1a', 
-                            border: '1px solid #2a2a2a',
-                            borderRadius: 8 
-                          }} 
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: theme.palette.background.paper,
+                            border: `1px solid ${theme.palette.divider}`,
+                            borderRadius: 8
+                          }}
                         />
-                        <Bar dataKey="count" fill="#6366f1" radius={[0, 4, 4, 0]}>
+                        <Bar dataKey="count" fill={theme.palette.primary.main} radius={[0, 4, 4, 0]}>
                           {stats.decadeDistribution.map((_, index) => (
                             <Cell key={`cell-${index}`} fill={DECADE_COLORS[index % DECADE_COLORS.length]} />
                           ))}
@@ -533,14 +536,14 @@ export function WatchStatsPage() {
                   {stats.ratingDistribution.length > 0 ? (
                     <ResponsiveContainer width="100%" height={200}>
                       <BarChart data={stats.ratingDistribution}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+                        <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                         <XAxis dataKey="rating" stroke="#666" fontSize={11} />
                         <YAxis stroke="#666" fontSize={11} />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: '#1a1a1a', 
-                            border: '1px solid #2a2a2a',
-                            borderRadius: 8 
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: theme.palette.background.paper,
+                            border: `1px solid ${theme.palette.divider}`,
+                            borderRadius: 8
                           }}
                           formatter={(value) => {
                             const count = typeof value === 'number' ? value : Number(value)
@@ -550,7 +553,7 @@ export function WatchStatsPage() {
                             ]
                           }}
                         />
-                        <Bar dataKey="count" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="count" fill={theme.palette.warning.main} radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
@@ -642,7 +645,7 @@ export function WatchStatsPage() {
                                 sx={{ 
                                   height: '100%', 
                                   width: `${(actor.count / stats.topActors[0].count) * 100}%`,
-                                  backgroundColor: '#6366f1',
+                                  backgroundColor: theme.palette.primary.main,
                                   borderRadius: 2,
                                 }} 
                               />
@@ -737,7 +740,7 @@ export function WatchStatsPage() {
                                 sx={{ 
                                   height: '100%', 
                                   width: `${(director.count / stats.topDirectors[0].count) * 100}%`,
-                                  backgroundColor: '#8b5cf6',
+                                  backgroundColor: theme.palette.secondary.main,
                                   borderRadius: 2,
                                 }} 
                               />
@@ -982,12 +985,12 @@ export function WatchStatsPage() {
                           </Pie>
                           <Tooltip
                             contentStyle={{
-                              backgroundColor: '#1a1a1a',
-                              border: '1px solid #2a2a2a',
+                              backgroundColor: theme.palette.background.paper,
+                              border: `1px solid ${theme.palette.divider}`,
                               borderRadius: 8,
-                              color: '#f5f5f5',
+                              color: theme.palette.text.primary,
                             }}
-                            itemStyle={{ color: '#f5f5f5' }}
+                            itemStyle={{ color: theme.palette.text.primary }}
                             formatter={(value, name) => {
                               const hours = typeof value === 'number' ? value : Number(value)
                               const pct = timeSplitTotal > 0 ? Math.round((hours / timeSplitTotal) * 100) : 0

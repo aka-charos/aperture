@@ -3,6 +3,7 @@
  * Shows actor/director with filmography
  */
 import { Box, Typography, Avatar, Chip } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import PersonIcon from '@mui/icons-material/Person'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
@@ -10,6 +11,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { getProxiedImageUrl } from '@aperture/ui'
 import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
+import { extraColors } from '@/theme'
 import { ToolResultError } from '../ToolResultError'
 import type { Person, PersonResultData } from './types'
 
@@ -20,6 +22,7 @@ interface PersonCardProps {
 function PersonCardSingle({ person }: PersonCardProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const theme = useTheme()
   // See ContentCard: null on surfaces where routing keeps the chat visible.
   const openMediaDetail = useMediaDetailModal()
 
@@ -44,7 +47,7 @@ function PersonCardSingle({ person }: PersonCardProps) {
     <Box
       sx={{
         p: 2,
-        bgcolor: '#1a1a1a',
+        bgcolor: theme.palette.background.paper,
         borderRadius: 2,
         mb: 1.5,
       }}
@@ -56,7 +59,7 @@ function PersonCardSingle({ person }: PersonCardProps) {
           sx={{
             width: 64,
             height: 64,
-            bgcolor: '#2a2a2a',
+            bgcolor: theme.palette.divider,
           }}
         >
           <PersonIcon />
@@ -72,7 +75,7 @@ function PersonCardSingle({ person }: PersonCardProps) {
               height: 22,
               mt: 0.5,
               bgcolor: 'rgba(99, 102, 241, 0.15)',
-              color: '#818cf8',
+              color: theme.palette.primary.light,
             }}
           />
         </Box>
@@ -82,7 +85,7 @@ function PersonCardSingle({ person }: PersonCardProps) {
       {movies.length > 0 && (
         <Box sx={{ mb: 1.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-            <MovieIcon sx={{ fontSize: 16, color: '#818cf8' }} />
+            <MovieIcon sx={{ fontSize: 16, color: theme.palette.primary.light }} />
             <Typography variant="caption" fontWeight={600} color="text.secondary">
               {t('assistantToolUi.moviesHeading', { count: movies.length })}
             </Typography>
@@ -96,11 +99,11 @@ function PersonCardSingle({ person }: PersonCardProps) {
                 onClick={() => openFilm('movie', film.id)}
                 sx={{
                   height: 24,
-                  bgcolor: '#2a2a2a',
+                  bgcolor: theme.palette.divider,
                   color: '#e4e4e7',
                   cursor: 'pointer',
                   '&:hover': {
-                    bgcolor: '#3a3a3a',
+                    bgcolor: extraColors.subtleBorder,
                   },
                 }}
               />
@@ -131,11 +134,11 @@ function PersonCardSingle({ person }: PersonCardProps) {
                 onClick={() => openFilm('series', film.id)}
                 sx={{
                   height: 24,
-                  bgcolor: '#2a2a2a',
+                  bgcolor: theme.palette.divider,
                   color: '#e4e4e7',
                   cursor: 'pointer',
                   '&:hover': {
-                    bgcolor: '#3a3a3a',
+                    bgcolor: extraColors.subtleBorder,
                   },
                 }}
               />

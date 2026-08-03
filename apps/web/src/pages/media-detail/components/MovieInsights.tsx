@@ -21,6 +21,7 @@ import ShuffleIcon from '@mui/icons-material/Shuffle'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
+import { gradients } from '@/theme'
 import type { RecommendationInsights, MediaType } from '../types'
 
 interface MovieInsightsProps {
@@ -73,7 +74,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                 width: 48,
                 height: 48,
                 borderRadius: 2,
-                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                background: gradients.primaryToSecondary,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

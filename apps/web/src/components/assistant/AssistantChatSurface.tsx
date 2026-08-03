@@ -31,6 +31,7 @@ import { getUnwatchedOnly } from './unwatchedPreference'
 import { setStatusPhase } from './assistantStatus'
 import { AICapabilityBanner } from '../AICapabilityBanner'
 import { MediaDetailModalProvider } from '@/hooks/MediaDetailModalProvider'
+import { gradients } from '@/theme'
 import type { AssistantChatState, BackendMessage } from './useAssistantChat'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -343,12 +344,12 @@ export function AssistantChatSurface({
             bgcolor: 'rgba(26, 26, 26, 0.6)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
             borderRadius: 2,
-            color: '#f5f5f5',
+            color: theme.palette.text.primary,
             cursor: 'pointer',
             transition: 'all 0.2s',
             '&:hover': {
               bgcolor: 'rgba(37, 37, 37, 0.8)',
-              borderColor: '#6366f1',
+              borderColor: theme.palette.primary.main,
             },
           }}
         >
@@ -527,7 +528,7 @@ export function AssistantChatSurface({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                  background: gradients.primaryToSecondary,
                   flexShrink: 0,
                 }}
               >

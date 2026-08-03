@@ -32,6 +32,7 @@ import AddIcon from '@mui/icons-material/Add'
 import OndemandVideoIcon from '@mui/icons-material/OndemandVideo'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useTheme } from '@mui/material/styles'
 import { getProxiedImageUrl, TrailerModal } from '@aperture/ui'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p'
@@ -95,6 +96,7 @@ export function TmdbExternalDetailModal({
 }: TmdbExternalDetailModalProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const theme = useTheme()
   const displaySourceLabel = sourceLabel ?? t('tmdbExternalModal.defaultSource')
   const [heroImageVisible, setHeroImageVisible] = useState(false)
   const [trailerLoading, setTrailerLoading] = useState(false)
@@ -285,7 +287,7 @@ export function TmdbExternalDetailModal({
                       }
                       size="small"
                       sx={{
-                        bgcolor: alpha('#8B5CF6', 0.2),
+                        bgcolor: alpha(theme.palette.secondary.main, 0.2),
                         '& .MuiChip-icon': { color: 'inherit' },
                       }}
                     />
@@ -499,8 +501,8 @@ export function TmdbExternalDetailModal({
                             size="small"
                             onClick={() => handlePersonClick(name)}
                             sx={{
-                              bgcolor: alpha('#8B5CF6', 0.2),
-                              '&:hover': { bgcolor: alpha('#8B5CF6', 0.3) },
+                              bgcolor: alpha(theme.palette.secondary.main, 0.2),
+                              '&:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.3) },
                               cursor: 'pointer',
                             }}
                           />

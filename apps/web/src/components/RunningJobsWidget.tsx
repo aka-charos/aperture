@@ -10,6 +10,7 @@ import {
   ClickAwayListener,
   Chip,
   Divider,
+  useTheme,
 } from '@mui/material'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import ErrorIcon from '@mui/icons-material/Error'
@@ -52,6 +53,7 @@ function formatDuration(startedAt: string): string {
 
 export function RunningJobsWidget() {
   const { t } = useTranslation()
+  const theme = useTheme()
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [jobs, setJobs] = useState<JobProgress[]>([])
   const { user } = useAuth()
@@ -195,7 +197,7 @@ export function RunningJobsWidget() {
               backgroundColor: 'rgba(255, 255, 255, 0.2)',
               '& .MuiLinearProgress-bar': {
                 borderRadius: 2,
-                background: 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #6366f1 100%)',
+                background: `linear-gradient(90deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 50%, ${theme.palette.primary.main} 100%)`,
                 backgroundSize: '200% 100%',
                 animation: 'shimmer 2s ease-in-out infinite',
                 '@keyframes shimmer': {
@@ -291,7 +293,7 @@ export function RunningJobsWidget() {
                               borderRadius: 3,
                               '& .MuiLinearProgress-bar': {
                                 borderRadius: 3,
-                                background: 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #6366f1 100%)',
+                                background: `linear-gradient(90deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 50%, ${theme.palette.primary.main} 100%)`,
                                 backgroundSize: '200% 100%',
                                 animation: 'shimmer 2s ease-in-out infinite',
                                 '@keyframes shimmer': {

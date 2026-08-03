@@ -125,7 +125,7 @@ export function TopPicksSeriesListItem({
                   position: 'absolute',
                   top: 8,
                   right: 8,
-                  backgroundColor: alpha('#8B5CF6', 0.9),
+                  backgroundColor: alpha(theme.palette.secondary.main, 0.9),
                   color: 'white',
                   fontWeight: 600,
                   fontSize: '0.65rem',
@@ -173,7 +173,7 @@ export function TopPicksSeriesListItem({
               )}
               {series.communityRating && (
                 <Box display="flex" alignItems="center" gap={0.5}>
-                  <StarIcon sx={{ fontSize: { xs: 12, md: 14 }, color: '#fbbf24' }} />
+                  <StarIcon sx={{ fontSize: { xs: 12, md: 14 }, color: theme.palette.warning.light }} />
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                     {series.communityRating.toFixed(1)}
                   </Typography>

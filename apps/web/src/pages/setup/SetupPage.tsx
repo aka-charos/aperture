@@ -1,4 +1,4 @@
-import { Box, Card, CardContent, Stepper, Step, StepLabel, Typography, IconButton, Tooltip } from '@mui/material'
+import { Box, Card, CardContent, Stepper, Step, StepLabel, Typography, IconButton, Tooltip, useTheme } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useSetupWizard } from './hooks/useSetupWizard'
@@ -24,6 +24,7 @@ const APP_VERSION = '0.7.8'
 
 export function SetupPage() {
   const { t } = useTranslation()
+  const theme = useTheme()
   const wizard = useSetupWizard()
   const { status } = useSetupStatus()
   const logoUrl = useLogoUrl()
@@ -74,7 +75,7 @@ export function SetupPage() {
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: 'background.default',
-        backgroundImage: 'radial-gradient(circle at 50% 50%, #1a1a2e 0%, #0f0f0f 100%)',
+        backgroundImage: `radial-gradient(circle at 50% 50%, #1a1a2e 0%, ${theme.palette.background.default} 100%)`,
         p: 2,
         position: 'relative',
       }}

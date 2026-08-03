@@ -20,6 +20,7 @@ import WebAssetIcon from '@mui/icons-material/WebAsset'
 import { AssistantChatSurface } from './assistant/AssistantChatSurface'
 import { useAssistantChat } from './assistant/useAssistantChat'
 import { useAssistantDock } from '@/hooks/useAssistantDock'
+import { gradients } from '@/theme'
 
 // Surface the assistant renders in: blocking dialog or persistent side panel
 // that leaves the rest of the app browsable.
@@ -232,9 +233,9 @@ export function AssistantModal() {
               bottom: 24,
               insetInlineEnd: 24,
               zIndex: 1000,
-              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+              background: gradients.primaryToSecondary,
               '&:hover': {
-                background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+                background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.secondary.dark} 100%)`,
               },
             }}
           >

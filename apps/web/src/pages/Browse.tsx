@@ -8,6 +8,7 @@ import {
   Tabs,
   ToggleButton,
   ToggleButtonGroup,
+  useTheme,
 } from '@mui/material'
 import MovieIcon from '@mui/icons-material/Movie'
 import PersonIcon from '@mui/icons-material/Person'
@@ -27,6 +28,7 @@ import { PageHeading } from '@/components/PageHeading'
 
 export function BrowsePage() {
   const { t } = useTranslation()
+  const theme = useTheme()
   const serverName = useServerDisplayName()
   const [searchParams, setSearchParams] = useSearchParams()
   const initialTabIndex = browseTabFromSearchParam(searchParams.get('tab'))
@@ -131,8 +133,8 @@ export function BrowsePage() {
             iconPosition="start"
             label={t('browse.tabMovies')}
             sx={{
-              color: tabIndex === 0 ? '#6366f1' : 'text.secondary',
-              '&.Mui-selected': { color: '#6366f1' },
+              color: tabIndex === 0 ? theme.palette.primary.main : 'text.secondary',
+              '&.Mui-selected': { color: theme.palette.primary.main },
             }}
           />
           <Tab

@@ -13,6 +13,7 @@ import {
   Skeleton,
   alpha,
 } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import AddIcon from '@mui/icons-material/Add'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty'
@@ -99,6 +100,7 @@ export function MediaPosterCard({
   compactMeta = false,
 }: MediaPosterCardProps) {
   const { t } = useTranslation()
+  const theme = useTheme()
   const [imageError, setImageError] = useState(false)
 
   const finalPosterUrl = posterUrl && !imageError ? posterUrl : FALLBACK_POSTER
@@ -269,7 +271,7 @@ export function MediaPosterCard({
               position: 'absolute',
               top: 8,
               right: 8,
-              backgroundColor: alpha(sourceColor || '#6366f1', 0.9),
+              backgroundColor: alpha(sourceColor || theme.palette.primary.main, 0.9),
               color: 'white',
               fontWeight: 600,
               fontSize: '0.7rem',
@@ -304,7 +306,7 @@ export function MediaPosterCard({
               position: 'absolute',
               bottom: 8,
               left: 8,
-              backgroundColor: alpha('#22c55e', 0.9),
+              backgroundColor: alpha(theme.palette.success.main, 0.9),
               borderRadius: 1,
               px: 1,
               py: 0.5,
@@ -328,8 +330,8 @@ export function MediaPosterCard({
               bottom: 8,
               left: 8,
               backgroundColor: requestStatus === 'declined'
-                ? alpha('#ef4444', 0.9)
-                : alpha('#8B5CF6', 0.9), // Aperture purple for requested/pending/approved
+                ? alpha(theme.palette.error.main, 0.9)
+                : alpha(theme.palette.secondary.main, 0.9), // Aperture purple for requested/pending/approved
               borderRadius: 1,
               px: 1,
               py: 0.5,

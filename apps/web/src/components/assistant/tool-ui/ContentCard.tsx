@@ -26,6 +26,7 @@ import {
   CircularProgress,
   Tooltip,
 } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import InfoIcon from '@mui/icons-material/Info'
 import StarIcon from '@mui/icons-material/Star'
@@ -38,6 +39,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { RankBadge, getProxiedImageUrl } from '@aperture/ui'
 import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
+import { gradients, extraColors } from '@/theme'
 import { COMPACT_THREAD } from '../density'
 import type { ContentItem } from './types'
 
@@ -112,6 +114,7 @@ export function ContentCard({
 }: ContentCardProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const theme = useTheme()
   const isList = variant === 'list'
 
   const detailsAction = item.actions?.find(a => a.id === 'details')
@@ -198,7 +201,7 @@ export function ContentCard({
         display: 'flex',
         gap: isList ? 1.75 : 1.5,
         p: isList ? 1.75 : 1.5,
-        bgcolor: '#1a1a1a',
+        bgcolor: theme.palette.background.paper,
         borderRadius: 2,
         cursor: 'pointer',
         ...(isList
@@ -245,7 +248,7 @@ export function ContentCard({
             height: POSTER_HEIGHT,
             borderRadius: 1,
             overflow: 'hidden',
-            bgcolor: '#2a2a2a',
+            bgcolor: theme.palette.divider,
             position: 'relative',
           }}
         >
@@ -356,7 +359,7 @@ export function ContentCard({
               mt: '1px',
               height: 18,
               bgcolor: item.type === 'movie' ? 'rgba(99, 102, 241, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-              color: item.type === 'movie' ? '#818cf8' : '#10b981',
+              color: item.type === 'movie' ? theme.palette.primary.light : '#10b981',
               '& .MuiChip-label': { px: 0.625, fontSize: 10 },
             }}
           />
@@ -400,10 +403,10 @@ export function ContentCard({
               [COMPACT_THREAD]: { p: 0.75 },
               borderRadius: 1,
               bgcolor: 'rgba(99, 102, 241, 0.08)',
-              borderInlineStart: '2px solid #6366f1',
+              borderInlineStart: `2px solid ${theme.palette.primary.main}`,
             }}
           >
-            <LightbulbOutlinedIcon sx={{ fontSize: 15, color: '#818cf8', flexShrink: 0, mt: '1px' }} />
+            <LightbulbOutlinedIcon sx={{ fontSize: 15, color: theme.palette.primary.light, flexShrink: 0, mt: '1px' }} />
             <Typography
               ref={reasonRef}
               variant="caption"
@@ -446,7 +449,7 @@ export function ContentCard({
               py: 0,
               fontSize: 11,
               textTransform: 'none',
-              color: '#818cf8',
+              color: theme.palette.primary.light,
               '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.1)' },
             }}
           >
@@ -469,10 +472,10 @@ export function ContentCard({
               px: 1,
               py: 0.25,
               fontSize: 11,
-              borderColor: '#3a3a3a',
+              borderColor: extraColors.subtleBorder,
               color: '#a1a1aa',
               '&:hover': {
-                borderColor: '#6366f1',
+                borderColor: theme.palette.primary.main,
                 bgcolor: 'rgba(99, 102, 241, 0.1)',
               },
             }}
@@ -493,9 +496,9 @@ export function ContentCard({
                 px: 1,
                 py: 0.25,
                 fontSize: 11,
-                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                background: gradients.primaryToSecondary,
                 '&:hover': {
-                  background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+                  background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.secondary.dark} 100%)`,
                 },
               }}
             >
@@ -531,7 +534,7 @@ export function ContentCard({
                     p: 0.5,
                     borderRadius: 1,
                     border: '1px solid',
-                    borderColor: isFavorite ? 'rgba(236, 72, 153, 0.5)' : '#3a3a3a',
+                    borderColor: isFavorite ? 'rgba(236, 72, 153, 0.5)' : extraColors.subtleBorder,
                     bgcolor: isFavorite ? 'rgba(236, 72, 153, 0.12)' : 'transparent',
                     '&:hover': {
                       borderColor: '#ec4899',

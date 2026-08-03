@@ -221,15 +221,15 @@ export function DiscoveryListItem({
                   size="small"
                   sx={{
                     backgroundColor: requestStatus === 'approved'
-                      ? alpha('#22c55e', 0.2)
+                      ? alpha(theme.palette.success.main, 0.2)
                       : requestStatus === 'declined'
-                      ? alpha('#ef4444', 0.2)
-                      : alpha('#8B5CF6', 0.2),
+                      ? alpha(theme.palette.error.main, 0.2)
+                      : alpha(theme.palette.secondary.main, 0.2),
                     color: requestStatus === 'approved'
-                      ? '#22c55e'
+                      ? theme.palette.success.main
                       : requestStatus === 'declined'
-                      ? '#ef4444'
-                      : '#8B5CF6',
+                      ? theme.palette.error.main
+                      : theme.palette.secondary.main,
                     fontWeight: 600,
                     fontSize: '0.7rem',
                   }}
@@ -248,7 +248,7 @@ export function DiscoveryListItem({
               )}
               {candidate.voteAverage && (
                 <Box display="flex" alignItems="center" gap={0.5}>
-                  <StarIcon sx={{ fontSize: { xs: 12, md: 14 }, color: '#fbbf24' }} />
+                  <StarIcon sx={{ fontSize: { xs: 12, md: 14 }, color: theme.palette.warning.light }} />
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                     {candidate.voteAverage.toFixed(1)}
                   </Typography>
@@ -344,7 +344,7 @@ export function DiscoveryListItem({
                         sx={{
                           p: 0.5,
                           backgroundColor: isRequested
-                            ? (requestStatus === 'approved' ? alpha('#22c55e', 0.2) : alpha('#8B5CF6', 0.2))
+                            ? (requestStatus === 'approved' ? alpha(theme.palette.success.main, 0.2) : alpha(theme.palette.secondary.main, 0.2))
                             : alpha(theme.palette.primary.main, 0.1),
                           '&:hover': {
                             backgroundColor: isRequested
@@ -408,11 +408,11 @@ export function DiscoveryListItem({
                     sx={{
                       ml: 'auto',
                       backgroundColor: requestStatus === 'approved'
-                        ? alpha('#22c55e', 0.2)
-                        : alpha('#8B5CF6', 0.2),
+                        ? alpha(theme.palette.success.main, 0.2)
+                        : alpha(theme.palette.secondary.main, 0.2),
                       color: requestStatus === 'approved'
-                        ? '#22c55e'
-                        : '#8B5CF6',
+                        ? theme.palette.success.main
+                        : theme.palette.secondary.main,
                       fontWeight: 600,
                       fontSize: '0.6rem',
                       height: 20,
@@ -484,7 +484,7 @@ export function DiscoveryListItem({
                       disabled={isRequesting || isRequested}
                       sx={{
                         backgroundColor: isRequested
-                          ? (requestStatus === 'approved' ? alpha('#22c55e', 0.2) : alpha('#8B5CF6', 0.2))
+                          ? (requestStatus === 'approved' ? alpha(theme.palette.success.main, 0.2) : alpha(theme.palette.secondary.main, 0.2))
                           : alpha(theme.palette.primary.main, 0.1),
                         '&:hover': {
                           backgroundColor: isRequested
