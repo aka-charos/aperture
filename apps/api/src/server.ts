@@ -14,7 +14,7 @@ import authPlugin, { requireAdmin } from './plugins/auth.js'
 import staticPlugin from './plugins/static.js'
 import routes from './routes/index.js'
 import { getSwaggerConfig, swaggerUIConfig } from './config/openapi.js'
-import { useSecureCookies, apiDocsMode, helmetOptions } from './config/security.js'
+import { useSecureCookies, apiDocsMode, helmetOptions, robotsTagHook } from './config/security.js'
 import { buildTrustProxyOption, refreshProxyTrust } from './config/proxyTrust.js'
 import { warnOnWeakSecurityPosture, noteRequest } from './config/deploymentPosture.js'
 
@@ -111,6 +111,11 @@ export async function buildServer(options: ServerOptions = {}): Promise<any> {
   // Security headers. Policy lives in config/security.ts so it is one
   // reviewable object and can be asserted in tests.
   await fastify.register(helmet, helmetOptions())
+
+  // Keep the instance out of search results. A separate hook because helmet has
+  // no option for this header; onRequest at root scope so it covers static
+  // assets and the SPA fallback as well as every API route.
+  fastify.addHook('onRequest', robotsTagHook)
 
   // Register CORS
   await fastify.register(cors, {
