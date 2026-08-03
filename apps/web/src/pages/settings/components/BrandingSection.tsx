@@ -21,6 +21,47 @@ import { DEFAULT_APP_NAME, setAppName as applyAppName, useAppName } from '@/lib/
 const MAX_LENGTH = 40
 
 /**
+ * Kept out of the translation files on purpose: it is configuration to copy
+ * verbatim, not prose, and a translated indent or key name would not work.
+ * Mirrors the branding volume in docker-compose.yml.
+ */
+const COMPOSE_SNIPPET = `services:
+  app:
+    environment:
+      BRANDING_DIR: /config/branding
+    volumes:
+      - ./data/branding:/config/branding:ro`
+
+const FILE_LAYOUT_SNIPPET = `data/branding/
+├── logo.svg
+└── favicon.svg`
+
+/** Config shown for copying; matches the mono blocks elsewhere in Settings. */
+function CodeBlock({ children }: { children: string }) {
+  return (
+    <Typography
+      component="pre"
+      sx={{
+        mt: 1,
+        mb: 0,
+        px: 1.5,
+        py: 1,
+        borderRadius: 1,
+        bgcolor: 'action.hover',
+        fontFamily: 'monospace',
+        fontSize: '0.78rem',
+        lineHeight: 1.6,
+        // Long paths must scroll inside the block rather than widen the card.
+        overflowX: 'auto',
+        whiteSpace: 'pre',
+      }}
+    >
+      {children}
+    </Typography>
+  )
+}
+
+/**
  * Admin: what this instance calls itself.
  *
  * The saved name is applied to the running page immediately rather than after a
@@ -174,13 +215,22 @@ export function BrandingSection() {
               <Typography variant="subtitle2" gutterBottom>
                 {t('settingsBranding.artworkTitle')}
               </Typography>
+
               <Typography variant="body2" color="text.secondary">
-                {t('settingsBranding.artworkHelp')}
+                {t('settingsBranding.artworkStep1')}
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              <CodeBlock>{COMPOSE_SNIPPET}</CodeBlock>
+
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                {t('settingsBranding.artworkStep2')}
+              </Typography>
+              <CodeBlock>{FILE_LAYOUT_SNIPPET}</CodeBlock>
+
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
                 {t('settingsBranding.artworkSizing')}
               </Typography>
-              <Stack spacing={0.5} sx={{ mt: 1.5 }}>
+
+              <Stack spacing={0.5} sx={{ mt: 2 }}>
                 <Typography variant="caption" color="text.secondary">
                   {t('settingsBranding.artworkLogo')}{' '}
                   {artwork.logo
