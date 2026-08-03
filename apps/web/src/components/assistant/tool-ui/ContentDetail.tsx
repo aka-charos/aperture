@@ -3,6 +3,7 @@
  * Rich display of a single movie or series
  */
 import { Box, Typography, Paper, Chip, Button, Divider } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import InfoIcon from '@mui/icons-material/Info'
 import StarIcon from '@mui/icons-material/Star'
@@ -12,6 +13,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { getProxiedImageUrl } from '@aperture/ui'
 import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
+import { gradients, extraColors } from '@/theme'
 import type { ContentDetailData } from './types'
 
 interface ContentDetailProps {
@@ -21,6 +23,7 @@ interface ContentDetailProps {
 export function ContentDetail({ data }: ContentDetailProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const theme = useTheme()
   // See ContentCard: null on surfaces where routing keeps the chat visible.
   const openMediaDetail = useMediaDetailModal()
 
@@ -43,7 +46,7 @@ export function ContentDetail({ data }: ContentDetailProps) {
   }
 
   return (
-    <Paper sx={{ p: 2, bgcolor: '#1a1a1a', borderRadius: 2, my: 2 }}>
+    <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper, borderRadius: 2, my: 2 }}>
       <Box sx={{ display: 'flex', gap: 2 }}>
         {/* Poster */}
         <Box
@@ -53,7 +56,7 @@ export function ContentDetail({ data }: ContentDetailProps) {
             flexShrink: 0,
             borderRadius: 1.5,
             overflow: 'hidden',
-            bgcolor: '#2a2a2a',
+            bgcolor: theme.palette.divider,
           }}
         >
           {data.image ? (
@@ -97,7 +100,7 @@ export function ContentDetail({ data }: ContentDetailProps) {
               sx={{
                 height: 20,
                 bgcolor: data.type === 'movie' ? 'rgba(99, 102, 241, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                color: data.type === 'movie' ? '#818cf8' : '#10b981',
+                color: data.type === 'movie' ? theme.palette.primary.light : '#10b981',
               }}
             />
           </Box>
@@ -173,7 +176,7 @@ export function ContentDetail({ data }: ContentDetailProps) {
                   size="small"
                   sx={{
                     height: 22,
-                    bgcolor: '#2a2a2a',
+                    bgcolor: theme.palette.divider,
                     color: '#a1a1aa',
                   }}
                 />
@@ -214,10 +217,10 @@ export function ContentDetail({ data }: ContentDetailProps) {
               startIcon={<InfoIcon />}
               onClick={handleDetails}
               sx={{
-                borderColor: '#3a3a3a',
+                borderColor: extraColors.subtleBorder,
                 color: '#a1a1aa',
                 '&:hover': {
-                  borderColor: '#6366f1',
+                  borderColor: theme.palette.primary.main,
                   bgcolor: 'rgba(99, 102, 241, 0.1)',
                 },
               }}
@@ -230,9 +233,9 @@ export function ContentDetail({ data }: ContentDetailProps) {
                 startIcon={<PlayArrowIcon />}
                 onClick={handlePlay}
                 sx={{
-                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                  background: gradients.primaryToSecondary,
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+                    background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.secondary.dark} 100%)`,
                   },
                 }}
               >
@@ -246,7 +249,7 @@ export function ContentDetail({ data }: ContentDetailProps) {
       {/* Overview */}
       {data.overview && (
         <>
-          <Divider sx={{ my: 2, borderColor: '#2a2a2a' }} />
+          <Divider sx={{ my: 2, borderColor: theme.palette.divider }} />
           <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
             {data.overview}
           </Typography>
@@ -256,7 +259,7 @@ export function ContentDetail({ data }: ContentDetailProps) {
       {/* Cast */}
       {data.cast && data.cast.length > 0 && (
         <>
-          <Divider sx={{ my: 2, borderColor: '#2a2a2a' }} />
+          <Divider sx={{ my: 2, borderColor: theme.palette.divider }} />
           <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
             {t('assistantToolUi.castHeading')}
           </Typography>

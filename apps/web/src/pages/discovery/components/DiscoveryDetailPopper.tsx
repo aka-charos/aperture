@@ -21,6 +21,7 @@ import {
   Tooltip,
   Alert,
 } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import CloseIcon from '@mui/icons-material/Close'
 import StarIcon from '@mui/icons-material/Star'
 import AccessTimeIcon from '@mui/icons-material/AccessTime'
@@ -90,6 +91,7 @@ export function DiscoveryDetailPopper({
 }: DiscoveryDetailPopperProps) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
+  const theme = useTheme()
   const [trailerLoading, setTrailerLoading] = useState(false)
   const [trailerModal, setTrailerModal] = useState<{
     open: boolean
@@ -307,7 +309,7 @@ export function DiscoveryDetailPopper({
                     }
                     size="small"
                     sx={{
-                      bgcolor: alpha('#8B5CF6', 0.2),
+                      bgcolor: alpha(theme.palette.secondary.main, 0.2),
                       '& .MuiChip-icon': { color: 'inherit' },
                     }}
                   />
@@ -499,8 +501,8 @@ export function DiscoveryDetailPopper({
                           size="small"
                           onClick={() => handlePersonClick(director)}
                           sx={{
-                            bgcolor: alpha('#8B5CF6', 0.2),
-                            '&:hover': { bgcolor: alpha('#8B5CF6', 0.3) },
+                            bgcolor: alpha(theme.palette.secondary.main, 0.2),
+                            '&:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.3) },
                             cursor: 'pointer',
                           }}
                         />

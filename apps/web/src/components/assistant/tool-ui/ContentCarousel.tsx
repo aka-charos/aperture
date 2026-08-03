@@ -16,6 +16,7 @@ import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd'
 import { ContentCard } from './ContentCard'
 import { CreatePlaylistFromSuggestionsDialog } from './CreatePlaylistFromSuggestionsDialog'
 import { COMPACT_THREAD } from '../density'
+import { extraColors } from '@/theme'
 import type { ContentCarouselData, ContentItem } from './types'
 
 interface ContentCarouselProps {
@@ -239,9 +240,9 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
             fontSize: 11,
             py: 0.25,
             whiteSpace: 'nowrap',
-            borderColor: '#3a3a3a',
+            borderColor: extraColors.subtleBorder,
             color: '#a1a1aa',
-            '&:hover': { borderColor: '#6366f1', bgcolor: 'rgba(99, 102, 241, 0.1)' },
+            '&:hover': { borderColor: theme.palette.primary.main, bgcolor: 'rgba(99, 102, 241, 0.1)' },
           }}
         >
           {t('assistantToolUi.createPlaylist')}

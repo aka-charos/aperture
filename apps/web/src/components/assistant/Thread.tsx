@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { Box, Paper, Typography, Avatar, CircularProgress, TextField, IconButton, Button, Tooltip, Checkbox, FormControlLabel, Fab } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import { useTranslation } from 'react-i18next'
 import SendIcon from '@mui/icons-material/Send'
 import StopIcon from '@mui/icons-material/Stop'
@@ -41,6 +42,7 @@ import { ToolResultError } from './ToolResultError'
 import { useUnwatchedOnly, setUnwatchedOnly } from './unwatchedPreference'
 import { useStatusPhase, setStatusPhase } from './assistantStatus'
 import { NARROW_THREAD, COMPACT_THREAD } from './density'
+import { gradients, extraColors } from '@/theme'
 
 /** Shared avatar geometry; it shrinks on a compact thread and goes on a narrow one. */
 const avatarSx = {
@@ -81,6 +83,7 @@ const partGapSx = { mb: 2, [COMPACT_THREAD]: { mb: 1.25 } }
 // Custom link renderer for markdown (needs hooks for i18n)
 function MarkdownLink({ href, children }: { href?: string; children?: ReactNode }) {
   const { t } = useTranslation()
+  const theme = useTheme()
   const text = String(children)
   // The backend tags media-server play URLs with aperturePlay=1 (see api
   // helpers/mediaServer.ts). Text sniffing stays as a fallback for links in
@@ -101,10 +104,10 @@ function MarkdownLink({ href, children }: { href?: string; children?: ReactNode 
         rel="noopener noreferrer"
         sx={{
           mt: 1,
-          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          background: gradients.primaryToSecondary,
           textTransform: 'none',
           '&:hover': {
-            background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+            background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.secondary.dark} 100%)`,
           },
         }}
       >
@@ -119,7 +122,7 @@ function MarkdownLink({ href, children }: { href?: string; children?: ReactNode 
       target={href?.startsWith('/') ? undefined : '_blank'}
       rel={href?.startsWith('/') ? undefined : 'noopener noreferrer'}
       style={{
-        color: '#818cf8',
+        color: theme.palette.primary.light,
         textDecoration: 'none',
       }}
     >
@@ -190,13 +193,14 @@ function ToolUI({ toolName, result }: { toolName: string; result: unknown }) {
 
 // User message component
 function UserMessage() {
+  const theme = useTheme()
   return (
     <MessagePrimitive.Root>
       <Box sx={{ ...messageRowSx, justifyContent: 'flex-end' }}>
         <Paper
           sx={{
             ...bubbleSx('80%'),
-            bgcolor: '#6366f1',
+            bgcolor: theme.palette.primary.main,
             borderRadius: 2,
             borderStartEndRadius: 0,
           }}
@@ -205,7 +209,7 @@ function UserMessage() {
             <MessagePrimitive.Content />
           </Typography>
         </Paper>
-        <Avatar sx={{ ...avatarSx, bgcolor: '#3a3a3a' }}>
+        <Avatar sx={{ ...avatarSx, bgcolor: extraColors.subtleBorder }}>
           <PersonIcon fontSize="small" />
         </Avatar>
       </Box>
@@ -274,10 +278,11 @@ function AssistantMessageError() {
 // Auto-hides on non-last messages and while the thread is running.
 function AssistantActionBar() {
   const { t } = useTranslation()
+  const theme = useTheme()
 
   const iconButtonSx = {
     color: 'text.secondary',
-    '&:hover': { color: '#818cf8' },
+    '&:hover': { color: theme.palette.primary.light },
   }
 
   return (
@@ -320,6 +325,7 @@ const ANSWER_MARKER_PROP = { 'data-aperture-answer': '' }
 // compares component identity) survives the re-render every streamed token
 // causes.
 function AssistantTextPart({ text }: TextMessagePartProps) {
+  const theme = useTheme()
   // Don't render empty text parts
   if (!text || !text.trim()) return null
   return (
@@ -339,9 +345,9 @@ function AssistantTextPart({ text }: TextMessagePartProps) {
           '& p:last-of-type': { mb: 0 },
           '& ul, & ol': { pl: 2, my: 1.5 },
           '& li': { mb: 0.75 },
-          '& strong': { color: '#818cf8' },
+          '& strong': { color: theme.palette.primary.light },
           '& code': {
-            bgcolor: '#2a2a2a',
+            bgcolor: theme.palette.divider,
             px: 0.5,
             py: 0.25,
             borderRadius: 0.5,
@@ -356,11 +362,11 @@ function AssistantTextPart({ text }: TextMessagePartProps) {
           },
           '& hr': {
             border: 'none',
-            borderTop: '1px solid #3a3a3a',
+            borderTop: `1px solid ${extraColors.subtleBorder}`,
             my: 2.5,
           },
           '& blockquote': {
-            borderInlineStart: '3px solid #6366f1',
+            borderInlineStart: `3px solid ${theme.palette.primary.main}`,
             pl: 2,
             my: 1.5,
             color: '#a1a1aa',
@@ -452,7 +458,7 @@ function AssistantMessage() {
         <Avatar
           sx={{
             ...avatarSx,
-            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+            background: gradients.primaryToSecondary,
           }}
         >
           <SmartToyIcon fontSize="small" />
@@ -470,6 +476,7 @@ function AssistantMessage() {
 // Thread welcome screen
 function ThreadWelcome({ suggestions }: { suggestions: string[] }) {
   const { t } = useTranslation()
+  const theme = useTheme()
   const composerRuntime = useComposerRuntime()
 
   const defaultSuggestions = [
@@ -503,7 +510,7 @@ function ThreadWelcome({ suggestions }: { suggestions: string[] }) {
           width: 64,
           height: 64,
           mb: 2,
-          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          background: gradients.primaryToSecondary,
         }}
       >
         <SmartToyIcon sx={{ fontSize: 36 }} />
@@ -531,7 +538,7 @@ function ThreadWelcome({ suggestions }: { suggestions: string[] }) {
               transition: 'all 0.2s',
               '&:hover': {
                 bgcolor: '#252525',
-                borderColor: '#6366f1',
+                borderColor: theme.palette.primary.main,
               },
             }}
           >
@@ -584,7 +591,7 @@ function LoadingIndicator() {
       <Avatar
         sx={{
           ...avatarSx,
-          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          background: gradients.primaryToSecondary,
         }}
       >
         <SmartToyIcon fontSize="small" />
@@ -609,6 +616,7 @@ function LoadingIndicator() {
 // Composer component
 function Composer() {
   const { t } = useTranslation()
+  const theme = useTheme()
   const composerRuntime = useComposerRuntime()
   const unwatchedOnly = useUnwatchedOnly()
 
@@ -637,7 +645,7 @@ function Composer() {
                 size="small"
                 checked={unwatchedOnly}
                 onChange={(e) => setUnwatchedOnly(e.target.checked)}
-                sx={{ p: 0.5, mr: 0.75, color: '#71717a', '&.Mui-checked': { color: '#6366f1' } }}
+                sx={{ p: 0.5, mr: 0.75, color: '#71717a', '&.Mui-checked': { color: theme.palette.primary.main } }}
               />
             }
             label={
@@ -660,13 +668,13 @@ function Composer() {
                   bgcolor: 'rgba(26, 26, 26, 0.7)',
                   borderRadius: 3,
                   '& fieldset': {
-                    borderColor: '#2a2a2a',
+                    borderColor: theme.palette.divider,
                   },
                   '&:hover fieldset': {
-                    borderColor: '#3a3a3a',
+                    borderColor: extraColors.subtleBorder,
                   },
                   '&.Mui-focused fieldset': {
-                    borderColor: '#6366f1',
+                    borderColor: theme.palette.primary.main,
                   },
                 },
                 '& .MuiInputBase-input': {
@@ -680,15 +688,15 @@ function Composer() {
               <IconButton
                 type="submit"
                 sx={{
-                  bgcolor: '#6366f1',
+                  bgcolor: theme.palette.primary.main,
                   color: '#fff',
                   width: 40,
                   height: 40,
                   '&:hover': {
-                    bgcolor: '#4f46e5',
+                    bgcolor: theme.palette.primary.dark,
                   },
                   '&:disabled': {
-                    bgcolor: '#3a3a3a',
+                    bgcolor: extraColors.subtleBorder,
                     color: '#666',
                   },
                 }}
@@ -703,12 +711,12 @@ function Composer() {
                 type="button"
                 aria-label={t('assistant.tooltipStop')}
                 sx={{
-                  bgcolor: '#6366f1',
+                  bgcolor: theme.palette.primary.main,
                   color: '#fff',
                   width: 40,
                   height: 40,
                   '&:hover': {
-                    bgcolor: '#4f46e5',
+                    bgcolor: theme.palette.primary.dark,
                   },
                 }}
               >
@@ -737,12 +745,13 @@ interface HistoricalMessage {
 
 // Render a historical user message
 function HistoricalUserMessage({ message }: { message: HistoricalMessage }) {
+  const theme = useTheme()
   return (
     <Box sx={{ ...messageRowSx, justifyContent: 'flex-end' }}>
       <Paper
         sx={{
           ...bubbleSx('80%'),
-          bgcolor: '#6366f1',
+          bgcolor: theme.palette.primary.main,
           borderRadius: 2,
           borderStartEndRadius: 0,
         }}
@@ -751,7 +760,7 @@ function HistoricalUserMessage({ message }: { message: HistoricalMessage }) {
           {message.content}
         </Typography>
       </Paper>
-      <Avatar sx={{ ...avatarSx, bgcolor: '#3a3a3a' }}>
+      <Avatar sx={{ ...avatarSx, bgcolor: extraColors.subtleBorder }}>
         <PersonIcon fontSize="small" />
       </Avatar>
     </Box>
@@ -765,7 +774,7 @@ function HistoricalAssistantMessage({ message }: { message: HistoricalMessage })
       <Avatar
         sx={{
           ...avatarSx,
-          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          background: gradients.primaryToSecondary,
         }}
       >
         <SmartToyIcon fontSize="small" />
@@ -836,6 +845,7 @@ const ANSWER_SCROLL_PADDING = 12
  */
 function ThreadScrollControls({ viewportRef }: { viewportRef: RefObject<HTMLDivElement | null> }) {
   const { t } = useTranslation()
+  const theme = useTheme()
   const isRunning = useThread((s) => s.isRunning)
   // Boolean, not the message — this re-evaluates on every streamed token and
   // must only re-render the controls when the answer first finds its words.
@@ -942,7 +952,7 @@ function ThreadScrollControls({ viewportRef }: { viewportRef: RefObject<HTMLDivE
     bgcolor: 'rgba(26, 26, 26, 0.92)',
     color: 'text.secondary',
     border: '1px solid rgba(255, 255, 255, 0.1)',
-    '&:hover': { bgcolor: '#252525', color: '#818cf8' },
+    '&:hover': { bgcolor: '#252525', color: theme.palette.primary.light },
   }
 
   return (

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Box } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import { MediaPosterCard, type Genre } from '../../../components/MediaPosterCard'
 import { RequestSeerrOptionsDialog } from '../../../components/RequestSeerrOptionsDialog'
 import { DiscoveryDetailPopper } from './DiscoveryDetailPopper'
@@ -44,6 +45,7 @@ export function DiscoveryCard({
   showRank = true,
 }: DiscoveryCardProps) {
   const { t } = useTranslation()
+  const theme = useTheme()
   const [detailOpen, setDetailOpen] = useState(false)
   const [optionsDialogOpen, setOptionsDialogOpen] = useState(false)
   const [pendingSeerrOpts, setPendingSeerrOpts] = useState<SeerrRequestOptions | null>(null)
@@ -61,7 +63,7 @@ export function DiscoveryCard({
     if (source.startsWith('tmdb')) return '#01b4e4'
     if (source.startsWith('trakt')) return '#ed1c24'
     if (source.startsWith('justwatch')) return '#0ea5e9'
-    return '#6366f1'
+    return theme.palette.primary.main
   }
 
   const handleRequest = () => {

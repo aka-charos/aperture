@@ -128,7 +128,7 @@ export function WatchHistorySeriesListItem({
                   position: 'absolute',
                   top: { xs: 4, md: 8 },
                   left: { xs: 4, md: 8 },
-                  backgroundColor: alpha('#22c55e', 0.9),
+                  backgroundColor: alpha(theme.palette.success.main, 0.9),
                   color: 'white',
                   fontWeight: 600,
                   fontSize: { xs: '0.55rem', md: '0.65rem' },
@@ -183,8 +183,8 @@ export function WatchHistorySeriesListItem({
                   label={t('watchHistoryPage.favorite')}
                   size="small"
                   sx={{
-                    backgroundColor: alpha('#ef4444', 0.2),
-                    color: '#ef4444',
+                    backgroundColor: alpha(theme.palette.error.main, 0.2),
+                    color: theme.palette.error.main,
                     fontWeight: 600,
                     fontSize: '0.7rem',
                   }}
@@ -203,7 +203,7 @@ export function WatchHistorySeriesListItem({
               )}
               {series.community_rating && (
                 <Box display="flex" alignItems="center" gap={0.5}>
-                  <StarIcon sx={{ fontSize: { xs: 12, md: 14 }, color: '#fbbf24' }} />
+                  <StarIcon sx={{ fontSize: { xs: 12, md: 14 }, color: theme.palette.warning.light }} />
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                     {Number(series.community_rating).toFixed(1)}
                   </Typography>
@@ -309,11 +309,11 @@ export function WatchHistorySeriesListItem({
             {/* Progress */}
             <Box>
               <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
-                <TvIcon sx={{ fontSize: 20, color: isCompleted ? '#22c55e' : theme.palette.secondary.main }} />
-                <Typography 
-                  variant="h5" 
-                  fontWeight={700} 
-                  color={isCompleted ? '#22c55e' : 'secondary.main'}
+                <TvIcon sx={{ fontSize: 20, color: isCompleted ? theme.palette.success.main : theme.palette.secondary.main }} />
+                <Typography
+                  variant="h5"
+                  fontWeight={700}
+                  color={isCompleted ? theme.palette.success.main : 'secondary.main'}
                 >
                   {Math.round(progressPercent)}%
                 </Typography>
@@ -331,11 +331,11 @@ export function WatchHistorySeriesListItem({
                   mt: 1,
                   height: 6,
                   borderRadius: 3,
-                  backgroundColor: alpha(isCompleted ? '#22c55e' : theme.palette.secondary.main, 0.1),
+                  backgroundColor: alpha(isCompleted ? theme.palette.success.main : theme.palette.secondary.main, 0.1),
                   '& .MuiLinearProgress-bar': {
                     borderRadius: 3,
-                    background: isCompleted 
-                      ? '#22c55e'
+                    background: isCompleted
+                      ? theme.palette.success.main
                       : `linear-gradient(90deg, ${theme.palette.secondary.main}, ${theme.palette.primary.main})`,
                   },
                 }}
@@ -414,11 +414,11 @@ export function WatchHistorySeriesListItem({
         >
           <Box display="flex" alignItems="center" gap={2}>
             <Box display="flex" alignItems="center" gap={0.5}>
-              <TvIcon sx={{ fontSize: 16, color: isCompleted ? '#22c55e' : theme.palette.secondary.main }} />
-              <Typography 
-                variant="body2" 
-                fontWeight={700} 
-                color={isCompleted ? '#22c55e' : 'secondary.main'}
+              <TvIcon sx={{ fontSize: 16, color: isCompleted ? theme.palette.success.main : theme.palette.secondary.main }} />
+              <Typography
+                variant="body2"
+                fontWeight={700}
+                color={isCompleted ? theme.palette.success.main : 'secondary.main'}
               >
                 {Math.round(progressPercent)}%
               </Typography>
@@ -446,11 +446,11 @@ export function WatchHistorySeriesListItem({
               maxWidth: 80,
               height: 4,
               borderRadius: 2,
-              backgroundColor: alpha(isCompleted ? '#22c55e' : theme.palette.secondary.main, 0.1),
+              backgroundColor: alpha(isCompleted ? theme.palette.success.main : theme.palette.secondary.main, 0.1),
               '& .MuiLinearProgress-bar': {
                 borderRadius: 2,
-                background: isCompleted 
-                  ? '#22c55e'
+                background: isCompleted
+                  ? theme.palette.success.main
                   : `linear-gradient(90deg, ${theme.palette.secondary.main}, ${theme.palette.primary.main})`,
               },
             }}

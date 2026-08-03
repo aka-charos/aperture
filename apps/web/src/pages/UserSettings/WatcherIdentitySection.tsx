@@ -45,6 +45,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import Markdown from 'react-markdown'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslation } from 'react-i18next'
+import { useTheme } from '@mui/material/styles'
 
 // Types
 interface TasteProfile {
@@ -118,6 +119,7 @@ interface WatcherIdentitySectionProps {
 export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProps) {
   const { t } = useTranslation()
   const { user } = useAuth()
+  const theme = useTheme()
   
   // Data states
   const [data, setData] = useState<TasteProfileData | null>(null)
@@ -167,7 +169,7 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
   const sliderDebounceRef = useRef<Record<string, NodeJS.Timeout>>({})
 
   const isMovie = mediaType === 'movie'
-  const accentColor = isMovie ? '#6366f1' : '#ec4899'
+  const accentColor = isMovie ? theme.palette.primary.main : '#ec4899'
 
   // Fetch all data
   const fetchData = useCallback(async () => {
@@ -1132,20 +1134,20 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
                           p: isNew ? 1 : 0,
                           borderRadius: 1,
                           border: isNew ? '2px solid' : 'none',
-                          borderColor: isNew ? '#f59e0b' : 'transparent',
+                          borderColor: isNew ? theme.palette.warning.main : 'transparent',
                           animation: isNew ? 'pulse 2s infinite' : 'none',
                           '@keyframes pulse': {
-                            '0%, 100%': { borderColor: '#f59e0b' },
-                            '50%': { borderColor: '#fbbf24' },
+                            '0%, 100%': { borderColor: theme.palette.warning.main },
+                            '50%': { borderColor: theme.palette.warning.light },
                           },
                         }}
                       >
                         <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
                           <Box display="flex" alignItems="center" gap={1} sx={{ minWidth: 0, flex: 1 }}>
-                            <Typography 
-                              variant="body2" 
-                              fontWeight={500} 
-                              sx={{ 
+                            <Typography
+                              variant="body2"
+                              fontWeight={500}
+                              sx={{
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
                                 whiteSpace: 'nowrap',
@@ -1154,12 +1156,12 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
                               {franchise.franchiseName}
                             </Typography>
                             {isNew && (
-                              <Chip 
-                                size="small" 
-                                label={t('watcherIdentity.chipNew')} 
-                                sx={{ 
-                                  bgcolor: '#f59e0b', 
-                                  color: 'white', 
+                              <Chip
+                                size="small"
+                                label={t('watcherIdentity.chipNew')}
+                                sx={{
+                                  bgcolor: theme.palette.warning.main,
+                                  color: 'white',
                                   fontSize: '0.6rem', 
                                   height: 18,
                                   fontWeight: 700,
@@ -1206,12 +1208,12 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
                           size="small"
                           sx={{
                             '& .MuiSlider-track': {
-                              background: franchise.preferenceScore > 0 
-                                ? `linear-gradient(to right, #9ca3af, #22c55e)`
-                                : `linear-gradient(to right, #ef4444, #9ca3af)`,
+                              background: franchise.preferenceScore > 0
+                                ? `linear-gradient(to right, #9ca3af, ${theme.palette.success.main})`
+                                : `linear-gradient(to right, ${theme.palette.error.main}, #9ca3af)`,
                             },
                             '& .MuiSlider-rail': {
-                              background: 'linear-gradient(to right, #ef4444, #9ca3af, #22c55e)',
+                              background: `linear-gradient(to right, ${theme.palette.error.main}, #9ca3af, ${theme.palette.success.main})`,
                               opacity: 0.3,
                             },
                           }}
@@ -1243,11 +1245,11 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
                         label={name}
                         size="small"
                         onClick={() => scrollToItem('franchise', name)}
-                        sx={{ 
+                        sx={{
                           cursor: 'pointer',
-                          bgcolor: '#f59e0b',
+                          bgcolor: theme.palette.warning.main,
                           color: 'white',
-                          '&:hover': { bgcolor: '#d97706' },
+                          '&:hover': { bgcolor: theme.palette.warning.dark },
                         }}
                       />
                     ))}
@@ -1315,11 +1317,11 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
                           p: isNew ? 1 : 0,
                           borderRadius: 1,
                           border: isNew ? '2px solid' : 'none',
-                          borderColor: isNew ? '#f59e0b' : 'transparent',
+                          borderColor: isNew ? theme.palette.warning.main : 'transparent',
                           animation: isNew ? 'pulse 2s infinite' : 'none',
                           '@keyframes pulse': {
-                            '0%, 100%': { borderColor: '#f59e0b' },
-                            '50%': { borderColor: '#fbbf24' },
+                            '0%, 100%': { borderColor: theme.palette.warning.main },
+                            '50%': { borderColor: theme.palette.warning.light },
                           },
                         }}
                       >
@@ -1329,12 +1331,12 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
                               {genre.genre}
                             </Typography>
                             {isNew && (
-                              <Chip 
-                                size="small" 
-                                label={t('watcherIdentity.chipNew')} 
-                                sx={{ 
-                                  bgcolor: '#f59e0b', 
-                                  color: 'white', 
+                              <Chip
+                                size="small"
+                                label={t('watcherIdentity.chipNew')}
+                                sx={{
+                                  bgcolor: theme.palette.warning.main,
+                                  color: 'white',
                                   fontSize: '0.6rem', 
                                   height: 18,
                                   fontWeight: 700,
@@ -1416,11 +1418,11 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
                         label={name}
                         size="small"
                         onClick={() => scrollToItem('genre', name)}
-                        sx={{ 
+                        sx={{
                           cursor: 'pointer',
-                          bgcolor: '#f59e0b',
+                          bgcolor: theme.palette.warning.main,
                           color: 'white',
-                          '&:hover': { bgcolor: '#d97706' },
+                          '&:hover': { bgcolor: theme.palette.warning.dark },
                         }}
                       />
                     ))}
@@ -1443,7 +1445,7 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
                 width: 48,
                 height: 48,
                 borderRadius: 2,
-                background: `linear-gradient(135deg, ${accentColor} 0%, ${isMovie ? '#8b5cf6' : '#f472b6'} 100%)`,
+                background: `linear-gradient(135deg, ${accentColor} 0%, ${isMovie ? theme.palette.secondary.main : '#f472b6'} 100%)`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1576,7 +1578,7 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
             
             <Grid item xs={6} sm={3}>
               <Card sx={{ p: 2, textAlign: 'center', bgcolor: 'background.default' }}>
-                <CalendarMonthIcon sx={{ color: '#22c55e', fontSize: 32, mb: 1 }} />
+                <CalendarMonthIcon sx={{ color: theme.palette.success.main, fontSize: 32, mb: 1 }} />
                 <Typography variant="h5" fontWeight={700}>
                   {stats.favoriteDecade || '—'}
                 </Typography>

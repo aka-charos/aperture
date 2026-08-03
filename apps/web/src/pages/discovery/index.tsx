@@ -331,7 +331,7 @@ export function DiscoveryPage() {
                   sx={{
                     height: 20,
                     minWidth: 20,
-                    bgcolor: '#6366f1',
+                    bgcolor: theme.palette.primary.main,
                     color: 'white',
                     fontSize: '0.75rem',
                     '& .MuiChip-label': { px: 0.75 },
@@ -341,8 +341,8 @@ export function DiscoveryPage() {
             </Box>
           }
           sx={{
-            color: discoveryTab === 'movie' ? '#6366f1' : 'text.secondary',
-            '&.Mui-selected': { color: '#6366f1' },
+            color: discoveryTab === 'movie' ? theme.palette.primary.main : 'text.secondary',
+            '&.Mui-selected': { color: theme.palette.primary.main },
           }}
         />
         <Tab

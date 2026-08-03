@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react'
 import { Box, Typography, Tooltip, IconButton, Popper, Paper, ClickAwayListener, Fade } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import Star from '@mui/icons-material/Star'
 import StarBorder from '@mui/icons-material/StarBorder'
 
@@ -14,9 +15,9 @@ const EmptyStar = StarBorder as unknown as React.ComponentType<{
 
 // Indigo accent for the user's personal rating — deliberately distinct from the red
 // "favorite" heart and the gold community-rating star, so the three never read as the
-// same action.
-const RATED_COLOR = '#6366f1' // indigo-500
-const RATED_COLOR_HOVER = '#818cf8' // indigo-400
+// same action. RATED_COLOR / RATED_COLOR_HOVER match the theme's primary.main/primary.light
+// exactly, so they're sourced live via useTheme() instead of hardcoded (see FillableStar
+// and StarRating below).
 const EMPTY_COLOR = 'rgba(129, 140, 248, 0.75)' // indigo-400 @ 75% — visible-but-unrated
 const EMPTY_COLOR_HOVER = '#a5b4fc' // indigo-300
 
@@ -101,6 +102,7 @@ function FillableStar({
   disabled?: boolean
   interactive?: boolean
 }) {
+  const theme = useTheme()
   return (
     <Box
       onClick={interactive ? onClick : undefined}
@@ -144,7 +146,7 @@ function FillableStar({
             width: size,
             height: size,
             fontSize: size,
-            color: RATED_COLOR,
+            color: theme.palette.primary.main,
           }}
         />
       </Box>
@@ -165,6 +167,7 @@ export function StarRating({
   onOpenChange,
   sx = {},
 }: StarRatingProps) {
+  const theme = useTheme()
   const [popperOpen, setPopperOpen] = useState(false)
   const [hoverValue, setHoverValue] = useState<number | null>(null)
   const anchorRef = useRef<HTMLDivElement>(null)
@@ -189,7 +192,7 @@ export function StarRating({
             display: 'inline-flex',
             alignItems: 'center',
             gap: 0.5,
-            backgroundColor: RATED_COLOR,
+            backgroundColor: theme.palette.primary.main,
             borderRadius: 1,
             px: 0.75,
             py: 0.25,
@@ -281,7 +284,7 @@ export function StarRating({
             sx={{
               fontSize: config.fontSize,
               fontWeight: 600,
-              color: value ? RATED_COLOR : 'text.secondary',
+              color: value ? theme.palette.primary.main : 'text.secondary',
               minWidth: '2em',
             }}
           >
@@ -322,8 +325,8 @@ export function StarRating({
 
                     const starColor = isFilled
                       ? isHovered
-                        ? RATED_COLOR_HOVER
-                        : RATED_COLOR
+                        ? theme.palette.primary.light
+                        : theme.palette.primary.main
                       : isHovered
                         ? EMPTY_COLOR_HOVER
                         : EMPTY_COLOR
@@ -378,7 +381,7 @@ export function StarRating({
                       sx={{
                         fontSize: config.fontSize,
                         fontWeight: 600,
-                        color: RATED_COLOR,
+                        color: theme.palette.primary.main,
                       }}
                     >
                       {ratingLabels[displayValue]}

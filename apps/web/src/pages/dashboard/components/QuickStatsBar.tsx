@@ -1,4 +1,5 @@
 import { Box, Card, Typography, Skeleton } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import MovieIcon from '@mui/icons-material/Movie'
@@ -89,6 +90,7 @@ export function QuickStatsBar({
   loading,
 }: QuickStatsBarProps) {
   const { t } = useTranslation()
+  const theme = useTheme()
   return (
     <Box
       sx={{
@@ -108,14 +110,14 @@ export function QuickStatsBar({
         icon={<MovieIcon />}
         label={t('dashboard.statMoviesWatched')}
         value={moviesWatched.toLocaleString()}
-        color="#6366f1"
+        color={theme.palette.primary.main}
         loading={loading}
       />
       <StatCard
         icon={<TvIcon />}
         label={t('dashboard.statSeriesWatched')}
         value={seriesWatched.toLocaleString()}
-        color="#8b5cf6"
+        color={theme.palette.secondary.main}
         loading={loading}
       />
       <StatCard

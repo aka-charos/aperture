@@ -31,6 +31,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility'
 import ThumbDownIcon from '@mui/icons-material/ThumbDown'
 import CloseIcon from '@mui/icons-material/Close'
 import { useTranslation } from 'react-i18next'
+import { useTheme } from '@mui/material/styles'
 import { StarRating } from '@aperture/ui'
 
 interface AlgorithmWeights {
@@ -61,6 +62,7 @@ interface DislikedItem {
 
 export function AlgorithmSettingsSection({ userId }: Props) {
   const { t } = useTranslation()
+  const theme = useTheme()
   const weightLabels = useMemo(
     (): Record<keyof Omit<AlgorithmWeights, 'recentWatchLimit'>, { label: string; description: string }> => ({
       similarityWeight: {
@@ -407,7 +409,7 @@ export function AlgorithmSettingsSection({ userId }: Props) {
   }
 
   // Match colors from Watcher Identity page
-  const accentColor = mediaType === 'movie' ? '#6366f1' : '#ec4899'
+  const accentColor = mediaType === 'movie' ? theme.palette.primary.main : '#ec4899'
 
   return (
     <Box>

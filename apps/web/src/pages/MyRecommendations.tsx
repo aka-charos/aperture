@@ -428,7 +428,7 @@ export function MyRecommendationsPage() {
                   sx={{
                     height: 20,
                     minWidth: 20,
-                    bgcolor: '#6366f1',
+                    bgcolor: theme.palette.primary.main,
                     color: 'white',
                     fontSize: '0.75rem',
                     '& .MuiChip-label': { px: 0.75 },
@@ -438,8 +438,8 @@ export function MyRecommendationsPage() {
             </Box>
           }
           sx={{
-            color: mediaType === 'movies' ? '#6366f1' : 'text.secondary',
-            '&.Mui-selected': { color: '#6366f1' },
+            color: mediaType === 'movies' ? theme.palette.primary.main : 'text.secondary',
+            '&.Mui-selected': { color: theme.palette.primary.main },
           }}
         />
         <Tab
@@ -681,7 +681,7 @@ export function MyRecommendationsPage() {
                         )}
                         {item.community_rating && (
                           <Box display="flex" alignItems="center" gap={0.5}>
-                            <StarIcon sx={{ fontSize: { xs: 12, md: 14 }, color: '#fbbf24' }} />
+                            <StarIcon sx={{ fontSize: { xs: 12, md: 14 }, color: theme.palette.warning.light }} />
                             <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                               {Number(item.community_rating).toFixed(1)}
                             </Typography>
@@ -877,9 +877,9 @@ export function MyRecommendationsPage() {
                       <Typography variant="subtitle2" fontWeight={600} mb={1}>
                         {t('myRecommendations.matchScore', { pct: (rec.final_score * 100).toFixed(0) })}
                       </Typography>
-                      <ScoreBar label={t('myRecommendations.scoreSimilarity')} value={rec.similarity_score} color="#6366f1" />
+                      <ScoreBar label={t('myRecommendations.scoreSimilarity')} value={rec.similarity_score} color={theme.palette.primary.main} />
                       <ScoreBar label={t('myRecommendations.scoreNovelty')} value={rec.novelty_score} color="#10b981" />
-                      <ScoreBar label={t('myRecommendations.scoreRating')} value={rec.rating_score} color="#f59e0b" />
+                      <ScoreBar label={t('myRecommendations.scoreRating')} value={rec.rating_score} color={theme.palette.warning.main} />
                     </Box>
                   )}
                 </Box>
@@ -917,7 +917,7 @@ export function MyRecommendationsPage() {
                             borderRadius: 2,
                             backgroundColor: 'grey.800',
                             '& .MuiLinearProgress-bar': {
-                              backgroundColor: '#6366f1',
+                              backgroundColor: theme.palette.primary.main,
                               borderRadius: 2,
                             },
                           }}
@@ -963,7 +963,7 @@ export function MyRecommendationsPage() {
                             borderRadius: 2,
                             backgroundColor: 'grey.800',
                             '& .MuiLinearProgress-bar': {
-                              backgroundColor: '#f59e0b',
+                              backgroundColor: theme.palette.warning.main,
                               borderRadius: 2,
                             },
                           }}

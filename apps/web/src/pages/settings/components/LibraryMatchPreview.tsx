@@ -12,6 +12,7 @@ import {
   ListItemText,
   alpha,
 } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
@@ -39,19 +40,20 @@ export function LibraryMatchPreview({
   onOpenPreview,
 }: LibraryMatchPreviewProps) {
   const { t } = useTranslation()
+  const theme = useTheme()
   if (loading) {
     return (
-      <Box 
-        sx={{ 
-          p: 2, 
-          bgcolor: alpha('#8B5CF6', 0.08),
+      <Box
+        sx={{
+          p: 2,
+          bgcolor: alpha(theme.palette.secondary.main, 0.08),
           borderRadius: 2,
           border: '1px solid',
-          borderColor: alpha('#8B5CF6', 0.2),
+          borderColor: alpha(theme.palette.secondary.main, 0.2),
         }}
       >
         <Box display="flex" alignItems="center" gap={1.5}>
-          <CircularProgress size={18} sx={{ color: '#8B5CF6' }} />
+          <CircularProgress size={18} sx={{ color: theme.palette.secondary.main }} />
           <Typography variant="body2" color="text.secondary">
             {t('settingsLibraryMatchPreview.analyzing')}
           </Typography>
@@ -68,12 +70,12 @@ export function LibraryMatchPreview({
   const missingCount = data.missing.length
 
   return (
-    <Box 
-      sx={{ 
-        bgcolor: alpha('#8B5CF6', 0.06),
+    <Box
+      sx={{
+        bgcolor: alpha(theme.palette.secondary.main, 0.06),
         borderRadius: 2,
         border: '1px solid',
-        borderColor: alpha('#8B5CF6', 0.15),
+        borderColor: alpha(theme.palette.secondary.main, 0.15),
         overflow: 'hidden',
       }}
     >
@@ -98,9 +100,9 @@ export function LibraryMatchPreview({
               bgcolor: alpha('#fff', 0.1),
               '& .MuiLinearProgress-bar': {
                 borderRadius: 3,
-                background: matchPercentage === 100 
-                  ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)'
-                  : 'linear-gradient(90deg, #8B5CF6 0%, #6366f1 100%)',
+                background: matchPercentage === 100
+                  ? `linear-gradient(90deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`
+                  : `linear-gradient(90deg, ${theme.palette.secondary.main} 0%, ${theme.palette.primary.main} 100%)`,
               }
             }}
           />
@@ -113,12 +115,12 @@ export function LibraryMatchPreview({
             label={t('settingsLibraryMatchPreview.inLibrary', { count: data.matched })}
             size="small"
             sx={{
-              bgcolor: alpha('#22c55e', 0.15),
-              color: '#22c55e',
+              bgcolor: alpha(theme.palette.success.main, 0.15),
+              color: theme.palette.success.main,
               fontWeight: 600,
-              '& .MuiChip-icon': { color: '#22c55e' },
+              '& .MuiChip-icon': { color: theme.palette.success.main },
               cursor: 'pointer',
-              '&:hover': { bgcolor: alpha('#22c55e', 0.25) },
+              '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.25) },
             }}
             onClick={onOpenPreview}
           />
@@ -128,12 +130,12 @@ export function LibraryMatchPreview({
               label={t('settingsLibraryMatchPreview.missing', { count: missingCount })}
               size="small"
               sx={{
-                bgcolor: alpha('#f59e0b', 0.15),
-                color: '#f59e0b',
+                bgcolor: alpha(theme.palette.warning.main, 0.15),
+                color: theme.palette.warning.main,
                 fontWeight: 600,
-                '& .MuiChip-icon': { color: '#f59e0b' },
+                '& .MuiChip-icon': { color: theme.palette.warning.main },
                 cursor: 'pointer',
-                '&:hover': { bgcolor: alpha('#f59e0b', 0.25) },
+                '&:hover': { bgcolor: alpha(theme.palette.warning.main, 0.25) },
               }}
               onClick={onExpandToggle}
             />
@@ -156,17 +158,17 @@ export function LibraryMatchPreview({
         <>
           <Box 
             onClick={onExpandToggle}
-            sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
               justifyContent: 'space-between',
               px: 2,
               py: 1,
               cursor: 'pointer',
-              bgcolor: alpha('#f59e0b', 0.08),
+              bgcolor: alpha(theme.palette.warning.main, 0.08),
               borderTop: '1px solid',
-              borderColor: alpha('#f59e0b', 0.15),
-              '&:hover': { bgcolor: alpha('#f59e0b', 0.12) },
+              borderColor: alpha(theme.palette.warning.main, 0.15),
+              '&:hover': { bgcolor: alpha(theme.palette.warning.main, 0.12) },
             }}
           >
             <Typography variant="caption" fontWeight={600} color="warning.main">
@@ -225,17 +227,17 @@ export function LibraryMatchPreview({
       {/* View full preview button */}
       <Box 
         onClick={onOpenPreview}
-        sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
           justifyContent: 'center',
           gap: 0.5,
           py: 1.5,
           cursor: 'pointer',
-          bgcolor: alpha('#8B5CF6', 0.1),
+          bgcolor: alpha(theme.palette.secondary.main, 0.1),
           borderTop: '1px solid',
-          borderColor: alpha('#8B5CF6', 0.15),
-          '&:hover': { bgcolor: alpha('#8B5CF6', 0.18) },
+          borderColor: alpha(theme.palette.secondary.main, 0.15),
+          '&:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.18) },
           transition: 'background-color 0.2s',
         }}
       >

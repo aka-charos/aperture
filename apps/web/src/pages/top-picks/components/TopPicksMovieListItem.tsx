@@ -141,7 +141,7 @@ export function TopPicksMovieListItem({ movie, userRating, onRate }: TopPicksMov
               )}
               {movie.communityRating && (
                 <Box display="flex" alignItems="center" gap={0.5}>
-                  <StarIcon sx={{ fontSize: { xs: 12, md: 14 }, color: '#fbbf24' }} />
+                  <StarIcon sx={{ fontSize: { xs: 12, md: 14 }, color: theme.palette.warning.light }} />
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                     {movie.communityRating.toFixed(1)}
                   </Typography>

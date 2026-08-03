@@ -13,6 +13,7 @@ import {
   Tabs,
   Tab,
 } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import WhatshotIcon from '@mui/icons-material/Whatshot'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
@@ -71,6 +72,7 @@ interface TopPicksConfig {
 export function TopPicksPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const theme = useTheme()
   const [searchParams, setSearchParams] = useSearchParams()
   const { getRating, setRating } = useUserRatings()
   const { isWatching, toggleWatching } = useWatching()
@@ -386,9 +388,9 @@ export function TopPicksPage() {
             icon={<MovieIcon />} 
             iconPosition="start" 
             label={t('topPicksPage.tabMovies')} 
-            sx={{ 
-              color: tabIndex === 0 ? '#6366f1' : 'text.secondary',
-              '&.Mui-selected': { color: '#6366f1' },
+            sx={{
+              color: tabIndex === 0 ? theme.palette.primary.main : 'text.secondary',
+              '&.Mui-selected': { color: theme.palette.primary.main },
             }}
           />
           <Tab 

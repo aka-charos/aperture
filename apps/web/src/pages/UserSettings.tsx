@@ -9,6 +9,7 @@ import TvIcon from '@mui/icons-material/Tv'
 import TuneIcon from '@mui/icons-material/Tune'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useTheme } from '@mui/material/styles'
 import { useAuth } from '@/hooks/useAuth'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { WatcherIdentitySection } from './UserSettings/WatcherIdentitySection'
@@ -30,6 +31,7 @@ import { PageHeading } from '@/components/PageHeading'
 
 export function UserSettingsPage() {
   const { t } = useTranslation()
+  const theme = useTheme()
   const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [tabValue, setTabValue] = useState(() => userSettingsTabIndexFromParam(searchParams.get('tab')))
@@ -151,7 +153,7 @@ export function UserSettingsPage() {
     }
   }
 
-  const identityAccentColor = identityMediaType === 'movie' ? '#6366f1' : '#ec4899'
+  const identityAccentColor = identityMediaType === 'movie' ? theme.palette.primary.main : '#ec4899'
 
   return (
     <Box>

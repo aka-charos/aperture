@@ -10,6 +10,7 @@
  * a rank, a seed badge and a remove button.
  */
 import { Box, Typography, Chip, Paper, IconButton, Tooltip } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import StarIcon from '@mui/icons-material/Star'
 import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined'
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline'
@@ -48,13 +49,14 @@ export function PreviewItemCard({
   removeDisabled,
   pt,
 }: PreviewItemCardProps) {
+  const theme = useTheme()
   return (
     <Paper
       sx={{
         display: 'flex',
         gap: 1.75,
         p: 1.75,
-        bgcolor: '#1a1a1a',
+        bgcolor: theme.palette.background.paper,
         borderRadius: 2,
         border: '1px solid transparent',
         transition: 'background-color 0.2s, border-color 0.2s',
@@ -71,7 +73,7 @@ export function PreviewItemCard({
             height: POSTER_HEIGHT,
             borderRadius: 1,
             overflow: 'hidden',
-            bgcolor: '#2a2a2a',
+            bgcolor: theme.palette.divider,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -161,7 +163,7 @@ export function PreviewItemCard({
               height: 18,
               bgcolor:
                 item.mediaType === 'movie' ? 'rgba(99, 102, 241, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-              color: item.mediaType === 'movie' ? '#818cf8' : '#10b981',
+              color: item.mediaType === 'movie' ? theme.palette.primary.light : '#10b981',
               '& .MuiChip-label': { px: 0.625, fontSize: 10 },
             }}
           />
@@ -206,11 +208,11 @@ export function PreviewItemCard({
               p: 1,
               borderRadius: 1,
               bgcolor: 'rgba(99, 102, 241, 0.08)',
-              borderInlineStart: '2px solid #6366f1',
+              borderInlineStart: `2px solid ${theme.palette.primary.main}`,
             }}
           >
             <LightbulbOutlinedIcon
-              sx={{ fontSize: 15, color: '#818cf8', flexShrink: 0, mt: '1px' }}
+              sx={{ fontSize: 15, color: theme.palette.primary.light, flexShrink: 0, mt: '1px' }}
             />
             <Typography variant="caption" sx={{ color: '#c7c7d1', lineHeight: 1.45 }}>
               {item.reason}

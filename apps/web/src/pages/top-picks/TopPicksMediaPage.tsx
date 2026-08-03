@@ -13,6 +13,7 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import WhatshotIcon from '@mui/icons-material/Whatshot'
 import TvIcon from '@mui/icons-material/Tv'
 import GridViewIcon from '@mui/icons-material/GridView'
@@ -84,6 +85,7 @@ interface TopPicksMediaPageProps {
 export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const theme = useTheme()
   const { getRating, setRating } = useUserRatings()
   const { isWatching, toggleWatching } = useWatching()
   const [items, setItems] = useState<TopPickItem[]>([])
@@ -95,7 +97,7 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
   const isMovie = mediaType === 'movie'
   const headerIcon = isMovie
     ? <WhatshotIcon sx={{ color: '#f97316', fontSize: 32 }} />
-    : <TvIcon sx={{ color: '#8b5cf6', fontSize: 32 }} />
+    : <TvIcon sx={{ color: theme.palette.secondary.main, fontSize: 32 }} />
 
   const handleRate = useCallback(
     async (itemId: string, rating: number | null) => {

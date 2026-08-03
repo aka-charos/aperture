@@ -143,7 +143,7 @@ export function BrowseMovieListItem({
             )}
             {movie.community_rating && (
               <Box display="flex" alignItems="center" gap={0.5}>
-                <StarIcon sx={{ fontSize: { xs: 12, md: 14 }, color: '#fbbf24' }} />
+                <StarIcon sx={{ fontSize: { xs: 12, md: 14 }, color: theme.palette.warning.light }} />
                 <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                   {Number(movie.community_rating).toFixed(1)}
                 </Typography>
