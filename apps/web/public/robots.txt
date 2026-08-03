@@ -1,0 +1,9 @@
+# Aperture is a private, self-hosted instance. Nothing here is meant to be
+# indexed: the only page a crawler can render is the login form, and having it
+# turn up in search results invites credential-stuffing traffic for no benefit.
+#
+# This is advisory — a crawler chooses whether to obey it. The binding half is
+# the X-Robots-Tag: noindex response header (apps/api/src/config/security.ts),
+# which is also what gets a page *removed* if it was indexed before.
+User-agent: *
+Disallow: /

@@ -224,6 +224,42 @@ export function helmetOptions() {
   }
 }
 
+/**
+ * Search-engine directive sent on every response.
+ *
+ * Helmet has no option for this one, so it is applied by a hook in server.ts —
+ * but the value lives here with the other header policy so there is one place to
+ * read and one place for the test to assert.
+ *
+ * `apps/web/public/robots.txt` asks crawlers not to fetch these pages at all;
+ * this header is what makes it stick. The two are not redundant: robots.txt is
+ * advisory and only prevents *crawling*, so a URL linked from elsewhere can
+ * still be listed without ever being fetched — and a Disallow rule cannot
+ * remove a page that is already in the index, because obeying it stops the
+ * crawler seeing the removal request. noindex on the response can.
+ *
+ * There is deliberately no opt-out. The only page a crawler can render is the
+ * login form; a self-hosted media library has nothing to gain from being
+ * listed, and plenty to lose in drive-by credential stuffing.
+ */
+export const ROBOTS_TAG = 'noindex, nofollow'
+
+/**
+ * onRequest hook that stamps {@link ROBOTS_TAG} on the response.
+ *
+ * Exported as a hook rather than inlined in server.ts for the same reason
+ * helmetOptions() is a function here: the test can register the exact thing the
+ * server registers, instead of a copy that can drift from it.
+ */
+export function robotsTagHook(
+  _request: unknown,
+  reply: { header: (name: string, value: string) => unknown },
+  done: () => void
+): void {
+  reply.header('X-Robots-Tag', ROBOTS_TAG)
+  done()
+}
+
 export type ApiDocsMode = 'public' | 'admin' | 'off'
 
 /**

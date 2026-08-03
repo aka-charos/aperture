@@ -10,12 +10,16 @@
 
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import Fastify from 'fastify'
 import helmet from '@fastify/helmet'
 import rateLimit from '@fastify/rate-limit'
 
 import {
   helmetOptions,
+  robotsTagHook,
   isTrustedSetupSource,
   trustProxy,
   useSecureCookies,
@@ -118,6 +122,40 @@ describe('security headers', () => {
     assert.equal(res.headers['content-security-policy'], undefined)
 
     await app.close()
+  })
+
+  test('every response tells search engines not to index it — including the SPA fallback', async () => {
+    const f = Fastify()
+    f.addHook('onRequest', robotsTagHook)
+    f.get('/', async () => ({ ok: true }))
+
+    // A real route.
+    const root = await f.inject({ method: 'GET', url: '/' })
+    assert.equal(root.headers['x-robots-tag'], 'noindex, nofollow')
+
+    // And an unmatched path. In production these are answered by the SPA
+    // fallback with 200 and the app shell, which is exactly what a crawler
+    // would otherwise wander into and index.
+    const unknown = await f.inject({ method: 'GET', url: '/some/deep/link' })
+    assert.equal(unknown.headers['x-robots-tag'], 'noindex, nofollow')
+
+    await f.close()
+  })
+
+  test('robots.txt ships with the web bundle and disallows everything', () => {
+    // The header above is the binding half; this file is what stops well-behaved
+    // crawlers fetching the pages in the first place. Asserted as a file because
+    // Vite copies public/ into dist/ verbatim — if it is deleted or renamed, the
+    // request falls through to the SPA fallback and returns HTML with 200, which
+    // a crawler reads as "no rules, index everything".
+    const robotsPath = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../../../web/public/robots.txt'
+    )
+    const body = readFileSync(robotsPath, 'utf8')
+
+    assert.match(body, /^User-agent:\s*\*$/m)
+    assert.match(body, /^Disallow:\s*\/$/m)
   })
 
   test('HSTS is withheld when cookies are not Secure (plain-HTTP LAN install)', async () => {
