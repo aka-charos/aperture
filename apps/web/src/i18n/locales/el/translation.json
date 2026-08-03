@@ -4339,7 +4339,6 @@
     "saveFailed": "Failed to save the instance name",
     "unknownError": "Something went wrong",
     "artworkTitle": "Logo & favicon",
-    "artworkHelp": "Set by mounting a folder rather than uploading here. Put logo.svg and/or favicon.svg in the folder mapped to /config/branding (./data/branding in the bundled compose file) — png and webp work too, plus ico for the favicon. A new file is picked up on the next page load, with no restart.",
     "artworkSizing": "Use square artwork. SVG is best: it stays sharp everywhere the logo is drawn (28–72px) and at every size a browser scales the favicon to. For raster, 512 × 512px covers both — keep the favicon simple enough to still read at 16px.",
     "artworkLogo": "Logo:",
     "artworkFavicon": "Favicon:",
