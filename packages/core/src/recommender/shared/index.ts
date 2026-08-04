@@ -9,8 +9,10 @@ export {
   calculateRatingScore,
   calculateNoveltyScore,
   calculateBaseScore,
+  applyPreferenceAdjustment,
   type ScoringConfig,
   type BaseCandidate,
+  type PreferenceAffinities,
 } from './scoring.js'
 
 export {

@@ -37,12 +37,13 @@ import { syncWatchHistoryForUser } from './sync.js'
 import {
   getUserTasteProfile,
   storeTasteProfile as storeNewTasteProfile,
-  getFranchiseBoost,
-  getGenreBoost,
-  getCustomInterestBoost,
+  getFranchiseAffinity,
+  getGenreAffinity,
+  getCustomInterestAffinity,
   detectAndUpdateFranchises,
 } from '../../taste-profile/index.js'
 import { getItemFranchise } from '../../taste-profile/franchise.js'
+import { applyPreferenceAdjustment } from '../shared/index.js'
 
 // Re-export types
 export * from '../types.js'
@@ -232,63 +233,67 @@ export async function generateRecommendationsForUser(
     )
     const scoredCandidates = await scoreCandidates(candidates, watched, cfg)
 
-    // 4.5 Apply franchise, genre, and custom interest preference boosts
-    logger.info({ userId: user.id }, '🎯 Applying preference boosts (franchise, genre, custom interests)...')
-    let franchiseBoostCount = 0
-    let genreBoostCount = 0
-    let interestBoostCount = 0
-    
-    // Get embeddings for top candidates to apply custom interest boost
+    // 4.5 Apply franchise, genre, and custom interest preference adjustments
+    logger.info({ userId: user.id }, '🎯 Applying preference adjustments (franchise, genre, custom interests)...')
+    let franchiseSignalCount = 0
+    let genreSignalCount = 0
+    let interestSignalCount = 0
+
+    // Get embeddings for top candidates to apply custom interest affinity
     // (only fetch for top 100 to limit performance impact)
     const topCandidateIds = scoredCandidates.slice(0, 100).map((c) => c.id)
     const { getMovieEmbedding } = await import('./embeddings.js')
-    
+
     for (const candidate of scoredCandidates) {
-      // Get franchise boost (1.0 = neutral, up to 1.5 for loved franchises)
+      // Franchise affinity: 0 (avoid) - 0.5 (neutral) - 1 (loved)
       const franchiseName = await getItemFranchise(candidate.id, 'movie')
-      const franchiseBoost = await getFranchiseBoost(user.id, franchiseName, 'movie')
-      
-      // Get genre boost (1.0 = neutral, 0.5-1.5 range)
-      const genreBoost = await getGenreBoost(user.id, candidate.genres || [])
-      
-      // Get custom interest boost (only for top candidates with embeddings)
-      let interestBoost = 1.0
+      const franchiseAffinity = await getFranchiseAffinity(user.id, franchiseName, 'movie')
+
+      // Genre affinity: 0 (avoid) - 0.5 (neutral) - 1 (loved)
+      const genreAffinity = await getGenreAffinity(user.id, candidate.genres || [])
+
+      // Custom interest affinity (only for top candidates with embeddings)
+      let interestAffinity = 0.5
       if (topCandidateIds.includes(candidate.id)) {
         const embedding = await getMovieEmbedding(candidate.id)
         if (embedding) {
-          interestBoost = await getCustomInterestBoost(user.id, embedding)
+          interestAffinity = await getCustomInterestAffinity(user.id, embedding)
         }
       }
-      
-      // Apply boosts to final score
+
+      // Nudge the score toward 1 or 0 based on preference affinities, bounded to [0,1]
       const originalScore = candidate.finalScore
-      candidate.finalScore = originalScore * franchiseBoost * genreBoost * interestBoost
-      
-      if (franchiseBoost !== 1.0) {
-        franchiseBoostCount++
+      candidate.finalScore = applyPreferenceAdjustment(originalScore, {
+        franchise: franchiseAffinity,
+        genre: genreAffinity,
+        interest: interestAffinity,
+      })
+
+      if (franchiseAffinity !== 0.5) {
+        franchiseSignalCount++
         logger.debug(
-          { title: candidate.title, franchiseName, franchiseBoost: franchiseBoost.toFixed(2) },
-          'Applied franchise boost'
+          { title: candidate.title, franchiseName, franchiseAffinity: franchiseAffinity.toFixed(2) },
+          'Applied franchise preference'
         )
       }
-      if (genreBoost !== 1.0) {
-        genreBoostCount++
+      if (genreAffinity !== 0.5) {
+        genreSignalCount++
       }
-      if (interestBoost !== 1.0) {
-        interestBoostCount++
+      if (interestAffinity !== 0.5) {
+        interestSignalCount++
         logger.debug(
-          { title: candidate.title, interestBoost: interestBoost.toFixed(2) },
-          'Applied custom interest boost'
+          { title: candidate.title, interestAffinity: interestAffinity.toFixed(2) },
+          'Applied custom interest preference'
         )
       }
     }
-    
-    // Re-sort after applying boosts
+
+    // Re-sort after applying preference adjustments
     scoredCandidates.sort((a, b) => b.finalScore - a.finalScore)
-    
+
     logger.info(
-      { userId: user.id, franchiseBoostCount, genreBoostCount, interestBoostCount },
-      `Applied ${franchiseBoostCount} franchise, ${genreBoostCount} genre, ${interestBoostCount} interest boosts`
+      { userId: user.id, franchiseSignalCount, genreSignalCount, interestSignalCount },
+      `Applied ${franchiseSignalCount} franchise, ${genreSignalCount} genre, ${interestSignalCount} interest preference adjustments`
     )
 
     // Log top candidates

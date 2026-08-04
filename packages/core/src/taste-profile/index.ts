@@ -16,6 +16,7 @@ import type {
   UserTasteData,
   ProfileBuildOptions,
 } from './types.js'
+import { DEFAULT_MIN_FRANCHISE_ITEMS, DEFAULT_MIN_FRANCHISE_SIZE } from './types.js'
 
 export * from './types.js'
 export { 
@@ -41,7 +42,7 @@ export async function getUserTasteProfile(
   mediaType: MediaType,
   options: ProfileBuildOptions = {}
 ): Promise<TasteProfile | null> {
-  const { forceRebuild = false, skipLockCheck = false } = options
+  const { forceRebuild = false, skipLockCheck = false, refreshPreferences = true } = options
 
   // Try to get existing profile
   const existing = await getStoredProfile(userId, mediaType)
@@ -97,12 +98,63 @@ export async function getUserTasteProfile(
     // Get current embedding model to store with profile
     const { getActiveEmbeddingModelId } = await import('../lib/ai-provider.js')
     const currentModelId = await getActiveEmbeddingModelId()
-    
+
     await storeTasteProfile(userId, mediaType, newProfile, currentModelId || undefined)
+
+    if (refreshPreferences) {
+      await refreshDetectedPreferences(userId, mediaType, existing)
+    }
+
     return await getStoredProfile(userId, mediaType)
   }
 
   return existing // Return old profile if build failed
+}
+
+/**
+ * Re-run franchise/genre auto-detection whenever the taste profile embedding
+ * rebuilds (first build, or the periodic staleness refresh), so both signals
+ * stay current as watch history grows instead of only ever being seeded once
+ * — previously neither ran automatically on an ongoing basis; genre weights
+ * in particular were only ever populated by the manual "rebuild profile"
+ * settings action. Always uses 'merge' mode: auto-detected entries are
+ * updated, but anything the user set by hand (`isUserSet`) is left alone.
+ * Best-effort — a detection failure shouldn't block profile building, which
+ * is the thing recommendations actually depend on.
+ */
+async function refreshDetectedPreferences(
+  userId: string,
+  mediaType: MediaType,
+  existingProfile: TasteProfile | null
+): Promise<void> {
+  try {
+    // Dynamic import to avoid circular deps (franchise.js imports from this
+    // module) — same pattern used for the builder import above.
+    const { detectAndUpdateFranchises, detectAndUpdateGenres } = await import('./franchise.js')
+
+    const minFranchiseItems = existingProfile?.minFranchiseItems ?? DEFAULT_MIN_FRANCHISE_ITEMS
+    const minFranchiseSize = existingProfile?.minFranchiseSize ?? DEFAULT_MIN_FRANCHISE_SIZE
+
+    const [franchiseResult, genreResult] = await Promise.all([
+      detectAndUpdateFranchises(userId, mediaType, { mode: 'merge', minFranchiseItems, minFranchiseSize }),
+      detectAndUpdateGenres(userId, mediaType, { mode: 'merge' }),
+    ])
+
+    logger.info(
+      {
+        userId,
+        mediaType,
+        franchisesUpdated: franchiseResult.updated,
+        genresUpdated: genreResult.updated,
+      },
+      'Refreshed auto-detected franchise/genre preferences alongside taste profile'
+    )
+  } catch (err) {
+    logger.warn(
+      { err, userId, mediaType },
+      'Failed to refresh franchise/genre preferences, continuing with existing'
+    )
+  }
 }
 
 /**
@@ -631,35 +683,37 @@ function parseEmbedding(embeddingStr: string): number[] {
 }
 
 /**
- * Get the franchise boost multiplier for a given item
+ * Get the franchise affinity for a given item: 0 (avoid) - 0.5 (neutral, or
+ * no preference recorded) - 1 (loved). Feeds `applyPreferenceAdjustment`
+ * (core recommender/shared/scoring.ts), which treats 0.5 as a true no-op.
  */
-export async function getFranchiseBoost(
+export async function getFranchiseAffinity(
   userId: string,
   franchiseName: string | null | undefined,
   mediaType: MediaType
 ): Promise<number> {
-  if (!franchiseName) return 1.0
+  if (!franchiseName) return 0.5
 
   const pref = await queryOne<{ preference_score: string }>(
-    `SELECT preference_score FROM user_franchise_preferences 
+    `SELECT preference_score FROM user_franchise_preferences
      WHERE user_id = $1 AND franchise_name = $2 AND (media_type = $3 OR media_type = 'both')`,
     [userId, franchiseName, mediaType]
   )
 
-  if (!pref) return 1.0
+  if (!pref) return 0.5
 
+  // preference_score is stored clamped to -1..1 (see setFranchisePreference)
+  // -1 = avoid, 0 = neutral, 1 = loved
   const score = parseFloat(pref.preference_score)
-
-  // Convert -1 to 1 score to boost multiplier
-  // -1 = 0.5x (penalty), 0 = 1.0x (neutral), 1 = 1.5x (boost)
-  return 1.0 + score * 0.5
+  return 0.5 + score * 0.5
 }
 
 /**
- * Get genre weight multiplier
+ * Get the genre affinity for a candidate's genres: 0 (avoid) - 0.5 (neutral,
+ * or no weights set) - 1 (loved).
  */
-export async function getGenreBoost(userId: string, genres: string[]): Promise<number> {
-  if (genres.length === 0) return 1.0
+export async function getGenreAffinity(userId: string, genres: string[]): Promise<number> {
+  if (genres.length === 0) return 0.5
 
   const weights = await getUserGenreWeights(userId)
   const weightMap = new Map(weights.map((w) => [w.genre.toLowerCase(), w.weight]))
@@ -675,12 +729,11 @@ export async function getGenreBoost(userId: string, genres: string[]): Promise<n
     }
   }
 
-  if (count === 0) return 1.0
+  if (count === 0) return 0.5
 
-  // Average weight, then normalize around 1.0
-  // 0 = 0.5x, 1 = 1.0x, 2 = 1.5x
+  // weight is stored clamped to 0..2 (see setGenreWeight), 1 = neutral
   const avgWeight = totalWeight / count
-  return 0.5 + avgWeight * 0.5
+  return avgWeight / 2
 }
 
 /**
@@ -704,49 +757,50 @@ function cosineSimilarity(a: number[], b: number[]): number {
 }
 
 /**
- * Get custom interest boost for a candidate
- * 
- * Checks if the candidate's embedding is similar to any of the user's custom interests
- * (e.g., "I love time travel stories", "space opera adventures")
- * 
+ * Get the custom interest affinity for a candidate: 0.5 (no match, or no
+ * custom interests configured) - 1 (strong match). Never goes below neutral
+ * — custom interests are opt-in extra signal, not an aversion list.
+ *
+ * Checks if the candidate's embedding is similar to any of the user's custom
+ * interests (e.g., "I love time travel stories", "space opera adventures").
+ *
  * @param userId - The user ID
  * @param candidateEmbedding - The candidate's embedding vector
- * @returns Boost multiplier: 1.0 (no boost) to 1.3 (strong match)
  */
-export async function getCustomInterestBoost(
+export async function getCustomInterestAffinity(
   userId: string,
   candidateEmbedding: number[]
 ): Promise<number> {
   const interests = await getUserCustomInterests(userId)
-  
-  // No custom interests = no boost
-  if (interests.length === 0) return 1.0
-  
+
+  // No custom interests = neutral
+  if (interests.length === 0) return 0.5
+
   // Filter to interests that have embeddings
   const interestsWithEmbeddings = interests.filter((i) => i.embedding && i.embedding.length > 0)
-  if (interestsWithEmbeddings.length === 0) return 1.0
-  
+  if (interestsWithEmbeddings.length === 0) return 0.5
+
   // Find max similarity to any interest, weighted by user's interest weight
   let maxWeightedSimilarity = 0
-  
+
   for (const interest of interestsWithEmbeddings) {
     if (!interest.embedding) continue
-    
+
     const similarity = cosineSimilarity(candidateEmbedding, interest.embedding)
     const weightedSimilarity = similarity * interest.weight
-    
+
     if (weightedSimilarity > maxWeightedSimilarity) {
       maxWeightedSimilarity = weightedSimilarity
     }
   }
-  
-  // Convert similarity to boost:
-  // - 0.7+ similarity = 1.3x boost (strong match)
-  // - 0.5-0.7 similarity = 1.15x boost (moderate match)
-  // - 0.3-0.5 similarity = 1.05x boost (weak match)
-  // - <0.3 similarity = 1.0x (no boost)
-  if (maxWeightedSimilarity >= 0.7) return 1.3
-  if (maxWeightedSimilarity >= 0.5) return 1.15
-  if (maxWeightedSimilarity >= 0.3) return 1.05
-  return 1.0
+
+  // Convert similarity to affinity:
+  // - 0.7+ similarity = 1.0 (strong match)
+  // - 0.5-0.7 similarity = 0.8 (moderate match)
+  // - 0.3-0.5 similarity = 0.65 (weak match)
+  // - <0.3 similarity = 0.5 (neutral, no match)
+  if (maxWeightedSimilarity >= 0.7) return 1.0
+  if (maxWeightedSimilarity >= 0.5) return 0.8
+  if (maxWeightedSimilarity >= 0.3) return 0.65
+  return 0.5
 }

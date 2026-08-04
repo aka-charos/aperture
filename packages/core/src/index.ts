@@ -1088,12 +1088,12 @@ export {
   getUserFranchisePreferences,
   setFranchisePreference,
   bulkUpdateFranchisePreferences,
-  getFranchiseBoost,
+  getFranchiseAffinity,
   // Genre weights
   getUserGenreWeights,
   setGenreWeight,
   bulkUpdateGenreWeights,
-  getGenreBoost,
+  getGenreAffinity,
   // Custom interests
   getUserCustomInterests,
   addCustomInterest,
@@ -1102,8 +1102,8 @@ export {
   // Delete functions
   deleteFranchisePreference,
   deleteGenreWeight,
-  // Custom interest boost
-  getCustomInterestBoost,
+  // Custom interest affinity
+  getCustomInterestAffinity,
   // Types
   type TasteProfile,
   type FranchisePreference,

@@ -70,6 +70,14 @@ export interface WatchedItem {
 export interface ProfileBuildOptions {
   forceRebuild?: boolean
   skipLockCheck?: boolean
+  /**
+   * Re-run franchise/genre auto-detection (in 'merge' mode, so user-set
+   * preferences are never overwritten) whenever the embedding rebuilds.
+   * Defaults to true. Callers that manage detection themselves with a
+   * custom mode/thresholds (the manual "rebuild profile" settings action)
+   * should pass false to avoid running it twice.
+   */
+  refreshPreferences?: boolean
 }
 
 export interface UserTasteData {

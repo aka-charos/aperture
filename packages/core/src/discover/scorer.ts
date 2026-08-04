@@ -10,6 +10,7 @@ import { getActiveEmbeddingTableName } from '../lib/ai-provider.js'
 import type { MediaType, RawCandidate, ScoredCandidate, DiscoveryConfig } from './types.js'
 import { getUserFranchisePreferences } from '../taste-profile/index.js'
 import { detectFranchiseFromTitle } from '../taste-profile/franchise.js'
+import { applyPreferenceAdjustment } from '../recommender/shared/index.js'
 
 const logger = createChildLogger('discover:scorer')
 
@@ -175,27 +176,45 @@ export async function scoreCandidates(
     const recencyScore = calculateRecencyScore(candidate)
     const sourceScore = calculateSourceScore(candidate)
 
-    // Calculate base score as weighted average
-    let finalScore = (
-      similarityScore * config.similarityWeight +
-      popularityScore * config.popularityWeight +
-      recencyScore * config.recencyWeight +
-      sourceScore * 0.1 // Small boost for source quality
-    )
-    
-    // Apply franchise preference boost
-    let franchiseBoost = 1.0
+    // Calculate base score as a true weighted average (normalized by total
+    // weight, including the flat 0.1 source-quality term) so it's always
+    // bounded to [0,1] rather than able to run past 1.0 (0.5+0.3+0.2+0.1=1.1
+    // if taken as a raw weighted sum).
+    const sourceTermWeight = 0.1
+    const totalWeight =
+      config.similarityWeight + config.popularityWeight + config.recencyWeight + sourceTermWeight
+    // DiscoveryConfig weights are currently fixed defaults (never exposed
+    // through a settings API), so totalWeight <= 0 can't happen today — but
+    // guard it anyway rather than assume that stays true.
+    const baseScore =
+      totalWeight <= 0
+        ? (similarityScore + popularityScore + recencyScore + sourceScore) / 4
+        : (similarityScore * config.similarityWeight +
+            popularityScore * config.popularityWeight +
+            recencyScore * config.recencyWeight +
+            sourceScore * sourceTermWeight) /
+          totalWeight
+
+    // Apply franchise preference as a bounded nudge (not a raw multiplier —
+    // see applyPreferenceAdjustment) so a loved franchise can't push the
+    // score past 100%. Genre/interest dimensions aren't tracked here
+    // (discovery candidates carry TMDb genre IDs, not names), so they're
+    // passed as neutral no-ops.
+    let franchiseAffinity = 0.5
     const detectedFranchise = detectFranchiseFromTitle(candidate.title)
     if (detectedFranchise) {
       const prefScore = franchiseScoreMap.get(detectedFranchise.toLowerCase())
       if (prefScore !== undefined) {
-        // Convert -1 to 1 preference score to 0.5x to 1.5x multiplier
-        franchiseBoost = 1.0 + prefScore * 0.5
+        // preference_score is stored clamped to -1..1 (see setFranchisePreference)
+        franchiseAffinity = 0.5 + prefScore * 0.5
       }
     }
-    
-    // Apply franchise boost to final score
-    finalScore *= franchiseBoost
+
+    const finalScore = applyPreferenceAdjustment(baseScore, {
+      franchise: franchiseAffinity,
+      genre: 0.5,
+      interest: 0.5,
+    })
 
     return {
       ...candidate,
