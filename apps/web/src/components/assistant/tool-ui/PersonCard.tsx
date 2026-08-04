@@ -3,7 +3,7 @@
  * Shows actor/director with filmography
  */
 import { Box, Typography, Avatar, Chip } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
+import { alpha, useTheme } from '@mui/material/styles'
 import PersonIcon from '@mui/icons-material/Person'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
@@ -74,7 +74,7 @@ function PersonCardSingle({ person }: PersonCardProps) {
             sx={{
               height: 22,
               mt: 0.5,
-              bgcolor: 'rgba(99, 102, 241, 0.15)',
+              bgcolor: alpha(theme.palette.primary.main, 0.15),
               color: theme.palette.primary.light,
             }}
           />

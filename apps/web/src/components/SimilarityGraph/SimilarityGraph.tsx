@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as d3 from 'd3'
 import { Box, Typography, Fade, CircularProgress, Chip, Stack } from '@mui/material'
+import { alpha } from '@mui/material/styles'
 import { getProxiedImageUrl } from '@aperture/ui'
 import type { GraphNode, GraphEdge, GraphData, ConnectionReason, LoadingStatus, ConnectionType } from './types'
 import { CONNECTION_COLORS } from './types'
@@ -351,7 +352,7 @@ export const SimilarityGraph = memo(function SimilarityGraph({
       detailsButtonGroup
         .append('circle')
         .attr('r', 12)
-        .attr('fill', 'rgba(139, 92, 246, 0.9)')
+        .attr('fill', alpha(palette.secondary.main, 0.9))
         .attr('stroke', '#fff')
         .attr('stroke-width', 1.5)
 

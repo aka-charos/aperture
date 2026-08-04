@@ -3,7 +3,7 @@
  * Rich display of a single movie or series
  */
 import { Box, Typography, Paper, Chip, Button, Divider } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
+import { alpha, useTheme } from '@mui/material/styles'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import InfoIcon from '@mui/icons-material/Info'
 import StarIcon from '@mui/icons-material/Star'
@@ -99,7 +99,7 @@ export function ContentDetail({ data }: ContentDetailProps) {
               size="small"
               sx={{
                 height: 20,
-                bgcolor: data.type === 'movie' ? 'rgba(99, 102, 241, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                bgcolor: data.type === 'movie' ? alpha(theme.palette.primary.main, 0.15) : 'rgba(16, 185, 129, 0.15)',
                 color: data.type === 'movie' ? theme.palette.primary.light : '#10b981',
               }}
             />
@@ -221,7 +221,7 @@ export function ContentDetail({ data }: ContentDetailProps) {
                 color: '#a1a1aa',
                 '&:hover': {
                   borderColor: theme.palette.primary.main,
-                  bgcolor: 'rgba(99, 102, 241, 0.1)',
+                  bgcolor: alpha(theme.palette.primary.main, 0.1),
                 },
               }}
             >

@@ -10,7 +10,7 @@
  * a rank, a seed badge and a remove button.
  */
 import { Box, Typography, Chip, Paper, IconButton, Tooltip } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
+import { alpha, useTheme } from '@mui/material/styles'
 import StarIcon from '@mui/icons-material/Star'
 import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined'
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline'
@@ -60,7 +60,7 @@ export function PreviewItemCard({
         borderRadius: 2,
         border: '1px solid transparent',
         transition: 'background-color 0.2s, border-color 0.2s',
-        '&:hover': { bgcolor: '#212121', borderColor: 'rgba(99, 102, 241, 0.35)' },
+        '&:hover': { bgcolor: '#212121', borderColor: alpha(theme.palette.primary.main, 0.35) },
       }}
     >
       {/* Meta rail: poster + specs */}
@@ -162,7 +162,7 @@ export function PreviewItemCard({
               mt: '1px',
               height: 18,
               bgcolor:
-                item.mediaType === 'movie' ? 'rgba(99, 102, 241, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                item.mediaType === 'movie' ? alpha(theme.palette.primary.main, 0.15) : 'rgba(16, 185, 129, 0.15)',
               color: item.mediaType === 'movie' ? theme.palette.primary.light : '#10b981',
               '& .MuiChip-label': { px: 0.625, fontSize: 10 },
             }}
@@ -207,7 +207,7 @@ export function PreviewItemCard({
               mt: 0.25,
               p: 1,
               borderRadius: 1,
-              bgcolor: 'rgba(99, 102, 241, 0.08)',
+              bgcolor: alpha(theme.palette.primary.main, 0.08),
               borderInlineStart: `2px solid ${theme.palette.primary.main}`,
             }}
           >

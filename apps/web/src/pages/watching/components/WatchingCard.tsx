@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { Box, Typography, Chip, IconButton, Tooltip } from '@mui/material'
+import { alpha, useTheme } from '@mui/material/styles'
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import TvIcon from '@mui/icons-material/Tv'
 import StarIcon from '@mui/icons-material/Star'
@@ -45,6 +46,7 @@ function formatEpisodeNumber(ep: UpcomingEpisode): string {
 export function WatchingCard({ series, onRemove }: WatchingCardProps) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
+  const theme = useTheme()
   const { getRating, setRating } = useUserRatings()
   const { hideLibraryRatingBadge } = usePosterDisplaySettings()
 
@@ -130,7 +132,7 @@ export function WatchingCard({ series, onRemove }: WatchingCardProps) {
                 sx={{
                   opacity: 0,
                   color: '#fff',
-                  bgcolor: 'rgba(99, 102, 241, 0.95)',
+                  bgcolor: alpha(theme.palette.primary.main, 0.95),
                   border: '1.5px solid rgba(255, 255, 255, 0.75)',
                   boxShadow: '0 2px 10px rgba(0, 0, 0, 0.45)',
                   backdropFilter: 'blur(4px)',

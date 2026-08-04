@@ -15,6 +15,7 @@ import {
   Snackbar,
   CircularProgress,
 } from '@mui/material'
+import { alpha, darken, useTheme } from '@mui/material/styles'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import StarIcon from '@mui/icons-material/Star'
 import TvIcon from '@mui/icons-material/Tv'
@@ -39,6 +40,11 @@ import {
   FALLBACK_POSTER_URL,
   TrailerModal,
 } from '@aperture/ui'
+
+// The "open in <server>" CTA is branded like the app it opens, not the instance's own
+// theme — these are the media servers' own colors, not admin-configurable.
+const EMBY_GREEN = '#52b54b'
+const JELLYFIN_PURPLE = '#965ec7'
 
 interface MediaHeroProps {
   media: Media
@@ -78,6 +84,7 @@ export function MediaHero({
   onFavoriteToggle,
 }: MediaHeroProps) {
   const { t } = useTranslation()
+  const theme = useTheme()
   const serverName = useServerDisplayName()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [marking, setMarking] = useState(false)
@@ -235,6 +242,7 @@ export function MediaHero({
   }
 
   const yearDisplay = getYearDisplay()
+  const serverBrandColor = mediaServer?.type === 'jellyfin' ? JELLYFIN_PURPLE : EMBY_GREEN
 
   // Shared styling so every action reads as one consistent button group:
   // fixed height, no per-button text wrapping, no shrinking (they wrap the row instead).
@@ -487,7 +495,7 @@ export function MediaHero({
               alignItems: 'center',
             }}
           >
-            {/* Primary CTA: open in media server */}
+            {/* Primary CTA: open in media server, colored like that server's own brand */}
             <Button
               variant="contained"
               startIcon={<PlayArrowIcon />}
@@ -496,13 +504,11 @@ export function MediaHero({
               sx={{
                 ...actionBtnSx,
                 color: 'white',
-                background:
-                  'linear-gradient(135deg, rgba(99, 102, 241, 0.95) 0%, rgba(139, 92, 246, 0.95) 100%)',
-                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)',
+                backgroundColor: serverBrandColor,
+                boxShadow: `0 4px 14px ${alpha(serverBrandColor, 0.35)}`,
                 '&:hover': {
-                  background:
-                    'linear-gradient(135deg, rgba(99, 102, 241, 1) 0%, rgba(139, 92, 246, 1) 100%)',
-                  boxShadow: '0 6px 18px rgba(99, 102, 241, 0.45)',
+                  backgroundColor: darken(serverBrandColor, 0.1),
+                  boxShadow: `0 6px 18px ${alpha(serverBrandColor, 0.45)}`,
                 },
               }}
             >
@@ -527,8 +533,7 @@ export function MediaHero({
                     ...actionBtnSx,
                     ...(isWatching && {
                       color: 'white',
-                      background:
-                        'linear-gradient(135deg, rgba(99, 102, 241, 0.9) 0%, rgba(139, 92, 246, 0.9) 100%)',
+                      background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.9)} 0%, ${alpha(theme.palette.secondary.main, 0.9)} 100%)`,
                     }),
                   }}
                 >

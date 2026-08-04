@@ -29,6 +29,7 @@ import {
   useTheme,
   useMediaQuery,
 } from '@mui/material'
+import { alpha } from '@mui/material/styles'
 import GridViewIcon from '@mui/icons-material/GridView'
 import ViewListIcon from '@mui/icons-material/ViewList'
 import FavoriteIcon from '@mui/icons-material/Favorite'
@@ -655,14 +656,14 @@ export function MyWatchHistoryPage() {
                                 opacity: 0,
                                 color: '#fff',
                                 bgcolor: isWatching(item.series_id)
-                                  ? 'rgba(99, 102, 241, 0.95)'
+                                  ? alpha(theme.palette.primary.main, 0.95)
                                   : 'rgba(0, 0, 0, 0.7)',
                                 border: '1.5px solid rgba(255, 255, 255, 0.75)',
                                 boxShadow: '0 2px 10px rgba(0, 0, 0, 0.45)',
                                 backdropFilter: 'blur(4px)',
                                 transition: 'opacity 0.2s ease, transform 0.2s ease, background-color 0.2s ease',
                                 '&:hover': {
-                                  bgcolor: isWatching(item.series_id) ? 'rgba(99, 102, 241, 1)' : 'rgba(0, 0, 0, 0.9)',
+                                  bgcolor: isWatching(item.series_id) ? theme.palette.primary.main : 'rgba(0, 0, 0, 0.9)',
                                   transform: 'scale(1.12)',
                                 },
                               }}

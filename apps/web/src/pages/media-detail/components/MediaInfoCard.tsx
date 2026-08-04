@@ -11,6 +11,7 @@ import {
   Paper,
   LinearProgress,
 } from '@mui/material'
+import { alpha, useTheme } from '@mui/material/styles'
 import PersonIcon from '@mui/icons-material/Person'
 import BusinessIcon from '@mui/icons-material/Business'
 import CreateIcon from '@mui/icons-material/Create'
@@ -173,6 +174,7 @@ function getStudios(media: Media): StudioItem[] {
 
 export function MediaInfoCard({ media, watchStats }: MediaInfoCardProps) {
   const { t } = useTranslation()
+  const theme = useTheme()
   const hasRatings =
     media.rt_critic_score ||
     media.rt_audience_score ||
@@ -199,7 +201,7 @@ export function MediaInfoCard({ media, watchStats }: MediaInfoCardProps) {
             p: 2,
             borderRadius: 2,
             bgcolor: 'background.paper',
-            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.secondary.main, 0.08)} 100%)`,
             border: '1px solid',
             borderColor: 'primary.main',
           }}

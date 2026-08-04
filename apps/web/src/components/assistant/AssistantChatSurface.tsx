@@ -17,6 +17,7 @@ import {
   Alert,
   useTheme,
 } from '@mui/material'
+import { alpha } from '@mui/material/styles'
 import SmartToyIcon from '@mui/icons-material/SmartToy'
 import AddIcon from '@mui/icons-material/Add'
 import ChatIcon from '@mui/icons-material/Chat'
@@ -389,7 +390,7 @@ export function AssistantChatSurface({
                   borderRadius: 1,
                   mb: 0.5,
                   '&.Mui-selected': {
-                    bgcolor: 'rgba(99, 102, 241, 0.15)',
+                    bgcolor: alpha(theme.palette.primary.main, 0.15),
                   },
                   '&:hover .action-btn': {
                     opacity: 1,
@@ -516,7 +517,7 @@ export function AssistantChatSurface({
               px: 1.5,
               py: 1,
               borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)',
+              background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.15)} 0%, ${alpha(theme.palette.secondary.main, 0.15)} 100%)`,
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>

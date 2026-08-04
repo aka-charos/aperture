@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Box, Typography, IconButton, Button, Snackbar, Alert, useTheme } from '@mui/material'
+import { alpha } from '@mui/material/styles'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd'
@@ -242,7 +243,7 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
             whiteSpace: 'nowrap',
             borderColor: extraColors.subtleBorder,
             color: '#a1a1aa',
-            '&:hover': { borderColor: theme.palette.primary.main, bgcolor: 'rgba(99, 102, 241, 0.1)' },
+            '&:hover': { borderColor: theme.palette.primary.main, bgcolor: alpha(theme.palette.primary.main, 0.1) },
           }}
         >
           {t('assistantToolUi.createPlaylist')}
@@ -309,7 +310,7 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
                   bgcolor: 'rgba(0, 0, 0, 0.8)',
                   backdropFilter: 'blur(4px)',
                   '&:hover': {
-                    bgcolor: 'rgba(99, 102, 241, 0.8)',
+                    bgcolor: alpha(theme.palette.primary.main, 0.8),
                   },
                 }}
                 size="small"
@@ -328,7 +329,7 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
                   bgcolor: 'rgba(0, 0, 0, 0.8)',
                   backdropFilter: 'blur(4px)',
                   '&:hover': {
-                    bgcolor: 'rgba(99, 102, 241, 0.8)',
+                    bgcolor: alpha(theme.palette.primary.main, 0.8),
                   },
                 }}
                 size="small"

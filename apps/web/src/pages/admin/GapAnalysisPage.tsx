@@ -28,6 +28,7 @@ import {
   IconButton,
   Slider,
 } from '@mui/material'
+import { alpha, useTheme } from '@mui/material/styles'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import FactCheckIcon from '@mui/icons-material/FactCheck'
@@ -128,6 +129,7 @@ function seerrChipLabel(status: PartSeerrStatus, t: TFunction): string {
 
 export function GapAnalysisPage() {
   const { t } = useTranslation()
+  const theme = useTheme()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [run, setRun] = useState<GapRun | null>(null)
@@ -1065,7 +1067,7 @@ export function GapAnalysisPage() {
                                                 fontWeight: 600,
                                                 fontSize: '0.7rem',
                                                 height: 24,
-                                                bgcolor: 'rgba(139, 92, 246, 0.9)',
+                                                bgcolor: alpha(theme.palette.secondary.main, 0.9),
                                                 color: 'white',
                                                 '& .MuiChip-icon': { color: 'white' },
                                               }}
@@ -1107,8 +1109,8 @@ export function GapAnalysisPage() {
                                                 fontSize: '0.7rem',
                                                 fontWeight: 600,
                                                 textTransform: 'none',
-                                                bgcolor: 'rgba(99, 102, 241, 0.9)',
-                                                '&:hover': { bgcolor: 'rgba(99, 102, 241, 1)' },
+                                                bgcolor: alpha(theme.palette.primary.main, 0.9),
+                                                '&:hover': { bgcolor: theme.palette.primary.main },
                                               }}
                                               onClick={(e) => {
                                                 e.stopPropagation()
