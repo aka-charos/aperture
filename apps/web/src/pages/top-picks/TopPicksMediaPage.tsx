@@ -13,7 +13,7 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
+import { alpha, useTheme } from '@mui/material/styles'
 import WhatshotIcon from '@mui/icons-material/Whatshot'
 import TvIcon from '@mui/icons-material/Tv'
 import GridViewIcon from '@mui/icons-material/GridView'
@@ -253,7 +253,7 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
                       position: 'absolute',
                       top: 8,
                       right: 8,
-                      backgroundColor: 'rgba(139, 92, 246, 0.9)',
+                      backgroundColor: alpha(theme.palette.secondary.main, 0.9),
                       color: 'white',
                       fontSize: '0.65rem',
                       height: 20,
@@ -313,7 +313,7 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
                         label={item.network}
                         size="small"
                         sx={{
-                          backgroundColor: 'rgba(139, 92, 246, 0.2)',
+                          backgroundColor: alpha(theme.palette.secondary.main, 0.2),
                           fontSize: '0.7rem',
                           height: 22,
                         }}
@@ -351,8 +351,8 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
                     size="small"
                     sx={{
                       backgroundColor: item.mediaType === 'movie'
-                        ? 'rgba(99, 102, 241, 0.2)'
-                        : 'rgba(139, 92, 246, 0.2)',
+                        ? alpha(theme.palette.primary.main, 0.2)
+                        : alpha(theme.palette.secondary.main, 0.2),
                     }}
                   />
                   <Chip

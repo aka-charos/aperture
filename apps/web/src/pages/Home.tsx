@@ -16,6 +16,7 @@ import {
   Grid,
   useTheme,
 } from '@mui/material'
+import { alpha } from '@mui/material/styles'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
@@ -430,7 +431,7 @@ export function HomePage() {
                 sx={{
                   height: '100%',
                   borderRadius: 3,
-                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%)',
+                  background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
                   border: '1px solid',
                   borderColor: 'divider',
                   position: 'relative',

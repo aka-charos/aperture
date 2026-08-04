@@ -13,6 +13,7 @@ import {
   Collapse,
   IconButton,
 } from '@mui/material'
+import { alpha, useTheme } from '@mui/material/styles'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
@@ -34,6 +35,7 @@ interface MovieInsightsProps {
 export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: MovieInsightsProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const theme = useTheme()
   const [insightsExpanded, setInsightsExpanded] = useState(true)
 
   if (!insights.isRecommended || !insights.isSelected) {
@@ -51,7 +53,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
         sx={{
           borderRadius: 3,
           overflow: 'hidden',
-          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
+          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.secondary.main, 0.1)} 100%)`,
           border: '1px solid',
           borderColor: 'primary.main',
         }}
@@ -312,7 +314,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                               height: 20,
                               fontSize: '0.65rem',
                               fontWeight: 700,
-                              bgcolor: 'rgba(99, 102, 241, 0.9)',
+                              bgcolor: alpha(theme.palette.primary.main, 0.9),
                               color: 'white',
                             }}
                           />

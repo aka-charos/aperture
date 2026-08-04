@@ -3,7 +3,7 @@
  * Shows library statistics and user activity
  */
 import { Box, Typography, Paper, Chip, LinearProgress } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
+import { alpha, useTheme } from '@mui/material/styles'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
 import StarIcon from '@mui/icons-material/Star'
@@ -188,7 +188,7 @@ export function StudiosDisplay({ data }: StudiosDisplayProps) {
                     size="small"
                     sx={{
                       height: 20,
-                      bgcolor: 'rgba(99, 102, 241, 0.15)',
+                      bgcolor: alpha(theme.palette.primary.main, 0.15),
                       color: theme.palette.primary.light,
                     }}
                   />

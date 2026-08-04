@@ -28,7 +28,7 @@ import ThumbsUpDownIcon from '@mui/icons-material/ThumbsUpDown'
 import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth'
 import TheatersIcon from '@mui/icons-material/Theaters'
 import { Tooltip as MuiTooltip } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
+import { alpha, useTheme } from '@mui/material/styles'
 import {
   PieChart,
   Pie,
@@ -598,7 +598,7 @@ export function WatchStatsPage() {
                             borderRadius: 1,
                             p: 0.5,
                             mx: -0.5,
-                            '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.1)' },
+                            '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
                             transition: 'background-color 0.2s',
                           }}
                         >
@@ -633,7 +633,7 @@ export function WatchStatsPage() {
                                 sx={{ 
                                   height: 20, 
                                   fontSize: '0.7rem',
-                                  backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                                  backgroundColor: alpha(theme.palette.primary.main, 0.2),
                                   ml: 1,
                                   flexShrink: 0,
                                 }} 
@@ -643,7 +643,7 @@ export function WatchStatsPage() {
                               sx={{ 
                                 height: 4, 
                                 borderRadius: 2, 
-                                backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                                backgroundColor: alpha(theme.palette.primary.main, 0.2),
                                 overflow: 'hidden'
                               }}
                             >
@@ -693,7 +693,7 @@ export function WatchStatsPage() {
                             borderRadius: 1,
                             p: 0.5,
                             mx: -0.5,
-                            '&:hover': { bgcolor: 'rgba(139, 92, 246, 0.1)' },
+                            '&:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.1) },
                             transition: 'background-color 0.2s',
                           }}
                         >
@@ -728,7 +728,7 @@ export function WatchStatsPage() {
                                 sx={{ 
                                   height: 20, 
                                   fontSize: '0.7rem',
-                                  backgroundColor: 'rgba(139, 92, 246, 0.2)',
+                                  backgroundColor: alpha(theme.palette.secondary.main, 0.2),
                                   ml: 1,
                                   flexShrink: 0,
                                 }} 
@@ -738,7 +738,7 @@ export function WatchStatsPage() {
                               sx={{ 
                                 height: 4, 
                                 borderRadius: 2, 
-                                backgroundColor: 'rgba(139, 92, 246, 0.2)',
+                                backgroundColor: alpha(theme.palette.secondary.main, 0.2),
                                 overflow: 'hidden'
                               }}
                             >
@@ -1136,7 +1136,7 @@ export function WatchStatsPage() {
                                       borderRadius: 0.5,
                                       flexShrink: 0,
                                       backgroundColor:
-                                        count > 0 ? `rgba(99, 102, 241, ${intensity})` : 'rgba(148, 163, 184, 0.08)',
+                                        count > 0 ? alpha(theme.palette.primary.main, intensity) : 'rgba(148, 163, 184, 0.08)',
                                     }}
                                   />
                                 </MuiTooltip>
@@ -1166,7 +1166,7 @@ export function WatchStatsPage() {
                         {[0.15, 0.4, 0.65, 0.85, 1].map(a => (
                           <Box
                             key={a}
-                            sx={{ width: 14, height: 14, borderRadius: 0.5, backgroundColor: `rgba(99, 102, 241, ${a})` }}
+                            sx={{ width: 14, height: 14, borderRadius: 0.5, backgroundColor: alpha(theme.palette.primary.main, a) }}
                           />
                         ))}
                         <Typography variant="caption" color="text.secondary">

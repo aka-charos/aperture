@@ -12,6 +12,7 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material'
+import { alpha } from '@mui/material/styles'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import CloseIcon from '@mui/icons-material/Close'
 import OpenInFullIcon from '@mui/icons-material/OpenInFull'
@@ -308,7 +309,7 @@ export function AssistantModal() {
                 touchAction: 'none',
                 zIndex: 2,
                 '&:hover, &:active': {
-                  bgcolor: 'rgba(139, 92, 246, 0.35)',
+                  bgcolor: alpha(theme.palette.secondary.main, 0.35),
                 },
               }}
             />

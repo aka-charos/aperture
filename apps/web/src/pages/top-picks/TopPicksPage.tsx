@@ -13,7 +13,7 @@ import {
   Tabs,
   Tab,
 } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
+import { alpha, useTheme } from '@mui/material/styles'
 import WhatshotIcon from '@mui/icons-material/Whatshot'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
@@ -267,7 +267,7 @@ export function TopPicksPage() {
                   position: 'absolute',
                   top: 8,
                   right: 8,
-                  backgroundColor: 'rgba(139, 92, 246, 0.9)',
+                  backgroundColor: alpha(theme.palette.secondary.main, 0.9),
                   color: 'white',
                   fontSize: '0.65rem',
                   height: 20,

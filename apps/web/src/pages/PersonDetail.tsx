@@ -15,6 +15,7 @@ import {
   MenuItem,
   Select,
 } from '@mui/material'
+import { alpha, useTheme } from '@mui/material/styles'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import PersonIcon from '@mui/icons-material/Person'
 import MovieIcon from '@mui/icons-material/Movie'
@@ -137,6 +138,7 @@ function preloadImage(src: string): Promise<void> {
 
 export function PersonDetailPage() {
   const { t, i18n } = useTranslation()
+  const theme = useTheme()
   const { name } = useParams<{ name: string }>()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
@@ -573,7 +575,7 @@ export function PersonDetailPage() {
                     icon={<PersonIcon />}
                     label={`${data.stats.asActor} as Actor`}
                     size="small"
-                    sx={{ bgcolor: 'rgba(99, 102, 241, 0.6)', backdropFilter: 'blur(4px)' }}
+                    sx={{ bgcolor: alpha(theme.palette.primary.main, 0.6), backdropFilter: 'blur(4px)' }}
                   />
                 )}
                 {data.stats.asDirector > 0 && (
@@ -581,7 +583,7 @@ export function PersonDetailPage() {
                     icon={<VideocamIcon />}
                     label={`${data.stats.asDirector} as Director`}
                     size="small"
-                    sx={{ bgcolor: 'rgba(139, 92, 246, 0.6)', backdropFilter: 'blur(4px)' }}
+                    sx={{ bgcolor: alpha(theme.palette.secondary.main, 0.6), backdropFilter: 'blur(4px)' }}
                   />
                 )}
                 <Chip

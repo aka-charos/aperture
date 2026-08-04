@@ -26,7 +26,7 @@ import {
   CircularProgress,
   Tooltip,
 } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
+import { alpha, useTheme } from '@mui/material/styles'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import InfoIcon from '@mui/icons-material/Info'
 import StarIcon from '@mui/icons-material/Star'
@@ -215,7 +215,7 @@ export function ContentCard({
               transition: 'background-color 0.2s, border-color 0.2s',
               '&:hover': {
                 bgcolor: '#212121',
-                borderColor: 'rgba(99, 102, 241, 0.35)',
+                borderColor: alpha(theme.palette.primary.main, 0.35),
               },
             }
           : {
@@ -358,7 +358,7 @@ export function ContentCard({
               flexShrink: 0,
               mt: '1px',
               height: 18,
-              bgcolor: item.type === 'movie' ? 'rgba(99, 102, 241, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+              bgcolor: item.type === 'movie' ? alpha(theme.palette.primary.main, 0.15) : 'rgba(16, 185, 129, 0.15)',
               color: item.type === 'movie' ? theme.palette.primary.light : '#10b981',
               '& .MuiChip-label': { px: 0.625, fontSize: 10 },
             }}
@@ -402,7 +402,7 @@ export function ContentCard({
               p: 1,
               [COMPACT_THREAD]: { p: 0.75 },
               borderRadius: 1,
-              bgcolor: 'rgba(99, 102, 241, 0.08)',
+              bgcolor: alpha(theme.palette.primary.main, 0.08),
               borderInlineStart: `2px solid ${theme.palette.primary.main}`,
             }}
           >
@@ -450,7 +450,7 @@ export function ContentCard({
               fontSize: 11,
               textTransform: 'none',
               color: theme.palette.primary.light,
-              '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.1)' },
+              '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
             }}
           >
             {expanded ? t('assistantToolUi.showLess') : t('assistantToolUi.showMore')}
@@ -476,7 +476,7 @@ export function ContentCard({
               color: '#a1a1aa',
               '&:hover': {
                 borderColor: theme.palette.primary.main,
-                bgcolor: 'rgba(99, 102, 241, 0.1)',
+                bgcolor: alpha(theme.palette.primary.main, 0.1),
               },
             }}
           >
