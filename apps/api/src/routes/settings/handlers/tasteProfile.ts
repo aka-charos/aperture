@@ -112,6 +112,10 @@ export function registerTasteProfileHandlers(fastify: FastifyInstance) {
       const profile = await getUserTasteProfile(userId, mediaType, {
         forceRebuild: true,
         skipLockCheck: true,
+        // This handler runs its own detection below with the caller's chosen
+        // mode/thresholds — skip getUserTasteProfile's automatic merge-mode
+        // refresh so it doesn't run twice.
+        refreshPreferences: false,
       })
 
       const franchiseResult = await detectAndUpdateFranchises(userId, mediaType, { mode, minFranchiseItems, minFranchiseSize })

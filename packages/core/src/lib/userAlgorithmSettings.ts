@@ -60,12 +60,51 @@ export async function getUserAlgorithmSettings(userId: string): Promise<UserAlgo
 }
 
 /**
+ * Clamp user-supplied weight overrides to their valid ranges before storing.
+ * `calculateBaseScore` (recommender/shared/scoring.ts) treats
+ * similarity/novelty/rating weights as a true weighted average — that's
+ * only bounded to [0,1] if the weights themselves are non-negative. The
+ * admin config route validates this (settings/handlers/recommendations.ts),
+ * but this is a *separate* write path (PATCH /api/users/:id/algorithm-settings)
+ * with no schema validation of its own, so the invariant has to be enforced
+ * here too. Mirrors the existing clamp-at-the-setter pattern already used
+ * for franchise/genre preferences (taste-profile/index.ts).
+ */
+function clampWeights(
+  weights: Partial<UserAlgorithmWeights> | undefined
+): Partial<UserAlgorithmWeights> | undefined {
+  if (!weights) return weights
+
+  const clamped: Partial<UserAlgorithmWeights> = { ...weights }
+  for (const key of [
+    'similarityWeight',
+    'noveltyWeight',
+    'ratingWeight',
+    'diversityWeight',
+  ] as const) {
+    if (clamped[key] !== undefined) {
+      clamped[key] = Math.max(0, Math.min(1, clamped[key] as number))
+    }
+  }
+  if (clamped.recentWatchLimit !== undefined) {
+    clamped.recentWatchLimit = Math.max(1, clamped.recentWatchLimit)
+  }
+  return clamped
+}
+
+/**
  * Save user's custom algorithm settings
  */
 export async function setUserAlgorithmSettings(
   userId: string,
   settings: UserAlgorithmSettings
 ): Promise<void> {
+  const safeSettings: UserAlgorithmSettings = {
+    enabled: settings.enabled,
+    movie: clampWeights(settings.movie),
+    series: clampWeights(settings.series),
+  }
+
   // Ensure user_preferences row exists
   await query(
     `INSERT INTO user_preferences (user_id, settings)
@@ -76,14 +115,14 @@ export async function setUserAlgorithmSettings(
 
   // Update the algorithmSettings in the JSONB settings column
   await query(
-    `UPDATE user_preferences 
+    `UPDATE user_preferences
      SET settings = COALESCE(settings, '{}'::jsonb) || jsonb_build_object('algorithmSettings', $2::jsonb),
          updated_at = NOW()
      WHERE user_id = $1`,
-    [userId, JSON.stringify(settings)]
+    [userId, JSON.stringify(safeSettings)]
   )
 
-  logger.info({ userId, enabled: settings.enabled }, 'Updated user algorithm settings')
+  logger.info({ userId, enabled: safeSettings.enabled }, 'Updated user algorithm settings')
 }
 
 /**
@@ -268,7 +307,10 @@ export async function getSmartDiversityWeight(
       )
     }
 
-    return adjustedWeight
+    // applyDiversitySelection blends this weight as `base*(1-w) + diversity*w`,
+    // which only stays within [0,1] if w itself is in [0,1] — the 1.2x bump
+    // above can push a high base weight past 1.0, so clamp defensively.
+    return Math.max(0, Math.min(1, adjustedWeight))
   } catch (err) {
     logger.warn({ err, userId, mediaType }, 'Failed to calculate smart diversity, using default')
     return baseDiversityWeight
