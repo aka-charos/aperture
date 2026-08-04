@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Box,
@@ -48,7 +48,7 @@ import { getProxiedImageUrl } from '@aperture/ui'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslation } from 'react-i18next'
 import { PageHeading } from '@/components/PageHeading'
-import { palette, gradients } from '@/theme'
+import { gradients } from '@/theme'
 
 interface WatchStats {
   genreDistribution: { genre: string; count: number; percentage: number }[]
@@ -76,19 +76,25 @@ interface WatchStats {
   mostRewatched: { movieId: string; title: string; poster: string | null; playCount: number }[]
 }
 
-// Rich color palette for charts
-const GENRE_COLORS = [
-  palette.primary.main, palette.secondary.main, '#ec4899', '#f43f5e', '#f97316',
-  '#eab308', palette.success.main, '#14b8a6', '#06b6d4', palette.info.main,
-  '#a855f7', '#d946ef', '#f472b6', '#fb7185', '#fb923c',
-]
-
-const DECADE_COLORS = [palette.primary.main, palette.primary.light, '#a5b4fc', '#c7d2fe', '#e0e7ff']
-
 export function WatchStatsPage() {
   const theme = useTheme()
   const { t, i18n } = useTranslation()
   const { user } = useAuth()
+
+  // Rich color palette for charts. Depends on theme.palette (primary/secondary are
+  // admin-configurable) so it must be recomputed on theme change, not baked at import time.
+  const GENRE_COLORS = useMemo(
+    () => [
+      theme.palette.primary.main, theme.palette.secondary.main, '#ec4899', '#f43f5e', '#f97316',
+      '#eab308', theme.palette.success.main, '#14b8a6', '#06b6d4', theme.palette.info.main,
+      '#a855f7', '#d946ef', '#f472b6', '#fb7185', '#fb923c',
+    ],
+    [theme]
+  )
+  const DECADE_COLORS = useMemo(
+    () => [theme.palette.primary.main, theme.palette.primary.light, '#a5b4fc', '#c7d2fe', '#e0e7ff'],
+    [theme]
+  )
   const navigate = useNavigate()
   const [stats, setStats] = useState<WatchStats | null>(null)
   const [loading, setLoading] = useState(true)

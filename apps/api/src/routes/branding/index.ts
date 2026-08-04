@@ -1,20 +1,29 @@
 /**
  * Branding Routes
  *
- * - GET  /api/branding         (public) - display name + any mounted artwork
+ * - GET  /api/branding         (public) - display name + brand colors + any mounted artwork
  * - GET  /api/branding/:kind   (public) - the mounted logo or favicon itself
- * - PUT  /api/branding         (admin)  - rename the instance
+ * - PUT  /api/branding         (admin)  - rename the instance and/or recolor it
  *
  * The GETs are deliberately unauthenticated: the login page and the setup
- * wizard both show the name and the logo, and they run before anyone has a
- * session. They expose nothing an anonymous visitor can't already read off the
- * page they're looking at.
+ * wizard both show the name, colors, and the logo, and they run before anyone
+ * has a session. They expose nothing an anonymous visitor can't already read
+ * off the page they're looking at.
  *
  * The artwork is not uploaded — it is bind-mounted (see lib/brandingAssets).
  */
 import type { FastifyPluginAsync } from 'fastify'
 import { promises as fs } from 'fs'
-import { getAppName, setAppName, APP_NAME_MAX_LENGTH, DEFAULT_APP_NAME } from '@aperture/core'
+import {
+  getAppName,
+  setAppName,
+  APP_NAME_MAX_LENGTH,
+  DEFAULT_APP_NAME,
+  getThemeColors,
+  setThemeColors,
+  normalizeThemeColors,
+  DEFAULT_THEME_COLORS,
+} from '@aperture/core'
 import { requireAdmin } from '../../plugins/auth.js'
 import {
   resolveBrandingAsset,
@@ -38,14 +47,21 @@ const brandingRoutes: FastifyPluginAsync = async (fastify) => {
       // feature exists to avoid.
       void reply.header('Cache-Control', 'no-store')
 
-      // The name comes from the database and the artwork from disk. One being
-      // unavailable shouldn't take the other down, so the name degrades to the
-      // default rather than failing the whole response.
+      // The name/colors come from the database and the artwork from disk. One
+      // being unavailable shouldn't take the others down, so each degrades to
+      // its default rather than failing the whole response.
       let appName = DEFAULT_APP_NAME
       try {
         appName = await getAppName()
       } catch (err) {
         fastify.log.warn({ err }, 'Failed to read instance name; serving the default')
+      }
+
+      let themeColors = DEFAULT_THEME_COLORS
+      try {
+        themeColors = await getThemeColors()
+      } catch (err) {
+        fastify.log.warn({ err }, 'Failed to read theme colors; serving the default')
       }
 
       const [logo, favicon] = await Promise.all([
@@ -55,6 +71,7 @@ const brandingRoutes: FastifyPluginAsync = async (fastify) => {
 
       return reply.send({
         appName,
+        themeColors,
         // null means "nothing mounted" — the client keeps the bundled artwork.
         logo: logo ? { url: brandingAssetUrl(logo), filename: logo.filename } : null,
         favicon: favicon ? { url: brandingAssetUrl(favicon), filename: favicon.filename } : null,
@@ -116,12 +133,12 @@ const brandingRoutes: FastifyPluginAsync = async (fastify) => {
     }
   )
 
-  fastify.put<{ Body: { appName?: unknown } }>(
+  fastify.put<{ Body: { appName?: unknown; themeColors?: unknown } }>(
     '/api/branding',
     { preHandler: requireAdmin, schema: { tags: ['settings'] } },
     async (request, reply) => {
       try {
-        const { appName } = request.body ?? {}
+        const { appName, themeColors } = request.body ?? {}
         if (appName !== undefined && typeof appName !== 'string') {
           return reply.status(400).send({ error: 'appName must be a string' })
         }
@@ -130,8 +147,21 @@ const brandingRoutes: FastifyPluginAsync = async (fastify) => {
           // something pasted in by mistake, so the DB never stores an essay.
           return reply.status(400).send({ error: 'appName is too long' })
         }
-        // An empty string is a reset, not an error — see setAppName.
-        return reply.send({ appName: await setAppName(appName) })
+
+        const normalizedColors = themeColors !== undefined ? normalizeThemeColors(themeColors) : undefined
+        if (themeColors !== undefined && !normalizedColors) {
+          return reply
+            .status(400)
+            .send({ error: 'themeColors must include valid #rrggbb primary and secondary colors' })
+        }
+
+        // Each field is only touched when present — omitting one must not
+        // reset the other, since this section saves them independently.
+        const savedAppName = appName !== undefined ? await setAppName(appName) : await getAppName()
+        if (normalizedColors) await setThemeColors(normalizedColors)
+        const savedThemeColors = normalizedColors ?? (await getThemeColors())
+
+        return reply.send({ appName: savedAppName, themeColors: savedThemeColors })
       } catch (err) {
         fastify.log.error({ err }, 'Failed to update branding')
         return reply.status(500).send({ error: 'Failed to update branding' })

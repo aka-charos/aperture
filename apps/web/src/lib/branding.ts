@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import i18n from '@/i18n/config'
+import { applyThemeColorOverrides, type ThemeColorOverrides } from '@/theme'
 
 /**
  * The instance's display name.
@@ -68,16 +69,52 @@ function setCustomLogoUrl(url: string | null): void {
   emit()
 }
 
-interface BrandingResponse {
-  appName?: unknown
-  logo?: { url?: unknown } | null
+let themeColorOverrides: ThemeColorOverrides | null = null
+
+/** The admin-configured primary/secondary, or null if the instance is on the default palette. */
+export function getThemeColorOverrides(): ThemeColorOverrides | null {
+  return themeColorOverrides
 }
 
 /**
- * Load the configured name and any mounted artwork. Called once at startup,
- * before the app renders, and again after an admin saves.
+ * Applies brand color overrides. Exported (unlike setCustomLogoUrl) because the settings
+ * page needs to apply what it just saved immediately, the same way applyAppName does.
  *
- * One request covers both: the logo is only ever needed alongside the name, and
+ * Delegates the actual palette mutation to theme.ts — this module only owns the "what
+ * did the server last report" snapshot that useThemeColorOverrides exposes to React.
+ */
+export function setThemeColorOverrides(colors: ThemeColorOverrides | null): void {
+  const next = colors?.primary || colors?.secondary ? colors : null
+  if (next?.primary === themeColorOverrides?.primary && next?.secondary === themeColorOverrides?.secondary) return
+  themeColorOverrides = next
+  applyThemeColorOverrides(next)
+  emit()
+}
+
+function isHexColor(value: unknown): value is string {
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)
+}
+
+function parseThemeColors(raw: unknown): ThemeColorOverrides | null {
+  if (!raw || typeof raw !== 'object') return null
+  const { primary, secondary } = raw as Record<string, unknown>
+  const parsed: ThemeColorOverrides = {}
+  if (isHexColor(primary)) parsed.primary = primary
+  if (isHexColor(secondary)) parsed.secondary = secondary
+  return parsed.primary || parsed.secondary ? parsed : null
+}
+
+interface BrandingResponse {
+  appName?: unknown
+  logo?: { url?: unknown } | null
+  themeColors?: unknown
+}
+
+/**
+ * Load the configured name, brand colors, and any mounted artwork. Called once
+ * at startup, before the app renders, and again after an admin saves.
+ *
+ * One request covers all three: none of them is needed without the others, and
  * a second round trip would buy nothing.
  *
  * Failure is silent and leaves the defaults in place: an unreachable API is
@@ -95,6 +132,7 @@ export async function loadBranding(): Promise<void> {
       setAppName(data.appName)
     }
     setCustomLogoUrl(typeof data.logo?.url === 'string' ? data.logo.url : null)
+    setThemeColorOverrides(parseThemeColors(data.themeColors))
   } catch {
     // Keep the defaults.
   }
@@ -116,4 +154,9 @@ export function useAppName(): string {
  */
 export function useLogoUrl(fallback: string = DEFAULT_LOGO_URL): string {
   return useSyncExternalStore(subscribe, getCustomLogoUrl, getCustomLogoUrl) ?? fallback
+}
+
+/** null means the instance is on the default palette. */
+export function useThemeColorOverrides(): ThemeColorOverrides | null {
+  return useSyncExternalStore(subscribe, getThemeColorOverrides, getThemeColorOverrides)
 }
