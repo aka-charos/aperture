@@ -48,6 +48,7 @@ import TvIcon from '@mui/icons-material/Tv'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
 import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark'
+import EmailIcon from '@mui/icons-material/Email'
 import { usePageHeader } from '@/hooks/usePageHeader'
 
 interface ProviderUser {
@@ -64,6 +65,7 @@ interface ProviderUser {
   discoverEnabled: boolean
   discoverRequestEnabled: boolean
   collectionsEnabled: boolean
+  emailNotificationsAllowed: boolean
   aiOverrideAllowed: boolean
 }
 
@@ -395,6 +397,40 @@ export function UsersPage() {
     }
   }
 
+  const handleToggleEmailNotifications = async (user: ProviderUser) => {
+    if (!user.apertureUserId) return
+
+    setUpdating(user.providerUserId)
+    try {
+      const newValue = !user.emailNotificationsAllowed
+      const response = await fetch(`/api/users/${user.apertureUserId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ emailNotificationsAllowed: newValue }),
+      })
+
+      if (response.ok) {
+        setProviderUsers((prev) =>
+          prev.map((u) =>
+            u.providerUserId === user.providerUserId
+              ? { ...u, emailNotificationsAllowed: newValue }
+              : u
+          )
+        )
+        setSnackbar({
+          open: true,
+          message: newValue
+            ? t('admin.usersPage.emailOn', { name: user.name })
+            : t('admin.usersPage.emailOff', { name: user.name }),
+          severity: 'success',
+        })
+      }
+    } finally {
+      setUpdating(null)
+    }
+  }
+
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, user: ProviderUser) => {
     setMenuAnchor(event.currentTarget)
     setMenuUser(user)
@@ -672,6 +708,21 @@ export function UsersPage() {
                         />
                       </Stack>
 
+                      {/* Email notifications permission toggle */}
+                      <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
+                        <Tooltip title={t('admin.usersPage.emailColTooltip')}>
+                          <EmailIcon fontSize="small" color="action" />
+                        </Tooltip>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>{t('admin.usersPage.colEmail')}</Typography>
+                        <Switch
+                          checked={user.emailNotificationsAllowed}
+                          onChange={() => handleToggleEmailNotifications(user)}
+                          disabled={updating === user.providerUserId || user.isDisabled}
+                          color="primary"
+                          size="small"
+                        />
+                      </Stack>
+
                       {/* AI Override toggle (if enabled globally) */}
                       {globalAiConfig?.userOverrideAllowed && (
                         <Stack direction="row" alignItems="center" spacing={1} mb={2}>
@@ -870,6 +921,14 @@ export function UsersPage() {
                   </Box>
                 </Tooltip>
               </TableCell>
+              <TableCell align="center">
+                <Tooltip title={t('admin.usersPage.emailColTooltip')}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                    <EmailIcon fontSize="small" />
+                    {t('admin.usersPage.colEmail')}
+                  </Box>
+                </Tooltip>
+              </TableCell>
               {globalAiConfig?.userOverrideAllowed && (
                 <TableCell align="center">
                   <Tooltip title={t('admin.usersPage.aiOverrideColTooltip')}>
@@ -886,7 +945,7 @@ export function UsersPage() {
           <TableBody>
             {sortedUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={globalAiConfig?.userOverrideAllowed ? 10 : 9} align="center">
+                <TableCell colSpan={globalAiConfig?.userOverrideAllowed ? 11 : 10} align="center">
                   <Typography variant="body2" color="text.secondary" py={4}>
                     {t('admin.usersPage.noUsers', { provider: providerLabel })}
                   </Typography>
@@ -1003,6 +1062,21 @@ export function UsersPage() {
                         <Switch
                           checked={user.collectionsEnabled}
                           onChange={() => handleToggleCollections(user)}
+                          disabled={updating === user.providerUserId || user.isDisabled}
+                          color="primary"
+                          size="small"
+                        />
+                      </Tooltip>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">—</Typography>
+                    )}
+                  </TableCell>
+                  <TableCell align="center">
+                    {user.isImported ? (
+                      <Tooltip title={user.emailNotificationsAllowed ? t('admin.usersPage.emailToggleOn') : t('admin.usersPage.emailToggleOff')}>
+                        <Switch
+                          checked={user.emailNotificationsAllowed}
+                          onChange={() => handleToggleEmailNotifications(user)}
                           disabled={updating === user.providerUserId || user.isDisabled}
                           color="primary"
                           size="small"

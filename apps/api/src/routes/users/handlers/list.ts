@@ -12,7 +12,7 @@ import type { UserRow, UserListResponse, UserUpdateBody } from '../types.js'
 
 const listLogger = createChildLogger('users-list')
 
-const USER_ROW_SELECT = `id, username, display_name, email, provider, provider_user_id, is_admin, is_enabled, movies_enabled, series_enabled, discover_enabled, discover_request_enabled, collections_enabled, can_manage_watch_history, seerr_user_id, created_at, updated_at`
+const USER_ROW_SELECT = `id, username, display_name, email, provider, provider_user_id, is_admin, is_enabled, movies_enabled, series_enabled, discover_enabled, discover_request_enabled, collections_enabled, email_notifications_allowed, can_manage_watch_history, seerr_user_id, created_at, updated_at`
 
 export function registerListHandlers(fastify: FastifyInstance) {
   /**
@@ -75,7 +75,7 @@ export function registerListHandlers(fastify: FastifyInstance) {
     { preHandler: requireAdmin, schema: { tags: ["users"] } },
     async (request, reply) => {
       const { id } = request.params
-      const { displayName, isEnabled, moviesEnabled, seriesEnabled, discoverEnabled, discoverRequestEnabled, collectionsEnabled, canManageWatchHistory, seerrUserId } = request.body
+      const { displayName, isEnabled, moviesEnabled, seriesEnabled, discoverEnabled, discoverRequestEnabled, collectionsEnabled, emailNotificationsAllowed, canManageWatchHistory, seerrUserId } = request.body
 
       // Build update query dynamically
       const updates: string[] = []
@@ -123,6 +123,16 @@ export function registerListHandlers(fastify: FastifyInstance) {
       if (collectionsEnabled !== undefined) {
         updates.push(`collections_enabled = $${paramIndex++}`)
         values.push(collectionsEnabled)
+      }
+
+      if (emailNotificationsAllowed !== undefined) {
+        updates.push(`email_notifications_allowed = $${paramIndex++}`)
+        values.push(emailNotificationsAllowed)
+        // Revoking the permission also turns off the user's own opt-in, so a
+        // later re-grant doesn't silently reactivate a stale preference.
+        if (emailNotificationsAllowed === false) {
+          updates.push(`email_notifications_enabled = false`)
+        }
       }
 
       if (canManageWatchHistory !== undefined) {

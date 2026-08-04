@@ -35,6 +35,7 @@ import SaveIcon from '@mui/icons-material/Save'
 import GridViewIcon from '@mui/icons-material/GridView'
 import ViewListIcon from '@mui/icons-material/ViewList'
 import FavoriteIcon from '@mui/icons-material/Favorite'
+import EmailIcon from '@mui/icons-material/Email'
 import { MoviePoster, getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 
@@ -50,6 +51,7 @@ interface User {
   discover_enabled: boolean
   discover_request_enabled: boolean
   collections_enabled: boolean
+  email_notifications_allowed: boolean
   can_manage_watch_history: boolean
   seerr_user_id: number | null
   created_at: string
@@ -118,6 +120,8 @@ function UserSettingsTab({ userId, user }: { userId: string; user: User }) {
   const [discoverEnabled, setDiscoverEnabled] = useState(user.discover_enabled)
   const [discoverRequestEnabled, setDiscoverRequestEnabled] = useState(user.discover_request_enabled)
   const [collectionsEnabled, setCollectionsEnabled] = useState(user.collections_enabled)
+  const [emailNotificationsAllowed, setEmailNotificationsAllowed] = useState(user.email_notifications_allowed)
+  const [savingEmailNotifications, setSavingEmailNotifications] = useState(false)
   const [seerrUserIdInput, setSeerrUserIdInput] = useState(
     user.seerr_user_id != null ? String(user.seerr_user_id) : ''
   )
@@ -252,6 +256,28 @@ function UserSettingsTab({ userId, user }: { userId: string; user: User }) {
     }
   }
 
+  const handleEmailNotificationsToggle = async (enabled: boolean) => {
+    try {
+      setSavingEmailNotifications(true)
+      setError(null)
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emailNotificationsAllowed: enabled }),
+        credentials: 'include',
+      })
+      if (!response.ok) throw new Error(t('admin.userDetail.errorUpdatePermission'))
+      setEmailNotificationsAllowed(enabled)
+      setSuccess(t('admin.userDetail.emailNotificationsAccessUpdated'))
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('admin.userDetail.unknownError'))
+      setEmailNotificationsAllowed(!enabled)
+    } finally {
+      setSavingEmailNotifications(false)
+    }
+  }
+
   const handleDiscoveryToggle = async (field: 'discover' | 'request', enabled: boolean) => {
     try {
       setSavingDiscovery(true)
@@ -357,6 +383,48 @@ function UserSettingsTab({ userId, user }: { userId: string; user: User }) {
           />
 
           {savingWatchHistory && (
+            <Box display="flex" alignItems="center" gap={1} mt={2}>
+              <CircularProgress size={16} />
+              <Typography variant="caption" color="text.secondary">{t('common.saving')}</Typography>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Email Notifications Permission */}
+      <Card variant="outlined" sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <EmailIcon color="action" />
+            {t('admin.userDetail.emailNotificationsTitle')}
+          </Typography>
+
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {t('admin.userDetail.emailNotificationsBody')}
+          </Typography>
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={emailNotificationsAllowed}
+                onChange={(e) => handleEmailNotificationsToggle(e.target.checked)}
+                disabled={savingEmailNotifications}
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body1" fontWeight="medium">
+                  {t('admin.userDetail.emailNotificationsToggleTitle')}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {t('admin.userDetail.emailNotificationsToggleHint')}
+                </Typography>
+              </Box>
+            }
+            sx={{ alignItems: 'flex-start', ml: 0 }}
+          />
+
+          {savingEmailNotifications && (
             <Box display="flex" alignItems="center" gap={1} mt={2}>
               <CircularProgress size={16} />
               <Typography variant="caption" color="text.secondary">{t('common.saving')}</Typography>

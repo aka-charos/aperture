@@ -20,6 +20,7 @@ interface UserProfileTabProps {
   originalEmail: string
   emailLocked: boolean
   emailNotificationsEnabled: boolean
+  emailNotificationsAllowed: boolean
   loadingEmail: boolean
   savingEmail: boolean
   emailSuccess: string | null
@@ -36,6 +37,7 @@ export function UserProfileTab({
   email,
   emailLocked,
   emailNotificationsEnabled,
+  emailNotificationsAllowed,
   loadingEmail,
   savingEmail,
   emailSuccess,
@@ -114,65 +116,69 @@ export function UserProfileTab({
           {t('userSettings.profileSyncedCaption')}
         </Typography>
 
-        <Divider sx={{ my: 3 }} />
-
-        <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-          {t('userSettings.emailSectionTitle')}
-        </Typography>
-
-        {emailError && onDismissEmailError && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={onDismissEmailError}>
-            {emailError}
-          </Alert>
-        )}
-
-        {emailSuccess && (
-          <Alert severity="success" sx={{ mb: 2 }} onClose={onDismissSuccess}>
-            {emailSuccess}
-          </Alert>
-        )}
-
-        {loadingEmail ? (
-          <Box display="flex" justifyContent="center" py={2}>
-            <CircularProgress size={24} />
-          </Box>
-        ) : (
+        {emailNotificationsAllowed && (
           <>
-            <TextField
-              label={t('userSettings.emailAddress')}
-              value={email}
-              onChange={(e) => onEmailChange(e.target.value)}
-              fullWidth
-              margin="normal"
-              size="small"
-              placeholder={t('userSettings.emailPlaceholder')}
-              helperText={
-                emailLocked ? t('userSettings.emailHelperCustom') : t('userSettings.emailHelperSynced')
-              }
-              InputProps={{
-                endAdornment: savingEmail ? <CircularProgress size={16} /> : null,
-              }}
-              onBlur={onEmailBlur}
-            />
+            <Divider sx={{ my: 3 }} />
 
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={emailNotificationsEnabled}
-                  onChange={(e) => onNotificationsChange(e.target.checked)}
-                  disabled={savingEmail}
+            <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+              {t('userSettings.emailSectionTitle')}
+            </Typography>
+
+            {emailError && onDismissEmailError && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={onDismissEmailError}>
+                {emailError}
+              </Alert>
+            )}
+
+            {emailSuccess && (
+              <Alert severity="success" sx={{ mb: 2 }} onClose={onDismissSuccess}>
+                {emailSuccess}
+              </Alert>
+            )}
+
+            {loadingEmail ? (
+              <Box display="flex" justifyContent="center" py={2}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : (
+              <>
+                <TextField
+                  label={t('userSettings.emailAddress')}
+                  value={email}
+                  onChange={(e) => onEmailChange(e.target.value)}
+                  fullWidth
+                  margin="normal"
+                  size="small"
+                  placeholder={t('userSettings.emailPlaceholder')}
+                  helperText={
+                    emailLocked ? t('userSettings.emailHelperCustom') : t('userSettings.emailHelperSynced')
+                  }
+                  InputProps={{
+                    endAdornment: savingEmail ? <CircularProgress size={16} /> : null,
+                  }}
+                  onBlur={onEmailBlur}
                 />
-              }
-              label={
-                <Box>
-                  <Typography variant="body2">{t('userSettings.emailNotificationsTitle')}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {t('userSettings.emailNotificationsSubtitle')}
-                  </Typography>
-                </Box>
-              }
-              sx={{ mt: 1, alignItems: 'flex-start' }}
-            />
+
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={emailNotificationsEnabled}
+                      onChange={(e) => onNotificationsChange(e.target.checked)}
+                      disabled={savingEmail}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2">{t('userSettings.emailNotificationsTitle')}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {t('userSettings.emailNotificationsSubtitle')}
+                      </Typography>
+                    </Box>
+                  }
+                  sx={{ mt: 1, alignItems: 'flex-start' }}
+                />
+              </>
+            )}
           </>
         )}
       </CardContent>

@@ -41,6 +41,7 @@ export function UserSettingsPage() {
   const [originalEmail, setOriginalEmail] = useState('')
   const [emailLocked, setEmailLocked] = useState(false)
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(true)
+  const [emailNotificationsAllowed, setEmailNotificationsAllowed] = useState(false)
   const [loadingEmail, setLoadingEmail] = useState(false)
   const [savingEmail, setSavingEmail] = useState(false)
   const [emailSuccess, setEmailSuccess] = useState<string | null>(null)
@@ -85,12 +86,14 @@ export function UserSettingsPage() {
           email?: string
           emailLocked?: boolean
           emailNotificationsEnabled?: boolean
+          emailNotificationsAllowed?: boolean
         }
         const emailValue = data.email || ''
         setEmail(emailValue)
         setOriginalEmail(emailValue)
         setEmailLocked(data.emailLocked || false)
         setEmailNotificationsEnabled(data.emailNotificationsEnabled ?? true)
+        setEmailNotificationsAllowed(data.emailNotificationsAllowed ?? false)
       }
     } catch {
       // Optional load failures may degrade gracefully
@@ -134,12 +137,14 @@ export function UserSettingsPage() {
           email?: string
           emailLocked?: boolean
           emailNotificationsEnabled?: boolean
+          emailNotificationsAllowed?: boolean
         }
         const emailValue = data.email || ''
         setEmail(emailValue)
         setOriginalEmail(emailValue)
         setEmailLocked(data.emailLocked || false)
         setEmailNotificationsEnabled(data.emailNotificationsEnabled ?? true)
+        setEmailNotificationsAllowed(data.emailNotificationsAllowed ?? false)
         setEmailSuccess(t('userSettings.emailSettingsSaved'))
         window.setTimeout(() => setEmailSuccess(null), 3000)
       } else {
@@ -198,6 +203,7 @@ export function UserSettingsPage() {
               originalEmail={originalEmail}
               emailLocked={emailLocked}
               emailNotificationsEnabled={emailNotificationsEnabled}
+              emailNotificationsAllowed={emailNotificationsAllowed}
               loadingEmail={loadingEmail}
               savingEmail={savingEmail}
               emailSuccess={emailSuccess}
