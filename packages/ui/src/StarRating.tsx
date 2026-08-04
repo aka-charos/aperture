@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react'
 import { Box, Typography, Tooltip, IconButton, Popper, Paper, ClickAwayListener, Fade } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
+import { alpha, useTheme } from '@mui/material/styles'
 import Star from '@mui/icons-material/Star'
 import StarBorder from '@mui/icons-material/StarBorder'
 
@@ -13,13 +13,12 @@ const EmptyStar = StarBorder as unknown as React.ComponentType<{
   sx?: object
 }>
 
-// Indigo accent for the user's personal rating — deliberately distinct from the red
-// "favorite" heart and the gold community-rating star, so the three never read as the
-// same action. RATED_COLOR / RATED_COLOR_HOVER match the theme's primary.main/primary.light
-// exactly, so they're sourced live via useTheme() instead of hardcoded (see FillableStar
-// and StarRating below).
-const EMPTY_COLOR = 'rgba(129, 140, 248, 0.75)' // indigo-400 @ 75% — visible-but-unrated
-const EMPTY_COLOR_HOVER = '#a5b4fc' // indigo-300
+// The user's personal rating uses the theme's secondary color — deliberately distinct
+// from the red "favorite" heart, the gold community-rating star, and primary (used for
+// match-score/watching indicators elsewhere), so each reads as its own action. The
+// filled star and empty-star fade are both sourced live via useTheme() (see
+// FillableStar and StarRating below) so an admin-configured secondary color propagates
+// here too.
 
 export interface StarRatingProps {
   /** Current rating value (1-10), null if not rated */
@@ -126,7 +125,7 @@ function FillableStar({
           width: size,
           height: size,
           fontSize: size,
-          color: EMPTY_COLOR,
+          color: alpha(theme.palette.secondary.light, 0.75),
         }}
       />
       {/* Filled star with clip-path for partial fill */}
@@ -146,7 +145,7 @@ function FillableStar({
             width: size,
             height: size,
             fontSize: size,
-            color: theme.palette.primary.main,
+            color: theme.palette.secondary.main,
           }}
         />
       </Box>
@@ -192,7 +191,7 @@ export function StarRating({
             display: 'inline-flex',
             alignItems: 'center',
             gap: 0.5,
-            backgroundColor: theme.palette.primary.main,
+            backgroundColor: theme.palette.secondary.main,
             borderRadius: 1,
             px: 0.75,
             py: 0.25,
@@ -284,7 +283,7 @@ export function StarRating({
             sx={{
               fontSize: config.fontSize,
               fontWeight: 600,
-              color: value ? theme.palette.primary.main : 'text.secondary',
+              color: value ? theme.palette.secondary.main : 'text.secondary',
               minWidth: '2em',
             }}
           >
@@ -325,11 +324,11 @@ export function StarRating({
 
                     const starColor = isFilled
                       ? isHovered
-                        ? theme.palette.primary.light
-                        : theme.palette.primary.main
+                        ? theme.palette.secondary.light
+                        : theme.palette.secondary.main
                       : isHovered
-                        ? EMPTY_COLOR_HOVER
-                        : EMPTY_COLOR
+                        ? theme.palette.secondary.light
+                        : alpha(theme.palette.secondary.light, 0.75)
 
                     return (
                       <IconButton
@@ -381,7 +380,7 @@ export function StarRating({
                       sx={{
                         fontSize: config.fontSize,
                         fontWeight: 600,
-                        color: theme.palette.primary.main,
+                        color: theme.palette.secondary.main,
                       }}
                     >
                       {ratingLabels[displayValue]}

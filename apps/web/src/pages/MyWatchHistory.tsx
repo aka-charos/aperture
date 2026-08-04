@@ -524,7 +524,7 @@ export function MyWatchHistoryPage() {
                               sx={{
                                 width: `${Math.min(99, item.progress_percent ?? 0)}%`,
                                 height: '100%',
-                                backgroundColor: 'warning.main',
+                                backgroundColor: 'primary.main',
                               }}
                             />
                           </Box>
@@ -534,8 +534,8 @@ export function MyWatchHistoryPage() {
                       {!item.played && Math.min(99, item.progress_percent ?? 0) >= 1 && (
                         <Tooltip title={t('watchHistoryPage.inProgressTooltip', { percent: Math.min(99, item.progress_percent ?? 0) })}>
                           <Box display="flex" alignItems="center" gap={0.5} sx={{ mt: 0.5, width: 'fit-content' }}>
-                            <PlayCircleOutlineIcon sx={{ fontSize: 12, color: 'warning.main' }} />
-                            <Typography variant="caption" color="warning.main" noWrap sx={{ fontSize: '0.7rem', fontWeight: 600 }}>
+                            <PlayCircleOutlineIcon sx={{ fontSize: 12, color: 'primary.main' }} />
+                            <Typography variant="caption" color="primary.main" noWrap sx={{ fontSize: '0.7rem', fontWeight: 600 }}>
                               {Math.min(99, item.progress_percent ?? 0)}%
                             </Typography>
                           </Box>
