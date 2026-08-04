@@ -171,7 +171,7 @@ export function WatchHistoryMovieListItem({
                   sx={{
                     width: `${progressPercent}%`,
                     height: '100%',
-                    backgroundColor: 'warning.main',
+                    backgroundColor: 'primary.main',
                   }}
                 />
               </Box>
@@ -369,8 +369,8 @@ export function WatchHistoryMovieListItem({
             {inProgress && (
               <Tooltip title={t('watchHistoryPage.inProgressTooltip', { percent: progressPercent })}>
                 <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
-                  <PlayCircleOutlineIcon sx={{ fontSize: 14, color: 'warning.main' }} />
-                  <Typography variant="caption" color="warning.main" fontWeight={600}>
+                  <PlayCircleOutlineIcon sx={{ fontSize: 14, color: 'primary.main' }} />
+                  <Typography variant="caption" color="primary.main" fontWeight={600}>
                     {progressPercent}%
                   </Typography>
                 </Box>
@@ -458,8 +458,8 @@ export function WatchHistoryMovieListItem({
             {inProgress && (
               <Tooltip title={t('watchHistoryPage.inProgressTooltip', { percent: progressPercent })}>
                 <Box display="flex" alignItems="center" gap={0.5}>
-                  <PlayCircleOutlineIcon sx={{ fontSize: 14, color: 'warning.main' }} />
-                  <Typography variant="caption" color="warning.main" fontWeight={600}>
+                  <PlayCircleOutlineIcon sx={{ fontSize: 14, color: 'primary.main' }} />
+                  <Typography variant="caption" color="primary.main" fontWeight={600}>
                     {progressPercent}%
                   </Typography>
                 </Box>

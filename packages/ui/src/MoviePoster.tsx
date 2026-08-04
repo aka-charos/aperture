@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Box, Typography, Paper, Chip, Skeleton, Tooltip, IconButton } from '@mui/material'
+import { alpha, useTheme } from '@mui/material/styles'
 import Star from '@mui/icons-material/Star'
 import AddToQueue from '@mui/icons-material/AddToQueue'
 import PlaylistAddCheck from '@mui/icons-material/PlaylistAddCheck'
@@ -97,6 +98,7 @@ export function MoviePoster({
   const [ratingOpen, setRatingOpen] = useState(false)
   const [imageError, setImageError] = useState(false)
   const [isOffRatio, setIsOffRatio] = useState(false)
+  const theme = useTheme()
   const { hideLibraryRatingBadge } = usePosterDisplaySettings()
   const dimensions = sizeConfig[size]
 
@@ -253,12 +255,12 @@ export function MoviePoster({
                 position: 'absolute',
                 ...watchingToggleAnchor,
                 zIndex: 4,
-                backgroundColor: isWatching ? 'rgba(99, 102, 241, 0.9)' : 'rgba(0, 0, 0, 0.6)',
+                backgroundColor: isWatching ? alpha(theme.palette.primary.main, 0.9) : 'rgba(0, 0, 0, 0.6)',
                 color: 'white',
                 backdropFilter: 'blur(4px)',
                 transition: 'all 0.2s ease',
                 '&:hover': {
-                  backgroundColor: isWatching ? 'rgba(99, 102, 241, 1)' : 'rgba(0, 0, 0, 0.8)',
+                  backgroundColor: isWatching ? theme.palette.primary.main : 'rgba(0, 0, 0, 0.8)',
                   transform: 'scale(1.1)',
                 },
               }}
@@ -295,7 +297,7 @@ export function MoviePoster({
                   backdropFilter: 'blur(4px)',
                   transition: 'all 0.2s ease',
                   '&:hover': {
-                    backgroundColor: 'rgba(139, 92, 246, 0.9)',
+                    backgroundColor: alpha(theme.palette.secondary.main, 0.9),
                     transform: 'scale(1.1)',
                   },
                 }}
@@ -438,7 +440,7 @@ export function MoviePoster({
                 fontWeight: 700,
                 fontSize: '0.7rem',
                 height: 24,
-                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.9) 0%, rgba(139, 92, 246, 0.9) 100%)',
+                backgroundColor: alpha(theme.palette.secondary.main, 0.9),
                 color: 'white',
                 zIndex: 3,
                 '& .MuiChip-label': {
