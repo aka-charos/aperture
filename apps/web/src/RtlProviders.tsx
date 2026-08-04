@@ -8,6 +8,7 @@ import { prefixer } from 'stylis'
 import { useTranslation } from 'react-i18next'
 import { isRtlLocale } from './i18n/localeDirection'
 import { createAppTheme } from './theme'
+import { useThemeColorOverrides } from './lib/branding'
 
 const cacheLtr = createCache({ key: 'mui', prepend: true })
 const cacheRtl = createCache({
@@ -30,7 +31,12 @@ export function RtlProviders({ children }: { children: ReactNode }) {
     }
   }, [i18n])
 
-  const theme = useMemo(() => createAppTheme(dir), [dir])
+  // theme.ts's palette is mutated in place by branding.ts as overrides load, so
+  // createAppTheme(dir) rereads the same input either way — the lint rule can't see
+  // that dependency. Subscribing here is what turns the mutation into a re-render.
+  const themeColorOverrides = useThemeColorOverrides()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const theme = useMemo(() => createAppTheme(dir), [dir, themeColorOverrides])
   const cache = dir === 'rtl' ? cacheRtl : cacheLtr
 
   return (

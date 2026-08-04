@@ -2209,6 +2209,18 @@
     "artworkFound": "using {{file}}",
     "artworkBundled": "using the bundled artwork"
   },
+  "settingsThemeColors": {
+    "title": "Brand colors",
+    "subtitle": "The two accent colors used throughout the app — buttons, highlights, gradients, and badges. Other colors (errors, warnings, success) stay fixed.",
+    "primaryLabel": "Primary",
+    "secondaryLabel": "Secondary",
+    "invalidHex": "Enter a color like #6366f1",
+    "reset": "Reset to default",
+    "saved": "Brand colors updated",
+    "fetchFailed": "Failed to load the brand colors",
+    "saveFailed": "Failed to save the brand colors",
+    "unknownError": "Something went wrong"
+  },
   "settingsLibraryMatchPreview": {
     "analyzing": "Analyzing library coverage…",
     "coverageLabel": "Library Coverage",

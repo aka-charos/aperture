@@ -51,6 +51,7 @@ import {
   LanguageDefaultsSection,
   PosterDisplaySection,
   BrandingSection,
+  ThemeColorsSection,
   SystemLogsSection,
   DeploymentSection,
 } from './components'
@@ -421,6 +422,9 @@ export function SettingsPage() {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               {/* What this instance calls itself, everywhere in the UI */}
               <BrandingSection />
+
+              {/* Brand colors used throughout the UI */}
+              <ThemeColorsSection />
 
               <LanguageDefaultsSection />
 

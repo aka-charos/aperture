@@ -1175,6 +1175,58 @@ export async function setAppName(raw: unknown): Promise<string> {
 }
 
 // ============================================================================
+// Theme Colors
+// ============================================================================
+
+export interface ThemeColors {
+  primary: string
+  secondary: string
+}
+
+/** Must match the defaults baked into apps/web/src/theme.ts (duplicated on purpose — web never imports core). */
+export const DEFAULT_THEME_COLORS: ThemeColors = {
+  primary: '#6366f1',
+  secondary: '#8b5cf6',
+}
+
+const THEME_COLORS_SETTING = 'theme_colors'
+
+const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i
+
+/**
+ * Validates an operator-supplied color pair. Returns null (rather than
+ * silently substituting a default) so the API layer can reject a bad hex with
+ * a 400 instead of the admin's typo quietly turning into "no change".
+ */
+export function normalizeThemeColors(raw: unknown): ThemeColors | null {
+  if (!raw || typeof raw !== 'object') return null
+  const { primary, secondary } = raw as Record<string, unknown>
+  if (typeof primary !== 'string' || typeof secondary !== 'string') return null
+  if (!HEX_COLOR_RE.test(primary) || !HEX_COLOR_RE.test(secondary)) return null
+  return { primary: primary.toLowerCase(), secondary: secondary.toLowerCase() }
+}
+
+/** The instance's brand colors. Falls back to the defaults, same shape as getAppName. */
+export async function getThemeColors(): Promise<ThemeColors> {
+  const raw = await getSystemSetting(THEME_COLORS_SETTING)
+  if (!raw) return DEFAULT_THEME_COLORS
+  try {
+    return normalizeThemeColors(JSON.parse(raw)) ?? DEFAULT_THEME_COLORS
+  } catch {
+    return DEFAULT_THEME_COLORS
+  }
+}
+
+/** Set the instance's brand colors (admin). Caller must pass already-validated colors. */
+export async function setThemeColors(colors: ThemeColors): Promise<void> {
+  await setSystemSetting(
+    THEME_COLORS_SETTING,
+    JSON.stringify(colors),
+    'Primary/secondary brand colors used throughout the UI'
+  )
+}
+
+// ============================================================================
 // Library Title Template Settings
 // ============================================================================
 
