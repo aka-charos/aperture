@@ -30,7 +30,8 @@ import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import LogoutIcon from '@mui/icons-material/Logout'
 import PersonIcon from '@mui/icons-material/Person'
-import SettingsIcon from '@mui/icons-material/Settings'
+import FingerprintIcon from '@mui/icons-material/Fingerprint'
+import TuneIcon from '@mui/icons-material/Tune'
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 import WhatshotIcon from '@mui/icons-material/Whatshot'
 import InsightsIcon from '@mui/icons-material/Insights'
@@ -51,6 +52,7 @@ import { RunningJobsWidget } from './RunningJobsWidget'
 import { GlobalSearch } from './GlobalSearch'
 import { AppBarPageHeading } from './PageHeading'
 import { PageHeaderProvider } from '@/hooks/PageHeaderProvider'
+import { USER_SETTINGS_TAB_KEYS } from '@/pages/UserSettings/tabHelpers'
 import { useAppName, useLogoUrl } from '@/lib/branding'
 import { useTranslation } from 'react-i18next'
 import { applyEffectiveUiLanguage } from '@/i18n/syncUiLanguage'
@@ -87,6 +89,21 @@ const baseUserMenuItems: NavItem[] = [
 const adminMenuItems: { textKey: string; icon: React.ReactElement; path: string }[] = [
   { textKey: 'nav.admin', icon: <AdminPanelSettingsIcon />, path: '/admin' },
   { textKey: 'nav.gapAnalysis', icon: <FactCheckIcon />, path: '/admin/gaps' },
+]
+
+// The user-settings tabs (see UserSettings/tabHelpers), surfaced directly in
+// the user menu instead of behind an intermediate "Settings" item — one click
+// to any section instead of two. Icons and labels mirror UserSettingsPage's
+// own tabs so the destination is recognizable on arrival.
+const userSettingsMenuItems: {
+  textKey: string
+  icon: React.ReactElement
+  tab: (typeof USER_SETTINGS_TAB_KEYS)[number]
+}[] = [
+  { textKey: 'userSettings.tabProfile', icon: <PersonIcon fontSize="small" />, tab: 'profile' },
+  { textKey: 'userSettings.tabWatcherIdentity', icon: <FingerprintIcon fontSize="small" />, tab: 'watcher' },
+  { textKey: 'userSettings.tabAlgorithm', icon: <TuneIcon fontSize="small" />, tab: 'algorithm' },
+  { textKey: 'userSettings.tabPreferences', icon: <VideoLibraryIcon fontSize="small" />, tab: 'preferences' },
 ]
 
 /**
@@ -626,15 +643,22 @@ function AppShell() {
                   </Typography>
                 </Box>
                 <Divider />
-                <MenuItem onClick={() => { handleUserMenuClose(); navigate('/settings'); }}>
-                  <ListItemIcon>
-                    <SettingsIcon fontSize="small" />
-                  </ListItemIcon>
-                  {t('nav.settings')}
-                </MenuItem>
+                {userSettingsMenuItems.map((item) => (
+                  <MenuItem
+                    key={item.tab}
+                    onClick={() => {
+                      handleUserMenuClose()
+                      navigate(`/settings?tab=${item.tab}`)
+                    }}
+                  >
+                    <ListItemIcon>{item.icon}</ListItemIcon>
+                    {t(item.textKey)}
+                  </MenuItem>
+                ))}
+                <Divider />
                 <MenuItem onClick={() => { handleUserMenuClose(); navigate('/history'); }}>
                   <ListItemIcon>
-                    <PersonIcon fontSize="small" />
+                    <HistoryIcon fontSize="small" />
                   </ListItemIcon>
                   {t('nav.myWatchHistory')}
                 </MenuItem>
