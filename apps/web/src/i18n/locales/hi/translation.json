@@ -226,7 +226,14 @@
       "colCollections": "Collections",
       "collectionsColTooltip": "Allow user to create collections (server-wide Box Sets)",
       "collectionsToggleOn": "Disable collection creation",
-      "collectionsToggleOff": "Enable collection creation"
+      "collectionsToggleOff": "Enable collection creation",
+      "emailOn": "{{name}} can now opt in to email notifications",
+      "emailOff": "{{name}} can no longer opt in to email notifications",
+      "email": "Email",
+      "colEmail": "Email",
+      "emailColTooltip": "Lets the user opt in to email notifications about their recommendations in their settings. Feature coming soon — enabling this only reveals the setting, no emails are sent yet.",
+      "emailToggleOn": "Hide email notifications setting",
+      "emailToggleOff": "Show email notifications setting"
     },
     "userDetail": {
       "userNotFound": "उपयोगकर्ता नहीं मिला",
@@ -302,7 +309,12 @@
       "dateMonthsAgo": "{{count}} महीने पहले",
       "collectionsAccessUpdated": "Collection permission updated!",
       "collectionsTitle": "Allow Creating Collections",
-      "collectionsHint": "User can build server-wide Emby/Jellyfin collections (Box Sets) from the Collections page"
+      "collectionsHint": "User can build server-wide Emby/Jellyfin collections (Box Sets) from the Collections page",
+      "emailNotificationsAccessUpdated": "Email notifications permission updated!",
+      "emailNotificationsTitle": "Email Notifications",
+      "emailNotificationsBody": "Controls whether the Email Notifications opt-in appears in this user's settings. Feature coming soon — enabling this only reveals the setting, no emails are sent yet.",
+      "emailNotificationsToggleTitle": "Show Email Notifications Setting",
+      "emailNotificationsToggleHint": "User can enter an email and opt in to future notification emails from their settings"
     },
     "jobsPage": {
       "title": "पृष्ठभूमि जॉब",

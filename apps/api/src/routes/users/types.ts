@@ -12,6 +12,7 @@ export interface UserRow {
   discover_enabled: boolean
   discover_request_enabled: boolean
   collections_enabled: boolean
+  email_notifications_allowed: boolean
   max_parental_rating: number | null
   can_manage_watch_history: boolean
   seerr_user_id: number | null
@@ -32,6 +33,7 @@ export interface UserUpdateBody {
   discoverEnabled?: boolean
   discoverRequestEnabled?: boolean
   collectionsEnabled?: boolean
+  emailNotificationsAllowed?: boolean
   canManageWatchHistory?: boolean
   /** Admin: override Seerr/Seerr numeric user id for request attribution */
   seerrUserId?: number | null

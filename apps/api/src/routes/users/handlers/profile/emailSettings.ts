@@ -22,8 +22,9 @@ export function registerEmailSettingsHandlers(fastify: FastifyInstance) {
           email: string | null
           email_locked: boolean
           email_notifications_enabled: boolean
+          email_notifications_allowed: boolean
         }>(
-          `SELECT email, email_locked, email_notifications_enabled FROM users WHERE id = $1`,
+          `SELECT email, email_locked, email_notifications_enabled, email_notifications_allowed FROM users WHERE id = $1`,
           [id]
         )
 
@@ -35,6 +36,7 @@ export function registerEmailSettingsHandlers(fastify: FastifyInstance) {
           email: result.email,
           emailLocked: result.email_locked,
           emailNotificationsEnabled: result.email_notifications_enabled,
+          emailNotificationsAllowed: result.email_notifications_allowed,
         })
       } catch (error) {
         fastify.log.error({ error, userId: id }, 'Failed to get email settings')
@@ -64,6 +66,19 @@ export function registerEmailSettingsHandlers(fastify: FastifyInstance) {
       if (!requireSelfOrAdmin(id, currentUser, reply)) return
 
       try {
+        if (emailNotificationsEnabled) {
+          const current = await queryOne<{ email_notifications_allowed: boolean }>(
+            `SELECT email_notifications_allowed FROM users WHERE id = $1`,
+            [id]
+          )
+          if (!current) {
+            return reply.status(404).send({ error: 'User not found' })
+          }
+          if (!current.email_notifications_allowed) {
+            return reply.status(403).send({ error: 'Email notifications have not been enabled for this account by an administrator' })
+          }
+        }
+
         const updates: string[] = []
         const values: (string | boolean | null)[] = []
         let paramIndex = 1
@@ -102,8 +117,9 @@ export function registerEmailSettingsHandlers(fastify: FastifyInstance) {
           email: string | null
           email_locked: boolean
           email_notifications_enabled: boolean
+          email_notifications_allowed: boolean
         }>(
-          `SELECT email, email_locked, email_notifications_enabled FROM users WHERE id = $1`,
+          `SELECT email, email_locked, email_notifications_enabled, email_notifications_allowed FROM users WHERE id = $1`,
           [id]
         )
 
@@ -111,6 +127,7 @@ export function registerEmailSettingsHandlers(fastify: FastifyInstance) {
           email: result?.email,
           emailLocked: result?.email_locked,
           emailNotificationsEnabled: result?.email_notifications_enabled,
+          emailNotificationsAllowed: result?.email_notifications_allowed,
         })
       } catch (error) {
         fastify.log.error({ error, userId: id }, 'Failed to update email settings')
