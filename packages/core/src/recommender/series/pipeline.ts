@@ -683,7 +683,9 @@ async function storeSeriesCandidates(
      )
      SELECT $1, series_id, rank, similarity_score, novelty_score, rating_score,
             diversity_score, final_score, is_selected, selected_rank,
-            COALESCE(score_breakdown, '{}'::jsonb)
+            -- qualified: score_breakdown is also the name of the target
+            -- column, and t. leaves nothing resting on scoping rules
+            COALESCE(t.score_breakdown, '{}'::jsonb)
      FROM unnest(
        $2::uuid[], $3::int[], $4::real[], $5::real[], $6::real[],
        $7::real[], $8::real[], $9::boolean[], $10::int[], $11::jsonb[]
@@ -1101,6 +1103,10 @@ export async function generateSeriesRecommendationsForUser(
         similarity: s.similarity,
         novelty: s.novelty,
         ratingScore: s.ratingScore,
+        // Non-null only for reserved interest slots, so the explanation
+        // credits what actually put the show here instead of inventing a
+        // watch-history justification for it.
+        interestText: interestPicks.get(s.seriesId)?.interestText ?? null,
       }))
 
       // Generate explanations using embedding-based evidence

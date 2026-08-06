@@ -486,6 +486,10 @@ export async function generateRecommendationsForUser(
         similarity: s.similarity,
         novelty: s.novelty,
         ratingScore: s.ratingScore,
+        // Non-null only for reserved interest slots, so the explanation
+        // credits what actually put the film here instead of inventing a
+        // watch-history justification for it.
+        interestText: interestPicks.get(s.movieId)?.interestText ?? null,
       }))
 
       // Generate explanations using embedding-based evidence
