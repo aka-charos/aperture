@@ -27,3 +27,17 @@ export { averageEmbeddings } from './embeddings.js'
 
 export { allocateClusterCandidateLimits, MIN_CANDIDATES_PER_CLUSTER } from './clusterAllocation.js'
 
+export {
+  interestAffinityFromSimilarity,
+  buildInterestMatchIndex,
+  computeReservedInterestSlots,
+  pickInterestSlotFillers,
+  MAX_INTEREST_SLOTS,
+  INTEREST_SLOT_SHARE,
+  MIN_INTEREST_SLOT_SIMILARITY,
+  type InterestMatch,
+  type InterestCandidateMatch,
+  type InterestMatchIndex,
+  type InterestQueryResult,
+} from './interestSlots.js'
+

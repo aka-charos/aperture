@@ -18,6 +18,10 @@ import type {
 } from './types.js'
 import { DEFAULT_MIN_FRANCHISE_ITEMS, DEFAULT_MIN_FRANCHISE_SIZE } from './types.js'
 import type { ClusterCentroid } from './clustering.js'
+// Imported from the leaf module rather than recommender/shared/index.js: that
+// barrel pulls in scoring/selection, and the recommender already imports this
+// file. interestSlots.ts has no imports of its own, so there's no cycle.
+import { interestAffinityFromSimilarity } from '../recommender/shared/interestSlots.js'
 
 export * from './types.js'
 export { 
@@ -112,6 +116,10 @@ export async function getUserTasteProfile(
     // rebuild in lockstep with the overall profile.
     await refreshTasteClusters(userId, mediaType, currentModelId || undefined)
 
+    // Custom interests are not media-typed, so this runs on whichever profile
+    // rebuilds first and the staleness filter makes the second call a no-op.
+    await refreshCustomInterestEmbeddings(userId)
+
     return await getStoredProfile(userId, mediaType)
   }
 
@@ -189,6 +197,61 @@ async function refreshTasteClusters(
       { err, userId, mediaType },
       'Failed to build taste clusters, continuing with single-centroid profile only'
     )
+  }
+}
+
+/**
+ * Re-embed any custom interest whose stored embedding is missing or was made
+ * with a different model than the one currently active.
+ *
+ * Until this existed, nothing ever called updateCustomInterestEmbedding:
+ * interests were embedded once when they were created and never touched
+ * again. After an embedding-model change every one of them was silently dead
+ * — cosineSimilarity's length guard returns 0 for a dimension mismatch, which
+ * maps to neutral affinity, so the feature stopped working with no error and
+ * no log. Migration 0086 cleared them once as a one-off; this is the ongoing
+ * path.
+ *
+ * Runs alongside the taste-profile rebuild rather than on a schedule of its
+ * own, matching how taste clusters are handled. Best-effort throughout: an
+ * embedding failure must never block profile building.
+ */
+async function refreshCustomInterestEmbeddings(userId: string): Promise<void> {
+  try {
+    const { getActiveEmbeddingModelId, getEmbeddingModelInstance } = await import(
+      '../lib/ai-provider.js'
+    )
+    const modelId = await getActiveEmbeddingModelId()
+    if (!modelId) return
+
+    const interests = await getUserCustomInterests(userId)
+    const stale = interests.filter(
+      (interest) => !interest.embedding?.length || interest.embeddingModel !== modelId
+    )
+    if (stale.length === 0) return
+
+    const { embed } = await import('ai')
+    const model = await getEmbeddingModelInstance()
+
+    let repaired = 0
+    for (const interest of stale) {
+      try {
+        const result = await embed({ model, value: interest.interestText })
+        await updateCustomInterestEmbedding(interest.id, result.embedding, modelId)
+        repaired++
+      } catch (err) {
+        logger.warn({ err, userId, interestId: interest.id }, 'Failed to re-embed custom interest')
+      }
+    }
+
+    if (repaired > 0) {
+      logger.info(
+        { userId, repaired, model: modelId },
+        `Re-embedded ${repaired} custom interest(s) for the active embedding model`
+      )
+    }
+  } catch (err) {
+    logger.warn({ err, userId }, 'Custom interest embedding refresh failed')
   }
 }
 
@@ -960,13 +1023,7 @@ export async function getCustomInterestAffinity(
     }
   }
 
-  // Convert similarity to affinity:
-  // - 0.7+ similarity = 1.0 (strong match)
-  // - 0.5-0.7 similarity = 0.8 (moderate match)
-  // - 0.3-0.5 similarity = 0.65 (weak match)
-  // - <0.3 similarity = 0.5 (neutral, no match)
-  if (maxWeightedSimilarity >= 0.7) return 1.0
-  if (maxWeightedSimilarity >= 0.5) return 0.8
-  if (maxWeightedSimilarity >= 0.3) return 0.65
-  return 0.5
+  // Tiering lives in recommender/shared/interestSlots.ts so this and the
+  // recommendation pipeline's bulk path can't drift apart.
+  return interestAffinityFromSimilarity(maxWeightedSimilarity)
 }

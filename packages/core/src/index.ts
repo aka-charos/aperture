@@ -1150,6 +1150,15 @@ export {
 // not being barrel-exported either.
 export { type ClusterCentroid } from './taste-profile/clustering.js'
 
+// Custom-interest match types only, same reasoning as ClusterCentroid above --
+// the slot math itself (computeReservedInterestSlots, pickInterestSlotFillers)
+// is consumed solely by the two recommendation pipelines inside core.
+export {
+  type InterestMatch,
+  type InterestCandidateMatch,
+  type InterestMatchIndex,
+} from './recommender/shared/interestSlots.js'
+
 // User Algorithm Settings
 export {
   getUserAlgorithmSettings,

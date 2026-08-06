@@ -24,6 +24,12 @@ import {
   calculateBaseScore,
   applyDiversitySelection,
   applyPreferenceAdjustment,
+  buildInterestMatchIndex,
+  computeReservedInterestSlots,
+  pickInterestSlotFillers,
+  type InterestCandidateMatch,
+  type InterestMatchIndex,
+  type InterestQueryResult,
 } from '../shared/index.js'
 import { storeSeriesEvidence, getSeriesOverviews } from './storage.js'
 import {
@@ -40,7 +46,7 @@ import {
   getUserTasteClusters,
   getFranchiseAffinity,
   getGenreAffinity,
-  getCustomInterestAffinity,
+  getUserCustomInterests,
   detectAndUpdateFranchises,
 } from '../../taste-profile/index.js'
 import { getItemFranchise } from '../../taste-profile/franchise.js'
@@ -422,6 +428,105 @@ export async function getMultiClusterSeriesCandidates(
 }
 
 /**
+ * Custom-interest matching, mirroring recommender/movies/candidates.ts's
+ * getInterestMatchIndex -- one indexed ANN query per interest through the same
+ * querySeriesCandidatesForVector used for taste retrieval, so no new SQL and
+ * the same watched/parental filtering applies. See that function and
+ * shared/interestSlots.ts for why interests need this rather than the old
+ * per-candidate affinity loop.
+ */
+export const SERIES_INTEREST_ANN_LIMIT = 1000
+export const MAX_QUERIED_SERIES_INTERESTS = 10
+
+export interface SeriesInterestQueryInput {
+  interestId: string
+  interestText: string
+  weight: number
+  embedding: number[] | null
+  embeddingModel: string | null
+}
+
+export async function getSeriesInterestMatchIndex(
+  interests: SeriesInterestQueryInput[],
+  watchedSeriesIds: Set<string>,
+  includeWatched: boolean,
+  maxParentalRating: number | null
+): Promise<InterestMatchIndex> {
+  if (interests.length === 0) return buildInterestMatchIndex([])
+
+  const ctx = await resolveSeriesCandidateQueryContext()
+  if (!ctx) return buildInterestMatchIndex([])
+
+  // A stale-dimension embedding makes pgvector raise, and previously just
+  // scored 0 forever via cosineSimilarity's length guard. Skip those; they get
+  // re-embedded on the next profile rebuild.
+  const usable = interests.filter(
+    (interest) =>
+      interest.embedding && interest.embedding.length > 0 && interest.embeddingModel === ctx.model
+  )
+
+  const skipped = interests.length - usable.length
+  if (skipped > 0) {
+    logger.debug(
+      { skipped, activeModel: ctx.model },
+      'Skipped custom interests with a missing or stale-model embedding'
+    )
+  }
+
+  const queried = usable.slice(0, MAX_QUERIED_SERIES_INTERESTS)
+  if (queried.length < usable.length) {
+    logger.info(
+      { total: usable.length, queried: queried.length },
+      `Limiting interest matching to the ${MAX_QUERIED_SERIES_INTERESTS} most recent interests`
+    )
+  }
+
+  const results: InterestQueryResult[] = []
+
+  // Sequential on purpose: the interest count is user-controlled, unlike the
+  // fixed K<=3 cluster queries.
+  for (const interest of queried) {
+    try {
+      const vectorStr = `[${interest.embedding!.join(',')}]`
+      const rows = await querySeriesCandidatesForVector(
+        vectorStr,
+        SERIES_INTEREST_ANN_LIMIT,
+        includeWatched,
+        watchedSeriesIds,
+        maxParentalRating,
+        ctx
+      )
+
+      const tail = rows[rows.length - 1]
+      if (
+        rows.length >= SERIES_INTEREST_ANN_LIMIT &&
+        tail &&
+        tail.similarity * interest.weight >= 0.3
+      ) {
+        logger.debug(
+          { interestText: interest.interestText, tailSimilarity: tail.similarity },
+          'Interest match list hit its limit while still above the neutral threshold'
+        )
+      }
+
+      results.push({
+        interestId: interest.interestId,
+        interestText: interest.interestText,
+        weight: interest.weight,
+        rows: rows.map((row) => ({ candidateId: row.seriesId, similarity: row.similarity })),
+      })
+    } catch (err) {
+      logger.warn(
+        { err, interestId: interest.interestId },
+        'Custom interest match query failed, skipping this interest'
+      )
+    }
+  }
+
+  return buildInterestMatchIndex(results)
+}
+
+/**
  * Score candidates using multiple factors
  * Uses shared scoring functions for consistency with movie recommendations.
  */
@@ -532,7 +637,8 @@ async function storeSeriesCandidates(
   runId: string,
   candidates: SeriesCandidate[],
   selected: SeriesCandidate[],
-  selectedRanks: Map<string, number>
+  selectedRanks: Map<string, number>,
+  interestPicks?: Map<string, InterestCandidateMatch>
 ): Promise<void> {
   if (candidates.length === 0) return
 
@@ -542,6 +648,7 @@ async function storeSeriesCandidates(
   const data = candidates.map((candidate, i) => {
     const isSelected = selectedIds.has(candidate.seriesId)
     const selectedRank = isSelected ? selectedRanks.get(candidate.seriesId) || null : null
+    const interestPick = interestPicks?.get(candidate.seriesId)
 
     return {
       seriesId: candidate.seriesId,
@@ -553,6 +660,18 @@ async function storeSeriesCandidates(
       finalScore: candidate.finalScore,
       isSelected,
       selectedRank,
+      // null for the overwhelming majority, so this stays a cheap array to
+      // build even though every scored candidate is stored here. COALESCEd to
+      // '{}' below because the column is NOT NULL.
+      scoreBreakdown: interestPick
+        ? JSON.stringify({
+            interestMatch: {
+              interestId: interestPick.interestId,
+              interestText: interestPick.interestText,
+              weightedSimilarity: interestPick.weightedSimilarity,
+            },
+          })
+        : null,
     }
   })
 
@@ -560,15 +679,16 @@ async function storeSeriesCandidates(
   await query(
     `INSERT INTO recommendation_candidates (
        run_id, series_id, rank, similarity_score, novelty_score, rating_score,
-       diversity_score, final_score, is_selected, selected_rank
+       diversity_score, final_score, is_selected, selected_rank, score_breakdown
      )
      SELECT $1, series_id, rank, similarity_score, novelty_score, rating_score,
-            diversity_score, final_score, is_selected, selected_rank
+            diversity_score, final_score, is_selected, selected_rank,
+            COALESCE(score_breakdown, '{}'::jsonb)
      FROM unnest(
        $2::uuid[], $3::int[], $4::real[], $5::real[], $6::real[],
-       $7::real[], $8::real[], $9::boolean[], $10::int[]
-     ) AS t(series_id, rank, similarity_score, novelty_score, rating_score, 
-            diversity_score, final_score, is_selected, selected_rank)`,
+       $7::real[], $8::real[], $9::boolean[], $10::int[], $11::jsonb[]
+     ) AS t(series_id, rank, similarity_score, novelty_score, rating_score,
+            diversity_score, final_score, is_selected, selected_rank, score_breakdown)`,
     [
       runId,
       data.map((d) => d.seriesId),
@@ -580,6 +700,7 @@ async function storeSeriesCandidates(
       data.map((d) => d.finalScore),
       data.map((d) => d.isSelected),
       data.map((d) => d.selectedRank),
+      data.map((d) => d.scoreBreakdown),
     ]
   )
 }
@@ -799,10 +920,29 @@ export async function generateSeriesRecommendationsForUser(
     let genreSignalCount = 0
     let interestSignalCount = 0
 
-    // Get embeddings for top candidates to apply custom interest affinity
-    // (only fetch for top 100 to limit performance impact)
-    const topCandidateIds = scoredCandidates.slice(0, 100).map((c) => c.seriesId)
-    const { getSeriesEmbedding } = await import('./embeddings.js')
+    // One indexed ANN query per custom interest instead of a per-candidate
+    // embedding fetch plus affinity call, so every candidate is measured
+    // rather than only the top 100. Fails open to all-neutral affinities.
+    let interestIndex: InterestMatchIndex | null = null
+    try {
+      const customInterests = await getUserCustomInterests(user.id)
+      if (customInterests.length > 0) {
+        interestIndex = await getSeriesInterestMatchIndex(
+          customInterests.map((interest) => ({
+            interestId: interest.id,
+            interestText: interest.interestText,
+            weight: interest.weight,
+            embedding: interest.embedding,
+            embeddingModel: interest.embeddingModel,
+          })),
+          excludeIds,
+          includeWatched,
+          user.maxParentalRating ?? null
+        )
+      }
+    } catch (err) {
+      logger.warn({ err, userId: user.id }, 'Custom interest matching failed, continuing without it')
+    }
 
     for (const candidate of scoredCandidates) {
       // Franchise affinity: 0 (avoid) - 0.5 (neutral) - 1 (loved)
@@ -812,14 +952,8 @@ export async function generateSeriesRecommendationsForUser(
       // Genre affinity: 0 (avoid) - 0.5 (neutral) - 1 (loved)
       const genreAffinity = await getGenreAffinity(user.id, candidate.genres || [])
 
-      // Custom interest affinity (only for top candidates with embeddings)
-      let interestAffinity = 0.5
-      if (topCandidateIds.includes(candidate.seriesId)) {
-        const embedding = await getSeriesEmbedding(candidate.seriesId)
-        if (embedding) {
-          interestAffinity = await getCustomInterestAffinity(user.id, embedding)
-        }
-      }
+      // Custom interest affinity: 0.5 (no match) - 1 (strong match)
+      const interestAffinity = interestIndex?.best.get(candidate.seriesId)?.affinity ?? 0.5
 
       // Nudge the score toward 1 or 0 based on preference affinities, bounded to [0,1]
       const originalScore = candidate.finalScore
@@ -865,24 +999,53 @@ export async function generateSeriesRecommendationsForUser(
       { userId: user.id, targetCount: cfg.selectedCount, diversityWeight: effectiveDiversityWeight },
       '🎲 Applying diversity and selecting...'
     )
+    // Reserve a bounded few picks for the user's stated interests -- see
+    // shared/interestSlots.ts for why the preference multiplier alone can
+    // never surface anything. Zero interests means zero slots.
+    const reservedInterestSlots = computeReservedInterestSlots(
+      cfg.selectedCount,
+      interestIndex?.byInterest.length ?? 0
+    )
+
     const { selected } = applySeriesDiversityAndSelect(
       scoredCandidates,
-      cfg.selectedCount,
+      cfg.selectedCount - reservedInterestSlots,
       effectiveDiversityWeight
     )
 
+    const interestFillers = interestIndex
+      ? pickInterestSlotFillers(selected, scoredCandidates, interestIndex, reservedInterestSlots)
+      : []
+
+    const interestPicks = new Map<string, InterestCandidateMatch>()
+    for (const filler of interestFillers) {
+      interestPicks.set(filler.candidate.seriesId, filler.match)
+      logger.info(
+        { title: filler.candidate.title, interest: filler.match.interestText },
+        `⭐ Reserved slot for interest "${filler.match.interestText}": ${filler.candidate.title}`
+      )
+    }
+    if (reservedInterestSlots > interestFillers.length) {
+      logger.info(
+        { reserved: reservedInterestSlots, filled: interestFillers.length },
+        'Some reserved interest slots had no qualifying match and were left unused'
+      )
+    }
+
+    const selectedWithInterests = [...selected, ...interestFillers.map((f) => f.candidate)]
+
     const finalSelected = includeWatched
-      ? selected
+      ? selectedWithInterests
       : (await import('../watchedExclusion.js')).filterByWatchedIds(
-          selected.map((candidate) => ({ ...candidate, id: candidate.seriesId })),
+          selectedWithInterests.map((candidate) => ({ ...candidate, id: candidate.seriesId })),
           excludeIds
         )
 
-    if (!includeWatched && finalSelected.length < selected.length) {
+    if (!includeWatched && finalSelected.length < selectedWithInterests.length) {
       logger.info(
         {
           userId: user.id,
-          removed: selected.length - finalSelected.length,
+          removed: selectedWithInterests.length - finalSelected.length,
         },
         'Filtered watched series from final recommendations (safety net)'
       )
@@ -908,7 +1071,13 @@ export async function generateSeriesRecommendationsForUser(
 
     // 7. Store results
     logger.info({ runId }, '💾 Storing candidates...')
-    await storeSeriesCandidates(runId, scoredCandidates, finalSelected, finalSelectedRanks)
+    await storeSeriesCandidates(
+      runId,
+      scoredCandidates,
+      finalSelected,
+      finalSelectedRanks,
+      interestPicks
+    )
 
     // 8. Store evidence (similar watched series for each recommendation)
     logger.info({ runId }, '📊 Storing recommendation evidence...')

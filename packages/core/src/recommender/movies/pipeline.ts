@@ -19,7 +19,7 @@ import { randomUUID } from 'crypto'
 // Import from modular files
 import { loadConfigForUser } from '../config.js'
 import { getWatchHistory, buildTasteProfile as buildLegacyTasteProfile, storeTasteProfile as storeLegacyTasteProfile, getUserMovieRatings, getDislikedMovieIds } from './taste.js'
-import { getCandidates, getMultiClusterCandidates } from './candidates.js'
+import { getCandidates, getMultiClusterCandidates, getInterestMatchIndex } from './candidates.js'
 import { scoreCandidates } from './scoring.js'
 import { applyDiversityAndSelect } from './selection.js'
 import {
@@ -40,11 +40,17 @@ import {
   getUserTasteClusters,
   getFranchiseAffinity,
   getGenreAffinity,
-  getCustomInterestAffinity,
+  getUserCustomInterests,
   detectAndUpdateFranchises,
 } from '../../taste-profile/index.js'
 import { getItemFranchise } from '../../taste-profile/franchise.js'
-import { applyPreferenceAdjustment } from '../shared/index.js'
+import {
+  applyPreferenceAdjustment,
+  computeReservedInterestSlots,
+  pickInterestSlotFillers,
+  type InterestCandidateMatch,
+  type InterestMatchIndex,
+} from '../shared/index.js'
 
 // Re-export types
 export * from '../types.js'
@@ -279,10 +285,33 @@ export async function generateRecommendationsForUser(
     let genreSignalCount = 0
     let interestSignalCount = 0
 
-    // Get embeddings for top candidates to apply custom interest affinity
-    // (only fetch for top 100 to limit performance impact)
-    const topCandidateIds = scoredCandidates.slice(0, 100).map((c) => c.id)
-    const { getMovieEmbedding } = await import('./embeddings.js')
+    // Custom interests get one indexed ANN query each rather than a
+    // per-candidate embedding fetch plus affinity call. That's what lets every
+    // candidate be measured instead of only the top 100 -- the old cap meant
+    // the signal was simply absent for everything below it -- while cutting
+    // roughly 200 DB round-trips per user per run down to one per interest.
+    // Fails open: any problem here leaves every affinity neutral, exactly as
+    // a user with no interests configured would score.
+    let interestIndex: InterestMatchIndex | null = null
+    try {
+      const customInterests = await getUserCustomInterests(user.id)
+      if (customInterests.length > 0) {
+        interestIndex = await getInterestMatchIndex(
+          customInterests.map((interest) => ({
+            interestId: interest.id,
+            interestText: interest.interestText,
+            weight: interest.weight,
+            embedding: interest.embedding,
+            embeddingModel: interest.embeddingModel,
+          })),
+          excludeIds,
+          includeWatched,
+          user.maxParentalRating ?? null
+        )
+      }
+    } catch (err) {
+      logger.warn({ err, userId: user.id }, 'Custom interest matching failed, continuing without it')
+    }
 
     for (const candidate of scoredCandidates) {
       // Franchise affinity: 0 (avoid) - 0.5 (neutral) - 1 (loved)
@@ -292,14 +321,8 @@ export async function generateRecommendationsForUser(
       // Genre affinity: 0 (avoid) - 0.5 (neutral) - 1 (loved)
       const genreAffinity = await getGenreAffinity(user.id, candidate.genres || [])
 
-      // Custom interest affinity (only for top candidates with embeddings)
-      let interestAffinity = 0.5
-      if (topCandidateIds.includes(candidate.id)) {
-        const embedding = await getMovieEmbedding(candidate.id)
-        if (embedding) {
-          interestAffinity = await getCustomInterestAffinity(user.id, embedding)
-        }
-      }
+      // Custom interest affinity: 0.5 (no match) - 1 (strong match)
+      const interestAffinity = interestIndex?.best.get(candidate.id)?.affinity ?? 0.5
 
       // Nudge the score toward 1 or 0 based on preference affinities, bounded to [0,1]
       const originalScore = candidate.finalScore
@@ -361,24 +384,58 @@ export async function generateRecommendationsForUser(
       { userId: user.id, targetCount: cfg.selectedCount, diversityWeight: effectiveDiversityWeight },
       '🎲 Applying diversity and selecting final recommendations...'
     )
+    // Hand a bounded few of the picks to the user's stated interests. The
+    // preference multiplier alone can never surface anything -- it closes at
+    // most 11.5% of a candidate's gap to 1.0 (see shared/interestSlots.ts) --
+    // so the slots come out of selectedCount rather than trying to out-score
+    // the ranking. Zero interests means zero slots and an unchanged pipeline.
+    const reservedInterestSlots = computeReservedInterestSlots(
+      cfg.selectedCount,
+      interestIndex?.byInterest.length ?? 0
+    )
+
     const { selected } = applyDiversityAndSelect(
       scoredCandidates,
-      cfg.selectedCount,
+      cfg.selectedCount - reservedInterestSlots,
       effectiveDiversityWeight
     )
 
+    // Fillers keep their pre-diversity finalScore because they never go
+    // through applyDiversitySelection, which overwrites finalScore with the
+    // diversity-blended selection score for whatever it picks.
+    const interestFillers = interestIndex
+      ? pickInterestSlotFillers(selected, scoredCandidates, interestIndex, reservedInterestSlots)
+      : []
+
+    const interestPicks = new Map<string, InterestCandidateMatch>()
+    for (const filler of interestFillers) {
+      interestPicks.set(filler.candidate.movieId, filler.match)
+      logger.info(
+        { title: filler.candidate.title, interest: filler.match.interestText },
+        `⭐ Reserved slot for interest "${filler.match.interestText}": ${filler.candidate.title}`
+      )
+    }
+    if (reservedInterestSlots > interestFillers.length) {
+      logger.info(
+        { reserved: reservedInterestSlots, filled: interestFillers.length },
+        'Some reserved interest slots had no qualifying match and were left unused'
+      )
+    }
+
+    const selectedWithInterests = [...selected, ...interestFillers.map((f) => f.candidate)]
+
     const finalSelected = includeWatched
-      ? selected
+      ? selectedWithInterests
       : (await import('../watchedExclusion.js')).filterByWatchedIds(
-          selected.map((candidate) => ({ ...candidate, id: candidate.movieId })),
+          selectedWithInterests.map((candidate) => ({ ...candidate, id: candidate.movieId })),
           excludeIds
         )
 
-    if (!includeWatched && finalSelected.length < selected.length) {
+    if (!includeWatched && finalSelected.length < selectedWithInterests.length) {
       logger.info(
         {
           userId: user.id,
-          removed: selected.length - finalSelected.length,
+          removed: selectedWithInterests.length - finalSelected.length,
         },
         'Filtered watched movies from final recommendations (safety net)'
       )
@@ -410,7 +467,7 @@ export async function generateRecommendationsForUser(
 
     // 6. Store results
     logger.info({ runId }, '💾 Storing candidates and evidence...')
-    await storeCandidates(runId, scoredCandidates, finalSelected, finalSelectedRanks)
+    await storeCandidates(runId, scoredCandidates, finalSelected, finalSelectedRanks, interestPicks)
     await storeEvidence(runId, finalSelected, watched)
 
     // 7. Generate AI explanations for selected recommendations
