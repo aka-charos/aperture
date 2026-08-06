@@ -37,6 +37,7 @@ import { syncSeriesWatchHistoryForUser } from './sync.js'
 import {
   getUserTasteProfile,
   storeTasteProfile as storeNewTasteProfile,
+  getUserTasteClusters,
   getFranchiseAffinity,
   getGenreAffinity,
   getCustomInterestAffinity,
@@ -221,37 +222,53 @@ async function storeSeriesTasteProfile(userId: string, profile: number[]): Promi
   )
 }
 
+interface SeriesCandidateQueryContext {
+  model: string
+  tableName: string
+}
+
 /**
- * Get candidate series based on taste profile
+ * Resolves the model/table context shared by every series candidate query.
+ * Hoisted out of the per-vector query path so multi-cluster retrieval
+ * (getMultiClusterSeriesCandidates) resolves it once, not once per cluster.
  */
-async function getSeriesCandidates(
-  tasteProfile: number[],
-  watchedSeriesIds: Set<string>,
-  maxCandidates: number,
-  includeWatched: boolean,
-  maxParentalRating: number | null
-): Promise<SeriesCandidate[]> {
+async function resolveSeriesCandidateQueryContext(): Promise<SeriesCandidateQueryContext | null> {
   const model = await getActiveEmbeddingModelId()
   if (!model) {
     logger.warn('No embedding model configured for series candidate generation')
-    return []
+    return null
   }
-
-  // Get the embedding table name
   const tableName = await getActiveEmbeddingTableName('series_embeddings')
-  const vectorStr = `[${tasteProfile.join(',')}]`
+  return { model, tableName }
+}
 
-  const queryLimit = includeWatched ? maxCandidates : maxCandidates + watchedSeriesIds.size
+/**
+ * Runs the actual pgvector ANN query for a single query vector, filters out
+ * watched ids, and maps to SeriesCandidate[]. This exact `ORDER BY <=> LIMIT`
+ * shape is what lets Postgres use the HNSW index on the embedding table -- a
+ * query comparing against multiple vectors at once would not use it (see
+ * getMultiClusterSeriesCandidates), so multi-centroid retrieval calls this
+ * once per cluster instead of trying to fold multiple vectors into one query.
+ */
+async function querySeriesCandidatesForVector(
+  vectorStr: string,
+  limit: number,
+  includeWatched: boolean,
+  watchedSeriesIds: Set<string>,
+  maxParentalRating: number | null,
+  ctx: SeriesCandidateQueryContext
+): Promise<SeriesCandidate[]> {
+  const queryLimit = includeWatched ? limit : limit + watchedSeriesIds.size
 
   // Build query with optional parental rating filter
   let ratingFilter = ''
-  const params: (string | number)[] = [vectorStr, model, queryLimit]
+  const params: (string | number)[] = [vectorStr, ctx.model, queryLimit]
 
   if (maxParentalRating !== null) {
     // Map parental rating to content ratings
     // This is a simplified mapping - adjust based on your data
     ratingFilter = `AND (s.content_rating IS NULL OR s.content_rating IN (
-      SELECT unnest(CASE 
+      SELECT unnest(CASE
         WHEN $4 >= 18 THEN ARRAY['TV-MA', 'TV-14', 'TV-PG', 'TV-G', 'TV-Y7', 'TV-Y']
         WHEN $4 >= 14 THEN ARRAY['TV-14', 'TV-PG', 'TV-G', 'TV-Y7', 'TV-Y']
         WHEN $4 >= 7 THEN ARRAY['TV-PG', 'TV-G', 'TV-Y7', 'TV-Y']
@@ -271,7 +288,7 @@ async function getSeriesCandidates(
     community_rating: number | null
     similarity: number
   }>(
-    `SELECT 
+    `SELECT
        s.id as series_id,
        s.title,
        s.year,
@@ -281,7 +298,7 @@ async function getSeriesCandidates(
        s.community_rating,
        1 - (se.embedding <=> $1::halfvec) as similarity
      FROM series s
-     JOIN ${tableName} se ON se.series_id = s.id AND se.model = $2
+     JOIN ${ctx.tableName} se ON se.series_id = s.id AND se.model = $2
      WHERE 1=1 ${ratingFilter}
      ORDER BY se.embedding <=> $1::halfvec
      LIMIT $3`,
@@ -294,8 +311,8 @@ async function getSeriesCandidates(
     candidates = candidates.filter((c) => !watchedSeriesIds.has(c.series_id))
   }
 
-  // Limit to maxCandidates
-  candidates = candidates.slice(0, maxCandidates)
+  // Limit to the requested limit
+  candidates = candidates.slice(0, limit)
 
   return candidates.map((row) => ({
     seriesId: row.series_id,
@@ -311,6 +328,97 @@ async function getSeriesCandidates(
     diversityBoost: 0,
     finalScore: 0,
   }))
+}
+
+/**
+ * Get candidate series based on taste profile
+ */
+async function getSeriesCandidates(
+  tasteProfile: number[],
+  watchedSeriesIds: Set<string>,
+  maxCandidates: number,
+  includeWatched: boolean,
+  maxParentalRating: number | null
+): Promise<SeriesCandidate[]> {
+  const ctx = await resolveSeriesCandidateQueryContext()
+  if (!ctx) return []
+
+  const vectorStr = `[${tasteProfile.join(',')}]`
+  return querySeriesCandidatesForVector(vectorStr, maxCandidates, includeWatched, watchedSeriesIds, maxParentalRating, ctx)
+}
+
+export interface SeriesClusterQueryInput {
+  embedding: number[]
+  weight: number
+}
+
+/**
+ * Merge per-cluster candidate result sets, keeping the MAX similarity for any
+ * candidate id that appears in more than one cluster's results. Pure -- no DB
+ * access -- independently unit-testable. Same MAX-not-average rationale as
+ * the movies-side mergeClusterCandidatesByMaxSimilarity
+ * (recommender/movies/candidates.ts): a candidate that's a strong match for
+ * ANY one of the user's taste facets should score as a strong match.
+ */
+export function mergeSeriesClusterCandidatesByMaxSimilarity(
+  perClusterResults: SeriesCandidate[][]
+): SeriesCandidate[] {
+  const merged = new Map<string, SeriesCandidate>()
+
+  for (const candidates of perClusterResults) {
+    for (const candidate of candidates) {
+      const existing = merged.get(candidate.id)
+      if (!existing || candidate.similarity > existing.similarity) {
+        merged.set(candidate.id, candidate)
+      }
+    }
+  }
+
+  return Array.from(merged.values()).sort((a, b) => b.similarity - a.similarity)
+}
+
+/**
+ * Multi-centroid candidate retrieval, mirroring
+ * recommender/movies/candidates.ts's getMultiClusterCandidates: one indexed
+ * ANN query per taste cluster, merged by max similarity. Falls back to the
+ * single-vector getSeriesCandidates() when there's only one cluster.
+ */
+export async function getMultiClusterSeriesCandidates(
+  clusters: SeriesClusterQueryInput[],
+  watchedSeriesIds: Set<string>,
+  totalLimit: number,
+  includeWatched: boolean,
+  maxParentalRating: number | null
+): Promise<SeriesCandidate[]> {
+  if (clusters.length === 0) return []
+  if (clusters.length === 1) {
+    return getSeriesCandidates(clusters[0].embedding, watchedSeriesIds, totalLimit, includeWatched, maxParentalRating)
+  }
+
+  const ctx = await resolveSeriesCandidateQueryContext()
+  if (!ctx) return []
+
+  const { allocateClusterCandidateLimits } = await import('../shared/index.js')
+  const perClusterLimits = allocateClusterCandidateLimits(
+    clusters.map((c) => c.weight),
+    totalLimit
+  )
+
+  const perClusterResults = await Promise.all(
+    clusters.map((cluster, i) => {
+      const vectorStr = `[${cluster.embedding.join(',')}]`
+      return querySeriesCandidatesForVector(
+        vectorStr,
+        perClusterLimits[i],
+        includeWatched,
+        watchedSeriesIds,
+        maxParentalRating,
+        ctx
+      )
+    })
+  )
+
+  return mergeSeriesClusterCandidatesByMaxSimilarity(perClusterResults)
 }
 
 /**
@@ -627,13 +735,49 @@ export async function generateSeriesRecommendationsForUser(
 
     // 4. Get candidate series
     logger.info({ userId: user.id }, '🔍 Finding candidate series...')
-    const candidates = await getSeriesCandidates(
-      tasteProfile,
-      excludeIds,
-      cfg.maxCandidates,
-      includeWatched,
-      user.maxParentalRating ?? null
-    )
+
+    // Multi-centroid retrieval: mirrors movies/pipeline.ts. Falls open to the
+    // single-centroid path whenever there's only one cluster, no clusters yet
+    // (pre-rebuild), or the multi-cluster query itself fails for any reason.
+    const tasteClusters = await getUserTasteClusters(user.id, 'series')
+
+    let candidates: SeriesCandidate[]
+    if (tasteClusters.length > 1) {
+      try {
+        candidates = await getMultiClusterSeriesCandidates(
+          tasteClusters.map((c) => ({ embedding: c.embedding, weight: c.weight })),
+          excludeIds,
+          cfg.maxCandidates,
+          includeWatched,
+          user.maxParentalRating ?? null
+        )
+        logger.info(
+          { userId: user.id, clusterCount: tasteClusters.length },
+          `🧩 Using ${tasteClusters.length} taste clusters for candidate retrieval`
+        )
+      } catch (err) {
+        logger.warn(
+          { err, userId: user.id },
+          'Multi-cluster candidate retrieval failed, falling back to single-centroid'
+        )
+        candidates = await getSeriesCandidates(
+          tasteProfile,
+          excludeIds,
+          cfg.maxCandidates,
+          includeWatched,
+          user.maxParentalRating ?? null
+        )
+      }
+    } else {
+      candidates = await getSeriesCandidates(
+        tasteProfile,
+        excludeIds,
+        cfg.maxCandidates,
+        includeWatched,
+        user.maxParentalRating ?? null
+      )
+    }
+
     logger.info(
       { userId: user.id, candidateCount: candidates.length },
       `Found ${candidates.length} candidate series`

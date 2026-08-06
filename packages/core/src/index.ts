@@ -1084,6 +1084,10 @@ export {
   updateProfileSettings,
   invalidateProfile,
   isProfileStale,
+  // Taste clusters (multi-centroid)
+  getUserTasteClusters,
+  storeTasteClusters,
+  type TasteCluster,
   // Franchise preferences
   getUserFranchisePreferences,
   setFranchisePreference,
@@ -1134,7 +1138,17 @@ export {
   // Profile building
   buildTasteProfile,
   calculateEngagementWeight,
+  // Taste cluster building
+  buildTasteClusters,
+  type TasteClusterBuildResult,
 } from './taste-profile/builder.js'
+
+// Taste cluster type only -- the clustering algorithm itself (chooseK,
+// clusterTasteEmbeddings) is an internal primitive consumed solely within
+// packages/core (by builder.ts), matching the existing precedent of
+// recommender/shared/scoring.ts's calculateBaseScore/applyPreferenceAdjustment
+// not being barrel-exported either.
+export { type ClusterCentroid } from './taste-profile/clustering.js'
 
 // User Algorithm Settings
 export {

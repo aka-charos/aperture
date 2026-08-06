@@ -19,7 +19,7 @@ import { randomUUID } from 'crypto'
 // Import from modular files
 import { loadConfigForUser } from '../config.js'
 import { getWatchHistory, buildTasteProfile as buildLegacyTasteProfile, storeTasteProfile as storeLegacyTasteProfile, getUserMovieRatings, getDislikedMovieIds } from './taste.js'
-import { getCandidates } from './candidates.js'
+import { getCandidates, getMultiClusterCandidates } from './candidates.js'
 import { scoreCandidates } from './scoring.js'
 import { applyDiversityAndSelect } from './selection.js'
 import {
@@ -37,6 +37,7 @@ import { syncWatchHistoryForUser } from './sync.js'
 import {
   getUserTasteProfile,
   storeTasteProfile as storeNewTasteProfile,
+  getUserTasteClusters,
   getFranchiseAffinity,
   getGenreAffinity,
   getCustomInterestAffinity,
@@ -197,13 +198,52 @@ export async function generateRecommendationsForUser(
       )
     }
 
-    const candidates = await getCandidates(
-      tasteProfile,
-      excludeIds,
-      cfg.maxCandidates,
-      includeWatched,
-      user.maxParentalRating ?? null
-    )
+    // Multi-centroid retrieval: if the user's taste clustered into more than
+    // one facet (taste-profile/clustering.ts), query each cluster's centroid
+    // independently and merge by max similarity, so a candidate matching any
+    // one of the user's taste facets surfaces instead of being diluted by a
+    // single averaged vector. Falls open to the existing single-centroid
+    // path whenever there's only one cluster, no clusters yet (pre-rebuild),
+    // or the multi-cluster query itself fails for any reason.
+    const tasteClusters = await getUserTasteClusters(user.id, 'movie')
+
+    let candidates: Candidate[]
+    if (tasteClusters.length > 1) {
+      try {
+        candidates = await getMultiClusterCandidates(
+          tasteClusters.map((c) => ({ embedding: c.embedding, weight: c.weight })),
+          excludeIds,
+          cfg.maxCandidates,
+          includeWatched,
+          user.maxParentalRating ?? null
+        )
+        logger.info(
+          { userId: user.id, clusterCount: tasteClusters.length },
+          `🧩 Using ${tasteClusters.length} taste clusters for candidate retrieval`
+        )
+      } catch (err) {
+        logger.warn(
+          { err, userId: user.id },
+          'Multi-cluster candidate retrieval failed, falling back to single-centroid'
+        )
+        candidates = await getCandidates(
+          tasteProfile,
+          excludeIds,
+          cfg.maxCandidates,
+          includeWatched,
+          user.maxParentalRating ?? null
+        )
+      }
+    } else {
+      candidates = await getCandidates(
+        tasteProfile,
+        excludeIds,
+        cfg.maxCandidates,
+        includeWatched,
+        user.maxParentalRating ?? null
+      )
+    }
+
     logger.info(
       { userId: user.id, candidateCount: candidates.length },
       `Found ${candidates.length} candidate movies`

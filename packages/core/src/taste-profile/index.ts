@@ -5,7 +5,7 @@
  * similarity graphs, explore, and discovery features.
  */
 
-import { query, queryOne } from '../lib/db.js'
+import { query, queryOne, transaction } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import type {
   TasteProfile,
@@ -17,6 +17,7 @@ import type {
   ProfileBuildOptions,
 } from './types.js'
 import { DEFAULT_MIN_FRANCHISE_ITEMS, DEFAULT_MIN_FRANCHISE_SIZE } from './types.js'
+import type { ClusterCentroid } from './clustering.js'
 
 export * from './types.js'
 export { 
@@ -105,6 +106,12 @@ export async function getUserTasteProfile(
       await refreshDetectedPreferences(userId, mediaType, existing)
     }
 
+    // Unconditional (not gated on refreshPreferences -- that flag is about
+    // franchise/genre detection specifically, see its own doc comment).
+    // Clusters have no independent refresh schedule of their own; they
+    // rebuild in lockstep with the overall profile.
+    await refreshTasteClusters(userId, mediaType, currentModelId || undefined)
+
     return await getStoredProfile(userId, mediaType)
   }
 
@@ -153,6 +160,34 @@ async function refreshDetectedPreferences(
     logger.warn(
       { err, userId, mediaType },
       'Failed to refresh franchise/genre preferences, continuing with existing'
+    )
+  }
+}
+
+/**
+ * Rebuild a user's taste clusters (see clustering.ts) alongside the overall
+ * profile rebuild. Best-effort and isolated from the rest of the rebuild: a
+ * clustering failure must never block the centroid rebuild that
+ * recommendations actually depend on, so any error here is logged and
+ * swallowed — the next successful cluster read just falls back to whatever
+ * cluster rows existed from the last successful build, or none (which
+ * recommender pipelines already treat as "use the single-centroid path").
+ */
+async function refreshTasteClusters(
+  userId: string,
+  mediaType: MediaType,
+  embeddingModel?: string
+): Promise<void> {
+  try {
+    const { buildTasteClusters } = await import('./builder.js')
+    const result = await buildTasteClusters(userId, mediaType)
+    if (result) {
+      await storeTasteClusters(userId, mediaType, result.clusters, result.dispersion, embeddingModel)
+    }
+  } catch (err) {
+    logger.warn(
+      { err, userId, mediaType },
+      'Failed to build taste clusters, continuing with single-centroid profile only'
     )
   }
 }
@@ -254,6 +289,137 @@ export async function storeTasteProfile(
   )
 
   logger.info({ userId, mediaType }, 'Stored taste profile')
+}
+
+// ============================================================================
+// Taste Clusters
+// ============================================================================
+
+export interface TasteCluster {
+  id: string
+  userId: string
+  mediaType: MediaType
+  clusterIndex: number
+  embedding: number[]
+  embeddingModel: string | null
+  weight: number
+  itemCount: number
+  dispersion: number | null
+  createdAt: Date
+  updatedAt: Date
+}
+
+/**
+ * Get a user's taste clusters (1-3 per media type, ordered by descending
+ * weight / ascending cluster_index -- index 0 is the dominant taste facet).
+ *
+ * Fails open to `[]` on any error, and also returns `[]` if the stored
+ * clusters were built under a since-replaced embedding model (defensive:
+ * avoids mixing dimensions into downstream pgvector queries; the next
+ * profile rebuild repopulates them under the new model, same as
+ * `getUserTasteProfile`'s own model-mismatch handling above). Every caller
+ * treats an empty array as "use the single-centroid fallback", never as a
+ * hard failure — see `recommender/movies/pipeline.ts` and
+ * `recommender/series/pipeline.ts`.
+ */
+export async function getUserTasteClusters(userId: string, mediaType: MediaType): Promise<TasteCluster[]> {
+  try {
+    const result = await query<{
+      id: string
+      user_id: string
+      media_type: string
+      cluster_index: number
+      embedding: string
+      embedding_model: string | null
+      weight: string
+      item_count: number
+      dispersion: string | null
+      created_at: Date
+      updated_at: Date
+    }>(
+      `SELECT id, user_id, media_type, cluster_index, embedding::text as embedding,
+              embedding_model, weight, item_count, dispersion, created_at, updated_at
+       FROM user_taste_clusters
+       WHERE user_id = $1 AND media_type = $2
+       ORDER BY cluster_index`,
+      [userId, mediaType]
+    )
+
+    if (result.rows.length === 0) return []
+
+    const { getActiveEmbeddingModelId } = await import('../lib/ai-provider.js')
+    const currentModelId = await getActiveEmbeddingModelId()
+    const storedModelId = result.rows[0].embedding_model
+    if (currentModelId && storedModelId !== currentModelId) {
+      logger.debug(
+        { userId, mediaType, storedModelId, currentModelId },
+        'Stored taste clusters built under a different embedding model, ignoring until next rebuild'
+      )
+      return []
+    }
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      userId: row.user_id,
+      mediaType: row.media_type as MediaType,
+      clusterIndex: row.cluster_index,
+      embedding: parseEmbedding(row.embedding),
+      embeddingModel: row.embedding_model,
+      weight: parseFloat(row.weight),
+      itemCount: row.item_count,
+      dispersion: row.dispersion !== null ? parseFloat(row.dispersion) : null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }))
+  } catch (err) {
+    logger.warn(
+      { err, userId, mediaType },
+      'Failed to load taste clusters, falling back to single-centroid profile'
+    )
+    return []
+  }
+}
+
+/**
+ * Atomically replace a user's taste clusters (delete+insert in one
+ * transaction, mirroring the "full replace" semantics `storeTasteProfile`
+ * already uses for the single centroid) so a concurrent read never observes
+ * a partial cluster set mid-rebuild.
+ */
+export async function storeTasteClusters(
+  userId: string,
+  mediaType: MediaType,
+  clusters: ClusterCentroid[],
+  dispersion: number,
+  embeddingModel?: string
+): Promise<void> {
+  await transaction(async (client) => {
+    await client.query(`DELETE FROM user_taste_clusters WHERE user_id = $1 AND media_type = $2`, [
+      userId,
+      mediaType,
+    ])
+
+    for (const cluster of clusters) {
+      const vectorStr = `[${cluster.embedding.join(',')}]`
+      await client.query(
+        `INSERT INTO user_taste_clusters
+           (user_id, media_type, cluster_index, embedding, embedding_model, weight, item_count, dispersion)
+         VALUES ($1, $2, $3, $4::halfvec, $5, $6, $7, $8)`,
+        [
+          userId,
+          mediaType,
+          cluster.clusterIndex,
+          vectorStr,
+          embeddingModel || null,
+          cluster.weight,
+          cluster.itemCount,
+          dispersion,
+        ]
+      )
+    }
+  })
+
+  logger.info({ userId, mediaType, clusterCount: clusters.length }, 'Stored taste clusters')
 }
 
 /**
