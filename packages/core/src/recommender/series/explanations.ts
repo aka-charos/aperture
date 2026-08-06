@@ -59,6 +59,12 @@ export interface SeriesForExplanation {
   similarity: number
   novelty: number
   ratingScore: number
+  /**
+   * Set when this pick came from a reserved custom-interest slot rather than
+   * from the ranking (recommender/shared/interestSlots.ts). Mirrors
+   * MovieForExplanation.interestText.
+   */
+  interestText?: string | null
 }
 
 export interface EvidenceSeries {
@@ -274,11 +280,15 @@ async function generateBatchSeriesExplanations(
               .join(', ')
           : 'No direct match data'
 
+      const interestLine = s.interestText
+        ? `\n   ✍️ THEY ASKED FOR THIS: picked because they told us they like "${s.interestText}" — lead with that`
+        : ''
+
       return `${i + 1}. "${s.title}" (${s.year || 'N/A'})
    Genres: ${s.genres.join(', ')}
    ${s.network ? `Network: ${s.network}` : ''}
    ${s.status ? `Status: ${s.status}` : ''}
-   Overall match: ${(s.similarity * 100).toFixed(0)}% | Novelty: ${s.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${s.ratingScore > 0.7 ? 'critically acclaimed' : s.ratingScore > 0.5 ? 'well received' : 'mixed'}
+   Overall match: ${(s.similarity * 100).toFixed(0)}% | Novelty: ${s.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${s.ratingScore > 0.7 ? 'critically acclaimed' : s.ratingScore > 0.5 ? 'well received' : 'mixed'}${interestLine}
    🎯 SIMILAR TO SERIES THEY'VE WATCHED: ${evidenceStr}
    Plot: ${(s.overview || 'No overview available').substring(0, 250)}...`
     })
@@ -302,6 +312,8 @@ Write compelling 3-4 sentence explanations for each recommendation. Your explana
 - Mention if it's from a network/streaming service they seem to enjoy
 
 CRITICAL: Each recommendation shows which of the user's watched series it's most similar to. USE THAT DATA - don't make up connections to random series.
+
+CRITICAL: A few recommendations are marked "THEY ASKED FOR THIS" with an interest the user typed in themselves. For those, open by connecting the show to that interest in the user's own words, then fill in with the similarity evidence. Never justify one of these on viewing-history similarity alone - that is not why it is in the list, and claiming otherwise would be wrong.
 
 Format: Return JSON with an "explanations" array containing objects with "index" (1-based) and "explanation" fields.${langBlock}`,
       prompt: `=== USER'S TV TASTE PROFILE ===
@@ -389,6 +401,16 @@ Generate personalized explanations referencing the specific similar series shown
 }
 
 function generateFallbackSeriesExplanation(series: SeriesWithEvidence): string {
+  // Checked before the evidence branch: for a reserved interest pick the
+  // stated interest is the actual reason it's here, so leading with watch
+  // history would misattribute it.
+  if (series.interestText) {
+    // "one of the closest" rather than "the closest": the slot goes to the
+    // best-scoring title among the interest's strongest matches, not to the
+    // single closest one, and the wording shouldn't claim more than that.
+    return `You told us you like ${series.interestText.toLowerCase()} — this ${series.genres[0]?.toLowerCase() || 'series'} pick is one of the closest matches in your library that you haven't started yet.`
+  }
+
   if (series.evidence.length > 0) {
     const topMatch = series.evidence[0]
     return `Based on your enjoyment of "${topMatch.title}", this ${series.genres[0] || 'series'} shares similar qualities you'll likely appreciate.`
