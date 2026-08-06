@@ -14,6 +14,13 @@ import { query } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../lib/ai-provider.js'
 import type { MediaType, WatchedItem } from './types.js'
+import {
+  chooseK,
+  clusterTasteEmbeddings,
+  MAX_CLUSTERING_INPUT_ITEMS,
+  type WeightedEmbeddingItem,
+  type ClusterCentroid,
+} from './clustering.js'
 
 const logger = createChildLogger('taste-profile-builder')
 
@@ -87,6 +94,105 @@ export async function buildTasteProfile(
   )
 
   return profile
+}
+
+export interface TasteClusterBuildResult {
+  clusters: ClusterCentroid[]
+  dispersion: number
+}
+
+/**
+ * Build 1-3 per-user taste clusters from watch history, in place of the
+ * single averaged centroid buildTasteProfile() produces. Independently
+ * re-fetches watch history + embeddings via the same private helpers
+ * buildTasteProfile() uses (no new SQL) -- deliberately decoupled from
+ * buildTasteProfile() rather than threading shared data through both, so
+ * clustering has its own isolated failure domain (see the try/catch around
+ * its caller in taste-profile/index.ts) and buildTasteProfile()'s existing
+ * behavior stays completely untouched.
+ */
+export async function buildTasteClusters(
+  userId: string,
+  mediaType: MediaType
+): Promise<TasteClusterBuildResult | null> {
+  logger.info({ userId, mediaType }, 'Building taste clusters')
+
+  const watchedItems =
+    mediaType === 'movie'
+      ? await getMovieWatchHistory(userId)
+      : await getSeriesWatchHistory(userId)
+
+  if (watchedItems.length === 0) {
+    return null
+  }
+
+  const weightedItems = watchedItems.map((item) => ({
+    ...item,
+    weight: calculateEngagementWeight(item, mediaType),
+  }))
+
+  // Sorted by descending weight exactly as buildTasteProfile does above, and
+  // for a second reason here: floating-point addition is not associative, so
+  // summing the weighted embeddings in a different order would change the
+  // result in its last bits. Matching the order is what makes the K=1 result
+  // *bit-identical* to buildTasteProfile's, rather than merely very close.
+  // (Array.prototype.sort is stable, and both paths sort the same rows from
+  // the same query with the same comparator, so ties order identically too.)
+  weightedItems.sort((a, b) => b.weight - a.weight)
+
+  const embeddings = await getItemEmbeddings(
+    weightedItems.map((i) => i.id),
+    mediaType
+  )
+
+  if (embeddings.size === 0) {
+    return null
+  }
+
+  const allItems: WeightedEmbeddingItem[] = weightedItems
+    .filter((item) => embeddings.has(item.id))
+    .map((item) => ({ id: item.id, weight: item.weight, embedding: embeddings.get(item.id)! }))
+
+  if (allItems.length === 0) {
+    return null
+  }
+
+  // K-selection and k>1 clustering run on a capped, highest-engagement-weight
+  // subset to bound k-means cost for large watch histories (the queries above
+  // have no LIMIT). allItems is already in descending-weight order, so this is
+  // a plain prefix; the full allItems is what the K=1 path below uses.
+  const cappedItems = allItems.slice(0, MAX_CLUSTERING_INPUT_ITEMS)
+
+  const { k, dispersion } = chooseK(cappedItems)
+
+  let clusters = k <= 1 ? clusterTasteEmbeddings(allItems, 1) : clusterTasteEmbeddings(cappedItems, k)
+
+  // Whenever exactly one cluster survives -- whether chooseK decided K=1 up
+  // front, or a hard-floor step-down collapsed a larger K back down -- the
+  // stored result must be the true full-history mean, not a capped-subset
+  // approximation, so "K=1 == today's single-centroid behavior" is provable
+  // rather than approximate.
+  if (clusters.length === 1 && k > 1) {
+    clusters = clusterTasteEmbeddings(allItems, 1)
+  }
+
+  if (clusters.length === 0) {
+    logger.warn({ userId, mediaType }, 'Failed to build taste clusters')
+    return null
+  }
+
+  logger.info(
+    {
+      userId,
+      mediaType,
+      clusterCount: clusters.length,
+      dispersion: dispersion.toFixed(3),
+      itemCounts: clusters.map((c) => c.itemCount),
+    },
+    'Successfully built taste clusters'
+  )
+
+  return { clusters, dispersion }
 }
 
 // ============================================================================

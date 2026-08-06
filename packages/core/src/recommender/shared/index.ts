@@ -25,3 +25,5 @@ export {
 
 export { averageEmbeddings } from './embeddings.js'
 
+export { allocateClusterCandidateLimits, MIN_CANDIDATES_PER_CLUSTER } from './clusterAllocation.js'
+
