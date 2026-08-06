@@ -1,6 +1,11 @@
 import { createChildLogger } from '../../lib/logger.js'
 import { query, queryOne } from '../../lib/db.js'
 import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../../lib/ai-provider.js'
+import {
+  buildInterestMatchIndex,
+  type InterestMatchIndex,
+  type InterestQueryResult,
+} from '../shared/interestSlots.js'
 import type { Candidate } from '../types.js'
 
 const logger = createChildLogger('recommender-candidates')
@@ -206,4 +211,123 @@ export async function getMultiClusterCandidates(
   )
 
   return mergeClusterCandidatesByMaxSimilarity(perClusterResults)
+}
+
+/**
+ * How many neighbors to pull per custom interest. Anything past this falls to
+ * neutral affinity, which is what the old `<0.3 similarity` branch produced
+ * anyway -- see the tail check below, which makes a too-small cap visible in
+ * the logs instead of silent.
+ */
+export const INTEREST_ANN_LIMIT = 1000
+
+/**
+ * Upper bound on how many interests get their own query, so a user with a
+ * long interest list can't turn one recommendation run into dozens of scans.
+ * Interests arrive newest-first (user_custom_interests is ordered by
+ * created_at DESC), so the cap drops the oldest.
+ */
+export const MAX_QUERIED_INTERESTS = 10
+
+export interface InterestQueryInput {
+  interestId: string
+  interestText: string
+  weight: number
+  embedding: number[] | null
+  embeddingModel: string | null
+}
+
+/**
+ * One indexed ANN query per custom interest, folded into the lookup index the
+ * pipeline uses for both interest affinity and reserved slots.
+ *
+ * This replaces a per-candidate loop that re-fetched the user's whole interest
+ * list and one item embedding for every candidate it looked at -- roughly 200
+ * round-trips per user per run, and capped at the top 100 candidates, so the
+ * signal was simply absent for everything else. Going through
+ * queryCandidatesForVector means no new SQL: the same library/parental/watched
+ * filtering and the same index-friendly `ORDER BY <=> LIMIT` shape apply.
+ *
+ * Interests embedded with a different model are skipped rather than queried --
+ * pgvector raises on a dimension mismatch, and a stale-dimension interest
+ * would previously just score 0 forever via cosineSimilarity's length guard.
+ * refreshCustomInterestEmbeddings (taste-profile/index.ts) re-embeds them on
+ * the next profile rebuild.
+ */
+export async function getInterestMatchIndex(
+  interests: InterestQueryInput[],
+  watchedIds: Set<string>,
+  includeWatched: boolean = false,
+  maxParentalRating: number | null = null
+): Promise<InterestMatchIndex> {
+  if (interests.length === 0) return buildInterestMatchIndex([])
+
+  const ctx = await resolveCandidateQueryContext()
+  if (!ctx) return buildInterestMatchIndex([])
+
+  const usable = interests.filter(
+    (interest) =>
+      interest.embedding &&
+      interest.embedding.length > 0 &&
+      interest.embeddingModel === ctx.modelId
+  )
+
+  const skipped = interests.length - usable.length
+  if (skipped > 0) {
+    logger.debug(
+      { skipped, activeModel: ctx.modelId },
+      'Skipped custom interests with a missing or stale-model embedding'
+    )
+  }
+
+  const queried = usable.slice(0, MAX_QUERIED_INTERESTS)
+  if (queried.length < usable.length) {
+    logger.info(
+      { total: usable.length, queried: queried.length },
+      `Limiting interest matching to the ${MAX_QUERIED_INTERESTS} most recent interests`
+    )
+  }
+
+  const parentalFilter = buildParentalFilter(maxParentalRating)
+  const results: InterestQueryResult[] = []
+
+  // Sequential on purpose: the interest count is user-controlled, and firing
+  // one query per interest concurrently could crowd the connection pool in a
+  // way the fixed K<=3 cluster queries never can.
+  for (const interest of queried) {
+    try {
+      const vectorStr = `[${interest.embedding!.join(',')}]`
+      const rows = await queryCandidatesForVector(
+        vectorStr,
+        INTEREST_ANN_LIMIT,
+        includeWatched,
+        watchedIds,
+        parentalFilter,
+        ctx
+      )
+
+      const tail = rows[rows.length - 1]
+      if (rows.length >= INTEREST_ANN_LIMIT && tail && tail.similarity * interest.weight >= 0.3) {
+        logger.debug(
+          { interestText: interest.interestText, tailSimilarity: tail.similarity },
+          'Interest match list hit its limit while still above the neutral threshold'
+        )
+      }
+
+      results.push({
+        interestId: interest.interestId,
+        interestText: interest.interestText,
+        weight: interest.weight,
+        rows: rows.map((row) => ({ candidateId: row.id, similarity: row.similarity })),
+      })
+    } catch (err) {
+      // One malformed interest must not cost the whole run its recommendations.
+      logger.warn(
+        { err, interestId: interest.interestId },
+        'Custom interest match query failed, skipping this interest'
+      )
+    }
+  }
+
+  return buildInterestMatchIndex(results)
 }

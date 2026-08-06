@@ -48,6 +48,7 @@
     "test:justwatch": "node --import tsx --test src/justwatch/normalize.test.ts",
     "test:strm": "node --import tsx --test src/strm/posterOverlay.test.ts src/strm/artwork.test.ts",
     "test:clustering": "node --import tsx --test src/taste-profile/clustering.test.ts src/recommender/shared/clusterAllocation.test.ts src/recommender/movies/candidates.test.ts",
+    "test:interests": "node --import tsx --test src/recommender/shared/interestSlots.test.ts",
     "lint": "eslint src",
     "clean": "rm -rf dist"
   },

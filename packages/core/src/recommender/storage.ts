@@ -6,11 +6,24 @@ import type { Candidate, WatchedMovie } from './types.js'
  * Store recommendation candidates using bulk INSERT
  * OPTIMIZED: Uses unnest() for single query instead of N individual INSERTs
  */
+/**
+ * A reserved-slot pick, recorded on the candidate's score_breakdown so it's
+ * possible to tell after the fact which recommendations came from a stated
+ * interest rather than from the ranking. Lives in the existing JSONB column,
+ * so no migration is needed.
+ */
+export interface StoredInterestPick {
+  interestId: string
+  interestText: string
+  weightedSimilarity: number
+}
+
 export async function storeCandidates(
   runId: string,
   allCandidates: Candidate[],
   selected: Candidate[],
-  selectedRanks?: Map<string, number>
+  selectedRanks?: Map<string, number>,
+  interestPicks?: Map<string, StoredInterestPick>
 ): Promise<void> {
   const selectedIds = new Set(selected.map((s) => s.movieId))
 
@@ -33,6 +46,7 @@ export async function storeCandidates(
     const selectedRank = isSelected && selectedRanks ? selectedRanks.get(c.movieId) : null
     const originalRank =
       i < 100 ? i + 1 : allCandidates.findIndex((ac) => ac.movieId === c.movieId) + 1
+    const interestPick = interestPicks?.get(c.movieId)
 
     return {
       movieId: c.movieId,
@@ -49,6 +63,15 @@ export async function storeCandidates(
         novelty: c.novelty,
         rating: c.ratingScore,
         diversity: c.diversityScore,
+        ...(interestPick
+          ? {
+              interestMatch: {
+                interestId: interestPick.interestId,
+                interestText: interestPick.interestText,
+                weightedSimilarity: interestPick.weightedSimilarity,
+              },
+            }
+          : {}),
       }),
     }
   })
