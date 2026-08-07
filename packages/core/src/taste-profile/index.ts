@@ -83,6 +83,19 @@ export async function getUserTasteProfile(
     }
 
     if (!needsRebuild) {
+      // Clusters are written only by the rebuild branch below, which a fresh
+      // profile skips entirely -- so a user whose profile was last rebuilt
+      // before multi-centroid retrieval shipped stays on the single-centroid
+      // path until their profile next goes stale, up to refresh_interval_days
+      // later (30 by default). That is exactly what happened on first deploy:
+      // every profile had been rebuilt by the immediately-preceding release,
+      // so none of them were stale, and user_taste_clusters stayed empty while
+      // the feature looked deployed. This closes the gap on the next
+      // recommendation run at the cost of one indexed COUNT.
+      //
+      // Deliberately not done in the locked branch below: a lock means "leave
+      // my profile alone", and clusters are part of the profile.
+      await backfillTasteClustersIfMissing(userId, mediaType)
       return existing
     }
 
@@ -198,6 +211,40 @@ async function refreshTasteClusters(
       { err, userId, mediaType },
       'Failed to build taste clusters, continuing with single-centroid profile only'
     )
+  }
+}
+
+/**
+ * Build taste clusters for a profile that is fresh but has none.
+ *
+ * Only getUserTasteProfile's rebuild branch writes clusters, so any release
+ * that adds or resets them cannot reach a user whose profile is not due for a
+ * refresh. Cheap when clusters already exist -- one COUNT on
+ * idx_user_taste_clusters_user_id -- and otherwise does exactly what the
+ * rebuild branch would have done.
+ *
+ * Best-effort like refreshTasteClusters itself: a failure here must never stop
+ * getUserTasteProfile returning the profile recommendations actually depend
+ * on, and a user whose items have no embeddings simply retries next run.
+ */
+async function backfillTasteClustersIfMissing(
+  userId: string,
+  mediaType: MediaType
+): Promise<void> {
+  try {
+    const stored = await queryOne<{ count: string }>(
+      `SELECT COUNT(*) FROM user_taste_clusters WHERE user_id = $1 AND media_type = $2`,
+      [userId, mediaType]
+    )
+    if (stored && parseInt(stored.count, 10) > 0) return
+
+    const { getActiveEmbeddingModelId } = await import('../lib/ai-provider.js')
+    const currentModelId = await getActiveEmbeddingModelId()
+
+    logger.info({ userId, mediaType }, 'Profile is fresh but has no taste clusters, backfilling')
+    await refreshTasteClusters(userId, mediaType, currentModelId || undefined)
+  } catch (err) {
+    logger.warn({ err, userId, mediaType }, 'Failed to backfill missing taste clusters')
   }
 }
 
