@@ -75,9 +75,25 @@ export const MIN_ITEMS_PER_CLUSTER_HARD_FLOOR = 5
  */
 export const MIN_MARGINAL_DISPERSION_REDUCTION = 0.4
 
-/** Same cut points as lib/tasteAnalyzer.ts's calculateTasteDiversity -- reported for diagnostics, not used to pick K (see MIN_DISPERSION_REDUCTION). */
+/**
+ * Cut points for labelling a dispersion score. Reported for diagnostics, not
+ * used to pick K (see MIN_MARGINAL_DISPERSION_REDUCTION). lib/tasteAnalyzer.ts
+ * imports these rather than repeating the literals, and getSmartDiversityWeight
+ * keys its ×0.7 / ×1.2 adjustments off the same two numbers.
+ */
 export const DISPERSION_FOCUSED_THRESHOLD = 0.3
 export const DISPERSION_ECLECTIC_THRESHOLD = 0.6
+
+/**
+ * Label a dispersion score. Kept beside the cut points so the bands and the
+ * words describing them can't drift apart -- this module is a pure leaf with
+ * no imports of its own, so anything may depend on it.
+ */
+export function describeDispersion(score: number): 'focused' | 'balanced' | 'eclectic' {
+  if (score < DISPERSION_FOCUSED_THRESHOLD) return 'focused'
+  if (score < DISPERSION_ECLECTIC_THRESHOLD) return 'balanced'
+  return 'eclectic'
+}
 
 // ============================================================================
 // Vector primitives

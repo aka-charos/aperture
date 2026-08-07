@@ -492,6 +492,43 @@ export async function getUserTasteClusters(userId: string, mediaType: MediaType)
 }
 
 /**
+ * The user's stored taste-dispersion score in [0,1], or null if they have no
+ * clusters yet.
+ *
+ * This is the number clustering already computed to decide K (clustering.ts
+ * chooseK), persisted by storeTasteClusters -- one value per build, replicated
+ * onto every cluster row, so any row answers. Reading it here is what lets
+ * lib/tasteAnalyzer.ts and getSmartDiversityWeight stop recomputing the same
+ * quantity from scratch: they were running a 100-row embedding scan per call
+ * to derive a number already sitting in a column, with the same normalization
+ * and the same 0.3/0.6 cut points written out twice.
+ *
+ * Deliberately a plain read with no fallback -- callers decide what to do with
+ * null, since the only sensible fallback (recomputing) is exactly what each of
+ * them already has.
+ */
+export async function getTasteDispersion(
+  userId: string,
+  mediaType: MediaType
+): Promise<number | null> {
+  try {
+    const row = await queryOne<{ dispersion: string | null }>(
+      `SELECT dispersion FROM user_taste_clusters
+        WHERE user_id = $1 AND media_type = $2 AND dispersion IS NOT NULL
+        LIMIT 1`,
+      [userId, mediaType]
+    )
+    if (!row?.dispersion) return null
+
+    const dispersion = parseFloat(row.dispersion)
+    return Number.isFinite(dispersion) ? dispersion : null
+  } catch (err) {
+    logger.warn({ err, userId, mediaType }, 'Failed to read stored taste dispersion')
+    return null
+  }
+}
+
+/**
  * Atomically replace a user's taste clusters (delete+insert in one
  * transaction, mirroring the "full replace" semantics `storeTasteProfile`
  * already uses for the single centroid) so a concurrent read never observes

@@ -1087,6 +1087,7 @@ export {
   // Taste clusters (multi-centroid)
   getUserTasteClusters,
   storeTasteClusters,
+  getTasteDispersion,
   type TasteCluster,
   // Franchise preferences
   getUserFranchisePreferences,
