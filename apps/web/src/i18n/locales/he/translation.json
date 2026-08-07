@@ -1657,7 +1657,9 @@
     "seriesEpisodesLabel": "סדרות / פרקים",
     "avgRating": "ממוצע דֵרוּג",
     "favoriteEra": "עידן אהוב",
-    "topGenres": "ז'אנרים מובילים"
+    "topGenres": "ז'אנרים מובילים",
+    "errSaveInterest": "Couldn't save that interest",
+    "errRemoveInterest": "Couldn't remove that interest"
   },
   "algorithmSettings": {
     "weightSimilarity": "דִמיוֹן",
@@ -4343,7 +4345,9 @@
     "artworkLogo": "Logo:",
     "artworkFavicon": "Favicon:",
     "artworkFound": "using {{file}}",
-    "artworkBundled": "using the bundled artwork"
+    "artworkBundled": "using the bundled artwork",
+    "artworkStep1": "These are set by mounting a folder — there is nothing to upload here. Add the volume to your compose file, then apply it with docker compose up -d (adding a volume needs the container recreated):",
+    "artworkStep2": "Then put your artwork in that folder on the host, using these names. .png and .webp work too, plus .ico for the favicon. Replacing a file later takes effect on the next page load, with no restart:"
   },
   "settingsThemeColors": {
     "title": "Brand colors",

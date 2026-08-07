@@ -956,10 +956,19 @@ export const addCustomInterestSchema = {
     type: 'object' as const,
     additionalProperties: true,
     properties: {
-      description: { type: 'string' as const, description: 'Interest description' },
+      // Must stay `interestText`: that is what the client posts and what the
+      // handler reads. This said `description` (a field nothing sends and
+      // nothing reads) and marked it required, so Fastify rejected every add
+      // with a 400 before the handler ever ran.
+      interestText: {
+        type: 'string' as const,
+        minLength: 1,
+        maxLength: 500,
+        description: 'Interest text, e.g. "Time travel stories"',
+      },
       weight: { type: 'number' as const, minimum: 0, maximum: 1, description: 'Interest weight' },
     },
-    required: ['description'] as string[],
+    required: ['interestText'] as string[],
   },
 }
 
