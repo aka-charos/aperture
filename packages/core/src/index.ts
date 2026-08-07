@@ -1093,11 +1093,14 @@ export {
   setFranchisePreference,
   bulkUpdateFranchisePreferences,
   getFranchiseAffinity,
+  getFranchiseAffinityMap,
   // Genre weights
   getUserGenreWeights,
   setGenreWeight,
   bulkUpdateGenreWeights,
   getGenreAffinity,
+  buildGenreWeightMap,
+  genreAffinityFromWeights,
   // Custom interests
   getUserCustomInterests,
   addCustomInterest,
@@ -1130,6 +1133,7 @@ export {
   detectFranchiseFromTitle,
   detectAndUpdateFranchises,
   getItemFranchise,
+  getItemFranchises,
   // Genre detection
   detectAndUpdateGenres,
 } from './taste-profile/franchise.js'

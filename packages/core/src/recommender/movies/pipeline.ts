@@ -38,12 +38,14 @@ import {
   getUserTasteProfile,
   storeTasteProfile as storeNewTasteProfile,
   getUserTasteClusters,
-  getFranchiseAffinity,
-  getGenreAffinity,
+  getFranchiseAffinityMap,
+  getUserGenreWeights,
+  buildGenreWeightMap,
+  genreAffinityFromWeights,
   getUserCustomInterests,
   detectAndUpdateFranchises,
 } from '../../taste-profile/index.js'
-import { getItemFranchise } from '../../taste-profile/franchise.js'
+import { getItemFranchises } from '../../taste-profile/franchise.js'
 import {
   applyPreferenceAdjustment,
   computeReservedInterestSlots,
@@ -313,13 +315,31 @@ export async function generateRecommendationsForUser(
       logger.warn({ err, userId: user.id }, 'Custom interest matching failed, continuing without it')
     }
 
+    // Franchise and genre preferences are resolved up front rather than inside
+    // the loop. Asking per candidate meant 2-3 sequential round trips for every
+    // item in the library -- ~29k per user at a 12.5k-title library, and
+    // getGenreAffinity re-issued the byte-identical `WHERE user_id = $1` query
+    // every single iteration to get back the same handful of rows. Three
+    // queries now, and the loop below is pure CPU.
+    const [candidateFranchises, franchiseAffinities, genreWeights] = await Promise.all([
+      getItemFranchises(
+        scoredCandidates.map((candidate) => candidate.id),
+        'movie'
+      ),
+      getFranchiseAffinityMap(user.id, 'movie'),
+      getUserGenreWeights(user.id),
+    ])
+    const genreWeightMap = buildGenreWeightMap(genreWeights)
+
     for (const candidate of scoredCandidates) {
       // Franchise affinity: 0 (avoid) - 0.5 (neutral) - 1 (loved)
-      const franchiseName = await getItemFranchise(candidate.id, 'movie')
-      const franchiseAffinity = await getFranchiseAffinity(user.id, franchiseName, 'movie')
+      const franchiseName = candidateFranchises.get(candidate.id) ?? null
+      const franchiseAffinity = franchiseName
+        ? franchiseAffinities.get(franchiseName) ?? 0.5
+        : 0.5
 
       // Genre affinity: 0 (avoid) - 0.5 (neutral) - 1 (loved)
-      const genreAffinity = await getGenreAffinity(user.id, candidate.genres || [])
+      const genreAffinity = genreAffinityFromWeights(genreWeightMap, candidate.genres || [])
 
       // Custom interest affinity: 0.5 (no match) - 1 (strong match)
       const interestAffinity = interestIndex?.best.get(candidate.id)?.affinity ?? 0.5
