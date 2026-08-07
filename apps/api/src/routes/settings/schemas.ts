@@ -942,12 +942,6 @@ export const deleteFranchisePreferenceSchema = {
 // Custom Interest Schemas
 // =============================================================================
 
-export const customInterestsSchema = {
-  tags: ['settings'],
-  summary: 'Get custom interests',
-  description: 'Get user custom interests for recommendation personalization.',
-}
-
 export const addCustomInterestSchema = {
   tags: ['settings'],
   summary: 'Add custom interest',
@@ -969,27 +963,6 @@ export const addCustomInterestSchema = {
       weight: { type: 'number' as const, minimum: 0, maximum: 1, description: 'Interest weight' },
     },
     required: ['interestText'] as string[],
-  },
-}
-
-export const updateCustomInterestSchema = {
-  tags: ['settings'],
-  summary: 'Update custom interest',
-  description: 'Update a custom interest.',
-  params: {
-    type: 'object' as const,
-    properties: {
-      id: { type: 'string' as const, format: 'uuid' },
-    },
-    required: ['id'] as string[],
-  },
-  body: {
-    type: 'object' as const,
-    additionalProperties: true,
-    properties: {
-      description: { type: 'string' as const },
-      weight: { type: 'number' as const, minimum: 0, maximum: 1 },
-    },
   },
 }
 
