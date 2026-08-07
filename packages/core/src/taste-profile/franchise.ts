@@ -756,6 +756,59 @@ export async function getItemFranchise(
   }
 }
 
+/**
+ * How many ids to resolve per query. Only there so a large library can't turn
+ * the id array into a multi-megabyte bind parameter -- maxCandidates defaults
+ * to 50000, and the recommendation pipelines pass their whole candidate set.
+ */
+const FRANCHISE_LOOKUP_CHUNK = 10000
+
+/**
+ * Batch form of getItemFranchise: one query per 10k ids instead of one query
+ * per id.
+ *
+ * The recommendation pipelines resolve a franchise for every candidate they
+ * score -- 12k+ per user on a typical library -- and were paying a sequential
+ * round trip for each one. Same resolution rule (collection_name first, then
+ * the title patterns), so results are identical to calling getItemFranchise in
+ * a loop.
+ *
+ * Ids with no matching row are absent from the map rather than mapped to null,
+ * so callers should read `map.get(id) ?? null` to match getItemFranchise's
+ * null-for-missing return.
+ */
+export async function getItemFranchises(
+  itemIds: string[],
+  mediaType: MediaType
+): Promise<Map<string, string | null>> {
+  const franchises = new Map<string, string | null>()
+  if (itemIds.length === 0) return franchises
+
+  for (let i = 0; i < itemIds.length; i += FRANCHISE_LOOKUP_CHUNK) {
+    const chunk = itemIds.slice(i, i + FRANCHISE_LOOKUP_CHUNK)
+
+    if (mediaType === 'movie') {
+      const result = await query<{ id: string; collection_name: string | null; title: string }>(
+        `SELECT id, collection_name, title FROM movies WHERE id = ANY($1)`,
+        [chunk]
+      )
+      for (const row of result.rows) {
+        franchises.set(row.id, row.collection_name || detectFranchiseFromTitle(row.title))
+      }
+    } else {
+      const result = await query<{ id: string; title: string }>(
+        `SELECT id, title FROM series WHERE id = ANY($1)`,
+        [chunk]
+      )
+      for (const row of result.rows) {
+        franchises.set(row.id, detectFranchiseFromTitle(row.title))
+      }
+    }
+  }
+
+  return franchises
+}
+
 // ============================================================================
 // Genre Detection and Weight Calculation
 // ============================================================================

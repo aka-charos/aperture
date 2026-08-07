@@ -27,8 +27,9 @@ export * from './types.js'
 export { 
   detectAndUpdateFranchises, 
   detectAndUpdateGenres, 
-  detectFranchiseFromTitle, 
+  detectFranchiseFromTitle,
   getItemFranchise,
+  getItemFranchises,
   type DetectionResult,
   type DetectionOptions,
 } from './franchise.js'
@@ -931,10 +932,51 @@ export async function getFranchiseAffinity(
 
   if (!pref) return 0.5
 
-  // preference_score is stored clamped to -1..1 (see setFranchisePreference)
-  // -1 = avoid, 0 = neutral, 1 = loved
-  const score = parseFloat(pref.preference_score)
+  return franchiseAffinityFromScore(parseFloat(pref.preference_score))
+}
+
+/**
+ * preference_score is stored clamped to -1..1 (see setFranchisePreference):
+ * -1 = avoid, 0 = neutral, 1 = loved. Shared by getFranchiseAffinity and
+ * getFranchiseAffinityMap so the single-row and bulk paths can't drift.
+ */
+function franchiseAffinityFromScore(score: number): number {
   return 0.5 + score * 0.5
+}
+
+/**
+ * Every franchise affinity a user has, keyed by franchise name, in one query.
+ *
+ * The recommendation pipelines need an affinity for each of ~12k candidates
+ * per run; asking per candidate meant a sequential round trip each time even
+ * though the answer set is small and fixed for the whole run. Franchises the
+ * user has no row for are absent, so callers read `map.get(name) ?? 0.5` --
+ * the same neutral default getFranchiseAffinity returns.
+ *
+ * A franchise can carry both a media-type-specific row and a 'both' row
+ * (UNIQUE is on user_id + franchise_name + media_type, migration 0085). The
+ * specific row wins here. getFranchiseAffinity's single-row query has no
+ * ORDER BY, so which of the two it saw was up to Postgres.
+ */
+export async function getFranchiseAffinityMap(
+  userId: string,
+  mediaType: MediaType
+): Promise<Map<string, number>> {
+  const result = await query<{ franchise_name: string; preference_score: string }>(
+    `SELECT franchise_name, preference_score
+       FROM user_franchise_preferences
+      WHERE user_id = $1 AND (media_type = $2 OR media_type = 'both')
+      -- 'both' rows first, so a media-type-specific row overwrites them below
+      ORDER BY (media_type = 'both') DESC`,
+    [userId, mediaType]
+  )
+
+  const affinities = new Map<string, number>()
+  for (const row of result.rows) {
+    affinities.set(row.franchise_name, franchiseAffinityFromScore(parseFloat(row.preference_score)))
+  }
+
+  return affinities
 }
 
 /**
@@ -945,7 +987,30 @@ export async function getGenreAffinity(userId: string, genres: string[]): Promis
   if (genres.length === 0) return 0.5
 
   const weights = await getUserGenreWeights(userId)
-  const weightMap = new Map(weights.map((w) => [w.genre.toLowerCase(), w.weight]))
+  return genreAffinityFromWeights(buildGenreWeightMap(weights), genres)
+}
+
+/**
+ * Index a user's genre weights for repeated lookup. Split out with
+ * genreAffinityFromWeights so the recommendation pipelines can fetch the
+ * weights once per run: getGenreAffinity was being called once per candidate,
+ * which meant issuing the byte-identical `WHERE user_id = $1` query 12k+ times
+ * per user to get back the same rows every time.
+ */
+export function buildGenreWeightMap(weights: GenreWeight[]): Map<string, number> {
+  return new Map(weights.map((w) => [w.genre.toLowerCase(), w.weight]))
+}
+
+/**
+ * The genre-affinity math with the fetch lifted out: 0 (avoid) - 0.5 (neutral,
+ * or no weights set) - 1 (loved). Both the per-call and per-run paths go
+ * through this, so they cannot drift.
+ */
+export function genreAffinityFromWeights(
+  weightMap: Map<string, number>,
+  genres: string[]
+): number {
+  if (genres.length === 0) return 0.5
 
   let totalWeight = 0
   let count = 0
