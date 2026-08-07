@@ -63,6 +63,10 @@ export async function storeCandidates(
         novelty: c.novelty,
         rating: c.ratingScore,
         diversity: c.diversityScore,
+        // The diversity-blended number the selector actually ranked by. Kept
+        // out of final_score so that column stays one comparable scale for
+        // every row; present only on selected candidates.
+        ...(c.selectionScore !== undefined ? { selectionScore: c.selectionScore } : {}),
         ...(interestPick
           ? {
               interestMatch: {
