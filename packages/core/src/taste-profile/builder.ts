@@ -18,8 +18,10 @@ import {
   chooseK,
   clusterTasteEmbeddings,
   MAX_CLUSTERING_INPUT_ITEMS,
+  MIN_MARGINAL_DISPERSION_REDUCTION,
   type WeightedEmbeddingItem,
   type ClusterCentroid,
+  type ClusterAttempt,
 } from './clustering.js'
 
 const logger = createChildLogger('taste-profile-builder')
@@ -163,9 +165,17 @@ export async function buildTasteClusters(
   // a plain prefix; the full allItems is what the K=1 path below uses.
   const cappedItems = allItems.slice(0, MAX_CLUSTERING_INPUT_ITEMS)
 
-  const { k, dispersion } = chooseK(cappedItems)
+  const { k, dispersion, rawDispersion } = chooseK(cappedItems)
 
-  let clusters = k <= 1 ? clusterTasteEmbeddings(allItems, 1) : clusterTasteEmbeddings(cappedItems, k)
+  // Collects what each attempted K decided and why, so the constants gating
+  // those decisions can be calibrated from real watch histories instead of the
+  // synthetic fixtures they were set against. See the diagnostics log below.
+  const attempts: ClusterAttempt[] = []
+
+  let clusters =
+    k <= 1
+      ? clusterTasteEmbeddings(allItems, 1, attempts)
+      : clusterTasteEmbeddings(cappedItems, k, attempts)
 
   // Whenever exactly one cluster survives -- whether chooseK decided K=1 up
   // front, or a hard-floor step-down collapsed a larger K back down -- the
@@ -190,6 +200,38 @@ export async function buildTasteClusters(
       itemCounts: clusters.map((c) => c.itemCount),
     },
     'Successfully built taste clusters'
+  )
+
+  // One line per profile carrying every number behind the K decision. Emitted
+  // separately from the line above so it can be grepped on its own, and at info
+  // rather than debug because it exists to be collected from a live instance:
+  // both MIN_MARGINAL_DISPERSION_REDUCTION and the 0.3-0.8 window
+  // calculateWeightedDispersion rescales from were set against synthetic data,
+  // and the first real instance produced K=1 and a normalized dispersion of
+  // exactly 0.000 for every profile. rawDispersion is the unscaled measurement;
+  // attempts[].reduction is what each K actually achieved against the 0.4 bar.
+  logger.info(
+    {
+      userId,
+      mediaType,
+      itemsTotal: allItems.length,
+      itemsClustered: cappedItems.length,
+      desiredK: k,
+      finalClusterCount: clusters.length,
+      rawDispersion: Number(rawDispersion.toFixed(4)),
+      normalizedDispersion: Number(dispersion.toFixed(4)),
+      minReductionRequired: MIN_MARGINAL_DISPERSION_REDUCTION,
+      attempts: attempts.map((a) => ({
+        k: a.k,
+        prev: Number(a.previousDistance.toFixed(4)),
+        split: Number(a.splitDistance.toFixed(4)),
+        reduction: Number(a.reduction.toFixed(4)),
+        smallest: a.smallestCluster,
+        kept: a.kept,
+        rejectedFor: a.rejectedFor ?? null,
+      })),
+    },
+    'CLUSTER-DIAG'
   )
 
   return { clusters, dispersion }

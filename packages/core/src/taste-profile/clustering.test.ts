@@ -9,6 +9,7 @@ import {
   DISPERSION_FOCUSED_THRESHOLD,
   DISPERSION_ECLECTIC_THRESHOLD,
   type WeightedEmbeddingItem,
+  type ClusterAttempt,
 } from './clustering.js'
 
 // ============================================================================
@@ -383,7 +384,7 @@ test('no multi-cluster result is ever below the hard floor, across many fixtures
 // ============================================================================
 
 test('chooseK returns 1 for an empty list', () => {
-  assert.deepEqual(chooseK([]), { k: 1, dispersion: 0 })
+  assert.deepEqual(chooseK([]), { k: 1, dispersion: 0, rawDispersion: 0 })
 })
 
 test('chooseK gates the attempted K purely on item count', () => {
@@ -629,4 +630,115 @@ test('fuzz: cluster counts stay consistent with the requested K across random in
       items.length
     )
   }
+})
+
+// ============================================================================
+// 8. Diagnostics: the trace must be faithful, and must not perturb anything
+// ============================================================================
+
+test('passing a trace does not change the clustering result', () => {
+  const rng = makeRng(4242)
+  const fixtures: WeightedEmbeddingItem[][] = [
+    bimodalFixture(makeRng(1), 30),
+    coherentTasteFixture(makeRng(2), 60, 1.2),
+    correlatedBimodalFixture(makeRng(3), 30, 0.6),
+    Array.from({ length: 50 }, (_, i) => ({
+      id: `r-${i}`,
+      weight: 0.5 + rng() * 2,
+      embedding: Array.from({ length: 6 }, () => (rng() - 0.5) * 3),
+    })),
+  ]
+
+  for (const items of fixtures) {
+    const { k } = chooseK(items)
+    const withoutTrace = clusterTasteEmbeddings(items, k)
+    const withTrace = clusterTasteEmbeddings(items, k, [])
+    assert.deepEqual(withTrace, withoutTrace, 'the diagnostic trace changed the outcome')
+  }
+})
+
+test('a kept split is recorded with the reduction that earned it', () => {
+  const items = bimodalFixture(makeRng(777), 40)
+  const trace: ClusterAttempt[] = []
+  const clusters = clusterTasteEmbeddings(items, chooseK(items).k, trace)
+
+  assert.ok(clusters.length > 1, 'fixture should split -- test needs a new fixture otherwise')
+
+  const kept = trace.filter((a) => a.kept)
+  assert.ok(kept.length > 0, 'a split happened but nothing was recorded as kept')
+  for (const attempt of kept) {
+    assert.ok(
+      attempt.reduction >= MIN_MARGINAL_DISPERSION_REDUCTION,
+      `kept k=${attempt.k} at reduction ${attempt.reduction}, below the bar`
+    )
+    assert.equal(attempt.rejectedFor, undefined)
+    assert.ok(attempt.splitDistance <= attempt.previousDistance)
+    assert.ok(attempt.smallestCluster >= MIN_ITEMS_PER_CLUSTER_HARD_FLOOR)
+  }
+  assert.equal(clusters.length, Math.max(...kept.map((a) => a.k)))
+})
+
+test('a rejected split records why, and how close it came', () => {
+  // A single coherent taste: must stay at K=1, and the trace has to say the
+  // reduction was the reason. This is the shape every real profile currently
+  // produces, so it is the case the recorded number exists to quantify.
+  const items = coherentTasteFixture(makeRng(31337), 90, 1.0)
+  const trace: ClusterAttempt[] = []
+  const clusters = clusterTasteEmbeddings(items, chooseK(items).k, trace)
+
+  assert.equal(clusters.length, 1)
+  assert.ok(trace.length > 0, 'attempted splits must be recorded even when all are rejected')
+
+  for (const attempt of trace) {
+    assert.equal(attempt.kept, false)
+    assert.ok(attempt.rejectedFor, `k=${attempt.k} rejected with no reason recorded`)
+    if (attempt.rejectedFor === 'insufficient-reduction') {
+      assert.ok(
+        attempt.reduction < MIN_MARGINAL_DISPERSION_REDUCTION,
+        'recorded a reduction that clears the bar but was rejected for missing it'
+      )
+      // The whole point of collecting this: it must be a real measurement, not
+      // a placeholder, or it can't be used to recalibrate the threshold.
+      assert.ok(Number.isFinite(attempt.reduction))
+      assert.ok(attempt.previousDistance > 0)
+    }
+  }
+})
+
+test('every attempted K appears in the trace exactly once', () => {
+  const items = coherentTasteFixture(makeRng(2024), 120, 1.5)
+  const { k } = chooseK(items)
+  assert.ok(k > 1, 'fixture should be large enough to attempt a split')
+
+  const trace: ClusterAttempt[] = []
+  clusterTasteEmbeddings(items, k, trace)
+
+  const ks = trace.map((a) => a.k).sort((a, b) => a - b)
+  assert.deepEqual(ks, Array.from({ length: k - 1 }, (_, i) => i + 2))
+})
+
+test('chooseK reports the raw measurement alongside the rescaled one', () => {
+  for (const items of [
+    bimodalFixture(makeRng(11), 30),
+    coherentTasteFixture(makeRng(12), 60, 0.4),
+    coherentTasteFixture(makeRng(13), 60, 4.0),
+  ]) {
+    const { dispersion, rawDispersion } = chooseK(items)
+
+    // Raw is an unclamped cosine distance; normalized is that mapped from
+    // [FOCUSED, FOCUSED+0.5] onto [0,1]. Everything below the floor collapses
+    // to 0, which is exactly the behavior under review -- so the raw value has
+    // to survive independently.
+    assert.ok(rawDispersion >= 0 && rawDispersion <= 2, `raw out of range: ${rawDispersion}`)
+    assert.ok(dispersion >= 0 && dispersion <= 1)
+    assert.ok(
+      Math.abs(
+        dispersion -
+          Math.min(1, Math.max(0, (rawDispersion - DISPERSION_FOCUSED_THRESHOLD) / 0.5))
+      ) < 1e-12,
+      'normalized dispersion is no longer derivable from the raw measurement'
+    )
+  }
+
+  assert.deepEqual(chooseK([]), { k: 1, dispersion: 0, rawDispersion: 0 })
 })
