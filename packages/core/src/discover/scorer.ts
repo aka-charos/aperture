@@ -8,23 +8,80 @@ import { createChildLogger } from '../lib/logger.js'
 import { query, queryOne } from '../lib/db.js'
 import { getActiveEmbeddingTableName } from '../lib/ai-provider.js'
 import type { MediaType, RawCandidate, ScoredCandidate, DiscoveryConfig } from './types.js'
-import { getUserFranchisePreferences } from '../taste-profile/index.js'
+import { getUserFranchisePreferences, getUserTasteClusters } from '../taste-profile/index.js'
 import { detectFranchiseFromTitle } from '../taste-profile/franchise.js'
 import { applyPreferenceAdjustment } from '../recommender/shared/index.js'
 
 const logger = createChildLogger('discover:scorer')
 
 /**
- * Get user's taste embedding for comparison
+ * The vectors a discovery candidate gets scored against: the user's taste
+ * clusters when they have them, otherwise the single averaged vector this used
+ * to be limited to.
+ *
+ * That average is the "semantic middle" problem multi-centroid profiles exist
+ * to fix -- someone who loves both horror and rom-coms averages into a vector
+ * that matches neither well -- and discovery is the surface that decides what
+ * gets requested from Seerr, so it was the worst place left to still be doing
+ * it. Note the legacy read is `user_preferences.taste_embedding`, a different
+ * table from `user_taste_profiles`, kept current by storeLegacyTasteProfile.
+ *
+ * getUserTasteClusters already discards clusters embedded with a model other
+ * than the active one, so a stale profile falls through to the legacy vector
+ * instead of silently cosine-ing to zero against every candidate.
  */
-async function getUserTasteEmbedding(userId: string, mediaType: MediaType): Promise<number[] | null> {
+async function getUserTasteVectors(userId: string, mediaType: MediaType): Promise<number[][]> {
+  try {
+    const clusters = await getUserTasteClusters(userId, mediaType)
+    if (clusters.length > 0) {
+      return clusters.map((cluster) => cluster.embedding)
+    }
+  } catch (err) {
+    logger.warn(
+      { err, userId, mediaType },
+      'Failed to load taste clusters, falling back to the averaged taste vector'
+    )
+  }
+
   const embeddingColumn = mediaType === 'movie' ? 'taste_embedding' : 'series_taste_embedding'
-  
+
   const result = await queryOne<{ embedding: number[] }>(
     `SELECT ${embeddingColumn} as embedding FROM user_preferences WHERE user_id = $1`,
     [userId]
   )
-  return result?.embedding ?? null
+  return result?.embedding ? [result.embedding] : []
+}
+
+/**
+ * Best cosine similarity between a candidate and any of the user's taste
+ * vectors, normalized from [-1,1] to [0,1]. Returns null when there is nothing
+ * comparable to score against.
+ *
+ * MAX -- not average, and not weighted by cluster weight -- mirroring
+ * mergeClusterCandidatesByMaxSimilarity and getCustomInterestAffinity: a
+ * candidate that strongly matches any one facet of someone's taste is a strong
+ * match, and averaging here would recreate the very dilution the clusters were
+ * built to avoid. Cluster weight decides how many candidates each facet
+ * contributes during retrieval; there is no allocation happening here.
+ */
+export function maxTasteSimilarity(
+  tasteVectors: number[][],
+  candidateEmbedding: number[]
+): number | null {
+  if (tasteVectors.length === 0 || candidateEmbedding.length === 0) return null
+
+  let best: number | null = null
+  for (const vector of tasteVectors) {
+    // Skip rather than score a dimension mismatch: cosineSimilarity returns 0
+    // for one, which would read as a genuine "no match" and could beat a real
+    // negative similarity from a usable vector.
+    if (vector.length !== candidateEmbedding.length) continue
+
+    const similarity = cosineSimilarity(vector, candidateEmbedding)
+    if (best === null || similarity > best) best = similarity
+  }
+
+  return best === null ? null : (best + 1) / 2
 }
 
 /**
@@ -112,9 +169,9 @@ export async function scoreCandidates(
 
   logger.info({ userId, mediaType, candidateCount: candidates.length }, 'Scoring candidates')
 
-  // Get user's taste embedding
-  const tasteEmbedding = await getUserTasteEmbedding(userId, mediaType)
-  
+  // Get the user's taste vectors (one per cluster, or the legacy average)
+  const tasteVectors = await getUserTasteVectors(userId, mediaType)
+
   // Get embeddings for candidates that are in our database
   const embeddingTable = await getActiveEmbeddingTableName(mediaType === 'movie' ? 'embeddings' : 'series_embeddings')
   const mediaTable = mediaType === 'movie' ? 'movies' : 'series'
@@ -124,7 +181,7 @@ export async function scoreCandidates(
   
   const embeddingMap = new Map<number, number[]>()
   
-  if (tasteEmbedding && tmdbIds.length > 0) {
+  if (tasteVectors.length > 0 && tmdbIds.length > 0) {
     try {
       const embeddingResult = await query<{ tmdb_id: string; embedding: number[] }>(
         `SELECT m.tmdb_id, e.embedding 
@@ -141,10 +198,11 @@ export async function scoreCandidates(
         }
       }
       
-      logger.debug({ 
-        mediaType, 
-        candidateCount: candidates.length, 
-        embeddingsFound: embeddingMap.size 
+      logger.debug({
+        mediaType,
+        candidateCount: candidates.length,
+        embeddingsFound: embeddingMap.size,
+        tasteVectors: tasteVectors.length,
       }, 'Loaded embeddings for candidates')
     } catch (err) {
       logger.warn({ err }, 'Failed to load embeddings for candidates')
@@ -163,13 +221,11 @@ export async function scoreCandidates(
 
   // Score each candidate
   const scoredCandidates: ScoredCandidate[] = candidates.map(candidate => {
-    // Calculate similarity score
+    // Calculate similarity score against the user's best-matching taste facet
     let similarityScore = 0.5 // Default if no embedding available
     const candidateEmbedding = embeddingMap.get(candidate.tmdbId)
-    if (tasteEmbedding && candidateEmbedding) {
-      similarityScore = cosineSimilarity(tasteEmbedding, candidateEmbedding)
-      // Normalize from [-1, 1] to [0, 1]
-      similarityScore = (similarityScore + 1) / 2
+    if (candidateEmbedding) {
+      similarityScore = maxTasteSimilarity(tasteVectors, candidateEmbedding) ?? 0.5
     }
 
     const popularityScore = calculatePopularityScore(candidate, candidates)
