@@ -9,6 +9,10 @@ import { query } from './db.js'
 import { createChildLogger } from './logger.js'
 import { getActiveEmbeddingTableName, getActiveEmbeddingModelId } from './ai-provider.js'
 import { getUserExcludedLibraries } from './libraryExclusions.js'
+import { getTasteDispersion } from '../taste-profile/index.js'
+// clustering.ts is a pure leaf (no imports of its own), so taking the cut
+// points and the labelling from it can't introduce a cycle.
+import { describeDispersion, DISPERSION_FOCUSED_THRESHOLD } from '../taste-profile/clustering.js'
 
 const logger = createChildLogger('taste-analyzer')
 
@@ -315,12 +319,23 @@ async function calculateTasteDiversity(
   mediaType: 'movie' | 'series',
   excludedLibraryIds: string[]
 ): Promise<TasteDiversity> {
-  // Calculate diversity based on embedding spread
-  // Use standard deviation of embeddings to measure how varied their taste is
+  // Prefer the dispersion the clustering pass already computed and stored:
+  // same [0,1] scale, same normalization, same cut points, but engagement-
+  // weighted rather than a flat sample, and it costs one indexed row instead
+  // of scanning 100 embeddings and averaging distances in Postgres. It is also
+  // the number that decided how many taste clusters the user got, so the K
+  // choice and this description now cite the same evidence instead of two
+  // independent estimates that were free to disagree.
+  const storedDispersion = await getTasteDispersion(userId, mediaType)
+  if (storedDispersion !== null) {
+    return { score: storedDispersion, description: describeDispersion(storedDispersion) }
+  }
 
+  // No clusters yet (pre-rebuild, or a profile that failed to cluster) --
+  // fall back to computing it here, exactly as before.
   const modelId = await getActiveEmbeddingModelId()
   if (!modelId) {
-    return { score: 0.5, description: 'balanced' }
+    return { score: 0.5, description: describeDispersion(0.5) }
   }
 
   let avgDistance: number
@@ -377,19 +392,15 @@ async function calculateTasteDiversity(
     avgDistance = parseFloat(result.rows[0]?.avg_distance || '0.5')
   }
 
-  // Normalize to 0-1 scale (typical distances are 0.3-0.8)
-  const normalizedScore = Math.min(1, Math.max(0, (avgDistance - 0.3) / 0.5))
+  // Normalize to 0-1 scale (typical distances are 0.3-0.8). Same formula
+  // clustering.ts applies to its own dispersion, so the fallback above and the
+  // stored value are on one scale.
+  const normalizedScore = Math.min(
+    1,
+    Math.max(0, (avgDistance - DISPERSION_FOCUSED_THRESHOLD) / 0.5)
+  )
 
-  let description: string
-  if (normalizedScore < 0.3) {
-    description = 'focused'
-  } else if (normalizedScore < 0.6) {
-    description = 'balanced'
-  } else {
-    description = 'eclectic'
-  }
-
-  return { score: normalizedScore, description }
+  return { score: normalizedScore, description: describeDispersion(normalizedScore) }
 }
 
 function inferThemesFromGenres(genres: GenreDistribution[]): ThemeAffinity[] {

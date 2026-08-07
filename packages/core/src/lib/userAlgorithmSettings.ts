@@ -9,6 +9,13 @@ import { createChildLogger } from './logger.js'
 import { query, queryOne } from './db.js'
 import { getRecommendationConfig } from './recommendationConfig.js'
 import type { PipelineConfig } from '../recommender/types.js'
+// Pure leaf module, safe to import statically -- these are the same cut points
+// tasteAnalyzer labels dispersion with, so "focused"/"eclectic" in a prompt and
+// the diversity nudge here can't disagree about where the bands are.
+import {
+  DISPERSION_FOCUSED_THRESHOLD,
+  DISPERSION_ECLECTIC_THRESHOLD,
+} from '../taste-profile/clustering.js'
 
 const logger = createChildLogger('user-algorithm-settings')
 
@@ -281,24 +288,32 @@ export async function getSmartDiversityWeight(
       }
     }
 
-    // Get user's taste diversity score
-    const { analyzeMovieTaste, analyzeSeriesTaste } = await import('./tasteAnalyzer.js')
-    const analysis = mediaType === 'movie' 
-      ? await analyzeMovieTaste(userId)
-      : await analyzeSeriesTaste(userId)
+    // Get the user's taste dispersion. The stored cluster dispersion is the
+    // same [0,1] score analyzeMovieTaste would report, so read it directly:
+    // going through the full analysis meant four queries per user per
+    // recommendation run (genres, decades, viewing patterns, and a 100-row
+    // embedding scan) to use exactly one field of the result.
+    const { getTasteDispersion } = await import('../taste-profile/index.js')
+    let diversityScore = await getTasteDispersion(userId, mediaType)
 
-    const diversityScore = analysis.diversity.score
+    if (diversityScore === null) {
+      // No clusters yet -- fall back to computing it the long way.
+      const { analyzeMovieTaste, analyzeSeriesTaste } = await import('./tasteAnalyzer.js')
+      const analysis =
+        mediaType === 'movie' ? await analyzeMovieTaste(userId) : await analyzeSeriesTaste(userId)
+      diversityScore = analysis.diversity.score
+    }
 
     let adjustedWeight = baseDiversityWeight
 
-    if (diversityScore < 0.3) {
+    if (diversityScore < DISPERSION_FOCUSED_THRESHOLD) {
       // Focused taste - reduce diversity (they know what they like)
       adjustedWeight = baseDiversityWeight * 0.7
       logger.debug(
         { userId, mediaType, diversityScore, adjustment: 'reduced' },
         'Applied focused taste diversity adjustment'
       )
-    } else if (diversityScore > 0.6) {
+    } else if (diversityScore > DISPERSION_ECLECTIC_THRESHOLD) {
       // Eclectic taste - increase diversity (they enjoy variety)
       adjustedWeight = baseDiversityWeight * 1.2
       logger.debug(
