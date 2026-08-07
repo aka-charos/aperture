@@ -76,6 +76,32 @@ export const MIN_ITEMS_PER_CLUSTER_HARD_FLOOR = 5
 export const MIN_MARGINAL_DISPERSION_REDUCTION = 0.4
 
 /**
+ * What one attempted K decided, and why. Purely diagnostic: clusterTasteEmbeddings
+ * fills a caller-supplied array so the numbers behind a K choice can be logged
+ * without this module taking a logger dependency -- it has no imports at all,
+ * which is what lets lib/tasteAnalyzer.ts and lib/userAlgorithmSettings.ts
+ * import from it with no risk of a cycle.
+ *
+ * Recorded because 0.4 above was calibrated on synthetic fixtures and the first
+ * real instance produced K=1 for all 13 profiles. Whether that is correct or
+ * the threshold is simply too high is not answerable without seeing the
+ * reductions real watch histories actually achieve.
+ */
+export interface ClusterAttempt {
+  k: number
+  /** Weighted mean cosine distance to the nearest of the K-1 centroids. */
+  previousDistance: number
+  /** The same measure for the K centroids just fitted. */
+  splitDistance: number
+  /** (previous - split) / previous, i.e. what MIN_MARGINAL_DISPERSION_REDUCTION gates. */
+  reduction: number
+  /** Members in the smallest fitted cluster, against MIN_ITEMS_PER_CLUSTER_HARD_FLOOR. */
+  smallestCluster: number
+  kept: boolean
+  rejectedFor?: 'kmeans-failed' | 'cluster-too-small' | 'insufficient-reduction'
+}
+
+/**
  * Cut points for labelling a dispersion score. Reported for diagnostics, not
  * used to pick K (see MIN_MARGINAL_DISPERSION_REDUCTION). lib/tasteAnalyzer.ts
  * imports these rather than repeating the literals, and getSmartDiversityWeight
@@ -194,13 +220,34 @@ function avgDistanceToNearestCentroid(
  * reduction a split actually achieves, not by this score. See
  * MIN_DISPERSION_REDUCTION for why.
  */
-function calculateWeightedDispersion(items: WeightedEmbeddingItem[]): number {
+function normalizeDispersion(rawDispersion: number): number {
+  // Typical cosine distances in this embedding space were assumed to run
+  // ~0.3-0.8 (the window tasteAnalyzer.ts calibrated against) -- rescale to
+  // 0-1. That assumption is under review: see calculateRawDispersion.
+  return Math.min(1, Math.max(0, (rawDispersion - DISPERSION_FOCUSED_THRESHOLD) / 0.5))
+}
+
+/**
+ * The dispersion measurement before any rescaling: weighted mean cosine
+ * distance from each item to the single overall centroid.
+ *
+ * Split out because the rescaling above looks wrong against real data. Every
+ * profile on the first instance to run this reported a normalized dispersion of
+ * exactly 0.000, which is what happens when the raw value never reaches the
+ * 0.3 floor of the range it is being mapped from -- and the note on
+ * MIN_MARGINAL_DISPERSION_REDUCTION already observed that distance-to-centroid
+ * saturates near 0.293 even for two perfectly orthogonal facets. Reporting the
+ * raw number is how we find the range this embedding space actually occupies
+ * instead of guessing a replacement.
+ *
+ * Nothing keys off this yet -- K is chosen from the relative reduction a split
+ * achieves (see clusterTasteEmbeddings), which is scale-free and therefore
+ * unaffected either way.
+ */
+export function calculateRawDispersion(items: WeightedEmbeddingItem[]): number {
   const centroid = weightedMeanEmbedding(items)
   if (!centroid) return 0
-  const avgDistance = avgDistanceToNearestCentroid(items, [centroid])
-  // Typical cosine distances in this embedding space run ~0.3-0.8 (same
-  // empirical window tasteAnalyzer.ts calibrated against) -- rescale to 0-1.
-  return Math.min(1, Math.max(0, (avgDistance - DISPERSION_FOCUSED_THRESHOLD) / 0.5))
+  return avgDistanceToNearestCentroid(items, [centroid])
 }
 
 /**
@@ -215,17 +262,22 @@ function calculateWeightedDispersion(items: WeightedEmbeddingItem[]): number {
  * within-cluster dispersion (MIN_DISPERSION_REDUCTION), stepping down toward
  * K=1 otherwise. So this returning 3 means "try up to 3", not "use 3".
  */
-export function chooseK(items: WeightedEmbeddingItem[]): { k: number; dispersion: number } {
-  if (items.length === 0) return { k: 1, dispersion: 0 }
+export function chooseK(items: WeightedEmbeddingItem[]): {
+  k: number
+  dispersion: number
+  rawDispersion: number
+} {
+  if (items.length === 0) return { k: 1, dispersion: 0, rawDispersion: 0 }
 
-  const dispersion = calculateWeightedDispersion(items)
+  const rawDispersion = calculateRawDispersion(items)
+  const dispersion = normalizeDispersion(rawDispersion)
 
   let desiredK = MAX_K
   while (desiredK > 1 && items.length < desiredK * MIN_ITEMS_PER_CLUSTER_SOFT_TARGET) {
     desiredK -= 1
   }
 
-  return { k: desiredK, dispersion }
+  return { k: desiredK, dispersion, rawDispersion }
 }
 
 // ============================================================================
@@ -411,7 +463,11 @@ function buildSingleCluster(items: WeightedEmbeddingItem[]): ClusterCentroid[] {
  * MIN_ITEMS_PER_CLUSTER_HARD_FLOOR, recurses to k-1 (always terminates at
  * k=1, which never fails that check).
  */
-export function clusterTasteEmbeddings(items: WeightedEmbeddingItem[], k: number): ClusterCentroid[] {
+export function clusterTasteEmbeddings(
+  items: WeightedEmbeddingItem[],
+  k: number,
+  trace?: ClusterAttempt[]
+): ClusterCentroid[] {
   if (items.length === 0) return []
 
   const targetK = Math.max(1, Math.min(k, MAX_K))
@@ -424,7 +480,7 @@ export function clusterTasteEmbeddings(items: WeightedEmbeddingItem[], k: number
   // each K is judged against the best result one cluster smaller, rather than
   // against the single centroid -- distance falls monotonically as K grows,
   // so a K-vs-1 comparison would always favor the largest K.
-  const fallback = clusterTasteEmbeddings(items, targetK - 1)
+  const fallback = clusterTasteEmbeddings(items, targetK - 1, trace)
 
   const unitItems: UnitItem[] = items.map((item) => ({
     id: item.id,
@@ -434,6 +490,15 @@ export function clusterTasteEmbeddings(items: WeightedEmbeddingItem[], k: number
 
   const result = runSphericalKMeans(unitItems, targetK)
   if (!result) {
+    trace?.push({
+      k: targetK,
+      previousDistance: 0,
+      splitDistance: 0,
+      reduction: 0,
+      smallestCluster: 0,
+      kept: false,
+      rejectedFor: 'kmeans-failed',
+    })
     return fallback
   }
 
@@ -459,15 +524,16 @@ export function clusterTasteEmbeddings(items: WeightedEmbeddingItem[], k: number
   }
 
   const smallestCluster = Math.min(...rawClusters.map((c) => c.itemCount))
-  if (smallestCluster < MIN_ITEMS_PER_CLUSTER_HARD_FLOOR) {
-    return fallback
-  }
 
   // Only keep the extra centroid if it explains structure the K-1 result
   // missed. Without this, any item set gets carved into K pieces whether or
   // not it has K real facets -- fragmenting a coherent taste into arbitrary
   // sub-clusters that each retrieve a narrower, worse candidate pool than one
   // good centroid would.
+  //
+  // Computed before the hard-floor check purely so a rejected attempt still
+  // reports how close it came. Two O(n x k) passes over at most
+  // MAX_CLUSTERING_INPUT_ITEMS vectors, once per profile rebuild.
   const previousDistance = avgDistanceToNearestCentroid(
     items,
     fallback.map((c) => c.embedding)
@@ -478,9 +544,26 @@ export function clusterTasteEmbeddings(items: WeightedEmbeddingItem[], k: number
   )
   const reduction = previousDistance > 0 ? (previousDistance - splitDistance) / previousDistance : 0
 
-  if (reduction < MIN_MARGINAL_DISPERSION_REDUCTION) {
+  const attempt: ClusterAttempt = {
+    k: targetK,
+    previousDistance,
+    splitDistance,
+    reduction,
+    smallestCluster,
+    kept: false,
+  }
+
+  if (smallestCluster < MIN_ITEMS_PER_CLUSTER_HARD_FLOOR) {
+    trace?.push({ ...attempt, rejectedFor: 'cluster-too-small' })
     return fallback
   }
+
+  if (reduction < MIN_MARGINAL_DISPERSION_REDUCTION) {
+    trace?.push({ ...attempt, rejectedFor: 'insufficient-reduction' })
+    return fallback
+  }
+
+  trace?.push({ ...attempt, kept: true })
 
   return rawClusters
     .slice()
