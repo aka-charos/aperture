@@ -448,18 +448,24 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
     const newInterest = interest.trim()
     setInterests(prev => [...prev, newInterest])
     setInterestInput('')
-    
+    setError(null)
+
     try {
-      await fetch('/api/settings/taste-profile/interests', {
+      const response = await fetch('/api/settings/taste-profile/interests', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ interestText: newInterest }),
       })
+      // fetch only rejects on network failure, so without this a 4xx/5xx looked
+      // exactly like success: the chip stayed until the refetch below silently
+      // replaced it with the server's (unchanged) list.
+      if (!response.ok) throw new Error(String(response.status))
       await fetchData()
     } catch {
       // Revert on error
       setInterests(prev => prev.filter(i => i !== newInterest))
+      setError(t('watcherIdentity.errSaveInterest'))
     }
   }
 
@@ -468,15 +474,18 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
     if (!interestObj) return
     
     setInterests(prev => prev.filter(i => i !== interest))
-    
+    setError(null)
+
     try {
-      await fetch(`/api/settings/taste-profile/interests/${interestObj.id}`, {
+      const response = await fetch(`/api/settings/taste-profile/interests/${interestObj.id}`, {
         method: 'DELETE',
         credentials: 'include',
       })
+      if (!response.ok) throw new Error(String(response.status))
     } catch {
       // Revert on error
       setInterests(prev => [...prev, interest])
+      setError(t('watcherIdentity.errRemoveInterest'))
     }
   }
 
@@ -916,6 +925,13 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && interestInput.trim()) {
                       e.preventDefault()
+                      // Autocomplete's own Enter handler sits on the root above
+                      // this one and would fire onChange with reason
+                      // 'createOption' for the same keystroke, adding the
+                      // interest twice. preventDefault doesn't stop that --
+                      // only halting propagation does. Other keys still reach
+                      // it, so arrows/Escape behave normally.
+                      e.stopPropagation()
                       handleAddInterest(interestInput)
                     }
                   }}

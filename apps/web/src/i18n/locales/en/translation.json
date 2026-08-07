@@ -1375,6 +1375,8 @@
     "lockCaptionLocked": "Identity locked — won't auto-update",
     "lockCaptionUnlocked": "Re-analyzes watch history automatically",
     "errFetchData": "Failed to fetch data",
+    "errSaveInterest": "Couldn't save that interest",
+    "errRemoveInterest": "Couldn't remove that interest",
     "errAnalyzeWatchHistory": "Failed to analyze watch history",
     "errAnalyze": "Failed to analyze",
     "errGenerateIdentity": "Failed to generate identity",
