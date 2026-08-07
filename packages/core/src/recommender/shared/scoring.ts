@@ -108,7 +108,21 @@ export interface BaseCandidate {
   novelty: number
   ratingScore: number
   diversityBoost: number
+  /**
+   * How well this candidate matches the user: similarity/novelty/rating blended
+   * by the configured weights, then nudged by franchise/genre/interest
+   * preferences. This is what the "% Match" badge shows, so it must stay
+   * comparable across every candidate in a run -- selection deliberately does
+   * not overwrite it (see selectionScore).
+   */
   finalScore: number
+  /**
+   * finalScore blended with the diversity boost, i.e. the number the diversity
+   * selector actually ranked by. Set only on candidates that were selected, and
+   * only for diagnostics -- it is not comparable to finalScore and must never
+   * be shown as a match percentage.
+   */
+  selectionScore?: number
 }
 
 /**

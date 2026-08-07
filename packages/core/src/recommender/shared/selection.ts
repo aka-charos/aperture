@@ -162,9 +162,15 @@ export function applyDiversitySelection<T extends SelectableCandidate>(
     const best = candidateMap.get(bestId)!
     remaining.delete(bestId)
 
-    // Update candidate with selection info
+    // Update candidate with selection info. finalScore is deliberately left
+    // alone: it is the quality score the "% Match" badge renders, and these
+    // objects are the same references the caller stores, so overwriting it
+    // here used to leave one run's rows on two different scales -- selected
+    // rows carrying the diversity blend, unselected ones carrying raw quality.
+    // It also made the badge sink whenever the diversity weight went up, with
+    // nothing about content fit having changed.
     best.diversityBoost = bestDiversityBoost
-    best.finalScore = bestScore // Update to selection score
+    best.selectionScore = bestScore
 
     // Track for duplicate detection
     const titleKey = `${best.title.toLowerCase()}|${best.year || 'unknown'}`
@@ -224,8 +230,11 @@ export function applySimpleSelection<T extends SelectableCandidate>(
 
     candidate.diversityBoost = diversityScore
 
-    // Add diversity bonus to score
-    candidate.finalScore = candidate.finalScore + diversityScore * diversityWeight
+    // Same split as applyDiversitySelection above: the diversity bonus lands on
+    // selectionScore, never on the quality score. This path has no callers
+    // today, but leaving one of the two selectors mutating finalScore is
+    // exactly the trap that put a run's rows on two scales in the first place.
+    candidate.selectionScore = candidate.finalScore + diversityScore * diversityWeight
 
     // Track
     selectedTitles.add(titleKey)

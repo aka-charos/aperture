@@ -26,7 +26,10 @@ export interface Candidate {
   ratingScore: number
   diversityScore: number
   diversityBoost: number // Used by shared selection algorithm
+  /** Quality match, comparable across every candidate in a run. See BaseCandidate. */
   finalScore: number
+  /** Diversity-blended ranking score, selected candidates only. See BaseCandidate. */
+  selectionScore?: number
 }
 
 export interface PipelineConfig {

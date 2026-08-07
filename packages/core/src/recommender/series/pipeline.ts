@@ -88,7 +88,10 @@ export interface SeriesCandidate {
   novelty: number
   ratingScore: number
   diversityBoost: number
+  /** Quality match, comparable across every candidate in a run. See BaseCandidate. */
   finalScore: number
+  /** Diversity-blended ranking score, selected candidates only. See BaseCandidate. */
+  selectionScore?: number
 }
 
 // Re-export PipelineConfig as SeriesPipelineConfig for backwards compatibility
@@ -662,18 +665,30 @@ async function storeSeriesCandidates(
       finalScore: candidate.finalScore,
       isSelected,
       selectedRank,
-      // null for the overwhelming majority, so this stays a cheap array to
-      // build even though every scored candidate is stored here. COALESCEd to
-      // '{}' below because the column is NOT NULL.
-      scoreBreakdown: interestPick
-        ? JSON.stringify({
-            interestMatch: {
-              interestId: interestPick.interestId,
-              interestText: interestPick.interestText,
-              weightedSimilarity: interestPick.weightedSimilarity,
-            },
-          })
-        : null,
+      // null for everything that is neither selected nor an interest pick --
+      // the overwhelming majority -- so this stays a cheap array to build even
+      // though every scored candidate is stored here. COALESCEd to '{}' below
+      // because the column is NOT NULL.
+      scoreBreakdown:
+        candidate.selectionScore !== undefined || interestPick
+          ? JSON.stringify({
+              // The diversity-blended number the selector ranked by. Kept out
+              // of final_score so that column stays one comparable scale for
+              // every row; present only on selected candidates.
+              ...(candidate.selectionScore !== undefined
+                ? { selectionScore: candidate.selectionScore }
+                : {}),
+              ...(interestPick
+                ? {
+                    interestMatch: {
+                      interestId: interestPick.interestId,
+                      interestText: interestPick.interestText,
+                      weightedSimilarity: interestPick.weightedSimilarity,
+                    },
+                  }
+                : {}),
+            })
+          : null,
     }
   })
 
