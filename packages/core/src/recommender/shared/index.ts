@@ -7,12 +7,20 @@
 
 export {
   calculateRatingScore,
-  calculateNoveltyScore,
+  buildGenreFamiliarity,
+  calculateGenreNoveltyScore,
   calculateBaseScore,
   applyPreferenceAdjustment,
+  summarizeScoreComponents,
+  NOVELTY_SWEET_SPOT,
+  NOVELTY_PEAK,
+  NOVELTY_FAMILIAR_FLOOR,
+  NOVELTY_ALIEN_FLOOR,
   type ScoringConfig,
   type BaseCandidate,
   type PreferenceAffinities,
+  type ComponentSummary,
+  type ScoreComponentReport,
 } from './scoring.js'
 
 export {

@@ -20,13 +20,15 @@ import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../../li
 import { averageEmbeddings } from '../shared/index.js'
 import {
   calculateRatingScore,
-  calculateNoveltyScore,
+  buildGenreFamiliarity,
+  calculateGenreNoveltyScore,
   calculateBaseScore,
   applyDiversitySelection,
   applyPreferenceAdjustment,
   buildInterestMatchIndex,
   computeReservedInterestSlots,
   pickInterestSlotFillers,
+  summarizeScoreComponents,
   type InterestCandidateMatch,
   type InterestMatchIndex,
   type InterestQueryResult,
@@ -53,6 +55,7 @@ import {
 } from '../../taste-profile/index.js'
 import { getItemFranchises } from '../../taste-profile/franchise.js'
 import { getDislikedSeriesIds } from './taste.js'
+import { getWatchedGenreCounts } from '../genreFamiliarity.js'
 import { WATCH_HISTORY_TASTE_SQL } from '../watchedExclusion.js'
 import { loadConfigForUser } from '../config.js'
 import type { PipelineConfig } from '../types.js'
@@ -537,7 +540,7 @@ export async function getSeriesInterestMatchIndex(
  */
 async function scoreSeriesCandidates(
   candidates: SeriesCandidate[],
-  watchedSeries: WatchedSeriesData[],
+  genreFamiliarity: Map<string, number>,
   config: SeriesPipelineConfig
 ): Promise<SeriesCandidate[]> {
   // Get ratings for candidates
@@ -552,28 +555,15 @@ async function scoreSeriesCandidates(
     ratingsMap.set(row.id, row.community_rating)
   }
 
-  // Compute genre distribution from watched series for novelty
-  const watchedGenres = new Map<string, number>()
-  const watchedSeriesResult = await query<{ genres: string[] }>(
-    `SELECT genres FROM series WHERE id = ANY($1)`,
-    [watchedSeries.map((w) => w.seriesId)]
-  )
-
-  let totalWatchedGenres = 0
-  for (const row of watchedSeriesResult.rows) {
-    for (const genre of row.genres || []) {
-      watchedGenres.set(genre, (watchedGenres.get(genre) || 0) + 1)
-      totalWatchedGenres++
-    }
-  }
-
   // Score each candidate using shared scoring functions
   return candidates.map((candidate) => {
     // Use shared rating score calculation (handles bad data, proper scaling)
     const ratingScore = calculateRatingScore(ratingsMap.get(candidate.seriesId))
 
-    // Use shared novelty score calculation (handles missing genres)
-    const noveltyScore = calculateNoveltyScore(candidate.genres, watchedGenres, totalWatchedGenres)
+    // Use shared novelty score calculation (handles missing genres). The genre
+    // baseline now comes from the user's whole history rather than the
+    // recentWatchLimit slice this used to query for itself.
+    const noveltyScore = calculateGenreNoveltyScore(candidate.genres, genreFamiliarity)
 
     // Use shared base score calculation (bounded weighted average, same formula movies use)
     const finalScore = calculateBaseScore(candidate.similarity, noveltyScore, ratingScore, config)
@@ -931,7 +921,14 @@ export async function generateSeriesRecommendationsForUser(
 
     // 5. Score candidates
     logger.info({ userId: user.id }, '📈 Scoring and ranking candidates...')
-    const scoredCandidates = await scoreSeriesCandidates(candidates, watchedSeries, cfg)
+    // Genre familiarity is a per-run constant, resolved once from the user's
+    // whole history rather than the recentWatchLimit slice scoring used to
+    // query for itself (see genreFamiliarity.ts).
+    const genreFamiliarity = buildGenreFamiliarity(
+      await getWatchedGenreCounts(user.id, 'series')
+    )
+
+    const scoredCandidates = await scoreSeriesCandidates(candidates, genreFamiliarity, cfg)
 
     // 5.5 Apply franchise, genre, and custom interest preference adjustments
     logger.info({ userId: user.id }, '🎯 Applying preference adjustments (franchise, genre, custom interests)...')
@@ -1024,6 +1021,26 @@ export async function generateSeriesRecommendationsForUser(
     logger.info(
       { userId: user.id, franchiseSignalCount, genreSignalCount, interestSignalCount },
       `Applied ${franchiseSignalCount} franchise, ${genreSignalCount} genre, ${interestSignalCount} interest preference adjustments`
+    )
+
+    // What each scoring term actually contributed to the ordering -- see the
+    // matching block in movies/pipeline.ts. `influence` is the number to read.
+    logger.info(
+      {
+        userId: user.id,
+        mediaType: 'series',
+        genresKnown: genreFamiliarity.size,
+        weights: {
+          similarity: cfg.similarityWeight,
+          novelty: cfg.noveltyWeight,
+          rating: cfg.ratingWeight,
+        },
+        ...summarizeScoreComponents(
+          scoredCandidates.map((c) => ({ ...c, id: c.seriesId })),
+          cfg
+        ),
+      },
+      'SCORE-DIAG'
     )
 
     // 6. Apply diversity and select

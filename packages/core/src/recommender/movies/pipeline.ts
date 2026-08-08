@@ -48,11 +48,14 @@ import {
 import { getItemFranchises } from '../../taste-profile/franchise.js'
 import {
   applyPreferenceAdjustment,
+  buildGenreFamiliarity,
   computeReservedInterestSlots,
   pickInterestSlotFillers,
+  summarizeScoreComponents,
   type InterestCandidateMatch,
   type InterestMatchIndex,
 } from '../shared/index.js'
+import { getWatchedGenreCounts } from '../genreFamiliarity.js'
 
 // Re-export types
 export * from '../types.js'
@@ -279,7 +282,14 @@ export async function generateRecommendationsForUser(
       },
       'Using scoring weights'
     )
-    const scoredCandidates = await scoreCandidates(candidates, watched, cfg)
+    // Genre familiarity is a per-run constant, resolved once from the user's
+    // whole history rather than from the 50 favourites the novelty term used to
+    // read (see genreFamiliarity.ts).
+    const genreFamiliarity = buildGenreFamiliarity(
+      await getWatchedGenreCounts(user.id, 'movie')
+    )
+
+    const scoredCandidates = scoreCandidates(candidates, genreFamiliarity, cfg)
 
     // 4.5 Apply franchise, genre, and custom interest preference adjustments
     logger.info({ userId: user.id }, '🎯 Applying preference adjustments (franchise, genre, custom interests)...')
@@ -377,6 +387,26 @@ export async function generateRecommendationsForUser(
     logger.info(
       { userId: user.id, franchiseSignalCount, genreSignalCount, interestSignalCount },
       `Applied ${franchiseSignalCount} franchise, ${genreSignalCount} genre, ${interestSignalCount} interest preference adjustments`
+    )
+
+    // What each scoring term actually contributed to the ordering. A weight only
+    // controls influence if the terms it weighs have comparable spread, and
+    // nothing verified that -- which is how a novelty term whose entire range
+    // was three discrete values came to outweigh similarity while carrying half
+    // its configured weight. `influence` is the number to read.
+    logger.info(
+      {
+        userId: user.id,
+        mediaType: 'movie',
+        genresKnown: genreFamiliarity.size,
+        weights: {
+          similarity: cfg.similarityWeight,
+          novelty: cfg.noveltyWeight,
+          rating: cfg.ratingWeight,
+        },
+        ...summarizeScoreComponents(scoredCandidates, cfg),
+      },
+      'SCORE-DIAG'
     )
 
     // Log top candidates
