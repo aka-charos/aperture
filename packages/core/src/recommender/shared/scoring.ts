@@ -39,51 +39,102 @@ export function calculateRatingScore(rating: number | null | undefined): number 
 }
 
 /**
- * Calculate novelty score based on genre overlap with watched content.
- *
- * The novelty score rewards items that introduce some new genres while
- * still having some familiar genres (partial novelty is best).
- *
- * @param itemGenres - Genres of the candidate item
- * @param watchedGenreCounts - Map of genre -> count from user's watch history
- * @param totalWatchedGenres - Total genre occurrences in watch history
+ * Where on the 0-1 novelty axis the response peaks. Half the item's genre mass
+ * being unfamiliar is the "familiar anchor plus something new" case the score
+ * is meant to reward.
  */
-export function calculateNoveltyScore(
+export const NOVELTY_SWEET_SPOT = 0.5
+
+/**
+ * The three points the response curve passes through. These are the values the
+ * previous branch-based implementation produced at its representative input
+ * (its continuous term was pinned near 0.85, so its branches evaluated to
+ * ~0.84 / ~0.57 / ~0.47), which keeps this change about *what* novelty
+ * measures rather than quietly enlarging how much it counts. Novelty is 25% of
+ * the base score at default weights, so widening this band would have
+ * re-weighted the whole recommender as a side effect.
+ */
+export const NOVELTY_PEAK = 0.84
+export const NOVELTY_FAMILIAR_FLOOR = 0.57
+export const NOVELTY_ALIEN_FLOOR = 0.47
+
+/**
+ * Index a user's watched-genre counts as familiarity in [0,1], normalized by
+ * their own most-watched genre: their top genre is 1.0 and a genre they have
+ * never watched is 0.
+ *
+ * Normalizing by the max rather than by total genre occurrences is the whole
+ * point. Share-of-total is ~1/20 for every genre once a library has ~20 of
+ * them, so the old `1 - count/totalOccurrences` pinned into [0.8, 1.0] and
+ * contributed an 0.08 spread to a score that was otherwise decided by a
+ * discrete branch. Max-normalizing uses the full range, so the continuous
+ * measure carries the signal again.
+ *
+ * Keys are lowercased, matching buildGenreWeightMap in taste-profile/index.ts.
+ */
+export function buildGenreFamiliarity(genreCounts: Map<string, number>): Map<string, number> {
+  const familiarity = new Map<string, number>()
+  if (genreCounts.size === 0) return familiarity
+
+  let maxCount = 0
+  for (const count of genreCounts.values()) {
+    if (Number.isFinite(count) && count > maxCount) maxCount = count
+  }
+  if (maxCount <= 0) return familiarity
+
+  for (const [genre, count] of genreCounts) {
+    if (!Number.isFinite(count) || count <= 0) continue
+    familiarity.set(genre.toLowerCase(), Math.min(1, count / maxCount))
+  }
+
+  return familiarity
+}
+
+/**
+ * How much new ground a candidate covers relative to what the user actually
+ * watches, on a continuous curve that peaks at partial novelty.
+ *
+ * Rises from NOVELTY_FAMILIAR_FLOOR (every genre is one of their staples) to
+ * NOVELTY_PEAK at NOVELTY_SWEET_SPOT, then falls to NOVELTY_ALIEN_FLOOR (no
+ * genre they have ever watched). The fall is deliberately shallower than the
+ * rise: a genre-alien item already scores low on `similarity`, and penalizing
+ * it twice was never the intent -- whereas an item made entirely of staples is
+ * exactly what similarity over-rewards, so novelty is the counterweight.
+ *
+ * Genres the user has never watched contribute 0 familiarity rather than being
+ * counted as a separate binary "novel genre" flag. That flag was the previous
+ * implementation's real decision variable, and it made a single unfamiliar
+ * genre worth 0.27 of novelty -- more than twice the spread across an entire
+ * selected list -- on a baseline of only 50 items.
+ *
+ * An item with no genres, or a user with no watch history, scores a neutral
+ * 0.5, unchanged from before.
+ */
+export function calculateGenreNoveltyScore(
   itemGenres: string[],
-  watchedGenreCounts: Map<string, number>,
-  totalWatchedGenres: number
+  familiarity: Map<string, number>
 ): number {
-  // Default for items without genre data - neutral score
-  if (!itemGenres || itemGenres.length === 0) {
-    return 0.5
+  if (!itemGenres || itemGenres.length === 0) return 0.5
+  if (familiarity.size === 0) return 0.5
+
+  let familiaritySum = 0
+  for (const genre of itemGenres) {
+    familiaritySum += familiarity.get(genre.toLowerCase()) ?? 0
   }
 
-  // Calculate how novel each genre is (1 = completely new, 0 = very common)
-  const genreNovelties = itemGenres.map((genre) => {
-    const count = watchedGenreCounts.get(genre) || 0
-    if (totalWatchedGenres === 0) return 0.5 // No watch history = neutral
-    return 1 - count / totalWatchedGenres
-  })
+  const novelty = 1 - familiaritySum / itemGenres.length
 
-  // Average novelty across all genres
-  const avgNovelty = genreNovelties.reduce((a, b) => a + b, 0) / genreNovelties.length
-
-  // Count completely novel genres (not in watch history at all)
-  const novelGenreCount = itemGenres.filter((g) => !watchedGenreCounts.has(g)).length
-  const noveltyRatio = novelGenreCount / itemGenres.length
-
-  // Reward partial novelty (some new genres, some familiar)
-  // Pure novelty (all new) is risky, no novelty is boring
-  if (noveltyRatio > 0 && noveltyRatio < 0.7) {
-    // Sweet spot: 1-70% new genres
-    return 0.5 + avgNovelty * 0.4 // 0.5-0.9 range
-  } else if (noveltyRatio >= 0.7) {
-    // Too novel - user hasn't shown interest in these genres
-    return 0.3 + avgNovelty * 0.2 // 0.3-0.5 range
-  } else {
-    // No novelty - all familiar genres
-    return 0.4 + avgNovelty * 0.2 // 0.4-0.6 range
+  if (novelty <= NOVELTY_SWEET_SPOT) {
+    return (
+      NOVELTY_FAMILIAR_FLOOR +
+      (NOVELTY_PEAK - NOVELTY_FAMILIAR_FLOOR) * (novelty / NOVELTY_SWEET_SPOT)
+    )
   }
+
+  return (
+    NOVELTY_ALIEN_FLOOR +
+    (NOVELTY_PEAK - NOVELTY_ALIEN_FLOOR) * ((1 - novelty) / (1 - NOVELTY_SWEET_SPOT))
+  )
 }
 
 /**
@@ -231,3 +282,95 @@ export function applyPreferenceAdjustment(
 
 
 
+
+// ============================================================================
+// Score composition diagnostics
+// ============================================================================
+
+export interface ComponentSummary {
+  min: number
+  p10: number
+  p50: number
+  p90: number
+  max: number
+}
+
+export interface ScoreComponentReport {
+  count: number
+  similarity: ComponentSummary
+  novelty: ComponentSummary
+  rating: ComponentSummary
+  finalScore: ComponentSummary
+  /**
+   * How much each term actually moves the ranking: its share of the configured
+   * weight times its realized p10-p90 spread. A weight only controls influence
+   * if the terms it is weighing have comparable spread, and nothing checked
+   * that -- which is how a novelty term whose whole range was three values came
+   * to outweigh similarity despite carrying half its weight.
+   */
+  influence: {
+    similarity: number
+    novelty: number
+    rating: number
+  }
+}
+
+/** Nearest-rank percentile over an already-sorted ascending array. */
+function percentileOfSorted(sorted: number[], fraction: number): number {
+  if (sorted.length === 0) return 0
+  const index = Math.round(fraction * (sorted.length - 1))
+  return sorted[Math.min(sorted.length - 1, Math.max(0, index))]
+}
+
+function summarizeValues(values: number[]): ComponentSummary {
+  if (values.length === 0) return { min: 0, p10: 0, p50: 0, p90: 0, max: 0 }
+
+  const sorted = [...values].sort((a, b) => a - b)
+  return {
+    min: sorted[0],
+    p10: percentileOfSorted(sorted, 0.1),
+    p50: percentileOfSorted(sorted, 0.5),
+    p90: percentileOfSorted(sorted, 0.9),
+    max: sorted[sorted.length - 1],
+  }
+}
+
+/**
+ * Distribution of every scoring term across a candidate pool, plus what each
+ * one contributes to the ordering.
+ *
+ * Pure, and reported rather than acted on. Two bugs found by measuring instead
+ * of reasoning -- a taste-dispersion score that was identical for every user,
+ * and a novelty term that was three discrete values -- shared the same shape: a
+ * quantity assumed to vary that did not. This is the check that would have
+ * caught either on the first run.
+ *
+ * `similarity` is floored at 0 to match calculateBaseScore, so the reported
+ * spread is the one that actually feeds the score.
+ */
+export function summarizeScoreComponents(
+  candidates: Array<Pick<BaseCandidate, 'similarity' | 'novelty' | 'ratingScore' | 'finalScore'>>,
+  config: Pick<ScoringConfig, 'similarityWeight' | 'noveltyWeight' | 'ratingWeight'>
+): ScoreComponentReport {
+  const similarity = summarizeValues(candidates.map((c) => Math.max(0, c.similarity)))
+  const novelty = summarizeValues(candidates.map((c) => c.novelty))
+  const rating = summarizeValues(candidates.map((c) => c.ratingScore))
+  const finalScore = summarizeValues(candidates.map((c) => c.finalScore))
+
+  const totalWeight = config.similarityWeight + config.noveltyWeight + config.ratingWeight
+  // Mirrors calculateBaseScore's own fallback when every slider is at zero.
+  const share = (weight: number) => (totalWeight > 0 ? weight / totalWeight : 1 / 3)
+
+  return {
+    count: candidates.length,
+    similarity,
+    novelty,
+    rating,
+    finalScore,
+    influence: {
+      similarity: share(config.similarityWeight) * (similarity.p90 - similarity.p10),
+      novelty: share(config.noveltyWeight) * (novelty.p90 - novelty.p10),
+      rating: share(config.ratingWeight) * (rating.p90 - rating.p10),
+    },
+  }
+}

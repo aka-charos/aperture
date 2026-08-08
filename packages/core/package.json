@@ -51,6 +51,7 @@
     "test:interests": "node --import tsx --test src/recommender/shared/interestSlots.test.ts",
     "test:preferences": "node --import tsx --test src/taste-profile/genreAffinity.test.ts src/lib/diversityAdjustment.test.ts",
     "test:selection": "node --import tsx --test src/recommender/shared/selection.test.ts",
+    "test:novelty": "node --import tsx --test src/recommender/shared/novelty.test.ts",
     "test:discovery": "node --import tsx --test src/discover/scorer.test.ts",
     "lint": "eslint src",
     "clean": "rm -rf dist"
