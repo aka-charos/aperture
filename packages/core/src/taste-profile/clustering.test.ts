@@ -742,3 +742,114 @@ test('chooseK reports the raw measurement alongside the rescaled one', () => {
 
   assert.deepEqual(chooseK([]), { k: 1, dispersion: 0, rawDispersion: 0 })
 })
+
+// ============================================================================
+// 9. Real geometry: the criterion must survive a narrow embedding cone
+// ============================================================================
+
+/**
+ * Two real facets buried under a shared component, which is what real movie
+ * embeddings look like: every vector encodes "this is a movie" far more
+ * strongly than it encodes a genre. `shared` scales that common direction --
+ * higher means a tighter cone and a lower absolute dispersion.
+ */
+function coneBimodalFixture(
+  rng: () => number,
+  perGroup: number,
+  shared: number
+): WeightedEmbeddingItem[] {
+  const dim = 12
+  const sharedDir = Array.from({ length: dim }, (_, i) => (i % 3 === 0 ? 1 : 0.4))
+  const build = (prefix: string, facetAxis: number) =>
+    Array.from({ length: perGroup }, (_, i) => ({
+      id: `${prefix}-${i}`,
+      weight: 1 + i * 0.011,
+      embedding: Array.from({ length: dim }, (_, d) =>
+        sharedDir[d] * shared + (d === facetAxis ? 1 : 0) + (rng() - 0.5) * 0.5
+      ),
+    }))
+  return [...build('a', 1), ...build('b', 2)]
+}
+
+/** One facet in the same cone geometry -- must not split at any tightness. */
+function coneCoherentFixture(
+  rng: () => number,
+  count: number,
+  shared: number
+): WeightedEmbeddingItem[] {
+  const dim = 12
+  return Array.from({ length: count }, (_, i) => ({
+    id: `c-${i}`,
+    weight: 1 + i * 0.01,
+    embedding: Array.from({ length: dim }, (_, d) =>
+      (d % 3 === 0 ? 1 : 0.4) * shared + (d === 1 ? 1 : 0) + (rng() - 0.5) * 1.2
+    ),
+  }))
+}
+
+function k2Reduction(items: WeightedEmbeddingItem[]): number {
+  const trace: ClusterAttempt[] = []
+  clusterTasteEmbeddings(items, chooseK(items).k, trace)
+  const attempt = trace.find((a) => a.k === 2)
+  assert.ok(attempt, 'expected a k=2 attempt to be recorded')
+  return attempt.reduction
+}
+
+test('a tight embedding cone does not defeat the split criterion', () => {
+  // Real profiles measured raw dispersion 0.238-0.254. Sweeping `shared` drives
+  // dispersion from ~0.40 down to ~0.0005, bracketing that by a wide margin --
+  // so if the criterion were going to break down on cone-shaped data, it would
+  // break somewhere in here.
+  for (const shared of [0, 0.25, 0.5, 1, 2, 5, 12]) {
+    const bimodal = k2Reduction(coneBimodalFixture(makeRng(1234), 40, shared))
+    const coherent = k2Reduction(coneCoherentFixture(makeRng(99), 80, shared))
+
+    assert.ok(
+      bimodal > MIN_MARGINAL_DISPERSION_REDUCTION,
+      `shared=${shared}: real bimodal structure scored ${bimodal.toFixed(4)}, below the bar`
+    )
+    assert.ok(
+      coherent < MIN_MARGINAL_DISPERSION_REDUCTION,
+      `shared=${shared}: coherent taste scored ${coherent.toFixed(4)}, would have been split`
+    )
+    // The bands must stay far apart, not merely on the right sides -- a narrow
+    // margin would mean the threshold's exact value is doing the work.
+    assert.ok(
+      bimodal > coherent * 3,
+      `shared=${shared}: bands too close (${bimodal.toFixed(4)} vs ${coherent.toFixed(4)})`
+    )
+  }
+})
+
+test('absolute dispersion collapses in a tight cone while the ratio holds', () => {
+  // This is *why* the criterion is a ratio against K-1 rather than an absolute
+  // distance: the same real structure that scores 0.70 below reports a raw
+  // dispersion near zero once the shared component dominates.
+  const tight = coneBimodalFixture(makeRng(1234), 40, 12)
+  const loose = coneBimodalFixture(makeRng(1234), 40, 0)
+
+  assert.ok(chooseK(tight).rawDispersion < 0.01, 'expected the tight cone to flatten dispersion')
+  assert.ok(chooseK(loose).rawDispersion > 0.2)
+
+  // Both still split, and by a similar margin.
+  assert.ok(k2Reduction(tight) > MIN_MARGINAL_DISPERSION_REDUCTION)
+  assert.ok(k2Reduction(loose) > MIN_MARGINAL_DISPERSION_REDUCTION)
+})
+
+test('the reductions seen on real profiles sit in the coherent band', () => {
+  // Observed across 14 live profiles: k=2 in 0.020-0.078, k=3 in 0.045-0.130.
+  // The synthetic coherent fixture must cover that range, which is what makes
+  // "these users are unimodal" the reading rather than "the threshold is wrong".
+  const observedRealMax = 0.13
+  for (const shared of [0.25, 1, 5]) {
+    const coherent = k2Reduction(coneCoherentFixture(makeRng(99), 80, shared))
+    assert.ok(
+      coherent < MIN_MARGINAL_DISPERSION_REDUCTION,
+      `coherent fixture scored ${coherent.toFixed(4)}`
+    )
+    assert.ok(
+      observedRealMax < MIN_MARGINAL_DISPERSION_REDUCTION,
+      'real observations should remain well below the threshold'
+    )
+  }
+})
