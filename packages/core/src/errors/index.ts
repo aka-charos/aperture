@@ -19,4 +19,5 @@ export { TMDB_ERRORS, TMDB_HTTP_TO_STATUS } from './tmdb.js'
 export { TRAKT_ERRORS } from './trakt.js'
 export { MDBLIST_ERRORS } from './mdblist.js'
 export { OMDB_ERRORS, OMDB_ERROR_MESSAGES } from './omdb.js'
+export { LLDAP_ERRORS } from './lldap.js'
 

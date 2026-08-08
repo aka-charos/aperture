@@ -33,7 +33,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 
 interface ApiError {
   id: string
-  provider: 'openai' | 'google' | 'tavily' | 'tmdb' | 'trakt' | 'mdblist' | 'omdb'
+  provider: 'openai' | 'google' | 'tavily' | 'tmdb' | 'trakt' | 'mdblist' | 'omdb' | 'lldap'
   errorType: 'rate_limit' | 'auth' | 'limit' | 'outage'
   errorCode?: string
   httpStatus: number
@@ -51,7 +51,7 @@ interface ErrorSummaryItem {
 
 interface ApiErrorAlertProps {
   /** Show only errors for a specific provider */
-  provider?: 'openai' | 'google' | 'tavily' | 'tmdb' | 'trakt' | 'mdblist' | 'omdb'
+  provider?: 'openai' | 'google' | 'tavily' | 'tmdb' | 'trakt' | 'mdblist' | 'omdb' | 'lldap'
   /** Maximum number of errors to display */
   maxErrors?: number
   /** Compact mode for smaller displays */
@@ -67,6 +67,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   trakt: 'Trakt',
   mdblist: 'MDBList',
   omdb: 'OMDb',
+  lldap: 'LLDAP',
 }
 
 // Error type to severity mapping

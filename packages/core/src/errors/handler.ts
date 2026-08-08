@@ -14,6 +14,7 @@ import { TMDB_ERRORS, TMDB_HTTP_TO_STATUS } from './tmdb.js'
 import { TRAKT_ERRORS } from './trakt.js'
 import { MDBLIST_ERRORS } from './mdblist.js'
 import { OMDB_ERRORS, OMDB_ERROR_MESSAGES } from './omdb.js'
+import { LLDAP_ERRORS } from './lldap.js'
 
 const logger = createChildLogger('api-error-handler')
 
@@ -147,6 +148,13 @@ function parseMDBListError(status: number): ApiErrorDefinition {
 }
 
 /**
+ * Parse an LLDAP error response
+ */
+function parseLldapError(status: number): ApiErrorDefinition {
+  return LLDAP_ERRORS[status] || DEFAULT_ERROR
+}
+
+/**
  * Parse an OMDb error response
  */
 function parseOMDbError(
@@ -202,6 +210,9 @@ export function parseApiError(
       break
     case 'omdb':
       definition = parseOMDbError(status, options.errorMessage)
+      break
+    case 'lldap':
+      definition = parseLldapError(status)
       break
     default:
       definition = DEFAULT_ERROR

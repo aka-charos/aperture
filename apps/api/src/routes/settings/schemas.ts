@@ -842,6 +842,43 @@ export const testOmdbSchema = {
   },
 }
 
+export const lldapConfigSchema = {
+  tags: ['settings'],
+  summary: 'Get LLDAP configuration',
+  description: 'Get LLDAP email-import configuration status (admin only).',
+}
+
+export const updateLldapConfigSchema = {
+  tags: ['settings'],
+  summary: 'Update LLDAP configuration',
+  description: 'Update LLDAP server URL and admin credentials used to look up user emails (admin only).',
+  body: {
+    type: 'object' as const,
+    additionalProperties: true,
+    properties: {
+      url: { type: 'string' as const, description: 'LLDAP server base URL' },
+      adminUsername: { type: 'string' as const, description: 'LLDAP admin account username' },
+      adminPassword: { type: 'string' as const, description: 'LLDAP admin account password' },
+      enabled: { type: 'boolean' as const },
+    },
+  },
+}
+
+export const testLldapSchema = {
+  tags: ['settings'],
+  summary: 'Test LLDAP connection',
+  description: 'Test LLDAP login and a bulk user query with provided or saved credentials (admin only).',
+  body: {
+    type: 'object' as const,
+    additionalProperties: true,
+    properties: {
+      url: { type: 'string' as const, description: 'Server URL to test (optional, defaults to saved)' },
+      adminUsername: { type: 'string' as const, description: 'Admin username to test (optional, defaults to saved)' },
+      adminPassword: { type: 'string' as const, description: 'Admin password to test (optional, defaults to saved)' },
+    },
+  },
+}
+
 export const studioLogosConfigSchema = {
   tags: ['settings'],
   summary: 'Get studio logos configuration',

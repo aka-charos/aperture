@@ -515,6 +515,12 @@ export {
   type TMDbConfig,
   type OMDbConfig,
   type StudioLogosConfig,
+  // LLDAP settings
+  getLldapConfig,
+  setLldapConfig,
+  getLldapAdminPassword,
+  isLldapConfigured,
+  type LldapConfig,
 } from './settings/systemSettings.js'
 
 export { validateServerUrl, InvalidServerUrlError } from './settings/validateServerUrl.js'
@@ -792,6 +798,7 @@ export {
   MDBLIST_ERRORS,
   OMDB_ERRORS,
   OMDB_ERROR_MESSAGES,
+  LLDAP_ERRORS,
 } from './errors/index.js'
 
 // Similarity
@@ -871,6 +878,15 @@ export {
   // Types
   type MDBListSortOption,
 } from './mdblist/index.js'
+
+// LLDAP Integration
+export {
+  authenticateLldap,
+  fetchLldapUserEmails,
+  testLldapConnection,
+  syncLldapEmails,
+  type SyncLldapEmailsResult,
+} from './lldap/index.js'
 
 // Graph Playlists
 export {

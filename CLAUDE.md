@@ -1,6 +1,6 @@
 # Aperture — Repo Map
 
-Self-hosted media recommendation & watch-tracking app for Emby/Jellyfin. AI recommendations via pgvector embeddings, plus integrations: TMDB, OMDb, Trakt, Seerr (Jellyseerr/Overseerr), MDBList, JustWatch, n8n, Tavily.
+Self-hosted media recommendation & watch-tracking app for Emby/Jellyfin. AI recommendations via pgvector embeddings, plus integrations: TMDB, OMDb, Trakt, Seerr (Jellyseerr/Overseerr), MDBList, JustWatch, n8n, Tavily, LLDAP (optional email import, `packages/core/src/lldap/`).
 
 > **Keep this map current.** When you add/move/rename a route, page, core module, or table, update the relevant section here in the same change. This file is the primary navigation aid — stale entries cause wrong-file edits.
 
