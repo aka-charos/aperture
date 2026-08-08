@@ -272,6 +272,50 @@ export async function getAdminDefaultConfig(mediaType: 'movie' | 'series'): Prom
  * 
  * Only applies if user hasn't set a custom diversity weight.
  */
+/**
+ * Nudge a configured diversity weight by how spread out the user's taste is:
+ * down for focused viewers, up for eclectic ones, unchanged when the dispersion
+ * score carries no information.
+ *
+ * That last case is the reason this is a separate, testable function. A score
+ * pinned to either end of the scale is a *clamp*, not a measurement -- the raw
+ * cosine distance fell outside the [0.3, 0.8] window the score is rescaled
+ * from, and clamping discards how far outside it was. Measured across 14 real
+ * profiles the raw value sat between 0.238 and 0.254, entirely below that
+ * floor, so every user scored exactly 0.000 and every user was handed the
+ * "focused" x0.7 reduction on the strength of a number that said nothing about
+ * them. The eclectic branch was unreachable for anybody.
+ *
+ * Declining to adjust is the honest response to an uninformative input; the
+ * previous behavior was a confident judgement with nothing behind it. Until the
+ * underlying measurement can discriminate between users, this is a no-op in
+ * practice -- which is the point.
+ */
+export function adjustDiversityWeightForDispersion(
+  baseWeight: number,
+  dispersion: number
+): number {
+  const clamp = (w: number) => Math.max(0, Math.min(1, w))
+
+  if (!Number.isFinite(dispersion) || dispersion <= 0 || dispersion >= 1) {
+    return clamp(baseWeight)
+  }
+
+  if (dispersion < DISPERSION_FOCUSED_THRESHOLD) {
+    // Focused taste - reduce diversity (they know what they like)
+    return clamp(baseWeight * 0.7)
+  }
+
+  if (dispersion > DISPERSION_ECLECTIC_THRESHOLD) {
+    // Eclectic taste - increase diversity (they enjoy variety). applyDiversitySelection
+    // blends this as `base*(1-w) + diversity*w`, which only stays within [0,1]
+    // if w does, so the 1.2x bump is clamped rather than trusted.
+    return clamp(baseWeight * 1.2)
+  }
+
+  return clamp(baseWeight)
+}
+
 export async function getSmartDiversityWeight(
   userId: string,
   mediaType: 'movie' | 'series',
@@ -304,28 +348,14 @@ export async function getSmartDiversityWeight(
       diversityScore = analysis.diversity.score
     }
 
-    let adjustedWeight = baseDiversityWeight
-
-    if (diversityScore < DISPERSION_FOCUSED_THRESHOLD) {
-      // Focused taste - reduce diversity (they know what they like)
-      adjustedWeight = baseDiversityWeight * 0.7
+    const adjusted = adjustDiversityWeightForDispersion(baseDiversityWeight, diversityScore)
+    if (adjusted !== baseDiversityWeight) {
       logger.debug(
-        { userId, mediaType, diversityScore, adjustment: 'reduced' },
-        'Applied focused taste diversity adjustment'
-      )
-    } else if (diversityScore > DISPERSION_ECLECTIC_THRESHOLD) {
-      // Eclectic taste - increase diversity (they enjoy variety)
-      adjustedWeight = baseDiversityWeight * 1.2
-      logger.debug(
-        { userId, mediaType, diversityScore, adjustment: 'increased' },
-        'Applied eclectic taste diversity adjustment'
+        { userId, mediaType, diversityScore, baseDiversityWeight, adjusted },
+        'Applied taste-dispersion diversity adjustment'
       )
     }
-
-    // applyDiversitySelection blends this weight as `base*(1-w) + diversity*w`,
-    // which only stays within [0,1] if w itself is in [0,1] — the 1.2x bump
-    // above can push a high base weight past 1.0, so clamp defensively.
-    return Math.max(0, Math.min(1, adjustedWeight))
+    return adjusted
   } catch (err) {
     logger.warn({ err, userId, mediaType }, 'Failed to calculate smart diversity, using default')
     return baseDiversityWeight

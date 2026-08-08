@@ -69,9 +69,35 @@ export const MIN_ITEMS_PER_CLUSTER_HARD_FLOOR = 5
  * 0.4 sits in the middle of a wide empirical gap measured over synthetic
  * fixtures: genuinely multi-facet data yields 54-99% marginal reduction at
  * the K matching its real facet count, while structureless data (a uniform
- * blob, or a single wide/tight group) tops out around 33%. Worth re-checking
- * against real watch histories -- erring low fragments coherent taste, which
- * is the harmful direction; erring high just falls back to today's behavior.
+ * blob, or a single wide/tight group) tops out around 33%. Erring low
+ * fragments coherent taste, which is the harmful direction; erring high just
+ * falls back to single-centroid behavior.
+ *
+ * VALIDATED against 14 real profiles (Aug 2026), and the answer was that this
+ * threshold is fine and the data is simply unimodal:
+ *
+ * - Real k=2 reductions came in at 0.020-0.078, k=3 at 0.045-0.130 -- every
+ *   profile K=1. The obvious suspicion was that the criterion breaks down on
+ *   real geometry, since movie embeddings occupy a narrow cone (raw dispersion
+ *   was 0.238-0.254 for everyone) where splitting can barely move an absolute
+ *   distance.
+ * - It doesn't. Because the test is a *ratio* against K-1 it stays scale-free:
+ *   a synthetic bimodal fixture buried under a shared component large enough
+ *   to drive raw dispersion to 0.0005 still yields a 0.70 reduction and splits
+ *   correctly, while a coherent single-facet fixture in the same geometry
+ *   yields 0.07. See the cone-geometry test in clustering.test.ts.
+ * - Real profiles land at 0.02-0.13, i.e. squarely in the unimodal band and
+ *   nowhere near the 0.4 bar. Anything from ~0.15 to ~0.65 gives the same
+ *   answer on this data, so the exact value is not load-bearing.
+ * - Mean-centering the items before assignment (the standard remedy for a
+ *   dominant shared component) was tried and rejected: identical reductions on
+ *   truly bimodal data, and *higher* ones on unimodal data, i.e. strictly more
+ *   false splits for no gain.
+ *
+ * The observed variation also tracks sample size rather than the viewer -- six
+ * profiles clustered at the 150-item cap spanned only 0.045-0.074 despite
+ * covering watch histories from 191 to 3510 items -- so do not read a
+ * user-to-user difference in these numbers as a difference in taste.
  */
 export const MIN_MARGINAL_DISPERSION_REDUCTION = 0.4
 
