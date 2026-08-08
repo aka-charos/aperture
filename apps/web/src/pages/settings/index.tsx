@@ -38,6 +38,7 @@ import {
   TMDbConfigSection,
   OMDbConfigSection,
   MDBListConfigSection,
+  LldapConfigSection,
   SeerrConfigSection,
   N8nConfigSection,
   TavilyConfigSection,
@@ -305,6 +306,7 @@ export function SettingsPage() {
                   <TMDbConfigSection />
                   <OMDbConfigSection />
                   <MDBListConfigSection />
+                  <LldapConfigSection />
                   <SeerrConfigSection />
                   <N8nConfigSection />
                   <TavilyConfigSection />

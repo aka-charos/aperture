@@ -67,6 +67,7 @@ const ENV_DEFAULTS: Record<
 
   // === DAILY ===
   'backup-database': { scheduleType: 'daily', hour: 2, minute: 0 },
+  'sync-lldap-emails': { scheduleType: 'daily', hour: 3, minute: 15 },
   'refresh-top-picks': { scheduleType: 'daily', hour: 5, minute: 0 },
   'enrich-studio-logos': { scheduleType: 'daily', hour: 5, minute: 30 },
   'enrich-mdblist': { scheduleType: 'daily', hour: 7, minute: 0 },

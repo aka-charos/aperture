@@ -93,6 +93,12 @@ export const jobDefinitions: JobDefinition[] = [
     description: 'Sync ratings from Trakt for all connected users',
     cron: '0 */6 * * *', // Every 6 hours
   },
+  // === LLDAP Email Sync Job ===
+  {
+    name: 'sync-lldap-emails',
+    description: 'Import user emails from LLDAP by matching usernames (optional, admin-configured)',
+    cron: '15 3 * * *', // Daily at 3:15 AM
+  },
   // === Shows You Watch (favorites sync) ===
   {
     name: 'sync-watching-favorites',

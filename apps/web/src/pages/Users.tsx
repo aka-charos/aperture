@@ -31,6 +31,8 @@ import {
   useTheme,
   useMediaQuery,
   Avatar,
+  Select,
+  type SelectChangeEvent,
 } from '@mui/material'
 import SettingsIcon from '@mui/icons-material/Settings'
 import PersonAddIcon from '@mui/icons-material/PersonAdd'
@@ -49,6 +51,9 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
 import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark'
 import EmailIcon from '@mui/icons-material/Email'
+import LoginIcon from '@mui/icons-material/Login'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import { usePageHeader } from '@/hooks/usePageHeader'
 
 interface ProviderUser {
@@ -67,6 +72,37 @@ interface ProviderUser {
   collectionsEnabled: boolean
   emailNotificationsAllowed: boolean
   aiOverrideAllowed: boolean
+  /** From `users.email` — set via media server sync, LLDAP import, or manual entry. Only imported users have one. */
+  email: string | null
+  /** When this Aperture account last signed in to the web app (persisted, survives session cleanup). Only imported users have one. */
+  lastLoginAt: string | null
+}
+
+/** Renders a compact, locale-aware date+time — same convention as the Jobs history dialog. */
+function formatTimestamp(value?: string | null): string | null {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toLocaleString()
+}
+
+/** 'default' is the existing enabled/imported/name grouping below — not a real ascending/descending field. */
+type SortField = 'default' | 'email' | 'lastLogin' | 'lastActivity'
+type SortDirection = 'asc' | 'desc'
+
+/**
+ * Nullable strings always sort to the end, regardless of direction — otherwise
+ * flipping to descending would bury every user who's never logged in at the
+ * top instead of the bottom, which reads as broken rather than "no data yet."
+ * ISO date strings compare correctly as plain strings, so this one function
+ * covers email (alphabetical) and both date fields (chronological).
+ */
+function compareNullable(a: string | null | undefined, b: string | null | undefined, direction: SortDirection): number {
+  if (!a && !b) return 0
+  if (!a) return 1
+  if (!b) return -1
+  const cmp = a.localeCompare(b)
+  return direction === 'asc' ? cmp : -cmp
 }
 
 interface GlobalAiConfig {
@@ -101,6 +137,10 @@ export function UsersPage() {
   
   // Global AI config (to know if per-user overrides are enabled globally)
   const [globalAiConfig, setGlobalAiConfig] = useState<GlobalAiConfig | null>(null)
+
+  // Sort control for the email / web login / streaming activity columns
+  const [sortField, setSortField] = useState<SortField>('default')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   const fetchGlobalAiConfig = useCallback(async () => {
     try {
@@ -431,6 +471,19 @@ export function UsersPage() {
     }
   }
 
+  const handleSortFieldChange = (event: SelectChangeEvent) => {
+    const field = event.target.value as SortField
+    setSortField(field)
+    // A fresh field picks the direction that reads naturally on first click —
+    // most-recent-first for dates, A-Z for email — rather than always resetting
+    // to ascending, which would show "never logged in" users before anyone else.
+    if (field === 'lastLogin' || field === 'lastActivity') {
+      setSortDirection('desc')
+    } else if (field === 'email') {
+      setSortDirection('asc')
+    }
+  }
+
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, user: ProviderUser) => {
     setMenuAnchor(event.currentTarget)
     setMenuUser(user)
@@ -507,17 +560,51 @@ export function UsersPage() {
     )
   }
 
-  // Sort: imported & enabled first, then imported, then non-imported
+  // Default sort: imported & enabled first, then imported, then non-imported —
+  // unchanged from before the sort control existed, and still what loads by
+  // default. Picking a field below replaces this with a straight sort on that
+  // field (nulls last), name as the tiebreaker.
+  const sortFieldGetters: Record<'email' | 'lastLogin' | 'lastActivity', (u: ProviderUser) => string | null | undefined> = {
+    email: (u) => u.email,
+    lastLogin: (u) => u.lastLoginAt,
+    lastActivity: (u) => u.lastActivityDate,
+  }
   const sortedUsers = [...providerUsers].sort((a, b) => {
-    if (a.isEnabled && !b.isEnabled) return -1
-    if (!a.isEnabled && b.isEnabled) return 1
-    if (a.isImported && !b.isImported) return -1
-    if (!a.isImported && b.isImported) return 1
-    return a.name.localeCompare(b.name)
+    if (sortField === 'default') {
+      if (a.isEnabled && !b.isEnabled) return -1
+      if (!a.isEnabled && b.isEnabled) return 1
+      if (a.isImported && !b.isImported) return -1
+      if (!a.isImported && b.isImported) return 1
+      return a.name.localeCompare(b.name)
+    }
+    const getField = sortFieldGetters[sortField]
+    const cmp = compareNullable(getField(a), getField(b), sortDirection)
+    return cmp !== 0 ? cmp : a.name.localeCompare(b.name)
   })
 
   const isJobRunning = (userId: string) => runningJobs.has(userId)
   const providerLabel = provider.charAt(0).toUpperCase() + provider.slice(1)
+
+  const sortControl = (
+    <Stack direction="row" alignItems="center" spacing={0.5} flexWrap="wrap">
+      <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+        {t('admin.usersPage.sortByLabel')}
+      </Typography>
+      <Select size="small" value={sortField} onChange={handleSortFieldChange} sx={{ minWidth: 160 }}>
+        <MenuItem value="default">{t('admin.usersPage.sortDefault')}</MenuItem>
+        <MenuItem value="email">{t('admin.usersPage.sortEmail')}</MenuItem>
+        <MenuItem value="lastLogin">{t('admin.usersPage.sortLastLogin')}</MenuItem>
+        <MenuItem value="lastActivity">{t('admin.usersPage.sortLastActivity', { provider: providerLabel })}</MenuItem>
+      </Select>
+      {sortField !== 'default' && (
+        <Tooltip title={sortDirection === 'asc' ? t('admin.usersPage.sortAscending') : t('admin.usersPage.sortDescending')}>
+          <IconButton size="small" onClick={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}>
+            {sortDirection === 'asc' ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />}
+          </IconButton>
+        </Tooltip>
+      )}
+    </Stack>
+  )
 
   // Mobile card view
   if (isMobile) {
@@ -549,6 +636,8 @@ export function UsersPage() {
             </Button>
           </Stack>
         </Box>
+
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>{sortControl}</Box>
 
         <Stack spacing={2}>
           {sortedUsers.length === 0 ? (
@@ -618,6 +707,38 @@ export function UsersPage() {
                       </Tooltip>
                     ) : null}
                   </Stack>
+
+                  {/* Email + last login / last streaming activity */}
+                  {(user.isImported || user.lastActivityDate) && (
+                    <Stack spacing={0.25} mb={1.5}>
+                      {user.isImported && user.email && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <EmailIcon sx={{ fontSize: 14 }} color="action" />
+                          <Typography variant="caption" color="text.secondary">
+                            {user.email}
+                          </Typography>
+                        </Box>
+                      )}
+                      {user.isImported && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <LoginIcon sx={{ fontSize: 14 }} color="action" />
+                          <Typography variant="caption" color="text.secondary">
+                            {t('admin.usersPage.lastWebLoginLabel')}{' '}
+                            {formatTimestamp(user.lastLoginAt) || t('admin.usersPage.never')}
+                          </Typography>
+                        </Box>
+                      )}
+                      {user.lastActivityDate && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <PlayArrowIcon sx={{ fontSize: 14 }} color="action" />
+                          <Typography variant="caption" color="text.secondary">
+                            {t('admin.usersPage.lastStreamingLabel', { provider: providerLabel })}{' '}
+                            {formatTimestamp(user.lastActivityDate)}
+                          </Typography>
+                        </Box>
+                      )}
+                    </Stack>
+                  )}
 
                   {/* Import button for non-imported users */}
                   {!user.isImported && (
@@ -875,6 +996,8 @@ export function UsersPage() {
         </Stack>
       </Box>
 
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>{sortControl}</Box>
+
       <TableContainer
         component={Paper}
         sx={{ backgroundColor: 'background.paper', borderRadius: 2 }}
@@ -970,6 +1093,34 @@ export function UsersPage() {
                         <Chip label={t('admin.usersPage.adminChip')} size="small" color="primary" />
                       )}
                     </Box>
+                    <Stack spacing={0.25} sx={{ mt: (user.isImported || user.lastActivityDate) ? 0.5 : 0 }}>
+                      {user.isImported && user.email && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <EmailIcon sx={{ fontSize: 14 }} color="action" />
+                          <Typography variant="caption" color="text.secondary">
+                            {user.email}
+                          </Typography>
+                        </Box>
+                      )}
+                      {user.isImported && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <LoginIcon sx={{ fontSize: 14 }} color="action" />
+                          <Typography variant="caption" color="text.secondary">
+                            {t('admin.usersPage.lastWebLoginLabel')}{' '}
+                            {formatTimestamp(user.lastLoginAt) || t('admin.usersPage.never')}
+                          </Typography>
+                        </Box>
+                      )}
+                      {user.lastActivityDate && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <PlayArrowIcon sx={{ fontSize: 14 }} color="action" />
+                          <Typography variant="caption" color="text.secondary">
+                            {t('admin.usersPage.lastStreamingLabel', { provider: providerLabel })}{' '}
+                            {formatTimestamp(user.lastActivityDate)}
+                          </Typography>
+                        </Box>
+                      )}
+                    </Stack>
                   </TableCell>
                   <TableCell>
                     {user.isDisabled ? (

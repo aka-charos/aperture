@@ -12,9 +12,9 @@ export const apiErrorsSchemas = {
     description: 'An error from an external API provider',
     properties: {
       id: { type: 'string', format: 'uuid', description: 'Error record ID' },
-      provider: { 
-        type: 'string', 
-        enum: ['openai', 'google', 'tavily', 'tmdb', 'trakt', 'mdblist', 'omdb'],
+      provider: {
+        type: 'string',
+        enum: ['openai', 'google', 'tavily', 'tmdb', 'trakt', 'mdblist', 'omdb', 'lldap'],
         description: 'Which API provider had the error'
       },
       errorType: { type: 'string', description: 'Error classification (rate_limit, auth_error, etc.)' },
@@ -74,9 +74,9 @@ export const getProviderErrorsSchema = {
     type: 'object',
     required: ['provider'],
     properties: {
-      provider: { 
-        type: 'string', 
-        enum: ['openai', 'google', 'tavily', 'tmdb', 'trakt', 'mdblist', 'omdb'],
+      provider: {
+        type: 'string',
+        enum: ['openai', 'google', 'tavily', 'tmdb', 'trakt', 'mdblist', 'omdb', 'lldap'],
         description: 'Provider to get errors for'
       },
     },
@@ -104,7 +104,7 @@ export const dismissProviderErrorsSchema = {
     type: 'object',
     required: ['provider'],
     properties: {
-      provider: { type: 'string', enum: ['openai', 'google', 'tavily', 'tmdb', 'trakt', 'mdblist', 'omdb'] },
+      provider: { type: 'string', enum: ['openai', 'google', 'tavily', 'tmdb', 'trakt', 'mdblist', 'omdb', 'lldap'] },
     },
   },
 }

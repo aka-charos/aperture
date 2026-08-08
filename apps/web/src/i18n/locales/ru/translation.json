@@ -233,7 +233,17 @@
       "colEmail": "Email",
       "emailColTooltip": "Lets the user opt in to email notifications about their recommendations in their settings. Feature coming soon — enabling this only reveals the setting, no emails are sent yet.",
       "emailToggleOn": "Hide email notifications setting",
-      "emailToggleOff": "Show email notifications setting"
+      "emailToggleOff": "Show email notifications setting",
+      "never": "Never",
+      "lastWebLoginLabel": "Web login:",
+      "lastStreamingLabel": "{{provider}} activity:",
+      "sortByLabel": "Sort by:",
+      "sortDefault": "Default",
+      "sortEmail": "Email",
+      "sortLastLogin": "Web Login",
+      "sortLastActivity": "{{provider}} Activity",
+      "sortAscending": "Ascending — click to reverse",
+      "sortDescending": "Descending — click to reverse"
     },
     "userDetail": {
       "userNotFound": "Пользователь не найден",
@@ -379,7 +389,8 @@
         "syncMovieLibraries": "Создание библиотек фильмов {{appName}}",
         "syncSeriesLibraries": "Создание библиотек серии {{appName}}",
         "fullResetMovieRecommendations": "Полный сброс рекомендаций по фильмам",
-        "fullResetSeriesRecommendations": "Рекомендации по серии полного сброса"
+        "fullResetSeriesRecommendations": "Рекомендации по серии полного сброса",
+        "syncLldapEmails": "Sync LLDAP Emails"
       },
       "ui": {
         "cancelTitle": "Остановить Джоба?",
@@ -4372,5 +4383,27 @@
     "fetchFailed": "Failed to load the brand colors",
     "saveFailed": "Failed to save the brand colors",
     "unknownError": "Something went wrong"
+  },
+  "settingsLldap": {
+    "title": "LLDAP Email Import",
+    "loadError": "Failed to load LLDAP configuration",
+    "saved": "LLDAP configuration saved!",
+    "testSuccess": "Connection successful! Found {{count}} user(s) in LLDAP.",
+    "testFailed": "Connection test failed",
+    "configured": "Configured",
+    "description": "Optional: import each user's email from an LLDAP directory by matching their username. Only works if your media server authenticates against the same LLDAP server, so usernames line up exactly. Runs daily as the \"sync-lldap-emails\" job (Admin → Jobs), or trigger it manually there.",
+    "serverUrl": "Server URL",
+    "serverUrlPlaceholder": "https://lldap.example.com",
+    "adminUsername": "Admin Username",
+    "adminUsernamePlaceholder": "admin",
+    "adminUsernameHelper": "Must be an LLDAP admin account — regular accounts can't look up other users",
+    "adminPassword": "Admin Password",
+    "helperSaved": "Password is saved. Enter a new one to replace it.",
+    "enableImport": "Enable LLDAP email import",
+    "enableImportCaption": "Users without a manually-set email will get theirs from LLDAP",
+    "testing": "Testing…",
+    "testConnection": "Test Connection",
+    "errSave": "Failed to save configuration",
+    "errConnect": "Could not connect to server"
   }
 }

@@ -16,6 +16,7 @@ import StreamIcon from '@mui/icons-material/Stream'
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney'
 import ExploreIcon from '@mui/icons-material/Explore'
 import SendIcon from '@mui/icons-material/Send'
+import AlternateEmailIcon from '@mui/icons-material/AlternateEmail'
 import type { JobCategory } from './types'
 import { getAppName } from '@/lib/branding'
 
@@ -84,7 +85,7 @@ export const GLOBAL_JOB_CATEGORIES: JobCategory[] = [
     titleKey: 'admin.jobsPage.categories.globalIntegrations.title',
     descriptionKey: 'admin.jobsPage.categories.globalIntegrations.description',
     color: '#ed1c24',
-    jobs: ['sync-trakt-ratings', 'refresh-ai-pricing'],
+    jobs: ['sync-trakt-ratings', 'refresh-ai-pricing', 'sync-lldap-emails'],
   },
 ]
 
@@ -116,6 +117,7 @@ export const JOB_ICONS: Record<string, React.ReactNode> = {
   'sync-trakt-ratings': <SyncIcon />,
   'refresh-ai-pricing': <AttachMoneyIcon />,
   'generate-discovery-suggestions': <ExploreIcon />,
+  'sync-lldap-emails': <AlternateEmailIcon />,
 }
 
 export const JOB_COLORS: Record<string, string> = {
@@ -140,6 +142,7 @@ export const JOB_COLORS: Record<string, string> = {
   'sync-trakt-ratings': '#ed1c24',
   'refresh-ai-pricing': '#22c55e',
   'generate-discovery-suggestions': '#ec4899',
+  'sync-lldap-emails': '#0ea5e9',
 }
 
 const JOB_DISPLAY_NAME_KEYS: Record<string, string> = {
@@ -147,6 +150,8 @@ const JOB_DISPLAY_NAME_KEYS: Record<string, string> = {
   'sync-series-libraries': 'admin.jobsPage.jobNames.syncSeriesLibraries',
   'full-reset-movie-recommendations': 'admin.jobsPage.jobNames.fullResetMovieRecommendations',
   'full-reset-series-recommendations': 'admin.jobsPage.jobNames.fullResetSeriesRecommendations',
+  // Auto title-casing turns "lldap" into "Lldap" — the acronym needs its own key.
+  'sync-lldap-emails': 'admin.jobsPage.jobNames.syncLldapEmails',
 }
 
 // Only reached when a caller has no `t` to hand; the translated names above are

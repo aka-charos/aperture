@@ -92,6 +92,14 @@ export async function createSession(userId: string): Promise<string> {
     throw new Error('Failed to create session')
   }
 
+  // Persisted on the user row rather than derived from `sessions.last_seen_at` —
+  // that column gets rewritten by activity (not just login) and the row itself
+  // is pruned by cleanup-auth-state once idle, which would otherwise make a past
+  // login look like it never happened. Best-effort: never fail a login over this.
+  await query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [userId]).catch((err) =>
+    sessionLogger.warn({ err, userId }, 'Failed to update last_login_at')
+  )
+
   return token
 }
 

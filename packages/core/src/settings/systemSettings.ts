@@ -1551,6 +1551,84 @@ export async function testOMDbConnection(
 }
 
 // ============================================================================
+// LLDAP Integration Settings
+// ============================================================================
+// Optional: imports each user's email from an LLDAP directory by matching the
+// Aperture username to the LLDAP user ID (works when Emby/Jellyfin authenticates
+// against the same LLDAP server, so the two usernames are identical). See
+// packages/core/src/lldap/ for the client and sync job that use this config.
+
+export interface LldapConfig {
+  url: string | null
+  adminUsername: string | null
+  hasAdminPassword: boolean
+  enabled: boolean
+}
+
+/**
+ * Get LLDAP configuration
+ */
+export async function getLldapConfig(): Promise<LldapConfig> {
+  const url = await getSystemSetting('lldap_url')
+  const adminUsername = await getSystemSetting('lldap_admin_username')
+  const adminPassword = await getSystemSetting('lldap_admin_password')
+  const enabled = await getSystemSetting('lldap_enabled')
+
+  return {
+    url: url || null,
+    adminUsername: adminUsername || null,
+    hasAdminPassword: !!adminPassword,
+    // Enabled by default once fully configured, same convention as OMDb/MDBList
+    enabled: enabled !== 'false' && !!url && !!adminUsername && !!adminPassword,
+  }
+}
+
+/**
+ * Get the LLDAP admin password (never returned by getLldapConfig, which only
+ * reports whether one is set)
+ */
+export async function getLldapAdminPassword(): Promise<string | null> {
+  return await getSystemSetting('lldap_admin_password')
+}
+
+/**
+ * Set LLDAP configuration
+ */
+export async function setLldapConfig(config: {
+  url?: string
+  adminUsername?: string
+  adminPassword?: string
+  enabled?: boolean
+}): Promise<LldapConfig> {
+  if (config.url !== undefined) {
+    await setSystemSetting('lldap_url', config.url, 'LLDAP server base URL (e.g. https://lldap.example.com)')
+  }
+  if (config.adminUsername !== undefined) {
+    await setSystemSetting(
+      'lldap_admin_username',
+      config.adminUsername,
+      'LLDAP admin account username used to look up user emails'
+    )
+  }
+  if (config.adminPassword !== undefined) {
+    await setSystemSetting('lldap_admin_password', config.adminPassword, 'LLDAP admin account password')
+  }
+  if (config.enabled !== undefined) {
+    await setSystemSetting('lldap_enabled', String(config.enabled), 'Enable LLDAP email import')
+  }
+  logger.info('LLDAP config updated')
+  return getLldapConfig()
+}
+
+/**
+ * Check if LLDAP is configured and enabled
+ */
+export async function isLldapConfigured(): Promise<boolean> {
+  const config = await getLldapConfig()
+  return config.enabled
+}
+
+// ============================================================================
 // Studio Logo Settings
 // ============================================================================
 

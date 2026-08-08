@@ -33,6 +33,7 @@ import {
   completeJob,
   failJob,
   syncUsersFromMediaServer,
+  syncLldapEmails,
   createChildLogger,
   runLibraryGapAnalysis,
   withInferenceContext,
@@ -268,6 +269,21 @@ async function executeJob(name: string, jobId: string): Promise<void> {
             seriesSkipped: result.seriesSkipped,
           },
           `✅ Auto-request Top Picks complete`
+        )
+        break
+      }
+      // === LLDAP Email Sync Job ===
+      case 'sync-lldap-emails': {
+        const result = await syncLldapEmails(jobId)
+        logger.info(
+          {
+            job: name,
+            jobId,
+            matched: result.matched,
+            updated: result.updated,
+            skipped: result.skipped,
+          },
+          `✅ LLDAP email sync complete`
         )
         break
       }

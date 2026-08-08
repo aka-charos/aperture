@@ -90,13 +90,13 @@ const apiErrorsRoutes: FastifyPluginAsync = async (fastify) => {
       const { provider } = request.params
       
       // Validate provider
-      const validProviders = ['openai', 'google', 'tavily', 'tmdb', 'trakt', 'mdblist', 'omdb']
+      const validProviders = ['openai', 'google', 'tavily', 'tmdb', 'trakt', 'mdblist', 'omdb', 'lldap']
       if (!validProviders.includes(provider)) {
         return reply.status(400).send({ error: 'Invalid provider' })
       }
       
       try {
-        const errors = await getActiveErrorsByProvider(provider as 'openai' | 'google' | 'tavily' | 'tmdb' | 'trakt' | 'mdblist' | 'omdb')
+        const errors = await getActiveErrorsByProvider(provider as 'openai' | 'google' | 'tavily' | 'tmdb' | 'trakt' | 'mdblist' | 'omdb' | 'lldap')
         
         const transformed = errors.map((error) => ({
           id: error.id,
@@ -149,13 +149,13 @@ const apiErrorsRoutes: FastifyPluginAsync = async (fastify) => {
       const { provider } = request.params
       
       // Validate provider
-      const validProviders = ['openai', 'google', 'tavily', 'tmdb', 'trakt', 'mdblist', 'omdb']
+      const validProviders = ['openai', 'google', 'tavily', 'tmdb', 'trakt', 'mdblist', 'omdb', 'lldap']
       if (!validProviders.includes(provider)) {
         return reply.status(400).send({ error: 'Invalid provider' })
       }
       
       try {
-        const count = await dismissErrorsByProvider(provider as 'openai' | 'google' | 'tavily' | 'tmdb' | 'trakt' | 'mdblist' | 'omdb')
+        const count = await dismissErrorsByProvider(provider as 'openai' | 'google' | 'tavily' | 'tmdb' | 'trakt' | 'mdblist' | 'omdb' | 'lldap')
         reply.send({ success: true, dismissed: count })
       } catch (err) {
         logger.error({ err, provider }, 'Failed to dismiss provider errors')
