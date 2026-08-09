@@ -12,6 +12,7 @@
 
 import { query } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
+import { WATCH_HISTORY_TASTE_SQL } from '../recommender/watchedExclusion.js'
 import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../lib/ai-provider.js'
 import type { MediaType, WatchedItem } from './types.js'
 import {
@@ -242,11 +243,32 @@ export async function buildTasteClusters(
 // ============================================================================
 
 /**
+ * How much a series' completion rate scales its engagement weight.
+ *
+ * The denominator behind `completionRate` is the number of episodes **on the
+ * media server**, never TMDB's aired total, and that is load-bearing: a user
+ * who owns one season of a five-season show and watched it has finished
+ * everything they had, and must not be penalised for content they don't hold.
+ *
+ * Exported so the bands are testable as a unit -- they are the one place where
+ * "did they like it" is inferred rather than stated.
+ */
+export function completionMultiplier(completionRate: number | undefined): number {
+  if (completionRate === undefined) return 1.0
+
+  if (completionRate > 0.9) return 1.5 // finished it
+  if (completionRate > 0.5) return 1.2 // committed to it
+  if (completionRate >= 0.25) return 1.0 // neutral: could be a library gap
+  if (completionRate >= 0.1) return 0.4 // sampled and drifted away
+  return 0.25 // bounced off it
+}
+
+/**
  * Calculate engagement weight for a watched item
  *
  * Factors:
  * - Episode/movie count (log scale to prevent runaway)
- * - Completion rate (finished = strong signal)
+ * - Completion rate (finished = strong signal, abandoned = negative signal)
  * - Favorites (explicit positive signal)
  * - User rating (if available)
  * - Recency (half-life decay)
@@ -260,12 +282,17 @@ export function calculateEngagementWeight(item: WatchedItem, mediaType: MediaTyp
     const episodeCount = item.episodeCount || 1
     weight *= 1 + Math.log10(Math.max(episodeCount, 1))
 
-    // Completion bonus (finished series = very strong signal)
-    if (item.completionRate !== undefined && item.completionRate > 0.9) {
-      weight *= 1.5
-    } else if (item.completionRate !== undefined && item.completionRate > 0.5) {
-      weight *= 1.2
-    }
+    // Completion moves the weight in BOTH directions. Bonuses alone were not
+    // enough: people sample far more shows than they finish, so with the old
+    // 1.0x floor forty abandoned shows outvoted five finished ones roughly
+    // 2.5:1, and the taste vector was built mostly from shows the user
+    // rejected. Dropping a show early is evidence, and it is negative.
+    //
+    // Nothing between 25% and 50% is penalised, deliberately: a user who
+    // watched season one while season two was missing from the library, and
+    // never noticed it arrive, has not told us anything bad about the show.
+    // The bands above 50% stay bonuses for the same reason.
+    weight *= completionMultiplier(item.completionRate)
   } else {
     // Movie: play count matters
     const playCount = item.playCount || 1
@@ -340,6 +367,7 @@ async function getMovieWatchHistory(userId: string): Promise<WatchedItem[]> {
      JOIN movies m ON m.id = wh.movie_id
      LEFT JOIN user_ratings ur ON ur.movie_id = m.id AND ur.user_id = wh.user_id
      WHERE wh.user_id = $1 AND wh.media_type = 'movie'
+       AND ${WATCH_HISTORY_TASTE_SQL}
      ${libraryExclusionClause}
      ORDER BY wh.last_played_at DESC NULLS LAST`,
     [userId, ...excludedLibraryIds]
@@ -354,6 +382,74 @@ async function getMovieWatchHistory(userId: string): Promise<WatchedItem[]> {
     rating: row.user_rating ?? undefined,
     genres: row.genres || [],
     collectionName: row.collection_name ?? undefined,
+  }))
+}
+
+/**
+ * Shows the user favorited on the media server without playing an episode.
+ *
+ * These leave no watch_history rows at all -- the sync fetches favorited
+ * *Episodes*, while favoriting a show in Emby/Jellyfin marks the *Series*
+ * item -- so until now a show you explicitly flagged was invisible to the
+ * taste profile. user_watching_series is the bidirectional mirror of those
+ * server favorites (watching/favoriteSync.ts), which is why no new sync is
+ * needed here.
+ *
+ * Caveat worth knowing: that mirror is only refreshed while the Watching
+ * feature is enabled. With it off the table goes stale, and this contributes
+ * nothing rather than contributing something wrong.
+ *
+ * Returned with no episode count and no completion rate, so the engagement
+ * weight comes out at the favorites bonus alone -- a deliberate stance that a
+ * flagged-but-unstarted show is a real but modest signal, well below a show
+ * the user actually finished.
+ */
+async function getFavoritedSeriesWithoutHistory(userId: string): Promise<WatchedItem[]> {
+  const { getUserExcludedLibraries } = await import('../lib/libraryExclusions.js')
+  const excludedLibraryIds = await getUserExcludedLibraries(userId)
+
+  const libraryExclusionClause =
+    excludedLibraryIds.length > 0
+      ? `AND (s.provider_library_id IS NULL OR s.provider_library_id NOT IN (${excludedLibraryIds
+          .map((_, i) => `$${i + 2}`)
+          .join(', ')}))`
+      : ''
+
+  const result = await query<{
+    id: string
+    title: string
+    user_rating: number | null
+    genres: string[]
+    added_at: Date | null
+  }>(
+    `SELECT s.id, s.title, ur.rating as user_rating, s.genres, uws.added_at
+       FROM user_watching_series uws
+       JOIN series s ON s.id = uws.series_id
+       LEFT JOIN user_ratings ur ON ur.series_id = s.id AND ur.user_id = uws.user_id
+      WHERE uws.user_id = $1
+        ${libraryExclusionClause}
+        AND NOT EXISTS (
+          SELECT 1
+            FROM watch_history wh
+            JOIN episodes e ON e.id = wh.episode_id
+           WHERE wh.user_id = uws.user_id
+             AND wh.media_type = 'episode'
+             AND e.series_id = s.id
+             AND ${WATCH_HISTORY_TASTE_SQL}
+        )`,
+    [userId, ...excludedLibraryIds]
+  )
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    hasFavorites: true,
+    playCount: 0,
+    // Recency still applies, dated from when they flagged it -- the closest
+    // thing to an interaction timestamp a never-played show has.
+    lastPlayedAt: row.added_at,
+    rating: row.user_rating ?? undefined,
+    genres: row.genres || [],
   }))
 }
 
@@ -395,13 +491,14 @@ async function getSeriesWatchHistory(userId: string): Promise<WatchedItem[]> {
      JOIN series s ON s.id = e.series_id
      LEFT JOIN user_ratings ur ON ur.series_id = s.id AND ur.user_id = wh.user_id
      WHERE wh.user_id = $1 AND wh.media_type = 'episode'
+       AND ${WATCH_HISTORY_TASTE_SQL}
      GROUP BY s.id, s.title, s.total_episodes, s.genres
      ${libraryExclusionClause}
      ORDER BY MAX(wh.last_played_at) DESC NULLS LAST`,
     [userId, ...excludedLibraryIds]
   )
 
-  return result.rows.map((row) => {
+  const watched: WatchedItem[] = result.rows.map((row) => {
     const episodesWatched = parseInt(String(row.episodes_watched), 10)
     const totalEpisodes = row.total_episodes || undefined
 
@@ -418,6 +515,11 @@ async function getSeriesWatchHistory(userId: string): Promise<WatchedItem[]> {
       genres: row.genres || [],
     }
   })
+
+  // Shows flagged on the server but never started have no episode rows to
+  // group, so they are fetched separately and appended. The NOT EXISTS in that
+  // query is what keeps this from double-counting a show already above.
+  return [...watched, ...(await getFavoritedSeriesWithoutHistory(userId))]
 }
 
 // ============================================================================

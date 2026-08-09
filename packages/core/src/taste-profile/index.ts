@@ -33,6 +33,9 @@ export {
   type DetectionResult,
   type DetectionOptions,
 } from './franchise.js'
+// One completion policy, shared with the series pipeline's own weighting so the
+// two cannot drift into disagreeing about what "finished it" is worth.
+export { completionMultiplier, calculateEngagementWeight } from './builder.js'
 
 const logger = createChildLogger('taste-profile')
 
