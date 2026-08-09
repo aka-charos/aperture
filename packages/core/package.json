@@ -53,6 +53,7 @@
     "test:selection": "node --import tsx --test src/recommender/shared/selection.test.ts",
     "test:novelty": "node --import tsx --test src/recommender/shared/novelty.test.ts",
     "test:similarity": "node --import tsx --test src/recommender/shared/similarityScale.test.ts",
+    "test:era": "node --import tsx --test src/recommender/eraDiagnostics.test.ts",
     "test:discovery": "node --import tsx --test src/discover/scorer.test.ts",
     "lint": "eslint src",
     "clean": "rm -rf dist"

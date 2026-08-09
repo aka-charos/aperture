@@ -56,6 +56,7 @@ import {
   type InterestMatchIndex,
 } from '../shared/index.js'
 import { getWatchedGenreCounts } from '../genreFamiliarity.js'
+import { getWatchedYears, summarizeEraFit } from '../eraDiagnostics.js'
 
 // Re-export types
 export * from '../types.js'
@@ -517,6 +518,25 @@ export async function generateRecommendationsForUser(
         `  ${i + 1}. ${s.title} (${s.year}) - Score: ${s.finalScore.toFixed(3)}`
       )
     }
+
+    // Nothing scores or filters on release year, so whether the picks track the
+    // user's era at all is an open question rather than a designed behaviour.
+    // Read `unfamiliarShare` against `poolUnfamiliarShare`: the pool is
+    // effectively the library's own era mix, so a much smaller share among the
+    // picks means the embedding is carrying era implicitly and an explicit term
+    // would be redundant. Similar shares mean there is no era signal.
+    logger.info(
+      {
+        userId: user.id,
+        mediaType: 'movie',
+        ...summarizeEraFit(
+          await getWatchedYears(user.id, 'movie'),
+          scoredCandidates.map((c) => c.year),
+          finalSelected.map((c) => c.year)
+        ),
+      },
+      'ERA-DIAG'
+    )
 
     // 6. Store results
     logger.info({ runId }, '💾 Storing candidates and evidence...')

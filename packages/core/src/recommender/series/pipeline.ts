@@ -58,6 +58,7 @@ import {
 import { getItemFranchises } from '../../taste-profile/franchise.js'
 import { getDislikedSeriesIds } from './taste.js'
 import { getWatchedGenreCounts } from '../genreFamiliarity.js'
+import { getWatchedYears, summarizeEraFit } from '../eraDiagnostics.js'
 import { WATCH_HISTORY_TASTE_SQL } from '../watchedExclusion.js'
 import { loadConfigForUser } from '../config.js'
 import type { PipelineConfig } from '../types.js'
@@ -1137,6 +1138,21 @@ export async function generateSeriesRecommendationsForUser(
         `  ${i + 1}. ${s.title} (${s.year}) - Score: ${s.finalScore.toFixed(3)}`
       )
     }
+
+    // Mirrors the movie pipeline: nothing scores or filters on year, so this
+    // reports whether the picks track the user's era anyway. See eraDiagnostics.
+    logger.info(
+      {
+        userId: user.id,
+        mediaType: 'series',
+        ...summarizeEraFit(
+          await getWatchedYears(user.id, 'series'),
+          scoredCandidates.map((c) => c.year),
+          finalSelected.map((c) => c.year)
+        ),
+      },
+      'ERA-DIAG'
+    )
 
     // 7. Store results
     logger.info({ runId }, '💾 Storing candidates...')
