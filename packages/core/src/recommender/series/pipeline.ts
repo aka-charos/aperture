@@ -45,6 +45,7 @@ import { syncSeriesWatchHistoryForUser } from './sync.js'
 
 // New taste profile system
 import {
+  completionMultiplier,
   getUserTasteProfile,
   storeTasteProfile as storeNewTasteProfile,
   getUserTasteClusters,
@@ -135,16 +136,18 @@ async function getSeriesWatchHistory(userId: string, limit: number): Promise<Wat
   )
 
   return result.rows.map((row) => {
-    // Calculate engagement weight based on:
+    // Engagement weight, from:
     // 1. Completion rate (how much of the series they watched)
     // 2. Whether they have favorites (strong signal)
-    // 3. Recency (more recent = higher weight)
+    //
+    // No recency term here, unlike the taste-profile builder -- this is the
+    // fallback single-centroid path and has never had one.
     let weight = 1.0
 
-    // Completion bonus (0.5 - 2.0x based on completion %)
+    // Shared with the builder so both paths agree on what completion is worth,
+    // including the penalty for a show that was dropped early.
     if (row.total_episodes && row.total_episodes > 0) {
-      const completionRate = row.episodes_watched / row.total_episodes
-      weight *= 0.5 + completionRate * 1.5
+      weight *= completionMultiplier(row.episodes_watched / row.total_episodes)
     }
 
     // Favorites bonus (1.5x if they have any favorite episodes)

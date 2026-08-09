@@ -74,11 +74,12 @@ export async function getExpandedFavoritedMovieIds(userId: string): Promise<Set<
 /**
  * Series counterpart of getExpandedFavoritedMovieIds.
  *
- * watch_history carries series rows per *episode*, so this means "a series with
- * at least one favorited episode" -- the closest thing the table records to a
- * favorited show. A show favorited on the media server with nothing played
- * leaves no rows here at all, so it never reaches the taste profile and needs
- * no exclusion.
+ * watch_history carries series rows per *episode*, so `is_favorite` there means
+ * "has a favorited episode". A show favorited on the media server itself leaves
+ * no episode rows at all -- favoriting in Emby/Jellyfin marks the Series item --
+ * so those come from user_watching_series, the bidirectional mirror of server
+ * series-favorites (watching/favoriteSync.ts). Both count: either way the user
+ * has already found the show, which is the whole reason not to recommend it.
  */
 export async function getExpandedFavoritedSeriesIds(userId: string): Promise<Set<string>> {
   const result = await query<{ id: string }>(
@@ -89,6 +90,9 @@ export async function getExpandedFavoritedSeriesIds(userId: string): Promise<Set
        FROM watch_history wh
        JOIN episodes e ON e.id = wh.episode_id
        WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND wh.is_favorite = true
+     )
+     OR s.id IN (
+       SELECT uws.series_id FROM user_watching_series uws WHERE uws.user_id = $1
      )
      OR s.tmdb_id IN (
        SELECT DISTINCT s2.tmdb_id
