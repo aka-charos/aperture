@@ -140,6 +140,12 @@ export async function storeEvidence(
 
   // Get all evidence in a single query using LATERAL join
   // This finds the top 3 similar watched movies for each selected movie in one query
+  //
+  // The self-match exclusion is load-bearing: a title can sit in both sets at
+  // once (favorites are taste input), and without it the pick matched itself at
+  // cosine 1.0, took the top slot of only three, and told the explanation model
+  // -- which is instructed to use this data and not invent connections -- that
+  // the film's closest relative in the user's history was itself.
   const selectedIds = selected.map((s) => s.movieId)
   const evidenceResult = await query<{
     selected_movie_id: string
@@ -153,6 +159,7 @@ export async function storeEvidence(
               1 - (e2.embedding <=> e1.embedding) as similarity
        FROM ${tableName} e1
        JOIN ${tableName} e2 ON e2.movie_id = ANY($2) AND e2.model = $3
+         AND e2.movie_id <> sel.selected_movie_id
        WHERE e1.movie_id = sel.selected_movie_id AND e1.model = $3
        ORDER BY e2.embedding <=> e1.embedding
        LIMIT 3
