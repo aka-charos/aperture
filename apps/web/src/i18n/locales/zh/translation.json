@@ -1688,7 +1688,7 @@
   "algorithmSettings": {
     "weightSimilarity": "相似",
     "weightSimilarityDesc": "How strongly to favour titles close to your taste profile. Usually the one to keep highest",
-    "weightNovelty": "新奇",
+    "weightNovelty": "类型探索",
     "weightNoveltyDesc": "Rewards a familiar anchor plus a genre you rarely watch — partly new, rather than as strange as possible",
     "weightRating": "社区评级",
     "weightRatingDesc": "How much to favour highly-rated titles. This score never changes, so a high value makes your list repeat itself",
@@ -2231,7 +2231,7 @@
     "recsPerUser": "每个用户的建议",
     "watchHistoryDepth": "观看历史深度",
     "weightSimilarity": "相似",
-    "weightDiscovery": "发现",
+    "weightDiscovery": "类型探索",
     "weightRating": "等级",
     "weightDiversity": "多样性",
     "helpIncrease": "↑ 增加：",

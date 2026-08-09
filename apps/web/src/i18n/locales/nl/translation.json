@@ -1457,7 +1457,7 @@
   "algorithmSettings": {
     "weightSimilarity": "Gelijkenis",
     "weightSimilarityDesc": "How strongly to favour titles close to your taste profile. Usually the one to keep highest",
-    "weightNovelty": "Nieuwigheid",
+    "weightNovelty": "Genre ontdekking",
     "weightNoveltyDesc": "Rewards a familiar anchor plus a genre you rarely watch — partly new, rather than as strange as possible",
     "weightRating": "Gemeenschapsbeoordeling",
     "weightRatingDesc": "How much to favour highly-rated titles. This score never changes, so a high value makes your list repeat itself",
@@ -2000,7 +2000,7 @@
     "recsPerUser": "Recensies per gebruiker",
     "watchHistoryDepth": "Bekijk de geschiedenisdiepte",
     "weightSimilarity": "Gelijkenis",
-    "weightDiscovery": "Ontdekking",
+    "weightDiscovery": "Genre ontdekking",
     "weightRating": "Beoordeling",
     "weightDiversity": "Diversiteit",
     "helpIncrease": "↑ Verhogen:",

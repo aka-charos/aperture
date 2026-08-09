@@ -1485,7 +1485,7 @@
   "algorithmSettings": {
     "weightSimilarity": "Similarity",
     "weightSimilarityDesc": "How strongly to favour titles close to your taste profile. Usually the one to keep highest",
-    "weightNovelty": "Novelty",
+    "weightNovelty": "Genre Discovery",
     "weightNoveltyDesc": "Rewards a familiar anchor plus a genre you rarely watch — partly new, rather than as strange as possible",
     "weightRating": "Community Rating",
     "weightRatingDesc": "How much to favour highly-rated titles. This score never changes, so a high value makes your list repeat itself",
@@ -2155,7 +2155,7 @@
     "recsPerUser": "Recs Per User",
     "watchHistoryDepth": "Watch History Depth",
     "weightSimilarity": "Similarity",
-    "weightDiscovery": "Discovery",
+    "weightDiscovery": "Genre Discovery",
     "weightRating": "Rating",
     "weightDiversity": "Diversity",
     "helpIncrease": "↑ Increase:",
