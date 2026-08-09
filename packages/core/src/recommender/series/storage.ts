@@ -47,6 +47,9 @@ export async function storeSeriesEvidence(
   const tableName = await getActiveEmbeddingTableName('series_embeddings')
 
   // Get all evidence in a single query using LATERAL join
+  //
+  // Mirrors the movie path, including the self-match exclusion -- see the note
+  // in ../storage.ts for why a pick can appear in its own evidence at all.
   const selectedIds = selected.map((s) => s.seriesId)
   const evidenceResult = await query<{
     selected_series_id: string
@@ -60,6 +63,7 @@ export async function storeSeriesEvidence(
               1 - (e2.embedding <=> e1.embedding) as similarity
        FROM ${tableName} e1
        JOIN ${tableName} e2 ON e2.series_id = ANY($2) AND e2.model = $3
+         AND e2.series_id <> sel.selected_series_id
        WHERE e1.series_id = sel.selected_series_id AND e1.model = $3
        ORDER BY e2.embedding <=> e1.embedding
        LIMIT 3
