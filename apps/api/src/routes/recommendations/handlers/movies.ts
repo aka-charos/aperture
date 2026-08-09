@@ -5,7 +5,7 @@
 import type { FastifyInstance } from 'fastify'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
-import { regenerateUserRecommendations } from '@aperture/core'
+import { regenerateUserRecommendations, getEffectiveAiExplanationSetting } from '@aperture/core'
 import { recommendationSchemas } from '../schemas.js'
 import type { MovieRecommendationCandidate, RecommendationRun } from '../types.js'
 
@@ -156,10 +156,11 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
         rating_score: number | null
         diversity_score: number | null
         score_breakdown: Record<string, unknown>
+        ai_explanation: string | null
       }>(
         `SELECT rc.id, rc.rank, rc.is_selected, rc.final_score,
                 rc.similarity_score, rc.novelty_score, rc.rating_score, rc.diversity_score,
-                rc.score_breakdown
+                rc.score_breakdown, rc.ai_explanation
          FROM recommendation_candidates rc
          WHERE rc.run_id = $1 AND rc.movie_id = $2`,
         [latestRun.id, movieId]
@@ -225,8 +226,16 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
       const matchingGenres = movieGenres.filter((g) => userGenres.has(g))
       const newGenres = movieGenres.filter((g) => !userGenres.has(g))
 
+      // Withheld unless the target user's effective setting allows it, so the
+      // toggle governs this surface the same way it governs the NFO plot. Note
+      // it is the target's setting, not the viewing admin's.
+      const aiExplanation = (await getEffectiveAiExplanationSetting(userId))
+        ? candidate.ai_explanation
+        : null
+
       return reply.send({
         isRecommended: true,
+        aiExplanation,
         isSelected: candidate.is_selected,
         rank: candidate.rank,
         scores: {

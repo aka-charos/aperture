@@ -758,7 +758,8 @@
       "newGenresPart": "• {{count}} nieuw om te ontdekken",
       "whyWeThink": "Waarom we denken dat je dit leuk zult vinden",
       "basedOnHistoryMovie": "Gebaseerd op je geschiedenis met soortgelijke films:",
-      "basedOnHistorySeries": "Gebaseerd op jouw geschiedenis met vergelijkbare series:"
+      "basedOnHistorySeries": "Gebaseerd op jouw geschiedenis met vergelijkbare series:",
+      "aiExplanationTitle": "Waarom {{appName}} dit voor u heeft uitgekozen"
     },
     "seasons": {
       "title": "Afleveringen",
@@ -1293,9 +1294,9 @@
     "resetToDefaults": "Terugzetten naar standaardwaarden",
     "aiLibraryFooter": "Wijzigingen worden toegepast de volgende keer dat de bibliotheeksynchronisatietaken worden uitgevoerd of wanneer aanbevelingen opnieuw worden gegenereerd.",
     "aiExplanationTitle": "AI Uitleg Voorkeur",
-    "aiExplanationSubtitle": "Kies of u door AI gegenereerde uitleg wilt opnemen in uw aanbevelingsbeschrijvingen.",
+    "aiExplanationSubtitle": "Choose whether your recommendations come with a short note on why each title was picked.",
     "aiExplanationIncludeTitle": "Voeg AI-uitleg toe",
-    "aiExplanationIncludeBody": "Indien ingeschakeld, bevat elke aanbeveling 'Waarom {{appName}} dit voor u heeft uitgekozen'",
+    "aiExplanationIncludeBody": "Adds \"Why {{appName}} picked this for you\" to each recommendation — in its Recommended For You panel here, and at the top of its description on your media server",
     "aiExplanationReset": "Terugzetten naar standaard ({{state}})",
     "stateEnabled": "Ingeschakeld",
     "stateDisabled": "Gehandicapt",
@@ -1911,9 +1912,9 @@
     "saved": "AI-uitleginstellingen opgeslagen!",
     "unknownError": "Onbekende fout",
     "title": "AI-uitleg in aanbevelingen",
-    "subtitle": "Bepaal of door AI gegenereerde uitleg ('Waarom {{appName}} dit voor u heeft uitgekozen') wordt weergegeven in de beschrijvingen van aanbevelingen",
+    "subtitle": "A short written note on why each title was picked, shown as \"Why {{appName}} picked this for you\"",
     "includeTitle": "Voeg AI-uitleg toe",
-    "includeDesc": "Indien ingeschakeld, bevat elke aanbeveling een persoonlijke uitleg waarom deze is geselecteerd",
+    "includeDesc": "Each recommendation gets a paragraph explaining the pick, shown in its Recommended For You panel and at the top of its description on your media server. Turning this off also skips the AI call that writes them. Either way, the change applies from the next recommendation run onward — existing recommendations keep whatever they were generated with.",
     "overrideTitle": "Overschrijvingen per gebruiker toestaan",
     "overrideDesc": "Indien ingeschakeld kunnen beheerders individuele gebruikers de mogelijkheid geven om AI-verklaringen voor hun eigen aanbevelingen in of uit te schakelen",
     "infoThreeTier": "Drielaags systeem:",

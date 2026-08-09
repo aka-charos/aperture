@@ -598,9 +598,9 @@
     "resetToDefaults": "デフォルトにリセット",
     "aiLibraryFooter": "変更は、次回ライブラリ同期ジョブが実行されるとき、または推奨事項が再生成されるときに適用されます。",
     "aiExplanationTitle": "AI説明の好み",
-    "aiExplanationSubtitle": "AI が生成した説明を推奨事項の説明に含めるかどうかを選択します。",
+    "aiExplanationSubtitle": "Choose whether your recommendations come with a short note on why each title was picked.",
     "aiExplanationIncludeTitle": "AIの説明を含める",
-    "aiExplanationIncludeBody": "有効にすると、各推奨事項に「{{appName}} がこれを選んだ理由」が含まれます。",
+    "aiExplanationIncludeBody": "Adds \"Why {{appName}} picked this for you\" to each recommendation — in its Recommended For You panel here, and at the top of its description on your media server",
     "aiExplanationReset": "デフォルトにリセット ({{state}})",
     "stateEnabled": "有効",
     "stateDisabled": "無効",
@@ -1088,7 +1088,8 @@
       "newGenresPart": "• {{count}} 個の新たな探索",
       "whyWeThink": "これが気に入っていただけると思う理由",
       "basedOnHistoryMovie": "同様の映画の視聴歴に基づいて:",
-      "basedOnHistorySeries": "同様のシリーズの使用歴に基づくと、次のようになります。"
+      "basedOnHistorySeries": "同様のシリーズの使用歴に基づくと、次のようになります。",
+      "aiExplanationTitle": "{{appName}} がこれを選んだ理由"
     },
     "seasons": {
       "title": "エピソード",
@@ -2142,9 +2143,9 @@
     "saved": "AI解説設定が保存されました！",
     "unknownError": "不明なエラー",
     "title": "推奨事項における AI の説明",
-    "subtitle": "AI が生成した説明 (「{{appName}} がこれを選んだ理由」) を推奨事項の説明に表示するかどうかを制御します",
+    "subtitle": "A short written note on why each title was picked, shown as \"Why {{appName}} picked this for you\"",
     "includeTitle": "AIの説明を含める",
-    "includeDesc": "有効にすると、各推奨事項に、その推奨事項が選択された理由に関する個別の説明が含まれます。",
+    "includeDesc": "Each recommendation gets a paragraph explaining the pick, shown in its Recommended For You panel and at the top of its description on your media server. Turning this off also skips the AI call that writes them. Either way, the change applies from the next recommendation run onward — existing recommendations keep whatever they were generated with.",
     "overrideTitle": "ユーザーごとの上書きを許可する",
     "overrideDesc": "有効にすると、管理者は個々のユーザーに、AI の説明を自分の推奨事項に切り替える機能を付与できます。",
     "infoThreeTier": "3 層システム:",

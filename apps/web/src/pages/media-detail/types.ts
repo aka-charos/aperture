@@ -163,6 +163,12 @@ export interface RecommendationInsights {
   isSelected?: boolean
   rank?: number
   message?: string
+  /**
+   * The generated "why this was picked" paragraph. Null whenever the admin (or
+   * the user) has AI explanations switched off, and also for any run generated
+   * while it was off, since generation is gated on the same setting.
+   */
+  aiExplanation?: string | null
   scores?: {
     final: number
     similarity: number | null

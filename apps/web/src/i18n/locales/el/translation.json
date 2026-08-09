@@ -785,9 +785,9 @@
     "saved": "Οι ρυθμίσεις εξήγησης AI αποθηκεύτηκαν!",
     "unknownError": "Άγνωστο σφάλμα",
     "title": "Εξήγηση AI στις Προτάσεις",
-    "subtitle": "Ελέγξτε αν οι εξηγήσεις που δημιουργούνται από AI («Γιατί το {{appName}} το επέλεξε για εσάς») εμφανίζονται στις περιγραφές προτάσεων",
+    "subtitle": "A short written note on why each title was picked, shown as \"Why {{appName}} picked this for you\"",
     "includeTitle": "Συμπερίληψη Εξηγήσεων AI",
-    "includeDesc": "Όταν είναι ενεργό, κάθε πρόταση περιλαμβάνει μια εξατομικευμένη εξήγηση για τον λόγο επιλογής της",
+    "includeDesc": "Each recommendation gets a paragraph explaining the pick, shown in its Recommended For You panel and at the top of its description on your media server. Turning this off also skips the AI call that writes them. Either way, the change applies from the next recommendation run onward — existing recommendations keep whatever they were generated with.",
     "overrideTitle": "Επιτρέπεται Παράκαμψη ανά Χρήστη",
     "overrideDesc": "Όταν είναι ενεργό, οι διαχειριστές μπορούν να δίνουν σε μεμονωμένους χρήστες τη δυνατότητα να ενεργοποιούν/απενεργοποιούν τις εξηγήσεις AI για τις δικές τους προτάσεις",
     "infoThreeTier": "Σύστημα τριών επιπέδων:",
@@ -2115,9 +2115,9 @@
     "resetToDefaults": "Επαναφορά Προεπιλογών",
     "aiLibraryFooter": "Οι αλλαγές θα εφαρμοστούν την επόμενη φορά που θα εκτελεστούν οι εργασίες συγχρονισμού βιβλιοθήκης ή όταν αναδημιουργηθούν οι προτάσεις.",
     "aiExplanationTitle": "Προτίμηση Εξηγήσεων AI",
-    "aiExplanationSubtitle": "Επιλέξτε αν θα συμπεριλαμβάνονται εξηγήσεις AI στις περιγραφές των προτάσεών σας.",
+    "aiExplanationSubtitle": "Choose whether your recommendations come with a short note on why each title was picked.",
     "aiExplanationIncludeTitle": "Συμπερίληψη Εξηγήσεων AI",
-    "aiExplanationIncludeBody": "Όταν είναι ενεργό, κάθε πρόταση περιλαμβάνει \"Γιατί το {{appName}} το επέλεξε για εσάς\"",
+    "aiExplanationIncludeBody": "Adds \"Why {{appName}} picked this for you\" to each recommendation — in its Recommended For You panel here, and at the top of its description on your media server",
     "aiExplanationReset": "Επαναφορά στην Προεπιλογή ({{state}})",
     "stateEnabled": "Ενεργό",
     "stateDisabled": "Ανενεργό",
@@ -2927,7 +2927,8 @@
       "newGenresPart": " • {{count}} νέα προς εξερεύνηση",
       "whyWeThink": "Γιατί Πιστεύουμε Ότι Θα Σας Αρέσει",
       "basedOnHistoryMovie": "Βάσει του ιστορικού σας με παρόμοιες ταινίες:",
-      "basedOnHistorySeries": "Βάσει του ιστορικού σας με παρόμοιες σειρές:"
+      "basedOnHistorySeries": "Βάσει του ιστορικού σας με παρόμοιες σειρές:",
+      "aiExplanationTitle": "Γιατί το {{appName}} το επέλεξε για εσάς"
     },
     "seasons": {
       "title": "Επεισόδια",
