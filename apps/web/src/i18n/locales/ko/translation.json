@@ -1682,7 +1682,8 @@
     "favoriteEra": "좋아하는 시대",
     "topGenres": "상위 장르",
     "errSaveInterest": "Couldn't save that interest",
-    "errRemoveInterest": "Couldn't remove that interest"
+    "errRemoveInterest": "Couldn't remove that interest",
+    "genreSharedNote": "These weights are shared between movies and TV series."
   },
   "algorithmSettings": {
     "weightSimilarity": "유사",

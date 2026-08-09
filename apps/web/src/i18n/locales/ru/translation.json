@@ -1451,7 +1451,8 @@
     "favoriteEra": "Любимая эпоха",
     "topGenres": "Лучшие жанры",
     "errSaveInterest": "Couldn't save that interest",
-    "errRemoveInterest": "Couldn't remove that interest"
+    "errRemoveInterest": "Couldn't remove that interest",
+    "genreSharedNote": "These weights are shared between movies and TV series."
   },
   "algorithmSettings": {
     "weightSimilarity": "Сходство",

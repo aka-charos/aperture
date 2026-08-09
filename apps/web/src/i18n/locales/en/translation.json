@@ -1451,6 +1451,7 @@
     "franchiseExplainerAfterAvoid": " to see less. Your settings are saved automatically.",
     "genreWeightingTitle": "Genre Weighting ({{count}})",
     "genreExplainerLead": "Fine-tune genre preferences to personalize discovery and recommendations.",
+    "genreSharedNote": "These weights are shared between movies and TV series.",
     "genreExplainerAfterBoost": " genres you enjoy, ",
     "genreExplainerAfterHide": " genres you want to avoid. Changes apply to all features.",
     "weightAvoid": "Avoid",

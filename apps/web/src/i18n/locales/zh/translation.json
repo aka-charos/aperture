@@ -1682,7 +1682,8 @@
     "favoriteEra": "最喜欢的时代",
     "topGenres": "热门流派",
     "errSaveInterest": "Couldn't save that interest",
-    "errRemoveInterest": "Couldn't remove that interest"
+    "errRemoveInterest": "Couldn't remove that interest",
+    "genreSharedNote": "These weights are shared between movies and TV series."
   },
   "algorithmSettings": {
     "weightSimilarity": "相似",
