@@ -114,9 +114,16 @@ const REFRESH_INTERVAL_VALUES = [7, 14, 30, 60, 90, 180, 365] as const
 
 interface WatcherIdentitySectionProps {
   mediaType: 'movie' | 'series'
+  /**
+   * Genre weights are stored per user, not per media type, so they are edited
+   * in one shared card outside these sub-tabs (see GenreWeightingCard). An
+   * analyze run here still detects them, so the result is handed upward rather
+   * than rendered locally.
+   */
+  onGenresDetected?: (genres: GenreWeight[], newGenres: string[]) => void
 }
 
-export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProps) {
+export function WatcherIdentitySection({ mediaType, onGenresDetected }: WatcherIdentitySectionProps) {
   const { t } = useTranslation()
   const { user } = useAuth()
   const theme = useTheme()
@@ -150,15 +157,12 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
   // Modal state
   const [showAnalyzeModal, setShowAnalyzeModal] = useState(false)
   
-  // New items tracking (for highlighting)
-  const [newItems, setNewItems] = useState<{ franchises: string[]; genres: string[] }>({
-    franchises: [],
-    genres: [],
-  })
-  
+  // New items tracking (for highlighting). Genres are not here: they live in
+  // the shared GenreWeightingCard, which owns their highlighting too.
+  const [newFranchises, setNewFranchises] = useState<string[]>([])
+
   // Refs for scrolling to new items
   const franchiseRefs = useRef<Record<string, HTMLDivElement | null>>({})
-  const genreRefs = useRef<Record<string, HTMLDivElement | null>>({})
   
   // Library exclusions state
   const [accessibleLibraries, setAccessibleLibraries] = useState<AccessibleLibrary[]>([])
@@ -253,8 +257,8 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
     setAnalyzing(true)
     setError(null)
     setSuccess(null)
-    setNewItems({ franchises: [], genres: [] })
-    
+    setNewFranchises([])
+
     try {
       const response = await fetch('/api/settings/taste-profile/rebuild', {
         method: 'POST',
@@ -265,14 +269,11 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
       if (!response.ok) throw new Error(t('watcherIdentity.errAnalyzeWatchHistory'))
       const result = await response.json()
       
-      // Track new items for highlighting
-      if (result.newFranchises?.length > 0 || result.newGenres?.length > 0) {
-        setNewItems({
-          franchises: result.newFranchises || [],
-          genres: result.newGenres || [],
-        })
+      // Track new franchises for highlighting
+      if (result.newFranchises?.length > 0) {
+        setNewFranchises(result.newFranchises)
       }
-      
+
       // Update lists directly from response (no full page re-render)
       if (result.franchises || result.genres) {
         setData(prev => prev ? {
@@ -281,7 +282,14 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
           genres: result.genres || prev.genres,
         } : null)
       }
-      
+
+      // Genres are stored per user, not per media type, so the detected list
+      // goes to the one shared card rather than being rendered under whichever
+      // sub-tab happened to run the analysis.
+      if (result.genres) {
+        onGenresDetected?.(result.genres, result.newGenres || [])
+      }
+
       if (mode === 'merge') {
         const newCount = (result.newFranchises?.length || 0) + (result.newGenres?.length || 0)
         setSuccess(newCount > 0 
@@ -322,58 +330,32 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
   }
 
   // Auto-save slider with debounce
-  const handleSliderChange = (type: 'franchise' | 'genre', id: string, name: string, value: number) => {
+  const handleSliderChange = (id: string, name: string, value: number) => {
     // Clear existing debounce
-    const key = `${type}-${id}`
+    const key = `franchise-${id}`
     if (sliderDebounceRef.current[key]) {
       clearTimeout(sliderDebounceRef.current[key])
     }
-    
+
     // Remove from new items when user interacts
-    if (type === 'franchise' && newItems.franchises.includes(name)) {
-      setNewItems(prev => ({
-        ...prev,
-        franchises: prev.franchises.filter(f => f !== name),
-      }))
-    } else if (type === 'genre' && newItems.genres.includes(name)) {
-      setNewItems(prev => ({
-        ...prev,
-        genres: prev.genres.filter(g => g !== name),
-      }))
-    }
-    
+    setNewFranchises(prev => prev.includes(name) ? prev.filter(f => f !== name) : prev)
+
     // Update local state immediately
-    if (type === 'franchise') {
-      setData(prev => prev ? {
-        ...prev,
-        franchises: prev.franchises.map(f => f.id === id ? { ...f, preferenceScore: value } : f)
-      } : null)
-    } else {
-      setData(prev => prev ? {
-        ...prev,
-        genres: prev.genres.map(g => g.id === id ? { ...g, weight: value } : g)
-      } : null)
-    }
-    
+    setData(prev => prev ? {
+      ...prev,
+      franchises: prev.franchises.map(f => f.id === id ? { ...f, preferenceScore: value } : f)
+    } : null)
+
     // Debounce API call
     sliderDebounceRef.current[key] = setTimeout(async () => {
       setSavingSlider(key)
       try {
-        if (type === 'franchise') {
-          await fetch('/api/settings/taste-profile/franchises', {
-            method: 'PUT',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ franchises: [{ franchiseName: name, mediaType, preferenceScore: value }] }),
-          })
-        } else {
-          await fetch('/api/settings/taste-profile/genres', {
-            method: 'PUT',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ genres: [{ genre: name, weight: value }] }),
-          })
-        }
+        await fetch('/api/settings/taste-profile/franchises', {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ franchises: [{ franchiseName: name, mediaType, preferenceScore: value }] }),
+        })
       } catch {
         // Silent fail
       } finally {
@@ -382,13 +364,9 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
     }, 500)
   }
 
-  // Scroll to a new item
-  const scrollToItem = (type: 'franchise' | 'genre', name: string) => {
-    const refs = type === 'franchise' ? franchiseRefs : genreRefs
-    const element = refs.current[name]
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
+  // Scroll to a new franchise
+  const scrollToFranchise = (name: string) => {
+    franchiseRefs.current[name]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
   // Delete franchise
@@ -400,38 +378,10 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
     } : null)
     
     // Also remove from new items if present
-    setNewItems(prev => ({
-      ...prev,
-      franchises: prev.franchises.filter(f => f !== franchiseName),
-    }))
-    
+    setNewFranchises(prev => prev.filter(f => f !== franchiseName))
+
     try {
       await fetch(`/api/settings/taste-profile/franchises/${encodeURIComponent(franchiseName)}?mediaType=${mediaType}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      })
-    } catch {
-      // Revert on error - refetch data
-      fetchData()
-    }
-  }
-
-  // Delete genre
-  const handleDeleteGenre = async (genre: string) => {
-    // Optimistically remove from local state
-    setData(prev => prev ? {
-      ...prev,
-      genres: prev.genres.filter(g => g.genre !== genre)
-    } : null)
-    
-    // Also remove from new items if present
-    setNewItems(prev => ({
-      ...prev,
-      genres: prev.genres.filter(g => g !== genre),
-    }))
-    
-    try {
-      await fetch(`/api/settings/taste-profile/genres/${encodeURIComponent(genre)}`, {
         method: 'DELETE',
         credentials: 'include',
       })
@@ -1092,8 +1042,9 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
         </Box>
         
         <Grid container spacing={3}>
-          {/* Franchise Weighting */}
-          <Grid item xs={12} md={6}>
+          {/* Franchise Weighting. Full width since genre weights moved out to
+              their own card -- they are stored per user, not per media type. */}
+          <Grid item xs={12}>
             <Box sx={{ 
               border: '1px solid',
               borderColor: 'divider',
@@ -1140,7 +1091,7 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
                   [...data.franchises]
                     .sort((a, b) => a.franchiseName.localeCompare(b.franchiseName))
                     .map((franchise) => {
-                    const isNew = newItems.franchises.includes(franchise.franchiseName)
+                    const isNew = newFranchises.includes(franchise.franchiseName)
                     return (
                       <Box 
                         key={franchise.id} 
@@ -1217,7 +1168,7 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
                         </Box>
                         <Slider
                           value={franchise.preferenceScore}
-                          onChange={(_, value) => handleSliderChange('franchise', franchise.id, franchise.franchiseName, value as number)}
+                          onChange={(_, value) => handleSliderChange(franchise.id, franchise.franchiseName, value as number)}
                           min={-1}
                           max={1}
                           step={0.1}
@@ -1245,195 +1196,22 @@ export function WatcherIdentitySection({ mediaType }: WatcherIdentitySectionProp
               </Box>
               
               {/* New items alert */}
-              {newItems.franchises.length > 0 && (
-                <Alert 
-                  severity="info" 
+              {newFranchises.length > 0 && (
+                <Alert
+                  severity="info"
                   icon={<AutoFixHighIcon />}
                   sx={{ mt: 2 }}
                 >
                   <Typography variant="body2" fontWeight={500} mb={1}>
-                    {t('watcherIdentity.newFranchisesDetected', { count: newItems.franchises.length })}
+                    {t('watcherIdentity.newFranchisesDetected', { count: newFranchises.length })}
                   </Typography>
                   <Box display="flex" gap={0.5} flexWrap="wrap">
-                    {newItems.franchises.map((name) => (
+                    {newFranchises.map((name) => (
                       <Chip
                         key={name}
                         label={name}
                         size="small"
-                        onClick={() => scrollToItem('franchise', name)}
-                        sx={{
-                          cursor: 'pointer',
-                          bgcolor: theme.palette.warning.main,
-                          color: 'white',
-                          '&:hover': { bgcolor: theme.palette.warning.dark },
-                        }}
-                      />
-                    ))}
-                  </Box>
-                </Alert>
-              )}
-            </Box>
-          </Grid>
-          
-          {/* Genre Weighting */}
-          <Grid item xs={12} md={6}>
-            <Box sx={{ 
-              border: '1px solid',
-              borderColor: 'divider',
-              borderRadius: 2,
-              p: 2,
-            }}>
-              <Box display="flex" alignItems="center" gap={1} mb={1}>
-                <TheaterComedyIcon sx={{ color: accentColor }} fontSize="small" />
-                <Typography variant="subtitle1" fontWeight={600}>
-                  {t('watcherIdentity.genreWeightingTitle', { count: data?.genres?.length || 0 })}
-                </Typography>
-              </Box>
-              
-              {/* Explainer */}
-              <Box 
-                sx={{ 
-                  bgcolor: 'action.hover', 
-                  borderRadius: 1, 
-                  p: 1.5, 
-                  mb: 2,
-                  borderLeft: '3px solid',
-                  borderColor: accentColor,
-                }}
-              >
-                <Typography variant="caption" color="text.secondary">
-                  {t('watcherIdentity.genreExplainerLead')}{' '}
-                  <strong>{t('watcherIdentity.weightBoost')}</strong>
-                  {t('watcherIdentity.genreExplainerAfterBoost')}
-                  <strong>{t('watcherIdentity.weightHide')}</strong>
-                  {t('watcherIdentity.genreExplainerAfterHide')}
-                </Typography>
-              </Box>
-              
-              {/* Legend */}
-              <Box display="flex" justifyContent="space-between" mb={2} px={1}>
-                <Typography variant="caption" color="text.secondary">{t('watcherIdentity.weightHide')}</Typography>
-                <Typography variant="caption" color="text.secondary">{t('watcherIdentity.weightNormal')}</Typography>
-                <Typography variant="caption" color="info.main">{t('watcherIdentity.weightBoost')}</Typography>
-              </Box>
-              
-              {/* Scrollable slider list */}
-              <Box sx={{ maxHeight: 350, overflow: 'auto', pr: 1 }}>
-                {data?.genres && data.genres.length > 0 ? (
-                  [...data.genres]
-                    .sort((a, b) => a.genre.localeCompare(b.genre))
-                    .map((genre) => {
-                    const isNew = newItems.genres.includes(genre.genre)
-                    return (
-                      <Box 
-                        key={genre.id} 
-                        ref={(el: HTMLDivElement | null) => { genreRefs.current[genre.genre] = el }}
-                        sx={{ 
-                          mb: 2,
-                          p: isNew ? 1 : 0,
-                          borderRadius: 1,
-                          border: isNew ? '2px solid' : 'none',
-                          borderColor: isNew ? theme.palette.warning.main : 'transparent',
-                          animation: isNew ? 'pulse 2s infinite' : 'none',
-                          '@keyframes pulse': {
-                            '0%, 100%': { borderColor: theme.palette.warning.main },
-                            '50%': { borderColor: theme.palette.warning.light },
-                          },
-                        }}
-                      >
-                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <Typography variant="body2" fontWeight={500}>
-                              {genre.genre}
-                            </Typography>
-                            {isNew && (
-                              <Chip
-                                size="small"
-                                label={t('watcherIdentity.chipNew')}
-                                sx={{
-                                  bgcolor: theme.palette.warning.main,
-                                  color: 'white',
-                                  fontSize: '0.6rem', 
-                                  height: 18,
-                                  fontWeight: 700,
-                                }} 
-                              />
-                            )}
-                          </Box>
-                          <Box display="flex" alignItems="center" gap={0.5}>
-                            <Chip
-                              size="small"
-                              label={
-                                genre.weight > 1.3 ? t('watcherIdentity.weightBoost') :
-                                genre.weight < 0.7 ? t('watcherIdentity.weightLess') : t('watcherIdentity.weightNormal')
-                              }
-                              sx={{
-                                bgcolor: genre.weight > 1.3 ? 'info.main' :
-                                        genre.weight < 0.7 ? 'action.hover' : 'action.selected',
-                                color: genre.weight > 1.3 ? 'white' : 'text.primary',
-                                fontSize: '0.7rem',
-                                height: 20,
-                              }}
-                            />
-                            <Tooltip title={t('watcherIdentity.removeFromListTooltip')}>
-                              <IconButton 
-                                size="small" 
-                                onClick={() => handleDeleteGenre(genre.genre)}
-                                sx={{ 
-                                  p: 0.25,
-                                  opacity: 0.5,
-                                  '&:hover': { opacity: 1, color: 'error.main' }
-                                }}
-                              >
-                                <DeleteOutlineIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </Box>
-                        </Box>
-                        <Slider
-                          value={genre.weight}
-                          onChange={(_, value) => handleSliderChange('genre', genre.id, genre.genre, value as number)}
-                          min={0}
-                          max={2}
-                          step={0.1}
-                          size="small"
-                          sx={{
-                            '& .MuiSlider-track': {
-                              background: `linear-gradient(to right, #9ca3af, ${accentColor})`,
-                            },
-                            '& .MuiSlider-rail': {
-                              background: `linear-gradient(to right, #374151, #9ca3af, ${accentColor})`,
-                              opacity: 0.3,
-                            },
-                          }}
-                        />
-                      </Box>
-                    )
-                  })
-                ) : (
-                  <Typography variant="body2" color="text.secondary" textAlign="center" py={4}>
-                    {t('watcherIdentity.noGenresHint', { action: t('watcherIdentity.analyzeWatchHistory') })}
-                  </Typography>
-                )}
-              </Box>
-              
-              {/* New items alert */}
-              {newItems.genres.length > 0 && (
-                <Alert 
-                  severity="info" 
-                  icon={<AutoFixHighIcon />}
-                  sx={{ mt: 2 }}
-                >
-                  <Typography variant="body2" fontWeight={500} mb={1}>
-                    {t('watcherIdentity.newGenresDetected', { count: newItems.genres.length })}
-                  </Typography>
-                  <Box display="flex" gap={0.5} flexWrap="wrap">
-                    {newItems.genres.map((name) => (
-                      <Chip
-                        key={name}
-                        label={name}
-                        size="small"
-                        onClick={() => scrollToItem('genre', name)}
+                        onClick={() => scrollToFranchise(name)}
                         sx={{
                           cursor: 'pointer',
                           bgcolor: theme.palette.warning.main,

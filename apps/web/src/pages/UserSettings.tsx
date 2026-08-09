@@ -13,6 +13,7 @@ import { useTheme } from '@mui/material/styles'
 import { useAuth } from '@/hooks/useAuth'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { WatcherIdentitySection } from './UserSettings/WatcherIdentitySection'
+import { GenreWeightingCard, type GenreWeightingUpdate } from './UserSettings/GenreWeightingCard'
 import { AlgorithmSettingsSection } from './UserSettings/AlgorithmSettingsSection'
 import { UserLanguagePreferencesCard } from './UserSettings/UserLanguagePreferencesCard'
 import { UserProfileTab } from './UserSettings/UserProfileTab'
@@ -36,6 +37,10 @@ export function UserSettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [tabValue, setTabValue] = useState(() => userSettingsTabIndexFromParam(searchParams.get('tab')))
   const [identityMediaType, setIdentityMediaType] = useState<'movie' | 'series'>('movie')
+  // Genre weights are per user, not per media type, so the card sits outside
+  // the movie/series sub-tabs. Either sub-tab's analyze run detects the same
+  // rows, so whichever ran last hands its result across.
+  const [genreUpdate, setGenreUpdate] = useState<GenreWeightingUpdate | null>(null)
 
   const [email, setEmail] = useState('')
   const [originalEmail, setOriginalEmail] = useState('')
@@ -242,7 +247,13 @@ export function UserSettingsPage() {
               <Tab icon={<MovieIcon />} label={t('userSettings.identitySubtabMovies')} value="movie" iconPosition="start" />
               <Tab icon={<TvIcon />} label={t('userSettings.identitySubtabSeries')} value="series" iconPosition="start" />
             </Tabs>
-            <WatcherIdentitySection mediaType={identityMediaType} />
+            <Box display="flex" flexDirection="column" gap={3}>
+              <WatcherIdentitySection
+                mediaType={identityMediaType}
+                onGenresDetected={(genres, newGenres) => setGenreUpdate({ genres, newGenres })}
+              />
+              <GenreWeightingCard update={genreUpdate} />
+            </Box>
           </TabPanel>
 
           <TabPanel value={tabValue} index={2}>

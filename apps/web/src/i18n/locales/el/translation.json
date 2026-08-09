@@ -2539,7 +2539,8 @@
     "favoriteEra": "Αγαπημένη Εποχή",
     "topGenres": "Κορυφαία Είδη",
     "errSaveInterest": "Couldn't save that interest",
-    "errRemoveInterest": "Couldn't remove that interest"
+    "errRemoveInterest": "Couldn't remove that interest",
+    "genreSharedNote": "These weights are shared between movies and TV series."
   },
   "aiFunctionCard": {
     "chipActive": "Ενεργό",
