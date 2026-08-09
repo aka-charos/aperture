@@ -1,4 +1,5 @@
 import type { Movie } from '../types.js'
+import { DEFAULT_APP_NAME } from '../../settings/systemSettings.js'
 
 /**
  * Escape XML special characters
@@ -19,6 +20,12 @@ export interface NfoGenerateOptions {
   dateAdded?: Date
   /** Include AI explanation of why this was recommended (default: true) */
   includeAiExplanation?: boolean
+  /**
+   * The instance's display name, which the plot credits for the pick. Passed in
+   * rather than read here so this stays a pure formatter; callers get it from
+   * getAppName(). Defaults to the shipped brand for older call sites.
+   */
+  appName?: string
   /** Rank for sort title prefix (e.g., "01 - Movie Title") */
   rank?: number
 }
@@ -30,7 +37,7 @@ export interface NfoGenerateOptions {
  * When downloadImages is true, images are saved locally and Emby auto-detects them.
  * When downloadImages is false, we include remote URLs in the NFO.
  * 
- * The plot contains AI explanation first (why Aperture picked it), then original overview.
+ * The plot contains AI explanation first (why this instance picked it), then original overview.
  * dateAdded is used to set the "Date Added" in Emby based on rank (Rank 1 = newest)
  * 
  * @param movie - Movie data
@@ -55,7 +62,7 @@ export function generateNfoContent(
     options = includeImageUrls
   }
   
-  const { includeAiExplanation = true } = options
+  const { includeAiExplanation = true, appName = DEFAULT_APP_NAME } = options
   const lines: string[] = [
     '<?xml version="1.0" encoding="utf-8"?>',
     '<movie>',
@@ -87,7 +94,7 @@ export function generateNfoContent(
   // Build the plot - AI explanation first (if enabled), then original overview
   let plot = ''
   if (includeAiExplanation && movie.aiExplanation) {
-    plot = '🎯 Why Aperture picked this for you:\n' + movie.aiExplanation
+    plot = `🎯 Why ${appName} picked this for you:\n` + movie.aiExplanation
     if (movie.overview) {
       plot += '\n\n📖 About this movie:\n' + movie.overview
     }

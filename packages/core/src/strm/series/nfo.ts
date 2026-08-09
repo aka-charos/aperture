@@ -6,6 +6,7 @@
  */
 
 import type { Series, NfoGenerateOptions } from './types.js'
+import { DEFAULT_APP_NAME } from '../../settings/systemSettings.js'
 
 /**
  * Escape XML special characters
@@ -26,7 +27,7 @@ export function escapeXml(text: string): string {
  * Generate NFO content for a TV series
  *
  * NFO files contain comprehensive metadata that Emby can read when scanning the library.
- * The plot contains AI explanation first (why Aperture picked it), then original overview.
+ * The plot contains AI explanation first (why this instance picked it), then original overview.
  * dateAdded is used to set the "Date Added" in Emby based on rank (Rank 1 = newest)
  */
 export function generateSeriesNfoContent(
@@ -46,7 +47,7 @@ export function generateSeriesNfoContent(
     options = optionsOrIncludeImageUrls
   }
 
-  const { includeAiExplanation = true } = options
+  const { includeAiExplanation = true, appName = DEFAULT_APP_NAME } = options
   const lines: string[] = [
     '<?xml version="1.0" encoding="utf-8" standalone="yes"?>',
     '<tvshow>',
@@ -56,7 +57,7 @@ export function generateSeriesNfoContent(
   // Build the plot - AI explanation first (if enabled), then original overview
   let plot = ''
   if (includeAiExplanation && series.aiExplanation) {
-    plot = '🎯 Why Aperture picked this for you:\n' + series.aiExplanation
+    plot = `🎯 Why ${appName} picked this for you:\n` + series.aiExplanation
     if (series.overview) {
       plot += '\n\n📖 About this series:\n' + series.overview
     }

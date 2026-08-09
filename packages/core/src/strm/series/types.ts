@@ -76,6 +76,12 @@ export interface NfoGenerateOptions {
   dateAdded?: Date
   /** Include AI explanation of why this was recommended (default: true) */
   includeAiExplanation?: boolean
+  /**
+   * The instance's display name, which the plot credits for the pick. Passed in
+   * rather than read here so this stays a pure formatter; callers get it from
+   * getAppName(). Defaults to the shipped brand for older call sites.
+   */
+  appName?: string
   /** Rank for sort title prefix (e.g., "01 - Series Title") */
   rank?: number
 }

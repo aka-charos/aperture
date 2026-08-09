@@ -3,7 +3,7 @@ import path from 'path'
 import { createChildLogger } from '../../lib/logger.js'
 import { query, queryOne } from '../../lib/db.js'
 import { getConfig } from '../config.js'
-import { getAiRecsOutputConfig } from '../../settings/systemSettings.js'
+import { getAiRecsOutputConfig, getAppName } from '../../settings/systemSettings.js'
 import { downloadImage } from '../images.js'
 import { generateNfoContent } from './nfo.js'
 import {
@@ -107,6 +107,9 @@ export async function writeStrmFilesForUser(
   // Check if AI explanation should be included for this user
   const includeAiExplanation = await getEffectiveAiExplanationSetting(userId)
   logger.info({ userId, includeAiExplanation }, '🎯 AI explanation setting resolved')
+
+  // The plot credits the instance by its configured name, not the shipped brand.
+  const appName = await getAppName()
 
   // Ensure directory exists on local mount
   await fs.mkdir(localPath, { recursive: true })
@@ -303,6 +306,7 @@ export async function writeStrmFilesForUser(
         includeImageUrls: !config.downloadImages,
         dateAdded,
         includeAiExplanation,
+        appName,
         rank: movie.rank,
       })
       await fs.writeFile(path.join(movieFolderPath, 'movie.nfo'), nfoContent, 'utf-8')
@@ -409,6 +413,7 @@ export async function writeStrmFilesForUser(
         includeImageUrls: !config.downloadImages,
         dateAdded,
         includeAiExplanation,
+        appName,
         rank: movie.rank,
       })
       await fs.writeFile(path.join(movieFolderPath, 'movie.nfo'), nfoContent, 'utf-8')

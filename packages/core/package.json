@@ -46,7 +46,7 @@
     "dev": "tsc -p tsconfig.build.json --watch",
     "typecheck": "tsc --noEmit",
     "test:justwatch": "node --import tsx --test src/justwatch/normalize.test.ts",
-    "test:strm": "node --import tsx --test src/strm/posterOverlay.test.ts src/strm/artwork.test.ts",
+    "test:strm": "node --import tsx --test src/strm/posterOverlay.test.ts src/strm/artwork.test.ts src/strm/nfo.test.ts",
     "test:clustering": "node --import tsx --test src/taste-profile/clustering.test.ts src/taste-profile/dispersionBands.test.ts src/recommender/shared/clusterAllocation.test.ts src/recommender/movies/candidates.test.ts",
     "test:interests": "node --import tsx --test src/recommender/shared/interestSlots.test.ts",
     "test:preferences": "node --import tsx --test src/taste-profile/genreAffinity.test.ts src/taste-profile/detectionMerge.test.ts src/lib/diversityAdjustment.test.ts",
