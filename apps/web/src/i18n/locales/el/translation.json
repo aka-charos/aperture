@@ -1821,52 +1821,52 @@
     "help": {
       "maxCandidates": {
         "title": "Μέγιστοι Υποψήφιοι",
-        "description": "Πόσα αντικείμενα από τη βιβλιοθήκη σας θα αξιολογηθούν ως πιθανές συστάσεις.",
-        "increase": "Πιο διεξοδική αναζήτηση, εξετάζει ολόκληρη τη βιβλιοθήκη, αλλά πιο αργή επεξεργασία.",
-        "decrease": "Ταχύτερη δημιουργία, αλλά ενδέχεται να χάσει καλά ταιριάσματα από λιγότερο δημοφιλή αντικείμενα.",
-        "example": "Ορίστε σε ∞ (απεριόριστο) για καλύτερα αποτελέσματα αν έχετε χρόνο, ή 10-20K για ταχύτερες καθημερινές εκτελέσεις."
+        "description": "How many library items the vector search returns for scoring. It also sets the field each match is judged against, since similarity is scored relative to this pool.",
+        "increase": "Every title gets a chance to compete, and match scores are measured against a fuller picture of the library.",
+        "decrease": "Faster runs, but titles outside the pool are never considered at all.",
+        "example": "Set it at or above your library size so nothing is excluded — 20-50K covers most libraries. Below ~2,000 the pool is too narrow to rank against."
       },
       "selectedCount": {
         "title": "Συστάσεις Ανά Χρήστη",
-        "description": "Ο τελικός αριθμός συστάσεων που λαμβάνει κάθε χρήστης.",
-        "increase": "Περισσότερες επιλογές για τους χρήστες, αλλά η ποιότητα των τελευταίων επιλογών μπορεί να μειωθεί.",
-        "decrease": "Λιγότερες αλλά υψηλότερης ποιότητας, πιο σίγουρες συστάσεις.",
-        "example": "Ταινίες: 20-50 είναι τυπικό. Σειρές: 10-15 καθώς απαιτούν μεγαλύτερη επένδυση χρόνου."
+        "description": "How many picks each user ends up with. Slots reserved for a user's custom interests come out of this number rather than being added to it.",
+        "increase": "More to browse, though the tail of a long list is noticeably weaker than the top.",
+        "decrease": "A shorter, more confident list.",
+        "example": "Movies: 20-30. Series: 10-15, since each one is a much bigger time commitment."
       },
       "recentWatchLimit": {
         "title": "Βάθος Ιστορικού Παρακολούθησης",
-        "description": "Πόσα πρόσφατα προβεβλημένα αντικείμενα θα αναλυθούν κατά τη δημιουργία του προφίλ γούστου.",
-        "increase": "Ευρύτερη κατανόηση μακροπρόθεσμων προτιμήσεων, καλύτερο για καθιερωμένους χρήστες.",
-        "decrease": "Εστιάζει στις πρόσφατες συνήθειες προβολής, καλό αν το γούστο αλλάζει συχνά.",
-        "example": "Νέος χρήστης με 20 προβολές; Ορίστε το σε 20. Παλιός χρήστης; Το 50-100 αποτυπώνει πλήρως το γούστο του."
+        "description": "Feeds the \"because you watched…\" evidence on each pick, and stands in as a taste profile for users who don't have one built yet. Ranking does not use it: the taste profile and genre familiarity both read the full watch history.",
+        "increase": "A wider pool for explanations to draw their evidence from.",
+        "decrease": "Explanations cite only the most recent viewing.",
+        "example": "Rarely worth tuning — it does not change the ranking. 100-500 gives explanations plenty to work with."
       },
       "similarityWeight": {
         "title": "Ομοιότητα Γούστου",
-        "description": "Πόσο θα ευνοούνται τα αντικείμενα που ταιριάζουν με τις καθιερωμένες προτιμήσεις του χρήστη.",
-        "increase": "Ασφαλέστερες επιλογές που πιθανότατα θα αρέσουν στον χρήστη, αλλά λιγότερο τολμηρές.",
-        "decrease": "Περισσότερη ποικιλία και εκπλήξεις, αλλά μεγαλύτερη πιθανότητα αστοχίας.",
-        "example": "Ορίστε υψηλά (50-60%) για απαιτητικούς θεατές. Ορίστε χαμηλότερα (30-40%) για όσους τους αρέσει να ανακαλύπτουν νέα πράγματα."
+        "description": "How strongly to favour items close to the user's taste profile. Scored against the candidate pool, so this weight translates directly into influence over the order.",
+        "increase": "Picks stay close to what the user already watches and enjoys.",
+        "decrease": "Hands the decision to rating and discovery, which score the same for everyone — lists start to look generic and alike.",
+        "example": "This should be the largest weight. 45-70% suits most libraries; go higher for users with a narrow, well-defined taste."
       },
       "noveltyWeight": {
         "title": "Ανακάλυψη Είδους",
-        "description": "Επιβραβεύει αντικείμενα με είδη που ο χρήστης δεν έχει εξερευνήσει πολύ.",
-        "increase": "Ωθεί τους χρήστες έξω από τη ζώνη άνεσής τους σε νέα είδη.",
-        "decrease": "Μένει σε γνώριμο έδαφος και γνωστά αγαπημένα είδη.",
-        "example": "Κάποιος που βλέπει μόνο δράση; Υψηλότερη ανακάλυψη μπορεί να προτείνει ένα θρίλερ ή sci-fi που θα του άρεσε."
+        "description": "Rewards a familiar anchor plus something new. Peaks when roughly half an item's genres are ones the user rarely watches — both all-familiar and completely unfamiliar score lower.",
+        "increase": "Nudges users into adjacent genres they haven't tried much.",
+        "decrease": "Sticks to established genres.",
+        "example": "10-20% is enough to move a few slots. Set to almost zero and the term stops doing anything at all."
       },
       "ratingWeight": {
         "title": "Βαθμολογία Κοινότητας",
-        "description": "Πόσο θα ευνοούνται τα αντικείμενα με υψηλή βαθμολογία και κριτική αναγνώριση.",
-        "increase": "Δίνει προτεραιότητα στην ποιότητα έναντι της εξατομίκευσης — ιδανικό για νέους χρήστες.",
-        "decrease": "Αγνοεί τις βαθμολογίες, εμπιστεύεται περισσότερο τον αλγόριθμο ταιριάσματος γούστου.",
-        "example": "Ορίστε υψηλότερα (30%+) αν θέλετε να αναδείξετε κρυμμένα διαμάντια με εξαιρετικές κριτικές."
+        "description": "Favours highly-rated titles. This score never changes for a given title, so the more weight it carries the more static every list becomes — and the more every user's list resembles everyone else's.",
+        "increase": "Useful for new users with too little history to match against.",
+        "decrease": "Trusts the taste profile over the crowd.",
+        "example": "15-25%, and keep it well below Similarity. Push it higher and the same acclaimed titles resurface every run."
       },
       "diversityWeight": {
         "title": "Ποικιλομορφία Αποτελεσμάτων",
-        "description": "Εξασφαλίζει ποικιλία στην τελική λίστα συστάσεων.",
-        "increase": "Κατανέμει τις συστάσεις σε διαφορετικά είδη, χρονιές, στυλ.",
-        "decrease": "Μπορεί να συγκεντρώσει παρόμοια αντικείμενα μαζί αν όλα έχουν καλή βαθμολογία.",
-        "example": "Η υψηλή ποικιλομορφία αποτρέπει να εμφανιστούν 10 ταινίες Marvel στη σειρά, ακόμα κι αν ο χρήστης τις λατρεύει."
+        "description": "Applied when the final list is picked, not when candidates are scored. Each slot trades a little match quality for a genre — and for series, a network — not already in the list. Automatically eased for users with focused taste and raised for eclectic ones.",
+        "increase": "Spreads the list across genres and networks.",
+        "decrease": "Lets the list cluster on whatever scores highest.",
+        "example": "10-20%. Set it near zero and one franchise or genre can take over the whole list."
       }
     }
   },
@@ -3437,13 +3437,13 @@
   },
   "algorithmSettings": {
     "weightSimilarity": "Ομοιότητα",
-    "weightSimilarityDesc": "Πόσο να δίνεται προτεραιότητα σε περιεχόμενο παρόμοιο με αυτό που έχετε απολαύσει",
+    "weightSimilarityDesc": "How strongly to favour titles close to your taste profile. Usually the one to keep highest",
     "weightNovelty": "Πρωτοτυπία",
-    "weightNoveltyDesc": "Πόσο να δίνεται προτεραιότητα στην εξερεύνηση νέων ειδών και στιλ",
+    "weightNoveltyDesc": "Rewards a familiar anchor plus a genre you rarely watch — partly new, rather than as strange as possible",
     "weightRating": "Βαθμολογία κοινότητας",
-    "weightRatingDesc": "Πόσο να προτιμάται περιεχόμενο με υψηλή βαθμολογία",
+    "weightRatingDesc": "How much to favour highly-rated titles. This score never changes, so a high value makes your list repeat itself",
     "weightDiversity": "Ποικιλομορφία",
-    "weightDiversityDesc": "Πόση ποικιλία να περιλαμβάνεται στις προτάσεις",
+    "weightDiversityDesc": "How hard to push for variety across genres when your final list is picked",
     "errFetchSettings": "Αποτυχία ανάκτησης ρυθμίσεων",
     "successIncludeWatchedSaved": "Η προτίμηση συμπερίληψης παρακολουθημένων αποθηκεύτηκε",
     "successDislikeBehaviorSaved": "Η προτίμηση συμπεριφοράς για μη αρεστό περιεχόμενο αποθηκεύτηκε",
@@ -3461,9 +3461,9 @@
     "labelUsingDefaultWeights": "Χρήση προεπιλεγμένων βαρών",
     "descCustomActive": "Οι εξατομικευμένες ρυθμίσεις αλγορίθμου σας είναι ενεργές",
     "descSystemDefaults": "Οι προτάσεις χρησιμοποιούν τις προεπιλογές του συστήματος",
-    "weightTipNormal": "Ορίστε τη σχετική σπουδαιότητα κάθε παράγοντα. Τα βάρη κανονικοποιούνται αυτόματα.",
+    "weightTipNormal": "Only the ratio between these matters — they are normalised automatically, so they do not need to add up to 100%.",
     "recentWatchLimit": "Όριο πρόσφατου ιστορικού παρακολούθησης",
-    "recentWatchTooltip": "Πόσα πρόσφατα παρακολουθημένα στοιχεία να λαμβάνονται υπόψη κατά τη δημιουργία του προφίλ γούστου σας",
+    "recentWatchTooltip": "Used for the \"because you watched…\" note on each pick. Your taste profile always reads your full history, so this does not change what gets recommended",
     "itemsCount": "{{count}} στοιχεία",
     "defaultPercent": "(προεπιλογή: {{percent}}%)",
     "defaultValue": "(προεπιλογή: {{value}})",

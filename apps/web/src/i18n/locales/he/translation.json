@@ -1687,13 +1687,13 @@
   },
   "algorithmSettings": {
     "weightSimilarity": "דִמיוֹן",
-    "weightSimilarityDesc": "כמה לתעדף תוכן דומה למה שנהנית",
+    "weightSimilarityDesc": "How strongly to favour titles close to your taste profile. Usually the one to keep highest",
     "weightNovelty": "טְרִיוּת",
-    "weightNoveltyDesc": "עד כמה לתת עדיפות לחקור ז'אנרים וסגנונות חדשים",
+    "weightNoveltyDesc": "Rewards a familiar anchor plus a genre you rarely watch — partly new, rather than as strange as possible",
     "weightRating": "דירוג קהילה",
-    "weightRatingDesc": "כמה להעדיף תוכן בעל דירוג גבוה",
+    "weightRatingDesc": "How much to favour highly-rated titles. This score never changes, so a high value makes your list repeat itself",
     "weightDiversity": "גיוון",
-    "weightDiversityDesc": "כמה מגוון לכלול בהמלצות",
+    "weightDiversityDesc": "How hard to push for variety across genres when your final list is picked",
     "errFetchSettings": "אחזור ההגדרות נכשל",
     "successIncludeWatchedSaved": "כלול העדפת צפייה שנשמרה",
     "successDislikeBehaviorSaved": "העדפת התנהגות לא אהבתי נשמרה",
@@ -1711,9 +1711,9 @@
     "labelUsingDefaultWeights": "שימוש במשקלי ברירת מחדל",
     "descCustomActive": "הגדרות האלגוריתם המותאמות אישית שלך פעילות",
     "descSystemDefaults": "המלצות משתמשות בברירות המחדל של המערכת",
-    "weightTipNormal": "הגדר חשיבות יחסית לכל גורם. משקלים מנורמלים אוטומטית.",
+    "weightTipNormal": "Only the ratio between these matters — they are normalised automatically, so they do not need to add up to 100%.",
     "recentWatchLimit": "מגבלת היסטוריית צפייה אחרונה",
-    "recentWatchTooltip": "כמה פריטים שצפו לאחרונה לשקול בעת בניית פרופיל הטעם שלך",
+    "recentWatchTooltip": "Used for the \"because you watched…\" note on each pick. Your taste profile always reads your full history, so this does not change what gets recommended",
     "itemsCount": "{{count}} פריטים",
     "defaultPercent": "(ברירת מחדל: {{percent}}%)",
     "defaultValue": "(ברירת מחדל: {{value}})",
@@ -2239,52 +2239,52 @@
     "help": {
       "maxCandidates": {
         "title": "מקסימום מועמדים",
-        "description": "כמה פריטים מהספרייה שלך להעריך כהמלצות אפשריות.",
-        "increase": "חיפוש יסודי יותר, מחשיב את כל הספרייה, אך עיבוד איטי יותר.",
-        "decrease": "דור מהיר יותר, אבל עלול להחמיץ כמה התאמות טובות מפריטים פחות פופולריים.",
-        "example": "הגדר ל-∞ (ללא הגבלה) לתוצאות הטובות ביותר אם יש לך זמן, או 10-20K לריצות יומיות מהירות יותר."
+        "description": "How many library items the vector search returns for scoring. It also sets the field each match is judged against, since similarity is scored relative to this pool.",
+        "increase": "Every title gets a chance to compete, and match scores are measured against a fuller picture of the library.",
+        "decrease": "Faster runs, but titles outside the pool are never considered at all.",
+        "example": "Set it at or above your library size so nothing is excluded — 20-50K covers most libraries. Below ~2,000 the pool is too narrow to rank against."
       },
       "selectedCount": {
         "title": "המלצות למשתמש",
-        "description": "המספר הסופי של המלצות שכל משתמש מקבל.",
-        "increase": "אפשרויות נוספות למשתמשים, אך האיכות של בחירות מאוחרות יותר עשויה לרדת.",
-        "decrease": "פחות המלצות אך איכותיות יותר ובטוחות יותר.",
-        "example": "סרטים: 20-50 זה טיפוסי. סדרות: 10-15 מאחר והן דורשות יותר זמן השקעת זמן."
+        "description": "How many picks each user ends up with. Slots reserved for a user's custom interests come out of this number rather than being added to it.",
+        "increase": "More to browse, though the tail of a long list is noticeably weaker than the top.",
+        "decrease": "A shorter, more confident list.",
+        "example": "Movies: 20-30. Series: 10-15, since each one is a much bigger time commitment."
       },
       "recentWatchLimit": {
         "title": "צפו בעומק ההיסטוריה",
-        "description": "כמה צפו לאחרונה בפריטים לנתח בעת בניית פרופיל הטעם.",
-        "increase": "הבנה רחבה יותר של העדפות לטווח ארוך, טובה יותר עבור משתמשים מבוססים.",
-        "decrease": "מתמקד בהרגלי הצפייה האחרונים, טוב אם הטעמים משתנים לעתים קרובות.",
-        "example": "משתמש חדש עם 20 שעונים? מוגדר ל-20. משתמש ותיק? 50-100 לוכדים את טעמם המלא."
+        "description": "Feeds the \"because you watched…\" evidence on each pick, and stands in as a taste profile for users who don't have one built yet. Ranking does not use it: the taste profile and genre familiarity both read the full watch history.",
+        "increase": "A wider pool for explanations to draw their evidence from.",
+        "decrease": "Explanations cite only the most recent viewing.",
+        "example": "Rarely worth tuning — it does not change the ranking. 100-500 gives explanations plenty to work with."
       },
       "similarityWeight": {
         "title": "דמיון טעם",
-        "description": "כמה להעדיף פריטים התואמים להעדפות שנקבעו של המשתמש.",
-        "increase": "בחירות בטוחות יותר שהמשתמש יהנה בהן, אך פחות הרפתקני.",
-        "decrease": "יותר מגוון והפתעות, אבל סיכוי גבוה יותר להחמצות.",
-        "example": "הגדר גבוה (50-60%) עבור צופים בררנים. הגדר נמוך יותר (30-40%) למי שאוהב לגלות דברים חדשים."
+        "description": "How strongly to favour items close to the user's taste profile. Scored against the candidate pool, so this weight translates directly into influence over the order.",
+        "increase": "Picks stay close to what the user already watches and enjoys.",
+        "decrease": "Hands the decision to rating and discovery, which score the same for everyone — lists start to look generic and alike.",
+        "example": "This should be the largest weight. 45-70% suits most libraries; go higher for users with a narrow, well-defined taste."
       },
       "noveltyWeight": {
         "title": "גילוי ז'אנר",
-        "description": "מתגמל פריטים עם ז'אנרים שהמשתמש לא חקר הרבה.",
-        "increase": "דוחף משתמשים מחוץ לאזור הנוחות שלהם לז'אנרים חדשים.",
-        "decrease": "נצמד לטריטוריה מוכרת ולז'אנרים אהובים ידועים.",
-        "example": "מישהו שצופה רק באקשן? חידוש גבוה יותר עשוי להציע מותחן או מדע בדיוני שהם ייהנו."
+        "description": "Rewards a familiar anchor plus something new. Peaks when roughly half an item's genres are ones the user rarely watches — both all-familiar and completely unfamiliar score lower.",
+        "increase": "Nudges users into adjacent genres they haven't tried much.",
+        "decrease": "Sticks to established genres.",
+        "example": "10-20% is enough to move a few slots. Set to almost zero and the term stops doing anything at all."
       },
       "ratingWeight": {
         "title": "דירוג קהילה",
-        "description": "כמה להעדיף פריטים בעלי דירוג גבוה ושבחי ביקורת.",
-        "increase": "נותן עדיפות לאיכות על פני התאמה אישית - נהדר עבור משתמשים חדשים.",
-        "decrease": "מתעלם מדירוגים, סומך יותר על אלגוריתם התאמת הטעם.",
-        "example": "הגדר גבוה יותר (30%+) אם אתה רוצה להציג אבני חן נסתרות עם ביקורות מעולות."
+        "description": "Favours highly-rated titles. This score never changes for a given title, so the more weight it carries the more static every list becomes — and the more every user's list resembles everyone else's.",
+        "increase": "Useful for new users with too little history to match against.",
+        "decrease": "Trusts the taste profile over the crowd.",
+        "example": "15-25%, and keep it well below Similarity. Push it higher and the same acclaimed titles resurface every run."
       },
       "diversityWeight": {
         "title": "תוצאה גיוון",
-        "description": "מבטיח גיוון ברשימת ההמלצות הסופית.",
-        "increase": "מפיץ המלצות על פני ז'אנרים, שנים, סגנונות שונים.",
-        "decrease": "עשוי לקבץ פריטים דומים יחד אם כולם מקבלים ציון טוב.",
-        "example": "גיוון גבוה מונע קבלת 10 סרטי מארוול ברצף גם אם המשתמש אוהב אותם."
+        "description": "Applied when the final list is picked, not when candidates are scored. Each slot trades a little match quality for a genre — and for series, a network — not already in the list. Automatically eased for users with focused taste and raised for eclectic ones.",
+        "increase": "Spreads the list across genres and networks.",
+        "decrease": "Lets the list cluster on whatever scores highest.",
+        "example": "10-20%. Set it near zero and one franchise or genre can take over the whole list."
       }
     }
   },

@@ -1687,13 +1687,13 @@
   },
   "algorithmSettings": {
     "weightSimilarity": "Semelhança",
-    "weightSimilarityDesc": "Quanto priorizar conteúdo semelhante ao que você gostou",
+    "weightSimilarityDesc": "How strongly to favour titles close to your taste profile. Usually the one to keep highest",
     "weightNovelty": "Novidade",
-    "weightNoveltyDesc": "Quanto priorizar a exploração de novos gêneros e estilos",
+    "weightNoveltyDesc": "Rewards a familiar anchor plus a genre you rarely watch — partly new, rather than as strange as possible",
     "weightRating": "Classificação da comunidade",
-    "weightRatingDesc": "Quanto favorecer conteúdo de alta classificação",
+    "weightRatingDesc": "How much to favour highly-rated titles. This score never changes, so a high value makes your list repeat itself",
     "weightDiversity": "Diversidade",
-    "weightDiversityDesc": "Quanta variedade incluir nas recomendações",
+    "weightDiversityDesc": "How hard to push for variety across genres when your final list is picked",
     "errFetchSettings": "Falha ao buscar configurações",
     "successIncludeWatchedSaved": "Incluir preferência assistida salva",
     "successDislikeBehaviorSaved": "Preferência de comportamento de não gostar salva",
@@ -1711,9 +1711,9 @@
     "labelUsingDefaultWeights": "Usando pesos padrão",
     "descCustomActive": "Suas configurações de algoritmo personalizado estão ativas",
     "descSystemDefaults": "As recomendações usam os padrões do sistema",
-    "weightTipNormal": "Defina a importância relativa para cada fator. Os pesos são normalizados automaticamente.",
+    "weightTipNormal": "Only the ratio between these matters — they are normalised automatically, so they do not need to add up to 100%.",
     "recentWatchLimit": "Limite do histórico de exibição recente",
-    "recentWatchTooltip": "Quantos itens assistidos recentemente devem ser considerados ao construir seu perfil de gosto",
+    "recentWatchTooltip": "Used for the \"because you watched…\" note on each pick. Your taste profile always reads your full history, so this does not change what gets recommended",
     "itemsCount": "{{contar}} itens",
     "defaultPercent": "(padrão: {{percent}}%)",
     "defaultValue": "(padrão: {{valor}})",
@@ -2239,52 +2239,52 @@
     "help": {
       "maxCandidates": {
         "title": "Máximo de candidatos",
-        "description": "Quantos itens da sua biblioteca devem ser avaliados como possíveis recomendações.",
-        "increase": "Pesquisa mais completa, considera a biblioteca inteira, mas o processamento é mais lento.",
-        "decrease": "Geração mais rápida, mas pode perder algumas boas combinações de itens menos populares.",
-        "example": "Defina como ∞ (ilimitado) para obter melhores resultados se tiver tempo, ou 10-20K para corridas diárias mais rápidas."
+        "description": "How many library items the vector search returns for scoring. It also sets the field each match is judged against, since similarity is scored relative to this pool.",
+        "increase": "Every title gets a chance to compete, and match scores are measured against a fuller picture of the library.",
+        "decrease": "Faster runs, but titles outside the pool are never considered at all.",
+        "example": "Set it at or above your library size so nothing is excluded — 20-50K covers most libraries. Below ~2,000 the pool is too narrow to rank against."
       },
       "selectedCount": {
         "title": "Recomendações por usuário",
-        "description": "O número final de recomendações que cada usuário recebe.",
-        "increase": "Mais opções para os usuários, mas a qualidade das escolhas posteriores pode diminuir.",
-        "decrease": "Menos recomendações, mas de maior qualidade e mais confiantes.",
-        "example": "Filmes: 20-50 é típico. Séries: 10-15 pois requerem mais investimento de tempo."
+        "description": "How many picks each user ends up with. Slots reserved for a user's custom interests come out of this number rather than being added to it.",
+        "increase": "More to browse, though the tail of a long list is noticeably weaker than the top.",
+        "decrease": "A shorter, more confident list.",
+        "example": "Movies: 20-30. Series: 10-15, since each one is a much bigger time commitment."
       },
       "recentWatchLimit": {
         "title": "Assistir à profundidade do histórico",
-        "description": "Quantos itens assistidos recentemente devem ser analisados ​​ao construir o perfil de sabor.",
-        "increase": "Compreensão mais ampla das preferências de longo prazo, melhor para usuários estabelecidos.",
-        "decrease": "Concentra-se nos hábitos de visualização recentes, o que é bom se os gostos mudam com frequência.",
-        "example": "Novo usuário com 20 relógios? Defina como 20. Usuário antigo? 50-100 captura todo o seu sabor."
+        "description": "Feeds the \"because you watched…\" evidence on each pick, and stands in as a taste profile for users who don't have one built yet. Ranking does not use it: the taste profile and genre familiarity both read the full watch history.",
+        "increase": "A wider pool for explanations to draw their evidence from.",
+        "decrease": "Explanations cite only the most recent viewing.",
+        "example": "Rarely worth tuning — it does not change the ranking. 100-500 gives explanations plenty to work with."
       },
       "similarityWeight": {
         "title": "Similaridade de sabor",
-        "description": "Quanto favorecer itens que correspondam às preferências estabelecidas do usuário.",
-        "increase": "Escolhas mais seguras que o usuário provavelmente irá gostar, mas menos aventureiras.",
-        "decrease": "Mais variedade e surpresas, mas maior chance de erros.",
-        "example": "Defina um valor alto (50-60%) para espectadores exigentes. Defina um valor mais baixo (30-40%) para quem gosta de descobrir coisas novas."
+        "description": "How strongly to favour items close to the user's taste profile. Scored against the candidate pool, so this weight translates directly into influence over the order.",
+        "increase": "Picks stay close to what the user already watches and enjoys.",
+        "decrease": "Hands the decision to rating and discovery, which score the same for everyone — lists start to look generic and alike.",
+        "example": "This should be the largest weight. 45-70% suits most libraries; go higher for users with a narrow, well-defined taste."
       },
       "noveltyWeight": {
         "title": "Descoberta de gênero",
-        "description": "Recompensa itens com gêneros que o usuário não explorou muito.",
-        "increase": "Empurra os usuários para fora de sua zona de conforto para novos gêneros.",
-        "decrease": "Adere a um território familiar e a gêneros favoritos conhecidos.",
-        "example": "Alguém que só assiste à ação? Uma novidade maior pode sugerir um thriller ou ficção científica de que eles gostem."
+        "description": "Rewards a familiar anchor plus something new. Peaks when roughly half an item's genres are ones the user rarely watches — both all-familiar and completely unfamiliar score lower.",
+        "increase": "Nudges users into adjacent genres they haven't tried much.",
+        "decrease": "Sticks to established genres.",
+        "example": "10-20% is enough to move a few slots. Set to almost zero and the term stops doing anything at all."
       },
       "ratingWeight": {
         "title": "Classificação da comunidade",
-        "description": "Quanto favorecer itens altamente avaliados e aclamados pela crítica.",
-        "increase": "Prioriza a qualidade em vez da personalização – ótimo para novos usuários.",
-        "decrease": "Ignora as avaliações, confia mais no algoritmo de correspondência de gosto.",
-        "example": "Defina um valor mais alto (30% +) se quiser revelar joias escondidas com ótimas críticas."
+        "description": "Favours highly-rated titles. This score never changes for a given title, so the more weight it carries the more static every list becomes — and the more every user's list resembles everyone else's.",
+        "increase": "Useful for new users with too little history to match against.",
+        "decrease": "Trusts the taste profile over the crowd.",
+        "example": "15-25%, and keep it well below Similarity. Push it higher and the same acclaimed titles resurface every run."
       },
       "diversityWeight": {
         "title": "Diversidade de Resultados",
-        "description": "Garante variedade na lista final de recomendações.",
-        "increase": "Distribui recomendações em diferentes gêneros, anos e estilos.",
-        "decrease": "Pode agrupar itens semelhantes se todos obtiverem boa pontuação.",
-        "example": "A alta diversidade impede a obtenção de 10 filmes da Marvel seguidos, mesmo que o usuário os adore."
+        "description": "Applied when the final list is picked, not when candidates are scored. Each slot trades a little match quality for a genre — and for series, a network — not already in the list. Automatically eased for users with focused taste and raised for eclectic ones.",
+        "increase": "Spreads the list across genres and networks.",
+        "decrease": "Lets the list cluster on whatever scores highest.",
+        "example": "10-20%. Set it near zero and one franchise or genre can take over the whole list."
       }
     }
   },
