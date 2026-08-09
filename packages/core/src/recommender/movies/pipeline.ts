@@ -450,9 +450,12 @@ export async function generateRecommendationsForUser(
       effectiveDiversityWeight
     )
 
-    // Fillers keep their pre-diversity finalScore because they never go
-    // through applyDiversitySelection, which overwrites finalScore with the
-    // diversity-blended selection score for whatever it picks.
+    // Fillers carry the same finalScore as everything else: applyDiversitySelection
+    // writes its diversity-blended ranking to `selectionScore` and leaves
+    // finalScore alone, so slot fillers and diversity picks are directly
+    // comparable. (It used to overwrite finalScore, which is what made the
+    // "% Match" badge report a number that meant something different depending
+    // on how the item got picked.)
     const interestFillers = interestIndex
       ? pickInterestSlotFillers(selected, scoredCandidates, interestIndex, reservedInterestSlots)
       : []
