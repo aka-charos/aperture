@@ -57,6 +57,11 @@ export interface SeriesForExplanation {
   network: string | null
   status: string | null
   similarity: number
+  /**
+   * Pool-relative similarity, which is what every comparative claim below
+   * reads. Mirrors MovieForExplanation.normalizedSimilarity.
+   */
+  normalizedSimilarity: number
   novelty: number
   ratingScore: number
   /**
@@ -288,7 +293,7 @@ async function generateBatchSeriesExplanations(
    Genres: ${s.genres.join(', ')}
    ${s.network ? `Network: ${s.network}` : ''}
    ${s.status ? `Status: ${s.status}` : ''}
-   Overall match: ${(s.similarity * 100).toFixed(0)}% | Novelty: ${s.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${s.ratingScore > 0.7 ? 'critically acclaimed' : s.ratingScore > 0.5 ? 'well received' : 'mixed'}${interestLine}
+   Overall match: ${(s.normalizedSimilarity * 100).toFixed(0)}% | Novelty: ${s.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${s.ratingScore > 0.7 ? 'critically acclaimed' : s.ratingScore > 0.5 ? 'well received' : 'mixed'}${interestLine}
    🎯 SIMILAR TO SERIES THEY'VE WATCHED: ${evidenceStr}
    Plot: ${(s.overview || 'No overview available').substring(0, 250)}...`
     })
@@ -418,9 +423,9 @@ function generateFallbackSeriesExplanation(series: SeriesWithEvidence): string {
 
   const reasons: string[] = []
 
-  if (series.similarity > 0.7) {
+  if (series.normalizedSimilarity > 0.7) {
     reasons.push('strongly matches your viewing history')
-  } else if (series.similarity > 0.5) {
+  } else if (series.normalizedSimilarity > 0.5) {
     reasons.push('aligns with your taste')
   }
 

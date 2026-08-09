@@ -108,6 +108,8 @@ async function queryCandidatesForVector(
     genres: row.genres || [],
     communityRating: row.community_rating,
     similarity: row.similarity,
+    // Filled in by scoreCandidates, which needs the whole pool to set the scale.
+    normalizedSimilarity: 0,
     novelty: 0,
     ratingScore: 0,
     diversityScore: 0,
