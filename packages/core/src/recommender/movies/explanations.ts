@@ -50,6 +50,14 @@ export interface MovieForExplanation {
   genres: string[]
   overview: string | null
   similarity: number
+  /**
+   * Similarity read against the run's own candidate pool rather than as an
+   * absolute cosine. Every comparative claim below uses this: raw cosine within
+   * one library sits in a cone (~0.60-0.64 on a live instance), so an absolute
+   * threshold either fires for every pick or for none, and "62% match" was
+   * printed for the entire list.
+   */
+  normalizedSimilarity: number
   novelty: number
   ratingScore: number
   /**
@@ -271,7 +279,7 @@ async function generateBatchExplanations(
 
       return `${i + 1}. "${m.title}" (${m.year || 'N/A'})
    Genres: ${m.genres.join(', ')}
-   Overall match: ${(m.similarity * 100).toFixed(0)}% | Novelty: ${m.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${m.ratingScore > 0.7 ? 'highly acclaimed' : m.ratingScore > 0.5 ? 'well received' : 'mixed'}${interestLine}
+   Overall match: ${(m.normalizedSimilarity * 100).toFixed(0)}% | Novelty: ${m.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${m.ratingScore > 0.7 ? 'highly acclaimed' : m.ratingScore > 0.5 ? 'well received' : 'mixed'}${interestLine}
    🎯 SIMILAR TO MOVIES THEY'VE WATCHED: ${evidenceStr}
    Plot: ${(m.overview || 'No overview available').substring(0, 250)}...`
     })
@@ -400,9 +408,9 @@ function generateFallbackExplanation(movie: MovieWithEvidence): string {
 
   const reasons: string[] = []
 
-  if (movie.similarity > 0.7) {
+  if (movie.normalizedSimilarity > 0.7) {
     reasons.push('strongly matches your viewing history')
-  } else if (movie.similarity > 0.5) {
+  } else if (movie.normalizedSimilarity > 0.5) {
     reasons.push('aligns with your taste')
   }
 

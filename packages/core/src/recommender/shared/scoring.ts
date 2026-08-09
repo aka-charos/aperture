@@ -138,6 +138,92 @@ export function calculateGenreNoveltyScore(
 }
 
 /**
+ * How hard the standardized similarity is squashed back into [0,1]. A candidate
+ * one standard deviation above the pool mean lands at ~0.73, two at ~0.88, and
+ * nothing ever reaches 0 or 1 -- which is the point: no candidate gets clipped
+ * into a tie with its neighbours, so the ordering keeps full resolution at the
+ * top of the pool, where selection actually happens.
+ */
+const SIMILARITY_Z_SOFTNESS = 2
+
+/**
+ * The pool's own similarity distribution, which is what a raw cosine has to be
+ * read against to mean anything.
+ */
+export interface SimilarityScale {
+  mean: number
+  stdDev: number
+}
+
+/**
+ * Summarize a candidate pool's similarity spread.
+ *
+ * Computed per run over every candidate, because it is a property of the pool
+ * and the embedding model, not of any candidate.
+ */
+export function buildSimilarityScale(similarities: number[]): SimilarityScale {
+  if (similarities.length === 0) return { mean: 0, stdDev: 0 }
+
+  let sum = 0
+  let count = 0
+  for (const value of similarities) {
+    if (!Number.isFinite(value)) continue
+    sum += value
+    count++
+  }
+  if (count === 0) return { mean: 0, stdDev: 0 }
+
+  const mean = sum / count
+
+  let squaredError = 0
+  for (const value of similarities) {
+    if (!Number.isFinite(value)) continue
+    squaredError += (value - mean) ** 2
+  }
+
+  return { mean, stdDev: Math.sqrt(squaredError / count) }
+}
+
+/**
+ * Map a raw cosine similarity onto [0,1] relative to the pool it was drawn
+ * from, so that the configured similarity weight actually buys influence.
+ *
+ * The weighted average in calculateBaseScore assumes its three inputs are
+ * comparable 0-1 quantities. Rating and novelty are: both are deliberate
+ * mappings that use a real fraction of the range (measured p10-p90 spreads of
+ * ~0.46 and ~0.26). Raw cosine is not. Embeddings of one library occupy a
+ * narrow cone, and ANN retrieval then returns that cone's *nearest* slice, so
+ * on a live instance the whole 16k-candidate pool spanned about 0.04 between
+ * p10 and p90.
+ *
+ * Influence is `weight share x realized spread`, so a 0.72 similarity weight
+ * bought 0.039 of influence while a 0.25 rating weight bought 0.117. The
+ * recommender was effectively sorting by community rating -- which is static,
+ * and is why the same titles kept coming back no matter what else changed.
+ *
+ * Standardizing against the pool's mean and standard deviation, then squashing
+ * through tanh, restores a comparable spread (~0.57 between p10 and p90) while
+ * preserving the ordering exactly, since the transform is strictly monotone. A
+ * degenerate pool -- every candidate at the same distance, or a single
+ * candidate -- yields no spread to speak of, so everything scores a neutral 0.5
+ * and the other terms decide, which is the honest answer rather than
+ * manufacturing separation out of noise.
+ *
+ * The trade this makes deliberately: the result is *relative to the run's
+ * pool*, so it says "how close is this compared with the alternatives" rather
+ * than "how close is this in absolute cosine". Absolute cosine is kept
+ * untouched on the candidate for evidence, explanations, and storage; only the
+ * blend reads this.
+ */
+export function normalizeSimilarity(similarity: number, scale: SimilarityScale): number {
+  if (!Number.isFinite(similarity)) return 0.5
+  if (!Number.isFinite(scale.stdDev) || scale.stdDev <= 0) return 0.5
+
+  const z = (similarity - scale.mean) / scale.stdDev
+  return 0.5 + 0.5 * Math.tanh(z / SIMILARITY_Z_SOFTNESS)
+}
+
+/**
  * Configuration for scoring weights
  */
 export interface ScoringConfig {
@@ -155,7 +241,18 @@ export interface BaseCandidate {
   title: string
   year: number | null
   genres: string[]
+  /**
+   * Raw cosine similarity to the taste vector, as retrieved. Kept absolute for
+   * evidence, explanations and storage -- the score blend reads
+   * normalizedSimilarity instead (see normalizeSimilarity for why).
+   */
   similarity: number
+  /**
+   * `similarity` rescaled against the run's own candidate pool. This is the
+   * value calculateBaseScore consumes, and the one whose spread determines how
+   * much the configured similarity weight is really worth.
+   */
+  normalizedSimilarity: number
   novelty: number
   ratingScore: number
   diversityBoost: number
@@ -297,6 +394,13 @@ export interface ComponentSummary {
 
 export interface ScoreComponentReport {
   count: number
+  /**
+   * The cosine as retrieved. Reported alongside the normalized value so a run's
+   * log shows how compressed the raw embedding cone was -- the gap between
+   * these two spreads is the whole reason normalizeSimilarity exists.
+   */
+  rawSimilarity: ComponentSummary
+  /** What the blend actually consumed. */
   similarity: ComponentSummary
   novelty: ComponentSummary
   rating: ComponentSummary
@@ -345,14 +449,20 @@ function summarizeValues(values: number[]): ComponentSummary {
  * quantity assumed to vary that did not. This is the check that would have
  * caught either on the first run.
  *
- * `similarity` is floored at 0 to match calculateBaseScore, so the reported
- * spread is the one that actually feeds the score.
+ * `similarity` is the normalized value floored at 0 to match calculateBaseScore,
+ * so the reported spread is the one that actually feeds the score.
  */
 export function summarizeScoreComponents(
-  candidates: Array<Pick<BaseCandidate, 'similarity' | 'novelty' | 'ratingScore' | 'finalScore'>>,
+  candidates: Array<
+    Pick<
+      BaseCandidate,
+      'similarity' | 'normalizedSimilarity' | 'novelty' | 'ratingScore' | 'finalScore'
+    >
+  >,
   config: Pick<ScoringConfig, 'similarityWeight' | 'noveltyWeight' | 'ratingWeight'>
 ): ScoreComponentReport {
-  const similarity = summarizeValues(candidates.map((c) => Math.max(0, c.similarity)))
+  const rawSimilarity = summarizeValues(candidates.map((c) => c.similarity))
+  const similarity = summarizeValues(candidates.map((c) => Math.max(0, c.normalizedSimilarity)))
   const novelty = summarizeValues(candidates.map((c) => c.novelty))
   const rating = summarizeValues(candidates.map((c) => c.ratingScore))
   const finalScore = summarizeValues(candidates.map((c) => c.finalScore))
@@ -363,6 +473,7 @@ export function summarizeScoreComponents(
 
   return {
     count: candidates.length,
+    rawSimilarity,
     similarity,
     novelty,
     rating,

@@ -12,6 +12,7 @@ function candidate(id: string, similarity: number): Candidate {
     genres: [],
     communityRating: null,
     similarity,
+    normalizedSimilarity: 0,
     novelty: 0,
     ratingScore: 0,
     diversityScore: 0,

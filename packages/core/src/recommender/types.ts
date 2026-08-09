@@ -21,7 +21,10 @@ export interface Candidate {
   year: number | null
   genres: string[]
   communityRating: number | null
+  /** Raw cosine to the taste vector. See BaseCandidate. */
   similarity: number
+  /** Pool-relative similarity, which is what the score blend reads. See BaseCandidate. */
+  normalizedSimilarity: number
   novelty: number
   ratingScore: number
   diversityScore: number

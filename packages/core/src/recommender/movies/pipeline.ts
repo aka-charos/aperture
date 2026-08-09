@@ -537,6 +537,7 @@ export async function generateRecommendationsForUser(
         genres: s.genres,
         overview: movieOverviews.get(s.movieId) || null,
         similarity: s.similarity,
+        normalizedSimilarity: s.normalizedSimilarity,
         novelty: s.novelty,
         ratingScore: s.ratingScore,
         // Non-null only for reserved interest slots, so the explanation

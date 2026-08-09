@@ -19,6 +19,7 @@ function candidate(
     year: 2020,
     genres,
     similarity: finalScore,
+    normalizedSimilarity: finalScore,
     novelty: 0.5,
     ratingScore: 0.5,
     diversityBoost: 0,

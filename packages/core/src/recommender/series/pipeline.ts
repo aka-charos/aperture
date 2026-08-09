@@ -21,6 +21,8 @@ import { averageEmbeddings } from '../shared/index.js'
 import {
   calculateRatingScore,
   buildGenreFamiliarity,
+  buildSimilarityScale,
+  normalizeSimilarity,
   calculateGenreNoveltyScore,
   calculateBaseScore,
   applyDiversitySelection,
@@ -87,7 +89,10 @@ export interface SeriesCandidate {
   genres: string[]
   network: string | null
   status: string | null
+  /** Raw cosine to the taste vector. See BaseCandidate. */
   similarity: number
+  /** Pool-relative similarity, which is what the score blend reads. See BaseCandidate. */
+  normalizedSimilarity: number
   novelty: number
   ratingScore: number
   diversityBoost: number
@@ -337,6 +342,8 @@ async function querySeriesCandidatesForVector(
     network: row.network,
     status: row.status,
     similarity: row.similarity,
+    // Filled in by scoreSeriesCandidates, which needs the whole pool to set the scale.
+    normalizedSimilarity: 0,
     novelty: 0,
     ratingScore: 0,
     diversityBoost: 0,
@@ -555,6 +562,11 @@ async function scoreSeriesCandidates(
     ratingsMap.set(row.id, row.community_rating)
   }
 
+  // Similarity is read against the pool it came from rather than as an absolute
+  // cosine, so the configured similarity weight buys the influence it claims.
+  // Mirrors movies/scoring.ts.
+  const similarityScale = buildSimilarityScale(candidates.map((c) => c.similarity))
+
   // Score each candidate using shared scoring functions
   return candidates.map((candidate) => {
     // Use shared rating score calculation (handles bad data, proper scaling)
@@ -565,12 +577,16 @@ async function scoreSeriesCandidates(
     // recentWatchLimit slice this used to query for itself.
     const noveltyScore = calculateGenreNoveltyScore(candidate.genres, genreFamiliarity)
 
+    // Raw similarity stays untouched for evidence, explanations and storage.
+    const normalizedSimilarity = normalizeSimilarity(candidate.similarity, similarityScale)
+
     // Use shared base score calculation (bounded weighted average, same formula movies use)
-    const finalScore = calculateBaseScore(candidate.similarity, noveltyScore, ratingScore, config)
+    const finalScore = calculateBaseScore(normalizedSimilarity, noveltyScore, ratingScore, config)
 
     return {
       ...candidate,
       novelty: noveltyScore,
+      normalizedSimilarity,
       ratingScore,
       finalScore,
     }
@@ -1152,6 +1168,7 @@ export async function generateSeriesRecommendationsForUser(
         network: s.network,
         status: s.status,
         similarity: s.similarity,
+        normalizedSimilarity: s.normalizedSimilarity,
         novelty: s.novelty,
         ratingScore: s.ratingScore,
         // Non-null only for reserved interest slots, so the explanation

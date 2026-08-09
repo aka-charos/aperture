@@ -233,8 +233,13 @@ test('a familiar anchor plus something new beats both extremes', () => {
 // 6. Component influence reporting
 // ============================================================================
 
+/**
+ * The score blend reads normalizedSimilarity, so these fixtures set it to the
+ * same value as the raw cosine -- the percentile/influence assertions below are
+ * about the summary maths, not about the rescaling.
+ */
 function scored(similarity: number, novelty: number, ratingScore: number, finalScore: number) {
-  return { similarity, novelty, ratingScore, finalScore }
+  return { similarity, normalizedSimilarity: similarity, novelty, ratingScore, finalScore }
 }
 
 test('summarizeScoreComponents reports nearest-rank percentiles', () => {
@@ -286,6 +291,11 @@ test('similarity influence uses the floored value the score actually consumes', 
   assert.equal(report.similarity.min, 0)
   assert.equal(report.similarity.max, 0)
   assert.equal(report.influence.similarity, 0)
+
+  // The raw cosine is reported as measured, not floored -- it exists to show
+  // how compressed the retrieved pool was, not to feed the score.
+  assert.equal(report.rawSimilarity.min, -0.5)
+  assert.equal(report.rawSimilarity.max, -0.1)
 })
 
 test('summarizeScoreComponents survives an empty pool and zeroed weights', () => {

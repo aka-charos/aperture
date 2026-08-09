@@ -2,6 +2,8 @@ import type { Candidate, PipelineConfig } from '../types.js'
 import {
   calculateRatingScore,
   calculateGenreNoveltyScore,
+  buildSimilarityScale,
+  normalizeSimilarity,
   calculateBaseScore,
 } from '../shared/index.js'
 
@@ -16,6 +18,11 @@ export function scoreCandidates(
   genreFamiliarity: Map<string, number>,
   config: PipelineConfig
 ): Candidate[] {
+  // Similarity is read against the pool it came from rather than as an absolute
+  // cosine, so the configured similarity weight buys the influence it claims.
+  // One pass over the pool first, since the scale is a property of the pool.
+  const similarityScale = buildSimilarityScale(candidates.map((c) => c.similarity))
+
   for (const candidate of candidates) {
     // Use shared rating score calculation (handles bad data, proper scaling)
     const ratingScore = calculateRatingScore(candidate.communityRating)
@@ -23,11 +30,15 @@ export function scoreCandidates(
     // Use shared novelty score calculation (handles missing genres)
     const novelty = calculateGenreNoveltyScore(candidate.genres, genreFamiliarity)
 
+    // Raw similarity stays untouched for evidence, explanations and storage.
+    const normalizedSimilarity = normalizeSimilarity(candidate.similarity, similarityScale)
+
     candidate.novelty = novelty
     candidate.ratingScore = ratingScore
+    candidate.normalizedSimilarity = normalizedSimilarity
 
     // Calculate base score using shared function
-    candidate.finalScore = calculateBaseScore(candidate.similarity, novelty, ratingScore, config)
+    candidate.finalScore = calculateBaseScore(normalizedSimilarity, novelty, ratingScore, config)
   }
 
   // Sort by final score
