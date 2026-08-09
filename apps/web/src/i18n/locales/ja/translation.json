@@ -1687,13 +1687,13 @@
   },
   "algorithmSettings": {
     "weightSimilarity": "類似性",
-    "weightSimilarityDesc": "あなたが楽しんだものと同様のコンテンツをどの程度優先するか",
+    "weightSimilarityDesc": "How strongly to favour titles close to your taste profile. Usually the one to keep highest",
     "weightNovelty": "ノベルティ",
-    "weightNoveltyDesc": "新しいジャンルやスタイルの探索をどの程度優先するか",
+    "weightNoveltyDesc": "Rewards a familiar anchor plus a genre you rarely watch — partly new, rather than as strange as possible",
     "weightRating": "コミュニティ評価",
-    "weightRatingDesc": "高評価のコンテンツをどの程度優先するか",
+    "weightRatingDesc": "How much to favour highly-rated titles. This score never changes, so a high value makes your list repeat itself",
     "weightDiversity": "多様性",
-    "weightDiversityDesc": "推奨事項にどれだけ多様性を含めるか",
+    "weightDiversityDesc": "How hard to push for variety across genres when your final list is picked",
     "errFetchSettings": "設定の取得に失敗しました",
     "successIncludeWatchedSaved": "保存されている監視設定を含める",
     "successDislikeBehaviorSaved": "嫌いな行動の設定が保存されました",
@@ -1711,9 +1711,9 @@
     "labelUsingDefaultWeights": "デフォルトの重みの使用",
     "descCustomActive": "パーソナライズされたアルゴリズム設定が有効になっています",
     "descSystemDefaults": "推奨事項ではシステムのデフォルトが使用されます",
-    "weightTipNormal": "各要素の相対的な重要性を設定します。 重みは自動的に正規化されます。",
+    "weightTipNormal": "Only the ratio between these matters — they are normalised automatically, so they do not need to add up to 100%.",
     "recentWatchLimit": "最近の視聴履歴の制限",
-    "recentWatchTooltip": "嗜好プロファイルを作成する際に考慮すべき最近視聴したアイテムの数",
+    "recentWatchTooltip": "Used for the \"because you watched…\" note on each pick. Your taste profile always reads your full history, so this does not change what gets recommended",
     "itemsCount": "{{count}} 個のアイテム",
     "defaultPercent": "(デフォルト: {{パーセント}}%)",
     "defaultValue": "(デフォルト: {{値}})",
@@ -2239,52 +2239,52 @@
     "help": {
       "maxCandidates": {
         "title": "最大候補数",
-        "description": "潜在的な推奨事項として評価するライブラリ内のアイテムの数。",
-        "increase": "より徹底的な検索では、ライブラリ全体が考慮されますが、処理が遅くなります。",
-        "decrease": "生成が速くなりますが、あまり人気のないアイテムからいくつかの適切な一致を見逃す可能性があります。",
-        "example": "時間があれば最高の結果を得るには ∞ (無制限) に設定し、毎日の実行を高速化するには 10 ～ 20,000 に設定します。"
+        "description": "How many library items the vector search returns for scoring. It also sets the field each match is judged against, since similarity is scored relative to this pool.",
+        "increase": "Every title gets a chance to compete, and match scores are measured against a fuller picture of the library.",
+        "decrease": "Faster runs, but titles outside the pool are never considered at all.",
+        "example": "Set it at or above your library size so nothing is excluded — 20-50K covers most libraries. Below ~2,000 the pool is too narrow to rank against."
       },
       "selectedCount": {
         "title": "ユーザーごとの推奨事項",
-        "description": "各ユーザーが受け取る最終的な推奨事項の数。",
-        "increase": "ユーザーにとって選択肢は増えますが、その後の選択の品質は低下する可能性があります。",
-        "decrease": "数は少ないですが、より高品質で、より自信を持った推奨事項。",
-        "example": "映画: 20 ～ 50 が一般的です。 シリーズ: より多くの時間を投資する必要があるため、10 ～ 15 回。"
+        "description": "How many picks each user ends up with. Slots reserved for a user's custom interests come out of this number rather than being added to it.",
+        "increase": "More to browse, though the tail of a long list is noticeably weaker than the top.",
+        "decrease": "A shorter, more confident list.",
+        "example": "Movies: 20-30. Series: 10-15, since each one is a much bigger time commitment."
       },
       "recentWatchLimit": {
         "title": "視聴履歴の深さ",
-        "description": "嗜好プロファイルを作成するときに分析する、最近視聴したアイテムの数。",
-        "increase": "長期的な好みをより広く理解することで、確立されたユーザーにとってより良いものとなります。",
-        "decrease": "最近の視聴習慣に焦点を当てており、好みが頻繁に変わる場合に適しています。",
-        "example": "20 個のウォッチを持っている新規ユーザーですか? 20 に設定します。長年使用していますか? 50-100 はその味を最大限に捉えています。"
+        "description": "Feeds the \"because you watched…\" evidence on each pick, and stands in as a taste profile for users who don't have one built yet. Ranking does not use it: the taste profile and genre familiarity both read the full watch history.",
+        "increase": "A wider pool for explanations to draw their evidence from.",
+        "decrease": "Explanations cite only the most recent viewing.",
+        "example": "Rarely worth tuning — it does not change the ranking. 100-500 gives explanations plenty to work with."
       },
       "similarityWeight": {
         "title": "味の類似性",
-        "description": "ユーザーの確立された好みに一致するアイテムをどの程度優先するか。",
-        "increase": "より安全な選択はユーザーに喜ばれる可能性がありますが、冒険的ではありません。",
-        "decrease": "多様性と驚きが増えますが、見逃す可能性が高くなります。",
-        "example": "うるさい視聴者向けに高く (50 ～ 60%) に設定します。 新しいものを発見したい人は、低め (30 ～ 40%) に設定します。"
+        "description": "How strongly to favour items close to the user's taste profile. Scored against the candidate pool, so this weight translates directly into influence over the order.",
+        "increase": "Picks stay close to what the user already watches and enjoys.",
+        "decrease": "Hands the decision to rating and discovery, which score the same for everyone — lists start to look generic and alike.",
+        "example": "This should be the largest weight. 45-70% suits most libraries; go higher for users with a narrow, well-defined taste."
       },
       "noveltyWeight": {
         "title": "ジャンルの発見",
-        "description": "ユーザーがあまり探索していないジャンルのアイテムを報酬として与えます。",
-        "increase": "ユーザーを快適ゾーンの外に新しいジャンルに押し出します。",
-        "decrease": "馴染みのある分野や既知のお気に入りのジャンルに固執します。",
-        "example": "アクションだけを見ている人ですか？ より高い目新しさは、彼らが好むスリラーまたは SF を示唆している可能性があります。"
+        "description": "Rewards a familiar anchor plus something new. Peaks when roughly half an item's genres are ones the user rarely watches — both all-familiar and completely unfamiliar score lower.",
+        "increase": "Nudges users into adjacent genres they haven't tried much.",
+        "decrease": "Sticks to established genres.",
+        "example": "10-20% is enough to move a few slots. Set to almost zero and the term stops doing anything at all."
       },
       "ratingWeight": {
         "title": "コミュニティ評価",
-        "description": "評価が高く、批評家から絶賛されているアイテムをどれだけ優先するか。",
-        "increase": "パーソナライゼーションよりも品質を優先するため、新規ユーザーに最適です。",
-        "decrease": "評価を無視し、好みを一致させるアルゴリズムをより信頼します。",
-        "example": "優れたレビューで隠れた逸品を明らかにしたい場合は、より高く設定 (30%+) します。"
+        "description": "Favours highly-rated titles. This score never changes for a given title, so the more weight it carries the more static every list becomes — and the more every user's list resembles everyone else's.",
+        "increase": "Useful for new users with too little history to match against.",
+        "decrease": "Trusts the taste profile over the crowd.",
+        "example": "15-25%, and keep it well below Similarity. Push it higher and the same acclaimed titles resurface every run."
       },
       "diversityWeight": {
         "title": "結果の多様性",
-        "description": "最終的な推奨リストの多様性を確保します。",
-        "increase": "さまざまなジャンル、年代、スタイルにわたる推奨事項を広げます。",
-        "decrease": "すべてのスコアが高ければ、同様のアイテムをまとめてクラスター化する可能性があります。",
-        "example": "多様性が高いため、たとえユーザーが気に入ったマーベル映画であっても、10 回続けてマーベル映画を視聴することはできません。"
+        "description": "Applied when the final list is picked, not when candidates are scored. Each slot trades a little match quality for a genre — and for series, a network — not already in the list. Automatically eased for users with focused taste and raised for eclectic ones.",
+        "increase": "Spreads the list across genres and networks.",
+        "decrease": "Lets the list cluster on whatever scores highest.",
+        "example": "10-20%. Set it near zero and one franchise or genre can take over the whole list."
       }
     }
   },

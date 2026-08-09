@@ -1687,13 +1687,13 @@
   },
   "algorithmSettings": {
     "weightSimilarity": "유사",
-    "weightSimilarityDesc": "당신이 즐겼던 것과 비슷한 콘텐츠에 우선 순위를 두는 정도",
+    "weightSimilarityDesc": "How strongly to favour titles close to your taste profile. Usually the one to keep highest",
     "weightNovelty": "진기함",
-    "weightNoveltyDesc": "새로운 장르와 스타일을 탐구하는 데 얼마나 우선순위를 두어야 할까요?",
+    "weightNoveltyDesc": "Rewards a familiar anchor plus a genre you rarely watch — partly new, rather than as strange as possible",
     "weightRating": "커뮤니티 평가",
-    "weightRatingDesc": "높은 평가를 받은 콘텐츠를 얼마나 선호해야 할까요?",
+    "weightRatingDesc": "How much to favour highly-rated titles. This score never changes, so a high value makes your list repeat itself",
     "weightDiversity": "다양성",
-    "weightDiversityDesc": "추천에 포함할 다양성",
+    "weightDiversityDesc": "How hard to push for variety across genres when your final list is picked",
     "errFetchSettings": "설정을 가져오지 못했습니다.",
     "successIncludeWatchedSaved": "시청 환경설정 포함 저장됨",
     "successDislikeBehaviorSaved": "싫어하는 행동 환경설정이 저장되었습니다.",
@@ -1711,9 +1711,9 @@
     "labelUsingDefaultWeights": "기본 가중치 사용",
     "descCustomActive": "맞춤 알고리즘 설정이 활성화되었습니다.",
     "descSystemDefaults": "권장사항은 시스템 기본값을 사용합니다.",
-    "weightTipNormal": "각 요인에 대한 상대적 중요도를 설정합니다. 가중치는 자동으로 정규화됩니다.",
+    "weightTipNormal": "Only the ratio between these matters — they are normalised automatically, so they do not need to add up to 100%.",
     "recentWatchLimit": "최근 시청 기록 한도",
-    "recentWatchTooltip": "취향 프로필을 구축할 때 고려해야 할 최근 시청 항목 수",
+    "recentWatchTooltip": "Used for the \"because you watched…\" note on each pick. Your taste profile always reads your full history, so this does not change what gets recommended",
     "itemsCount": "{{count}}개 항목",
     "defaultPercent": "(기본값: {{percent}}%)",
     "defaultValue": "(기본값: {{값}})",
@@ -2239,52 +2239,52 @@
     "help": {
       "maxCandidates": {
         "title": "최대 후보자",
-        "description": "잠재적 추천으로 평가할 라이브러리의 항목 수입니다.",
-        "increase": "보다 철저한 검색은 전체 라이브러리를 고려하지만 처리 속도가 느려집니다.",
-        "decrease": "생성 속도가 빨라지지만 덜 인기 있는 항목의 좋은 일치 항목이 누락될 수 있습니다.",
-        "example": "시간이 있는 경우 최상의 결과를 얻으려면 (무제한)으로 설정하고 매일 더 빠르게 실행하려면 10~20K로 설정하세요."
+        "description": "How many library items the vector search returns for scoring. It also sets the field each match is judged against, since similarity is scored relative to this pool.",
+        "increase": "Every title gets a chance to compete, and match scores are measured against a fuller picture of the library.",
+        "decrease": "Faster runs, but titles outside the pool are never considered at all.",
+        "example": "Set it at or above your library size so nothing is excluded — 20-50K covers most libraries. Below ~2,000 the pool is too narrow to rank against."
       },
       "selectedCount": {
         "title": "사용자별 추천",
-        "description": "각 사용자가 받는 최종 추천 수입니다.",
-        "increase": "사용자에게 더 많은 선택권이 있지만 나중에 선택하는 경우 품질이 저하될 수 있습니다.",
-        "decrease": "더 적지만 더 높은 품질과 더 확실한 추천을 제공합니다.",
-        "example": "영화: 20-50이 일반적입니다. 시리즈: 10-15는 더 많은 시간 투자가 필요하기 때문입니다."
+        "description": "How many picks each user ends up with. Slots reserved for a user's custom interests come out of this number rather than being added to it.",
+        "increase": "More to browse, though the tail of a long list is noticeably weaker than the top.",
+        "decrease": "A shorter, more confident list.",
+        "example": "Movies: 20-30. Series: 10-15, since each one is a much bigger time commitment."
       },
       "recentWatchLimit": {
         "title": "시청 기록 깊이",
-        "description": "취향 프로필 구축 시 분석할 최근 시청 항목 수입니다.",
-        "increase": "장기적인 선호도에 대한 폭넓은 이해가 가능해 기존 사용자에게 더 좋습니다.",
-        "decrease": "최근 시청 습관에 중점을 두고, 취향이 자주 바뀌는 경우에 좋습니다.",
-        "example": "시계 20개를 보유한 신규 사용자인가요? 20으로 설정하세요. 오랜 사용자이신가요? 50-100은 그들의 맛을 최대한 포착합니다."
+        "description": "Feeds the \"because you watched…\" evidence on each pick, and stands in as a taste profile for users who don't have one built yet. Ranking does not use it: the taste profile and genre familiarity both read the full watch history.",
+        "increase": "A wider pool for explanations to draw their evidence from.",
+        "decrease": "Explanations cite only the most recent viewing.",
+        "example": "Rarely worth tuning — it does not change the ranking. 100-500 gives explanations plenty to work with."
       },
       "similarityWeight": {
         "title": "맛 유사성",
-        "description": "사용자가 설정한 선호도와 일치하는 항목을 선호하는 정도입니다.",
-        "increase": "사용자가 더 안전한 선택을 즐길 수 있지만 모험심은 덜합니다.",
-        "decrease": "더 다양하고 놀라움이 많지만 놓칠 확률도 더 높습니다.",
-        "example": "까다로운 시청자를 위해 높게 설정하세요(50~60%). 새로운 것을 발견하는 것을 좋아하는 사람들은 더 낮게(30-40%) 설정하세요."
+        "description": "How strongly to favour items close to the user's taste profile. Scored against the candidate pool, so this weight translates directly into influence over the order.",
+        "increase": "Picks stay close to what the user already watches and enjoys.",
+        "decrease": "Hands the decision to rating and discovery, which score the same for everyone — lists start to look generic and alike.",
+        "example": "This should be the largest weight. 45-70% suits most libraries; go higher for users with a narrow, well-defined taste."
       },
       "noveltyWeight": {
         "title": "장르발견",
-        "description": "사용자가 많이 탐색하지 않은 장르의 아이템을 보상합니다.",
-        "increase": "사용자를 익숙한 영역에서 벗어나 새로운 장르로 밀어냅니다.",
-        "decrease": "친숙한 영역과 알려진 좋아하는 장르를 고수합니다.",
-        "example": "액션만 보는 사람? 참신함이 높을수록 그들이 즐길 수 있는 스릴러나 공상과학을 제안할 수 있습니다."
+        "description": "Rewards a familiar anchor plus something new. Peaks when roughly half an item's genres are ones the user rarely watches — both all-familiar and completely unfamiliar score lower.",
+        "increase": "Nudges users into adjacent genres they haven't tried much.",
+        "decrease": "Sticks to established genres.",
+        "example": "10-20% is enough to move a few slots. Set to almost zero and the term stops doing anything at all."
       },
       "ratingWeight": {
         "title": "커뮤니티 평가",
-        "description": "높은 평가를 받고 비평가들의 찬사를 받는 항목을 얼마나 선호합니까?",
-        "increase": "개인화보다 품질을 우선시하므로 신규 사용자에게 적합합니다.",
-        "decrease": "평점을 무시하고 취향 매칭 알고리즘을 더 신뢰합니다.",
-        "example": "훌륭한 리뷰로 숨겨진 보석을 드러내고 싶다면 더 높게(30%+) 설정하세요."
+        "description": "Favours highly-rated titles. This score never changes for a given title, so the more weight it carries the more static every list becomes — and the more every user's list resembles everyone else's.",
+        "increase": "Useful for new users with too little history to match against.",
+        "decrease": "Trusts the taste profile over the crowd.",
+        "example": "15-25%, and keep it well below Similarity. Push it higher and the same acclaimed titles resurface every run."
       },
       "diversityWeight": {
         "title": "결과 다양성",
-        "description": "최종 추천 목록의 다양성을 보장합니다.",
-        "increase": "다양한 장르, 연도, 스타일에 걸쳐 추천을 퍼뜨립니다.",
-        "decrease": "모두 점수가 좋으면 유사한 항목을 함께 묶을 수 있습니다.",
-        "example": "다양성이 높으면 사용자가 좋아하는 마블 영화를 연속으로 10편 볼 수 없습니다."
+        "description": "Applied when the final list is picked, not when candidates are scored. Each slot trades a little match quality for a genre — and for series, a network — not already in the list. Automatically eased for users with focused taste and raised for eclectic ones.",
+        "increase": "Spreads the list across genres and networks.",
+        "decrease": "Lets the list cluster on whatever scores highest.",
+        "example": "10-20%. Set it near zero and one franchise or genre can take over the whole list."
       }
     }
   },

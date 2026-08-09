@@ -1687,13 +1687,13 @@
   },
   "algorithmSettings": {
     "weightSimilarity": "相似",
-    "weightSimilarityDesc": "优先考虑与您喜欢的内容类似的内容的程度",
+    "weightSimilarityDesc": "How strongly to favour titles close to your taste profile. Usually the one to keep highest",
     "weightNovelty": "新奇",
-    "weightNoveltyDesc": "优先考虑探索新流派和风格的程度",
+    "weightNoveltyDesc": "Rewards a familiar anchor plus a genre you rarely watch — partly new, rather than as strange as possible",
     "weightRating": "社区评级",
-    "weightRatingDesc": "对高评价内容的青睐程度",
+    "weightRatingDesc": "How much to favour highly-rated titles. This score never changes, so a high value makes your list repeat itself",
     "weightDiversity": "多样性",
-    "weightDiversityDesc": "推荐中应包含多少种类",
+    "weightDiversityDesc": "How hard to push for variety across genres when your final list is picked",
     "errFetchSettings": "无法获取设置",
     "successIncludeWatchedSaved": "包括已保存的观看偏好",
     "successDislikeBehaviorSaved": "已保存不喜欢行为首选项",
@@ -1711,9 +1711,9 @@
     "labelUsingDefaultWeights": "使用默认权重",
     "descCustomActive": "您的个性化算法设置已激活",
     "descSystemDefaults": "建议使用系统默认值",
-    "weightTipNormal": "设置每个因素的相对重要性。 权重自动标准化。",
+    "weightTipNormal": "Only the ratio between these matters — they are normalised automatically, so they do not need to add up to 100%.",
     "recentWatchLimit": "最近观看历史限制",
-    "recentWatchTooltip": "建立您的品味档案时要考虑多少最近观看的项目",
+    "recentWatchTooltip": "Used for the \"because you watched…\" note on each pick. Your taste profile always reads your full history, so this does not change what gets recommended",
     "itemsCount": "{{count}} 件",
     "defaultPercent": "（默认值：{{percent}}%）",
     "defaultValue": "（默认值：{{值}}）",
@@ -2239,52 +2239,52 @@
     "help": {
       "maxCandidates": {
         "title": "最大候选数",
-        "description": "您的图书馆中有多少项目可以评估为潜在推荐。",
-        "increase": "更彻底的搜索，考虑整个图书馆，但处理速度较慢。",
-        "decrease": "生成速度更快，但可能会错过一些不太受欢迎的项目的良好匹配。",
-        "example": "如果您有时间，请设置为 ∞（无限制）以获得最佳结果，或者设置为 10-20K 以获得更快的日常跑步速度。"
+        "description": "How many library items the vector search returns for scoring. It also sets the field each match is judged against, since similarity is scored relative to this pool.",
+        "increase": "Every title gets a chance to compete, and match scores are measured against a fuller picture of the library.",
+        "decrease": "Faster runs, but titles outside the pool are never considered at all.",
+        "example": "Set it at or above your library size so nothing is excluded — 20-50K covers most libraries. Below ~2,000 the pool is too narrow to rank against."
       },
       "selectedCount": {
         "title": "每个用户的推荐",
-        "description": "每个用户收到的最终推荐数量。",
-        "increase": "用户有更多选择，但后期选择的质量可能会下降。",
-        "decrease": "更少但质量更高、更有信心的推荐。",
-        "example": "电影：20-50 是典型的。 系列：10-15，因为它们需要更多的时间投入。"
+        "description": "How many picks each user ends up with. Slots reserved for a user's custom interests come out of this number rather than being added to it.",
+        "increase": "More to browse, though the tail of a long list is noticeably weaker than the top.",
+        "decrease": "A shorter, more confident list.",
+        "example": "Movies: 20-30. Series: 10-15, since each one is a much bigger time commitment."
       },
       "recentWatchLimit": {
         "title": "观看历史深度",
-        "description": "构建品味概况时要分析多少最近观看的项目。",
-        "increase": "对长期偏好有更广泛的了解，对老用户来说更好。",
-        "decrease": "关注最近的观看习惯，如果口味经常改变，那就太好了。",
-        "example": "新用户有 20 块手表？ 设置为 20。长期用户？ 50-100 捕捉到他们的全部品味。"
+        "description": "Feeds the \"because you watched…\" evidence on each pick, and stands in as a taste profile for users who don't have one built yet. Ranking does not use it: the taste profile and genre familiarity both read the full watch history.",
+        "increase": "A wider pool for explanations to draw their evidence from.",
+        "decrease": "Explanations cite only the most recent viewing.",
+        "example": "Rarely worth tuning — it does not change the ranking. 100-500 gives explanations plenty to work with."
       },
       "similarityWeight": {
         "title": "口味相似度",
-        "description": "对符合用户既定偏好的项目的偏爱程度。",
-        "increase": "用户可能会喜欢更安全的选择，但冒险性较差。",
-        "decrease": "更多种类和惊喜，但错过的机会也更高。",
-        "example": "对于挑剔的观众，设置较高（50-60%）。 对于那些喜欢发现新事物的人来说，设置较低（30-40%）。"
+        "description": "How strongly to favour items close to the user's taste profile. Scored against the candidate pool, so this weight translates directly into influence over the order.",
+        "increase": "Picks stay close to what the user already watches and enjoys.",
+        "decrease": "Hands the decision to rating and discovery, which score the same for everyone — lists start to look generic and alike.",
+        "example": "This should be the largest weight. 45-70% suits most libraries; go higher for users with a narrow, well-defined taste."
       },
       "noveltyWeight": {
         "title": "类型探索",
-        "description": "奖励用户尚未探索过的类型的物品。",
-        "increase": "将用户推向舒适区之外，进入新的流派。",
-        "decrease": "坚持熟悉的领域和已知的最喜欢的类型。",
-        "example": "只看动作的人？ 更高的新颖性可能意味着他们喜欢的惊悚片或科幻小说。"
+        "description": "Rewards a familiar anchor plus something new. Peaks when roughly half an item's genres are ones the user rarely watches — both all-familiar and completely unfamiliar score lower.",
+        "increase": "Nudges users into adjacent genres they haven't tried much.",
+        "decrease": "Sticks to established genres.",
+        "example": "10-20% is enough to move a few slots. Set to almost zero and the term stops doing anything at all."
       },
       "ratingWeight": {
         "title": "社区评级",
-        "description": "对评价高、广受好评的商品有多少青睐。",
-        "increase": "质量优先于个性化——这对新用户来说非常有用。",
-        "decrease": "忽略评分，更相信口味匹配算法。",
-        "example": "如果您想展示具有好评的隐藏宝石，请设置更高的值（30%+）。"
+        "description": "Favours highly-rated titles. This score never changes for a given title, so the more weight it carries the more static every list becomes — and the more every user's list resembles everyone else's.",
+        "increase": "Useful for new users with too little history to match against.",
+        "decrease": "Trusts the taste profile over the crowd.",
+        "example": "15-25%, and keep it well below Similarity. Push it higher and the same acclaimed titles resurface every run."
       },
       "diversityWeight": {
         "title": "结果多样性",
-        "description": "确保最终推荐列表的多样性。",
-        "increase": "传播不同流派、年份、风格的推荐。",
-        "decrease": "如果相似的项目都得分良好，则可以将它们聚集在一起。",
-        "example": "即使用户喜欢这些电影，高度的多样性也会阻止连续观看 10 部漫威电影。"
+        "description": "Applied when the final list is picked, not when candidates are scored. Each slot trades a little match quality for a genre — and for series, a network — not already in the list. Automatically eased for users with focused taste and raised for eclectic ones.",
+        "increase": "Spreads the list across genres and networks.",
+        "decrease": "Lets the list cluster on whatever scores highest.",
+        "example": "10-20%. Set it near zero and one franchise or genre can take over the whole list."
       }
     }
   },
