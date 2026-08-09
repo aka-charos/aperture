@@ -59,6 +59,7 @@ import { getItemFranchises } from '../../taste-profile/franchise.js'
 import { getDislikedSeriesIds } from './taste.js'
 import { getWatchedGenreCounts } from '../genreFamiliarity.js'
 import { getWatchedYears, summarizeEraFit } from '../eraDiagnostics.js'
+import { getEffectiveAiExplanationSetting } from '../../lib/userSettings.js'
 import { WATCH_HISTORY_TASTE_SQL } from '../watchedExclusion.js'
 import { loadConfigForUser } from '../config.js'
 import type { PipelineConfig } from '../types.js'
@@ -1169,40 +1170,49 @@ export async function generateSeriesRecommendationsForUser(
     await storeSeriesEvidence(runId, finalSelected, watchedSeries)
 
     // 9. Generate AI explanations for selected recommendations
-    logger.info({ runId }, '🤖 Generating AI explanations...')
-    try {
-      // Fetch overviews for selected series
-      const seriesOverviews = await getSeriesOverviews(finalSelected.map((s) => s.seriesId))
+    //
+    // Gated on the same setting that decides whether anyone will ever read them.
+    // Without this the run pays for a text-generation call whose only output is
+    // a column nothing renders. Turning the setting back on takes effect from
+    // the next run: past runs stay unexplained rather than being backfilled.
+    if (!(await getEffectiveAiExplanationSetting(user.id))) {
+      logger.info({ runId }, '⏭️ AI explanations disabled for this user, skipping generation')
+    } else {
+      logger.info({ runId }, '🤖 Generating AI explanations...')
+      try {
+        // Fetch overviews for selected series
+        const seriesOverviews = await getSeriesOverviews(finalSelected.map((s) => s.seriesId))
 
-      // Prepare data for explanation generation
-      const seriesForExplanation: SeriesForExplanation[] = finalSelected.map((s) => ({
-        seriesId: s.seriesId,
-        title: s.title,
-        year: s.year,
-        genres: s.genres,
-        overview: seriesOverviews.get(s.seriesId) || null,
-        network: s.network,
-        status: s.status,
-        similarity: s.similarity,
-        normalizedSimilarity: s.normalizedSimilarity,
-        novelty: s.novelty,
-        ratingScore: s.ratingScore,
-        // Non-null only for reserved interest slots, so the explanation
-        // credits what actually put the show here instead of inventing a
-        // watch-history justification for it.
-        interestText: interestPicks.get(s.seriesId)?.interestText ?? null,
-      }))
+        // Prepare data for explanation generation
+        const seriesForExplanation: SeriesForExplanation[] = finalSelected.map((s) => ({
+          seriesId: s.seriesId,
+          title: s.title,
+          year: s.year,
+          genres: s.genres,
+          overview: seriesOverviews.get(s.seriesId) || null,
+          network: s.network,
+          status: s.status,
+          similarity: s.similarity,
+          normalizedSimilarity: s.normalizedSimilarity,
+          novelty: s.novelty,
+          ratingScore: s.ratingScore,
+          // Non-null only for reserved interest slots, so the explanation
+          // credits what actually put the show here instead of inventing a
+          // watch-history justification for it.
+          interestText: interestPicks.get(s.seriesId)?.interestText ?? null,
+        }))
 
-      // Generate explanations using embedding-based evidence
-      const explanations = await generateSeriesExplanations(runId, user.id, seriesForExplanation)
-      await storeSeriesExplanations(runId, explanations)
-      logger.info({ runId, count: explanations.length }, '✅ AI explanations stored')
-    } catch (explanationError) {
-      // Don't fail the whole run if explanations fail
-      logger.warn(
-        { runId, error: explanationError },
-        '⚠️ Failed to generate explanations, continuing without'
-      )
+        // Generate explanations using embedding-based evidence
+        const explanations = await generateSeriesExplanations(runId, user.id, seriesForExplanation)
+        await storeSeriesExplanations(runId, explanations)
+        logger.info({ runId, count: explanations.length }, '✅ AI explanations stored')
+      } catch (explanationError) {
+        // Don't fail the whole run if explanations fail
+        logger.warn(
+          { runId, error: explanationError },
+          '⚠️ Failed to generate explanations, continuing without'
+        )
+      }
     }
 
     const duration = Date.now() - startTime
