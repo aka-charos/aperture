@@ -15,6 +15,7 @@
 import { query } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { bulkUpdateFranchisePreferences, bulkUpdateGenreWeights } from './index.js'
+import { newlyDetectedNames } from './detectionMerge.js'
 import type { MediaType } from './types.js'
 
 const logger = createChildLogger('franchise-detector')
@@ -423,32 +424,26 @@ export async function detectAndUpdateFranchises(
     totalEngagement: stat.totalEngagement,
   }))
 
-  // Track new items
-  const newItems: string[] = []
-
-  // In merge mode, only include franchises that don't exist yet
-  const preferencesToUpdate = mode === 'merge'
-    ? preferences.filter((p) => {
-        const isNew = !existingFranchises.has(p.franchiseName)
-        if (isNew) newItems.push(p.franchiseName)
-        return isNew
-      })
-    : preferences
-
-  // In reset mode, all items are "new" for highlighting purposes
-  if (mode === 'reset') {
-    newItems.push(...preferences.map((p) => p.franchiseName))
-  }
+  // Which franchises the user hasn't seen before -- highlighting only. Every
+  // detected franchise is written regardless of mode; see newlyDetectedNames
+  // for why merge mode no longer filters the write list. is_user_set rows keep
+  // their score in SQL and only have their stats refreshed.
+  const newItems = newlyDetectedNames(
+    preferences,
+    (p) => p.franchiseName,
+    existingFranchises,
+    mode
+  )
 
   // Update database - clear first in reset mode to remove items from excluded libraries
   // Pass mediaType so only that content type's franchises are cleared
   const clearFirst = mode === 'reset'
-  const updated =
-    preferencesToUpdate.length > 0
-      ? await bulkUpdateFranchisePreferences(userId, preferencesToUpdate, clearFirst, mediaType)
-      : clearFirst
-        ? (await bulkUpdateFranchisePreferences(userId, [], true, mediaType), 0)
-        : 0
+  const updated = await bulkUpdateFranchisePreferences(
+    userId,
+    preferences,
+    clearFirst,
+    mediaType
+  )
 
   logger.info(
     { userId, mediaType, mode, detected: franchiseStats.length, updated, newItems: newItems.length },
@@ -857,28 +852,14 @@ export async function detectAndUpdateGenres(
     weight: calculateGenreWeight(stat, genreStats),
   }))
 
-  // Track new items
-  const newItems: string[] = []
-
-  // In merge mode, only include genres that don't exist yet
-  const weightsToUpdate = mode === 'merge'
-    ? genreWeights.filter((g) => {
-        const isNew = !existingGenres.has(g.genre)
-        if (isNew) newItems.push(g.genre)
-        return isNew
-      })
-    : genreWeights
-
-  // In reset mode, all items are "new" for highlighting purposes
-  if (mode === 'reset') {
-    newItems.push(...genreWeights.map((g) => g.genre))
-  }
+  // Highlighting only -- every detected genre is written on every run so the
+  // weights track a shifting watch history instead of being frozen at first
+  // detection. See newlyDetectedNames.
+  const newItems = newlyDetectedNames(genreWeights, (g) => g.genre, existingGenres, mode)
 
   // Update database - clear first in reset mode to remove items from excluded libraries
   const clearFirst = mode === 'reset'
-  const updated = weightsToUpdate.length > 0
-    ? await bulkUpdateGenreWeights(userId, weightsToUpdate, clearFirst)
-    : (clearFirst ? (await bulkUpdateGenreWeights(userId, [], true), 0) : 0)
+  const updated = await bulkUpdateGenreWeights(userId, genreWeights, clearFirst)
 
   logger.info(
     { userId, mediaType, mode, detected: genreStats.length, updated, newItems: newItems.length },
