@@ -1813,7 +1813,7 @@
     "recsPerUser": "Συστάσεις Ανά Χρήστη",
     "watchHistoryDepth": "Βάθος Ιστορικού Παρακολούθησης",
     "weightSimilarity": "Ομοιότητα",
-    "weightDiscovery": "Ανακάλυψη",
+    "weightDiscovery": "Ανακάλυψη Είδους",
     "weightRating": "Βαθμολογία",
     "weightDiversity": "Ποικιλομορφία",
     "helpIncrease": "↑ Αύξηση:",
@@ -3438,7 +3438,7 @@
   "algorithmSettings": {
     "weightSimilarity": "Ομοιότητα",
     "weightSimilarityDesc": "How strongly to favour titles close to your taste profile. Usually the one to keep highest",
-    "weightNovelty": "Πρωτοτυπία",
+    "weightNovelty": "Ανακάλυψη Είδους",
     "weightNoveltyDesc": "Rewards a familiar anchor plus a genre you rarely watch — partly new, rather than as strange as possible",
     "weightRating": "Βαθμολογία κοινότητας",
     "weightRatingDesc": "How much to favour highly-rated titles. This score never changes, so a high value makes your list repeat itself",

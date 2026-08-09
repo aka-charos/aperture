@@ -1688,7 +1688,7 @@
   "algorithmSettings": {
     "weightSimilarity": "類似性",
     "weightSimilarityDesc": "How strongly to favour titles close to your taste profile. Usually the one to keep highest",
-    "weightNovelty": "ノベルティ",
+    "weightNovelty": "ジャンルの発見",
     "weightNoveltyDesc": "Rewards a familiar anchor plus a genre you rarely watch — partly new, rather than as strange as possible",
     "weightRating": "コミュニティ評価",
     "weightRatingDesc": "How much to favour highly-rated titles. This score never changes, so a high value makes your list repeat itself",
@@ -2231,7 +2231,7 @@
     "recsPerUser": "ユーザーごとの Rec 数",
     "watchHistoryDepth": "視聴履歴の深さ",
     "weightSimilarity": "類似性",
-    "weightDiscovery": "発見",
+    "weightDiscovery": "ジャンルの発見",
     "weightRating": "評価",
     "weightDiversity": "多様性",
     "helpIncrease": "↑増加：",

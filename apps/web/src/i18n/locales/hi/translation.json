@@ -1688,7 +1688,7 @@
   "algorithmSettings": {
     "weightSimilarity": "समानता",
     "weightSimilarityDesc": "How strongly to favour titles close to your taste profile. Usually the one to keep highest",
-    "weightNovelty": "नवीनता",
+    "weightNovelty": "शैली की खोज",
     "weightNoveltyDesc": "Rewards a familiar anchor plus a genre you rarely watch — partly new, rather than as strange as possible",
     "weightRating": "सामुदायिक रेटिंग",
     "weightRatingDesc": "How much to favour highly-rated titles. This score never changes, so a high value makes your list repeat itself",
@@ -2231,7 +2231,7 @@
     "recsPerUser": "प्रति उपयोगकर्ता Recs",
     "watchHistoryDepth": "इतिहास की गहराई देखें",
     "weightSimilarity": "समानता",
-    "weightDiscovery": "खोज",
+    "weightDiscovery": "शैली की खोज",
     "weightRating": "रेटिंग",
     "weightDiversity": "विविधता",
     "helpIncrease": "↑ वृद्धि:",

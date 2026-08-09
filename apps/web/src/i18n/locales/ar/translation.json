@@ -1688,7 +1688,7 @@
   "algorithmSettings": {
     "weightSimilarity": "تشابه",
     "weightSimilarityDesc": "How strongly to favour titles close to your taste profile. Usually the one to keep highest",
-    "weightNovelty": "بدعة",
+    "weightNovelty": "اكتشاف النوع",
     "weightNoveltyDesc": "Rewards a familiar anchor plus a genre you rarely watch — partly new, rather than as strange as possible",
     "weightRating": "تصنيف المجتمع",
     "weightRatingDesc": "How much to favour highly-rated titles. This score never changes, so a high value makes your list repeat itself",
@@ -2231,7 +2231,7 @@
     "recsPerUser": "التوصيات لكل مستخدم",
     "watchHistoryDepth": "شاهد عمق التاريخ",
     "weightSimilarity": "تشابه",
-    "weightDiscovery": "اكتشاف",
+    "weightDiscovery": "اكتشاف النوع",
     "weightRating": "تصنيف",
     "weightDiversity": "تنوع",
     "helpIncrease": "↑ الزيادة:",
