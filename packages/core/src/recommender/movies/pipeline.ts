@@ -57,6 +57,7 @@ import {
 } from '../shared/index.js'
 import { getWatchedGenreCounts } from '../genreFamiliarity.js'
 import { getWatchedYears, summarizeEraFit } from '../eraDiagnostics.js'
+import { getEffectiveAiExplanationSetting } from '../../lib/userSettings.js'
 
 // Re-export types
 export * from '../types.js'
@@ -544,38 +545,47 @@ export async function generateRecommendationsForUser(
     await storeEvidence(runId, finalSelected, watched)
 
     // 7. Generate AI explanations for selected recommendations
-    logger.info({ runId }, '🤖 Generating AI explanations...')
-    try {
-      // Fetch overviews for selected movies
-      const movieOverviews = await getMovieOverviews(finalSelected.map((s) => s.movieId))
+    //
+    // Gated on the same setting that decides whether anyone will ever read them.
+    // Without this the run pays for a text-generation call whose only output is
+    // a column nothing renders. Turning the setting back on takes effect from
+    // the next run: past runs stay unexplained rather than being backfilled.
+    if (!(await getEffectiveAiExplanationSetting(user.id))) {
+      logger.info({ runId }, '⏭️ AI explanations disabled for this user, skipping generation')
+    } else {
+      logger.info({ runId }, '🤖 Generating AI explanations...')
+      try {
+        // Fetch overviews for selected movies
+        const movieOverviews = await getMovieOverviews(finalSelected.map((s) => s.movieId))
 
-      // Prepare data for explanation generation
-      const moviesForExplanation: MovieForExplanation[] = finalSelected.map((s) => ({
-        movieId: s.movieId,
-        title: s.title,
-        year: s.year,
-        genres: s.genres,
-        overview: movieOverviews.get(s.movieId) || null,
-        similarity: s.similarity,
-        normalizedSimilarity: s.normalizedSimilarity,
-        novelty: s.novelty,
-        ratingScore: s.ratingScore,
-        // Non-null only for reserved interest slots, so the explanation
-        // credits what actually put the film here instead of inventing a
-        // watch-history justification for it.
-        interestText: interestPicks.get(s.movieId)?.interestText ?? null,
-      }))
+        // Prepare data for explanation generation
+        const moviesForExplanation: MovieForExplanation[] = finalSelected.map((s) => ({
+          movieId: s.movieId,
+          title: s.title,
+          year: s.year,
+          genres: s.genres,
+          overview: movieOverviews.get(s.movieId) || null,
+          similarity: s.similarity,
+          normalizedSimilarity: s.normalizedSimilarity,
+          novelty: s.novelty,
+          ratingScore: s.ratingScore,
+          // Non-null only for reserved interest slots, so the explanation
+          // credits what actually put the film here instead of inventing a
+          // watch-history justification for it.
+          interestText: interestPicks.get(s.movieId)?.interestText ?? null,
+        }))
 
-      // Generate explanations using embedding-based evidence
-      const explanations = await generateExplanations(runId, user.id, moviesForExplanation)
-      await storeExplanations(runId, explanations)
-      logger.info({ runId, count: explanations.length }, '✅ AI explanations stored')
-    } catch (explanationError) {
-      // Don't fail the whole run if explanations fail
-      logger.warn(
-        { runId, error: explanationError },
-        '⚠️ Failed to generate explanations, continuing without'
-      )
+        // Generate explanations using embedding-based evidence
+        const explanations = await generateExplanations(runId, user.id, moviesForExplanation)
+        await storeExplanations(runId, explanations)
+        logger.info({ runId, count: explanations.length }, '✅ AI explanations stored')
+      } catch (explanationError) {
+        // Don't fail the whole run if explanations fail
+        logger.warn(
+          { runId, error: explanationError },
+          '⚠️ Failed to generate explanations, continuing without'
+        )
+      }
     }
 
     const duration = Date.now() - startTime
