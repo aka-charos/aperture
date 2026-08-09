@@ -650,7 +650,8 @@
       "newGenresPart": " • {{count}} neu zum Entdecken",
       "whyWeThink": "Warum wir denken, dass es dir gefällt",
       "basedOnHistoryMovie": "Basierend auf deinem Verlauf mit ähnlichen Filmen:",
-      "basedOnHistorySeries": "Basierend auf deinem Verlauf mit ähnlichen Serien:"
+      "basedOnHistorySeries": "Basierend auf deinem Verlauf mit ähnlichen Serien:",
+      "aiExplanationTitle": "Warum {{appName}} das für dich ausgewählt hat"
     },
     "seasons": {
       "title": "Episoden",
@@ -926,9 +927,9 @@
     "resetToDefaults": "Auf Standard zurücksetzen",
     "aiLibraryFooter": "Änderungen werden angewendet, wenn die Bibliothekssynchronisierung das nächste Mal läuft oder Empfehlungen neu generiert werden.",
     "aiExplanationTitle": "KI-Erklärungspräferenz",
-    "aiExplanationSubtitle": "Wähle, ob KI-generierte Erklärungen in deinen Empfehlungsbeschreibungen enthalten sein sollen.",
+    "aiExplanationSubtitle": "Choose whether your recommendations come with a short note on why each title was picked.",
     "aiExplanationIncludeTitle": "KI-Erklärungen einbeziehen",
-    "aiExplanationIncludeBody": "Wenn aktiviert, enthält jede Empfehlung \"Warum {{appName}} das für dich ausgewählt hat\"",
+    "aiExplanationIncludeBody": "Adds \"Why {{appName}} picked this for you\" to each recommendation — in its Recommended For You panel here, and at the top of its description on your media server",
     "aiExplanationReset": "Auf Standard zurücksetzen ({{state}})",
     "stateEnabled": "Aktiviert",
     "stateDisabled": "Deaktiviert",
@@ -2142,9 +2143,9 @@
     "saved": "KI-Erklärungseinstellungen gespeichert!",
     "unknownError": "Unbekannter Fehler",
     "title": "KI-Erklärung in Empfehlungen",
-    "subtitle": "Steuere, ob KI-generierte Erklärungen („Warum {{appName}} das für dich ausgewählt hat“) in Empfehlungsbeschreibungen angezeigt werden",
+    "subtitle": "A short written note on why each title was picked, shown as \"Why {{appName}} picked this for you\"",
     "includeTitle": "KI-Erklärungen einschließen",
-    "includeDesc": "Wenn aktiviert, enthält jede Empfehlung eine personalisierte Erklärung, warum sie ausgewählt wurde",
+    "includeDesc": "Each recommendation gets a paragraph explaining the pick, shown in its Recommended For You panel and at the top of its description on your media server. Turning this off also skips the AI call that writes them. Either way, the change applies from the next recommendation run onward — existing recommendations keep whatever they were generated with.",
     "overrideTitle": "Benutzerdefinierte Überschreibungen erlauben",
     "overrideDesc": "Wenn aktiviert, können Administratoren einzelnen Nutzern erlauben, KI-Erklärungen für ihre eigenen Empfehlungen ein- oder auszuschalten",
     "infoThreeTier": "Drei-Stufen-System:",

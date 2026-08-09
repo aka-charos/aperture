@@ -650,7 +650,8 @@
       "newGenresPart": "• {{count}} novidades para explorar",
       "whyWeThink": "Por que achamos que você vai gostar disso",
       "basedOnHistoryMovie": "Com base na sua história com filmes semelhantes:",
-      "basedOnHistorySeries": "Com base no seu histórico com séries semelhantes:"
+      "basedOnHistorySeries": "Com base no seu histórico com séries semelhantes:",
+      "aiExplanationTitle": "Por que o {{appName}} escolheu isso para você"
     },
     "seasons": {
       "title": "Episódios",
@@ -926,9 +927,9 @@
     "resetToDefaults": "Redefinir para os padrões",
     "aiLibraryFooter": "As alterações serão aplicadas na próxima vez que os trabalhos de sincronização da biblioteca forem executados ou quando as recomendações forem regeneradas.",
     "aiExplanationTitle": "Preferência de explicação de IA",
-    "aiExplanationSubtitle": "Escolha se deseja incluir explicações geradas por IA nas descrições de suas recomendações.",
+    "aiExplanationSubtitle": "Choose whether your recommendations come with a short note on why each title was picked.",
     "aiExplanationIncludeTitle": "Incluir explicações de IA",
-    "aiExplanationIncludeBody": "Quando ativado, cada recomendação inclui \"Por que o {{appName}} escolheu isso para você\"",
+    "aiExplanationIncludeBody": "Adds \"Why {{appName}} picked this for you\" to each recommendation — in its Recommended For You panel here, and at the top of its description on your media server",
     "aiExplanationReset": "Redefinir para o padrão ({{state}})",
     "stateEnabled": "Habilitada",
     "stateDisabled": "Desabilitada",
@@ -2142,9 +2143,9 @@
     "saved": "Configurações de explicação de IA salvas!",
     "unknownError": "Erro desconhecido",
     "title": "Explicação da IA ​​nas recomendações",
-    "subtitle": "Controle se as explicações geradas pela IA (\"Por que o {{appName}} escolheu isso para você\") aparecem nas descrições das recomendações",
+    "subtitle": "A short written note on why each title was picked, shown as \"Why {{appName}} picked this for you\"",
     "includeTitle": "Incluir explicações de IA",
-    "includeDesc": "Quando ativada, cada recomendação inclui uma explicação personalizada do motivo pelo qual foi selecionada",
+    "includeDesc": "Each recommendation gets a paragraph explaining the pick, shown in its Recommended For You panel and at the top of its description on your media server. Turning this off also skips the AI call that writes them. Either way, the change applies from the next recommendation run onward — existing recommendations keep whatever they were generated with.",
     "overrideTitle": "Permitir substituições por usuário",
     "overrideDesc": "Quando ativado, os administradores podem conceder aos usuários individuais a capacidade de alternar as explicações de IA para suas próprias recomendações",
     "infoThreeTier": "Sistema de três níveis:",

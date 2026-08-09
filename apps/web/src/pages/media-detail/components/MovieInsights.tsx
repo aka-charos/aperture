@@ -113,6 +113,32 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
         <Collapse in={insightsExpanded}>
           <Divider />
           <Box sx={{ p: 3 }}>
+            {/* The generated "why" — prose before numbers, matching the order
+                the same text is written into the media-server plot. Absent
+                whenever AI explanations are switched off. */}
+            {insights.aiExplanation && (
+              <Paper
+                sx={{
+                  p: 2,
+                  mb: 4,
+                  bgcolor: 'background.default',
+                  borderRadius: 2,
+                  borderInlineStart: '3px solid',
+                  borderInlineStartColor: 'primary.main',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <AutoAwesomeIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+                  <Typography variant="subtitle1" fontWeight={600}>
+                    {t('mediaDetail.insights.aiExplanationTitle')}
+                  </Typography>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+                  {insights.aiExplanation}
+                </Typography>
+              </Paper>
+            )}
+
             {/* Score Breakdown */}
             <Typography variant="subtitle1" fontWeight={600} gutterBottom>
               {t('mediaDetail.insights.howWeCalculated')}

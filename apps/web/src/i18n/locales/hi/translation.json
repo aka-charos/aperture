@@ -650,7 +650,8 @@
       "newGenresPart": "• {{गिनती}} अन्वेषण के लिए नया",
       "whyWeThink": "हम क्यों सोचते हैं कि आपको यह पसंद आएगा",
       "basedOnHistoryMovie": "समान फिल्मों के साथ आपके इतिहास के आधार पर:",
-      "basedOnHistorySeries": "इसी तरह की श्रृंखला के साथ आपके इतिहास पर आधारित:"
+      "basedOnHistorySeries": "इसी तरह की श्रृंखला के साथ आपके इतिहास पर आधारित:",
+      "aiExplanationTitle": "{{appName}} ने आपके लिए इसे क्यों चुना"
     },
     "seasons": {
       "title": "एपिसोड",
@@ -926,9 +927,9 @@
     "resetToDefaults": "डिफ़ॉल्ट पर पुनः सेट करें",
     "aiLibraryFooter": "अगली बार लाइब्रेरी सिंक कार्य चलने पर या अनुशंसाएँ पुन: जेनरेट होने पर परिवर्तन लागू होंगे।",
     "aiExplanationTitle": "एआई स्पष्टीकरण प्राथमिकता",
-    "aiExplanationSubtitle": "चुनें कि क्या आपके अनुशंसा विवरण में एआई-जनरेटेड स्पष्टीकरण शामिल करना है या नहीं।",
+    "aiExplanationSubtitle": "Choose whether your recommendations come with a short note on why each title was picked.",
     "aiExplanationIncludeTitle": "एआई स्पष्टीकरण शामिल करें",
-    "aiExplanationIncludeBody": "सक्षम होने पर, प्रत्येक अनुशंसा में \"{{appName}} ने आपके लिए इसे क्यों चुना\" शामिल होता है",
+    "aiExplanationIncludeBody": "Adds \"Why {{appName}} picked this for you\" to each recommendation — in its Recommended For You panel here, and at the top of its description on your media server",
     "aiExplanationReset": "डिफ़ॉल्ट पर रीसेट करें ({{राज्य}})",
     "stateEnabled": "सक्रिय",
     "stateDisabled": "अक्षम",
@@ -2142,9 +2143,9 @@
     "saved": "एआई स्पष्टीकरण सेटिंग्स सहेजी गईं!",
     "unknownError": "अज्ञात त्रुटि",
     "title": "अनुशंसाओं में एआई स्पष्टीकरण",
-    "subtitle": "नियंत्रित करें कि क्या एआई-जनरेटेड स्पष्टीकरण (\"{{appName}} ने आपके लिए इसे क्यों चुना\") अनुशंसा विवरण में दिखाई देते हैं",
+    "subtitle": "A short written note on why each title was picked, shown as \"Why {{appName}} picked this for you\"",
     "includeTitle": "एआई स्पष्टीकरण शामिल करें",
-    "includeDesc": "सक्षम होने पर, प्रत्येक अनुशंसा में एक वैयक्तिकृत स्पष्टीकरण शामिल होता है कि उसे क्यों चुना गया",
+    "includeDesc": "Each recommendation gets a paragraph explaining the pick, shown in its Recommended For You panel and at the top of its description on your media server. Turning this off also skips the AI call that writes them. Either way, the change applies from the next recommendation run onward — existing recommendations keep whatever they were generated with.",
     "overrideTitle": "प्रति-उपयोगकर्ता ओवरराइड की अनुमति दें",
     "overrideDesc": "सक्षम होने पर, प्रशासक व्यक्तिगत उपयोगकर्ताओं को अपनी अनुशंसाओं के लिए एआई स्पष्टीकरण को टॉगल करने की क्षमता प्रदान कर सकते हैं",
     "infoThreeTier": "त्रिस्तरीय प्रणाली:",

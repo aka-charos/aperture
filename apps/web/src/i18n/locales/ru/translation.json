@@ -758,7 +758,8 @@
       "newGenresPart": "• {{count}} новых для изучения",
       "whyWeThink": "Почему мы думаем, что вам это понравится",
       "basedOnHistoryMovie": "Основываясь на вашей истории с похожими фильмами:",
-      "basedOnHistorySeries": "Основываясь на вашей истории с похожими сериалами:"
+      "basedOnHistorySeries": "Основываясь на вашей истории с похожими сериалами:",
+      "aiExplanationTitle": "Почему {{appName}} выбрала это для вас"
     },
     "seasons": {
       "title": "Эпизоды",
@@ -1293,9 +1294,9 @@
     "resetToDefaults": "Сброс к настройкам по умолчанию",
     "aiLibraryFooter": "Изменения вступят в силу при следующем запуске заданий синхронизации библиотеки или при повторном создании рекомендаций.",
     "aiExplanationTitle": "Предпочтение объяснения AI",
-    "aiExplanationSubtitle": "Выберите, включать ли в описания рекомендаций пояснения, созданные искусственным интеллектом.",
+    "aiExplanationSubtitle": "Choose whether your recommendations come with a short note on why each title was picked.",
     "aiExplanationIncludeTitle": "Включить пояснения ИИ",
-    "aiExplanationIncludeBody": "Если эта функция включена, каждая рекомендация включает в себя «Почему {{appName}} выбрала это для вас».",
+    "aiExplanationIncludeBody": "Adds \"Why {{appName}} picked this for you\" to each recommendation — in its Recommended For You panel here, and at the top of its description on your media server",
     "aiExplanationReset": "Сбросить настройки по умолчанию ({{state}})",
     "stateEnabled": "Включено",
     "stateDisabled": "Неполноценный",
@@ -1911,9 +1912,9 @@
     "saved": "Настройки объяснения ИИ сохранены!",
     "unknownError": "Неизвестная ошибка",
     "title": "Объяснение AI в рекомендациях",
-    "subtitle": "Контролируйте, будут ли в описаниях рекомендаций появляться объяснения, созданные искусственным интеллектом («Почему {{appName}} выбрала это для вас»).",
+    "subtitle": "A short written note on why each title was picked, shown as \"Why {{appName}} picked this for you\"",
     "includeTitle": "Включить пояснения ИИ",
-    "includeDesc": "Если эта функция включена, каждая рекомендация включает персонализированное объяснение того, почему она была выбрана.",
+    "includeDesc": "Each recommendation gets a paragraph explaining the pick, shown in its Recommended For You panel and at the top of its description on your media server. Turning this off also skips the AI call that writes them. Either way, the change applies from the next recommendation run onward — existing recommendations keep whatever they were generated with.",
     "overrideTitle": "Разрешить переопределения для каждого пользователя",
     "overrideDesc": "Если этот параметр включен, администраторы могут предоставить отдельным пользователям возможность переключать объяснения ИИ для своих собственных рекомендаций.",
     "infoThreeTier": "Трехуровневая система:",
