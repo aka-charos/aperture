@@ -28,6 +28,98 @@ export const WATCH_HISTORY_EXCLUDABLE_SQL = `(
 export const WATCH_HISTORY_TASTE_SQL = `(wh.played = true OR wh.is_favorite = true)`
 
 /**
+ * Favoriting is not watching, and the two predicates above keep it that way on
+ * purpose: a favorite counts as taste evidence but never as "seen", so it is
+ * still eligible for a Seerr request or a watched-only filter.
+ *
+ * It should not, however, come back as a *recommendation*. A recommendation
+ * slot exists to surface something the user hasn't found yet, and a favorite is
+ * by definition already found -- offering it back spends one of twenty slots
+ * telling someone about their own bookmark. Worse, a favorite feeds the taste
+ * vector, so it helps retrieve itself.
+ *
+ * Deliberately separate from getExpandedWatchedMovieIds rather than folded into
+ * WATCH_HISTORY_EXCLUDABLE_SQL: that predicate is shared with discovery
+ * (discover/filter.ts) and the STRM safety net, where "have they seen it" is
+ * the real question and a favorite must keep answering no.
+ *
+ * Already-played favorites are in here too, which is harmless -- the caller
+ * unions this with the watched set that already contains them.
+ */
+export async function getExpandedFavoritedMovieIds(userId: string): Promise<Set<string>> {
+  const result = await query<{ id: string }>(
+    `SELECT DISTINCT m.id
+     FROM movies m
+     WHERE m.id IN (
+       SELECT wh.movie_id FROM watch_history wh
+       WHERE wh.user_id = $1 AND wh.media_type = 'movie' AND wh.is_favorite = true
+     )
+     OR m.tmdb_id IN (
+       SELECT DISTINCT m2.tmdb_id FROM watch_history wh
+       JOIN movies m2 ON m2.id = wh.movie_id
+       WHERE wh.user_id = $1 AND wh.media_type = 'movie' AND m2.tmdb_id IS NOT NULL
+         AND wh.is_favorite = true
+     )
+     OR m.imdb_id IN (
+       SELECT DISTINCT m2.imdb_id FROM watch_history wh
+       JOIN movies m2 ON m2.id = wh.movie_id
+       WHERE wh.user_id = $1 AND wh.media_type = 'movie' AND m2.imdb_id IS NOT NULL
+         AND wh.is_favorite = true
+     )`,
+    [userId]
+  )
+  return new Set(result.rows.map((r) => r.id))
+}
+
+/**
+ * Series counterpart of getExpandedFavoritedMovieIds.
+ *
+ * watch_history carries series rows per *episode*, so this means "a series with
+ * at least one favorited episode" -- the closest thing the table records to a
+ * favorited show. A show favorited on the media server with nothing played
+ * leaves no rows here at all, so it never reaches the taste profile and needs
+ * no exclusion.
+ */
+export async function getExpandedFavoritedSeriesIds(userId: string): Promise<Set<string>> {
+  const result = await query<{ id: string }>(
+    `SELECT DISTINCT s.id
+     FROM series s
+     WHERE s.id IN (
+       SELECT DISTINCT e.series_id
+       FROM watch_history wh
+       JOIN episodes e ON e.id = wh.episode_id
+       WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND wh.is_favorite = true
+     )
+     OR s.tmdb_id IN (
+       SELECT DISTINCT s2.tmdb_id
+       FROM watch_history wh
+       JOIN episodes e ON e.id = wh.episode_id
+       JOIN series s2 ON s2.id = e.series_id
+       WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND s2.tmdb_id IS NOT NULL
+         AND wh.is_favorite = true
+     )
+     OR s.imdb_id IN (
+       SELECT DISTINCT s2.imdb_id
+       FROM watch_history wh
+       JOIN episodes e ON e.id = wh.episode_id
+       JOIN series s2 ON s2.id = e.series_id
+       WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND s2.imdb_id IS NOT NULL
+         AND wh.is_favorite = true
+     )
+     OR s.tvdb_id IN (
+       SELECT DISTINCT s2.tvdb_id
+       FROM watch_history wh
+       JOIN episodes e ON e.id = wh.episode_id
+       JOIN series s2 ON s2.id = e.series_id
+       WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND s2.tvdb_id IS NOT NULL
+         AND wh.is_favorite = true
+     )`,
+    [userId]
+  )
+  return new Set(result.rows.map((r) => r.id))
+}
+
+/**
  * All movie IDs that should be treated as watched for a user, including duplicate
  * library copies that share the same TMDb/IMDb ID as a watched title.
  */
