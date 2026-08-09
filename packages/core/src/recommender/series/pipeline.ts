@@ -870,14 +870,27 @@ export async function generateSeriesRecommendationsForUser(
       // Only exclude disliked series (not watched ones)
       excludeIds = new Set(dislikedIds)
     } else {
-      const { getExpandedWatchedSeriesIds } = await import('../watchedExclusion.js')
+      const { getExpandedWatchedSeriesIds, getExpandedFavoritedSeriesIds } = await import(
+        '../watchedExclusion.js'
+      )
       excludeIds = await getExpandedWatchedSeriesIds(user.id)
+      // Favorites stay taste input but stop being offered back as discoveries;
+      // see getExpandedFavoritedSeriesIds for why this isn't part of "watched".
+      const favoritedIds = await getExpandedFavoritedSeriesIds(user.id)
+      for (const favoritedId of favoritedIds) {
+        excludeIds.add(favoritedId)
+      }
       for (const dislikedId of dislikedIds) {
         excludeIds.add(dislikedId)
       }
       logger.info(
-        { userId: user.id, excludeTotal: excludeIds.size, dislikedCount: dislikedIds.size },
-        `📋 Loaded ${excludeIds.size} series to exclude (watched duplicates + disliked)`
+        {
+          userId: user.id,
+          excludeTotal: excludeIds.size,
+          favoritedCount: favoritedIds.size,
+          dislikedCount: dislikedIds.size,
+        },
+        `📋 Loaded ${excludeIds.size} series to exclude (watched duplicates + favorited + disliked)`
       )
     }
 
