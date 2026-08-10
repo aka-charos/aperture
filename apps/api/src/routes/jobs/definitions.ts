@@ -76,6 +76,14 @@ export const jobDefinitions: JobDefinition[] = [
     description: 'Build Aperture series libraries with AI recommendations (STRM or symlinks)',
     cron: process.env.PERMS_CRON || '0 5 * * *',
   },
+  // === Taste Profiles (both media types) ===
+  {
+    name: 'rebuild-taste-profiles',
+    description:
+      "Rebuilds every user's taste profile, clusters and detected preferences from their current watch history. Use after changes to how taste is calculated — profiles otherwise only refresh when they age past their own interval.",
+    cron: null,
+    manualOnly: true,
+  },
   // === Top Picks Jobs ===
   {
     name: 'refresh-top-picks',

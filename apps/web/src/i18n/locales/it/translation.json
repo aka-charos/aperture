@@ -383,6 +383,10 @@
         "globalIntegrations": {
           "title": "Integrazioni",
           "description": "Sincronizza con Trakt e aggiorna i prezzi IA"
+        },
+        "globalTaste": {
+          "title": "Taste Profiles",
+          "description": "Rebuild what {{appName}} has learned about each user's taste"
         }
       },
       "jobNames": {

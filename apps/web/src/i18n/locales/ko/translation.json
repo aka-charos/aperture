@@ -383,6 +383,10 @@
         "globalIntegrations": {
           "title": "연동",
           "description": "Trakt 동기화 및 AI 가격 데이터 갱신"
+        },
+        "globalTaste": {
+          "title": "Taste Profiles",
+          "description": "Rebuild what {{appName}} has learned about each user's taste"
         }
       },
       "jobNames": {

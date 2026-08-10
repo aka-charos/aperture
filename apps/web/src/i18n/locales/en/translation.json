@@ -422,6 +422,10 @@
           "title": "Discovery & Suggestions",
           "description": "AI-powered content discovery and recommendations"
         },
+        "globalTaste": {
+          "title": "Taste Profiles",
+          "description": "Rebuild what {{appName}} has learned about each user's taste"
+        },
         "globalIntegrations": {
           "title": "Integrations",
           "description": "Sync with Trakt and LLDAP, and update AI pricing data"

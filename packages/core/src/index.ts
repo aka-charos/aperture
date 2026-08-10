@@ -1164,6 +1164,12 @@ export {
   type TasteClusterBuildResult,
 } from './taste-profile/builder.js'
 
+export {
+  // Admin-wide profile rebuild (jobs executor)
+  rebuildAllTasteProfiles,
+  type RebuildAllTasteProfilesResult,
+} from './taste-profile/rebuildAll.js'
+
 // Taste cluster type only -- the clustering algorithm itself (chooseK,
 // clusterTasteEmbeddings) is an internal primitive consumed solely within
 // packages/core (by builder.ts), matching the existing precedent of
