@@ -26,6 +26,9 @@ export {
   scheduleToCron,
   formatSchedule,
   getValidJobNames,
+  isBiweeklyRunDue,
+  isScheduledRunDue,
+  BIWEEKLY_MIN_DAYS,
   type JobConfig,
   type ScheduleType,
 } from './jobConfig.js'

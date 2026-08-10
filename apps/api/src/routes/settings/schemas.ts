@@ -147,6 +147,8 @@ export const updateRecommendationConfigSchema = {
       noveltyWeight: { type: 'number' as const, minimum: 0, maximum: 1, description: 'Weight for content novelty/freshness (0-1)', example: 0.2 },
       ratingWeight: { type: 'number' as const, minimum: 0, maximum: 1, description: 'Weight for critic/community ratings (0-1)', example: 0.2 },
       diversityWeight: { type: 'number' as const, minimum: 0, maximum: 1, description: 'Weight for genre diversity in results (0-1)', example: 0.2 },
+      newCandidateThreshold: { type: 'integer' as const, minimum: 1, description: 'Newly-available titles required before the activity gate treats the catalogue as changed', example: 12 },
+      maxRunAgeDays: { type: 'integer' as const, minimum: 1, description: 'Regenerate regardless once the last run is this many days old', example: 35 },
     },
     example: {
       similarityWeight: 0.4,

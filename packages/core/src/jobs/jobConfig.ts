@@ -3,7 +3,34 @@ import { createChildLogger } from '../lib/logger.js'
 
 const logger = createChildLogger('job-config')
 
-export type ScheduleType = 'daily' | 'weekly' | 'interval' | 'manual'
+export type ScheduleType = 'daily' | 'weekly' | 'biweekly' | 'interval' | 'manual'
+
+/**
+ * Days that must have passed before a biweekly job runs again.
+ *
+ * Thirteen, not fourteen: cron fires at the same wall-clock time each week, so
+ * two weeks later is *exactly* 14 days minus whatever drift the clock and a DST
+ * change contribute. At 14 the second run would sometimes miss by seconds and
+ * slip a whole week. Thirteen clears a one-week-old run (7) by a wide margin
+ * and admits a two-week-old one every time.
+ */
+export const BIWEEKLY_MIN_DAYS = 13
+
+/**
+ * Has enough time passed for a biweekly job to run again?
+ *
+ * Cron has no way to say "every other week", so a biweekly schedule carries the
+ * ordinary weekly expression and this check drops every second firing. Split
+ * out from the database lookup so the arithmetic is testable.
+ *
+ * No previous run means run now — a job that has never run must not be blocked
+ * by a rule about its own history.
+ */
+export function isBiweeklyRunDue(lastRunAt: Date | null, now: Date = new Date()): boolean {
+  if (!lastRunAt) return true
+  const daysSince = (now.getTime() - lastRunAt.getTime()) / (1000 * 60 * 60 * 24)
+  return daysSince >= BIWEEKLY_MIN_DAYS
+}
 
 export interface JobConfig {
   jobName: string
@@ -229,7 +256,11 @@ export function scheduleToCron(config: JobConfig): string | null {
     case 'daily':
       return `${minute} ${hour} * * *`
 
-    case 'weekly': {
+    // Biweekly deliberately produces the *weekly* expression. Cron cannot
+    // express "every other week", so the task fires every week and
+    // isBiweeklyRunDue drops the off-week firings (see scheduler.ts).
+    case 'weekly':
+    case 'biweekly': {
       const dayOfWeek = config.scheduleDayOfWeek ?? 0
       return `${minute} ${hour} * * ${dayOfWeek}`
     }
@@ -278,10 +309,12 @@ export function formatSchedule(config: JobConfig): string {
     case 'daily':
       return `Daily at ${formatTime(hour, minute)}`
 
-    case 'weekly': {
+    case 'weekly':
+    case 'biweekly': {
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
       const dayName = days[config.scheduleDayOfWeek ?? 0]
-      return `Weekly on ${dayName} at ${formatTime(hour, minute)}`
+      const cadence = config.scheduleType === 'biweekly' ? 'Every 2 weeks on' : 'Weekly on'
+      return `${cadence} ${dayName} at ${formatTime(hour, minute)}`
     }
 
     case 'interval': {
@@ -302,6 +335,46 @@ export function formatSchedule(config: JobConfig): string {
 
     default:
       return 'Unknown schedule'
+  }
+}
+
+/**
+ * Should a scheduled firing of this job actually execute?
+ *
+ * Every schedule type except biweekly is fully described by its cron
+ * expression, so this only ever says no to a biweekly job whose previous run is
+ * too recent. Manual runs never reach here — clicking Run is someone asking for
+ * the work regardless of cadence.
+ *
+ * Only `completed` runs count. A failed or cancelled run did not do the work,
+ * and waiting another fortnight to retry would turn one bad night into a month
+ * of stale picks.
+ *
+ * Fails open like the rest of the scheduling path: an unreadable history means
+ * run the job, because skipping on a database hiccup would be indistinguishable
+ * from the schedule silently breaking.
+ */
+export async function isScheduledRunDue(
+  jobName: string,
+  scheduleType: ScheduleType,
+  now: Date = new Date()
+): Promise<{ due: boolean; lastRunAt: Date | null }> {
+  if (scheduleType !== 'biweekly') return { due: true, lastRunAt: null }
+
+  try {
+    const lastRun = await queryOne<{ started_at: Date }>(
+      `SELECT started_at FROM job_runs
+        WHERE job_name = $1 AND status = 'completed'
+        ORDER BY started_at DESC
+        LIMIT 1`,
+      [jobName]
+    )
+
+    const lastRunAt = lastRun?.started_at ?? null
+    return { due: isBiweeklyRunDue(lastRunAt, now), lastRunAt }
+  } catch (err) {
+    logger.warn({ err, jobName }, 'Could not read job history for biweekly check, running anyway')
+    return { due: true, lastRunAt: null }
   }
 }
 

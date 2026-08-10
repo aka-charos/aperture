@@ -45,23 +45,29 @@ interface ScheduleTableProps {
   onToggleEnabled: (jobName: string, enabled: boolean) => void
 }
 
-function getNextRunTime(schedule: JobSchedule | null, t: TFunction): string {
-  if (!schedule || !schedule.isEnabled || schedule.type === 'manual') {
-    return t('admin.jobsPage.ui.dash')
-  }
-  
-  const now = new Date()
+/**
+ * Days a biweekly job must wait before running again. Mirrors BIWEEKLY_MIN_DAYS
+ * in core's jobConfig — the web bundle deliberately never imports @aperture/core,
+ * so this is one of the duplicated tiny constants.
+ */
+const BIWEEKLY_MIN_DAYS = 13
+
+/**
+ * When this schedule next fires. Shared by the display column and the sort key
+ * so the list cannot order itself by one answer while showing another.
+ */
+function computeNextRun(schedule: JobSchedule, lastRun: Job['lastRun'], now: Date): Date {
   const targetHour = schedule.hour ?? 0
   const targetMinute = schedule.minute ?? 0
-  
-  const nextRun = new Date()
-  
+
+  const nextRun = new Date(now)
+
   if (schedule.type === 'daily') {
     nextRun.setHours(targetHour, targetMinute, 0, 0)
     if (nextRun <= now) {
       nextRun.setDate(nextRun.getDate() + 1)
     }
-  } else if (schedule.type === 'weekly') {
+  } else if (schedule.type === 'weekly' || schedule.type === 'biweekly') {
     const targetDay = schedule.dayOfWeek ?? 0
     nextRun.setHours(targetHour, targetMinute, 0, 0)
     const daysUntil = (targetDay - now.getDay() + 7) % 7
@@ -70,14 +76,39 @@ function getNextRunTime(schedule: JobSchedule | null, t: TFunction): string {
     } else {
       nextRun.setDate(nextRun.getDate() + daysUntil)
     }
+    // A biweekly job fires on a weekly cron and the scheduler drops the
+    // off-week firing, so the next weekday match is only the next *actual* run
+    // when enough time has passed since the last one. Without this the column
+    // would confidently name a date the job is going to skip.
+    if (schedule.type === 'biweekly' && lastRun) {
+      const earliest = new Date(lastRun.startedAt)
+      earliest.setDate(earliest.getDate() + BIWEEKLY_MIN_DAYS)
+      while (nextRun < earliest) {
+        nextRun.setDate(nextRun.getDate() + 7)
+      }
+    }
   } else if (schedule.type === 'interval') {
     const intervalMins =
       schedule.intervalMinutes ?? (schedule.intervalHours ?? 1) * 60
     const ms = intervalMins * 60 * 1000
-    const next = new Date(Math.ceil(now.getTime() / ms) * ms)
-    nextRun.setTime(next.getTime())
+    nextRun.setTime(Math.ceil(now.getTime() / ms) * ms)
   }
-  
+
+  return nextRun
+}
+
+function getNextRunTime(
+  schedule: JobSchedule | null,
+  lastRun: Job['lastRun'],
+  t: TFunction
+): string {
+  if (!schedule || !schedule.isEnabled || schedule.type === 'manual') {
+    return t('admin.jobsPage.ui.dash')
+  }
+
+  const now = new Date()
+  const nextRun = computeNextRun(schedule, lastRun, now)
+
   // Format relative time
   const diff = nextRun.getTime() - now.getTime()
   const hours = Math.floor(diff / (1000 * 60 * 60))
@@ -101,39 +132,17 @@ function formatLastRun(lastRun: Job['lastRun'], t: TFunction): string {
 /**
  * Calculate minutes until next run for sorting
  */
-function getMinutesUntilNextRun(schedule: JobSchedule | null | undefined): number {
+function getMinutesUntilNextRun(
+  schedule: JobSchedule | null | undefined,
+  lastRun: Job['lastRun']
+): number {
   if (!schedule || !schedule.isEnabled || schedule.type === 'manual') {
     return Infinity // Manual/disabled jobs sort to the end
   }
-  
+
   const now = new Date()
-  const targetHour = schedule.hour ?? 0
-  const targetMinute = schedule.minute ?? 0
-  
-  const nextRun = new Date()
-  
-  if (schedule.type === 'daily') {
-    nextRun.setHours(targetHour, targetMinute, 0, 0)
-    if (nextRun <= now) {
-      nextRun.setDate(nextRun.getDate() + 1)
-    }
-  } else if (schedule.type === 'weekly') {
-    const targetDay = schedule.dayOfWeek ?? 0
-    nextRun.setHours(targetHour, targetMinute, 0, 0)
-    const daysUntil = (targetDay - now.getDay() + 7) % 7
-    if (daysUntil === 0 && nextRun <= now) {
-      nextRun.setDate(nextRun.getDate() + 7)
-    } else {
-      nextRun.setDate(nextRun.getDate() + daysUntil)
-    }
-  } else if (schedule.type === 'interval') {
-    const intervalMins =
-      schedule.intervalMinutes ?? (schedule.intervalHours ?? 1) * 60
-    const ms = intervalMins * 60 * 1000
-    const next = new Date(Math.ceil(now.getTime() / ms) * ms)
-    nextRun.setTime(next.getTime())
-  }
-  
+  const nextRun = computeNextRun(schedule, lastRun, now)
+
   return Math.floor((nextRun.getTime() - now.getTime()) / (1000 * 60))
 }
 
@@ -171,8 +180,8 @@ export function ScheduleTable({
     
     // 4. Both are scheduled - sort by next run time (soonest first)
     if (!aManual && !bManual && aEnabled && bEnabled) {
-      const aMinutes = getMinutesUntilNextRun(a.schedule)
-      const bMinutes = getMinutesUntilNextRun(b.schedule)
+      const aMinutes = getMinutesUntilNextRun(a.schedule, a.lastRun ?? null)
+      const bMinutes = getMinutesUntilNextRun(b.schedule, b.lastRun ?? null)
       if (aMinutes !== bMinutes) return aMinutes - bMinutes
     }
     
@@ -277,7 +286,7 @@ export function ScheduleTable({
                       <Stack direction="row" spacing={0.5} alignItems="center">
                         <AccessTimeIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                         <Typography variant="caption" color="text.secondary">
-                          {getNextRunTime(job.schedule ?? null, t)}
+                          {getNextRunTime(job.schedule ?? null, job.lastRun ?? null, t)}
                         </Typography>
                       </Stack>
                     </Stack>
@@ -429,7 +438,7 @@ export function ScheduleTable({
                       <AccessTimeIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                     )}
                     <Typography variant="body2" color="text.secondary">
-                      {getNextRunTime(job.schedule ?? null, t)}
+                      {getNextRunTime(job.schedule ?? null, job.lastRun ?? null, t)}
                     </Typography>
                   </Stack>
                 </TableCell>

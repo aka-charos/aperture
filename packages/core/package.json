@@ -57,6 +57,7 @@
     "test:exclusion": "node --import tsx --test src/recommender/watchedExclusion.test.ts",
     "test:engagement": "node --import tsx --test src/taste-profile/engagement.test.ts",
     "test:activity-gate": "node --import tsx --test src/recommender/activityGate.test.ts",
+    "test:schedule": "node --import tsx --test src/jobs/schedule.test.ts",
     "test:discovery": "node --import tsx --test src/discover/scorer.test.ts",
     "lint": "eslint src",
     "clean": "rm -rf dist"

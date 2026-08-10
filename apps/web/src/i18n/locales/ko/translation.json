@@ -510,7 +510,10 @@
         "resultCancelled": "사용자가 취소함",
         "resultFailedDefault": "작업 실패",
         "resultItemsCount_one": "{{count}}개 항목",
-        "resultItemsCount_other": "{{count}}개 항목"
+        "resultItemsCount_other": "{{count}}개 항목",
+        "configBiweekly": "Every 2 weeks",
+        "configBiweeklyNote": "Cron cannot express a two-week cycle, so this job is checked every week and skipped unless at least 13 days have passed since its last successful run.",
+        "configPreviewBiweekly": "Runs every other {{day}} at {{time}}"
       }
     },
     "translations": "Translations",
@@ -2290,8 +2293,25 @@
         "increase": "Spreads the list across genres and networks.",
         "decrease": "Lets the list cluster on whatever scores highest.",
         "example": "10-20%. Set it near zero and one franchise or genre can take over the whole list."
+      },
+      "newCandidateThreshold": {
+        "title": "New Titles Before Regenerating",
+        "description": "The scheduled job skips users whose inputs have not changed. Newly added titles are the one input shared by everybody, so they are counted rather than compared: fewer arrivals than this, and the library does not count as having changed.",
+        "increase": "Skips more runs and spends less, at the cost of new arrivals waiting longer to appear.",
+        "decrease": "New content reaches recommendations sooner, but a slow trickle of additions can regenerate everyone every run.",
+        "example": "Low is not safer. Setting this to 1 means a single new title regenerates every user on every run, which is exactly the behaviour the skip exists to prevent."
+      },
+      "maxRunAgeDays": {
+        "title": "Maximum Days Between Runs",
+        "description": "A safety valve. Once a user's last run is this old, the next scheduled job regenerates it whether or not anything looks changed — the backstop for inputs nothing tracks, such as a model change or refreshed metadata.",
+        "increase": "Inactive users are skipped for longer and cost less to keep.",
+        "decrease": "Changes that leave no trace reach everyone sooner, at the cost of more full runs.",
+        "example": "Keep this comfortably above your job interval, or the valve fires every time and nothing is ever skipped."
       }
-    }
+    },
+    "sectionRegeneration": "WHEN TO REGENERATE",
+    "newCandidateThreshold": "New titles before regenerating",
+    "maxRunAgeDays": "Maximum days between runs"
   },
   "settingsWatching": {
     "title": "당신이 시청하는 프로그램",

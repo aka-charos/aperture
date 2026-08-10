@@ -11,23 +11,32 @@ export interface MediaTypeConfig {
   noveltyWeight: number
   ratingWeight: number
   diversityWeight: number
+  /**
+   * Newly-available titles required before the catalogue counts as changed.
+   * Read by the activity gate; does not affect what gets recommended.
+   */
+  newCandidateThreshold: number
+  /**
+   * Regenerate regardless once the last completed run is this old. The backstop
+   * for inputs the activity gate does not enumerate.
+   */
+  maxRunAgeDays: number
 }
 
 export interface RecommendationConfig {
   movie: MediaTypeConfig
   series: MediaTypeConfig
   updatedAt: Date
+  /**
+   * Last change to a setting that affects what gets recommended. Distinct from
+   * updatedAt, which an updated_at trigger moves on any write — including the
+   * activity gate's own thresholds, which must not force a regeneration.
+   */
+  scoringUpdatedAt: Date
 }
 
 // Legacy interface for backward compatibility
-export interface LegacyRecommendationConfig {
-  maxCandidates: number
-  selectedCount: number
-  recentWatchLimit: number
-  similarityWeight: number
-  noveltyWeight: number
-  ratingWeight: number
-  diversityWeight: number
+export interface LegacyRecommendationConfig extends MediaTypeConfig {
   updatedAt: Date
 }
 
@@ -39,6 +48,8 @@ interface RecommendationConfigRow {
   movie_novelty_weight: string
   movie_rating_weight: string
   movie_diversity_weight: string
+  movie_new_candidate_threshold: number
+  movie_max_run_age_days: number
   series_max_candidates: number
   series_selected_count: number
   series_recent_watch_limit: number
@@ -46,7 +57,10 @@ interface RecommendationConfigRow {
   series_novelty_weight: string
   series_rating_weight: string
   series_diversity_weight: string
+  series_new_candidate_threshold: number
+  series_max_run_age_days: number
   updated_at: Date
+  scoring_updated_at: Date
 }
 
 // Default values
@@ -58,6 +72,8 @@ const MOVIE_DEFAULTS: MediaTypeConfig = {
   noveltyWeight: 0.2,
   ratingWeight: 0.2,
   diversityWeight: 0.2,
+  newCandidateThreshold: 12,
+  maxRunAgeDays: 35,
 }
 
 const SERIES_DEFAULTS: MediaTypeConfig = {
@@ -68,19 +84,56 @@ const SERIES_DEFAULTS: MediaTypeConfig = {
   noveltyWeight: 0.2,
   ratingWeight: 0.2,
   diversityWeight: 0.2,
+  // Lower than movies on purpose: shows arrive far less often, so waiting for
+  // the same batch would mean the catalogue signal never fires for series.
+  newCandidateThreshold: 6,
+  maxRunAgeDays: 35,
 }
+
+/**
+ * Column suffix for each field, shared by the readers and the writers so a new
+ * setting cannot be half-wired.
+ */
+const COLUMN_SUFFIX: Record<keyof MediaTypeConfig, string> = {
+  maxCandidates: 'max_candidates',
+  selectedCount: 'selected_count',
+  recentWatchLimit: 'recent_watch_limit',
+  similarityWeight: 'similarity_weight',
+  noveltyWeight: 'novelty_weight',
+  ratingWeight: 'rating_weight',
+  diversityWeight: 'diversity_weight',
+  newCandidateThreshold: 'new_candidate_threshold',
+  maxRunAgeDays: 'max_run_age_days',
+}
+
+/**
+ * The settings that change *what* gets recommended, as opposed to *when* we
+ * recompute it. Only these bump scoring_updated_at — see the column comment in
+ * migration 0131.
+ */
+const SCORING_FIELDS = new Set<keyof MediaTypeConfig>([
+  'maxCandidates',
+  'selectedCount',
+  'recentWatchLimit',
+  'similarityWeight',
+  'noveltyWeight',
+  'ratingWeight',
+  'diversityWeight',
+])
 
 /**
  * Get the full recommendation configuration (movies and series)
  */
 export async function getRecommendationConfig(): Promise<RecommendationConfig> {
   const row = await queryOne<RecommendationConfigRow>(
-    `SELECT 
+    `SELECT
       movie_max_candidates, movie_selected_count, movie_recent_watch_limit,
       movie_similarity_weight, movie_novelty_weight, movie_rating_weight, movie_diversity_weight,
+      movie_new_candidate_threshold, movie_max_run_age_days,
       series_max_candidates, series_selected_count, series_recent_watch_limit,
       series_similarity_weight, series_novelty_weight, series_rating_weight, series_diversity_weight,
-      updated_at
+      series_new_candidate_threshold, series_max_run_age_days,
+      updated_at, scoring_updated_at
      FROM recommendation_config WHERE id = 1`
   )
 
@@ -90,6 +143,7 @@ export async function getRecommendationConfig(): Promise<RecommendationConfig> {
       movie: MOVIE_DEFAULTS,
       series: SERIES_DEFAULTS,
       updatedAt: new Date(),
+      scoringUpdatedAt: new Date(),
     }
   }
 
@@ -102,6 +156,8 @@ export async function getRecommendationConfig(): Promise<RecommendationConfig> {
       noveltyWeight: parseFloat(row.movie_novelty_weight),
       ratingWeight: parseFloat(row.movie_rating_weight),
       diversityWeight: parseFloat(row.movie_diversity_weight),
+      newCandidateThreshold: row.movie_new_candidate_threshold,
+      maxRunAgeDays: row.movie_max_run_age_days,
     },
     series: {
       maxCandidates: row.series_max_candidates,
@@ -111,8 +167,11 @@ export async function getRecommendationConfig(): Promise<RecommendationConfig> {
       noveltyWeight: parseFloat(row.series_novelty_weight),
       ratingWeight: parseFloat(row.series_rating_weight),
       diversityWeight: parseFloat(row.series_diversity_weight),
+      newCandidateThreshold: row.series_new_candidate_threshold,
+      maxRunAgeDays: row.series_max_run_age_days,
     },
     updatedAt: row.updated_at,
+    scoringUpdatedAt: row.scoring_updated_at,
   }
 }
 
@@ -139,46 +198,47 @@ export async function getSeriesRecommendationConfig(): Promise<LegacyRecommendat
 }
 
 /**
- * Update movie recommendation configuration
+ * Apply a partial update to one media type's half of the single config row.
+ *
+ * Shared by both media types because the two column sets differ only by prefix,
+ * and because the scoring_updated_at rule below has to hold for both: an admin
+ * lowering the gate's own thresholds must not thereby trigger the full
+ * regeneration the gate exists to prevent.
  */
-export async function updateMovieRecommendationConfig(
+async function updateConfigFor(
+  prefix: 'movie' | 'series',
   updates: Partial<MediaTypeConfig>
 ): Promise<RecommendationConfig> {
+  // Compared by value, not by presence: the settings page PATCHes the whole
+  // media-type object on every save, so "a scoring field was supplied" would be
+  // true even when the admin only moved a gate threshold — and that would
+  // regenerate everyone, which is the thing the gate exists to avoid.
+  const current = await getRecommendationConfig()
+  const before = prefix === 'movie' ? current.movie : current.series
+
   const setClauses: string[] = []
   const values: unknown[] = []
-  let paramIndex = 1
+  let touchedScoring = false
 
-  if (updates.maxCandidates !== undefined) {
-    setClauses.push(`movie_max_candidates = $${paramIndex++}`)
-    values.push(updates.maxCandidates)
-  }
-  if (updates.selectedCount !== undefined) {
-    setClauses.push(`movie_selected_count = $${paramIndex++}`)
-    values.push(updates.selectedCount)
-  }
-  if (updates.recentWatchLimit !== undefined) {
-    setClauses.push(`movie_recent_watch_limit = $${paramIndex++}`)
-    values.push(updates.recentWatchLimit)
-  }
-  if (updates.similarityWeight !== undefined) {
-    setClauses.push(`movie_similarity_weight = $${paramIndex++}`)
-    values.push(updates.similarityWeight)
-  }
-  if (updates.noveltyWeight !== undefined) {
-    setClauses.push(`movie_novelty_weight = $${paramIndex++}`)
-    values.push(updates.noveltyWeight)
-  }
-  if (updates.ratingWeight !== undefined) {
-    setClauses.push(`movie_rating_weight = $${paramIndex++}`)
-    values.push(updates.ratingWeight)
-  }
-  if (updates.diversityWeight !== undefined) {
-    setClauses.push(`movie_diversity_weight = $${paramIndex++}`)
-    values.push(updates.diversityWeight)
+  for (const field of Object.keys(COLUMN_SUFFIX) as (keyof MediaTypeConfig)[]) {
+    const value = updates[field]
+    if (value === undefined) continue
+
+    setClauses.push(`${prefix}_${COLUMN_SUFFIX[field]} = $${values.length + 1}`)
+    values.push(value)
+
+    // Tolerance because the weights round-trip through NUMERIC(3,2).
+    if (SCORING_FIELDS.has(field) && Math.abs(value - before[field]) > 1e-9) {
+      touchedScoring = true
+    }
   }
 
   if (setClauses.length === 0) {
-    return getRecommendationConfig()
+    return current
+  }
+
+  if (touchedScoring) {
+    setClauses.push('scoring_updated_at = NOW()')
   }
 
   await query(
@@ -186,8 +246,17 @@ export async function updateMovieRecommendationConfig(
     values
   )
 
-  logger.info({ updates }, 'Movie recommendation config updated')
+  logger.info({ updates, touchedScoring }, `${prefix} recommendation config updated`)
   return getRecommendationConfig()
+}
+
+/**
+ * Update movie recommendation configuration
+ */
+export async function updateMovieRecommendationConfig(
+  updates: Partial<MediaTypeConfig>
+): Promise<RecommendationConfig> {
+  return updateConfigFor('movie', updates)
 }
 
 /**
@@ -196,50 +265,7 @@ export async function updateMovieRecommendationConfig(
 export async function updateSeriesRecommendationConfig(
   updates: Partial<MediaTypeConfig>
 ): Promise<RecommendationConfig> {
-  const setClauses: string[] = []
-  const values: unknown[] = []
-  let paramIndex = 1
-
-  if (updates.maxCandidates !== undefined) {
-    setClauses.push(`series_max_candidates = $${paramIndex++}`)
-    values.push(updates.maxCandidates)
-  }
-  if (updates.selectedCount !== undefined) {
-    setClauses.push(`series_selected_count = $${paramIndex++}`)
-    values.push(updates.selectedCount)
-  }
-  if (updates.recentWatchLimit !== undefined) {
-    setClauses.push(`series_recent_watch_limit = $${paramIndex++}`)
-    values.push(updates.recentWatchLimit)
-  }
-  if (updates.similarityWeight !== undefined) {
-    setClauses.push(`series_similarity_weight = $${paramIndex++}`)
-    values.push(updates.similarityWeight)
-  }
-  if (updates.noveltyWeight !== undefined) {
-    setClauses.push(`series_novelty_weight = $${paramIndex++}`)
-    values.push(updates.noveltyWeight)
-  }
-  if (updates.ratingWeight !== undefined) {
-    setClauses.push(`series_rating_weight = $${paramIndex++}`)
-    values.push(updates.ratingWeight)
-  }
-  if (updates.diversityWeight !== undefined) {
-    setClauses.push(`series_diversity_weight = $${paramIndex++}`)
-    values.push(updates.diversityWeight)
-  }
-
-  if (setClauses.length === 0) {
-    return getRecommendationConfig()
-  }
-
-  await query(
-    `UPDATE recommendation_config SET ${setClauses.join(', ')}, updated_at = NOW() WHERE id = 1`,
-    values
-  )
-
-  logger.info({ updates }, 'Series recommendation config updated')
-  return getRecommendationConfig()
+  return updateConfigFor('series', updates)
 }
 
 /**
@@ -260,27 +286,10 @@ export async function updateRecommendationConfig(
  * Reset movie configuration to defaults
  */
 export async function resetMovieRecommendationConfig(): Promise<RecommendationConfig> {
-  await query(
-    `UPDATE recommendation_config SET
-      movie_max_candidates = $1,
-      movie_selected_count = $2,
-      movie_recent_watch_limit = $3,
-      movie_similarity_weight = $4,
-      movie_novelty_weight = $5,
-      movie_rating_weight = $6,
-      movie_diversity_weight = $7,
-      updated_at = NOW()
-     WHERE id = 1`,
-    [
-      MOVIE_DEFAULTS.maxCandidates,
-      MOVIE_DEFAULTS.selectedCount,
-      MOVIE_DEFAULTS.recentWatchLimit,
-      MOVIE_DEFAULTS.similarityWeight,
-      MOVIE_DEFAULTS.noveltyWeight,
-      MOVIE_DEFAULTS.ratingWeight,
-      MOVIE_DEFAULTS.diversityWeight,
-    ]
-  )
+  // Goes through the shared setter so a reset can never miss a column a plain
+  // update knows about; it always touches scoring fields, so the gate correctly
+  // sees this as a reason to regenerate.
+  await updateConfigFor('movie', MOVIE_DEFAULTS)
 
   logger.info('Movie recommendation config reset to defaults')
   return getRecommendationConfig()
@@ -290,27 +299,7 @@ export async function resetMovieRecommendationConfig(): Promise<RecommendationCo
  * Reset series configuration to defaults
  */
 export async function resetSeriesRecommendationConfig(): Promise<RecommendationConfig> {
-  await query(
-    `UPDATE recommendation_config SET
-      series_max_candidates = $1,
-      series_selected_count = $2,
-      series_recent_watch_limit = $3,
-      series_similarity_weight = $4,
-      series_novelty_weight = $5,
-      series_rating_weight = $6,
-      series_diversity_weight = $7,
-      updated_at = NOW()
-     WHERE id = 1`,
-    [
-      SERIES_DEFAULTS.maxCandidates,
-      SERIES_DEFAULTS.selectedCount,
-      SERIES_DEFAULTS.recentWatchLimit,
-      SERIES_DEFAULTS.similarityWeight,
-      SERIES_DEFAULTS.noveltyWeight,
-      SERIES_DEFAULTS.ratingWeight,
-      SERIES_DEFAULTS.diversityWeight,
-    ]
-  )
+  await updateConfigFor('series', SERIES_DEFAULTS)
 
   logger.info('Series recommendation config reset to defaults')
   return getRecommendationConfig()

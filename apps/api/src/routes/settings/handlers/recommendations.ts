@@ -44,11 +44,17 @@ function validateConfigUpdates(updates: Partial<MediaTypeConfig>): string | null
     }
   }
 
-  const counts = ['maxCandidates', 'selectedCount', 'recentWatchLimit'] as const
+  const counts = [
+    'maxCandidates',
+    'selectedCount',
+    'recentWatchLimit',
+    'newCandidateThreshold',
+    'maxRunAgeDays',
+  ] as const
   for (const key of counts) {
     if (updates[key] !== undefined) {
-      if (updates[key]! < 1) {
-        return `${key} must be at least 1`
+      if (!Number.isInteger(updates[key]) || updates[key]! < 1) {
+        return `${key} must be a whole number of at least 1`
       }
     }
   }
@@ -69,6 +75,10 @@ function calculateRunsPerWeek(
       return 7
     case 'weekly':
       return 1
+    // Fractional on purpose: the estimator multiplies this by a per-run cost,
+    // and rounding a fortnightly job up to weekly would double its projection.
+    case 'biweekly':
+      return 0.5
     case 'interval': {
       const hourSpan = intervalMinutes
         ? intervalMinutes / 60

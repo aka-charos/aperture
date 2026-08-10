@@ -18,7 +18,7 @@
  *    "regenerate" — the pre-existing behaviour. A bug here can waste compute;
  *    it can never silently freeze someone's recommendations.
  * 2. **Has a maximum age.** Even with every signal quiet, a run older than
- *    MAX_RUN_AGE_DAYS regenerates. The signal list below is necessarily
+ *    `maxRunAgeDays` regenerates. The signal list below is necessarily
  *    incomplete — enrichment rewriting a synopsis, a prompt change, a scoring
  *    change in code — and this is what stops an input nobody thought to
  *    enumerate stranding a user on stale picks forever.
@@ -29,20 +29,18 @@
  * anybody. New titles are caught by created_at, and newly-embedded titles by
  * the embedding table's created_at, which are the two ways the candidate pool
  * actually grows.
+ *
+ * Both numbers are admin-configurable per media type (Settings → AI Config →
+ * Algorithm, stored on `recommendation_config`); the constants below are the
+ * fallback for a config read that fails.
  */
 
 import { query, queryOne } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { getActiveEmbeddingTableName } from '../lib/ai-provider.js'
+import { getRecommendationConfig } from '../lib/recommendationConfig.js'
 
 const logger = createChildLogger('recommender-activity-gate')
-
-/**
- * Regenerate regardless once the last run is this old. Long enough that a
- * genuinely inactive user is skipped for months of weekly runs, short enough
- * that any unenumerated input reaches everyone within a month.
- */
-export const MAX_RUN_AGE_DAYS = 30
 
 /**
  * Runs to keep per user per media type. Enough to back the run-history view
@@ -51,23 +49,41 @@ export const MAX_RUN_AGE_DAYS = 30
  */
 export const RECOMMENDATION_RUNS_TO_KEEP = 10
 
-/**
- * How many newly-available titles it takes before the catalogue counts as
- * having changed.
- *
- * This one is a threshold rather than a timestamp because the catalogue is a
- * *global* signal: gating on "is there anything newer than your last run" would
- * mean one new film in the library forces all eighteen users to regenerate, and
- * on an instance that acquires content weekly the gate would never once fire.
- *
- * A handful of arrivals almost never displaces anything in a top-20 drawn from
- * tens of thousands of candidates, so requiring a batch trades a negligible
- * chance of a slightly stale list for the skip actually happening. The 30-day
- * valve is the backstop for a library that grows slowly but steadily.
- */
-export const NEW_CANDIDATE_THRESHOLD = 25
-
 export type RecommendationMediaType = 'movie' | 'series'
+
+export interface GateThresholds {
+  /**
+   * How many newly-available titles it takes before the catalogue counts as
+   * having changed.
+   *
+   * This one is a threshold rather than a timestamp because the catalogue is a
+   * *global* signal: gating on "is there anything newer than your last run"
+   * would mean one new film in the library forces every user to regenerate, and
+   * on an instance that acquires content weekly the gate would never once fire.
+   *
+   * A handful of arrivals almost never displaces anything in a top-20 drawn
+   * from tens of thousands of candidates, so requiring a batch trades a
+   * negligible chance of a slightly stale list for the skip actually happening.
+   * The age valve is the backstop for a library that grows slowly but steadily.
+   */
+  newCandidateThreshold: number
+  /**
+   * Regenerate regardless once the last run is this old. Long enough that a
+   * genuinely inactive user is skipped for several weekly runs, short enough
+   * that any unenumerated input reaches everyone within about a month.
+   */
+  maxRunAgeDays: number
+}
+
+/**
+ * Used only when the config read fails. Kept in step with the column defaults
+ * in migration 0131 — series sits lower because shows arrive far less often
+ * than films, so the same batch size would never accumulate.
+ */
+export const DEFAULT_GATE_THRESHOLDS: Record<RecommendationMediaType, GateThresholds> = {
+  movie: { newCandidateThreshold: 12, maxRunAgeDays: 35 },
+  series: { newCandidateThreshold: 6, maxRunAgeDays: 35 },
+}
 
 export interface RegenerationDecision {
   regenerate: boolean
@@ -115,12 +131,13 @@ interface SignalRow {
 export function decideRegeneration(
   lastRunAt: Date | null,
   signals: Partial<SignalRow> | null,
+  thresholds: GateThresholds,
   now: Date = new Date()
 ): RegenerationDecision {
   if (!lastRunAt) return REGENERATE('no-previous-run')
 
   const ageDays = (now.getTime() - lastRunAt.getTime()) / (1000 * 60 * 60 * 24)
-  if (ageDays > MAX_RUN_AGE_DAYS) return REGENERATE('max-age', lastRunAt)
+  if (ageDays > thresholds.maxRunAgeDays) return REGENERATE('max-age', lastRunAt)
 
   // A missing row means we could not read the signals at all, which is not
   // evidence that nothing changed.
@@ -142,8 +159,8 @@ export function decideRegeneration(
     }
   }
 
-  // Counted, not compared: see NEW_CANDIDATE_THRESHOLD.
-  if ((signals.new_candidate_count ?? 0) >= NEW_CANDIDATE_THRESHOLD) {
+  // Counted, not compared: see GateThresholds.newCandidateThreshold.
+  if ((signals.new_candidate_count ?? 0) >= thresholds.newCandidateThreshold) {
     return REGENERATE('new-candidates', lastRunAt)
   }
 
@@ -159,7 +176,8 @@ async function readSignals(
   userId: string,
   mediaType: RecommendationMediaType,
   embeddingTable: string | null,
-  lastRunAt: Date
+  lastRunAt: Date,
+  thresholds: GateThresholds
 ): Promise<SignalRow | null> {
   const isMovie = mediaType === 'movie'
 
@@ -183,16 +201,17 @@ async function readSignals(
   // is old, so both halves count. The embedding half is dropped when no model
   // is configured — the pipeline reports that problem itself. Capped by LIMIT
   // so this stays an early-exit scan rather than counting a whole fresh import.
+  const cap = Math.max(1, Math.trunc(thresholds.newCandidateThreshold))
   const newCandidatesSql = embeddingTable
     ? `SELECT COUNT(*) FROM (
          SELECT 1 FROM ${catalogTable} WHERE created_at > $3
           UNION ALL
          SELECT 1 FROM ${embeddingTable} WHERE created_at > $3
-         LIMIT ${NEW_CANDIDATE_THRESHOLD}
+         LIMIT ${cap}
        ) capped`
     : `SELECT COUNT(*) FROM (
          SELECT 1 FROM ${catalogTable} WHERE created_at > $3
-         LIMIT ${NEW_CANDIDATE_THRESHOLD}
+         LIMIT ${cap}
        ) capped`
 
   return queryOne<SignalRow>(
@@ -209,10 +228,34 @@ async function readSignals(
          (SELECT MAX(updated_at) FROM user_genre_weights WHERE user_id = $1),
          (SELECT MAX(created_at) FROM user_custom_interests WHERE user_id = $1)
        ) AS preferences,
-       (SELECT MAX(updated_at) FROM recommendation_config) AS config,
+       -- scoring_updated_at, not updated_at: the row's trigger fires on any
+       -- write, including edits to the gate's own thresholds, which are not a
+       -- reason to recompute anyone's picks.
+       (SELECT MAX(scoring_updated_at) FROM recommendation_config) AS config,
        (${newCandidatesSql})::int AS new_candidate_count`,
     [userId, mediaType, lastRunAt]
   )
+}
+
+/**
+ * The admin-configured thresholds for one media type, falling back to the
+ * shipped defaults rather than failing the check outright — a config read that
+ * throws should not be the reason nobody's picks ever refresh.
+ */
+async function getGateThresholds(
+  mediaType: RecommendationMediaType
+): Promise<GateThresholds> {
+  try {
+    const config = await getRecommendationConfig()
+    const forType = mediaType === 'movie' ? config.movie : config.series
+    return {
+      newCandidateThreshold: forType.newCandidateThreshold,
+      maxRunAgeDays: forType.maxRunAgeDays,
+    }
+  } catch (err) {
+    logger.warn({ err, mediaType }, 'Could not read gate thresholds, using defaults')
+    return DEFAULT_GATE_THRESHOLDS[mediaType]
+  }
 }
 
 /**
@@ -236,11 +279,13 @@ export async function shouldRegenerateRecommendations(
 
     if (!lastRun) return REGENERATE('no-previous-run')
 
+    const thresholds = await getGateThresholds(mediaType)
+
     // Age valve first, so an instance whose signals are all quiet still cannot
     // strand anyone — and so we skip the signal query entirely in that case.
     const lastRunAt = lastRun.created_at
     const ageDays = (Date.now() - lastRunAt.getTime()) / (1000 * 60 * 60 * 24)
-    if (ageDays > MAX_RUN_AGE_DAYS) return REGENERATE('max-age', lastRunAt)
+    if (ageDays > thresholds.maxRunAgeDays) return REGENERATE('max-age', lastRunAt)
 
     let embeddingTable: string | null = null
     try {
@@ -252,8 +297,8 @@ export async function shouldRegenerateRecommendations(
       // works, and the pipeline will report the real problem itself.
     }
 
-    const signals = await readSignals(userId, mediaType, embeddingTable, lastRunAt)
-    return decideRegeneration(lastRunAt, signals)
+    const signals = await readSignals(userId, mediaType, embeddingTable, lastRunAt, thresholds)
+    return decideRegeneration(lastRunAt, signals, thresholds)
   } catch (err) {
     // Fails open: a broken check must cost compute, never correctness.
     logger.warn({ err, userId, mediaType }, 'Activity check failed, regenerating anyway')
