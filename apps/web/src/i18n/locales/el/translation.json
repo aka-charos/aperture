@@ -3979,6 +3979,10 @@
         "globalIntegrations": {
           "title": "Ενσωματώσεις",
           "description": "Συγχρονισμός με το Trakt και ενημέρωση δεδομένων τιμολόγησης AI"
+        },
+        "globalTaste": {
+          "title": "Taste Profiles",
+          "description": "Rebuild what {{appName}} has learned about each user's taste"
         }
       },
       "jobNames": {

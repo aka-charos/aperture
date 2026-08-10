@@ -17,6 +17,7 @@ import AttachMoneyIcon from '@mui/icons-material/AttachMoney'
 import ExploreIcon from '@mui/icons-material/Explore'
 import SendIcon from '@mui/icons-material/Send'
 import AlternateEmailIcon from '@mui/icons-material/AlternateEmail'
+import FingerprintIcon from '@mui/icons-material/Fingerprint'
 import type { JobCategory } from './types'
 import { getAppName } from '@/lib/branding'
 
@@ -81,6 +82,14 @@ export const GLOBAL_JOB_CATEGORIES: JobCategory[] = [
     color: '#ec4899',
     jobs: ['generate-discovery-suggestions'],
   },
+  // Taste profiles are per-user but span both media types, so they belong here
+  // rather than under Movies or Series.
+  {
+    titleKey: 'admin.jobsPage.categories.globalTaste.title',
+    descriptionKey: 'admin.jobsPage.categories.globalTaste.description',
+    color: '#a855f7',
+    jobs: ['rebuild-taste-profiles'],
+  },
   {
     titleKey: 'admin.jobsPage.categories.globalIntegrations.title',
     descriptionKey: 'admin.jobsPage.categories.globalIntegrations.description',
@@ -118,6 +127,7 @@ export const JOB_ICONS: Record<string, React.ReactNode> = {
   'refresh-ai-pricing': <AttachMoneyIcon />,
   'generate-discovery-suggestions': <ExploreIcon />,
   'sync-lldap-emails': <AlternateEmailIcon />,
+  'rebuild-taste-profiles': <FingerprintIcon />,
 }
 
 export const JOB_COLORS: Record<string, string> = {
@@ -143,6 +153,7 @@ export const JOB_COLORS: Record<string, string> = {
   'refresh-ai-pricing': '#22c55e',
   'generate-discovery-suggestions': '#ec4899',
   'sync-lldap-emails': '#0ea5e9',
+  'rebuild-taste-profiles': '#a855f7',
 }
 
 const JOB_DISPLAY_NAME_KEYS: Record<string, string> = {

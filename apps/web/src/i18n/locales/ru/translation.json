@@ -383,6 +383,10 @@
         "globalIntegrations": {
           "title": "Интеграции",
           "description": "Синхронизируйтесь с Trakt и обновляйте данные о ценах AI."
+        },
+        "globalTaste": {
+          "title": "Taste Profiles",
+          "description": "Rebuild what {{appName}} has learned about each user's taste"
         }
       },
       "jobNames": {

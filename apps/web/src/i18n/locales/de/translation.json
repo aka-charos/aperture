@@ -383,6 +383,10 @@
         "globalIntegrations": {
           "title": "Integrationen",
           "description": "Synchronisiere mit Trakt und aktualisiere KI-Preisdaten"
+        },
+        "globalTaste": {
+          "title": "Taste Profiles",
+          "description": "Rebuild what {{appName}} has learned about each user's taste"
         }
       },
       "jobNames": {

@@ -302,6 +302,10 @@
         "globalIntegrations": {
           "title": "集成",
           "description": "与 Trakt 同步并更新 AI 定价数据"
+        },
+        "globalTaste": {
+          "title": "Taste Profiles",
+          "description": "Rebuild what {{appName}} has learned about each user's taste"
         }
       },
       "jobNames": {

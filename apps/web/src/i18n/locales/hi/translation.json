@@ -383,6 +383,10 @@
         "globalIntegrations": {
           "title": "एकीकरण",
           "description": "Trakt के साथ सिंक और AI मूल्य डेटा अपडेट करें"
+        },
+        "globalTaste": {
+          "title": "Taste Profiles",
+          "description": "Rebuild what {{appName}} has learned about each user's taste"
         }
       },
       "jobNames": {

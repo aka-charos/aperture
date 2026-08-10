@@ -36,6 +36,7 @@ import {
   syncLldapEmails,
   createChildLogger,
   runLibraryGapAnalysis,
+  rebuildAllTasteProfiles,
   withInferenceContext,
 } from '@aperture/core'
 import { syncAllTraktRatings } from '../trakt/index.js'
@@ -238,6 +239,23 @@ async function executeJob(name: string, jobId: string): Promise<void> {
             failed: result.failed,
           },
           `✅ Series libraries sync complete`
+        )
+        break
+      }
+      // === Taste Profiles ===
+      case 'rebuild-taste-profiles': {
+        const result = await rebuildAllTasteProfiles(jobId)
+        logger.info(
+          {
+            job: name,
+            jobId,
+            usersProcessed: result.usersProcessed,
+            rebuilt: result.rebuilt,
+            skippedLocked: result.skippedLocked,
+            skippedNoData: result.skippedNoData,
+            failed: result.failed,
+          },
+          `✅ Taste profile rebuild complete`
         )
         break
       }
