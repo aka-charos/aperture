@@ -837,7 +837,15 @@ export async function generateSeriesRecommendationsForUser(
         { userId: user.id },
         '⚠️ User has no series watch history - cannot generate recommendations'
       )
-      await finalizeSeriesRun(runId, 0, 0, Date.now() - startTime, 'completed')
+      // Not 'completed' — see the note at this function's success path.
+      await finalizeSeriesRun(
+        runId,
+        0,
+        0,
+        Date.now() - startTime,
+        'failed',
+        'No series watch history for this user'
+      )
       return { runId, recommendations: [] }
     }
 
@@ -873,7 +881,14 @@ export async function generateSeriesRecommendationsForUser(
         { userId: user.id },
         '⚠️ Could not build series taste profile - series may be missing embeddings'
       )
-      await finalizeSeriesRun(runId, 0, 0, Date.now() - startTime, 'completed')
+      await finalizeSeriesRun(
+        runId,
+        0,
+        0,
+        Date.now() - startTime,
+        'failed',
+        'Could not build series taste profile (series may be missing embeddings)'
+      )
       return { runId, recommendations: [] }
     }
 
@@ -985,7 +1000,14 @@ export async function generateSeriesRecommendationsForUser(
 
     if (candidates.length === 0) {
       logger.warn({ userId: user.id }, '⚠️ No candidate series found')
-      await finalizeSeriesRun(runId, 0, 0, Date.now() - startTime, 'completed')
+      await finalizeSeriesRun(
+        runId,
+        0,
+        0,
+        Date.now() - startTime,
+        'failed',
+        'No candidate series found (library may need syncing or embedding)'
+      )
       return { runId, recommendations: [] }
     }
 
@@ -1268,6 +1290,11 @@ export async function generateSeriesRecommendationsForUser(
     }
 
     const duration = Date.now() - startTime
+    // 'completed' is reserved for a run that actually produced picks, because
+    // /api/recommendations serves the newest completed run and nothing else.
+    // The early returns above finalize as 'failed' with a reason instead, so a
+    // transient condition can't blank every user's page while last week's good
+    // picks sit one row further down. Mirrors the movie pipeline.
     await finalizeSeriesRun(runId, scoredCandidates.length, finalSelected.length, duration, 'completed')
 
     // Housekeeping, after this run is marked completed so the kept prefix

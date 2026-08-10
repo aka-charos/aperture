@@ -183,7 +183,17 @@ export async function generateRecommendationsForUser(
         { userId: user.id },
         '⚠️ User has no watch history - cannot generate recommendations'
       )
-      await finalizeRun(runId, 0, 0, Date.now() - startTime, 'completed')
+      // Not 'completed': see the note on finalizeRun's status at the bottom of
+      // this function. An empty run marked completed becomes the newest one the
+      // API will serve and blanks whatever the user already had.
+      await finalizeRun(
+        runId,
+        0,
+        0,
+        Date.now() - startTime,
+        'failed',
+        'No watch history for this user'
+      )
       return { runId, recommendations: [] }
     }
 
@@ -219,7 +229,14 @@ export async function generateRecommendationsForUser(
         { userId: user.id },
         '⚠️ Could not build taste profile - movies may be missing embeddings'
       )
-      await finalizeRun(runId, 0, 0, Date.now() - startTime, 'completed')
+      await finalizeRun(
+        runId,
+        0,
+        0,
+        Date.now() - startTime,
+        'failed',
+        'Could not build taste profile (movies may be missing embeddings)'
+      )
       return { runId, recommendations: [] }
     }
 
@@ -321,7 +338,14 @@ export async function generateRecommendationsForUser(
         { userId: user.id },
         '⚠️ No candidate movies found - may need to sync movies or generate embeddings'
       )
-      await finalizeRun(runId, 0, 0, Date.now() - startTime, 'completed')
+      await finalizeRun(
+        runId,
+        0,
+        0,
+        Date.now() - startTime,
+        'failed',
+        'No candidate movies found (library may need syncing or embedding)'
+      )
       return { runId, recommendations: [] }
     }
 
@@ -643,6 +667,12 @@ export async function generateRecommendationsForUser(
     }
 
     const duration = Date.now() - startTime
+    // 'completed' is reserved for a run that actually produced picks, because
+    // /api/recommendations serves the newest completed run and nothing else.
+    // The early returns above therefore finalize as 'failed' with a reason: a
+    // transient condition like a missing embedding model would otherwise write
+    // an empty completed run for every user at once and blank every page,
+    // while the good picks from last week sat one row further down.
     await finalizeRun(runId, scoredCandidates.length, finalSelected.length, duration, 'completed')
 
     // Housekeeping, after this run is safely marked completed so the prefix we
@@ -822,7 +852,10 @@ export async function clearAndRebuildAllRecommendations(existingJobId?: string):
       provider_user_id: string
       max_parental_rating: number | null
     }>(
-      `SELECT id, username, provider_user_id, max_parental_rating FROM users WHERE is_enabled = true AND provider_disabled = false`
+      // movies_enabled matters here exactly as much as it does in the scheduled
+      // job above: without it the reset generates movie recommendations for
+      // users who have movies switched off.
+      `SELECT id, username, provider_user_id, max_parental_rating FROM users WHERE is_enabled = true AND movies_enabled = true AND provider_disabled = false`
     )
     const users = result.rows
     addLog(jobId, 'info', `👥 Regenerating for ${users.length} enabled user(s)`)
