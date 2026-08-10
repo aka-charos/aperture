@@ -32,6 +32,11 @@ import {
   getMovieOverviews,
 } from '../storage.js'
 import { syncWatchHistoryForUser } from './sync.js'
+import {
+  shouldRegenerateRecommendations,
+  pruneOldRecommendationRuns,
+  RECOMMENDATION_RUNS_TO_KEEP,
+} from '../activityGate.js'
 
 // New taste profile system
 import {
@@ -82,13 +87,28 @@ import type { User, Candidate, PipelineConfig } from '../types.js'
 
 const logger = createChildLogger('recommender')
 
+export interface GenerateRecommendationsOptions {
+  /**
+   * Skip the whole pipeline when no input has moved since the last completed
+   * run (see recommender/activityGate.ts). Off by default so every existing
+   * caller keeps today's behaviour — only the scheduled all-users job opts in,
+   * since a person who pressed "regenerate" is asking for work to happen.
+   */
+  skipIfUnchanged?: boolean
+}
+
 /**
  * Generate recommendations for a user
+ *
+ * `runId` is null when the activity gate skipped the user: no run row is
+ * written at all, because /api/recommendations serves the newest *completed*
+ * run and an empty one would blank the page.
  */
 export async function generateRecommendationsForUser(
   user: User,
-  configOverrides: Partial<PipelineConfig> = {}
-): Promise<{ runId: string; recommendations: Candidate[] }> {
+  configOverrides: Partial<PipelineConfig> = {},
+  options: GenerateRecommendationsOptions = {}
+): Promise<{ runId: string | null; recommendations: Candidate[]; skipped?: boolean }> {
   // Load user-specific config (applies user overrides if enabled, falls back to admin defaults)
   const dbConfig = await loadConfigForUser(user.id, 'movie')
   const cfg = { ...dbConfig, ...configOverrides }
@@ -96,23 +116,44 @@ export async function generateRecommendationsForUser(
 
   logger.info({ userId: user.id, username: user.username }, '🎬 Starting recommendation generation')
 
+  // 0. Sync watch history from media server to ensure we have latest data.
+  // Ahead of both the activity gate and the run record: the gate reads
+  // watch_history, so syncing after it would judge the user on stale data and
+  // skip someone who watched something this morning.
+  if (user.providerUserId) {
+    logger.info({ userId: user.id }, '🔄 Syncing watch history before recommendations (full sync)...')
+    try {
+      // Use full sync to catch any items that may have been missed by delta syncs
+      await syncWatchHistoryForUser(user.id, user.providerUserId, true)
+      logger.info({ userId: user.id }, '✅ Watch history synced')
+    } catch (err) {
+      logger.warn({ err, userId: user.id }, '⚠️ Watch history sync failed, continuing with existing data')
+    }
+  }
+
+  // 0b. Nothing changed since last time? Then the answer would be the same one
+  // already stored, and generating it again costs a full retrieval pass plus an
+  // LLM call per batch of explanations.
+  if (options.skipIfUnchanged) {
+    const decision = await shouldRegenerateRecommendations(user.id, 'movie')
+    if (!decision.regenerate) {
+      logger.info(
+        { userId: user.id, username: user.username, lastRunAt: decision.lastRunAt },
+        '⏭️ No new activity since last run, keeping existing recommendations'
+      )
+      return { runId: null, recommendations: [], skipped: true }
+    }
+    logger.info(
+      { userId: user.id, reason: decision.reason, changedAt: decision.changedAt },
+      `🔎 Regenerating: ${decision.reason}`
+    )
+  }
+
   // Create recommendation run record
   const runId = await createRecommendationRun(user.id)
   logger.info({ runId }, '📝 Created recommendation run record')
 
   try {
-    // 0. Sync watch history from media server to ensure we have latest data
-    if (user.providerUserId) {
-      logger.info({ userId: user.id }, '🔄 Syncing watch history before recommendations (full sync)...')
-      try {
-        // Use full sync to catch any items that may have been missed by delta syncs
-        await syncWatchHistoryForUser(user.id, user.providerUserId, true)
-        logger.info({ userId: user.id }, '✅ Watch history synced')
-      } catch (err) {
-        logger.warn({ err, userId: user.id }, '⚠️ Watch history sync failed, continuing with existing data')
-      }
-    }
-
     // 1. Get user's recommendation preferences
     const userPrefs = await queryOne<{ include_watched: boolean; dislike_behavior: string }>(
       `SELECT include_watched, COALESCE(dislike_behavior, 'exclude') as dislike_behavior FROM user_preferences WHERE user_id = $1`,
@@ -604,6 +645,10 @@ export async function generateRecommendationsForUser(
     const duration = Date.now() - startTime
     await finalizeRun(runId, scoredCandidates.length, finalSelected.length, duration, 'completed')
 
+    // Housekeeping, after this run is safely marked completed so the prefix we
+    // keep is guaranteed to include it.
+    await pruneOldRecommendationRuns(user.id, 'movie', RECOMMENDATION_RUNS_TO_KEEP)
+
     logger.info(
       {
         userId: user.id,
@@ -630,6 +675,8 @@ export async function generateRecommendationsForUser(
 export async function generateRecommendationsForAllUsers(jobId?: string): Promise<{
   success: number
   failed: number
+  /** Users left alone because no input had changed since their last run */
+  skipped: number
   totalRecommendations: number
   jobId: string
 }> {
@@ -655,8 +702,8 @@ export async function generateRecommendationsForAllUsers(jobId?: string): Promis
 
     if (totalUsers === 0) {
       addLog(actualJobId, 'warn', '⚠️ No enabled users found')
-      completeJob(actualJobId, { success: 0, failed: 0, totalRecommendations: 0 })
-      return { success: 0, failed: 0, totalRecommendations: 0, jobId: actualJobId }
+      completeJob(actualJobId, { success: 0, failed: 0, skipped: 0, totalRecommendations: 0 })
+      return { success: 0, failed: 0, skipped: 0, totalRecommendations: 0, jobId: actualJobId }
     }
 
     addLog(actualJobId, 'info', `👥 Found ${totalUsers} enabled user(s)`)
@@ -664,6 +711,7 @@ export async function generateRecommendationsForAllUsers(jobId?: string): Promis
 
     let success = 0
     let failed = 0
+    let skipped = 0
     let totalRecommendations = 0
 
     for (let i = 0; i < result.rows.length; i++) {
@@ -672,25 +720,36 @@ export async function generateRecommendationsForAllUsers(jobId?: string): Promis
       try {
         addLog(actualJobId, 'info', `🎬 Generating recommendations for ${user.username}...`)
 
-        const recResult = await generateRecommendationsForUser({
-          id: user.id,
-          username: user.username,
-          providerUserId: user.provider_user_id,
-          maxParentalRating: user.max_parental_rating,
-        })
-
-        success++
-        totalRecommendations += recResult.recommendations.length
-        addLog(
-          actualJobId,
-          'info',
-          `✅ Generated ${recResult.recommendations.length} recommendations for ${user.username}`
+        const recResult = await generateRecommendationsForUser(
+          {
+            id: user.id,
+            username: user.username,
+            providerUserId: user.provider_user_id,
+            maxParentalRating: user.max_parental_rating,
+          },
+          {},
+          // The scheduled sweep is the one caller that should do nothing when
+          // nothing changed; every manual path is someone asking for work.
+          { skipIfUnchanged: true }
         )
+
+        if (recResult.skipped) {
+          skipped++
+          addLog(actualJobId, 'info', `⏭️ ${user.username}: no new activity, keeping existing picks`)
+        } else {
+          success++
+          totalRecommendations += recResult.recommendations.length
+          addLog(
+            actualJobId,
+            'info',
+            `✅ Generated ${recResult.recommendations.length} recommendations for ${user.username}`
+          )
+        }
         updateJobProgress(
           actualJobId,
           i + 1,
           totalUsers,
-          `${success}/${totalUsers} users (${totalRecommendations} recommendations)`
+          `${success}/${totalUsers} users (${totalRecommendations} recommendations, ${skipped} unchanged)`
         )
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Unknown error'
@@ -706,16 +765,16 @@ export async function generateRecommendationsForAllUsers(jobId?: string): Promis
       }
     }
 
-    const finalResult = { success, failed, totalRecommendations, jobId: actualJobId }
+    const finalResult = { success, failed, skipped, totalRecommendations, jobId: actualJobId }
 
     if (failed > 0) {
       addLog(
         actualJobId,
         'warn',
-        `⚠️ Completed with ${failed} failure(s): ${success} succeeded, ${failed} failed, ${totalRecommendations} total recommendations`
+        `⚠️ Completed with ${failed} failure(s): ${success} succeeded, ${failed} failed, ${skipped} unchanged, ${totalRecommendations} total recommendations`
       )
     } else {
-      addLog(actualJobId, 'info', `🎉 All ${success} user(s) processed successfully! ${totalRecommendations} total recommendations`)
+      addLog(actualJobId, 'info', `🎉 All ${success + skipped} user(s) processed successfully! ${totalRecommendations} total recommendations, ${skipped} left unchanged`)
     }
 
     completeJob(actualJobId, finalResult)
@@ -837,6 +896,13 @@ export async function regenerateUserRecommendations(userId: string): Promise<{
     providerUserId: user.provider_user_id,
     maxParentalRating: user.max_parental_rating,
   })
+
+  if (!result.runId) {
+    // Unreachable: runId is only null when the activity gate skips, and this
+    // path never opts into it. Asserted rather than widened so the caller's
+    // contract stays a plain string.
+    throw new Error('Recommendation run produced no run id')
+  }
 
   return {
     runId: result.runId,

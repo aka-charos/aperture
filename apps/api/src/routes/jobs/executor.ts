@@ -126,6 +126,7 @@ async function executeJob(name: string, jobId: string): Promise<void> {
             jobId,
             success: result.success,
             failed: result.failed,
+            skipped: result.skipped,
           },
           `✅ Movie recommendations complete`
         )
@@ -210,6 +211,7 @@ async function executeJob(name: string, jobId: string): Promise<void> {
             jobId,
             success: result.success,
             failed: result.failed,
+            skipped: result.skipped,
           },
           `✅ Series recommendations complete`
         )

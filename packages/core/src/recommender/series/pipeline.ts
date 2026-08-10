@@ -42,6 +42,11 @@ import {
   type SeriesForExplanation,
 } from './explanations.js'
 import { syncSeriesWatchHistoryForUser } from './sync.js'
+import {
+  shouldRegenerateRecommendations,
+  pruneOldRecommendationRuns,
+  RECOMMENDATION_RUNS_TO_KEEP,
+} from '../activityGate.js'
 
 // New taste profile system
 import {
@@ -755,13 +760,26 @@ async function finalizeSeriesRun(
   )
 }
 
+export interface GenerateSeriesRecommendationsOptions {
+  /**
+   * Skip the whole pipeline when no input has moved since the last completed
+   * run. Off by default; only the scheduled all-users job opts in. Mirrors
+   * GenerateRecommendationsOptions on the movie side.
+   */
+  skipIfUnchanged?: boolean
+}
+
 /**
  * Generate series recommendations for a user
+ *
+ * `runId` is null when the activity gate skipped the user — no run row is
+ * written, since the API serves the newest completed run.
  */
 export async function generateSeriesRecommendationsForUser(
   user: SeriesUser,
-  configOverrides: Partial<SeriesPipelineConfig> = {}
-): Promise<{ runId: string; recommendations: SeriesCandidate[] }> {
+  configOverrides: Partial<SeriesPipelineConfig> = {},
+  options: GenerateSeriesRecommendationsOptions = {}
+): Promise<{ runId: string | null; recommendations: SeriesCandidate[]; skipped?: boolean }> {
   // Load user-specific config (applies user overrides if enabled, falls back to admin defaults)
   const config = await loadConfigForUser(user.id, 'series')
   const cfg = { ...config, ...configOverrides }
@@ -772,22 +790,40 @@ export async function generateSeriesRecommendationsForUser(
     '📺 Starting series recommendation generation'
   )
 
+  // 0. Sync watch history from media server to ensure we have latest data.
+  // Ahead of both the activity gate and the run record — see the movie pipeline
+  // for why the order matters.
+  if (user.providerUserId) {
+    logger.info({ userId: user.id }, '🔄 Syncing series watch history before recommendations (full sync)...')
+    try {
+      // Use full sync to catch any items that may have been missed by delta syncs
+      await syncSeriesWatchHistoryForUser(user.id, user.providerUserId, true)
+      logger.info({ userId: user.id }, '✅ Series watch history synced')
+    } catch (err) {
+      logger.warn({ err, userId: user.id }, '⚠️ Series watch history sync failed, continuing with existing data')
+    }
+  }
+
+  // 0b. Skip entirely when no input has moved since the last completed run.
+  if (options.skipIfUnchanged) {
+    const decision = await shouldRegenerateRecommendations(user.id, 'series')
+    if (!decision.regenerate) {
+      logger.info(
+        { userId: user.id, username: user.username, lastRunAt: decision.lastRunAt },
+        '⏭️ No new activity since last run, keeping existing series recommendations'
+      )
+      return { runId: null, recommendations: [], skipped: true }
+    }
+    logger.info(
+      { userId: user.id, reason: decision.reason, changedAt: decision.changedAt },
+      `🔎 Regenerating: ${decision.reason}`
+    )
+  }
+
   const runId = await createSeriesRecommendationRun(user.id)
   logger.info({ runId }, '📝 Created series recommendation run record')
 
   try {
-    // 0. Sync watch history from media server to ensure we have latest data
-    if (user.providerUserId) {
-      logger.info({ userId: user.id }, '🔄 Syncing series watch history before recommendations (full sync)...')
-      try {
-        // Use full sync to catch any items that may have been missed by delta syncs
-        await syncSeriesWatchHistoryForUser(user.id, user.providerUserId, true)
-        logger.info({ userId: user.id }, '✅ Series watch history synced')
-      } catch (err) {
-        logger.warn({ err, userId: user.id }, '⚠️ Series watch history sync failed, continuing with existing data')
-      }
-    }
-
     // 1. Get user's series watch history (now from synced data)
     logger.info({ userId: user.id }, '📊 Fetching series watch history...')
     const watchedSeries = await getSeriesWatchHistory(user.id, cfg.recentWatchLimit)
@@ -1234,6 +1270,10 @@ export async function generateSeriesRecommendationsForUser(
     const duration = Date.now() - startTime
     await finalizeSeriesRun(runId, scoredCandidates.length, finalSelected.length, duration, 'completed')
 
+    // Housekeeping, after this run is marked completed so the kept prefix
+    // definitely includes it.
+    await pruneOldRecommendationRuns(user.id, 'series', RECOMMENDATION_RUNS_TO_KEEP)
+
     logger.info(
       { userId: user.id, username: user.username, selected: finalSelected.length, duration },
       `🎉 Series recommendations complete: ${finalSelected.length} picks in ${duration}ms`
@@ -1254,6 +1294,8 @@ export async function generateSeriesRecommendationsForUser(
 export async function generateSeriesRecommendationsForAllUsers(jobId?: string): Promise<{
   success: number
   failed: number
+  /** Users left alone because no input had changed since their last run */
+  skipped: number
   totalRecommendations: number
   jobId: string
 }> {
@@ -1278,8 +1320,8 @@ export async function generateSeriesRecommendationsForAllUsers(jobId?: string): 
 
     if (totalUsers === 0) {
       addLog(actualJobId, 'warn', '⚠️ No enabled users found')
-      completeJob(actualJobId, { success: 0, failed: 0, totalRecommendations: 0 })
-      return { success: 0, failed: 0, totalRecommendations: 0, jobId: actualJobId }
+      completeJob(actualJobId, { success: 0, failed: 0, skipped: 0, totalRecommendations: 0 })
+      return { success: 0, failed: 0, skipped: 0, totalRecommendations: 0, jobId: actualJobId }
     }
 
     addLog(actualJobId, 'info', `👥 Found ${totalUsers} enabled user(s)`)
@@ -1287,6 +1329,7 @@ export async function generateSeriesRecommendationsForAllUsers(jobId?: string): 
 
     let success = 0
     let failed = 0
+    let skipped = 0
     let totalRecommendations = 0
 
     for (let i = 0; i < result.rows.length; i++) {
@@ -1295,25 +1338,36 @@ export async function generateSeriesRecommendationsForAllUsers(jobId?: string): 
       try {
         addLog(actualJobId, 'info', `📺 Generating series recommendations for ${user.username}...`)
 
-        const recResult = await generateSeriesRecommendationsForUser({
-          id: user.id,
-          username: user.username,
-          providerUserId: user.provider_user_id,
-          maxParentalRating: user.max_parental_rating,
-        })
-
-        success++
-        totalRecommendations += recResult.recommendations.length
-        addLog(
-          actualJobId,
-          'info',
-          `✅ Generated ${recResult.recommendations.length} series recommendations for ${user.username}`
+        const recResult = await generateSeriesRecommendationsForUser(
+          {
+            id: user.id,
+            username: user.username,
+            providerUserId: user.provider_user_id,
+            maxParentalRating: user.max_parental_rating,
+          },
+          {},
+          // Only the scheduled sweep skips; every manual path means someone
+          // asked for the work.
+          { skipIfUnchanged: true }
         )
+
+        if (recResult.skipped) {
+          skipped++
+          addLog(actualJobId, 'info', `⏭️ ${user.username}: no new activity, keeping existing picks`)
+        } else {
+          success++
+          totalRecommendations += recResult.recommendations.length
+          addLog(
+            actualJobId,
+            'info',
+            `✅ Generated ${recResult.recommendations.length} series recommendations for ${user.username}`
+          )
+        }
         updateJobProgress(
           actualJobId,
           i + 1,
           totalUsers,
-          `${success}/${totalUsers} users (${totalRecommendations} recommendations)`
+          `${success}/${totalUsers} users (${totalRecommendations} recommendations, ${skipped} unchanged)`
         )
       } catch (err) {
         const error = err instanceof Error ? err.message : 'Unknown error'
@@ -1329,9 +1383,9 @@ export async function generateSeriesRecommendationsForAllUsers(jobId?: string): 
       }
     }
 
-    const finalResult = { success, failed, totalRecommendations, jobId: actualJobId }
+    const finalResult = { success, failed, skipped, totalRecommendations, jobId: actualJobId }
     completeJob(actualJobId, finalResult)
-    addLog(actualJobId, 'info', `🎉 Complete: ${success} succeeded, ${failed} failed, ${totalRecommendations} total recommendations`)
+    addLog(actualJobId, 'info', `🎉 Complete: ${success} succeeded, ${failed} failed, ${skipped} unchanged, ${totalRecommendations} total recommendations`)
 
     return finalResult
   } catch (err) {
@@ -1476,6 +1530,12 @@ export async function regenerateUserSeriesRecommendations(userId: string): Promi
     { userId, username: user.username, count: result.recommendations.length },
     '✅ Series recommendations regenerated'
   )
+
+  if (!result.runId) {
+    // Unreachable: only the activity gate returns a null runId, and this path
+    // never opts into it.
+    throw new Error('Series recommendation run produced no run id')
+  }
 
   return {
     runId: result.runId,

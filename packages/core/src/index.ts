@@ -1170,6 +1170,15 @@ export {
   type RebuildAllTasteProfilesResult,
 } from './taste-profile/rebuildAll.js'
 
+export {
+  shouldRegenerateRecommendations,
+  pruneOldRecommendationRuns,
+  MAX_RUN_AGE_DAYS,
+  NEW_CANDIDATE_THRESHOLD,
+  RECOMMENDATION_RUNS_TO_KEEP,
+  type RegenerationDecision,
+} from './recommender/activityGate.js'
+
 // Taste cluster type only -- the clustering algorithm itself (chooseK,
 // clusterTasteEmbeddings) is an internal primitive consumed solely within
 // packages/core (by builder.ts), matching the existing precedent of
