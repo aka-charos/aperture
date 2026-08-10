@@ -5,7 +5,7 @@ export interface LogEntry {
   data?: Record<string, unknown>
 }
 
-export type ScheduleType = 'daily' | 'weekly' | 'interval' | 'manual'
+export type ScheduleType = 'daily' | 'weekly' | 'biweekly' | 'interval' | 'manual'
 
 export interface JobSchedule {
   type: ScheduleType

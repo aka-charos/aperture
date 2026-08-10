@@ -31,6 +31,8 @@ type HelpSettingKey =
   | 'noveltyWeight'
   | 'ratingWeight'
   | 'diversityWeight'
+  | 'newCandidateThreshold'
+  | 'maxRunAgeDays'
 
 function HelpIcon({ settingKey }: { settingKey: HelpSettingKey }) {
   const { t } = useTranslation()
@@ -283,7 +285,7 @@ function MediaTypeCard({
         </FormControl>
 
         {/* Diversity Weight */}
-        <FormControl fullWidth size="small">
+        <FormControl fullWidth sx={{ mb: 2 }} size="small">
           <Box display="flex" justifyContent="space-between" alignItems="center">
             <Box display="flex" alignItems="center">
               <Typography variant="body2">{t('settingsRecAlgo.weightDiversity')}</Typography>
@@ -299,6 +301,45 @@ function MediaTypeCard({
             min={0}
             max={100}
             size="small"
+          />
+        </FormControl>
+
+        {/* When to recompute at all. Deliberately separate from the weights:
+            these change nothing about what gets recommended, only how often the
+            scheduled job bothers to work it out again. */}
+        <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={1}>
+          {t('settingsRecAlgo.sectionRegeneration')}
+        </Typography>
+
+        <FormControl fullWidth sx={{ mb: 2 }} size="small">
+          <Box display="flex" alignItems="center">
+            <Typography variant="body2">{t('settingsRecAlgo.newCandidateThreshold')}</Typography>
+            <HelpIcon settingKey="newCandidateThreshold" />
+          </Box>
+          <TextField
+            type="number"
+            value={config.newCandidateThreshold}
+            onChange={(e) =>
+              onUpdateField('newCandidateThreshold', Math.max(1, parseInt(e.target.value) || 1))
+            }
+            size="small"
+            InputProps={{ inputProps: { min: 1, max: 1000 } }}
+          />
+        </FormControl>
+
+        <FormControl fullWidth size="small">
+          <Box display="flex" alignItems="center">
+            <Typography variant="body2">{t('settingsRecAlgo.maxRunAgeDays')}</Typography>
+            <HelpIcon settingKey="maxRunAgeDays" />
+          </Box>
+          <TextField
+            type="number"
+            value={config.maxRunAgeDays}
+            onChange={(e) =>
+              onUpdateField('maxRunAgeDays', Math.max(1, parseInt(e.target.value) || 1))
+            }
+            size="small"
+            InputProps={{ inputProps: { min: 1, max: 365 } }}
           />
         </FormControl>
       </CardContent>

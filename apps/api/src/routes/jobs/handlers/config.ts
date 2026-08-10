@@ -82,11 +82,11 @@ export async function registerConfigHandlers(fastify: FastifyInstance) {
       // Validate schedule type
       if (
         updates.scheduleType &&
-        !['daily', 'weekly', 'interval', 'manual'].includes(updates.scheduleType)
+        !['daily', 'weekly', 'biweekly', 'interval', 'manual'].includes(updates.scheduleType)
       ) {
-        return reply
-          .status(400)
-          .send({ error: 'Invalid schedule type. Must be: daily, weekly, interval, or manual' })
+        return reply.status(400).send({
+          error: 'Invalid schedule type. Must be: daily, weekly, biweekly, interval, or manual',
+        })
       }
 
       // Validate hour (0-23)

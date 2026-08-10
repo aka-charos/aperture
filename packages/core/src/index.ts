@@ -291,6 +291,9 @@ export {
   scheduleToCron,
   formatSchedule,
   getValidJobNames,
+  isBiweeklyRunDue,
+  isScheduledRunDue,
+  BIWEEKLY_MIN_DAYS,
   type JobConfig,
   type ScheduleType,
 } from './jobs/index.js'
@@ -1173,9 +1176,9 @@ export {
 export {
   shouldRegenerateRecommendations,
   pruneOldRecommendationRuns,
-  MAX_RUN_AGE_DAYS,
-  NEW_CANDIDATE_THRESHOLD,
+  DEFAULT_GATE_THRESHOLDS,
   RECOMMENDATION_RUNS_TO_KEEP,
+  type GateThresholds,
   type RegenerationDecision,
 } from './recommender/activityGate.js'
 

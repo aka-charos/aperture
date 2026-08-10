@@ -131,6 +131,11 @@ export function JobConfigDialog({
     }
   }, [open, initialized, currentSchedule])
 
+  // Biweekly is weekly plus a skipped firing, so it takes exactly the same two
+  // inputs. Naming these keeps the three call sites below from drifting apart.
+  const showsDayOfWeek = scheduleType === 'weekly' || scheduleType === 'biweekly'
+  const showsTimeOfDay = showsDayOfWeek || scheduleType === 'daily'
+
   const handleSave = async () => {
     setSaving(true)
     setError(null)
@@ -147,7 +152,7 @@ export function JobConfigDialog({
         payload.scheduleMinute = 0
       }
 
-      if (scheduleType === 'weekly') {
+      if (showsDayOfWeek) {
         payload.scheduleDayOfWeek = dayOfWeek
       } else {
         payload.scheduleDayOfWeek = null
@@ -181,6 +186,10 @@ export function JobConfigDialog({
       case 'weekly': {
         const dayLabel = daysOfWeek.find((d) => d.value === dayOfWeek)?.label ?? ''
         return t('admin.jobsPage.ui.configPreviewWeekly', { day: dayLabel, time: timeLabel })
+      }
+      case 'biweekly': {
+        const dayLabel = daysOfWeek.find((d) => d.value === dayOfWeek)?.label ?? ''
+        return t('admin.jobsPage.ui.configPreviewBiweekly', { day: dayLabel, time: timeLabel })
       }
       case 'interval':
         return (
@@ -251,6 +260,12 @@ export function JobConfigDialog({
                 disabled={manualOnly}
               />
               <FormControlLabel
+                value="biweekly"
+                control={<Radio />}
+                label={t('admin.jobsPage.ui.configBiweekly')}
+                disabled={manualOnly}
+              />
+              <FormControlLabel
                 value="interval"
                 control={<Radio />}
                 label={t('admin.jobsPage.ui.configInterval')}
@@ -260,7 +275,7 @@ export function JobConfigDialog({
             </RadioGroup>
           </FormControl>
 
-          {isEnabled && (scheduleType === 'daily' || scheduleType === 'weekly') && (
+          {isEnabled && showsTimeOfDay && (
             <FormControl fullWidth>
               <FormLabel sx={{ mb: 1, fontWeight: 500 }}>{t('admin.jobsPage.ui.configTime')}</FormLabel>
               <Select value={hour} onChange={(e) => setHour(e.target.value as number)} size="small">
@@ -273,7 +288,7 @@ export function JobConfigDialog({
             </FormControl>
           )}
 
-          {isEnabled && scheduleType === 'weekly' && (
+          {isEnabled && showsDayOfWeek && (
             <FormControl fullWidth>
               <FormLabel sx={{ mb: 1, fontWeight: 500 }}>{t('admin.jobsPage.ui.configDayOfWeek')}</FormLabel>
               <Select value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value as number)} size="small">
@@ -284,6 +299,12 @@ export function JobConfigDialog({
                 ))}
               </Select>
             </FormControl>
+          )}
+
+          {isEnabled && scheduleType === 'biweekly' && (
+            <Alert severity="info" sx={{ py: 0.5 }}>
+              {t('admin.jobsPage.ui.configBiweeklyNote')}
+            </Alert>
           )}
 
           {isEnabled && scheduleType === 'interval' && (

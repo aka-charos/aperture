@@ -11,6 +11,7 @@ import {
   getAllJobConfigs,
   scheduleToCron,
   formatSchedule,
+  isScheduledRunDue,
   type JobConfig,
 } from '@aperture/core'
 
@@ -62,8 +63,21 @@ function scheduleJob(config: JobConfig): void {
 
   // Create scheduled task
   const task = cron.schedule(cronExpression, async () => {
+    // A biweekly job carries a weekly cron expression, because cron cannot say
+    // "every other week"; this is where the off-week firing is dropped. Only
+    // the scheduled path is gated — a manual run through the jobs route is
+    // someone explicitly asking for the work.
+    const { due, lastRunAt } = await isScheduledRunDue(config.jobName, config.scheduleType)
+    if (!due) {
+      logger.info(
+        { job: config.jobName, schedule: humanSchedule, lastRunAt },
+        `⏭️ Skipping ${config.jobName}: already ran this fortnight`
+      )
+      return
+    }
+
     logger.info({ job: config.jobName, schedule: humanSchedule }, `⏰ Scheduled job starting: ${config.jobName}`)
-    
+
     if (!jobExecutor) {
       logger.error({ job: config.jobName }, 'Job executor not set - cannot run scheduled job')
       return

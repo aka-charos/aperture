@@ -16,12 +16,17 @@ export interface MediaTypeConfig {
   noveltyWeight: number
   ratingWeight: number
   diversityWeight: number
+  /** Activity gate: new titles required before the catalogue counts as changed */
+  newCandidateThreshold: number
+  /** Activity gate: regenerate regardless once the last run is this old */
+  maxRunAgeDays: number
 }
 
 export interface RecommendationConfig {
   movie: MediaTypeConfig
   series: MediaTypeConfig
   updatedAt: string
+  scoringUpdatedAt: string
 }
 
 export interface PurgeStats {

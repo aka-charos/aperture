@@ -25,7 +25,7 @@ export const jobComponentSchemas = {
         nullable: true,
         description: 'Schedule configuration',
         properties: {
-          type: { type: 'string' as const, enum: ['daily', 'weekly', 'interval', 'manual'], description: 'Schedule type' },
+          type: { type: 'string' as const, enum: ['daily', 'weekly', 'biweekly', 'interval', 'manual'], description: 'Schedule type' },
           hour: { type: 'integer' as const, nullable: true, description: 'Hour to run (0-23)' },
           minute: { type: 'integer' as const, nullable: true, description: 'Minute to run (0-59)' },
           dayOfWeek: { type: 'integer' as const, nullable: true, description: 'Day of week (0=Sunday)' },
@@ -215,8 +215,8 @@ const updateJobConfig = {
     properties: {
       scheduleType: {
         type: 'string' as const,
-        enum: ['daily', 'weekly', 'interval', 'manual'],
-        description: 'Schedule type: daily (runs once per day), weekly (runs once per week), interval (runs every N hours), manual (only runs when triggered)',
+        enum: ['daily', 'weekly', 'biweekly', 'interval', 'manual'],
+        description: 'Schedule type: daily (runs once per day), weekly (runs once per week), biweekly (runs every other week on the chosen day), interval (runs every N hours), manual (only runs when triggered)',
       },
       scheduleHour: {
         anyOf: [
