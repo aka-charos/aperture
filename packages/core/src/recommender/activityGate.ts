@@ -307,7 +307,58 @@ export async function shouldRegenerateRecommendations(
 }
 
 /**
- * Delete a user's recommendation runs beyond the newest `keep`.
+ * Delete the non-selected candidates of every run except the newest completed
+ * one.
+ *
+ * Rows past the picks exist to explain a title the user browses, and the
+ * insights panel resolves exactly one run to do that: the newest completed one.
+ * Keeping the full scored list on older runs would therefore store thousands of
+ * rows per user per run that nothing can display. Run history is unaffected —
+ * it only ever showed the picks.
+ *
+ * The consequence worth knowing when reading this table by hand: an old run
+ * legitimately holds a dozen candidates while the newest holds thousands. That
+ * asymmetry is deliberate, not damage.
+ *
+ * Comparing against the newest *completed* run rather than the newest row of
+ * any status is load-bearing. Readers skip failed runs, so a failed run sitting
+ * on top does not blank the panel — but thinning the completed run underneath
+ * it would. With no completed run at all the subquery is NULL, `<> NULL`
+ * matches nothing and this no-ops, which is the safe direction to fail.
+ */
+async function thinSupersededCandidates(
+  userId: string,
+  mediaType: RecommendationMediaType
+): Promise<number> {
+  try {
+    const result = await query(
+      `DELETE FROM recommendation_candidates c
+        USING recommendation_runs r
+        WHERE c.run_id = r.id
+          AND r.user_id = $1
+          AND r.media_type = $2
+          AND r.channel_id IS NULL
+          AND c.is_selected = false
+          AND r.id <> (
+            SELECT id FROM recommendation_runs
+             WHERE user_id = $1 AND media_type = $2 AND channel_id IS NULL
+               AND status = 'completed'
+             ORDER BY created_at DESC
+             LIMIT 1
+          )`,
+      [userId, mediaType]
+    )
+    return result.rowCount ?? 0
+  } catch (err) {
+    // Same contract as the run sweep below: housekeeping never fails a run.
+    logger.warn({ err, userId, mediaType }, 'Failed to thin superseded candidates')
+    return 0
+  }
+}
+
+/**
+ * Delete a user's recommendation runs beyond the newest `keep`, then thin the
+ * survivors down to their picks.
  *
  * Nothing pruned these, so every scheduled run appended a row set —
  * recommendation_runs plus its candidates and evidence — that was never read
@@ -326,6 +377,8 @@ export async function pruneOldRecommendationRuns(
 ): Promise<number> {
   if (keep < 1) throw new Error('pruneOldRecommendationRuns: keep must be at least 1')
 
+  let deleted = 0
+
   try {
     const result = await query(
       `DELETE FROM recommendation_runs
@@ -343,14 +396,20 @@ export async function pruneOldRecommendationRuns(
       [userId, mediaType, keep]
     )
 
-    const deleted = result.rowCount ?? 0
-    if (deleted > 0) {
-      logger.info({ userId, mediaType, deleted, keep }, 'Pruned old recommendation runs')
-    }
-    return deleted
+    deleted = result.rowCount ?? 0
   } catch (err) {
     // Housekeeping must never fail a run that already produced good picks.
     logger.warn({ err, userId, mediaType }, 'Failed to prune old recommendation runs')
-    return 0
   }
+
+  // Second phase, deliberately outside that catch: the runs kept above still
+  // hold a full scored list each, and only the newest completed one is ever
+  // read. Thinning is worth doing even when the sweep above failed.
+  const thinned = await thinSupersededCandidates(userId, mediaType)
+
+  if (deleted > 0 || thinned > 0) {
+    logger.info({ userId, mediaType, deleted, thinned, keep }, 'Pruned old recommendation runs')
+  }
+
+  return deleted
 }

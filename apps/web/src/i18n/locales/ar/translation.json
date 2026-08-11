@@ -658,7 +658,9 @@
       "whyWeThink": "لماذا نعتقد أنك سوف تحب هذا",
       "basedOnHistoryMovie": "استنادًا إلى تاريخك مع الأفلام المشابهة:",
       "basedOnHistorySeries": "بناءً على تاريخك مع سلسلة مماثلة:",
-      "aiExplanationTitle": "لماذا اختارت {{appName}} هذا لك"
+      "aiExplanationTitle": "لماذا اختارت {{appName}} هذا لك",
+      "consideredForYou": "How This Fits Your Taste",
+      "consideredSubtitle": "{{pct}}% match · one of {{total}} titles scored for you"
     },
     "seasons": {
       "title": "الحلقات",

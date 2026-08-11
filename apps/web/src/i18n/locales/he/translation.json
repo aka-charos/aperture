@@ -658,7 +658,9 @@
       "whyWeThink": "למה אנחנו חושבים שתאהב את זה",
       "basedOnHistoryMovie": "בהתבסס על ההיסטוריה שלך עם סרטים דומים:",
       "basedOnHistorySeries": "בהתבסס על ההיסטוריה שלך עם סדרות דומות:",
-      "aiExplanationTitle": "למה {{appName}} בחרה את זה בשבילך"
+      "aiExplanationTitle": "למה {{appName}} בחרה את זה בשבילך",
+      "consideredForYou": "How This Fits Your Taste",
+      "consideredSubtitle": "{{pct}}% match · one of {{total}} titles scored for you"
     },
     "seasons": {
       "title": "פרקים",

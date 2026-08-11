@@ -658,7 +658,9 @@
       "whyWeThink": "Pourquoi nous pensons que vous aimerez ça",
       "basedOnHistoryMovie": "Basé sur votre historique avec des films similaires :",
       "basedOnHistorySeries": "Basé sur votre historique avec des séries similaires :",
-      "aiExplanationTitle": "Pourquoi {{appName}} a choisi cela pour vous"
+      "aiExplanationTitle": "Pourquoi {{appName}} a choisi cela pour vous",
+      "consideredForYou": "How This Fits Your Taste",
+      "consideredSubtitle": "{{pct}}% match · one of {{total}} titles scored for you"
     },
     "seasons": {
       "title": "Épisodes",

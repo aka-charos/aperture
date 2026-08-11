@@ -1096,7 +1096,9 @@
       "whyWeThink": "为什么我们认为您会喜欢这个",
       "basedOnHistoryMovie": "根据您观看类似电影的历史记录：",
       "basedOnHistorySeries": "根据您对类似系列的历史记录：",
-      "aiExplanationTitle": "为什么 {{appName}} 为您选择了这个"
+      "aiExplanationTitle": "为什么 {{appName}} 为您选择了这个",
+      "consideredForYou": "How This Fits Your Taste",
+      "consideredSubtitle": "{{pct}}% match · one of {{total}} titles scored for you"
     },
     "seasons": {
       "title": "剧集数",

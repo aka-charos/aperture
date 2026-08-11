@@ -658,7 +658,9 @@
       "whyWeThink": "우리가 당신이 이것을 좋아할 것이라고 생각하는 이유",
       "basedOnHistoryMovie": "유사한 영화에 대한 기록을 바탕으로:",
       "basedOnHistorySeries": "유사한 시리즈의 기록을 바탕으로:",
-      "aiExplanationTitle": "{{appName}}가 이것을 선택한 이유"
+      "aiExplanationTitle": "{{appName}}가 이것을 선택한 이유",
+      "consideredForYou": "How This Fits Your Taste",
+      "consideredSubtitle": "{{pct}}% match · one of {{total}} titles scored for you"
     },
     "seasons": {
       "title": "에피소드",

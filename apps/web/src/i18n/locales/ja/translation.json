@@ -1096,7 +1096,9 @@
       "whyWeThink": "これが気に入っていただけると思う理由",
       "basedOnHistoryMovie": "同様の映画の視聴歴に基づいて:",
       "basedOnHistorySeries": "同様のシリーズの使用歴に基づくと、次のようになります。",
-      "aiExplanationTitle": "{{appName}} がこれを選んだ理由"
+      "aiExplanationTitle": "{{appName}} がこれを選んだ理由",
+      "consideredForYou": "How This Fits Your Taste",
+      "consideredSubtitle": "{{pct}}% match · one of {{total}} titles scored for you"
     },
     "seasons": {
       "title": "エピソード",

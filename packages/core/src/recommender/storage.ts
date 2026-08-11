@@ -18,6 +18,88 @@ export interface StoredInterestPick {
   weightedSimilarity: number
 }
 
+/** One prepared row per scored candidate, ready for the bulk INSERT. */
+export interface PreparedCandidateRow {
+  movieId: string
+  rank: number
+  isSelected: boolean
+  selectedRank: number | null
+  finalScore: number
+  similarity: number
+  novelty: number
+  ratingScore: number
+  diversityScore: number
+  /** null unless it carries something no column already holds. */
+  scoreBreakdown: string | null
+}
+
+/**
+ * Shape every scored candidate into a storable row.
+ *
+ * Pure and exported so the parts a silent regression would hide can be pinned
+ * by tests: that nothing is dropped, that ranks stay dense and 1-based, that a
+ * selected pick can never go missing, and which rows carry a score_breakdown.
+ */
+export function buildCandidateRows(
+  allCandidates: Candidate[],
+  selected: Candidate[],
+  selectedRanks?: Map<string, number>,
+  interestPicks?: Map<string, StoredInterestPick>
+): PreparedCandidateRow[] {
+  const selectedIds = new Set(selected.map((s) => s.movieId))
+
+  // Every scored candidate is stored, which is what the series pipeline has
+  // always done. Movies kept `allCandidates.slice(0, 100)` and discarded the
+  // rest, so the insights panel could only ever explain about a hundred titles
+  // per user: every other film was scored and then immediately forgotten, and
+  // browsing one reported it had never been considered. See
+  // pruneOldRecommendationRuns for what stops this growing without bound.
+  const storedIds = new Set(allCandidates.map((c) => c.movieId))
+
+  // Defensive, and almost always empty now the list is complete. A pick
+  // missing from this table vanishes from /api/recommendations, which reads
+  // the picks back out of it -- worth one Set to make impossible.
+  const orphanedPicks = selected.filter((s) => !storedIds.has(s.movieId))
+
+  return [...allCandidates, ...orphanedPicks].map((c, i) => {
+    const isSelected = selectedIds.has(c.movieId)
+    const interestPick = interestPicks?.get(c.movieId)
+
+    // Only what no column already holds. similarity, novelty, rating and
+    // diversity each have their own column, so copying them into JSONB as well
+    // was harmless on a hundred rows and is not on twelve thousand. Matches
+    // the series pipeline, which has always left this null for ordinary rows.
+    const extras = {
+      // The diversity-blended number the selector actually ranked by. Kept out
+      // of final_score so that column stays one comparable scale for every
+      // row; present only on selected candidates.
+      ...(c.selectionScore !== undefined ? { selectionScore: c.selectionScore } : {}),
+      ...(interestPick
+        ? {
+            interestMatch: {
+              interestId: interestPick.interestId,
+              interestText: interestPick.interestText,
+              weightedSimilarity: interestPick.weightedSimilarity,
+            },
+          }
+        : {}),
+    }
+
+    return {
+      movieId: c.movieId,
+      rank: i + 1,
+      isSelected,
+      selectedRank: isSelected ? (selectedRanks?.get(c.movieId) ?? null) : null,
+      finalScore: c.finalScore,
+      similarity: c.similarity,
+      novelty: c.novelty,
+      ratingScore: c.ratingScore,
+      diversityScore: c.diversityScore,
+      scoreBreakdown: Object.keys(extras).length > 0 ? JSON.stringify(extras) : null,
+    }
+  })
+}
+
 export async function storeCandidates(
   runId: string,
   allCandidates: Candidate[],
@@ -25,84 +107,47 @@ export async function storeCandidates(
   selectedRanks?: Map<string, number>,
   interestPicks?: Map<string, StoredInterestPick>
 ): Promise<void> {
-  const selectedIds = new Set(selected.map((s) => s.movieId))
+  const data = buildCandidateRows(allCandidates, selected, selectedRanks, interestPicks)
 
-  // Store top 100 candidates plus any selected movies not in top 100
-  // (diversity algorithm can select movies from beyond top 100)
-  const top100 = allCandidates.slice(0, 100)
-  const top100Ids = new Set(top100.map((c) => c.movieId))
+  if (data.length === 0) return
 
-  // Find selected movies that aren't in top 100
-  const selectedNotInTop100 = selected.filter((s) => !top100Ids.has(s.movieId))
+  // One statement per run was fine while this stored a hundred rows. The pool
+  // is now the user's whole unwatched library, so an unbounded statement would
+  // serialise tens of thousands of rows across ten arrays on the wire at once.
+  // Chunking keeps that bounded without giving up the unnest bulk insert.
+  const CHUNK_SIZE = 5000
 
-  // Combine: top 100 + any selected movies not already included
-  const toStore = [...top100, ...selectedNotInTop100]
+  for (let offset = 0; offset < data.length; offset += CHUNK_SIZE) {
+    const chunk = data.slice(offset, offset + CHUNK_SIZE)
 
-  if (toStore.length === 0) return
-
-  // Prepare bulk data
-  const data = toStore.map((c, i) => {
-    const isSelected = selectedIds.has(c.movieId)
-    const selectedRank = isSelected && selectedRanks ? selectedRanks.get(c.movieId) : null
-    const originalRank =
-      i < 100 ? i + 1 : allCandidates.findIndex((ac) => ac.movieId === c.movieId) + 1
-    const interestPick = interestPicks?.get(c.movieId)
-
-    return {
-      movieId: c.movieId,
-      rank: originalRank,
-      isSelected,
-      selectedRank,
-      finalScore: c.finalScore,
-      similarity: c.similarity,
-      novelty: c.novelty,
-      ratingScore: c.ratingScore,
-      diversityScore: c.diversityScore,
-      scoreBreakdown: JSON.stringify({
-        similarity: c.similarity,
-        novelty: c.novelty,
-        rating: c.ratingScore,
-        diversity: c.diversityScore,
-        // The diversity-blended number the selector actually ranked by. Kept
-        // out of final_score so that column stays one comparable scale for
-        // every row; present only on selected candidates.
-        ...(c.selectionScore !== undefined ? { selectionScore: c.selectionScore } : {}),
-        ...(interestPick
-          ? {
-              interestMatch: {
-                interestId: interestPick.interestId,
-                interestText: interestPick.interestText,
-                weightedSimilarity: interestPick.weightedSimilarity,
-              },
-            }
-          : {}),
-      }),
-    }
-  })
-
-  // Bulk INSERT using unnest
-  await query(
-    `INSERT INTO recommendation_candidates
-     (run_id, movie_id, rank, is_selected, selected_rank, final_score, similarity_score, novelty_score, rating_score, diversity_score, score_breakdown)
-     SELECT $1, movie_id, rank, is_selected, selected_rank, final_score, similarity_score, novelty_score, rating_score, diversity_score, score_breakdown
-     FROM unnest(
-       $2::uuid[], $3::int[], $4::boolean[], $5::int[], $6::real[],
-       $7::real[], $8::real[], $9::real[], $10::real[], $11::jsonb[]
-     ) AS t(movie_id, rank, is_selected, selected_rank, final_score, similarity_score, novelty_score, rating_score, diversity_score, score_breakdown)`,
-    [
-      runId,
-      data.map((d) => d.movieId),
-      data.map((d) => d.rank),
-      data.map((d) => d.isSelected),
-      data.map((d) => d.selectedRank),
-      data.map((d) => d.finalScore),
-      data.map((d) => d.similarity),
-      data.map((d) => d.novelty),
-      data.map((d) => d.ratingScore),
-      data.map((d) => d.diversityScore),
-      data.map((d) => d.scoreBreakdown),
-    ]
-  )
+    await query(
+      `INSERT INTO recommendation_candidates
+       (run_id, movie_id, rank, is_selected, selected_rank, final_score, similarity_score, novelty_score, rating_score, diversity_score, score_breakdown)
+       SELECT $1, movie_id, rank, is_selected, selected_rank, final_score, similarity_score, novelty_score, rating_score, diversity_score,
+              -- qualified: score_breakdown is also the name of the target column,
+              -- and t. leaves nothing resting on scoping rules. NULL for every
+              -- row that carries nothing a column doesn't already hold, which is
+              -- almost all of them; the column itself is NOT NULL.
+              COALESCE(t.score_breakdown, '{}'::jsonb)
+       FROM unnest(
+         $2::uuid[], $3::int[], $4::boolean[], $5::int[], $6::real[],
+         $7::real[], $8::real[], $9::real[], $10::real[], $11::jsonb[]
+       ) AS t(movie_id, rank, is_selected, selected_rank, final_score, similarity_score, novelty_score, rating_score, diversity_score, score_breakdown)`,
+      [
+        runId,
+        chunk.map((d) => d.movieId),
+        chunk.map((d) => d.rank),
+        chunk.map((d) => d.isSelected),
+        chunk.map((d) => d.selectedRank),
+        chunk.map((d) => d.finalScore),
+        chunk.map((d) => d.similarity),
+        chunk.map((d) => d.novelty),
+        chunk.map((d) => d.ratingScore),
+        chunk.map((d) => d.diversityScore),
+        chunk.map((d) => d.scoreBreakdown),
+      ]
+    )
+  }
 }
 
 /**

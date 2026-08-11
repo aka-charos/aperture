@@ -766,7 +766,9 @@
       "whyWeThink": "Почему мы думаем, что вам это понравится",
       "basedOnHistoryMovie": "Основываясь на вашей истории с похожими фильмами:",
       "basedOnHistorySeries": "Основываясь на вашей истории с похожими сериалами:",
-      "aiExplanationTitle": "Почему {{appName}} выбрала это для вас"
+      "aiExplanationTitle": "Почему {{appName}} выбрала это для вас",
+      "consideredForYou": "How This Fits Your Taste",
+      "consideredSubtitle": "{{pct}}% match · one of {{total}} titles scored for you"
     },
     "seasons": {
       "title": "Эпизоды",

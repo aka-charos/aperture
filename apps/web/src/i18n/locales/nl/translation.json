@@ -766,7 +766,9 @@
       "whyWeThink": "Waarom we denken dat je dit leuk zult vinden",
       "basedOnHistoryMovie": "Gebaseerd op je geschiedenis met soortgelijke films:",
       "basedOnHistorySeries": "Gebaseerd op jouw geschiedenis met vergelijkbare series:",
-      "aiExplanationTitle": "Waarom {{appName}} dit voor u heeft uitgekozen"
+      "aiExplanationTitle": "Waarom {{appName}} dit voor u heeft uitgekozen",
+      "consideredForYou": "How This Fits Your Taste",
+      "consideredSubtitle": "{{pct}}% match · one of {{total}} titles scored for you"
     },
     "seasons": {
       "title": "Afleveringen",
