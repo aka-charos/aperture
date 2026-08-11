@@ -135,8 +135,10 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
         return reply.status(403).send({ error: 'Forbidden' })
       }
 
-      const latestRun = await queryOne<{ id: string }>(
-        `SELECT id FROM recommendation_runs
+      // See the movie handler: the denominator behind "#340 of 512", read off
+      // the run rather than counted, so it survives old runs being thinned.
+      const latestRun = await queryOne<{ id: string; candidate_count: number }>(
+        `SELECT id, candidate_count FROM recommendation_runs
          WHERE user_id = $1 AND status = 'completed' AND media_type = 'series'
          ORDER BY created_at DESC
          LIMIT 1`,
@@ -243,6 +245,7 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
         aiExplanation,
         isSelected: candidate.is_selected,
         rank: candidate.rank,
+        totalCandidates: latestRun.candidate_count,
         scores: {
           final: Number(candidate.final_score),
           similarity: candidate.similarity_score ? Number(candidate.similarity_score) : null,

@@ -2945,7 +2945,9 @@
       "whyWeThink": "Γιατί Πιστεύουμε Ότι Θα Σας Αρέσει",
       "basedOnHistoryMovie": "Βάσει του ιστορικού σας με παρόμοιες ταινίες:",
       "basedOnHistorySeries": "Βάσει του ιστορικού σας με παρόμοιες σειρές:",
-      "aiExplanationTitle": "Γιατί το {{appName}} το επέλεξε για εσάς"
+      "aiExplanationTitle": "Γιατί το {{appName}} το επέλεξε για εσάς",
+      "consideredForYou": "How This Fits Your Taste",
+      "consideredSubtitle": "{{pct}}% match · one of {{total}} titles scored for you"
     },
     "seasons": {
       "title": "Επεισόδια",

@@ -131,8 +131,12 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
         return reply.status(403).send({ error: 'Forbidden' })
       }
 
-      const latestRun = await queryOne<{ id: string }>(
-        `SELECT id FROM recommendation_runs
+      // candidate_count is how large a pool this run scored, which is the
+      // denominator that makes a rank mean anything ("#340 of 12,451"). Read
+      // from the run rather than counted here: the pipeline already recorded
+      // what it scored, and that stays true after old runs are thinned.
+      const latestRun = await queryOne<{ id: string; candidate_count: number }>(
+        `SELECT id, candidate_count FROM recommendation_runs
          WHERE user_id = $1 AND status = 'completed' AND media_type = 'movie'
          ORDER BY created_at DESC
          LIMIT 1`,
@@ -238,6 +242,7 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
         aiExplanation,
         isSelected: candidate.is_selected,
         rank: candidate.rank,
+        totalCandidates: latestRun.candidate_count,
         scores: {
           final: Number(candidate.final_score),
           similarity: candidate.similarity_score ? Number(candidate.similarity_score) : null,

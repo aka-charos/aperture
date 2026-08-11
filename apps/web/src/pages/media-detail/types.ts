@@ -161,7 +161,10 @@ export interface SimilarItem {
 export interface RecommendationInsights {
   isRecommended: boolean
   isSelected?: boolean
+  /** Position among everything the run scored, not among the picks. */
   rank?: number
+  /** How many titles that run scored — the denominator for `rank`. */
+  totalCandidates?: number
   message?: string
   /**
    * The generated "why this was picked" paragraph. Null whenever the admin (or

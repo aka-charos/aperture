@@ -747,7 +747,9 @@
     },
     "insights": {
       "recommendedForYou": "Recommended For You",
+      "consideredForYou": "How This Fits Your Taste",
       "matchSubtitle": "{{pct}}% match based on your viewing history",
+      "consideredSubtitle": "{{pct}}% match · one of {{total}} titles scored for you",
       "aiExplanationTitle": "Why {{appName}} picked this for you",
       "subtitleMovie": "How similar this movie is to movies you've enjoyed",
       "subtitleSeries": "How similar this series is to series you've enjoyed",

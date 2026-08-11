@@ -21,6 +21,7 @@ import ThumbUpIcon from '@mui/icons-material/ThumbUp'
 import ShuffleIcon from '@mui/icons-material/Shuffle'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
+import QueryStatsIcon from '@mui/icons-material/QueryStats'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
 import { gradients } from '@/theme'
 import type { RecommendationInsights, MediaType } from '../types'
@@ -33,12 +34,19 @@ interface MovieInsightsProps {
 }
 
 export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: MovieInsightsProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const theme = useTheme()
-  const [insightsExpanded, setInsightsExpanded] = useState(true)
 
-  if (!insights.isRecommended || !insights.isSelected) {
+  // One of the run's picks, as opposed to a title the run merely scored. This
+  // used to be a second condition on the early return below, so the panel could
+  // only ever explain a dozen films per user — everything else was scored,
+  // discarded before it reached the database, and reported as never considered.
+  // A non-pick opens collapsed: it answers a question the reader hasn't asked.
+  const isPick = insights.isSelected === true
+  const [insightsExpanded, setInsightsExpanded] = useState(isPick)
+
+  if (!insights.isRecommended) {
     return null
   }
 
@@ -46,6 +54,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
   const similarityTooltip = isSeriesView
     ? t('mediaDetail.insights.subtitleSeries')
     : t('mediaDetail.insights.subtitleMovie')
+  const matchPct = Math.round((insights.scores?.final || 0) * 100)
 
   return (
     <Box sx={{ mt: 4, px: 3 }}>
@@ -53,9 +62,14 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
         sx={{
           borderRadius: 3,
           overflow: 'hidden',
-          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.secondary.main, 0.1)} 100%)`,
+          // A scored-but-not-picked title gets the same numbers without the
+          // recommendation styling, so the page can't be misread as claiming
+          // the recommender chose it.
+          background: isPick
+            ? `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.secondary.main, 0.1)} 100%)`
+            : 'transparent',
           border: '1px solid',
-          borderColor: 'primary.main',
+          borderColor: isPick ? 'primary.main' : 'divider',
         }}
       >
         {/* Header */}
@@ -76,32 +90,47 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                 width: 48,
                 height: 48,
                 borderRadius: 2,
-                background: gradients.primaryToSecondary,
+                background: isPick
+                  ? gradients.primaryToSecondary
+                  : alpha(theme.palette.text.primary, 0.08),
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <AutoAwesomeIcon sx={{ color: 'white', fontSize: 28 }} />
+              {isPick ? (
+                <AutoAwesomeIcon sx={{ color: 'white', fontSize: 28 }} />
+              ) : (
+                <QueryStatsIcon sx={{ color: 'text.secondary', fontSize: 28 }} />
+              )}
             </Box>
             <Box>
               <Typography variant="h6" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                {t('mediaDetail.insights.recommendedForYou')}
-                <Chip
-                  label={`#${insights.rank}`}
-                  size="small"
-                  sx={{
-                    bgcolor: 'primary.main',
-                    color: 'white',
-                    fontWeight: 700,
-                    height: 22,
-                  }}
-                />
+                {isPick
+                  ? t('mediaDetail.insights.recommendedForYou')
+                  : t('mediaDetail.insights.consideredForYou')}
+                {insights.rank != null && (
+                  <Chip
+                    label={`#${insights.rank}`}
+                    size="small"
+                    sx={{
+                      bgcolor: isPick ? 'primary.main' : 'action.selected',
+                      color: isPick ? 'white' : 'text.primary',
+                      fontWeight: 700,
+                      height: 22,
+                    }}
+                  />
+                )}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {t('mediaDetail.insights.matchSubtitle', {
-                  pct: Math.round((insights.scores?.final || 0) * 100),
-                })}
+                {/* A rank means nothing without the size of the field it was
+                    ranked in, so the two are never shown apart. */}
+                {!isPick && insights.totalCandidates
+                  ? t('mediaDetail.insights.consideredSubtitle', {
+                      pct: matchPct,
+                      total: insights.totalCandidates.toLocaleString(i18n.language),
+                    })
+                  : t('mediaDetail.insights.matchSubtitle', { pct: matchPct })}
               </Typography>
             </Box>
           </Box>
