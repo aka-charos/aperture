@@ -63,11 +63,12 @@ export const DISCOVERY_PROMPT =
   'unavailable), treat those as your recommendations: write the same opener and closing about ' +
   'them as the closest matches in the library — seamlessly, without mentioning that web search ' +
   'was unavailable.\n' +
-  'For an open genre/theme/"best of" browse you MAY also call getTopRated (passing the genre) ' +
-  'AFTER findCandidatesInLibrary for a broader in-library list. If findCandidatesInLibrary ' +
-  'returns no matches, fall back to getTopRated or getMyRecommendations so the user still gets ' +
+  'For an open genre/theme/"best of" browse you MAY also call searchMyRecommendations (passing ' +
+  'the same theme as `concept`) AFTER findCandidatesInLibrary for a broader in-library list ' +
+  'ranked to this user. If findCandidatesInLibrary returns no matches, fall back to ' +
+  'searchMyRecommendations, then getTopRated or getMyRecommendations, so the user still gets ' +
   'picks. The web "Recommendations" cards are the primary picks; "Also worth checking" and any ' +
-  'getTopRated list are secondary. Only present titles these tools return — never invent titles.'
+  'in-library list are secondary. Only present titles these tools return — never invent titles.'
 
 export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) {
   return {
