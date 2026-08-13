@@ -33,6 +33,8 @@ type HelpSettingKey =
   | 'diversityWeight'
   | 'newCandidateThreshold'
   | 'maxRunAgeDays'
+  | 'twinMaxSlots'
+  | 'twinThresholdK'
 
 function HelpIcon({ settingKey }: { settingKey: HelpSettingKey }) {
   const { t } = useTranslation()
@@ -301,6 +303,57 @@ function MediaTypeCard({
             min={0}
             max={100}
             size="small"
+          />
+        </FormControl>
+
+        {/* Borrowed picks. Grouped with the scoring settings rather than the
+            regeneration ones below, because these decide what ends up in the
+            list — which is also why both are in SCORING_FIELDS server-side. */}
+        <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={1}>
+          {t('settingsRecAlgo.sectionTwins')}
+        </Typography>
+
+        <FormControl fullWidth sx={{ mb: 2 }} size="small">
+          <Box display="flex" alignItems="center">
+            <Typography variant="body2">{t('settingsRecAlgo.twinMaxSlots')}</Typography>
+            <HelpIcon settingKey="twinMaxSlots" />
+          </Box>
+          <TextField
+            type="number"
+            value={config.twinMaxSlots}
+            onChange={(e) =>
+              onUpdateField('twinMaxSlots', Math.min(10, Math.max(0, parseInt(e.target.value) || 0)))
+            }
+            size="small"
+            helperText={t('settingsRecAlgo.twinMaxSlotsHelp')}
+            InputProps={{ inputProps: { min: 0, max: 10 } }}
+          />
+        </FormControl>
+
+        <FormControl fullWidth sx={{ mb: 3 }} size="small">
+          <Box display="flex" alignItems="center" justifyContent="space-between">
+            <Box display="flex" alignItems="center">
+              <Typography variant="body2">{t('settingsRecAlgo.twinThresholdK')}</Typography>
+              <HelpIcon settingKey="twinThresholdK" />
+            </Box>
+            <Typography variant="body2" color="primary" fontWeight={600}>
+              {config.twinThresholdK.toFixed(1)}
+            </Typography>
+          </Box>
+          <Slider
+            value={config.twinThresholdK}
+            onChange={(_, v) => onUpdateField('twinThresholdK', v as number)}
+            min={1}
+            max={4}
+            step={0.5}
+            size="small"
+            // Nothing to tune when the feature is off; the number would still
+            // save, which reads as though it were doing something.
+            disabled={config.twinMaxSlots === 0}
+            marks={[
+              { value: 1, label: t('settingsRecAlgo.twinLooser') },
+              { value: 4, label: t('settingsRecAlgo.twinStricter') },
+            ]}
           />
         </FormControl>
 

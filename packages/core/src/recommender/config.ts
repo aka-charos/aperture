@@ -21,6 +21,8 @@ export async function loadConfig(): Promise<PipelineConfig> {
       ratingWeight: dbConfig.movie.ratingWeight,
       diversityWeight: dbConfig.movie.diversityWeight,
       recentWatchLimit: dbConfig.movie.recentWatchLimit,
+      twinThresholdK: dbConfig.movie.twinThresholdK,
+      twinMaxSlots: dbConfig.movie.twinMaxSlots,
     }
   } catch (err) {
     logger.warn({ err }, 'Failed to load movie recommendation config from DB, using fallback')
@@ -44,12 +46,14 @@ export async function loadSeriesConfig(): Promise<PipelineConfig> {
       ratingWeight: dbConfig.series.ratingWeight,
       diversityWeight: dbConfig.series.diversityWeight,
       recentWatchLimit: dbConfig.series.recentWatchLimit,
+      twinThresholdK: dbConfig.series.twinThresholdK,
+      twinMaxSlots: dbConfig.series.twinMaxSlots,
     }
   } catch (err) {
     logger.warn({ err }, 'Failed to load series recommendation config from DB, using fallback')
     return {
       ...FALLBACK_CONFIG,
-      selectedCount: 12, // Default series recommendation count
+      selectedCount: 20, // Same fallback as movies; the configured value lives in recommendation_config
       recentWatchLimit: 100, // More episodes for taste profile
     }
   }

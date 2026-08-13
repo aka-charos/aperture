@@ -70,6 +70,13 @@ export interface SeriesForExplanation {
    * MovieForExplanation.interestText.
    */
   interestText?: string | null
+  /**
+   * True when this pick came from a reserved taste-twin slot. Mirrors
+   * MovieForExplanation.fromTasteTwin, including that it is a flag rather than
+   * the donor's identity: the panel says "someone with taste like yours", so a
+   * name must not be able to reach the prompt.
+   */
+  fromTasteTwin?: boolean
 }
 
 export interface EvidenceSeries {
@@ -289,11 +296,15 @@ async function generateBatchSeriesExplanations(
         ? `\n   ✍️ THEY ASKED FOR THIS: picked because they told us they like "${s.interestText}" — lead with that`
         : ''
 
+      const twinLine = s.fromTasteTwin
+        ? `\n   👥 A KINDRED VIEWER PICKED THIS: another viewer here whose taste closely overlaps theirs watched it — lead with that, and never name or describe that person`
+        : ''
+
       return `${i + 1}. "${s.title}" (${s.year || 'N/A'})
    Genres: ${s.genres.join(', ')}
    ${s.network ? `Network: ${s.network}` : ''}
    ${s.status ? `Status: ${s.status}` : ''}
-   Overall match: ${(s.normalizedSimilarity * 100).toFixed(0)}% | Novelty: ${s.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${s.ratingScore > 0.7 ? 'critically acclaimed' : s.ratingScore > 0.5 ? 'well received' : 'mixed'}${interestLine}
+   Overall match: ${(s.normalizedSimilarity * 100).toFixed(0)}% | Novelty: ${s.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${s.ratingScore > 0.7 ? 'critically acclaimed' : s.ratingScore > 0.5 ? 'well received' : 'mixed'}${interestLine}${twinLine}
    🎯 SIMILAR TO SERIES THEY'VE WATCHED: ${evidenceStr}
    Plot: ${(s.overview || 'No overview available').substring(0, 250)}...`
     })
@@ -319,6 +330,8 @@ Write compelling 3-4 sentence explanations for each recommendation. Your explana
 CRITICAL: Each recommendation shows which of the user's watched series it's most similar to. USE THAT DATA - don't make up connections to random series.
 
 CRITICAL: A few recommendations are marked "THEY ASKED FOR THIS" with an interest the user typed in themselves. For those, open by connecting the show to that interest in the user's own words, then fill in with the similarity evidence. Never justify one of these on viewing-history similarity alone - that is not why it is in the list, and claiming otherwise would be wrong.
+
+CRITICAL: A few recommendations are marked "A KINDRED VIEWER PICKED THIS". Those are in the list because another viewer with strongly overlapping taste watched them, which is a different reason from similarity to the user's own history - say so, and then use the similarity evidence as support. Refer to that person only in general terms ("someone whose taste lines up with yours"). You do not know who they are, so never name them, guess at them, or describe them.
 
 Format: Return JSON with an "explanations" array containing objects with "index" (1-based) and "explanation" fields.${langBlock}`,
       prompt: `=== USER'S TV TASTE PROFILE ===
@@ -414,6 +427,13 @@ function generateFallbackSeriesExplanation(series: SeriesWithEvidence): string {
     // best-scoring title among the interest's strongest matches, not to the
     // single closest one, and the wording shouldn't claim more than that.
     return `You told us you like ${series.interestText.toLowerCase()} — this ${series.genres[0]?.toLowerCase() || 'series'} pick is one of the closest matches in your library that you haven't started yet.`
+  }
+
+  // Same reasoning one step down: a twin pick is here because a like-minded
+  // viewer watched it, so the evidence branch below would credit the wrong
+  // thing. Kept deliberately anonymous.
+  if (series.fromTasteTwin) {
+    return `Someone here whose taste closely overlaps yours has been watching this ${series.genres[0]?.toLowerCase() || 'series'} — it's the kind of thing the two of you keep landing on independently.`
   }
 
   if (series.evidence.length > 0) {

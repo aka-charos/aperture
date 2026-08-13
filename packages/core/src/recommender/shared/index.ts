@@ -52,3 +52,14 @@ export {
   type InterestQueryResult,
 } from './interestSlots.js'
 
+export {
+  buildTwinIndex,
+  deriveTwinThreshold,
+  computeReservedTwinSlots,
+  pickTwinSlotFillers,
+  TWIN_SLOT_SHARE,
+  type TwinPair,
+  type TwinDonor,
+  type TwinIndex,
+} from './twinSlots.js'
+

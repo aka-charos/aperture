@@ -21,6 +21,17 @@ export interface MediaTypeConfig {
    * for inputs the activity gate does not enumerate.
    */
   maxRunAgeDays: number
+  /**
+   * How far above the typical pair a viewer's rarity-weighted overlap must sit
+   * before their picks are borrowed, in multiples of the median absolute
+   * deviation. Higher is stricter. See recommender/twinAffinity.ts.
+   */
+  twinThresholdK: number
+  /**
+   * Ceiling on picks drawn from a taste twin. 0 disables the feature; the
+   * realised count also scales with selectedCount (shared/twinSlots.ts).
+   */
+  twinMaxSlots: number
 }
 
 export interface RecommendationConfig {
@@ -50,6 +61,8 @@ interface RecommendationConfigRow {
   movie_diversity_weight: string
   movie_new_candidate_threshold: number
   movie_max_run_age_days: number
+  movie_twin_threshold_k: string
+  movie_twin_max_slots: number
   series_max_candidates: number
   series_selected_count: number
   series_recent_watch_limit: number
@@ -59,6 +72,8 @@ interface RecommendationConfigRow {
   series_diversity_weight: string
   series_new_candidate_threshold: number
   series_max_run_age_days: number
+  series_twin_threshold_k: string
+  series_twin_max_slots: number
   updated_at: Date
   scoring_updated_at: Date
 }
@@ -66,7 +81,7 @@ interface RecommendationConfigRow {
 // Default values
 const MOVIE_DEFAULTS: MediaTypeConfig = {
   maxCandidates: 50000,
-  selectedCount: 12,
+  selectedCount: 20,
   recentWatchLimit: 50,
   similarityWeight: 0.4,
   noveltyWeight: 0.2,
@@ -74,11 +89,13 @@ const MOVIE_DEFAULTS: MediaTypeConfig = {
   diversityWeight: 0.2,
   newCandidateThreshold: 12,
   maxRunAgeDays: 35,
+  twinThresholdK: 2.0,
+  twinMaxSlots: 4,
 }
 
 const SERIES_DEFAULTS: MediaTypeConfig = {
   maxCandidates: 50000,
-  selectedCount: 12,
+  selectedCount: 20,
   recentWatchLimit: 100,
   similarityWeight: 0.4,
   noveltyWeight: 0.2,
@@ -88,6 +105,8 @@ const SERIES_DEFAULTS: MediaTypeConfig = {
   // the same batch would mean the catalogue signal never fires for series.
   newCandidateThreshold: 6,
   maxRunAgeDays: 35,
+  twinThresholdK: 2.0,
+  twinMaxSlots: 4,
 }
 
 /**
@@ -104,6 +123,8 @@ const COLUMN_SUFFIX: Record<keyof MediaTypeConfig, string> = {
   diversityWeight: 'diversity_weight',
   newCandidateThreshold: 'new_candidate_threshold',
   maxRunAgeDays: 'max_run_age_days',
+  twinThresholdK: 'twin_threshold_k',
+  twinMaxSlots: 'twin_max_slots',
 }
 
 /**
@@ -119,6 +140,11 @@ const SCORING_FIELDS = new Set<keyof MediaTypeConfig>([
   'noveltyWeight',
   'ratingWeight',
   'diversityWeight',
+  // Both decide which titles reach the final list, so an edit has to invalidate
+  // the gate. Left out, lowering the twin threshold would appear to do nothing
+  // until max_run_age_days eventually forced a run.
+  'twinThresholdK',
+  'twinMaxSlots',
 ])
 
 /**
@@ -130,9 +156,11 @@ export async function getRecommendationConfig(): Promise<RecommendationConfig> {
       movie_max_candidates, movie_selected_count, movie_recent_watch_limit,
       movie_similarity_weight, movie_novelty_weight, movie_rating_weight, movie_diversity_weight,
       movie_new_candidate_threshold, movie_max_run_age_days,
+      movie_twin_threshold_k, movie_twin_max_slots,
       series_max_candidates, series_selected_count, series_recent_watch_limit,
       series_similarity_weight, series_novelty_weight, series_rating_weight, series_diversity_weight,
       series_new_candidate_threshold, series_max_run_age_days,
+      series_twin_threshold_k, series_twin_max_slots,
       updated_at, scoring_updated_at
      FROM recommendation_config WHERE id = 1`
   )
@@ -158,6 +186,8 @@ export async function getRecommendationConfig(): Promise<RecommendationConfig> {
       diversityWeight: parseFloat(row.movie_diversity_weight),
       newCandidateThreshold: row.movie_new_candidate_threshold,
       maxRunAgeDays: row.movie_max_run_age_days,
+      twinThresholdK: parseFloat(row.movie_twin_threshold_k),
+      twinMaxSlots: row.movie_twin_max_slots,
     },
     series: {
       maxCandidates: row.series_max_candidates,
@@ -169,6 +199,8 @@ export async function getRecommendationConfig(): Promise<RecommendationConfig> {
       diversityWeight: parseFloat(row.series_diversity_weight),
       newCandidateThreshold: row.series_new_candidate_threshold,
       maxRunAgeDays: row.series_max_run_age_days,
+      twinThresholdK: parseFloat(row.series_twin_threshold_k),
+      twinMaxSlots: row.series_twin_max_slots,
     },
     updatedAt: row.updated_at,
     scoringUpdatedAt: row.scoring_updated_at,
