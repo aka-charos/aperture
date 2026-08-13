@@ -32,6 +32,28 @@ export const ContentItemSchema = z.object({
   rating: z.number().nullable().optional().describe('Community rating 0-10'),
   userRating: z.number().nullable().optional().describe('User rating 1-10'),
   rank: z.number().optional().describe('Recommendation rank'),
+  source: z
+    .enum(['ranked', 'twin', 'interest'])
+    .optional()
+    .describe(
+      'How a recommendation earned its place in the list. "ranked" = the recommender scored it ' +
+        'into the top of the list. "twin" = a reserved slot borrowed it from another viewer on ' +
+        'this server whose watch history overlaps the user\'s far more than chance — similarity ' +
+        'is precisely what did NOT choose it, so do not explain it as being like something they ' +
+        'watched, and never identify the other viewer: they are always "someone here whose taste ' +
+        'closely overlaps yours". "interest" = a reserved slot for one of the interests the user ' +
+        'stated themselves. Absent for anything that is not a recommendation.'
+    ),
+  sharedTitles: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Only on a "twin" pick: titles the user and that other viewer have BOTH watched, rarest ' +
+        'first. This overlap is what identified the match, so it is the honest way to explain ' +
+        'the pick — e.g. "you both watched X and Y, and they also watched this". These are ' +
+        "films from the user's own history, so naming them reveals nothing about the other " +
+        'viewer, who still must never be identified.'
+    ),
   actions: z.array(ActionSchema).optional().describe('Action buttons'),
 })
 

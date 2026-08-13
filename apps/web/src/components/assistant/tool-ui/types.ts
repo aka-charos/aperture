@@ -23,6 +23,15 @@ export interface ContentItem {
   rating?: number | null
   userRating?: number | null
   rank?: number
+  /**
+   * How a recommendation earned its place: scored into the list, or placed by a
+   * reserved slot for a taste twin / a stated interest. Present only on
+   * recommendation results. Carried so a card can label a borrowed pick the way
+   * the insights panel does — never carries the donor's identity.
+   */
+  source?: 'ranked' | 'twin' | 'interest'
+  /** Only on a `twin` pick: titles the user and that viewer have both watched, rarest first. */
+  sharedTitles?: string[]
   actions?: Action[]
 }
 
