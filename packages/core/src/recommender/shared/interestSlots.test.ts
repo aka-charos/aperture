@@ -5,8 +5,7 @@ import {
   buildInterestMatchIndex,
   computeReservedInterestSlots,
   pickInterestSlotFillers,
-  MAX_INTEREST_SLOTS,
-  INTEREST_SLOT_SHARE,
+  DEFAULT_INTEREST_MAX_SLOTS,
   MIN_INTEREST_SLOT_SIMILARITY,
   INTEREST_SLOT_MATCH_POOL,
   type InterestQueryResult,
@@ -62,56 +61,59 @@ test('the slot-filling bar sits exactly on the "moderate match" tier', () => {
 // Reserved slot count
 // ============================================================================
 
-test('computeReservedInterestSlots is 2 at the shipped defaults', () => {
-  // selectedCount defaults to 12 (lib/recommendationConfig.ts).
-  assert.equal(computeReservedInterestSlots(12, 2), 2)
-  assert.equal(computeReservedInterestSlots(12, 5), 2)
-  assert.equal(computeReservedInterestSlots(12, 1), 1)
+test('the configured ceiling is what happens, not a starting point for a hidden share', () => {
+  // The regression this guards: a 0.2 share used to sit under the ceiling, so
+  // 3 configured against a 10-item list quietly became 2 and nothing on screen
+  // explained why.
+  assert.equal(computeReservedInterestSlots(10, 5, 3), 3)
+  assert.equal(computeReservedInterestSlots(12, 5, DEFAULT_INTEREST_MAX_SLOTS), 3)
+  assert.equal(computeReservedInterestSlots(20, 5, 4), 4)
 })
 
-test('computeReservedInterestSlots respects all three bounds across a sweep', () => {
+test('never more slots than the user actually wrote interests', () => {
+  assert.equal(computeReservedInterestSlots(20, 1, 4), 1)
+  assert.equal(computeReservedInterestSlots(20, 2, 4), 2)
+})
+
+test('computeReservedInterestSlots respects every bound across a sweep', () => {
   for (let selectedCount = 0; selectedCount <= 60; selectedCount++) {
     for (let interestCount = 0; interestCount <= 6; interestCount++) {
-      const slots = computeReservedInterestSlots(selectedCount, interestCount)
+      for (const maxSlots of [0, 1, 3, 4, 10]) {
+        const slots = computeReservedInterestSlots(selectedCount, interestCount, maxSlots)
+        const at = `(${selectedCount}, ${interestCount}, ${maxSlots})`
 
-      assert.ok(Number.isInteger(slots), `non-integer slots at (${selectedCount}, ${interestCount})`)
-      assert.ok(slots >= 0, `negative slots at (${selectedCount}, ${interestCount})`)
-      assert.ok(slots <= MAX_INTEREST_SLOTS, `over hard cap at (${selectedCount}, ${interestCount})`)
-      assert.ok(
-        slots <= interestCount,
-        `more slots than interests at (${selectedCount}, ${interestCount})`
-      )
-      assert.ok(
-        slots <= selectedCount * INTEREST_SLOT_SHARE,
-        `over share at (${selectedCount}, ${interestCount})`
-      )
-      // Reserved picks come out of selectedCount, so this must never go negative.
-      assert.ok(
-        selectedCount - slots >= 0,
-        `would leave a negative target at (${selectedCount}, ${interestCount})`
-      )
+        assert.ok(Number.isInteger(slots), `non-integer slots at ${at}`)
+        assert.ok(slots >= 0, `negative slots at ${at}`)
+        assert.ok(slots <= maxSlots, `over the configured ceiling at ${at}`)
+        assert.ok(slots <= interestCount, `more slots than interests at ${at}`)
+        // Reserved picks come out of selectedCount, so this must never go negative.
+        assert.ok(selectedCount - slots >= 0, `would leave a negative target at ${at}`)
+      }
     }
   }
 })
 
-test('computeReservedInterestSlots reserves nothing for short lists or no interests', () => {
-  for (let selectedCount = 0; selectedCount <= 4; selectedCount++) {
-    assert.equal(computeReservedInterestSlots(selectedCount, 3), 0)
-  }
-  assert.equal(computeReservedInterestSlots(5, 3), 1)
+test('a list shorter than the ceiling is bounded by the list', () => {
+  assert.equal(computeReservedInterestSlots(2, 5, 4), 2)
+  assert.equal(computeReservedInterestSlots(0, 5, 4), 0)
+})
 
-  // The overwhelmingly common case: no interests configured at all.
+test('no interests, or a ceiling of 0, reserves nothing', () => {
   for (let selectedCount = 0; selectedCount <= 60; selectedCount++) {
-    assert.equal(computeReservedInterestSlots(selectedCount, 0), 0)
+    // The overwhelmingly common case: no interests configured at all.
+    assert.equal(computeReservedInterestSlots(selectedCount, 0, 3), 0)
+    assert.equal(computeReservedInterestSlots(selectedCount, 3, 0), 0)
   }
 })
 
 test('computeReservedInterestSlots handles nonsense input without throwing', () => {
-  assert.equal(computeReservedInterestSlots(NaN, 3), 0)
-  assert.equal(computeReservedInterestSlots(12, NaN), 0)
-  assert.equal(computeReservedInterestSlots(Infinity, 3), 0)
-  assert.equal(computeReservedInterestSlots(-12, 3), 0)
-  assert.equal(computeReservedInterestSlots(12, -3), 0)
+  assert.equal(computeReservedInterestSlots(NaN, 3, 3), 0)
+  assert.equal(computeReservedInterestSlots(12, NaN, 3), 0)
+  assert.equal(computeReservedInterestSlots(12, 3, NaN), 0)
+  assert.equal(computeReservedInterestSlots(Infinity, 3, 3), 0)
+  assert.equal(computeReservedInterestSlots(-12, 3, 3), 0)
+  assert.equal(computeReservedInterestSlots(12, -3, 3), 0)
+  assert.equal(computeReservedInterestSlots(12, 3, -3), 0)
 })
 
 // ============================================================================

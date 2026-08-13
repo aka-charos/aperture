@@ -173,6 +173,8 @@ export async function getEffectiveAlgorithmConfig(
       recentWatchLimit: mediaType === 'movie' ? dbConfig.movie.recentWatchLimit : dbConfig.series.recentWatchLimit,
       twinThresholdK: mediaType === 'movie' ? dbConfig.movie.twinThresholdK : dbConfig.series.twinThresholdK,
       twinMaxSlots: mediaType === 'movie' ? dbConfig.movie.twinMaxSlots : dbConfig.series.twinMaxSlots,
+      interestMaxSlots:
+        mediaType === 'movie' ? dbConfig.movie.interestMaxSlots : dbConfig.series.interestMaxSlots,
     }
   } catch {
     logger.warn('Failed to load admin config, using fallback defaults')
@@ -181,6 +183,7 @@ export async function getEffectiveAlgorithmConfig(
       selectedCount: 20,
       twinThresholdK: 2.0,
       twinMaxSlots: 4,
+      interestMaxSlots: 3,
       ...DEFAULT_WEIGHTS,
     }
   }
@@ -213,6 +216,7 @@ export async function getEffectiveAlgorithmConfig(
     selectedCount: adminConfig.selectedCount, // User can't override this
     twinThresholdK: adminConfig.twinThresholdK, // Instance-wide: the bar is derived from every pair
     twinMaxSlots: adminConfig.twinMaxSlots, // User can't override this
+    interestMaxSlots: adminConfig.interestMaxSlots, // User can't override this
     ...normalizedWeights,
   }
 

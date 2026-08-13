@@ -59,11 +59,26 @@ function validateConfigUpdates(updates: Partial<MediaTypeConfig>): string | null
     }
   }
 
-  // 0 is meaningful here and nowhere else in this function: it is how the twin
-  // feature is switched off, which is why twinMaxSlots is not in `counts`.
-  if (updates.twinMaxSlots !== undefined) {
-    if (!Number.isInteger(updates.twinMaxSlots) || updates.twinMaxSlots < 0 || updates.twinMaxSlots > 10) {
-      return 'twinMaxSlots must be a whole number between 0 and 10'
+  // 0 is meaningful for both of these and nowhere else in this function: it is
+  // how each slot feature is switched off, which is why neither is in `counts`.
+  const slotCeilings = ['twinMaxSlots', 'interestMaxSlots'] as const
+  for (const key of slotCeilings) {
+    const value = updates[key]
+    if (value !== undefined) {
+      if (!Number.isInteger(value) || value < 0 || value > 10) {
+        return `${key} must be a whole number between 0 and 10`
+      }
+    }
+  }
+
+  // Reserved slots come out of selectedCount, so the two ceilings together
+  // cannot exceed the list. The pipeline clamps anyway, but a setting that
+  // silently does less than it says is the exact problem these controls exist
+  // to avoid -- better to refuse the save than to accept a lie.
+  const selected = updates.selectedCount
+  if (selected !== undefined && updates.twinMaxSlots !== undefined && updates.interestMaxSlots !== undefined) {
+    if (updates.twinMaxSlots + updates.interestMaxSlots > selected) {
+      return 'twinMaxSlots and interestMaxSlots together cannot exceed selectedCount'
     }
   }
 

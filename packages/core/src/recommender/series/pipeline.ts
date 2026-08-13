@@ -1211,7 +1211,8 @@ export async function generateSeriesRecommendationsForUser(
     // never surface anything. Zero interests means zero slots.
     const reservedInterestSlots = computeReservedInterestSlots(
       cfg.selectedCount,
-      interestIndex?.byInterest.length ?? 0
+      interestIndex?.byInterest.length ?? 0,
+      cfg.interestMaxSlots
     )
 
     // Against what interests left behind, so the two can never over-reserve.

@@ -583,7 +583,8 @@ export async function generateRecommendationsForUser(
     // the ranking. Zero interests means zero slots and an unchanged pipeline.
     const reservedInterestSlots = computeReservedInterestSlots(
       cfg.selectedCount,
-      interestIndex?.byInterest.length ?? 0
+      interestIndex?.byInterest.length ?? 0,
+      cfg.interestMaxSlots
     )
 
     // Measured against what interests left behind, so the two slot features can

@@ -299,11 +299,13 @@ export function useSettingsData(isAdmin: boolean) {
     field: K,
     value: MediaTypeConfig[K]
   ) => {
-    if (!recConfig) return
-    setRecConfig({
-      ...recConfig,
-      movie: { ...recConfig.movie, [field]: value },
-    })
+    // Functional update, not a spread of the captured `recConfig`: lowering
+    // Recs Per User has to clamp the reserved-slot fields in the same handler,
+    // and with a captured value each call would overwrite the last so only one
+    // of the three would stick.
+    setRecConfig((prev) =>
+      prev ? { ...prev, movie: { ...prev.movie, [field]: value } } : prev
+    )
     setMovieConfigDirty(true)
   }
 
@@ -311,11 +313,10 @@ export function useSettingsData(isAdmin: boolean) {
     field: K,
     value: MediaTypeConfig[K]
   ) => {
-    if (!recConfig) return
-    setRecConfig({
-      ...recConfig,
-      series: { ...recConfig.series, [field]: value },
-    })
+    // Functional for the same reason as the movie setter above.
+    setRecConfig((prev) =>
+      prev ? { ...prev, series: { ...prev.series, [field]: value } } : prev
+    )
     setSeriesConfigDirty(true)
   }
 

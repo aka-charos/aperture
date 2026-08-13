@@ -21,18 +21,17 @@
  */
 
 /**
- * Hard ceiling on reserved slots regardless of list length. Reserved picks
- * come *out of* selectedCount rather than extending it, so every slot is one
- * fewer normally-ranked recommendation.
+ * The shipped ceiling, now `recommendation_config.{movie,series}_interest_max_slots`
+ * and admin-editable. Kept here only as the value used when a config read
+ * fails; the number in the database is what governs a real run.
+ *
+ * There used to be a second, invisible bound alongside it -- an
+ * INTEREST_SLOT_SHARE of 0.2, so the count could never exceed a fifth of the
+ * list however it was configured. It is gone. Two knobs answering the same
+ * question, one of them hidden and winning, is how a setting comes to mean
+ * something other than what it says.
  */
-export const MAX_INTEREST_SLOTS = 3
-
-/**
- * Share of the final list interests may claim. At the default selectedCount
- * of 12 this is 2 slots; a list of 4 or fewer reserves nothing, so short
- * lists are protected without a special case.
- */
-export const INTEREST_SLOT_SHARE = 0.2
+export const DEFAULT_INTEREST_MAX_SLOTS = 3
 
 /**
  * A reserved slot is only filled by a match that clears the same "moderate
@@ -160,17 +159,26 @@ export function buildInterestMatchIndex(results: InterestQueryResult[]): Interes
 /**
  * How many of the final picks to hand over to custom interests.
  *
- * Bounded three ways: never more slots than the user has interests, never
- * more than MAX_INTEREST_SLOTS, and never more than INTEREST_SLOT_SHARE of
- * the list. Zero interests (the overwhelmingly common case) means zero slots
- * and a pipeline that behaves exactly as it did before.
+ * Bounded by three things the admin can see: the number of interests the user
+ * actually wrote, the configured ceiling, and the length of the list. Zero
+ * interests (the overwhelmingly common case) means zero slots and a pipeline
+ * that behaves exactly as it did before.
+ *
+ * The configured ceiling is authoritative. Nothing here silently reduces it,
+ * because a slot budget the admin cannot see is a slot budget they will
+ * eventually be surprised by -- the UI caps the two sliders against each other
+ * so the sum can never overdraw the list in the first place.
  */
-export function computeReservedInterestSlots(selectedCount: number, interestCount: number): number {
+export function computeReservedInterestSlots(
+  selectedCount: number,
+  interestCount: number,
+  maxSlots: number
+): number {
   if (!Number.isFinite(selectedCount) || !Number.isFinite(interestCount)) return 0
+  if (!Number.isFinite(maxSlots) || maxSlots <= 0) return 0
   if (selectedCount <= 0 || interestCount <= 0) return 0
 
-  const share = Math.floor(selectedCount * INTEREST_SLOT_SHARE)
-  return Math.max(0, Math.min(interestCount, MAX_INTEREST_SLOTS, share))
+  return Math.max(0, Math.min(interestCount, Math.floor(maxSlots), selectedCount))
 }
 
 /**
