@@ -54,13 +54,34 @@ async function generateSuggestionsForUser(userId: string): Promise<string[]> {
       [userId]
     )
 
-    // Get top recommendations (join through recommendation_runs to get user's recs)
+    // Top picks from the user's *current* movie recommendations.
+    //
+    // Pinned to one run on purpose. This used to select every is_selected row
+    // the user had ever been given, across every run and regardless of status,
+    // which meant a suggestion chip could name a film from a run superseded
+    // weeks ago — pruneOldRecommendationRuns deliberately keeps the selected
+    // rows on old runs, so there is no shortage of stale ones to find. Matching
+    // the status='completed' + newest-run rule every other reader uses is what
+    // makes "your top recommendation" true.
+    //
+    // Ordered by selected_rank, not final_score: rank is the order the user
+    // actually sees on their recommendations page, and final_score would
+    // systematically bury the reserved-slot picks, since a twin pick is by
+    // construction the one the ranking did not choose.
+    //
+    // A user with no completed run yields no rows (the subquery is NULL and
+    // matches nothing), which just means no recommendation-based chip.
     const recommendations = await query<RecommendationItem>(
       `SELECT m.title, 'movie' as type FROM recommendation_candidates rc
-       JOIN recommendation_runs rr ON rr.id = rc.run_id
        JOIN movies m ON m.id = rc.movie_id
-       WHERE rr.user_id = $1 AND rc.is_selected = true
-       ORDER BY rc.final_score DESC
+       WHERE rc.run_id = (
+               SELECT id FROM recommendation_runs
+                WHERE user_id = $1 AND status = 'completed' AND media_type = 'movie'
+                ORDER BY created_at DESC
+                LIMIT 1
+             )
+         AND rc.is_selected = true
+       ORDER BY rc.selected_rank ASC NULLS LAST
        LIMIT 3`,
       [userId]
     )

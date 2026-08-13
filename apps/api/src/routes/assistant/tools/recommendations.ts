@@ -5,16 +5,43 @@ import { tool } from 'ai'
 import { nullSafe } from './utils.js'
 import { z } from 'zod'
 import { query } from '../../../lib/db.js'
+import { readTwinSharedIds, resolveTwinSharedTitles } from '../../../lib/twinShared.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext, MovieResult, SeriesResult } from '../types.js'
+
+/**
+ * Which reserved slot, if any, put a pick in the list.
+ *
+ * Derived from score_breakdown rather than passed through it, because that
+ * object also holds `twinMatch.donorId` and the model must never receive an
+ * identity it could name — the copy rule everywhere else in the app is
+ * "someone here whose taste closely overlaps yours". An enum carries the whole
+ * fact the model needs and nothing it doesn't.
+ *
+ * Defaults to 'ranked' for anything unrecognised, which is both the honest
+ * reading of a breakdown with no slot marker and the safe one: runs written
+ * before reserved slots existed simply look like ordinary picks.
+ */
+function pickSource(scoreBreakdown: unknown): 'ranked' | 'twin' | 'interest' {
+  if (typeof scoreBreakdown !== 'object' || scoreBreakdown === null) return 'ranked'
+
+  const breakdown = scoreBreakdown as Record<string, unknown>
+  if (typeof breakdown.twinMatch === 'object' && breakdown.twinMatch !== null) return 'twin'
+  if (typeof breakdown.interestMatch === 'object' && breakdown.interestMatch !== null) {
+    return 'interest'
+  }
+  return 'ranked'
+}
 
 // Helper to format content item for Tool UI
 function formatContentItem(
   item: MovieResult | SeriesResult,
   type: 'movie' | 'series',
   playLink: string | null,
-  rank?: number
+  rank?: number,
+  source?: 'ranked' | 'twin' | 'interest',
+  sharedTitles?: string[]
 ): ContentItem {
   const genres = item.genres?.slice(0, 2).join(', ') || ''
   const subtitle = [item.year, genres].filter(Boolean).join(' · ')
@@ -30,6 +57,8 @@ function formatContentItem(
     overview: item.overview ?? null,
     rating: item.community_rating,
     rank,
+    ...(source ? { source } : {}),
+    ...(sharedTitles?.length ? { sharedTitles } : {}),
     actions: [
       {
         id: 'details',
@@ -47,7 +76,13 @@ function formatContentItem(
 export function createRecommendationTools(ctx: ToolContext) {
   return {
     getMyRecommendations: tool({
-      description: "Get the user's current AI-generated personalized recommendations.",
+      description:
+        "Get the user's current AI-generated personalized recommendations. Each item carries a " +
+        '`source` saying how it earned its place: a "twin" or "interest" pick was placed by a ' +
+        'reserved slot rather than by the ranking, so say so instead of explaining it as being ' +
+        'similar to something they watched — for a "twin" pick similarity is exactly what did ' +
+        'not choose it — use its `sharedTitles`, the films the user and that viewer have both ' +
+        'watched, to explain it concretely. Never identify the other viewer behind a twin pick.',
       inputSchema: nullSafe(z.object({
         type: z.enum(['movies', 'series', 'both']).default('both'),
         limit: z.number().optional().default(15).describe('Number of results (default 15, max 50)'),
@@ -67,9 +102,10 @@ export function createRecommendationTools(ctx: ToolContext) {
             community_rating: number | null
             provider_item_id: string | null
             directors: string[] | null
+            score_breakdown: Record<string, unknown> | null
           }>(
             `SELECT m.id, m.title, m.year, rc.selected_rank as rank, m.genres, m.overview, m.poster_url,
-             m.community_rating, m.provider_item_id, m.directors
+             m.community_rating, m.provider_item_id, m.directors, rc.score_breakdown
              FROM recommendation_candidates rc
              JOIN recommendation_runs rr ON rr.id = rc.run_id
              JOIN movies m ON m.id = rc.movie_id
@@ -79,9 +115,27 @@ export function createRecommendationTools(ctx: ToolContext) {
             [ctx.userId, limit]
           )
 
+          // One lookup for the whole page of picks. Resolving per item would
+          // put up to `limit` round trips inside a single chat turn.
+          const sharedTitles = await resolveTwinSharedTitles(
+            movieRecs.rows.map((r) => r.score_breakdown),
+            'movies'
+          )
+
           for (const r of movieRecs.rows) {
             const playLink = buildPlayLink(ctx.mediaServer, r.provider_item_id, 'movie')
-            items.push(formatContentItem(r as unknown as MovieResult, 'movie', playLink, r.rank))
+            items.push(
+              formatContentItem(
+                r as unknown as MovieResult,
+                'movie',
+                playLink,
+                r.rank,
+                pickSource(r.score_breakdown),
+                readTwinSharedIds(r.score_breakdown)
+                  .map((id) => sharedTitles.get(id))
+                  .filter((title): title is string => Boolean(title))
+              )
+            )
           }
         }
 
@@ -97,9 +151,10 @@ export function createRecommendationTools(ctx: ToolContext) {
             community_rating: number | null
             provider_item_id: string | null
             directors: string[] | null
+            score_breakdown: Record<string, unknown> | null
           }>(
             `SELECT s.id, s.title, s.year, rc.selected_rank as rank, s.genres, s.overview, s.poster_url,
-             s.community_rating, s.provider_item_id, s.directors
+             s.community_rating, s.provider_item_id, s.directors, rc.score_breakdown
              FROM recommendation_candidates rc
              JOIN recommendation_runs rr ON rr.id = rc.run_id
              JOIN series s ON s.id = rc.series_id
@@ -109,9 +164,25 @@ export function createRecommendationTools(ctx: ToolContext) {
             [ctx.userId, limit]
           )
 
+          const sharedTitles = await resolveTwinSharedTitles(
+            seriesRecs.rows.map((r) => r.score_breakdown),
+            'series'
+          )
+
           for (const r of seriesRecs.rows) {
             const playLink = buildPlayLink(ctx.mediaServer, r.provider_item_id, 'series')
-            items.push(formatContentItem(r as unknown as SeriesResult, 'series', playLink, r.rank))
+            items.push(
+              formatContentItem(
+                r as unknown as SeriesResult,
+                'series',
+                playLink,
+                r.rank,
+                pickSource(r.score_breakdown),
+                readTwinSharedIds(r.score_breakdown)
+                  .map((id) => sharedTitles.get(id))
+                  .filter((title): title is string => Boolean(title))
+              )
+            )
           }
         }
 

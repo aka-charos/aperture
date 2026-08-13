@@ -1,9 +1,9 @@
 /**
  * Reading the titles that earned a taste-twin relationship.
  *
- * Lives in lib/ rather than beside one route because both insights handlers
- * (`routes/recommendations/handlers/`) need it, and it is the kind of thing a
- * third surface will want the moment twin picks appear anywhere else.
+ * Lives in lib/ rather than beside one route because three surfaces need it:
+ * both insights handlers (`routes/recommendations/handlers/`) and the
+ * assistant's recommendation tool, which are otherwise unrelated.
  *
  * The ids come from `score_breakdown.twinMatch.sharedIds`, written by core's
  * recommender/storage.ts. They are the *rarest* titles both viewers watched,
@@ -68,4 +68,28 @@ export async function resolveTwinShared(
   )
 
   return result.rows
+}
+
+/**
+ * Titles for many picks at once, as an id -> title map.
+ *
+ * The per-pick resolver above is right for the insights panel, which renders
+ * exactly one candidate. The assistant returns up to fifty in a single tool
+ * call, and calling that once per item would put fifty round trips inside one
+ * chat turn — so the ids are gathered across every pick and looked up together.
+ * Callers keep their own per-pick id lists and index into this.
+ */
+export async function resolveTwinSharedTitles(
+  scoreBreakdowns: unknown[],
+  table: 'movies' | 'series'
+): Promise<Map<string, string>> {
+  const ids = [...new Set(scoreBreakdowns.flatMap(readTwinSharedIds))]
+  if (ids.length === 0) return new Map()
+
+  const result = await query<{ id: string; title: string }>(
+    `SELECT id, title FROM ${table} WHERE id = ANY($1::uuid[])`,
+    [ids]
+  )
+
+  return new Map(result.rows.map((row) => [row.id, row.title]))
 }
