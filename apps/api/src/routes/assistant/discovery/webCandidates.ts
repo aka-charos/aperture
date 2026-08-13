@@ -212,11 +212,15 @@ function parseCandidatesJson(text: string): DiscoveryCandidate[] {
 
 export async function gatherWebCandidates(
   queryText: string,
-  onStatus?: StatusEmitter
+  onStatus?: StatusEmitter,
+  tasteBrief?: string | null
 ): Promise<DiscoveryCandidate[]> {
-  logger.info({ query: queryText.slice(0, 200) }, 'Discovery routed: gathering web candidates')
+  logger.info(
+    { query: queryText.slice(0, 200), personalized: Boolean(tasteBrief) },
+    'Discovery routed: gathering web candidates'
+  )
 
-  const results = await gatherFromSources(queryText)
+  const results = await gatherFromSources(queryText, { tasteBrief })
   if (results.length === 0) {
     // No source enabled, or all failed/returned empty. Discovery is off/degraded;
     // the caller falls back to library behavior.

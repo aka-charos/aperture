@@ -30,6 +30,19 @@ export interface WebSearchSourceResult {
   references?: WebSearchSourceReference[]
 }
 
+/**
+ * Extra material a source may use to sharpen its search, beyond the request.
+ *
+ * Optional by design and ignored by sources that cannot use it: a source is
+ * free to take only the query. In particular a *search API* should ignore
+ * `tasteBrief` — it is prose meant for a model prompt, and pasting it into a
+ * keyword query makes the query worse, not more personal.
+ */
+export interface WebSearchContext {
+  /** A short description of the viewer. See discovery/tasteBrief.ts. */
+  tasteBrief?: string | null
+}
+
 export interface WebSearchSource {
   /** Stable id, also used as the label in the combined material and logs. */
   readonly id: string
@@ -37,5 +50,5 @@ export interface WebSearchSource {
    * Produce grounded material for the query, or null when this source is
    * disabled, unconfigured, errored, or returned nothing usable. Must not throw.
    */
-  gather(query: string): Promise<WebSearchSourceResult | null>
+  gather(query: string, context?: WebSearchContext): Promise<WebSearchSourceResult | null>
 }
