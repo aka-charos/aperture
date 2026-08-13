@@ -8,6 +8,7 @@ import { getActiveEmbeddingTableName } from '@aperture/core'
 import { query } from '../../../lib/db.js'
 import { readTwinSharedIds, resolveTwinSharedTitles } from '../../../lib/twinShared.js'
 import { blendQueryAndTaste } from './tasteBlend.js'
+import { enrichCardReasons } from '../discovery/enrichReasons.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext, MovieResult, SeriesResult } from '../types.js'
@@ -223,12 +224,13 @@ export function createRecommendationTools(ctx: ToolContext) {
     searchMyRecommendations: tool({
       description:
         "Search everything the recommender has already scored for this user — their whole " +
-        'unwatched library, ranked personally — by theme, mood or description. PREFER THIS over ' +
-        'semanticSearch whenever the user is asking for something to watch, because semanticSearch ' +
-        'ranks by text similarity alone and knows nothing about who is asking, while this ranks by ' +
-        "the request AND the user's own taste scores, and never returns anything they have already " +
-        'seen. Use semanticSearch only for impersonal library lookups. Differs from ' +
-        'getMyRecommendations, which returns the fixed short list with no query.',
+        'unwatched library, ranked personally — by theme, mood or description. Ranks by the ' +
+        "request AND the user's own taste scores, and never returns anything they have already " +
+        'seen; each card comes back with a short note on why it fits. Use it when the user asks ' +
+        'about their OWN library ("what do I have that\'s…"), and as the in-library fallback when ' +
+        'a web-backed discovery search is unavailable or returns nothing. Prefer semanticSearch ' +
+        'only for impersonal library lookups. Differs from getMyRecommendations, which returns ' +
+        'the fixed short list with no query.',
       inputSchema: nullSafe(
         z.object({
           concept: z
@@ -277,7 +279,6 @@ export function createRecommendationTools(ctx: ToolContext) {
             directors: string[] | null
             query_score: number
             final_score: string | number | null
-            rank: number
             score_breakdown: Record<string, unknown> | null
           }>(
             `WITH latest AS (
@@ -296,7 +297,7 @@ export function createRecommendationTools(ctx: ToolContext) {
              )
              SELECT c.id, c.title, c.year, c.genres, c.overview, c.community_rating,
                     c.poster_url, c.provider_item_id, c.directors,
-                    near.query_score, rc.final_score, rc.rank, rc.score_breakdown
+                    near.query_score, rc.final_score, rc.score_breakdown
                FROM near
                JOIN recommendation_candidates rc
                  ON rc.${idColumn} = near.item_id
@@ -323,11 +324,18 @@ export function createRecommendationTools(ctx: ToolContext) {
           for (const { row: r } of ranked) {
             const playLink = buildPlayLink(ctx.mediaServer, r.provider_item_id, media)
             items.push(
+              // Deliberately no rank. `rank` renders as a RankBadge on the
+              // poster, which reads as "position in this list" — and the only
+              // rank these rows carry is `recommendation_candidates.rank`, the
+              // position among *everything the run scored*. Passing it stamped
+              // "2012" and "449" on the first two cards. The list is already in
+              // blended order, so the badge has nothing true to say here;
+              // semanticSearch omits it for the same reason.
               formatContentItem(
                 r as unknown as MovieResult,
                 media,
                 playLink,
-                r.rank,
+                undefined,
                 pickSource(r.score_breakdown),
                 readTwinSharedIds(r.score_breakdown)
                   .map((id) => sharedTitles.get(id))
@@ -343,12 +351,19 @@ export function createRecommendationTools(ctx: ToolContext) {
           return { id: `taste-search-empty-${Date.now()}`, items: [] }
         }
 
+        // Every card gets a "why it fits", the same way the discovery path
+        // writes them. Without this the tool returned a wall of unexplained
+        // posters — which is what the web-grounded path was already doing
+        // better, and the reason making this tool the default for "find me
+        // something" was a downgrade rather than an upgrade.
+        const explained = await enrichCardReasons(items, concept)
+
         return {
           id: `taste-search-${Date.now()}`,
           titleKey: 'carouselRecommendationsTitle',
           descriptionKey: 'carouselRecommendationsDesc',
-          descriptionParams: { count: items.length },
-          items,
+          descriptionParams: { count: explained.length },
+          items: explained,
         }
       },
     }),
