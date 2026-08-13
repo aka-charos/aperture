@@ -87,6 +87,7 @@ const TOOL_PHASES: Record<string, StatusPhase> = {
   searchByKeyword: 'searchingLibrary',
   findSimilarContent: 'findingSimilar',
   getMyRecommendations: 'personalPicks',
+  searchMyRecommendations: 'personalPicks',
   getTopRated: 'ranking',
   getTopByRtScore: 'ranking',
   getAwardWinners: 'ranking',
