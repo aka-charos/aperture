@@ -661,7 +661,12 @@
       "aiExplanationTitle": "Warum {{appName}} das für dich ausgewählt hat",
       "consideredForYou": "How This Fits Your Taste",
       "consideredSubtitle": "{{pct}}% match · one of {{total}} titles scored for you",
-      "tasteTwin": "Someone here whose taste closely overlaps yours has watched this — that's what put it in your list, rather than the scores below."
+      "tasteTwin": "Someone here whose taste closely overlaps yours has watched this — that's what put it in your list, rather than the scores below.",
+      "tasteTwinSharedMovie": "Films you have both watched that few others here have — this overlap is what identified the match:",
+      "tasteTwinSharedSeries": "Shows you have both watched that few others here have — this overlap is what identified the match:",
+      "closestInLibrary": "Closest Titles in Your Library",
+      "closestInLibraryMovie": "Films in your history that most resemble this one. Shown for context — they are not why it was picked:",
+      "closestInLibrarySeries": "Shows in your history that most resemble this one. Shown for context — they are not why it was picked:"
     },
     "seasons": {
       "title": "Episoden",

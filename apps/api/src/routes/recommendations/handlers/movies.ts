@@ -7,6 +7,7 @@ import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import { regenerateUserRecommendations, getEffectiveAiExplanationSetting } from '@aperture/core'
 import { recommendationSchemas } from '../schemas.js'
+import { resolveTwinShared } from '../../../lib/twinShared.js'
 import type { MovieRecommendationCandidate, RecommendationRun } from '../types.js'
 
 export async function registerMovieHandlers(fastify: FastifyInstance) {
@@ -206,6 +207,19 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
         [candidate.id]
       )
 
+      // The titles that earned the taste-twin relationship, when a reserved
+      // twin slot is what put this film in the list.
+      //
+      // Distinct from `evidence` above in the way that matters: evidence is a
+      // content-similarity lookup run *after* the pick was made, so it explains
+      // nothing about why a borrowed title is here — the ranking is precisely
+      // what did not choose it. These are the rarest films the two viewers both
+      // watched, which is the quantity the affinity score is built from.
+      //
+      // Resolved on read rather than stored as names, so a re-matched or
+      // renamed film can't leave a stale title frozen in the run's JSONB.
+      const twinShared = await resolveTwinShared(candidate.score_breakdown, 'movies')
+
       const tasteInsights = await query<{
         genre: string
         watch_count: number
@@ -245,12 +259,17 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
         totalCandidates: latestRun.candidate_count,
         scores: {
           final: Number(candidate.final_score),
-          similarity: candidate.similarity_score ? Number(candidate.similarity_score) : null,
-          novelty: candidate.novelty_score ? Number(candidate.novelty_score) : null,
-          rating: candidate.rating_score ? Number(candidate.rating_score) : null,
-          diversity: candidate.diversity_score ? Number(candidate.diversity_score) : null,
+          // Explicit null checks, not truthiness: these columns are NUMERIC and
+          // pg hands them back as strings, so a stored 0 arrives as '0.0000'
+          // and passes a truthy test. That is how a candidate the diversity
+          // selector never looked at came to render a confident "Variety 0%".
+          similarity: candidate.similarity_score != null ? Number(candidate.similarity_score) : null,
+          novelty: candidate.novelty_score != null ? Number(candidate.novelty_score) : null,
+          rating: candidate.rating_score != null ? Number(candidate.rating_score) : null,
+          diversity: candidate.diversity_score != null ? Number(candidate.diversity_score) : null,
         },
         scoreBreakdown: candidate.score_breakdown,
+        twinShared,
         evidence: evidence.rows,
         genreAnalysis: {
           movieGenres,

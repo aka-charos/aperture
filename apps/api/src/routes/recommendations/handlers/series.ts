@@ -10,6 +10,7 @@ import {
   getEffectiveAiExplanationSetting,
 } from '@aperture/core'
 import { recommendationSchemas } from '../schemas.js'
+import { resolveTwinShared } from '../../../lib/twinShared.js'
 import type { SeriesRecommendationCandidate, RecommendationRun } from '../types.js'
 
 export async function registerSeriesHandlers(fastify: FastifyInstance) {
@@ -208,6 +209,12 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
         [candidate.id]
       )
 
+      // The shows that earned the taste-twin relationship, when a reserved twin
+      // slot is what put this series in the list. Unlike `evidence` above,
+      // which is a content-similarity lookup run after the fact, these are what
+      // the affinity score is actually made of. See handlers/twinShared.ts.
+      const twinShared = await resolveTwinShared(candidate.score_breakdown, 'series')
+
       const tasteInsights = await query<{
         genre: string
         watch_count: number
@@ -248,12 +255,16 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
         totalCandidates: latestRun.candidate_count,
         scores: {
           final: Number(candidate.final_score),
-          similarity: candidate.similarity_score ? Number(candidate.similarity_score) : null,
-          novelty: candidate.novelty_score ? Number(candidate.novelty_score) : null,
-          rating: candidate.rating_score ? Number(candidate.rating_score) : null,
-          diversity: candidate.diversity_score ? Number(candidate.diversity_score) : null,
+          // Explicit null checks, not truthiness — see the movie handler: these
+          // are NUMERIC columns that pg returns as strings, so a stored 0 is
+          // truthy and renders as a measured 0% rather than "n/a".
+          similarity: candidate.similarity_score != null ? Number(candidate.similarity_score) : null,
+          novelty: candidate.novelty_score != null ? Number(candidate.novelty_score) : null,
+          rating: candidate.rating_score != null ? Number(candidate.rating_score) : null,
+          diversity: candidate.diversity_score != null ? Number(candidate.diversity_score) : null,
         },
         scoreBreakdown: candidate.score_breakdown,
+        twinShared,
         evidence: evidence.rows,
         genreAnalysis: {
           mediaGenres: seriesGenres,

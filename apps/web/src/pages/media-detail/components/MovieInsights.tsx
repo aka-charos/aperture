@@ -65,6 +65,24 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
     typeof insights.scoreBreakdown?.twinMatch === 'object' &&
     insights.scoreBreakdown.twinMatch !== null
 
+  // Same for a stated interest. Both are *reserved slot* picks, which is the
+  // distinction the evidence carousel below has to respect: a slot filler was
+  // chosen by something other than the ranking, so labelling the similarity
+  // lookup "why we think you'll like this" states a cause that isn't one.
+  const fromInterest =
+    typeof insights.scoreBreakdown?.interestMatch === 'object' &&
+    insights.scoreBreakdown.interestMatch !== null
+  const fromReservedSlot = fromTasteTwin || fromInterest
+
+  // Empty unless a twin slot placed this title *and* the run that produced it
+  // recorded the overlap, which runs generated before that shipped did not.
+  const twinShared = insights.twinShared ?? []
+
+  const openItem = (id: string) =>
+    onOpenMedia
+      ? onOpenMedia(mediaType, id)
+      : navigate(`/${mediaType === 'movie' ? 'movies' : 'series'}/${id}`)
+
   return (
     <Box sx={{ mt: 4, px: 3 }}>
       <Paper
@@ -171,6 +189,60 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                     {t('mediaDetail.insights.tasteTwin')}
                   </Typography>
                 </Box>
+
+                {/* The overlap that identified the twin in the first place, and
+                    so the only evidence on this page that actually explains the
+                    pick. Kept inside the same card as the claim it supports —
+                    the similarity carousel further down is computed after
+                    selection and had no part in it. */}
+                {twinShared.length > 0 && (
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                      {isSeriesView
+                        ? t('mediaDetail.insights.tasteTwinSharedSeries')
+                        : t('mediaDetail.insights.tasteTwinSharedMovie')}
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1 }}>
+                      {twinShared.map((item) => (
+                        <Box
+                          key={item.id}
+                          onClick={() => openItem(item.id)}
+                          sx={{
+                            flexShrink: 0,
+                            width: 92,
+                            cursor: 'pointer',
+                            transition: 'transform 0.2s',
+                            '&:hover': { transform: 'scale(1.05)' },
+                          }}
+                        >
+                          <Box
+                            component="img"
+                            src={getProxiedImageUrl(item.poster_url)}
+                            alt={item.title}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              target.src = FALLBACK_POSTER_URL
+                            }}
+                            sx={{
+                              width: '100%',
+                              height: 124,
+                              objectFit: 'cover',
+                              borderRadius: 1.5,
+                              bgcolor: 'grey.800',
+                              display: 'block',
+                            }}
+                          />
+                          <Typography variant="caption" noWrap display="block" sx={{ mt: 0.5 }}>
+                            {item.title}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {item.year ?? t('mediaDetail.insights.na')}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                )}
               </Paper>
             )}
 
@@ -347,13 +419,26 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
             {/* Evidence - Items that contributed to this recommendation */}
             {insights.evidence && insights.evidence.length > 0 && (
               <Box>
+                {/* These rows are the pick's nearest neighbours in the reader's
+                    own history by embedding cosine, found *after* selection.
+                    For a ranked pick that is a fair account of why it is here.
+                    For a reserved-slot pick it is not — the ranking is exactly
+                    what did not choose it — and calling it "why we think you'll
+                    like this" directly contradicts the banner at the top of the
+                    panel. Same rows either way; only the claim changes. */}
                 <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-                  {t('mediaDetail.insights.whyWeThink')}
+                  {fromReservedSlot
+                    ? t('mediaDetail.insights.closestInLibrary')
+                    : t('mediaDetail.insights.whyWeThink')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  {isSeriesView
-                    ? t('mediaDetail.insights.basedOnHistorySeries')
-                    : t('mediaDetail.insights.basedOnHistoryMovie')}
+                  {fromReservedSlot
+                    ? isSeriesView
+                      ? t('mediaDetail.insights.closestInLibrarySeries')
+                      : t('mediaDetail.insights.closestInLibraryMovie')
+                    : isSeriesView
+                      ? t('mediaDetail.insights.basedOnHistorySeries')
+                      : t('mediaDetail.insights.basedOnHistoryMovie')}
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 2 }}>
                   {insights.evidence.map((ev) => {

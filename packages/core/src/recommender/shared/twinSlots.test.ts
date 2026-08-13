@@ -70,6 +70,31 @@ describe('buildTwinIndex', () => {
     pair('frank', 'erin', 0.05),
   ]
 
+  test('carries the shared-title overlap through to the donor', () => {
+    // These ids are the only evidence on the insights panel that actually
+    // explains a borrowed pick. Dropping them here would leave the panel
+    // silently falling back to the similarity carousel, which is exactly the
+    // wrong story — so the carry-through is worth pinning even though nothing
+    // in the slot arithmetic reads the field.
+    const withOverlap: TwinPair = {
+      ...pair('alice', 'bob', 0.19),
+      sharedTopIds: ['rare-1', 'rare-2'],
+    }
+    const index = buildTwinIndex([withOverlap, ...pairs.slice(1)], 2)
+
+    assert.deepEqual(index.get('alice')?.[0]?.sharedTopIds, ['rare-1', 'rare-2'])
+  })
+
+  test('a pair with no recorded overlap still allocates slots', () => {
+    // Display-only data must never be able to cost someone a recommendation.
+    const index = buildTwinIndex(pairs, 2)
+    const donors = index.get('alice') ?? []
+
+    assert.equal(donors.length, 2)
+    assert.equal(donors[0]?.sharedTopIds, undefined)
+    assert.equal(computeReservedTwinSlots(20, donors.length, 4), 2)
+  })
+
   test('keeps only pairs above the population bar', () => {
     const index = buildTwinIndex(pairs, 2)
     // median 0.05, MAD 0.01 -> bar 0.07. Only alice's two strongest survive.

@@ -10,7 +10,7 @@
 
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildCandidateRows, type StoredInterestPick } from './storage.js'
+import { buildCandidateRows, type StoredInterestPick, type StoredTwinPick } from './storage.js'
 import type { Candidate } from './types.js'
 
 function candidate(id: string, overrides: Partial<Candidate> = {}): Candidate {
@@ -125,6 +125,61 @@ describe('buildCandidateRows', () => {
 
     assert.equal(rows[0]!.scoreBreakdown, null)
     assert.deepEqual(JSON.parse(rows[1]!.scoreBreakdown!), { interestMatch: pick })
+  })
+
+  test('a twin pick records the overlap that earned it the slot', () => {
+    // The ids are what the insights panel resolves into "you both watched
+    // these". Without them the panel falls back to the content-similarity
+    // carousel, which is computed after selection and explains nothing about a
+    // borrowed pick.
+    const pick: StoredTwinPick = {
+      donorId: 'donor-1',
+      affinity: 0.19,
+      sharedCount: 42,
+      sharedIds: ['shared-a', 'shared-b'],
+    }
+    const rows = buildCandidateRows(pool(2), [], undefined, undefined, new Map([['m2', pick]]))
+
+    assert.deepEqual(JSON.parse(rows[1]!.scoreBreakdown!), { twinMatch: pick })
+  })
+
+  test('a twin pick from a run with no recorded overlap omits the key entirely', () => {
+    // Runs generated before sharedIds existed, and any pair whose ids failed to
+    // come back. Writing `sharedIds: []` would make the read path distinguish
+    // empty from absent for no gain.
+    const rows = buildCandidateRows(
+      pool(1),
+      [],
+      undefined,
+      undefined,
+      new Map([['m1', { donorId: 'd', affinity: 0.1, sharedCount: 11 }]])
+    )
+
+    const parsed = JSON.parse(rows[0]!.scoreBreakdown!)
+    assert.equal('sharedIds' in parsed.twinMatch, false)
+  })
+
+  test('diversity is null for anything the selector never ranked', () => {
+    // diversityScore is initialised to 0 and only written for candidates that
+    // pass through applyDiversityAndSelect. Storing that 0 made the insights
+    // panel report a confident "Variety 0%" for every scored-but-unpicked title
+    // and for every reserved-slot filler — a measurement for something never
+    // measured. selectionScore is the mark the selector leaves behind.
+    const ranked = candidate('m1', { selectionScore: 0.91, diversityScore: 0.4 })
+    const filler = candidate('m2')
+    const rows = buildCandidateRows([ranked, filler], [ranked, filler])
+
+    assert.equal(rows[0]!.diversityScore, 0.4)
+    assert.equal(rows[1]!.diversityScore, null)
+  })
+
+  test('a genuine zero diversity is kept, not turned into null', () => {
+    // A candidate whose genres fully overlap what is already selected really
+    // does score 0 here, and that is a measurement worth showing.
+    const ranked = candidate('m1', { selectionScore: 0.5, diversityScore: 0 })
+    const rows = buildCandidateRows([ranked], [ranked])
+
+    assert.equal(rows[0]!.diversityScore, 0)
   })
 
   test('a pick missing from the scored pool is stored anyway', () => {
