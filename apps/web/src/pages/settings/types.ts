@@ -11,6 +11,10 @@ export interface LibraryConfig {
 export interface MediaTypeConfig {
   maxCandidates: number
   selectedCount: number
+  /** MAD multiplier deciding who counts as a taste twin (1-4). */
+  twinThresholdK: number
+  /** Ceiling on picks borrowed from a taste twin; 0 disables the feature. */
+  twinMaxSlots: number
   recentWatchLimit: number
   similarityWeight: number
   noveltyWeight: number

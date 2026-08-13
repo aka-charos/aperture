@@ -18,6 +18,7 @@ import { randomUUID } from 'crypto'
 
 // Import from modular files
 import { loadConfigForUser } from '../config.js'
+import { getRecommendationConfig } from '../../lib/recommendationConfig.js'
 import { getWatchHistory, buildTasteProfile as buildLegacyTasteProfile, storeTasteProfile as storeLegacyTasteProfile, getUserMovieRatings, getDislikedMovieIds } from './taste.js'
 import { getCandidates, getMultiClusterCandidates, getInterestMatchIndex } from './candidates.js'
 import { scoreCandidates } from './scoring.js'
@@ -54,13 +55,19 @@ import { getItemFranchises } from '../../taste-profile/franchise.js'
 import {
   applyPreferenceAdjustment,
   buildGenreFamiliarity,
+  buildTwinIndex,
   computeReservedInterestSlots,
+  computeReservedTwinSlots,
   pickInterestSlotFillers,
+  pickTwinSlotFillers,
   summarizeScoreComponents,
   type InterestCandidateMatch,
   type InterestMatchIndex,
+  type TwinDonor,
+  type TwinIndex,
 } from '../shared/index.js'
 import { getWatchedGenreCounts } from '../genreFamiliarity.js'
+import { getDonorWatchedIds, getTwinPairs } from '../twinAffinity.js'
 import { getWatchedYears, summarizeEraFit } from '../eraDiagnostics.js'
 import { getEffectiveAiExplanationSetting } from '../../lib/userSettings.js'
 
@@ -95,6 +102,38 @@ export interface GenerateRecommendationsOptions {
    * since a person who pressed "regenerate" is asking for work to happen.
    */
   skipIfUnchanged?: boolean
+  /**
+   * The instance-wide taste-twin index, already thresholded.
+   *
+   * Passed in by the batch callers because the acceptance bar is derived from
+   * the spread of every pair on the instance, so building it per user would
+   * recompute the identical matrix once per viewer. Omitted by the single-user
+   * paths, which build their own.
+   */
+  twinIndex?: TwinIndex
+}
+
+/**
+ * Build the taste-twin index once for a whole batch.
+ *
+ * The acceptance bar comes from the spread of every pair on the instance, so
+ * the matrix is identical for every user in the loop and computing it per user
+ * would repeat the same query once per viewer.
+ *
+ * Always returns an index, never undefined: an empty one means "nobody has a
+ * twin", which is what the per-user path should see after a failure here. The
+ * alternative -- returning undefined -- would send all eighteen users down the
+ * per-user build path and retry the failing query once each.
+ */
+async function buildBatchTwinIndex(): Promise<TwinIndex> {
+  try {
+    const config = await getRecommendationConfig()
+    if (config.movie.twinMaxSlots <= 0) return new Map()
+    return buildTwinIndex(await getTwinPairs('movie'), config.movie.twinThresholdK)
+  } catch (err) {
+    logger.warn({ err }, 'Failed to build the taste twin index, running without twin slots')
+    return new Map()
+  }
 }
 
 /**
@@ -405,6 +444,29 @@ export async function generateRecommendationsForUser(
       logger.warn({ err, userId: user.id }, 'Custom interest matching failed, continuing without it')
     }
 
+    // Taste twins: a bounded few picks borrowed from viewers whose watch history
+    // overlaps this user's far more than chance (recommender/twinAffinity.ts).
+    // Same reasoning as the interest slots below -- the signal is sparse, so it
+    // earns reserved slots rather than a weight it could never win on. Fails
+    // open: no twins means no slots and a pipeline identical to today's.
+    let twins: TwinDonor[] = []
+    let donorWatched = new Map<string, Set<string>>()
+    if (cfg.twinMaxSlots > 0) {
+      try {
+        const twinIndex =
+          options.twinIndex ?? buildTwinIndex(await getTwinPairs('movie'), cfg.twinThresholdK)
+        twins = twinIndex.get(user.id) ?? []
+        if (twins.length > 0) {
+          donorWatched = await getDonorWatchedIds(
+            twins.map((twin) => twin.donorId),
+            'movie'
+          )
+        }
+      } catch (err) {
+        logger.warn({ err, userId: user.id }, 'Taste twin lookup failed, continuing without it')
+      }
+    }
+
     // Franchise and genre preferences are resolved up front rather than inside
     // the loop. Asking per candidate meant 2-3 sequential round trips for every
     // item in the library -- ~29k per user at a 12.5k-title library, and
@@ -524,9 +586,17 @@ export async function generateRecommendationsForUser(
       interestIndex?.byInterest.length ?? 0
     )
 
+    // Measured against what interests left behind, so the two slot features can
+    // never over-reserve between them however they are configured.
+    const reservedTwinSlots = computeReservedTwinSlots(
+      cfg.selectedCount - reservedInterestSlots,
+      twins.length,
+      cfg.twinMaxSlots
+    )
+
     const { selected } = applyDiversityAndSelect(
       scoredCandidates,
-      cfg.selectedCount - reservedInterestSlots,
+      cfg.selectedCount - reservedInterestSlots - reservedTwinSlots,
       effectiveDiversityWeight
     )
 
@@ -555,20 +625,53 @@ export async function generateRecommendationsForUser(
       )
     }
 
-    const selectedWithInterests = [...selected, ...interestFillers.map((f) => f.candidate)]
+    // After the interest fillers so their picks are already spoken for: a title
+    // must not occupy both an interest slot and a twin slot.
+    const twinFillers = pickTwinSlotFillers(
+      [...selected, ...interestFillers.map((f) => f.candidate)],
+      scoredCandidates,
+      twins,
+      donorWatched,
+      reservedTwinSlots
+    )
+
+    const twinPicks = new Map<string, TwinDonor>()
+    for (const filler of twinFillers) {
+      twinPicks.set(filler.candidate.movieId, filler.twin)
+      logger.info(
+        {
+          title: filler.candidate.title,
+          affinity: filler.twin.affinity,
+          shared: filler.twin.sharedCount,
+        },
+        `👥 Reserved slot for a taste twin: ${filler.candidate.title}`
+      )
+    }
+    if (reservedTwinSlots > twinFillers.length) {
+      logger.info(
+        { reserved: reservedTwinSlots, filled: twinFillers.length },
+        'Some reserved twin slots had no qualifying candidate and were left unused'
+      )
+    }
+
+    const selectedWithSlots = [
+      ...selected,
+      ...interestFillers.map((f) => f.candidate),
+      ...twinFillers.map((f) => f.candidate),
+    ]
 
     const finalSelected = includeWatched
-      ? selectedWithInterests
+      ? selectedWithSlots
       : (await import('../watchedExclusion.js')).filterByWatchedIds(
-          selectedWithInterests.map((candidate) => ({ ...candidate, id: candidate.movieId })),
+          selectedWithSlots.map((candidate) => ({ ...candidate, id: candidate.movieId })),
           excludeIds
         )
 
-    if (!includeWatched && finalSelected.length < selectedWithInterests.length) {
+    if (!includeWatched && finalSelected.length < selectedWithSlots.length) {
       logger.info(
         {
           userId: user.id,
-          removed: selectedWithInterests.length - finalSelected.length,
+          removed: selectedWithSlots.length - finalSelected.length,
         },
         'Filtered watched movies from final recommendations (safety net)'
       )
@@ -619,7 +722,14 @@ export async function generateRecommendationsForUser(
 
     // 6. Store results
     logger.info({ runId }, '💾 Storing candidates and evidence...')
-    await storeCandidates(runId, scoredCandidates, finalSelected, finalSelectedRanks, interestPicks)
+    await storeCandidates(
+      runId,
+      scoredCandidates,
+      finalSelected,
+      finalSelectedRanks,
+      interestPicks,
+      twinPicks
+    )
     await storeEvidence(runId, finalSelected, watched)
 
     // 7. Generate AI explanations for selected recommendations
@@ -651,6 +761,9 @@ export async function generateRecommendationsForUser(
           // credits what actually put the film here instead of inventing a
           // watch-history justification for it.
           interestText: interestPicks.get(s.movieId)?.interestText ?? null,
+          // Same idea for a borrowed pick: the reason is a like-minded viewer,
+          // not the ranking. A flag, never the donor's identity.
+          fromTasteTwin: twinPicks.has(s.movieId),
         }))
 
         // Generate explanations using embedding-based evidence
@@ -744,6 +857,8 @@ export async function generateRecommendationsForAllUsers(jobId?: string): Promis
     let skipped = 0
     let totalRecommendations = 0
 
+    const twinIndex = await buildBatchTwinIndex()
+
     for (let i = 0; i < result.rows.length; i++) {
       const user = result.rows[i]
 
@@ -760,7 +875,7 @@ export async function generateRecommendationsForAllUsers(jobId?: string): Promis
           {},
           // The scheduled sweep is the one caller that should do nothing when
           // nothing changed; every manual path is someone asking for work.
-          { skipIfUnchanged: true }
+          { skipIfUnchanged: true, twinIndex }
         )
 
         if (recResult.skipped) {
@@ -863,18 +978,24 @@ export async function clearAndRebuildAllRecommendations(existingJobId?: string):
     let success = 0
     let failed = 0
 
+    const twinIndex = await buildBatchTwinIndex()
+
     for (let i = 0; i < users.length; i++) {
       const user = users[i]
       updateJobProgress(jobId, i, users.length, user.username)
 
       try {
         addLog(jobId, 'info', `🧠 Generating for ${user.username}...`)
-        await generateRecommendationsForUser({
-          id: user.id,
-          username: user.username,
-          providerUserId: user.provider_user_id,
-          maxParentalRating: user.max_parental_rating,
-        })
+        await generateRecommendationsForUser(
+          {
+            id: user.id,
+            username: user.username,
+            providerUserId: user.provider_user_id,
+            maxParentalRating: user.max_parental_rating,
+          },
+          {},
+          { twinIndex }
+        )
         success++
         addLog(jobId, 'info', `✅ Done: ${user.username}`)
       } catch (err) {

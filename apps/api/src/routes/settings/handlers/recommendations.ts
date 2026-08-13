@@ -59,6 +59,27 @@ function validateConfigUpdates(updates: Partial<MediaTypeConfig>): string | null
     }
   }
 
+  // 0 is meaningful here and nowhere else in this function: it is how the twin
+  // feature is switched off, which is why twinMaxSlots is not in `counts`.
+  if (updates.twinMaxSlots !== undefined) {
+    if (!Number.isInteger(updates.twinMaxSlots) || updates.twinMaxSlots < 0 || updates.twinMaxSlots > 10) {
+      return 'twinMaxSlots must be a whole number between 0 and 10'
+    }
+  }
+
+  // Bounds match the CHECK constraint in migration 0132; below 1 the bar sits
+  // at or under the median and admits half the population, which is the
+  // opposite of an outlier test.
+  if (updates.twinThresholdK !== undefined) {
+    if (
+      !Number.isFinite(updates.twinThresholdK) ||
+      updates.twinThresholdK < 1 ||
+      updates.twinThresholdK > 4
+    ) {
+      return 'twinThresholdK must be between 1 and 4'
+    }
+  }
+
   return null
 }
 

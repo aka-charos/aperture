@@ -67,6 +67,17 @@ export interface MovieForExplanation {
    * an interest pick is exactly the signal that did *not* put it here.
    */
   interestText?: string | null
+  /**
+   * True when this pick came from a reserved taste-twin slot
+   * (recommender/shared/twinSlots.ts). Same reasoning as interestText: what put
+   * the film here is that a viewer with demonstrably overlapping taste watched
+   * it, not the user's own similarity ranking, so an explanation built on
+   * similarity alone would be describing a reason that did not apply.
+   *
+   * Deliberately a flag and not the donor's name. The panel says "someone with
+   * taste like yours", so an identity must not be able to reach the prompt.
+   */
+  fromTasteTwin?: boolean
 }
 
 export interface EvidenceMovie {
@@ -277,9 +288,13 @@ async function generateBatchExplanations(
         ? `\n   ✍️ THEY ASKED FOR THIS: picked because they told us they like "${m.interestText}" — lead with that`
         : ''
 
+      const twinLine = m.fromTasteTwin
+        ? `\n   👥 A KINDRED VIEWER PICKED THIS: another viewer here whose taste closely overlaps theirs watched it — lead with that, and never name or describe that person`
+        : ''
+
       return `${i + 1}. "${m.title}" (${m.year || 'N/A'})
    Genres: ${m.genres.join(', ')}
-   Overall match: ${(m.normalizedSimilarity * 100).toFixed(0)}% | Novelty: ${m.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${m.ratingScore > 0.7 ? 'highly acclaimed' : m.ratingScore > 0.5 ? 'well received' : 'mixed'}${interestLine}
+   Overall match: ${(m.normalizedSimilarity * 100).toFixed(0)}% | Novelty: ${m.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${m.ratingScore > 0.7 ? 'highly acclaimed' : m.ratingScore > 0.5 ? 'well received' : 'mixed'}${interestLine}${twinLine}
    🎯 SIMILAR TO MOVIES THEY'VE WATCHED: ${evidenceStr}
    Plot: ${(m.overview || 'No overview available').substring(0, 250)}...`
     })
@@ -304,6 +319,8 @@ Write compelling 3-4 sentence explanations for each recommendation. Your explana
 CRITICAL: Each recommendation shows which of the user's watched movies it's most similar to. USE THAT DATA - don't make up connections to random movies.
 
 CRITICAL: A few recommendations are marked "THEY ASKED FOR THIS" with an interest the user typed in themselves. For those, open by connecting the film to that interest in the user's own words, then fill in with the similarity evidence. Never justify one of these on viewing-history similarity alone - that is not why it is in the list, and claiming otherwise would be wrong.
+
+CRITICAL: A few recommendations are marked "A KINDRED VIEWER PICKED THIS". Those are in the list because another viewer with strongly overlapping taste watched them, which is a different reason from similarity to the user's own history - say so, and then use the similarity evidence as support. Refer to that person only in general terms ("someone whose taste lines up with yours"). You do not know who they are, so never name them, guess at them, or describe them.
 
 Format: Return JSON with an "explanations" array containing objects with "index" (1-based) and "explanation" fields.${langBlock}`,
       prompt: `=== USER'S TASTE PROFILE ===
@@ -399,6 +416,13 @@ function generateFallbackExplanation(movie: MovieWithEvidence): string {
     // best-scoring title among the interest's strongest matches, not to the
     // single closest one, and the wording shouldn't claim more than that.
     return `You told us you like ${movie.interestText.toLowerCase()} — this ${movie.genres[0]?.toLowerCase() || 'film'} pick is one of the closest matches in your library that you haven't seen yet.`
+  }
+
+  // Same reasoning one step down: a twin pick is here because a like-minded
+  // viewer watched it, so the evidence branch below would credit the wrong
+  // thing. Kept deliberately anonymous.
+  if (movie.fromTasteTwin) {
+    return `Someone here whose taste closely overlaps yours watched this ${movie.genres[0]?.toLowerCase() || 'film'} — it's the kind of thing the two of you keep landing on independently.`
   }
 
   if (movie.evidence.length > 0) {

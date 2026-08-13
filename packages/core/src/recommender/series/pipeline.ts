@@ -28,13 +28,20 @@ import {
   applyDiversitySelection,
   applyPreferenceAdjustment,
   buildInterestMatchIndex,
+  buildTwinIndex,
   computeReservedInterestSlots,
+  computeReservedTwinSlots,
   pickInterestSlotFillers,
+  pickTwinSlotFillers,
   summarizeScoreComponents,
   type InterestCandidateMatch,
   type InterestMatchIndex,
   type InterestQueryResult,
+  type TwinDonor,
+  type TwinIndex,
 } from '../shared/index.js'
+import { getDonorWatchedIds, getTwinPairs } from '../twinAffinity.js'
+import { getRecommendationConfig } from '../../lib/recommendationConfig.js'
 import { storeSeriesEvidence, getSeriesOverviews } from './storage.js'
 import {
   generateSeriesExplanations,
@@ -659,7 +666,8 @@ async function storeSeriesCandidates(
   candidates: SeriesCandidate[],
   selected: SeriesCandidate[],
   selectedRanks: Map<string, number>,
-  interestPicks?: Map<string, InterestCandidateMatch>
+  interestPicks?: Map<string, InterestCandidateMatch>,
+  twinPicks?: Map<string, TwinDonor>
 ): Promise<void> {
   if (candidates.length === 0) return
 
@@ -670,6 +678,7 @@ async function storeSeriesCandidates(
     const isSelected = selectedIds.has(candidate.seriesId)
     const selectedRank = isSelected ? selectedRanks.get(candidate.seriesId) || null : null
     const interestPick = interestPicks?.get(candidate.seriesId)
+    const twinPick = twinPicks?.get(candidate.seriesId)
 
     return {
       seriesId: candidate.seriesId,
@@ -686,7 +695,7 @@ async function storeSeriesCandidates(
       // though every scored candidate is stored here. COALESCEd to '{}' below
       // because the column is NOT NULL.
       scoreBreakdown:
-        candidate.selectionScore !== undefined || interestPick
+        candidate.selectionScore !== undefined || interestPick || twinPick
           ? JSON.stringify({
               // The diversity-blended number the selector ranked by. Kept out
               // of final_score so that column stays one comparable scale for
@@ -700,6 +709,15 @@ async function storeSeriesCandidates(
                       interestId: interestPick.interestId,
                       interestText: interestPick.interestText,
                       weightedSimilarity: interestPick.weightedSimilarity,
+                    },
+                  }
+                : {}),
+              ...(twinPick
+                ? {
+                    twinMatch: {
+                      donorId: twinPick.donorId,
+                      affinity: twinPick.affinity,
+                      sharedCount: twinPick.sharedCount,
                     },
                   }
                 : {}),
@@ -767,6 +785,28 @@ export interface GenerateSeriesRecommendationsOptions {
    * GenerateRecommendationsOptions on the movie side.
    */
   skipIfUnchanged?: boolean
+  /**
+   * The instance-wide taste-twin index, already thresholded. Built once per
+   * batch because the acceptance bar comes from the spread of every pair, so a
+   * per-user build would recompute the identical matrix for each viewer.
+   */
+  twinIndex?: TwinIndex
+}
+
+/**
+ * Build the series taste-twin index once for a whole batch. Returns an empty
+ * index rather than undefined on failure, so a broken query costs one attempt
+ * instead of one per user.
+ */
+async function buildBatchSeriesTwinIndex(): Promise<TwinIndex> {
+  try {
+    const config = await getRecommendationConfig()
+    if (config.series.twinMaxSlots <= 0) return new Map()
+    return buildTwinIndex(await getTwinPairs('series'), config.series.twinThresholdK)
+  } catch (err) {
+    logger.warn({ err }, 'Failed to build the series taste twin index, running without twin slots')
+    return new Map()
+  }
 }
 
 /**
@@ -1052,6 +1092,28 @@ export async function generateSeriesRecommendationsForUser(
       logger.warn({ err, userId: user.id }, 'Custom interest matching failed, continuing without it')
     }
 
+    // Taste twins, mirroring the movie pipeline. The series taste set is not a
+    // copy of the movie one: watch_history holds series per *episode*, and a
+    // show favorited on the media server leaves no rows at all, so
+    // twinAffinity.ts unions user_watching_series. Fails open to no twins.
+    let twins: TwinDonor[] = []
+    let donorWatched = new Map<string, Set<string>>()
+    if (cfg.twinMaxSlots > 0) {
+      try {
+        const twinIndex =
+          options.twinIndex ?? buildTwinIndex(await getTwinPairs('series'), cfg.twinThresholdK)
+        twins = twinIndex.get(user.id) ?? []
+        if (twins.length > 0) {
+          donorWatched = await getDonorWatchedIds(
+            twins.map((twin) => twin.donorId),
+            'series'
+          )
+        }
+      } catch (err) {
+        logger.warn({ err, userId: user.id }, 'Taste twin lookup failed, continuing without it')
+      }
+    }
+
     // Franchise and genre preferences are resolved up front rather than inside
     // the loop. Asking per candidate meant 2-3 sequential round trips for every
     // item in the library, and getGenreAffinity re-issued the byte-identical
@@ -1152,9 +1214,16 @@ export async function generateSeriesRecommendationsForUser(
       interestIndex?.byInterest.length ?? 0
     )
 
+    // Against what interests left behind, so the two can never over-reserve.
+    const reservedTwinSlots = computeReservedTwinSlots(
+      cfg.selectedCount - reservedInterestSlots,
+      twins.length,
+      cfg.twinMaxSlots
+    )
+
     const { selected } = applySeriesDiversityAndSelect(
       scoredCandidates,
-      cfg.selectedCount - reservedInterestSlots,
+      cfg.selectedCount - reservedInterestSlots - reservedTwinSlots,
       effectiveDiversityWeight
     )
 
@@ -1177,20 +1246,52 @@ export async function generateSeriesRecommendationsForUser(
       )
     }
 
-    const selectedWithInterests = [...selected, ...interestFillers.map((f) => f.candidate)]
+    // After the interest fillers so their picks are already spoken for.
+    const twinFillers = pickTwinSlotFillers(
+      [...selected, ...interestFillers.map((f) => f.candidate)],
+      scoredCandidates,
+      twins,
+      donorWatched,
+      reservedTwinSlots
+    )
+
+    const twinPicks = new Map<string, TwinDonor>()
+    for (const filler of twinFillers) {
+      twinPicks.set(filler.candidate.seriesId, filler.twin)
+      logger.info(
+        {
+          title: filler.candidate.title,
+          affinity: filler.twin.affinity,
+          shared: filler.twin.sharedCount,
+        },
+        `👥 Reserved slot for a taste twin: ${filler.candidate.title}`
+      )
+    }
+    if (reservedTwinSlots > twinFillers.length) {
+      logger.info(
+        { reserved: reservedTwinSlots, filled: twinFillers.length },
+        'Some reserved twin slots had no qualifying candidate and were left unused'
+      )
+    }
+
+    const selectedWithSlots = [
+      ...selected,
+      ...interestFillers.map((f) => f.candidate),
+      ...twinFillers.map((f) => f.candidate),
+    ]
 
     const finalSelected = includeWatched
-      ? selectedWithInterests
+      ? selectedWithSlots
       : (await import('../watchedExclusion.js')).filterByWatchedIds(
-          selectedWithInterests.map((candidate) => ({ ...candidate, id: candidate.seriesId })),
+          selectedWithSlots.map((candidate) => ({ ...candidate, id: candidate.seriesId })),
           excludeIds
         )
 
-    if (!includeWatched && finalSelected.length < selectedWithInterests.length) {
+    if (!includeWatched && finalSelected.length < selectedWithSlots.length) {
       logger.info(
         {
           userId: user.id,
-          removed: selectedWithInterests.length - finalSelected.length,
+          removed: selectedWithSlots.length - finalSelected.length,
         },
         'Filtered watched series from final recommendations (safety net)'
       )
@@ -1236,7 +1337,8 @@ export async function generateSeriesRecommendationsForUser(
       scoredCandidates,
       finalSelected,
       finalSelectedRanks,
-      interestPicks
+      interestPicks,
+      twinPicks
     )
 
     // 8. Store evidence (similar watched series for each recommendation)
@@ -1274,6 +1376,9 @@ export async function generateSeriesRecommendationsForUser(
           // credits what actually put the show here instead of inventing a
           // watch-history justification for it.
           interestText: interestPicks.get(s.seriesId)?.interestText ?? null,
+          // Same idea for a borrowed pick: the reason is a like-minded viewer,
+          // not the ranking. A flag, never the donor's identity.
+          fromTasteTwin: twinPicks.has(s.seriesId),
         }))
 
         // Generate explanations using embedding-based evidence
@@ -1359,6 +1464,8 @@ export async function generateSeriesRecommendationsForAllUsers(jobId?: string): 
     let skipped = 0
     let totalRecommendations = 0
 
+    const twinIndex = await buildBatchSeriesTwinIndex()
+
     for (let i = 0; i < result.rows.length; i++) {
       const user = result.rows[i]
 
@@ -1375,7 +1482,7 @@ export async function generateSeriesRecommendationsForAllUsers(jobId?: string): 
           {},
           // Only the scheduled sweep skips; every manual path means someone
           // asked for the work.
-          { skipIfUnchanged: true }
+          { skipIfUnchanged: true, twinIndex }
         )
 
         if (recResult.skipped) {
@@ -1483,18 +1590,24 @@ export async function clearAndRebuildAllSeriesRecommendations(existingJobId?: st
     let success = 0
     let failed = 0
 
+    const twinIndex = await buildBatchSeriesTwinIndex()
+
     for (let i = 0; i < users.length; i++) {
       const user = users[i]
       updateJobProgress(jobId, i, users.length, user.username)
 
       try {
         addLog(jobId, 'info', `🧠 Generating for ${user.username}...`)
-        await generateSeriesRecommendationsForUser({
-          id: user.id,
-          username: user.username,
-          providerUserId: user.provider_user_id,
-          maxParentalRating: user.max_parental_rating,
-        })
+        await generateSeriesRecommendationsForUser(
+          {
+            id: user.id,
+            username: user.username,
+            providerUserId: user.provider_user_id,
+            maxParentalRating: user.max_parental_rating,
+          },
+          {},
+          { twinIndex }
+        )
         success++
         addLog(jobId, 'info', `✅ Done: ${user.username}`)
       } catch (err) {

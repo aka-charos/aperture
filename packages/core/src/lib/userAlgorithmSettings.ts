@@ -171,12 +171,16 @@ export async function getEffectiveAlgorithmConfig(
       ratingWeight: mediaType === 'movie' ? dbConfig.movie.ratingWeight : dbConfig.series.ratingWeight,
       diversityWeight: mediaType === 'movie' ? dbConfig.movie.diversityWeight : dbConfig.series.diversityWeight,
       recentWatchLimit: mediaType === 'movie' ? dbConfig.movie.recentWatchLimit : dbConfig.series.recentWatchLimit,
+      twinThresholdK: mediaType === 'movie' ? dbConfig.movie.twinThresholdK : dbConfig.series.twinThresholdK,
+      twinMaxSlots: mediaType === 'movie' ? dbConfig.movie.twinMaxSlots : dbConfig.series.twinMaxSlots,
     }
   } catch {
     logger.warn('Failed to load admin config, using fallback defaults')
     adminConfig = {
       maxCandidates: 50000,
-      selectedCount: 12,
+      selectedCount: 20,
+      twinThresholdK: 2.0,
+      twinMaxSlots: 4,
       ...DEFAULT_WEIGHTS,
     }
   }
@@ -207,6 +211,8 @@ export async function getEffectiveAlgorithmConfig(
   const effectiveConfig: PipelineConfig = {
     maxCandidates: adminConfig.maxCandidates, // User can't override this
     selectedCount: adminConfig.selectedCount, // User can't override this
+    twinThresholdK: adminConfig.twinThresholdK, // Instance-wide: the bar is derived from every pair
+    twinMaxSlots: adminConfig.twinMaxSlots, // User can't override this
     ...normalizedWeights,
   }
 

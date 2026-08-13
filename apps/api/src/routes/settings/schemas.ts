@@ -149,6 +149,8 @@ export const updateRecommendationConfigSchema = {
       diversityWeight: { type: 'number' as const, minimum: 0, maximum: 1, description: 'Weight for genre diversity in results (0-1)', example: 0.2 },
       newCandidateThreshold: { type: 'integer' as const, minimum: 1, description: 'Newly-available titles required before the activity gate treats the catalogue as changed', example: 12 },
       maxRunAgeDays: { type: 'integer' as const, minimum: 1, description: 'Regenerate regardless once the last run is this many days old', example: 35 },
+      twinThresholdK: { type: 'number' as const, minimum: 1, maximum: 4, description: 'How closely another viewer must match before their picks are borrowed, as a multiple of the median absolute deviation of all pairs. Higher is stricter', example: 2 },
+      twinMaxSlots: { type: 'integer' as const, minimum: 0, maximum: 10, description: 'Ceiling on recommendations drawn from a taste twin; 0 disables the feature. The realised count also scales with selectedCount', example: 4 },
     },
     example: {
       similarityWeight: 0.4,

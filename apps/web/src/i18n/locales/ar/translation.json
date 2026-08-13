@@ -660,7 +660,8 @@
       "basedOnHistorySeries": "بناءً على تاريخك مع سلسلة مماثلة:",
       "aiExplanationTitle": "لماذا اختارت {{appName}} هذا لك",
       "consideredForYou": "How This Fits Your Taste",
-      "consideredSubtitle": "{{pct}}% match · one of {{total}} titles scored for you"
+      "consideredSubtitle": "{{pct}}% match · one of {{total}} titles scored for you",
+      "tasteTwin": "Someone here whose taste closely overlaps yours has watched this — that's what put it in your list, rather than the scores below."
     },
     "seasons": {
       "title": "الحلقات",
@@ -2309,11 +2310,31 @@
         "increase": "Inactive users are skipped for longer and cost less to keep.",
         "decrease": "Changes that leave no trace reach everyone sooner, at the cost of more full runs.",
         "example": "Keep this comfortably above your job interval, or the valve fires every time and nothing is ever skipped."
+      },
+      "twinMaxSlots": {
+        "title": "Picks Borrowed From A Taste Twin",
+        "description": "A taste twin is another viewer here whose watch history overlaps a user's far more than chance, measured by how rare the titles they share are. This many of that user's recommendations can be drawn from what their twin has watched and they haven't. Reserved picks come out of Recs Per User, so each one replaces a normally-ranked recommendation.",
+        "increase": "More of the list comes from a like-minded viewer, which surfaces titles the scoring alone never reaches.",
+        "decrease": "More of the list is decided by the scores. Set to 0 to switch the feature off entirely.",
+        "example": "Set to 0 if nobody here watches anything like anyone else — the feature simply stays quiet in that case anyway, since a user with no qualifying twin reserves nothing."
+      },
+      "twinThresholdK": {
+        "title": "How Close A Match Must Be",
+        "description": "Where the bar sits for calling someone a taste twin, measured against the spread of every viewer pair on this instance rather than as a fixed number — so it keeps meaning the same thing as people are added and watch more.",
+        "increase": "Fewer viewers qualify, and those that do are closer matches. Some users will have no twin at all and simply get an ordinary list.",
+        "decrease": "More viewers qualify, including weaker matches whose picks may feel arbitrary.",
+        "example": "Below about 1.5 the bar approaches the middle of the distribution, which makes roughly half of all pairs a 'twin' and the label stops meaning anything."
       }
     },
     "sectionRegeneration": "WHEN TO REGENERATE",
     "newCandidateThreshold": "New titles before regenerating",
-    "maxRunAgeDays": "Maximum days between runs"
+    "maxRunAgeDays": "Maximum days between runs",
+    "sectionTwins": "TASTE TWINS",
+    "twinMaxSlots": "Picks borrowed from a taste twin",
+    "twinMaxSlotsHelp": "0 turns this off. The number actually used also scales with Recs Per User.",
+    "twinThresholdK": "How close a match must be",
+    "twinLooser": "Looser",
+    "twinStricter": "Stricter"
   },
   "settingsWatching": {
     "title": "العروض التي تشاهدها",

@@ -43,16 +43,24 @@ export interface PipelineConfig {
   ratingWeight: number
   diversityWeight: number
   recentWatchLimit: number
+  /** MAD multiplier deciding who counts as a taste twin. See twinAffinity.ts. */
+  twinThresholdK: number
+  /** Ceiling on picks borrowed from a taste twin; 0 disables. */
+  twinMaxSlots: number
 }
 
 // Fallback defaults (used only if DB fetch fails)
+// selectedCount is the admin's `recommendation_config.{movie,series}_selected_count`
+// in every normal run; this value applies only when that read throws.
 export const FALLBACK_CONFIG: PipelineConfig = {
   maxCandidates: 50000,
-  selectedCount: 12,
+  selectedCount: 20,
   similarityWeight: 0.4,
   noveltyWeight: 0.2,
   ratingWeight: 0.2,
   diversityWeight: 0.2,
   recentWatchLimit: 50,
+  twinThresholdK: 2.0,
+  twinMaxSlots: 4,
 }
 

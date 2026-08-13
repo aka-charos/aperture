@@ -22,6 +22,7 @@ import ShuffleIcon from '@mui/icons-material/Shuffle'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import QueryStatsIcon from '@mui/icons-material/QueryStats'
+import GroupsIcon from '@mui/icons-material/Groups'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
 import { gradients } from '@/theme'
 import type { RecommendationInsights, MediaType } from '../types'
@@ -55,6 +56,14 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
     ? t('mediaDetail.insights.subtitleSeries')
     : t('mediaDetail.insights.subtitleMovie')
   const matchPct = Math.round((insights.scores?.final || 0) * 100)
+
+  // Present only when a reserved taste-twin slot put this title in the list
+  // (recommender/shared/twinSlots.ts). The stored object carries the donor's
+  // id, which is deliberately never read here: the line says "someone", and
+  // resolving an identity should not be one refactor away.
+  const fromTasteTwin =
+    typeof insights.scoreBreakdown?.twinMatch === 'object' &&
+    insights.scoreBreakdown.twinMatch !== null
 
   return (
     <Box sx={{ mt: 4, px: 3 }}>
@@ -142,6 +151,29 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
         <Collapse in={insightsExpanded}>
           <Divider />
           <Box sx={{ p: 3 }}>
+            {/* Above the explanation because it is the reason this title is in
+                the list at all — the scores below describe it, they did not
+                choose it. */}
+            {fromTasteTwin && (
+              <Paper
+                sx={{
+                  p: 2,
+                  mb: 3,
+                  bgcolor: 'background.default',
+                  borderRadius: 2,
+                  borderInlineStart: '3px solid',
+                  borderInlineStartColor: 'secondary.main',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <GroupsIcon sx={{ color: 'secondary.main', fontSize: 20 }} />
+                  <Typography variant="body2" color="text.secondary">
+                    {t('mediaDetail.insights.tasteTwin')}
+                  </Typography>
+                </Box>
+              </Paper>
+            )}
+
             {/* The generated "why" — prose before numbers, matching the order
                 the same text is written into the media-server plot. Absent
                 whenever AI explanations are switched off. */}
