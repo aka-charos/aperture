@@ -2324,6 +2324,13 @@
         "increase": "Fewer viewers qualify, and those that do are closer matches. Some users will have no twin at all and simply get an ordinary list.",
         "decrease": "More viewers qualify, including weaker matches whose picks may feel arbitrary.",
         "example": "Below about 1.5 the bar approaches the middle of the distribution, which makes roughly half of all pairs a 'twin' and the label stops meaning anything."
+      },
+      "interestMaxSlots": {
+        "title": "Reserved For Stated Interests",
+        "description": "How many of a user's recommendations can be set aside for interests they typed in themselves. The interest score alone can never surface anything — it closes at most a tenth of a title's gap to a perfect match — so interests earn slots instead. Only applies to users who have actually written some.",
+        "increase": "Stated interests shape more of the list, at the cost of top-ranked picks.",
+        "decrease": "More of the list is decided by the scores. Set to 0 to ignore stated interests when selecting.",
+        "example": "The slot goes to the best-scoring title among an interest's strongest matches, so raising this surfaces more of that interest rather than more obscure examples of it."
       }
     },
     "sectionRegeneration": "WHEN TO REGENERATE",
@@ -2334,7 +2341,11 @@
     "twinMaxSlotsHelp": "0 turns this off. The number actually used also scales with Recs Per User.",
     "twinThresholdK": "How close a match must be",
     "twinLooser": "Looser",
-    "twinStricter": "Stricter"
+    "twinStricter": "Stricter",
+    "sectionSlots": "RESERVED SLOTS",
+    "slotBudget": "{{total}} recommendations per user",
+    "slotBudgetSplit": "{{ranked}} top-ranked · {{interests}} for stated interests · {{twins}} from a taste twin",
+    "interestMaxSlots": "Reserved for stated interests"
   },
   "settingsWatching": {
     "title": "शोज़ यू वॉच",

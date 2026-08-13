@@ -5,7 +5,6 @@ import {
   computeReservedTwinSlots,
   deriveTwinThreshold,
   pickTwinSlotFillers,
-  TWIN_SLOT_SHARE,
   type TwinDonor,
   type TwinPair,
 } from './twinSlots.js'
@@ -126,14 +125,13 @@ describe('buildTwinIndex', () => {
 })
 
 describe('computeReservedTwinSlots', () => {
-  test('tracks list length: 2 at a selectedCount of 12, 4 at 20', () => {
-    // The reason the share is 0.2 rather than a flat count -- an admin who
-    // raises Recs Per User expects the borrowed share to scale with it.
-    assert.equal(computeReservedTwinSlots(12, 5, 4), 2)
+  test('the configured ceiling is what happens, whatever the list length', () => {
+    // The regression this guards: a 0.2 share used to sit under the ceiling, so
+    // 4 configured against a 10-item list quietly became 2 and the settings
+    // page gave no indication why.
+    assert.equal(computeReservedTwinSlots(10, 5, 4), 4)
+    assert.equal(computeReservedTwinSlots(12, 5, 4), 4)
     assert.equal(computeReservedTwinSlots(20, 5, 4), 4)
-  })
-
-  test('the admin ceiling binds on long lists', () => {
     assert.equal(computeReservedTwinSlots(100, 9, 4), 4)
     assert.equal(computeReservedTwinSlots(100, 9, 2), 2)
   })
@@ -150,13 +148,12 @@ describe('computeReservedTwinSlots', () => {
     assert.equal(computeReservedTwinSlots(20, 0, 4), 0)
   })
 
-  test('short lists reserve nothing without needing a special case', () => {
-    for (let remaining = 0; remaining <= 4; remaining++) {
-      assert.equal(computeReservedTwinSlots(remaining, 5, 4), 0)
-    }
+  test('a list shorter than the ceiling is bounded by the list', () => {
+    assert.equal(computeReservedTwinSlots(2, 5, 4), 2)
+    assert.equal(computeReservedTwinSlots(0, 5, 4), 0)
   })
 
-  test('never exceeds the share, the ceiling, or the list itself', () => {
+  test('never exceeds the ceiling, the twins available, or the list itself', () => {
     for (let remaining = 0; remaining <= 60; remaining++) {
       for (let twins = 0; twins <= 6; twins++) {
         for (const cap of [0, 1, 2, 4, 10]) {
@@ -164,7 +161,6 @@ describe('computeReservedTwinSlots', () => {
           assert.ok(Number.isInteger(slots) && slots >= 0, 'slots must be a non-negative integer')
           assert.ok(slots <= cap, 'over the admin ceiling')
           assert.ok(slots <= twins, 'more slots than twins')
-          assert.ok(slots <= remaining * TWIN_SLOT_SHARE, 'over the share')
           assert.ok(remaining - slots >= 0, 'would leave a negative target')
         }
       }
@@ -180,17 +176,25 @@ describe('computeReservedTwinSlots', () => {
 
 describe('composition with interest slots', () => {
   test('the two features together can never over-reserve the list', () => {
-    // The pipelines compute twin slots against what interests left behind,
-    // which is what makes this hold for every configuration.
+    // Both ceilings are now authoritative, so nothing scales them down against
+    // the list any more. What keeps the budget balanced is that the pipelines
+    // measure twin slots against what interests left behind -- this sweep is
+    // what makes that ordering load-bearing rather than incidental.
     for (let selectedCount = 1; selectedCount <= 60; selectedCount++) {
       for (let interests = 0; interests <= 5; interests++) {
-        for (const cap of [0, 2, 4, 10]) {
-          const interestSlots = computeReservedInterestSlots(selectedCount, interests)
-          const twinSlots = computeReservedTwinSlots(selectedCount - interestSlots, 5, cap)
-          assert.ok(
-            interestSlots + twinSlots <= selectedCount,
-            `over-reserved at selectedCount=${selectedCount}, interests=${interests}, cap=${cap}`
-          )
+        for (const interestCap of [0, 3, 10]) {
+          for (const twinCap of [0, 2, 4, 10]) {
+            const interestSlots = computeReservedInterestSlots(
+              selectedCount,
+              interests,
+              interestCap
+            )
+            const twinSlots = computeReservedTwinSlots(selectedCount - interestSlots, 5, twinCap)
+            assert.ok(
+              interestSlots + twinSlots <= selectedCount,
+              `over-reserved at selectedCount=${selectedCount}, interests=${interests}, caps=${interestCap}/${twinCap}`
+            )
+          }
         }
       }
     }

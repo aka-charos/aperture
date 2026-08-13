@@ -28,10 +28,16 @@ export interface MediaTypeConfig {
    */
   twinThresholdK: number
   /**
-   * Ceiling on picks drawn from a taste twin. 0 disables the feature; the
-   * realised count also scales with selectedCount (shared/twinSlots.ts).
+   * Ceiling on picks drawn from a taste twin. 0 disables the feature.
+   * Authoritative: nothing reduces it except how many twins actually qualify
+   * and how much of the list is left (shared/twinSlots.ts).
    */
   twinMaxSlots: number
+  /**
+   * Ceiling on picks reserved for the user's stated interests. 0 disables.
+   * Spends from the same selectedCount budget as twinMaxSlots.
+   */
+  interestMaxSlots: number
 }
 
 export interface RecommendationConfig {
@@ -63,6 +69,7 @@ interface RecommendationConfigRow {
   movie_max_run_age_days: number
   movie_twin_threshold_k: string
   movie_twin_max_slots: number
+  movie_interest_max_slots: number
   series_max_candidates: number
   series_selected_count: number
   series_recent_watch_limit: number
@@ -74,6 +81,7 @@ interface RecommendationConfigRow {
   series_max_run_age_days: number
   series_twin_threshold_k: string
   series_twin_max_slots: number
+  series_interest_max_slots: number
   updated_at: Date
   scoring_updated_at: Date
 }
@@ -91,6 +99,7 @@ const MOVIE_DEFAULTS: MediaTypeConfig = {
   maxRunAgeDays: 35,
   twinThresholdK: 2.0,
   twinMaxSlots: 4,
+  interestMaxSlots: 3,
 }
 
 const SERIES_DEFAULTS: MediaTypeConfig = {
@@ -107,6 +116,7 @@ const SERIES_DEFAULTS: MediaTypeConfig = {
   maxRunAgeDays: 35,
   twinThresholdK: 2.0,
   twinMaxSlots: 4,
+  interestMaxSlots: 3,
 }
 
 /**
@@ -125,6 +135,7 @@ const COLUMN_SUFFIX: Record<keyof MediaTypeConfig, string> = {
   maxRunAgeDays: 'max_run_age_days',
   twinThresholdK: 'twin_threshold_k',
   twinMaxSlots: 'twin_max_slots',
+  interestMaxSlots: 'interest_max_slots',
 }
 
 /**
@@ -145,6 +156,7 @@ const SCORING_FIELDS = new Set<keyof MediaTypeConfig>([
   // until max_run_age_days eventually forced a run.
   'twinThresholdK',
   'twinMaxSlots',
+  'interestMaxSlots',
 ])
 
 /**
@@ -156,11 +168,11 @@ export async function getRecommendationConfig(): Promise<RecommendationConfig> {
       movie_max_candidates, movie_selected_count, movie_recent_watch_limit,
       movie_similarity_weight, movie_novelty_weight, movie_rating_weight, movie_diversity_weight,
       movie_new_candidate_threshold, movie_max_run_age_days,
-      movie_twin_threshold_k, movie_twin_max_slots,
+      movie_twin_threshold_k, movie_twin_max_slots, movie_interest_max_slots,
       series_max_candidates, series_selected_count, series_recent_watch_limit,
       series_similarity_weight, series_novelty_weight, series_rating_weight, series_diversity_weight,
       series_new_candidate_threshold, series_max_run_age_days,
-      series_twin_threshold_k, series_twin_max_slots,
+      series_twin_threshold_k, series_twin_max_slots, series_interest_max_slots,
       updated_at, scoring_updated_at
      FROM recommendation_config WHERE id = 1`
   )
@@ -188,6 +200,7 @@ export async function getRecommendationConfig(): Promise<RecommendationConfig> {
       maxRunAgeDays: row.movie_max_run_age_days,
       twinThresholdK: parseFloat(row.movie_twin_threshold_k),
       twinMaxSlots: row.movie_twin_max_slots,
+      interestMaxSlots: row.movie_interest_max_slots,
     },
     series: {
       maxCandidates: row.series_max_candidates,
@@ -201,6 +214,7 @@ export async function getRecommendationConfig(): Promise<RecommendationConfig> {
       maxRunAgeDays: row.series_max_run_age_days,
       twinThresholdK: parseFloat(row.series_twin_threshold_k),
       twinMaxSlots: row.series_twin_max_slots,
+      interestMaxSlots: row.series_interest_max_slots,
     },
     updatedAt: row.updated_at,
     scoringUpdatedAt: row.scoring_updated_at,

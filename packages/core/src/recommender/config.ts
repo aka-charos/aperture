@@ -23,6 +23,7 @@ export async function loadConfig(): Promise<PipelineConfig> {
       recentWatchLimit: dbConfig.movie.recentWatchLimit,
       twinThresholdK: dbConfig.movie.twinThresholdK,
       twinMaxSlots: dbConfig.movie.twinMaxSlots,
+      interestMaxSlots: dbConfig.movie.interestMaxSlots,
     }
   } catch (err) {
     logger.warn({ err }, 'Failed to load movie recommendation config from DB, using fallback')
@@ -48,6 +49,7 @@ export async function loadSeriesConfig(): Promise<PipelineConfig> {
       recentWatchLimit: dbConfig.series.recentWatchLimit,
       twinThresholdK: dbConfig.series.twinThresholdK,
       twinMaxSlots: dbConfig.series.twinMaxSlots,
+      interestMaxSlots: dbConfig.series.interestMaxSlots,
     }
   } catch (err) {
     logger.warn({ err }, 'Failed to load series recommendation config from DB, using fallback')

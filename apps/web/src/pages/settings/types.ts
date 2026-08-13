@@ -15,6 +15,8 @@ export interface MediaTypeConfig {
   twinThresholdK: number
   /** Ceiling on picks borrowed from a taste twin; 0 disables the feature. */
   twinMaxSlots: number
+  /** Ceiling on picks reserved for stated interests; shares the selectedCount budget. */
+  interestMaxSlots: number
   recentWatchLimit: number
   similarityWeight: number
   noveltyWeight: number

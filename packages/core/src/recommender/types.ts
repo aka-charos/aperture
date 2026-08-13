@@ -47,6 +47,8 @@ export interface PipelineConfig {
   twinThresholdK: number
   /** Ceiling on picks borrowed from a taste twin; 0 disables. */
   twinMaxSlots: number
+  /** Ceiling on picks reserved for stated interests; 0 disables. */
+  interestMaxSlots: number
 }
 
 // Fallback defaults (used only if DB fetch fails)
@@ -62,5 +64,6 @@ export const FALLBACK_CONFIG: PipelineConfig = {
   recentWatchLimit: 50,
   twinThresholdK: 2.0,
   twinMaxSlots: 4,
+  interestMaxSlots: 3,
 }
 

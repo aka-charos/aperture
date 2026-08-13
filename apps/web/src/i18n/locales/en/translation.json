@@ -2163,9 +2163,11 @@
     "sectionSelection": "SELECTION",
     "sectionWeights": "WEIGHTS",
     "sectionRegeneration": "WHEN TO REGENERATE",
-    "sectionTwins": "TASTE TWINS",
-    "twinMaxSlots": "Picks borrowed from a taste twin",
-    "twinMaxSlotsHelp": "0 turns this off. The number actually used also scales with Recs Per User.",
+    "sectionSlots": "RESERVED SLOTS",
+    "slotBudget": "{{total}} recommendations per user",
+    "slotBudgetSplit": "{{ranked}} top-ranked · {{interests}} for stated interests · {{twins}} from a taste twin",
+    "interestMaxSlots": "Reserved for stated interests",
+    "twinMaxSlots": "Borrowed from a taste twin",
     "twinThresholdK": "How close a match must be",
     "twinLooser": "Looser",
     "twinStricter": "Stricter",
@@ -2244,12 +2246,19 @@
         "decrease": "Changes that leave no trace reach everyone sooner, at the cost of more full runs.",
         "example": "Keep this comfortably above your job interval, or the valve fires every time and nothing is ever skipped."
       },
+      "interestMaxSlots": {
+        "title": "Reserved For Stated Interests",
+        "description": "How many of a user's recommendations can be set aside for interests they typed in themselves. The interest score alone can never surface anything — it closes at most a tenth of a title's gap to a perfect match — so interests earn slots instead. Only applies to users who have actually written some.",
+        "increase": "Stated interests shape more of the list, at the cost of top-ranked picks.",
+        "decrease": "More of the list is decided by the scores. Set to 0 to ignore stated interests when selecting.",
+        "example": "The slot goes to the best-scoring title among an interest's strongest matches, so raising this surfaces more of that interest rather than more obscure examples of it."
+      },
       "twinMaxSlots": {
-        "title": "Picks Borrowed From A Taste Twin",
-        "description": "A taste twin is another viewer here whose watch history overlaps a user's far more than chance, measured by how rare the titles they share are. This many of that user's recommendations can be drawn from what their twin has watched and they haven't. Reserved picks come out of Recs Per User, so each one replaces a normally-ranked recommendation.",
+        "title": "Borrowed From A Taste Twin",
+        "description": "A taste twin is another viewer here whose watch history overlaps a user's far more than chance, measured by how rare the titles they share are. This many of that user's recommendations can be drawn from what their twin has watched and they haven't.",
         "increase": "More of the list comes from a like-minded viewer, which surfaces titles the scoring alone never reaches.",
         "decrease": "More of the list is decided by the scores. Set to 0 to switch the feature off entirely.",
-        "example": "Set to 0 if nobody here watches anything like anyone else — the feature simply stays quiet in that case anyway, since a user with no qualifying twin reserves nothing."
+        "example": "A user with no qualifying twin reserves nothing regardless of this number, so raising it costs nothing for people it does not apply to."
       },
       "twinThresholdK": {
         "title": "How Close A Match Must Be",

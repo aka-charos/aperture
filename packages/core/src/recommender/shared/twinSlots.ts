@@ -38,13 +38,16 @@ export interface TwinDonor {
 export type TwinIndex = Map<string, TwinDonor[]>
 
 /**
- * Share of the final list twins may claim, before the admin's own ceiling.
+ * The shipped ceiling, now `recommendation_config.{movie,series}_twin_max_slots`
+ * and admin-editable. Kept here only as the value used when a config read
+ * fails.
  *
- * 0.2 is chosen so the realised count tracks list length the way an admin would
- * expect: 2 slots at a selectedCount of 12, 4 at 20. A list of 4 or fewer
- * reserves nothing, so short lists are protected without a special case.
+ * This briefly shipped alongside a TWIN_SLOT_SHARE of 0.2, which capped the
+ * count at a fifth of the list *underneath* the configured ceiling -- so an
+ * admin who set 4 against a 10-item list got 2 and had no way to see why. The
+ * share is gone; the visible number is the one that governs.
  */
-export const TWIN_SLOT_SHARE = 0.2
+export const DEFAULT_TWIN_MAX_SLOTS = 4
 
 /**
  * Turn raw pairs into a per-recipient index, keeping only pairs that stand out
@@ -128,13 +131,14 @@ function medianOf(values: number[]): number {
 /**
  * How many of the final picks to hand over to taste twins.
  *
- * Bounded four ways: never more slots than the recipient has twins, never more
- * than the admin's ceiling, never more than TWIN_SLOT_SHARE of the list, and
- * never more than the list itself. No twins -- the common case -- means zero
- * slots and a pipeline that behaves exactly as it did before.
+ * Bounded by three things the admin can see: how many twins actually cleared
+ * the bar, the configured ceiling, and what is left of the list. No twins --
+ * the common case -- means zero slots and a pipeline that behaves exactly as it
+ * did before.
  *
- * `selectedCount` here is what remains *after* interest slots are reserved, so
- * the two features can never over-reserve between them.
+ * `remainingCount` is what is left *after* interest slots are reserved, so the
+ * two features can never over-reserve between them even if a stored ceiling
+ * predates the UI that keeps the two sliders in bounds.
  */
 export function computeReservedTwinSlots(
   remainingCount: number,
@@ -145,8 +149,7 @@ export function computeReservedTwinSlots(
   if (!Number.isFinite(maxSlots) || maxSlots <= 0) return 0
   if (remainingCount <= 0 || twinCount <= 0) return 0
 
-  const share = Math.floor(remainingCount * TWIN_SLOT_SHARE)
-  return Math.max(0, Math.min(twinCount, Math.floor(maxSlots), share, remainingCount))
+  return Math.max(0, Math.min(twinCount, Math.floor(maxSlots), remainingCount))
 }
 
 /**

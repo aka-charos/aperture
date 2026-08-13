@@ -35,6 +35,7 @@ type HelpSettingKey =
   | 'maxRunAgeDays'
   | 'twinMaxSlots'
   | 'twinThresholdK'
+  | 'interestMaxSlots'
 
 function HelpIcon({ settingKey }: { settingKey: HelpSettingKey }) {
   const { t } = useTranslation()
@@ -188,7 +189,21 @@ function MediaTypeCard({
           <TextField
             type="number"
             value={config.selectedCount}
-            onChange={(e) => onUpdateField('selectedCount', Math.max(1, parseInt(e.target.value) || 1))}
+            onChange={(e) => {
+              const next = Math.max(1, parseInt(e.target.value) || 1)
+              onUpdateField('selectedCount', next)
+              // Reserved slots spend from this budget, so shrinking the list
+              // has to shrink them with it — otherwise the sliders below would
+              // sit above their own maximum and the save would be refused.
+              const interests = Math.min(config.interestMaxSlots, next)
+              if (interests !== config.interestMaxSlots) {
+                onUpdateField('interestMaxSlots', interests)
+              }
+              const twins = Math.min(config.twinMaxSlots, Math.max(0, next - interests))
+              if (twins !== config.twinMaxSlots) {
+                onUpdateField('twinMaxSlots', twins)
+              }
+            }}
             size="small"
             InputProps={{
               inputProps: { min: 1, max: 500 },
@@ -306,27 +321,79 @@ function MediaTypeCard({
           />
         </FormControl>
 
-        {/* Borrowed picks. Grouped with the scoring settings rather than the
-            regeneration ones below, because these decide what ends up in the
-            list — which is also why both are in SCORING_FIELDS server-side. */}
+        {/* Recs Per User is a budget three things spend from, and until these
+            sliders existed only one spender was visible — the other two were
+            hardcoded shares applied after the fact, so a configured number and
+            the number that happened were different things. Each slider's max is
+            what the other one leaves behind, which makes overdrawing
+            impossible in the control rather than clamped later. */}
         <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={1}>
-          {t('settingsRecAlgo.sectionTwins')}
+          {t('settingsRecAlgo.sectionSlots')}
         </Typography>
 
+        <Box
+          sx={{
+            mb: 2,
+            p: 1.5,
+            borderRadius: 2,
+            bgcolor: 'background.default',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 1.5,
+            alignItems: 'baseline',
+          }}
+        >
+          <Typography variant="body2" fontWeight={600}>
+            {t('settingsRecAlgo.slotBudget', { total: config.selectedCount })}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {t('settingsRecAlgo.slotBudgetSplit', {
+              ranked: Math.max(0, config.selectedCount - config.interestMaxSlots - config.twinMaxSlots),
+              interests: config.interestMaxSlots,
+              twins: config.twinMaxSlots,
+            })}
+          </Typography>
+        </Box>
+
         <FormControl fullWidth sx={{ mb: 2 }} size="small">
-          <Box display="flex" alignItems="center">
-            <Typography variant="body2">{t('settingsRecAlgo.twinMaxSlots')}</Typography>
-            <HelpIcon settingKey="twinMaxSlots" />
+          <Box display="flex" alignItems="center" justifyContent="space-between">
+            <Box display="flex" alignItems="center">
+              <Typography variant="body2">{t('settingsRecAlgo.interestMaxSlots')}</Typography>
+              <HelpIcon settingKey="interestMaxSlots" />
+            </Box>
+            <Typography variant="body2" color="primary" fontWeight={600}>
+              {config.interestMaxSlots}
+            </Typography>
           </Box>
-          <TextField
-            type="number"
-            value={config.twinMaxSlots}
-            onChange={(e) =>
-              onUpdateField('twinMaxSlots', Math.min(10, Math.max(0, parseInt(e.target.value) || 0)))
-            }
+          <Slider
+            value={config.interestMaxSlots}
+            onChange={(_, v) => onUpdateField('interestMaxSlots', v as number)}
+            min={0}
+            max={Math.max(0, Math.min(10, config.selectedCount - config.twinMaxSlots))}
+            step={1}
             size="small"
-            helperText={t('settingsRecAlgo.twinMaxSlotsHelp')}
-            InputProps={{ inputProps: { min: 0, max: 10 } }}
+            marks
+          />
+        </FormControl>
+
+        <FormControl fullWidth sx={{ mb: 2 }} size="small">
+          <Box display="flex" alignItems="center" justifyContent="space-between">
+            <Box display="flex" alignItems="center">
+              <Typography variant="body2">{t('settingsRecAlgo.twinMaxSlots')}</Typography>
+              <HelpIcon settingKey="twinMaxSlots" />
+            </Box>
+            <Typography variant="body2" color="primary" fontWeight={600}>
+              {config.twinMaxSlots}
+            </Typography>
+          </Box>
+          <Slider
+            value={config.twinMaxSlots}
+            onChange={(_, v) => onUpdateField('twinMaxSlots', v as number)}
+            min={0}
+            max={Math.max(0, Math.min(10, config.selectedCount - config.interestMaxSlots))}
+            step={1}
+            size="small"
+            marks
           />
         </FormControl>
 
