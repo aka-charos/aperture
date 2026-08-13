@@ -23,6 +23,7 @@ import { createChildLogger } from '@aperture/core'
 import { createCarouselResult, type ContentCarousel } from '../schemas/contentCarousel.js'
 import { resolveCandidates } from '../discovery/resolveCandidates.js'
 import { gatherWebCandidates } from '../discovery/webCandidates.js'
+import { buildTasteBrief } from '../discovery/tasteBrief.js'
 import { enrichCardReasons } from '../discovery/enrichReasons.js'
 import { filterUnwatchedItems } from '../helpers/unwatched.js'
 import { findSimilarItems } from './search.js'
@@ -87,9 +88,15 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
         // sees "entering findCandidatesInLibrary".
         const onStatus = ctx.onStatus
         onStatus?.('discoveryScouting')
+        // The grounding call is a separate model call and never saw the system
+        // prompt, so the user's taste has to be handed to it explicitly or the
+        // web search runs on the bare request. Fetched here rather than in
+        // webCandidates so the network work stays in the tool boundary; fails
+        // soft to null, which restores the previous un-personalized behaviour.
+        const tasteBrief = await buildTasteBrief(ctx.userId)
         // Gathered here (not before the stream) so the assistant's opening line
         // streams first and this slow web work runs behind the card skeletons.
-        const gathered = await gatherWebCandidates(queryText, onStatus)
+        const gathered = await gatherWebCandidates(queryText, onStatus, tasteBrief)
 
         // "movies like X" must never recommend X back. Web sources list the seed
         // itself routinely (sometimes with a wrong year, so match on title only).

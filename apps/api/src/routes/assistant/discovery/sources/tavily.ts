@@ -47,6 +47,13 @@ function buildGroundedText(res: TavilySearchResponse, maxContentChars: number): 
 
 export const tavilySource: WebSearchSource = {
   id: 'tavily',
+  /**
+   * Takes only the query, on purpose. `WebSearchContext.tasteBrief` is prose
+   * written for a model prompt; Tavily is a search API, and appending a
+   * paragraph about the viewer to a search string degrades the results rather
+   * than personalising them. Personalisation happens on the grounding source,
+   * which is an actual model call and can weigh a profile against a request.
+   */
   async gather(query: string): Promise<WebSearchSourceResult | null> {
     try {
       const config = await getTavilyConfig()

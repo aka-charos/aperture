@@ -17,7 +17,7 @@
 import { generateText } from 'ai'
 import { withWebSearchModel, getWebSearchProviderTools, createChildLogger } from '@aperture/core'
 import { recordLlmError } from '../../helpers/errors.js'
-import type { WebSearchSource, WebSearchSourceResult } from './types.js'
+import type { WebSearchSource, WebSearchSourceResult, WebSearchContext } from './types.js'
 
 const logger = createChildLogger('web-source-google')
 
@@ -29,17 +29,34 @@ const PASS1_RETRY_DELAY_MS = 800
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
-const groundingPrompt = (query: string): string =>
+/**
+ * The viewer block is deliberately placed AFTER the request and fenced with an
+ * explicit precedence rule.
+ *
+ * The request is what the user actually asked for; the profile is a tiebreaker
+ * between titles that answer it equally well. Put the profile first, or leave
+ * the precedence unstated, and "find me a good horror film" starts returning
+ * the arthouse dramas the profile is full of — personalisation that quietly
+ * overrides the question is worse than none.
+ */
+const viewerBlock = (tasteBrief: string): string =>
+  '\n\nAbout the viewer this is for. Use it ONLY to choose between titles that answer the ' +
+  'request equally well, and to avoid suggesting things they have plainly already seen. ' +
+  'It must NEVER override the request: if it conflicts, the request wins outright.\n' +
+  tasteBrief
+
+const groundingPrompt = (query: string, tasteBrief?: string | null): string =>
   'Using current web information, list up to 12 specific movies or TV series that best answer this request. ' +
   'For EACH title you MUST provide: the exact title, the release year, whether it is a movie or a series, and — most importantly — one or two sentences on WHY it fits this specific request. ' +
   'The "why" is mandatory for every title and must be CONCRETE and SPECIFIC: the shared structural device, the tonal or thematic link, how the filmmaker themselves framed it, the precise thing it has in common. ' +
   'Write it directly, not as hedged reportage — prefer "same fragmented structure where identities blur" over "is often described as similar". No generic praise. A title with no real reason is useless: omit it rather than list it without one. ' +
   'Include the IMDb id (tt…) or TMDb id ONLY if it appears in a source you actually used; otherwise omit it.\n\n' +
-  `Request: ${query}`
+  `Request: ${query}` +
+  (tasteBrief?.trim() ? viewerBlock(tasteBrief) : '')
 
 export const googleGroundingSource: WebSearchSource = {
   id: 'google',
-  async gather(query: string): Promise<WebSearchSourceResult | null> {
+  async gather(query: string, context?: WebSearchContext): Promise<WebSearchSourceResult | null> {
     try {
       const tools = await getWebSearchProviderTools()
 
@@ -55,7 +72,7 @@ export const googleGroundingSource: WebSearchSource = {
             model,
             tools,
             maxRetries: SDK_MAX_RETRIES,
-            prompt: groundingPrompt(query),
+            prompt: groundingPrompt(query, context?.tasteBrief),
           })
           text = pass1.text ?? ''
           usage = pass1.usage
