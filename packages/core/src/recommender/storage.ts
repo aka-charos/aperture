@@ -28,6 +28,12 @@ export interface StoredTwinPick {
   donorId: string
   affinity: number
   sharedCount: number
+  /**
+   * The rarest titles the two viewers both watched, which is what the panel
+   * shows as the reason. Stored as ids and resolved to titles on read, so a
+   * renamed or re-matched film cannot leave a stale name frozen in JSONB.
+   */
+  sharedIds?: string[]
 }
 
 /** One prepared row per scored candidate, ready for the bulk INSERT. */
@@ -40,9 +46,28 @@ export interface PreparedCandidateRow {
   similarity: number
   novelty: number
   ratingScore: number
-  diversityScore: number
+  /** null when the diversity selector never looked at this candidate. */
+  diversityScore: number | null
   /** null unless it carries something no column already holds. */
   scoreBreakdown: string | null
+}
+
+/**
+ * Diversity is measured *relative to what has already been chosen*, so it only
+ * exists for candidates the selector actually walked. Two kinds of row never
+ * get that far: the thousands that were scored but not picked, and the reserved
+ * slot fillers, which are appended after applyDiversityAndSelect has returned.
+ *
+ * Both kept the 0 they were initialised with, and storing that 0 made the
+ * insights panel render a confident "Variety 0%" -- a measurement-looking
+ * number for something never measured, on precisely the picks whose whole point
+ * is that the ranking did not choose them. selectionScore is the existing mark
+ * the selector leaves on everything it ranked, so it decides here too.
+ *
+ * The column is nullable already; the read path renders null as "n/a".
+ */
+function measuredDiversity(candidate: Candidate): number | null {
+  return candidate.selectionScore !== undefined ? candidate.diversityScore : null
 }
 
 /**
@@ -103,6 +128,7 @@ export function buildCandidateRows(
               donorId: twinPick.donorId,
               affinity: twinPick.affinity,
               sharedCount: twinPick.sharedCount,
+              ...(twinPick.sharedIds?.length ? { sharedIds: twinPick.sharedIds } : {}),
             },
           }
         : {}),
@@ -117,7 +143,7 @@ export function buildCandidateRows(
       similarity: c.similarity,
       novelty: c.novelty,
       ratingScore: c.ratingScore,
-      diversityScore: c.diversityScore,
+      diversityScore: measuredDiversity(c),
       scoreBreakdown: Object.keys(extras).length > 0 ? JSON.stringify(extras) : null,
     }
   })

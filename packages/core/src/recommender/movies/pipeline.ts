@@ -31,6 +31,7 @@ import {
   clearUserRecommendations,
   clearAllRecommendations,
   getMovieOverviews,
+  type StoredTwinPick,
 } from '../storage.js'
 import { syncWatchHistoryForUser } from './sync.js'
 import {
@@ -636,9 +637,14 @@ export async function generateRecommendationsForUser(
       reservedTwinSlots
     )
 
-    const twinPicks = new Map<string, TwinDonor>()
+    const twinPicks = new Map<string, StoredTwinPick>()
     for (const filler of twinFillers) {
-      twinPicks.set(filler.candidate.movieId, filler.twin)
+      twinPicks.set(filler.candidate.movieId, {
+        donorId: filler.twin.donorId,
+        affinity: filler.twin.affinity,
+        sharedCount: filler.twin.sharedCount,
+        sharedIds: filler.twin.sharedTopIds,
+      })
       logger.info(
         {
           title: filler.candidate.title,

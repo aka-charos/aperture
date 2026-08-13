@@ -686,7 +686,10 @@ async function storeSeriesCandidates(
       similarity: candidate.similarity,
       novelty: candidate.novelty,
       ratingScore: candidate.ratingScore,
-      diversityScore: candidate.diversityBoost,
+      // null when the selector never ranked this row, so a slot filler and a
+      // scored-but-unpicked title stop reporting a measured-looking 0% variety.
+      // See measuredDiversity in ../storage.ts for the full reasoning.
+      diversityScore: candidate.selectionScore !== undefined ? candidate.diversityBoost : null,
       finalScore: candidate.finalScore,
       isSelected,
       selectedRank,
@@ -718,6 +721,9 @@ async function storeSeriesCandidates(
                       donorId: twinPick.donorId,
                       affinity: twinPick.affinity,
                       sharedCount: twinPick.sharedCount,
+                      ...(twinPick.sharedTopIds?.length
+                        ? { sharedIds: twinPick.sharedTopIds }
+                        : {}),
                     },
                   }
                 : {}),

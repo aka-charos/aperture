@@ -75,10 +75,28 @@ export const MIN_TWIN_HISTORY = 25
  */
 export const MIN_TWIN_SHARED = 10
 
+/**
+ * How many of a pair's shared titles to carry along for the insights panel.
+ *
+ * These are the *rarest* shared titles, not a sample of them, because rarity is
+ * literally what the affinity score is made of: a title both users watched
+ * contributes idf^2 to the numerator, so the highest-idf shared titles are the
+ * ones that earned the pair its place above the bar. Showing anything else
+ * would illustrate the relationship with evidence that did not cause it, which
+ * is the exact failure this data exists to fix -- the panel previously
+ * explained a borrowed pick with content-similar titles from the reader's own
+ * history, which is computed after the fact and had no part in the decision.
+ *
+ * Six fits one poster row without scrolling and is well under the MIN_TWIN_SHARED
+ * floor, so a qualifying pair always has enough to fill it.
+ */
+export const SHARED_TITLE_SAMPLE = 6
+
 interface TwinRow {
   recipient: string
   donor: string
   shared: string
+  shared_top: string[] | null
   affinity: string
 }
 
@@ -152,6 +170,10 @@ export async function getTwinPairs(mediaType: 'movie' | 'series'): Promise<TwinP
          SELECT r.user_id AS recipient,
                 d.user_id AS donor,
                 COUNT(*) AS shared,
+                -- The rarest shared titles, which are the ones carrying the
+                -- affinity. idf is a property of the item, so r.idf = d.idf
+                -- here and ordering by either is ordering by rarity.
+                (array_agg(r.item_id ORDER BY r.idf DESC))[1:$3::int] AS shared_top,
                 SUM(r.idf * d.idf) / NULLIF(nr.mag * nd.mag, 0) AS affinity
            FROM w r
            JOIN w d ON d.item_id = r.item_id AND d.user_id <> r.user_id
@@ -166,11 +188,11 @@ export async function getTwinPairs(mediaType: 'movie' | 'series'): Promise<TwinP
           GROUP BY r.user_id, d.user_id, nr.mag, nd.mag
          HAVING COUNT(*) >= $2
        )
-       SELECT recipient, donor, shared, affinity
+       SELECT recipient, donor, shared, shared_top, affinity
          FROM pairs
         WHERE affinity IS NOT NULL
         ORDER BY recipient, affinity DESC`,
-      [MIN_TWIN_HISTORY, MIN_TWIN_SHARED]
+      [MIN_TWIN_HISTORY, MIN_TWIN_SHARED, SHARED_TITLE_SAMPLE]
     )
 
     for (const row of result.rows) {
@@ -183,6 +205,7 @@ export async function getTwinPairs(mediaType: 'movie' | 'series'): Promise<TwinP
         donorId: row.donor,
         affinity,
         sharedCount,
+        sharedTopIds: row.shared_top ?? [],
       })
     }
 
