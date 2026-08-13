@@ -5,7 +5,7 @@ import { tool, embed } from 'ai'
 import { nullSafe } from './utils.js'
 import { z } from 'zod'
 import { getActiveEmbeddingTableName } from '@aperture/core'
-import { query } from '../../../lib/db.js'
+import { query, transaction } from '../../../lib/db.js'
 import { readTwinSharedIds, resolveTwinSharedTitles } from '../../../lib/twinShared.js'
 import { blendQueryAndTaste } from './tasteBlend.js'
 import { enrichCardReasons } from '../discovery/enrichReasons.js'
@@ -22,6 +22,18 @@ import type { ToolContext, MovieResult, SeriesResult } from '../types.js'
  * second opinion.
  */
 const ANN_POOL_SIZE = 400
+
+/**
+ * pgvector's HNSW search-list size for the query above.
+ *
+ * Must be >= ANN_POOL_SIZE. The default is 40, which is smaller than the pool
+ * this tool asks for, and an HNSW scan will never return more rows than
+ * ef_search — so leaving it alone means either a short result or a planner that
+ * gives up on the index and sequentially scans every embedding. Set per
+ * statement with SET LOCAL rather than on the pool, so it cannot leak into the
+ * other vector queries that are tuned for the default.
+ */
+const HNSW_EF_SEARCH = 500
 
 /** Narrow the tool's plural media type to the singular one the queries use. */
 const asMedia = (type: 'movies' | 'series' | 'both'): 'movie' | 'series' =>
@@ -267,7 +279,16 @@ export function createRecommendationTools(ctx: ToolContext) {
           // pool is by construction what the user has NOT seen, it applies the
           // pipeline's watched exclusion for free. Blending in SQL would put
           // the one piece of real arithmetic somewhere no test can reach.
-          const rows = await query<{
+          //
+          // Runs in a transaction solely to carry `SET LOCAL hnsw.ef_search`.
+          // pgvector's default ef_search is 40 and nothing in this repo raises
+          // it, so an HNSW scan cannot produce more than 40 rows: a bare
+          // `LIMIT 400` either comes back short or makes the planner abandon the
+          // index for a sequential scan of the whole embedding table. The search
+          // list has to be at least as large as the number of rows wanted.
+          const rows = await transaction(async (client) => {
+            await client.query(`SET LOCAL hnsw.ef_search = ${HNSW_EF_SEARCH}`)
+            return client.query<{
             id: string
             title: string
             year: number | null
@@ -303,8 +324,9 @@ export function createRecommendationTools(ctx: ToolContext) {
                  ON rc.${idColumn} = near.item_id
                 AND rc.run_id = (SELECT id FROM latest)
                JOIN ${contentTable} c ON c.id = near.item_id`,
-            [ctx.userId, media, embeddingStr, ctx.embeddingModelId, ANN_POOL_SIZE]
-          )
+              [ctx.userId, media, embeddingStr, ctx.embeddingModelId, ANN_POOL_SIZE]
+            )
+          })
 
           // NUMERIC arrives from pg as a string; Number() it before any maths,
           // or the blend silently compares strings.
