@@ -1,14 +1,30 @@
 /**
  * Recommendation tools with Tool UI output schemas
  */
-import { tool } from 'ai'
+import { tool, embed } from 'ai'
 import { nullSafe } from './utils.js'
 import { z } from 'zod'
+import { getActiveEmbeddingTableName } from '@aperture/core'
 import { query } from '../../../lib/db.js'
 import { readTwinSharedIds, resolveTwinSharedTitles } from '../../../lib/twinShared.js'
+import { blendQueryAndTaste } from './tasteBlend.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext, MovieResult, SeriesResult } from '../types.js'
+
+/**
+ * How many nearest neighbours to pull before blending in taste.
+ *
+ * Big enough that the join against the scored pool still leaves plenty after
+ * watched titles drop out, small enough that the re-rank stays trivial. The ANN
+ * index does the expensive part; this is just how much of its output gets a
+ * second opinion.
+ */
+const ANN_POOL_SIZE = 400
+
+/** Narrow the tool's plural media type to the singular one the queries use. */
+const asMedia = (type: 'movies' | 'series' | 'both'): 'movie' | 'series' =>
+  type === 'series' ? 'series' : 'movie'
 
 /**
  * Which reserved slot, if any, put a pick in the list.
@@ -80,9 +96,9 @@ export function createRecommendationTools(ctx: ToolContext) {
         "Get the user's current AI-generated personalized recommendations. Each item carries a " +
         '`source` saying how it earned its place: a "twin" or "interest" pick was placed by a ' +
         'reserved slot rather than by the ranking, so say so instead of explaining it as being ' +
-        'similar to something they watched — for a "twin" pick similarity is exactly what did ' +
-        'not choose it — use its `sharedTitles`, the films the user and that viewer have both ' +
-        'watched, to explain it concretely. Never identify the other viewer behind a twin pick.',
+        'similar to something they watched — for a "twin" pick, similarity is exactly what did ' +
+        'not choose it. Explain a twin pick with its `sharedTitles`: the films the user and that ' +
+        'viewer have both watched. Never identify the other viewer behind a twin pick.',
       inputSchema: nullSafe(z.object({
         type: z.enum(['movies', 'series', 'both']).default('both'),
         limit: z.number().optional().default(15).describe('Number of results (default 15, max 50)'),
@@ -196,6 +212,139 @@ export function createRecommendationTools(ctx: ToolContext) {
 
         return {
           id: `recs-${Date.now()}`,
+          titleKey: 'carouselRecommendationsTitle',
+          descriptionKey: 'carouselRecommendationsDesc',
+          descriptionParams: { count: items.length },
+          items,
+        }
+      },
+    }),
+
+    searchMyRecommendations: tool({
+      description:
+        "Search everything the recommender has already scored for this user — their whole " +
+        'unwatched library, ranked personally — by theme, mood or description. PREFER THIS over ' +
+        'semanticSearch whenever the user is asking for something to watch, because semanticSearch ' +
+        'ranks by text similarity alone and knows nothing about who is asking, while this ranks by ' +
+        "the request AND the user's own taste scores, and never returns anything they have already " +
+        'seen. Use semanticSearch only for impersonal library lookups. Differs from ' +
+        'getMyRecommendations, which returns the fixed short list with no query.',
+      inputSchema: nullSafe(
+        z.object({
+          concept: z
+            .string()
+            .describe(
+              'The theme, mood or description to search for, e.g. "slow-burn arthouse" or "heist films with an ensemble cast"'
+            ),
+          type: z.enum(['movies', 'series', 'both']).optional().default('both'),
+          limit: z
+            .number()
+            .optional()
+            .default(12)
+            .describe('Number of results (default 12, max 30)'),
+        })
+      ),
+      execute: async ({ concept, type = 'both', limit = 12 }) => {
+        const safeLimit = Math.min(limit ?? 12, 30)
+        const { embedding } = await embed({ model: ctx.embeddingModel, value: concept })
+        const embeddingStr = `[${embedding.join(',')}]`
+
+        const items: ContentItem[] = []
+
+        for (const media of type === 'both' ? (['movie', 'series'] as const) : [asMedia(type)]) {
+          const isMovie = media === 'movie'
+          const table = await getActiveEmbeddingTableName(
+            isMovie ? 'embeddings' : 'series_embeddings'
+          )
+          const idColumn = isMovie ? 'movie_id' : 'series_id'
+          const contentTable = isMovie ? 'movies' : 'series'
+
+          // Two stages on purpose. The ANN index answers "nearest to the
+          // request" cheaply; joining that to the newest completed run's stored
+          // candidates is what makes the result personal — and, because the
+          // pool is by construction what the user has NOT seen, it applies the
+          // pipeline's watched exclusion for free. Blending in SQL would put
+          // the one piece of real arithmetic somewhere no test can reach.
+          const rows = await query<{
+            id: string
+            title: string
+            year: number | null
+            genres: string[]
+            overview: string | null
+            community_rating: number | null
+            poster_url: string | null
+            provider_item_id: string | null
+            directors: string[] | null
+            query_score: number
+            final_score: string | number | null
+            rank: number
+            score_breakdown: Record<string, unknown> | null
+          }>(
+            `WITH latest AS (
+               SELECT id FROM recommendation_runs
+                WHERE user_id = $1 AND status = 'completed' AND media_type = $2
+                ORDER BY created_at DESC
+                LIMIT 1
+             ),
+             near AS (
+               SELECT e.${idColumn} AS item_id,
+                      1 - (e.embedding <=> $3::halfvec) AS query_score
+                 FROM ${table} e
+                WHERE e.model = $4
+                ORDER BY e.embedding <=> $3::halfvec
+                LIMIT $5
+             )
+             SELECT c.id, c.title, c.year, c.genres, c.overview, c.community_rating,
+                    c.poster_url, c.provider_item_id, c.directors,
+                    near.query_score, rc.final_score, rc.rank, rc.score_breakdown
+               FROM near
+               JOIN recommendation_candidates rc
+                 ON rc.${idColumn} = near.item_id
+                AND rc.run_id = (SELECT id FROM latest)
+               JOIN ${contentTable} c ON c.id = near.item_id`,
+            [ctx.userId, media, embeddingStr, ctx.embeddingModelId, ANN_POOL_SIZE]
+          )
+
+          // NUMERIC arrives from pg as a string; Number() it before any maths,
+          // or the blend silently compares strings.
+          const ranked = blendQueryAndTaste(
+            rows.rows.map((r) => ({
+              row: r,
+              queryScore: Number(r.query_score),
+              tasteScore: r.final_score != null ? Number(r.final_score) : 0,
+            }))
+          ).slice(0, safeLimit)
+
+          const sharedTitles = await resolveTwinSharedTitles(
+            ranked.map((r) => r.row.score_breakdown),
+            isMovie ? 'movies' : 'series'
+          )
+
+          for (const { row: r } of ranked) {
+            const playLink = buildPlayLink(ctx.mediaServer, r.provider_item_id, media)
+            items.push(
+              formatContentItem(
+                r as unknown as MovieResult,
+                media,
+                playLink,
+                r.rank,
+                pickSource(r.score_breakdown),
+                readTwinSharedIds(r.score_breakdown)
+                  .map((id) => sharedTitles.get(id))
+                  .filter((title): title is string => Boolean(title))
+              )
+            )
+          }
+        }
+
+        if (items.length === 0) {
+          // No completed run yet, or nothing near the request survived the
+          // join. The model falls back to semanticSearch from here.
+          return { id: `taste-search-empty-${Date.now()}`, items: [] }
+        }
+
+        return {
+          id: `taste-search-${Date.now()}`,
           titleKey: 'carouselRecommendationsTitle',
           descriptionKey: 'carouselRecommendationsDesc',
           descriptionParams: { count: items.length },
