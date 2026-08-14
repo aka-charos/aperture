@@ -43,6 +43,7 @@ import {
 } from '../tmdb/index.js'
 import { getSeriesEnrichmentData } from '../tmdb/series.js'
 import { getRatingsData } from '../omdb/ratings.js'
+import { OmdbRequestError, isGlobalOmdbFailure } from '../omdb/failures.js'
 import type { RatingsData } from '../omdb/types.js'
 import { needsEnrichmentSql } from './pending.js'
 
@@ -372,6 +373,10 @@ async function getMoviesNeedingEnrichment(
  * on every pass forever, the first must not be or the gap re-freezes.
  *
  * An error counts as NOT attempted, so a transient outage retries next run.
+ * That guarantee rests on the client *throwing* rather than returning null for
+ * a failed request: when it returned null for an HTTP 401 exactly as it does
+ * for a genuine "Movie not found!", every row an auth outage touched was
+ * stamped OMDb-complete and retired for good.
  */
 interface OmdbOutcome {
   attempted: boolean
@@ -379,6 +384,38 @@ interface OmdbOutcome {
 }
 
 const OMDB_NOT_ASKED: OmdbOutcome = { attempted: false, data: null }
+
+/**
+ * Jobs that have already announced a global OMDb failure.
+ *
+ * A bad key or a spent quota is true of every remaining title, so reporting it
+ * per title says the same thing twelve thousand times and buries the one line
+ * the operator needs. The client stops making requests on its own; this only
+ * decides where the explanation goes.
+ */
+const omdbFailureAnnounced = new Set<string>()
+
+/**
+ * Turn an OMDb failure into the per-item log string, announcing it once per run
+ * if it is the kind that will not fix itself.
+ */
+function describeOmdbFailure(err: unknown, jobId: string): string {
+  if (!(err instanceof OmdbRequestError)) return 'OMDb: error'
+
+  if (isGlobalOmdbFailure(err.kind) && !omdbFailureAnnounced.has(jobId)) {
+    omdbFailureAnnounced.add(jobId)
+    const cause =
+      err.kind === 'auth' ? 'rejected the API key' : 'reports its daily request limit reached'
+    addLog(
+      jobId,
+      'error',
+      `⛔ OMDb ${cause}: ${err.omdbError ?? `HTTP ${err.status}`}. Skipping OMDb for the rest of this run. ` +
+        `Nothing is marked OMDb-enriched, so these titles are picked up again once it's resolved. TMDb enrichment continues.`
+    )
+  }
+
+  return `OMDb: ${err.omdbError ?? 'error'}`
+}
 
 /**
  * Enrich a single movie with TMDb and OMDb data
@@ -437,7 +474,7 @@ async function enrichMovie(
             return { attempted: true, data }
           } catch (err) {
             logger.warn({ err, movieId: movie.id, title: movie.title }, 'Failed to fetch OMDb data')
-            apiResults.push('OMDb: error')
+            apiResults.push(describeOmdbFailure(err, jobId))
             return OMDB_NOT_ASKED
           }
         })()
@@ -601,7 +638,7 @@ async function enrichSeries(
               { err, seriesId: series.id, title: series.title },
               'Failed to fetch OMDb data'
             )
-            apiResults.push('OMDb: error')
+            apiResults.push(describeOmdbFailure(err, jobId))
             return OMDB_NOT_ASKED
           }
         })()
@@ -766,6 +803,9 @@ export async function enrichMetadata(jobId: string): Promise<EnrichmentProgress>
     return progress
   }
 
+  // A resumed job reuses its id, and the announcement is once per *run*.
+  omdbFailureAnnounced.delete(jobId)
+
   createJobProgress(jobId, 'enrich-metadata', 3) // 3 steps: movies, series, collections
 
   // Check for interrupted runs first
@@ -838,6 +878,13 @@ export async function enrichMetadata(jobId: string): Promise<EnrichmentProgress>
 
     const collectionsToCreate = new Map<number, CollectionData>()
 
+    // Every row this run has already handed to the enricher. See the movie loop
+    // for why: without it, a row that legitimately stays pending after being
+    // processed — which is exactly what an OMDb failure now produces — makes the
+    // batch loop re-select it forever.
+    const attemptedMovieIds = new Set<string>()
+    const attemptedSeriesIds = new Set<string>()
+
     // Process movies with concurrency
     if (totalMovies > 0) {
       setJobStep(jobId, 0, 'Enriching movies', totalItems)
@@ -848,8 +895,18 @@ export async function enrichMetadata(jobId: string): Promise<EnrichmentProgress>
           break
         }
 
-        const movies = await getMoviesNeedingEnrichment(omdbEnabled, BATCH_SIZE)
+        const fetched = await getMoviesNeedingEnrichment(omdbEnabled, BATCH_SIZE)
+        // The loop ends when the pending selection stops returning work, so a
+        // row that stays pending after being processed spins it forever. That
+        // is now reachable: an OMDb failure deliberately leaves omdb_enriched_at
+        // NULL, and the OMDb clause keeps re-selecting the row. Attempting each
+        // row at most once per run is what makes the loop terminate, and it is
+        // the correct rule anyway — a second attempt in the same pass would hit
+        // the same failure. They stay pending for the *next* run, which is the
+        // whole point of not stamping them.
+        const movies = fetched.filter((m) => !attemptedMovieIds.has(m.id))
         if (movies.length === 0) break
+        for (const movie of movies) attemptedMovieIds.add(movie.id)
 
         // Process batch concurrently
         const results = await processWithConcurrency(
@@ -911,8 +968,11 @@ export async function enrichMetadata(jobId: string): Promise<EnrichmentProgress>
           break
         }
 
-        const seriesList = await getSeriesNeedingEnrichment(omdbEnabled, BATCH_SIZE)
+        // Same one-attempt-per-run rule as the movie loop above.
+        const fetchedSeries = await getSeriesNeedingEnrichment(omdbEnabled, BATCH_SIZE)
+        const seriesList = fetchedSeries.filter((s) => !attemptedSeriesIds.has(s.id))
         if (seriesList.length === 0) break
+        for (const series of seriesList) attemptedSeriesIds.add(series.id)
 
         // Process batch concurrently
         const results = await processWithConcurrency(

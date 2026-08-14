@@ -1485,9 +1485,12 @@ export async function setOMDbConfig(config: {
   paidTier?: boolean
 }): Promise<OMDbConfig> {
   if (config.apiKey !== undefined) {
+    // Trimmed at the boundary: a key pasted with a trailing newline stores and
+    // displays fine, then reaches OMDb as a different string and is rejected —
+    // an invalid-key failure with nothing visibly wrong to find.
     await setSystemSetting(
       'omdb_api_key',
-      config.apiKey,
+      config.apiKey.trim(),
       'OMDb API key for Rotten Tomatoes scores, Metacritic, and awards'
     )
   }
@@ -1515,34 +1518,46 @@ export async function isOMDbPaidTier(): Promise<boolean> {
 
 /**
  * Test OMDb API connection
+ *
+ * OMDb answers 401 for an invalid key and for an exhausted daily quota alike,
+ * so the status code cannot say which — only the JSON body can, and this used
+ * to discard it and report "API returned status 401" for both. That is the one
+ * message the operator cannot act on, from the one button whose entire job is
+ * to tell them what is wrong.
  */
 export async function testOMDbConnection(
   apiKey?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const key = apiKey || (await getOMDbApiKey())
+    // Trimmed to match the client: a pasted key carrying a newline reaches
+    // OMDb as a different string while looking correct in the settings field.
+    const key = (apiKey || (await getOMDbApiKey()))?.trim()
     if (!key) {
       return { success: false, error: 'No API key configured' }
     }
 
     // Test with a simple API call (search for a known movie)
-    const response = await fetch(`https://www.omdbapi.com/?apikey=${key}&i=tt0111161`)
+    const response = await fetch(`https://www.omdbapi.com/?apikey=${encodeURIComponent(key)}&i=tt0111161`)
 
-    if (response.ok) {
-      const data = (await response.json()) as { Response?: string; Error?: string }
-      if (data.Response === 'True') {
-        // Auto-dismiss any auth/outage errors since connection is successful
-        const { dismissResolvedErrors } = await import('../errors/db.js')
-        await dismissResolvedErrors('omdb').catch((err) =>
-          logger.warn({ err }, 'Failed to dismiss OMDb errors')
-        )
-        return { success: true }
-      } else {
-        return { success: false, error: data.Error || 'Unknown error' }
-      }
-    } else {
-      return { success: false, error: `API returned status ${response.status}` }
+    const data = await response
+      .json()
+      .then((body) => body as { Response?: string; Error?: string })
+      .catch(() => null)
+
+    if (response.ok && data?.Response === 'True') {
+      // Auto-dismiss any auth/outage errors since connection is successful
+      const { dismissResolvedErrors } = await import('../errors/db.js')
+      await dismissResolvedErrors('omdb').catch((err) =>
+        logger.warn({ err }, 'Failed to dismiss OMDb errors')
+      )
+      return { success: true }
     }
+
+    if (data?.Error) {
+      return { success: false, error: data.Error }
+    }
+
+    return { success: false, error: `API returned status ${response.status}` }
   } catch (err) {
     const error = err instanceof Error ? err.message : 'Unknown error'
     logger.warn({ err }, 'OMDb connection test failed')
