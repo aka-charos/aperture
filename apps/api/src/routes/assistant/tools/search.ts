@@ -9,6 +9,7 @@ import { query, queryOne, transaction } from '../../../lib/db.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import { annotateWatchedItems } from '../helpers/unwatched.js'
 import { anyTitleMatchesSql, titleMatchRankSql } from '../helpers/titleMatch.js'
+import { normalizeCountryQuery } from '../helpers/countryMatch.js'
 import { briefResult, FORMAT_PARAM_DESCRIPTION } from './utils.js'
 import type { ContentCarouselI18nKey } from '../schemas/contentCarousel.js'
 import type { ContentItem } from '../schemas/index.js'
@@ -308,7 +309,15 @@ export function createSearchTools(ctx: ToolContext) {
         'Comprehensive search for movies and TV series with ALL available filters. Use for specific queries with known criteria. For conceptual/vague queries like "mind-bending movies", use semanticSearch instead. Set watchStatus to search WITHIN what the user has (or has not) watched — this is the only way to answer "which X have I seen", since getWatchHistory returns recent plays in order and cannot filter.',
       inputSchema: nullSafe(z.object({
         // Text search
-        query: z.string().optional().describe('Title or keywords to match'),
+        query: z
+          .string()
+          .optional()
+          .describe(
+            'Literal text to find in the title or plot summary. NOT a concept search: ' +
+              '"noir", "slow-burn", "feel-good" will match almost nothing, because those ' +
+              'words rarely appear in a title or synopsis. Use semanticSearch for a mood, ' +
+              'style or theme, and this only for words you expect to be written down.'
+          ),
 
         // Basic filters
         genre: z
@@ -348,11 +357,11 @@ export function createSearchTools(ctx: ToolContext) {
         country: z
           .string()
           .optional()
-          .describe('Production country, e.g. "France", "Japan", "South Korea"'),
-        language: z
-          .string()
-          .optional()
-          .describe('Spoken language, e.g. "French", "Japanese" — use for "French films" etc.'),
+          .describe(
+            'Production country — the filter for national cinema ("French films", ' +
+              '"Korean thrillers", "a Japanese horror"). Either the country ("France") ' +
+              'or the nationality ("French") works.'
+          ),
 
         // Watch status
         watchStatus: z
@@ -406,7 +415,6 @@ export function createSearchTools(ctx: ToolContext) {
           studio,
           network,
           country,
-          language,
           watchStatus = 'all',
           status,
           minSeasons,
@@ -532,13 +540,9 @@ export function createSearchTools(ctx: ToolContext) {
             idx++
           }
           if (country) {
+            // "French" has to find {France,Italy}; see countryMatch.ts.
             conditions.push(`production_countries::text ILIKE $${idx}`)
-            values.push(`%${country}%`)
-            idx++
-          }
-          if (language) {
-            conditions.push(`languages::text ILIKE $${idx}`)
-            values.push(`%${language}%`)
+            values.push(`%${normalizeCountryQuery(country)}%`)
             idx++
           }
           if (watchStatus !== 'all') {
@@ -664,6 +668,15 @@ export function createSearchTools(ctx: ToolContext) {
               'history by theme or mood — "the bleak thrillers I have seen" — which ' +
               'getWatchHistory cannot do, as it only returns recent plays in order.'
           ),
+        country: z
+          .string()
+          .optional()
+          .describe(
+            'Restrict to a production country. This is what makes national cinema ' +
+              'answerable: "French film noir" is concept "film noir" + country "France", ' +
+              'because the noir part is a style (not searchable as text) and the French ' +
+              'part is a fact about the row. Country or nationality both work.'
+          ),
         limit: z
           .number()
           .optional()
@@ -680,6 +693,7 @@ export function createSearchTools(ctx: ToolContext) {
         type = 'both',
         excludeTitle,
         watchStatus = 'all',
+        country,
         limit = 15,
         format = 'cards',
       }) => {
@@ -704,11 +718,14 @@ export function createSearchTools(ctx: ToolContext) {
           // Get model ID for database query (stored in db as string identifier)
           const modelId = ctx.embeddingModelId
 
-          // A watch-status filter is a post-filter on the ANN scan, so it needs a
-          // wider search list to have anything to filter — see HNSW_EF_SEARCH_FILTERED.
+          // Watch status and country are both post-filters on the ANN scan, so
+          // either one needs a wider search list to have anything left to
+          // filter — see HNSW_EF_SEARCH_FILTERED.
           const filterWatch = watchStatus !== 'all'
+          const countryFilter = country?.trim() ? normalizeCountryQuery(country) : null
+          const hasPostFilter = filterWatch || countryFilter !== null
           const runAnn = async <T,>(sql: string, params: unknown[]): Promise<{ rows: T[] }> => {
-            if (!filterWatch) return query<T>(sql, params)
+            if (!hasPostFilter) return query<T>(sql, params)
             return transaction(async (client) => {
               await client.query(`SET LOCAL hnsw.ef_search = ${HNSW_EF_SEARCH_FILTERED}`)
               const res = await client.query(sql, params)
@@ -716,12 +733,29 @@ export function createSearchTools(ctx: ToolContext) {
             })
           }
 
+          // $1 embedding, $2 model and $3 limit are fixed; the optional filters
+          // take the next indices in a fixed order, so the movie and series
+          // halves stay in agreement about which parameter is which.
+          const buildFilters = (isMovie: boolean, alias: string) => {
+            const clauses: string[] = []
+            const extra: unknown[] = []
+            let idx = 4
+            if (filterWatch) {
+              clauses.push(`AND ${watchStatusCondition(watchStatus, isMovie, `${alias}.id`, idx)}`)
+              extra.push(ctx.userId)
+              idx++
+            }
+            if (countryFilter) {
+              clauses.push(`AND ${alias}.production_countries::text ILIKE $${idx}`)
+              extra.push(`%${countryFilter}%`)
+              idx++
+            }
+            return { clause: clauses.join(' '), extra }
+          }
+
           if (type === 'movies' || type === 'both') {
             const movieTableName = await getActiveEmbeddingTableName('embeddings')
-            // userId is $4 — appended after the three fixed params below.
-            const watchedClause = filterWatch
-              ? `AND ${watchStatusCondition(watchStatus, true, 'm.id', 4)}`
-              : ''
+            const { clause, extra } = buildFilters(true, 'm')
             const movieResults = await runAnn<
               MovieResult & { provider_item_id?: string; similarity: number }
             >(
@@ -729,12 +763,11 @@ export function createSearchTools(ctx: ToolContext) {
                       1 - (e.embedding <=> $1::halfvec) as similarity
                FROM ${movieTableName} e
                JOIN movies m ON m.id = e.movie_id
-               WHERE e.model = $2 ${watchedClause}
+               WHERE e.model = $2 ${clause}
                ORDER BY e.embedding <=> $1::halfvec
                LIMIT $3`,
-              filterWatch
-                ? [embeddingStr, modelId, safeLimit + 5, ctx.userId]
-                : [embeddingStr, modelId, safeLimit + 5] // Get extra to account for exclusion
+              // Extra rows to absorb the excluded title and any duplicates.
+              [embeddingStr, modelId, safeLimit + 5, ...extra]
             )
 
             for (const m of movieResults.rows) {
@@ -751,9 +784,7 @@ export function createSearchTools(ctx: ToolContext) {
 
           if (type === 'series' || type === 'both') {
             const seriesTableName = await getActiveEmbeddingTableName('series_embeddings')
-            const watchedClause = filterWatch
-              ? `AND ${watchStatusCondition(watchStatus, false, 's.id', 4)}`
-              : ''
+            const { clause, extra } = buildFilters(false, 's')
             const seriesResults = await runAnn<
               SeriesResult & { provider_item_id?: string; similarity: number }
             >(
@@ -761,12 +792,11 @@ export function createSearchTools(ctx: ToolContext) {
                       1 - (se.embedding <=> $1::halfvec) as similarity
                FROM ${seriesTableName} se
                JOIN series s ON s.id = se.series_id
-               WHERE se.model = $2 ${watchedClause}
+               WHERE se.model = $2 ${clause}
                ORDER BY se.embedding <=> $1::halfvec
                LIMIT $3`,
-              filterWatch
-                ? [embeddingStr, modelId, safeLimit + 5, ctx.userId]
-                : [embeddingStr, modelId, safeLimit + 5] // Get extra to account for exclusion
+              // Extra rows to absorb the excluded title and any duplicates.
+              [embeddingStr, modelId, safeLimit + 5, ...extra]
             )
 
             for (const s of seriesResults.rows) {

@@ -11,7 +11,7 @@
     "test:security": "node --import tsx --test src/config/security.test.ts",
     "lint": "eslint src",
     "clean": "rm -rf dist",
-    "test:assistant": "node --import tsx --test src/routes/assistant/tools/tasteBlend.test.ts src/routes/assistant/helpers/routeIntent.test.ts src/routes/assistant/helpers/titleMatch.test.ts"
+    "test:assistant": "node --import tsx --test src/routes/assistant/tools/tasteBlend.test.ts src/routes/assistant/helpers/routeIntent.test.ts src/routes/assistant/helpers/titleMatch.test.ts src/routes/assistant/helpers/countryMatch.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.0",
