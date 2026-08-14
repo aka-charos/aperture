@@ -37,6 +37,7 @@ import {
 } from '@aperture/core'
 import { recordLlmError } from '../helpers/errors.js'
 import { gatherFromSources } from './sources/index.js'
+import { normalizeTitle } from '../helpers/titleMatch.js'
 import type { StatusEmitter } from '../helpers/status.js'
 import type { DiscoveryCandidate } from '../types.js'
 
@@ -171,12 +172,8 @@ function isSubstantiveReason(reason: string | undefined): boolean {
   return !FILLER_REASON_PATTERNS.some((re) => re.test(text))
 }
 
-function normalizeTitleKey(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-}
+/** Shared with resolveCandidates so dedupe folds accents the same way it matches. */
+const normalizeTitleKey = normalizeTitle
 
 /**
  * Post-process structured candidates: dedupe, drop meaningless reasons, order

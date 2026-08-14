@@ -1,0 +1,24 @@
+-- Accent-insensitive title matching.
+--
+-- 30% of a real 12.5k-film library (3,739 rows) has an `original_title` that
+-- differs from `title` — "Ascenseur Pour L'échafaud" vs "Elevator To The
+-- Gallows". Web-sourced recommendations name titles either way, and every
+-- lookup in the assistant compared `title` alone with a plain ILIKE, so those
+-- films were unreachable by their real names.
+--
+-- Matching both columns is most of the fix, but not all of it: a source that
+-- writes "Ascenseur pour l'echafaud" without the accent still fails a byte-wise
+-- ILIKE against the accented row. unaccent() closes that.
+--
+-- Safe to add: pg_trgm is already created in 0060, so postgresql-contrib is
+-- present and unaccent ships in the same package.
+CREATE EXTENSION IF NOT EXISTS unaccent;
+
+-- Deliberately no expression index. unaccent() is STABLE rather than IMMUTABLE,
+-- so indexing it needs an IMMUTABLE wrapper function, and at this table size the
+-- sequential scan costs a few milliseconds inside a tool call that already takes
+-- tens of seconds. If the library grows an order of magnitude, add:
+--   CREATE FUNCTION immutable_unaccent(text) RETURNS text LANGUAGE sql
+--     IMMUTABLE STRICT PARALLEL SAFE AS
+--     $$ SELECT public.unaccent('public.unaccent'::regdictionary, $1) $$;
+--   CREATE INDEX ... USING GIN (immutable_unaccent(title) gin_trgm_ops);
