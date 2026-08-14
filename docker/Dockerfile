@@ -104,10 +104,21 @@ RUN mkdir -p /app/uploads && chown aperture:nodejs /app/uploads
 # Set user
 USER aperture
 
+# Version identity, supplied by CI (see .github/workflows/docker-build.yml).
+# APP_VERSION is the upstream lineage this fork tracks; APP_BUILD identifies the
+# fork build ("mod.<commits>.g<shortsha>"). Left empty here on purpose: an image
+# built by hand then reports the code fallbacks, which say "dev" rather than
+# claiming to be a release. Declared AFTER the build stages so a version bump
+# does not invalidate their layer cache.
+ARG APP_VERSION=""
+ARG APP_BUILD=""
+
 # Environment
 ENV NODE_ENV=production
 ENV PORT=3456
 ENV DOCKER_ENV=true
+ENV APP_VERSION=${APP_VERSION}
+ENV APP_BUILD=${APP_BUILD}
 
 # Expose port
 EXPOSE 3456
