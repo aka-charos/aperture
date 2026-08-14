@@ -31,6 +31,15 @@ export const ContentItemSchema = z.object({
     .describe('Short rationale for why this title fits the request (rendered on the card)'),
   rating: z.number().nullable().optional().describe('Community rating 0-10'),
   userRating: z.number().nullable().optional().describe('User rating 1-10'),
+  watched: z
+    .boolean()
+    .optional()
+    .describe(
+      "Whether the user has already watched this title, read from their watch history. This is " +
+        'authoritative: use it rather than guessing from whatever history you happen to have ' +
+        'fetched, and NEVER claim someone has or has not seen something without it. Absent means ' +
+        'not looked up — which is not the same as false.'
+    ),
   rank: z.number().optional().describe('Recommendation rank'),
   source: z
     .enum(['ranked', 'twin', 'interest'])

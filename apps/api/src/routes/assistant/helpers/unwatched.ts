@@ -46,6 +46,37 @@ async function watchedIds(
 }
 
 /**
+ * Stamp `watched` on every card from the user's history, in ONE round trip.
+ *
+ * Without this the model has no way to tell whether a search result has been
+ * seen: `ContentItem` carried no such field, so answering "which X have I
+ * watched" meant fetching a page of recent history and eyeballing it — which
+ * produced confident false negatives ("you haven't watched any French film
+ * noir") from a sample far too small to support them.
+ *
+ * Mutates in place and returns the same array: callers hand these straight to
+ * an existing result object. Fails open by leaving the field absent, which the
+ * schema documents as "not looked up" rather than "unwatched".
+ */
+export async function annotateWatchedItems(
+  userId: string,
+  items: ContentItem[]
+): Promise<ContentItem[]> {
+  if (items.length === 0) return items
+  try {
+    const watched = await watchedIds(
+      userId,
+      items.filter((i) => i.type === 'movie').map((i) => i.id),
+      items.filter((i) => i.type === 'series').map((i) => i.id)
+    )
+    for (const item of items) item.watched = watched.has(item.id)
+  } catch {
+    // Leave the field absent — see the schema note on absent vs false.
+  }
+  return items
+}
+
+/**
  * Drop the items the user has already watched. Returns the list unchanged if
  * the lookup fails — a filter this cheap must never cost the user their results.
  */
@@ -112,6 +143,13 @@ export function withUnwatchedFilter<T extends ToolSet>(tools: T, userId: string)
       if (!execute || EXEMPT_TOOLS.has(name)) return [name, toolDef]
       const filtered: typeof execute = async (input, options) => {
         const result = await execute(input, options)
+        // An explicit `watchStatus: 'watched'` IS the question ("which noir have
+        // I seen?"), so stripping watched titles would empty the answer — the
+        // same reason EXEMPT_TOOLS exists, but decided per CALL rather than per
+        // tool, because the same search tool serves both kinds of request.
+        // Only 'watched' overrides: 'all' is the model's default, not a user
+        // intent, and must still honour the composer's preference.
+        if (isRecord(input) && input.watchStatus === 'watched') return result
         const containers = cardContainers(result)
         if (containers.length === 0) return result
 

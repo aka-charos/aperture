@@ -35,6 +35,7 @@ import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder'
 import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined'
 import MovieCreationOutlinedIcon from '@mui/icons-material/MovieCreationOutlined'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import CheckIcon from '@mui/icons-material/Check'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { RankBadge, getProxiedImageUrl } from '@aperture/ui'
@@ -282,6 +283,32 @@ export function ContentCard({
           )}
           {/* Rank badge */}
           {item.rank && <RankBadge rank={item.rank} size="small" />}
+          {/* Watched marker. `=== true` on purpose: the field is absent when the
+              tool never looked it up, and "unknown" must not render as "not
+              watched". Opposite corner from the rank badge so the two never
+              collide on a recommendation card. */}
+          {item.watched === true && (
+            <Tooltip title={t('assistantToolUi.watched')}>
+              <Box
+                aria-label={t('assistantToolUi.watched')}
+                sx={{
+                  position: 'absolute',
+                  top: 4,
+                  insetInlineStart: 4,
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: alpha('#10b981', 0.9),
+                  color: '#fff',
+                }}
+              >
+                <CheckIcon sx={{ fontSize: 13 }} />
+              </Box>
+            </Tooltip>
+          )}
         </Box>
 
         {/* Ratings. Community score as plain text rather than a chip: at rail
