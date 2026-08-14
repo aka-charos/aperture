@@ -102,10 +102,26 @@ export const googleGroundingSource: WebSearchSource = {
               | { groundingMetadata?: { webSearchQueries?: string[]; groundingChunks?: unknown[] } }
               | undefined
           )?.groundingMetadata
+          // The task instructions live in the system message, so a provider that
+          // silently drops it would leave this call with nothing but the user's
+          // question — free prose instead of a title list, and a structuring
+          // pass fed garbage. The SDK reports that as an unsupported-setting
+          // warning, which is worth its own line rather than a field nobody
+          // reads. Empty on every healthy call.
+          if (pass1.warnings?.length) {
+            logger.warn(
+              { warnings: pass1.warnings, modelId: pass1.response?.modelId },
+              'Google grounding returned provider warnings'
+            )
+          }
           logger.info(
             {
               attempt,
               keySlot: keyAttempt.slot,
+              // Which model actually served this — the Web Search role is
+              // configurable and its free-tier models differ in what they
+              // support, so "it worked on mine" is not a useful record.
+              modelId: pass1.response?.modelId,
               webSearchQueries: grounding?.webSearchQueries ?? [],
               groundingChunks: grounding?.groundingChunks?.length ?? 0,
               sources: pass1.sources?.length ?? 0,
