@@ -2,7 +2,7 @@
  * Watch history and ratings tools with Tool UI output schemas
  */
 import { tool } from 'ai'
-import { nullSafe } from './utils.js'
+import { nullSafe, briefResult, FORMAT_PARAM_DESCRIPTION, type BriefEntry } from './utils.js'
 import { z } from 'zod'
 import { query } from '../../../lib/db.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
@@ -16,9 +16,12 @@ export function createHistoryTools(ctx: ToolContext) {
       inputSchema: nullSafe(z.object({
         type: z.enum(['movies', 'series', 'both']).optional().default('both'),
         limit: z.number().optional().default(20),
+        format: z.enum(['cards', 'brief']).optional().default('cards')
+          .describe(FORMAT_PARAM_DESCRIPTION),
       })),
-      execute: async ({ type = 'both', limit = 20 }) => {
+      execute: async ({ type = 'both', limit = 20, format = 'cards' }) => {
         const items: ContentItem[] = []
+        const brief: BriefEntry[] = []
 
         if (type === 'movies' || type === 'both') {
           const movieHistory = await query<{
@@ -42,6 +45,11 @@ export function createHistoryTools(ctx: ToolContext) {
           )
 
           for (const m of movieHistory.rows) {
+            brief.push({
+              name: m.title,
+              year: m.year,
+              note: m.play_count > 1 ? `${m.play_count}× played` : null,
+            })
             const playLink = buildPlayLink(ctx.mediaServer, m.provider_item_id, 'movie')
             const genres = m.genres?.slice(0, 2).join(', ') || ''
             const playInfo = m.play_count > 1 ? ` · ${m.play_count}x` : ''
@@ -93,6 +101,7 @@ export function createHistoryTools(ctx: ToolContext) {
             const playLink = buildPlayLink(ctx.mediaServer, s.provider_item_id, 'series')
             const genres = s.genres?.slice(0, 2).join(', ') || ''
             const epCount = parseInt(s.episodes_watched)
+            brief.push({ name: s.title, year: s.year, note: `${epCount} ep watched` })
             const subtitle = [s.year, genres, `${epCount} ep${epCount !== 1 ? 's' : ''}`]
               .filter(Boolean)
               .join(' · ')
@@ -115,6 +124,8 @@ export function createHistoryTools(ctx: ToolContext) {
           }
         }
 
+        if (format === 'brief') return briefResult(`history-${Date.now()}`, brief)
+
         return {
           id: `history-${Date.now()}`,
           titleKey: 'carouselWatchHistoryTitle',
@@ -131,9 +142,12 @@ export function createHistoryTools(ctx: ToolContext) {
         minRating: z.number().optional().describe('Minimum rating (1-10)'),
         maxRating: z.number().optional().describe('Maximum rating (1-10)'),
         limit: z.number().optional().default(20),
+        format: z.enum(['cards', 'brief']).optional().default('cards')
+          .describe(FORMAT_PARAM_DESCRIPTION),
       })),
-      execute: async ({ minRating, maxRating, limit = 20 }) => {
+      execute: async ({ minRating, maxRating, limit = 20, format = 'cards' }) => {
         const items: ContentItem[] = []
+        const brief: BriefEntry[] = []
 
         let whereClause = 'WHERE ur.user_id = $1'
         const params: unknown[] = [ctx.userId]
@@ -169,6 +183,7 @@ export function createHistoryTools(ctx: ToolContext) {
         )
 
         for (const m of movieRatings.rows) {
+          brief.push({ name: m.title, year: m.year, note: `rated ${m.rating}` })
           const playLink = buildPlayLink(ctx.mediaServer, m.provider_item_id, 'movie')
           const genres = m.genres?.slice(0, 2).join(', ') || ''
           const subtitle = [m.year, genres, `${m.rating}❤️`].filter(Boolean).join(' · ')
@@ -211,6 +226,7 @@ export function createHistoryTools(ctx: ToolContext) {
         )
 
         for (const s of seriesRatings.rows) {
+          brief.push({ name: s.title, year: s.year, note: `rated ${s.rating}` })
           const playLink = buildPlayLink(ctx.mediaServer, s.provider_item_id, 'series')
           const genres = s.genres?.slice(0, 2).join(', ') || ''
           const subtitle = [s.year, genres, `${s.rating}❤️`].filter(Boolean).join(' · ')
@@ -232,6 +248,8 @@ export function createHistoryTools(ctx: ToolContext) {
             ],
           })
         }
+
+        if (format === 'brief') return briefResult(`ratings-${Date.now()}`, brief)
 
         return {
           id: `ratings-${Date.now()}`,

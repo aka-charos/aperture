@@ -9,6 +9,7 @@ import { query, queryOne, transaction } from '../../../lib/db.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import { annotateWatchedItems } from '../helpers/unwatched.js'
 import { anyTitleMatchesSql, titleMatchRankSql } from '../helpers/titleMatch.js'
+import { briefResult, FORMAT_PARAM_DESCRIPTION } from './utils.js'
 import type { ContentCarouselI18nKey } from '../schemas/contentCarousel.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext, MovieResult, SeriesResult } from '../types.js'
@@ -383,6 +384,9 @@ export function createSearchTools(ctx: ToolContext) {
           .optional()
           .default('rating'),
         sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
+
+        format: z.enum(['cards', 'brief']).optional().default('cards')
+          .describe(FORMAT_PARAM_DESCRIPTION),
       })),
       execute: async (params) => {
         const {
@@ -411,9 +415,12 @@ export function createSearchTools(ctx: ToolContext) {
           limit = 15,
           sortBy = 'rating',
           sortOrder = 'desc',
+          format = 'cards',
         } = params
 
         const items: ContentItem[] = []
+        // ContentItem folds the year into `subtitle`; a brief line wants it back.
+        const yearById = new Map<string, number | null>()
         const seenTitles = new Set<string>()
         const safeLimit = Math.min(limit ?? 15, 50)
 
@@ -571,6 +578,7 @@ export function createSearchTools(ctx: ToolContext) {
             if (!seenTitles.has(titleKey)) {
               seenTitles.add(titleKey)
               const playLink = buildPlayLink(ctx.mediaServer, m.provider_item_id, 'movie')
+              yearById.set(m.id, m.year)
               items.push(formatContentItem(m, 'movie', playLink))
             }
           }
@@ -590,6 +598,7 @@ export function createSearchTools(ctx: ToolContext) {
             if (!seenTitles.has(titleKey)) {
               seenTitles.add(titleKey)
               const playLink = buildPlayLink(ctx.mediaServer, s.provider_item_id, 'series')
+              yearById.set(s.id, s.year)
               items.push(formatContentItem(s, 'series', playLink))
             }
           }
@@ -607,6 +616,19 @@ export function createSearchTools(ctx: ToolContext) {
         // seen, so "have I watched any of these" is read off the data instead
         // of guessed. One round trip for the whole page.
         await annotateWatchedItems(ctx.userId, items)
+
+        if (format === 'brief') {
+          // After annotation, so a private lookup can answer "have they seen
+          // these?" — which is the main reason to make one.
+          return briefResult(
+            `search-${Date.now()}`,
+            items.map((i) => ({
+              name: i.name,
+              year: yearById.get(i.id) ?? null,
+              note: i.watched === true ? 'watched' : null,
+            }))
+          )
+        }
 
         const { titleKey, titleParams } = searchContentTitleKey(searchQuery, genre, type)
         return {
@@ -647,8 +669,20 @@ export function createSearchTools(ctx: ToolContext) {
           .optional()
           .default(15)
           .describe('Number of results to return (default 15, max 50)'),
+        format: z
+          .enum(['cards', 'brief'])
+          .optional()
+          .default('cards')
+          .describe(FORMAT_PARAM_DESCRIPTION),
       })),
-      execute: async ({ concept, type = 'both', excludeTitle, watchStatus = 'all', limit = 15 }) => {
+      execute: async ({
+        concept,
+        type = 'both',
+        excludeTitle,
+        watchStatus = 'all',
+        limit = 15,
+        format = 'cards',
+      }) => {
         try {
           const safeLimit = Math.min(limit ?? 15, 50)
 
@@ -660,6 +694,8 @@ export function createSearchTools(ctx: ToolContext) {
           const embeddingStr = `[${queryEmbedding.join(',')}]`
 
           const items: ContentItem[] = []
+          // ContentItem folds the year into `subtitle`; a brief line wants it back.
+          const yearById = new Map<string, number | null>()
           const seenTitles = new Set<string>() // Deduplicate by title
 
           // If user mentioned a title they already watched, exclude it
@@ -708,6 +744,7 @@ export function createSearchTools(ctx: ToolContext) {
               if (seenTitles.has(titleKey)) continue
               seenTitles.add(titleKey)
               const playLink = buildPlayLink(ctx.mediaServer, m.provider_item_id, 'movie')
+              yearById.set(m.id, m.year)
               items.push(formatContentItem(m, 'movie', playLink))
             }
           }
@@ -739,6 +776,7 @@ export function createSearchTools(ctx: ToolContext) {
               if (seenTitles.has(titleKey)) continue
               seenTitles.add(titleKey)
               const playLink = buildPlayLink(ctx.mediaServer, s.provider_item_id, 'series')
+              yearById.set(s.id, s.year)
               items.push(formatContentItem(s, 'series', playLink))
             }
           }
@@ -749,6 +787,17 @@ export function createSearchTools(ctx: ToolContext) {
           // Limit final results
           const finalItems = items.slice(0, safeLimit)
           await annotateWatchedItems(ctx.userId, finalItems)
+
+          if (format === 'brief') {
+            return briefResult(
+              `semantic-${Date.now()}`,
+              finalItems.map((i) => ({
+                name: i.name,
+                year: yearById.get(i.id) ?? null,
+                note: i.watched === true ? 'watched' : null,
+              }))
+            )
+          }
 
           if (finalItems.length === 0) {
             return {
