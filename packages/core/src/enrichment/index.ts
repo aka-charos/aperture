@@ -43,8 +43,20 @@ import {
 } from '../tmdb/index.js'
 import { getSeriesEnrichmentData } from '../tmdb/series.js'
 import { getRatingsData } from '../omdb/ratings.js'
+import type { RatingsData } from '../omdb/types.js'
+import { needsEnrichmentSql } from './pending.js'
 
 const logger = createChildLogger('enrichment')
+
+// ============================================================================
+// What still needs enriching
+// ============================================================================
+
+/** OMDb can only be asked when it is switched on AND holds a key. */
+async function isOmdbUsable(): Promise<boolean> {
+  const config = await getOMDbConfig()
+  return config.enabled && config.hasApiKey
+}
 
 // ============================================================================
 // Enrichment Run Tracking
@@ -143,20 +155,19 @@ export async function getIncompleteEnrichmentRun(): Promise<{
       `SELECT value FROM system_settings WHERE key = 'enrichment_version'`
     )
     const currentVersion = parseInt(versionResult?.value || '1', 10)
-    
+    const omdbEnabled = await isOmdbUsable()
+
     const movieCount = await queryOne<{ count: string }>(
-      `SELECT COUNT(*) as count FROM movies 
-       WHERE (enriched_at IS NULL OR COALESCE(enrichment_version, 0) < $1)
-         AND (imdb_id IS NOT NULL OR tmdb_id IS NOT NULL)`,
+      `SELECT COUNT(*) as count FROM movies
+       WHERE ${needsEnrichmentSql('movies', '$1', omdbEnabled)}`,
       [currentVersion]
     )
     const seriesCount = await queryOne<{ count: string }>(
-      `SELECT COUNT(*) as count FROM series 
-       WHERE (enriched_at IS NULL OR COALESCE(enrichment_version, 0) < $1)
-         AND (imdb_id IS NOT NULL OR tmdb_id IS NOT NULL OR tvdb_id IS NOT NULL)`,
+      `SELECT COUNT(*) as count FROM series
+       WHERE ${needsEnrichmentSql('series', '$1', omdbEnabled)}`,
       [currentVersion]
     )
-    
+
     return {
       hasIncompleteRun: true,
       run: lastRun,
@@ -330,7 +341,10 @@ interface SeriesToEnrich {
  * Get movies that need enrichment
  * Includes: never enriched OR enrichment version is outdated
  */
-async function getMoviesNeedingEnrichment(limit: number = 100): Promise<MovieToEnrich[]> {
+async function getMoviesNeedingEnrichment(
+  omdbEnabled: boolean,
+  limit: number = 100
+): Promise<MovieToEnrich[]> {
   // Get current enrichment version from system settings
   const versionResult = await queryOne<{ value: string }>(
     `SELECT value FROM system_settings WHERE key = 'enrichment_version'`
@@ -340,9 +354,8 @@ async function getMoviesNeedingEnrichment(limit: number = 100): Promise<MovieToE
   const result = await query<MovieToEnrich>(
     `SELECT id, title, tmdb_id, imdb_id
      FROM movies
-     WHERE (enriched_at IS NULL OR COALESCE(enrichment_version, 0) < $2)
-       AND (imdb_id IS NOT NULL OR tmdb_id IS NOT NULL)
-     ORDER BY 
+     WHERE ${needsEnrichmentSql('movies', '$2', omdbEnabled)}
+     ORDER BY
        CASE WHEN enriched_at IS NULL THEN 0 ELSE 1 END,  -- New items first
        created_at DESC
      LIMIT $1`,
@@ -350,6 +363,22 @@ async function getMoviesNeedingEnrichment(limit: number = 100): Promise<MovieToE
   )
   return result.rows
 }
+
+/**
+ * Whether OMDb was actually asked, kept separate from whether it had anything
+ * to say. `data: null` alone cannot distinguish "we never called" from "we
+ * called and it has no entry", and stamping omdb_enriched_at needs exactly
+ * that distinction: the second must be recorded or those titles are re-fetched
+ * on every pass forever, the first must not be or the gap re-freezes.
+ *
+ * An error counts as NOT attempted, so a transient outage retries next run.
+ */
+interface OmdbOutcome {
+  attempted: boolean
+  data: RatingsData | null
+}
+
+const OMDB_NOT_ASKED: OmdbOutcome = { attempted: false, data: null }
 
 /**
  * Enrich a single movie with TMDb and OMDb data
@@ -389,7 +418,7 @@ async function enrichMovie(
         })()
       : Promise.resolve(null)
 
-  const omdbPromise =
+  const omdbPromise: Promise<OmdbOutcome> =
     omdbEnabled && movie.imdb_id
       ? (async () => {
           try {
@@ -404,17 +433,19 @@ async function enrichMovie(
             } else {
               apiResults.push('OMDb: not found')
             }
-            return data
+            // Asked and answered, even when the answer was "no entry".
+            return { attempted: true, data }
           } catch (err) {
             logger.warn({ err, movieId: movie.id, title: movie.title }, 'Failed to fetch OMDb data')
             apiResults.push('OMDb: error')
-            return null
+            return OMDB_NOT_ASKED
           }
         })()
-      : Promise.resolve(null)
+      : Promise.resolve(OMDB_NOT_ASKED)
 
   // Execute both API calls in parallel
-  const [tmdbData, omdbData] = await Promise.all([tmdbPromise, omdbPromise])
+  const [tmdbData, omdb] = await Promise.all([tmdbPromise, omdbPromise])
+  const omdbData = omdb.data
 
   // Log API results summary for this movie
   if (apiResults.length > 0) {
@@ -448,7 +479,10 @@ async function enrichMovie(
          languages = COALESCE($12, languages),
          production_countries = COALESCE($13, production_countries),
          enriched_at = NOW(),
-         enrichment_version = COALESCE((SELECT value::int FROM system_settings WHERE key = 'enrichment_version'), 1)
+         enrichment_version = COALESCE((SELECT value::int FROM system_settings WHERE key = 'enrichment_version'), 1),
+         -- Only advance when OMDb was actually asked; CASE rather than COALESCE
+         -- so a pass that skipped OMDb leaves an earlier timestamp intact.
+         omdb_enriched_at = CASE WHEN $14 THEN NOW() ELSE omdb_enriched_at END
        WHERE id = $1`,
       [
         movie.id,
@@ -464,6 +498,7 @@ async function enrichMovie(
         omdbData?.awardsSummary ?? null,
         omdbData?.languages ?? null,
         omdbData?.countries ?? null,
+        omdb.attempted,
       ]
     )
     return true
@@ -480,7 +515,10 @@ async function enrichMovie(
 /**
  * Get series that need enrichment
  */
-async function getSeriesNeedingEnrichment(limit: number = 100): Promise<SeriesToEnrich[]> {
+async function getSeriesNeedingEnrichment(
+  omdbEnabled: boolean,
+  limit: number = 100
+): Promise<SeriesToEnrich[]> {
   // Get current enrichment version from system settings
   const versionResult = await queryOne<{ value: string }>(
     `SELECT value FROM system_settings WHERE key = 'enrichment_version'`
@@ -490,9 +528,8 @@ async function getSeriesNeedingEnrichment(limit: number = 100): Promise<SeriesTo
   const result = await query<SeriesToEnrich>(
     `SELECT id, title, tmdb_id, imdb_id, tvdb_id
      FROM series
-     WHERE (enriched_at IS NULL OR COALESCE(enrichment_version, 0) < $2)
-       AND (imdb_id IS NOT NULL OR tmdb_id IS NOT NULL OR tvdb_id IS NOT NULL)
-     ORDER BY 
+     WHERE ${needsEnrichmentSql('series', '$2', omdbEnabled)}
+     ORDER BY
        CASE WHEN enriched_at IS NULL THEN 0 ELSE 1 END,  -- New items first
        created_at DESC
      LIMIT $1`,
@@ -542,7 +579,7 @@ async function enrichSeries(
         })()
       : Promise.resolve(null)
 
-  const omdbPromise =
+  const omdbPromise: Promise<OmdbOutcome> =
     omdbEnabled && series.imdb_id
       ? (async () => {
           try {
@@ -557,20 +594,22 @@ async function enrichSeries(
             } else {
               apiResults.push('OMDb: not found')
             }
-            return data
+            // Asked and answered, even when the answer was "no entry".
+            return { attempted: true, data }
           } catch (err) {
             logger.warn(
               { err, seriesId: series.id, title: series.title },
               'Failed to fetch OMDb data'
             )
             apiResults.push('OMDb: error')
-            return null
+            return OMDB_NOT_ASKED
           }
         })()
-      : Promise.resolve(null)
+      : Promise.resolve(OMDB_NOT_ASKED)
 
   // Execute both API calls in parallel
-  const [tmdbData, omdbData] = await Promise.all([tmdbPromise, omdbPromise])
+  const [tmdbData, omdb] = await Promise.all([tmdbPromise, omdbPromise])
+  const omdbData = omdb.data
 
   // Log API results summary for this series
   if (apiResults.length > 0) {
@@ -589,7 +628,10 @@ async function enrichSeries(
          languages = COALESCE($7, languages),
          production_countries = COALESCE($8, production_countries),
          enriched_at = NOW(),
-         enrichment_version = COALESCE((SELECT value::int FROM system_settings WHERE key = 'enrichment_version'), 1)
+         enrichment_version = COALESCE((SELECT value::int FROM system_settings WHERE key = 'enrichment_version'), 1),
+         -- Only advance when OMDb was actually asked; CASE rather than COALESCE
+         -- so a pass that skipped OMDb leaves an earlier timestamp intact.
+         omdb_enriched_at = CASE WHEN $9 THEN NOW() ELSE omdb_enriched_at END
        WHERE id = $1`,
       [
         series.id,
@@ -600,6 +642,7 @@ async function enrichSeries(
         omdbData?.awardsSummary ?? null,
         omdbData?.languages ?? null,
         omdbData?.countries ?? null,
+        omdb.attempted,
       ]
     )
     return true
@@ -749,17 +792,17 @@ export async function enrichMetadata(jobId: string): Promise<EnrichmentProgress>
     )
     const currentVersion = parseInt(versionResult?.value || '1', 10)
 
-    // Get counts for progress tracking (includes never enriched + outdated versions)
+    // Counts for progress tracking. Must use the same predicate the selection
+    // does, or the progress bar counts a different population than the loop
+    // processes and the run appears to stall or finish early.
     const movieCount = await queryOne<{ count: string }>(
-      `SELECT COUNT(*) as count FROM movies 
-       WHERE (enriched_at IS NULL OR COALESCE(enrichment_version, 0) < $1)
-         AND (imdb_id IS NOT NULL OR tmdb_id IS NOT NULL)`,
+      `SELECT COUNT(*) as count FROM movies
+       WHERE ${needsEnrichmentSql('movies', '$1', omdbEnabled)}`,
       [currentVersion]
     )
     const seriesCount = await queryOne<{ count: string }>(
-      `SELECT COUNT(*) as count FROM series 
-       WHERE (enriched_at IS NULL OR COALESCE(enrichment_version, 0) < $1)
-         AND (imdb_id IS NOT NULL OR tmdb_id IS NOT NULL OR tvdb_id IS NOT NULL)`,
+      `SELECT COUNT(*) as count FROM series
+       WHERE ${needsEnrichmentSql('series', '$1', omdbEnabled)}`,
       [currentVersion]
     )
 
@@ -805,7 +848,7 @@ export async function enrichMetadata(jobId: string): Promise<EnrichmentProgress>
           break
         }
 
-        const movies = await getMoviesNeedingEnrichment(BATCH_SIZE)
+        const movies = await getMoviesNeedingEnrichment(omdbEnabled, BATCH_SIZE)
         if (movies.length === 0) break
 
         // Process batch concurrently
@@ -868,7 +911,7 @@ export async function enrichMetadata(jobId: string): Promise<EnrichmentProgress>
           break
         }
 
-        const seriesList = await getSeriesNeedingEnrichment(BATCH_SIZE)
+        const seriesList = await getSeriesNeedingEnrichment(omdbEnabled, BATCH_SIZE)
         if (seriesList.length === 0) break
 
         // Process batch concurrently
@@ -1013,19 +1056,25 @@ export async function getEnrichmentStats(): Promise<{
  * Clear enrichment data (for re-enriching)
  */
 export async function clearEnrichmentData(): Promise<void> {
-  await query(`UPDATE movies SET enriched_at = NULL, enrichment_version = 0`)
-  await query(`UPDATE series SET enriched_at = NULL, enrichment_version = 0`)
+  await query(`UPDATE movies SET enriched_at = NULL, enrichment_version = 0, omdb_enriched_at = NULL`)
+  await query(`UPDATE series SET enriched_at = NULL, enrichment_version = 0, omdb_enriched_at = NULL`)
   logger.info('Enrichment data cleared')
 }
 
 /**
  * Get enrichment version status
  * Returns current version and counts of items needing update
+ *
+ * `missingOmdb` is reported separately because the version counter cannot see
+ * it: a row enriched without OMDb is stamped at the current version, so this
+ * function used to report zero outdated items on a library where OMDb had
+ * never run at all. Counted only for rows with an imdb_id, since OMDb is
+ * looked up by that and a row without one is not missing anything obtainable.
  */
 export async function getEnrichmentVersionStatus(): Promise<{
   currentVersion: number
-  movies: { total: number; outdated: number }
-  series: { total: number; outdated: number }
+  movies: { total: number; outdated: number; missingOmdb: number }
+  series: { total: number; outdated: number; missingOmdb: number }
   needsUpdate: boolean
 }> {
   // Get current version from system settings
@@ -1035,20 +1084,22 @@ export async function getEnrichmentVersionStatus(): Promise<{
   const currentVersion = parseInt(versionResult?.value || '1', 10)
 
   // Count movies with outdated enrichment
-  const movieStats = await queryOne<{ total: string; outdated: string }>(
-    `SELECT 
+  const movieStats = await queryOne<{ total: string; outdated: string; missing_omdb: string }>(
+    `SELECT
        COUNT(*) as total,
-       COUNT(*) FILTER (WHERE enrichment_version < $1) as outdated
+       COUNT(*) FILTER (WHERE enrichment_version < $1) as outdated,
+       COUNT(*) FILTER (WHERE omdb_enriched_at IS NULL AND imdb_id IS NOT NULL) as missing_omdb
      FROM movies
      WHERE enriched_at IS NOT NULL`,
     [currentVersion]
   )
 
   // Count series with outdated enrichment
-  const seriesStats = await queryOne<{ total: string; outdated: string }>(
-    `SELECT 
+  const seriesStats = await queryOne<{ total: string; outdated: string; missing_omdb: string }>(
+    `SELECT
        COUNT(*) as total,
-       COUNT(*) FILTER (WHERE enrichment_version < $1) as outdated
+       COUNT(*) FILTER (WHERE enrichment_version < $1) as outdated,
+       COUNT(*) FILTER (WHERE omdb_enriched_at IS NULL AND imdb_id IS NOT NULL) as missing_omdb
      FROM series
      WHERE enriched_at IS NOT NULL`,
     [currentVersion]
@@ -1056,17 +1107,23 @@ export async function getEnrichmentVersionStatus(): Promise<{
 
   const movieOutdated = parseInt(movieStats?.outdated || '0', 10)
   const seriesOutdated = parseInt(seriesStats?.outdated || '0', 10)
+  const movieMissingOmdb = parseInt(movieStats?.missing_omdb || '0', 10)
+  const seriesMissingOmdb = parseInt(seriesStats?.missing_omdb || '0', 10)
 
   return {
     currentVersion,
     movies: {
       total: parseInt(movieStats?.total || '0', 10),
       outdated: movieOutdated,
+      missingOmdb: movieMissingOmdb,
     },
     series: {
       total: parseInt(seriesStats?.total || '0', 10),
       outdated: seriesOutdated,
+      missingOmdb: seriesMissingOmdb,
     },
+    // Deliberately not folding in missingOmdb: with OMDb switched off those
+    // rows are not "needing an update", they are simply not getting OMDb.
     needsUpdate: movieOutdated > 0 || seriesOutdated > 0,
   }
 }

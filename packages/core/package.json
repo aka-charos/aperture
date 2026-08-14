@@ -61,6 +61,7 @@
     "test:twins": "node --import tsx --test src/recommender/shared/twinSlots.test.ts",
     "test:schedule": "node --import tsx --test src/jobs/schedule.test.ts",
     "test:discovery": "node --import tsx --test src/discover/scorer.test.ts",
+    "test:enrichment": "node --import tsx --test src/enrichment/needsEnrichment.test.ts",
     "lint": "eslint src",
     "clean": "rm -rf dist"
   },
