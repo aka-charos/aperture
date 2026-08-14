@@ -3,7 +3,9 @@ export {
   buildCanonicalText,
   embedMovies,
   storeEmbeddings,
-  getMoviesWithoutEmbeddings,
+  getMoviesNeedingEmbeddings,
+  markEmbeddingsCurrent,
+  CANONICAL_TEXT_VERSION,
   generateMissingEmbeddings,
   getMovieEmbedding,
 } from './embeddings.js'

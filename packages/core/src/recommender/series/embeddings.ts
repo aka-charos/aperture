@@ -16,6 +16,9 @@ import {
 } from '../../lib/ai-provider.js'
 import { embedMany } from 'ai'
 import { randomUUID } from 'crypto'
+// One version for both media types: a builder change invalidates whichever
+// texts it touched, and two counters would drift.
+import { CANONICAL_TEXT_VERSION } from '../movies/embeddings.js'
 
 const logger = createChildLogger('embeddings-series')
 
@@ -38,7 +41,34 @@ interface SeriesForEmbedding {
   awards: string | null
   totalSeasons: number | null
   totalEpisodes: number | null
+  // Enrichment output — see the movie builder for why these were missing
+  keywords: string[] | null
+  languages: string[] | null
+  awardsSummary: string | null
 }
+
+/**
+ * A series whose vector is missing or out of date, carrying the text that was
+ * embedded last time so the caller can skip an unchanged one.
+ */
+export interface SeriesNeedingEmbedding extends SeriesForEmbedding {
+  storedCanonicalText: string | null
+}
+
+/** Mirrors the movie builder's cap. */
+const MAX_KEYWORDS = 18
+
+/**
+ * Missing, built by an older builder, or enriched since it was embedded.
+ * Mirrors MOVIE_STALE_SQL — the two pipelines must agree or one media type
+ * silently keeps stale vectors. `updated_at` rather than `created_at` for the
+ * same reason: the upsert preserves created_at, so it would never clear.
+ */
+const SERIES_STALE_SQL = `(
+        e.id IS NULL
+        OR COALESCE(e.text_version, 0) < $3
+        OR (s.enriched_at IS NOT NULL AND e.updated_at < s.enriched_at)
+      )`
 
 interface EpisodeForEmbedding {
   id: string
@@ -159,6 +189,12 @@ export function buildSeriesCanonicalText(series: SeriesForEmbedding): string {
     sections.push(`Themes: ${series.tags.join(', ')}`)
   }
 
+  // TMDb keywords — the concept vocabulary. Same reasoning as the movie
+  // builder: a style or subject almost never appears in a synopsis.
+  if (series.keywords && series.keywords.length > 0) {
+    sections.push(`Keywords: ${series.keywords.slice(0, MAX_KEYWORDS).join(', ')}`)
+  }
+
   // === SECTION 5: Context ===
   // Series scope (seasons/episodes)
   if (series.totalSeasons && series.totalEpisodes) {
@@ -173,10 +209,17 @@ export function buildSeriesCanonicalText(series: SeriesForEmbedding): string {
     sections.push(`From ${countries.join(', ')}`)
   }
 
-  // Awards signal quality
-  if (series.awards) {
-    const awardsText =
-      series.awards.length > 150 ? series.awards.substring(0, 150) + '...' : series.awards
+  // Spoken language, which the country does not imply
+  if (series.languages && series.languages.length > 0) {
+    sections.push(`In ${series.languages.slice(0, 3).join(', ')}`)
+  }
+
+  // Awards signal quality. OMDb's structured summary where available; the
+  // media server's free-text `awards` is usually empty. Scores stay out — see
+  // the movie builder.
+  const awards = series.awardsSummary || series.awards
+  if (awards) {
+    const awardsText = awards.length > 150 ? awards.substring(0, 150) + '...' : awards
     sections.push(`Awards: ${awardsText}`)
   }
 
@@ -351,22 +394,45 @@ export async function storeSeriesEmbeddings(embeddings: SeriesEmbeddingResult[])
   const tableName = await getActiveEmbeddingTableName('series_embeddings')
 
   await query(
-    `INSERT INTO ${tableName} (series_id, model, embedding, canonical_text)
-     SELECT t.series_id, t.model, t.embedding, t.canonical_text
+    `INSERT INTO ${tableName} (series_id, model, embedding, canonical_text, text_version, updated_at)
+     SELECT t.series_id, t.model, t.embedding, t.canonical_text, $5, NOW()
      FROM unnest($1::uuid[], $2::text[], $3::halfvec[], $4::text[])
      AS t(series_id, model, embedding, canonical_text)
      ON CONFLICT (series_id, model) DO UPDATE SET
        embedding = EXCLUDED.embedding,
-       canonical_text = EXCLUDED.canonical_text`,
+       canonical_text = EXCLUDED.canonical_text,
+       text_version = EXCLUDED.text_version,
+       -- created_at survives the upsert, so staleness reads updated_at.
+       updated_at = NOW()`,
     [
       embeddings.map((emb) => emb.seriesId),
       Array(embeddings.length).fill(modelName),
       embeddings.map((emb) => `[${emb.embedding.join(',')}]`),
       embeddings.map((emb) => emb.canonicalText),
+      CANONICAL_TEXT_VERSION,
     ]
   )
 
   logger.info({ count: embeddings.length, table: tableName }, 'Series embeddings stored')
+}
+
+/**
+ * Mark stored series embeddings as current without re-embedding them.
+ * Mirrors markEmbeddingsCurrent on the movie side.
+ */
+export async function markSeriesEmbeddingsCurrent(seriesIds: string[]): Promise<void> {
+  if (seriesIds.length === 0) return
+
+  const config = await getFunctionConfig('embeddings')
+  const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
+  const tableName = await getActiveEmbeddingTableName('series_embeddings')
+
+  await query(
+    `UPDATE ${tableName}
+        SET text_version = $3, updated_at = NOW()
+      WHERE model = $2 AND series_id = ANY($1::uuid[])`,
+    [seriesIds, modelName, CANONICAL_TEXT_VERSION]
+  )
 }
 
 /**
@@ -399,7 +465,7 @@ export async function storeEpisodeEmbeddings(embeddings: EpisodeEmbeddingResult[
 /**
  * Get series that don't have embeddings yet (with full metadata)
  */
-export async function getSeriesWithoutEmbeddings(limit = 100): Promise<SeriesForEmbedding[]> {
+export async function getSeriesNeedingEmbeddings(limit = 100): Promise<SeriesNeedingEmbedding[]> {
   const config = await getFunctionConfig('embeddings')
   const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
   const tableName = await getActiveEmbeddingTableName('series_embeddings')
@@ -429,15 +495,21 @@ export async function getSeriesWithoutEmbeddings(limit = 100): Promise<SeriesFor
     awards: string | null
     total_seasons: number | null
     total_episodes: number | null
+    keywords: string[] | null
+    languages: string[] | null
+    awards_summary: string | null
+    stored_canonical_text: string | null
   }>(
     hasTvLibraryConfigs
       ? `SELECT s.id, s.title, s.year, s.end_year, s.genres, s.overview,
                 s.tagline, s.status, s.network, s.directors, s.actors::text, s.studios::text,
                 s.content_rating, s.tags, s.production_countries, s.awards,
-                s.total_seasons, s.total_episodes
+                s.total_seasons, s.total_episodes,
+                s.keywords, s.languages, s.awards_summary,
+                e.canonical_text AS stored_canonical_text
          FROM series s
          LEFT JOIN ${tableName} e ON e.series_id = s.id AND e.model = $1
-         WHERE e.id IS NULL
+         WHERE ${SERIES_STALE_SQL}
            AND EXISTS (
              SELECT 1 FROM library_config lc
              WHERE lc.provider_library_id = s.provider_library_id
@@ -447,12 +519,14 @@ export async function getSeriesWithoutEmbeddings(limit = 100): Promise<SeriesFor
       : `SELECT s.id, s.title, s.year, s.end_year, s.genres, s.overview,
                 s.tagline, s.status, s.network, s.directors, s.actors::text, s.studios::text,
                 s.content_rating, s.tags, s.production_countries, s.awards,
-                s.total_seasons, s.total_episodes
+                s.total_seasons, s.total_episodes,
+                s.keywords, s.languages, s.awards_summary,
+                e.canonical_text AS stored_canonical_text
          FROM series s
          LEFT JOIN ${tableName} e ON e.series_id = s.id AND e.model = $1
-         WHERE e.id IS NULL
+         WHERE ${SERIES_STALE_SQL}
          LIMIT $2`,
-    [modelName, limit]
+    [modelName, limit, CANONICAL_TEXT_VERSION]
   )
 
   return result.rows.map((row) => ({
@@ -474,6 +548,10 @@ export async function getSeriesWithoutEmbeddings(limit = 100): Promise<SeriesFor
     awards: row.awards,
     totalSeasons: row.total_seasons,
     totalEpisodes: row.total_episodes,
+    keywords: row.keywords,
+    languages: row.languages,
+    awardsSummary: row.awards_summary,
+    storedCanonicalText: row.stored_canonical_text,
   }))
 }
 
@@ -562,12 +640,13 @@ export async function generateMissingSeriesEmbeddings(
     setJobStep(jobId, 1, 'Counting series without embeddings')
     const seriesTableName = await getActiveEmbeddingTableName('series_embeddings')
 
+    // Same predicate as the selection, or the counter and the loop disagree.
     const seriesCountResult = await query<{ count: string }>(
       `SELECT COUNT(*) as count
        FROM series s
        LEFT JOIN ${seriesTableName} e ON e.series_id = s.id AND e.model = $1
-       WHERE e.id IS NULL`,
-      [modelName]
+       WHERE ${SERIES_STALE_SQL}`,
+      [modelName, null, CANONICAL_TEXT_VERSION]
     )
 
     const totalSeriesNeeded = parseInt(seriesCountResult.rows[0]?.count || '0', 10)
@@ -577,29 +656,48 @@ export async function generateMissingSeriesEmbeddings(
     setJobStep(jobId, 2, 'Generating series embeddings', totalSeriesNeeded)
 
     let seriesGenerated = 0
+    let seriesUnchanged = 0
     let totalFailed = 0
     const batchSize = 25
 
     if (totalSeriesNeeded > 0) {
-      let batch: SeriesForEmbedding[]
+      // One attempt per row per run — see the movie job. The loop reads until
+      // the selection empties, so a row that survives being handled hangs it.
+      const attempted = new Set<string>()
 
-      do {
-        batch = await getSeriesWithoutEmbeddings(batchSize)
+      for (;;) {
+        const fetched = await getSeriesNeedingEmbeddings(batchSize)
+        const batch = fetched.filter((s) => !attempted.has(s.id))
+        if (batch.length === 0) break
+        for (const series of batch) attempted.add(series.id)
 
-        if (batch.length > 0) {
-          addLog(jobId, 'info', `🧠 Processing batch of ${batch.length} series...`)
+        // Stale but unchanged: restamp, don't re-embed.
+        const changed: SeriesNeedingEmbedding[] = []
+        const unchanged: string[] = []
+        for (const series of batch) {
+          if (
+            series.storedCanonicalText !== null &&
+            series.storedCanonicalText === buildSeriesCanonicalText(series)
+          ) {
+            unchanged.push(series.id)
+          } else {
+            changed.push(series)
+          }
+        }
+
+        if (unchanged.length > 0) {
+          await markSeriesEmbeddingsCurrent(unchanged)
+          seriesUnchanged += unchanged.length
+        }
+
+        if (changed.length > 0) {
+          addLog(jobId, 'info', `🧠 Processing batch of ${changed.length} series...`)
 
           try {
-            const embeddings = await embedSeries(batch)
+            const embeddings = await embedSeries(changed)
             await storeSeriesEmbeddings(embeddings)
 
             seriesGenerated += embeddings.length
-            updateJobProgress(
-              jobId,
-              seriesGenerated,
-              totalSeriesNeeded,
-              `Generated ${seriesGenerated}/${totalSeriesNeeded}`
-            )
 
             addLog(
               jobId,
@@ -609,7 +707,7 @@ export async function generateMissingSeriesEmbeddings(
           } catch (err) {
             const error = err instanceof Error ? err.message : 'Unknown error'
             addLog(jobId, 'error', `❌ Series batch failed: ${error}`)
-            totalFailed += batch.length
+            totalFailed += changed.length
 
             if (error.includes('rate_limit') || error.includes('429')) {
               addLog(jobId, 'warn', '⏳ Rate limited - waiting 60 seconds...')
@@ -620,7 +718,10 @@ export async function generateMissingSeriesEmbeddings(
             }
           }
         }
-      } while (batch.length > 0)
+
+        const handled = seriesGenerated + seriesUnchanged + totalFailed
+        updateJobProgress(jobId, handled, totalSeriesNeeded, `Processed ${handled}/${totalSeriesNeeded}`)
+      }
     }
 
     // Step 4: Generate episode embeddings (if enabled)
