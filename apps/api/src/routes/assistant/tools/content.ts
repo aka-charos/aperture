@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { queryOne } from '../../../lib/db.js'
 import type { ToolContext } from '../types.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
+import { anyTitleMatchesSql, titleMatchRankSql } from '../helpers/titleMatch.js'
 import type { ContentDetail } from '../schemas/index.js'
 
 export function createContentTools(ctx: ToolContext) {
@@ -38,8 +39,9 @@ export function createContentTools(ctx: ToolContext) {
           }>(
             `SELECT id, title, year, genres, overview, community_rating, poster_url,
            provider_item_id, runtime_minutes, directors, actors, tagline, content_rating, critic_rating
-           FROM movies WHERE title ILIKE $1 LIMIT 1`,
-            [`%${title}%`]
+           FROM movies WHERE ${anyTitleMatchesSql('$1')}
+           ORDER BY ${titleMatchRankSql('$2')} LIMIT 1`,
+            [`%${title}%`, title]
           )
 
           if (movie) {
@@ -121,8 +123,9 @@ export function createContentTools(ctx: ToolContext) {
           }>(
             `SELECT id, title, year, end_year, genres, overview, community_rating, poster_url,
            provider_item_id, network, status, content_rating, critic_rating
-           FROM series WHERE title ILIKE $1 LIMIT 1`,
-            [`%${title}%`]
+           FROM series WHERE ${anyTitleMatchesSql('$1')}
+           ORDER BY ${titleMatchRankSql('$2')} LIMIT 1`,
+            [`%${title}%`, title]
           )
 
           if (series) {

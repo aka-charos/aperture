@@ -26,19 +26,19 @@ import { gatherWebCandidates } from '../discovery/webCandidates.js'
 import { buildTasteBrief } from '../discovery/tasteBrief.js'
 import { enrichCardReasons } from '../discovery/enrichReasons.js'
 import { filterUnwatchedItems } from '../helpers/unwatched.js'
+import { normalizeTitle } from '../helpers/titleMatch.js'
 import { findSimilarItems } from './search.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext } from '../types.js'
 
 const logger = createChildLogger('discovery-resolve')
 
-/** Loose title key for comparing a candidate against the referenced seed title. */
-function normalizeTitleKey(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-}
+/**
+ * Loose title key for comparing a candidate against the referenced seed title.
+ * Shared so that dropping a seed echo, deduping cards and matching the library
+ * all fold accents identically — "Le Samouraï" and "Le Samourai" are one film.
+ */
+const normalizeTitleKey = normalizeTitle
 
 /** Appended to the system prompt on discovery-routed turns. */
 export const DISCOVERY_PROMPT =

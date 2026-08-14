@@ -8,6 +8,7 @@ import { getActiveEmbeddingTableName } from '@aperture/core'
 import { query, queryOne, transaction } from '../../../lib/db.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import { annotateWatchedItems } from '../helpers/unwatched.js'
+import { anyTitleMatchesSql, titleMatchRankSql } from '../helpers/titleMatch.js'
 import type { ContentCarouselI18nKey } from '../schemas/contentCarousel.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext, MovieResult, SeriesResult } from '../types.js'
@@ -172,13 +173,10 @@ export async function findSimilarItems(
       `SELECT m.id, m.title, m.overview, m.year, m.tagline, m.directors, m.actors, m.studios, m.tags
        FROM movies m
        LEFT JOIN ${movieEmbeddingTable} e ON e.movie_id = m.id AND e.model = $2
-       WHERE m.title ILIKE $1
+       WHERE ${anyTitleMatchesSql('$1', 'm')}
        ORDER BY
-         CASE
-           WHEN LOWER(m.title) = LOWER($3) THEN 0
-           WHEN LOWER(m.title) LIKE LOWER($4) THEN 1
-           ELSE 2
-         END,
+         ${titleMatchRankSql('$3', 'm')},
+         CASE WHEN unaccent(LOWER(m.title)) LIKE unaccent(LOWER($4)) THEN 0 ELSE 1 END,
          e.id IS NOT NULL DESC
        LIMIT 1`,
       [`%${title}%`, modelId, title, `${title}%`]
@@ -191,13 +189,10 @@ export async function findSimilarItems(
     series = await queryOne<{ id: string; title: string; overview: string | null; year: number | null }>(
       `SELECT s.id, s.title, s.overview, s.year FROM series s
        LEFT JOIN ${seriesEmbeddingTable} se ON se.series_id = s.id AND se.model = $2
-       WHERE s.title ILIKE $1
+       WHERE ${anyTitleMatchesSql('$1', 's')}
        ORDER BY
-         CASE
-           WHEN LOWER(s.title) = LOWER($3) THEN 0
-           WHEN LOWER(s.title) LIKE LOWER($4) THEN 1
-           ELSE 2
-         END,
+         ${titleMatchRankSql('$3', 's')},
+         CASE WHEN unaccent(LOWER(s.title)) LIKE unaccent(LOWER($4)) THEN 0 ELSE 1 END,
          se.id IS NOT NULL DESC
        LIMIT 1`,
       [`%${title}%`, modelId, title, `${title}%`]
@@ -413,7 +408,12 @@ export function createSearchTools(ctx: ToolContext) {
           let idx = 1
 
           if (searchQuery) {
-            conditions.push(`(title ILIKE $${idx} OR overview ILIKE $${idx})`)
+            // Original/sort titles too: a third of a real library carries a
+            // different original title, so "Ascenseur pour l'échafaud" found
+            // nothing while the film sat there as "Elevator to the Gallows".
+            conditions.push(
+              `(${anyTitleMatchesSql(`$${idx}`)} OR unaccent(overview) ILIKE unaccent($${idx}))`
+            )
             values.push(`%${searchQuery}%`)
             idx++
           }
