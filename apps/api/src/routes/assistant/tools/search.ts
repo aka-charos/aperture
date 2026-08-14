@@ -147,6 +147,22 @@ export async function findSimilarItems(
   const excludeWatched = opts?.excludeWatched ?? false
   const limit = opts?.limit ?? 15
 
+  /**
+   * The watched-exclusion filter below is a post-filter on the ANN scan, so the
+   * scan has to be told to walk further — same trap as the watchStatus path, see
+   * HNSW_EF_SEARCH_FILTERED. Without it, "Also worth checking" quietly returns
+   * fewer than `limit` items for anyone with a well-watched library, and the
+   * shortfall grows with how much of the library they have seen.
+   */
+  const runAnn = async <T,>(sql: string, params: unknown[]): Promise<{ rows: T[] }> => {
+    if (!excludeWatched) return query<T>(sql, params)
+    return transaction(async (client) => {
+      await client.query(`SET LOCAL hnsw.ef_search = ${HNSW_EF_SEARCH_FILTERED}`)
+      const res = await client.query(sql, params)
+      return { rows: res.rows as T[] }
+    })
+  }
+
   const items: ContentItem[] = []
   let foundTitle = ''
   let foundType: 'movie' | 'series' | '' = ''
@@ -227,7 +243,7 @@ export async function findSimilarItems(
       ? [movie.id, modelId, embeddingStr, ctx.userId, limit]
       : [movie.id, modelId, embeddingStr, limit]
 
-    const similar = await query<MovieResult & { provider_item_id?: string }>(
+    const similar = await runAnn<MovieResult & { provider_item_id?: string }>(
       `SELECT m.id, m.title, m.year, m.genres, m.overview, m.community_rating, m.poster_url, m.provider_item_id, m.directors
        FROM ${movieEmbeddingTable} e JOIN movies m ON m.id = e.movie_id
        WHERE e.movie_id != $1 AND e.model = $2 ${watchedFilter}
@@ -264,7 +280,7 @@ export async function findSimilarItems(
       ? [series.id, modelId, embeddingStr, ctx.userId, limit]
       : [series.id, modelId, embeddingStr, limit]
 
-    const similar = await query<SeriesResult & { provider_item_id?: string }>(
+    const similar = await runAnn<SeriesResult & { provider_item_id?: string }>(
       `SELECT s.id, s.title, s.year, s.genres, s.network, s.overview, s.community_rating, s.poster_url, s.provider_item_id, s.directors
        FROM ${seriesEmbeddingTable} se
        JOIN series s ON s.id = se.series_id
