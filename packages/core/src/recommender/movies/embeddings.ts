@@ -41,6 +41,7 @@ interface Movie {
   cinematographers: string[] | null
   languages: string[] | null
   awardsSummary: string | null
+  plotFull: string | null
 }
 
 /**
@@ -134,15 +135,34 @@ export function buildCanonicalText(movie: Movie): string {
   }
 
   // === SECTION 4: Thematic Content ===
-  // Overview is the primary semantic content - allow more text
-  if (movie.overview) {
-    // text-embedding-3-small handles 8191 tokens, so we can be generous
+  // Primary semantic content. IMDb's long synopsis when we have one, since it
+  // narrates the story — characters, settings, turns — where the media
+  // server's blurb only pitches it, and those specifics are what a concept
+  // query matches on.
+  //
+  // Chosen INSTEAD of the overview rather than alongside it: the two describe
+  // the same story, and including both would weight plot twice over against
+  // genre, crew and keywords. The longer text is picked only when it is
+  // actually longer, because OMDb falls back to the short blurb when IMDb has
+  // no long synopsis.
+  //
+  // The 1000-char cap stays. text-embedding-3-small handles 8191 tokens so
+  // length is not the constraint — dilution is. A 2,000-word synopsis pulls
+  // the vector toward plot minutiae and away from what the film *is*, which
+  // costs item-to-item similarity even where it helps query recall.
+  // Same condition the hero's "read full synopsis" button uses, so the text
+  // that gets embedded is the text a reader can actually see.
+  const synopsis =
+    movie.plotFull && (!movie.overview || movie.plotFull.length > movie.overview.length)
+      ? movie.plotFull
+      : movie.overview
+  if (synopsis) {
     const maxOverviewLength = 1000
-    const overview =
-      movie.overview.length > maxOverviewLength
-        ? movie.overview.substring(0, maxOverviewLength) + '...'
-        : movie.overview
-    sections.push(overview)
+    const text =
+      synopsis.length > maxOverviewLength
+        ? synopsis.substring(0, maxOverviewLength) + '...'
+        : synopsis
+    sections.push(text)
   }
 
   // Tags capture thematic elements (e.g., "time travel", "heist", "dystopia")
@@ -335,6 +355,7 @@ export async function getMoviesNeedingEmbeddings(limit = 100): Promise<MovieNeed
     cinematographers: string[] | null
     languages: string[] | null
     awards_summary: string | null
+    plot_full: string | null
     stored_canonical_text: string | null
   }>(
     hasLibraryConfigs
@@ -342,7 +363,7 @@ export async function getMoviesNeedingEmbeddings(limit = 100): Promise<MovieNeed
                 m.tagline, m.directors, m.actors::text, m.studios::text,
                 m.content_rating, m.tags, m.production_countries, m.awards,
                 m.keywords, m.collection_name, m.composers, m.cinematographers,
-                m.languages, m.awards_summary,
+                m.languages, m.awards_summary, m.plot_full,
                 e.canonical_text AS stored_canonical_text
          FROM movies m
          LEFT JOIN ${tableName} e ON e.movie_id = m.id AND e.model = $1
@@ -357,7 +378,7 @@ export async function getMoviesNeedingEmbeddings(limit = 100): Promise<MovieNeed
                 m.tagline, m.directors, m.actors::text, m.studios::text,
                 m.content_rating, m.tags, m.production_countries, m.awards,
                 m.keywords, m.collection_name, m.composers, m.cinematographers,
-                m.languages, m.awards_summary,
+                m.languages, m.awards_summary, m.plot_full,
                 e.canonical_text AS stored_canonical_text
          FROM movies m
          LEFT JOIN ${tableName} e ON e.movie_id = m.id AND e.model = $1
@@ -387,6 +408,7 @@ export async function getMoviesNeedingEmbeddings(limit = 100): Promise<MovieNeed
     cinematographers: row.cinematographers,
     languages: row.languages,
     awardsSummary: row.awards_summary,
+    plotFull: row.plot_full,
     storedCanonicalText: row.stored_canonical_text,
   }))
 }

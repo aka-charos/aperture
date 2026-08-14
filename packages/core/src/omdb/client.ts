@@ -159,7 +159,11 @@ export async function omdbRequest(
     throw new OmdbRequestError(0, latched, 'auth')
   }
 
-  const url = `${OMDB_API_BASE_URL}/?apikey=${encodeURIComponent(apiKey)}&i=${encodeURIComponent(imdbId)}&plot=short`
+  // plot=full costs nothing extra — same request, same quota, larger response —
+  // and returns IMDb's long synopsis instead of the one-line blurb. The media
+  // server already supplies a short overview, so asking for the short one here
+  // fetched a near-duplicate of something we had.
+  const url = `${OMDB_API_BASE_URL}/?apikey=${encodeURIComponent(apiKey)}&i=${encodeURIComponent(imdbId)}&plot=full`
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     await rateLimit()

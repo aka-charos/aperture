@@ -61,6 +61,7 @@ export interface MovieDetailRow extends MovieRow {
   rt_consensus: string | null
   metacritic_score: number | null
   awards_summary: string | null
+  plot_full: string | null
   languages: string[] | null
   production_countries: string[] | null
   // MDBList enrichment

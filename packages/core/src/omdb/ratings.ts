@@ -70,6 +70,12 @@ export function extractRatingsData(data: OMDbMovieResponse): RatingsData {
   const languages = parseCommaSeparated(data.Language)
   const countries = parseCommaSeparated(data.Country)
 
+  // The long synopsis. The client asks for plot=full, but OMDb falls back to
+  // the short blurb when no long one exists, so this is often just the
+  // one-liner — callers compare against what they already have rather than
+  // assuming it is longer.
+  const plot = !data.Plot || data.Plot === 'N/A' ? null : data.Plot.trim() || null
+
   return {
     rtCriticScore,
     rtAudienceScore,
@@ -77,6 +83,7 @@ export function extractRatingsData(data: OMDbMovieResponse): RatingsData {
     awardsSummary,
     languages,
     countries,
+    plot,
   }
 }
 

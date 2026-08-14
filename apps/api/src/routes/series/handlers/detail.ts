@@ -36,7 +36,7 @@ export function registerDetailHandler(fastify: FastifyInstance) {
                 s.imdb_id, s.tmdb_id, s.tvdb_id, s.air_days, s.production_countries, s.awards,
                 s.poster_url, s.backdrop_url, s.created_at, s.updated_at,
                 s.keywords, s.rt_critic_score, s.rt_audience_score, s.rt_consensus, s.metacritic_score, s.awards_summary,
-                s.languages, s.letterboxd_score, s.mdblist_score, s.streaming_providers,
+                s.languages, s.plot_full, s.letterboxd_score, s.mdblist_score, s.streaming_providers,
                 s.tmdb_total_episodes, s.tmdb_total_seasons, s.tmdb_seasons, s.tmdb_status,
                 (SELECT ROUND(AVG(e.runtime_minutes))::int
                  FROM episodes e

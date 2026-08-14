@@ -2953,7 +2953,9 @@
       "snackbarMarkWatchedFailed": "Αποτυχία σήμανσης ως προβεβλημένη",
       "snackbarFavoriteAdded": "Προστέθηκε στα αγαπημένα",
       "snackbarFavoriteRemoved": "Αφαιρέθηκε από τα αγαπημένα",
-      "snackbarFavoriteFailed": "Αποτυχία ενημέρωσης αγαπημένου"
+      "snackbarFavoriteFailed": "Αποτυχία ενημέρωσης αγαπημένου",
+      "showFullPlot": "Read full synopsis",
+      "showShortPlot": "Show short summary"
     },
     "insights": {
       "recommendedForYou": "Προτείνεται Για Εσάς",

@@ -701,6 +701,8 @@
       "awards": "Awards"
     },
     "hero": {
+      "showFullPlot": "Read full synopsis",
+      "showShortPlot": "Show short summary",
       "available": "Available",
       "watched": "Watched",
       "watchedCount": "Watched {{count}}x",

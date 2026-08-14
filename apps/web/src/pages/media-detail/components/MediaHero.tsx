@@ -23,6 +23,8 @@ import MovieIcon from '@mui/icons-material/Movie'
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import AddToQueueIcon from '@mui/icons-material/AddToQueue'
+import NotesIcon from '@mui/icons-material/Notes'
+import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
@@ -86,6 +88,13 @@ export function MediaHero({
   const { t } = useTranslation()
   const theme = useTheme()
   const serverName = useServerDisplayName()
+  const [showFullPlot, setShowFullPlot] = useState(false)
+  // Only worth offering when it actually adds something: OMDb answers plot=full
+  // with the short blurb whenever IMDb has no long synopsis, and for a good
+  // number of titles the two are the same string.
+  const hasLongerPlot = Boolean(
+    media.plot_full && (!media.overview || media.plot_full.length > media.overview.length)
+  )
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [marking, setMarking] = useState(false)
   const [markingWatched, setMarkingWatched] = useState(false)
@@ -670,18 +679,29 @@ export function MediaHero({
             </Box>
           )}
 
-          {/* Overview */}
-          {media.overview && (
-            <Typography
-              variant="body1"
-              color="text.secondary"
-              sx={{
-                lineHeight: 1.7,
-                maxWidth: 600,
-              }}
-            >
-              {media.overview}
-            </Typography>
+          {/* Overview, with IMDb's longer synopsis available on request.
+              Collapsed by default and never swapped in silently: the long plot
+              is a user-submitted synopsis that narrates the whole story, so for
+              anything with a twist it gives it away. Only offered when it is
+              actually longer — OMDb returns the short blurb when IMDb has no
+              long one, and a "read more" that reveals nothing is worse than
+              no button. */}
+          {(media.overview || media.plot_full) && (
+            <Box sx={{ maxWidth: 600 }}>
+              <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+                {showFullPlot && media.plot_full ? media.plot_full : media.overview}
+              </Typography>
+              {hasLongerPlot && (
+                <Button
+                  size="small"
+                  startIcon={showFullPlot ? <ExpandLessIcon /> : <NotesIcon />}
+                  onClick={() => setShowFullPlot((shown) => !shown)}
+                  sx={{ mt: 0.5, ml: -1, textTransform: 'none' }}
+                >
+                  {showFullPlot ? t('mediaDetail.hero.showShortPlot') : t('mediaDetail.hero.showFullPlot')}
+                </Button>
+              )}
+            </Box>
           )}
         </Box>
       </Box>

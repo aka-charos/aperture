@@ -25,7 +25,7 @@ export function registerDetailHandler(fastify: FastifyInstance) {
                 actors, directors, writers, cinematographers, composers, editors, studios,
                 imdb_id, tmdb_id, keywords, collection_id, collection_name,
                 rt_critic_score, rt_audience_score, rt_consensus, metacritic_score, awards_summary,
-                languages, production_countries, letterboxd_score, mdblist_score, streaming_providers
+                languages, production_countries, plot_full, letterboxd_score, mdblist_score, streaming_providers
          FROM movies WHERE id = $1`,
         [id]
       )

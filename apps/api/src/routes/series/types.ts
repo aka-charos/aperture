@@ -56,6 +56,7 @@ export interface SeriesDetailRow extends SeriesRow {
   rt_consensus: string | null
   metacritic_score: number | null
   awards_summary: string | null
+  plot_full: string | null
   languages: string[] | null
   // MDBList enrichment
   letterboxd_score: number | null

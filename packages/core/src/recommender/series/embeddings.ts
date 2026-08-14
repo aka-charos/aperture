@@ -45,6 +45,7 @@ interface SeriesForEmbedding {
   keywords: string[] | null
   languages: string[] | null
   awardsSummary: string | null
+  plotFull: string | null
 }
 
 /**
@@ -174,14 +175,21 @@ export function buildSeriesCanonicalText(series: SeriesForEmbedding): string {
   }
 
   // === SECTION 4: Thematic Content ===
-  // Overview is the primary semantic content
-  if (series.overview) {
+  // Primary semantic content — IMDb's long synopsis where it beats the media
+  // server's blurb. Instead of, never alongside: both tell the same story, and
+  // including both would weight plot twice against genre, creator and
+  // keywords. See the movie builder for the cap's reasoning.
+  const synopsis =
+    series.plotFull && (!series.overview || series.plotFull.length > series.overview.length)
+      ? series.plotFull
+      : series.overview
+  if (synopsis) {
     const maxOverviewLength = 1000
-    const overview =
-      series.overview.length > maxOverviewLength
-        ? series.overview.substring(0, maxOverviewLength) + '...'
-        : series.overview
-    sections.push(overview)
+    const text =
+      synopsis.length > maxOverviewLength
+        ? synopsis.substring(0, maxOverviewLength) + '...'
+        : synopsis
+    sections.push(text)
   }
 
   // Tags capture thematic elements
@@ -498,6 +506,7 @@ export async function getSeriesNeedingEmbeddings(limit = 100): Promise<SeriesNee
     keywords: string[] | null
     languages: string[] | null
     awards_summary: string | null
+    plot_full: string | null
     stored_canonical_text: string | null
   }>(
     hasTvLibraryConfigs
@@ -505,7 +514,7 @@ export async function getSeriesNeedingEmbeddings(limit = 100): Promise<SeriesNee
                 s.tagline, s.status, s.network, s.directors, s.actors::text, s.studios::text,
                 s.content_rating, s.tags, s.production_countries, s.awards,
                 s.total_seasons, s.total_episodes,
-                s.keywords, s.languages, s.awards_summary,
+                s.keywords, s.languages, s.awards_summary, s.plot_full,
                 e.canonical_text AS stored_canonical_text
          FROM series s
          LEFT JOIN ${tableName} e ON e.series_id = s.id AND e.model = $1
@@ -520,7 +529,7 @@ export async function getSeriesNeedingEmbeddings(limit = 100): Promise<SeriesNee
                 s.tagline, s.status, s.network, s.directors, s.actors::text, s.studios::text,
                 s.content_rating, s.tags, s.production_countries, s.awards,
                 s.total_seasons, s.total_episodes,
-                s.keywords, s.languages, s.awards_summary,
+                s.keywords, s.languages, s.awards_summary, s.plot_full,
                 e.canonical_text AS stored_canonical_text
          FROM series s
          LEFT JOIN ${tableName} e ON e.series_id = s.id AND e.model = $1
@@ -551,6 +560,7 @@ export async function getSeriesNeedingEmbeddings(limit = 100): Promise<SeriesNee
     keywords: row.keywords,
     languages: row.languages,
     awardsSummary: row.awards_summary,
+    plotFull: row.plot_full,
     storedCanonicalText: row.stored_canonical_text,
   }))
 }
