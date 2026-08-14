@@ -29,6 +29,24 @@ interface ChatBody {
 }
 
 /**
+ * Model round trips per turn — a step is one generation plus any tools it calls,
+ * NOT one tool call (a step can call several in parallel).
+ *
+ * The loop only consults `stopWhen` after a step that called tools, so the last
+ * step's results are fetched and then never sent back to the model: nothing is
+ * left to read them. A turn that spent every step searching therefore ended with
+ * no prose at all — the user saw five "No results found" strips and nothing else,
+ * because tool results stream to the client independently of the model composing
+ * an answer from them.
+ *
+ * `prepareStep` closes that hole by taking the tools away on the final step, so
+ * the model has to write. Note this costs no retrieval: results from the last
+ * step could never reach the model anyway, so the effective tool budget was
+ * always MAX_STEPS - 1 and this only repurposes a step that was already dead.
+ */
+const MAX_STEPS = 5
+
+/**
  * Creates a TransformStream that transforms tool-input streaming events
  * into a single complete event. This fixes compatibility issues with
  * @assistant-ui/react which expects tool args to be appended in order.
@@ -332,7 +350,23 @@ export function registerChatHandler(fastify: FastifyInstance) {
               messages: convertToModelMessages(processedMessages),
               tools,
               toolChoice: 'auto',
-              stopWhen: stepCountIs(5), // Stop after 5 steps (allows tool calls + follow-up responses)
+              stopWhen: stepCountIs(MAX_STEPS),
+              // stepNumber is 0-indexed, so MAX_STEPS - 1 is the last step the
+              // loop will run. Forcing toolChoice 'none' there turns "ran out of
+              // budget mid-search" into "answered with whatever it found", which
+              // is worse than a good answer and far better than silence.
+              prepareStep: ({ stepNumber }) => {
+                if (stepNumber !== MAX_STEPS - 1) return undefined
+                // Warn, not info: reaching this means the model burned every
+                // search it had. The turn still answers, but something upstream
+                // (a filter returning nothing, a tool it can't drive) made it
+                // spend the whole budget looking.
+                request.log.warn(
+                  { stepNumber, maxSteps: MAX_STEPS },
+                  'Step budget exhausted — forcing an answer without tools'
+                )
+                return { toolChoice: 'none' }
+              },
               onStepFinish: (step) => {
                 request.log.info(
                   {
