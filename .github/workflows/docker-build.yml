@@ -73,8 +73,26 @@ jobs:
     outputs:
       needs_merge: ${{ steps.tags.outputs.needs_merge }}
     steps:
+      # Full history so `git rev-list --count` is a real build number. The default
+      # shallow checkout has depth 1, which would make every build "mod.1".
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Fork version identity. APP_VERSION is the upstream lineage taken from
+      # apps/api/package.json; APP_BUILD is git-describe shaped — a commit count
+      # for a monotonic build number plus the short SHA, so it stays unambiguous
+      # even if history is ever rewritten.
+      - name: Compute version identity
+        id: version
+        run: |
+          VERSION="$(node -p "require('./apps/api/package.json').version")"
+          COUNT="$(git rev-list --count HEAD)"
+          SHA="$(git rev-parse --short HEAD)"
+          echo "app_version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "app_build=mod.${COUNT}.g${SHA}" >> "$GITHUB_OUTPUT"
+          echo "Building ${VERSION}-mod.${COUNT}.g${SHA}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -110,6 +128,9 @@ jobs:
           context: .
           file: ./docker/Dockerfile
           push: true
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.app_version }}
+            APP_BUILD=${{ steps.version.outputs.app_build }}
           tags: ${{ steps.tags.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=amd64
@@ -129,8 +150,26 @@ jobs:
       contents: read
       packages: write
     steps:
+      # Full history so `git rev-list --count` is a real build number. The default
+      # shallow checkout has depth 1, which would make every build "mod.1".
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Fork version identity. APP_VERSION is the upstream lineage taken from
+      # apps/api/package.json; APP_BUILD is git-describe shaped — a commit count
+      # for a monotonic build number plus the short SHA, so it stays unambiguous
+      # even if history is ever rewritten.
+      - name: Compute version identity
+        id: version
+        run: |
+          VERSION="$(node -p "require('./apps/api/package.json').version")"
+          COUNT="$(git rev-list --count HEAD)"
+          SHA="$(git rev-parse --short HEAD)"
+          echo "app_version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "app_build=mod.${COUNT}.g${SHA}" >> "$GITHUB_OUTPUT"
+          echo "Building ${VERSION}-mod.${COUNT}.g${SHA}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -154,6 +193,9 @@ jobs:
           context: .
           file: ./docker/Dockerfile
           push: true
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.app_version }}
+            APP_BUILD=${{ steps.version.outputs.app_build }}
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:build-arm64
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=arm64
