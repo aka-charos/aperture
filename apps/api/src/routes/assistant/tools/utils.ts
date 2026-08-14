@@ -88,3 +88,52 @@ export function withToolErrorHandling<T extends ToolSet>(tools: T): T {
   ) as T
 }
 
+
+/**
+ * The `format` parameter shared by tools that are as often a private lookup as
+ * they are the answer.
+ *
+ * Every tool result carrying `items` renders as a wall of posters, so a model
+ * checking the watch history to inform a different answer produced fifty cards
+ * that were not the answer — most visibly when it fetched fifty recent plays,
+ * failed to find any French noir among them, and announced that none had been
+ * watched, with fifty unrelated posters underneath. The model is the only party
+ * that knows why it is calling, so it is the one that has to say.
+ */
+export const FORMAT_PARAM_DESCRIPTION =
+  'How to return this result. "cards" (the default) renders posters for the user — use it ' +
+  'when this list IS your answer. "brief" returns a short text list and NO cards — use it ' +
+  'when you are looking something up to inform a different answer, e.g. checking what they ' +
+  'have already seen before recommending. A brief result is invisible to the user, so never ' +
+  'use it for the list you are actually presenting to them.'
+
+/** One line of a brief result. `note` carries whatever the tool considers salient. */
+export interface BriefEntry {
+  name: string
+  year?: number | null
+  note?: string | null
+}
+
+/**
+ * A tool result the user never sees: compact text, and crucially NO `items` key.
+ *
+ * The client dispatches on shape (`carousels` → `items` → `contentId` → …) and
+ * falls through to rendering nothing, so omitting `items` is the whole
+ * mechanism — no client change, and both the live and replayed renderers agree
+ * for free. It also costs a fraction of the context: a ContentItem carries a
+ * poster URL, synopsis, director and action hrefs, none of which a lookup uses.
+ */
+export function briefResult(
+  id: string,
+  entries: BriefEntry[]
+): { id: string; brief: string; count: number } {
+  const lines = entries.map((e) => {
+    const title = e.year ? `${e.name} (${e.year})` : e.name
+    return e.note ? `${title} — ${e.note}` : title
+  })
+  return {
+    id,
+    brief: lines.length > 0 ? lines.join('\n') : 'Nothing matched.',
+    count: entries.length,
+  }
+}
