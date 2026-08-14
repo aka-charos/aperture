@@ -6,7 +6,7 @@
  * source (e.g. SearxNG) by implementing WebSearchSource and appending it here.
  */
 import { createChildLogger } from '@aperture/core'
-import type { WebSearchSource, WebSearchSourceResult, WebSearchContext } from './types.js'
+import type { WebSearchSource, WebSearchSourceResult } from './types.js'
 import { googleGroundingSource } from './googleGrounding.js'
 import { tavilySource } from './tavily.js'
 
@@ -22,13 +22,10 @@ const ALL_SOURCES: WebSearchSource[] = [googleGroundingSource, tavilySource]
  * already fails open to null; the extra catch is belt-and-suspenders so one
  * broken source can't sink the others. Returns only sources that yielded text.
  */
-export async function gatherFromSources(
-  query: string,
-  context?: WebSearchContext
-): Promise<WebSearchSourceResult[]> {
+export async function gatherFromSources(query: string): Promise<WebSearchSourceResult[]> {
   const settled = await Promise.all(
     ALL_SOURCES.map((source) =>
-      source.gather(query, context).catch((err) => {
+      source.gather(query).catch((err) => {
         logger.warn({ err, source: source.id }, 'Web search source threw; ignoring')
         return null
       })
