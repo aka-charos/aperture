@@ -32,7 +32,12 @@ export interface TavilyConfig {
   maxResults: number
   /** 'basic' (fast) or 'advanced' (deeper, costs more credits). */
   searchDepth: TavilySearchDepth
-  /** Ask Tavily for a synthesized answer to the query (extra grounding text). */
+  /**
+   * Ask Tavily for a synthesized answer to the query — the LLM-written summary
+   * of the results, requested at 'advanced' depth. This is the part of a Tavily
+   * response that carries reasoning, so leaving it off usually means Tavily
+   * contributes snippets that the discovery structuring pass then discards.
+   */
   includeAnswer: boolean
   /** 'general' (default) or 'news' (recency-weighted, good for "trending"). */
   topic: TavilyTopic
@@ -164,7 +169,17 @@ export async function tavilySearch(
     search_depth: params.searchDepth ?? DEFAULT_TAVILY_CONFIG.searchDepth,
     topic: params.topic ?? DEFAULT_TAVILY_CONFIG.topic,
     max_results: clampMaxResults(params.maxResults ?? DEFAULT_TAVILY_CONFIG.maxResults),
-    include_answer: params.includeAnswer ?? DEFAULT_TAVILY_CONFIG.includeAnswer,
+    // 'advanced' rather than a bare true. The answer is LLM-synthesized from the
+    // retrieved results and 'advanced' asks for the longer, more reasoned form;
+    // credits are charged on search_depth, not on the answer, so the detail is
+    // free. It is also the only part of a Tavily response shaped like a reasoned
+    // recommendation, and the discovery structuring pass drops any title that
+    // arrives without a real "why" — so an admin who asked for an answer at all
+    // wants this one. The config stays a boolean: "do I want an answer" is the
+    // question they were asked, and its depth is not a separate preference.
+    include_answer: (params.includeAnswer ?? DEFAULT_TAVILY_CONFIG.includeAnswer)
+      ? 'advanced'
+      : false,
   }
   if (params.timeRange) body.time_range = params.timeRange
 
