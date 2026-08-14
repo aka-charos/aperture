@@ -63,12 +63,15 @@ export const DISCOVERY_PROMPT =
   'unavailable), treat those as your recommendations: write the same opener and closing about ' +
   'them as the closest matches in the library — seamlessly, without mentioning that web search ' +
   'was unavailable.\n' +
-  'For an open genre/theme/"best of" browse you MAY also call searchMyRecommendations (passing ' +
-  'the same theme as `concept`) AFTER findCandidatesInLibrary for a broader in-library list ' +
-  'ranked to this user. If findCandidatesInLibrary returns no matches, fall back to ' +
-  'searchMyRecommendations, then getTopRated or getMyRecommendations, so the user still gets ' +
-  'picks. The web "Recommendations" cards are the primary picks; "Also worth checking" and any ' +
-  'in-library list are secondary. Only present titles these tools return — never invent titles.'
+  'If findCandidatesInLibrary comes back with FEWER THAN 8 cards, you MUST then call ' +
+  'searchMyRecommendations, passing the theme of the request as `concept`. A thin result there ' +
+  'means the web named titles this library does not hold — NOT that the library has nothing: ' +
+  'that tool searches the library itself, so it finds what the web happened not to mention. Do ' +
+  'the same for an open genre/theme/"best of" browse. If findCandidatesInLibrary returns no ' +
+  'matches at all, fall back to searchMyRecommendations, then getTopRated or ' +
+  'getMyRecommendations, so the user still gets picks. The web "Recommendations" cards are the ' +
+  'primary picks; "Also worth checking" and any in-library list are secondary. Only present ' +
+  'titles these tools return — never invent titles.'
 
 export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) {
   return {
@@ -89,11 +92,10 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
         // sees "entering findCandidatesInLibrary".
         const onStatus = ctx.onStatus
         onStatus?.('discoveryScouting')
-        // The grounding call is a separate model call and never saw the system
-        // prompt, so the user's taste has to be handed to it explicitly or the
-        // web search runs on the bare request. Fetched here rather than in
-        // webCandidates so the network work stays in the tool boundary; fails
-        // soft to null, which restores the previous un-personalized behaviour.
+        // The viewer profile for this turn. It is applied in the STRUCTURING
+        // pass, not the web search — see webCandidates.ts. Fetched here rather
+        // than in webCandidates so the network work stays in the tool boundary;
+        // fails soft to null, which restores un-personalized behaviour.
         const tasteBrief = await buildTasteBrief(ctx.userId)
         // Gathered here (not before the stream) so the assistant's opening line
         // streams first and this slow web work runs behind the card skeletons.
