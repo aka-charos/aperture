@@ -6,6 +6,14 @@
  * suggestions with a "why" for each title. Enabled simply by configuring the
  * Web Search role; disabled (returns null) when that role is unconfigured.
  *
+ * TWO CHANNELS, deliberately: the task instructions and the viewer profile go
+ * in the SYSTEM message, and the user's question is the ENTIRE user message.
+ * The model formulates its own search queries from what it is given, so the
+ * request has to be the only thing sitting where a request goes. This is not a
+ * hard boundary — a system message is still context, and Gemini can search on
+ * anything in it — which is why the profile also carries an explicit "do not
+ * search for these" rule. Steer the selection, never the retrieval.
+ *
  * Grounding has a tight per-minute quota, so back-to-back queries can 429 or
  * return empty text. We (a) set an explicit SDK maxRetries so 429/5xx get real
  * backoff, (b) retry once when grounding returns empty text (a 200 the SDK never
@@ -30,28 +38,37 @@ const PASS1_RETRY_DELAY_MS = 800
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 /**
- * The viewer block is deliberately placed AFTER the request and fenced with an
- * explicit precedence rule.
+ * Viewer context, for the SYSTEM message.
  *
- * The request is what the user actually asked for; the profile is a tiebreaker
- * between titles that answer it equally well. Put the profile first, or leave
- * the precedence unstated, and "find me a good horror film" starts returning
- * the arthouse dramas the profile is full of — personalisation that quietly
- * overrides the question is worse than none.
+ * The rule that matters is the first one: the profile must never become a
+ * search term. Retrieval answers the question the user asked; this exists only
+ * to judge what comes back. Everything used to sit in one user message
+ * alongside the request, which put the two on equal footing exactly when the
+ * model was deciding what to search for.
+ *
+ * The precedence line stays, and stays explicit: leave it unstated and "find me
+ * a good horror film" starts returning the arthouse dramas the profile is full
+ * of — personalisation that quietly overrides the question is worse than none.
  */
 const viewerBlock = (tasteBrief: string): string =>
-  '\n\nAbout the viewer this is for. Use it ONLY to choose between titles that answer the ' +
-  'request equally well, and to avoid suggesting things they have plainly already seen. ' +
-  'It must NEVER override the request: if it conflicts, the request wins outright.\n' +
-  tasteBrief
+  '\n\nABOUT THE VIEWER THIS IS FOR:\n' +
+  tasteBrief +
+  '\n\nUse this profile ONLY to choose between and rank titles that already answer the ' +
+  'request equally well, and to avoid offering things they have plainly already seen. ' +
+  'Do NOT search for the titles or names in it, and do NOT add them to your search ' +
+  'queries: search for what the user asked and nothing else. The profile must NEVER ' +
+  'override the request — if the two conflict, the request wins outright.'
 
-const groundingPrompt = (query: string, tasteBrief?: string | null): string =>
-  'Using current web information, list up to 12 specific movies or TV series that best answer this request. ' +
+/**
+ * Task instructions and viewer context. The user's message carries the request
+ * ALONE, so the thing being searched for is the thing they typed.
+ */
+const groundingSystem = (tasteBrief?: string | null): string =>
+  "Using current web information, list up to 12 specific movies or TV series that best answer the user's request. " +
   'For EACH title you MUST provide: the exact title, the release year, whether it is a movie or a series, and — most importantly — one or two sentences on WHY it fits this specific request. ' +
   'The "why" is mandatory for every title and must be CONCRETE and SPECIFIC: the shared structural device, the tonal or thematic link, how the filmmaker themselves framed it, the precise thing it has in common. ' +
   'Write it directly, not as hedged reportage — prefer "same fragmented structure where identities blur" over "is often described as similar". No generic praise. A title with no real reason is useless: omit it rather than list it without one. ' +
-  'Include the IMDb id (tt…) or TMDb id ONLY if it appears in a source you actually used; otherwise omit it.\n\n' +
-  `Request: ${query}` +
+  'Include the IMDb id (tt…) or TMDb id ONLY if it appears in a source you actually used; otherwise omit it.' +
   (tasteBrief?.trim() ? viewerBlock(tasteBrief) : '')
 
 export const googleGroundingSource: WebSearchSource = {
@@ -72,7 +89,8 @@ export const googleGroundingSource: WebSearchSource = {
             model,
             tools,
             maxRetries: SDK_MAX_RETRIES,
-            prompt: groundingPrompt(query, context?.tasteBrief),
+            system: groundingSystem(context?.tasteBrief),
+            prompt: query,
           })
           text = pass1.text ?? ''
           usage = pass1.usage
