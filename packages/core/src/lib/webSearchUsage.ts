@@ -27,8 +27,18 @@ import {
 
 const logger = createChildLogger('web-search-usage')
 
-/** How a call ended. `rate_limited` rows are what make the 429s visible. */
-export type WebSearchCallStatus = 'ok' | 'rate_limited' | 'error'
+/**
+ * How a call ended. `rate_limited` rows are what make the 429s visible.
+ *
+ * `empty` is a request that SUCCEEDED at the HTTP level and returned no usable
+ * text — a soft refusal. It is not `ok` (nothing came back), not `error`
+ * (nothing failed), and not `rate_limited` (quota was fine). It exists because
+ * grounding retries an empty response, and every one of those retries is a
+ * request the provider counts against the daily limit: without a status for it,
+ * the retry either went unrecorded (undercounting real spend) or had to be
+ * mislabelled as a success.
+ */
+export type WebSearchCallStatus = 'ok' | 'rate_limited' | 'error' | 'empty'
 
 export interface WebSearchCallRecord {
   provider: string

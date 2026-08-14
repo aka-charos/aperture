@@ -28,7 +28,12 @@
  * 'google') instead of swallowing them.
  */
 import { generateText } from 'ai'
-import { withWebSearchModel, getWebSearchProviderTools, createChildLogger } from '@aperture/core'
+import {
+  withWebSearchModel,
+  getWebSearchProviderTools,
+  createChildLogger,
+  recordWebSearchCall,
+} from '@aperture/core'
 import { recordLlmError } from '../../helpers/errors.js'
 import type { WebSearchSource, WebSearchSourceResult } from './types.js'
 
@@ -116,6 +121,19 @@ export const googleGroundingSource: WebSearchSource = {
           if (text.trim()) break
           if (attempt < PASS1_MAX_ATTEMPTS) {
             logger.warn({ attempt }, 'Google grounding returned empty text; retrying')
+            // Meter the attempt we are about to throw away. withWebSearchModel
+            // records once per KEY attempt and this retry loop lives inside one
+            // of those, so without this the second request is invisible to the
+            // meter while Google still counts it against the daily quota. Only
+            // the retried attempts are recorded here — the wrapper still records
+            // the final one, so the totals add up exactly.
+            await recordWebSearchCall({
+              provider: keyAttempt.provider,
+              model: keyAttempt.modelId,
+              slot: keyAttempt.slot,
+              status: 'empty',
+              ...pass1.usage,
+            })
             await sleep(PASS1_RETRY_DELAY_MS)
           }
         }
