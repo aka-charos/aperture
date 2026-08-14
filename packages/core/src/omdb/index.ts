@@ -10,6 +10,17 @@
 // Client
 export { omdbRequest } from './client.js'
 
+// Failures — omdbRequest throws these; a null return means "OMDb has no entry"
+// and nothing else, because callers record a null as asked-and-answered.
+export {
+  OmdbRequestError,
+  classifyOmdbFailure,
+  isGlobalOmdbFailure,
+  isRetryableOmdbFailure,
+  isNotFoundBody,
+  type OmdbFailureKind,
+} from './failures.js'
+
 // Ratings functions
 export {
   extractRatingsData,

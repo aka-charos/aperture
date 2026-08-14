@@ -700,6 +700,12 @@ export {
 export {
   // Client
   omdbRequest,
+  // Failure classification
+  OmdbRequestError,
+  classifyOmdbFailure,
+  isGlobalOmdbFailure,
+  isRetryableOmdbFailure,
+  type OmdbFailureKind,
   // Ratings functions
   extractRatingsData,
   getRatingsData,
