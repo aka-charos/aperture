@@ -5,8 +5,9 @@ import { tool, embed } from 'ai'
 import { nullSafe } from './utils.js'
 import { z } from 'zod'
 import { getActiveEmbeddingTableName } from '@aperture/core'
-import { query, queryOne } from '../../../lib/db.js'
+import { query, queryOne, transaction } from '../../../lib/db.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
+import { annotateWatchedItems } from '../helpers/unwatched.js'
 import type { ContentCarouselI18nKey } from '../schemas/contentCarousel.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext, MovieResult, SeriesResult } from '../types.js'
@@ -79,6 +80,47 @@ function formatContentItem(
         : []),
     ],
   }
+}
+
+export type WatchStatus = 'all' | 'watched' | 'unwatched'
+
+/**
+ * HNSW search-list size for a semantic query carrying a watch-status filter.
+ *
+ * pgvector applies a WHERE predicate AFTER the index scan, and an HNSW scan
+ * never yields more rows than `ef_search` (default 40). Asking for 20 watched
+ * titles out of a library where most things are unwatched would therefore come
+ * back nearly empty — the filter would look broken when the index was simply
+ * not asked to walk far enough. SET LOCAL only, so it cannot leak onto the
+ * pooled connection and change the vector queries tuned for the default.
+ */
+const HNSW_EF_SEARCH_FILTERED = 500
+
+/**
+ * SQL predicate restricting rows to titles the user has (or has not) watched.
+ *
+ * The exclusion half already existed in several places; the INCLUSION half is
+ * what makes "which French film noir have I watched" answerable at all. Before
+ * it, the only history tool was getWatchHistory — most-recent-N in play order,
+ * with no filter of any kind — so the model had to infer membership by eye from
+ * a sample, and reported confident false negatives when the sample missed.
+ *
+ * `column` is the id column of the row being filtered ('id' when the table is
+ * unaliased, 'm.id'/'s.id' when it is). A watched SERIES means at least one of
+ * its episodes was played, matching every other watched check in the codebase.
+ */
+function watchStatusCondition(
+  status: Exclude<WatchStatus, 'all'>,
+  isMovie: boolean,
+  column: string,
+  paramIdx: number
+): string {
+  const subquery = isMovie
+    ? `SELECT movie_id FROM watch_history WHERE user_id = $${paramIdx} AND movie_id IS NOT NULL`
+    : `SELECT DISTINCT ep.series_id FROM watch_history wh
+       JOIN episodes ep ON ep.id = wh.episode_id
+       WHERE wh.user_id = $${paramIdx}`
+  return `${column} ${status === 'watched' ? 'IN' : 'NOT IN'} (${subquery})`
 }
 
 export interface SimilarItemsResult {
@@ -251,7 +293,7 @@ export function createSearchTools(ctx: ToolContext) {
   return {
     searchContent: tool({
       description:
-        'Comprehensive search for movies and TV series with ALL available filters. Use for specific queries with known criteria. For conceptual/vague queries like "mind-bending movies", use semanticSearch instead.',
+        'Comprehensive search for movies and TV series with ALL available filters. Use for specific queries with known criteria. For conceptual/vague queries like "mind-bending movies", use semanticSearch instead. Set watchStatus to search WITHIN what the user has (or has not) watched — this is the only way to answer "which X have I seen", since getWatchHistory returns recent plays in order and cannot filter.',
       inputSchema: nullSafe(z.object({
         // Text search
         query: z.string().optional().describe('Title or keywords to match'),
@@ -290,6 +332,29 @@ export function createSearchTools(ctx: ToolContext) {
         studio: z.string().optional().describe('Studio or production company name'),
         network: z.string().optional().describe('TV network (for series): HBO, Netflix, AMC, etc.'),
 
+        // Origin
+        country: z
+          .string()
+          .optional()
+          .describe('Production country, e.g. "France", "Japan", "South Korea"'),
+        language: z
+          .string()
+          .optional()
+          .describe('Spoken language, e.g. "French", "Japanese" — use for "French films" etc.'),
+
+        // Watch status
+        watchStatus: z
+          .enum(['all', 'watched', 'unwatched'])
+          .optional()
+          .default('all')
+          .describe(
+            'Restrict to titles the user HAS watched ("watched"), has NOT watched ' +
+              '("unwatched"), or both ("all", the default). Use "watched" for any question ' +
+              'about what they have already seen — "which French noir have I watched", "have ' +
+              'I seen any Kurosawa" — because getWatchHistory can only return their most ' +
+              'recent plays in order and cannot filter by genre, country, era or theme.'
+          ),
+
         // Series-specific
         status: z.enum(['Continuing', 'Ended']).optional().describe('Series status'),
         minSeasons: z.number().optional().describe('Minimum number of seasons'),
@@ -325,6 +390,9 @@ export function createSearchTools(ctx: ToolContext) {
           actor,
           studio,
           network,
+          country,
+          language,
+          watchStatus = 'all',
           status,
           minSeasons,
           tag,
@@ -400,7 +468,12 @@ export function createSearchTools(ctx: ToolContext) {
             idx++
           }
           if (director) {
-            conditions.push(`$${idx} ILIKE ANY(directors)`)
+            // `directors::text ILIKE $n`, matching the actor/studio filters below.
+            // This was `$n ILIKE ANY(directors)`, which is backwards: in
+            // `a ILIKE b` the RIGHT side is the pattern, so that asked whether the
+            // literal string "%Nolan%" matches the pattern "Christopher Nolan" —
+            // false for every real name, making the filter silently return nothing.
+            conditions.push(`directors::text ILIKE $${idx}`)
             values.push(`%${director}%`)
             idx++
           }
@@ -430,8 +503,24 @@ export function createSearchTools(ctx: ToolContext) {
             idx++
           }
           if (tag) {
-            conditions.push(`$${idx} ILIKE ANY(tags)`)
+            // Same inversion as the director filter above — see the note there.
+            conditions.push(`tags::text ILIKE $${idx}`)
             values.push(`%${tag}%`)
+            idx++
+          }
+          if (country) {
+            conditions.push(`production_countries::text ILIKE $${idx}`)
+            values.push(`%${country}%`)
+            idx++
+          }
+          if (language) {
+            conditions.push(`languages::text ILIKE $${idx}`)
+            values.push(`%${language}%`)
+            idx++
+          }
+          if (watchStatus !== 'all') {
+            conditions.push(watchStatusCondition(watchStatus, isMovie, 'id', idx))
+            values.push(ctx.userId)
             idx++
           }
 
@@ -498,6 +587,11 @@ export function createSearchTools(ctx: ToolContext) {
           }
         }
 
+        // Tell the model (and the card) which of these the user has already
+        // seen, so "have I watched any of these" is read off the data instead
+        // of guessed. One round trip for the whole page.
+        await annotateWatchedItems(ctx.userId, items)
+
         const { titleKey, titleParams } = searchContentTitleKey(searchQuery, genre, type)
         return {
           id: `search-${Date.now()}`,
@@ -522,13 +616,23 @@ export function createSearchTools(ctx: ToolContext) {
           .string()
           .optional()
           .describe('Title to EXCLUDE from results (use when user says "I liked X, what else...")'),
+        watchStatus: z
+          .enum(['all', 'watched', 'unwatched'])
+          .optional()
+          .default('all')
+          .describe(
+            'Restrict to titles the user HAS watched ("watched"), has NOT watched ' +
+              '("unwatched"), or both ("all", the default). Use "watched" to search their ' +
+              'history by theme or mood — "the bleak thrillers I have seen" — which ' +
+              'getWatchHistory cannot do, as it only returns recent plays in order.'
+          ),
         limit: z
           .number()
           .optional()
           .default(15)
           .describe('Number of results to return (default 15, max 50)'),
       })),
-      execute: async ({ concept, type = 'both', excludeTitle, limit = 15 }) => {
+      execute: async ({ concept, type = 'both', excludeTitle, watchStatus = 'all', limit = 15 }) => {
         try {
           const safeLimit = Math.min(limit ?? 15, 50)
 
@@ -548,19 +652,37 @@ export function createSearchTools(ctx: ToolContext) {
           // Get model ID for database query (stored in db as string identifier)
           const modelId = ctx.embeddingModelId
 
+          // A watch-status filter is a post-filter on the ANN scan, so it needs a
+          // wider search list to have anything to filter — see HNSW_EF_SEARCH_FILTERED.
+          const filterWatch = watchStatus !== 'all'
+          const runAnn = async <T,>(sql: string, params: unknown[]): Promise<{ rows: T[] }> => {
+            if (!filterWatch) return query<T>(sql, params)
+            return transaction(async (client) => {
+              await client.query(`SET LOCAL hnsw.ef_search = ${HNSW_EF_SEARCH_FILTERED}`)
+              const res = await client.query(sql, params)
+              return { rows: res.rows as T[] }
+            })
+          }
+
           if (type === 'movies' || type === 'both') {
             const movieTableName = await getActiveEmbeddingTableName('embeddings')
-            const movieResults = await query<
+            // userId is $4 — appended after the three fixed params below.
+            const watchedClause = filterWatch
+              ? `AND ${watchStatusCondition(watchStatus, true, 'm.id', 4)}`
+              : ''
+            const movieResults = await runAnn<
               MovieResult & { provider_item_id?: string; similarity: number }
             >(
               `SELECT m.id, m.title, m.year, m.genres, m.overview, m.community_rating, m.poster_url, m.provider_item_id, m.directors,
                       1 - (e.embedding <=> $1::halfvec) as similarity
                FROM ${movieTableName} e
                JOIN movies m ON m.id = e.movie_id
-               WHERE e.model = $2
+               WHERE e.model = $2 ${watchedClause}
                ORDER BY e.embedding <=> $1::halfvec
                LIMIT $3`,
-              [embeddingStr, modelId, safeLimit + 5] // Get extra to account for exclusion
+              filterWatch
+                ? [embeddingStr, modelId, safeLimit + 5, ctx.userId]
+                : [embeddingStr, modelId, safeLimit + 5] // Get extra to account for exclusion
             )
 
             for (const m of movieResults.rows) {
@@ -576,17 +698,22 @@ export function createSearchTools(ctx: ToolContext) {
 
           if (type === 'series' || type === 'both') {
             const seriesTableName = await getActiveEmbeddingTableName('series_embeddings')
-            const seriesResults = await query<
+            const watchedClause = filterWatch
+              ? `AND ${watchStatusCondition(watchStatus, false, 's.id', 4)}`
+              : ''
+            const seriesResults = await runAnn<
               SeriesResult & { provider_item_id?: string; similarity: number }
             >(
               `SELECT s.id, s.title, s.year, s.genres, s.network, s.overview, s.community_rating, s.poster_url, s.provider_item_id, s.directors,
                       1 - (se.embedding <=> $1::halfvec) as similarity
                FROM ${seriesTableName} se
                JOIN series s ON s.id = se.series_id
-               WHERE se.model = $2
+               WHERE se.model = $2 ${watchedClause}
                ORDER BY se.embedding <=> $1::halfvec
                LIMIT $3`,
-              [embeddingStr, modelId, safeLimit + 5] // Get extra to account for exclusion
+              filterWatch
+                ? [embeddingStr, modelId, safeLimit + 5, ctx.userId]
+                : [embeddingStr, modelId, safeLimit + 5] // Get extra to account for exclusion
             )
 
             for (const s of seriesResults.rows) {
@@ -605,6 +732,7 @@ export function createSearchTools(ctx: ToolContext) {
 
           // Limit final results
           const finalItems = items.slice(0, safeLimit)
+          await annotateWatchedItems(ctx.userId, finalItems)
 
           if (finalItems.length === 0) {
             return {

@@ -32,6 +32,12 @@ export interface ContentItem {
   source?: 'ranked' | 'twin' | 'interest'
   /** Only on a `twin` pick: titles the user and that viewer have both watched, rarest first. */
   sharedTitles?: string[]
+  /**
+   * Whether the user has already watched this title, read from their history.
+   * Set by the library search tools; **absent means not looked up**, which is
+   * why the card must branch on `=== true` rather than on falsiness.
+   */
+  watched?: boolean
   actions?: Action[]
 }
 
