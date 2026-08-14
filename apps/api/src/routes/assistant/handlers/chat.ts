@@ -102,6 +102,34 @@ function createToolBufferingStream(): TransformStream<Uint8Array, Uint8Array> {
   })
 }
 
+/**
+ * Cards in a tool result — `{ items }` plus every `{ carousels: [{ items }] }`,
+ * the two shapes the content tools return (see helpers/unwatched.ts, which
+ * walks the same containers to filter them).
+ *
+ * Deliberately shape-tolerant rather than typed against the tool results: this
+ * exists only to make a log line legible, and a tool whose payload it does not
+ * recognise must log a 0, never throw inside onStepFinish.
+ */
+function countCards(value: unknown): number {
+  if (typeof value !== 'object' || value === null) return 0
+  const record = value as Record<string, unknown>
+  let count = Array.isArray(record.items) ? record.items.length : 0
+  if (Array.isArray(record.carousels)) {
+    for (const carousel of record.carousels) {
+      if (typeof carousel !== 'object' || carousel === null) continue
+      const items = (carousel as Record<string, unknown>).items
+      if (Array.isArray(items)) count += items.length
+    }
+  }
+  return count
+}
+
+/** `"getWatchHistory:30"` — the one line that explains a wall of posters. */
+function describeToolResult(result: { toolName: string; output?: unknown }): string {
+  return `${result.toolName}:${countCards(result.output)}`
+}
+
 export function registerChatHandler(fastify: FastifyInstance) {
   fastify.post<{ Body: ChatBody }>(
     '/api/assistant/chat',
@@ -235,7 +263,7 @@ export function registerChatHandler(fastify: FastifyInstance) {
             let discoveryAppend = ''
             emit('understanding')
             const intent = await classifyIntent(processedMessages)
-            fastify.log.info({ intent }, 'Assistant intent classified')
+            request.log.info({ intent }, 'Assistant intent classified')
             // What the user actually typed this turn. Drives the discovery search,
             // and is stamped onto every card list so the UI can act on the request
             // later (naming a playlist after it) without re-reading the thread.
@@ -287,7 +315,7 @@ export function registerChatHandler(fastify: FastifyInstance) {
               userRequest
             )
 
-            fastify.log.info(
+            request.log.info(
               {
                 toolCount: Object.keys(tools).length,
                 model: typeof chatModel === 'string' ? chatModel : chatModel.modelId,
@@ -306,13 +334,18 @@ export function registerChatHandler(fastify: FastifyInstance) {
               toolChoice: 'auto',
               stopWhen: stepCountIs(5), // Stop after 5 steps (allows tool calls + follow-up responses)
               onStepFinish: (step) => {
-                fastify.log.info(
+                request.log.info(
                   {
-                    stepKeys: Object.keys(step),
+                    // Tool NAMES and card counts, not Object.keys(step) — that
+                    // was the same seven strings every time and said nothing.
+                    // When a turn comes back with the wrong content, "which
+                    // tool, returning how many cards" is the entire question,
+                    // and reconstructing it from poster requests in the access
+                    // log is not a debugging strategy.
+                    tools: step.toolCalls?.map((call) => call.toolName) ?? [],
+                    results: step.toolResults?.map(describeToolResult) ?? [],
                     hasText: !!step.text,
                     textLength: step.text?.length,
-                    toolCallCount: step.toolCalls?.length ?? 0,
-                    toolResultCount: step.toolResults?.length ?? 0,
                   },
                   'Step finished'
                 )
