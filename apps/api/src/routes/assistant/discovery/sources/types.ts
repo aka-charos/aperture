@@ -30,25 +30,21 @@ export interface WebSearchSourceResult {
   references?: WebSearchSourceReference[]
 }
 
-/**
- * Extra material a source may use to sharpen its search, beyond the request.
- *
- * Optional by design and ignored by sources that cannot use it: a source is
- * free to take only the query. In particular a *search API* should ignore
- * `tasteBrief` — it is prose meant for a model prompt, and pasting it into a
- * keyword query makes the query worse, not more personal.
- */
-export interface WebSearchContext {
-  /** A short description of the viewer. See discovery/tasteBrief.ts. */
-  tasteBrief?: string | null
-}
-
 export interface WebSearchSource {
   /** Stable id, also used as the label in the combined material and logs. */
   readonly id: string
   /**
    * Produce grounded material for the query, or null when this source is
    * disabled, unconfigured, errored, or returned nothing usable. Must not throw.
+   *
+   * The QUERY IS THE ONLY INPUT, and deliberately so. A source used to be able
+   * to take a `WebSearchContext` carrying the viewer's taste profile; Google
+   * grounding did, and turned it into search terms — a request for French film
+   * noir "based on my history" became twelve queries about the user's favourite
+   * surrealist film, despite an explicit instruction not to search for it.
+   * Personalisation now happens after retrieval, in the structuring pass, where
+   * it can only reorder what the search found. Do not reintroduce a channel
+   * here: retrieval must answer the question the user asked and nothing else.
    */
-  gather(query: string, context?: WebSearchContext): Promise<WebSearchSourceResult | null>
+  gather(query: string): Promise<WebSearchSourceResult | null>
 }

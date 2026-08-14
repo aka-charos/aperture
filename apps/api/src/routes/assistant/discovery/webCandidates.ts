@@ -8,6 +8,12 @@
  * across all of them. Fails to an empty list — the caller then behaves as the
  * normal library assistant, so discovery is purely additive.
  *
+ * The structuring pass is also where the viewer's taste profile is applied. It
+ * has no search tool, so a profile there can only order candidates the sources
+ * already returned — unlike the grounding call, which turned the same profile
+ * into search terms and went looking for the viewer's favourite films instead
+ * of what they asked about.
+ *
  * The structuring pass prefers the Web Search (Gemini) model — reliable JSON and
  * already configured for grounding — but a Tavily-only setup (no Gemini) falls
  * back to the text-generation, then chat model. `reason` is required first
@@ -58,6 +64,30 @@ const candidateFields = {
 }
 const StrictCandidateSchema = z.object({ ...candidateFields, reason: z.string().min(1) })
 const LenientCandidateSchema = z.object({ ...candidateFields, reason: z.string().optional() })
+
+/**
+ * Viewer profile, prefixed to the structuring prompt.
+ *
+ * Placed FIRST so it frames the extraction rather than trailing a wall of web
+ * text. Its job is strictly ordering and tie-breaking: the candidate set is
+ * fixed by what the sources retrieved, so the worst this can do is rank well-
+ * justified titles in an order the viewer likes less. That is the whole reason
+ * personalisation lives here rather than on the search call, where the same
+ * paragraph decided what got looked up in the first place.
+ *
+ * The precedence line is still explicit. A profile that quietly overrides the
+ * request turns "a good horror film" into the arthouse dramas the profile is
+ * full of — worse than no personalisation at all.
+ */
+const viewerBlock = (tasteBrief: string): string =>
+  'ABOUT THE VIEWER THESE PICKS ARE FOR:\n' +
+  tasteBrief +
+  '\n\nUse this profile ONLY to ORDER the candidates you extract below, and only among titles ' +
+  'that answer the request equally well — put the ones this viewer is likeliest to want first. ' +
+  'It must NEVER change which titles qualify: do not add a title that is not in the text, do not ' +
+  'drop one that genuinely answers the request because it is outside their usual taste, and do ' +
+  'not let it override the request. If the profile and the request disagree, the request wins ' +
+  'outright. A title still needs a real reason tied to THE REQUEST, never to the profile.\n\n'
 
 /** 'google' when the structuring model is the Gemini web-search role; else unknown. */
 type StructuringProvider = 'google' | undefined
@@ -216,11 +246,15 @@ export async function gatherWebCandidates(
   tasteBrief?: string | null
 ): Promise<DiscoveryCandidate[]> {
   logger.info(
+    // `personalized` says a profile was built and will be applied at
+    // STRUCTURING. It says nothing about retrieval, which never sees it.
     { query: queryText.slice(0, 200), personalized: Boolean(tasteBrief) },
     'Discovery routed: gathering web candidates'
   )
 
-  const results = await gatherFromSources(queryText, { tasteBrief })
+  // The sources get the request and nothing else — see WebSearchSource.gather.
+  // The viewer profile is applied below, on material already retrieved.
+  const results = await gatherFromSources(queryText)
   if (results.length === 0) {
     // No source enabled, or all failed/returned empty. Discovery is off/degraded;
     // the caller falls back to library behavior.
@@ -248,7 +282,16 @@ export async function gatherWebCandidates(
   }
 
   // Structure the combined material into typed candidates (no grounding needed).
+  //
+  // This is also where personalisation happens, and it is the ONLY place it can
+  // safely happen. This model has no search tool: the titles it may return are
+  // exactly the ones already in `combined`, so a profile here can reorder and
+  // choose but cannot bend what was looked up. Putting the same profile on the
+  // grounding call instead — which was the first attempt — let it become search
+  // terms, and "french film noir based on my history" went looking for the
+  // user's favourite Lynch film in twelve different phrasings.
   const structurePrompt =
+    (tasteBrief?.trim() ? viewerBlock(tasteBrief) : '') +
     'The text below is web research about a movie/TV recommendation request, possibly from multiple sources. ' +
     'Extract the specific movies/series it recommends into structured candidates. ' +
     'For each, capture the explanation of WHY it fits as "reason" (verbatim or lightly condensed — one or two sentences, never empty). ' +

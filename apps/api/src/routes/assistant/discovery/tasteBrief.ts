@@ -1,17 +1,20 @@
 /**
- * A short description of the viewer, for the web-search grounding call.
+ * A short description of the viewer, for the discovery structuring pass.
  *
  * The chat model already knows the user's taste — `prompts/context/user.ts`
  * puts both synopses and the last ten watches in the system prompt. The
- * *grounding* call does not: it is a separate model call whose entire input is
- * `groundingPrompt(queryText)`, and queryText is the user's raw message. So a
- * request for "something arthouse" searched the web for exactly that, with no
- * idea it was asking on behalf of someone who watches Béla Tarr.
+ * discovery pipeline's own model calls do not: they are separate calls whose
+ * input is the user's raw message. So a request for "something arthouse" was
+ * answered with no idea it was asking on behalf of someone who watches Béla Tarr.
  *
- * Deliberately short. This is appended to a search prompt whose job is to find
- * titles, and a long profile would start competing with the request itself for
- * the model's attention — which is the failure mode to avoid, since the request
- * is what the user actually asked for.
+ * WHERE this is used matters more than what is in it. It goes to the
+ * structuring pass, which picks and orders among titles the web search already
+ * returned. It must NOT go to a search call: it did once, and a request for
+ * French film noir "based on my history" produced a dozen queries about the
+ * viewer's favourite surrealist film instead.
+ *
+ * Deliberately short — it shares a prompt with the retrieved web material, and a
+ * long profile would start competing with the request for the model's attention.
  */
 import { query, queryOne } from '../../../lib/db.js'
 import { createChildLogger } from '@aperture/core'
