@@ -1,0 +1,13 @@
+-- Document the `empty` call status.
+--
+-- Grounding retries a response that comes back with no text (a soft refusal —
+-- observed live when a request ended "based on my watched history" and the model
+-- had no history to work from). That retry is a second request the provider
+-- counts against the daily quota, but recordWebSearchCall fires once per KEY
+-- attempt in withWebSearchModel while the retry loop sits inside one attempt, so
+-- the extra request was never recorded and the meter read low.
+--
+-- The column has no CHECK constraint, so this is a comment-only change; the
+-- enforcement lives in WebSearchCallStatus. Recorded as a migration anyway so
+-- the schema documents its own values rather than lying about them.
+COMMENT ON COLUMN web_search_usage.status IS 'ok | rate_limited | error | empty (HTTP success, no usable text — still consumes quota)';
