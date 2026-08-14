@@ -36,9 +36,48 @@ function movie(overrides: Partial<Movie> = {}): Movie {
     cinematographers: null,
     languages: null,
     awardsSummary: null,
+    plotFull: null,
     ...overrides,
   } as Movie
 }
+
+// ============================================================================
+// Which synopsis gets embedded
+// ============================================================================
+
+test('the long synopsis replaces the short one, it does not join it', () => {
+  // Both tell the same story. Including both would weight plot twice over
+  // against genre, crew and keywords — the fields that say what a film *is*.
+  const overview = 'A murder plan unravels over one night in Paris.'
+  const plotFull =
+    'A young executive and his lover plot to kill her husband, but a jammed lift ' +
+    'traps him in the building overnight while a joyriding couple takes his car.'
+  const text = buildCanonicalText(movie({ overview, plotFull }))
+  assert.match(text, /jammed lift/)
+  assert.doesNotMatch(text, /unravels over one night/)
+})
+
+test('a full plot no longer than the overview is ignored', () => {
+  // OMDb answers plot=full with the short blurb when IMDb has no long synopsis,
+  // so "we got a value back" is not evidence that it is worth having.
+  const overview = 'A long and reasonably detailed overview sentence from the media server.'
+  const text = buildCanonicalText(movie({ overview, plotFull: 'Short.' }))
+  assert.match(text, /media server/)
+  assert.doesNotMatch(text, /Short\./)
+})
+
+test('the long synopsis is used when there is no overview at all', () => {
+  const text = buildCanonicalText(movie({ overview: null, plotFull: 'The whole story.' }))
+  assert.match(text, /The whole story\./)
+})
+
+test('a very long synopsis is still capped', () => {
+  // Length is not the constraint — dilution is. A 2,000-word synopsis pulls the
+  // vector toward plot minutiae and away from what the film is.
+  const text = buildCanonicalText(movie({ plotFull: 'x'.repeat(5000) }))
+  assert.ok(text.length < 2000)
+  assert.match(text, /\.\.\./)
+})
 
 // ============================================================================
 // The enrichment fields reach the text

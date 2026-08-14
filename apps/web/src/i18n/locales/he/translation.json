@@ -635,7 +635,9 @@
       "snackbarFavoriteFailed": "Failed to update favorite",
       "addFavoriteTooltipNamed": "Add to favorites on {{serverName}} — a quick way to bookmark titles you want to come back to",
       "removeFavoriteTooltipNamed": "Remove from favorites on {{serverName}}",
-      "markWatchedTooltipNamed": "Mark as watched - syncs to {{serverName}} and watch history"
+      "markWatchedTooltipNamed": "Mark as watched - syncs to {{serverName}} and watch history",
+      "showFullPlot": "Read full synopsis",
+      "showShortPlot": "Show short summary"
     },
     "insights": {
       "recommendedForYou": "מומלץ עבורך",

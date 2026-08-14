@@ -54,6 +54,17 @@ export interface RatingsData {
   languages: string[] | null
   /** Production countries parsed from Country field (e.g., ["USA", "UK"]) */
   countries: string[] | null
+  /**
+   * IMDb's long synopsis, from `plot=full`.
+   *
+   * Several times the length of the one-paragraph overview the media server
+   * syncs — and materially different in kind: it is user-submitted prose that
+   * narrates the story rather than pitching it, so it names characters,
+   * settings and turns the short blurb never reaches. That is why it is worth
+   * embedding, and also why it must not be shown unprompted: for a film with a
+   * twist it routinely gives it away.
+   */
+  plot: string | null
 }
 
 // ============================================================================

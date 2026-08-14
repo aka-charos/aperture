@@ -515,6 +515,7 @@ async function enrichMovie(
          awards_summary = COALESCE($11, awards_summary),
          languages = COALESCE($12, languages),
          production_countries = COALESCE($13, production_countries),
+         plot_full = COALESCE($15, plot_full),
          enriched_at = NOW(),
          enrichment_version = COALESCE((SELECT value::int FROM system_settings WHERE key = 'enrichment_version'), 1),
          -- Only advance when OMDb was actually asked; CASE rather than COALESCE
@@ -536,6 +537,7 @@ async function enrichMovie(
         omdbData?.languages ?? null,
         omdbData?.countries ?? null,
         omdb.attempted,
+        omdbData?.plot ?? null,
       ]
     )
     return true
@@ -664,6 +666,7 @@ async function enrichSeries(
          awards_summary = COALESCE($6, awards_summary),
          languages = COALESCE($7, languages),
          production_countries = COALESCE($8, production_countries),
+         plot_full = COALESCE($10, plot_full),
          enriched_at = NOW(),
          enrichment_version = COALESCE((SELECT value::int FROM system_settings WHERE key = 'enrichment_version'), 1),
          -- Only advance when OMDb was actually asked; CASE rather than COALESCE
@@ -680,6 +683,7 @@ async function enrichSeries(
         omdbData?.languages ?? null,
         omdbData?.countries ?? null,
         omdb.attempted,
+        omdbData?.plot ?? null,
       ]
     )
     return true
