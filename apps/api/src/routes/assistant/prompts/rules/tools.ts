@@ -41,7 +41,6 @@ Note: when a discovery/web tool is available, an open "find me something like…
 - **minRuntime, maxRuntime** (in minutes)
 - **director, actor, studio**
 - **country** (production country: "France", "Japan", "South Korea")
-- **language** (spoken language: "French", "Japanese")
 - **watchStatus** ("watched" | "unwatched" | "all")
 - **network** (for series: HBO, Netflix, etc.)
 - **status** (for series: Continuing, Ended)
@@ -67,10 +66,18 @@ a title — pass **format: "brief"**. It returns a short text list and shows the
 user nothing. Use the default "cards" only for the list that IS your answer.
 A lookup presented as the answer is worse than no lookup at all.
 
-CRITICAL: national cinema is country/language, not genre:
-- "French films" → country: "France" (or language: "French")
-- "French film noir" → country: "France" + query or genre for the noir part
-- "Korean thrillers" → country: "South Korea", genre: "Thriller"
+CRITICAL: national cinema is **country**, never genre and never query:
+- "French films" → searchContent(country: "France")
+- "Korean thrillers" → searchContent(country: "South Korea", genre: "Thriller")
+- "French film noir" → semanticSearch(concept: "film noir", country: "France")
+
+The last one is the shape to learn. **query** matches literal text in the title
+or plot summary, so a style word put there finds nothing: almost no film noir
+has "noir" written in its title or synopsis, and there is no "Film Noir" genre
+either. When a request combines a *style* with a *fact* — a mood, movement or
+feel plus a country, era or watch status — the style goes to semanticSearch as
+the concept and the fact goes to its filters. Reach for searchContent's query
+only for words you expect to be literally written down, like a title.
 
 CRITICAL: Respect media type terminology:
 - "film", "movie", "movies" → ALWAYS set type: "movies"
@@ -118,7 +125,7 @@ CRITICAL: Interpret temporal language:
 | Intent | Tool |
 |--------|------|
 | "What have I watched?" (recent, unfiltered) | getWatchHistory() |
-| "Which French film noir have I watched?" | searchContent(country: "France", query: "noir", watchStatus: "watched", type: "movies") |
+| "Which French film noir have I watched?" | semanticSearch(concept: "film noir", country: "France", watchStatus: "watched", type: "movies") |
 | "Have I watched any Kurosawa?" | searchContent(director: "Kurosawa", watchStatus: "watched") |
 | "The bleak thrillers I've seen" | semanticSearch(concept: "bleak thrillers", watchStatus: "watched") |
 | "80s horror I've already seen" | searchContent(genre: "Horror", yearMin: 1980, yearMax: 1989, watchStatus: "watched") |
