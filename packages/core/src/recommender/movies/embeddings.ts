@@ -34,7 +34,31 @@ interface Movie {
   tags: string[] | null
   productionCountries: string[] | null
   awards: string | null
+  // Enrichment output (TMDb keywords/collection/crew, OMDb languages/awards)
+  keywords: string[] | null
+  collectionName: string | null
+  composers: string[] | null
+  cinematographers: string[] | null
+  languages: string[] | null
+  awardsSummary: string | null
 }
+
+/**
+ * Bumped whenever buildCanonicalText changes what it emits, so the embedding
+ * job can find rows whose stored text was produced by an older build. Stored
+ * as `text_version` on the embedding row; NULL predates it and reads as stale.
+ *
+ * Version 1 added the enrichment fields. Before it, the builder read only
+ * columns the media-server sync writes — `tags` and `awards` — while the
+ * enrichment columns beside them (`keywords`, `awards_summary`) went into no
+ * vector at all. The pairs are easy to confuse and were: `0022` added `tags`
+ * and `awards` for the sync, `0059` added `keywords` and `awards_summary` for
+ * enrichment, and the builder was never repointed.
+ */
+export const CANONICAL_TEXT_VERSION = 1
+
+/** Enough to characterise a film; a few titles carry 100+ and would drown it. */
+const MAX_KEYWORDS = 18
 
 interface EmbeddingResult {
   movieId: string
@@ -92,6 +116,17 @@ export function buildCanonicalText(movie: Movie): string {
     sections.push(`Studio: ${topStudios.join(', ')}`)
   }
 
+  // Below-the-line crew carries real style signal — a Deakins photograph or a
+  // Greenwood score is as identifying as the director. TMDb enrichment writes
+  // both; nothing else in the app reads them except the NFO writer.
+  if (movie.cinematographers && movie.cinematographers.length > 0) {
+    sections.push(`Cinematography by ${movie.cinematographers.slice(0, 2).join(', ')}`)
+  }
+
+  if (movie.composers && movie.composers.length > 0) {
+    sections.push(`Music by ${movie.composers.slice(0, 2).join(', ')}`)
+  }
+
   // Lead actors (top 3) influence viewing choices significantly
   if (movie.actors && movie.actors.length > 0) {
     const leadActors = movie.actors.slice(0, 3).map((a) => a.name)
@@ -115,6 +150,15 @@ export function buildCanonicalText(movie: Movie): string {
     sections.push(`Themes: ${movie.tags.join(', ')}`)
   }
 
+  // TMDb keywords are the concept vocabulary this text was missing. "film
+  // noir", "neo-noir", "dystopia", "one-woman army" are keywords; almost none
+  // of them appear in a synopsis, so a semantic search for a *style* had
+  // nothing but plot prose to match against. Distinct from `tags`, which comes
+  // from the media server and is usually sparse or operator-set.
+  if (movie.keywords && movie.keywords.length > 0) {
+    sections.push(`Keywords: ${movie.keywords.slice(0, MAX_KEYWORDS).join(', ')}`)
+  }
+
   // === SECTION 5: Context ===
   // Production country affects style, language, cultural context
   if (movie.productionCountries && movie.productionCountries.length > 0) {
@@ -122,11 +166,28 @@ export function buildCanonicalText(movie: Movie): string {
     sections.push(`From ${countries.join(', ')}`)
   }
 
-  // Awards signal quality and recognition
-  if (movie.awards) {
+  // Spoken language, which country does not imply — a French-language Belgian
+  // film and an English-language French co-production read very differently.
+  if (movie.languages && movie.languages.length > 0) {
+    sections.push(`In ${movie.languages.slice(0, 3).join(', ')}`)
+  }
+
+  // Franchise membership, so entries cluster with their siblings rather than
+  // relying on title overlap that a renamed sequel does not have.
+  if (movie.collectionName) {
+    sections.push(`Part of ${movie.collectionName}`)
+  }
+
+  // Awards signal quality and recognition. OMDb's summary is the structured
+  // one ("Won 4 Oscars. 12 nominations."); `awards` is the media server's free
+  // text and is usually empty, which is why this used to contribute nothing.
+  // Scores are deliberately NOT here: a bare "82" embeds as noise, and quality
+  // already has its own term in scoring (calculateRatingScore) and its own
+  // filters in Browse.
+  const awards = movie.awardsSummary || movie.awards
+  if (awards) {
     // Truncate very long awards text
-    const awardsText =
-      movie.awards.length > 150 ? movie.awards.substring(0, 150) + '...' : movie.awards
+    const awardsText = awards.length > 150 ? awards.substring(0, 150) + '...' : awards
     sections.push(`Awards: ${awardsText}`)
   }
 
@@ -192,18 +253,23 @@ export async function storeEmbeddings(embeddings: EmbeddingResult[]): Promise<vo
   const tableName = await getActiveEmbeddingTableName('embeddings')
 
   await query(
-    `INSERT INTO ${tableName} (movie_id, model, embedding, canonical_text)
-     SELECT t.movie_id, t.model, t.embedding, t.canonical_text
+    `INSERT INTO ${tableName} (movie_id, model, embedding, canonical_text, text_version, updated_at)
+     SELECT t.movie_id, t.model, t.embedding, t.canonical_text, $5, NOW()
      FROM unnest($1::uuid[], $2::text[], $3::halfvec[], $4::text[])
      AS t(movie_id, model, embedding, canonical_text)
      ON CONFLICT (movie_id, model) DO UPDATE SET
        embedding = EXCLUDED.embedding,
-       canonical_text = EXCLUDED.canonical_text`,
+       canonical_text = EXCLUDED.canonical_text,
+       text_version = EXCLUDED.text_version,
+       -- created_at deliberately survives the upsert, which is exactly why the
+       -- staleness check reads updated_at instead.
+       updated_at = NOW()`,
     [
       embeddings.map((emb) => emb.movieId),
       Array(embeddings.length).fill(modelName),
       embeddings.map((emb) => `[${emb.embedding.join(',')}]`),
       embeddings.map((emb) => emb.canonicalText),
+      CANONICAL_TEXT_VERSION,
     ]
   )
 
@@ -211,10 +277,36 @@ export async function storeEmbeddings(embeddings: EmbeddingResult[]): Promise<vo
 }
 
 /**
- * Get movies that don't have embeddings yet (with full metadata)
+ * A movie whose vector is missing or out of date, carrying the text that was
+ * embedded last time so the caller can decide whether anything actually
+ * changed before paying for a new embedding.
+ */
+export interface MovieNeedingEmbedding extends Movie {
+  storedCanonicalText: string | null
+}
+
+/**
+ * The three ways a row can need work.
+ *
+ * Only the first existed before: `e.id IS NULL`, missing. A row whose metadata
+ * changed after it was embedded kept its original vector permanently, and the
+ * only cure was truncating every embedding table in the instance.
+ *
+ * `updated_at`, not `created_at` — storeEmbeddings upserts, so created_at holds
+ * the *first* write forever and a row would re-qualify on every pass. The batch
+ * loop runs until this selection empties, so that is a job that never ends.
+ */
+const MOVIE_STALE_SQL = `(
+        e.id IS NULL
+        OR COALESCE(e.text_version, 0) < $3
+        OR (m.enriched_at IS NOT NULL AND e.updated_at < m.enriched_at)
+      )`
+
+/**
+ * Get movies whose embedding is missing or stale (with full metadata)
  * Only includes movies from enabled libraries
  */
-export async function getMoviesWithoutEmbeddings(limit = 100): Promise<Movie[]> {
+export async function getMoviesNeedingEmbeddings(limit = 100): Promise<MovieNeedingEmbedding[]> {
   const config = await getFunctionConfig('embeddings')
   const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
   const tableName = await getActiveEmbeddingTableName('embeddings')
@@ -237,14 +329,24 @@ export async function getMoviesWithoutEmbeddings(limit = 100): Promise<Movie[]> 
     tags: string[] | null
     production_countries: string[] | null
     awards: string | null
+    keywords: string[] | null
+    collection_name: string | null
+    composers: string[] | null
+    cinematographers: string[] | null
+    languages: string[] | null
+    awards_summary: string | null
+    stored_canonical_text: string | null
   }>(
     hasLibraryConfigs
       ? `SELECT m.id, m.title, m.year, m.genres, m.overview,
                 m.tagline, m.directors, m.actors::text, m.studios::text,
-                m.content_rating, m.tags, m.production_countries, m.awards
+                m.content_rating, m.tags, m.production_countries, m.awards,
+                m.keywords, m.collection_name, m.composers, m.cinematographers,
+                m.languages, m.awards_summary,
+                e.canonical_text AS stored_canonical_text
          FROM movies m
          LEFT JOIN ${tableName} e ON e.movie_id = m.id AND e.model = $1
-         WHERE e.id IS NULL
+         WHERE ${MOVIE_STALE_SQL}
            AND EXISTS (
              SELECT 1 FROM library_config lc
              WHERE lc.provider_library_id = m.provider_library_id
@@ -253,12 +355,15 @@ export async function getMoviesWithoutEmbeddings(limit = 100): Promise<Movie[]> 
          LIMIT $2`
       : `SELECT m.id, m.title, m.year, m.genres, m.overview,
                 m.tagline, m.directors, m.actors::text, m.studios::text,
-                m.content_rating, m.tags, m.production_countries, m.awards
+                m.content_rating, m.tags, m.production_countries, m.awards,
+                m.keywords, m.collection_name, m.composers, m.cinematographers,
+                m.languages, m.awards_summary,
+                e.canonical_text AS stored_canonical_text
          FROM movies m
          LEFT JOIN ${tableName} e ON e.movie_id = m.id AND e.model = $1
-         WHERE e.id IS NULL
+         WHERE ${MOVIE_STALE_SQL}
          LIMIT $2`,
-    [modelName, limit]
+    [modelName, limit, CANONICAL_TEXT_VERSION]
   )
 
   // Map database rows to Movie interface
@@ -276,12 +381,45 @@ export async function getMoviesWithoutEmbeddings(limit = 100): Promise<Movie[]> 
     tags: row.tags,
     productionCountries: row.production_countries,
     awards: row.awards,
+    keywords: row.keywords,
+    collectionName: row.collection_name,
+    composers: row.composers,
+    cinematographers: row.cinematographers,
+    languages: row.languages,
+    awardsSummary: row.awards_summary,
+    storedCanonicalText: row.stored_canonical_text,
   }))
+}
+
+/**
+ * Mark a stored embedding as current without re-embedding it.
+ *
+ * A row can be selected as stale — its text_version is behind, or enrichment
+ * touched it — and still produce byte-identical canonical text, because most
+ * enrichment passes change columns this text does not read. Re-embedding those
+ * is a paid API call for the same vector, and *not* clearing their staleness is
+ * an infinite batch loop, so the stamp has to move either way.
+ */
+export async function markEmbeddingsCurrent(movieIds: string[]): Promise<void> {
+  if (movieIds.length === 0) return
+
+  const config = await getFunctionConfig('embeddings')
+  const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
+  const tableName = await getActiveEmbeddingTableName('embeddings')
+
+  await query(
+    `UPDATE ${tableName}
+        SET text_version = $3, updated_at = NOW()
+      WHERE model = $2 AND movie_id = ANY($1::uuid[])`,
+    [movieIds, modelName, CANONICAL_TEXT_VERSION]
+  )
 }
 
 export interface GenerateEmbeddingsResult {
   generated: number
   failed: number
+  /** Selected as stale but the text had not actually changed — no API call. */
+  unchanged: number
   jobId: string
 }
 
@@ -305,26 +443,29 @@ export async function generateMissingEmbeddings(
       addLog(jobId, 'error', '❌ Embedding provider is not configured!')
       addLog(jobId, 'info', '💡 Go to Settings > AI to configure your embedding provider')
       completeJob(jobId, { generated: 0, failed: 0, skipped: true })
-      return { generated: 0, failed: 0, jobId }
+      return { generated: 0, failed: 0, unchanged: 0, jobId }
     }
 
     const modelName = `${config.provider}:${config.model}`
     addLog(jobId, 'info', `🤖 Using embedding provider: ${config.provider}, model: ${config.model}`)
 
     // Step 2: Count movies needing embeddings (only from enabled libraries)
-    setJobStep(jobId, 1, 'Counting movies without embeddings')
+    setJobStep(jobId, 1, 'Counting movies needing embeddings')
 
     // Check if any library configs exist
     const configCheck = await queryOne<{ count: string }>('SELECT COUNT(*) FROM library_config')
     const hasLibraryConfigs = configCheck && parseInt(configCheck.count, 10) > 0
     const tableName = await getActiveEmbeddingTableName('embeddings')
 
+    // Must use the same predicate as the selection, or the counter reports a
+    // total the loop never reaches and the job looks stuck or finishes early.
+    // $3 lines up with MOVIE_STALE_SQL's placeholder.
     const countResult = await query<{ count: string }>(
       hasLibraryConfigs
         ? `SELECT COUNT(*) as count
            FROM movies m
            LEFT JOIN ${tableName} e ON e.movie_id = m.id AND e.model = $1
-           WHERE e.id IS NULL
+           WHERE ${MOVIE_STALE_SQL}
              AND EXISTS (
                SELECT 1 FROM library_config lc
                WHERE lc.provider_library_id = m.provider_library_id
@@ -333,16 +474,16 @@ export async function generateMissingEmbeddings(
         : `SELECT COUNT(*) as count
            FROM movies m
            LEFT JOIN ${tableName} e ON e.movie_id = m.id AND e.model = $1
-           WHERE e.id IS NULL`,
-      [modelName]
+           WHERE ${MOVIE_STALE_SQL}`,
+      [modelName, null, CANONICAL_TEXT_VERSION]
     )
 
     const totalNeeded = parseInt(countResult.rows[0]?.count || '0', 10)
 
     if (totalNeeded === 0) {
-      addLog(jobId, 'info', '✅ All movies already have embeddings!')
-      completeJob(jobId, { generated: 0, failed: 0 })
-      return { generated: 0, failed: 0, jobId }
+      addLog(jobId, 'info', '✅ All movie embeddings are up to date!')
+      completeJob(jobId, { generated: 0, failed: 0, unchanged: 0 })
+      return { generated: 0, failed: 0, unchanged: 0, jobId }
     }
 
     addLog(jobId, 'info', `🎬 Found ${totalNeeded} movies needing embeddings`)
@@ -352,37 +493,63 @@ export async function generateMissingEmbeddings(
 
     let totalGenerated = 0
     let totalFailed = 0
+    let totalUnchanged = 0
     const batchSize = 25 // Smaller batches for better progress feedback
-    let batch: Movie[]
 
-    do {
-      batch = await getMoviesWithoutEmbeddings(batchSize)
+    // The loop reads until the selection stops returning rows, so any row that
+    // is still selected after being handled spins it forever. That was already
+    // reachable — a batch whose embedding call fails is never stored and comes
+    // straight back — and staleness adds two more ways in. One attempt per row
+    // per run removes the whole class.
+    const attempted = new Set<string>()
 
-      if (batch.length > 0) {
-        addLog(jobId, 'info', `🧠 Processing batch of ${batch.length} movies...`)
+    for (;;) {
+      const fetched = await getMoviesNeedingEmbeddings(batchSize)
+      const batch = fetched.filter((m) => !attempted.has(m.id))
+      if (batch.length === 0) break
+      for (const movie of batch) attempted.add(movie.id)
+
+      // A row can be stale without its text having moved: enrichment mostly
+      // writes columns this text does not read (the scores, the crew nobody
+      // renders), and the version bump flags everything regardless. Re-embedding
+      // those buys an identical vector for the price of an API call.
+      const changed: Array<{ movie: MovieNeedingEmbedding; text: string }> = []
+      const unchanged: string[] = []
+      for (const movie of batch) {
+        const text = buildCanonicalText(movie)
+        if (movie.storedCanonicalText !== null && movie.storedCanonicalText === text) {
+          unchanged.push(movie.id)
+        } else {
+          changed.push({ movie, text })
+        }
+      }
+
+      if (unchanged.length > 0) {
+        // Must happen even though nothing was embedded — this is what clears
+        // their staleness, and therefore what lets the loop finish.
+        await markEmbeddingsCurrent(unchanged)
+        totalUnchanged += unchanged.length
+      }
+
+      if (changed.length > 0) {
+        addLog(jobId, 'info', `🧠 Processing batch of ${changed.length} movies...`)
 
         // Log some movie titles
-        const movieTitles = batch.slice(0, 3).map((m) => `${m.title} (${m.year || 'N/A'})`)
+        const movieTitles = changed.slice(0, 3).map((c) => `${c.movie.title} (${c.movie.year || 'N/A'})`)
         addLog(
           jobId,
           'debug',
-          `  Including: ${movieTitles.join(', ')}${batch.length > 3 ? '...' : ''}`
+          `  Including: ${movieTitles.join(', ')}${changed.length > 3 ? '...' : ''}`
         )
 
         try {
           // Generate embeddings
-          const embeddings = await embedMovies(batch)
+          const embeddings = await embedMovies(changed.map((c) => c.movie))
 
           // Store them
           await storeEmbeddings(embeddings)
 
           totalGenerated += embeddings.length
-          updateJobProgress(
-            jobId,
-            totalGenerated,
-            totalNeeded,
-            `Generated ${totalGenerated}/${totalNeeded}`
-          )
 
           addLog(
             jobId,
@@ -391,15 +558,15 @@ export async function generateMissingEmbeddings(
           )
 
           // Estimate cost
-          const estimatedTokens = batch.reduce((sum, m) => {
-            const text = buildCanonicalText(m)
-            return sum + Math.ceil(text.length / 4) // Rough token estimate
-          }, 0)
+          const estimatedTokens = changed.reduce(
+            (sum, c) => sum + Math.ceil(c.text.length / 4), // Rough token estimate
+            0
+          )
           addLog(jobId, 'debug', `  Estimated tokens: ~${estimatedTokens}`, { estimatedTokens })
         } catch (err) {
           const error = err instanceof Error ? err.message : 'Unknown error'
           addLog(jobId, 'error', `❌ Batch failed: ${error}`)
-          totalFailed += batch.length
+          totalFailed += changed.length
 
           // Continue with next batch
           if (error.includes('rate_limit') || error.includes('429')) {
@@ -411,15 +578,25 @@ export async function generateMissingEmbeddings(
           }
         }
       }
-    } while (batch.length > 0)
 
-    const finalResult = { generated: totalGenerated, failed: totalFailed, jobId }
+      // Skipped rows are progress too, or the bar stalls on a run that is
+      // mostly re-verification.
+      const handled = totalGenerated + totalUnchanged + totalFailed
+      updateJobProgress(jobId, handled, totalNeeded, `Processed ${handled}/${totalNeeded}`)
+    }
+
+    const finalResult = {
+      generated: totalGenerated,
+      failed: totalFailed,
+      unchanged: totalUnchanged,
+      jobId,
+    }
     completeJob(jobId, finalResult)
 
     addLog(
       jobId,
       'info',
-      `🎉 Embedding generation complete: ${totalGenerated} generated, ${totalFailed} failed`
+      `🎉 Embedding generation complete: ${totalGenerated} generated, ${totalUnchanged} already current, ${totalFailed} failed`
     )
 
     return finalResult

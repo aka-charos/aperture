@@ -58,6 +58,7 @@
     "test:engagement": "node --import tsx --test src/taste-profile/engagement.test.ts",
     "test:activity-gate": "node --import tsx --test src/recommender/activityGate.test.ts",
     "test:storage": "node --import tsx --test src/recommender/storage.test.ts",
+    "test:canonical": "node --import tsx --test src/recommender/movies/canonicalText.test.ts",
     "test:twins": "node --import tsx --test src/recommender/shared/twinSlots.test.ts",
     "test:schedule": "node --import tsx --test src/jobs/schedule.test.ts",
     "test:discovery": "node --import tsx --test src/discover/scorer.test.ts",
