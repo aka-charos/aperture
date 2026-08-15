@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildCanonicalText, CANONICAL_TEXT_VERSION } from './embeddings.js'
+import { buildCanonicalText, CANONICAL_TEXT_VERSION, MOVIE_STALE_SQL } from './embeddings.js'
+import { SERIES_STALE_SQL } from '../series/embeddings.js'
 
 /**
  * The canonical text is the only thing an embedding sees, so a column absent
@@ -182,3 +183,30 @@ test('the version is a positive integer', () => {
   assert.ok(Number.isInteger(CANONICAL_TEXT_VERSION))
   assert.ok(CANONICAL_TEXT_VERSION > 0)
 })
+
+// ============================================================================
+// The staleness predicate
+// ============================================================================
+
+/**
+ * Each predicate is spliced into two queries with different parameter lists —
+ * the selection ends in `LIMIT $2`, the count has no LIMIT at all. A fragment
+ * that names a placeholder therefore forces one of them to pass a parameter it
+ * never references, and Postgres rejects the statement outright rather than
+ * ignoring it: `42P18 could not determine data type of parameter $2`. That is
+ * how both embedding jobs shipped broken — nothing in lint, typecheck or these
+ * tests touches a database, so the first execution was on the live instance.
+ */
+for (const [name, sql] of [
+  ['movies', MOVIE_STALE_SQL],
+  ['series', SERIES_STALE_SQL],
+] as const) {
+  test(`the ${name} staleness predicate binds no parameters`, () => {
+    assert.doesNotMatch(sql, /\$\d/)
+  })
+
+  test(`the ${name} staleness predicate compares against the current version`, () => {
+    // Interpolated, so a version bump has to reach the SQL text itself.
+    assert.match(sql, new RegExp(`text_version, 0\\) < ${CANONICAL_TEXT_VERSION}\\b`))
+  })
+}
