@@ -315,10 +315,18 @@ export interface MovieNeedingEmbedding extends Movie {
  * `updated_at`, not `created_at` — storeEmbeddings upserts, so created_at holds
  * the *first* write forever and a row would re-qualify on every pass. The batch
  * loop runs until this selection empties, so that is a job that never ends.
+ *
+ * The version is interpolated rather than bound, and that is load-bearing: a
+ * fragment shared by queries with different parameter lists cannot name a
+ * placeholder index without forcing every caller to pad its array to match. The
+ * count query has no LIMIT, so padding it meant passing a `$2` that appears
+ * nowhere in the SQL — Postgres cannot infer a type for an unreferenced
+ * parameter and rejects the whole statement (42P18). It is a numeric constant
+ * with a literal type, so there is nothing to escape.
  */
-const MOVIE_STALE_SQL = `(
+export const MOVIE_STALE_SQL = `(
         e.id IS NULL
-        OR COALESCE(e.text_version, 0) < $3
+        OR COALESCE(e.text_version, 0) < ${CANONICAL_TEXT_VERSION}
         OR (m.enriched_at IS NOT NULL AND e.updated_at < m.enriched_at)
       )`
 
@@ -384,7 +392,7 @@ export async function getMoviesNeedingEmbeddings(limit = 100): Promise<MovieNeed
          LEFT JOIN ${tableName} e ON e.movie_id = m.id AND e.model = $1
          WHERE ${MOVIE_STALE_SQL}
          LIMIT $2`,
-    [modelName, limit, CANONICAL_TEXT_VERSION]
+    [modelName, limit]
   )
 
   // Map database rows to Movie interface
@@ -481,7 +489,6 @@ export async function generateMissingEmbeddings(
 
     // Must use the same predicate as the selection, or the counter reports a
     // total the loop never reaches and the job looks stuck or finishes early.
-    // $3 lines up with MOVIE_STALE_SQL's placeholder.
     const countResult = await query<{ count: string }>(
       hasLibraryConfigs
         ? `SELECT COUNT(*) as count
@@ -497,7 +504,7 @@ export async function generateMissingEmbeddings(
            FROM movies m
            LEFT JOIN ${tableName} e ON e.movie_id = m.id AND e.model = $1
            WHERE ${MOVIE_STALE_SQL}`,
-      [modelName, null, CANONICAL_TEXT_VERSION]
+      [modelName]
     )
 
     const totalNeeded = parseInt(countResult.rows[0]?.count || '0', 10)

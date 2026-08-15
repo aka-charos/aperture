@@ -65,9 +65,9 @@ const MAX_KEYWORDS = 18
  * silently keeps stale vectors. `updated_at` rather than `created_at` for the
  * same reason: the upsert preserves created_at, so it would never clear.
  */
-const SERIES_STALE_SQL = `(
+export const SERIES_STALE_SQL = `(
         e.id IS NULL
-        OR COALESCE(e.text_version, 0) < $3
+        OR COALESCE(e.text_version, 0) < ${CANONICAL_TEXT_VERSION}
         OR (s.enriched_at IS NOT NULL AND e.updated_at < s.enriched_at)
       )`
 
@@ -535,7 +535,7 @@ export async function getSeriesNeedingEmbeddings(limit = 100): Promise<SeriesNee
          LEFT JOIN ${tableName} e ON e.series_id = s.id AND e.model = $1
          WHERE ${SERIES_STALE_SQL}
          LIMIT $2`,
-    [modelName, limit, CANONICAL_TEXT_VERSION]
+    [modelName, limit]
   )
 
   return result.rows.map((row) => ({
@@ -656,7 +656,7 @@ export async function generateMissingSeriesEmbeddings(
        FROM series s
        LEFT JOIN ${seriesTableName} e ON e.series_id = s.id AND e.model = $1
        WHERE ${SERIES_STALE_SQL}`,
-      [modelName, null, CANONICAL_TEXT_VERSION]
+      [modelName]
     )
 
     const totalSeriesNeeded = parseInt(seriesCountResult.rows[0]?.count || '0', 10)
