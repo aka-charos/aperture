@@ -43,9 +43,11 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
   // used to be a second condition on the early return below, so the panel could
   // only ever explain a dozen films per user — everything else was scored,
   // discarded before it reached the database, and reported as never considered.
-  // A non-pick opens collapsed: it answers a question the reader hasn't asked.
+  // Both variants open expanded: a panel whose entire content is an explanation
+  // is not worth a click to reach, and a collapsed one reads as though there is
+  // nothing inside it.
   const isPick = insights.isSelected === true
-  const [insightsExpanded, setInsightsExpanded] = useState(isPick)
+  const [insightsExpanded, setInsightsExpanded] = useState(true)
 
   if (!insights.isRecommended) {
     return null
@@ -77,6 +79,12 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
   // Empty unless a twin slot placed this title *and* the run that produced it
   // recorded the overlap, which runs generated before that shipped did not.
   const twinShared = insights.twinShared ?? []
+
+  // The two lists partition the title's genres exactly (both routes filter the
+  // same DB column against the viewer's top genres), so these counts always add
+  // up to the number of chips rendered in the hero.
+  const enjoyedCount = insights.genreAnalysis?.matchingGenres.length ?? 0
+  const newCount = insights.genreAnalysis?.newGenres.length ?? 0
 
   const openItem = (id: string) =>
     onOpenMedia
@@ -366,53 +374,30 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
               </Grid>
             </Grid>
 
-            {/* Genre Analysis */}
-            {insights.genreAnalysis && (
+            {/* Genre Analysis — the count only.
+                The genres themselves are chips on the title's own genre row at
+                the top of the page, styled there with this same enjoyed/new
+                distinction. Listing them again here meant the same handful of
+                words appeared twice on one screen in two different colour
+                schemes, which reads as two different facts. */}
+            {enjoyedCount + newCount > 0 && (
               <Box sx={{ mb: 4 }}>
                 <Typography variant="subtitle1" fontWeight={600} gutterBottom>
                   {t('mediaDetail.insights.genreAnalysis')}
                 </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-                  {insights.genreAnalysis.matchingGenres.map((genre) => (
-                    <Chip
-                      key={genre}
-                      label={genre}
-                      size="small"
-                      sx={{
-                        bgcolor: 'success.main',
-                        color: 'white',
-                        fontWeight: 500,
-                      }}
-                      icon={<ThumbUpIcon sx={{ color: 'white !important', fontSize: 16 }} />}
-                    />
-                  ))}
-                  {insights.genreAnalysis.newGenres.map((genre) => (
-                    <Chip
-                      key={genre}
-                      label={genre}
-                      size="small"
-                      variant="outlined"
-                      sx={{ borderColor: 'info.main', color: 'info.main' }}
-                      icon={<HubOutlinedIcon sx={{ color: 'info.main', fontSize: 16 }} />}
-                    />
-                  ))}
-                </Box>
-                {insights.genreAnalysis.matchingGenres.length > 0 && (
-                  <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.secondary">
+                  {enjoyedCount > 0 && (
                     <span style={{ color: '#4caf50', fontWeight: 600 }}>
-                      {t('mediaDetail.insights.genresEnjoy', {
-                        count: insights.genreAnalysis.matchingGenres.length,
-                      })}
+                      {t('mediaDetail.insights.genresEnjoy', { count: enjoyedCount })}
                     </span>
-                    {insights.genreAnalysis.newGenres.length > 0 && (
-                      <span style={{ color: '#2196f3', fontWeight: 600 }}>
-                        {t('mediaDetail.insights.newGenresPart', {
-                          count: insights.genreAnalysis.newGenres.length,
-                        })}
-                      </span>
-                    )}
-                  </Typography>
-                )}
+                  )}
+                  {enjoyedCount > 0 && newCount > 0 && ' • '}
+                  {newCount > 0 && (
+                    <span style={{ color: '#2196f3', fontWeight: 600 }}>
+                      {t('mediaDetail.insights.genresNew', { count: newCount })}
+                    </span>
+                  )}
+                </Typography>
               </Box>
             )}
 
