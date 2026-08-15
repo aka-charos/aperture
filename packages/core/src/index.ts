@@ -440,6 +440,8 @@ export {
   detectPathMappings,
   getAiExplanationConfig,
   setAiExplanationConfig,
+  getEpisodeEmbeddingsEnabled,
+  setEpisodeEmbeddingsEnabled,
   getSystemLanguageDefaults,
   setSystemLanguageDefaults,
   type SystemLanguageDefaults,

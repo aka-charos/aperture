@@ -767,6 +767,38 @@ export const clearAllEmbeddingsSchema = {
   description: 'Delete all embeddings for all models (admin only). Use with caution.',
 }
 
+export const episodeEmbeddingsSettingSchema = {
+  tags: ['settings'],
+  summary: 'Get episode embedding settings',
+  description:
+    'Whether episode embeddings are generated, and how many rows exist for the active ' +
+    'model (admin only). Episode vectors power episode-level semantic search in the assistant.',
+}
+
+export const updateEpisodeEmbeddingsSettingSchema = {
+  tags: ['settings'],
+  summary: 'Update episode embedding settings',
+  description:
+    'Enable or disable generation of per-episode embeddings (admin only). Turning it off ' +
+    'stops future generation and removes the assistant\'s episode search tool; existing rows ' +
+    'are left alone until they are cleared explicitly.',
+  body: {
+    type: 'object' as const,
+    properties: {
+      enabled: { type: 'boolean' as const, description: 'Generate embeddings for episodes' },
+    },
+    required: ['enabled'] as string[],
+  },
+}
+
+export const clearEpisodeEmbeddingsSchema = {
+  tags: ['settings'],
+  summary: 'Clear episode embeddings',
+  description:
+    'Delete every episode embedding across all dimensions (admin only). Reclaims the largest ' +
+    'embedding table; episode search stops working until they are generated again.',
+}
+
 export const legacyEmbeddingsSchema = {
   tags: ['settings'],
   summary: 'Check legacy embeddings',

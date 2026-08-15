@@ -943,6 +943,39 @@ export async function setAiExplanationConfig(
 }
 
 // ============================================================================
+// Episode embeddings
+// ============================================================================
+
+/**
+ * Whether the series embedding job also vectorizes individual episodes.
+ *
+ * Episode vectors are the only thing that can answer a question about episode
+ * *content* — "the one where they go to the desert". The series vector holds
+ * none of it: `buildSeriesCanonicalText` describes the show, and the sole trace
+ * of its episodes is the literal string "5 seasons, 62 episodes".
+ *
+ * They are also the largest embedding table on any real library, one row per
+ * episode against one per show — 16,591 against 987 on the instance this was
+ * built for, 535 MB against 33 MB. So turning them off is a legitimate choice
+ * rather than a degraded one, and the setting exists to make that choice
+ * visible. It defaults ON because the search tool ships with it: a feature that
+ * only works after the operator finds a switch is a feature that looks broken.
+ */
+export async function getEpisodeEmbeddingsEnabled(): Promise<boolean> {
+  const value = await getSystemSetting('episode_embeddings_enabled')
+  return value !== 'false' // Default to true
+}
+
+export async function setEpisodeEmbeddingsEnabled(enabled: boolean): Promise<boolean> {
+  await setSystemSetting(
+    'episode_embeddings_enabled',
+    String(enabled),
+    'Generate embeddings for individual episodes, which power episode-level semantic search'
+  )
+  return getEpisodeEmbeddingsEnabled()
+}
+
+// ============================================================================
 // Language defaults (UI + AI output)
 // ============================================================================
 

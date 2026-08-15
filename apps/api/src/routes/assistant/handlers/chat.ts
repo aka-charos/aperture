@@ -20,7 +20,7 @@ import {
 import { getChatModelInstance, getEmbeddingModelInstance, getActiveEmbeddingModelId, withInferenceContext } from '@aperture/core'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText, loadConversationHistory, withUnwatchedFilter, createStatusEmitter, withStatusEvents, withRequestContext } from '../helpers/index.js'
-import { createTools, createN8nTools, createDiscoveryResolveTool, DISCOVERY_PROMPT } from '../tools/index.js'
+import { createTools, createN8nTools, createEpisodeTools, createDiscoveryResolveTool, DISCOVERY_PROMPT } from '../tools/index.js'
 import { withToolErrorHandling } from '../tools/utils.js'
 import type { ToolContext } from '../types.js'
 
@@ -292,8 +292,14 @@ export function registerChatHandler(fastify: FastifyInstance) {
             }
 
             // Create tools with context, plus n8n search_web + discovery (when routed)
+            //
+            // Both async spreads decide for themselves whether they have
+            // anything to contribute — searchEpisodes returns {} when episode
+            // embeddings are switched off, so the model is never handed a tool
+            // whose table is empty.
             const baseTools = {
               ...createTools(toolContext),
+              ...(await createEpisodeTools(toolContext)),
               ...(await createN8nTools()),
             }
             // On discovery turns, drop only the tools that directly duplicate what the

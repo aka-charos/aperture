@@ -15,6 +15,8 @@ import { createDiscoveryTools } from './discovery.js'
 
 // Async, conditional on settings — merged separately in the chat handler
 export { createN8nTools } from './n8n.js'
+// Conditional on the episode-embeddings setting — same reason, merged there too
+export { createEpisodeTools } from './episodes.js'
 // Discovery presentation tool — added only on discovery-routed turns
 export { createDiscoveryResolveTool, DISCOVERY_PROMPT } from './discoveryResolve.js'
 

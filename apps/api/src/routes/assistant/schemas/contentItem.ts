@@ -11,6 +11,24 @@ export const ActionSchema = z.object({
   variant: z.enum(['default', 'secondary', 'primary']).optional().describe('Button style variant'),
 })
 
+/**
+ * Episode identity, carried on a card that represents one episode.
+ *
+ * `ContentItem.id` has to stay the EPISODE id — ContentCarousel keys React on
+ * it, and two episodes of the same show would collide otherwise — so the parent
+ * series travels here, and the card navigates to `seriesId` when this is
+ * present. There is no `'episode'` member of the `type` enum on purpose: type
+ * drives watched lookups and detail routes throughout the client, and a third
+ * value would need handling in every one of them to fix a problem this field
+ * already solves.
+ */
+export const EpisodeRefSchema = z.object({
+  seriesId: z.string().describe('Id of the parent series — the navigation target for the card'),
+  seriesTitle: z.string().describe('Title of the parent series'),
+  season: z.number().describe('Season number'),
+  number: z.number().describe('Episode number within the season'),
+})
+
 // Content item schema matching Tool UI ItemCarousel format
 export const ContentItemSchema = z.object({
   id: z.string().describe('Unique content ID'),
@@ -63,10 +81,16 @@ export const ContentItemSchema = z.object({
         "films from the user's own history, so naming them reveals nothing about the other " +
         'viewer, who still must never be identified.'
     ),
+  episode: EpisodeRefSchema.optional().describe(
+    'Present ONLY when this card is a single episode rather than a whole show (searchEpisodes). ' +
+      'The card `id` is the episode, so use these fields to talk about it: name the series and ' +
+      'the SxEy position, never present an episode as though it were the series.'
+  ),
   actions: z.array(ActionSchema).optional().describe('Action buttons'),
 })
 
 export type ContentItem = z.infer<typeof ContentItemSchema>
 export type Action = z.infer<typeof ActionSchema>
+export type EpisodeRef = z.infer<typeof EpisodeRefSchema>
 
 

@@ -38,7 +38,20 @@ export interface ContentItem {
    * why the card must branch on `=== true` rather than on falsiness.
    */
   watched?: boolean
+  /**
+   * Present only on a card that is one EPISODE (searchEpisodes). `id` is the
+   * episode — the carousel keys on it, so two episodes of one show must differ —
+   * which means the card has to navigate to `seriesId` instead of `id`.
+   */
+  episode?: EpisodeRef
   actions?: Action[]
+}
+
+export interface EpisodeRef {
+  seriesId: string
+  seriesTitle: string
+  season: number
+  number: number
 }
 
 /** Mirrors API `ContentCarouselI18nKey` allowlist (client resolves under `assistantToolUi.<key>`). */
@@ -77,6 +90,10 @@ export type ContentCarouselI18nKey =
   | 'carouselSemanticEmpty'
   | 'carouselSemanticDesc'
   | 'carouselSemanticError'
+  | 'carouselEpisodesTitle'
+  | 'carouselEpisodesDesc'
+  | 'carouselEpisodesEmpty'
+  | 'carouselEpisodesError'
   | 'carouselSimilarTitle'
   | 'carouselSimilarLookupNotFound'
   | 'carouselSimilarNoEmbedding'

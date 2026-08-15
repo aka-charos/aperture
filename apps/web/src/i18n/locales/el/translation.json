@@ -1492,7 +1492,8 @@
       "discoveryMatching": "Matching against your library…",
       "discoveryRelated": "Finding related titles…",
       "discoveryReasons": "Writing up why each fits…",
-      "discoveryAssembling": "Putting your list together…"
+      "discoveryAssembling": "Putting your list together…",
+      "episodes": "Looking through episodes…"
     },
     "tooltipOpenFullPage": "Open full page",
     "scrollToAnswer": "Back to the answer",
@@ -1592,7 +1593,16 @@
     "confirmDeleteSet": "Διαγραφή όλων των embeddings για το «{{model}}»; Αυτή η ενέργεια δεν αναιρείται.",
     "deleteFailed": "Αποτυχία διαγραφής",
     "deleteSetError": "Αποτυχία διαγραφής συνόλου embeddings",
-    "saveFailed": "Αποτυχία αποθήκευσης"
+    "saveFailed": "Αποτυχία αποθήκευσης",
+    "episodeEmbeddingsTitle": "Episode Embeddings",
+    "episodeEmbeddingsBody": "Vectorizing individual episodes lets the assistant answer questions about what happens inside one — \"the episode where they get stuck in the desert\". Nothing else can: the series vector describes the show, not its episodes. It is also the largest embedding table by far, one row per episode instead of one per show, and every new episode costs an embedding call.",
+    "episodeEmbeddingsToggle": "Generate embeddings for episodes",
+    "episodeEmbeddingsStats": "{{stored}} of {{total}} episodes have embeddings",
+    "episodeEmbeddingsSaveFailed": "Failed to save the setting",
+    "episodeEmbeddingsClearBody": "Generation is off, but the existing vectors are still stored. Deleting them frees the space; episode search will stay unavailable until you turn generation back on and re-run the series embedding job.",
+    "episodeEmbeddingsClear": "Delete episode embeddings",
+    "episodeEmbeddingsClearConfirm": "Delete every episode embedding? Regenerating them later means re-embedding every episode in the library.",
+    "episodeEmbeddingsClearFailed": "Failed to delete episode embeddings"
   },
   "filterPresets": {
     "tooltip": "Προεπιλογές φίλτρων",
@@ -3438,7 +3448,12 @@
     "directedBy": "Dir. {{name}}",
     "createdBy": "Created by {{name}}",
     "showMore": "Show more",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "episode": "Episode",
+    "carouselEpisodesTitle": "Episodes closest to \"{{concept}}\"",
+    "carouselEpisodesDesc": "The {{count}} nearest episodes in your library",
+    "carouselEpisodesEmpty": "No episodes found matching \"{{concept}}\". Try describing what happens in it.",
+    "carouselEpisodesError": "Episode search failed: {{message}}"
   },
   "dashboard": {
     "greetingMorning": "Καλημέρα",

@@ -22,6 +22,9 @@
  * - GET /api/settings/ai/embeddings/sets - List embedding sets
  * - DELETE /api/settings/ai/embeddings/sets/:model - Delete embedding set
  * - POST /api/settings/ai/embeddings/clear - Clear all embeddings
+ * - GET /api/settings/ai/embeddings/episodes - Episode embedding setting + stored count
+ * - PATCH /api/settings/ai/embeddings/episodes - Toggle episode embedding generation
+ * - POST /api/settings/ai/embeddings/episodes/clear - Delete every episode embedding
  * - GET /api/settings/ai/embeddings/legacy - Check legacy embeddings
  * - DELETE /api/settings/ai/embeddings/legacy - Drop legacy embeddings
  * - POST /api/settings/ai/test - Test AI provider
@@ -48,6 +51,8 @@ import {
   deleteCustomModel,
   getSystemSetting,
   setSystemSetting,
+  getEpisodeEmbeddingsEnabled,
+  setEpisodeEmbeddingsEnabled,
   getWebSearchUsageSummary,
   type AIFunction,
   type ProviderType,
@@ -68,6 +73,9 @@ import {
   embeddingSetsSchema,
   deleteEmbeddingSetSchema,
   clearAllEmbeddingsSchema,
+  episodeEmbeddingsSettingSchema,
+  updateEpisodeEmbeddingsSettingSchema,
+  clearEpisodeEmbeddingsSchema,
   legacyEmbeddingsSchema,
   deleteLegacyEmbeddingsSchema,
   aiPricingSchema,
@@ -610,6 +618,76 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
     } catch (err) {
       fastify.log.error({ err }, 'Failed to clear embeddings')
       return reply.status(500).send({ error: 'Failed to clear embeddings' })
+    }
+  })
+
+  /**
+   * GET /api/settings/ai/embeddings/episodes
+   *
+   * Reports the setting alongside what is actually stored, because the two
+   * answer different questions: turning generation off does not delete
+   * anything, so an operator needs to see the row count to know whether there
+   * is still space to reclaim.
+   */
+  fastify.get('/api/settings/ai/embeddings/episodes', { preHandler: requireAdmin, schema: episodeEmbeddingsSettingSchema }, async (_request, reply) => {
+    try {
+      const enabled = await getEpisodeEmbeddingsEnabled()
+
+      // Count across every dimension, not just the active one: a dimension
+      // switch leaves the old rows behind, and they are what is taking up room.
+      const unions = VALID_EMBEDDING_DIMENSIONS.map(
+        (d) => `SELECT COUNT(*)::int AS count FROM episode_embeddings_${d}`
+      ).join(' UNION ALL ')
+      const counts = await query<{ count: number }>(unions)
+      const storedCount = counts.rows.reduce((sum, row) => sum + row.count, 0)
+
+      const total = await query<{ count: number }>('SELECT COUNT(*)::int AS count FROM episodes')
+
+      return reply.send({
+        enabled,
+        storedCount,
+        episodeCount: total.rows[0]?.count ?? 0,
+      })
+    } catch (err) {
+      fastify.log.error({ err }, 'Failed to read episode embedding settings')
+      return reply.status(500).send({ error: 'Failed to read episode embedding settings' })
+    }
+  })
+
+  /**
+   * PATCH /api/settings/ai/embeddings/episodes
+   */
+  fastify.patch<{ Body: { enabled: boolean } }>('/api/settings/ai/embeddings/episodes', { preHandler: requireAdmin, schema: updateEpisodeEmbeddingsSettingSchema }, async (request, reply) => {
+    try {
+      const enabled = await setEpisodeEmbeddingsEnabled(request.body.enabled === true)
+      fastify.log.info({ enabled }, 'Episode embeddings setting updated')
+      return reply.send({ success: true, enabled })
+    } catch (err) {
+      fastify.log.error({ err }, 'Failed to update episode embedding settings')
+      return reply.status(500).send({ error: 'Failed to update episode embedding settings' })
+    }
+  })
+
+  /**
+   * POST /api/settings/ai/embeddings/episodes/clear
+   *
+   * Separate from the setting on purpose: disabling generation is reversible
+   * and free, deleting the rows costs a re-embed of every episode to undo. An
+   * operator should be able to do the first without being talked into the
+   * second.
+   */
+  fastify.post('/api/settings/ai/embeddings/episodes/clear', { preHandler: requireAdmin, schema: clearEpisodeEmbeddingsSchema }, async (_request, reply) => {
+    try {
+      let deleted = 0
+      for (const dim of VALID_EMBEDDING_DIMENSIONS) {
+        const result = await query(`DELETE FROM episode_embeddings_${dim}`)
+        deleted += result.rowCount || 0
+      }
+      fastify.log.info({ deleted }, 'Episode embeddings cleared')
+      return reply.send({ success: true, deleted })
+    } catch (err) {
+      fastify.log.error({ err }, 'Failed to clear episode embeddings')
+      return reply.status(500).send({ error: 'Failed to clear episode embeddings' })
     }
   })
 

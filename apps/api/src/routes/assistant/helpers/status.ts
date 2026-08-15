@@ -36,6 +36,7 @@ export type StatusPhase =
   | 'composing'
   // Per-tool
   | 'searchingLibrary'
+  | 'episodes'
   | 'findingSimilar'
   | 'personalPicks'
   | 'ranking'
@@ -85,6 +86,7 @@ const TOOL_PHASES: Record<string, StatusPhase> = {
   searchContent: 'searchingLibrary',
   semanticSearch: 'searchingLibrary',
   searchByKeyword: 'searchingLibrary',
+  searchEpisodes: 'episodes',
   findSimilarContent: 'findingSimilar',
   getMyRecommendations: 'personalPicks',
   searchMyRecommendations: 'personalPicks',
