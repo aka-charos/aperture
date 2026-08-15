@@ -102,6 +102,9 @@ export function MediaDetailPage({
         userRating={userRating}
         ratingLoading={ratingLoading}
         onRatingChange={updateRating}
+        // Styles the genre chips as enjoyed / new to explore. Undefined until
+        // the insights request lands, and for any title no run has scored.
+        genreAnalysis={insights?.genreAnalysis}
         // Series-specific
         isWatching={isSeries(media) && id ? isWatching(id) : false}
         onWatchingToggle={isSeries(media) && id ? () => toggleWatching(id) : undefined}

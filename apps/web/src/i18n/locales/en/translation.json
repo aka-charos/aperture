@@ -749,7 +749,10 @@
       "snackbarMarkWatchedFailed": "Failed to mark as watched",
       "snackbarFavoriteAdded": "Added to favorites",
       "snackbarFavoriteRemoved": "Removed from favorites",
-      "snackbarFavoriteFailed": "Failed to update favorite"
+      "snackbarFavoriteFailed": "Failed to update favorite",
+      "plusMore": "+{{count}} more",
+      "genreEnjoyedTooltip": "A genre you already watch a lot of",
+      "genreNewTooltip": "New to you — this would be a first"
     },
     "insights": {
       "recommendedForYou": "Recommended For You",
@@ -777,10 +780,11 @@
       "genreAnalysis": "Genre Analysis",
       "genresEnjoy_one": "{{count}} genre you enjoy",
       "genresEnjoy_other": "{{count}} genres you enjoy",
-      "newGenresPart": " • {{count}} new to explore",
       "whyWeThink": "Why We Think You'll Like This",
       "basedOnHistoryMovie": "Based on your history with similar movies:",
-      "basedOnHistorySeries": "Based on your history with similar series:"
+      "basedOnHistorySeries": "Based on your history with similar series:",
+      "genresNew_one": "{{count}} new to explore",
+      "genresNew_other": "{{count}} new to explore"
     },
     "seasons": {
       "title": "Episodes",

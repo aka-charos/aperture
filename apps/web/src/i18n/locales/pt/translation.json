@@ -637,7 +637,10 @@
       "removeFavoriteTooltipNamed": "Remove from favorites on {{serverName}}",
       "markWatchedTooltipNamed": "Mark as watched - syncs to {{serverName}} and watch history",
       "showFullPlot": "Read full synopsis",
-      "showShortPlot": "Show short summary"
+      "showShortPlot": "Show short summary",
+      "plusMore": "+{{count}} more",
+      "genreEnjoyedTooltip": "A genre you already watch a lot of",
+      "genreNewTooltip": "New to you — this would be a first"
     },
     "insights": {
       "recommendedForYou": "Recomendado para você",
@@ -668,7 +671,9 @@
       "tasteTwinSharedSeries": "Shows you have both watched that few others here have — this overlap is what identified the match:",
       "closestInLibrary": "Closest Titles in Your Library",
       "closestInLibraryMovie": "Films in your history that most resemble this one. Shown for context — they are not why it was picked:",
-      "closestInLibrarySeries": "Shows in your history that most resemble this one. Shown for context — they are not why it was picked:"
+      "closestInLibrarySeries": "Shows in your history that most resemble this one. Shown for context — they are not why it was picked:",
+      "genresNew_one": "{{count}} new to explore",
+      "genresNew_other": "{{count}} new to explore"
     },
     "seasons": {
       "title": "Episódios",

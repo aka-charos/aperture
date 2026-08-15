@@ -14,11 +14,8 @@ import {
 import { alpha, useTheme } from '@mui/material/styles'
 import PersonIcon from '@mui/icons-material/Person'
 import BusinessIcon from '@mui/icons-material/Business'
-import CreateIcon from '@mui/icons-material/Create'
-import MovieFilterIcon from '@mui/icons-material/MovieFilter'
 import PublicIcon from '@mui/icons-material/Public'
 import LanguageIcon from '@mui/icons-material/Language'
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents'
 import LinkIcon from '@mui/icons-material/Link'
 import LocalOfferIcon from '@mui/icons-material/LocalOffer'
 import StreamIcon from '@mui/icons-material/Stream'
@@ -38,192 +35,13 @@ import { useTranslation } from 'react-i18next'
 import { getProxiedImageUrl } from '@aperture/ui'
 import type { Media, Actor, StudioItem, MovieWatchStats, SeriesWatchStats } from '../types'
 import { isMovie, isSeries } from '../types'
-
-function personPath(name: string): string {
-  return `/person/${encodeURIComponent(name)}`
-}
-
-function studioPath(name: string): string {
-  return `/studio/${encodeURIComponent(name)}`
-}
+import { personPath, studioPath } from '../helpers'
 
 type WatchStats = MovieWatchStats | SeriesWatchStats
 
 interface MediaInfoCardProps {
   media: Media
   watchStats?: WatchStats | null
-}
-
-// Rotten Tomatoes score badge component
-function RTScoreBadge({ score, type }: { score: number | string; type: 'critic' | 'audience' }) {
-  const { t } = useTranslation()
-  const numScore = typeof score === 'string' ? parseFloat(score) : score
-  if (isNaN(numScore)) return null
-
-  const isFresh = numScore >= 60
-  const icon = type === 'critic' ? '🍅' : '🍿'
-  const tooltipTitle =
-    type === 'critic'
-      ? t('mediaDetail.infoCard.scoreTooltipTomatometer', { pct: Math.round(numScore) })
-      : t('mediaDetail.infoCard.scoreTooltipAudience', { pct: Math.round(numScore) })
-
-  return (
-    <Tooltip title={tooltipTitle}>
-      <Box
-        sx={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 0.5,
-          bgcolor: isFresh ? 'success.main' : 'error.main',
-          color: 'white',
-          px: 1,
-          py: 0.25,
-          borderRadius: 1,
-          fontSize: '0.75rem',
-          fontWeight: 600,
-        }}
-      >
-        <span>{icon}</span>
-        <span>{Math.round(numScore)}%</span>
-      </Box>
-    </Tooltip>
-  )
-}
-
-// Metacritic score badge
-function MetacriticBadge({ score }: { score: number | string }) {
-  const { t } = useTranslation()
-  const numScore = typeof score === 'string' ? parseFloat(score) : score
-  if (isNaN(numScore)) return null
-
-  const getColor = () => {
-    if (numScore >= 75) return '#66cc33'
-    if (numScore >= 50) return '#ffcc33'
-    return '#ff0000'
-  }
-
-  return (
-    <Tooltip title={t('mediaDetail.infoCard.scoreTooltipMetacritic', { score: Math.round(numScore) })}>
-      <Box
-        sx={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 0.5,
-          bgcolor: getColor(),
-          color: numScore >= 50 ? 'black' : 'white',
-          px: 1,
-          py: 0.25,
-          borderRadius: 1,
-          fontSize: '0.75rem',
-          fontWeight: 700,
-        }}
-      >
-        <span>Ⓜ️</span>
-        <span>{Math.round(numScore)}</span>
-      </Box>
-    </Tooltip>
-  )
-}
-
-// Letterboxd score badge
-function LetterboxdBadge({ score }: { score: number | string }) {
-  const { t } = useTranslation()
-  const numScore = typeof score === 'string' ? parseFloat(score) : score
-  if (isNaN(numScore)) return null
-
-  const displayScore = numScore.toFixed(1)
-  const percentage = (numScore / 5) * 100
-
-  const getColor = () => {
-    if (percentage >= 80) return '#00e054'
-    if (percentage >= 60) return '#40bcf4'
-    if (percentage >= 40) return '#ee9b00'
-    return '#ff8000'
-  }
-
-  return (
-    <Tooltip title={t('mediaDetail.infoCard.scoreTooltipLetterboxd', { score: displayScore })}>
-      <Box
-        sx={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 0.5,
-          bgcolor: getColor(),
-          color: 'white',
-          px: 1,
-          py: 0.25,
-          borderRadius: 1,
-          fontSize: '0.75rem',
-          fontWeight: 600,
-        }}
-      >
-        <span>📽️</span>
-        <span>{displayScore}</span>
-      </Box>
-    </Tooltip>
-  )
-}
-
-/**
- * A 0-10 score with the number of votes behind it on hover.
- *
- * The vote count is the reason this exists rather than a bare number: 8.2 from
- * 22,000 votes and 8.2 from six are not the same claim, and a badge showing
- * only the score gives the reader no way to tell them apart. Every other score
- * on this card has the same ambiguity — these are the two where we hold the
- * count.
- */
-function VoteRatingBadge({
-  score,
-  votes,
-  source,
-}: {
-  score: number | string
-  votes?: number | string | null
-  source: 'tmdb' | 'imdb'
-}) {
-  const { t } = useTranslation()
-  // pg returns NUMERIC as a string, so these arrive as '7.0' rather than 7.
-  const numScore = typeof score === 'string' ? parseFloat(score) : score
-  if (isNaN(numScore)) return null
-
-  const numVotes = votes == null ? null : typeof votes === 'string' ? parseInt(votes, 10) : votes
-  const hasVotes = numVotes != null && Number.isFinite(numVotes) && numVotes > 0
-
-  const tooltip = hasVotes
-    ? t(`mediaDetail.infoCard.scoreTooltip${source === 'tmdb' ? 'Tmdb' : 'Imdb'}Votes`, {
-        score: numScore.toFixed(1),
-        votes: numVotes.toLocaleString(),
-      })
-    : t(`mediaDetail.infoCard.scoreTooltip${source === 'tmdb' ? 'Tmdb' : 'Imdb'}`, {
-        score: numScore.toFixed(1),
-      })
-
-  // Each service's own brand colour, like the RT and Metacritic badges beside
-  // them — these are not theme colours and are not admin-configurable.
-  const bgcolor = source === 'tmdb' ? '#01b4e4' : '#f5c518'
-
-  return (
-    <Tooltip title={tooltip}>
-      <Box
-        sx={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 0.5,
-          bgcolor,
-          color: source === 'tmdb' ? 'white' : 'black',
-          px: 1,
-          py: 0.25,
-          borderRadius: 1,
-          fontSize: '0.75rem',
-          fontWeight: 700,
-        }}
-      >
-        <span>{source === 'tmdb' ? 'TMDB' : 'IMDb'}</span>
-        <span>{numScore.toFixed(1)}</span>
-      </Box>
-    </Tooltip>
-  )
 }
 
 function getActors(media: Media): Actor[] {
@@ -237,16 +55,9 @@ function getStudios(media: Media): StudioItem[] {
 export function MediaInfoCard({ media, watchStats }: MediaInfoCardProps) {
   const { t } = useTranslation()
   const theme = useTheme()
-  // != null throughout: pg hands NUMERIC back as a string, so a stored 0
-  // arrives as '0.0' — truthy — while a genuine 0 score would be falsy as a
-  // number. Both directions are wrong under a truthiness test.
-  const hasRatings =
-    media.rt_critic_score != null ||
-    media.rt_audience_score != null ||
-    media.metacritic_score != null ||
-    media.letterboxd_score != null ||
-    media.imdb_rating != null ||
-    media.tmdb_rating != null
+  // Critic scores, awards and the director/writer credits are not here any
+  // more: they render once, at the top of the page, beside the community
+  // rating and under the title. See MediaHero.
   const hasStreamingProviders =
     media.streaming_providers && media.streaming_providers.length > 0
   const actors = getActors(media)
@@ -512,48 +323,6 @@ export function MediaInfoCard({ media, watchStats }: MediaInfoCardProps) {
         </Paper>
       )}
 
-      {/* Critic Ratings Section */}
-      {hasRatings && (
-        <Paper sx={{ p: 2, borderRadius: 2, bgcolor: 'background.paper' }}>
-          <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-            {t('mediaDetail.infoCard.criticRatings')}
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-            {media.rt_critic_score && (
-              <RTScoreBadge score={media.rt_critic_score} type="critic" />
-            )}
-            {media.rt_audience_score && (
-              <RTScoreBadge score={media.rt_audience_score} type="audience" />
-            )}
-            {media.metacritic_score && <MetacriticBadge score={media.metacritic_score} />}
-            {media.imdb_rating != null && (
-              <VoteRatingBadge
-                score={media.imdb_rating}
-                votes={media.imdb_vote_count}
-                source="imdb"
-              />
-            )}
-            {media.tmdb_rating != null && (
-              <VoteRatingBadge
-                score={media.tmdb_rating}
-                votes={media.tmdb_vote_count}
-                source="tmdb"
-              />
-            )}
-            {media.letterboxd_score && <LetterboxdBadge score={media.letterboxd_score} />}
-          </Box>
-          {media.rt_consensus && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: 'block', mt: 1, fontStyle: 'italic' }}
-            >
-              "{media.rt_consensus}"
-            </Typography>
-          )}
-        </Paper>
-      )}
-
       {/* Streaming Providers Section */}
       {hasStreamingProviders && (
         <Paper sx={{ p: 2, borderRadius: 2, bgcolor: 'background.paper' }}>
@@ -590,18 +359,6 @@ export function MediaInfoCard({ media, watchStats }: MediaInfoCardProps) {
                 {media.collection_name}
               </Typography>
             </Box>
-          </Box>
-        </Paper>
-      )}
-
-      {/* Awards Section */}
-      {media.awards_summary && (
-        <Paper sx={{ p: 2, borderRadius: 2, bgcolor: 'background.paper' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <EmojiEventsIcon sx={{ color: 'warning.main', fontSize: 20 }} />
-            <Typography variant="body2" fontWeight={500}>
-              {media.awards_summary}
-            </Typography>
           </Box>
         </Paper>
       )}
@@ -680,66 +437,6 @@ export function MediaInfoCard({ media, watchStats }: MediaInfoCardProps) {
                   </Box>
                 ))}
               </Box>
-            </>
-          )}
-
-          {/* Directors */}
-          {media.directors && media.directors.length > 0 && (
-            <>
-              <Divider sx={{ my: 2 }} />
-              <Typography
-                variant="subtitle1"
-                fontWeight={600}
-                gutterBottom
-                sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-              >
-                <MovieFilterIcon fontSize="small" />
-                {isSeries(media)
-                  ? t('mediaDetail.infoCard.createdBy')
-                  : t('mediaDetail.infoCard.director')}
-              </Typography>
-              <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
-                {media.directors.map((director) => (
-                  <Chip
-                    key={director}
-                    label={director}
-                    size="small"
-                    variant="outlined"
-                    component={RouterLink}
-                    to={personPath(director)}
-                    clickable
-                  />
-                ))}
-              </Stack>
-            </>
-          )}
-
-          {/* Writers */}
-          {media.writers && media.writers.length > 0 && (
-            <>
-              <Divider sx={{ my: 2 }} />
-              <Typography
-                variant="subtitle1"
-                fontWeight={600}
-                gutterBottom
-                sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-              >
-                <CreateIcon fontSize="small" />
-                {t('mediaDetail.infoCard.writers')}
-              </Typography>
-              <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
-                {media.writers.slice(0, 10).map((writer) => (
-                  <Chip
-                    key={writer}
-                    label={writer}
-                    size="small"
-                    variant="outlined"
-                    component={RouterLink}
-                    to={personPath(writer)}
-                    clickable
-                  />
-                ))}
-              </Stack>
             </>
           )}
 
@@ -944,25 +641,6 @@ export function MediaInfoCard({ media, watchStats }: MediaInfoCardProps) {
                   <Chip key={country} label={country} size="small" variant="outlined" />
                 ))}
               </Stack>
-            </>
-          )}
-
-          {/* Series Awards (from original series card) */}
-          {isSeries(media) && media.awards && (
-            <>
-              <Divider sx={{ my: 2 }} />
-              <Typography
-                variant="subtitle1"
-                fontWeight={600}
-                gutterBottom
-                sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-              >
-                <EmojiEventsIcon fontSize="small" />
-                {t('mediaDetail.infoCard.awards')}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {media.awards}
-              </Typography>
             </>
           )}
 

@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react'
+import { Fragment, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link as RouterLink } from 'react-router-dom'
 import {
   Box,
   Typography,
@@ -32,10 +33,15 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder'
 import OndemandVideoIcon from '@mui/icons-material/OndemandVideo'
-import type { Media, MediaServerInfo, WatchStatus } from '../types'
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents'
+import ThumbUpIcon from '@mui/icons-material/ThumbUp'
+import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
+import type { Media, MediaServerInfo, RecommendationInsights, WatchStatus } from '../types'
 import { isMovie, isSeries } from '../types'
 import { useServerDisplayName } from '../../../hooks/useServerDisplayName'
 import { formatRuntime } from '../hooks'
+import { hasCriticRatings, personPath } from '../helpers'
+import { RatingBadges } from './RatingBadges'
 import {
   StarRating,
   getProxiedImageUrl,
@@ -48,12 +54,26 @@ import {
 const EMBY_GREEN = '#52b54b'
 const JELLYFIN_PURPLE = '#965ec7'
 
+/**
+ * Credits are a scan target, not a cast list — a director and a couple of
+ * writers is what people look for at the top of a page. Anything past this is
+ * counted rather than named.
+ */
+const CREW_NAMES_SHOWN = 4
+
 interface MediaHeroProps {
   media: Media
   mediaServer: MediaServerInfo | null
   userRating: number | null
   ratingLoading?: boolean
   onRatingChange: (rating: number | null) => void
+  /**
+   * The recommender's read on this title's genres, when it scored it. Used to
+   * style the genre chips below — this is the only place that classification is
+   * rendered, so the insights panel no longer repeats the same genres in its
+   * own format.
+   */
+  genreAnalysis?: RecommendationInsights['genreAnalysis']
   // Series-specific
   isWatching?: boolean
   onWatchingToggle?: () => void
@@ -74,6 +94,7 @@ export function MediaHero({
   userRating,
   ratingLoading = false,
   onRatingChange,
+  genreAnalysis,
   isWatching,
   onWatchingToggle,
   watchStatus,
@@ -253,6 +274,43 @@ export function MediaHero({
   const yearDisplay = getYearDisplay()
   const serverBrandColor = mediaServer?.type === 'jellyfin' ? JELLYFIN_PURPLE : EMBY_GREEN
 
+  // The credits worth naming at the top of a page. Rendered here rather than
+  // in the info card several screens down, where the director of the film you
+  // are looking at sat below the whole cast.
+  const crewCredits: Array<{ id: string; label: string; names: string[] }> = []
+  if (media.directors && media.directors.length > 0) {
+    crewCredits.push({
+      id: 'directors',
+      label: isSeries(media)
+        ? t('mediaDetail.infoCard.createdBy')
+        : t('mediaDetail.infoCard.director'),
+      names: media.directors,
+    })
+  }
+  if (media.writers && media.writers.length > 0) {
+    crewCredits.push({
+      id: 'writers',
+      label: t('mediaDetail.infoCard.writers'),
+      names: media.writers,
+    })
+  }
+
+  // Two sets rather than a lookup per chip: a title has a handful of genres and
+  // this runs on every render, so building them is cheaper than memoising them.
+  // Both are empty until the insights request lands, and stay empty for a title
+  // no run has scored — in which case the chips keep their neutral styling.
+  const enjoyedGenres = new Set(genreAnalysis?.matchingGenres ?? [])
+  const unexploredGenres = new Set(genreAnalysis?.newGenres ?? [])
+
+  // OMDb writes the summary for both media types; `awards` is the older
+  // series-only column, kept as a fallback so a show enriched before OMDb was
+  // configured still says something.
+  const awardsLine = media.awards_summary ?? (isSeries(media) ? media.awards : null)
+  const showRatingLine =
+    media.community_rating != null ||
+    hasCriticRatings(media) ||
+    (isSeries(media) && media.critic_rating != null)
+
   // Shared styling so every action reads as one consistent button group:
   // fixed height, no per-button text wrapping, no shrinking (they wrap the row instead).
   const actionBtnSx = {
@@ -422,8 +480,9 @@ export function MediaHero({
             </Typography>
           )}
 
-          {/* Meta row */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+          {/* Meta row — tight against the credits line below it, which is part
+              of the same "what is this" block rather than a new one. */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5, flexWrap: 'wrap' }}>
             {yearDisplay && (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <CalendarTodayIcon fontSize="small" color="action" />
@@ -464,20 +523,90 @@ export function MediaHero({
             )}
           </Box>
 
-          {/* Genres */}
+          {/* Credits */}
+          {crewCredits.length > 0 && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 3, rowGap: 0.5, mb: 3 }}>
+              {crewCredits.map(({ id, label, names }) => (
+                <Typography key={id} variant="body2" color="text.secondary">
+                  {label}{' '}
+                  {names.slice(0, CREW_NAMES_SHOWN).map((name, idx) => (
+                    <Fragment key={`${name}-${idx}`}>
+                      {idx > 0 && ', '}
+                      <Box
+                        component={RouterLink}
+                        to={personPath(name)}
+                        sx={{
+                          color: 'text.primary',
+                          fontWeight: 600,
+                          textDecoration: 'none',
+                          '&:hover': { textDecoration: 'underline' },
+                        }}
+                      >
+                        {name}
+                      </Box>
+                    </Fragment>
+                  ))}
+                  {names.length > CREW_NAMES_SHOWN &&
+                    ` ${t('mediaDetail.hero.plusMore', {
+                      count: names.length - CREW_NAMES_SHOWN,
+                    })}`}
+                </Typography>
+              ))}
+            </Box>
+          )}
+
+          {/* Genres, carrying the recommender's read on them where there is one:
+              a genre this viewer already watches, or one that would be new to
+              them. The insights panel used to render exactly these genres a
+              second time in its own colours — same fact, two formats, two
+              places. */}
           {media.genres && media.genres.length > 0 && (
             <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap' }}>
-              {media.genres.map((genre) => (
-                <Chip
-                  key={genre}
-                  label={genre}
-                  size="small"
-                  sx={{
-                    bgcolor: 'rgba(255,255,255,0.1)',
-                    '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' },
-                  }}
-                />
-              ))}
+              {media.genres.map((genre) => {
+                const enjoyed = enjoyedGenres.has(genre)
+                const unexplored = unexploredGenres.has(genre)
+                const chip = (
+                  <Chip
+                    label={genre}
+                    size="small"
+                    variant={unexplored ? 'outlined' : 'filled'}
+                    icon={
+                      enjoyed ? (
+                        <ThumbUpIcon sx={{ color: 'white !important', fontSize: 16 }} />
+                      ) : unexplored ? (
+                        <HubOutlinedIcon sx={{ color: 'info.main', fontSize: 16 }} />
+                      ) : undefined
+                    }
+                    sx={
+                      enjoyed
+                        ? { bgcolor: 'success.main', color: 'white', fontWeight: 500 }
+                        : unexplored
+                          ? { borderColor: 'info.main', color: 'info.main' }
+                          : {
+                              bgcolor: 'rgba(255,255,255,0.1)',
+                              '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' },
+                            }
+                    }
+                  />
+                )
+
+                // Colour alone doesn't say what it means, and there is no
+                // legend now that the panel's chips are gone.
+                return enjoyed || unexplored ? (
+                  <Tooltip
+                    key={genre}
+                    title={
+                      enjoyed
+                        ? t('mediaDetail.hero.genreEnjoyedTooltip')
+                        : t('mediaDetail.hero.genreNewTooltip')
+                    }
+                  >
+                    {chip}
+                  </Tooltip>
+                ) : (
+                  <Fragment key={genre}>{chip}</Fragment>
+                )
+              })}
             </Box>
           )}
 
@@ -653,21 +782,28 @@ export function MediaHero({
             )}
           </Box>
 
-          {/* Community Rating */}
-          {media.community_rating && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <StarIcon sx={{ color: 'warning.main' }} />
-                <Typography variant="h6" fontWeight={600}>
-                  {Number(media.community_rating).toFixed(1)}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {t('mediaDetail.hero.outOfTen')}
-                </Typography>
-              </Box>
+          {/* Every score on one line: the community rating this page has always
+              led with, then the external ones, which used to sit in their own
+              panel in the sidebar. Guards are `!= null` because pg returns
+              NUMERIC as a string — '0.0' is truthy, a numeric 0 is not. */}
+          {showRatingLine && (
+            <Box
+              sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5, flexWrap: 'wrap' }}
+            >
+              {media.community_rating != null && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 0.5 }}>
+                  <StarIcon sx={{ color: 'warning.main' }} />
+                  <Typography variant="h6" fontWeight={600}>
+                    {Number(media.community_rating).toFixed(1)}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {t('mediaDetail.hero.outOfTen')}
+                  </Typography>
+                </Box>
+              )}
               {/* Series critic rating */}
-              {isSeries(media) && media.critic_rating && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {isSeries(media) && media.critic_rating != null && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <Typography variant="body2" color="text.secondary">
                     {t('mediaDetail.hero.critic')}
                   </Typography>
@@ -676,6 +812,31 @@ export function MediaHero({
                   </Typography>
                 </Box>
               )}
+              <RatingBadges media={media} />
+            </Box>
+          )}
+
+          {/* The Rotten Tomatoes consensus, which is about the scores above it
+              and travelled with them. */}
+          {media.rt_consensus && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: 'block', mb: 1.5, fontStyle: 'italic', maxWidth: 600 }}
+            >
+              "{media.rt_consensus}"
+            </Typography>
+          )}
+
+          {/* Awards, on the line below the scores — one sentence, not a panel. */}
+          {awardsLine && (
+            <Box
+              sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, maxWidth: 600 }}
+            >
+              <EmojiEventsIcon sx={{ color: 'warning.main', fontSize: 20, flexShrink: 0 }} />
+              <Typography variant="body2" color="text.secondary">
+                {awardsLine}
+              </Typography>
             </Box>
           )}
 
