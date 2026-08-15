@@ -180,7 +180,9 @@ export function ContentCard({
   const handleDetails = () => {
     if (!detailsAction?.href) return
     if (openMediaDetail) {
-      openMediaDetail(item.type, item.id)
+      // An episode card's `id` is the episode (the carousel keys on it), and no
+      // detail view takes one — the parent show is the destination.
+      openMediaDetail(item.type, item.episode?.seriesId ?? item.id)
       return
     }
     navigate(detailsAction.href)
@@ -379,7 +381,13 @@ export function ContentCard({
             )}
           </Typography>
           <Chip
-            label={item.type === 'movie' ? t('assistantToolUi.movie') : t('assistantToolUi.series')}
+            label={
+              item.episode
+                ? t('assistantToolUi.episode')
+                : item.type === 'movie'
+                  ? t('assistantToolUi.movie')
+                  : t('assistantToolUi.series')
+            }
             size="small"
             sx={{
               flexShrink: 0,

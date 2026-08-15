@@ -14,10 +14,14 @@ import {
   IconButton,
   Divider,
   alpha,
+  Switch,
+  FormControlLabel,
+  Button,
 } from '@mui/material'
 import {
   Delete as DeleteIcon,
   Storage as StorageIcon,
+  LiveTv as LiveTvIcon,
 } from '@mui/icons-material'
 import type { AIFunction } from '../../../components/AIFunctionCard'
 import { AISetupCardGrid } from '../../../components/AISetupCardGrid'
@@ -197,6 +201,144 @@ function EmbeddingSetsManager() {
   )
 }
 
+interface EpisodeEmbeddingsState {
+  enabled: boolean
+  storedCount: number
+  episodeCount: number
+}
+
+/**
+ * Episode embeddings: the largest embedding table, and an optional one.
+ *
+ * One row per episode against one per show — on a mid-sized library that is
+ * hundreds of megabytes and an embedding call for every episode that ever
+ * arrives. What it buys is the assistant's episode search, the only thing that
+ * can answer a question about what happens *inside* an episode. Both halves of
+ * that trade are stated here because neither is obvious from the switch.
+ *
+ * Turning it off and deleting the rows are deliberately separate actions: the
+ * first is free to reverse, the second costs a full re-embed.
+ */
+function EpisodeEmbeddingsCard() {
+  const { t } = useTranslation()
+  const [state, setState] = useState<EpisodeEmbeddingsState | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [clearing, setClearing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchState = useCallback(async () => {
+    try {
+      const res = await fetch('/api/settings/ai/embeddings/episodes', { credentials: 'include' })
+      if (res.ok) setState(await res.json())
+    } catch {
+      // Ignore — the card simply stays hidden.
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchState()
+  }, [fetchState])
+
+  const handleToggle = async (enabled: boolean) => {
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/settings/ai/embeddings/episodes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ enabled }),
+      })
+      if (!res.ok) throw new Error(t('settingsAiSetup.episodeEmbeddingsSaveFailed'))
+      await fetchState()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('settingsAiSetup.episodeEmbeddingsSaveFailed'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleClear = async () => {
+    if (!confirm(t('settingsAiSetup.episodeEmbeddingsClearConfirm'))) return
+    setClearing(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/settings/ai/embeddings/episodes/clear', {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error(t('settingsAiSetup.episodeEmbeddingsClearFailed'))
+      await fetchState()
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : t('settingsAiSetup.episodeEmbeddingsClearFailed')
+      )
+    } finally {
+      setClearing(false)
+    }
+  }
+
+  // A library with no episodes has nothing to decide here.
+  if (!state || state.episodeCount === 0) return null
+
+  return (
+    <Card sx={{ mt: 3 }}>
+      <CardContent>
+        <Box display="flex" alignItems="center" gap={1} mb={2}>
+          <LiveTvIcon color="primary" />
+          <Typography variant="h6">{t('settingsAiSetup.episodeEmbeddingsTitle')}</Typography>
+        </Box>
+
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          {t('settingsAiSetup.episodeEmbeddingsBody')}
+        </Typography>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
+
+        <FormControlLabel
+          control={
+            <Switch
+              checked={state.enabled}
+              disabled={saving}
+              onChange={(e) => handleToggle(e.target.checked)}
+            />
+          }
+          label={t('settingsAiSetup.episodeEmbeddingsToggle')}
+        />
+
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+          {t('settingsAiSetup.episodeEmbeddingsStats', {
+            stored: state.storedCount.toLocaleString(),
+            total: state.episodeCount.toLocaleString(),
+          })}
+        </Typography>
+
+        {!state.enabled && state.storedCount > 0 && (
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              {t('settingsAiSetup.episodeEmbeddingsClearBody')}
+            </Typography>
+            <Button
+              size="small"
+              color="error"
+              variant="outlined"
+              onClick={handleClear}
+              disabled={clearing}
+              startIcon={clearing ? <CircularProgress size={14} /> : <DeleteIcon />}
+            >
+              {t('settingsAiSetup.episodeEmbeddingsClear')}
+            </Button>
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export function AISetupSection() {
   const { t } = useTranslation()
   const [config, setConfig] = useState<AIConfig | null>(null)
@@ -256,6 +398,9 @@ export function AISetupSection() {
       </Box>
 
       <AISetupCardGrid config={config} onSave={handleSave} variant="settings" />
+
+      {/* Episode embeddings: optional, and the largest table when on */}
+      <EpisodeEmbeddingsCard />
 
       {/* Embedding Sets Manager */}
       <EmbeddingSetsManager />

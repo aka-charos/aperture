@@ -16,6 +16,7 @@ import {
 } from '../../lib/ai-provider.js'
 import { embedMany } from 'ai'
 import { randomUUID } from 'crypto'
+import { getEpisodeEmbeddingsEnabled } from '../../settings/systemSettings.js'
 // One version for both media types: a builder change invalidates whichever
 // texts it touched, and two counters would drift.
 import { CANONICAL_TEXT_VERSION } from '../movies/embeddings.js'
@@ -621,13 +622,22 @@ export interface GenerateSeriesEmbeddingsResult {
 
 /**
  * Generate and store embeddings for all series and episodes missing them
+ *
+ * `includeEpisodes` used to be a default-true parameter no caller ever passed,
+ * which made episode vectors unconditional — and for a long time nothing read
+ * them, so every new episode bought an embedding call for a table with no
+ * consumer. It is now an admin setting, and an explicit argument still wins so
+ * a caller that has already decided is not second-guessed by config.
  */
 export async function generateMissingSeriesEmbeddings(
   existingJobId?: string,
-  includeEpisodes = true
+  includeEpisodes?: boolean
 ): Promise<GenerateSeriesEmbeddingsResult> {
+  // Resolved before createJobProgress: the step count, and therefore the whole
+  // progress bar, depends on whether episodes are in scope.
+  const shouldEmbedEpisodes = includeEpisodes ?? (await getEpisodeEmbeddingsEnabled())
   const jobId = existingJobId || randomUUID()
-  createJobProgress(jobId, 'generate-series-embeddings', includeEpisodes ? 4 : 3)
+  createJobProgress(jobId, 'generate-series-embeddings', shouldEmbedEpisodes ? 4 : 3)
 
   try {
     // Step 1: Check AI provider configuration
@@ -737,7 +747,7 @@ export async function generateMissingSeriesEmbeddings(
     // Step 4: Generate episode embeddings (if enabled)
     let episodesGenerated = 0
 
-    if (includeEpisodes) {
+    if (shouldEmbedEpisodes) {
       setJobStep(jobId, 3, 'Counting episodes without embeddings')
       const episodeTableName = await getActiveEmbeddingTableName('episode_embeddings')
 

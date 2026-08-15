@@ -110,6 +110,13 @@ const EXEMPT_TOOLS = new Set([
   'getFranchiseProgress',
   'getContentDetails',
   'getContentRankings',
+  // Its items are EPISODES: `id` is an episode id, which matches neither a
+  // movie nor a series, so the generic filter would silently do nothing. It
+  // also should not do anything — "which episode of X was the desert one" is
+  // asked about a show the user has by definition been watching, so filtering
+  // on the parent would empty the answer. Episode-level watch status is a
+  // parameter on the tool instead.
+  'searchEpisodes',
 ])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
