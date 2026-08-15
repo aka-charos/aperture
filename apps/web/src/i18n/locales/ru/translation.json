@@ -698,7 +698,11 @@
       "studios": "Студии",
       "languages": "Языки",
       "countries": "Страны",
-      "awards": "Награды"
+      "awards": "Награды",
+      "scoreTooltipTmdb": "TMDB: {{score}}/10",
+      "scoreTooltipTmdbVotes": "TMDB: {{score}}/10 from {{votes}} votes",
+      "scoreTooltipImdb": "IMDb: {{score}}/10",
+      "scoreTooltipImdbVotes": "IMDb: {{score}}/10 from {{votes}} votes"
     },
     "hero": {
       "available": "Доступный",

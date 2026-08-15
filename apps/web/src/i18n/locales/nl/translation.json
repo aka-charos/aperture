@@ -698,7 +698,11 @@
       "studios": "Studio's",
       "languages": "Talen",
       "countries": "Landen",
-      "awards": "Onderscheidingen"
+      "awards": "Onderscheidingen",
+      "scoreTooltipTmdb": "TMDB: {{score}}/10",
+      "scoreTooltipTmdbVotes": "TMDB: {{score}}/10 from {{votes}} votes",
+      "scoreTooltipImdb": "IMDb: {{score}}/10",
+      "scoreTooltipImdbVotes": "IMDb: {{score}}/10 from {{votes}} votes"
     },
     "hero": {
       "available": "Beschikbaar",

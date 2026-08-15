@@ -123,6 +123,9 @@ export async function getSeriesEnrichmentData(
 
   return {
     keywords,
+    // Same free ride as the movie side — see MovieEnrichmentData.
+    voteAverage: details && details.vote_average > 0 ? details.vote_average : null,
+    voteCount: details && details.vote_count > 0 ? details.vote_count : null,
     networks,
     productionCompanies,
   }

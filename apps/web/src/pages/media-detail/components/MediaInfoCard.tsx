@@ -164,6 +164,68 @@ function LetterboxdBadge({ score }: { score: number | string }) {
   )
 }
 
+/**
+ * A 0-10 score with the number of votes behind it on hover.
+ *
+ * The vote count is the reason this exists rather than a bare number: 8.2 from
+ * 22,000 votes and 8.2 from six are not the same claim, and a badge showing
+ * only the score gives the reader no way to tell them apart. Every other score
+ * on this card has the same ambiguity — these are the two where we hold the
+ * count.
+ */
+function VoteRatingBadge({
+  score,
+  votes,
+  source,
+}: {
+  score: number | string
+  votes?: number | string | null
+  source: 'tmdb' | 'imdb'
+}) {
+  const { t } = useTranslation()
+  // pg returns NUMERIC as a string, so these arrive as '7.0' rather than 7.
+  const numScore = typeof score === 'string' ? parseFloat(score) : score
+  if (isNaN(numScore)) return null
+
+  const numVotes = votes == null ? null : typeof votes === 'string' ? parseInt(votes, 10) : votes
+  const hasVotes = numVotes != null && Number.isFinite(numVotes) && numVotes > 0
+
+  const tooltip = hasVotes
+    ? t(`mediaDetail.infoCard.scoreTooltip${source === 'tmdb' ? 'Tmdb' : 'Imdb'}Votes`, {
+        score: numScore.toFixed(1),
+        votes: numVotes.toLocaleString(),
+      })
+    : t(`mediaDetail.infoCard.scoreTooltip${source === 'tmdb' ? 'Tmdb' : 'Imdb'}`, {
+        score: numScore.toFixed(1),
+      })
+
+  // Each service's own brand colour, like the RT and Metacritic badges beside
+  // them — these are not theme colours and are not admin-configurable.
+  const bgcolor = source === 'tmdb' ? '#01b4e4' : '#f5c518'
+
+  return (
+    <Tooltip title={tooltip}>
+      <Box
+        sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 0.5,
+          bgcolor,
+          color: source === 'tmdb' ? 'white' : 'black',
+          px: 1,
+          py: 0.25,
+          borderRadius: 1,
+          fontSize: '0.75rem',
+          fontWeight: 700,
+        }}
+      >
+        <span>{source === 'tmdb' ? 'TMDB' : 'IMDb'}</span>
+        <span>{numScore.toFixed(1)}</span>
+      </Box>
+    </Tooltip>
+  )
+}
+
 function getActors(media: Media): Actor[] {
   return media.actors || []
 }
@@ -175,11 +237,16 @@ function getStudios(media: Media): StudioItem[] {
 export function MediaInfoCard({ media, watchStats }: MediaInfoCardProps) {
   const { t } = useTranslation()
   const theme = useTheme()
+  // != null throughout: pg hands NUMERIC back as a string, so a stored 0
+  // arrives as '0.0' — truthy — while a genuine 0 score would be falsy as a
+  // number. Both directions are wrong under a truthiness test.
   const hasRatings =
-    media.rt_critic_score ||
-    media.rt_audience_score ||
-    media.metacritic_score ||
-    media.letterboxd_score
+    media.rt_critic_score != null ||
+    media.rt_audience_score != null ||
+    media.metacritic_score != null ||
+    media.letterboxd_score != null ||
+    media.imdb_rating != null ||
+    media.tmdb_rating != null
   const hasStreamingProviders =
     media.streaming_providers && media.streaming_providers.length > 0
   const actors = getActors(media)
@@ -459,6 +526,20 @@ export function MediaInfoCard({ media, watchStats }: MediaInfoCardProps) {
               <RTScoreBadge score={media.rt_audience_score} type="audience" />
             )}
             {media.metacritic_score && <MetacriticBadge score={media.metacritic_score} />}
+            {media.imdb_rating != null && (
+              <VoteRatingBadge
+                score={media.imdb_rating}
+                votes={media.imdb_vote_count}
+                source="imdb"
+              />
+            )}
+            {media.tmdb_rating != null && (
+              <VoteRatingBadge
+                score={media.tmdb_rating}
+                votes={media.tmdb_vote_count}
+                source="tmdb"
+              />
+            )}
             {media.letterboxd_score && <LetterboxdBadge score={media.letterboxd_score} />}
           </Box>
           {media.rt_consensus && (

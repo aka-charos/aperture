@@ -221,12 +221,28 @@ export interface MovieEnrichmentData {
   composers: string[]
   editors: string[]
   productionCompanies: ProductionCompanyData[]
+  /**
+   * TMDb's own user rating and how many votes back it.
+   *
+   * These come off the same `/movie/{id}` response the collection and
+   * production companies are read from — no extra request, no extra quota. The
+   * app collects Rotten Tomatoes, Metacritic and Letterboxd, and was throwing
+   * this one away while already holding it.
+   *
+   * The count is what makes the rating readable: 8.2 from 22,000 votes and 8.2
+   * from 6 are not the same claim, and every other score here has the same
+   * problem hidden.
+   */
+  voteAverage: number | null
+  voteCount: number | null
 }
 
 export interface SeriesEnrichmentData {
   keywords: string[]
   networks: NetworkData[]
   productionCompanies: ProductionCompanyData[]
+  voteAverage: number | null
+  voteCount: number | null
 }
 
 export interface CollectionData {

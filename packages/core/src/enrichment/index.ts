@@ -516,6 +516,10 @@ async function enrichMovie(
          languages = COALESCE($12, languages),
          production_countries = COALESCE($13, production_countries),
          plot_full = COALESCE($15, plot_full),
+         tmdb_rating = COALESCE($16, tmdb_rating),
+         tmdb_vote_count = COALESCE($17, tmdb_vote_count),
+         imdb_rating = COALESCE($18, imdb_rating),
+         imdb_vote_count = COALESCE($19, imdb_vote_count),
          enriched_at = NOW(),
          enrichment_version = COALESCE((SELECT value::int FROM system_settings WHERE key = 'enrichment_version'), 1),
          -- Only advance when OMDb was actually asked; CASE rather than COALESCE
@@ -538,6 +542,10 @@ async function enrichMovie(
         omdbData?.countries ?? null,
         omdb.attempted,
         omdbData?.plot ?? null,
+        tmdbData?.voteAverage ?? null,
+        tmdbData?.voteCount ?? null,
+        omdbData?.imdbRating ?? null,
+        omdbData?.imdbVotes ?? null,
       ]
     )
     return true
@@ -667,6 +675,10 @@ async function enrichSeries(
          languages = COALESCE($7, languages),
          production_countries = COALESCE($8, production_countries),
          plot_full = COALESCE($10, plot_full),
+         tmdb_rating = COALESCE($11, tmdb_rating),
+         tmdb_vote_count = COALESCE($12, tmdb_vote_count),
+         imdb_rating = COALESCE($13, imdb_rating),
+         imdb_vote_count = COALESCE($14, imdb_vote_count),
          enriched_at = NOW(),
          enrichment_version = COALESCE((SELECT value::int FROM system_settings WHERE key = 'enrichment_version'), 1),
          -- Only advance when OMDb was actually asked; CASE rather than COALESCE
@@ -684,6 +696,10 @@ async function enrichSeries(
         omdbData?.countries ?? null,
         omdb.attempted,
         omdbData?.plot ?? null,
+        tmdbData?.voteAverage ?? null,
+        tmdbData?.voteCount ?? null,
+        omdbData?.imdbRating ?? null,
+        omdbData?.imdbVotes ?? null,
       ]
     )
     return true

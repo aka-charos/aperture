@@ -39,6 +39,30 @@ function parseAwards(value: string | undefined): string | null {
 }
 
 /**
+ * Parse a plain decimal, e.g. imdbRating "7.0" -> 7.0
+ *
+ * "N/A" is OMDb's null and must not become 0 — a title nobody has rated would
+ * otherwise render as the worst-rated thing in the library.
+ */
+function parseDecimal(value: string | undefined): number | null {
+  if (!value || value === 'N/A') return null
+  const parsed = parseFloat(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+/**
+ * Parse a thousands-grouped integer, e.g. imdbVotes "545,163" -> 545163
+ *
+ * The separators have to go before parseFloat sees the string: `parseFloat`
+ * stops at the first comma and would read "545,163" as 545.
+ */
+function parseGroupedInteger(value: string | undefined): number | null {
+  if (!value || value === 'N/A') return null
+  const parsed = parseInt(value.replace(/[,\s]/g, ''), 10)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+/**
  * Parse comma-separated string into array
  * e.g., "English, French, Spanish" -> ["English", "French", "Spanish"]
  */
@@ -76,6 +100,9 @@ export function extractRatingsData(data: OMDbMovieResponse): RatingsData {
   // assuming it is longer.
   const plot = !data.Plot || data.Plot === 'N/A' ? null : data.Plot.trim() || null
 
+  const imdbRating = parseDecimal(data.imdbRating)
+  const imdbVotes = parseGroupedInteger(data.imdbVotes)
+
   return {
     rtCriticScore,
     rtAudienceScore,
@@ -84,6 +111,8 @@ export function extractRatingsData(data: OMDbMovieResponse): RatingsData {
     languages,
     countries,
     plot,
+    imdbRating,
+    imdbVotes,
   }
 }
 

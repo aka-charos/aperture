@@ -128,6 +128,11 @@ export async function getMovieEnrichmentData(
     composers,
     editors,
     productionCompanies,
+    // Already on `details`; this call was made for the collection and crew and
+    // the rating was discarded. TMDb reports 0/0 for unrated titles, which is
+    // an absence rather than a score of zero.
+    voteAverage: details.vote_average > 0 ? details.vote_average : null,
+    voteCount: details.vote_count > 0 ? details.vote_count : null,
   }
 }
 
