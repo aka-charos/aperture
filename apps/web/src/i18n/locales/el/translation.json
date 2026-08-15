@@ -2908,7 +2908,11 @@
       "studios": "Στούντιο",
       "languages": "Γλώσσες",
       "countries": "Χώρες",
-      "awards": "Βραβεία"
+      "awards": "Βραβεία",
+      "scoreTooltipTmdb": "TMDB: {{score}}/10",
+      "scoreTooltipTmdbVotes": "TMDB: {{score}}/10 from {{votes}} votes",
+      "scoreTooltipImdb": "IMDb: {{score}}/10",
+      "scoreTooltipImdbVotes": "IMDb: {{score}}/10 from {{votes}} votes"
     },
     "hero": {
       "available": "Διαθέσιμο",

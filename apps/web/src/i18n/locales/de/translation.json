@@ -734,7 +734,11 @@
       "studios": "Studios",
       "languages": "Sprachen",
       "countries": "Länder",
-      "awards": "Auszeichnungen"
+      "awards": "Auszeichnungen",
+      "scoreTooltipTmdb": "TMDB: {{score}}/10",
+      "scoreTooltipTmdbVotes": "TMDB: {{score}}/10 from {{votes}} votes",
+      "scoreTooltipImdb": "IMDb: {{score}}/10",
+      "scoreTooltipImdbVotes": "IMDb: {{score}}/10 from {{votes}} votes"
     },
     "similar": {
       "titleMovies": "Verwandte Filme",

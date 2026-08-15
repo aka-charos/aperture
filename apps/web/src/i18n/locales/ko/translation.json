@@ -734,7 +734,11 @@
       "studios": "스튜디오",
       "languages": "언어",
       "countries": "국가",
-      "awards": "수상 내역"
+      "awards": "수상 내역",
+      "scoreTooltipTmdb": "TMDB: {{score}}/10",
+      "scoreTooltipTmdbVotes": "TMDB: {{score}}/10 from {{votes}} votes",
+      "scoreTooltipImdb": "IMDb: {{score}}/10",
+      "scoreTooltipImdbVotes": "IMDb: {{score}}/10 from {{votes}} votes"
     },
     "similar": {
       "titleMovies": "관련 영화",

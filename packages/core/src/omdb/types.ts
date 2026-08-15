@@ -65,6 +65,17 @@ export interface RatingsData {
    * twist it routinely gives it away.
    */
   plot: string | null
+  /**
+   * IMDb's rating and vote count, from the same response as everything else.
+   *
+   * The app already displays a 0–10 score, but it comes from
+   * `movies.community_rating`, which the media server syncs — for Emby that
+   * *is* the IMDb rating, so the number was right by inheritance and carried no
+   * vote count and no source we control. Taking it here makes the provenance
+   * explicit and is what supplies the count.
+   */
+  imdbRating: number | null
+  imdbVotes: number | null
 }
 
 // ============================================================================

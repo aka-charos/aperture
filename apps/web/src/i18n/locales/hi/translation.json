@@ -734,7 +734,11 @@
       "studios": "स्टूडियो",
       "languages": "बोली",
       "countries": "देशों",
-      "awards": "पुरस्कार"
+      "awards": "पुरस्कार",
+      "scoreTooltipTmdb": "TMDB: {{score}}/10",
+      "scoreTooltipTmdbVotes": "TMDB: {{score}}/10 from {{votes}} votes",
+      "scoreTooltipImdb": "IMDb: {{score}}/10",
+      "scoreTooltipImdbVotes": "IMDb: {{score}}/10 from {{votes}} votes"
     },
     "similar": {
       "titleMovies": "संबंधित फ़िल्में",

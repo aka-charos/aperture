@@ -734,7 +734,11 @@
       "studios": "Studi",
       "languages": "Lingue",
       "countries": "Paesi",
-      "awards": "Premi"
+      "awards": "Premi",
+      "scoreTooltipTmdb": "TMDB: {{score}}/10",
+      "scoreTooltipTmdbVotes": "TMDB: {{score}}/10 from {{votes}} votes",
+      "scoreTooltipImdb": "IMDb: {{score}}/10",
+      "scoreTooltipImdbVotes": "IMDb: {{score}}/10 from {{votes}} votes"
     },
     "similar": {
       "titleMovies": "Film correlati",
