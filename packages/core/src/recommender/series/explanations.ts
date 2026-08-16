@@ -16,12 +16,19 @@ import {
   type AppLocaleCode,
 } from '../../lib/locales.js'
 import { resolveEffectiveAiLanguage } from '../../lib/userSettings.js'
+import { WATCH_HISTORY_TASTE_SQL } from '../watchedExclusion.js'
 import {
   describeExplanationBatch,
   explanationBatchSettings,
   parseExplanationResponse,
   type ExplanationBatchSettings,
 } from '../shared/explanationParsing.js'
+import {
+  EVIDENCE_PLOT_CHARS,
+  KEYWORD_LIMIT,
+  PICK_PLOT_CHARS,
+  clip,
+} from '../shared/explanationPrompt.js'
 
 const logger = createChildLogger('series-explanations')
 
@@ -67,6 +74,13 @@ export interface EvidenceSeries {
   year: number | null
   similarity: number
   evidenceType: 'favorite' | 'highly_rated' | 'watched'
+  /** See EvidenceMovie.overview — the model needs to know what these shows are. */
+  overview: string | null
+}
+
+/** Mirrors the movie generator's TitleContext; series carry no director column. */
+interface SeriesTitleContext {
+  keywords: string[]
 }
 
 export interface SeriesWithEvidence extends SeriesForExplanation {
@@ -96,13 +110,15 @@ async function fetchSeriesEvidenceForRecommendations(
     series_id: string
     similar_title: string
     similar_year: number | null
+    similar_overview: string | null
     similarity: number
     evidence_type: string
   }>(
-    `SELECT 
+    `SELECT
        rc.series_id,
        s.title as similar_title,
        s.year as similar_year,
+       s.overview as similar_overview,
        re.similarity,
        re.evidence_type
      FROM recommendation_evidence re
@@ -124,23 +140,43 @@ async function fetchSeriesEvidenceForRecommendations(
       year: row.similar_year,
       similarity: row.similarity,
       evidenceType: row.evidence_type as 'favorite' | 'highly_rated' | 'watched',
+      overview: row.similar_overview,
     })
   }
 
   return evidenceMap
 }
 
+/** Mirrors fetchTitleContext in the movie generator. */
+async function fetchSeriesTitleContext(
+  seriesIds: string[]
+): Promise<Map<string, SeriesTitleContext>> {
+  if (seriesIds.length === 0) return new Map()
+
+  const result = await query<{ id: string; keywords: string[] | null }>(
+    `SELECT id, keywords FROM series WHERE id = ANY($1)`,
+    [seriesIds]
+  )
+
+  return new Map(result.rows.map((row) => [row.id, { keywords: row.keywords ?? [] }]))
+}
+
 /**
  * Get rich user taste context for series
  */
 async function getUserSeriesTasteContext(userId: string): Promise<UserSeriesTasteContext> {
+  // Gated on the taste predicate for the same reason the movie generator is:
+  // the sync stores a row for any episode with playback position, so an ungated
+  // count let shows the viewer sampled and abandoned outrank ones they finished.
+  // Matches taste-profile/builder.ts and series/pipeline.ts.
+
   // Get top genres by watch frequency from series watch history
   const genreResult = await query<{ genre: string }>(
     `SELECT unnest(s.genres) as genre, COUNT(*) as count
      FROM watch_history wh
      JOIN episodes e ON e.id = wh.episode_id
      JOIN series s ON s.id = e.series_id
-     WHERE wh.user_id = $1 AND wh.media_type = 'episode'
+     WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND ${WATCH_HISTORY_TASTE_SQL}
      GROUP BY genre
      ORDER BY count DESC
      LIMIT 8`,
@@ -159,7 +195,7 @@ async function getUserSeriesTasteContext(userId: string): Promise<UserSeriesTast
      FROM watch_history wh
      JOIN episodes e ON e.id = wh.episode_id
      JOIN series s ON s.id = e.series_id
-     WHERE wh.user_id = $1 AND wh.media_type = 'episode'
+     WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND ${WATCH_HISTORY_TASTE_SQL}
      GROUP BY s.id, s.title, s.year, s.genres, s.network
      ORDER BY episodes_watched DESC, MAX(wh.last_played_at) DESC NULLS LAST
      LIMIT 15`,
@@ -207,10 +243,11 @@ export async function generateSeriesExplanations(
 
   // Fetch the actual embedding-based evidence
   const seriesIds = recommendations.map((r) => r.seriesId)
-  const evidenceMap = await fetchSeriesEvidenceForRecommendations(runId, seriesIds)
-
-  // Get user taste context
-  const tasteContext = await getUserSeriesTasteContext(userId)
+  const [evidenceMap, titleContext, tasteContext] = await Promise.all([
+    fetchSeriesEvidenceForRecommendations(runId, seriesIds),
+    fetchSeriesTitleContext(seriesIds),
+    getUserSeriesTasteContext(userId),
+  ])
 
   // Attach evidence to each recommendation
   const seriesWithEvidence: SeriesWithEvidence[] = recommendations.map((r) => ({
@@ -233,7 +270,13 @@ export async function generateSeriesExplanations(
       break
     }
     const batch = seriesWithEvidence.slice(i, i + batchSize)
-    const batchResults = await generateBatchSeriesExplanations(batch, tasteContext, maxTokens, aiLocale)
+    const batchResults = await generateBatchSeriesExplanations(
+      batch,
+      tasteContext,
+      titleContext,
+      maxTokens,
+      aiLocale
+    )
     results.push(...batchResults)
   }
 
@@ -244,6 +287,7 @@ export async function generateSeriesExplanations(
 async function generateBatchSeriesExplanations(
   seriesList: SeriesWithEvidence[],
   tasteContext: UserSeriesTasteContext,
+  titleContext: Map<string, SeriesTitleContext>,
   maxOutputTokens: number = 3000,
   aiLocale: AppLocaleCode = DEFAULT_LOCALE
 ): Promise<SeriesExplanationResult[]> {
@@ -267,6 +311,10 @@ async function generateBatchSeriesExplanations(
   const userContext = userContextLines.join('\n')
 
   // Build series list with evidence
+  //
+  // Mirrors the movie generator, including dropping the raw cosine percentages:
+  // they sit in a band a few points wide, so they read as grades while carrying
+  // almost no information. Order is the usable part and is preserved.
   const seriesListStr = seriesList
     .map((s, i) => {
       const evidenceStr =
@@ -275,14 +323,15 @@ async function generateBatchSeriesExplanations(
               .map((e) => {
                 const typeLabel =
                   e.evidenceType === 'favorite'
-                    ? '⭐ favorite'
+                    ? '⭐ a favorite of theirs'
                     : e.evidenceType === 'highly_rated'
                       ? '🔥 binged'
                       : 'watched'
-                return `"${e.title}" (${(e.similarity * 100).toFixed(0)}% match, ${typeLabel})`
+                const plot = clip(e.overview, EVIDENCE_PLOT_CHARS)
+                return `      - "${e.title}" (${e.year || 'N/A'}, ${typeLabel})${plot ? `: ${plot}` : ''}`
               })
-              .join(', ')
-          : 'No direct match data'
+              .join('\n')
+          : '      (none — say so by writing about the show itself, not about a connection)'
 
       const interestLine = s.interestText
         ? `\n   ✍️ THEY ASKED FOR THIS: picked because they told us they like "${s.interestText}" — lead with that`
@@ -292,13 +341,17 @@ async function generateBatchSeriesExplanations(
         ? `\n   👥 A KINDRED VIEWER PICKED THIS: another viewer here whose taste closely overlaps theirs watched it — lead with that, and never name or describe that person`
         : ''
 
+      const keywords = titleContext.get(s.seriesId)?.keywords
+      const themes = keywords?.length
+        ? `\n   Themes: ${keywords.slice(0, KEYWORD_LIMIT).join(', ')}`
+        : ''
+
       return `${i + 1}. "${s.title}" (${s.year || 'N/A'})
-   Genres: ${s.genres.join(', ')}
-   ${s.network ? `Network: ${s.network}` : ''}
-   ${s.status ? `Status: ${s.status}` : ''}
-   Overall match: ${(s.normalizedSimilarity * 100).toFixed(0)}% | Novelty: ${s.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${s.ratingScore > 0.7 ? 'critically acclaimed' : s.ratingScore > 0.5 ? 'well received' : 'mixed'}${interestLine}${twinLine}
-   🎯 SIMILAR TO SERIES THEY'VE WATCHED: ${evidenceStr}
-   Plot: ${(s.overview || 'No overview available').substring(0, 250)}...`
+   Genres: ${s.genres.join(', ')}${s.network ? `\n   Network: ${s.network}` : ''}${s.status ? `\n   Status: ${s.status}` : ''}${themes}
+   Novelty: ${s.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${s.ratingScore > 0.7 ? 'critically acclaimed' : s.ratingScore > 0.5 ? 'well received' : 'mixed'}${interestLine}${twinLine}
+   Plot: ${clip(s.overview, PICK_PLOT_CHARS) ?? 'No overview available'}
+   🎯 CLOSEST IN THEIR WATCH HISTORY (nearest first):
+${evidenceStr}`
     })
     .join('\n\n')
 
@@ -310,16 +363,18 @@ async function generateBatchSeriesExplanations(
       model,
       system: `You are an expert TV curator writing personalized recommendation explanations for TV series. You have access to:
 1. The user's taste profile and favorite series
-2. For each recommendation, the SPECIFIC watched series it's most similar to (via AI embedding analysis)
+2. For each recommendation, the SPECIFIC watched series it's most similar to (via AI embedding analysis), with a short synopsis of each
 
 Write compelling 3-4 sentence explanations for each recommendation. Your explanations MUST:
-- Reference the SPECIFIC watched series listed in "SIMILAR TO SERIES THEY'VE WATCHED" for each recommendation
-- Explain what qualities those series share with the recommendation (themes, tone, showrunners, network style, etc.)
+- Reference the SPECIFIC watched series listed in "CLOSEST IN THEIR WATCH HISTORY" for each recommendation
+- Explain what qualities those series share with the recommendation, drawing on the synopses and themes you have been given
 - Be warm and conversational, like a knowledgeable friend recommending their favorite shows
-- Create excitement without spoiling plots
+- Be specific rather than superlative. Naming what two shows share is more persuasive than praising either one, and never spoil an ending
 - Mention if it's from a network/streaming service they seem to enjoy
 
 CRITICAL: Each recommendation shows which of the user's watched series it's most similar to. USE THAT DATA - don't make up connections to random series.
+
+CRITICAL: Some of these shows will be obscure and you will not recognise them. That is expected. Work only from the data given - the plot summaries, themes, genres and network above. Do NOT state awards, ratings performance, critical reception, cancellation history or production trivia unless it appears in the data. If all you have is two plot summaries, connect them on subject, tone and theme, and say nothing about how either was received. An honest sentence about what a show is beats a confident one about what it achieved.
 
 CRITICAL: A few recommendations are marked "THEY ASKED FOR THIS" with an interest the user typed in themselves. For those, open by connecting the show to that interest in the user's own words, then fill in with the similarity evidence. Never justify one of these on viewing-history similarity alone - that is not why it is in the list, and claiming otherwise would be wrong.
 
@@ -332,7 +387,7 @@ CRITICAL: Never write a double quote inside the explanation text. Titles are sho
 ${userContext}
 
 === RECOMMENDED SERIES WITH SIMILARITY EVIDENCE ===
-For each series below, I've included which of the user's watched series it's most similar to based on AI analysis:
+For each series below, I've included which of the user's watched series it's most similar to based on AI analysis, with a short synopsis of each so you can see what they actually share:
 
 ${seriesListStr}
 

@@ -59,6 +59,55 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
     : t('mediaDetail.insights.subtitleMovie')
   const matchPct = Math.round((insights.scores?.final || 0) * 100)
 
+  // The value the score blend actually consumed — the raw cosine rescaled
+  // against the run's own candidate pool.
+  //
+  // Showing the raw cosine here was the bug: embeddings of one library sit in a
+  // cone a few points wide, so a strong match reads as a middling percentage,
+  // and worse, it is not the number `final` is made from. The panel showed
+  // 78 / 72 / 85 under a headline of 90, which no weighted average of those
+  // three can produce. Falls back to the raw value for runs written before
+  // migration 0141 stored it, which at least keeps the card populated.
+  const tasteMatch = insights.scores?.normalizedSimilarity ?? insights.scores?.similarity ?? null
+
+  // Present only from 0141 on. Its absence is what hides the arithmetic line
+  // rather than showing one that cannot be checked.
+  //
+  // The delta is derived from the two ROUNDED percentages, not rounded
+  // separately from the underlying floats. Rounding each of three numbers
+  // independently lets them disagree by a point — 0.824 and 0.897 render as 82
+  // and 90 while their difference renders as 7 — and a line that visibly fails
+  // to add up is worse than no line, since the whole purpose of it is that the
+  // reader can check the arithmetic.
+  const basePct = insights.scores?.base != null ? Math.round(insights.scores.base * 100) : null
+  const preferenceDeltaPct = basePct != null ? matchPct - basePct : 0
+
+  // Novelty's response curve floors well above zero (it is a peaked function,
+  // not a fraction), so its bar is filled against the range it can occupy. The
+  // scale comes from the API, which reads core's own constants — the web app
+  // never imports @aperture/core, and hardcoding them here would let the bar
+  // drift the first time the curve is retuned.
+  const noveltyScale = insights.scoreScales?.novelty
+  const noveltyFill =
+    insights.scores?.novelty != null && noveltyScale && noveltyScale.max > noveltyScale.min
+      ? Math.min(
+          100,
+          Math.max(
+            0,
+            ((insights.scores.novelty - noveltyScale.min) /
+              (noveltyScale.max - noveltyScale.min)) *
+              100
+          )
+        )
+      : (insights.scores?.novelty ?? 0) * 100
+
+  const discoveryTooltip = noveltyScale
+    ? t('mediaDetail.insights.tooltipDiscoveryRanged', {
+        min: Math.round(noveltyScale.min * 100),
+        max: Math.round(noveltyScale.max * 100),
+      })
+    : t('mediaDetail.insights.tooltipDiscovery')
+
   // Present only when a reserved taste-twin slot put this title in the list
   // (recommender/shared/twinSlots.ts). The stored object carries the donor's
   // id, which is deliberately never read here: the line says "someone", and
@@ -280,13 +329,17 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
               </Paper>
             )}
 
-            {/* Score Breakdown */}
+            {/* Score Breakdown
+                Three components, because three is how many the match is made
+                of. Variety used to sit here as a fourth and is not part of it
+                at all — it is blended separately, into the ordering — so it now
+                appears below under its own heading. */}
             <Typography variant="subtitle1" fontWeight={600} gutterBottom>
               {t('mediaDetail.insights.howWeCalculated')}
             </Typography>
-            <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid container spacing={3} sx={{ mb: 2 }}>
               {/* Taste Similarity */}
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid item xs={12} sm={6} md={4}>
                 <Tooltip title={similarityTooltip} arrow>
                   <Paper sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -294,13 +347,13 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                       <Typography variant="body2" fontWeight={600}>{t('mediaDetail.insights.tasteMatch')}</Typography>
                     </Box>
                     <Typography variant="h4" fontWeight={700} color="info.main">
-                      {insights.scores?.similarity != null
-                        ? `${Math.round(insights.scores.similarity * 100)}%`
+                      {tasteMatch != null
+                        ? `${Math.round(tasteMatch * 100)}%`
                         : t('mediaDetail.insights.na')}
                     </Typography>
                     <LinearProgress
                       variant="determinate"
-                      value={(insights.scores?.similarity || 0) * 100}
+                      value={(tasteMatch ?? 0) * 100}
                       sx={{ mt: 1, borderRadius: 1, bgcolor: 'grey.800', '& .MuiLinearProgress-bar': { bgcolor: 'info.main' } }}
                     />
                   </Paper>
@@ -308,8 +361,8 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
               </Grid>
 
               {/* Novelty Score */}
-              <Grid item xs={12} sm={6} md={3}>
-                <Tooltip title={t('mediaDetail.insights.tooltipDiscovery')} arrow>
+              <Grid item xs={12} sm={6} md={4}>
+                <Tooltip title={discoveryTooltip} arrow>
                   <Paper sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                       <HubOutlinedIcon sx={{ color: 'success.main', fontSize: 20 }} />
@@ -320,9 +373,14 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                         ? `${Math.round(insights.scores.novelty * 100)}%`
                         : t('mediaDetail.insights.na')}
                     </Typography>
+                    {/* Filled against the band this score can actually occupy,
+                        not against 0-100: the curve floors at ~47%, so drawn
+                        raw the emptiest possible discovery score looks like a
+                        half-full bar. The number above stays the real value, so
+                        the arithmetic below still adds up. */}
                     <LinearProgress
                       variant="determinate"
-                      value={(insights.scores?.novelty || 0) * 100}
+                      value={noveltyFill}
                       sx={{ mt: 1, borderRadius: 1, bgcolor: 'grey.800', '& .MuiLinearProgress-bar': { bgcolor: 'success.main' } }}
                     />
                   </Paper>
@@ -330,7 +388,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
               </Grid>
 
               {/* Rating Score */}
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid item xs={12} sm={6} md={4}>
                 <Tooltip title={t('mediaDetail.insights.tooltipQuality')} arrow>
                   <Paper sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -350,29 +408,80 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                   </Paper>
                 </Tooltip>
               </Grid>
-
-              {/* Diversity Score */}
-              <Grid item xs={12} sm={6} md={3}>
-                <Tooltip title={t('mediaDetail.insights.tooltipVariety')} arrow>
-                  <Paper sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                      <ShuffleIcon sx={{ color: 'secondary.main', fontSize: 20 }} />
-                      <Typography variant="body2" fontWeight={600}>{t('mediaDetail.insights.variety')}</Typography>
-                    </Box>
-                    <Typography variant="h4" fontWeight={700} color="secondary.main">
-                      {insights.scores?.diversity != null
-                        ? `${Math.round(insights.scores.diversity * 100)}%`
-                        : t('mediaDetail.insights.na')}
-                    </Typography>
-                    <LinearProgress
-                      variant="determinate"
-                      value={(insights.scores?.diversity || 0) * 100}
-                      sx={{ mt: 1, borderRadius: 1, bgcolor: 'grey.800', '& .MuiLinearProgress-bar': { bgcolor: 'secondary.main' } }}
-                    />
-                  </Paper>
-                </Tooltip>
-              </Grid>
             </Grid>
+
+            {/* How those three become the match.
+                Shown only when the run stored the pre-preference blend, i.e.
+                from migration 0141 on. Older runs kept neither that nor the
+                similarity value the blend consumed, and neither is recoverable
+                — so rather than imply an arithmetic it cannot show, the panel
+                simply omits this line for them. */}
+            {basePct != null && (
+              <Box
+                sx={{
+                  mb: 4,
+                  p: 2,
+                  borderRadius: 2,
+                  bgcolor: 'background.default',
+                  display: 'flex',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: { xs: 0.5, sm: 1.5 },
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  {t('mediaDetail.insights.blendedScore')}
+                </Typography>
+                <Typography variant="body2" fontWeight={700}>
+                  {basePct}%
+                </Typography>
+                {preferenceDeltaPct !== 0 && (
+                  <>
+                    <Typography variant="body2" color="text.secondary">
+                      {preferenceDeltaPct > 0
+                        ? t('mediaDetail.insights.preferenceLift')
+                        : t('mediaDetail.insights.preferenceDrop')}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      fontWeight={700}
+                      color={preferenceDeltaPct > 0 ? 'success.main' : 'error.main'}
+                    >
+                      {preferenceDeltaPct > 0 ? '+' : '−'}
+                      {Math.abs(preferenceDeltaPct)}%
+                    </Typography>
+                  </>
+                )}
+                <Typography variant="body2" color="text.secondary">
+                  {t('mediaDetail.insights.givesMatch')}
+                </Typography>
+                <Typography variant="body2" fontWeight={700} color="primary.main">
+                  {matchPct}%
+                </Typography>
+              </Box>
+            )}
+
+            {/* Variety — a property of the LIST, not of the match.
+                It measures how much this pick differs from what was already
+                chosen, and is blended into the selection ordering rather than
+                into the score above. Rendering it as a fourth component of
+                "How We Calculated Your Match" claimed it was one. */}
+            {insights.scores?.diversity != null && (
+              <Box sx={{ mb: 4 }}>
+                <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                  {t('mediaDetail.insights.varietyHeading')}
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <ShuffleIcon sx={{ color: 'secondary.main', fontSize: 20 }} />
+                  <Typography variant="body2" fontWeight={700} color="secondary.main">
+                    {Math.round(insights.scores.diversity * 100)}%
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {t('mediaDetail.insights.varietyExplainer')}
+                  </Typography>
+                </Box>
+              </Box>
+            )}
 
             {/* Genre Analysis — the count only.
                 The genres themselves are chips on the title's own genre row at

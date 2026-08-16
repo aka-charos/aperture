@@ -34,6 +34,7 @@ import {
   pickInterestSlotFillers,
   pickTwinSlotFillers,
   summarizeScoreComponents,
+  EVIDENCE_HISTORY_LIMIT,
   type InterestCandidateMatch,
   type InterestMatchIndex,
   type InterestQueryResult,
@@ -113,6 +114,8 @@ export interface SeriesCandidate {
   diversityBoost: number
   /** Quality match, comparable across every candidate in a run. See BaseCandidate. */
   finalScore: number
+  /** The blend before preference affinities moved it. See BaseCandidate. */
+  baseScore?: number
   /** Diversity-blended ranking score, selected candidates only. See BaseCandidate. */
   selectionScore?: number
 }
@@ -684,6 +687,9 @@ async function storeSeriesCandidates(
       seriesId: candidate.seriesId,
       rank: i + 1,
       similarity: candidate.similarity,
+      // What the blend consumed, as opposed to the raw cosine beside it. See
+      // PreparedCandidateRow in ../storage.ts for why both are kept.
+      normalizedSimilarity: candidate.normalizedSimilarity,
       novelty: candidate.novelty,
       ratingScore: candidate.ratingScore,
       // null when the selector never ranked this row, so a slot filler and a
@@ -691,6 +697,9 @@ async function storeSeriesCandidates(
       // See measuredDiversity in ../storage.ts for the full reasoning.
       diversityScore: candidate.selectionScore !== undefined ? candidate.diversityBoost : null,
       finalScore: candidate.finalScore,
+      // The blend before preference affinities moved it, so the three stored
+      // components can account for final_score exactly.
+      baseScore: candidate.baseScore ?? null,
       isSelected,
       selectedRank,
       // null for everything that is neither selected nor an interest pick --
@@ -735,28 +744,30 @@ async function storeSeriesCandidates(
   // Bulk INSERT using unnest
   await query(
     `INSERT INTO recommendation_candidates (
-       run_id, series_id, rank, similarity_score, novelty_score, rating_score,
-       diversity_score, final_score, is_selected, selected_rank, score_breakdown
+       run_id, series_id, rank, similarity_score, normalized_similarity, novelty_score, rating_score,
+       diversity_score, final_score, base_score, is_selected, selected_rank, score_breakdown
      )
-     SELECT $1, series_id, rank, similarity_score, novelty_score, rating_score,
-            diversity_score, final_score, is_selected, selected_rank,
+     SELECT $1, series_id, rank, similarity_score, normalized_similarity, novelty_score, rating_score,
+            diversity_score, final_score, base_score, is_selected, selected_rank,
             -- qualified: score_breakdown is also the name of the target
             -- column, and t. leaves nothing resting on scoping rules
             COALESCE(t.score_breakdown, '{}'::jsonb)
      FROM unnest(
-       $2::uuid[], $3::int[], $4::real[], $5::real[], $6::real[],
-       $7::real[], $8::real[], $9::boolean[], $10::int[], $11::jsonb[]
-     ) AS t(series_id, rank, similarity_score, novelty_score, rating_score,
-            diversity_score, final_score, is_selected, selected_rank, score_breakdown)`,
+       $2::uuid[], $3::int[], $4::real[], $5::real[], $6::real[], $7::real[],
+       $8::real[], $9::real[], $10::real[], $11::boolean[], $12::int[], $13::jsonb[]
+     ) AS t(series_id, rank, similarity_score, normalized_similarity, novelty_score, rating_score,
+            diversity_score, final_score, base_score, is_selected, selected_rank, score_breakdown)`,
     [
       runId,
       data.map((d) => d.seriesId),
       data.map((d) => d.rank),
       data.map((d) => d.similarity),
+      data.map((d) => d.normalizedSimilarity),
       data.map((d) => d.novelty),
       data.map((d) => d.ratingScore),
       data.map((d) => d.diversityScore),
       data.map((d) => d.finalScore),
+      data.map((d) => d.baseScore),
       data.map((d) => d.isSelected),
       data.map((d) => d.selectedRank),
       data.map((d) => d.scoreBreakdown),
@@ -1149,7 +1160,12 @@ export async function generateSeriesRecommendationsForUser(
       const interestAffinity = interestIndex?.best.get(candidate.seriesId)?.affinity ?? 0.5
 
       // Nudge the score toward 1 or 0 based on preference affinities, bounded to [0,1]
+      //
+      // Mirrors the movie pipeline: the pre-nudge value is what the three
+      // stored score components blend to, and is kept so the insights panel can
+      // show this adjustment rather than leave a gap it cannot account for.
       const originalScore = candidate.finalScore
+      candidate.baseScore = originalScore
       candidate.finalScore = applyPreferenceAdjustment(originalScore, {
         franchise: franchiseAffinity,
         genre: genreAffinity,
@@ -1350,7 +1366,12 @@ export async function generateSeriesRecommendationsForUser(
 
     // 8. Store evidence (similar watched series for each recommendation)
     logger.info({ runId }, '📊 Storing recommendation evidence...')
-    await storeSeriesEvidence(runId, finalSelected, watchedSeries)
+    // Mirrors the movie pipeline: `watchedSeries` is capped at recentWatchLimit
+    // because it builds a centroid, which is far too narrow a field for a
+    // nearest-neighbour lookup the explanation is then written from. See
+    // shared/evidencePool.ts.
+    const evidencePool = await getSeriesWatchHistory(user.id, EVIDENCE_HISTORY_LIMIT)
+    await storeSeriesEvidence(runId, finalSelected, evidencePool)
 
     // 9. Generate AI explanations for selected recommendations
     //

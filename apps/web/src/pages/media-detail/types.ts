@@ -178,11 +178,38 @@ export interface RecommendationInsights {
    */
   aiExplanation?: string | null
   scores?: {
+    /** The match percentage. Blend of the three components below, then nudged by preferences. */
     final: number
+    /**
+     * Raw cosine to the taste centroid. Comparable with the evidence
+     * percentages — both are item-to-item distances — and NOT comparable with
+     * novelty, rating or `final`, which is why it is no longer what the score
+     * panel draws.
+     */
     similarity: number | null
+    /**
+     * `similarity` rescaled against the run's own candidate pool: the value the
+     * blend actually consumed. Null on runs generated before migration 0141,
+     * which is the signal that the arithmetic cannot be shown for this row.
+     */
+    normalizedSimilarity: number | null
     novelty: number | null
     rating: number | null
+    /**
+     * How much variety this pick added to the list. Used to order the list, and
+     * deliberately NOT part of `final` — see the panel.
+     */
     diversity: number | null
+    /** The blend before preference affinities moved it. Null on pre-0141 runs. */
+    base: number | null
+  }
+  /**
+   * The range each score component can actually occupy, from core's own
+   * constants. Novelty's curve floors well above zero, so a bar drawn on 0-100
+   * would sit half full at the component's minimum.
+   */
+  scoreScales?: {
+    novelty: { min: number; max: number }
   }
   scoreBreakdown?: Record<string, unknown>
   /**

@@ -655,11 +655,9 @@
       "tasteMatch": "취향 일치",
       "discovery": "발견",
       "quality": "품질",
-      "variety": "다양성",
       "na": "해당 없음",
       "tooltipDiscovery": "평소 시청하는 것과 얼마나 다른지 - 새로운 것을 발견하는 데 도움이 됩니다.",
       "tooltipQuality": "커뮤니티 및 비평가 평가 품질",
-      "tooltipVariety": "추천 항목이 얼마나 다양해졌나요?",
       "genreAnalysis": "장르 분석",
       "genresEnjoy_one": "좋아하는 장르 {{count}}개",
       "genresEnjoy_other": "좋아하는 장르 {{count}}개",
@@ -677,7 +675,14 @@
       "closestInLibraryMovie": "Films in your history that most resemble this one. Shown for context — they are not why it was picked:",
       "closestInLibrarySeries": "Shows in your history that most resemble this one. Shown for context — they are not why it was picked:",
       "genresNew_one": "{{count}} new to explore",
-      "genresNew_other": "{{count}} new to explore"
+      "genresNew_other": "{{count}} new to explore",
+      "blendedScore": "These blend to",
+      "preferenceLift": "and your franchise and genre preferences add",
+      "preferenceDrop": "and your franchise and genre preferences take off",
+      "givesMatch": "for a match of",
+      "varietyHeading": "Variety In Your List",
+      "varietyExplainer": "How much this pick differs from the others chosen with it. This shapes the order of your list, not the match above.",
+      "tooltipDiscoveryRanged": "How different this is from what you usually watch. Peaks when a pick mixes the familiar with something new, so this score always sits between {{min}}% and {{max}}%."
     },
     "seasons": {
       "title": "에피소드",

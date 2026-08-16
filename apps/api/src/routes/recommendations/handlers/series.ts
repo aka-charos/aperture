@@ -8,6 +8,8 @@ import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import {
   regenerateUserSeriesRecommendations,
   getEffectiveAiExplanationSetting,
+  NOVELTY_ALIEN_FLOOR,
+  NOVELTY_PEAK,
 } from '@aperture/core'
 import { recommendationSchemas } from '../schemas.js'
 import { resolveTwinShared } from '../../../lib/twinShared.js'
@@ -159,14 +161,17 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
         is_selected: boolean
         final_score: number
         similarity_score: number | null
+        normalized_similarity: number | null
         novelty_score: number | null
         rating_score: number | null
         diversity_score: number | null
+        base_score: number | null
         score_breakdown: Record<string, unknown>
         ai_explanation: string | null
       }>(
         `SELECT rc.id, rc.rank, rc.is_selected, rc.final_score,
-                rc.similarity_score, rc.novelty_score, rc.rating_score, rc.diversity_score,
+                rc.similarity_score, rc.normalized_similarity, rc.novelty_score,
+                rc.rating_score, rc.diversity_score, rc.base_score,
                 rc.score_breakdown, rc.ai_explanation
          FROM recommendation_candidates rc
          WHERE rc.run_id = $1 AND rc.series_id = $2`,
@@ -259,9 +264,19 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
           // are NUMERIC columns that pg returns as strings, so a stored 0 is
           // truthy and renders as a measured 0% rather than "n/a".
           similarity: candidate.similarity_score != null ? Number(candidate.similarity_score) : null,
+          // See the movie handler: this is what the blend consumed, the raw
+          // cosine above is not, and NULL means the run predates 0141.
+          normalizedSimilarity:
+            candidate.normalized_similarity != null
+              ? Number(candidate.normalized_similarity)
+              : null,
           novelty: candidate.novelty_score != null ? Number(candidate.novelty_score) : null,
           rating: candidate.rating_score != null ? Number(candidate.rating_score) : null,
           diversity: candidate.diversity_score != null ? Number(candidate.diversity_score) : null,
+          base: candidate.base_score != null ? Number(candidate.base_score) : null,
+        },
+        scoreScales: {
+          novelty: { min: NOVELTY_ALIEN_FLOOR, max: NOVELTY_PEAK },
         },
         scoreBreakdown: candidate.score_breakdown,
         twinShared,

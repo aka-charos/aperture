@@ -1216,6 +1216,18 @@ export {
   type InterestMatchIndex,
 } from './recommender/shared/interestSlots.js'
 
+// The bounds of the novelty response curve, exported for exactly one reason:
+// the insights route hands them to the client so it can draw a discovery bar
+// on the range the score can actually occupy. The curve floors at
+// NOVELTY_ALIEN_FLOOR, so a bar drawn on 0-100 sits half full at its minimum
+// and looks like a measurement rather than the bottom of a band. The web app
+// never imports @aperture/core, and duplicating the numbers there would let
+// them drift the moment the curve is retuned.
+export {
+  NOVELTY_ALIEN_FLOOR,
+  NOVELTY_PEAK,
+} from './recommender/shared/scoring.js'
+
 // User Algorithm Settings
 export {
   getUserAlgorithmSettings,

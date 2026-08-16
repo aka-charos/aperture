@@ -43,11 +43,24 @@ export interface PreparedCandidateRow {
   isSelected: boolean
   selectedRank: number | null
   finalScore: number
+  /**
+   * Raw cosine, kept absolute. Comparable between items but NOT with the other
+   * score columns, which is why the blend reads normalizedSimilarity instead.
+   */
   similarity: number
+  /**
+   * What the blend actually consumed: `similarity` rescaled against this run's
+   * candidate pool. Persisted because a reader showing the raw cosine beside
+   * novelty and rating is showing a number on a different scale from the two it
+   * sits next to, and from the total it is supposed to explain.
+   */
+  normalizedSimilarity: number
   novelty: number
   ratingScore: number
   /** null when the diversity selector never looked at this candidate. */
   diversityScore: number | null
+  /** The blend before preference affinities moved it. See BaseCandidate. */
+  baseScore: number | null
   /** null unless it carries something no column already holds. */
   scoreBreakdown: string | null
 }
@@ -141,9 +154,13 @@ export function buildCandidateRows(
       selectedRank: isSelected ? (selectedRanks?.get(c.movieId) ?? null) : null,
       finalScore: c.finalScore,
       similarity: c.similarity,
+      normalizedSimilarity: c.normalizedSimilarity,
       novelty: c.novelty,
       ratingScore: c.ratingScore,
       diversityScore: measuredDiversity(c),
+      // Undefined only if the preference pass never ran, which cannot happen in
+      // the pipeline but keeps this pure function total for its tests.
+      baseScore: c.baseScore ?? null,
       scoreBreakdown: Object.keys(extras).length > 0 ? JSON.stringify(extras) : null,
     }
   })
@@ -172,8 +189,8 @@ export async function storeCandidates(
 
     await query(
       `INSERT INTO recommendation_candidates
-       (run_id, movie_id, rank, is_selected, selected_rank, final_score, similarity_score, novelty_score, rating_score, diversity_score, score_breakdown)
-       SELECT $1, movie_id, rank, is_selected, selected_rank, final_score, similarity_score, novelty_score, rating_score, diversity_score,
+       (run_id, movie_id, rank, is_selected, selected_rank, final_score, similarity_score, normalized_similarity, novelty_score, rating_score, diversity_score, base_score, score_breakdown)
+       SELECT $1, movie_id, rank, is_selected, selected_rank, final_score, similarity_score, normalized_similarity, novelty_score, rating_score, diversity_score, base_score,
               -- qualified: score_breakdown is also the name of the target column,
               -- and t. leaves nothing resting on scoping rules. NULL for every
               -- row that carries nothing a column doesn't already hold, which is
@@ -181,8 +198,8 @@ export async function storeCandidates(
               COALESCE(t.score_breakdown, '{}'::jsonb)
        FROM unnest(
          $2::uuid[], $3::int[], $4::boolean[], $5::int[], $6::real[],
-         $7::real[], $8::real[], $9::real[], $10::real[], $11::jsonb[]
-       ) AS t(movie_id, rank, is_selected, selected_rank, final_score, similarity_score, novelty_score, rating_score, diversity_score, score_breakdown)`,
+         $7::real[], $8::real[], $9::real[], $10::real[], $11::real[], $12::real[], $13::jsonb[]
+       ) AS t(movie_id, rank, is_selected, selected_rank, final_score, similarity_score, normalized_similarity, novelty_score, rating_score, diversity_score, base_score, score_breakdown)`,
       [
         runId,
         chunk.map((d) => d.movieId),
@@ -191,9 +208,11 @@ export async function storeCandidates(
         chunk.map((d) => d.selectedRank),
         chunk.map((d) => d.finalScore),
         chunk.map((d) => d.similarity),
+        chunk.map((d) => d.normalizedSimilarity),
         chunk.map((d) => d.novelty),
         chunk.map((d) => d.ratingScore),
         chunk.map((d) => d.diversityScore),
+        chunk.map((d) => d.baseScore),
         chunk.map((d) => d.scoreBreakdown),
       ]
     )

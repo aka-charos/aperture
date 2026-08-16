@@ -767,11 +767,9 @@
       "tasteMatch": "Вкус совпадения",
       "discovery": "Открытие",
       "quality": "Качество",
-      "variety": "Разнообразие",
       "na": "Н/Д",
       "tooltipDiscovery": "Насколько это отличается от того, что вы обычно смотрите – помогает вам открыть для себя что-то новое.",
       "tooltipQuality": "Качество рейтинга сообщества и критиков",
-      "tooltipVariety": "Насколько это разнообразит ваши рекомендации",
       "genreAnalysis": "Жанровый анализ",
       "genresEnjoy_one": "{{count}} жанр, который вам нравится",
       "genresEnjoy_other": "{{count}} жанров, которые вам нравятся",
@@ -789,7 +787,14 @@
       "closestInLibraryMovie": "Films in your history that most resemble this one. Shown for context — they are not why it was picked:",
       "closestInLibrarySeries": "Shows in your history that most resemble this one. Shown for context — they are not why it was picked:",
       "genresNew_one": "{{count}} new to explore",
-      "genresNew_other": "{{count}} new to explore"
+      "genresNew_other": "{{count}} new to explore",
+      "blendedScore": "These blend to",
+      "preferenceLift": "and your franchise and genre preferences add",
+      "preferenceDrop": "and your franchise and genre preferences take off",
+      "givesMatch": "for a match of",
+      "varietyHeading": "Variety In Your List",
+      "varietyExplainer": "How much this pick differs from the others chosen with it. This shapes the order of your list, not the match above.",
+      "tooltipDiscoveryRanged": "How different this is from what you usually watch. Peaks when a pick mixes the familiar with something new, so this score always sits between {{min}}% and {{max}}%."
     },
     "seasons": {
       "title": "Эпизоды",

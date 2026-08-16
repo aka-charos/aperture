@@ -265,6 +265,16 @@ export interface BaseCandidate {
    */
   finalScore: number
   /**
+   * finalScore as calculateBaseScore returned it, before
+   * applyPreferenceAdjustment moved it. Stored so the insights panel can show
+   * the preference nudge as its own step: the three score components blend to
+   * this, and `finalScore - baseScore` is what franchise/genre/interest
+   * affinities added or removed. Without it the components cannot reconstruct
+   * the match, which is exactly how a panel titled "How We Calculated Your
+   * Match" came to show three numbers that do not produce it.
+   */
+  baseScore?: number
+  /**
    * finalScore blended with the diversity boost, i.e. the number the diversity
    * selector actually ranked by. Set only on candidates that were selected, and
    * only for diagnostics -- it is not comparable to finalScore and must never

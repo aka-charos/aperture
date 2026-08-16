@@ -1093,11 +1093,9 @@
       "tasteMatch": "味の一致",
       "discovery": "発見",
       "quality": "品質",
-      "variety": "バラエティ",
       "na": "該当なし",
       "tooltipDiscovery": "普段見ているものとの違い - 新しい発見に役立ちます",
       "tooltipQuality": "コミュニティと批評家の評価の質",
-      "tooltipVariety": "これにより、推奨事項にどれだけ多様性が加えられるか",
       "genreAnalysis": "ジャンル分析",
       "genresEnjoy_one": "あなたが楽しんでいるジャンルは {{count}} 件です",
       "genresEnjoy_other": "あなたが楽しんでいるジャンルは {{count}} つです",
@@ -1115,7 +1113,14 @@
       "closestInLibraryMovie": "Films in your history that most resemble this one. Shown for context — they are not why it was picked:",
       "closestInLibrarySeries": "Shows in your history that most resemble this one. Shown for context — they are not why it was picked:",
       "genresNew_one": "{{count}} new to explore",
-      "genresNew_other": "{{count}} new to explore"
+      "genresNew_other": "{{count}} new to explore",
+      "blendedScore": "These blend to",
+      "preferenceLift": "and your franchise and genre preferences add",
+      "preferenceDrop": "and your franchise and genre preferences take off",
+      "givesMatch": "for a match of",
+      "varietyHeading": "Variety In Your List",
+      "varietyExplainer": "How much this pick differs from the others chosen with it. This shapes the order of your list, not the match above.",
+      "tooltipDiscoveryRanged": "How different this is from what you usually watch. Peaks when a pick mixes the familiar with something new, so this score always sits between {{min}}% and {{max}}%."
     },
     "seasons": {
       "title": "エピソード",
