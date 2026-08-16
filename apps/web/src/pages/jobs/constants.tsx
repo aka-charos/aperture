@@ -18,6 +18,7 @@ import ExploreIcon from '@mui/icons-material/Explore'
 import SendIcon from '@mui/icons-material/Send'
 import AlternateEmailIcon from '@mui/icons-material/AlternateEmail'
 import FingerprintIcon from '@mui/icons-material/Fingerprint'
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import type { JobCategory } from './types'
 import { getAppName } from '@/lib/branding'
 
@@ -90,6 +91,16 @@ export const GLOBAL_JOB_CATEGORIES: JobCategory[] = [
     color: '#a855f7',
     jobs: ['rebuild-taste-profiles'],
   },
+  // Same reasoning: one pass covers both media types. Note this list is an
+  // allowlist and the only thing that renders a job card — a job missing from
+  // every category has no Run button and, more to the point, no Cancel button,
+  // however correctly it is registered in the API.
+  {
+    titleKey: 'admin.jobsPage.categories.globalExplanations.title',
+    descriptionKey: 'admin.jobsPage.categories.globalExplanations.description',
+    color: '#06b6d4',
+    jobs: ['refresh-recommendation-explanations'],
+  },
   {
     titleKey: 'admin.jobsPage.categories.globalIntegrations.title',
     descriptionKey: 'admin.jobsPage.categories.globalIntegrations.description',
@@ -128,6 +139,7 @@ export const JOB_ICONS: Record<string, React.ReactNode> = {
   'generate-discovery-suggestions': <ExploreIcon />,
   'sync-lldap-emails': <AlternateEmailIcon />,
   'rebuild-taste-profiles': <FingerprintIcon />,
+  'refresh-recommendation-explanations': <AutoAwesomeIcon />,
 }
 
 export const JOB_COLORS: Record<string, string> = {
@@ -154,6 +166,7 @@ export const JOB_COLORS: Record<string, string> = {
   'generate-discovery-suggestions': '#ec4899',
   'sync-lldap-emails': '#0ea5e9',
   'rebuild-taste-profiles': '#a855f7',
+  'refresh-recommendation-explanations': '#06b6d4',
 }
 
 const JOB_DISPLAY_NAME_KEYS: Record<string, string> = {

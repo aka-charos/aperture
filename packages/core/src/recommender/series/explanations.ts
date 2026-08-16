@@ -17,6 +17,7 @@ import {
 } from '../../lib/locales.js'
 import { resolveEffectiveAiLanguage } from '../../lib/userSettings.js'
 import {
+  describeExplanationBatch,
   explanationBatchSettings,
   parseExplanationResponse,
   type ExplanationBatchSettings,
@@ -189,7 +190,9 @@ async function getUserSeriesTasteContext(userId: string): Promise<UserSeriesTast
 export async function generateSeriesExplanations(
   runId: string,
   userId: string,
-  recommendations: SeriesForExplanation[]
+  recommendations: SeriesForExplanation[],
+  /** See the movie generator: checked between batches so Cancel lands quickly. */
+  shouldCancel?: () => boolean
 ): Promise<SeriesExplanationResult[]> {
   if (recommendations.length === 0) {
     return []
@@ -222,6 +225,13 @@ export async function generateSeriesExplanations(
   const results: SeriesExplanationResult[] = []
 
   for (let i = 0; i < seriesWithEvidence.length; i += batchSize) {
+    if (shouldCancel?.()) {
+      logger.info(
+        { generated: results.length, expected: seriesWithEvidence.length },
+        '🛑 Series explanation generation cancelled between batches'
+      )
+      break
+    }
     const batch = seriesWithEvidence.slice(i, i + batchSize)
     const batchResults = await generateBatchSeriesExplanations(batch, tasteContext, maxTokens, aiLocale)
     results.push(...batchResults)
@@ -315,7 +325,9 @@ CRITICAL: A few recommendations are marked "THEY ASKED FOR THIS" with an interes
 
 CRITICAL: A few recommendations are marked "A KINDRED VIEWER PICKED THIS". Those are in the list because another viewer with strongly overlapping taste watched them, which is a different reason from similarity to the user's own history - say so, and then use the similarity evidence as support. Refer to that person only in general terms ("someone whose taste lines up with yours"). You do not know who they are, so never name them, guess at them, or describe them.
 
-Format: Return JSON with an "explanations" array containing objects with "index" (1-based) and "explanation" fields.${langBlock}`,
+Format: Return JSON with an "explanations" array containing objects with "index" (1-based) and "explanation" fields.
+
+CRITICAL: Never write a double quote inside the explanation text. Titles are shown in quotes above for readability, but repeating that in your answer breaks the JSON - write series titles as plain text, or in single quotes.${langBlock}`,
       prompt: `=== USER'S TV TASTE PROFILE ===
 ${userContext}
 
@@ -329,23 +341,29 @@ Generate personalized explanations referencing the specific similar series shown
       maxOutputTokens,
     })
 
-    const { byIndex, mode } = parseExplanationResponse(text)
+    const { byIndex, mode, rejected } = parseExplanationResponse(text)
 
-    // Mirrors the movie generator: see the note there for why a short batch is
-    // worth a warning and why finishReason is the field that identifies it.
-    if (byIndex.size < seriesList.length) {
+    // Mirrors the movie generator: see the note there for why any response the
+    // strict reader rejected is worth a line, not only a short one.
+    const warning = describeExplanationBatch({
+      mode,
+      parsed: byIndex.size,
+      rejected,
+      expected: seriesList.length,
+      finishReason,
+    })
+    if (warning) {
       logger.warn(
         {
           mode,
           parsed: byIndex.size,
+          rejected,
           expected: seriesList.length,
           finishReason,
           maxOutputTokens,
           rawTail: text?.slice(-160) ?? null,
         },
-        finishReason === 'length'
-          ? 'Series explanation batch hit the output token cap; using fallbacks for the rest'
-          : 'Series explanation batch came back incomplete; using fallbacks for the rest'
+        `Series: ${warning}`
       )
     }
 
