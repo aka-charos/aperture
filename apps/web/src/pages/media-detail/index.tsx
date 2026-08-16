@@ -12,6 +12,7 @@ import {
   MissingSeasonsCard,
   SimilarMedia,
   MovieInsights,
+  TitleAnalysis,
 } from './components'
 import { isMovie, isSeries } from './types'
 import type { MediaType } from './types'
@@ -119,10 +120,16 @@ export function MediaDetailPage({
         onFavoriteToggle={isMovie(media) && user?.id ? toggleFavorite : undefined}
       />
 
-      {/* AI Recommendation Insights */}
+      {/* AI Recommendation Insights — about the READER: why this was picked
+          for them, from measured pipeline output. */}
       {insights && (
         <MovieInsights insights={insights} mediaType={mediaType} onOpenMedia={onOpenMedia} />
       )}
+
+      {/* Grounded critical analysis — about the WORK, identical for every user,
+          written from web sources. Sits below the personal panel because a
+          reader who came here from their recommendations wants "why me" first. */}
+      {id && <TitleAnalysis mediaType={mediaType} mediaId={id} />}
 
       {/* Main Content */}
       <Box sx={{ mt: 4, px: { xs: 2, sm: 3 } }}>

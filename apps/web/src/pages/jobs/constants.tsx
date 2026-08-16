@@ -19,6 +19,7 @@ import SendIcon from '@mui/icons-material/Send'
 import AlternateEmailIcon from '@mui/icons-material/AlternateEmail'
 import FingerprintIcon from '@mui/icons-material/Fingerprint'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import TheatersIcon from '@mui/icons-material/Theaters'
 import type { JobCategory } from './types'
 import { getAppName } from '@/lib/branding'
 
@@ -102,6 +103,12 @@ export const GLOBAL_JOB_CATEGORIES: JobCategory[] = [
     jobs: ['refresh-recommendation-explanations'],
   },
   {
+    titleKey: 'admin.jobsPage.categories.globalAnalysis.title',
+    descriptionKey: 'admin.jobsPage.categories.globalAnalysis.description',
+    color: '#e91e63',
+    jobs: ['generate-title-analysis'],
+  },
+  {
     titleKey: 'admin.jobsPage.categories.globalIntegrations.title',
     descriptionKey: 'admin.jobsPage.categories.globalIntegrations.description',
     color: '#ed1c24',
@@ -140,6 +147,7 @@ export const JOB_ICONS: Record<string, React.ReactNode> = {
   'sync-lldap-emails': <AlternateEmailIcon />,
   'rebuild-taste-profiles': <FingerprintIcon />,
   'refresh-recommendation-explanations': <AutoAwesomeIcon />,
+  'generate-title-analysis': <TheatersIcon />,
 }
 
 export const JOB_COLORS: Record<string, string> = {
@@ -167,6 +175,7 @@ export const JOB_COLORS: Record<string, string> = {
   'sync-lldap-emails': '#0ea5e9',
   'rebuild-taste-profiles': '#a855f7',
   'refresh-recommendation-explanations': '#06b6d4',
+  'generate-title-analysis': '#e91e63',
 }
 
 const JOB_DISPLAY_NAME_KEYS: Record<string, string> = {

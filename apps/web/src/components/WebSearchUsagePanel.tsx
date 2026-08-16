@@ -21,7 +21,8 @@ interface UsageWindow {
 }
 
 interface SlotUsage {
-  slot: 'primary' | 'fallback'
+  /** 'primary', then 'fallback', 'fallback2', … — as many as the role holds. */
+  slot: string
   minute: UsageWindow
   day: UsageWindow
   rateLimitedToday: number
@@ -32,7 +33,7 @@ interface SlotUsage {
 
 interface UsageResponse {
   configured: boolean
-  hasFallbackKey: boolean
+  fallbackKeyCount: number
   model: string | null
   limits: { rpm: number; rpd: number; tpm: number } | null
   dayResetsAt: string
@@ -52,6 +53,21 @@ function formatTime(iso: string | null): string {
 
 function formatCompact(n: number): string {
   return n.toLocaleString(undefined, { notation: 'compact', maximumFractionDigits: 1 })
+}
+
+/**
+ * Slot names are `primary`, `fallback`, `fallback2`, `fallback3`… The first two
+ * keep dedicated strings because they read better than "Spare key 1"; beyond
+ * that they are numbered. The number shown is the position among the spares,
+ * which is why `fallback` is 1 and `fallback2` is 2.
+ */
+function slotLabel(slot: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
+  if (slot === 'primary') return t('webSearchUsage.slotPrimary')
+  if (slot === 'fallback') return t('webSearchUsage.slotFallback')
+  const n = Number.parseInt(slot.replace('fallback', ''), 10)
+  return Number.isFinite(n)
+    ? t('webSearchUsage.slotFallbackNumbered', { number: n })
+    : t('webSearchUsage.slotFallback')
 }
 
 /** Green until the budget is most of the way gone, then amber, then red. */
@@ -88,7 +104,7 @@ function UsageBar({ label, used, limit }: { label: string; used: number; limit: 
   )
 }
 
-export function WebSearchUsagePanel() {
+export function WebSearchUsagePanel({ role = 'webSearch' }: { role?: string } = {}) {
   const { t } = useTranslation()
   const [usage, setUsage] = useState<UsageResponse | null>(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -96,14 +112,19 @@ export function WebSearchUsagePanel() {
   const fetchUsage = useCallback(async () => {
     setRefreshing(true)
     try {
-      const res = await fetch('/api/settings/ai/web-search/usage', { credentials: 'include' })
+      // Per role: the grounding roles hold different keys and therefore
+      // different quota, and a combined number could not say which ran out.
+      const res = await fetch(
+        `/api/settings/ai/web-search/usage?role=${encodeURIComponent(role)}`,
+        { credentials: 'include' }
+      )
       if (res.ok) setUsage(await res.json())
     } catch {
       // A meter that can't load is not worth an error banner over the card.
     } finally {
       setRefreshing(false)
     }
-  }, [])
+  }, [role])
 
   useEffect(() => {
     fetchUsage()
@@ -114,9 +135,9 @@ export function WebSearchUsagePanel() {
   // Nothing to meter until the role is configured — the card already says so.
   if (!usage?.configured) return null
 
-  // The fallback key gets its own row only once there is one; otherwise the
-  // primary's numbers are the whole story.
-  const slots = usage.slots.filter((s) => s.slot === 'primary' || usage.hasFallbackKey)
+  // The server already returns exactly the configured keys, deduped — a role
+  // with no spares gets one row, and the primary's numbers are the whole story.
+  const slots = usage.slots
   const limits = usage.limits
   const paused = slots.filter((s) => s.cooldownUntil)
 
@@ -158,7 +179,7 @@ export function WebSearchUsagePanel() {
         <Box key={slot.slot} sx={{ mb: 1.5, '&:last-of-type': { mb: 0 } }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
             <Typography variant="caption" fontWeight={600}>
-              {t(slot.slot === 'primary' ? 'webSearchUsage.slotPrimary' : 'webSearchUsage.slotFallback')}
+              {slotLabel(slot.slot, t)}
             </Typography>
             {slot.rateLimitedToday > 0 && (
               <Chip
@@ -202,7 +223,7 @@ export function WebSearchUsagePanel() {
           sx={{ mt: 1 }}
         >
           {t('webSearchUsage.paused', {
-            slot: t(slot.slot === 'primary' ? 'webSearchUsage.slotPrimary' : 'webSearchUsage.slotFallback'),
+            slot: slotLabel(slot.slot, t),
             time: formatTime(slot.cooldownUntil),
           })}
         </Typography>

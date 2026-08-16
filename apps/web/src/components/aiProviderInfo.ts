@@ -26,10 +26,17 @@ export interface FunctionConfig {
   apiKey?: string
   baseUrl?: string
   /**
-   * Spare key used when the main one runs out of quota. Only the Web Search role
-   * offers it today. Omitted from a save request means "leave it as it is"; an
-   * empty string clears it (see the PATCH handler in settings/aiConfig.ts).
+   * Spare keys, tried in order when the main one runs out of quota. Offered by
+   * the grounding roles (Web Search, Title Analysis), where a free-tier daily
+   * cap is what actually runs out. Omitted from a save request means "leave
+   * them as they are"; an empty array clears them (see the PATCH handler in
+   * settings/aiConfig.ts).
+   *
+   * Each key should belong to a separate provider project — two keys on one
+   * project share a quota, so the second buys nothing.
    */
+  fallbackApiKeys?: string[]
+  /** @deprecated Superseded by {@link fallbackApiKeys}; still read, never written. */
   fallbackApiKey?: string
 }
 

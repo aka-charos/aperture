@@ -84,6 +84,14 @@ export const jobDefinitions: JobDefinition[] = [
     cron: null,
     manualOnly: true,
   },
+  // === Title analysis (grounded, per title, shared by every user) ===
+  {
+    name: 'generate-title-analysis',
+    description:
+      'Writes a grounded, critic-informed analysis for titles that have none, newest recommendations first. Each one costs a Google search-grounding request against a hard daily cap, so a pass covers a few hundred titles and the library fills in over weeks. Needs the Title Analysis role configured in Settings > AI.',
+    cron: null,
+    manualOnly: true,
+  },
   // === Taste Profiles (both media types) ===
   {
     name: 'rebuild-taste-profiles',

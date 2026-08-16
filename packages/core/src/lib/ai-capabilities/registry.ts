@@ -47,8 +47,9 @@ export function getProvidersForFunction(fn: AIFunction): ProviderMetadata[] {
       )
     if (fn === 'textGeneration') return p.supportsTextGeneration
     if (fn === 'exploration') return p.supportsExploration
-    // Web Search needs a grounding-capable provider — Google only for now
-    if (fn === 'webSearch') return p.id === 'google' && p.chatModels.length > 0
+    // Both grounding roles need a grounding-capable provider — Google only for now
+    if (fn === 'webSearch' || fn === 'titleAnalysis')
+      return p.id === 'google' && p.chatModels.length > 0
     return false
   })
 }
@@ -73,7 +74,7 @@ export function getModelsForFunction(providerId: string, fn: AIFunction): ModelM
       ? provider.explorationModels.filter((m) => m.capabilities.supportsObjectGeneration)
       : provider.chatModels.filter((m) => m.capabilities.supportsObjectGeneration)
   }
-  if (fn === 'webSearch') {
+  if (fn === 'webSearch' || fn === 'titleAnalysis') {
     // Grounding-capable chat models (Google); tool calling required to ground
     return provider.chatModels.filter((m) => m.capabilities.supportsToolCalling)
   }
@@ -90,10 +91,10 @@ export function validateCapabilityForFeature(
     return { supported: false, reason: `Unknown provider: ${providerId}` }
   }
 
-  if (fn === 'webSearch' && providerId !== 'google') {
+  if ((fn === 'webSearch' || fn === 'titleAnalysis') && providerId !== 'google') {
     return {
       supported: false,
-      reason: 'Web Search requires a grounding-capable provider (Google)',
+      reason: `${fn === 'titleAnalysis' ? 'Title Analysis' : 'Web Search'} requires a grounding-capable provider (Google)`,
     }
   }
 

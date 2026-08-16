@@ -1,26 +1,30 @@
 /**
- * Usage meter for the Web Search (Google Gemini grounding) role.
+ * Usage meter for the roles that spend Google Gemini grounding quota:
+ * `webSearch` and `titleAnalysis`.
  *
  * Every grounding call writes a row to `web_search_usage`; the admin panel reads
  * a summary of the last minute and the current Gemini day back out and shows it
  * against the free-tier limits in ./webSearchQuota.ts.
  *
- * Two things shape the queries. Gemini's daily request quota is **per model**
+ * Three things shape the queries. Gemini's daily request quota is **per model**
  * and resets at midnight US/Pacific, not UTC and not local — so the day window
  * is anchored there and the counts are filtered to the configured model.
- * And the quotas are per project, i.e. per API key — so counts are broken out
+ * The quotas are per project, i.e. per API key — so counts are broken out
  * per key slot rather than lumped together, or a fallback key's spend would
- * make the primary's meter look full.
+ * make the primary's meter look full. And they are broken out **per role**,
+ * because two roles now spend this quota from different credentials: one number
+ * covering both could not answer "which of them exhausted the day", which is
+ * the entire question the split exists to make answerable.
  *
  * Nothing here throws at its caller: a usage meter must never be able to break
  * the search it is measuring.
  */
+import type { AIFunction } from './ai-capabilities/types.js'
 import { query } from './db.js'
 import { createChildLogger } from './logger.js'
 import {
   getFreeTierLimits,
   getSlotCooldownUntil,
-  WEB_SEARCH_KEY_SLOTS,
   type FreeTierLimits,
   type WebSearchKeySlot,
 } from './webSearchQuota.js'
@@ -41,6 +45,11 @@ const logger = createChildLogger('web-search-usage')
 export type WebSearchCallStatus = 'ok' | 'rate_limited' | 'error' | 'empty'
 
 export interface WebSearchCallRecord {
+  /**
+   * Which role spent the quota. Two do, from different credentials, and the
+   * meter is useless if it cannot tell them apart.
+   */
+  role: AIFunction
   provider: string
   model: string
   slot: WebSearchKeySlot
@@ -75,12 +84,12 @@ export async function recordWebSearchCall(record: WebSearchCallRecord): Promise<
   try {
     await query(
       `INSERT INTO web_search_usage
-         (provider, model, key_slot, status, input_tokens, output_tokens, total_tokens)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [record.provider, record.model, record.slot, record.status, input, output, total]
+         (role, provider, model, key_slot, status, input_tokens, output_tokens, total_tokens)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [record.role, record.provider, record.model, record.slot, record.status, input, output, total]
     )
   } catch (err) {
-    logger.warn({ err, slot: record.slot }, 'Failed to record Web Search usage')
+    logger.warn({ err, role: record.role, slot: record.slot }, 'Failed to record Web Search usage')
     return
   }
 
@@ -119,6 +128,8 @@ export interface WebSearchSlotUsage {
 }
 
 export interface WebSearchUsageSummary {
+  /** Which role's spend this is. */
+  role: AIFunction
   /** The model these counts are for; quotas are per model. */
   model: string | null
   /** Published free-tier limits, or null for a model we have no figures for. */
@@ -139,8 +150,8 @@ interface UsageRow {
   last_used_at: Date | null
 }
 
-function emptySlot(slot: WebSearchKeySlot, now: number): WebSearchSlotUsage {
-  const cooldown = getSlotCooldownUntil(slot, now)
+function emptySlot(role: AIFunction, slot: WebSearchKeySlot, now: number): WebSearchSlotUsage {
+  const cooldown = getSlotCooldownUntil(role, slot, now)
   return {
     slot,
     minute: { requests: 0, tokens: 0 },
@@ -153,22 +164,30 @@ function emptySlot(slot: WebSearchKeySlot, now: number): WebSearchSlotUsage {
 }
 
 /**
- * Counts for the given model, per key slot. Returns zeroed slots (rather than
+ * Counts for one role's model, per key slot. Returns zeroed slots (rather than
  * throwing) when the table is missing or the query fails, so a settings page
  * still renders on a database that hasn't run the migration yet.
+ *
+ * `slots` is passed in rather than derived from a constant because how many
+ * keys a role holds is now configuration. A slot that has spent nothing still
+ * appears — an unused fallback reading zero is information, and a slot missing
+ * from the panel would look like a key that was never configured.
  */
 export async function getWebSearchUsageSummary(
-  model: string | null
+  role: AIFunction,
+  model: string | null,
+  slots: WebSearchKeySlot[]
 ): Promise<WebSearchUsageSummary> {
   const now = Date.now()
   const limits = getFreeTierLimits(model)
 
   const empty: WebSearchUsageSummary = {
+    role,
     model,
     limits,
     dayStart: new Date(now).toISOString(),
     dayResetsAt: new Date(now).toISOString(),
-    slots: WEB_SEARCH_KEY_SLOTS.map((slot) => emptySlot(slot, now)),
+    slots: slots.map((slot) => emptySlot(role, slot, now)),
   }
 
   try {
@@ -195,16 +214,17 @@ export async function getWebSearchUsageSummary(
          MAX(created_at) AS last_used_at
        FROM web_search_usage
        WHERE created_at >= ${PACIFIC_DAY_START} - INTERVAL '1 day'
+         AND role = $2
          AND ($1::text IS NULL OR model = $1)
        GROUP BY key_slot`,
-      [model]
+      [model, role]
     )
 
     const bySlot = new Map(rows.rows.map((r) => [r.key_slot, r]))
-    const slots = WEB_SEARCH_KEY_SLOTS.map((slot) => {
+    const slotUsage = slots.map((slot) => {
       const row = bySlot.get(slot)
-      if (!row) return emptySlot(slot, now)
-      const cooldown = getSlotCooldownUntil(slot, now)
+      if (!row) return emptySlot(role, slot, now)
+      const cooldown = getSlotCooldownUntil(role, slot, now)
       return {
         slot,
         minute: { requests: row.minute_requests, tokens: Number(row.minute_tokens) },
@@ -216,9 +236,9 @@ export async function getWebSearchUsageSummary(
       }
     })
 
-    return { ...empty, slots }
+    return { ...empty, slots: slotUsage }
   } catch (err) {
-    logger.warn({ err }, 'Failed to read Web Search usage; reporting zeroes')
+    logger.warn({ err, role }, 'Failed to read Web Search usage; reporting zeroes')
     return empty
   }
 }

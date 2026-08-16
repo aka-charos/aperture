@@ -5,4 +5,5 @@ export { SeasonsList } from './SeasonsList'
 export { MissingSeasonsCard } from './MissingSeasonsCard'
 export { MediaInfoCard } from './MediaInfoCard'
 export { MovieInsights } from './MovieInsights'
+export { TitleAnalysis } from './TitleAnalysis'
 

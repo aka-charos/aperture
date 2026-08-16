@@ -2,7 +2,7 @@
  * Shared AI Function Configuration Card
  * Used in both Admin Settings and Setup Wizard
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Box,
@@ -14,6 +14,7 @@ import {
   Select,
   MenuItem,
   FormControl,
+  FormHelperText,
   InputLabel,
   InputAdornment,
   IconButton,
@@ -45,7 +46,13 @@ import {
   type ProviderType,
 } from './aiProviderInfo'
 
-export type AIFunction = 'embeddings' | 'chat' | 'textGeneration' | 'exploration' | 'webSearch'
+export type AIFunction =
+  | 'embeddings'
+  | 'chat'
+  | 'textGeneration'
+  | 'exploration'
+  | 'webSearch'
+  | 'titleAnalysis'
 
 export interface ModelInfo {
   id: string
@@ -154,14 +161,13 @@ export function AIFunctionCard({
   const [showApiKey, setShowApiKey] = useState(false)
   const [initialized, setInitialized] = useState(false)
 
-  // Fallback key. `fallbackTouched` is what separates "the admin cleared this
-  // box" from "the admin never opened it" — only the former gets sent, so a save
-  // that ignores the field leaves the stored key alone.
-  const [fallbackApiKey, setFallbackApiKey] = useState('')
-  const [fallbackTouched, setFallbackTouched] = useState(false)
-  const [showFallbackKey, setShowFallbackKey] = useState(false)
-  const [hasSavedFallbackKey, setHasSavedFallbackKey] = useState(Boolean(config?.fallbackApiKey))
-  
+  // Spare keys, tried in order when the one above runs out of quota. Seeded
+  // from what is stored and sent back whole on every save, so editing one key
+  // cannot silently drop the others. Rendered as password fields — the values
+  // are real, not masked placeholders, which is what lets a save round-trip.
+  const [fallbackKeys, setFallbackKeys] = useState<string[]>([])
+  const [showFallbackKeys, setShowFallbackKeys] = useState(false)
+
   // Custom model dialog state
   const [addModelDialogOpen, setAddModelDialogOpen] = useState(false)
   const [newModelName, setNewModelName] = useState('')
@@ -197,9 +203,17 @@ export function AIFunctionCard({
     }
   }, [config, initialized])
 
+  // Reads the legacy single-key field too, so a role configured before the list
+  // existed shows its spare key rather than appearing to have none.
+  const storedFallbackKeys = useMemo(() => {
+    const list = config?.fallbackApiKeys ?? []
+    const legacy = config?.fallbackApiKey ? [config.fallbackApiKey] : []
+    return [...list, ...legacy].filter((k) => k.trim().length > 0)
+  }, [config?.fallbackApiKeys, config?.fallbackApiKey])
+
   useEffect(() => {
-    setHasSavedFallbackKey(Boolean(config?.fallbackApiKey))
-  }, [config?.fallbackApiKey])
+    setFallbackKeys(storedFallbackKeys)
+  }, [storedFallbackKeys])
   
   // Check capability warning
   const hasCapabilityWarning = requiredCapability === 'toolCalling' && 
@@ -298,10 +312,8 @@ export function AIFunctionCard({
   const providerIsFixed = !loadingProviders && providers.length === 1
   const fixedProvider = providerIsFixed ? providers[0] : null
 
-  /** The fallback key to exercise: whatever is typed, else whatever is stored. */
-  const effectiveFallbackKey = fallbackTouched
-    ? fallbackApiKey.trim()
-    : (config?.fallbackApiKey ?? '')
+  /** Spare keys worth exercising: whatever is in the boxes, blanks dropped. */
+  const effectiveFallbackKeys = fallbackKeys.map((k) => k.trim()).filter((k) => k.length > 0)
 
   const handleTest = async () => {
     setTesting(true)
@@ -329,16 +341,21 @@ export function AIFunctionCard({
         return
       }
 
-      // A fallback key that doesn't work is worse than no fallback at all — you
-      // find out at the moment the main key runs out. Check it here instead.
-      if (supportsFallbackKey && effectiveFallbackKey) {
-        const fallback = await runTest(effectiveFallbackKey)
-        if (!fallback.success) {
-          setTestResult({
-            success: false,
-            error: t('aiFunctionCard.fallbackKeyFailed', { error: fallback.error ?? '' }),
-          })
-          return
+      // A spare key that doesn't work is worse than no spare at all — you find
+      // out at the moment the main key runs out. Check them all here instead,
+      // and stop at the first bad one so the message names a single fault.
+      if (supportsFallbackKey) {
+        for (const [i, key] of effectiveFallbackKeys.entries()) {
+          const fallback = await runTest(key)
+          if (!fallback.success) {
+            setTestResult({
+              success: false,
+              error: t('aiFunctionCard.fallbackKeyFailed', {
+                error: `#${i + 1}: ${fallback.error ?? ''}`,
+              }),
+            })
+            return
+          }
         }
       }
 
@@ -356,10 +373,10 @@ export function AIFunctionCard({
       model,
       apiKey: apiKey || undefined,
       baseUrl: baseUrl || undefined,
-      // Sent only when the admin actually edited the box; see fallbackTouched.
-      ...(supportsFallbackKey && fallbackTouched
-        ? { fallbackApiKey: fallbackApiKey.trim() }
-        : {}),
+      // Always sent whole for roles that offer it — the boxes were seeded from
+      // what is stored, so a round-trip preserves keys the admin didn't touch,
+      // and clearing them all is expressible as an empty array.
+      ...(supportsFallbackKey ? { fallbackApiKeys: effectiveFallbackKeys } : {}),
     }
 
     setSaving(true)
@@ -369,11 +386,10 @@ export function AIFunctionCard({
       await onSave(newConfig)
       setSuccess(t('aiFunctionCard.configSaved'))
       setApiKey('') // Clear for security
-      if (fallbackTouched) {
-        setHasSavedFallbackKey(Boolean(fallbackApiKey.trim()))
-        setFallbackApiKey('')
-        setFallbackTouched(false)
-      }
+      // Spare keys stay in the form on purpose: they are a list the admin
+      // manages, and blanking it after every save would make "how many do I
+      // have?" unanswerable without a reload.
+      setFallbackKeys(effectiveFallbackKeys)
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('aiFunctionCard.failedToSave'))
@@ -895,32 +911,55 @@ export function AIFunctionCard({
           />
         )}
 
-        {/* Fallback API key — a second key to fall back on when the first one
-            hits its quota. Only offered for roles that ask for it. */}
+        {/* Spare API keys — tried in order when the key above runs out of quota.
+            Only offered for roles that ask for them (the grounding roles, where
+            a free-tier daily cap is the thing that actually runs out). Each key
+            should be a separate provider project: two keys on one project share
+            one quota, so a "fallback" there buys nothing. */}
         {supportsFallbackKey && providerInfo?.requiresApiKey && (
-          <TextField
-            label={t('aiFunctionCard.fallbackApiKey')}
-            type={showFallbackKey ? 'text' : 'password'}
-            value={fallbackTouched ? fallbackApiKey : hasSavedFallbackKey ? '••••••••••••••••' : ''}
-            onChange={(e) => {
-              setFallbackTouched(true)
-              setFallbackApiKey(e.target.value.replace(/•/g, ''))
-            }}
-            size="small"
-            fullWidth
-            placeholder={t('aiFunctionCard.fallbackApiKeyPlaceholder')}
-            sx={{ mb: 2 }}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton onClick={() => setShowFallbackKey(!showFallbackKey)} size="small">
-                    {showFallbackKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
-            helperText={t('aiFunctionCard.fallbackApiKeyHelp')}
-          />
+          <Box sx={{ mb: 2 }}>
+            {fallbackKeys.map((key, i) => (
+              <TextField
+                key={i}
+                label={t('aiFunctionCard.fallbackApiKeyNumbered', { number: i + 1 })}
+                type={showFallbackKeys ? 'text' : 'password'}
+                value={key}
+                onChange={(e) => {
+                  const next = [...fallbackKeys]
+                  next[i] = e.target.value
+                  setFallbackKeys(next)
+                }}
+                size="small"
+                fullWidth
+                placeholder={t('aiFunctionCard.fallbackApiKeyPlaceholder')}
+                sx={{ mb: 1 }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton onClick={() => setShowFallbackKeys(!showFallbackKeys)} size="small">
+                        {showFallbackKeys ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                      </IconButton>
+                      <IconButton
+                        onClick={() => setFallbackKeys(fallbackKeys.filter((_, j) => j !== i))}
+                        size="small"
+                        aria-label={t('aiFunctionCard.removeFallbackKey')}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            ))}
+            <Button
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={() => setFallbackKeys([...fallbackKeys, ''])}
+            >
+              {t('aiFunctionCard.addFallbackKey')}
+            </Button>
+            <FormHelperText>{t('aiFunctionCard.fallbackApiKeyHelp')}</FormHelperText>
+          </Box>
         )}
 
         {/* Ollama Instructions */}

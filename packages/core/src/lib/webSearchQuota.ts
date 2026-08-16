@@ -1,5 +1,6 @@
 /**
- * Free-tier quota handling for the Web Search (Google Gemini grounding) role.
+ * Free-tier quota handling for any role that spends Google Gemini grounding
+ * quota. Two do: `webSearch` (the assistant's discovery) and `titleAnalysis`.
  *
  * Grounding runs on a Gemini key that is very often a free-tier one, and the
  * free tier is metered three ways at once: requests per minute, requests per
@@ -8,21 +9,36 @@
  *
  * This module is the pure half of the response to that: the published limits,
  * the classification of a 429 into "wait a minute" vs "wait until tomorrow",
- * and a per-key-slot cooldown so an exhausted key is skipped instead of being
+ * and a per-key cooldown so an exhausted key is skipped instead of being
  * hammered. The DB-backed counters live in ./webSearchUsage.ts; the key
  * switching lives in ./ai-provider.ts.
+ *
+ * The `webSearch*` naming is historical — it predates the second role, and the
+ * usage table it feeds is `web_search_usage`. Renaming the code without being
+ * able to rename the table would trade one confusion for a worse one.
  */
+import type { AIFunction } from './ai-capabilities/types.js'
 import { createChildLogger } from './logger.js'
 
 const logger = createChildLogger('web-search-quota')
 
 /**
- * Which configured API key served a call. The Web Search role can hold two: the
- * everyday one and a fallback used when the first hits its quota.
+ * Which configured API key served a call: `primary`, then `fallback`,
+ * `fallback2`, `fallback3`… for as many as the role holds.
+ *
+ * A plain string rather than a union because the count is now configurable.
+ * The first fallback keeps the bare name `fallback` deliberately — historical
+ * `web_search_usage` rows carry it, and renaming would split one key's history
+ * into two slots in the admin panel.
  */
-export type WebSearchKeySlot = 'primary' | 'fallback'
+export type WebSearchKeySlot = string
 
-export const WEB_SEARCH_KEY_SLOTS: WebSearchKeySlot[] = ['primary', 'fallback']
+/** Slot name for the nth configured key (0 = primary). */
+export function keySlotName(index: number): WebSearchKeySlot {
+  if (index === 0) return 'primary'
+  if (index === 1) return 'fallback'
+  return `fallback${index}`
+}
 
 export interface FreeTierLimits {
   /** Requests per minute. */
@@ -41,6 +57,17 @@ export interface FreeTierLimits {
  *
  * Models absent here (anything newer, or a paid-tier key) simply have no
  * denominator: usage is still counted and shown, just without a limit.
+ *
+ * KNOWN GAP: the 3.x models in `ai-capabilities/data/google.json`
+ * (`gemini-3.5-flash`, `gemini-3.1-flash-lite`) are not here, so pointing a
+ * grounding role at one shows a count with no limit beside it. They are left
+ * out rather than estimated on purpose — a guessed denominator renders as a
+ * confident, wrong gauge, which is worse than an absent one. Fill them in from
+ * https://ai.google.dev/gemini-api/docs/rate-limits, not from a model's recall.
+ *
+ * Note also that these are the limits on the MODEL. Grounded search carries its
+ * own, tighter daily cap that applies whatever model is in use, so a role well
+ * inside these numbers can still be refused.
  */
 const GEMINI_FREE_TIER_LIMITS: Record<string, FreeTierLimits> = {
   'gemini-2.5-flash-lite': { rpm: 15, rpd: 1000, tpm: 250_000 },
@@ -162,6 +189,8 @@ const MINUTE_SCOPE_COOLDOWN_MS = 60_000
 const MAX_COOLDOWN_MS = 24 * 60 * 60 * 1000
 
 interface SlotCooldown {
+  role: AIFunction
+  slot: WebSearchKeySlot
   until: number
   scope: QuotaScope
 }
@@ -171,8 +200,15 @@ interface SlotCooldown {
  * saw fail — and losing it on restart costs one wasted request, which the 429
  * handler then re-parks. Persisting it would risk the opposite mistake: parking
  * a key that has since recovered.
+ *
+ * Keyed by role AND slot. Every role names its first key `primary`, so keying
+ * on the slot alone would let one role's exhausted key park another role's
+ * working one — which is the exact contention that giving `titleAnalysis` its
+ * own credentials exists to prevent.
  */
-const cooldowns = new Map<WebSearchKeySlot, SlotCooldown>()
+const cooldowns = new Map<string, SlotCooldown>()
+
+const cooldownKey = (role: AIFunction, slot: WebSearchKeySlot) => `${role}:${slot}`
 
 /** Milliseconds from `now` until the next midnight in US/Pacific, where Gemini's daily quota rolls over. */
 function msUntilPacificMidnight(now: number): number {
@@ -189,6 +225,7 @@ function msUntilPacificMidnight(now: number): number {
 
 /** Park a key after a quota rejection. Returns when it becomes usable again. */
 export function markSlotExhausted(
+  role: AIFunction,
   slot: WebSearchKeySlot,
   info: QuotaErrorInfo,
   now: number = Date.now()
@@ -207,51 +244,72 @@ export function markSlotExhausted(
   const waitMs = Number.isFinite(raw) && raw > 0 ? raw : UNKNOWN_SCOPE_COOLDOWN_MS
   const until = now + waitMs
 
-  const existing = cooldowns.get(slot)
+  const key = cooldownKey(role, slot)
+  const existing = cooldowns.get(key)
   if (existing && existing.until >= until) return existing.until
 
-  cooldowns.set(slot, { until, scope: info.scope })
+  cooldowns.set(key, { role, slot, until, scope: info.scope })
   logger.warn(
-    { slot, scope: info.scope, waitSeconds: Math.round(waitMs / 1000) },
-    'Web Search key hit its quota; parking it'
+    { role, slot, scope: info.scope, waitSeconds: Math.round(waitMs / 1000) },
+    'Grounding key hit its quota; parking it'
   )
   return until
 }
 
 /** When this key becomes usable again, or null if it is usable now. */
 export function getSlotCooldownUntil(
+  role: AIFunction,
   slot: WebSearchKeySlot,
   now: number = Date.now()
 ): number | null {
-  const cooldown = cooldowns.get(slot)
+  const key = cooldownKey(role, slot)
+  const cooldown = cooldowns.get(key)
   if (!cooldown) return null
   if (cooldown.until <= now) {
-    cooldowns.delete(slot)
+    cooldowns.delete(key)
     return null
   }
   return cooldown.until
 }
 
 /** True when the key is parked and should be skipped if another is available. */
-export function isSlotCoolingDown(slot: WebSearchKeySlot, now: number = Date.now()): boolean {
-  return getSlotCooldownUntil(slot, now) !== null
+export function isSlotCoolingDown(
+  role: AIFunction,
+  slot: WebSearchKeySlot,
+  now: number = Date.now()
+): boolean {
+  return getSlotCooldownUntil(role, slot, now) !== null
 }
 
 /** Clear a key's cooldown — called when it serves a request successfully. */
-export function clearSlotCooldown(slot: WebSearchKeySlot): void {
-  cooldowns.delete(slot)
+export function clearSlotCooldown(role: AIFunction, slot: WebSearchKeySlot): void {
+  cooldowns.delete(cooldownKey(role, slot))
 }
 
-/** Current cooldowns, for the admin usage panel. */
+/**
+ * Current cooldowns, for the admin usage panel. Walks the map rather than a
+ * fixed slot list, since how many keys a role holds is now configuration.
+ */
 export function getSlotCooldowns(
   now: number = Date.now()
-): Array<{ slot: WebSearchKeySlot; until: string; scope: QuotaScope }> {
-  const out: Array<{ slot: WebSearchKeySlot; until: string; scope: QuotaScope }> = []
-  for (const slot of WEB_SEARCH_KEY_SLOTS) {
-    const cooldown = cooldowns.get(slot)
-    if (cooldown && cooldown.until > now) {
-      out.push({ slot, until: new Date(cooldown.until).toISOString(), scope: cooldown.scope })
+): Array<{ role: AIFunction; slot: WebSearchKeySlot; until: string; scope: QuotaScope }> {
+  const out: Array<{
+    role: AIFunction
+    slot: WebSearchKeySlot
+    until: string
+    scope: QuotaScope
+  }> = []
+  for (const [key, cooldown] of cooldowns) {
+    if (cooldown.until <= now) {
+      cooldowns.delete(key)
+      continue
     }
+    out.push({
+      role: cooldown.role,
+      slot: cooldown.slot,
+      until: new Date(cooldown.until).toISOString(),
+      scope: cooldown.scope,
+    })
   }
   return out
 }

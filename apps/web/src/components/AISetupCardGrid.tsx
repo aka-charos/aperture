@@ -4,6 +4,7 @@ import {
   HubOutlined as HubOutlinedIcon,
   Memory as MemoryIcon,
   SmartToy as SmartToyIcon,
+  Theaters as TheatersIcon,
   TravelExplore as TravelExploreIcon,
 } from '@mui/icons-material'
 import { useTranslation } from 'react-i18next'
@@ -17,6 +18,7 @@ export interface AISetupGridConfig {
   textGeneration: FunctionConfig | null
   exploration: FunctionConfig | null
   webSearch?: FunctionConfig | null
+  titleAnalysis?: FunctionConfig | null
 }
 
 interface AISetupCardGridProps {
@@ -87,10 +89,16 @@ export function AISetupCardGrid({ config, onSave, variant }: AISetupCardGridProp
         isSetup={isSetup}
       />
 
-      {/* Web Search — optional 5th role, admin settings only (not the onboarding
-          wizard). Google-only, because it rides on Gemini's native search
-          grounding, so the card locks its provider and offers a second API key
-          for when the free tier runs out. */}
+      {/* The two grounding roles — optional, admin settings only (not the
+          onboarding wizard). Google-only, because they ride on Gemini's native
+          search grounding, so each card locks its provider and offers spare API
+          keys for when a free tier runs out.
+
+          They are separate roles, with separate credentials, on purpose: both
+          spend the same per-project daily grounding cap, so a batch of title
+          analyses run from the chat role's key would exhaust the quota the
+          assistant needs. Give each its own key from its own Google project or
+          the split achieves nothing. */}
       {variant === 'settings' && (
         <AIFunctionCard
           functionType="webSearch"
@@ -103,7 +111,23 @@ export function AISetupCardGrid({ config, onSave, variant }: AISetupCardGridProp
           compact={isSetup}
           isSetup={isSetup}
           supportsFallbackKey
-          footer={<WebSearchUsagePanel />}
+          footer={<WebSearchUsagePanel role="webSearch" />}
+        />
+      )}
+
+      {variant === 'settings' && (
+        <AIFunctionCard
+          functionType="titleAnalysis"
+          title={t(`${keyPrefix}.cardTitleAnalysisTitle`)}
+          description={t(`${keyPrefix}.cardTitleAnalysisDesc`)}
+          icon={<TheatersIcon />}
+          iconColor="#e91e63"
+          config={config?.titleAnalysis ?? null}
+          onSave={(c) => onSave('titleAnalysis', c)}
+          compact={isSetup}
+          isSetup={isSetup}
+          supportsFallbackKey
+          footer={<WebSearchUsagePanel role="titleAnalysis" />}
         />
       )}
     </Box>

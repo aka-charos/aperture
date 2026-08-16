@@ -41,6 +41,7 @@ import {
   classifyQuotaError,
   clearSlotCooldown,
   isSlotCoolingDown,
+  keySlotName,
   markSlotExhausted,
   type WebSearchKeySlot,
 } from './webSearchQuota.js'
@@ -69,12 +70,29 @@ export interface ProviderConfig {
   apiKey?: string
   baseUrl?: string
   /**
-   * Second API key, used when `apiKey` runs out of quota. Only the Web Search
-   * role reads it today (Gemini's free tier is the thing that runs out), and it
-   * stays on the role rather than in the shared per-provider credential store —
-   * a spare key is a property of this role, not of the provider.
+   * Spare API keys, tried in order when `apiKey` runs out of quota. Read by the
+   * grounding roles (`webSearch`, `titleAnalysis`), because Gemini's free tier
+   * is the thing that runs out. They stay on the role rather than in the shared
+   * per-provider credential store — a spare key is a property of this role, not
+   * of the provider, and the two grounding roles must not share one.
+   */
+  fallbackApiKeys?: string[]
+  /**
+   * @deprecated Superseded by {@link fallbackApiKeys}. Still read so config
+   * stored before the list existed keeps working; never written.
    */
   fallbackApiKey?: string
+}
+
+/**
+ * Every spare key on a role, oldest shape first. Trimmed and de-blanked here so
+ * callers never have to: a pasted key carrying a newline reaches Google as a
+ * different string while looking perfect in the settings field.
+ */
+export function resolveFallbackKeys(config: ProviderConfig): string[] {
+  const fromList = config.fallbackApiKeys ?? []
+  const legacy = config.fallbackApiKey ? [config.fallbackApiKey] : []
+  return [...fromList, ...legacy].map((k) => k.trim()).filter((k) => k.length > 0)
 }
 
 export interface AIConfig {
@@ -83,6 +101,7 @@ export interface AIConfig {
   textGeneration: ProviderConfig | null
   exploration: ProviderConfig | null
   webSearch: ProviderConfig | null
+  titleAnalysis: ProviderConfig | null
   migratedAt?: string
   migratedFrom?: string
 }
@@ -138,7 +157,14 @@ export async function getAIConfig(): Promise<AIConfig> {
   }
 
   // No config at all - return unconfigured state
-  return { embeddings: null, chat: null, textGeneration: null, exploration: null, webSearch: null }
+  return {
+    embeddings: null,
+    chat: null,
+    textGeneration: null,
+    exploration: null,
+    webSearch: null,
+    titleAnalysis: null,
+  }
 }
 
 /**
@@ -211,7 +237,10 @@ async function migrateFromLegacyOpenAI(): Promise<AIConfig> {
           apiKey,
         }
       : null,
-    webSearch: null, // Optional role — configured separately in Settings > AI
+    // Optional roles — configured separately in Settings > AI. Both hold their
+    // own Google keys, so neither can be migrated from an OpenAI-only setup.
+    webSearch: null,
+    titleAnalysis: null,
     migratedAt: new Date().toISOString(),
     migratedFrom: 'openai_single_provider',
   }
@@ -361,7 +390,14 @@ async function resolveApiKeyForProvider(provider: ProviderType): Promise<string 
     }
   }
 
-  // 2) Any other configured function already using this provider
+  // 2) Any other configured function already using this provider.
+  //
+  // The two grounding roles (`webSearch`, `titleAnalysis`) are deliberately NOT
+  // donors here. Their keys exist to hold separate free-tier grounding quota,
+  // and lending one to another role would put spend the operator meant to keep
+  // apart back onto the same Google project — silently, and in the one place
+  // where the whole design is about keeping quotas separate. They still
+  // *borrow* (see withResolvedCredentials); they just never lend.
   const config = await getAIConfig()
   for (const fn of ['chat', 'embeddings', 'textGeneration', 'exploration'] as AIFunction[]) {
     const fnConfig = config[fn]
@@ -388,7 +424,16 @@ async function resolveBaseUrlForProvider(provider: ProviderType): Promise<string
   }
 
   const config = await getAIConfig()
-  for (const fn of ['chat', 'embeddings', 'textGeneration', 'exploration', 'webSearch'] as AIFunction[]) {
+  // Unlike the API key above, a base URL carries no quota, so every role is a
+  // valid donor.
+  for (const fn of [
+    'chat',
+    'embeddings',
+    'textGeneration',
+    'exploration',
+    'webSearch',
+    'titleAnalysis',
+  ] as AIFunction[]) {
     const fnConfig = config[fn]
     if (fnConfig?.provider === provider && fnConfig.baseUrl) return fnConfig.baseUrl
   }
@@ -497,54 +542,92 @@ export async function getChatModelInstance(): Promise<LanguageModel> {
   return (provider as any)(modelId) as LanguageModel
 }
 
-/** One usable Web Search key, already turned into a model instance. */
+/** One usable grounding key, already turned into a model instance. */
 export interface WebSearchAttempt {
+  /** Which role's credentials this is — quota and cooldowns are per role. */
+  role: AIFunction
   slot: WebSearchKeySlot
   provider: ProviderType
   modelId: string
   model: LanguageModel
 }
 
+/** Human name for a grounding role, for error messages the operator reads. */
+function roleLabel(role: AIFunction): string {
+  return role === 'titleAnalysis' ? 'Title Analysis' : 'Web Search'
+}
+
 /**
- * Every API key configured for the Web Search role, as ready-to-use models, in
- * the order they should be tried: keys currently parked by a 429 go last (but
- * are never dropped — trying a parked key beats doing nothing at all).
+ * Slot names for a role's configured keys, for the usage panel.
  *
- * The Web Search role is Google-only for now, and its key is usually entered
- * once for the chat role and shared. If this role has no key of its own, fall
- * back to the shared credential store (then any other role on the same
- * provider) so grounding doesn't fail with a missing-key error.
+ * Deliberately derived from {@link getGroundingAttempts} rather than counted
+ * from the config: the attempts builder dedupes keys, so counting the config
+ * would show the panel a slot that never runs. Two functions computing the same
+ * list independently is exactly how they drift. Provider instances are cached,
+ * so the extra work is a map lookup.
  */
-export async function getWebSearchAttempts(): Promise<WebSearchAttempt[]> {
-  const config = await getFunctionConfig('webSearch')
+export async function getGroundingKeySlots(role: AIFunction): Promise<WebSearchKeySlot[]> {
+  try {
+    const attempts = await getGroundingAttempts(role)
+    // Slots are assigned by position at creation, so N surviving keys always
+    // carry slots 0..N-1 — rebuilding from the count restores configured order,
+    // which getGroundingAttempts perturbs by sorting parked keys last.
+    return attempts.map((_, i) => keySlotName(i))
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Every API key configured for a grounding role, as ready-to-use models, in the
+ * order they should be tried: keys currently parked by a 429 go last (but are
+ * never dropped — trying a parked key beats doing nothing at all).
+ *
+ * The grounding roles are Google-only for now. If a role has no key of its own,
+ * fall back to the shared credential store (then any other role on the same
+ * provider) so grounding doesn't fail with a missing-key error — but say so,
+ * loudly, for `titleAnalysis`: borrowing puts it back on the very quota that
+ * giving it a separate role exists to keep it off.
+ */
+export async function getGroundingAttempts(role: AIFunction): Promise<WebSearchAttempt[]> {
+  const config = await getFunctionConfig(role)
 
   if (!config) {
     throw new Error(
-      'Web Search provider is not configured. Please configure it in Settings > AI.'
+      `${roleLabel(role)} provider is not configured. Please configure it in Settings > AI.`
     )
   }
 
+  const ownKey = config.apiKey?.trim()
   const resolved = await withResolvedCredentials(config)
   if (!resolved.apiKey) {
     logger.warn(
-      { provider: resolved.provider },
-      'Web Search role has no API key and none could be resolved for its provider'
+      { role, provider: resolved.provider },
+      'Grounding role has no API key and none could be resolved for its provider'
+    )
+  } else if (!ownKey && role === 'titleAnalysis') {
+    logger.warn(
+      { role, provider: resolved.provider },
+      'Title Analysis has no key of its own and is borrowing another role’s — it will compete for the same grounding quota'
     )
   }
 
   const attempts: WebSearchAttempt[] = []
   const seenKeys = new Set<string>()
 
-  const addSlot = (slot: WebSearchKeySlot, apiKey: string | undefined) => {
-    // A fallback that repeats the primary key is not a fallback: same Google
+  const addSlot = (apiKey: string | undefined) => {
+    // A fallback that repeats an earlier key is not a fallback: same Google
     // project, same quota. Skip it instead of doubling the wasted requests.
+    // Slot names are assigned from the attempt's position AFTER deduping, so a
+    // duplicated key does not leave a gap in the sequence.
     const dedupeKey = apiKey ?? ''
     if (seenKeys.has(dedupeKey)) return
     seenKeys.add(dedupeKey)
 
-    const instance = createProviderInstance({ ...resolved, apiKey }, 'webSearch')
+    const instance = createProviderInstance({ ...resolved, apiKey }, role)
     attempts.push({
-      slot,
+      role,
+      slot: keySlotName(attempts.length),
       provider: resolved.provider,
       modelId: resolved.model,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -552,12 +635,17 @@ export async function getWebSearchAttempts(): Promise<WebSearchAttempt[]> {
     })
   }
 
-  addSlot('primary', resolved.apiKey)
-  addSlot('fallback', config.fallbackApiKey?.trim() || undefined)
+  addSlot(resolved.apiKey)
+  for (const key of resolveFallbackKeys(config)) addSlot(key)
 
-  const ready = attempts.filter((a) => !isSlotCoolingDown(a.slot))
-  const parked = attempts.filter((a) => isSlotCoolingDown(a.slot))
+  const ready = attempts.filter((a) => !isSlotCoolingDown(role, a.slot))
+  const parked = attempts.filter((a) => isSlotCoolingDown(role, a.slot))
   return [...ready, ...parked]
+}
+
+/** {@link getGroundingAttempts} for the Web Search role. */
+export async function getWebSearchAttempts(): Promise<WebSearchAttempt[]> {
+  return getGroundingAttempts('webSearch')
 }
 
 /**
@@ -605,13 +693,14 @@ export interface WebSearchCallOutcome<T> {
  * Throws when every key is exhausted (the last quota error), or when there is no
  * key at all, so existing fail-open callers keep failing open unchanged.
  */
-export async function withWebSearchModel<T>(
+export async function withGroundingModel<T>(
+  role: AIFunction,
   run: (model: LanguageModel, attempt: WebSearchAttempt) => Promise<WebSearchCallOutcome<T>>
 ): Promise<T> {
-  const attempts = await getWebSearchAttempts()
+  const attempts = await getGroundingAttempts(role)
   if (attempts.length === 0) {
     throw new Error(
-      'Web Search provider is not configured. Please configure it in Settings > AI.'
+      `${roleLabel(role)} provider is not configured. Please configure it in Settings > AI.`
     )
   }
 
@@ -619,8 +708,9 @@ export async function withWebSearchModel<T>(
   for (const attempt of attempts) {
     try {
       const outcome = await run(attempt.model, attempt)
-      clearSlotCooldown(attempt.slot)
+      clearSlotCooldown(role, attempt.slot)
       await recordWebSearchCall({
+        role,
         provider: attempt.provider,
         model: attempt.modelId,
         slot: attempt.slot,
@@ -631,6 +721,7 @@ export async function withWebSearchModel<T>(
     } catch (err) {
       const quota = classifyQuotaError(err)
       await recordWebSearchCall({
+        role,
         provider: attempt.provider,
         model: attempt.modelId,
         slot: attempt.slot,
@@ -639,16 +730,28 @@ export async function withWebSearchModel<T>(
 
       if (!quota.isQuota) throw err
 
-      markSlotExhausted(attempt.slot, quota)
+      markSlotExhausted(role, attempt.slot, quota)
       lastQuotaError = err
       logger.warn(
-        { slot: attempt.slot, scope: quota.scope, remaining: attempts.length - attempts.indexOf(attempt) - 1 },
-        'Web Search key is out of quota; trying the next key'
+        {
+          role,
+          slot: attempt.slot,
+          scope: quota.scope,
+          remaining: attempts.length - attempts.indexOf(attempt) - 1,
+        },
+        'Grounding key is out of quota; trying the next key'
       )
     }
   }
 
   throw lastQuotaError
+}
+
+/** {@link withGroundingModel} for the Web Search role. */
+export async function withWebSearchModel<T>(
+  run: (model: LanguageModel, attempt: WebSearchAttempt) => Promise<WebSearchCallOutcome<T>>
+): Promise<T> {
+  return withGroundingModel('webSearch', run)
 }
 
 /**
@@ -659,14 +762,19 @@ export async function withWebSearchModel<T>(
  * it. The google_search tool carries no credentials; the configured provider
  * instance supplies the API key at request time.
  */
-export async function getWebSearchProviderTools(): Promise<ToolSet> {
-  const config = await getFunctionConfig('webSearch')
+export async function getGroundingProviderTools(role: AIFunction): Promise<ToolSet> {
+  const config = await getFunctionConfig(role)
 
   if (config?.provider === 'google') {
     return { google_search: google.tools.googleSearch({}) }
   }
 
   return {}
+}
+
+/** {@link getGroundingProviderTools} for the Web Search role. */
+export async function getWebSearchProviderTools(): Promise<ToolSet> {
+  return getGroundingProviderTools('webSearch')
 }
 
 /**
