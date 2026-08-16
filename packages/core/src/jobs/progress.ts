@@ -168,12 +168,40 @@ export function addLog(
   emitProgress(jobId, progress)
 }
 
+const TERMINAL_STATUSES: JobProgress['status'][] = ['completed', 'failed', 'cancelled']
+
+/**
+ * Has this job already finished, one way or another?
+ *
+ * Reaching a terminal status is a one-way door, because arriving there is what
+ * writes the `job_runs` row. A second transition would file a second row for
+ * the same run and overwrite `job_config.last_run_status` with the later
+ * answer.
+ *
+ * The case that matters is cancellation. A job only stops when its own code
+ * polls `isJobCancelled`, and several never do — so the work carries on and
+ * calls `completeJob` at the end, which used to flip a cancelled job back to
+ * 'completed' and leave the admin looking at a job that ignored them and then
+ * claimed success. Cancel is the last resort when something is stuck; it has to
+ * hold even when the work underneath it does not stop.
+ */
+function hasFinished(progress: JobProgress): boolean {
+  return TERMINAL_STATUSES.includes(progress.status)
+}
+
 /**
  * Complete a job successfully
  */
 export function completeJob(jobId: string, result?: Record<string, unknown>): void {
   const progress = activeJobs.get(jobId)
   if (!progress) return
+  if (hasFinished(progress)) {
+    logger.warn(
+      { jobId, jobName: progress.jobName, status: progress.status },
+      'Ignoring completion for a job that has already finished'
+    )
+    return
+  }
 
   progress.status = 'completed'
   progress.completedAt = new Date()
@@ -203,6 +231,16 @@ export function completeJob(jobId: string, result?: Record<string, unknown>): vo
 export function failJob(jobId: string, error: string): void {
   const progress = activeJobs.get(jobId)
   if (!progress) return
+  // Same one-way door as completeJob. This also covers the double-report path:
+  // a core function that fails its own job and rethrows reaches the executor's
+  // catch, which fails it again.
+  if (hasFinished(progress)) {
+    logger.warn(
+      { jobId, jobName: progress.jobName, status: progress.status, error },
+      'Ignoring failure for a job that has already finished'
+    )
+    return
+  }
 
   progress.status = 'failed'
   progress.completedAt = new Date()

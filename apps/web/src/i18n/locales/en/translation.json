@@ -426,6 +426,10 @@
           "title": "Taste Profiles",
           "description": "Rebuild what {{appName}} has learned about each user's taste"
         },
+        "globalExplanations": {
+          "title": "Recommendation Explanations",
+          "description": "Rewrite the explanations on everyone's current picks without re-scoring anything"
+        },
         "globalIntegrations": {
           "title": "Integrations",
           "description": "Sync with Trakt and LLDAP, and update AI pricing data"

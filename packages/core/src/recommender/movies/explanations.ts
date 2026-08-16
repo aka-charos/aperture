@@ -12,6 +12,7 @@ import { generateText } from 'ai'
 import { buildAiLanguageInstruction, DEFAULT_LOCALE, type AppLocaleCode } from '../../lib/locales.js'
 import { resolveEffectiveAiLanguage } from '../../lib/userSettings.js'
 import {
+  describeExplanationBatch,
   explanationBatchSettings,
   parseExplanationResponse,
   type ExplanationBatchSettings,
@@ -184,7 +185,13 @@ async function getUserTasteContext(userId: string): Promise<UserTasteContext> {
 export async function generateExplanations(
   runId: string,
   userId: string,
-  recommendations: MovieForExplanation[]
+  recommendations: MovieForExplanation[],
+  /**
+   * Checked between batches so an admin's Cancel lands within one request
+   * rather than at the end of the user. Optional because the pipelines have no
+   * job id to hand at this point; the explanations-only refresh does.
+   */
+  shouldCancel?: () => boolean
 ): Promise<ExplanationResult[]> {
   if (recommendations.length === 0) {
     return []
@@ -217,6 +224,13 @@ export async function generateExplanations(
   const results: ExplanationResult[] = []
 
   for (let i = 0; i < moviesWithEvidence.length; i += batchSize) {
+    if (shouldCancel?.()) {
+      logger.info(
+        { generated: results.length, expected: moviesWithEvidence.length },
+        '🛑 Explanation generation cancelled between batches'
+      )
+      break
+    }
     const batch = moviesWithEvidence.slice(i, i + batchSize)
     const batchResults = await generateBatchExplanations(batch, tasteContext, maxTokens, aiLocale)
     results.push(...batchResults)
@@ -304,7 +318,9 @@ CRITICAL: A few recommendations are marked "THEY ASKED FOR THIS" with an interes
 
 CRITICAL: A few recommendations are marked "A KINDRED VIEWER PICKED THIS". Those are in the list because another viewer with strongly overlapping taste watched them, which is a different reason from similarity to the user's own history - say so, and then use the similarity evidence as support. Refer to that person only in general terms ("someone whose taste lines up with yours"). You do not know who they are, so never name them, guess at them, or describe them.
 
-Format: Return JSON with an "explanations" array containing objects with "index" (1-based) and "explanation" fields.${langBlock}`,
+Format: Return JSON with an "explanations" array containing objects with "index" (1-based) and "explanation" fields.
+
+CRITICAL: Never write a double quote inside the explanation text. Titles are shown in quotes above for readability, but repeating that in your answer breaks the JSON - write film titles as plain text, or in single quotes.${langBlock}`,
       prompt: `=== USER'S TASTE PROFILE ===
 ${userContext}
 
@@ -318,29 +334,34 @@ Generate personalized explanations referencing the specific similar movies shown
       maxOutputTokens,
     })
 
-    const { byIndex, mode } = parseExplanationResponse(text)
+    const { byIndex, mode, rejected } = parseExplanationResponse(text)
 
-    // Anything short of a full batch used to be silent -- a JSON parse error
-    // discarded all ten explanations and the templates that replaced them are
-    // indistinguishable, on the page, from a model that has simply got worse.
-    // finishReason is the direct tell: 'length' means the response was cut off
-    // rather than malformed, which for a reasoning model is the likely case,
-    // since its thinking is spent from the same ceiling as its prose. Token
-    // counts are deliberately not repeated here -- llm_inference_calls already
-    // records them per request, with the reasoning split.
-    if (byIndex.size < movies.length) {
+    // Any response the strict reader would not accept gets a line, not just a
+    // short one. The first version warned only on a short batch, which is
+    // exactly the condition ten recovered fragments satisfy -- the page was
+    // full of half-sentences while the log read `generated: 20`.
+    //
+    // Token counts are deliberately not repeated here: llm_inference_calls
+    // already records them per request, with the reasoning split.
+    const warning = describeExplanationBatch({
+      mode,
+      parsed: byIndex.size,
+      rejected,
+      expected: movies.length,
+      finishReason,
+    })
+    if (warning) {
       logger.warn(
         {
           mode,
           parsed: byIndex.size,
+          rejected,
           expected: movies.length,
           finishReason,
           maxOutputTokens,
           rawTail: text?.slice(-160) ?? null,
         },
-        finishReason === 'length'
-          ? 'Explanation batch hit the output token cap; using fallbacks for the rest'
-          : 'Explanation batch came back incomplete; using fallbacks for the rest'
+        warning
       )
     }
 

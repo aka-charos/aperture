@@ -46,6 +46,7 @@ import {
   addLog,
   completeJob,
   failJob,
+  isJobCancelled,
 } from '../jobs/progress.js'
 
 const logger = createChildLogger('explanation-refresh')
@@ -162,7 +163,11 @@ interface StoredPickRow {
  */
 const PICK_ORDER = `ORDER BY rc.selected_rank NULLS LAST, rc.rank`
 
-async function refreshMovieRun(runId: string, userId: string): Promise<number> {
+async function refreshMovieRun(
+  runId: string,
+  userId: string,
+  shouldCancel?: () => boolean
+): Promise<number> {
   const scale = await buildRunSimilarityScale(runId)
 
   const result = await query<StoredPickRow & { movie_id: string }>(
@@ -195,12 +200,19 @@ async function refreshMovieRun(runId: string, userId: string): Promise<number> {
     }
   })
 
-  const explanations = await generateExplanations(runId, userId, movies)
+  const explanations = await generateExplanations(runId, userId, movies, shouldCancel)
+  // Stored even when the generation was cut short: a partial rewrite leaves the
+  // remaining picks on their previous text, which is a strictly better state
+  // than throwing away the explanations already paid for.
   await storeExplanations(runId, explanations)
   return explanations.length
 }
 
-async function refreshSeriesRun(runId: string, userId: string): Promise<number> {
+async function refreshSeriesRun(
+  runId: string,
+  userId: string,
+  shouldCancel?: () => boolean
+): Promise<number> {
   const scale = await buildRunSimilarityScale(runId)
 
   const result = await query<
@@ -237,7 +249,7 @@ async function refreshSeriesRun(runId: string, userId: string): Promise<number> 
     }
   })
 
-  const explanations = await generateSeriesExplanations(runId, userId, seriesList)
+  const explanations = await generateSeriesExplanations(runId, userId, seriesList, shouldCancel)
   await storeSeriesExplanations(runId, explanations)
   return explanations.length
 }
@@ -253,7 +265,8 @@ async function refreshSeriesRun(runId: string, userId: string): Promise<number> 
  */
 export async function refreshExplanationsForRun(
   userId: string,
-  mediaType: ExplanationMediaType
+  mediaType: ExplanationMediaType,
+  shouldCancel?: () => boolean
 ): Promise<{ runId: string; explanations: number } | null> {
   // The same resolution every reader uses, so this rewrites the text that is
   // actually on screen.
@@ -269,8 +282,8 @@ export async function refreshExplanationsForRun(
 
   const explanations =
     mediaType === 'movie'
-      ? await refreshMovieRun(run.id, userId)
-      : await refreshSeriesRun(run.id, userId)
+      ? await refreshMovieRun(run.id, userId, shouldCancel)
+      : await refreshSeriesRun(run.id, userId, shouldCancel)
 
   if (explanations === 0) return null
 
@@ -331,10 +344,27 @@ export async function refreshExplanations(
     let failed = 0
     let done = 0
 
+    // Every text-generation call in here costs money and the whole job is
+    // minutes long, so an admin's Cancel has to actually stop it. Checked once
+    // per target and again between batches inside the generators, which puts
+    // the worst case at one in-flight request rather than one whole user.
+    const shouldCancel = () => isJobCancelled(jobId)
+    let cancelled = false
+
     for (const user of users.rows) {
+      if (shouldCancel()) {
+        cancelled = true
+        break
+      }
+
       const allowed = await getEffectiveAiExplanationSetting(user.id)
 
       for (const mediaType of mediaTypes) {
+        if (shouldCancel()) {
+          cancelled = true
+          break
+        }
+
         done++
 
         if (!allowed) {
@@ -345,7 +375,7 @@ export async function refreshExplanations(
         }
 
         try {
-          const result = await refreshExplanationsForRun(user.id, mediaType)
+          const result = await refreshExplanationsForRun(user.id, mediaType, shouldCancel)
           if (!result) {
             skipped++
             addLog(jobId, 'info', `⏭️ ${user.username}: no ${mediaType} picks to explain`)
@@ -367,9 +397,24 @@ export async function refreshExplanations(
 
         updateJobProgress(jobId, done, targets, `${runs} run(s), ${explanations} explanations`)
       }
+
+      if (cancelled) break
     }
 
     const result = { runs, explanations, skipped, failed, jobId }
+
+    if (cancelled) {
+      // cancelJob has already set the status and written the job_runs row.
+      // Completing it here would overwrite that with 'completed' and file a
+      // second row for the same run.
+      addLog(
+        jobId,
+        'warn',
+        `🛑 Cancelled after ${explanations} explanation(s) across ${runs} run(s) — the rest keep their previous text`
+      )
+      logger.info({ jobId, runs, explanations }, 'Explanation refresh cancelled')
+      return result
+    }
 
     if (failed > 0) {
       addLog(jobId, 'warn', `⚠️ Finished with ${failed} failure(s): ${explanations} explanations rewritten across ${runs} run(s)`)
