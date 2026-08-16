@@ -16,36 +16,18 @@ import {
   type AppLocaleCode,
 } from '../../lib/locales.js'
 import { resolveEffectiveAiLanguage } from '../../lib/userSettings.js'
+import {
+  explanationBatchSettings,
+  parseExplanationResponse,
+  type ExplanationBatchSettings,
+} from '../shared/explanationParsing.js'
 
 const logger = createChildLogger('series-explanations')
 
-/**
- * Get the appropriate batch size based on the text generation provider.
- * Tiered by context window size to avoid hitting limits.
- */
-async function getExplanationBatchSize(): Promise<{ batchSize: number; maxTokens: number }> {
+/** The configured provider's batch settings. The numbers live in shared/. */
+async function getExplanationBatchSize(): Promise<ExplanationBatchSettings> {
   const config = await getFunctionConfig('textGeneration')
-
-  if (!config) {
-    // Default conservative settings
-    return { batchSize: 3, maxTokens: 1000 }
-  }
-
-  // Large context providers: OpenAI (128K), Anthropic (200K), Google (1M+), DeepSeek (64K),
-  // OpenRouter (a router in front of those same large-context models)
-  const largeContextProviders = ['openai', 'anthropic', 'google', 'deepseek', 'openrouter']
-  if (largeContextProviders.includes(config.provider)) {
-    return { batchSize: 10, maxTokens: 3000 }
-  }
-
-  // Medium context: Groq (8K context)
-  if (config.provider === 'groq') {
-    return { batchSize: 5, maxTokens: 1500 }
-  }
-
-  // Small context: Ollama (default 4K), OpenAI-compatible (varies)
-  // Use conservative batch size to fit within limited context windows
-  return { batchSize: 3, maxTokens: 1000 }
+  return explanationBatchSettings(config?.provider)
 }
 
 export interface SeriesForExplanation {
@@ -314,7 +296,7 @@ async function generateBatchSeriesExplanations(
 
   try {
     const model = await getTextGenerationModelInstance()
-    const { text } = await generateText({
+    const { text, finishReason } = await generateText({
       model,
       system: `You are an expert TV curator writing personalized recommendation explanations for TV series. You have access to:
 1. The user's taste profile and favorite series
@@ -347,62 +329,32 @@ Generate personalized explanations referencing the specific similar series shown
       maxOutputTokens,
     })
 
-    const content = text
-    if (!content) {
-      logger.warn('No response from AI for series explanations')
-      return seriesList.map((s) => ({
-        seriesId: s.seriesId,
-        explanation: generateFallbackSeriesExplanation(s),
-      }))
-    }
+    const { byIndex, mode } = parseExplanationResponse(text)
 
-    // Parse the JSON response - handle models that wrap in markdown or include preamble
-    let jsonContent = content.trim()
-
-    // Extract JSON from markdown code blocks if present
-    const jsonBlockMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/)
-    if (jsonBlockMatch) {
-      jsonContent = jsonBlockMatch[1].trim()
-    }
-
-    // Try to find JSON object/array if there's other text around it
-    if (!jsonContent.startsWith('{') && !jsonContent.startsWith('[')) {
-      const jsonStart = jsonContent.search(/[[{]/)
-      if (jsonStart !== -1) {
-        jsonContent = jsonContent.slice(jsonStart)
-      }
-    }
-
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(jsonContent)
-    } catch (parseError) {
+    // Mirrors the movie generator: see the note there for why a short batch is
+    // worth a warning and why finishReason is the field that identifies it.
+    if (byIndex.size < seriesList.length) {
       logger.warn(
         {
-          rawResponse: content.substring(0, 500),
-          parseError: parseError instanceof Error ? parseError.message : String(parseError),
+          mode,
+          parsed: byIndex.size,
+          expected: seriesList.length,
+          finishReason,
+          maxOutputTokens,
+          rawTail: text?.slice(-160) ?? null,
         },
-        'Failed to parse AI response as JSON, using fallbacks'
+        finishReason === 'length'
+          ? 'Series explanation batch hit the output token cap; using fallbacks for the rest'
+          : 'Series explanation batch came back incomplete; using fallbacks for the rest'
       )
-      return seriesList.map((s) => ({
-        seriesId: s.seriesId,
-        explanation: generateFallbackSeriesExplanation(s),
-      }))
     }
-    const explanations = Array.isArray(parsed)
-      ? parsed
-      : (parsed as { explanations?: unknown[] }).explanations || []
 
-    // Map back to series IDs
-    return seriesList.map((s, i) => {
-      const found = explanations.find(
-        (e: { index: number; explanation: string }) => e.index === i + 1
-      )
-      return {
-        seriesId: s.seriesId,
-        explanation: found?.explanation || generateFallbackSeriesExplanation(s),
-      }
-    })
+    // 1-based, matching how the prompt numbers them. A missing entry gets the
+    // template, so a partial response costs only the items it left out.
+    return seriesList.map((s, i) => ({
+      seriesId: s.seriesId,
+      explanation: byIndex.get(i + 1) ?? generateFallbackSeriesExplanation(s),
+    }))
   } catch (error) {
     // Extract meaningful error information - AI SDK errors don't serialize well
     const errorInfo = {

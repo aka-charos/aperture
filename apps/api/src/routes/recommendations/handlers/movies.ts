@@ -5,7 +5,12 @@
 import type { FastifyInstance } from 'fastify'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
-import { regenerateUserRecommendations, getEffectiveAiExplanationSetting } from '@aperture/core'
+import {
+  regenerateUserRecommendations,
+  getEffectiveAiExplanationSetting,
+  refreshExplanations,
+  type ExplanationMediaType,
+} from '@aperture/core'
 import { recommendationSchemas } from '../schemas.js'
 import { resolveTwinShared } from '../../../lib/twinShared.js'
 import type { MovieRecommendationCandidate, RecommendationRun } from '../types.js'
@@ -113,6 +118,48 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
         const error = err instanceof Error ? err.message : 'Unknown error'
         fastify.log.error({ err, userId }, 'Failed to regenerate recommendations')
         return reply.status(500).send({ error: `Failed to regenerate: ${error}` })
+      }
+    }
+  )
+
+  /**
+   * POST /api/recommendations/:userId/explanations
+   *
+   * Rewrite the AI explanations on the user's current recommendations without
+   * re-scoring. Lives on the movie handler but covers both media types, the
+   * same way the job does — the explanation pass is not media-specific, and
+   * splitting it in two would mean two round trips to change one setting's
+   * output.
+   */
+  fastify.post<{ Params: { userId: string }; Body: { mediaType?: ExplanationMediaType } }>(
+    '/api/recommendations/:userId/explanations',
+    { preHandler: requireAuth, schema: recommendationSchemas.refreshExplanations },
+    async (request, reply) => {
+      const { userId } = request.params
+      const currentUser = request.user as SessionUser
+
+      if (userId !== currentUser.id && !currentUser.isAdmin) {
+        return reply.status(403).send({ error: 'Forbidden' })
+      }
+
+      const mediaType = request.body?.mediaType
+
+      try {
+        const result = await refreshExplanations({
+          userId,
+          mediaTypes: mediaType ? [mediaType] : undefined,
+        })
+        return reply.send({
+          message: 'Explanations refreshed',
+          runs: result.runs,
+          explanations: result.explanations,
+          skipped: result.skipped,
+          failed: result.failed,
+        })
+      } catch (err) {
+        const error = err instanceof Error ? err.message : 'Unknown error'
+        fastify.log.error({ err, userId }, 'Failed to refresh explanations')
+        return reply.status(500).send({ error: `Failed to refresh explanations: ${error}` })
       }
     }
   )

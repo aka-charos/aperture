@@ -202,6 +202,13 @@ export {
   clearAllRecommendations,
   clearAndRebuildAllRecommendations,
   regenerateUserRecommendations,
+  // Explanations-only rerun (both media types)
+  refreshExplanations,
+  refreshAllExplanations,
+  refreshExplanationsForRun,
+  type ExplanationMediaType,
+  type ExplanationRefreshOptions,
+  type ExplanationRefreshResult,
   // Movie sync
   syncMovies,
   syncWatchHistoryForUser,

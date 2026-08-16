@@ -76,6 +76,14 @@ export const jobDefinitions: JobDefinition[] = [
     description: 'Build Aperture series libraries with AI recommendations (STRM or symlinks)',
     cron: process.env.PERMS_CRON || '0 5 * * *',
   },
+  // === Explanations only (both media types) ===
+  {
+    name: 'refresh-recommendation-explanations',
+    description:
+      "Rewrites the AI explanation on everyone's current recommendations without re-scoring anything. Use after changing the Text Generation model, or to repair explanations that fell back to generic text.",
+    cron: null,
+    manualOnly: true,
+  },
   // === Taste Profiles (both media types) ===
   {
     name: 'rebuild-taste-profiles',

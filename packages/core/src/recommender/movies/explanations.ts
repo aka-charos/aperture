@@ -11,36 +11,18 @@ import { getTextGenerationModelInstance, getFunctionConfig } from '../../lib/ai-
 import { generateText } from 'ai'
 import { buildAiLanguageInstruction, DEFAULT_LOCALE, type AppLocaleCode } from '../../lib/locales.js'
 import { resolveEffectiveAiLanguage } from '../../lib/userSettings.js'
+import {
+  explanationBatchSettings,
+  parseExplanationResponse,
+  type ExplanationBatchSettings,
+} from '../shared/explanationParsing.js'
 
 const logger = createChildLogger('explanations')
 
-/**
- * Get the appropriate batch size based on the text generation provider.
- * Tiered by context window size to avoid hitting limits.
- */
-async function getExplanationBatchSize(): Promise<{ batchSize: number; maxTokens: number }> {
+/** The configured provider's batch settings. The numbers live in shared/. */
+async function getExplanationBatchSize(): Promise<ExplanationBatchSettings> {
   const config = await getFunctionConfig('textGeneration')
-
-  if (!config) {
-    // Default conservative settings
-    return { batchSize: 3, maxTokens: 1000 }
-  }
-
-  // Large context providers: OpenAI (128K), Anthropic (200K), Google (1M+), DeepSeek (64K),
-  // OpenRouter (a router in front of those same large-context models)
-  const largeContextProviders = ['openai', 'anthropic', 'google', 'deepseek', 'openrouter']
-  if (largeContextProviders.includes(config.provider)) {
-    return { batchSize: 10, maxTokens: 3000 }
-  }
-
-  // Medium context: Groq (8K context)
-  if (config.provider === 'groq') {
-    return { batchSize: 5, maxTokens: 1500 }
-  }
-
-  // Small context: Ollama (default 4K), OpenAI-compatible (varies)
-  // Use conservative batch size to fit within limited context windows
-  return { batchSize: 3, maxTokens: 1000 }
+  return explanationBatchSettings(config?.provider)
 }
 
 export interface MovieForExplanation {
@@ -304,7 +286,7 @@ async function generateBatchExplanations(
 
   try {
     const model = await getTextGenerationModelInstance()
-    const { text } = await generateText({
+    const { text, finishReason } = await generateText({
       model,
       system: `You are an expert film curator writing personalized recommendation explanations. You have access to:
 1. The user's taste profile and favorite films
@@ -336,62 +318,38 @@ Generate personalized explanations referencing the specific similar movies shown
       maxOutputTokens,
     })
 
-    const content = text
-    if (!content) {
-      logger.warn('No response from AI for explanations')
-      return movies.map((m) => ({
-        movieId: m.movieId,
-        explanation: generateFallbackExplanation(m),
-      }))
-    }
+    const { byIndex, mode } = parseExplanationResponse(text)
 
-    // Parse the JSON response - handle models that wrap in markdown or include preamble
-    let jsonContent = content.trim()
-
-    // Extract JSON from markdown code blocks if present
-    const jsonBlockMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/)
-    if (jsonBlockMatch) {
-      jsonContent = jsonBlockMatch[1].trim()
-    }
-
-    // Try to find JSON object/array if there's other text around it
-    if (!jsonContent.startsWith('{') && !jsonContent.startsWith('[')) {
-      const jsonStart = jsonContent.search(/[[{]/)
-      if (jsonStart !== -1) {
-        jsonContent = jsonContent.slice(jsonStart)
-      }
-    }
-
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(jsonContent)
-    } catch (parseError) {
+    // Anything short of a full batch used to be silent -- a JSON parse error
+    // discarded all ten explanations and the templates that replaced them are
+    // indistinguishable, on the page, from a model that has simply got worse.
+    // finishReason is the direct tell: 'length' means the response was cut off
+    // rather than malformed, which for a reasoning model is the likely case,
+    // since its thinking is spent from the same ceiling as its prose. Token
+    // counts are deliberately not repeated here -- llm_inference_calls already
+    // records them per request, with the reasoning split.
+    if (byIndex.size < movies.length) {
       logger.warn(
         {
-          rawResponse: content.substring(0, 500),
-          parseError: parseError instanceof Error ? parseError.message : String(parseError),
+          mode,
+          parsed: byIndex.size,
+          expected: movies.length,
+          finishReason,
+          maxOutputTokens,
+          rawTail: text?.slice(-160) ?? null,
         },
-        'Failed to parse AI response as JSON, using fallbacks'
+        finishReason === 'length'
+          ? 'Explanation batch hit the output token cap; using fallbacks for the rest'
+          : 'Explanation batch came back incomplete; using fallbacks for the rest'
       )
-      return movies.map((m) => ({
-        movieId: m.movieId,
-        explanation: generateFallbackExplanation(m),
-      }))
     }
-    const explanations = Array.isArray(parsed)
-      ? parsed
-      : (parsed as { explanations?: unknown[] }).explanations || []
 
-    // Map back to movie IDs
-    return movies.map((m, i) => {
-      const found = explanations.find(
-        (e: { index: number; explanation: string }) => e.index === i + 1
-      )
-      return {
-        movieId: m.movieId,
-        explanation: found?.explanation || generateFallbackExplanation(m),
-      }
-    })
+    // 1-based, matching how the prompt numbers them. A missing entry gets the
+    // template, so a partial response costs only the items it left out.
+    return movies.map((m, i) => ({
+      movieId: m.movieId,
+      explanation: byIndex.get(i + 1) ?? generateFallbackExplanation(m),
+    }))
   } catch (error) {
     // Extract meaningful error information - AI SDK errors don't serialize well
     const errorInfo = {

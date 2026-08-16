@@ -60,6 +60,7 @@
     "test:storage": "node --import tsx --test src/recommender/storage.test.ts",
     "test:canonical": "node --import tsx --test src/recommender/movies/canonicalText.test.ts",
     "test:twins": "node --import tsx --test src/recommender/shared/twinSlots.test.ts",
+    "test:explanations": "node --import tsx --test src/recommender/shared/explanationParsing.test.ts",
     "test:schedule": "node --import tsx --test src/jobs/schedule.test.ts",
     "test:discovery": "node --import tsx --test src/discover/scorer.test.ts",
     "test:enrichment": "node --import tsx --test src/enrichment/needsEnrichment.test.ts src/omdb/failures.test.ts src/omdb/ratings.test.ts",

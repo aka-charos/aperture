@@ -120,6 +120,30 @@ const regenerateMovieRecommendations = {
   },
 }
 
+const refreshExplanations = {
+  tags: ['recommendations'],
+  summary: 'Rewrite recommendation explanations',
+  description:
+    "Re-runs only the AI explanation pass over the user's current recommendations. Scores, picks and evidence are untouched — this rewrites the text on the existing run, which is far cheaper than regenerating and is the way to try a different Text Generation model.",
+  params: {
+    type: 'object' as const,
+    properties: {
+      userId: { type: 'string' as const, format: 'uuid', description: 'User ID' },
+    },
+    required: ['userId'] as string[],
+  },
+  body: {
+    type: 'object' as const,
+    properties: {
+      mediaType: {
+        type: 'string' as const,
+        enum: ['movie', 'series'],
+        description: 'Limit to one media type. Both are refreshed when omitted.',
+      },
+    },
+  },
+}
+
 const getMovieInsights = {
   tags: ['recommendations'],
   summary: 'Get movie insights',
@@ -270,6 +294,7 @@ const updatePreferences = {
 export const recommendationSchemas = {
   getMovieRecommendations,
   regenerateMovieRecommendations,
+  refreshExplanations,
   getMovieInsights,
   getSeriesRecommendations,
   regenerateSeriesRecommendations,

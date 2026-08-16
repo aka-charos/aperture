@@ -37,6 +37,7 @@ import {
   createChildLogger,
   runLibraryGapAnalysis,
   rebuildAllTasteProfiles,
+  refreshAllExplanations,
   withInferenceContext,
 } from '@aperture/core'
 import { syncAllTraktRatings } from '../trakt/index.js'
@@ -241,6 +242,22 @@ async function executeJob(name: string, jobId: string): Promise<void> {
             failed: result.failed,
           },
           `✅ Series libraries sync complete`
+        )
+        break
+      }
+      // === Explanations only ===
+      case 'refresh-recommendation-explanations': {
+        const result = await refreshAllExplanations(jobId)
+        logger.info(
+          {
+            job: name,
+            jobId,
+            runs: result.runs,
+            explanations: result.explanations,
+            skipped: result.skipped,
+            failed: result.failed,
+          },
+          `✅ Recommendation explanations refreshed`
         )
         break
       }

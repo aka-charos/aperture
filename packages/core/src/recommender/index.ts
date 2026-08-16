@@ -27,6 +27,17 @@ export {
   regenerateUserRecommendations,
 } from './movies/pipeline.js'
 
+// Explanations-only rerun, for both media types. Separate from the pipelines
+// because it deliberately does not touch scoring or selection.
+export {
+  refreshExplanations,
+  refreshAllExplanations,
+  refreshExplanationsForRun,
+  type ExplanationMediaType,
+  type ExplanationRefreshOptions,
+  type ExplanationRefreshResult,
+} from './explanationRefresh.js'
+
 export {
   syncMovies,
   syncWatchHistoryForUser,
