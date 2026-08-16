@@ -1093,11 +1093,9 @@
       "tasteMatch": "口味搭配",
       "discovery": "发现",
       "quality": "质量",
-      "variety": "种类",
       "na": "不适用",
       "tooltipDiscovery": "这与您平常观看的内容有何不同 - 帮助您发现新事物",
       "tooltipQuality": "社区和评论家评级质量",
-      "tooltipVariety": "这为您的推荐增加了多少多样性",
       "genreAnalysis": "类型分析",
       "genresEnjoy_one": "您喜欢的 {{count}} 种类型",
       "genresEnjoy_other": "您喜欢的 {{count}} 种类型",
@@ -1115,7 +1113,14 @@
       "closestInLibraryMovie": "Films in your history that most resemble this one. Shown for context — they are not why it was picked:",
       "closestInLibrarySeries": "Shows in your history that most resemble this one. Shown for context — they are not why it was picked:",
       "genresNew_one": "{{count}} new to explore",
-      "genresNew_other": "{{count}} new to explore"
+      "genresNew_other": "{{count}} new to explore",
+      "blendedScore": "These blend to",
+      "preferenceLift": "and your franchise and genre preferences add",
+      "preferenceDrop": "and your franchise and genre preferences take off",
+      "givesMatch": "for a match of",
+      "varietyHeading": "Variety In Your List",
+      "varietyExplainer": "How much this pick differs from the others chosen with it. This shapes the order of your list, not the match above.",
+      "tooltipDiscoveryRanged": "How different this is from what you usually watch. Peaks when a pick mixes the familiar with something new, so this score always sits between {{min}}% and {{max}}%."
     },
     "seasons": {
       "title": "剧集数",

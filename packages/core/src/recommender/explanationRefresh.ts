@@ -120,14 +120,17 @@ function readSlotOrigin(breakdown: unknown): {
 /**
  * Rebuild the run's similarity scale from the scores it stored.
  *
- * `normalizedSimilarity` is a property of the pool, computed once per run and
- * never persisted — only the raw cosine is — so a rerun has to derive it again.
- * Feeding the same stored pool to buildSimilarityScale reproduces it exactly.
+ * Only needed for runs made before `normalized_similarity` was a column
+ * (migration 0141). Those stored the raw cosine alone, so the pool-relative
+ * value has to be derived again; feeding the same stored pool to
+ * buildSimilarityScale reproduces it exactly.
  *
- * The caveat, and the reason callers here only ever target the newest completed
- * run: thinSupersededCandidates strips non-selected rows from every *other*
- * run, so an older one would yield a scale built from its twenty picks alone —
- * the top slice of the distribution, whose mean is nothing like the pool's.
+ * The caveat that made this fragile, and the reason callers here only ever
+ * target the newest completed run: thinSupersededCandidates strips non-selected
+ * rows from every *other* run, so an older one would yield a scale built from
+ * its twenty picks alone — the top slice of the distribution, whose mean is
+ * nothing like the pool's. Runs written since 0141 read the stored value and
+ * are not exposed to that at all.
  */
 async function buildRunSimilarityScale(runId: string): Promise<SimilarityScale> {
   const result = await query<{ similarity_score: string | null }>(
@@ -150,9 +153,28 @@ interface StoredPickRow {
   genres: string[] | null
   overview: string | null
   similarity_score: string | null
+  normalized_similarity: string | null
   novelty_score: string | null
   rating_score: string | null
   score_breakdown: unknown
+}
+
+/**
+ * The pool-relative similarity the run actually scored with, preferring what it
+ * stored over what can be inferred from what it stored.
+ *
+ * NULL means the run predates migration 0141, not that the value was zero — so
+ * the fallback recomputes rather than defaulting, and a genuine 0 (possible:
+ * normalizeSimilarity returns 0.5 for a degenerate pool, and tanh can land
+ * anywhere) is respected.
+ */
+function resolveNormalizedSimilarity(
+  stored: string | null,
+  rawSimilarity: number,
+  scale: SimilarityScale
+): number {
+  const value = numOrNull(stored)
+  return value ?? normalizeSimilarity(rawSimilarity, scale)
 }
 
 /**
@@ -171,8 +193,8 @@ async function refreshMovieRun(
   const scale = await buildRunSimilarityScale(runId)
 
   const result = await query<StoredPickRow & { movie_id: string }>(
-    `SELECT rc.movie_id, rc.similarity_score, rc.novelty_score, rc.rating_score,
-            rc.score_breakdown, m.title, m.year, m.genres, m.overview
+    `SELECT rc.movie_id, rc.similarity_score, rc.normalized_similarity, rc.novelty_score,
+            rc.rating_score, rc.score_breakdown, m.title, m.year, m.genres, m.overview
      FROM recommendation_candidates rc
      JOIN movies m ON m.id = rc.movie_id
      WHERE rc.run_id = $1 AND rc.is_selected = true
@@ -192,7 +214,11 @@ async function refreshMovieRun(
       genres: row.genres ?? [],
       overview: row.overview,
       similarity,
-      normalizedSimilarity: normalizeSimilarity(similarity, scale),
+      normalizedSimilarity: resolveNormalizedSimilarity(
+        row.normalized_similarity,
+        similarity,
+        scale
+      ),
       novelty: numOrNull(row.novelty_score) ?? 0,
       ratingScore: numOrNull(row.rating_score) ?? 0,
       interestText: origin.interestText,
@@ -218,8 +244,9 @@ async function refreshSeriesRun(
   const result = await query<
     StoredPickRow & { series_id: string; network: string | null; status: string | null }
   >(
-    `SELECT rc.series_id, rc.similarity_score, rc.novelty_score, rc.rating_score,
-            rc.score_breakdown, s.title, s.year, s.genres, s.overview, s.network, s.status
+    `SELECT rc.series_id, rc.similarity_score, rc.normalized_similarity, rc.novelty_score,
+            rc.rating_score, rc.score_breakdown, s.title, s.year, s.genres, s.overview,
+            s.network, s.status
      FROM recommendation_candidates rc
      JOIN series s ON s.id = rc.series_id
      WHERE rc.run_id = $1 AND rc.is_selected = true
@@ -241,7 +268,11 @@ async function refreshSeriesRun(
       network: row.network,
       status: row.status,
       similarity,
-      normalizedSimilarity: normalizeSimilarity(similarity, scale),
+      normalizedSimilarity: resolveNormalizedSimilarity(
+        row.normalized_similarity,
+        similarity,
+        scale
+      ),
       novelty: numOrNull(row.novelty_score) ?? 0,
       ratingScore: numOrNull(row.rating_score) ?? 0,
       interestText: origin.interestText,

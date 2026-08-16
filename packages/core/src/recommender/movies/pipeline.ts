@@ -62,6 +62,7 @@ import {
   pickInterestSlotFillers,
   pickTwinSlotFillers,
   summarizeScoreComponents,
+  EVIDENCE_HISTORY_LIMIT,
   type InterestCandidateMatch,
   type InterestMatchIndex,
   type TwinDonor,
@@ -498,7 +499,13 @@ export async function generateRecommendationsForUser(
       const interestAffinity = interestIndex?.best.get(candidate.id)?.affinity ?? 0.5
 
       // Nudge the score toward 1 or 0 based on preference affinities, bounded to [0,1]
+      //
+      // The pre-nudge value is kept rather than discarded: it is the number the
+      // three stored score components actually blend to, so it is what lets the
+      // insights panel show this adjustment as a step instead of leaving an
+      // unexplained gap between the components and the match.
       const originalScore = candidate.finalScore
+      candidate.baseScore = originalScore
       candidate.finalScore = applyPreferenceAdjustment(originalScore, {
         franchise: franchiseAffinity,
         genre: genreAffinity,
@@ -737,7 +744,12 @@ export async function generateRecommendationsForUser(
       interestPicks,
       twinPicks
     )
-    await storeEvidence(runId, finalSelected, watched)
+    // Deliberately NOT `watched`: that list is capped at recentWatchLimit
+    // (default 50, favourites-first) because it builds a centroid, and reusing
+    // it here searched 1.4% of a real viewer's history for the titles the
+    // explanation is then built from. See shared/evidencePool.ts.
+    const evidencePool = await getWatchHistory(user.id, EVIDENCE_HISTORY_LIMIT)
+    await storeEvidence(runId, finalSelected, evidencePool)
 
     // 7. Generate AI explanations for selected recommendations
     //

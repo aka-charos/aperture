@@ -31,6 +31,8 @@ export interface Candidate {
   diversityBoost: number // Used by shared selection algorithm
   /** Quality match, comparable across every candidate in a run. See BaseCandidate. */
   finalScore: number
+  /** The blend before preference affinities moved it. See BaseCandidate. */
+  baseScore?: number
   /** Diversity-blended ranking score, selected candidates only. See BaseCandidate. */
   selectionScore?: number
 }

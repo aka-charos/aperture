@@ -767,11 +767,9 @@
       "tasteMatch": "Smaak Match",
       "discovery": "Ontdekking",
       "quality": "Kwaliteit",
-      "variety": "Verscheidenheid",
       "na": "N.v.t",
       "tooltipDiscovery": "Hoe anders dit is dan waar je normaal naar kijkt: het helpt je nieuwe dingen te ontdekken",
       "tooltipQuality": "Beoordelingskwaliteit van de gemeenschap en critici",
-      "tooltipVariety": "Hoeveel variatie dit toevoegt aan uw aanbevelingen",
       "genreAnalysis": "Genreanalyse",
       "genresEnjoy_one": "{{count}} genre dat je leuk vindt",
       "genresEnjoy_other": "{{count}} genres die je leuk vindt",
@@ -789,7 +787,14 @@
       "closestInLibraryMovie": "Films in your history that most resemble this one. Shown for context — they are not why it was picked:",
       "closestInLibrarySeries": "Shows in your history that most resemble this one. Shown for context — they are not why it was picked:",
       "genresNew_one": "{{count}} new to explore",
-      "genresNew_other": "{{count}} new to explore"
+      "genresNew_other": "{{count}} new to explore",
+      "blendedScore": "These blend to",
+      "preferenceLift": "and your franchise and genre preferences add",
+      "preferenceDrop": "and your franchise and genre preferences take off",
+      "givesMatch": "for a match of",
+      "varietyHeading": "Variety In Your List",
+      "varietyExplainer": "How much this pick differs from the others chosen with it. This shapes the order of your list, not the match above.",
+      "tooltipDiscoveryRanged": "How different this is from what you usually watch. Peaks when a pick mixes the familiar with something new, so this score always sits between {{min}}% and {{max}}%."
     },
     "seasons": {
       "title": "Afleveringen",

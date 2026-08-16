@@ -182,6 +182,37 @@ describe('buildCandidateRows', () => {
     assert.equal(rows[0]!.diversityScore, 0)
   })
 
+  test('both similarity scales are stored, not just the raw cosine', () => {
+    // The insights panel blends normalizedSimilarity, novelty and rating; it
+    // used to render the *raw* cosine under "Taste Match" because that was the
+    // only one persisted, so the three bars could not produce the match above
+    // them. Live: 78 / 72 / 85 under a headline of 90.
+    const c = candidate('m1', { similarity: 0.61, normalizedSimilarity: 0.94 })
+    const rows = buildCandidateRows([c], [c])
+
+    assert.equal(rows[0]!.similarity, 0.61)
+    assert.equal(rows[0]!.normalizedSimilarity, 0.94)
+  })
+
+  test('the pre-preference blend is stored so the components can account for the match', () => {
+    // applyPreferenceAdjustment moves finalScore by up to half the remaining
+    // headroom, so without baseScore the gap between the three components and
+    // the match has no visible cause.
+    const c = candidate('m1', { baseScore: 0.82, finalScore: 0.9 })
+    const rows = buildCandidateRows([c], [c])
+
+    assert.equal(rows[0]!.baseScore, 0.82)
+    assert.equal(rows[0]!.finalScore, 0.9)
+  })
+
+  test('an absent base score is null rather than zero', () => {
+    // Same trap as diversity: a stored 0 renders as a measured "no preference
+    // effect", which is a different claim from "never recorded".
+    const rows = buildCandidateRows([candidate('m1')], [])
+
+    assert.equal(rows[0]!.baseScore, null)
+  })
+
   test('a pick missing from the scored pool is stored anyway', () => {
     // Should not happen — selection draws from the scored list. But a pick that
     // never reaches this table disappears from the recommendations page, so the

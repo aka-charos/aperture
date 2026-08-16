@@ -655,11 +655,9 @@
       "tasteMatch": "مباراة الذوق",
       "discovery": "اكتشاف",
       "quality": "جودة",
-      "variety": "متنوع",
       "na": "لا يوجد",
       "tooltipDiscovery": "مدى اختلاف هذا عما تشاهده عادةً - يساعدك على اكتشاف أشياء جديدة",
       "tooltipQuality": "جودة تصنيف المجتمع والناقد",
-      "tooltipVariety": "ما مدى التنوع الذي يضيفه هذا إلى توصياتك",
       "genreAnalysis": "تحليل النوع",
       "genresEnjoy_one": "{{count}} النوع الذي تستمتع به",
       "genresEnjoy_other": "{{count}} الأنواع التي تستمتع بها",
@@ -677,7 +675,14 @@
       "closestInLibraryMovie": "Films in your history that most resemble this one. Shown for context — they are not why it was picked:",
       "closestInLibrarySeries": "Shows in your history that most resemble this one. Shown for context — they are not why it was picked:",
       "genresNew_one": "{{count}} new to explore",
-      "genresNew_other": "{{count}} new to explore"
+      "genresNew_other": "{{count}} new to explore",
+      "blendedScore": "These blend to",
+      "preferenceLift": "and your franchise and genre preferences add",
+      "preferenceDrop": "and your franchise and genre preferences take off",
+      "givesMatch": "for a match of",
+      "varietyHeading": "Variety In Your List",
+      "varietyExplainer": "How much this pick differs from the others chosen with it. This shapes the order of your list, not the match above.",
+      "tooltipDiscoveryRanged": "How different this is from what you usually watch. Peaks when a pick mixes the familiar with something new, so this score always sits between {{min}}% and {{max}}%."
     },
     "seasons": {
       "title": "الحلقات",

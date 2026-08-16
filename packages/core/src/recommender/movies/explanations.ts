@@ -11,12 +11,19 @@ import { getTextGenerationModelInstance, getFunctionConfig } from '../../lib/ai-
 import { generateText } from 'ai'
 import { buildAiLanguageInstruction, DEFAULT_LOCALE, type AppLocaleCode } from '../../lib/locales.js'
 import { resolveEffectiveAiLanguage } from '../../lib/userSettings.js'
+import { WATCH_HISTORY_TASTE_SQL } from '../watchedExclusion.js'
 import {
   describeExplanationBatch,
   explanationBatchSettings,
   parseExplanationResponse,
   type ExplanationBatchSettings,
 } from '../shared/explanationParsing.js'
+import {
+  EVIDENCE_PLOT_CHARS,
+  KEYWORD_LIMIT,
+  PICK_PLOT_CHARS,
+  clip,
+} from '../shared/explanationPrompt.js'
 
 const logger = createChildLogger('explanations')
 
@@ -68,6 +75,22 @@ export interface EvidenceMovie {
   year: number | null
   similarity: number
   evidenceType: 'favorite' | 'highly_rated' | 'watched'
+  /**
+   * What this film is about. Carried so the model can say what the pick and
+   * this share instead of asserting a link from two titles — see
+   * shared/explanationPrompt.ts.
+   */
+  overview: string | null
+}
+
+/**
+ * The enriched fields that describe a title beyond its genre list. Fetched for
+ * the picks themselves; the evidence rows carry their own overview from the
+ * evidence query.
+ */
+interface TitleContext {
+  keywords: string[]
+  directors: string[]
 }
 
 export interface MovieWithEvidence extends MovieForExplanation {
@@ -97,13 +120,15 @@ async function fetchEvidenceForRecommendations(
     movie_id: string
     similar_title: string
     similar_year: number | null
+    similar_overview: string | null
     similarity: number
     evidence_type: string
   }>(
-    `SELECT 
+    `SELECT
        rc.movie_id,
        m.title as similar_title,
        m.year as similar_year,
+       m.overview as similar_overview,
        re.similarity,
        re.evidence_type
      FROM recommendation_evidence re
@@ -125,6 +150,7 @@ async function fetchEvidenceForRecommendations(
       year: row.similar_year,
       similarity: row.similarity,
       evidenceType: row.evidence_type as 'favorite' | 'highly_rated' | 'watched',
+      overview: row.similar_overview,
     })
   }
 
@@ -132,15 +158,45 @@ async function fetchEvidenceForRecommendations(
 }
 
 /**
+ * Themes and crew for the picks being explained.
+ *
+ * A separate round trip because the picks arrive from the pipeline (or from the
+ * refresh job) as already-scored candidates that carry neither. One query for
+ * the whole batch set, not one per title.
+ */
+async function fetchTitleContext(movieIds: string[]): Promise<Map<string, TitleContext>> {
+  if (movieIds.length === 0) return new Map()
+
+  const result = await query<{
+    id: string
+    keywords: string[] | null
+    directors: string[] | null
+  }>(`SELECT id, keywords, directors FROM movies WHERE id = ANY($1)`, [movieIds])
+
+  return new Map(
+    result.rows.map((row) => [
+      row.id,
+      { keywords: row.keywords ?? [], directors: row.directors ?? [] },
+    ])
+  )
+}
+
+/**
  * Get rich user taste context
  */
 async function getUserTasteContext(userId: string): Promise<UserTasteContext> {
+  // Both queries are gated on the taste predicate, the same one the taste
+  // vector, the genre familiarity baseline and the series pipeline all use.
+  // Ungated they counted every watch_history row, including films abandoned
+  // after two minutes — so a genre someone bounced off repeatedly could be
+  // presented to the model as one of their favourites.
+
   // Get top genres by watch frequency
   const genreResult = await query<{ genre: string }>(
     `SELECT unnest(m.genres) as genre, COUNT(*) as count
      FROM watch_history wh
      JOIN movies m ON m.id = wh.movie_id
-     WHERE wh.user_id = $1
+     WHERE wh.user_id = $1 AND ${WATCH_HISTORY_TASTE_SQL}
      GROUP BY genre
      ORDER BY count DESC
      LIMIT 8`,
@@ -156,7 +212,7 @@ async function getUserTasteContext(userId: string): Promise<UserTasteContext> {
     `SELECT m.title, m.year, m.genres
      FROM watch_history wh
      JOIN movies m ON m.id = wh.movie_id
-     WHERE wh.user_id = $1
+     WHERE wh.user_id = $1 AND ${WATCH_HISTORY_TASTE_SQL}
      ORDER BY wh.is_favorite DESC, wh.play_count DESC, wh.last_played_at DESC NULLS LAST
      LIMIT 15`,
     [userId]
@@ -206,10 +262,11 @@ export async function generateExplanations(
 
   // Fetch the actual embedding-based evidence
   const movieIds = recommendations.map((r) => r.movieId)
-  const evidenceMap = await fetchEvidenceForRecommendations(runId, movieIds)
-
-  // Get user taste context
-  const tasteContext = await getUserTasteContext(userId)
+  const [evidenceMap, titleContext, tasteContext] = await Promise.all([
+    fetchEvidenceForRecommendations(runId, movieIds),
+    fetchTitleContext(movieIds),
+    getUserTasteContext(userId),
+  ])
 
   // Attach evidence to each recommendation
   const moviesWithEvidence: MovieWithEvidence[] = recommendations.map((r) => ({
@@ -232,7 +289,13 @@ export async function generateExplanations(
       break
     }
     const batch = moviesWithEvidence.slice(i, i + batchSize)
-    const batchResults = await generateBatchExplanations(batch, tasteContext, maxTokens, aiLocale)
+    const batchResults = await generateBatchExplanations(
+      batch,
+      tasteContext,
+      titleContext,
+      maxTokens,
+      aiLocale
+    )
     results.push(...batchResults)
   }
 
@@ -243,6 +306,7 @@ export async function generateExplanations(
 async function generateBatchExplanations(
   movies: MovieWithEvidence[],
   tasteContext: UserTasteContext,
+  titleContext: Map<string, TitleContext>,
   maxOutputTokens: number = 3000,
   aiLocale: AppLocaleCode = DEFAULT_LOCALE
 ): Promise<ExplanationResult[]> {
@@ -263,6 +327,13 @@ async function generateBatchExplanations(
   const userContext = userContextLines.join('\n')
 
   // Build movie list with evidence
+  //
+  // The similarity percentages that used to sit on each evidence line are gone.
+  // They were raw cosines, which inside one library occupy a band roughly 0.04
+  // wide — so 74 and 69 are not the meaningfully different numbers they look
+  // like, and there is nothing useful a model can do with either except repeat
+  // it as though it were a grade. The list is ordered closest-first, which is
+  // the only part of that signal it can actually use.
   const movieList = movies
     .map((m, i) => {
       const evidenceStr =
@@ -271,14 +342,15 @@ async function generateBatchExplanations(
               .map((e) => {
                 const typeLabel =
                   e.evidenceType === 'favorite'
-                    ? '⭐ favorite'
+                    ? '⭐ a favorite of theirs'
                     : e.evidenceType === 'highly_rated'
-                      ? '🔥 highly rewatched'
+                      ? '🔥 rewatched often'
                       : 'watched'
-                return `"${e.title}" (${(e.similarity * 100).toFixed(0)}% match, ${typeLabel})`
+                const plot = clip(e.overview, EVIDENCE_PLOT_CHARS)
+                return `      - "${e.title}" (${e.year || 'N/A'}, ${typeLabel})${plot ? `: ${plot}` : ''}`
               })
-              .join(', ')
-          : 'No direct match data'
+              .join('\n')
+          : '      (none — say so by writing about the film itself, not about a connection)'
 
       const interestLine = m.interestText
         ? `\n   ✍️ THEY ASKED FOR THIS: picked because they told us they like "${m.interestText}" — lead with that`
@@ -288,11 +360,20 @@ async function generateBatchExplanations(
         ? `\n   👥 A KINDRED VIEWER PICKED THIS: another viewer here whose taste closely overlaps theirs watched it — lead with that, and never name or describe that person`
         : ''
 
+      const context = titleContext.get(m.movieId)
+      const directors = context?.directors?.length
+        ? `\n   Director: ${context.directors.slice(0, 3).join(', ')}`
+        : ''
+      const keywords = context?.keywords?.length
+        ? `\n   Themes: ${context.keywords.slice(0, KEYWORD_LIMIT).join(', ')}`
+        : ''
+
       return `${i + 1}. "${m.title}" (${m.year || 'N/A'})
-   Genres: ${m.genres.join(', ')}
-   Overall match: ${(m.normalizedSimilarity * 100).toFixed(0)}% | Novelty: ${m.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${m.ratingScore > 0.7 ? 'highly acclaimed' : m.ratingScore > 0.5 ? 'well received' : 'mixed'}${interestLine}${twinLine}
-   🎯 SIMILAR TO MOVIES THEY'VE WATCHED: ${evidenceStr}
-   Plot: ${(m.overview || 'No overview available').substring(0, 250)}...`
+   Genres: ${m.genres.join(', ')}${directors}${keywords}
+   Novelty: ${m.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${m.ratingScore > 0.7 ? 'highly acclaimed' : m.ratingScore > 0.5 ? 'well received' : 'mixed'}${interestLine}${twinLine}
+   Plot: ${clip(m.overview, PICK_PLOT_CHARS) ?? 'No overview available'}
+   🎯 CLOSEST IN THEIR WATCH HISTORY (nearest first):
+${evidenceStr}`
     })
     .join('\n\n')
 
@@ -304,15 +385,17 @@ async function generateBatchExplanations(
       model,
       system: `You are an expert film curator writing personalized recommendation explanations. You have access to:
 1. The user's taste profile and favorite films
-2. For each recommendation, the SPECIFIC watched movies it's most similar to (via AI embedding analysis)
+2. For each recommendation, the SPECIFIC watched movies it's most similar to (via AI embedding analysis), with a short synopsis of each
 
 Write compelling 3-4 sentence explanations for each recommendation. Your explanations MUST:
-- Reference the SPECIFIC watched movies listed in "SIMILAR TO MOVIES THEY'VE WATCHED" for each recommendation
-- Explain what qualities those movies share with the recommendation (themes, tone, directors, era, etc.)
+- Reference the SPECIFIC watched movies listed in "CLOSEST IN THEIR WATCH HISTORY" for each recommendation
+- Explain what qualities those movies share with the recommendation, drawing on the synopses, themes and crew you have been given
 - Be warm and conversational, like a knowledgeable friend
-- Create excitement without spoiling plots
+- Be specific rather than superlative. Naming what two films share is more persuasive than praising either one, and never spoil an ending
 
 CRITICAL: Each recommendation shows which of the user's watched movies it's most similar to. USE THAT DATA - don't make up connections to random movies.
+
+CRITICAL: Some of these films will be obscure and you will not recognise them. That is expected. Work only from the data given - the plot summaries, themes, genres and crew above. Do NOT state awards, box office, critical reception, festival history, cultural impact or production trivia unless it appears in the data. If all you have is two plot summaries, connect them on subject, tone and theme, and say nothing about how either was received. An honest sentence about what a film is beats a confident one about what it achieved.
 
 CRITICAL: A few recommendations are marked "THEY ASKED FOR THIS" with an interest the user typed in themselves. For those, open by connecting the film to that interest in the user's own words, then fill in with the similarity evidence. Never justify one of these on viewing-history similarity alone - that is not why it is in the list, and claiming otherwise would be wrong.
 
@@ -325,7 +408,7 @@ CRITICAL: Never write a double quote inside the explanation text. Titles are sho
 ${userContext}
 
 === RECOMMENDATIONS WITH SIMILARITY EVIDENCE ===
-For each movie below, I've included which of the user's watched films it's most similar to based on AI analysis:
+For each movie below, I've included which of the user's watched films it's most similar to based on AI analysis, with a short synopsis of each so you can see what they actually share:
 
 ${movieList}
 
