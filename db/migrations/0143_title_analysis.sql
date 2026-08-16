@@ -1,0 +1,81 @@
+-- Grounded, critic-informed analysis of a title: how it was made, what its
+-- makers were attempting, where it sits, what critics argue about.
+--
+-- Distinct from a recommendation explanation in the one way that matters:
+-- an explanation is about (user x title) and is regenerated whenever the
+-- recommender runs; this is about the TITLE ALONE. Nothing in it depends on who
+-- is reading, so it is generated once, shared by every user, survives a
+-- recommendations regenerate, and is worth showing on any detail page rather
+-- than only on the ~20 picks.
+--
+-- The two texts must not be merged. The explanation prompt is deliberately
+-- fenced ("state no awards, reception or production trivia that is not in the
+-- data") because it writes from measured pipeline output. This one is the
+-- opposite instruction — its whole value is outside knowledge, which is safe
+-- only because it is web-grounded and because a thin-sourced result is refused
+-- rather than invented.
+--
+-- A ROW EXISTING MEANS THE ATTEMPT HAPPENED; the row's contents say what came
+-- of it. That distinction is the lesson from `enrichment_version`, which
+-- recorded which schema was current when a row was touched rather than which
+-- source answered, and consequently froze OMDb out of a 12,584-film library
+-- while the progress counter reported nothing outstanding. Here:
+--
+--   * analysis IS NOT NULL  -> we have one
+--   * analysis IS NULL      -> asked, and the answer was "there is nothing
+--                              substantive to say" or "the web has too little
+--                              to ground on". Stored so it is not retried
+--                              forever; decline_reason says which.
+--   * no row at all         -> never asked, OR the attempt failed in transport
+--                              (429, 5xx, timeout). Both retry, which is the
+--                              whole reason a failure must not write a row.
+--
+-- `prompt_version` is what makes improving the prompt a config change instead
+-- of a migration — the thing 0137 and 0139 both had to be written to work
+-- around. Bump the constant, and every row below it becomes pending again.
+-- `tags_prompt_version` is deliberately separate: style-tag extraction is a
+-- second, cheap, ungrounded pass over prose already stored here, so its
+-- vocabulary can be re-run without spending a single grounded request.
+
+CREATE TABLE IF NOT EXISTS title_analysis (
+  media_type TEXT NOT NULL CHECK (media_type IN ('movie', 'series')),
+  -- No foreign key: this references movies.id OR series.id depending on
+  -- media_type, which Postgres cannot express. A title removed from the library
+  -- therefore leaves an orphan row — cheap, and safer than a trigger.
+  media_id UUID NOT NULL,
+
+  analysis TEXT,
+  decline_reason TEXT,
+
+  -- [{ "title": "...", "domain": "sensesofcinema.com" }]. Deliberately NOT the
+  -- grounding URLs: Google returns vertexaisearch redirect links that expire,
+  -- so a cache living for months would fill with dead links.
+  sources JSONB,
+  -- The model's own closing verdict on what it found: substantial critical
+  -- writing / reviews only / almost nothing. Cheap signal for tuning the floor.
+  source_grade TEXT,
+  grounding_chunks INTEGER,
+
+  model TEXT NOT NULL,
+  prompt_version INTEGER NOT NULL,
+  tags_prompt_version INTEGER,
+  analyzed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  PRIMARY KEY (media_type, media_id)
+);
+
+-- The job selects titles whose analysis is missing or predates the current
+-- prompt version, so both columns are read together on every pass.
+CREATE INDEX IF NOT EXISTS idx_title_analysis_pending
+  ON title_analysis (media_type, prompt_version);
+
+COMMENT ON TABLE title_analysis IS
+  'Per-title grounded analysis, cached forever. Title-scoped, not user-scoped: generated once and shared by every user.';
+COMMENT ON COLUMN title_analysis.analysis IS
+  'NULL means asked and declined (see decline_reason), which is a result. No row at all means never asked or the attempt failed in transport.';
+COMMENT ON COLUMN title_analysis.sources IS
+  'Source title + domain. Never the grounding redirect URLs, which expire.';
+COMMENT ON COLUMN title_analysis.prompt_version IS
+  'Bump the code constant to make every older row pending again — a prompt change is a config change, not a migration.';
+COMMENT ON COLUMN title_analysis.tags_prompt_version IS
+  'Version of the style-tag extraction applied to this prose. Separate from prompt_version so tags can be re-extracted without new grounded calls.';

@@ -391,6 +391,10 @@
         "globalExplanations": {
           "title": "Recommendation Explanations",
           "description": "Rewrite the explanations on everyone's current picks without re-scoring anything"
+        },
+        "globalAnalysis": {
+          "title": "Title Analysis",
+          "description": "Write grounded critical analysis for titles that have none, a few hundred per run"
         }
       },
       "jobNames": {
@@ -775,6 +779,23 @@
       "requestFailed": "Failed to submit request",
       "seasonPartialChip": "Season {{n}} · {{missing}} of {{aired}} missing",
       "summary": "{{count}} aired episodes aren't available yet."
+    },
+    "analysis": {
+      "headingMovie": "About This Film",
+      "headingSeries": "About This Series",
+      "spoilerNote": "Written from published criticism and interviews. It discusses how the work is made rather than what happens in it, but it is not guaranteed to be free of detail.",
+      "notYetGenerated": "No analysis has been written for this title yet.",
+      "generate": "Write an analysis",
+      "generating": "Reading what critics wrote…",
+      "failed": "Could not write an analysis right now.",
+      "sourcesLabel": "Drawn from",
+      "declinedThinSources": "There is too little published writing about this title to say anything grounded. Nothing was invented to fill the gap.",
+      "declinedNoCraft": "Nothing substantive to report about how this one was made. That is an answer, not a failure.",
+      "grade": {
+        "substantial": "Well documented",
+        "reviewsOnly": "Reviews only",
+        "almostNothing": "Sparse sources"
+      }
     }
   },
   "browse": {
@@ -1407,7 +1428,10 @@
     "fallbackApiKey": "Fallback API Key",
     "fallbackApiKeyPlaceholder": "Optional second key",
     "fallbackApiKeyHelp": "Used automatically when the key above runs out of quota. Use a key from a different Google project — the same key shares the same limits.",
-    "fallbackKeyFailed": "The main key works, but the fallback key failed: {{error}}"
+    "fallbackKeyFailed": "The main key works, but the fallback key failed: {{error}}",
+    "fallbackApiKeyNumbered": "Spare API key {{number}}",
+    "addFallbackKey": "Add spare key",
+    "removeFallbackKey": "Remove this spare key"
   },
   "topPicksOutputConfig": {
     "accordionTitle": "מה ההבדל בין ספרייה, אוסף ופלייליסט?",
@@ -2183,7 +2207,9 @@
     "episodeEmbeddingsClearBody": "Generation is off, but the existing vectors are still stored. Deleting them frees the space; episode search will stay unavailable until you turn generation back on and re-run the series embedding job.",
     "episodeEmbeddingsClear": "Delete episode embeddings",
     "episodeEmbeddingsClearConfirm": "Delete every episode embedding? Regenerating them later means re-embedding every episode in the library.",
-    "episodeEmbeddingsClearFailed": "Failed to delete episode embeddings"
+    "episodeEmbeddingsClearFailed": "Failed to delete episode embeddings",
+    "cardTitleAnalysisTitle": "Google Gemini Title Analysis",
+    "cardTitleAnalysisDesc": "Optional. Writes a grounded, critic-informed analysis of a film or show — how it was made, what its makers were attempting, where it sits, what critics argue about. Cached per title and shared by everyone. Give it a key from a separate Google project: it spends the same daily grounding quota as Web Search, and a batch of analyses would otherwise starve the assistant."
   },
   "settingsAiExplanation": {
     "loadFailed": "טעינת תצורת הסבר בינה מלאכותית נכשלה",
@@ -4310,7 +4336,8 @@
     "paused": "{{slot}} is paused until {{time}} — Google turned it away for going over quota.",
     "caveat": "Counted per {{appName}} request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
     "slotPrimary": "Main key",
-    "slotFallback": "Fallback key"
+    "slotFallback": "Fallback key",
+    "slotFallbackNumbered": "Spare key {{number}}"
   },
   "inferenceDashboard": {
     "title": "AI Spend",

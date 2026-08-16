@@ -430,6 +430,10 @@
           "title": "Recommendation Explanations",
           "description": "Rewrite the explanations on everyone's current picks without re-scoring anything"
         },
+        "globalAnalysis": {
+          "title": "Title Analysis",
+          "description": "Write grounded critical analysis for titles that have none, a few hundred per run"
+        },
         "globalIntegrations": {
           "title": "Integrations",
           "description": "Sync with Trakt and LLDAP, and update AI pricing data"
@@ -758,6 +762,23 @@
       "genreEnjoyedTooltip": "A genre you already watch a lot of",
       "genreNewTooltip": "New to you — this would be a first"
     },
+    "analysis": {
+      "headingMovie": "About This Film",
+      "headingSeries": "About This Series",
+      "spoilerNote": "Written from published criticism and interviews. It discusses how the work is made rather than what happens in it, but it is not guaranteed to be free of detail.",
+      "notYetGenerated": "No analysis has been written for this title yet.",
+      "generate": "Write an analysis",
+      "generating": "Reading what critics wrote…",
+      "failed": "Could not write an analysis right now.",
+      "sourcesLabel": "Drawn from",
+      "declinedThinSources": "There is too little published writing about this title to say anything grounded. Nothing was invented to fill the gap.",
+      "declinedNoCraft": "Nothing substantive to report about how this one was made. That is an answer, not a failure.",
+      "grade": {
+        "substantial": "Well documented",
+        "reviewsOnly": "Reviews only",
+        "almostNothing": "Sparse sources"
+      }
+    },
     "insights": {
       "recommendedForYou": "Recommended For You",
       "consideredForYou": "How This Fits Your Taste",
@@ -888,9 +909,12 @@
     "apiKeyPlaceholder": "Enter your {{provider}} API key",
     "getApiKeyPrefix": "Get your API key from",
     "fallbackApiKey": "Fallback API Key",
-    "fallbackApiKeyPlaceholder": "Optional second key",
-    "fallbackApiKeyHelp": "Used automatically when the key above runs out of quota. Use a key from a different Google project — the same key shares the same limits.",
-    "fallbackKeyFailed": "The main key works, but the fallback key failed: {{error}}",
+    "fallbackApiKeyNumbered": "Spare API key {{number}}",
+    "fallbackApiKeyPlaceholder": "Optional spare key",
+    "fallbackApiKeyHelp": "Used automatically, in order, when the key above runs out of quota. Each spare must come from a different Google project — keys on the same project share one limit, so a spare there buys nothing.",
+    "addFallbackKey": "Add spare key",
+    "removeFallbackKey": "Remove this spare key",
+    "fallbackKeyFailed": "The main key works, but a spare key failed — {{error}}",
     "ollamaInstallTitle": "Install models on your Ollama server",
     "ollamaNotes": {
       "recommended": "recommended",
@@ -2088,6 +2112,8 @@
     "cardExplorationDesc": "Powers the Explore page. Uses AI to find meaningful connections from conceptual searches like \"feel-good comedies\".",
     "cardWebSearchTitle": "Google Gemini Web Search",
     "cardWebSearchDesc": "Optional. Gemini's native search grounding finds current titles from the web for discovery requests, then matches them against your library. Google is the only provider that offers this. Leave unset to disable web discovery.",
+    "cardTitleAnalysisTitle": "Google Gemini Title Analysis",
+    "cardTitleAnalysisDesc": "Optional. Writes a grounded, critic-informed analysis of a film or show — how it was made, what its makers were attempting, where it sits, what critics argue about. Cached per title and shared by everyone. Give it a key from a separate Google project: it spends the same daily grounding quota as Web Search, and a batch of analyses would otherwise starve the assistant.",
     "episodeEmbeddingsTitle": "Episode Embeddings",
     "episodeEmbeddingsBody": "Vectorizing individual episodes lets the assistant answer questions about what happens inside one — \"the episode where they get stuck in the desert\". Nothing else can: the series vector describes the show, not its episodes. It is also the largest embedding table by far, one row per episode instead of one per show, and every new episode costs an embedding call.",
     "episodeEmbeddingsToggle": "Generate embeddings for episodes",
@@ -4360,7 +4386,8 @@
     "paused": "{{slot}} is paused until {{time}} — Google turned it away for going over quota.",
     "caveat": "Counted per {{appName}} request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
     "slotPrimary": "Main key",
-    "slotFallback": "Fallback key"
+    "slotFallback": "Spare key",
+    "slotFallbackNumbered": "Spare key {{number}}"
   },
   "inferenceDashboard": {
     "title": "AI Spend",

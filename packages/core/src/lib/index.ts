@@ -53,6 +53,11 @@ export {
   getWebSearchAttempts,
   withWebSearchModel,
   getWebSearchProviderTools,
+  getGroundingAttempts,
+  getGroundingKeySlots,
+  withGroundingModel,
+  getGroundingProviderTools,
+  resolveFallbackKeys,
   getTextGenerationModelInstance,
   // Capability Checking
   getAICapabilitiesStatus,
@@ -114,7 +119,7 @@ export {
   type WebSearchUsageTokens,
 } from './ai-provider.js'
 
-// Web Search free-tier quota (Gemini grounding role)
+// Free-tier quota, shared by the grounding roles (webSearch, titleAnalysis)
 export {
   getFreeTierLimits,
   classifyQuotaError,
@@ -123,7 +128,7 @@ export {
   clearSlotCooldown,
   getSlotCooldownUntil,
   getSlotCooldowns,
-  WEB_SEARCH_KEY_SLOTS,
+  keySlotName,
   type WebSearchKeySlot,
   type FreeTierLimits,
   type QuotaScope,

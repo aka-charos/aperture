@@ -128,6 +128,7 @@ export const googleGroundingSource: WebSearchSource = {
             // the retried attempts are recorded here — the wrapper still records
             // the final one, so the totals add up exactly.
             await recordWebSearchCall({
+              role: keyAttempt.role,
               provider: keyAttempt.provider,
               model: keyAttempt.modelId,
               slot: keyAttempt.slot,

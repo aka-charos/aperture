@@ -43,7 +43,10 @@ export function AISetupStep({ wizard }: AISetupStepProps) {
     chat: null,
     textGeneration: null,
     exploration: null,
+    // Neither grounding role is offered in the wizard — both are optional and
+    // need their own Google keys — but the map is keyed by every AIFunction.
     webSearch: null,
+    titleAnalysis: null,
   })
 
   // Fetch current AI config from each function endpoint (setup-safe)

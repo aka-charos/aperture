@@ -314,6 +314,7 @@ export async function gatherWebCandidates(
   ) => {
     if (structuring.provider !== 'google' || !structuring.keySlot || !structuring.modelId) return
     await recordWebSearchCall({
+      role: 'webSearch',
       provider: 'google',
       model: structuring.modelId,
       slot: structuring.keySlot,
@@ -328,7 +329,8 @@ export async function gatherWebCandidates(
     await meterGoogleCall(quota.isQuota ? 'rate_limited' : 'error')
     // Structuring can't switch keys mid-cascade, but the next request can — and
     // will, because getWebSearchAttempts orders a parked key last.
-    if (quota.isQuota && structuring.keySlot) markSlotExhausted(structuring.keySlot, quota)
+    if (quota.isQuota && structuring.keySlot)
+      markSlotExhausted('webSearch', structuring.keySlot, quota)
   }
 
   const structure = async (candidateSchema: z.ZodTypeAny) => {

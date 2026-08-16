@@ -27,6 +27,13 @@ export {
   getWebSearchAttempts,
   withWebSearchModel,
   getWebSearchProviderTools,
+  // Role-parameterised forms — anything spending grounding quota must use one
+  // of these, or the usage meter silently undercounts.
+  getGroundingAttempts,
+  getGroundingKeySlots,
+  withGroundingModel,
+  getGroundingProviderTools,
+  resolveFallbackKeys,
   getTextGenerationModelInstance,
   getAICapabilitiesStatus,
   isAIFunctionConfigured,
@@ -79,7 +86,7 @@ export {
   type WebSearchAttempt,
   type WebSearchCallOutcome,
   type WebSearchUsageTokens,
-  // Web Search free-tier quota (Gemini grounding role)
+  // Free-tier quota, shared by the grounding roles (webSearch, titleAnalysis)
   getFreeTierLimits,
   classifyQuotaError,
   markSlotExhausted,
@@ -87,7 +94,7 @@ export {
   clearSlotCooldown,
   getSlotCooldownUntil,
   getSlotCooldowns,
-  WEB_SEARCH_KEY_SLOTS,
+  keySlotName,
   recordWebSearchCall,
   getWebSearchUsageSummary,
   type WebSearchKeySlot,
@@ -1279,3 +1286,26 @@ export {
   type BulkOverrideInput,
   type BulkOverrideResult,
 } from './i18nOverrides.js'
+
+// Grounded per-title analysis (title-scoped, cached forever — see ./analysis)
+export {
+  ANALYSIS_PROMPT_VERSION,
+  buildAnalysisPrompt,
+  parseAnalysisResponse,
+  decideAnalysisFloor,
+  analyseTitle,
+  getStoredAnalysis,
+  loadAnalysisSubject,
+  countPendingAnalysis,
+  selectPendingTitles,
+  generateTitleAnalyses,
+  getAnalysisStatus,
+  DEFAULT_DAILY_BUDGET,
+  type AnalysisSubject,
+  type SourceGrade,
+  type DeclineReason,
+  type StoredAnalysis,
+  type PendingTitle,
+  type AnalysisJobOptions,
+  type AnalysisJobResult,
+} from './analysis/index.js'

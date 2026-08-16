@@ -32,6 +32,9 @@ import {
   addLog,
   completeJob,
   failJob,
+  isJobCancelled,
+  updateJobProgress,
+  generateTitleAnalyses,
   syncUsersFromMediaServer,
   syncLldapEmails,
   createChildLogger,
@@ -258,6 +261,31 @@ async function executeJob(name: string, jobId: string): Promise<void> {
             failed: result.failed,
           },
           `✅ Recommendation explanations refreshed`
+        )
+        break
+      }
+      // === Title analysis (grounded, per title, cached forever) ===
+      case 'generate-title-analysis': {
+        const result = await generateTitleAnalyses({
+          // Cancellation has to be polled BETWEEN titles: every step here is a
+          // paid grounded request, so per-phase granularity would mean
+          // cancelling costs the rest of the batch anyway.
+          shouldCancel: () => isJobCancelled(jobId),
+          onProgress: ({ processed, total }) =>
+            updateJobProgress(jobId, processed, total),
+        })
+        logger.info(
+          {
+            job: name,
+            jobId,
+            processed: result.processed,
+            stored: result.stored,
+            declined: result.declined,
+            failed: result.failed,
+            cancelled: result.cancelled,
+            budgetExhausted: result.budgetExhausted,
+          },
+          `✅ Title analysis pass complete`
         )
         break
       }

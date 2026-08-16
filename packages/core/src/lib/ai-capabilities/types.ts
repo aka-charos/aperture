@@ -46,7 +46,22 @@ export interface ProviderMetadata {
   explorationModels: ModelMetadata[]
 }
 
-export type AIFunction = 'embeddings' | 'chat' | 'textGeneration' | 'exploration' | 'webSearch'
+/**
+ * A configurable AI role. Each holds its own provider, model and credentials.
+ *
+ * `webSearch` and `titleAnalysis` both spend Google's grounded-search quota,
+ * and are separate roles precisely so they spend it from different keys: a
+ * batch job writing per-title analysis would otherwise exhaust the daily
+ * grounding cap that the assistant's discovery needs, and one meter covering
+ * both could not say which did it.
+ */
+export type AIFunction =
+  | 'embeddings'
+  | 'chat'
+  | 'textGeneration'
+  | 'exploration'
+  | 'webSearch'
+  | 'titleAnalysis'
 
 export interface FunctionPricing {
   provider: string

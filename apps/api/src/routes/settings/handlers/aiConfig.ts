@@ -54,6 +54,8 @@ import {
   getEpisodeEmbeddingsEnabled,
   setEpisodeEmbeddingsEnabled,
   getWebSearchUsageSummary,
+  getGroundingKeySlots,
+  resolveFallbackKeys,
   type AIFunction,
   type ProviderType,
 } from '@aperture/core'
@@ -112,7 +114,14 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         model: string
         apiKey?: string
         baseUrl?: string
-        fallbackApiKey?: string
+        fallbackApiKeys?: string[]
+      }
+      titleAnalysis?: {
+        provider: ProviderType
+        model: string
+        apiKey?: string
+        baseUrl?: string
+        fallbackApiKeys?: string[]
       }
     }
   }>('/api/settings/ai', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
@@ -134,6 +143,9 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         webSearch: updates.webSearch
           ? { ...currentConfig.webSearch, ...updates.webSearch }
           : currentConfig.webSearch,
+        titleAnalysis: updates.titleAnalysis
+          ? { ...currentConfig.titleAnalysis, ...updates.titleAnalysis }
+          : currentConfig.titleAnalysis,
       }
 
       await setAIConfig(newConfig)
@@ -398,25 +410,34 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
   })
 
   /**
-   * GET /api/settings/ai/web-search/usage
+   * GET /api/settings/ai/web-search/usage?role=webSearch|titleAnalysis
    *
-   * Free-tier meter for the Web Search (Gemini grounding) role: requests in the
-   * last minute and since midnight US/Pacific, per API key, against Google's
-   * published limits for the configured model. Never 500s on a missing table —
-   * the summary degrades to zeroes so the settings page still renders.
+   * Free-tier meter for a grounding role: requests in the last minute and since
+   * midnight US/Pacific, per API key, against Google's published limits for the
+   * configured model. Never 500s on a missing table — the summary degrades to
+   * zeroes so the settings page still renders.
+   *
+   * `role` defaults to `webSearch`, so the path keeps working for callers
+   * written before a second grounding role existed. The two roles hold
+   * different keys and therefore different quota; a response covering both
+   * could not answer which one ran out.
    */
-  fastify.get('/api/settings/ai/web-search/usage', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (_request, reply) => {
+  fastify.get<{ Querystring: { role?: string } }>('/api/settings/ai/web-search/usage', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
     try {
-      const config = await getFunctionConfig('webSearch')
-      const usage = await getWebSearchUsageSummary(config?.model ?? null)
+      const requested = request.query.role
+      const role: AIFunction = requested === 'titleAnalysis' ? 'titleAnalysis' : 'webSearch'
+      const config = await getFunctionConfig(role)
+      const slots = await getGroundingKeySlots(role)
+      const usage = await getWebSearchUsageSummary(role, config?.model ?? null, slots)
       return reply.send({
         configured: Boolean(config),
         provider: config?.provider ?? null,
-        hasFallbackKey: Boolean(config?.fallbackApiKey),
+        /** How many spare keys are configured; 0 means one 429 stops the role. */
+        fallbackKeyCount: config ? resolveFallbackKeys(config).length : 0,
         ...usage,
       })
     } catch (err) {
-      fastify.log.error({ err }, 'Failed to get Web Search usage')
+      fastify.log.error({ err }, 'Failed to get grounding usage')
       return reply.status(500).send({ error: 'Failed to get Web Search usage' })
     }
   })
@@ -780,17 +801,24 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
    */
   fastify.patch<{
     Params: { function: string }
-    Body: { provider: string; model: string; apiKey?: string; baseUrl?: string; fallbackApiKey?: string }
+    Body: { provider: string; model: string; apiKey?: string; baseUrl?: string; fallbackApiKeys?: string[] }
   }>('/api/settings/ai/:function', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
     try {
       const fn = request.params.function as AIFunction
-      const { provider, model, apiKey, baseUrl, fallbackApiKey } = request.body
+      const { provider, model, apiKey, baseUrl, fallbackApiKeys } = request.body
 
-      if (!['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'].includes(fn)) {
-        return reply.status(400).send({ error: 'Invalid function. Must be embeddings, chat, textGeneration, exploration, or webSearch' })
+      if (!['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch', 'titleAnalysis'].includes(fn)) {
+        return reply.status(400).send({ error: 'Invalid function. Must be embeddings, chat, textGeneration, exploration, webSearch, or titleAnalysis' })
       }
 
-      if (apiKey || baseUrl) {
+      // `ai_provider_credentials` is keyed by PROVIDER and shared by every role
+      // on it, which is exactly wrong for the grounding roles: publishing one of
+      // their Google keys there would let the other borrow it, silently putting
+      // both back on a single free-tier quota — the thing separate roles exist
+      // to prevent. Their keys stay on the role, like their fallbacks do.
+      const isGroundingRole = fn === 'webSearch' || fn === 'titleAnalysis'
+
+      if ((apiKey || baseUrl) && !isGroundingRole) {
         const credentialsJson = await getSystemSetting('ai_provider_credentials')
         const credentials = credentialsJson ? JSON.parse(credentialsJson) : {}
 
@@ -803,22 +831,28 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         await setSystemSetting('ai_provider_credentials', JSON.stringify(credentials), 'Stored credentials for AI providers')
       }
 
-      // The primary key survives a keyless save because withResolvedCredentials
-      // finds it again in the shared credential store. The fallback key has no
-      // such store — it lives only here — so an omitted field must mean "leave it
-      // alone", and only an explicit empty string clears it.
       const existing = await getFunctionConfig(fn)
-      const nextFallbackKey =
-        fallbackApiKey === undefined
-          ? existing?.fallbackApiKey
-          : fallbackApiKey.trim() || undefined
+
+      // A non-grounding role's primary key survives a keyless save because
+      // withResolvedCredentials finds it again in the shared store. A grounding
+      // role's does not go there at all, so an omitted key has to be carried
+      // over here or saving a model change would wipe the credential.
+      const nextApiKey = apiKey ?? (isGroundingRole ? existing?.apiKey : undefined)
+
+      // Fallback keys live only here, so an omitted field means "leave alone"
+      // and only an explicit empty array clears them.
+      const nextFallbackKeys =
+        fallbackApiKeys === undefined
+          ? (existing?.fallbackApiKeys ??
+            (existing?.fallbackApiKey ? [existing.fallbackApiKey] : undefined))
+          : fallbackApiKeys.map((k) => k.trim()).filter((k) => k.length > 0)
 
       await setFunctionConfig(fn, {
         provider: provider as ProviderType,
         model,
-        apiKey,
+        apiKey: nextApiKey,
         baseUrl,
-        fallbackApiKey: nextFallbackKey,
+        fallbackApiKeys: nextFallbackKeys?.length ? nextFallbackKeys : undefined,
       })
 
       const config = await getFunctionConfig(fn)
