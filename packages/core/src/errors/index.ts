@@ -20,4 +20,5 @@ export { TRAKT_ERRORS } from './trakt.js'
 export { MDBLIST_ERRORS } from './mdblist.js'
 export { OMDB_ERRORS, OMDB_ERROR_MESSAGES } from './omdb.js'
 export { LLDAP_ERRORS } from './lldap.js'
+export { CRW_ERRORS, CRW_ERROR_PATTERNS } from './crw.js'
 

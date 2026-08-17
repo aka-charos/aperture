@@ -42,6 +42,7 @@ import {
   SeerrConfigSection,
   N8nConfigSection,
   TavilyConfigSection,
+  CrwConfigSection,
   StreamingDiscoverySettings,
   ChannelsWebExpandSettings,
   DiscoveryGenreStripsSettings,
@@ -310,6 +311,7 @@ export function SettingsPage() {
                   <SeerrConfigSection />
                   <N8nConfigSection />
                   <TavilyConfigSection />
+                  <CrwConfigSection />
                 </Box>
                 <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
                   <StreamingDiscoverySettings />

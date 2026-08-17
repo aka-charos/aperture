@@ -1,6 +1,6 @@
 /**
- * Usage meter for the roles that spend Google Gemini grounding quota:
- * `webSearch` and `titleAnalysis`.
+ * Usage meter for the roles that spend Google Gemini grounding quota. Today
+ * that is `webSearch` alone — see 0142 for why the role column exists anyway.
  *
  * Every grounding call writes a row to `web_search_usage`; the admin panel reads
  * a summary of the last minute and the current Gemini day back out and shows it

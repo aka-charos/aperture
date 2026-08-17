@@ -1,6 +1,9 @@
 /**
  * Free-tier quota handling for any role that spends Google Gemini grounding
- * quota. Two do: `webSearch` (the assistant's discovery) and `titleAnalysis`.
+ * quota. One does: `webSearch`, behind the assistant's discovery and channel
+ * web-expansion. (`titleAnalysis` was the second until it moved to a
+ * self-hosted retrieval endpoint; the role parameter survives because a
+ * self-hosted grounding source is planned for discovery — see 0142.)
  *
  * Grounding runs on a Gemini key that is very often a free-tier one, and the
  * free tier is metered three ways at once: requests per minute, requests per

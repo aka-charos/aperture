@@ -71,10 +71,11 @@ export interface ProviderConfig {
   baseUrl?: string
   /**
    * Spare API keys, tried in order when `apiKey` runs out of quota. Read by the
-   * grounding roles (`webSearch`, `titleAnalysis`), because Gemini's free tier
-   * is the thing that runs out. They stay on the role rather than in the shared
-   * per-provider credential store — a spare key is a property of this role, not
-   * of the provider, and the two grounding roles must not share one.
+   * `webSearch` role, because Gemini's free tier is the thing that runs out —
+   * a second key is what turns ~20 grounded requests a day into ~40. They stay
+   * on the role rather than in the shared per-provider credential store: a spare
+   * key is a property of this role, not of the provider, and lending one out
+   * would put the spend back on the quota it was added to escape.
    */
   fallbackApiKeys?: string[]
   /**
@@ -392,14 +393,22 @@ async function resolveApiKeyForProvider(provider: ProviderType): Promise<string 
 
   // 2) Any other configured function already using this provider.
   //
-  // The two grounding roles (`webSearch`, `titleAnalysis`) are deliberately NOT
-  // donors here. Their keys exist to hold separate free-tier grounding quota,
-  // and lending one to another role would put spend the operator meant to keep
-  // apart back onto the same Google project — silently, and in the one place
-  // where the whole design is about keeping quotas separate. They still
-  // *borrow* (see withResolvedCredentials); they just never lend.
+  // `webSearch` is deliberately NOT a donor here. Its keys exist to hold
+  // free-tier grounding quota that the operator chose to keep separate, and
+  // lending one to another role would put that spend back on the same Google
+  // project — silently, and in the one place where the whole design is about
+  // keeping quotas apart. It still *borrows* (see withResolvedCredentials); it
+  // just never lends. `titleAnalysis` is an ordinary role and participates
+  // normally: retrieval happens before its model is called, so it holds no
+  // grounding quota to protect.
   const config = await getAIConfig()
-  for (const fn of ['chat', 'embeddings', 'textGeneration', 'exploration'] as AIFunction[]) {
+  for (const fn of [
+    'chat',
+    'embeddings',
+    'textGeneration',
+    'exploration',
+    'titleAnalysis',
+  ] as AIFunction[]) {
     const fnConfig = config[fn]
     if (fnConfig?.provider === provider && fnConfig.apiKey) return fnConfig.apiKey
   }
@@ -552,9 +561,16 @@ export interface WebSearchAttempt {
   model: LanguageModel
 }
 
-/** Human name for a grounding role, for error messages the operator reads. */
+/**
+ * Human name for a grounding role, for error messages the operator reads.
+ *
+ * `webSearch` is the only grounding role today. The machinery below stays
+ * role-parameterised anyway, because a self-hosted retrieval source is planned
+ * as a third grounding option for discovery — and collapsing it to one role now
+ * would only have to be undone.
+ */
 function roleLabel(role: AIFunction): string {
-  return role === 'titleAnalysis' ? 'Title Analysis' : 'Web Search'
+  return role === 'webSearch' ? 'Web Search' : role
 }
 
 /**
@@ -583,11 +599,9 @@ export async function getGroundingKeySlots(role: AIFunction): Promise<WebSearchK
  * order they should be tried: keys currently parked by a 429 go last (but are
  * never dropped — trying a parked key beats doing nothing at all).
  *
- * The grounding roles are Google-only for now. If a role has no key of its own,
- * fall back to the shared credential store (then any other role on the same
- * provider) so grounding doesn't fail with a missing-key error — but say so,
- * loudly, for `titleAnalysis`: borrowing puts it back on the very quota that
- * giving it a separate role exists to keep it off.
+ * Grounding is Google-only. If the role has no key of its own, fall back to the
+ * shared credential store (then any other role on the same provider) so
+ * grounding doesn't fail outright with a missing-key error.
  */
 export async function getGroundingAttempts(role: AIFunction): Promise<WebSearchAttempt[]> {
   const config = await getFunctionConfig(role)
@@ -598,17 +612,11 @@ export async function getGroundingAttempts(role: AIFunction): Promise<WebSearchA
     )
   }
 
-  const ownKey = config.apiKey?.trim()
   const resolved = await withResolvedCredentials(config)
   if (!resolved.apiKey) {
     logger.warn(
       { role, provider: resolved.provider },
       'Grounding role has no API key and none could be resolved for its provider'
-    )
-  } else if (!ownKey && role === 'titleAnalysis') {
-    logger.warn(
-      { role, provider: resolved.provider },
-      'Title Analysis has no key of its own and is borrowing another role’s — it will compete for the same grounding quota'
     )
   }
 
@@ -798,6 +806,36 @@ export async function getTextGenerationModelInstance(): Promise<LanguageModel> {
   // All providers use similar API for language models
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (provider as any)(modelId) as LanguageModel
+}
+
+/**
+ * Get the model that writes title analyses.
+ *
+ * Returns the model id alongside the instance because `title_analysis.model`
+ * records which model produced each row — worth having when comparing output
+ * after swapping a local model, which is the expected way to tune this.
+ *
+ * Not a grounding role: retrieval happens before this is called (see
+ * ../analysis/generate.ts), so this is an ordinary writing role and any
+ * provider will do — including a local one, which is the point.
+ */
+export async function getTitleAnalysisModelInstance(): Promise<{
+  model: LanguageModel
+  modelId: string
+}> {
+  const config = await getFunctionConfig('titleAnalysis')
+
+  if (!config) {
+    throw new Error(
+      'Title Analysis provider is not configured. Please configure it in Settings > AI.'
+    )
+  }
+
+  const resolved = await withResolvedCredentials(config)
+  const provider = createProviderInstance(resolved, 'titleAnalysis')
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { model: (provider as any)(resolved.model) as LanguageModel, modelId: resolved.model }
 }
 
 /**

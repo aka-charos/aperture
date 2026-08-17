@@ -1,5 +1,5 @@
--- Grounded, critic-informed analysis of a title: how it was made, what its
--- makers were attempting, where it sits, what critics argue about.
+-- Critic-informed analysis of a title: how it was made, what its makers were
+-- attempting, where it sits, what critics argue about.
 --
 -- Distinct from a recommendation explanation in the one way that matters:
 -- an explanation is about (user x title) and is regenerated whenever the
@@ -8,12 +8,13 @@
 -- recommendations regenerate, and is worth showing on any detail page rather
 -- than only on the ~20 picks.
 --
--- The two texts must not be merged. The explanation prompt is deliberately
--- fenced ("state no awards, reception or production trivia that is not in the
--- data") because it writes from measured pipeline output. This one is the
--- opposite instruction — its whole value is outside knowledge, which is safe
--- only because it is web-grounded and because a thin-sourced result is refused
--- rather than invented.
+-- The two texts must not be merged, but they are fenced the same way. The
+-- explanation prompt refuses outside knowledge because it writes from measured
+-- pipeline output; this one refuses it because the material it may use is
+-- RETRIEVED AND SUPPLIED IN THE PROMPT — a self-hosted search+scrape service
+-- fetches the articles and the model summarises what it was handed. "Use only
+-- the sources" is therefore a checkable instruction in both, rather than an
+-- appeal to a model's judgement about its own memory.
 --
 -- A ROW EXISTING MEANS THE ATTEMPT HAPPENED; the row's contents say what came
 -- of it. That distinction is the lesson from `enrichment_version`, which
@@ -47,14 +48,24 @@ CREATE TABLE IF NOT EXISTS title_analysis (
   analysis TEXT,
   decline_reason TEXT,
 
-  -- [{ "title": "...", "domain": "sensesofcinema.com" }]. Deliberately NOT the
-  -- grounding URLs: Google returns vertexaisearch redirect links that expire,
-  -- so a cache living for months would fill with dead links.
+  -- [{ "title": "...", "domain": "sensesofcinema.com" }]. Title and domain only,
+  -- never the full URL: provenance is what a reader needs (it is what says
+  -- whether this came from a film journal or a listicle), and a link table
+  -- living for months would rot.
   sources JSONB,
   -- The model's own closing verdict on what it found: substantial critical
   -- writing / reviews only / almost nothing. Cheap signal for tuning the floor.
   source_grade TEXT,
-  grounding_chunks INTEGER,
+
+  -- Retrieval evidence, the two halves of which answer different questions and
+  -- are both needed. `source_count` is how many documents were fetched and
+  -- handed over; `retrieved_chars` is how much text they carried. A title can
+  -- score well on count and near-zero on chars (six paywall stubs), or the
+  -- reverse (one long Wikipedia page). Together with source_grade above they
+  -- are what the floor decides on, and what makes the decline rate tunable
+  -- after the fact instead of guessed at now.
+  source_count INTEGER,
+  retrieved_chars INTEGER,
 
   model TEXT NOT NULL,
   prompt_version INTEGER NOT NULL,
@@ -70,11 +81,13 @@ CREATE INDEX IF NOT EXISTS idx_title_analysis_pending
   ON title_analysis (media_type, prompt_version);
 
 COMMENT ON TABLE title_analysis IS
-  'Per-title grounded analysis, cached forever. Title-scoped, not user-scoped: generated once and shared by every user.';
+  'Per-title analysis written from retrieved web sources, cached forever. Title-scoped, not user-scoped: generated once and shared by every user.';
 COMMENT ON COLUMN title_analysis.analysis IS
   'NULL means asked and declined (see decline_reason), which is a result. No row at all means never asked or the attempt failed in transport.';
 COMMENT ON COLUMN title_analysis.sources IS
-  'Source title + domain. Never the grounding redirect URLs, which expire.';
+  'Source title + domain. Never full URLs — provenance is the durable part, links rot.';
+COMMENT ON COLUMN title_analysis.retrieved_chars IS
+  'Total characters of source text handed to the model. Paired with source_count because six stubs and one long article fail in opposite directions.';
 COMMENT ON COLUMN title_analysis.prompt_version IS
   'Bump the code constant to make every older row pending again — a prompt change is a config change, not a migration.';
 COMMENT ON COLUMN title_analysis.tags_prompt_version IS

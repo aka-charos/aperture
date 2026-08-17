@@ -20,5 +20,6 @@ export { registerChannelsWebExpandSettingsHandlers } from './channelsWebExpand.j
 export { registerDiscoveryGenreStripsSettingsHandlers } from './discoveryGenreStrips.js'
 export { registerN8nHandlers } from './n8n.js'
 export { registerTavilyHandlers } from './tavily.js'
+export { registerCrwHandlers } from './crw.js'
 export { registerSystemHandlers } from './system.js'
 export { registerDeploymentHandlers } from './deployment.js'

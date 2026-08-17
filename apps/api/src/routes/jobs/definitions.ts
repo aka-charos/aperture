@@ -84,11 +84,11 @@ export const jobDefinitions: JobDefinition[] = [
     cron: null,
     manualOnly: true,
   },
-  // === Title analysis (grounded, per title, shared by every user) ===
+  // === Title analysis (per title, from retrieved sources, shared by all users) ===
   {
     name: 'generate-title-analysis',
     description:
-      'Writes a grounded, critic-informed analysis for titles that have none, newest recommendations first. Each one costs a Google search-grounding request against a hard daily cap, so a pass covers a few hundred titles and the library fills in over weeks. Needs the Title Analysis role configured in Settings > AI.',
+      'Writes a critic-informed analysis for titles that have none, current recommendations first. Each title costs a web search, a few page fetches and one model call — all self-hosted, so there is no quota, only time. Needs the retrieval service configured in Settings > Integrations and the Title Analysis role in Settings > AI.',
     cron: null,
     manualOnly: true,
   },

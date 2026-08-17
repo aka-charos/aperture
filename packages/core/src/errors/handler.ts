@@ -10,6 +10,7 @@ import type { ApiErrorDefinition, ParsedApiError, ApiErrorRecord } from './types
 import { OPENAI_ERRORS, OPENAI_ERROR_PATTERNS } from './openai.js'
 import { GOOGLE_ERRORS, GOOGLE_ERROR_PATTERNS } from './google.js'
 import { TAVILY_ERRORS, TAVILY_ERROR_PATTERNS } from './tavily.js'
+import { CRW_ERRORS, CRW_ERROR_PATTERNS } from './crw.js'
 import { TMDB_ERRORS, TMDB_HTTP_TO_STATUS } from './tmdb.js'
 import { TRAKT_ERRORS } from './trakt.js'
 import { MDBLIST_ERRORS } from './mdblist.js'
@@ -85,6 +86,30 @@ function parseGoogleError(
   }
 
   return errorDef
+}
+
+/**
+ * Parse a fastCRW error response.
+ *
+ * Patterns are checked BEFORE the status, which is the opposite of every other
+ * parser here and deliberate: "search is disabled" is a configuration fault that
+ * the service can report on whatever status it likes, and it is the one CRW
+ * failure whose fix is completely different from everything else. Matching it
+ * only under its own status code would miss exactly the case worth catching.
+ */
+function parseCrwError(status: number, errorMessage?: string): ApiErrorDefinition {
+  if (errorMessage) {
+    const messageLower = errorMessage.toLowerCase()
+    for (const [pattern, match] of Object.entries(CRW_ERROR_PATTERNS)) {
+      if (!messageLower.includes(pattern)) continue
+      const mapped = CRW_ERRORS[match.status]
+      if (mapped) return Array.isArray(mapped) ? (mapped[match.index] ?? mapped[0]) : mapped
+    }
+  }
+
+  const errorDef = CRW_ERRORS[status]
+  if (!errorDef) return DEFAULT_ERROR
+  return Array.isArray(errorDef) ? errorDef[0] : errorDef
 }
 
 /**
@@ -197,6 +222,9 @@ export function parseApiError(
       break
     case 'tavily':
       definition = parseTavilyError(status, options.errorMessage)
+      break
+    case 'crw':
+      definition = parseCrwError(status, options.errorMessage)
       break
     case 'tmdb':
       definition = parseTMDbError(status, options.responseBody as { status_code?: number })
