@@ -47,21 +47,37 @@ export interface ProviderMetadata {
 }
 
 /**
- * A configurable AI role. Each holds its own provider, model and credentials.
+ * Every configurable AI role. Each holds its own provider, model and credentials.
  *
- * `webSearch` and `titleAnalysis` both spend Google's grounded-search quota,
+ * `webSearch` and `titleAnalysis` can both spend Google's grounded-search quota,
  * and are separate roles precisely so they spend it from different keys: a
  * batch job writing per-title analysis would otherwise exhaust the daily
  * grounding cap that the assistant's discovery needs, and one meter covering
  * both could not say which did it.
+ *
+ * This is a runtime list rather than a bare union because the roles are also a
+ * JSON-Schema `enum` on ten Fastify routes, and TypeScript cannot check a
+ * hand-written copy of a union against the union. Adding `titleAnalysis` to the
+ * type alone left every one of those enums a role short, so the settings card
+ * asked for its providers and models and got `400 Bad Request` — which the web
+ * reads as "no models available", for every provider, with the "add a custom
+ * model" escape hatch rejected by the same rule. Derive, never retype.
  */
-export type AIFunction =
-  | 'embeddings'
-  | 'chat'
-  | 'textGeneration'
-  | 'exploration'
-  | 'webSearch'
-  | 'titleAnalysis'
+export const AI_FUNCTIONS = [
+  'embeddings',
+  'chat',
+  'textGeneration',
+  'exploration',
+  'webSearch',
+  'titleAnalysis',
+] as const
+
+export type AIFunction = (typeof AI_FUNCTIONS)[number]
+
+/** Narrow a string that arrived over HTTP to a known role. */
+export function isAIFunction(value: string): value is AIFunction {
+  return (AI_FUNCTIONS as readonly string[]).includes(value)
+}
 
 export interface FunctionPricing {
   provider: string

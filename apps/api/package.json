@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "test:security": "node --import tsx --test src/config/security.test.ts",
+    "test:schemas": "node --import tsx --test src/routes/aiFunctionSchemas.test.ts",
     "lint": "eslint src",
     "clean": "rm -rf dist",
     "test:assistant": "node --import tsx --test src/routes/assistant/tools/tasteBlend.test.ts src/routes/assistant/tools/episodes.test.ts src/routes/assistant/helpers/routeIntent.test.ts src/routes/assistant/helpers/titleMatch.test.ts src/routes/assistant/helpers/countryMatch.test.ts"

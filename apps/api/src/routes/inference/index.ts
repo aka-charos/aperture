@@ -19,6 +19,7 @@ import {
   getRecentInferenceCalls,
   getOpenRouterAccountStatus,
   createChildLogger,
+  AI_FUNCTIONS,
   type AIFunction,
 } from '@aperture/core'
 
@@ -41,11 +42,14 @@ function parseLimit(raw: string | undefined, fallback: number, max: number): num
   return Math.min(max, Math.max(1, parsed))
 }
 
-/** Which AI roles are pointed at OpenRouter right now. */
+/**
+ * Which AI roles are pointed at OpenRouter right now. Read off the shared role
+ * list, not a copy: `configured` gates the whole dashboard, so a role missing
+ * here hides the measured spend of the only role that was spending.
+ */
 async function getOpenRouterRoles(): Promise<AIFunction[]> {
   const config = await getAIConfig()
-  const roles: AIFunction[] = ['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch']
-  return roles.filter((role) => config[role]?.provider === LEDGER_PROVIDER)
+  return AI_FUNCTIONS.filter((role) => config[role]?.provider === LEDGER_PROVIDER)
 }
 
 const inferenceRoutes: FastifyPluginAsync = async (fastify) => {

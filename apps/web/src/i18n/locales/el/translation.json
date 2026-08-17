@@ -3146,7 +3146,8 @@
     "unpricedTitle": "Some models have no published price.",
     "unpricedBody": "We could not find pricing for {{models}}, so rows using them are left blank rather than counted as free. The totals below are an undercount.",
     "initialCaptionPending": "One-time cost to embed what is still missing. Library: {{movies}} movies, {{series}} series, {{episodes}} episodes.",
-    "allEmbedded": "Everything is embedded — nothing left to pay for."
+    "allEmbedded": "Everything is embedded — nothing left to pay for.",
+    "fnTitleAnalysis": "Title Analysis"
   },
   "watchStats": {
     "errorLoadFailed": "Αποτυχία φόρτωσης στατιστικών προβολής",

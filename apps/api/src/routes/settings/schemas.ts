@@ -1,9 +1,17 @@
 /**
  * Settings OpenAPI Schemas
- * 
+ *
  * All OpenAPI/Swagger schema definitions for settings endpoints.
  * Admin endpoints are marked with "(admin only)" in descriptions.
  */
+import { AI_FUNCTIONS } from '@aperture/core'
+
+/**
+ * The AI roles, as a JSON-Schema enum. Always spread the shared constant —
+ * these enums are validation, so a role missing here is a 400 on the settings
+ * card, not a documentation slip.
+ */
+const aiFunctionEnum = [...AI_FUNCTIONS]
 
 // =============================================================================
 // Media Server Schemas
@@ -646,7 +654,7 @@ export const aiProvidersSchema = {
   querystring: {
     type: 'object' as const,
     properties: {
-      function: { type: 'string' as const, enum: ['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'] },
+      function: { type: 'string' as const, enum: aiFunctionEnum },
     },
     // function is optional - if not provided, returns all providers
   },
@@ -660,7 +668,7 @@ export const aiModelsSchema = {
     type: 'object' as const,
     properties: {
       provider: { type: 'string' as const },
-      function: { type: 'string' as const, enum: ['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'] },
+      function: { type: 'string' as const, enum: aiFunctionEnum },
     },
     required: ['provider', 'function'] as string[],
   },
@@ -693,7 +701,7 @@ export const addCustomModelSchema = {
       provider: { type: 'string' as const },
       modelId: { type: 'string' as const },
       displayName: { type: 'string' as const },
-      function: { type: 'string' as const, enum: ['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'] },
+      function: { type: 'string' as const, enum: aiFunctionEnum },
       contextWindow: { type: 'integer' as const },
       inputPrice: { type: 'number' as const },
       outputPrice: { type: 'number' as const },

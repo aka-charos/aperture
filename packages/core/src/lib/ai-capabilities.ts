@@ -6,6 +6,8 @@ export type {
   ProviderMetadata,
 } from './ai-capabilities/types.js'
 
+export { AI_FUNCTIONS, isAIFunction } from './ai-capabilities/types.js'
+
 export {
   PROVIDERS,
   getDefaultBaseUrl,

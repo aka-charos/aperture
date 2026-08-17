@@ -1479,6 +1479,8 @@ export {
   getPricingForModel,
   getPricingForModelAsync,
   PROVIDERS,
+  AI_FUNCTIONS,
+  isAIFunction,
 } from './ai-capabilities.js'
 
 export type { AIFunction, ModelMetadata, ProviderMetadata, ModelCapabilities, FunctionPricing } from './ai-capabilities.js'

@@ -54,6 +54,7 @@ interface AIPricing {
   textGeneration: FunctionPricing | null
   exploration: FunctionPricing | null
   webSearch: FunctionPricing | null
+  titleAnalysis: FunctionPricing | null
 }
 
 /** How to present a role's money: a real price, genuinely free, or unknown. */
@@ -417,6 +418,7 @@ export function CostEstimatorSection() {
       { key: 'chat', labelKey: 'fnChat' },
       { key: 'exploration', labelKey: 'fnExploration' },
       { key: 'webSearch', labelKey: 'fnWebSearch' },
+      { key: 'titleAnalysis', labelKey: 'fnTitleAnalysis' },
     ]
     return roles.flatMap(({ key, labelKey }) => {
       const rolePricing = pricing?.[key]
