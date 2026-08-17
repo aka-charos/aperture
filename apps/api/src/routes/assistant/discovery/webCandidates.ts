@@ -330,7 +330,7 @@ export async function gatherWebCandidates(
     // Structuring can't switch keys mid-cascade, but the next request can — and
     // will, because getWebSearchAttempts orders a parked key last.
     if (quota.isQuota && structuring.keySlot)
-      markSlotExhausted('webSearch', structuring.keySlot, quota)
+      markSlotExhausted('webSearch', structuring.keySlot, quota, structuring.modelId)
   }
 
   const structure = async (candidateSchema: z.ZodTypeAny) => {

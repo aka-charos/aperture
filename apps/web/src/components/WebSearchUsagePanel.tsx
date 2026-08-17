@@ -35,7 +35,13 @@ interface UsageResponse {
   configured: boolean
   fallbackKeyCount: number
   model: string | null
-  limits: { rpm: number; rpd: number; tpm: number } | null
+  /**
+   * Each field is learned independently from a Google 429 that named it, so any
+   * of them can be absent. There is no published table to fall back on — Google
+   * withdrew it, and the numbers differ per account — so a missing field means
+   * a bare count with no bar, which is the honest rendering.
+   */
+  limits: { rpm?: number; rpd?: number; tpm?: number } | null
   dayResetsAt: string
   slots: SlotUsage[]
 }
@@ -169,7 +175,7 @@ export function WebSearchUsagePanel({ role = 'webSearch' }: { role?: string } = 
         {t('webSearchUsage.resets', { time: formatTime(usage.dayResetsAt) })}
       </Typography>
 
-      {!limits && (
+      {!limits?.rpd && !limits?.rpm && (
         <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
           {t('webSearchUsage.noPublishedLimits')}
         </Typography>
@@ -204,7 +210,7 @@ export function WebSearchUsagePanel({ role = 'webSearch' }: { role?: string } = 
             limit={limits?.rpm ?? null}
           />
           <Typography variant="caption" color="text.secondary" display="block">
-            {limits
+            {limits?.tpm
               ? t('webSearchUsage.tokensThisMinuteWithLimit', {
                   used: formatCompact(slot.minute.tokens),
                   limit: formatCompact(limits.tpm),

@@ -86,8 +86,10 @@ export {
   type WebSearchAttempt,
   type WebSearchCallOutcome,
   type WebSearchUsageTokens,
-  // Free-tier quota, shared by the grounding roles (webSearch, titleAnalysis)
+  // Free-tier quota for the grounding role; limits are learned from 429s
   getFreeTierLimits,
+  noteObservedLimit,
+  clearObservedLimits,
   classifyQuotaError,
   markSlotExhausted,
   isSlotCoolingDown,

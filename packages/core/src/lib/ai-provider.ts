@@ -738,7 +738,7 @@ export async function withGroundingModel<T>(
 
       if (!quota.isQuota) throw err
 
-      markSlotExhausted(role, attempt.slot, quota)
+      markSlotExhausted(role, attempt.slot, quota, attempt.modelId)
       lastQuotaError = err
       logger.warn(
         {
