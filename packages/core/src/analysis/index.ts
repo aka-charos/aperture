@@ -31,13 +31,25 @@ export {
   decideAnalysisFloor,
   isListingDomain,
   MIN_ANALYSIS_CHARS,
+  MIN_GROUNDING_CHUNKS,
   MIN_SUBSTANTIVE_SOURCES,
   MIN_SUBSTANTIVE_SOURCE_CHARS,
   type DeclineReason,
   type FloorDecision,
   type FloorInput,
+  type RetrievalEvidence,
   type RetrievedSource,
 } from './sourceFloor.js'
+
+export {
+  getRetrievalMode,
+  setRetrievalMode,
+  isRetrievalMode,
+  checkModeReadiness,
+  DEFAULT_RETRIEVAL_MODE,
+  type RetrievalMode,
+  type ModeReadiness,
+} from './mode.js'
 
 export { budgetSources, type BudgetOptions } from './budget.js'
 

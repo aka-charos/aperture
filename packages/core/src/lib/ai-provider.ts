@@ -393,22 +393,15 @@ async function resolveApiKeyForProvider(provider: ProviderType): Promise<string 
 
   // 2) Any other configured function already using this provider.
   //
-  // `webSearch` is deliberately NOT a donor here. Its keys exist to hold
-  // free-tier grounding quota that the operator chose to keep separate, and
-  // lending one to another role would put that spend back on the same Google
-  // project — silently, and in the one place where the whole design is about
-  // keeping quotas apart. It still *borrows* (see withResolvedCredentials); it
-  // just never lends. `titleAnalysis` is an ordinary role and participates
-  // normally: retrieval happens before its model is called, so it holds no
-  // grounding quota to protect.
+  // Neither role that can spend Google grounding quota is a donor here. Their
+  // keys exist to hold free-tier quota the operator chose to keep separate, and
+  // lending one out would put that spend back on the same Google project —
+  // silently, and in the one place where the whole design is about keeping
+  // quotas apart. They still *borrow* (see withResolvedCredentials); they just
+  // never lend. `titleAnalysis` qualifies because it can be switched to
+  // Gemini's built-in search (core `analysis/mode.ts`).
   const config = await getAIConfig()
-  for (const fn of [
-    'chat',
-    'embeddings',
-    'textGeneration',
-    'exploration',
-    'titleAnalysis',
-  ] as AIFunction[]) {
+  for (const fn of ['chat', 'embeddings', 'textGeneration', 'exploration'] as AIFunction[]) {
     const fnConfig = config[fn]
     if (fnConfig?.provider === provider && fnConfig.apiKey) return fnConfig.apiKey
   }
@@ -612,11 +605,20 @@ export async function getGroundingAttempts(role: AIFunction): Promise<WebSearchA
     )
   }
 
+  const ownKey = config.apiKey?.trim()
   const resolved = await withResolvedCredentials(config)
   if (!resolved.apiKey) {
     logger.warn(
       { role, provider: resolved.provider },
       'Grounding role has no API key and none could be resolved for its provider'
+    )
+  } else if (!ownKey && role === 'titleAnalysis') {
+    // Borrowing works, but it puts this role back on the very quota that giving
+    // it its own credentials exists to keep it off — and on a free tier that
+    // means a batch of analyses can starve the assistant's discovery.
+    logger.warn(
+      { role, provider: resolved.provider },
+      'Title Analysis has no key of its own and is borrowing another role’s — it will compete for the same grounding quota'
     )
   }
 

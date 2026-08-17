@@ -4559,6 +4559,12 @@
     "testSuccess": "Connected. Search returned {{count}} result(s).",
     "testFailed": "Could not reach the retrieval service",
     "errSave": "Failed to save the retrieval configuration",
-    "errConnect": "Connection failed"
+    "errConnect": "Connection failed",
+    "modeLabel": "Where analysis gets its sources",
+    "modeCrw": "Self-hosted retrieval",
+    "modeGrounding": "Model built-in search",
+    "modeCrwHelp": "fastCRW searches and fetches the pages, and the Title Analysis model writes from that text. No quota, so a whole library is reachable — a local or cheap model is enough, because the work is organising text it has been handed rather than recalling it.",
+    "modeGroundingHelp": "A Google Gemini model searches for itself. Better retrieval and no infrastructure, but metered per day per Google project — on a free tier that is a few dozen titles a day, not a library. Needs Google selected for Title Analysis in Settings > AI.",
+    "groundingNotice": "The retrieval service settings below are unused while built-in search is selected. They are kept so you can switch back without reconfiguring."
   }
 }

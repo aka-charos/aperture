@@ -116,14 +116,15 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         baseUrl?: string
         fallbackApiKeys?: string[]
       }
-      // No `fallbackApiKeys`: Title Analysis is an ordinary writing role whose
-      // retrieval happens before the model is called, so it holds no per-day
-      // grounding quota for a spare key to extend.
+      // `fallbackApiKeys` because this role can be switched to Gemini's
+      // built-in search, and then it spends the same per-day grounding quota
+      // Web Search does. Unused when it points at a local or OpenRouter model.
       titleAnalysis?: {
         provider: ProviderType
         model: string
         apiKey?: string
         baseUrl?: string
+        fallbackApiKeys?: string[]
       }
     }
   }>('/api/settings/ai', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
@@ -412,22 +413,22 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
   })
 
   /**
-   * GET /api/settings/ai/web-search/usage?role=webSearch
+   * GET /api/settings/ai/web-search/usage?role=webSearch|titleAnalysis
    *
-   * Free-tier meter for a grounding role: requests in the last minute and since
-   * midnight US/Pacific, per API key, against Google's published limits for the
-   * configured model. Never 500s on a missing table — the summary degrades to
-   * zeroes so the settings page still renders.
+   * Free-tier meter for a role that spends Google grounding quota: requests in
+   * the last minute and since midnight US/Pacific, per API key, against limits
+   * learned from Google's own 429s. Never 500s on a missing table — the summary
+   * degrades to zeroes so the settings page still renders.
    *
-   * `webSearch` is the only grounding role, and the only accepted value. The
-   * parameter survives because `web_search_usage.role` distinguishes consumers
-   * and a self-hosted retrieval source is planned as a second one; anything
-   * unrecognised falls back rather than erroring, since a meter is not worth a
-   * 400.
+   * Two roles can qualify: `webSearch` always, and `titleAnalysis` when it is
+   * set to Gemini's built-in search. They hold different keys and therefore
+   * different quota, so a combined response could not say which ran out.
+   * Anything unrecognised falls back to `webSearch` rather than erroring — a
+   * meter is not worth a 400.
    */
   fastify.get<{ Querystring: { role?: string } }>('/api/settings/ai/web-search/usage', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
     try {
-      const role: AIFunction = 'webSearch'
+      const role: AIFunction = request.query.role === 'titleAnalysis' ? 'titleAnalysis' : 'webSearch'
       const config = await getFunctionConfig(role)
       const slots = await getGroundingKeySlots(role)
       const usage = await getWebSearchUsageSummary(role, config?.model ?? null, slots)
@@ -814,11 +815,16 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       }
 
       // `ai_provider_credentials` is keyed by PROVIDER and shared by every role
-      // on it, which is exactly wrong for a grounding role: publishing its
-      // Google key there would let any other role borrow it, silently putting
-      // that spend back on the free-tier quota the separate role exists to
-      // protect. Its key stays on the role, like its fallbacks do.
-      const isGroundingRole = fn === 'webSearch'
+      // on it, which is exactly wrong for a role that can spend Google grounding
+      // quota: publishing its key there would let another role borrow it,
+      // silently putting that spend back on the free-tier quota a separate role
+      // exists to protect. Its key stays on the role, like its fallbacks do.
+      //
+      // `titleAnalysis` is included because it can be switched to Gemini's
+      // built-in search (see core `analysis/mode.ts`). It costs nothing when it
+      // is pointed at a local model — there is no key to protect — and the
+      // alternative is a setting whose safety depends on another setting.
+      const isGroundingRole = fn === 'webSearch' || fn === 'titleAnalysis'
 
       if ((apiKey || baseUrl) && !isGroundingRole) {
         const credentialsJson = await getSystemSetting('ai_provider_credentials')

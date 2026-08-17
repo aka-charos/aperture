@@ -121,8 +121,24 @@ const SERIES_QUESTIONS = [
   'What do critics genuinely disagree about?',
 ]
 
+/**
+ * The first rule is the whole epistemic difference between the two retrieval
+ * modes, so it is the only one that varies.
+ *
+ * With documents in hand the instruction is checkable — the material is right
+ * there and anything else is invention. With native grounding the model does
+ * its own searching, so the best that can be asked for is that it prefer real
+ * criticism and refuse to invent; whether it complied is not verifiable from
+ * the response, which is why `sourceFloor.ts` leans harder on the model's own
+ * verdict in that mode.
+ */
+const SOURCED_RULE =
+  'Use ONLY the source documents above. If they do not support a claim, do not make it. You may not fall back on what you already know about this title - not for production history, not for reception, not for awards, not for influence.'
+
+const GROUNDED_RULE =
+  'Ground every claim in something you actually retrieved. Prefer critics, filmmaker interviews and film scholarship over aggregators, listicles and marketing copy. Invent nothing: no production history, festival history or reception you cannot source.'
+
 const RULES = [
-  'Use ONLY the source documents above. If they do not support a claim, do not make it. You may not fall back on what you already know about this title - not for production history, not for reception, not for awards, not for influence.',
   'Describe how it works, never what happens in it. No third-act or ending discussion. Someone who has not seen it must be able to read this safely.',
   'Match your register to the work. A stunt-driven action picture’s craft is its staging and choreography, and that is a legitimate subject - write about it as what it is. Do not apply art-cinema vocabulary to a genre entertainment.',
   'If a question has no real answer in the sources, skip it. If none of them do, say so in two sentences and stop. A short honest answer is correct. Padding is not.',
@@ -172,21 +188,33 @@ function buildSourceBlock(sources: AnalysisSource[]): string {
   return `${SOURCE_BLOCK_HEADER}\n\n${documents}`
 }
 
+export interface PromptOptions {
+  /**
+   * 'crw' embeds the retrieved documents; 'grounding' omits them and asks the
+   * model to search for itself. See ./mode.ts.
+   */
+  mode: 'crw' | 'grounding'
+  /** Retrieved documents, already budgeted. Ignored in 'grounding' mode. */
+  sources?: AnalysisSource[]
+}
+
 /**
  * Assemble the prompt.
  *
- * ORDER IS DELIBERATE: subject, then the documents, then the task and rules.
- * Putting the instructions last means the final thing the model reads is ours
- * rather than a scraped page — which is both the injection-resistant ordering
- * and the one that keeps a long source block from pushing the actual task out
- * of the model's attention.
+ * ORDER IS DELIBERATE in 'crw' mode: subject, then the documents, then the task
+ * and rules. Putting the instructions last means the final thing the model reads
+ * is ours rather than a scraped page — which is both the injection-resistant
+ * ordering and the one that keeps a long source block from pushing the actual
+ * task out of the model's attention.
  */
 export function buildAnalysisPrompt(
   subject: AnalysisSubject,
-  sources: AnalysisSource[]
+  options: PromptOptions
 ): string {
   const questions = subject.mediaType === 'series' ? SERIES_QUESTIONS : MOVIE_QUESTIONS
   const kind = subject.mediaType === 'series' ? 'series' : 'film'
+  const grounded = options.mode === 'grounding'
+  const sources = options.sources ?? []
 
   const header = [
     `${kind === 'series' ? 'Series' : 'Film'}: ${subject.title}${subject.year ? ` (${subject.year})` : ''}`,
@@ -201,16 +229,19 @@ export function buildAnalysisPrompt(
   return [
     header,
     '',
-    buildSourceBlock(sources),
+    ...(grounded ? [] : [buildSourceBlock(sources), '']),
+    'TASK',
+    grounded
+      ? `Using current web sources, write an analysis of this ${kind}. Not a review, not a plot summary.`
+      : `Write an analysis of this ${kind} from the source documents above. Not a review, not a plot summary.`,
     '',
-    `TASK`,
-    `Write an analysis of this ${kind} from the source documents above. Not a review, not a plot summary.`,
-    '',
-    `Answer only the questions the sources actually support:`,
+    grounded
+      ? `Answer only the questions that have real answers for this ${kind}:`
+      : `Answer only the questions the sources actually support:`,
     ...questions.map((q, i) => `${i + 1}. ${q}`),
     '',
     'RULES',
-    ...RULES.map((r) => `- ${r}`),
+    ...[grounded ? GROUNDED_RULE : SOURCED_RULE, ...RULES].map((r) => `- ${r}`),
     '',
     SOURCE_GRADE_LINE,
   ].join('\n')

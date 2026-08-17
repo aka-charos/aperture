@@ -8,10 +8,14 @@
  */
 import type { FastifyInstance } from 'fastify'
 import {
+  checkModeReadiness,
   getCrwConfig,
+  isRetrievalMode,
   setCrwConfig,
+  setRetrievalMode,
   testCrwConnection,
   type CrwConfig,
+  type RetrievalMode,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
 
@@ -23,6 +27,12 @@ interface CrwUpdateBody {
   maxContentChars?: number
   timeoutMs?: number
   sourceBudgetChars?: number
+  /**
+   * Where title analysis gets its sources. Lives on this endpoint rather than
+   * its own because it decides whether anything else on this card is used at
+   * all, and an operator picks the two together.
+   */
+  retrievalMode?: RetrievalMode
 }
 
 /** Config for the client, with the API key omitted (only hasApiKey exposed). */
@@ -94,8 +104,14 @@ export function registerCrwHandlers(fastify: FastifyInstance) {
     { preHandler: requireAdmin, schema: { tags: ['settings'] } },
     async (_request, reply) => {
       try {
-        const config = await getCrwConfig()
-        return reply.send({ config: toPublicConfig(config) })
+        const [config, readiness] = await Promise.all([getCrwConfig(), checkModeReadiness()])
+        return reply.send({
+          config: { ...toPublicConfig(config), retrievalMode: readiness.mode },
+          // Both modes fail identically from a job log — every title erroring —
+          // while their fixes are on different settings pages, so the card says
+          // which half is missing before anyone runs a batch.
+          readiness: { ready: readiness.ready, reason: readiness.reason },
+        })
       } catch (err) {
         fastify.log.error({ err }, 'Failed to get CRW config')
         return reply.status(500).send({ error: 'Failed to get retrieval configuration' })
@@ -133,8 +149,19 @@ export function registerCrwHandlers(fastify: FastifyInstance) {
         const validationError = validateConfig(newConfig)
         if (validationError) return reply.status(400).send({ error: validationError })
 
+        if (body.retrievalMode !== undefined) {
+          if (!isRetrievalMode(body.retrievalMode)) {
+            return reply.status(400).send({ error: 'retrievalMode must be crw or grounding' })
+          }
+          await setRetrievalMode(body.retrievalMode)
+        }
+
         await setCrwConfig(newConfig)
-        return reply.send({ config: toPublicConfig(newConfig) })
+        const readiness = await checkModeReadiness()
+        return reply.send({
+          config: { ...toPublicConfig(newConfig), retrievalMode: readiness.mode },
+          readiness: { ready: readiness.ready, reason: readiness.reason },
+        })
       } catch (err) {
         fastify.log.error({ err }, 'Failed to update CRW config')
         return reply.status(500).send({ error: 'Failed to update retrieval configuration' })
