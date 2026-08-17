@@ -107,42 +107,75 @@ export type FloorDecision =
   | { store: true }
   | { store: false; reason: DeclineReason }
 
+/**
+ * Below this many grounding chunks, a natively-grounded model was mostly
+ * working from its own pretrained knowledge.
+ *
+ * Deliberately low, and it measures OBSCURITY rather than depth — a blockbuster
+ * returns plenty of chunks and may still carry no analytical writing at all,
+ * which is what `source_grade` is for. Only used in 'grounding' mode; the
+ * self-hosted path has the documents themselves and can judge them better.
+ */
+export const MIN_GROUNDING_CHUNKS = 2
+
 /** One retrieved document, as evidence rather than as content. */
 export interface RetrievedSource {
   domain: string
   chars: number
 }
 
+/**
+ * What retrieval left behind, which differs by mode and must not be flattened.
+ *
+ * The self-hosted path knows each document's domain and size. Native grounding
+ * knows only how many chunks Google attached — the text is never exposed, and
+ * its source URLs are expiring redirects, so no domain is recoverable. Faking a
+ * common shape would mean inventing one of those numbers, and the floor would
+ * then decide on a fiction.
+ */
+export type RetrievalEvidence =
+  | { mode: 'crw'; sources: RetrievedSource[] }
+  | { mode: 'grounding'; chunkCount: number }
+
 export interface FloorInput {
   /** Prose with the SOURCES line already stripped. */
   text: string
   /** The model's own verdict, or null when it omitted / garbled the line. */
   grade: SourceGrade | null
-  /** What retrieval actually returned and handed to the model. */
-  sources: RetrievedSource[]
+  /** What retrieval actually produced. */
+  evidence: RetrievalEvidence
 }
 
 export function decideAnalysisFloor(input: FloorInput): FloorDecision {
   const text = input.text.trim()
 
   // The model said outright that the sources have almost nothing. Trust it:
-  // this is the one signal that reflects what was *read* rather than how much.
+  // this is the one signal that reflects what was *read* rather than how much,
+  // and in 'grounding' mode it is very nearly the only signal there is.
   if (input.grade === 'almost-nothing') {
     return { store: false, reason: 'thin_sources' }
   }
 
-  const substantive = input.sources.filter((s) => s.chars >= MIN_SUBSTANTIVE_SOURCE_CHARS)
+  if (input.evidence.mode === 'grounding') {
+    if (input.evidence.chunkCount < MIN_GROUNDING_CHUNKS) {
+      return { store: false, reason: 'thin_sources' }
+    }
+  } else {
+    const substantive = input.evidence.sources.filter(
+      (s) => s.chars >= MIN_SUBSTANTIVE_SOURCE_CHARS
+    )
 
-  if (substantive.length < MIN_SUBSTANTIVE_SOURCES) {
-    return { store: false, reason: 'thin_sources' }
-  }
+    if (substantive.length < MIN_SUBSTANTIVE_SOURCES) {
+      return { store: false, reason: 'thin_sources' }
+    }
 
-  // Plenty of text, none of it writing. Whatever the model produced here came
-  // from its own pretrained knowledge dressed in retrieved cast lists, which is
-  // precisely what this module exists to stop.
-  const allListings = substantive.every((s) => isListingDomain(s.domain))
-  if (allListings) {
-    return { store: false, reason: 'thin_sources' }
+    // Plenty of text, none of it writing. Whatever the model produced here came
+    // from its own pretrained knowledge dressed in retrieved cast lists, which
+    // is precisely what this module exists to stop. Not checkable under native
+    // grounding, where the domains are never disclosed.
+    if (substantive.every((s) => isListingDomain(s.domain))) {
+      return { store: false, reason: 'thin_sources' }
+    }
   }
 
   // Short means the model took the exit — a correct answer about the work

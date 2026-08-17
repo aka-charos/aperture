@@ -91,6 +91,12 @@ const analysisRoutes: FastifyPluginAsync = async (fastify) => {
    * Not admin-only. Spend is bounded by the provider's own daily cap and by
    * single-flight, and the people who want an analysis are the people reading
    * the page; requiring an admin would mean nobody ever gets one.
+   *
+   * `?force=true` re-runs a title that already has a row, and is ADMIN-ONLY. It
+   * exists because the two retrieval modes can only be judged by running both
+   * over the same titles, which the cache otherwise makes impossible — but it
+   * is also the one way to spend unboundedly by holding down a button, so the
+   * cache stays authoritative for everyone else.
    */
   fastify.post<{ Params: { mediaType: string; id: string }; Querystring: { force?: string } }>(
     '/api/analysis/:mediaType/:id',
@@ -102,8 +108,13 @@ const analysisRoutes: FastifyPluginAsync = async (fastify) => {
       const { id } = request.params
       const key = `${mediaType}:${id}`
 
+      // Silently ignored for a non-admin rather than refused: the request is
+      // still perfectly serviceable from cache, and failing it would turn a
+      // stray query parameter into a broken page.
+      const force = request.query.force === 'true' && request.user?.isAdmin === true
+
       try {
-        const existing = await getStoredAnalysis(mediaType, id)
+        const existing = force ? null : await getStoredAnalysis(mediaType, id)
         // A stored decline counts as an answer: re-asking spends a grounded
         // request to receive the same "there is nothing to say" every time.
         // Bumping ANALYSIS_PROMPT_VERSION is what clears those deliberately.

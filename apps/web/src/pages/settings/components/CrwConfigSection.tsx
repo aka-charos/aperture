@@ -31,12 +31,16 @@ import {
   Switch,
   FormControlLabel,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import SaveIcon from '@mui/icons-material/Save'
 import SyncIcon from '@mui/icons-material/Sync'
+
+type RetrievalMode = 'crw' | 'grounding'
 
 interface CrwPublicConfig {
   enabled: boolean
@@ -46,6 +50,12 @@ interface CrwPublicConfig {
   maxContentChars: number
   timeoutMs: number
   sourceBudgetChars: number
+  retrievalMode: RetrievalMode
+}
+
+interface Readiness {
+  ready: boolean
+  reason: string | null
 }
 
 interface TestResult {
@@ -59,6 +69,7 @@ const clampInt = (raw: string, min: number, max: number, fallback: number) =>
 export function CrwConfigSection() {
   const { t } = useTranslation()
   const [config, setConfig] = useState<CrwPublicConfig | null>(null)
+  const [readiness, setReadiness] = useState<Readiness | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -66,6 +77,7 @@ export function CrwConfigSection() {
   const [success, setSuccess] = useState<string | null>(null)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
 
+  const [retrievalMode, setRetrievalMode] = useState<RetrievalMode>('crw')
   const [enabled, setEnabled] = useState(false)
   const [baseUrl, setBaseUrl] = useState('')
   const [apiKey, setApiKey] = useState('')
@@ -80,6 +92,7 @@ export function CrwConfigSection() {
   // value shows the persisted number rather than what was typed.
   const applyConfig = useCallback((c: CrwPublicConfig) => {
     setConfig(c)
+    setRetrievalMode(c.retrievalMode ?? 'crw')
     setEnabled(!!c.enabled)
     setBaseUrl(c.baseUrl ?? '')
     setApiKey('')
@@ -96,6 +109,7 @@ export function CrwConfigSection() {
       if (response.ok) {
         const data = await response.json()
         applyConfig(data.config)
+        setReadiness(data.readiness ?? null)
       }
     } catch {
       setError(t('settingsCrw.loadError'))
@@ -111,6 +125,7 @@ export function CrwConfigSection() {
   const markChanged = () => setHasChanges(true)
 
   const buildPayload = () => ({
+    retrievalMode,
     enabled,
     baseUrl: baseUrl.trim(),
     // Omitted rather than blank when untouched: the server reads an explicit
@@ -137,6 +152,7 @@ export function CrwConfigSection() {
       if (response.ok) {
         const data = await response.json()
         applyConfig(data.config)
+        setReadiness(data.readiness ?? null)
         setSuccess(t('settingsCrw.saved'))
         setTimeout(() => setSuccess(null), 3000)
       } else {
@@ -251,6 +267,43 @@ export function CrwConfigSection() {
         )}
 
         <Stack spacing={2}>
+          <Box>
+            <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+              {t('settingsCrw.modeLabel')}
+            </Typography>
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={retrievalMode}
+              onChange={(_e, value: RetrievalMode | null) => {
+                // Null arrives when the active button is clicked again;
+                // there is no "neither" here, so keep the current mode.
+                if (!value) return
+                setRetrievalMode(value)
+                markChanged()
+              }}
+            >
+              <ToggleButton value="crw">{t('settingsCrw.modeCrw')}</ToggleButton>
+              <ToggleButton value="grounding">{t('settingsCrw.modeGrounding')}</ToggleButton>
+            </ToggleButtonGroup>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+              {retrievalMode === 'crw'
+                ? t('settingsCrw.modeCrwHelp')
+                : t('settingsCrw.modeGroundingHelp')}
+            </Typography>
+          </Box>
+
+          {/* Both modes fail the same way from a job log — every title erroring
+              — while their fixes live on different settings pages, so say which
+              half is missing before a batch is started. */}
+          {readiness && !readiness.ready && readiness.reason && (
+            <Alert severity="warning">{readiness.reason}</Alert>
+          )}
+
+          {retrievalMode === 'grounding' && (
+            <Alert severity="info">{t('settingsCrw.groundingNotice')}</Alert>
+          )}
+
           <FormControlLabel
             control={
               <Switch

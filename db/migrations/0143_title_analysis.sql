@@ -67,6 +67,21 @@ CREATE TABLE IF NOT EXISTS title_analysis (
   source_count INTEGER,
   retrieved_chars INTEGER,
 
+  -- Which approach produced this row: 'crw' (self-hosted search + scrape, the
+  -- model writes from article text in the prompt) or 'grounding' (a Gemini
+  -- model searches for itself). They fail in opposite directions — one is
+  -- bounded by hardware, the other by a per-day Google quota — so the mode is
+  -- recorded rather than assumed, and the two can be compared on a real library
+  -- instead of argued about:
+  --
+  --   SELECT retrieval_mode, model, count(*), count(analysis) AS kept,
+  --          round(avg(length(analysis))) AS avg_chars
+  --   FROM title_analysis GROUP BY 1, 2;
+  --
+  -- Note retrieved_chars is NULL under 'grounding': Google never exposes the
+  -- text it retrieved, so there is nothing to count. That is not zero.
+  retrieval_mode TEXT,
+
   model TEXT NOT NULL,
   prompt_version INTEGER NOT NULL,
   tags_prompt_version INTEGER,

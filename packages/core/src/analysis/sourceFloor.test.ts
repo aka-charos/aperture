@@ -4,8 +4,10 @@ import assert from 'node:assert/strict'
 import {
   decideAnalysisFloor,
   isListingDomain,
+  MIN_GROUNDING_CHUNKS,
   MIN_SUBSTANTIVE_SOURCES,
   MIN_SUBSTANTIVE_SOURCE_CHARS,
+  type RetrievalEvidence,
   type RetrievedSource,
 } from './sourceFloor.js'
 
@@ -18,9 +20,15 @@ const goodSources = (n: number): RetrievedSource[] =>
     chars: MIN_SUBSTANTIVE_SOURCE_CHARS * 3,
   }))
 
+/** Self-hosted retrieval: whole documents, so domain and size are known. */
+const crw = (sources: RetrievedSource[]): RetrievalEvidence => ({ mode: 'crw', sources })
+
+/** Native grounding: only a chunk count is ever disclosed. */
+const grounded = (chunkCount: number): RetrievalEvidence => ({ mode: 'grounding', chunkCount })
+
 test('a substantial answer over real sources is kept', () => {
   assert.deepEqual(
-    decideAnalysisFloor({ text: longText, grade: 'substantial', sources: goodSources(4) }),
+    decideAnalysisFloor({ text: longText, grade: 'substantial', evidence: crw(goodSources(4)) }),
     { store: true }
   )
 })
@@ -29,7 +37,7 @@ test("the model's own 'almost-nothing' outranks any amount of retrieval", () => 
   // Volume measures obscurity, the grade measures depth: a widely-listed
   // blockbuster returns plenty of pages carrying no analytical writing at all.
   assert.deepEqual(
-    decideAnalysisFloor({ text: longText, grade: 'almost-nothing', sources: goodSources(12) }),
+    decideAnalysisFloor({ text: longText, grade: 'almost-nothing', evidence: crw(goodSources(12)) }),
     { store: false, reason: 'thin_sources' }
   )
 })
@@ -39,7 +47,7 @@ test('too few documents declines as thin sources', () => {
     decideAnalysisFloor({
       text: longText,
       grade: 'substantial',
-      sources: goodSources(MIN_SUBSTANTIVE_SOURCES - 1),
+      evidence: crw(goodSources(MIN_SUBSTANTIVE_SOURCES - 1)),
     }),
     { store: false, reason: 'thin_sources' }
   )
@@ -53,7 +61,7 @@ test('exactly the minimum is enough — the bar errs toward keeping', () => {
     decideAnalysisFloor({
       text: longText,
       grade: 'substantial',
-      sources: goodSources(MIN_SUBSTANTIVE_SOURCES),
+      evidence: crw(goodSources(MIN_SUBSTANTIVE_SOURCES)),
     }),
     { store: true }
   )
@@ -66,7 +74,7 @@ test('stub pages do not count as documents', () => {
     domain: `journal${i}.example.org`,
     chars: MIN_SUBSTANTIVE_SOURCE_CHARS - 1,
   }))
-  assert.deepEqual(decideAnalysisFloor({ text: longText, grade: 'substantial', sources: stubs }), {
+  assert.deepEqual(decideAnalysisFloor({ text: longText, grade: 'substantial', evidence: crw(stubs) }), {
     store: false,
     reason: 'thin_sources',
   })
@@ -83,7 +91,7 @@ test('plenty of text from nothing but listing sites is not sourcing', () => {
     { domain: 'tv.apple.com', chars: 4000 },
   ]
   assert.deepEqual(
-    decideAnalysisFloor({ text: longText, grade: 'substantial', sources: listings }),
+    decideAnalysisFloor({ text: longText, grade: 'substantial', evidence: crw(listings) }),
     { store: false, reason: 'thin_sources' }
   )
 })
@@ -95,7 +103,7 @@ test('one real source among listings is enough to keep', () => {
     { domain: 'imdb.com', chars: 9000 },
     { domain: 'sensesofcinema.com', chars: 4000 },
   ]
-  assert.deepEqual(decideAnalysisFloor({ text: longText, grade: 'substantial', sources: mixed }), {
+  assert.deepEqual(decideAnalysisFloor({ text: longText, grade: 'substantial', evidence: crw(mixed) }), {
     store: true,
   })
 })
@@ -105,7 +113,7 @@ test('a short answer over good sources is the model taking the exit', () => {
     decideAnalysisFloor({
       text: 'There is little of formal interest here. It is a competently made romantic comedy.',
       grade: 'reviews-only',
-      sources: goodSources(5),
+      evidence: crw(goodSources(5)),
     }),
     { store: false, reason: 'no_distinctive_craft' }
   )
@@ -114,7 +122,7 @@ test('a short answer over good sources is the model taking the exit', () => {
 test('short AND unsourced is reported as the sourcing problem', () => {
   // Ordering matters: the retrieval failure is the likelier cause and the more
   // actionable report.
-  assert.deepEqual(decideAnalysisFloor({ text: 'Nothing found.', grade: null, sources: [] }), {
+  assert.deepEqual(decideAnalysisFloor({ text: 'Nothing found.', grade: null, evidence: crw([]) }), {
     store: false,
     reason: 'thin_sources',
   })
@@ -124,7 +132,7 @@ test('a missing SOURCES line costs the signal, not the analysis', () => {
   // A smaller local model is likelier to drift on an exact output format than
   // on the writing itself, so a null grade must never be read as a decline.
   assert.deepEqual(
-    decideAnalysisFloor({ text: longText, grade: null, sources: goodSources(3) }),
+    decideAnalysisFloor({ text: longText, grade: null, evidence: crw(goodSources(3)) }),
     { store: true }
   )
 })
@@ -133,7 +141,7 @@ test('an empty response declines rather than storing blank prose', () => {
   const decision = decideAnalysisFloor({
     text: '   ',
     grade: 'substantial',
-    sources: goodSources(5),
+    evidence: crw(goodSources(5)),
   })
   assert.equal(decision.store, false)
 })
@@ -150,6 +158,48 @@ test('listing domains match on host and subdomain, never on substring', () => {
 
   assert.equal(isListingDomain('sensesofcinema.com'), false)
   assert.equal(isListingDomain(''), false)
+})
+
+test('grounded mode judges on chunk count, since it gets nothing else', () => {
+  assert.deepEqual(
+    decideAnalysisFloor({ text: longText, grade: 'substantial', evidence: grounded(7) }),
+    { store: true }
+  )
+  assert.deepEqual(
+    decideAnalysisFloor({
+      text: longText,
+      grade: 'substantial',
+      evidence: grounded(MIN_GROUNDING_CHUNKS - 1),
+    }),
+    { store: false, reason: 'thin_sources' }
+  )
+})
+
+test('the listing rule cannot fire under grounding, because domains are hidden', () => {
+  // Google returns expiring redirect URLs, so there is no domain to judge. A
+  // grounded answer over plenty of chunks is kept even though the same volume
+  // of pure listings would be refused on the self-hosted path — the evidence
+  // genuinely differs, which is why the two are not flattened into one shape.
+  assert.deepEqual(
+    decideAnalysisFloor({ text: longText, grade: 'substantial', evidence: grounded(20) }),
+    { store: true }
+  )
+})
+
+test("the model's verdict still outranks retrieval in grounded mode", () => {
+  // It is very nearly the only signal there is here, which is why it is checked
+  // before the mode split rather than inside either branch.
+  assert.deepEqual(
+    decideAnalysisFloor({ text: longText, grade: 'almost-nothing', evidence: grounded(30) }),
+    { store: false, reason: 'thin_sources' }
+  )
+})
+
+test('a short grounded answer is the exit, not a retrieval failure', () => {
+  assert.deepEqual(
+    decideAnalysisFloor({ text: 'Not much to say.', grade: 'reviews-only', evidence: grounded(9) }),
+    { store: false, reason: 'no_distinctive_craft' }
+  )
 })
 
 test('places that carry writing are deliberately not listings', () => {

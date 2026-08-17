@@ -110,13 +110,14 @@ export function AISetupCardGrid({ config, onSave, variant }: AISetupCardGridProp
         />
       )}
 
-      {/* Title Analysis is NOT a grounding role. Retrieval happens before the
-          model is called — fastCRW returns the source text — so this is a plain
-          writing role with a free choice of provider, and pointing it at a local
-          model (LM Studio via OpenAI-Compatible, or Ollama) is the intended
-          setup: a per-day grounding cap is precisely what made a library-wide
-          pass impossible. No spare keys and no usage meter, because there is no
-          per-day quota here to extend or watch. */}
+      {/* Title Analysis takes ANY provider, because where its sources come from
+          is a separate setting (Settings > Integrations > Retrieval). With
+          self-hosted retrieval the model only has to write from text it is
+          handed — a local LM Studio model or a cheap OpenRouter one does that
+          well, and neither is metered, which is what makes covering a whole
+          library possible. Pointed at Google it can instead search for itself,
+          and then it IS spending grounding quota: hence the spare keys and the
+          usage meter, shown only for Google since no other provider grounds. */}
       {variant === 'settings' && (
         <AIFunctionCard
           functionType="titleAnalysis"
@@ -128,6 +129,12 @@ export function AISetupCardGrid({ config, onSave, variant }: AISetupCardGridProp
           onSave={(c) => onSave('titleAnalysis', c)}
           compact={isSetup}
           isSetup={isSetup}
+          supportsFallbackKey
+          footer={
+            config?.titleAnalysis?.provider === 'google' ? (
+              <WebSearchUsagePanel role="titleAnalysis" />
+            ) : undefined
+          }
         />
       )}
     </Box>

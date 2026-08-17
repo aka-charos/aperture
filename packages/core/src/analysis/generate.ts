@@ -26,11 +26,17 @@
  */
 import { generateText } from 'ai'
 
-import { getTitleAnalysisModelInstance } from '../lib/ai-provider.js'
-import { crwSearch, getCrwConfig, isCrwEnabled } from '../lib/crw.js'
+import {
+  getGroundingProviderTools,
+  getTitleAnalysisModelInstance,
+  withGroundingModel,
+} from '../lib/ai-provider.js'
+import { crwSearch, getCrwConfig, isCrwEnabled, urlDomain } from '../lib/crw.js'
 import { query, queryOne } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
+import { recordWebSearchCall } from '../lib/webSearchUsage.js'
 import { budgetSources } from './budget.js'
+import { getRetrievalMode, type RetrievalMode } from './mode.js'
 import {
   ANALYSIS_PROMPT_VERSION,
   buildAnalysisPrompt,
@@ -39,7 +45,11 @@ import {
   type AnalysisSource,
   type AnalysisSubject,
 } from './prompt.js'
-import { decideAnalysisFloor, type RetrievedSource } from './sourceFloor.js'
+import {
+  decideAnalysisFloor,
+  type RetrievalEvidence,
+  type RetrievedSource,
+} from './sourceFloor.js'
 
 const logger = createChildLogger('title-analysis')
 
@@ -68,6 +78,8 @@ export interface StoredAnalysis {
   sourceCount: number | null
   retrievedChars: number | null
   model: string | null
+  /** Which approach produced this row — the whole point of storing it. */
+  retrievalMode: RetrievalMode | null
   promptVersion: number
   analyzedAt: string
 }
@@ -85,11 +97,12 @@ export async function getStoredAnalysis(
     source_count: number | null
     retrieved_chars: number | null
     model: string | null
+    retrieval_mode: RetrievalMode | null
     prompt_version: number
     analyzed_at: Date
   }>(
     `SELECT analysis, decline_reason, sources, source_grade, source_count,
-            retrieved_chars, model, prompt_version, analyzed_at
+            retrieved_chars, model, retrieval_mode, prompt_version, analyzed_at
        FROM title_analysis
       WHERE media_type = $1 AND media_id = $2`,
     [mediaType, mediaId]
@@ -106,6 +119,7 @@ export async function getStoredAnalysis(
     sourceCount: row.source_count,
     retrievedChars: row.retrieved_chars,
     model: row.model,
+    retrievalMode: row.retrieval_mode,
     promptVersion: row.prompt_version,
     analyzedAt: row.analyzed_at.toISOString(),
   }
@@ -193,8 +207,16 @@ async function retrieveSources(subject: AnalysisSubject): Promise<Retrieval> {
   }
 }
 
-/** One writing call, with a retry for empty output. */
-async function writeAnalysis(prompt: string): Promise<{ text: string; modelId: string }> {
+interface WriteResult {
+  text: string
+  modelId: string
+  /** Only in grounding mode: what Google attached to the answer. */
+  groundingChunks?: number
+  groundingSources?: Array<{ title: string; domain: string }>
+}
+
+/** One plain writing call over documents already in the prompt. */
+async function writeFromSources(prompt: string): Promise<WriteResult> {
   const { model, modelId } = await getTitleAnalysisModelInstance()
 
   let text = ''
@@ -218,6 +240,108 @@ async function writeAnalysis(prompt: string): Promise<{ text: string; modelId: s
 }
 
 /**
+ * Turn Google's grounding sources into something worth storing.
+ *
+ * Drops the URL deliberately: Google returns `vertexaisearch…/
+ * grounding-api-redirect/…` links that expire, so a cache meant to live for
+ * months would fill with dead links. The redirect host is also identical for
+ * every source, so showing it as provenance would tell a reader nothing — which
+ * is why a domain that looks like one is blanked rather than displayed.
+ */
+function extractGroundingSources(raw: unknown): Array<{ title: string; domain: string }> {
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<string>()
+  const out: Array<{ title: string; domain: string }> = []
+
+  for (const entry of raw) {
+    const source = entry as { title?: unknown; url?: unknown }
+    const title = typeof source.title === 'string' ? source.title.trim() : ''
+    let domain = typeof source.url === 'string' ? urlDomain(source.url) : ''
+    if (domain.includes('vertexaisearch') || domain.includes('grounding-api')) domain = ''
+    if (!title && !domain) continue
+
+    const key = `${title}|${domain}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ title: title || domain, domain })
+  }
+
+  return out
+}
+
+/**
+ * One natively-grounded call: the model searches for itself.
+ *
+ * Runs through `withGroundingModel`, which is what rotates keys on a 429, parks
+ * an exhausted one and writes `web_search_usage` — so this mode is metered
+ * exactly like the assistant's discovery, and `web_search_usage.role` is what
+ * separates the two. The empty-text retry inside is metered by hand for the
+ * usual reason: the wrapper records once per KEY attempt, and this loop sits
+ * inside one of them, so without it a request Google counts is invisible.
+ */
+async function writeWithGrounding(prompt: string): Promise<WriteResult> {
+  const tools = await getGroundingProviderTools('titleAnalysis')
+
+  return withGroundingModel('titleAnalysis', async (model, keyAttempt) => {
+    let result: WriteResult = { text: '', modelId: keyAttempt.modelId }
+    let usage: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | undefined
+
+    for (let attempt = 1; attempt <= MAX_EMPTY_RETRIES; attempt++) {
+      const response = await generateText({
+        model,
+        tools,
+        prompt,
+        maxRetries: MODEL_MAX_RETRIES,
+        maxOutputTokens: MAX_OUTPUT_TOKENS,
+      })
+      usage = response.usage
+
+      const grounding = (
+        response.providerMetadata?.google as
+          | { groundingMetadata?: { webSearchQueries?: string[]; groundingChunks?: unknown[] } }
+          | undefined
+      )?.groundingMetadata
+
+      result = {
+        text: response.text ?? '',
+        modelId: response.response?.modelId ?? keyAttempt.modelId,
+        groundingChunks: grounding?.groundingChunks?.length ?? 0,
+        groundingSources: extractGroundingSources(response.sources),
+      }
+
+      logger.info(
+        {
+          attempt,
+          keySlot: keyAttempt.slot,
+          modelId: result.modelId,
+          webSearchQueries: grounding?.webSearchQueries?.length ?? 0,
+          groundingChunks: result.groundingChunks,
+          textChars: result.text.length,
+        },
+        'Title analysis grounding completed'
+      )
+
+      if (result.text.trim()) break
+
+      if (attempt < MAX_EMPTY_RETRIES) {
+        logger.warn({ attempt }, 'Grounded analysis returned empty text; retrying')
+        await recordWebSearchCall({
+          role: 'titleAnalysis',
+          provider: keyAttempt.provider,
+          model: keyAttempt.modelId,
+          slot: keyAttempt.slot,
+          status: 'empty',
+          ...response.usage,
+        })
+        await sleep(EMPTY_RETRY_DELAY_MS)
+      }
+    }
+
+    return { value: result, usage }
+  })
+}
+
+/**
  * Analyse one title and store the outcome.
  *
  * Returns the stored row on success OR decline — both are results. Throws on
@@ -233,23 +357,51 @@ export async function analyseTitle(
   mediaId: string,
   subject: AnalysisSubject
 ): Promise<StoredAnalysis> {
-  const retrieval = await retrieveSources(subject)
-  const prompt = buildAnalysisPrompt(subject, retrieval.sources)
-  const { text: raw, modelId } = await writeAnalysis(prompt)
+  const mode = await getRetrievalMode()
+
+  let raw: string
+  let modelId: string
+  let evidence: RetrievalEvidence
+  let foundSources: Array<{ title: string; domain: string }>
+  let sourceCount: number
+  let retrievedChars: number | null
+
+  if (mode === 'grounding') {
+    // The model searches for itself. Nothing to budget and nothing to fence —
+    // no external text enters the prompt — but also far less to judge the
+    // result on, which is why the floor leans on the model's own verdict here.
+    const result = await writeWithGrounding(buildAnalysisPrompt(subject, { mode }))
+    raw = result.text
+    modelId = result.modelId
+    evidence = { mode: 'grounding', chunkCount: result.groundingChunks ?? 0 }
+    foundSources = result.groundingSources ?? []
+    sourceCount = result.groundingChunks ?? 0
+    // Google never exposes the retrieved text, so there is no character count
+    // to record. NULL means "not measurable in this mode", not zero.
+    retrievedChars = null
+  } else {
+    const retrieval = await retrieveSources(subject)
+    const result = await writeFromSources(
+      buildAnalysisPrompt(subject, { mode, sources: retrieval.sources })
+    )
+    raw = result.text
+    modelId = result.modelId
+    evidence = { mode: 'crw', sources: retrieval.evidence }
+    foundSources = retrieval.sources.map((s) => ({ title: s.title, domain: s.domain }))
+    sourceCount = retrieval.sources.length
+    retrievedChars = retrieval.retrievedChars
+  }
 
   const { text, grade } = parseAnalysisResponse(raw)
-  const decision = decideAnalysisFloor({ text, grade, sources: retrieval.evidence })
+  const decision = decideAnalysisFloor({ text, grade, evidence })
 
   const analysis = decision.store ? text : null
   const declineReason = decision.store ? null : decision.reason
-  const sourceCount = retrieval.sources.length
 
   // Provenance is stored for what we KEPT only: a declined row renders as
   // "we looked and there was nothing worth writing", and listing the pages that
   // produced nothing would invite a reader to go and check them.
-  const storedSources = decision.store
-    ? retrieval.sources.map((s) => ({ title: s.title, domain: s.domain }))
-    : []
+  const storedSources = decision.store ? foundSources : []
 
   if (!decision.store) {
     logger.info(
@@ -257,11 +409,12 @@ export async function analyseTitle(
         mediaType,
         mediaId,
         title: subject.title,
+        mode,
         reason: declineReason,
         grade,
         sourceCount,
-        retrievedChars: retrieval.retrievedChars,
-        domains: retrieval.evidence.map((s) => s.domain),
+        retrievedChars,
+        domains: evidence.mode === 'crw' ? evidence.sources.map((s) => s.domain) : undefined,
         textChars: text.length,
       },
       'Title analysis declined; storing the decline so it is not re-asked'
@@ -271,8 +424,8 @@ export async function analyseTitle(
   await query(
     `INSERT INTO title_analysis
        (media_type, media_id, analysis, decline_reason, sources, source_grade,
-        source_count, retrieved_chars, model, prompt_version, analyzed_at)
-     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, NOW())
+        source_count, retrieved_chars, model, retrieval_mode, prompt_version, analyzed_at)
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, NOW())
      ON CONFLICT (media_type, media_id) DO UPDATE SET
        analysis = EXCLUDED.analysis,
        decline_reason = EXCLUDED.decline_reason,
@@ -281,6 +434,7 @@ export async function analyseTitle(
        source_count = EXCLUDED.source_count,
        retrieved_chars = EXCLUDED.retrieved_chars,
        model = EXCLUDED.model,
+       retrieval_mode = EXCLUDED.retrieval_mode,
        prompt_version = EXCLUDED.prompt_version,
        analyzed_at = NOW(),
        -- A fresh analysis invalidates tags extracted from the previous prose.
@@ -293,8 +447,9 @@ export async function analyseTitle(
       JSON.stringify(storedSources),
       grade,
       sourceCount,
-      retrieval.retrievedChars,
+      retrievedChars,
       modelId,
+      mode,
       ANALYSIS_PROMPT_VERSION,
     ]
   )
@@ -307,8 +462,9 @@ export async function analyseTitle(
     sources: storedSources,
     sourceGrade: grade,
     sourceCount,
-    retrievedChars: retrieval.retrievedChars,
+    retrievedChars,
     model: modelId,
+    retrievalMode: mode,
     promptVersion: ANALYSIS_PROMPT_VERSION,
     analyzedAt: new Date().toISOString(),
   }

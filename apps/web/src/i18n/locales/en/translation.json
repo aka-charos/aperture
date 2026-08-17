@@ -1923,7 +1923,13 @@
     "testSuccess": "Connected. Search returned {{count}} result(s).",
     "testFailed": "Could not reach the retrieval service",
     "errSave": "Failed to save the retrieval configuration",
-    "errConnect": "Connection failed"
+    "errConnect": "Connection failed",
+    "modeLabel": "Where analysis gets its sources",
+    "modeCrw": "Self-hosted retrieval",
+    "modeGrounding": "Model built-in search",
+    "modeCrwHelp": "fastCRW searches and fetches the pages, and the Title Analysis model writes from that text. No quota, so a whole library is reachable — a local or cheap model is enough, because the work is organising text it has been handed rather than recalling it.",
+    "modeGroundingHelp": "A Google Gemini model searches for itself. Better retrieval and no infrastructure, but metered per day per Google project — on a free tier that is a few dozen titles a day, not a library. Needs Google selected for Title Analysis in Settings > AI.",
+    "groundingNotice": "The retrieval service settings below are unused while built-in search is selected. They are kept so you can switch back without reconfiguring."
   },
   "settingsStreamingDiscovery": {
     "title": "Streaming discovery (JustWatch)",
@@ -2141,7 +2147,7 @@
     "cardWebSearchTitle": "Google Gemini Web Search",
     "cardWebSearchDesc": "Optional. Gemini's native search grounding finds current titles from the web for discovery requests, then matches them against your library. Google is the only provider that offers this. Leave unset to disable web discovery.",
     "cardTitleAnalysisTitle": "Title Analysis",
-    "cardTitleAnalysisDesc": "Optional. Writes a critic-informed analysis of a film or show — how it was made, what its makers were attempting, where it sits, what critics argue about. Cached per title and shared by everyone. It writes from web pages fetched by the retrieval service, so configure that first under Integrations; a local model works well here, and is what makes covering a whole library affordable.",
+    "cardTitleAnalysisDesc": "Optional. Writes a critic-informed analysis of a film or show — how it was made, what its makers were attempting, where it sits, what critics argue about. Cached per title and shared by everyone. Any provider works: with self-hosted retrieval the model only writes from pages already fetched for it, so a local LM Studio model or a cheap OpenRouter one is plenty. Choose Google to let it search for itself instead — better sources, but a hard daily cap.",
     "episodeEmbeddingsTitle": "Episode Embeddings",
     "episodeEmbeddingsBody": "Vectorizing individual episodes lets the assistant answer questions about what happens inside one — \"the episode where they get stuck in the desert\". Nothing else can: the series vector describes the show, not its episodes. It is also the largest embedding table by far, one row per episode instead of one per show, and every new episode costs an embedding call.",
     "episodeEmbeddingsToggle": "Generate embeddings for episodes",
