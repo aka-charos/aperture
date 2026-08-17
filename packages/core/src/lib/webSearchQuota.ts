@@ -43,45 +43,97 @@ export function keySlotName(index: number): WebSearchKeySlot {
   return `fallback${index}`
 }
 
+/**
+ * Every field is optional because each is learned separately — see
+ * {@link getFreeTierLimits}. A missing field means "no denominator yet", which
+ * the panel renders as a bare count rather than a bar.
+ */
 export interface FreeTierLimits {
   /** Requests per minute. */
-  rpm: number
+  rpm?: number
   /** Requests per day, resetting at midnight US/Pacific. */
-  rpd: number
+  rpd?: number
   /** Tokens per minute (input + output). */
-  tpm: number
+  tpm?: number
 }
 
 /**
- * Google's published free-tier limits, per model. These are Google's numbers,
- * not ours, and Google revises them — they drive a progress bar and a warning,
- * never a hard block, so being a revision behind degrades to a slightly wrong
- * gauge rather than a refused request.
+ * Limits OBSERVED from Google's own 429 responses, keyed by model.
  *
- * Models absent here (anything newer, or a paid-tier key) simply have no
- * denominator: usage is still counted and shown, just without a limit.
+ * THIS USED TO BE A HARDCODED TABLE AND THE TABLE WAS WRONG. It claimed
+ * `gemini-2.5-flash-lite: { rpd: 1000 }`; a live free-tier account enforces
+ * **20**, so the panel drew a green bar at 1.2% while the day was 60% gone —
+ * a confidently wrong gauge, which is worse than no gauge. Worse, it cannot be
+ * repaired by reading the docs: Google has withdrawn the published per-model
+ * free-tier table and now points at a per-account page in AI Studio, and the
+ * numbers genuinely differ between accounts and tiers. Hardcoding one
+ * operator's figures would just be wrong for everybody else.
  *
- * KNOWN GAP: the 3.x models in `ai-capabilities/data/google.json`
- * (`gemini-3.5-flash`, `gemini-3.1-flash-lite`) are not here, so pointing a
- * grounding role at one shows a count with no limit beside it. They are left
- * out rather than estimated on purpose — a guessed denominator renders as a
- * confident, wrong gauge, which is worse than an absent one. Fill them in from
- * https://ai.google.dev/gemini-api/docs/rate-limits, not from a model's recall.
+ * So the denominator comes from the only authority that always knows it: the
+ * 429 itself. Google's quota rejections carry a `QuotaFailure` detail naming
+ * the violated quota and its `quotaValue`, which is this account's real limit
+ * for this model. Nothing is shown until one arrives — and on a 20/day tier
+ * that happens quickly and harmlessly.
  *
- * Note also that these are the limits on the MODEL. Grounded search carries its
- * own, tighter daily cap that applies whatever model is in use, so a role well
- * inside these numbers can still be refused.
+ * In memory, deliberately, exactly like the cooldowns below: losing it on
+ * restart costs a gauge until the next 429, whereas persisting it risks
+ * showing a stale limit after Google revises one or the operator upgrades a
+ * tier. It is display data and nothing throttles on it.
+ *
+ * Note these are limits on the MODEL. Grounded search carries its own separate
+ * allowance — currently 5,000 requests/month shared across the Gemini 3.x
+ * family — so a role well inside these numbers can still be refused, and the
+ * daily window this module is built around does not even measure that budget.
  */
-const GEMINI_FREE_TIER_LIMITS: Record<string, FreeTierLimits> = {
-  'gemini-2.5-flash-lite': { rpm: 15, rpd: 1000, tpm: 250_000 },
-  'gemini-2.5-flash': { rpm: 10, rpd: 250, tpm: 250_000 },
-  'gemini-2.5-pro': { rpm: 5, rpd: 100, tpm: 250_000 },
-}
+const observedLimits = new Map<string, FreeTierLimits>()
 
-/** Published free-tier limits for a model, or null when we don't know them. */
+/**
+ * Limits for a model as learned from its 429s, or null if none have arrived.
+ *
+ * Returns a copy: callers hand this straight to an API response, and a mutation
+ * there would silently rewrite what every later request reports.
+ */
 export function getFreeTierLimits(modelId: string | null | undefined): FreeTierLimits | null {
   if (!modelId) return null
-  return GEMINI_FREE_TIER_LIMITS[modelId] ?? null
+  const learned = observedLimits.get(modelId)
+  if (!learned) return null
+  return { ...learned }
+}
+
+/**
+ * Record a limit Google just told us about.
+ *
+ * Exported for the one caller that has a model id and a classified error in
+ * hand at the same time ({@link markSlotExhausted}), and for tests.
+ */
+export function noteObservedLimit(modelId: string, info: QuotaErrorInfo): void {
+  if (!info.observedLimit || !Number.isFinite(info.observedLimit)) return
+
+  const field: keyof FreeTierLimits | null = info.limitIsTokens
+    ? 'tpm'
+    : info.scope === 'day'
+      ? 'rpd'
+      : info.scope === 'minute'
+        ? 'rpm'
+        : // An unattributed 429 tells us a number but not which bucket it
+          // belongs to, and guessing would put a per-minute cap on the daily
+          // bar. Drop it; another rejection will be clearer.
+          null
+  if (!field) return
+
+  const current = observedLimits.get(modelId) ?? {}
+  if (current[field] === info.observedLimit) return
+
+  observedLimits.set(modelId, { ...current, [field]: info.observedLimit })
+  logger.info(
+    { model: modelId, [field]: info.observedLimit },
+    'Learned a quota limit from Google’s 429'
+  )
+}
+
+/** Test seam — the map is process-wide and would otherwise leak between cases. */
+export function clearObservedLimits(): void {
+  observedLimits.clear()
 }
 
 // ============================================================================
@@ -97,6 +149,14 @@ export interface QuotaErrorInfo {
   scope: QuotaScope
   /** Google's own RetryInfo, when the error body carried one. */
   retryAfterMs?: number
+  /**
+   * The violated quota's actual value, when the body named it. This is the
+   * account's real limit and the only trustworthy source of one — see
+   * {@link getFreeTierLimits}.
+   */
+  observedLimit?: number
+  /** True when the violated quota counts tokens rather than requests. */
+  limitIsTokens?: boolean
 }
 
 const NOT_QUOTA: QuotaErrorInfo = { isQuota: false, scope: 'unknown' }
@@ -173,7 +233,22 @@ export function classifyQuotaError(err: unknown): QuotaErrorInfo {
   const retryMatch = /"?retry[-_]?(?:delay|after)"?\s*[:=]\s*"?(\d+(?:\.\d+)?)s?"?/i.exec(blob)
   const retryAfterMs = retryMatch ? Math.round(Number(retryMatch[1]) * 1000) : undefined
 
-  return { isQuota: true, scope, retryAfterMs }
+  // The account's real limit, straight from the QuotaFailure detail:
+  //   "quotaValue": "20"
+  // Some responses phrase it in the message instead ("limit: 20"), so both are
+  // matched. `quotaValue` wins — it is structured, and a message can mention a
+  // number that is not the limit.
+  const limitMatch =
+    /"?quota_?[Vv]alue"?\s*[:=]\s*"?(\d+)"?/.exec(blob) ??
+    /\blimit(?:\s+of)?\s*[:=]?\s*(\d+)\b/i.exec(blob)
+  const observedLimit = limitMatch ? Number(limitMatch[1]) : undefined
+
+  // A token quota reads as PerMinute too, so without this a TPM ceiling would
+  // be recorded as a requests-per-minute limit and the RPM bar would show a
+  // quarter-million.
+  const limitIsTokens = /token/i.test(blob)
+
+  return { isQuota: true, scope, retryAfterMs, observedLimit, limitIsTokens }
 }
 
 // ============================================================================
@@ -226,13 +301,23 @@ function msUntilPacificMidnight(now: number): number {
   return 86_400_000 - sinceMidnight
 }
 
-/** Park a key after a quota rejection. Returns when it becomes usable again. */
+/**
+ * Park a key after a quota rejection. Returns when it becomes usable again.
+ *
+ * Also harvests the limit Google just disclosed, when the caller knows which
+ * model was refused. Doing it here rather than at the call sites is deliberate:
+ * every quota rejection already funnels through this function, so a new caller
+ * cannot forget to feed the gauge.
+ */
 export function markSlotExhausted(
   role: AIFunction,
   slot: WebSearchKeySlot,
   info: QuotaErrorInfo,
+  modelId?: string | null,
   now: number = Date.now()
 ): number {
+  if (modelId) noteObservedLimit(modelId, info)
+
   const base =
     info.scope === 'day'
       ? msUntilPacificMidnight(now)

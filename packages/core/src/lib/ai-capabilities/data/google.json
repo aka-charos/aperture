@@ -29,6 +29,40 @@
   ],
   "chatModels": [
     {
+      "id": "gemini-3.5-flash-lite",
+      "name": "Gemini 3.5 Flash Lite",
+      "description": "Cheapest current model, and the replacement for 2.5 Flash Lite — which Google no longer offers to new projects. Native Google Search grounding. Best choice for the Web Search role on a free tier.",
+      "capabilities": {
+        "supportsToolCalling": true,
+        "supportsToolStreaming": true,
+        "supportsObjectGeneration": true,
+        "supportsEmbeddings": false
+      },
+      "quality": "standard",
+      "speed": "fast",
+      "costTier": "low",
+      "contextWindow": "1M",
+      "inputCostPerMillion": 0.3,
+      "outputCostPerMillion": 2.5
+    },
+    {
+      "id": "gemini-3.7-flash",
+      "name": "Gemini 3.7 Flash",
+      "description": "Newest stable Flash. Native Google Search grounding. Note the listed price is promotional through 31 Dec 2026 and doubles on 1 Jan 2027.",
+      "capabilities": {
+        "supportsToolCalling": true,
+        "supportsToolStreaming": true,
+        "supportsObjectGeneration": true,
+        "supportsEmbeddings": false
+      },
+      "quality": "premium",
+      "speed": "fast",
+      "costTier": "medium",
+      "contextWindow": "1M",
+      "inputCostPerMillion": 0.75,
+      "outputCostPerMillion": 3.75
+    },
+    {
       "id": "gemini-3.5-flash",
       "name": "Gemini 3.5 Flash",
       "description": "Latest Flash (Gemini 3.5). Most intelligent Flash for agentic and coding tasks. Native Google Search grounding.",

@@ -135,9 +135,12 @@ export {
   type WebSearchUsageTokens,
 } from './ai-provider.js'
 
-// Free-tier quota, shared by the grounding roles (webSearch, titleAnalysis)
+// Free-tier quota for the grounding role. Limits are LEARNED from Google's
+// 429s, never hardcoded — see webSearchQuota.ts for why the table was deleted.
 export {
   getFreeTierLimits,
+  noteObservedLimit,
+  clearObservedLimits,
   classifyQuotaError,
   markSlotExhausted,
   isSlotCoolingDown,
