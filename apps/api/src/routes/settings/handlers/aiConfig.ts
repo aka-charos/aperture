@@ -56,6 +56,8 @@ import {
   getWebSearchUsageSummary,
   getGroundingKeySlots,
   resolveFallbackKeys,
+  AI_FUNCTIONS,
+  isAIFunction,
   type AIFunction,
   type ProviderType,
 } from '@aperture/core'
@@ -452,33 +454,21 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
     try {
       const aiConfig = await getAIConfig()
 
-      const [embeddingsPricing, chatPricing, textGenerationPricing, explorationPricing, webSearchPricing] = await Promise.all([
-        aiConfig.embeddings
-          ? getPricingForModelAsync(aiConfig.embeddings.provider, aiConfig.embeddings.model, 'embeddings')
-          : null,
-        aiConfig.chat
-          ? getPricingForModelAsync(aiConfig.chat.provider, aiConfig.chat.model, 'chat')
-          : null,
-        aiConfig.textGeneration
-          ? getPricingForModelAsync(aiConfig.textGeneration.provider, aiConfig.textGeneration.model, 'textGeneration')
-          : null,
-        aiConfig.exploration
-          ? getPricingForModelAsync(aiConfig.exploration.provider, aiConfig.exploration.model, 'exploration')
-          : null,
-        // Optional 5th role. Priced like the rest so the estimator's summary
-        // doesn't quietly omit a model that is spending money.
-        aiConfig.webSearch
-          ? getPricingForModelAsync(aiConfig.webSearch.provider, aiConfig.webSearch.model, 'webSearch')
-          : null,
-      ])
+      // Every role, priced the same way, so the estimator's summary cannot
+      // quietly omit a model that is spending money — which is what a
+      // hand-written list of roles did to `titleAnalysis`, the one role that
+      // runs across the whole library.
+      const priced = await Promise.all(
+        AI_FUNCTIONS.map(async (fn) => {
+          const roleConfig = aiConfig[fn]
+          return [
+            fn,
+            roleConfig ? await getPricingForModelAsync(roleConfig.provider, roleConfig.model, fn) : null,
+          ] as const
+        })
+      )
 
-      return reply.send({
-        embeddings: embeddingsPricing,
-        chat: chatPricing,
-        textGeneration: textGenerationPricing,
-        exploration: explorationPricing,
-        webSearch: webSearchPricing,
-      })
+      return reply.send(Object.fromEntries(priced))
     } catch (err) {
       fastify.log.error({ err }, 'Failed to get AI pricing')
       return reply.status(500).send({ error: 'Failed to get AI pricing' })
@@ -807,11 +797,11 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
     Body: { provider: string; model: string; apiKey?: string; baseUrl?: string; fallbackApiKeys?: string[] }
   }>('/api/settings/ai/:function', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
     try {
-      const fn = request.params.function as AIFunction
+      const fn = request.params.function
       const { provider, model, apiKey, baseUrl, fallbackApiKeys } = request.body
 
-      if (!['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch', 'titleAnalysis'].includes(fn)) {
-        return reply.status(400).send({ error: 'Invalid function. Must be embeddings, chat, textGeneration, exploration, webSearch, or titleAnalysis' })
+      if (!isAIFunction(fn)) {
+        return reply.status(400).send({ error: `Invalid function. Must be one of: ${AI_FUNCTIONS.join(', ')}` })
       }
 
       // `ai_provider_credentials` is keyed by PROVIDER and shared by every role

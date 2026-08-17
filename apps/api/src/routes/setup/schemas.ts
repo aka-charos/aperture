@@ -1,9 +1,13 @@
 /**
  * Setup OpenAPI Schemas
- * 
+ *
  * Setup wizard endpoints for initial configuration.
  * Most endpoints are only available during first-run setup or to admins.
  */
+import { AI_FUNCTIONS } from '@aperture/core'
+
+/** The AI roles, as a JSON-Schema enum. See the note in settings/schemas.ts. */
+const aiFunctionEnum = [...AI_FUNCTIONS]
 
 // =============================================================================
 // Setup Status & Progress Schemas
@@ -445,7 +449,7 @@ const getAIProviders = {
     properties: {
       function: { 
         type: 'string' as const, 
-        enum: ['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'],
+        enum: aiFunctionEnum,
         description: 'AI function type'
       },
     },
@@ -461,7 +465,7 @@ const getAIModels = {
     required: ['provider', 'function'] as string[],
     properties: {
       provider: { type: 'string' as const, description: 'Provider ID', example: 'openai' },
-      function: { type: 'string' as const, enum: ['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'] },
+      function: { type: 'string' as const, enum: aiFunctionEnum },
     },
   },
 }
@@ -476,7 +480,7 @@ const addCustomModel = {
     required: ['provider', 'function', 'modelId'] as string[],
     properties: {
       provider: { type: 'string' as const, description: 'Provider ID' },
-      function: { type: 'string' as const, enum: ['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'] },
+      function: { type: 'string' as const, enum: aiFunctionEnum },
       modelId: { type: 'string' as const, description: 'Model identifier' },
       embeddingDimensions: { type: 'number' as const, description: 'Embedding dimensions (required for embedding models)' },
     },
@@ -499,7 +503,7 @@ const deleteCustomModel = {
     required: ['provider', 'function', 'modelId'] as string[],
     properties: {
       provider: { type: 'string' as const },
-      function: { type: 'string' as const, enum: ['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'] },
+      function: { type: 'string' as const, enum: aiFunctionEnum },
       modelId: { type: 'string' as const },
     },
   },
@@ -526,7 +530,7 @@ const getAIFunctionConfig = {
     type: 'object' as const,
     required: ['function'] as string[],
     properties: {
-      function: { type: 'string' as const, enum: ['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'] },
+      function: { type: 'string' as const, enum: aiFunctionEnum },
     },
   },
 }
@@ -540,7 +544,7 @@ const testAIProvider = {
     additionalProperties: true,
     required: ['function', 'provider', 'model'] as string[],
     properties: {
-      function: { type: 'string' as const, enum: ['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'] },
+      function: { type: 'string' as const, enum: aiFunctionEnum },
       provider: { type: 'string' as const },
       model: { type: 'string' as const },
       apiKey: { type: 'string' as const, description: 'API key to test (optional, uses saved if not provided)' },
@@ -557,7 +561,7 @@ const updateAIFunctionConfig = {
     type: 'object' as const,
     required: ['function'] as string[],
     properties: {
-      function: { type: 'string' as const, enum: ['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'] },
+      function: { type: 'string' as const, enum: aiFunctionEnum },
     },
   },
   body: {

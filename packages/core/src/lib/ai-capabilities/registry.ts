@@ -16,6 +16,24 @@ export function getProvider(providerId: string): ProviderMetadata | undefined {
   return PROVIDERS.find((p) => p.id === providerId)
 }
 
+/**
+ * The catalog array a role draws from, before any capability filter.
+ *
+ * Only Ollama publishes `textGenerationModels` or `explorationModels`; everyone
+ * else lists their models once, under `chatModels`, which is why those roles
+ * fall back to it. `getModel` has to resolve from the same pool the picker
+ * offered — otherwise a model chosen from the list looks unknown when it is
+ * looked up again, losing its display name and its catalog price.
+ */
+function modelPool(provider: ProviderMetadata, fn: AIFunction): ModelMetadata[] {
+  if (fn === 'embeddings') return provider.embeddingModels
+  if (fn === 'chat' || fn === 'webSearch') return provider.chatModels
+  if (fn === 'exploration') {
+    return provider.explorationModels.length > 0 ? provider.explorationModels : provider.chatModels
+  }
+  return provider.textGenerationModels.length > 0 ? provider.textGenerationModels : provider.chatModels
+}
+
 export function getModel(
   providerId: string,
   modelId: string,
@@ -24,16 +42,7 @@ export function getModel(
   const provider = getProvider(providerId)
   if (!provider) return undefined
 
-  const models =
-    functionType === 'embeddings'
-      ? provider.embeddingModels
-      : functionType === 'chat' || functionType === 'webSearch'
-        ? provider.chatModels
-        : functionType === 'exploration'
-          ? provider.explorationModels
-          : provider.textGenerationModels
-
-  return models.find((m) => m.id === modelId)
+  return modelPool(provider, functionType).find((m) => m.id === modelId)
 }
 
 export function getProvidersForFunction(fn: AIFunction): ProviderMetadata[] {
@@ -62,27 +71,17 @@ export function getModelsForFunction(providerId: string, fn: AIFunction): ModelM
   const provider = getProvider(providerId)
   if (!provider) return []
 
-  if (fn === 'embeddings') {
-    return provider.embeddingModels
-  }
-  if (fn === 'chat') {
-    return provider.chatModels.filter((m) => m.capabilities.supportsToolCalling)
-  }
-  if (fn === 'textGeneration' || fn === 'titleAnalysis') {
-    return provider.textGenerationModels.length > 0
-      ? provider.textGenerationModels
-      : provider.chatModels
+  const pool = modelPool(provider, fn)
+
+  // Tool calling is required to hold a conversation, and to ground a search.
+  if (fn === 'chat' || fn === 'webSearch') {
+    return pool.filter((m) => m.capabilities.supportsToolCalling)
   }
   if (fn === 'exploration') {
-    return provider.explorationModels.length > 0
-      ? provider.explorationModels.filter((m) => m.capabilities.supportsObjectGeneration)
-      : provider.chatModels.filter((m) => m.capabilities.supportsObjectGeneration)
+    return pool.filter((m) => m.capabilities.supportsObjectGeneration)
   }
-  if (fn === 'webSearch') {
-    // Grounding-capable chat models (Google); tool calling required to ground
-    return provider.chatModels.filter((m) => m.capabilities.supportsToolCalling)
-  }
-  return []
+  // Embeddings, textGeneration and titleAnalysis take the pool as it stands.
+  return pool
 }
 
 export function validateCapabilityForFeature(

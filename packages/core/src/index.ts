@@ -61,6 +61,8 @@ export {
   getPricingForModel,
   getPricingForModelAsync,
   PROVIDERS,
+  AI_FUNCTIONS,
+  isAIFunction,
   // Custom models (Ollama & OpenAI-compatible)
   getCustomModels,
   addCustomModel,

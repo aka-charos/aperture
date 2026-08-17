@@ -15,6 +15,8 @@ import {
   addCustomModel,
   deleteCustomModel,
   VALID_EMBEDDING_DIMENSIONS,
+  AI_FUNCTIONS,
+  isAIFunction,
   type AIFunction,
   type ProviderType,
 } from '@aperture/core'
@@ -213,10 +215,10 @@ export async function registerAIHandlers(fastify: FastifyInstance) {
       if (complete && !isAdmin) return reply.status(404).send({ error: 'Not Found' })
 
       try {
-        const fn = request.params.function as AIFunction
+        const fn = request.params.function
 
-        if (!['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'].includes(fn)) {
-          return reply.status(400).send({ error: 'Invalid function. Must be embeddings, chat, textGeneration, or exploration' })
+        if (!isAIFunction(fn)) {
+          return reply.status(400).send({ error: `Invalid function. Must be one of: ${AI_FUNCTIONS.join(', ')}` })
         }
 
         const config = await getFunctionConfig(fn)
@@ -297,11 +299,11 @@ export async function registerAIHandlers(fastify: FastifyInstance) {
       if (complete && !isAdmin) return reply.status(404).send({ error: 'Not Found' })
 
       try {
-        const fn = request.params.function as AIFunction
+        const fn = request.params.function
         const { provider, model, apiKey, baseUrl } = request.body
 
-        if (!['embeddings', 'chat', 'textGeneration', 'exploration', 'webSearch'].includes(fn)) {
-          return reply.status(400).send({ error: 'Invalid function. Must be embeddings, chat, textGeneration, exploration, or webSearch' })
+        if (!isAIFunction(fn)) {
+          return reply.status(400).send({ error: `Invalid function. Must be one of: ${AI_FUNCTIONS.join(', ')}` })
         }
 
         if (apiKey || baseUrl) {

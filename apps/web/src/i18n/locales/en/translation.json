@@ -2241,6 +2241,7 @@
     },
     "fnExploration": "Exploration",
     "fnWebSearch": "Web Search",
+    "fnTitleAnalysis": "Title Analysis",
     "priceUnknown": "Price unknown",
     "priceUnknownShort": "Unknown",
     "priceUnknownTooltip": "No published price for this model, so this row cannot be estimated.",
