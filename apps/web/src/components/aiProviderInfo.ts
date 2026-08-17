@@ -38,6 +38,13 @@ export interface FunctionConfig {
   fallbackApiKeys?: string[]
   /** @deprecated Superseded by {@link fallbackApiKeys}; still read, never written. */
   fallbackApiKey?: string
+  /**
+   * Whether this role's Google keys are on the free tier. Only affects what the
+   * usage meter may assume: on, the shipped free-tier ceilings give the bars a
+   * denominator; off, only limits Google has actually enforced are drawn.
+   * Nothing throttles on it. Absent means free tier.
+   */
+  freeTier?: boolean
 }
 
 export const PROVIDER_INFO: Record<ProviderType, ProviderInfo> = {

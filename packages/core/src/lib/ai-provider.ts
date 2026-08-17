@@ -83,6 +83,31 @@ export interface ProviderConfig {
    * stored before the list existed keeps working; never written.
    */
   fallbackApiKey?: string
+  /**
+   * Whether this role's Google keys are on the free tier. Purely a statement
+   * about what the usage meter may assume: with it on, the shipped free-tier
+   * ceilings supply a denominator; with it off, only limits Google has actually
+   * enforced against this account are shown, and the meter reports bare counts
+   * until one arrives.
+   *
+   * Nothing throttles on it either way — the key rotation and cooldowns are
+   * driven by real 429s, not by a prediction.
+   *
+   * Absent means "not stated", which {@link isFreeTierConfig} reads as free:
+   * that is what a self-hosted operator with an AI Studio key almost always
+   * has, and it is the reading that shows a ceiling rather than hiding one.
+   */
+  freeTier?: boolean
+}
+
+/**
+ * Whether to apply the shipped free-tier ceilings to this role's meter.
+ *
+ * Only an explicit `false` opts out, so config stored before the flag existed
+ * keeps the free-tier reading it was implicitly getting.
+ */
+export function isFreeTierConfig(config: Pick<ProviderConfig, 'freeTier'> | null | undefined): boolean {
+  return config?.freeTier !== false
 }
 
 /**

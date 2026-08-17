@@ -28,6 +28,8 @@ import {
   DialogContent,
   DialogActions,
   ListItemSecondaryAction,
+  Checkbox,
+  FormControlLabel,
 } from '@mui/material'
 import {
   Visibility as VisibilityIcon,
@@ -167,6 +169,8 @@ export function AIFunctionCard({
   // are real, not masked placeholders, which is what lets a save round-trip.
   const [fallbackKeys, setFallbackKeys] = useState<string[]>([])
   const [showFallbackKeys, setShowFallbackKeys] = useState(false)
+  /** Whether the meter may assume Google's free-tier ceilings. See the checkbox below. */
+  const [freeTier, setFreeTier] = useState(true)
 
   // Custom model dialog state
   const [addModelDialogOpen, setAddModelDialogOpen] = useState(false)
@@ -214,7 +218,15 @@ export function AIFunctionCard({
   useEffect(() => {
     setFallbackKeys(storedFallbackKeys)
   }, [storedFallbackKeys])
-  
+
+  // Absent means free tier — that is what an AI Studio key almost always is,
+  // and it is the reading that shows a ceiling rather than hiding one.
+  const storedFreeTier = config?.freeTier !== false
+  useEffect(() => {
+    setFreeTier(storedFreeTier)
+  }, [storedFreeTier])
+
+
   // Check capability warning
   const hasCapabilityWarning = requiredCapability === 'toolCalling' && 
     selectedModel && !selectedModel.capabilities.supportsToolCalling
@@ -315,6 +327,11 @@ export function AIFunctionCard({
   /** Spare keys worth exercising: whatever is in the boxes, blanks dropped. */
   const effectiveFallbackKeys = fallbackKeys.map((k) => k.trim()).filter((k) => k.length > 0)
 
+  // The tier question is Google's alone: it is the only provider whose free
+  // tier this app meters, and the only one the usage panel is drawn for. A
+  // Title Analysis card pointed at LM Studio should not be asked.
+  const offersFreeTierToggle = supportsFallbackKey && provider === 'google'
+
   const handleTest = async () => {
     setTesting(true)
     setTestResult(null)
@@ -377,6 +394,10 @@ export function AIFunctionCard({
       // what is stored, so a round-trip preserves keys the admin didn't touch,
       // and clearing them all is expressible as an empty array.
       ...(supportsFallbackKey ? { fallbackApiKeys: effectiveFallbackKeys } : {}),
+      // Only sent by the card that asks the question. Omitting it elsewhere is
+      // what stops switching Title Analysis to a local model from silently
+      // rewriting the tier it was told about its Google keys.
+      ...(offersFreeTierToggle ? { freeTier } : {}),
     }
 
     setSaving(true)
@@ -959,6 +980,29 @@ export function AIFunctionCard({
               {t('aiFunctionCard.addFallbackKey')}
             </Button>
             <FormHelperText>{t('aiFunctionCard.fallbackApiKeyHelp')}</FormHelperText>
+          </Box>
+        )}
+
+        {/* Free tier. This changes what the usage meter is allowed to ASSUME,
+            and nothing else — no request is throttled, delayed or refused on
+            the strength of it. Ticked, the shipped free-tier ceilings give the
+            bars a denominator; unticked, only limits Google has actually
+            enforced against this account are drawn, because a paid project's
+            real budget is many times the free one and a bar claiming otherwise
+            would read as full while the day had barely started. */}
+        {offersFreeTierToggle && (
+          <Box sx={{ mb: 2 }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={freeTier}
+                  onChange={(e) => setFreeTier(e.target.checked)}
+                />
+              }
+              label={t('aiFunctionCard.freeTierLabel')}
+            />
+            <FormHelperText sx={{ mt: 0 }}>{t('aiFunctionCard.freeTierHelp')}</FormHelperText>
           </Box>
         )}
 

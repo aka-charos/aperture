@@ -34,6 +34,7 @@ export {
   withGroundingModel,
   getGroundingProviderTools,
   resolveFallbackKeys,
+  isFreeTierConfig,
   getTextGenerationModelInstance,
   getAICapabilitiesStatus,
   isAIFunctionConfigured,
@@ -88,8 +89,9 @@ export {
   type WebSearchAttempt,
   type WebSearchCallOutcome,
   type WebSearchUsageTokens,
-  // Free-tier quota for the grounding role; limits are learned from 429s
+  // Free-tier quota for the grounding role; enforced limits beat shipped ones
   getFreeTierLimits,
+  resolveModelLimits,
   noteObservedLimit,
   clearObservedLimits,
   classifyQuotaError,
@@ -103,6 +105,8 @@ export {
   getWebSearchUsageSummary,
   type WebSearchKeySlot,
   type FreeTierLimits,
+  type ResolvedLimits,
+  type LimitSource,
   type QuotaScope,
   type QuotaErrorInfo,
   type WebSearchCallStatus,

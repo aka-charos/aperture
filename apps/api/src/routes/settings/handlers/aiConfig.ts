@@ -56,6 +56,7 @@ import {
   getWebSearchUsageSummary,
   getGroundingKeySlots,
   resolveFallbackKeys,
+  isFreeTierConfig,
   AI_FUNCTIONS,
   isAIFunction,
   type AIFunction,
@@ -433,7 +434,12 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       const role: AIFunction = request.query.role === 'titleAnalysis' ? 'titleAnalysis' : 'webSearch'
       const config = await getFunctionConfig(role)
       const slots = await getGroundingKeySlots(role)
-      const usage = await getWebSearchUsageSummary(role, config?.model ?? null, slots)
+      // The free-tier ceilings are an assumption about the operator's Google
+      // project, so they are only applied when the operator has made it. What
+      // Google has actually enforced is shown either way.
+      const usage = await getWebSearchUsageSummary(role, config?.model ?? null, slots, {
+        freeTier: isFreeTierConfig(config),
+      })
       return reply.send({
         configured: Boolean(config),
         provider: config?.provider ?? null,
@@ -794,11 +800,18 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
    */
   fastify.patch<{
     Params: { function: string }
-    Body: { provider: string; model: string; apiKey?: string; baseUrl?: string; fallbackApiKeys?: string[] }
+    Body: {
+      provider: string
+      model: string
+      apiKey?: string
+      baseUrl?: string
+      fallbackApiKeys?: string[]
+      freeTier?: boolean
+    }
   }>('/api/settings/ai/:function', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
     try {
       const fn = request.params.function
-      const { provider, model, apiKey, baseUrl, fallbackApiKeys } = request.body
+      const { provider, model, apiKey, baseUrl, fallbackApiKeys, freeTier } = request.body
 
       if (!isAIFunction(fn)) {
         return reply.status(400).send({ error: `Invalid function. Must be one of: ${AI_FUNCTIONS.join(', ')}` })
@@ -845,12 +858,19 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
             (existing?.fallbackApiKey ? [existing.fallbackApiKey] : undefined))
           : fallbackApiKeys.map((k) => k.trim()).filter((k) => k.length > 0)
 
+      // Same rule as the keys, for the same reason: the flag lives only here,
+      // so an omitted field means "leave alone". Unlike the keys it is stored
+      // only when it is `false` — absent already reads as free tier, and
+      // writing the default would just make every role's config noisier.
+      const nextFreeTier = freeTier === undefined ? existing?.freeTier : freeTier
+
       await setFunctionConfig(fn, {
         provider: provider as ProviderType,
         model,
         apiKey: nextApiKey,
         baseUrl,
         fallbackApiKeys: nextFallbackKeys?.length ? nextFallbackKeys : undefined,
+        freeTier: nextFreeTier === false ? false : undefined,
       })
 
       const config = await getFunctionConfig(fn)

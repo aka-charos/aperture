@@ -36,18 +36,44 @@ interface UsageResponse {
   fallbackKeyCount: number
   model: string | null
   /**
-   * Each field is learned independently from a Google 429 that named it, so any
-   * of them can be absent. There is no published table to fall back on — Google
-   * withdrew it, and the numbers differ per account — so a missing field means
-   * a bare count with no bar, which is the honest rendering.
+   * Any field can be absent. Each is either learned from a Google 429 that
+   * named it, or supplied by the shipped free-tier table — and `source` says
+   * which, because a ceiling Google enforced and one this app assumed are not
+   * the same claim. A missing field means a bare count with no bar, which is
+   * the honest rendering when nothing is known.
    */
-  limits: { rpm?: number; rpd?: number; tpm?: number } | null
+  limits: {
+    rpm?: number
+    rpd?: number
+    tpm?: number
+    /**
+     * Grounded searches per day, a separate allowance charged per model
+     * family. **Zero is a real answer** — the free tier gives the Gemini 3.x
+     * family none at all — so this is tested against `undefined`, never for
+     * truthiness.
+     */
+    groundingRpd?: number
+    source: 'observed' | 'freeTier' | 'mixed'
+  } | null
+  /** Whether the operator says these keys are on the free tier. */
+  freeTier: boolean
   dayResetsAt: string
   slots: SlotUsage[]
 }
 
 /** The meter is live, so it refreshes itself — slowly, on an admin-only page. */
 const POLL_INTERVAL_MS = 60_000
+
+/**
+ * One line saying where the denominators came from. Spelled out as a map rather
+ * than built from the source name so the keys are greppable — an i18n key that
+ * only exists as a template fragment is one nobody finds when it goes missing.
+ */
+const LIMIT_SOURCE_KEYS = {
+  observed: 'webSearchUsage.limitsObserved',
+  freeTier: 'webSearchUsage.limitsAssumed',
+  mixed: 'webSearchUsage.limitsMixed',
+} as const
 
 function formatTime(iso: string | null): string {
   if (!iso) return ''
@@ -177,8 +203,35 @@ export function WebSearchUsagePanel({ role = 'webSearch' }: { role?: string } = 
 
       {!limits?.rpd && !limits?.rpm && (
         <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
-          {t('webSearchUsage.noPublishedLimits')}
+          {/* Two different reasons for a bare count, and the operator can only
+              act on one of them: they turned the free-tier ceilings off. */}
+          {usage.freeTier
+            ? t('webSearchUsage.noPublishedLimits')
+            : t('webSearchUsage.paidTierNoLimits')}
         </Typography>
+      )}
+
+      {/* The grounding allowance is a different quota from the model's own, and
+          the case that matters is zero: a model can sit at 1% of its daily
+          requests and still have every grounded search refused. Rendered as a
+          warning rather than a bar because nothing here meters it separately —
+          claiming a fill level for a budget we don't count would be the same
+          confident guess this panel exists to avoid. */}
+      {limits?.groundingRpd === 0 ? (
+        <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5 }}>
+          <WarningAmberIcon fontSize="small" color="warning" sx={{ mt: '1px' }} />
+          <Typography variant="caption" color="warning.main">
+            {t('webSearchUsage.groundingBlocked')}
+          </Typography>
+        </Box>
+      ) : (
+        limits?.groundingRpd != null && (
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+            {t('webSearchUsage.groundingAllowance', {
+              limit: limits.groundingRpd.toLocaleString(),
+            })}
+          </Typography>
+        )
       )}
 
       {slots.map((slot) => (
@@ -234,6 +287,16 @@ export function WebSearchUsagePanel({ role = 'webSearch' }: { role?: string } = 
           })}
         </Typography>
       ))}
+
+      {/* Where the denominators came from. Worth a line of its own: a number
+          Google enforced against this key is a fact, and a number taken from
+          the shipped free-tier table is an assumption about the operator's
+          project — which they can withdraw with the Free tier checkbox. */}
+      {limits && (
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1.5 }}>
+          {t(LIMIT_SOURCE_KEYS[limits.source])}
+        </Typography>
+      )}
 
       <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1.5 }}>
         {t('webSearchUsage.caveat')}

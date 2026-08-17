@@ -1431,7 +1431,9 @@
     "fallbackKeyFailed": "The main key works, but the fallback key failed: {{error}}",
     "fallbackApiKeyNumbered": "Spare API key {{number}}",
     "addFallbackKey": "Add spare key",
-    "removeFallbackKey": "Remove this spare key"
+    "removeFallbackKey": "Remove this spare key",
+    "freeTierLabel": "These keys are on the free tier",
+    "freeTierHelp": "Only affects the usage meter below: ticked, it draws the free-tier ceilings for the chosen model. Untick it on a paid project, where those ceilings are far too low and the bars would read as full. Nothing is throttled either way."
   },
   "topPicksOutputConfig": {
     "accordionTitle": "ライブラリ、コレクション、プレイリストの違いは何ですか?",
@@ -4338,7 +4340,13 @@
     "caveat": "Counted per {{appName}} request. Google also counts its own automatic retries, so the real figure can run slightly higher.",
     "slotPrimary": "Main key",
     "slotFallback": "Fallback key",
-    "slotFallbackNumbered": "Spare key {{number}}"
+    "slotFallbackNumbered": "Spare key {{number}}",
+    "paidTierNoLimits": "Free-tier ceilings are switched off for this key, so only usage is shown. Any limit Google enforces against it will still appear here.",
+    "groundingAllowance": "Grounded searches: {{limit}} per day, shared across this model family and separate from the request budget above.",
+    "groundingBlocked": "This model has no free-tier grounding allowance, so grounded searches are refused no matter how much of the budget above is left. On the free tier only the Gemini 2.x models can ground.",
+    "limitsObserved": "Ceilings shown were enforced by Google against this key.",
+    "limitsAssumed": "Ceilings shown are the free-tier defaults for this model. Google enforces the real ones, and they replace these as soon as a rate-limit response names them.",
+    "limitsMixed": "Some ceilings shown were enforced by Google against this key; the rest are free-tier defaults, replaced as Google names them."
   },
   "inferenceDashboard": {
     "title": "AI Spend",

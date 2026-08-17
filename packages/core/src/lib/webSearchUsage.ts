@@ -23,9 +23,9 @@ import type { AIFunction } from './ai-capabilities/types.js'
 import { query } from './db.js'
 import { createChildLogger } from './logger.js'
 import {
-  getFreeTierLimits,
   getSlotCooldownUntil,
-  type FreeTierLimits,
+  resolveModelLimits,
+  type ResolvedLimits,
   type WebSearchKeySlot,
 } from './webSearchQuota.js'
 
@@ -132,8 +132,15 @@ export interface WebSearchUsageSummary {
   role: AIFunction
   /** The model these counts are for; quotas are per model. */
   model: string | null
-  /** Published free-tier limits, or null for a model we have no figures for. */
-  limits: FreeTierLimits | null
+  /**
+   * Ceilings to draw bars against, or null when nothing is known — which the
+   * panel must render as bare counts rather than inventing a denominator.
+   * Carries `source`, because a number Google enforced and a number this app
+   * assumed are not the same claim and the panel says which it is showing.
+   */
+  limits: ResolvedLimits | null
+  /** Whether the free-tier table was applied. Echoed so the panel can explain itself. */
+  freeTier: boolean
   dayStart: string
   dayResetsAt: string
   slots: WebSearchSlotUsage[]
@@ -172,19 +179,24 @@ function emptySlot(role: AIFunction, slot: WebSearchKeySlot, now: number): WebSe
  * keys a role holds is now configuration. A slot that has spent nothing still
  * appears — an unused fallback reading zero is information, and a slot missing
  * from the panel would look like a key that was never configured.
+ *
+ * `freeTier` says whether the shipped ceilings may be assumed; limits Google
+ * has actually enforced apply regardless, since a paid tier has limits too.
  */
 export async function getWebSearchUsageSummary(
   role: AIFunction,
   model: string | null,
-  slots: WebSearchKeySlot[]
+  slots: WebSearchKeySlot[],
+  opts: { freeTier: boolean } = { freeTier: true }
 ): Promise<WebSearchUsageSummary> {
   const now = Date.now()
-  const limits = getFreeTierLimits(model)
+  const limits = resolveModelLimits(model, opts)
 
   const empty: WebSearchUsageSummary = {
     role,
     model,
     limits,
+    freeTier: opts.freeTier,
     dayStart: new Date(now).toISOString(),
     dayResetsAt: new Date(now).toISOString(),
     slots: slots.map((slot) => emptySlot(role, slot, now)),
