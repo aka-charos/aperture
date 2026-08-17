@@ -1,0 +1,190 @@
+/**
+ * fastCRW Retrieval Settings Handlers
+ *
+ * Endpoints:
+ * - GET  /api/settings/crw      - Get config (API key masked)
+ * - PUT  /api/settings/crw      - Update config (partial merge)
+ * - POST /api/settings/crw/test - Verify the service answers AND that search works
+ */
+import type { FastifyInstance } from 'fastify'
+import {
+  getCrwConfig,
+  setCrwConfig,
+  testCrwConnection,
+  type CrwConfig,
+} from '@aperture/core'
+import { requireAdmin } from '../../../plugins/auth.js'
+
+interface CrwUpdateBody {
+  enabled?: boolean
+  baseUrl?: string
+  apiKey?: string
+  maxResults?: number
+  maxContentChars?: number
+  timeoutMs?: number
+  sourceBudgetChars?: number
+}
+
+/** Config for the client, with the API key omitted (only hasApiKey exposed). */
+interface PublicCrwConfig {
+  enabled: boolean
+  baseUrl: string
+  hasApiKey: boolean
+  maxResults: number
+  maxContentChars: number
+  timeoutMs: number
+  sourceBudgetChars: number
+}
+
+function validateConfig(config: CrwConfig): string | null {
+  if (config.enabled && !config.baseUrl.trim()) {
+    return 'baseUrl is required when the retrieval service is enabled'
+  }
+  if (config.baseUrl && !/^https?:\/\//i.test(config.baseUrl)) {
+    return 'baseUrl must start with http:// or https://'
+  }
+  if (!Number.isInteger(config.maxResults) || config.maxResults < 1 || config.maxResults > 20) {
+    return 'maxResults must be an integer between 1 and 20'
+  }
+  if (
+    !Number.isInteger(config.maxContentChars) ||
+    config.maxContentChars < 1000 ||
+    config.maxContentChars > 100000
+  ) {
+    return 'maxContentChars must be an integer between 1000 and 100000'
+  }
+  if (
+    !Number.isInteger(config.timeoutMs) ||
+    config.timeoutMs < 5000 ||
+    config.timeoutMs > 300000
+  ) {
+    return 'timeoutMs must be an integer between 5000 and 300000'
+  }
+  if (
+    !Number.isInteger(config.sourceBudgetChars) ||
+    config.sourceBudgetChars < 2000 ||
+    config.sourceBudgetChars > 200000
+  ) {
+    return 'sourceBudgetChars must be an integer between 2000 and 200000'
+  }
+  return null
+}
+
+function toPublicConfig(config: CrwConfig): PublicCrwConfig {
+  return {
+    enabled: config.enabled,
+    // Unlike a key, the base URL is not a secret and IS the thing an operator
+    // needs to see to debug a connection — returning it saves them guessing
+    // what got saved.
+    baseUrl: config.baseUrl,
+    hasApiKey: !!config.apiKey.trim(),
+    maxResults: config.maxResults,
+    maxContentChars: config.maxContentChars,
+    timeoutMs: config.timeoutMs,
+    sourceBudgetChars: config.sourceBudgetChars,
+  }
+}
+
+export function registerCrwHandlers(fastify: FastifyInstance) {
+  /**
+   * GET /api/settings/crw
+   */
+  fastify.get(
+    '/api/settings/crw',
+    { preHandler: requireAdmin, schema: { tags: ['settings'] } },
+    async (_request, reply) => {
+      try {
+        const config = await getCrwConfig()
+        return reply.send({ config: toPublicConfig(config) })
+      } catch (err) {
+        fastify.log.error({ err }, 'Failed to get CRW config')
+        return reply.status(500).send({ error: 'Failed to get retrieval configuration' })
+      }
+    }
+  )
+
+  /**
+   * PUT /api/settings/crw
+   *
+   * Partial merge. The API key follows the repo's usual rule and NOT Tavily's:
+   * an omitted key means "leave alone", an explicit empty string CLEARS it.
+   * Tavily can treat blank as "keep" because a key is mandatory there; here it
+   * is optional — most self-hosted deployments run without one — so "keep on
+   * blank" would make a key impossible to remove once set.
+   */
+  fastify.put<{ Body: CrwUpdateBody }>(
+    '/api/settings/crw',
+    { preHandler: requireAdmin, schema: { tags: ['settings'] } },
+    async (request, reply) => {
+      try {
+        const current = await getCrwConfig()
+        const body = request.body ?? {}
+
+        const newConfig: CrwConfig = {
+          enabled: body.enabled ?? current.enabled,
+          baseUrl: body.baseUrl ?? current.baseUrl,
+          apiKey: body.apiKey === undefined ? current.apiKey : body.apiKey.trim(),
+          maxResults: body.maxResults ?? current.maxResults,
+          maxContentChars: body.maxContentChars ?? current.maxContentChars,
+          timeoutMs: body.timeoutMs ?? current.timeoutMs,
+          sourceBudgetChars: body.sourceBudgetChars ?? current.sourceBudgetChars,
+        }
+
+        const validationError = validateConfig(newConfig)
+        if (validationError) return reply.status(400).send({ error: validationError })
+
+        await setCrwConfig(newConfig)
+        return reply.send({ config: toPublicConfig(newConfig) })
+      } catch (err) {
+        fastify.log.error({ err }, 'Failed to update CRW config')
+        return reply.status(500).send({ error: 'Failed to update retrieval configuration' })
+      }
+    }
+  )
+
+  /**
+   * POST /api/settings/crw/test
+   *
+   * Runs a real one-result search. Deliberately not a health ping: the
+   * documented failure is running the bare single container, which serves
+   * scraping fine while search reports itself disabled — a health check passes
+   * on exactly the broken setup this button exists to catch.
+   */
+  fastify.post<{ Body: { baseUrl?: string; apiKey?: string } }>(
+    '/api/settings/crw/test',
+    { preHandler: requireAdmin, schema: { tags: ['settings'] } },
+    async (request, reply) => {
+      try {
+        const current = await getCrwConfig()
+        const provided = request.body ?? {}
+        const baseUrl =
+          typeof provided.baseUrl === 'string' && provided.baseUrl.trim()
+            ? provided.baseUrl.trim()
+            : current.baseUrl
+        if (!baseUrl) {
+          return reply.status(400).send({ error: 'No retrieval service URL configured' })
+        }
+
+        const result = await testCrwConnection({
+          baseUrl,
+          apiKey:
+            typeof provided.apiKey === 'string' && provided.apiKey.trim()
+              ? provided.apiKey.trim()
+              : current.apiKey,
+          maxResults: 1,
+          maxContentChars: current.maxContentChars,
+          timeoutMs: current.timeoutMs,
+        })
+
+        return reply.send(
+          result.success
+            ? { success: true, resultCount: result.resultCount ?? 0, message: result.message }
+            : { success: false, error: result.message }
+        )
+      } catch (err) {
+        fastify.log.error({ err }, 'Failed to test CRW connection')
+        return reply.status(500).send({ error: 'Failed to test the retrieval connection' })
+      }
+    }
+  )
+}

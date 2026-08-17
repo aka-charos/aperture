@@ -264,12 +264,13 @@ async function executeJob(name: string, jobId: string): Promise<void> {
         )
         break
       }
-      // === Title analysis (grounded, per title, cached forever) ===
+      // === Title analysis (per title, from retrieved sources, cached forever) ===
       case 'generate-title-analysis': {
         const result = await generateTitleAnalyses({
-          // Cancellation has to be polled BETWEEN titles: every step here is a
-          // paid grounded request, so per-phase granularity would mean
-          // cancelling costs the rest of the batch anyway.
+          // Cancellation has to be polled BETWEEN titles: a title costs a
+          // search, several page fetches and a few thousand tokens of local
+          // inference, so per-phase granularity would mean cancelling still
+          // costs the rest of the batch.
           shouldCancel: () => isJobCancelled(jobId),
           onProgress: ({ processed, total }) =>
             updateJobProgress(jobId, processed, total),

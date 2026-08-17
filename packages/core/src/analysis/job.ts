@@ -16,9 +16,15 @@
  *    minutes long and every step of which is a paid grounded request, the poll
  *    has to sit between calls, not between phases.
  *
- * 3. THE BUDGET IS A CALL COUNT, NOT A ROW COUNT. Declines, empty-text retries
- *    and quota failures all consume Google's daily allowance, so counting
- *    stored analyses would systematically overrun it.
+ * 3. THE CAP COUNTS ATTEMPTS, NOT STORED ROWS. Declines and failures cost the
+ *    same retrieval and inference time a success does, so counting only stored
+ *    analyses would let a run of declines take many times longer than asked.
+ *
+ * WHAT THE CAP IS FOR NOW. It used to ration a per-day grounding quota. With
+ * retrieval and inference both self-hosted there is no quota — the limit is
+ * wall-clock time, since a title costs one search, several page fetches and a
+ * few thousand tokens through a local model, so ~1-3 minutes each. The default
+ * is therefore sized as "a long overnight run", not as anyone's allowance.
  */
 import { createChildLogger } from '../lib/logger.js'
 import { analyseTitle } from './generate.js'
@@ -27,19 +33,22 @@ import { countPendingAnalysis, selectPendingTitles } from './titles.js'
 const logger = createChildLogger('title-analysis-job')
 
 /**
- * Grounded search carries a far tighter daily cap than the model's own request
- * limit, and it is per Google project. Conservative by default: the job is
- * meant to trickle through the library over weeks, and an operator who wants it
- * faster can raise this or add more keys.
+ * Titles attempted per run, unless the caller says otherwise.
+ *
+ * 200 is roughly an overnight pass at 1-3 minutes a title. Nothing breaks if it
+ * is raised — there is no quota to overrun — but a run that outlives the gap to
+ * its next schedule is a job overlapping itself, which is the actual failure to
+ * avoid. The real throughput limits are the operator's GPU and, more likely,
+ * SearXNG's upstream engines throttling a fast crawl.
  */
-export const DEFAULT_DAILY_BUDGET = 200
+export const DEFAULT_MAX_TITLES_PER_RUN = 200
 
 /** How many pending rows to fetch at a time. Small — priority order shifts. */
 const SELECT_BATCH = 25
 
 export interface AnalysisJobOptions {
-  /** Maximum grounded calls this run may make. */
-  budget?: number
+  /** Maximum titles this run may attempt. */
+  maxTitles?: number
   /** Media types to cover, in order. */
   mediaTypes?: Array<'movie' | 'series'>
   /** Polled between titles; returning true stops the run cleanly. */
@@ -66,7 +75,7 @@ export interface AnalysisJobResult {
 export async function generateTitleAnalyses(
   options: AnalysisJobOptions = {}
 ): Promise<AnalysisJobResult> {
-  const budget = options.budget ?? DEFAULT_DAILY_BUDGET
+  const budget = options.maxTitles ?? DEFAULT_MAX_TITLES_PER_RUN
   const mediaTypes = options.mediaTypes ?? ['movie', 'series']
 
   const result: AnalysisJobResult = {

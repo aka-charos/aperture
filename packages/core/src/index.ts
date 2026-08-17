@@ -145,6 +145,19 @@ export {
   type TavilySearchDepth,
   type TavilyTopic,
   type TavilyTimeRange,
+  // fastCRW — self-hosted search + scrape
+  getCrwConfig,
+  setCrwConfig,
+  isCrwEnabled,
+  crwSearch,
+  testCrwConnection,
+  urlDomain,
+  CrwError,
+  DEFAULT_CRW_CONFIG,
+  type CrwConfig,
+  type CrwSearchParams,
+  type CrwSearchResponse,
+  type CrwSearchResultItem,
 } from './lib/index.js'
 
 // Migrations
@@ -1287,12 +1300,16 @@ export {
   type BulkOverrideResult,
 } from './i18nOverrides.js'
 
-// Grounded per-title analysis (title-scoped, cached forever — see ./analysis)
+// Per-title analysis from retrieved sources (title-scoped, cached forever —
+// see ./analysis; retrieval is the self-hosted fastCRW client in ./lib/crw.ts)
 export {
   ANALYSIS_PROMPT_VERSION,
   buildAnalysisPrompt,
+  buildAnalysisQuery,
   parseAnalysisResponse,
   decideAnalysisFloor,
+  budgetSources,
+  isListingDomain,
   analyseTitle,
   getStoredAnalysis,
   loadAnalysisSubject,
@@ -1300,10 +1317,12 @@ export {
   selectPendingTitles,
   generateTitleAnalyses,
   getAnalysisStatus,
-  DEFAULT_DAILY_BUDGET,
+  DEFAULT_MAX_TITLES_PER_RUN,
+  type AnalysisSource,
   type AnalysisSubject,
   type SourceGrade,
   type DeclineReason,
+  type RetrievedSource,
   type StoredAnalysis,
   type PendingTitle,
   type AnalysisJobOptions,

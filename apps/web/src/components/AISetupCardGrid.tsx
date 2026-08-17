@@ -89,16 +89,11 @@ export function AISetupCardGrid({ config, onSave, variant }: AISetupCardGridProp
         isSetup={isSetup}
       />
 
-      {/* The two grounding roles — optional, admin settings only (not the
-          onboarding wizard). Google-only, because they ride on Gemini's native
-          search grounding, so each card locks its provider and offers spare API
-          keys for when a free tier runs out.
-
-          They are separate roles, with separate credentials, on purpose: both
-          spend the same per-project daily grounding cap, so a batch of title
-          analyses run from the chat role's key would exhaust the quota the
-          assistant needs. Give each its own key from its own Google project or
-          the split achieves nothing. */}
+      {/* Web Search — optional, admin settings only (not the onboarding
+          wizard). Google-only, because it rides on Gemini's native search
+          grounding, so the card locks its provider and offers spare API keys:
+          the free tier is capped per day per Google project, and a second key
+          from a second project is what doubles the ceiling. */}
       {variant === 'settings' && (
         <AIFunctionCard
           functionType="webSearch"
@@ -115,6 +110,13 @@ export function AISetupCardGrid({ config, onSave, variant }: AISetupCardGridProp
         />
       )}
 
+      {/* Title Analysis is NOT a grounding role. Retrieval happens before the
+          model is called — fastCRW returns the source text — so this is a plain
+          writing role with a free choice of provider, and pointing it at a local
+          model (LM Studio via OpenAI-Compatible, or Ollama) is the intended
+          setup: a per-day grounding cap is precisely what made a library-wide
+          pass impossible. No spare keys and no usage meter, because there is no
+          per-day quota here to extend or watch. */}
       {variant === 'settings' && (
         <AIFunctionCard
           functionType="titleAnalysis"
@@ -126,8 +128,6 @@ export function AISetupCardGrid({ config, onSave, variant }: AISetupCardGridProp
           onSave={(c) => onSave('titleAnalysis', c)}
           compact={isSetup}
           isSetup={isSetup}
-          supportsFallbackKey
-          footer={<WebSearchUsagePanel role="titleAnalysis" />}
         />
       )}
     </Box>

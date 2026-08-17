@@ -45,11 +45,15 @@ export function getProvidersForFunction(fn: AIFunction): ProviderMetadata[] {
         (p.chatModels.some((m) => m.capabilities.supportsToolCalling) ||
           CUSTOM_MODEL_PROVIDERS.has(p.id))
       )
-    if (fn === 'textGeneration') return p.supportsTextGeneration
+    // Title Analysis is a plain writing role: retrieval happens before the model
+    // is called (fastCRW returns the source text), so it needs no grounding
+    // support and deliberately admits the local providers — a self-hosted model
+    // is the point, since a per-day grounding cap is what made a library-wide
+    // pass impossible.
+    if (fn === 'textGeneration' || fn === 'titleAnalysis') return p.supportsTextGeneration
     if (fn === 'exploration') return p.supportsExploration
-    // Both grounding roles need a grounding-capable provider — Google only for now
-    if (fn === 'webSearch' || fn === 'titleAnalysis')
-      return p.id === 'google' && p.chatModels.length > 0
+    // Web Search still grounds through the provider, so it stays Google-only.
+    if (fn === 'webSearch') return p.id === 'google' && p.chatModels.length > 0
     return false
   })
 }
@@ -64,7 +68,7 @@ export function getModelsForFunction(providerId: string, fn: AIFunction): ModelM
   if (fn === 'chat') {
     return provider.chatModels.filter((m) => m.capabilities.supportsToolCalling)
   }
-  if (fn === 'textGeneration') {
+  if (fn === 'textGeneration' || fn === 'titleAnalysis') {
     return provider.textGenerationModels.length > 0
       ? provider.textGenerationModels
       : provider.chatModels
@@ -74,7 +78,7 @@ export function getModelsForFunction(providerId: string, fn: AIFunction): ModelM
       ? provider.explorationModels.filter((m) => m.capabilities.supportsObjectGeneration)
       : provider.chatModels.filter((m) => m.capabilities.supportsObjectGeneration)
   }
-  if (fn === 'webSearch' || fn === 'titleAnalysis') {
+  if (fn === 'webSearch') {
     // Grounding-capable chat models (Google); tool calling required to ground
     return provider.chatModels.filter((m) => m.capabilities.supportsToolCalling)
   }
@@ -91,10 +95,10 @@ export function validateCapabilityForFeature(
     return { supported: false, reason: `Unknown provider: ${providerId}` }
   }
 
-  if ((fn === 'webSearch' || fn === 'titleAnalysis') && providerId !== 'google') {
+  if (fn === 'webSearch' && providerId !== 'google') {
     return {
       supported: false,
-      reason: `${fn === 'titleAnalysis' ? 'Title Analysis' : 'Web Search'} requires a grounding-capable provider (Google)`,
+      reason: 'Web Search requires a grounding-capable provider (Google)',
     }
   }
 

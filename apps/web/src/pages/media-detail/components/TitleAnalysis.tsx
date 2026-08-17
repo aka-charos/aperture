@@ -168,9 +168,10 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
                     {t('mediaDetail.analysis.sourcesLabel')}
                   </Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {/* Domains, not links. Google's grounding URLs are
-                        short-lived redirects, so a cache that lives for months
-                        would be a wall of dead links. */}
+                    {/* Domains, not links. Provenance is the durable and useful
+                        part — it says whether this came from a film journal or
+                        a listicle — while a link table in a cache that lives
+                        for months would rot. */}
                     {data.sources.map((source, i) => (
                       <Chip
                         key={`${source.domain}-${i}`}

@@ -27,6 +27,22 @@ export {
   type TavilyTimeRange,
 } from './tavily.js'
 
+// fastCRW — self-hosted search + scrape, the retrieval half of title analysis
+export {
+  getCrwConfig,
+  setCrwConfig,
+  isCrwEnabled,
+  crwSearch,
+  testCrwConnection,
+  urlDomain,
+  CrwError,
+  DEFAULT_CRW_CONFIG,
+  type CrwConfig,
+  type CrwSearchParams,
+  type CrwSearchResponse,
+  type CrwSearchResultItem,
+} from './crw.js'
+
 export {
   getPool,
   query,

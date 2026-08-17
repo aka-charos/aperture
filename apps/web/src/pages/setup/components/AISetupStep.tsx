@@ -43,8 +43,9 @@ export function AISetupStep({ wizard }: AISetupStepProps) {
     chat: null,
     textGeneration: null,
     exploration: null,
-    // Neither grounding role is offered in the wizard — both are optional and
-    // need their own Google keys — but the map is keyed by every AIFunction.
+    // Neither is offered in the wizard — Web Search needs its own Google key,
+    // Title Analysis needs a retrieval backend — but the map is keyed by every
+    // AIFunction, so both have to appear here.
     webSearch: null,
     titleAnalysis: null,
   })

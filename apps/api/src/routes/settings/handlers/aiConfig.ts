@@ -116,12 +116,14 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         baseUrl?: string
         fallbackApiKeys?: string[]
       }
+      // No `fallbackApiKeys`: Title Analysis is an ordinary writing role whose
+      // retrieval happens before the model is called, so it holds no per-day
+      // grounding quota for a spare key to extend.
       titleAnalysis?: {
         provider: ProviderType
         model: string
         apiKey?: string
         baseUrl?: string
-        fallbackApiKeys?: string[]
       }
     }
   }>('/api/settings/ai', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
@@ -410,22 +412,22 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
   })
 
   /**
-   * GET /api/settings/ai/web-search/usage?role=webSearch|titleAnalysis
+   * GET /api/settings/ai/web-search/usage?role=webSearch
    *
    * Free-tier meter for a grounding role: requests in the last minute and since
    * midnight US/Pacific, per API key, against Google's published limits for the
    * configured model. Never 500s on a missing table — the summary degrades to
    * zeroes so the settings page still renders.
    *
-   * `role` defaults to `webSearch`, so the path keeps working for callers
-   * written before a second grounding role existed. The two roles hold
-   * different keys and therefore different quota; a response covering both
-   * could not answer which one ran out.
+   * `webSearch` is the only grounding role, and the only accepted value. The
+   * parameter survives because `web_search_usage.role` distinguishes consumers
+   * and a self-hosted retrieval source is planned as a second one; anything
+   * unrecognised falls back rather than erroring, since a meter is not worth a
+   * 400.
    */
   fastify.get<{ Querystring: { role?: string } }>('/api/settings/ai/web-search/usage', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
     try {
-      const requested = request.query.role
-      const role: AIFunction = requested === 'titleAnalysis' ? 'titleAnalysis' : 'webSearch'
+      const role: AIFunction = 'webSearch'
       const config = await getFunctionConfig(role)
       const slots = await getGroundingKeySlots(role)
       const usage = await getWebSearchUsageSummary(role, config?.model ?? null, slots)
@@ -812,11 +814,11 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       }
 
       // `ai_provider_credentials` is keyed by PROVIDER and shared by every role
-      // on it, which is exactly wrong for the grounding roles: publishing one of
-      // their Google keys there would let the other borrow it, silently putting
-      // both back on a single free-tier quota — the thing separate roles exist
-      // to prevent. Their keys stay on the role, like their fallbacks do.
-      const isGroundingRole = fn === 'webSearch' || fn === 'titleAnalysis'
+      // on it, which is exactly wrong for a grounding role: publishing its
+      // Google key there would let any other role borrow it, silently putting
+      // that spend back on the free-tier quota the separate role exists to
+      // protect. Its key stays on the role, like its fallbacks do.
+      const isGroundingRole = fn === 'webSearch'
 
       if ((apiKey || baseUrl) && !isGroundingRole) {
         const credentialsJson = await getSystemSetting('ai_provider_credentials')

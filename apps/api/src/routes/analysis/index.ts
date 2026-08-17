@@ -152,8 +152,9 @@ const analysisRoutes: FastifyPluginAsync = async (fastify) => {
       } catch (err) {
         // A failure writes no row, so the title stays pending and both this
         // button and the batch job will try again. Surfaced as 503 rather than
-        // 500: the usual cause is the day's grounding quota being gone, which
-        // is temporary and is not the caller's fault.
+        // 500: the usual causes are the retrieval service being unreachable or
+        // its upstream search engines throttling, both temporary and neither
+        // the caller's fault.
         logger.warn({ err, mediaType, id }, 'Title analysis generation failed')
         const message = err instanceof Error ? err.message : 'Analysis failed'
         const unconfigured = /is not configured/i.test(message)

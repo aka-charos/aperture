@@ -43,7 +43,7 @@ export interface ApiErrorDefinition {
  */
 export interface ParsedApiError {
   /** Which external API */
-  provider: 'openai' | 'google' | 'tavily' | 'tmdb' | 'trakt' | 'mdblist' | 'omdb' | 'lldap'
+  provider: 'openai' | 'google' | 'tavily' | 'crw' | 'tmdb' | 'trakt' | 'mdblist' | 'omdb' | 'lldap'
   /** HTTP status code from response */
   httpStatus: number
   /** Provider-specific error code (if available) */

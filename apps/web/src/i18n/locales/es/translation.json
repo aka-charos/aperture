@@ -4532,5 +4532,33 @@
     "testConnection": "Test Connection",
     "errSave": "Failed to save configuration",
     "errConnect": "Could not connect to server"
+  },
+  "settingsCrw": {
+    "title": "Retrieval Service (fastCRW)",
+    "description": "Self-hosted web search and page scraping. Runs a metasearch through its bundled SearXNG and returns each result as clean text, which Title Analysis writes from. No API quota — the limits are your hardware and how hard SearXNG can hit its upstream engines.",
+    "learnMoreLink": "Setup guide",
+    "loadError": "Failed to load the retrieval configuration",
+    "saved": "Retrieval settings saved",
+    "chipEnabled": "Enabled",
+    "chipDisabled": "Configured, off",
+    "enabledLabel": "Use the retrieval service",
+    "baseUrlLabel": "Service URL",
+    "baseUrlHelp": "The service root, no path. fastCRW usually runs in its own Compose project, so its container name will not resolve from here — use the published host port (http://host.docker.internal:3000 on Docker Desktop) unless both stacks share a network. Never localhost.",
+    "apiKeyLabel": "API key (optional)",
+    "apiKeyHelp": "Leave blank if your deployment needs none. Clearing the field and saving removes a stored key.",
+    "maxResultsLabel": "Results per title",
+    "maxResultsHelp": "How many pages to search and fetch (1–20).",
+    "timeoutLabel": "Timeout (seconds)",
+    "timeoutHelp": "One call searches and then fetches every result, so allow generously.",
+    "sourceBudgetLabel": "Source text per analysis (characters)",
+    "sourceBudgetHelp": "How much fetched text the model receives in one prompt. Set by your model’s context window, not by the service: roughly 4 characters per token, so 16,000 fits an 8k-context model with room for the answer. Raise it to match a larger window — more source text produces better analysis.",
+    "maxContentLabel": "Maximum text per page (characters)",
+    "maxContentHelp": "Safety valve so one enormous page cannot dominate. The budget above is what actually decides how much the model sees.",
+    "save": "Save",
+    "test": "Test",
+    "testSuccess": "Connected. Search returned {{count}} result(s).",
+    "testFailed": "Could not reach the retrieval service",
+    "errSave": "Failed to save the retrieval configuration",
+    "errConnect": "Connection failed"
   }
 }
