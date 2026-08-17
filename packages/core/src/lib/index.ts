@@ -74,6 +74,7 @@ export {
   withGroundingModel,
   getGroundingProviderTools,
   resolveFallbackKeys,
+  isFreeTierConfig,
   getTextGenerationModelInstance,
   // Capability Checking
   getAICapabilitiesStatus,
@@ -137,10 +138,12 @@ export {
   type WebSearchUsageTokens,
 } from './ai-provider.js'
 
-// Free-tier quota for the grounding role. Limits are LEARNED from Google's
-// 429s, never hardcoded — see webSearchQuota.ts for why the table was deleted.
+// Free-tier quota for the grounding role. Limits Google has ENFORCED always
+// win; the shipped free-tier table only fills gaps, and only when the operator
+// says the key is a free-tier one — see webSearchQuota.ts for why.
 export {
   getFreeTierLimits,
+  resolveModelLimits,
   noteObservedLimit,
   clearObservedLimits,
   classifyQuotaError,
@@ -152,6 +155,8 @@ export {
   keySlotName,
   type WebSearchKeySlot,
   type FreeTierLimits,
+  type ResolvedLimits,
+  type LimitSource,
   type QuotaScope,
   type QuotaErrorInfo,
 } from './webSearchQuota.js'

@@ -31,7 +31,7 @@
     {
       "id": "gemini-3.5-flash-lite",
       "name": "Gemini 3.5 Flash Lite",
-      "description": "Cheapest current model, and the replacement for 2.5 Flash Lite — which Google no longer offers to new projects. Native Google Search grounding. Best choice for the Web Search role on a free tier.",
+      "description": "Cheapest current model, and the replacement for 2.5 Flash Lite — which Google no longer offers to new projects. Generous free tier (500 requests/day). Grounds natively, but a free tier grants the Gemini 3.x family NO search-grounding allowance, so free keys cannot use it for Web Search.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -48,7 +48,7 @@
     {
       "id": "gemini-3.7-flash",
       "name": "Gemini 3.7 Flash",
-      "description": "Newest stable Flash. Native Google Search grounding. Note the listed price is promotional through 31 Dec 2026 and doubles on 1 Jan 2027.",
+      "description": "Newest stable Flash. Grounds natively on a paid key; a free key gets no grounding allowance for the 3.x family. Note the listed price is promotional through 31 Dec 2026 and doubles on 1 Jan 2027.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -65,7 +65,7 @@
     {
       "id": "gemini-3.5-flash",
       "name": "Gemini 3.5 Flash",
-      "description": "Latest Flash (Gemini 3.5). Most intelligent Flash for agentic and coding tasks. Native Google Search grounding.",
+      "description": "Latest Flash (Gemini 3.5). Most intelligent Flash for agentic and coding tasks. Grounds natively on a paid key; a free key gets no grounding allowance for the 3.x family.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -82,7 +82,7 @@
     {
       "id": "gemini-3.1-flash-lite",
       "name": "Gemini 3.1 Flash Lite",
-      "description": "Latest Flash-Lite (Gemini 3.1). Fastest, most budget-friendly multimodal model. Native Google Search grounding.",
+      "description": "Latest Flash-Lite (Gemini 3.1). Fastest, most budget-friendly multimodal model, with the same generous free tier as 3.5 Flash Lite (500 requests/day). Grounds only on a paid key — the 3.x family gets no free-tier grounding allowance.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -116,7 +116,7 @@
     {
       "id": "gemini-2.5-flash",
       "name": "Gemini 2.5 Flash",
-      "description": "Latest Flash model. Supports native Google Search grounding.",
+      "description": "Best free-tier choice for Web Search: the 3.x family gets no grounding allowance on a free key, and 2.5 Flash Lite is closed to new projects. Free tier caps it at 20 requests/day, so a second key from a second project is worth adding.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
@@ -133,7 +133,7 @@
     {
       "id": "gemini-2.5-flash-lite",
       "name": "Gemini 2.5 Flash Lite",
-      "description": "Fastest, most cost-efficient Gemini model. Supports native Google Search grounding.",
+      "description": "Fastest, most cost-efficient Gemini model, and grounds on a free key — but Google no longer offers it to new projects, so only an older project can select it. Free tier caps it at 20 requests/day.",
       "capabilities": {
         "supportsToolCalling": true,
         "supportsToolStreaming": true,
