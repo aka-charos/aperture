@@ -27,7 +27,8 @@
  * is therefore sized as "a long overnight run", not as anyone's allowance.
  */
 import { createChildLogger } from '../lib/logger.js'
-import { analyseTitle } from './generate.js'
+import { AnalysisCancelledError, analyseTitle } from './generate.js'
+import { checkModeReadiness } from './mode.js'
 import { countPendingAnalysis, selectPendingTitles } from './titles.js'
 
 const logger = createChildLogger('title-analysis-job')
@@ -60,6 +61,16 @@ export interface AnalysisJobOptions {
     declined: number
     failed: number
     total: number
+    /**
+     * The title currently being worked on.
+     *
+     * Load-bearing for a job of this shape, not decoration. A title takes 45
+     * seconds to three minutes, so a bare counter moves once in that window and
+     * a run genuinely working looks identical to one wedged. The console has a
+     * label field for exactly this (`updateJobProgress`'s `currentItem`) and
+     * this job was passing nothing into it.
+     */
+    currentTitle?: string
   }) => void
 }
 
@@ -87,6 +98,18 @@ export async function generateTitleAnalyses(
     budgetExhausted: false,
   }
 
+  // Fail the whole run once, before any work, when the mode cannot run at all.
+  // `analyseTitle` checks this too — it is the choke point every path goes
+  // through — but discovering it per title would spend the entire budget on
+  // identical failures and bury the reason under 200 stack traces. The message
+  // is the operator-facing sentence from `checkModeReadiness`, and the executor
+  // puts it on the job card.
+  const readiness = await checkModeReadiness()
+  if (!readiness.ready) {
+    logger.error({ mode: readiness.mode, reason: readiness.reason }, 'Title analysis cannot run')
+    throw new Error(readiness.reason ?? 'Title analysis is not configured')
+  }
+
   // Totals come from the same predicate the selection uses, so the progress
   // bar cannot describe a total the loop never reaches.
   let total = 0
@@ -95,13 +118,14 @@ export async function generateTitleAnalyses(
   }
   const capped = Math.min(total, budget)
 
-  const report = () =>
+  const report = (currentTitle?: string) =>
     options.onProgress?.({
       processed: result.processed,
       stored: result.stored,
       declined: result.declined,
       failed: result.failed,
       total: capped,
+      currentTitle,
     })
 
   report()
@@ -132,13 +156,27 @@ export async function generateTitleAnalyses(
         }
 
         attempted.add(title.mediaId)
+        // Announced BEFORE the work, so the console names what it is chewing on
+        // for the minute it takes rather than only after it finishes.
+        report(title.subject.title)
         result.processed++
 
         try {
-          const stored = await analyseTitle(title.mediaType, title.mediaId, title.subject)
+          const stored = await analyseTitle(title.mediaType, title.mediaId, title.subject, {
+            shouldCancel: options.shouldCancel,
+          })
           if (stored.analysis) result.stored++
           else result.declined++
         } catch (err) {
+          // Stopped on request part-way through, not a broken title. The row is
+          // unwritten either way, so it stays pending; the difference is that
+          // this ends the run instead of counting against it.
+          if (err instanceof AnalysisCancelledError) {
+            result.processed--
+            result.cancelled = true
+            report()
+            return result
+          }
           // No row was written, so this title stays pending and the NEXT run
           // picks it up — which is the entire reason a failure must not be
           // stored as a decline. `attempted` is what keeps this run finite.

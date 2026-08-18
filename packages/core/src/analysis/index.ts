@@ -61,7 +61,13 @@ export {
   type AnalysisSqlAliases,
 } from './pending.js'
 
-export { analyseTitle, getStoredAnalysis, type StoredAnalysis } from './generate.js'
+export {
+  analyseTitle,
+  getStoredAnalysis,
+  AnalysisCancelledError,
+  type StoredAnalysis,
+  type AnalyseTitleOptions,
+} from './generate.js'
 
 export {
   countPendingAnalysis,
