@@ -1,17 +1,5 @@
-import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  Divider,
-  Chip,
-  Avatar,
-  Stack,
-  Tooltip,
-  Paper,
-  LinearProgress,
-} from '@mui/material'
-import { alpha, useTheme } from '@mui/material/styles'
+import type { ReactNode } from 'react'
+import { Box, Typography, Card, CardContent, Divider, Chip, Avatar, Stack } from '@mui/material'
 import PersonIcon from '@mui/icons-material/Person'
 import BusinessIcon from '@mui/icons-material/Business'
 import PublicIcon from '@mui/icons-material/Public'
@@ -20,29 +8,22 @@ import LinkIcon from '@mui/icons-material/Link'
 import LocalOfferIcon from '@mui/icons-material/LocalOffer'
 import StreamIcon from '@mui/icons-material/Stream'
 import CollectionsIcon from '@mui/icons-material/Collections'
-import GroupIcon from '@mui/icons-material/Group'
-import VisibilityIcon from '@mui/icons-material/Visibility'
-import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import CameraRollIcon from '@mui/icons-material/CameraRoll'
 import MusicNoteIcon from '@mui/icons-material/MusicNote'
 import ContentCutIcon from '@mui/icons-material/ContentCut'
-import FavoriteIcon from '@mui/icons-material/Favorite'
-import StarIcon from '@mui/icons-material/Star'
-import TrendingUpIcon from '@mui/icons-material/TrendingUp'
-import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import { Link as RouterLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { getProxiedImageUrl } from '@aperture/ui'
-import type { Media, Actor, StudioItem, MovieWatchStats, SeriesWatchStats } from '../types'
+import type { Media, Actor, StudioItem } from '../types'
 import { isMovie, isSeries } from '../types'
 import { personPath, studioPath } from '../helpers'
 
-type WatchStats = MovieWatchStats | SeriesWatchStats
-
 interface MediaInfoCardProps {
   media: Media
-  watchStats?: WatchStats | null
 }
+
+/** Cast shown before the count takes over. */
+const CAST_SHOWN = 12
 
 function getActors(media: Media): Actor[] {
   return media.actors || []
@@ -52,359 +33,194 @@ function getStudios(media: Media): StudioItem[] {
   return media.studios || []
 }
 
-export function MediaInfoCard({ media, watchStats }: MediaInfoCardProps) {
+/**
+ * One metadata group: a label in a fixed gutter, its values beside it.
+ *
+ * Every group here used to be a `subtitle1` heading with an icon, a divider
+ * above it and a chip row below — three lines and a rule to show, in the worst
+ * case, a single name. Ten of those stacked was most of the card's height and
+ * all of its noise.
+ *
+ * The gutter is a flex basis rather than a breakpoint, so the values drop
+ * under the label when the *container* is narrow — which is what a phone does,
+ * and also what the assistant dock and MediaDetailModal do at full window
+ * width.
+ */
+function FactRow({
+  icon,
+  label,
+  children,
+}: {
+  icon: ReactNode
+  label: string
+  children: ReactNode
+}) {
+  return (
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5, py: 1 }}>
+      <Box
+        sx={{
+          flex: '0 0 7rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0.75,
+          color: 'text.secondary',
+          '& .MuiSvgIcon-root': { fontSize: 16 },
+        }}
+      >
+        {icon}
+        <Typography variant="caption" color="text.secondary">
+          {label}
+        </Typography>
+      </Box>
+      <Box sx={{ flex: '1 1 14rem', minWidth: 0 }}>{children}</Box>
+    </Box>
+  )
+}
+
+export function MediaInfoCard({ media }: MediaInfoCardProps) {
   const { t } = useTranslation()
-  const theme = useTheme()
   // Critic scores, awards and the director/writer credits are not here any
   // more: they render once, at the top of the page, beside the community
   // rating and under the title. See MediaHero.
+  //
+  // Community watch counts left for the same reason — they are a line in the
+  // hero now. See CommunityStrip.
   const hasStreamingProviders =
     media.streaming_providers && media.streaming_providers.length > 0
   const actors = getActors(media)
   const studios = getStudios(media)
+  const extraActors = Math.max(0, actors.length - CAST_SHOWN)
 
-  // Check if there are any watch stats to display
-  const hasWatchStats = watchStats && (
-    isMovie(media) 
-      ? (watchStats as MovieWatchStats).totalWatchers > 0
-      : (watchStats as SeriesWatchStats).totalViewers > 0 || (watchStats as SeriesWatchStats).currentlyWatching > 0
-  )
+  // The three below-the-line craft credits. They share a row because each one
+  // is a name or two: given a heading and a rule apiece they cost about 180px
+  // to say "Robby Müller", "Björk", "François Gédigier".
+  //
+  // auto-fit rather than three fixed columns — the row becomes two-up and then
+  // one-up on its own as the container narrows, with no media query.
+  const crewGroups: Array<{ id: string; icon: ReactNode; label: string; names: string[] }> = []
+  if (isMovie(media)) {
+    if (media.cinematographers && media.cinematographers.length > 0) {
+      crewGroups.push({
+        id: 'cinematography',
+        icon: <CameraRollIcon />,
+        label: t('mediaDetail.infoCard.cinematography'),
+        names: media.cinematographers,
+      })
+    }
+    if (media.composers && media.composers.length > 0) {
+      crewGroups.push({
+        id: 'music',
+        icon: <MusicNoteIcon />,
+        label: t('mediaDetail.infoCard.music'),
+        names: media.composers,
+      })
+    }
+    if (media.editors && media.editors.length > 0) {
+      crewGroups.push({
+        id: 'editing',
+        icon: <ContentCutIcon />,
+        label: t('mediaDetail.infoCard.editing'),
+        names: media.editors,
+      })
+    }
+  }
+
+  const externalLinks: Array<{ id: string; label: string; href: string }> = []
+  if (media.imdb_id) {
+    externalLinks.push({
+      id: 'imdb',
+      label: t('mediaDetail.infoCard.linkImdb'),
+      href: `https://www.imdb.com/title/${media.imdb_id}`,
+    })
+  }
+  if (media.tmdb_id) {
+    externalLinks.push({
+      id: 'tmdb',
+      label: t('mediaDetail.infoCard.linkTmdb'),
+      href: `https://www.themoviedb.org/${isMovie(media) ? 'movie' : 'tv'}/${media.tmdb_id}`,
+    })
+  }
+  if (isSeries(media) && media.tvdb_id) {
+    externalLinks.push({
+      id: 'tvdb',
+      label: t('mediaDetail.infoCard.linkTvdb'),
+      href: `https://thetvdb.com/?id=${media.tvdb_id}&tab=series`,
+    })
+  }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {/* Community Watch Stats */}
-      {hasWatchStats && (
-        <Paper
-          sx={{
-            p: 2,
-            borderRadius: 2,
-            bgcolor: 'background.paper',
-            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.secondary.main, 0.08)} 100%)`,
-            border: '1px solid',
-            borderColor: 'primary.main',
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-            <GroupIcon sx={{ color: 'primary.main', fontSize: 20 }} />
-            <Typography variant="subtitle1" fontWeight={600}>
-              {t('mediaDetail.infoCard.communityActivity')}
+    <Card sx={{ backgroundColor: 'background.paper', borderRadius: 2 }}>
+      <CardContent>
+        {hasStreamingProviders && (
+          <FactRow icon={<StreamIcon />} label={t('mediaDetail.infoCard.alsoAvailableOn')}>
+            <Stack direction="row" flexWrap="wrap" gap={0.5}>
+              {media.streaming_providers!.map((provider) => (
+                <Chip
+                  key={provider.id}
+                  label={provider.name}
+                  size="small"
+                  variant="outlined"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              ))}
+            </Stack>
+          </FactRow>
+        )}
+
+        {isMovie(media) && media.collection_name && (
+          <FactRow icon={<CollectionsIcon />} label={t('mediaDetail.infoCard.partOfCollection')}>
+            <Typography variant="body2" fontWeight={500}>
+              {media.collection_name}
             </Typography>
-          </Box>
-          
-          {isMovie(media) ? (
-            // Movie watch stats - comprehensive
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {/* Reach/Engagement Row */}
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <Tooltip
-                  title={t('mediaDetail.infoCard.movieWatchersTooltip', {
-                    pct: (watchStats as MovieWatchStats).watchPercentage,
-                    total: (watchStats as MovieWatchStats).totalUsers,
-                  })}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 100 }}>
-                    <VisibilityIcon sx={{ color: 'info.main', fontSize: 20 }} />
-                    <Box>
-                      <Typography variant="h5" fontWeight={700} color="info.main" lineHeight={1}>
-                        {(watchStats as MovieWatchStats).totalWatchers}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" lineHeight={1.2}>
-                        {t('mediaDetail.infoCard.watched')}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Tooltip>
+          </FactRow>
+        )}
 
-                {(watchStats as MovieWatchStats).totalPlays > 0 && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 100 }}>
-                    <PlayArrowIcon sx={{ color: 'success.main', fontSize: 20 }} />
-                    <Box>
-                      <Typography variant="h5" fontWeight={700} color="success.main" lineHeight={1}>
-                        {(watchStats as MovieWatchStats).totalPlays}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" lineHeight={1.2}>
-                        {t('mediaDetail.infoCard.plays')}
-                      </Typography>
-                    </Box>
-                  </Box>
-                )}
+        {media.keywords && media.keywords.length > 0 && (
+          <FactRow icon={<LocalOfferIcon />} label={t('mediaDetail.infoCard.keywords')}>
+            <Stack direction="row" flexWrap="wrap" gap={0.5}>
+              {media.keywords.slice(0, 10).map((keyword) => (
+                <Chip
+                  key={keyword}
+                  label={keyword}
+                  size="small"
+                  variant="outlined"
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              ))}
+            </Stack>
+          </FactRow>
+        )}
 
-                {(watchStats as MovieWatchStats).favoritesCount > 0 && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 100 }}>
-                    <FavoriteIcon sx={{ color: 'error.main', fontSize: 20 }} />
-                    <Box>
-                      <Typography variant="h5" fontWeight={700} color="error.main" lineHeight={1}>
-                        {(watchStats as MovieWatchStats).favoritesCount}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" lineHeight={1.2}>
-                        {t('mediaDetail.infoCard.favorited')}
-                      </Typography>
-                    </Box>
-                  </Box>
-                )}
+        {/* Language and country sit above the cast rather than at the very
+            bottom of the card. They say what the film is — a Danish-language
+            co-production is the kind of thing a reader wants before a list of
+            twenty production companies, not after it. */}
+        {media.languages && media.languages.length > 0 && (
+          <FactRow icon={<LanguageIcon />} label={t('mediaDetail.infoCard.languages')}>
+            <Stack direction="row" flexWrap="wrap" gap={0.5}>
+              {media.languages.map((language) => (
+                <Chip key={language} label={language} size="small" variant="outlined" />
+              ))}
+            </Stack>
+          </FactRow>
+        )}
 
-                {(watchStats as MovieWatchStats).averageUserRating != null && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 100 }}>
-                    <StarIcon sx={{ color: 'warning.main', fontSize: 20 }} />
-                    <Box>
-                      <Typography variant="h5" fontWeight={700} color="warning.main" lineHeight={1}>
-                        {(watchStats as MovieWatchStats).averageUserRating!.toFixed(1)}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" lineHeight={1.2}>
-                        {t('mediaDetail.infoCard.avgRatingCount', {
-                          count: (watchStats as MovieWatchStats).totalRatings,
-                        })}
-                      </Typography>
-                    </Box>
-                  </Box>
-                )}
-              </Box>
+        {media.production_countries && media.production_countries.length > 0 && (
+          <FactRow icon={<PublicIcon />} label={t('mediaDetail.infoCard.countries')}>
+            <Stack direction="row" flexWrap="wrap" gap={0.5}>
+              {media.production_countries.map((country) => (
+                <Chip key={country} label={country} size="small" variant="outlined" />
+              ))}
+            </Stack>
+          </FactRow>
+        )}
 
-              {/* Reach Progress Bar */}
-              {(watchStats as MovieWatchStats).watchPercentage > 0 && (
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      {t('mediaDetail.infoCard.householdReach')}
-                    </Typography>
-                    <Typography variant="caption" fontWeight={600} color="primary.main">
-                      {(watchStats as MovieWatchStats).watchPercentage}%
-                    </Typography>
-                  </Box>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={(watchStats as MovieWatchStats).watchPercentage}
-                    sx={{ 
-                      height: 6, 
-                      borderRadius: 3,
-                      bgcolor: 'action.hover',
-                      '& .MuiLinearProgress-bar': {
-                        borderRadius: 3,
-                      }
-                    }}
-                  />
-                </Box>
-              )}
-            </Box>
-          ) : (
-            // Series watch stats - comprehensive
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {/* Main Stats Row */}
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                {(watchStats as SeriesWatchStats).currentlyWatching > 0 && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 100 }}>
-                    <TrendingUpIcon sx={{ color: 'success.main', fontSize: 20 }} />
-                    <Box>
-                      <Typography variant="h5" fontWeight={700} color="success.main" lineHeight={1}>
-                        {(watchStats as SeriesWatchStats).currentlyWatching}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" lineHeight={1.2}>
-                        {t('mediaDetail.infoCard.watchingNow')}
-                      </Typography>
-                    </Box>
-                  </Box>
-                )}
-
-                {(watchStats as SeriesWatchStats).totalViewers > 0 && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 100 }}>
-                    <VisibilityIcon sx={{ color: 'info.main', fontSize: 20 }} />
-                    <Box>
-                      <Typography variant="h5" fontWeight={700} color="info.main" lineHeight={1}>
-                        {(watchStats as SeriesWatchStats).totalViewers}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" lineHeight={1.2}>
-                        {t('mediaDetail.infoCard.viewers')}
-                      </Typography>
-                    </Box>
-                  </Box>
-                )}
-
-                {(watchStats as SeriesWatchStats).completedViewers > 0 && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 100 }}>
-                    <CheckCircleIcon sx={{ color: 'warning.main', fontSize: 20 }} />
-                    <Box>
-                      <Typography variant="h5" fontWeight={700} color="warning.main" lineHeight={1}>
-                        {(watchStats as SeriesWatchStats).completedViewers}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" lineHeight={1.2}>
-                        {t('mediaDetail.infoCard.completed')}
-                      </Typography>
-                    </Box>
-                  </Box>
-                )}
-
-                {(watchStats as SeriesWatchStats).totalEpisodePlays > 0 && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 100 }}>
-                    <PlayArrowIcon sx={{ color: 'secondary.main', fontSize: 20 }} />
-                    <Box>
-                      <Typography variant="h5" fontWeight={700} color="secondary.main" lineHeight={1}>
-                        {(watchStats as SeriesWatchStats).totalEpisodePlays}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" lineHeight={1.2}>
-                        {t('mediaDetail.infoCard.episodePlays')}
-                      </Typography>
-                    </Box>
-                  </Box>
-                )}
-
-                {(watchStats as SeriesWatchStats).averageUserRating != null && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 100 }}>
-                    <StarIcon sx={{ color: 'warning.main', fontSize: 20 }} />
-                    <Box>
-                      <Typography variant="h5" fontWeight={700} color="warning.main" lineHeight={1}>
-                        {(watchStats as SeriesWatchStats).averageUserRating!.toFixed(1)}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" lineHeight={1.2}>
-                        {t('mediaDetail.infoCard.avgRatingCount', {
-                          count: (watchStats as SeriesWatchStats).totalRatings,
-                        })}
-                      </Typography>
-                    </Box>
-                  </Box>
-                )}
-              </Box>
-
-              {/* Average Progress Bar */}
-              {(watchStats as SeriesWatchStats).averageProgress > 0 && (
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      {t('mediaDetail.infoCard.averageViewerProgress', {
-                        count: (watchStats as SeriesWatchStats).totalEpisodes,
-                      })}
-                    </Typography>
-                    <Typography variant="caption" fontWeight={600} color="primary.main">
-                      {(watchStats as SeriesWatchStats).averageProgress}%
-                    </Typography>
-                  </Box>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={(watchStats as SeriesWatchStats).averageProgress}
-                    sx={{ 
-                      height: 6, 
-                      borderRadius: 3,
-                      bgcolor: 'action.hover',
-                      '& .MuiLinearProgress-bar': {
-                        borderRadius: 3,
-                      }
-                    }}
-                  />
-                </Box>
-              )}
-
-              {/* Household Reach */}
-              {(watchStats as SeriesWatchStats).watchPercentage > 0 && (
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      {t('mediaDetail.infoCard.userReach')}
-                    </Typography>
-                    <Typography variant="caption" fontWeight={600} color="secondary.main">
-                      {(watchStats as SeriesWatchStats).watchPercentage}%
-                    </Typography>
-                  </Box>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={(watchStats as SeriesWatchStats).watchPercentage}
-                    color="secondary"
-                    sx={{ 
-                      height: 6, 
-                      borderRadius: 3,
-                      bgcolor: 'action.hover',
-                      '& .MuiLinearProgress-bar': {
-                        borderRadius: 3,
-                      }
-                    }}
-                  />
-                </Box>
-              )}
-            </Box>
-          )}
-        </Paper>
-      )}
-
-      {/* Streaming Providers Section */}
-      {hasStreamingProviders && (
-        <Paper sx={{ p: 2, borderRadius: 2, bgcolor: 'background.paper' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-            <StreamIcon sx={{ color: 'info.main', fontSize: 20 }} />
-            <Typography variant="subtitle1" fontWeight={600}>
-              {t('mediaDetail.infoCard.alsoAvailableOn')}
-            </Typography>
-          </Box>
-          <Stack direction="row" flexWrap="wrap" gap={0.5}>
-            {media.streaming_providers!.map((provider) => (
-              <Chip
-                key={provider.id}
-                label={provider.name}
-                size="small"
-                variant="outlined"
-                sx={{ fontSize: '0.7rem' }}
-              />
-            ))}
-          </Stack>
-        </Paper>
-      )}
-
-      {/* Collection Section (Movies only) */}
-      {isMovie(media) && media.collection_name && (
-        <Paper sx={{ p: 2, borderRadius: 2, bgcolor: 'background.paper' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CollectionsIcon sx={{ color: 'secondary.main', fontSize: 20 }} />
-            <Box>
-              <Typography variant="caption" color="text.secondary">
-                {t('mediaDetail.infoCard.partOfCollection')}
-              </Typography>
-              <Typography variant="body2" fontWeight={500}>
-                {media.collection_name}
-              </Typography>
-            </Box>
-          </Box>
-        </Paper>
-      )}
-
-      {/* Keywords Section */}
-      {media.keywords && media.keywords.length > 0 && (
-        <Paper sx={{ p: 2, borderRadius: 2, bgcolor: 'background.paper' }}>
-          <Typography
-            variant="subtitle1"
-            fontWeight={600}
-            gutterBottom
-            sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-          >
-            <LocalOfferIcon fontSize="small" />
-            {t('mediaDetail.infoCard.keywords')}
-          </Typography>
-          <Stack direction="row" flexWrap="wrap" gap={0.5}>
-            {media.keywords.slice(0, 10).map((keyword) => (
-              <Chip
-                key={keyword}
-                label={keyword}
-                size="small"
-                variant="outlined"
-                sx={{ fontSize: '0.7rem' }}
-              />
-            ))}
-          </Stack>
-        </Paper>
-      )}
-
-      <Card sx={{ backgroundColor: 'background.paper', borderRadius: 2 }}>
-        <CardContent>
-          {/* Cast */}
-          {actors.length > 0 && (
-            <>
-              <Typography
-                variant="h6"
-                fontWeight={600}
-                gutterBottom
-                sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-              >
-                <PersonIcon fontSize="small" />
-                {t('mediaDetail.infoCard.cast')}
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
-                {actors.slice(0, 12).map((actor, idx) => (
+        {actors.length > 0 && (
+          <>
+            <Divider sx={{ my: 1.5 }} />
+            <FactRow icon={<PersonIcon />} label={t('mediaDetail.infoCard.cast')}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
+                {actors.slice(0, CAST_SHOWN).map((actor, idx) => (
                   <Box
                     key={idx}
                     component={RouterLink}
@@ -420,43 +236,63 @@ export function MediaInfoCard({ media, watchStats }: MediaInfoCardProps) {
                   >
                     <Avatar
                       src={getProxiedImageUrl(actor.thumb)}
-                      sx={{ width: 40, height: 40, bgcolor: 'grey.700' }}
+                      sx={{ width: 32, height: 32, bgcolor: 'grey.700' }}
                     >
                       <PersonIcon fontSize="small" />
                     </Avatar>
                     <Box>
-                      <Typography variant="body2" fontWeight={500} color="primary">
+                      <Typography variant="body2" fontWeight={500} color="primary" lineHeight={1.3}>
                         {actor.name}
                       </Typography>
                       {actor.role && (
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="text.secondary" lineHeight={1.2}>
                           {actor.role}
                         </Typography>
                       )}
                     </Box>
                   </Box>
                 ))}
+                {/* The list was already cut at twelve, silently. */}
+                {extraActors > 0 && (
+                  <Typography variant="caption" color="text.secondary">
+                    {t('mediaDetail.hero.plusMore', { count: extraActors })}
+                  </Typography>
+                )}
               </Box>
-            </>
-          )}
+            </FactRow>
+          </>
+        )}
 
-          {/* Movie-specific crew */}
-          {isMovie(media) && (
-            <>
-              {media.cinematographers && media.cinematographers.length > 0 && (
-                <>
-                  <Divider sx={{ my: 2 }} />
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight={600}
-                    gutterBottom
-                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+        {crewGroups.length > 0 && (
+          <>
+            <Divider sx={{ my: 1.5 }} />
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(11rem, 1fr))',
+                gap: 2,
+                py: 1,
+              }}
+            >
+              {crewGroups.map(({ id, icon, label, names }) => (
+                <Box key={id}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.75,
+                      mb: 0.75,
+                      color: 'text.secondary',
+                      '& .MuiSvgIcon-root': { fontSize: 16 },
+                    }}
                   >
-                    <CameraRollIcon fontSize="small" />
-                    {t('mediaDetail.infoCard.cinematography')}
-                  </Typography>
-                  <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
-                    {media.cinematographers.map((name) => (
+                    {icon}
+                    <Typography variant="caption" color="text.secondary">
+                      {label}
+                    </Typography>
+                  </Box>
+                  <Stack direction="row" flexWrap="wrap" gap={0.5}>
+                    {names.map((name) => (
                       <Chip
                         key={name}
                         label={name}
@@ -468,236 +304,54 @@ export function MediaInfoCard({ media, watchStats }: MediaInfoCardProps) {
                       />
                     ))}
                   </Stack>
-                </>
-              )}
+                </Box>
+              ))}
+            </Box>
+          </>
+        )}
 
-              {media.composers && media.composers.length > 0 && (
-                <>
-                  <Divider sx={{ my: 2 }} />
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight={600}
-                    gutterBottom
-                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-                  >
-                    <MusicNoteIcon fontSize="small" />
-                    {t('mediaDetail.infoCard.music')}
-                  </Typography>
-                  <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
-                    {media.composers.map((name) => (
-                      <Chip
-                        key={name}
-                        label={name}
-                        size="small"
-                        variant="outlined"
-                        component={RouterLink}
-                        to={personPath(name)}
-                        clickable
-                      />
-                    ))}
-                  </Stack>
-                </>
-              )}
+        {(studios.length > 0 || externalLinks.length > 0) && <Divider sx={{ my: 1.5 }} />}
 
-              {media.editors && media.editors.length > 0 && (
-                <>
-                  <Divider sx={{ my: 2 }} />
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight={600}
-                    gutterBottom
-                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-                  >
-                    <ContentCutIcon fontSize="small" />
-                    {t('mediaDetail.infoCard.editing')}
-                  </Typography>
-                  <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
-                    {media.editors.map((name) => (
-                      <Chip
-                        key={name}
-                        label={name}
-                        size="small"
-                        variant="outlined"
-                        component={RouterLink}
-                        to={personPath(name)}
-                        clickable
-                      />
-                    ))}
-                  </Stack>
-                </>
-              )}
-
-              {/* External Links for Movies */}
-              {(media.imdb_id || media.tmdb_id) && (
-                <>
-                  <Divider sx={{ my: 2 }} />
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight={600}
-                    gutterBottom
-                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-                  >
-                    <LinkIcon fontSize="small" />
-                    {t('mediaDetail.infoCard.externalLinks')}
-                  </Typography>
-                  <Stack direction="row" gap={1}>
-                    {media.imdb_id && (
-                      <Chip
-                        label={t('mediaDetail.infoCard.linkImdb')}
-                        size="small"
-                        component="a"
-                        href={`https://www.imdb.com/title/${media.imdb_id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        clickable
-                        sx={{ fontWeight: 600 }}
-                      />
-                    )}
-                    {media.tmdb_id && (
-                      <Chip
-                        label={t('mediaDetail.infoCard.linkTmdb')}
-                        size="small"
-                        component="a"
-                        href={`https://www.themoviedb.org/movie/${media.tmdb_id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        clickable
-                      />
-                    )}
-                  </Stack>
-                </>
-              )}
-            </>
-          )}
-
-          {/* Studios */}
-          {studios.length > 0 && (
-            <>
-              <Divider sx={{ my: 2 }} />
-              <Typography
-                variant="subtitle1"
-                fontWeight={600}
-                gutterBottom
-                sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-              >
-                <BusinessIcon fontSize="small" />
-                {t('mediaDetail.infoCard.studios')}
-              </Typography>
-              <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
-                {studios.map((studio, idx) => {
-                  const studioName = typeof studio === 'string' ? studio : studio.name
-                  return (
-                    <Chip
-                      key={`${studioName}-${idx}`}
-                      label={studioName}
-                      size="small"
-                      variant="outlined"
-                      component={RouterLink}
-                      to={studioPath(studioName)}
-                      clickable
-                    />
-                  )
-                })}
-              </Stack>
-            </>
-          )}
-
-          {/* Languages */}
-          {media.languages && media.languages.length > 0 && (
-            <>
-              <Divider sx={{ my: 2 }} />
-              <Typography
-                variant="subtitle1"
-                fontWeight={600}
-                gutterBottom
-                sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-              >
-                <LanguageIcon fontSize="small" />
-                {t('mediaDetail.infoCard.languages')}
-              </Typography>
-              <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
-                {media.languages.map((language) => (
-                  <Chip key={language} label={language} size="small" variant="outlined" />
-                ))}
-              </Stack>
-            </>
-          )}
-
-          {/* Production Countries */}
-          {media.production_countries && media.production_countries.length > 0 && (
-            <>
-              <Divider sx={{ my: 2 }} />
-              <Typography
-                variant="subtitle1"
-                fontWeight={600}
-                gutterBottom
-                sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-              >
-                <PublicIcon fontSize="small" />
-                {t('mediaDetail.infoCard.countries')}
-              </Typography>
-              <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
-                {media.production_countries.map((country) => (
-                  <Chip key={country} label={country} size="small" variant="outlined" />
-                ))}
-              </Stack>
-            </>
-          )}
-
-          {/* External Links (Series only has these explicitly) */}
-          {isSeries(media) && (media.imdb_id || media.tmdb_id || media.tvdb_id) && (
-            <>
-              <Divider sx={{ my: 2 }} />
-              <Typography
-                variant="subtitle1"
-                fontWeight={600}
-                gutterBottom
-                sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-              >
-                <LinkIcon fontSize="small" />
-                {t('mediaDetail.infoCard.externalLinks')}
-              </Typography>
-              <Stack direction="row" gap={1}>
-                {media.imdb_id && (
+        {studios.length > 0 && (
+          <FactRow icon={<BusinessIcon />} label={t('mediaDetail.infoCard.studios')}>
+            <Stack direction="row" flexWrap="wrap" gap={0.5}>
+              {studios.map((studio, idx) => {
+                const studioName = typeof studio === 'string' ? studio : studio.name
+                return (
                   <Chip
-                    label={t('mediaDetail.infoCard.linkImdb')}
+                    key={`${studioName}-${idx}`}
+                    label={studioName}
                     size="small"
-                    component="a"
-                    href={`https://www.imdb.com/title/${media.imdb_id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    clickable
-                    sx={{ fontWeight: 600 }}
-                  />
-                )}
-                {media.tmdb_id && (
-                  <Chip
-                    label={t('mediaDetail.infoCard.linkTmdb')}
-                    size="small"
-                    component="a"
-                    href={`https://www.themoviedb.org/tv/${media.tmdb_id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    variant="outlined"
+                    component={RouterLink}
+                    to={studioPath(studioName)}
                     clickable
                   />
-                )}
-                {media.tvdb_id && (
-                  <Chip
-                    label={t('mediaDetail.infoCard.linkTvdb')}
-                    size="small"
-                    component="a"
-                    href={`https://thetvdb.com/?id=${media.tvdb_id}&tab=series`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    clickable
-                  />
-                )}
-              </Stack>
-            </>
-          )}
-        </CardContent>
-      </Card>
-    </Box>
+                )
+              })}
+            </Stack>
+          </FactRow>
+        )}
+
+        {externalLinks.length > 0 && (
+          <FactRow icon={<LinkIcon />} label={t('mediaDetail.infoCard.externalLinks')}>
+            <Stack direction="row" flexWrap="wrap" gap={0.5}>
+              {externalLinks.map(({ id, label, href }) => (
+                <Chip
+                  key={id}
+                  label={label}
+                  size="small"
+                  component="a"
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  clickable
+                />
+              ))}
+            </Stack>
+          </FactRow>
+        )}
+      </CardContent>
+    </Card>
   )
 }
-

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -7,7 +8,6 @@ import {
   Paper,
   Chip,
   Divider,
-  Grid,
   LinearProgress,
   Tooltip,
   Collapse,
@@ -43,11 +43,14 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
   // used to be a second condition on the early return below, so the panel could
   // only ever explain a dozen films per user — everything else was scored,
   // discarded before it reached the database, and reported as never considered.
-  // Both variants open expanded: a panel whose entire content is an explanation
-  // is not worth a click to reach, and a collapsed one reads as though there is
-  // nothing inside it.
+  // A pick opens expanded, because its prose explanation is the point of the
+  // panel and a collapsed one would read as though there were nothing inside.
+  // A merely-scored title opens collapsed: it is not a recommendation, so it
+  // should not take a screen by default. Neither is a dead end any more — the
+  // header carries all three component scores, so the collapsed panel already
+  // says everything the meters below say.
   const isPick = insights.isSelected === true
-  const [insightsExpanded, setInsightsExpanded] = useState(true)
+  const [insightsExpanded, setInsightsExpanded] = useState(isPick)
 
   if (!insights.isRecommended) {
     return null
@@ -140,6 +143,52 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
       ? onOpenMedia(mediaType, id)
       : navigate(`/${mediaType === 'movie' ? 'movies' : 'series'}/${id}`)
 
+  // The three components of the match, built once and rendered twice: as a
+  // one-line summary in the header, and as meters in the body. Three `h4`
+  // percentages in three padded cards used to cost 154px of page to say what
+  // fits in the header of a collapsed panel.
+  const scoreMeters: Array<{
+    id: string
+    icon: ReactElement
+    label: string
+    tooltip: string
+    value: number | null
+    /** Bar fill, which is not always the value — see novelty above. */
+    fill: number
+    color: 'info' | 'success' | 'warning'
+  }> = [
+    {
+      id: 'taste',
+      icon: <TrendingUpIcon sx={{ fontSize: 16 }} />,
+      label: t('mediaDetail.insights.tasteMatch'),
+      tooltip: similarityTooltip,
+      value: tasteMatch,
+      fill: (tasteMatch ?? 0) * 100,
+      color: 'info',
+    },
+    {
+      id: 'discovery',
+      icon: <HubOutlinedIcon sx={{ fontSize: 16 }} />,
+      label: t('mediaDetail.insights.discovery'),
+      tooltip: discoveryTooltip,
+      value: insights.scores?.novelty ?? null,
+      fill: noveltyFill,
+      color: 'success',
+    },
+    {
+      id: 'quality',
+      icon: <ThumbUpIcon sx={{ fontSize: 16 }} />,
+      label: t('mediaDetail.insights.quality'),
+      tooltip: t('mediaDetail.insights.tooltipQuality'),
+      value: insights.scores?.rating ?? null,
+      fill: (insights.scores?.rating ?? 0) * 100,
+      color: 'warning',
+    },
+  ]
+
+  const formatScore = (value: number | null) =>
+    value != null ? `${Math.round(value * 100)}%` : t('mediaDetail.insights.na')
+
   return (
     <Box sx={{ mt: 4, px: 3 }}>
       <Paper
@@ -156,19 +205,32 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
           borderColor: isPick ? 'primary.main' : 'divider',
         }}
       >
-        {/* Header */}
+        {/* Header. Carries the whole score story, so the panel says something
+            while collapsed and the body below is elaboration rather than the
+            only place the numbers exist. */}
         <Box
           sx={{
             p: 2,
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            gap: 1,
             cursor: 'pointer',
             '&:hover': { bgcolor: 'action.hover' },
           }}
           onClick={() => setInsightsExpanded(!insightsExpanded)}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box
+            sx={{
+              flex: 1,
+              minWidth: 0,
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              columnGap: 2,
+              rowGap: 1,
+            }}
+          >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: '1 1 16rem', minWidth: 0 }}>
             <Box
               sx={{
                 width: 48,
@@ -218,6 +280,23 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
               </Typography>
             </Box>
           </Box>
+
+            {/* The three component scores, inline. Wraps under the title on a
+                narrow container rather than at a breakpoint, because this
+                panel also renders inside MediaDetailModal. */}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5 }}>
+              {scoreMeters.map(({ id, label, value, color }) => (
+                <Box key={id} sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    {label}
+                  </Typography>
+                  <Typography variant="body2" fontWeight={700} color={`${color}.main`}>
+                    {formatScore(value)}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          </Box>
           <IconButton>
             {insightsExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
           </IconButton>
@@ -225,7 +304,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
 
         <Collapse in={insightsExpanded}>
           <Divider />
-          <Box sx={{ p: 3 }}>
+          <Box sx={{ p: 2.5 }}>
             {/* Above the explanation because it is the reason this title is in
                 the list at all — the scores below describe it, they did not
                 choose it. */}
@@ -233,7 +312,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
               <Paper
                 sx={{
                   p: 2,
-                  mb: 3,
+                  mb: 2.5,
                   bgcolor: 'background.default',
                   borderRadius: 2,
                   borderInlineStart: '3px solid',
@@ -303,212 +382,207 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
               </Paper>
             )}
 
-            {/* The generated "why" — prose before numbers, matching the order
-                the same text is written into the media-server plot. Absent
-                whenever AI explanations are switched off. */}
-            {insights.aiExplanation && (
-              <Paper
-                sx={{
-                  p: 2,
-                  mb: 4,
-                  bgcolor: 'background.default',
-                  borderRadius: 2,
-                  borderInlineStart: '3px solid',
-                  borderInlineStartColor: 'primary.main',
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <AutoAwesomeIcon sx={{ color: 'primary.main', fontSize: 20 }} />
-                  <Typography variant="subtitle1" fontWeight={600}>
-                    {t('mediaDetail.insights.aiExplanationTitle')}
+            {/* Prose and numbers side by side rather than stacked.
+                Everything below the header used to be one column down the
+                middle of a full-page-width panel: four section headings, four
+                32px gaps and a row of three padded score cards, about 550px of
+                page for three percentages and two one-line facts, with the
+                right half of every row empty.
+
+                The split is flex basis, not breakpoints — same reasoning as
+                TitleAnalysis, which this mirrors: the panel also renders
+                inside MediaDetailModal and beside the assistant dock, so the
+                window's width is not the width it gets. When there is no
+                explanation to show, the rail is the only child and takes the
+                full width, at which point its own auto-fit grid puts the three
+                meters back in a row. One layout, both variants. */}
+            <Box
+              sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'flex-start',
+                gap: 2.5,
+                mb: 2.5,
+              }}
+            >
+              {/* The generated "why" — prose before numbers, matching the order
+                  the same text is written into the media-server plot. Absent
+                  whenever AI explanations are switched off. */}
+              {insights.aiExplanation && (
+                <Box
+                  sx={{
+                    flex: '1 1 26rem',
+                    minWidth: 0,
+                    maxWidth: '80ch',
+                    borderInlineStart: '3px solid',
+                    borderInlineStartColor: 'primary.main',
+                    pl: 2,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <AutoAwesomeIcon sx={{ color: 'primary.main', fontSize: 18 }} />
+                    <Typography variant="subtitle2" fontWeight={600}>
+                      {t('mediaDetail.insights.aiExplanationTitle')}
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+                    {insights.aiExplanation}
                   </Typography>
                 </Box>
-                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
-                  {insights.aiExplanation}
+              )}
+
+              <Box sx={{ flex: '1 1 17rem', minWidth: 0 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  display="block"
+                  sx={{ mb: 1 }}
+                >
+                  {t('mediaDetail.insights.howWeCalculated')}
                 </Typography>
-              </Paper>
-            )}
 
-            {/* Score Breakdown
-                Three components, because three is how many the match is made
-                of. Variety used to sit here as a fourth and is not part of it
-                at all — it is blended separately, into the ordering — so it now
-                appears below under its own heading. */}
-            <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-              {t('mediaDetail.insights.howWeCalculated')}
-            </Typography>
-            <Grid container spacing={3} sx={{ mb: 2 }}>
-              {/* Taste Similarity */}
-              <Grid item xs={12} sm={6} md={4}>
-                <Tooltip title={similarityTooltip} arrow>
-                  <Paper sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                      <TrendingUpIcon sx={{ color: 'info.main', fontSize: 20 }} />
-                      <Typography variant="body2" fontWeight={600}>{t('mediaDetail.insights.tasteMatch')}</Typography>
-                    </Box>
-                    <Typography variant="h4" fontWeight={700} color="info.main">
-                      {tasteMatch != null
-                        ? `${Math.round(tasteMatch * 100)}%`
-                        : t('mediaDetail.insights.na')}
-                    </Typography>
-                    <LinearProgress
-                      variant="determinate"
-                      value={(tasteMatch ?? 0) * 100}
-                      sx={{ mt: 1, borderRadius: 1, bgcolor: 'grey.800', '& .MuiLinearProgress-bar': { bgcolor: 'info.main' } }}
-                    />
-                  </Paper>
-                </Tooltip>
-              </Grid>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(9rem, 1fr))',
+                    columnGap: 2,
+                    rowGap: 1.25,
+                    mb: 1.5,
+                  }}
+                >
+                  {scoreMeters.map(({ id, icon, label, tooltip, value, fill, color }) => (
+                    <Tooltip key={id} title={tooltip} arrow>
+                      <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
+                          <Box sx={{ display: 'flex', color: `${color}.main` }}>{icon}</Box>
+                          <Typography variant="caption" sx={{ flex: 1 }} noWrap>
+                            {label}
+                          </Typography>
+                          <Typography variant="body2" fontWeight={700} color={`${color}.main`}>
+                            {formatScore(value)}
+                          </Typography>
+                        </Box>
+                        {/* Discovery fills against the band its curve can
+                            occupy rather than 0-100 — see noveltyFill. The
+                            number above stays the real value, so the
+                            arithmetic below still adds up. */}
+                        <LinearProgress
+                          variant="determinate"
+                          value={fill}
+                          sx={{
+                            height: 4,
+                            borderRadius: 1,
+                            bgcolor: 'grey.800',
+                            '& .MuiLinearProgress-bar': { bgcolor: `${color}.main` },
+                          }}
+                        />
+                      </Box>
+                    </Tooltip>
+                  ))}
+                </Box>
 
-              {/* Novelty Score */}
-              <Grid item xs={12} sm={6} md={4}>
-                <Tooltip title={discoveryTooltip} arrow>
-                  <Paper sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                      <HubOutlinedIcon sx={{ color: 'success.main', fontSize: 20 }} />
-                      <Typography variant="body2" fontWeight={600}>{t('mediaDetail.insights.discovery')}</Typography>
-                    </Box>
-                    <Typography variant="h4" fontWeight={700} color="success.main">
-                      {insights.scores?.novelty != null
-                        ? `${Math.round(insights.scores.novelty * 100)}%`
-                        : t('mediaDetail.insights.na')}
-                    </Typography>
-                    {/* Filled against the band this score can actually occupy,
-                        not against 0-100: the curve floors at ~47%, so drawn
-                        raw the emptiest possible discovery score looks like a
-                        half-full bar. The number above stays the real value, so
-                        the arithmetic below still adds up. */}
-                    <LinearProgress
-                      variant="determinate"
-                      value={noveltyFill}
-                      sx={{ mt: 1, borderRadius: 1, bgcolor: 'grey.800', '& .MuiLinearProgress-bar': { bgcolor: 'success.main' } }}
-                    />
-                  </Paper>
-                </Tooltip>
-              </Grid>
-
-              {/* Rating Score */}
-              <Grid item xs={12} sm={6} md={4}>
-                <Tooltip title={t('mediaDetail.insights.tooltipQuality')} arrow>
-                  <Paper sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                      <ThumbUpIcon sx={{ color: 'warning.main', fontSize: 20 }} />
-                      <Typography variant="body2" fontWeight={600}>{t('mediaDetail.insights.quality')}</Typography>
-                    </Box>
-                    <Typography variant="h4" fontWeight={700} color="warning.main">
-                      {insights.scores?.rating != null
-                        ? `${Math.round(insights.scores.rating * 100)}%`
-                        : t('mediaDetail.insights.na')}
-                    </Typography>
-                    <LinearProgress
-                      variant="determinate"
-                      value={(insights.scores?.rating || 0) * 100}
-                      sx={{ mt: 1, borderRadius: 1, bgcolor: 'grey.800', '& .MuiLinearProgress-bar': { bgcolor: 'warning.main' } }}
-                    />
-                  </Paper>
-                </Tooltip>
-              </Grid>
-            </Grid>
-
-            {/* How those three become the match.
-                Shown only when the run stored the pre-preference blend, i.e.
-                from migration 0141 on. Older runs kept neither that nor the
-                similarity value the blend consumed, and neither is recoverable
-                — so rather than imply an arithmetic it cannot show, the panel
-                simply omits this line for them. */}
-            {basePct != null && (
-              <Box
-                sx={{
-                  mb: 4,
-                  p: 2,
-                  borderRadius: 2,
-                  bgcolor: 'background.default',
-                  display: 'flex',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: { xs: 0.5, sm: 1.5 },
-                }}
-              >
-                <Typography variant="body2" color="text.secondary">
-                  {t('mediaDetail.insights.blendedScore')}
-                </Typography>
-                <Typography variant="body2" fontWeight={700}>
-                  {basePct}%
-                </Typography>
-                {preferenceDeltaPct !== 0 && (
-                  <>
-                    <Typography variant="body2" color="text.secondary">
-                      {preferenceDeltaPct > 0
-                        ? t('mediaDetail.insights.preferenceLift')
-                        : t('mediaDetail.insights.preferenceDrop')}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      fontWeight={700}
-                      color={preferenceDeltaPct > 0 ? 'success.main' : 'error.main'}
+                <Box
+                  sx={{
+                    pt: 1.25,
+                    borderTop: '1px solid',
+                    borderColor: 'divider',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 0.75,
+                  }}
+                >
+                  {/* How those three become the match.
+                      Shown only when the run stored the pre-preference blend,
+                      i.e. from migration 0141 on. Older runs kept neither that
+                      nor the similarity value the blend consumed, and neither
+                      is recoverable — so rather than imply an arithmetic it
+                      cannot show, the panel simply omits this line for them. */}
+                  {basePct != null && (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'baseline',
+                        columnGap: 0.75,
+                      }}
                     >
-                      {preferenceDeltaPct > 0 ? '+' : '−'}
-                      {Math.abs(preferenceDeltaPct)}%
-                    </Typography>
-                  </>
-                )}
-                <Typography variant="body2" color="text.secondary">
-                  {t('mediaDetail.insights.givesMatch')}
-                </Typography>
-                <Typography variant="body2" fontWeight={700} color="primary.main">
-                  {matchPct}%
-                </Typography>
-              </Box>
-            )}
+                      <Typography variant="caption" color="text.secondary">
+                        {t('mediaDetail.insights.blendedScore')}
+                      </Typography>
+                      <Typography variant="caption" fontWeight={700}>
+                        {basePct}%
+                      </Typography>
+                      {preferenceDeltaPct !== 0 && (
+                        <>
+                          <Typography variant="caption" color="text.secondary">
+                            {preferenceDeltaPct > 0
+                              ? t('mediaDetail.insights.preferenceLift')
+                              : t('mediaDetail.insights.preferenceDrop')}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            fontWeight={700}
+                            color={preferenceDeltaPct > 0 ? 'success.main' : 'error.main'}
+                          >
+                            {preferenceDeltaPct > 0 ? '+' : '−'}
+                            {Math.abs(preferenceDeltaPct)}%
+                          </Typography>
+                        </>
+                      )}
+                      <Typography variant="caption" color="text.secondary">
+                        {t('mediaDetail.insights.givesMatch')}
+                      </Typography>
+                      <Typography variant="caption" fontWeight={700} color="primary.main">
+                        {matchPct}%
+                      </Typography>
+                    </Box>
+                  )}
 
-            {/* Variety — a property of the LIST, not of the match.
-                It measures how much this pick differs from what was already
-                chosen, and is blended into the selection ordering rather than
-                into the score above. Rendering it as a fourth component of
-                "How We Calculated Your Match" claimed it was one. */}
-            {insights.scores?.diversity != null && (
-              <Box sx={{ mb: 4 }}>
-                <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-                  {t('mediaDetail.insights.varietyHeading')}
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <ShuffleIcon sx={{ color: 'secondary.main', fontSize: 20 }} />
-                  <Typography variant="body2" fontWeight={700} color="secondary.main">
-                    {Math.round(insights.scores.diversity * 100)}%
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {t('mediaDetail.insights.varietyExplainer')}
-                  </Typography>
+                  {/* Variety — a property of the LIST, not of the match. It
+                      measures how much this pick differs from what was already
+                      chosen, and is blended into the selection ordering rather
+                      than into the score above. It is below the rule and
+                      outside the meter grid for that reason; rendering it as a
+                      fourth component of "How We Calculated Your Match"
+                      claimed it was one. The explainer stays on screen rather
+                      than moving into a tooltip, because that sentence is the
+                      whole of the distinction. */}
+                  {insights.scores?.diversity != null && (
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
+                      <ShuffleIcon sx={{ color: 'secondary.main', fontSize: 16 }} />
+                      <Typography variant="caption" color="text.secondary">
+                        {t('mediaDetail.insights.varietyHeading')}
+                      </Typography>
+                      <Typography variant="caption" fontWeight={700} color="secondary.main">
+                        {Math.round(insights.scores.diversity * 100)}%
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {t('mediaDetail.insights.varietyExplainer')}
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {/* Genre Analysis — the count only. The genres themselves are
+                      chips on the title's own genre row at the top of the page,
+                      styled there with this same enjoyed/new distinction. */}
+                  {enjoyedCount + newCount > 0 && (
+                    <Typography variant="caption" color="text.secondary">
+                      {enjoyedCount > 0 && (
+                        <Box component="span" sx={{ color: 'success.main', fontWeight: 600 }}>
+                          {t('mediaDetail.insights.genresEnjoy', { count: enjoyedCount })}
+                        </Box>
+                      )}
+                      {enjoyedCount > 0 && newCount > 0 && ' • '}
+                      {newCount > 0 && (
+                        <Box component="span" sx={{ color: 'info.main', fontWeight: 600 }}>
+                          {t('mediaDetail.insights.genresNew', { count: newCount })}
+                        </Box>
+                      )}
+                    </Typography>
+                  )}
                 </Box>
               </Box>
-            )}
-
-            {/* Genre Analysis — the count only.
-                The genres themselves are chips on the title's own genre row at
-                the top of the page, styled there with this same enjoyed/new
-                distinction. Listing them again here meant the same handful of
-                words appeared twice on one screen in two different colour
-                schemes, which reads as two different facts. */}
-            {enjoyedCount + newCount > 0 && (
-              <Box sx={{ mb: 4 }}>
-                <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-                  {t('mediaDetail.insights.genreAnalysis')}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {enjoyedCount > 0 && (
-                    <span style={{ color: '#4caf50', fontWeight: 600 }}>
-                      {t('mediaDetail.insights.genresEnjoy', { count: enjoyedCount })}
-                    </span>
-                  )}
-                  {enjoyedCount > 0 && newCount > 0 && ' • '}
-                  {newCount > 0 && (
-                    <span style={{ color: '#2196f3', fontWeight: 600 }}>
-                      {t('mediaDetail.insights.genresNew', { count: newCount })}
-                    </span>
-                  )}
-                </Typography>
-              </Box>
-            )}
+            </Box>
 
             {/* Evidence - Items that contributed to this recommendation */}
             {insights.evidence && insights.evidence.length > 0 && (
@@ -520,21 +594,37 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                     what did not choose it — and calling it "why we think you'll
                     like this" directly contradicts the banner at the top of the
                     panel. Same rows either way; only the claim changes. */}
-                <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-                  {fromReservedSlot
-                    ? t('mediaDetail.insights.closestInLibrary')
-                    : t('mediaDetail.insights.whyWeThink')}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  {fromReservedSlot
-                    ? isSeriesView
-                      ? t('mediaDetail.insights.closestInLibrarySeries')
-                      : t('mediaDetail.insights.closestInLibraryMovie')
-                    : isSeriesView
-                      ? t('mediaDetail.insights.basedOnHistorySeries')
-                      : t('mediaDetail.insights.basedOnHistoryMovie')}
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 2 }}>
+                {/* Heading and its qualifier on one wrapping line rather than
+                    two stacked blocks — the qualifier is a clause about the
+                    heading, and it read as a paragraph of its own. */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'baseline',
+                    columnGap: 1,
+                    mb: 1.5,
+                  }}
+                >
+                  <Typography variant="subtitle2" fontWeight={600}>
+                    {fromReservedSlot
+                      ? t('mediaDetail.insights.closestInLibrary')
+                      : t('mediaDetail.insights.whyWeThink')}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {fromReservedSlot
+                      ? isSeriesView
+                        ? t('mediaDetail.insights.closestInLibrarySeries')
+                        : t('mediaDetail.insights.closestInLibraryMovie')
+                      : isSeriesView
+                        ? t('mediaDetail.insights.basedOnHistorySeries')
+                        : t('mediaDetail.insights.basedOnHistoryMovie')}
+                  </Typography>
+                </Box>
+                {/* Same poster size as the taste-twin row above, which was
+                    already the denser of the two treatments this file had for
+                    the same kind of row. */}
+                <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1 }}>
                   {insights.evidence.map((ev) => {
                     const item = ev.similar_movie || ev.similar_series
                     if (!item) return null
@@ -550,7 +640,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                         }
                         sx={{
                           flexShrink: 0,
-                          width: 120,
+                          width: 92,
                           cursor: 'pointer',
                           borderRadius: 2,
                           overflow: 'hidden',
@@ -559,7 +649,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                           bgcolor: 'background.default',
                         }}
                       >
-                        <Box sx={{ height: 160, bgcolor: 'grey.800', position: 'relative' }}>
+                        <Box sx={{ height: 124, bgcolor: 'grey.800', position: 'relative' }}>
                           <Box
                             component="img"
                             src={getProxiedImageUrl(item.poster_url)}
