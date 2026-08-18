@@ -1322,6 +1322,7 @@ export {
   isListingDomain,
   analyseTitle,
   getStoredAnalysis,
+  isAnalysisStale,
   loadAnalysisSubject,
   countPendingAnalysis,
   selectPendingTitles,

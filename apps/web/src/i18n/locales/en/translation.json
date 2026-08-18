@@ -776,7 +776,9 @@
         "substantial": "Well documented",
         "reviewsOnly": "Reviews only",
         "almostNothing": "Sparse sources"
-      }
+      },
+      "rewrite": "Rewrite this analysis",
+      "staleNote": "Written with an earlier version of the prompt. Rewriting reads the sources again."
     },
     "insights": {
       "recommendedForYou": "Recommended For You",

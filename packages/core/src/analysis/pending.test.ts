@@ -4,9 +4,11 @@ import assert from 'node:assert/strict'
 import {
   analysisJoinSql,
   analysisPriorityOrderSql,
+  isAnalysisStale,
   needsAnalysisSql,
   pendingAnalysisFromSql,
 } from './pending.js'
+import { ANALYSIS_PROMPT_VERSION } from './prompt.js'
 
 /** Collapse whitespace so assertions are about SQL, not indentation. */
 const flat = (sql: string) => sql.replace(/\s+/g, ' ').trim()
@@ -103,4 +105,18 @@ test('custom aliases flow through the join and the predicate together', () => {
   const aliases = { media: 'mv', analysis: 'an' }
   assert.match(flat(analysisJoinSql('movie', aliases)), /an\.media_id = mv\.id/)
   assert.match(needsAnalysisSql('$2', aliases), /an\.media_id IS NULL/)
+})
+
+test('the JS staleness check agrees with the SQL predicate above it', () => {
+  // The batch job asks this in SQL, the detail page and the on-demand POST ask
+  // it in TypeScript. Drift means a title is obsolete to one and current to the
+  // other: the job rewrites rows the page thinks are fine, or the page offers a
+  // rewrite for something the job has already redone.
+  assert.ok(needsAnalysisSql('$1').includes('prompt_version < $1'))
+
+  // Strictly below, on both sides. The other off-by-one would rewrite the whole
+  // library on every run, forever.
+  assert.equal(isAnalysisStale(ANALYSIS_PROMPT_VERSION - 1), true)
+  assert.equal(isAnalysisStale(ANALYSIS_PROMPT_VERSION), false)
+  assert.equal(isAnalysisStale(ANALYSIS_PROMPT_VERSION + 1), false)
 })

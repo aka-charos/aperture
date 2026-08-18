@@ -56,6 +56,7 @@ export { budgetSources, type BudgetOptions } from './budget.js'
 export {
   analysisJoinSql,
   analysisPriorityOrderSql,
+  isAnalysisStale,
   needsAnalysisSql,
   pendingAnalysisFromSql,
   type AnalysisSqlAliases,

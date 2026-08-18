@@ -18,10 +18,33 @@ import { requireAuth } from '../../plugins/auth.js'
 import {
   analyseTitle,
   getStoredAnalysis,
+  isAnalysisStale,
   loadAnalysisSubject,
   createChildLogger,
   type StoredAnalysis,
 } from '@aperture/core'
+
+/**
+ * The wire shape, in one place because GET and POST both send it and the
+ * client branches on all of it.
+ *
+ * `stale` is computed here rather than shipping `promptVersion` to the
+ * browser: the current version is a server-side constant, and a client that
+ * compared numbers itself would need to be redeployed in lockstep with every
+ * prompt change to stay right.
+ */
+function analysisPayload(stored: StoredAnalysis, generated: boolean) {
+  return {
+    attempted: true,
+    analysis: stored.analysis,
+    declineReason: stored.declineReason,
+    sources: stored.sources,
+    sourceGrade: stored.sourceGrade,
+    analyzedAt: stored.analyzedAt,
+    stale: isAnalysisStale(stored.promptVersion),
+    generated,
+  }
+}
 
 const logger = createChildLogger('analysis-routes')
 
@@ -66,12 +89,7 @@ const analysisRoutes: FastifyPluginAsync = async (fastify) => {
           return reply.send({ attempted: false, analysis: null })
         }
         return reply.send({
-          attempted: true,
-          analysis: stored.analysis,
-          declineReason: stored.declineReason,
-          sources: stored.sources,
-          sourceGrade: stored.sourceGrade,
-          analyzedAt: stored.analyzedAt,
+          ...analysisPayload(stored, false),
           generating: inFlight.has(`${mediaType}:${request.params.id}`),
         })
       } catch (err) {
@@ -114,34 +132,24 @@ const analysisRoutes: FastifyPluginAsync = async (fastify) => {
       const force = request.query.force === 'true' && request.user?.isAdmin === true
 
       try {
-        const existing = force ? null : await getStoredAnalysis(mediaType, id)
-        // A stored decline counts as an answer: re-asking spends a grounded
-        // request to receive the same "there is nothing to say" every time.
-        // Bumping ANALYSIS_PROMPT_VERSION is what clears those deliberately.
+        const stored = force ? null : await getStoredAnalysis(mediaType, id)
+        // A stored decline counts as an answer: re-asking spends a request to
+        // receive the same "there is nothing to say" every time. Bumping
+        // ANALYSIS_PROMPT_VERSION is what clears those deliberately — and a row
+        // below the current version is exactly that case, so it falls through
+        // to regeneration rather than being served back. This is the only route
+        // an obsolete analysis has to a current one for a non-admin; without it
+        // a prompt improvement reaches nothing already written, because the
+        // batch job queues stale rows behind every title never analysed at all.
+        const existing = stored && !isAnalysisStale(stored.promptVersion) ? stored : null
         if (existing) {
-          return reply.send({
-            attempted: true,
-            analysis: existing.analysis,
-            declineReason: existing.declineReason,
-            sources: existing.sources,
-            sourceGrade: existing.sourceGrade,
-            analyzedAt: existing.analyzedAt,
-            generated: false,
-          })
+          return reply.send(analysisPayload(existing, false))
         }
 
         const running = inFlight.get(key)
         if (running) {
           const joined = await running
-          return reply.send({
-            attempted: true,
-            analysis: joined.analysis,
-            declineReason: joined.declineReason,
-            sources: joined.sources,
-            sourceGrade: joined.sourceGrade,
-            analyzedAt: joined.analyzedAt,
-            generated: false,
-          })
+          return reply.send(analysisPayload(joined, false))
         }
 
         const subject = await loadAnalysisSubject(mediaType, id)
@@ -151,15 +159,7 @@ const analysisRoutes: FastifyPluginAsync = async (fastify) => {
         inFlight.set(key, work)
 
         const result = await work
-        return reply.send({
-          attempted: true,
-          analysis: result.analysis,
-          declineReason: result.declineReason,
-          sources: result.sources,
-          sourceGrade: result.sourceGrade,
-          analyzedAt: result.analyzedAt,
-          generated: true,
-        })
+        return reply.send(analysisPayload(result, true))
       } catch (err) {
         // A failure writes no row, so the title stays pending and both this
         // button and the batch job will try again. Surfaced as 503 rather than
