@@ -11,6 +11,28 @@
  * describe a total the loop never reaches.
  */
 
+import { ANALYSIS_PROMPT_VERSION } from './prompt.js'
+
+/**
+ * Is a stored row written under an older prompt?
+ *
+ * The JS twin of the `prompt_version <` clause below, and it lives here so
+ * the two cannot drift — the batch job asks this question in SQL, the detail
+ * page and the on-demand button ask it in TypeScript, and they have to mean
+ * the same thing or a title is obsolete to one and current to the other.
+ *
+ * WHY THE READER NEEDS TO ASK AT ALL. A bump used to be visible only to the
+ * job. The page kept rendering the old text (correctly — blanking every
+ * analysis in the library on a prompt change would swap decent prose for a
+ * button) and the on-demand POST returned the same row from cache, so an
+ * obsolete analysis had no route back except an admin force or a hand-written
+ * DELETE. At ten rows that is a nuisance; at ten thousand it means a prompt
+ * improvement never reaches anything already written.
+ */
+export function isAnalysisStale(promptVersion: number): boolean {
+  return promptVersion < ANALYSIS_PROMPT_VERSION
+}
+
 /** Table and id column for each media type. */
 const MEDIA_TABLE = { movie: 'movies', series: 'series' } as const
 

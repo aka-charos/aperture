@@ -864,7 +864,9 @@
       },
       "headingMovie": "Film Analysis",
       "headingSeries": "Series Analysis",
-      "sourcesLabel": "Sources"
+      "sourcesLabel": "Sources",
+      "rewrite": "Rewrite this analysis",
+      "staleNote": "Written with an earlier version of the prompt. Rewriting reads the sources again."
     }
   },
   "imageUpload": {

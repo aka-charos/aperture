@@ -59,6 +59,12 @@ interface AnalysisResponse {
   sources?: AnalysisSource[]
   sourceGrade?: string | null
   analyzedAt?: string
+  /**
+   * Written under an older prompt. Decided by the server, because the current
+   * version is a server-side constant and a client comparing numbers itself
+   * would have to be redeployed in lockstep with every prompt change.
+   */
+  stale?: boolean
 }
 
 interface TitleAnalysisProps {
@@ -119,6 +125,11 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
 
   const hasAnalysis = Boolean(data?.attempted && data.analysis)
   const declined = Boolean(data?.attempted && !data.analysis)
+  // Offered only over an analysis that exists and is behind the current
+  // prompt. It disappears of its own accord once used, because the rewritten
+  // row is current — which is what bounds the spend without an admin gate:
+  // one rewrite per title per prompt version, not a button anyone can lean on.
+  const canRewrite = hasAnalysis && Boolean(data?.stale)
 
   return (
     <Box sx={{ mt: 3, px: { xs: 2, sm: 3 } }}>
@@ -179,6 +190,25 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
                   </Typography>
                 ))}
               </Box>
+
+              {canRewrite && (
+                <Box sx={{ mt: 1.5 }}>
+                  <Button
+                    variant="text"
+                    size="small"
+                    onClick={generate}
+                    disabled={generating}
+                    startIcon={generating ? <CircularProgress size={14} /> : undefined}
+                  >
+                    {generating
+                      ? t('mediaDetail.analysis.generating')
+                      : t('mediaDetail.analysis.rewrite')}
+                  </Button>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    {t('mediaDetail.analysis.staleNote')}
+                  </Typography>
+                </Box>
+              )}
 
               {data?.sources && data.sources.length > 0 && (
                 <Box sx={{ mt: 2 }}>
