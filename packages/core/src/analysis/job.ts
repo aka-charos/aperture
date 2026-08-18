@@ -72,6 +72,17 @@ export interface AnalysisJobOptions {
      */
     currentTitle?: string
   }) => void
+  /**
+   * A line for the job console, which mirrors it to the container log.
+   *
+   * Separate from `onProgress` because a counter answers "how far" and this
+   * answers "what is happening" — and for this job the second question is the
+   * one that was unanswerable. A run spent minutes per title with the app log
+   * completely silent between "Starting job" and the next title's outcome,
+   * while CRW's own log showed it fetching pages the whole time. Two systems,
+   * one of them working, no way to tell from ours.
+   */
+  onLog?: (level: 'info' | 'warn' | 'error', message: string) => void
 }
 
 export interface AnalysisJobResult {
@@ -130,6 +141,16 @@ export async function generateTitleAnalyses(
 
   report()
 
+  const say = (level: 'info' | 'warn' | 'error', message: string) => options.onLog?.(level, message)
+
+  say(
+    'info',
+    `📚 ${total.toLocaleString()} title(s) pending — analysing up to ${capped.toLocaleString()} this run (${readiness.mode === 'crw' ? 'self-hosted retrieval' : 'built-in search'})`
+  )
+  if (capped === 0) {
+    say('info', 'Nothing pending — every title already has an analysis or a stored decline.')
+  }
+
   for (const mediaType of mediaTypes) {
     // Per media type, since a movie id and a series id are different keyspaces.
     const attempted = new Set<string>()
@@ -159,14 +180,34 @@ export async function generateTitleAnalyses(
         // Announced BEFORE the work, so the console names what it is chewing on
         // for the minute it takes rather than only after it finishes.
         report(title.subject.title)
+        say('info', `🔎 [${result.processed + 1}/${capped}] ${describe(title.subject)}`)
         result.processed++
+        const startedAt = Date.now()
 
         try {
           const stored = await analyseTitle(title.mediaType, title.mediaId, title.subject, {
             shouldCancel: options.shouldCancel,
           })
-          if (stored.analysis) result.stored++
-          else result.declined++
+          const secs = ((Date.now() - startedAt) / 1000).toFixed(0)
+          const found = `${stored.sourceCount ?? 0} source(s)${
+            stored.retrievedChars != null ? `, ${stored.retrievedChars.toLocaleString()} chars` : ''
+          }`
+          if (stored.analysis) {
+            result.stored++
+            say(
+              'info',
+              `✅ ${title.subject.title} — stored ${stored.analysis.length.toLocaleString()} chars from ${found} in ${secs}s`
+            )
+          } else {
+            result.declined++
+            // A decline is a result, not a fault — but it is the number that
+            // says whether the source floor is set right, so it has to be
+            // visible while a run is happening rather than only in SQL after.
+            say(
+              'info',
+              `➖ ${title.subject.title} — declined (${stored.declineReason ?? 'no reason recorded'}) after ${secs}s; found ${found}`
+            )
+          }
         } catch (err) {
           // Stopped on request part-way through, not a broken title. The row is
           // unwritten either way, so it stays pending; the difference is that
@@ -174,6 +215,7 @@ export async function generateTitleAnalyses(
           if (err instanceof AnalysisCancelledError) {
             result.processed--
             result.cancelled = true
+            say('info', `🛑 Stopped during "${title.subject.title}" — it stays pending`)
             report()
             return result
           }
@@ -181,10 +223,12 @@ export async function generateTitleAnalyses(
           // picks it up — which is the entire reason a failure must not be
           // stored as a decline. `attempted` is what keeps this run finite.
           result.failed++
+          const reason = err instanceof Error ? err.message : String(err)
           logger.warn(
             { err, mediaType, mediaId: title.mediaId, title: title.subject.title },
             'Title analysis failed; leaving it pending for the next run'
           )
+          say('warn', `⚠️ ${title.subject.title} — failed, staying pending: ${reason}`)
         }
 
         report()
@@ -205,8 +249,18 @@ export async function generateTitleAnalyses(
     },
     'Title analysis pass finished'
   )
+  say(
+    'info',
+    `🏁 Finished: ${result.stored} stored, ${result.declined} declined, ${result.failed} failed out of ${result.processed} attempted` +
+      (result.budgetExhausted ? ` (hit this run's limit of ${budget})` : '')
+  )
 
   return result
+}
+
+/** "Title (Year)" when the year is known, so a log line identifies one film. */
+function describe(subject: { title: string; year?: number | null }): string {
+  return subject.year ? `${subject.title} (${subject.year})` : subject.title
 }
 
 async function isCancelled(options: AnalysisJobOptions): Promise<boolean> {

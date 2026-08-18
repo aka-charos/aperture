@@ -471,7 +471,11 @@ export async function crwSearch(
     logger.warn({ query, warnings, usable: results.length }, 'Retrieval reported warnings')
   }
 
-  logger.debug(
+  // INFO. `returned` vs `usable` vs `withText` is the whole diagnosis of a bad
+  // retrieval — a search that answered but scraped nothing looks identical to a
+  // healthy one from every other vantage point — and at debug none of it
+  // reached the container log under the default level.
+  logger.info(
     {
       query,
       returned: rawResults.length,

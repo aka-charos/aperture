@@ -161,6 +161,12 @@ async function retrieveSources(subject: AnalysisSubject): Promise<Retrieval> {
   }
 
   const queryText = buildAnalysisQuery(subject)
+  // Retrieval is the long half of a title and used to be entirely silent: a run
+  // spent minutes here while the app log said nothing at all and CRW's own log
+  // showed it fetching pages the whole time. Announcing the query BEFORE the
+  // call is what lets the two logs be read against each other.
+  logger.info({ title: subject.title, query: queryText }, 'Retrieving sources')
+  const startedAt = Date.now()
   const response = await crwSearch(queryText, {
     baseUrl: config.baseUrl,
     apiKey: config.apiKey,
@@ -195,13 +201,21 @@ async function retrieveSources(subject: AnalysisSubject): Promise<Retrieval> {
   const sources = budgetSources(fetched, { budget: config.sourceBudgetChars })
   const retrievedChars = sources.reduce((sum, s) => sum + s.text.length, 0)
 
-  logger.debug(
+  // INFO, not debug. This is the line that says whether retrieval is healthy —
+  // how many pages came back, how much text they carried, and which sites they
+  // came from, which is what separates "six film-journal essays" from "six
+  // where-to-watch listicles". At debug it was below the default level, so the
+  // one useful record of the expensive half of the job was invisible in the
+  // container log. One line per title, and a title takes minutes.
+  logger.info(
     {
       title: subject.title,
       results: response.results.length,
       fetchedChars,
       budgeted: sources.length,
       retrievedChars,
+      domains: sources.map((s) => s.domain),
+      ms: Date.now() - startedAt,
     },
     'Retrieved sources for analysis'
   )
@@ -225,6 +239,15 @@ interface WriteResult {
 async function writeFromSources(prompt: string): Promise<WriteResult> {
   const { model, modelId } = await getTitleAnalysisModelInstance()
 
+  // The other silent half. A local model chewing through ~18k tokens of article
+  // text is minutes of wall clock with nothing to show for it, and on a
+  // self-hosted setup this is the step most likely to be the slow one — so the
+  // model id and the prompt size are logged before the call, not just after.
+  // Together with the retrieval line above, every long pause in a run now has a
+  // log line that says which of the two services owns it.
+  logger.info({ modelId, promptChars: prompt.length }, 'Writing analysis')
+  const startedAt = Date.now()
+
   let text = ''
   for (let attempt = 1; attempt <= MAX_EMPTY_RETRIES; attempt++) {
     const response = await generateText({
@@ -241,6 +264,11 @@ async function writeFromSources(prompt: string): Promise<WriteResult> {
       await sleep(EMPTY_RETRY_DELAY_MS)
     }
   }
+
+  logger.info(
+    { modelId, textChars: text.length, ms: Date.now() - startedAt },
+    'Analysis written'
+  )
 
   return { text, modelId }
 }

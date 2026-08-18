@@ -34,6 +34,39 @@ export interface LogEntry {
 const activeJobs = new Map<string, JobProgress>()
 const jobEmitter = new EventEmitter()
 
+/**
+ * Job ids already reported as having no progress record, so the warning below
+ * fires once per run rather than once per item.
+ */
+const warnedUnknownJobs = new Set<string>()
+
+/**
+ * Every function here begins `activeJobs.get(jobId)` and returns when there is
+ * no record — which is correct (a completed job is evicted after five minutes,
+ * and late calls must not resurrect it) but is also completely silent, and that
+ * silence hid a whole job.
+ *
+ * `generate-title-analysis` never called `createJobProgress`. Nothing else had
+ * to be wrong for every symptom to follow at once: `updateJobProgress` and
+ * `addLog` became no-ops, so the console showed an empty bar and an empty log;
+ * `completeJob` returned before `saveJobRun`, so no `job_runs` row was ever
+ * written and the history dialog said "No run history found for this job"; and
+ * `isJobCancelled` reduced to `undefined?.status === 'cancelled'`, which is
+ * always false, so Stop could not work no matter how often the work polled it.
+ * The job ran correctly and reported nothing, for an hour, twice.
+ *
+ * A registration that must happen and is never checked is a bug waiting for its
+ * next job. This makes the omission say so, once, in the container log.
+ */
+function missingProgress(jobId: string, calledFrom: string): void {
+  if (warnedUnknownJobs.has(jobId)) return
+  warnedUnknownJobs.add(jobId)
+  logger.warn(
+    { jobId, calledFrom },
+    `${calledFrom} called for a job with no progress record — createJobProgress was never called, so this job reports no progress, writes no job_runs row, and cannot be cancelled`
+  )
+}
+
 // Increase max listeners for many concurrent subscribers
 jobEmitter.setMaxListeners(100)
 
@@ -98,7 +131,7 @@ export function updateJobProgress(
   currentItem?: string
 ): void {
   const progress = activeJobs.get(jobId)
-  if (!progress) return
+  if (!progress) return missingProgress(jobId, 'updateJobProgress')
 
   progress.itemsProcessed = itemsProcessed
   if (itemsTotal !== undefined) {
@@ -145,7 +178,7 @@ export function addLog(
   data?: Record<string, unknown>
 ): void {
   const progress = activeJobs.get(jobId)
-  if (!progress) return
+  if (!progress) return missingProgress(jobId, 'addLog')
 
   const entry: LogEntry = {
     timestamp: new Date(),
@@ -194,7 +227,7 @@ function hasFinished(progress: JobProgress): boolean {
  */
 export function completeJob(jobId: string, result?: Record<string, unknown>): void {
   const progress = activeJobs.get(jobId)
-  if (!progress) return
+  if (!progress) return missingProgress(jobId, 'completeJob')
   if (hasFinished(progress)) {
     logger.warn(
       { jobId, jobName: progress.jobName, status: progress.status },
@@ -230,7 +263,7 @@ export function completeJob(jobId: string, result?: Record<string, unknown>): vo
  */
 export function failJob(jobId: string, error: string): void {
   const progress = activeJobs.get(jobId)
-  if (!progress) return
+  if (!progress) return missingProgress(jobId, 'failJob')
   // Same one-way door as completeJob. This also covers the double-report path:
   // a core function that fails its own job and rethrows reaches the executor's
   // catch, which fails it again.
