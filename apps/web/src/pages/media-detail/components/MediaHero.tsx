@@ -36,12 +36,20 @@ import OndemandVideoIcon from '@mui/icons-material/OndemandVideo'
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents'
 import ThumbUpIcon from '@mui/icons-material/ThumbUp'
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
-import type { Media, MediaServerInfo, RecommendationInsights, WatchStatus } from '../types'
+import type {
+  Media,
+  MediaServerInfo,
+  MovieWatchStats,
+  RecommendationInsights,
+  SeriesWatchStats,
+  WatchStatus,
+} from '../types'
 import { isMovie, isSeries } from '../types'
 import { useServerDisplayName } from '../../../hooks/useServerDisplayName'
 import { formatRuntime } from '../hooks'
 import { hasCriticRatings, personPath } from '../helpers'
 import { RatingBadges } from './RatingBadges'
+import { CommunityStrip } from './CommunityStrip'
 import {
   StarRating,
   getProxiedImageUrl,
@@ -74,6 +82,12 @@ interface MediaHeroProps {
    * own format.
    */
   genreAnalysis?: RecommendationInsights['genreAnalysis']
+  /**
+   * Community watch counts, rendered as a single line between the genres and
+   * the action buttons. Used to be a card in the info card, a screen further
+   * down the page.
+   */
+  watchStats?: MovieWatchStats | SeriesWatchStats | null
   // Series-specific
   isWatching?: boolean
   onWatchingToggle?: () => void
@@ -95,6 +109,7 @@ export function MediaHero({
   ratingLoading = false,
   onRatingChange,
   genreAnalysis,
+  watchStats,
   isWatching,
   onWatchingToggle,
   watchStatus,
@@ -458,14 +473,47 @@ export function MediaHero({
             )}
           </Box>
 
-          {/* Title */}
-          <Typography
-            variant="h3"
-            fontWeight={700}
-            sx={{ mb: 1, textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}
+          {/* Title, with the viewer's own rating (indigo star, distinct from
+              the red favorite heart) opposite it.
+
+              The rating used to sit on its own line below the genres, where it
+              read as a fifth action button. Up here it reads as a property of
+              the title, and it puts something in the half of the row that was
+              empty at desktop width.
+
+              The wrap is driven by flex basis, not a breakpoint: the title
+              claims 16rem before the rating's ~11rem, so below roughly 27rem
+              of *container* width the rating drops to its own line and sits
+              under the title, left-aligned. No `ml: 'auto'` — an auto margin
+              would still be in force on the wrapped line and would strand the
+              stars against the right edge on a phone. */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'baseline',
+              columnGap: 3,
+              rowGap: 1,
+              mb: 1,
+            }}
           >
-            {media.title}
-          </Typography>
+            <Typography
+              variant="h3"
+              fontWeight={700}
+              sx={{ flex: '1 1 16rem', minWidth: 0, textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}
+            >
+              {media.title}
+            </Typography>
+            <Box sx={{ flex: '0 0 auto' }}>
+              <StarRating
+                value={userRating}
+                onChange={onRatingChange}
+                loading={ratingLoading}
+                size="medium"
+                showValue
+              />
+            </Box>
+          </Box>
 
           {media.original_title && media.original_title !== media.title && (
             <Typography variant="h6" color="text.secondary" sx={{ mb: 2, fontStyle: 'italic' }}>
@@ -561,7 +609,7 @@ export function MediaHero({
               second time in its own colours — same fact, two formats, two
               places. */}
           {media.genres && media.genres.length > 0 && (
-            <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap' }}>
+            <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
               {media.genres.map((genre) => {
                 const enjoyed = enjoyedGenres.has(genre)
                 const unexplored = unexploredGenres.has(genre)
@@ -610,17 +658,10 @@ export function MediaHero({
             </Box>
           )}
 
-          {/* Your rating (indigo star, distinct from the red favorite heart) — on its own
-              line so it doesn't compete with the action buttons */}
-          <Box sx={{ mb: 2.5 }}>
-            <StarRating
-              value={userRating}
-              onChange={onRatingChange}
-              loading={ratingLoading}
-              size="medium"
-              showValue
-            />
-          </Box>
+          {/* What the rest of the household did with this title. One line
+              between the genres and the actions, rather than a bordered card
+              most of a page below. */}
+          <CommunityStrip media={media} watchStats={watchStats} />
 
           {/* Action buttons — one consistent group; the primary "open" action leads,
               secondary actions follow. Wraps as a whole instead of squishing individual buttons. */}

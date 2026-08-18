@@ -106,6 +106,9 @@ export function MediaDetailPage({
         // Styles the genre chips as enjoyed / new to explore. Undefined until
         // the insights request lands, and for any title no run has scored.
         genreAnalysis={insights?.genreAnalysis}
+        // Community watch counts. These render as a line in the hero now
+        // rather than as a card in the info card below.
+        watchStats={watchStats}
         // Series-specific
         isWatching={isSeries(media) && id ? isWatching(id) : false}
         onWatchingToggle={isSeries(media) && id ? () => toggleWatching(id) : undefined}
@@ -137,7 +140,7 @@ export function MediaDetailPage({
           {/* Left Column - Info */}
           <Grid item xs={12} md={6}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <MediaInfoCard media={media} watchStats={watchStats} />
+              <MediaInfoCard media={media} />
               {/* Aired episodes missing from the server + Seerr requests (series only) */}
               {isSeries(media) && (
                 <MissingSeasonsCard series={media} seasonAvailability={seasonAvailability} />
