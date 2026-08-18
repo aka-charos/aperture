@@ -266,7 +266,24 @@ async function executeJob(name: string, jobId: string): Promise<void> {
       }
       // === Title analysis (per title, from retrieved sources, cached forever) ===
       case 'generate-title-analysis': {
+        // THE registration this job was missing. Without it `activeJobs` has no
+        // entry for this id, and every function in jobs/progress.ts opens with
+        // `activeJobs.get(jobId)` and returns silently — so updateJobProgress
+        // and addLog were no-ops, completeJob returned before writing the
+        // job_runs row (hence "No run history found for this job"), and
+        // isJobCancelled was `undefined?.status === 'cancelled'`, which is
+        // always false, so Stop could not work however diligently the work
+        // polled it. One line missing, every symptom at once.
+        //
+        // One step, because this job is a single pass over a list; the item
+        // counter carries the detail. `setJobStep` leaves itemsTotal at 0 and
+        // the first progress report fills it in, since the pending count is not
+        // known until the job has done its own counting.
+        createJobProgress(jobId, name, 1)
+        setJobStep(jobId, 0, 'Analysing titles')
+
         const result = await generateTitleAnalyses({
+          onLog: (level, message) => addLog(jobId, level, message),
           // Cancellation has to be polled BETWEEN titles: a title costs a
           // search, several page fetches and a few thousand tokens of local
           // inference, so per-phase granularity would mean cancelling still
@@ -291,6 +308,15 @@ async function executeJob(name: string, jobId: string): Promise<void> {
           },
           `✅ Title analysis pass complete`
         )
+        // Reaching a terminal status is what writes the `job_runs` row, so
+        // without this the run would sit at 'running' until the five-minute
+        // eviction and still leave the history dialog empty. Skipped when
+        // cancelled: `cancelJob` has already filed the row, and completing over
+        // it would flip a cancelled run to 'completed' — the exact double
+        // transition `hasFinished` exists to refuse.
+        if (!result.cancelled) {
+          completeJob(jobId, { ...result })
+        }
         break
       }
       // === Taste Profiles ===
