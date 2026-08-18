@@ -272,8 +272,11 @@ async function executeJob(name: string, jobId: string): Promise<void> {
           // inference, so per-phase granularity would mean cancelling still
           // costs the rest of the batch.
           shouldCancel: () => isJobCancelled(jobId),
-          onProgress: ({ processed, total }) =>
-            updateJobProgress(jobId, processed, total),
+          // The title goes into `currentItem`. Without it the console shows a
+          // bar that moves once every 45s-3min and nothing else, which is
+          // indistinguishable from a wedged run.
+          onProgress: ({ processed, total, currentTitle }) =>
+            updateJobProgress(jobId, processed, total, currentTitle),
         })
         logger.info(
           {

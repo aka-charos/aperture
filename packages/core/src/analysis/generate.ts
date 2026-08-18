@@ -36,7 +36,7 @@ import { query, queryOne } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { recordWebSearchCall } from '../lib/webSearchUsage.js'
 import { budgetSources } from './budget.js'
-import { getRetrievalMode, type RetrievalMode } from './mode.js'
+import { checkModeReadiness, type RetrievalMode } from './mode.js'
 import {
   ANALYSIS_PROMPT_VERSION,
   buildAnalysisPrompt,
@@ -358,12 +358,56 @@ async function writeWithGrounding(prompt: string): Promise<WriteResult> {
  * is exactly the mistake that let a run of OMDb 401s stamp an entire library
  * complete.
  */
+/**
+ * Thrown when a caller's `shouldCancel` fires part-way through a title.
+ *
+ * Distinct from a failure so a batch can tell "stopped on request" from "this
+ * title is broken" — both leave the row unwritten and pending, but only one of
+ * them should end the run.
+ */
+export class AnalysisCancelledError extends Error {
+  constructor() {
+    super('Title analysis cancelled')
+    this.name = 'AnalysisCancelledError'
+  }
+}
+
+export interface AnalyseTitleOptions {
+  /**
+   * Polled at the one seam inside a title: after retrieval, before inference.
+   *
+   * Cancelling is cooperative and nothing interrupts an in-flight request, so
+   * the granularity of Stop is however long the current step runs. A title is
+   * two long steps — a search plus several page fetches (up to the 180s
+   * retrieval timeout), then a few thousand tokens through the writing model —
+   * and checking only between titles meant pressing Stop did nothing visible
+   * for minutes, which reads as a button that does not work.
+   */
+  shouldCancel?: () => Promise<boolean> | boolean
+}
+
 export async function analyseTitle(
   mediaType: 'movie' | 'series',
   mediaId: string,
-  subject: AnalysisSubject
+  subject: AnalysisSubject,
+  options: AnalyseTitleOptions = {}
 ): Promise<StoredAnalysis> {
-  const mode = await getRetrievalMode()
+  // The readiness check is on the EXECUTION path, not just the settings page.
+  // It existed from the start and was called only by the settings handler, to
+  // render a badge — so it described the configuration without ever governing
+  // it. What that permitted, measured live: retrieval mode left on `grounding`
+  // while the role pointed at an OpenRouter model, which cannot ground. The run
+  // logged `webSearchQueries: 0, groundingChunks: 0`, the model wrote 8,023
+  // characters out of its own memory, the floor correctly called it
+  // `thin_sources` — and the decline was stored, retiring the title until
+  // ANALYSIS_PROMPT_VERSION moves. Left alone it would have walked the library
+  // writing permanent declines at roughly a title a minute, never once
+  // contacting the retrieval service. A guard nothing calls is a comment.
+  const readiness = await checkModeReadiness()
+  if (!readiness.ready) {
+    throw new Error(readiness.reason ?? 'Title analysis is not configured')
+  }
+  const mode = readiness.mode
 
   let raw: string
   let modelId: string
@@ -377,6 +421,23 @@ export async function analyseTitle(
     // no external text enters the prompt — but also far less to judge the
     // result on, which is why the floor leans on the model's own verdict here.
     const result = await writeWithGrounding(buildAnalysisPrompt(subject, { mode }))
+
+    // A grounded call that retrieved NOTHING did not answer the question — it
+    // answered from memory, which is the one thing this feature exists to
+    // prevent. That is a retrieval failure, so it throws and leaves the title
+    // pending, exactly as `retrieveSources` does when the metasearch comes back
+    // empty. Storing it as a thin-sources decline would be permanent, and would
+    // be recording "the web has little on this film" on the strength of a
+    // search that never happened. The two branches now fail the same way; the
+    // grounding one silently did not, which is what turned a misconfiguration
+    // into data loss rather than an error.
+    if ((result.groundingChunks ?? 0) === 0) {
+      throw new Error(
+        `Grounded analysis retrieved no sources for "${subject.title}" — the model answered without searching. ` +
+          `Check that the Title Analysis role is on a Google model that supports search grounding, and that its quota is not exhausted.`
+      )
+    }
+
     raw = result.text
     modelId = result.modelId
     evidence = { mode: 'grounding', chunkCount: result.groundingChunks ?? 0 }
@@ -387,6 +448,14 @@ export async function analyseTitle(
     retrievedChars = null
   } else {
     const retrieval = await retrieveSources(subject)
+
+    // The seam. Retrieval is the long half and the model call is about to be
+    // the other one, so a Stop pressed during the fetch takes effect here
+    // rather than after another few thousand tokens of inference.
+    if (options.shouldCancel && (await options.shouldCancel()) === true) {
+      throw new AnalysisCancelledError()
+    }
+
     const result = await writeFromSources(
       buildAnalysisPrompt(subject, { mode, sources: retrieval.sources })
     )
