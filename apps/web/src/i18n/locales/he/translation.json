@@ -4577,6 +4577,11 @@
     "modeGroundingHelp": "A Google Gemini model searches for itself. Better retrieval and no infrastructure, but metered per day per Google project — on a free tier that is a few dozen titles a day, not a library. Needs Google selected for Title Analysis in Settings > AI.",
     "groundingNotice": "The retrieval service settings below are unused while built-in search is selected. They are kept so you can switch back without reconfiguring.",
     "analysisOutputLabel": "Analysis output limit (tokens)",
-    "analysisOutputHelp": "Ceiling on the model’s own answer. This is a runaway backstop, not a length control — length is asked for in the prompt, and a token limit does not shorten an answer, it cuts one off mid-sentence. Keep it well above any answer you want: the longest the prompt asks for is roughly 1,200 tokens, and a reasoning model spends its thinking from this same budget. 0 means no limit. Remember output shares a context window with the source text above."
+    "analysisOutputHelp": "Ceiling on the model’s own answer. This is a runaway backstop, not a length control — length is asked for in the prompt, and a token limit does not shorten an answer, it cuts one off mid-sentence. Keep it well above any answer you want: the longest the prompt asks for is roughly 1,200 tokens, and a reasoning model spends its thinking from this same budget. 0 means no limit. Remember output shares a context window with the source text above.",
+    "engineSlot1Label": "Search engine",
+    "engineSlot2Label": "Fall back to",
+    "engineSlot3Label": "Then",
+    "engineNone": "None",
+    "enginesHelp": "Tried in order until one returns results. Each is a separate request, so a first choice that is permanently blocked costs one wasted search per title — drop it from the list rather than paying for it. After five empty answers in a row an engine is tried last for half an hour, then given another chance."
   }
 }

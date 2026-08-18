@@ -31,6 +31,7 @@ import {
   Switch,
   FormControlLabel,
   Stack,
+  MenuItem,
   ToggleButton,
   ToggleButtonGroup,
 } from '@mui/material'
@@ -42,6 +43,31 @@ import SyncIcon from '@mui/icons-material/Sync'
 
 type RetrievalMode = 'crw' | 'grounding'
 
+const SEARCH_ENGINES = ['google', 'duckduckgo', 'bing'] as const
+const DEFAULT_ENGINES = ['google', 'duckduckgo', 'bing']
+const ENGINE_SLOTS = [0, 1, 2]
+
+/**
+ * Three ordered dropdowns rather than a multi-select, because ORDER is the
+ * whole meaning here and a multi-select has none — it hands back values in
+ * option order, not click order. With only three engines, naming the slots is
+ * clearer than any drag affordance would be.
+ *
+ * Blanks and repeats are dropped rather than blocked: leaving slot 2 empty and
+ * filling slot 3 is an obvious thing to do while rearranging, and it means
+ * exactly what it looks like.
+ */
+function orderedEngines(slots: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const slot of slots) {
+    if (!slot || seen.has(slot)) continue
+    seen.add(slot)
+    out.push(slot)
+  }
+  return out.length > 0 ? out : DEFAULT_ENGINES
+}
+
 interface CrwPublicConfig {
   enabled: boolean
   baseUrl: string
@@ -51,6 +77,7 @@ interface CrwPublicConfig {
   timeoutMs: number
   sourceBudgetChars: number
   analysisMaxOutputTokens: number
+  searchEngines?: string[]
   retrievalMode: RetrievalMode
 }
 
@@ -88,6 +115,7 @@ export function CrwConfigSection() {
   const [analysisMaxOutputTokens, setAnalysisMaxOutputTokens] = useState('8000')
   const [maxContentChars, setMaxContentChars] = useState('12000')
   const [timeoutSeconds, setTimeoutSeconds] = useState('90')
+  const [engineSlots, setEngineSlots] = useState<string[]>(DEFAULT_ENGINES)
   const [hasChanges, setHasChanges] = useState(false)
 
   // Sync every field from a server config — on load and after save, so a clamped
@@ -103,6 +131,9 @@ export function CrwConfigSection() {
     setAnalysisMaxOutputTokens(String(c.analysisMaxOutputTokens ?? 8000))
     setMaxContentChars(String(c.maxContentChars ?? 12000))
     setTimeoutSeconds(String(Math.round((c.timeoutMs ?? 90000) / 1000)))
+    // Padded to three so a saved two-engine cascade still renders an empty
+    // third slot to add to, rather than no slot at all.
+    setEngineSlots([...(c.searchEngines ?? DEFAULT_ENGINES), '', '', ''].slice(0, 3))
     setHasChanges(false)
   }, [])
 
@@ -144,6 +175,7 @@ export function CrwConfigSection() {
         : clampInt(analysisMaxOutputTokens, 512, 128000, 8000),
     maxContentChars: clampInt(maxContentChars, 1000, 100000, 12000),
     timeoutMs: clampInt(timeoutSeconds, 5, 300, 90) * 1000,
+    searchEngines: orderedEngines(engineSlots),
   })
 
   const handleSave = async () => {
@@ -361,6 +393,40 @@ export function CrwConfigSection() {
               },
             }}
           />
+
+          <Box>
+            <Box display="flex" gap={2} flexWrap="wrap">
+              {ENGINE_SLOTS.map((slot) => (
+                <TextField
+                  key={slot}
+                  select
+                  label={t(`settingsCrw.engineSlot${slot + 1}Label`)}
+                  value={engineSlots[slot] ?? ''}
+                  onChange={(e) => {
+                    setEngineSlots((prev) => {
+                      const next = [...prev]
+                      next[slot] = e.target.value
+                      return next
+                    })
+                    markChanged()
+                  }}
+                  sx={{ flex: '1 1 160px' }}
+                >
+                  <MenuItem value="">
+                    <em>{t('settingsCrw.engineNone')}</em>
+                  </MenuItem>
+                  {SEARCH_ENGINES.map((engine) => (
+                    <MenuItem key={engine} value={engine}>
+                      {engine}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              ))}
+            </Box>
+            <Typography variant="caption" color="text.secondary">
+              {t('settingsCrw.enginesHelp')}
+            </Typography>
+          </Box>
 
           <Box display="flex" gap={2} flexWrap="wrap">
             <TextField

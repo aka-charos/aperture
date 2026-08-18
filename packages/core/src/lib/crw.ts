@@ -36,6 +36,17 @@ import { parseApiError, logApiError, hasRecentSimilarError } from '../errors/ind
 
 const logger = createChildLogger('crw')
 
+/**
+ * Web search engines CRW can drive, in the spelling its API expects.
+ *
+ * Only the general-web ones. CRW also knows `github`, `wikipedia`, `youtube`,
+ * `reddit` and `amazon`, but those are site-scoped and would answer a request
+ * for film criticism with whatever that one site happens to hold.
+ */
+export const CRW_SEARCH_ENGINES = ['google', 'duckduckgo', 'bing'] as const
+
+export type CrwSearchEngine = (typeof CRW_SEARCH_ENGINES)[number]
+
 export interface CrwConfig {
   /** Master switch; retrieval runs only when this is true and a base URL is set. */
   enabled: boolean
@@ -128,6 +139,30 @@ export interface CrwConfig {
    * screens would mean tuning one without seeing the other.
    */
   analysisMaxOutputTokens: number
+  /**
+   * Engines to try, in order, until one answers. Never empty.
+   *
+   * WHY A CASCADE AND NOT A CHOICE. Google is the best of these when it works
+   * and refuses outright when it does not: a blocked client is redirected to
+   * `/sorry/index` and CRW reports `200 {results: []}` with a warning, which is
+   * shaped exactly like "the web has nothing on this title". Measured live on a
+   * datacenter address, every query walled while DuckDuckGo answered the same
+   * query fine. One engine is therefore a single point of failure that fails
+   * silently, and which engine is available is a property of the deployment -
+   * its IP, its browser profile, its country - so no default can be right for
+   * everyone and it has to be an operator setting.
+   *
+   * ORDER IS PREFERENCE, NOT PARALLELISM. Each entry is a separate request, so
+   * a first engine that is permanently walled costs one wasted round trip per
+   * title (~1.4s measured) forever. That is negligible against a title that
+   * takes 45s-3min, and it self-heals the day the block lifts - but if yours is
+   * walled for good, take it off the list rather than paying for it 13,000
+   * times. Do NOT pass several engines in one CRW request instead: CRW runs
+   * them sequentially on one warm tab and returns the union, so that is N times
+   * the latency on EVERY title including the healthy ones, which is the exact
+   * opposite of a fallback.
+   */
+  searchEngines: CrwSearchEngine[]
 }
 
 export const DEFAULT_CRW_CONFIG: CrwConfig = {
@@ -144,6 +179,9 @@ export const DEFAULT_CRW_CONFIG: CrwConfig = {
   // with a prompt that is already ~16,000 characters of article text, and a
   // 32k-context local model has to fit both.
   analysisMaxOutputTokens: 8000,
+  // Google first because its results are the best of the three when it is not
+  // walling the client, and the fallbacks cost nothing on a run where it works.
+  searchEngines: ['google', 'duckduckgo', 'bing'],
 }
 
 const SETTING_KEY = 'crw_integration'
@@ -159,6 +197,32 @@ const clampContentChars = (n: number) =>
 const clampTimeout = (n: number) => clampInt(n, 5000, 300_000, DEFAULT_CRW_CONFIG.timeoutMs)
 const clampSourceBudget = (n: number) =>
   clampInt(n, 2000, 200_000, DEFAULT_CRW_CONFIG.sourceBudgetChars)
+/**
+ * Keep only engines CRW knows, in the order given, without repeats.
+ *
+ * Falls back to the default list rather than to an empty one: an empty list
+ * would make CRW apply its own default (Google alone), which is the setup this
+ * field exists to escape - so a typo would silently reinstate the fault.
+ */
+export function sanitizeSearchEngines(raw: unknown): CrwSearchEngine[] {
+  if (!Array.isArray(raw)) return [...DEFAULT_CRW_CONFIG.searchEngines]
+  const seen = new Set<string>()
+  const out: CrwSearchEngine[] = []
+  for (const entry of raw) {
+    if (typeof entry !== 'string') continue
+    const name = entry.trim().toLowerCase()
+    if (!isCrwSearchEngine(name) || seen.has(name)) continue
+    seen.add(name)
+    out.push(name)
+  }
+  return out.length > 0 ? out : [...DEFAULT_CRW_CONFIG.searchEngines]
+}
+
+/** Narrowing guard, so the route and the sanitizer share one list. */
+export function isCrwSearchEngine(value: string): value is CrwSearchEngine {
+  return (CRW_SEARCH_ENGINES as readonly string[]).includes(value)
+}
+
 /** 0 is meaningful — "send no ceiling at all" — so it bypasses the range. */
 export const clampAnalysisOutputTokens = (n: number): number => {
   if (n === 0) return 0
@@ -185,6 +249,7 @@ function sanitize(config: Partial<CrwConfig>): CrwConfig {
     analysisMaxOutputTokens: clampAnalysisOutputTokens(
       config.analysisMaxOutputTokens ?? DEFAULT_CRW_CONFIG.analysisMaxOutputTokens
     ),
+    searchEngines: sanitizeSearchEngines(config.searchEngines),
   }
 }
 
@@ -258,6 +323,12 @@ export interface CrwSearchParams {
   maxResults?: number
   maxContentChars?: number
   timeoutMs?: number
+  /**
+   * One engine per request. Omitted, CRW uses its own default, which is
+   * Google — there is no server-side setting for this, the choice only exists
+   * on the request.
+   */
+  engine?: CrwSearchEngine
 }
 
 /** Hostname without `www.`, or '' when the URL is unusable. */
@@ -454,6 +525,9 @@ export async function crwSearch(
       body: JSON.stringify({
         query,
         limit: clampMaxResults(params.maxResults ?? DEFAULT_CRW_CONFIG.maxResults),
+        // A single-element list: see CrwConfig.searchEngines for why several
+        // engines in one request is not the fallback it looks like.
+        ...(params.engine ? { engines: [params.engine] } : {}),
         // The point of the whole integration: fetch each hit and hand back
         // cleaned markdown, rather than returning links for a second round trip.
         scrapeOptions: { formats: ['markdown'] },
@@ -538,21 +612,49 @@ export async function crwSearch(
  * It catches a second, quieter one now. Reaching the service and getting a
  * well-formed empty answer is ALSO a broken setup — see {@link describeTestOutcome}
  * — so the probe judges the results, not just the round trip.
+ *
+ * It walks the SAME engine cascade the job does, and says which one answered.
+ * Testing one engine while the job tries three would make the button lie in
+ * both directions: green while every real run fails over, or red while the job
+ * is perfectly healthy on a fallback.
  */
 export async function testCrwConnection(
-  params: CrwSearchParams
-): Promise<{ success: boolean; message: string; resultCount?: number }> {
-  try {
-    const res = await crwSearch('film criticism', { ...params, maxResults: 1 })
-    const outcome = describeTestOutcome({
-      resultCount: res.results.length,
-      warnings: res.warnings,
-    })
-    return { ...outcome, resultCount: res.results.length }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    return { success: false, message }
+  params: CrwSearchParams & { engines?: CrwSearchEngine[] }
+): Promise<{ success: boolean; message: string; resultCount?: number; engine?: CrwSearchEngine }> {
+  const engines = params.engines?.length ? params.engines : [undefined]
+  const attempts: string[] = []
+
+  for (const engine of engines) {
+    try {
+      const res = await crwSearch('film criticism', { ...params, maxResults: 1, engine })
+      const outcome = describeTestOutcome({
+        resultCount: res.results.length,
+        warnings: res.warnings,
+      })
+      if (outcome.success) {
+        // The working engine is named even on success, because "it works" and
+        // "it works because it quietly fell back" are different facts about a
+        // deployment and only one of them needs attention.
+        const via = engine ? ` (via ${engine})` : ""
+        const skipped = attempts.length ? ` Skipped — ${attempts.join(" | ")}.` : ""
+        return {
+          success: true,
+          message: `${outcome.message}${via}${skipped}`,
+          resultCount: res.results.length,
+          ...(engine ? { engine } : {}),
+        }
+      }
+      attempts.push(`${engine ?? "default"}: ${outcome.message}`)
+    } catch (err) {
+      // A transport failure is a fact about the SERVICE, not about this engine,
+      // so there is nothing to fall back to and trying the rest would just
+      // repeat the same error two more times before saying so.
+      const message = err instanceof Error ? err.message : String(err)
+      return { success: false, message }
+    }
   }
+
+  return { success: false, message: `No engine returned results. ${attempts.join(' | ')}` }
 }
 
 /** Record a CRW failure to the api_errors sink (deduped). Never throws. */
