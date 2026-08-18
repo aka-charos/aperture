@@ -37,8 +37,11 @@ import {
 } from '@mui/material'
 import {
   AutoStories as AutoStoriesIcon,
+  Autorenew as AutorenewIcon,
   ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material'
+import type { TFunction } from 'i18next'
+import { useAuth } from '../../../hooks/useAuth'
 import type { MediaType } from '../types'
 
 interface AnalysisSource {
@@ -50,6 +53,19 @@ interface AnalysisSource {
    * written before the field existed. A source without one is normal.
    */
   url?: string
+}
+
+/**
+ * What produced the stored row: which model wrote it, which retrieval mode fed
+ * it, how much text that came to. Sent to admins only, so the panel renders it
+ * whenever it is present rather than re-deciding who may see it.
+ */
+interface AnalysisProvenance {
+  model: string | null
+  retrievalMode: 'crw' | 'grounding' | null
+  sourceCount: number | null
+  retrievedChars: number | null
+  promptVersion: number
 }
 
 interface AnalysisResponse {
@@ -65,6 +81,7 @@ interface AnalysisResponse {
    * would have to be redeployed in lockstep with every prompt change.
    */
   stale?: boolean
+  provenance?: AnalysisProvenance
 }
 
 interface TitleAnalysisProps {
@@ -74,6 +91,8 @@ interface TitleAnalysisProps {
 
 export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
   const { t } = useTranslation()
+  const { user } = useAuth()
+  const isAdmin = user?.isAdmin === true
   const [data, setData] = useState<AnalysisResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
@@ -100,26 +119,36 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
     }
   }, [mediaType, mediaId])
 
-  const generate = useCallback(async () => {
-    setGenerating(true)
-    setError(null)
-    try {
-      const res = await fetch(`/api/analysis/${mediaType}/${mediaId}`, {
-        method: 'POST',
-        credentials: 'include',
-      })
-      const json = await res.json()
-      if (!res.ok) {
-        setError(json?.error ?? t('mediaDetail.analysis.failed'))
-        return
+  /**
+   * `force` re-runs a title that already has a row, and is admin-only on the
+   * server. It has to be passed explicitly at every call site: `onClick={run}`
+   * would hand React's click event in as `force`, and an event object is
+   * truthy — so an ordinary "Write an analysis" press would silently become a
+   * forced regeneration.
+   */
+  const run = useCallback(
+    async (force: boolean) => {
+      setGenerating(true)
+      setError(null)
+      try {
+        const res = await fetch(
+          `/api/analysis/${mediaType}/${mediaId}${force ? '?force=true' : ''}`,
+          { method: 'POST', credentials: 'include' }
+        )
+        const json = await res.json()
+        if (!res.ok) {
+          setError(json?.error ?? t('mediaDetail.analysis.failed'))
+          return
+        }
+        setData(json as AnalysisResponse)
+      } catch {
+        setError(t('mediaDetail.analysis.failed'))
+      } finally {
+        setGenerating(false)
       }
-      setData(json as AnalysisResponse)
-    } catch {
-      setError(t('mediaDetail.analysis.failed'))
-    } finally {
-      setGenerating(false)
-    }
-  }, [mediaType, mediaId, t])
+    },
+    [mediaType, mediaId, t]
+  )
 
   if (loading) return null
 
@@ -130,6 +159,7 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
   // row is current — which is what bounds the spend without an admin gate:
   // one rewrite per title per prompt version, not a button anyone can lean on.
   const canRewrite = hasAnalysis && Boolean(data?.stale)
+  const provenanceLine = data ? describeProvenance(data, t) : null
 
   return (
     <Box sx={{ mt: 3, px: { xs: 2, sm: 3 } }}>
@@ -220,7 +250,7 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
                       <Button
                         variant="text"
                         size="small"
-                        onClick={generate}
+                        onClick={() => run(false)}
                         disabled={generating}
                         startIcon={generating ? <CircularProgress size={14} /> : undefined}
                       >
@@ -292,7 +322,7 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
               <Button
                 variant="outlined"
                 size="small"
-                onClick={generate}
+                onClick={() => run(false)}
                 disabled={generating}
                 startIcon={generating ? <CircularProgress size={16} /> : <AutoStoriesIcon />}
               >
@@ -302,10 +332,82 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
               </Button>
             </Box>
           )}
+          {/* Admin re-run.
+
+              Offered only over a row that already exists, because that is the
+              case the cache otherwise makes a dead end: an ordinary POST is
+              answered from storage, so the only way to try another model — or
+              to give a DECLINED title a second chance under better retrieval —
+              is to say so explicitly. A title never analysed already has the
+              button above, where forcing would mean nothing.
+
+              It sits under a rule and states its cost, because unlike every
+              other control here it spends on a title that already has an
+              answer, and can be leaned on. The provenance line beside it is
+              what makes the re-run worth having at all: without knowing which
+              model and which mode wrote the text on screen, a before and after
+              compares nothing. */}
+          {isAdmin && data?.attempted && (
+            <Box sx={{ mt: 3, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="secondary"
+                  onClick={() => run(true)}
+                  disabled={generating}
+                  startIcon={
+                    generating ? <CircularProgress size={16} /> : <AutorenewIcon fontSize="small" />
+                  }
+                >
+                  {generating
+                    ? t('mediaDetail.analysis.generating')
+                    : t('mediaDetail.analysis.admin.rerun')}
+                </Button>
+                <Typography variant="caption" color="text.secondary" sx={{ flex: '1 1 16rem' }}>
+                  {t('mediaDetail.analysis.admin.hint')}
+                </Typography>
+              </Box>
+              {provenanceLine && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  display="block"
+                  sx={{ mt: 1, fontFamily: 'monospace', fontSize: '0.68rem' }}
+                >
+                  {provenanceLine}
+                </Typography>
+              )}
+            </Box>
+          )}
         </AccordionDetails>
       </Accordion>
     </Box>
   )
+}
+
+/**
+ * One line saying what wrote this row. Every part is optional: rows written
+ * before a column existed carry nulls, and a gap has to read as "not recorded"
+ * rather than as a broken panel.
+ */
+function describeProvenance(data: AnalysisResponse, t: TFunction): string | null {
+  const p = data.provenance
+  if (!p) return null
+  const parts: string[] = []
+  if (p.model) parts.push(p.model)
+  if (p.retrievalMode) parts.push(t(`mediaDetail.analysis.admin.mode.${p.retrievalMode}`))
+  if (p.sourceCount != null) {
+    parts.push(t('mediaDetail.analysis.admin.sourceCount', { count: p.sourceCount }))
+  }
+  if (p.retrievedChars != null) {
+    parts.push(
+      t('mediaDetail.analysis.admin.retrievedChars', { chars: p.retrievedChars.toLocaleString() })
+    )
+  }
+  parts.push(t('mediaDetail.analysis.admin.promptVersion', { version: p.promptVersion }))
+  if (data.analyzedAt) parts.push(new Date(data.analyzedAt).toLocaleString())
+  return parts.length > 0 ? parts.join(' · ') : null
 }
 
 /** Maps the stored grade onto an i18n key fragment. */

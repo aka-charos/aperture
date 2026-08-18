@@ -33,7 +33,7 @@ import {
  * compared numbers itself would need to be redeployed in lockstep with every
  * prompt change to stay right.
  */
-function analysisPayload(stored: StoredAnalysis, generated: boolean) {
+function analysisPayload(stored: StoredAnalysis, generated: boolean, admin: boolean) {
   return {
     attempted: true,
     analysis: stored.analysis,
@@ -43,6 +43,23 @@ function analysisPayload(stored: StoredAnalysis, generated: boolean) {
     analyzedAt: stored.analyzedAt,
     stale: isAnalysisStale(stored.promptVersion),
     generated,
+    // Which model, which retrieval mode, how much text it read. Admins only.
+    //
+    // These columns exist so the two retrieval modes can be compared after the
+    // fact rather than argued about, and that comparison is unreachable from
+    // the UI without shipping them: someone re-running a title to try another
+    // model otherwise has no way to see what the text already on screen was
+    // written by, which makes a before/after meaningless. Withheld from
+    // everyone else because it describes our infrastructure, not the film.
+    provenance: admin
+      ? {
+          model: stored.model,
+          retrievalMode: stored.retrievalMode,
+          sourceCount: stored.sourceCount,
+          retrievedChars: stored.retrievedChars,
+          promptVersion: stored.promptVersion,
+        }
+      : undefined,
   }
 }
 
@@ -83,13 +100,15 @@ const analysisRoutes: FastifyPluginAsync = async (fastify) => {
       const mediaType = parseMediaType(request.params.mediaType)
       if (!mediaType) return reply.status(400).send({ error: 'Invalid media type' })
 
+      const admin = request.user?.isAdmin === true
+
       try {
         const stored = await getStoredAnalysis(mediaType, request.params.id)
         if (!stored) {
           return reply.send({ attempted: false, analysis: null })
         }
         return reply.send({
-          ...analysisPayload(stored, false),
+          ...analysisPayload(stored, false, admin),
           generating: inFlight.has(`${mediaType}:${request.params.id}`),
         })
       } catch (err) {
@@ -126,10 +145,11 @@ const analysisRoutes: FastifyPluginAsync = async (fastify) => {
       const { id } = request.params
       const key = `${mediaType}:${id}`
 
+      const admin = request.user?.isAdmin === true
       // Silently ignored for a non-admin rather than refused: the request is
       // still perfectly serviceable from cache, and failing it would turn a
       // stray query parameter into a broken page.
-      const force = request.query.force === 'true' && request.user?.isAdmin === true
+      const force = request.query.force === 'true' && admin
 
       try {
         const stored = force ? null : await getStoredAnalysis(mediaType, id)
@@ -143,13 +163,13 @@ const analysisRoutes: FastifyPluginAsync = async (fastify) => {
         // batch job queues stale rows behind every title never analysed at all.
         const existing = stored && !isAnalysisStale(stored.promptVersion) ? stored : null
         if (existing) {
-          return reply.send(analysisPayload(existing, false))
+          return reply.send(analysisPayload(existing, false, admin))
         }
 
         const running = inFlight.get(key)
         if (running) {
           const joined = await running
-          return reply.send(analysisPayload(joined, false))
+          return reply.send(analysisPayload(joined, false, admin))
         }
 
         const subject = await loadAnalysisSubject(mediaType, id)
@@ -159,7 +179,7 @@ const analysisRoutes: FastifyPluginAsync = async (fastify) => {
         inFlight.set(key, work)
 
         const result = await work
-        return reply.send(analysisPayload(result, true))
+        return reply.send(analysisPayload(result, true, admin))
       } catch (err) {
         // A failure writes no row, so the title stays pending and both this
         // button and the batch job will try again. Surfaced as 503 rather than
