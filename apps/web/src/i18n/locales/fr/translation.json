@@ -796,7 +796,19 @@
       "headingSeries": "Series Analysis",
       "sourcesLabel": "Sources",
       "rewrite": "Rewrite this analysis",
-      "staleNote": "Written with an earlier version of the prompt. Rewriting reads the sources again."
+      "staleNote": "Written with an earlier version of the prompt. Rewriting reads the sources again.",
+      "admin": {
+        "rerun": "Re-run this analysis",
+        "hint": "Admin only. Reads the sources again and rewrites the text with whichever model the Title Analysis role points at now.",
+        "sourceCount_one": "{{count}} source",
+        "sourceCount_other": "{{count}} sources",
+        "retrievedChars": "{{chars}} chars read",
+        "promptVersion": "prompt v{{version}}",
+        "mode": {
+          "crw": "Self-hosted search",
+          "grounding": "Google grounding"
+        }
+      }
     }
   },
   "browse": {
