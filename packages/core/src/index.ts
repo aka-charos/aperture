@@ -159,6 +159,8 @@ export {
   isCrwEnabled,
   crwSearch,
   testCrwConnection,
+  readCrwWarnings,
+  describeTestOutcome,
   urlDomain,
   CrwError,
   DEFAULT_CRW_CONFIG,

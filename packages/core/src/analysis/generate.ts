@@ -169,8 +169,14 @@ async function retrieveSources(subject: AnalysisSubject): Promise<Retrieval> {
     timeoutMs: config.timeoutMs,
   })
 
+  // Warnings are carried into both messages below because these throws are the
+  // ones an operator reads in a job log, and they are exactly the failures the
+  // service explains on a 200: a blocked search engine returns a well-formed
+  // empty answer, and only `warnings` says so.
+  const reported = response.warnings.length ? ` Service reported: ${response.warnings.join('; ')}` : ''
+
   if (response.results.length === 0) {
-    throw new Error(`Retrieval returned no results for "${queryText}"`)
+    throw new Error(`Retrieval returned no results for "${queryText}".${reported}`)
   }
 
   const fetched: AnalysisSource[] = response.results.map((r) => ({
@@ -182,7 +188,7 @@ async function retrieveSources(subject: AnalysisSubject): Promise<Retrieval> {
   const fetchedChars = fetched.reduce((sum, s) => sum + s.text.length, 0)
   if (fetchedChars === 0) {
     throw new Error(
-      `Retrieval returned ${response.results.length} result(s) but no page text — check the scraper`
+      `Retrieval returned ${response.results.length} result(s) but no page text — check the scraper.${reported}`
     )
   }
 

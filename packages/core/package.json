@@ -64,7 +64,7 @@
     "test:schedule": "node --import tsx --test src/jobs/schedule.test.ts",
     "test:discovery": "node --import tsx --test src/discover/scorer.test.ts",
     "test:enrichment": "node --import tsx --test src/enrichment/needsEnrichment.test.ts src/omdb/failures.test.ts src/omdb/ratings.test.ts",
-    "test:analysis": "node --import tsx --test src/analysis/sourceFloor.test.ts src/analysis/pending.test.ts src/analysis/budget.test.ts",
+    "test:analysis": "node --import tsx --test src/analysis/sourceFloor.test.ts src/analysis/pending.test.ts src/analysis/budget.test.ts src/lib/crw.test.ts",
     "test:quota": "node --import tsx --test src/lib/webSearchQuota.test.ts",
     "lint": "eslint src",
     "clean": "rm -rf dist"

@@ -68,6 +68,20 @@ export interface CrwConfig {
    * Whole-request timeout (5,000–300,000 ms). Generous by default: this one
    * call runs a metasearch and then fetches several pages, and a JS-rendering
    * fallback makes it slower still.
+   *
+   * THE DEFAULT IS SET BY A NUMBER THE SERVICE PRINTS AT BOOT, not by taste.
+   * CRW's render ladder is HTTP → LightPanda → the heavy browser tier, and with
+   * `auto_extend_deadline_for_ladder` on (the shipped default) a single page
+   * that reaches the heavy tier is allowed the whole ladder. A stock deployment
+   * logs its own arithmetic on startup:
+   *
+   *   deadline_ms_default=15000 ladder_min_ms=82500 effective_default_ms=82500
+   *
+   * So ONE slow page can occupy 82.5s, and search runs before any of it. The
+   * previous 90s default sat under the worst case with the search leg
+   * unaccounted for — and a timeout here throws, which writes no row, so the
+   * title silently stays pending and the work is simply lost. Grep the boot log
+   * for `ladder_min_ms` and keep this comfortably above it plus the search leg.
    */
   timeoutMs: number
   /**
@@ -97,7 +111,7 @@ export const DEFAULT_CRW_CONFIG: CrwConfig = {
   apiKey: '',
   maxResults: 6,
   maxContentChars: 12000,
-  timeoutMs: 90000,
+  timeoutMs: 180000,
   sourceBudgetChars: 16000,
 }
 
@@ -184,6 +198,19 @@ export interface CrwSearchResultItem {
 export interface CrwSearchResponse {
   query: string
   results: CrwSearchResultItem[]
+  /**
+   * Soft failures the service reported alongside a 200.
+   *
+   * THIS IS THE ONLY THING THAT DISTINGUISHES THE TWO WAYS OF GETTING NOTHING.
+   * A search engine that has blocked us returns an empty result list inside a
+   * perfectly well-formed success response — measured live, where a first-boot
+   * browser profile on a datacenter address was handed Google's
+   * `/sorry/index` interstitial and the call came back `200 {results: []}`.
+   * That is indistinguishable from "the web has nothing on this title" unless
+   * the service says so, and it does: unresponsive engines and partial scrape
+   * failures arrive here rather than as an error status.
+   */
+  warnings: string[]
 }
 
 export interface CrwSearchParams {
@@ -272,6 +299,89 @@ function readResultsArray(json: unknown): unknown[] | null {
   return null
 }
 
+/** Non-empty strings from `value`, whether it is one string or an array. */
+function collectStrings(value: unknown, into: string[]): void {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (trimmed && !into.includes(trimmed)) into.push(trimmed)
+    return
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) collectStrings(entry, into)
+  }
+}
+
+/**
+ * Soft-failure notices from anywhere the service might have put them.
+ *
+ * The documented shape is `{ data: { warnings: [...] }, warning: "..." }` — a
+ * plural list of engine-level problems inside the payload, and a singular
+ * scalar beside it for a partial scrape failure. Both are read, along with the
+ * flattened variants, for the same reason the result reader is liberal: this is
+ * a young project and a shape difference should cost a diagnostic, not throw.
+ *
+ * Pure and exported so the reading is testable without a service to answer.
+ */
+export function readCrwWarnings(json: unknown): string[] {
+  const out: string[] = []
+  if (!json || typeof json !== 'object') return out
+  const body = json as Record<string, unknown>
+
+  collectStrings(body.warnings, out)
+  collectStrings(body.warning, out)
+
+  const data = body.data
+  if (data && typeof data === 'object') {
+    const nested = data as Record<string, unknown>
+    collectStrings(nested.warnings, out)
+    collectStrings(nested.warning, out)
+  }
+
+  return out
+}
+
+/**
+ * What the Test button should say, given what a real search came back with.
+ *
+ * ZERO RESULTS IS A FAILURE HERE, and that is the whole point of this function.
+ * The probe query is deliberately banal, so a working metasearch cannot answer
+ * it with nothing — an empty list means the search backend is blocked, throttled
+ * or misconfigured, not that the query was hard. Reporting that as
+ * "Connected. Search returned 0 result(s)." was technically true and completely
+ * useless: it renders as a green tick over a retrieval service that cannot
+ * retrieve, which is precisely the silent-zero this integration is written to
+ * avoid everywhere else.
+ *
+ * Warnings ride along in both directions. On a failure they usually name the
+ * cause outright ("search engine 'google' ..."), which is the difference
+ * between a diagnosis and a shrug; on a success they still matter, because a
+ * degraded engine is worth knowing about before a library-wide batch.
+ *
+ * Pure, so the decision is testable without stubbing fetch.
+ */
+export function describeTestOutcome(input: {
+  resultCount: number
+  warnings: string[]
+}): { success: boolean; message: string } {
+  const suffix = input.warnings.length ? ` Service reported: ${input.warnings.join('; ')}` : ''
+
+  if (input.resultCount === 0) {
+    return {
+      success: false,
+      message:
+        'Connected, but the search returned no results. The service is reachable and its ' +
+        'search endpoint answered, so this points at the search backend itself — a blocked ' +
+        'or rate-limited engine, or a missing search sidecar.' +
+        (suffix || ' The service reported no reason.'),
+    }
+  }
+
+  return {
+    success: true,
+    message: `Connected. Search returned ${input.resultCount} result(s).${suffix}`,
+  }
+}
+
 /**
  * Search and scrape in one call.
  *
@@ -352,6 +462,15 @@ export async function crwSearch(
     .map((raw) => readResult(raw, maxContentChars))
     .filter((r): r is CrwSearchResultItem => r !== null)
 
+  const warnings = readCrwWarnings(json)
+
+  // Logged at warn rather than folded into the debug line below, because this
+  // is the one signal that explains a thin or empty retrieval — and it arrives
+  // on a 200, so nothing else in the pipeline will ever mention it.
+  if (warnings.length > 0) {
+    logger.warn({ query, warnings, usable: results.length }, 'Retrieval reported warnings')
+  }
+
   logger.debug(
     {
       query,
@@ -362,7 +481,7 @@ export async function crwSearch(
     'Retrieval completed'
   )
 
-  return { query, results }
+  return { query, results, warnings }
 }
 
 /**
@@ -372,17 +491,21 @@ export async function crwSearch(
  * running the bare single container, which serves /v1/scrape happily while
  * /v1/search reports that search is disabled. A health check would pass on
  * exactly the broken configuration this button exists to catch.
+ *
+ * It catches a second, quieter one now. Reaching the service and getting a
+ * well-formed empty answer is ALSO a broken setup — see {@link describeTestOutcome}
+ * — so the probe judges the results, not just the round trip.
  */
 export async function testCrwConnection(
   params: CrwSearchParams
 ): Promise<{ success: boolean; message: string; resultCount?: number }> {
   try {
     const res = await crwSearch('film criticism', { ...params, maxResults: 1 })
-    return {
-      success: true,
-      message: `Connected. Search returned ${res.results.length} result(s).`,
+    const outcome = describeTestOutcome({
       resultCount: res.results.length,
-    }
+      warnings: res.warnings,
+    })
+    return { ...outcome, resultCount: res.results.length }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return { success: false, message }
