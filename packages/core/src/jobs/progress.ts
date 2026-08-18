@@ -1,4 +1,5 @@
 import { createChildLogger } from '../lib/logger.js'
+import { condenseLogs } from './logWindow.js'
 import { query } from '../lib/db.js'
 import { EventEmitter } from 'events'
 
@@ -69,6 +70,11 @@ function missingProgress(jobId: string, calledFrom: string): void {
 
 // Increase max listeners for many concurrent subscribers
 jobEmitter.setMaxListeners(100)
+
+/** In-memory ceiling per running job. */
+const LIVE_LOG_LIMIT = 500
+/** What is persisted to job_runs and rendered by the history dialog. */
+const STORED_LOG_LIMIT = 300
 
 /**
  * Create a new job progress tracker
@@ -189,9 +195,11 @@ export function addLog(
 
   progress.logs.push(entry)
 
-  // Keep only last 500 logs to prevent memory issues
-  if (progress.logs.length > 500) {
-    progress.logs = progress.logs.slice(-500)
+  // Bounded to protect memory, but head-and-tail rather than tail-only: for a
+  // job that logs two lines per unit of work, a pure tail drops the line saying
+  // what the run set out to do and keeps the most repetitive stretch of it.
+  if (progress.logs.length > LIVE_LOG_LIMIT) {
+    progress.logs = condenseLogs(progress.logs, LIVE_LOG_LIMIT)
   }
 
   // Also log to console
@@ -423,7 +431,10 @@ async function saveJobRun(progress: JobProgress): Promise<void> {
   // Build metadata with result and logs
   const metadata = {
     ...progress.result,
-    logs: progress.logs.slice(-100), // Keep last 100 log entries
+    // What the history dialog renders. Head-and-tail for the reason above, and
+    // roomier than the old 100 because a long run is two entries per item and
+    // this is a JSONB column measured in kilobytes, not a hot path.
+    logs: condenseLogs(progress.logs, STORED_LOG_LIMIT),
   }
 
   // Insert into job_runs table

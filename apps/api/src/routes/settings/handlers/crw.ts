@@ -27,6 +27,7 @@ interface CrwUpdateBody {
   maxContentChars?: number
   timeoutMs?: number
   sourceBudgetChars?: number
+  analysisMaxOutputTokens?: number
   /**
    * Where title analysis gets its sources. Lives on this endpoint rather than
    * its own because it decides whether anything else on this card is used at
@@ -44,6 +45,7 @@ interface PublicCrwConfig {
   maxContentChars: number
   timeoutMs: number
   sourceBudgetChars: number
+  analysisMaxOutputTokens: number
 }
 
 function validateConfig(config: CrwConfig): string | null {
@@ -77,6 +79,16 @@ function validateConfig(config: CrwConfig): string | null {
   ) {
     return 'sourceBudgetChars must be an integer between 2000 and 200000'
   }
+  // 0 is a real answer here - "send no ceiling" - so it is allowed alongside
+  // the range rather than clamped into it.
+  if (
+    !Number.isInteger(config.analysisMaxOutputTokens) ||
+    config.analysisMaxOutputTokens < 0 ||
+    (config.analysisMaxOutputTokens > 0 && config.analysisMaxOutputTokens < 512) ||
+    config.analysisMaxOutputTokens > 128000
+  ) {
+    return 'analysisMaxOutputTokens must be 0 (no limit) or an integer between 512 and 128000'
+  }
   return null
 }
 
@@ -92,6 +104,7 @@ function toPublicConfig(config: CrwConfig): PublicCrwConfig {
     maxContentChars: config.maxContentChars,
     timeoutMs: config.timeoutMs,
     sourceBudgetChars: config.sourceBudgetChars,
+    analysisMaxOutputTokens: config.analysisMaxOutputTokens,
   }
 }
 
@@ -144,6 +157,8 @@ export function registerCrwHandlers(fastify: FastifyInstance) {
           maxContentChars: body.maxContentChars ?? current.maxContentChars,
           timeoutMs: body.timeoutMs ?? current.timeoutMs,
           sourceBudgetChars: body.sourceBudgetChars ?? current.sourceBudgetChars,
+          analysisMaxOutputTokens:
+            body.analysisMaxOutputTokens ?? current.analysisMaxOutputTokens,
         }
 
         const validationError = validateConfig(newConfig)

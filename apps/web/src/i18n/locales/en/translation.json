@@ -1918,6 +1918,8 @@
     "timeoutHelp": "One call searches and then fetches every result, and a single page that falls through to the heavy browser tier can take over 80 seconds by itself — so allow generously. The service prints its own worst case when it starts up; look for ladder_min_ms in its log and keep this above it.",
     "sourceBudgetLabel": "Source text per analysis (characters)",
     "sourceBudgetHelp": "How much fetched text the model receives in one prompt. Set by your model’s context window, not by the service: roughly 4 characters per token, so 16,000 fits an 8k-context model with room for the answer. Raise it to match a larger window — more source text produces better analysis.",
+    "analysisOutputLabel": "Analysis output limit (tokens)",
+    "analysisOutputHelp": "Ceiling on the model’s own answer. This is a runaway backstop, not a length control — length is asked for in the prompt, and a token limit does not shorten an answer, it cuts one off mid-sentence. Keep it well above any answer you want: the longest the prompt asks for is roughly 1,200 tokens, and a reasoning model spends its thinking from this same budget. 0 means no limit. Remember output shares a context window with the source text above.",
     "maxContentLabel": "Maximum text per page (characters)",
     "maxContentHelp": "Safety valve so one enormous page cannot dominate. The budget above is what actually decides how much the model sees.",
     "save": "Save",

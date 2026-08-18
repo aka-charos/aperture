@@ -50,6 +50,7 @@ interface CrwPublicConfig {
   maxContentChars: number
   timeoutMs: number
   sourceBudgetChars: number
+  analysisMaxOutputTokens: number
   retrievalMode: RetrievalMode
 }
 
@@ -84,6 +85,7 @@ export function CrwConfigSection() {
   const [showApiKey, setShowApiKey] = useState(false)
   const [maxResults, setMaxResults] = useState('6')
   const [sourceBudgetChars, setSourceBudgetChars] = useState('16000')
+  const [analysisMaxOutputTokens, setAnalysisMaxOutputTokens] = useState('8000')
   const [maxContentChars, setMaxContentChars] = useState('12000')
   const [timeoutSeconds, setTimeoutSeconds] = useState('90')
   const [hasChanges, setHasChanges] = useState(false)
@@ -98,6 +100,7 @@ export function CrwConfigSection() {
     setApiKey('')
     setMaxResults(String(c.maxResults ?? 6))
     setSourceBudgetChars(String(c.sourceBudgetChars ?? 16000))
+    setAnalysisMaxOutputTokens(String(c.analysisMaxOutputTokens ?? 8000))
     setMaxContentChars(String(c.maxContentChars ?? 12000))
     setTimeoutSeconds(String(Math.round((c.timeoutMs ?? 90000) / 1000)))
     setHasChanges(false)
@@ -133,6 +136,12 @@ export function CrwConfigSection() {
     ...(apiKey ? { apiKey } : {}),
     maxResults: clampInt(maxResults, 1, 20, 6),
     sourceBudgetChars: clampInt(sourceBudgetChars, 2000, 200000, 16000),
+    // 0 is meaningful - "no ceiling" - so it skips the range rather than being
+    // clamped up to the minimum.
+    analysisMaxOutputTokens:
+      analysisMaxOutputTokens.trim() === '0'
+        ? 0
+        : clampInt(analysisMaxOutputTokens, 512, 128000, 8000),
     maxContentChars: clampInt(maxContentChars, 1000, 100000, 12000),
     timeoutMs: clampInt(timeoutSeconds, 5, 300, 90) * 1000,
   })
@@ -388,6 +397,18 @@ export function CrwConfigSection() {
               markChanged()
             }}
             helperText={t('settingsCrw.sourceBudgetHelp')}
+          />
+
+          <TextField
+            fullWidth
+            label={t('settingsCrw.analysisOutputLabel')}
+            type="number"
+            value={analysisMaxOutputTokens}
+            onChange={(e) => {
+              setAnalysisMaxOutputTokens(e.target.value)
+              markChanged()
+            }}
+            helperText={t('settingsCrw.analysisOutputHelp')}
           />
 
           <TextField

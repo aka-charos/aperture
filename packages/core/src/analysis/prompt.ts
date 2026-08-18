@@ -43,8 +43,10 @@
  *
  * 2: retrieved sources are supplied in the prompt instead of the model
  *    searching for itself.
+ * 3: the answer is delimited at both ends, so anything the model writes before
+ *    it can be discarded structurally rather than guessed at.
  */
-export const ANALYSIS_PROMPT_VERSION = 2
+export const ANALYSIS_PROMPT_VERSION = 3
 
 /** Reception figures, passed as calibration only. All optional. */
 export interface ReceptionContext {
@@ -153,9 +155,39 @@ const RULES = [
  * writing at all — volume measures obscurity, this measures depth. Both feed
  * the decision in ./sourceFloor.ts.
  */
+/**
+ * The opening delimiter, and why the answer needs one at all.
+ *
+ * The contract used to have a closing marker and no opening one, which quietly
+ * assumed the model's first character is the first character of the analysis.
+ * Plenty of capable models do not work that way: some think out loud in the
+ * content stream, some restate the task, some open with "Here is the analysis:".
+ * With only a closing marker there is no way to tell a preamble from the piece
+ * itself, and the first live pass stored 8,852 characters of a model scratchpad
+ * as an analysis for exactly that reason.
+ *
+ * REJECTING THOSE MODELS WAS THE WRONG FIX. This role is deliberately a free
+ * choice of provider and model, so a design that only works for models which
+ * keep reasoning out of the content stream is a broken design rather than a
+ * wrong model. Delimiting both ends makes extraction structural: whatever
+ * precedes the opening marker is discarded without anyone having to guess where
+ * thinking stops and prose starts, and guessing is exactly what made the
+ * explanationParsing salvage regex worse than the bug it was fixing.
+ *
+ * The token is deliberately unlovely. A model reasoning about this task writes
+ * headers like "Analysis:" or "**Analyze the sources**", and a marker that
+ * collided with those would be found in the scratchpad rather than at the
+ * answer. The parser also takes the LAST occurrence before the closing line, so
+ * a model that echoes the instruction back still lands on the real one.
+ */
+export const ANALYSIS_BEGIN_MARKER = '===ANALYSIS==='
+
 const SOURCE_GRADE_LINE =
-  'End with a single final line, exactly in this form and nothing after it:\n' +
-  'SOURCES: substantial | reviews-only | almost-nothing'
+  `Output format. Write this and nothing else:\n` +
+  `${ANALYSIS_BEGIN_MARKER}\n` +
+  `<your analysis as continuous prose>\n` +
+  `SOURCES: substantial | reviews-only | almost-nothing\n\n` +
+  `The first line of your output must be ${ANALYSIS_BEGIN_MARKER} exactly. If you need to think first, do it above that line - everything above it is discarded. The SOURCES line is the last line and nothing follows it.`
 
 /**
  * The untrusted-content fence.
@@ -251,6 +283,14 @@ export function buildAnalysisPrompt(
 export type SourceGrade = 'substantial' | 'reviews-only' | 'almost-nothing'
 
 export interface ParsedAnalysis {
+  /**
+   * Whether the opening marker was found.
+   *
+   * Not a formatting nit: without it there is no way to know that the prose
+   * above is the analysis rather than a preamble, which is the exact failure
+   * this contract exists to close.
+   */
+  hadBeginMarker: boolean
   /** Prose with the SOURCES line removed. Empty when the model wrote none. */
   text: string
   /** null when the model omitted the line or wrote something unrecognised. */
@@ -278,11 +318,31 @@ export function parseAnalysisResponse(raw: string): ParsedAnalysis {
 
     const value = match[1].toLowerCase().replace(/[\s_]+/g, '-').replace(/[.*`]/g, '')
     const grade = GRADES.find((g) => value.includes(g)) ?? null
-    const text = [...lines.slice(0, i), ...lines.slice(i + 1)].join('\n').trim()
-    return { text, grade }
+    const body = [...lines.slice(0, i), ...lines.slice(i + 1)].join('\n')
+    return { ...afterBeginMarker(body), grade }
   }
 
-  return { text: raw.trim(), grade: null }
+  return { ...afterBeginMarker(raw), grade: null }
+}
+
+/**
+ * Cut everything above the opening marker.
+ *
+ * Takes the LAST occurrence rather than the first, because a model that quotes
+ * the instruction back while reasoning would otherwise have its scratchpad
+ * treated as the answer: the marker appears twice and only the later one opens
+ * the real prose. The line is matched loosely, since a model told to emit a
+ * literal exactly will still sometimes bold it or add trailing punctuation, but
+ * the token itself has to be present.
+ */
+function afterBeginMarker(body: string): { text: string; hadBeginMarker: boolean } {
+  const lines = body.split('\n')
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i].includes(ANALYSIS_BEGIN_MARKER)) {
+      return { text: lines.slice(i + 1).join('\n').trim(), hadBeginMarker: true }
+    }
+  }
+  return { text: body.trim(), hadBeginMarker: false }
 }
 
 /**
