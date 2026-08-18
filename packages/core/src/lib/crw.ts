@@ -103,6 +103,31 @@ export interface CrwConfig {
    * it stops fitting.
    */
   sourceBudgetChars: number
+  /**
+   * Ceiling on the model's own answer, in tokens. 0 means no ceiling.
+   *
+   * VISIBLE BECAUSE THE HIDDEN VERSION COST A LIBRARY PASS. This was a
+   * hardcoded 2,000 in the analysis module, and 2,000 sits near the length of a
+   * legitimate long answer (~900 words is ~1,200 tokens) rather than far above
+   * it. A reasoning model bills its scratchpad from the same allowance, so the
+   * first real run spent the whole budget thinking, was cut off before writing
+   * any analysis, and stored the scratchpad. The only way to discover the
+   * number existed was to hit that bug and go looking.
+   *
+   * IT IS A RUNAWAY BACKSTOP, NOT A LENGTH CONTROL, and the distinction is the
+   * whole point. Asking the prompt for a length is an editorial instruction: the
+   * model complies and still produces a finished piece of writing. A token cap
+   * is a guillotine that produces a BROKEN one. So this belongs far above any
+   * answer you would want, and the prompt is where length is actually shaped.
+   * Truncation is no longer silent either — it throws and leaves the title
+   * pending — which is what makes a default cap safe rather than destructive.
+   *
+   * Lives on this card, next to sourceBudgetChars, for the reason that one is
+   * here: how much text goes in and how much may come out are the same decision
+   * about the same model's context window, and splitting them across two
+   * screens would mean tuning one without seeing the other.
+   */
+  analysisMaxOutputTokens: number
 }
 
 export const DEFAULT_CRW_CONFIG: CrwConfig = {
@@ -113,6 +138,12 @@ export const DEFAULT_CRW_CONFIG: CrwConfig = {
   maxContentChars: 12000,
   timeoutMs: 180000,
   sourceBudgetChars: 16000,
+  // Generous rather than tight: ~1,200 tokens covers the longest answer the
+  // prompt asks for, so this leaves roughly 6,800 for a reasoning model's
+  // scratchpad. Not higher by default because output shares one context window
+  // with a prompt that is already ~16,000 characters of article text, and a
+  // 32k-context local model has to fit both.
+  analysisMaxOutputTokens: 8000,
 }
 
 const SETTING_KEY = 'crw_integration'
@@ -128,6 +159,11 @@ const clampContentChars = (n: number) =>
 const clampTimeout = (n: number) => clampInt(n, 5000, 300_000, DEFAULT_CRW_CONFIG.timeoutMs)
 const clampSourceBudget = (n: number) =>
   clampInt(n, 2000, 200_000, DEFAULT_CRW_CONFIG.sourceBudgetChars)
+/** 0 is meaningful — "send no ceiling at all" — so it bypasses the range. */
+export const clampAnalysisOutputTokens = (n: number): number => {
+  if (n === 0) return 0
+  return clampInt(n, 512, 128_000, DEFAULT_CRW_CONFIG.analysisMaxOutputTokens)
+}
 
 function sanitize(config: Partial<CrwConfig>): CrwConfig {
   return {
@@ -145,6 +181,9 @@ function sanitize(config: Partial<CrwConfig>): CrwConfig {
     timeoutMs: clampTimeout(config.timeoutMs ?? DEFAULT_CRW_CONFIG.timeoutMs),
     sourceBudgetChars: clampSourceBudget(
       config.sourceBudgetChars ?? DEFAULT_CRW_CONFIG.sourceBudgetChars
+    ),
+    analysisMaxOutputTokens: clampAnalysisOutputTokens(
+      config.analysisMaxOutputTokens ?? DEFAULT_CRW_CONFIG.analysisMaxOutputTokens
     ),
   }
 }

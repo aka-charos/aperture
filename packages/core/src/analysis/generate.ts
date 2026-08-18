@@ -44,11 +44,13 @@ import {
   parseAnalysisResponse,
   type AnalysisSource,
   type AnalysisSubject,
+  type SourceGrade,
 } from './prompt.js'
 import {
   describeResponseProblem,
   findResponseProblem,
   stripReasoningBlocks,
+  type ResponseProblem,
 } from './response.js'
 import {
   decideAnalysisFloor,
@@ -60,29 +62,17 @@ const logger = createChildLogger('title-analysis')
 
 /** Retries for a transport blip talking to the model. */
 const MODEL_MAX_RETRIES = 2
-/** Extra attempts when the model returns empty text — a 200 the SDK won't retry. */
-const MAX_EMPTY_RETRIES = 2
-const EMPTY_RETRY_DELAY_MS = 500
 
 /**
- * Ceiling on the answer.
+ * Attempts at getting a usable answer out of the model.
  *
- * NOT A TARGET, and not a budget for prose alone: a reasoning model bills its
- * scratchpad from this same allowance, which is how the first live pass spent
- * 2,000 tokens thinking and had nothing left to answer with. The prompt asks
- * for length to follow the work — 200 words is often right, ~900 is the long
- * case, so ~1,200 tokens covers any real answer — and everything above that is
- * headroom for reasoning.
- *
- * Deliberately not raised further. maxOutputTokens is a cap rather than a
- * reservation, so headroom is free on a healthy call, but this role usually
- * points at a LOCAL model where the output shares one context window with a
- * prompt that is already ~18k tokens of article text. 8k leaves a 32k-context
- * model room for both; 16k would not, and would trade this bug for truncated
- * prompts, which is the worse one.
+ * This used to retry only an EMPTY response. Retrying an unusable one matters
+ * far more: a model that buries its answer in a preamble, or drifts off the
+ * output format, very often gets it right on a second pass — and the
+ * alternative is failing a title over a one-off formatting slip.
  */
-const MAX_OUTPUT_TOKENS = 8000
-
+const MAX_WRITE_ATTEMPTS = 3
+const RETRY_DELAY_MS = 500
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 export interface StoredAnalysis {
@@ -245,60 +235,95 @@ async function retrieveSources(subject: AnalysisSubject): Promise<Retrieval> {
 }
 
 interface WriteResult {
+  /** The prose, already unwrapped from the contract. */
   text: string
+  /** The closing grade, or null when the model omitted it. */
+  grade: SourceGrade | null
+  /** Why the response is unusable, or null when it reads as an answer. */
+  problem: ResponseProblem | null
   modelId: string
-  /**
-   * Why generation stopped. 'length' means the answer was cut off, which is the
-   * one direct tell that the model ran out of room. The SDK returned it all
-   * along and this module dropped it, which is half of why a truncated
-   * scratchpad could be stored as an analysis.
-   */
   finishReason?: string
   /** Only in grounding mode: what Google attached to the answer. */
   groundingChunks?: number
   groundingSources?: Array<{ title: string; domain: string }>
 }
 
+/**
+ * Read one raw completion against the output contract.
+ *
+ * Reasoning tags come off first because they are unambiguous; everything else
+ * is decided by the markers the prompt asked for, never by inspecting the prose
+ * and guessing.
+ */
+function readAnalysis(raw: string, finishReason?: string) {
+  const parsed = parseAnalysisResponse(stripReasoningBlocks(raw))
+  return {
+    text: parsed.text,
+    grade: parsed.grade,
+    problem: findResponseProblem({
+      text: parsed.text,
+      grade: parsed.grade,
+      hadBeginMarker: parsed.hadBeginMarker,
+      finishReason,
+    }),
+  }
+}
+
 /** One plain writing call over documents already in the prompt. */
-async function writeFromSources(prompt: string): Promise<WriteResult> {
+async function writeFromSources(prompt: string, maxOutputTokens: number): Promise<WriteResult> {
   const { model, modelId } = await getTitleAnalysisModelInstance()
 
   // The other silent half. A local model chewing through ~18k tokens of article
   // text is minutes of wall clock with nothing to show for it, and on a
-  // self-hosted setup this is the step most likely to be the slow one — so the
-  // model id and the prompt size are logged before the call, not just after.
-  // Together with the retrieval line above, every long pause in a run now has a
-  // log line that says which of the two services owns it.
-  logger.info({ modelId, promptChars: prompt.length }, 'Writing analysis')
+  // self-hosted setup this is the step most likely to be the slow one - so the
+  // model id, the prompt size and the output ceiling are logged before the
+  // call, not just after. Together with the retrieval line above, every long
+  // pause in a run now has a log line saying which of the two services owns it.
+  logger.info(
+    { modelId, promptChars: prompt.length, maxOutputTokens: maxOutputTokens || 'unlimited' },
+    'Writing analysis'
+  )
   const startedAt = Date.now()
 
-  let text = ''
+  let reading = { text: '', grade: null as SourceGrade | null, problem: null as ResponseProblem | null }
   let finishReason: string | undefined
-  for (let attempt = 1; attempt <= MAX_EMPTY_RETRIES; attempt++) {
+
+  for (let attempt = 1; attempt <= MAX_WRITE_ATTEMPTS; attempt++) {
     const response = await generateText({
       model,
       prompt,
       maxRetries: MODEL_MAX_RETRIES,
-      maxOutputTokens: MAX_OUTPUT_TOKENS,
+      // 0 means the operator asked for no ceiling, so none is sent and the
+      // provider default applies.
+      ...(maxOutputTokens > 0 ? { maxOutputTokens } : {}),
     })
-    text = response.text ?? ''
     finishReason = response.finishReason
+    reading = readAnalysis(response.text ?? '', response.finishReason)
 
-    if (text.trim()) break
-    if (attempt < MAX_EMPTY_RETRIES) {
-      logger.warn({ attempt, modelId }, 'Analysis model returned empty text; retrying')
-      await sleep(EMPTY_RETRY_DELAY_MS)
+    if (!reading.problem) break
+    if (attempt < MAX_WRITE_ATTEMPTS) {
+      logger.warn(
+        { attempt, modelId, problem: reading.problem.kind, finishReason },
+        'Analysis response was not usable; retrying'
+      )
+      await sleep(RETRY_DELAY_MS)
     }
   }
 
   logger.info(
-    { modelId, textChars: text.length, finishReason, ms: Date.now() - startedAt },
+    {
+      modelId,
+      textChars: reading.text.length,
+      grade: reading.grade,
+      problem: reading.problem?.kind,
+      finishReason,
+      ms: Date.now() - startedAt,
+    },
     'Analysis written'
   )
 
-  return { text, modelId, finishReason }
+  return { ...reading, modelId, finishReason }
 }
-
 /**
  * Turn Google's grounding sources into something worth storing.
  *
@@ -339,20 +364,28 @@ function extractGroundingSources(raw: unknown): Array<{ title: string; domain: s
  * usual reason: the wrapper records once per KEY attempt, and this loop sits
  * inside one of them, so without it a request Google counts is invisible.
  */
-async function writeWithGrounding(prompt: string): Promise<WriteResult> {
+async function writeWithGrounding(
+  prompt: string,
+  maxOutputTokens: number
+): Promise<WriteResult> {
   const tools = await getGroundingProviderTools('titleAnalysis')
 
   return withGroundingModel('titleAnalysis', async (model, keyAttempt) => {
-    let result: WriteResult = { text: '', modelId: keyAttempt.modelId }
+    let result: WriteResult = {
+      text: '',
+      grade: null,
+      problem: null,
+      modelId: keyAttempt.modelId,
+    }
     let usage: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | undefined
 
-    for (let attempt = 1; attempt <= MAX_EMPTY_RETRIES; attempt++) {
+    for (let attempt = 1; attempt <= MAX_WRITE_ATTEMPTS; attempt++) {
       const response = await generateText({
         model,
         tools,
         prompt,
         maxRetries: MODEL_MAX_RETRIES,
-        maxOutputTokens: MAX_OUTPUT_TOKENS,
+        ...(maxOutputTokens > 0 ? { maxOutputTokens } : {}),
       })
       usage = response.usage
 
@@ -362,8 +395,9 @@ async function writeWithGrounding(prompt: string): Promise<WriteResult> {
           | undefined
       )?.groundingMetadata
 
+      const reading = readAnalysis(response.text ?? '', response.finishReason)
       result = {
-        text: response.text ?? '',
+        ...reading,
         modelId: response.response?.modelId ?? keyAttempt.modelId,
         finishReason: response.finishReason,
         groundingChunks: grounding?.groundingChunks?.length ?? 0,
@@ -378,14 +412,18 @@ async function writeWithGrounding(prompt: string): Promise<WriteResult> {
           webSearchQueries: grounding?.webSearchQueries?.length ?? 0,
           groundingChunks: result.groundingChunks,
           textChars: result.text.length,
+          problem: result.problem?.kind,
         },
         'Title analysis grounding completed'
       )
 
-      if (result.text.trim()) break
+      if (!result.problem) break
 
-      if (attempt < MAX_EMPTY_RETRIES) {
-        logger.warn({ attempt }, 'Grounded analysis returned empty text; retrying')
+      if (attempt < MAX_WRITE_ATTEMPTS) {
+        logger.warn({ attempt, problem: result.problem.kind }, 'Grounded analysis unusable; retrying')
+        // Metered by hand: withGroundingModel records once per KEY attempt and
+        // this loop sits inside one of them, so a request Google counts would
+        // otherwise be invisible.
         await recordWebSearchCall({
           role: 'titleAnalysis',
           provider: keyAttempt.provider,
@@ -394,14 +432,13 @@ async function writeWithGrounding(prompt: string): Promise<WriteResult> {
           status: 'empty',
           ...response.usage,
         })
-        await sleep(EMPTY_RETRY_DELAY_MS)
+        await sleep(RETRY_DELAY_MS)
       }
     }
 
     return { value: result, usage }
   })
 }
-
 /**
  * Analyse one title and store the outcome.
  *
@@ -464,7 +501,15 @@ export async function analyseTitle(
   }
   const mode = readiness.mode
 
-  let raw: string
+  // Read in both modes. The output ceiling is a property of the model, not of
+  // the retrieval service, but it lives on the same settings card as
+  // sourceBudgetChars because how much text goes in and how much may come out
+  // are one decision about one context window.
+  const crwConfig = await getCrwConfig()
+
+  let text: string
+  let grade: SourceGrade | null
+  let problem: ResponseProblem | null
   let modelId: string
   let finishReason: string | undefined
   let evidence: RetrievalEvidence
@@ -476,7 +521,10 @@ export async function analyseTitle(
     // The model searches for itself. Nothing to budget and nothing to fence —
     // no external text enters the prompt — but also far less to judge the
     // result on, which is why the floor leans on the model's own verdict here.
-    const result = await writeWithGrounding(buildAnalysisPrompt(subject, { mode }))
+    const result = await writeWithGrounding(
+      buildAnalysisPrompt(subject, { mode }),
+      crwConfig.analysisMaxOutputTokens
+    )
 
     // A grounded call that retrieved NOTHING did not answer the question — it
     // answered from memory, which is the one thing this feature exists to
@@ -494,7 +542,9 @@ export async function analyseTitle(
       )
     }
 
-    raw = result.text
+    text = result.text
+    grade = result.grade
+    problem = result.problem
     modelId = result.modelId
     finishReason = result.finishReason
     evidence = { mode: 'grounding', chunkCount: result.groundingChunks ?? 0 }
@@ -514,9 +564,12 @@ export async function analyseTitle(
     }
 
     const result = await writeFromSources(
-      buildAnalysisPrompt(subject, { mode, sources: retrieval.sources })
+      buildAnalysisPrompt(subject, { mode, sources: retrieval.sources }),
+      crwConfig.analysisMaxOutputTokens
     )
-    raw = result.text
+    text = result.text
+    grade = result.grade
+    problem = result.problem
     modelId = result.modelId
     finishReason = result.finishReason
     evidence = { mode: 'crw', sources: retrieval.evidence }
@@ -525,16 +578,12 @@ export async function analyseTitle(
     retrievedChars = retrieval.retrievedChars
   }
 
-  // Reasoning tags off first, then the prompt's own output contract.
-  //
   // A response that cannot be read as an answer THROWS rather than declining,
   // which leaves the row unwritten and the title pending. That asymmetry is the
-  // whole point: a decline is permanent, and "the model ignored the output
-  // format" is a fact about the MODEL — point the role at one that can follow
-  // it and the same title succeeds. Declining here would retire the library
-  // over a settings mistake, which is the OMDb-401 incident exactly.
-  const { text, grade } = parseAnalysisResponse(stripReasoningBlocks(raw))
-  const problem = findResponseProblem({ text, grade, finishReason })
+  // whole point: a decline is permanent, and "the model did not follow the
+  // output format" is a fact about the MODEL, so declining would retire the
+  // library over a settings mistake - the OMDb-401 incident exactly. The
+  // writers have already retried this several times by the time it gets here.
   if (problem) {
     logger.warn(
       {
@@ -545,7 +594,6 @@ export async function analyseTitle(
         modelId,
         problem: problem.kind,
         finishReason,
-        rawChars: raw.length,
         textChars: text.length,
       },
       'Analysis response was not an answer; leaving the title pending'

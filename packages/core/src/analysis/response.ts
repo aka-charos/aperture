@@ -43,6 +43,7 @@
 export type ResponseProblem =
   | { kind: 'truncated' }
   | { kind: 'reasoning_only' }
+  | { kind: 'no_begin_marker' }
   | { kind: 'no_contract_line' }
 
 /**
@@ -69,10 +70,18 @@ export function stripReasoningBlocks(raw: string): string {
 }
 
 export interface ResponseCheckInput {
-  /** The prose, after reasoning tags are stripped and the SOURCES line removed. */
+  /** The prose, after the opening marker, reasoning tags and SOURCES line. */
   text: string
   /** The parsed closing grade, or null when the model omitted or garbled it. */
   grade: string | null
+  /**
+   * Whether the opening marker was found.
+   *
+   * The load-bearing one. Without it the prose may be an analysis or may be a
+   * preamble, and nothing downstream can tell the difference — which is the
+   * whole reason the marker exists.
+   */
+  hadBeginMarker: boolean
   /** The SDK's own account of why generation stopped. */
   finishReason?: string
 }
@@ -92,6 +101,11 @@ export function findResponseProblem(input: ResponseCheckInput): ResponseProblem 
 
   // Nothing survived the strip: the entire budget went on a scratchpad.
   if (!input.text.trim()) return { kind: 'reasoning_only' }
+
+  // The answer was never opened, so where it starts is unknown. Everything the
+  // model wrote might be the analysis or might be preamble, and there is no
+  // honest way to choose — so this is a failure rather than a guess.
+  if (!input.hadBeginMarker) return { kind: 'no_begin_marker' }
 
   // The prompt requires the answer to end with a single `SOURCES: <grade>`
   // line. Its absence means the model was not writing to the contract — it was
@@ -122,6 +136,11 @@ export function describeResponseProblem(
     case 'reasoning_only':
       return (
         `The model returned only reasoning for "${context.title}" and no analysis.${suffix}`
+      )
+    case 'no_begin_marker':
+      return (
+        `The response for "${context.title}" did not open with the required marker line,` +
+        ` so there is no way to tell the analysis from anything written before it.${suffix}`
       )
     case 'no_contract_line':
       return (
