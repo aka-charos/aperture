@@ -31,7 +31,15 @@ import {
   getTitleAnalysisModelInstance,
   withGroundingModel,
 } from '../lib/ai-provider.js'
-import { crwSearch, getCrwConfig, isCrwEnabled, urlDomain } from '../lib/crw.js'
+import {
+  crwSearch,
+  getCrwConfig,
+  isCrwEnabled,
+  urlDomain,
+  type CrwSearchEngine,
+  type CrwSearchResponse,
+} from '../lib/crw.js'
+import { orderByHealth, recordEngineOutcome } from '../lib/crwEngines.js'
 import { query, queryOne } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { recordWebSearchCall } from '../lib/webSearchUsage.js'
@@ -185,23 +193,56 @@ async function retrieveSources(subject: AnalysisSubject): Promise<Retrieval> {
   // spent minutes here while the app log said nothing at all and CRW's own log
   // showed it fetching pages the whole time. Announcing the query BEFORE the
   // call is what lets the two logs be read against each other.
-  logger.info({ title: subject.title, query: queryText }, 'Retrieving sources')
+  logger.info(
+    { title: subject.title, query: queryText, engines: config.searchEngines },
+    'Retrieving sources'
+  )
   const startedAt = Date.now()
-  const response = await crwSearch(queryText, {
-    baseUrl: config.baseUrl,
-    apiKey: config.apiKey,
-    maxResults: config.maxResults,
-    maxContentChars: config.maxContentChars,
-    timeoutMs: config.timeoutMs,
-  })
 
-  // Warnings are carried into both messages below because these throws are the
-  // ones an operator reads in a job log, and they are exactly the failures the
-  // service explains on a 200: a blocked search engine returns a well-formed
-  // empty answer, and only `warnings` says so.
-  const reported = response.warnings.length ? ` Service reported: ${response.warnings.join('; ')}` : ''
+  // Try each configured engine in turn and keep the first that answers.
+  //
+  // A blocked engine is NOT an error: CRW replies `200 {results: []}` with a
+  // warning, the same shape as a genuine "nothing found". So the cascade reads
+  // an empty result as "ask the next one" rather than as an answer — which is
+  // only safe because a title with genuinely no coverage costs a couple of
+  // extra searches and then throws exactly as before.
+  let response: CrwSearchResponse | null = null
+  let engineUsed: CrwSearchEngine | null = null
+  const attempts: string[] = []
 
-  if (response.results.length === 0) {
+  // Health-ordered rather than as configured: an engine that has come back
+  // empty five titles running is a wall, and paying it one request per title
+  // for the rest of a 13,000-title library is hours spent on a service that has
+  // already said no. It goes to the BACK, never off the list — see crwEngines.
+  for (const engine of orderByHealth(config.searchEngines)) {
+    const attempt = await crwSearch(queryText, {
+      baseUrl: config.baseUrl,
+      apiKey: config.apiKey,
+      maxResults: config.maxResults,
+      maxContentChars: config.maxContentChars,
+      timeoutMs: config.timeoutMs,
+      engine,
+    })
+    recordEngineOutcome(engine, attempt.results.length > 0)
+    if (attempt.results.length > 0) {
+      response = attempt
+      engineUsed = engine
+      break
+    }
+    // Kept per engine rather than merged, or a message naming three warnings
+    // gives no clue which engine produced which.
+    attempts.push(
+      attempt.warnings.length ? `${engine}: ${attempt.warnings.join("; ")}` : `${engine}: no results`
+    )
+    logger.warn({ title: subject.title, engine, warnings: attempt.warnings }, 'Search engine returned nothing')
+  }
+
+  // Carried into both throws below because these are the lines an operator
+  // actually reads in a job log, and they are exactly the failures the service
+  // explains on a 200 rather than with an error status.
+  const reported = attempts.length ? ` Tried — ${attempts.join(' | ')}.` : ''
+
+  if (!response || !engineUsed) {
     throw new Error(`Retrieval returned no results for "${queryText}".${reported}`)
   }
 
@@ -231,6 +272,7 @@ async function retrieveSources(subject: AnalysisSubject): Promise<Retrieval> {
   logger.info(
     {
       title: subject.title,
+      engine: engineUsed,
       results: response.results.length,
       fetchedChars,
       budgeted: sources.length,

@@ -10,11 +10,14 @@ import type { FastifyInstance } from 'fastify'
 import {
   checkModeReadiness,
   getCrwConfig,
+  isCrwSearchEngine,
   isRetrievalMode,
+  sanitizeSearchEngines,
   setCrwConfig,
   setRetrievalMode,
   testCrwConnection,
   type CrwConfig,
+  type CrwSearchEngine,
   type RetrievalMode,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
@@ -28,6 +31,11 @@ interface CrwUpdateBody {
   timeoutMs?: number
   sourceBudgetChars?: number
   analysisMaxOutputTokens?: number
+  /**
+   * Ordered cascade, tried until one answers. See CrwConfig.searchEngines —
+   * order is preference, not parallelism.
+   */
+  searchEngines?: string[]
   /**
    * Where title analysis gets its sources. Lives on this endpoint rather than
    * its own because it decides whether anything else on this card is used at
@@ -46,6 +54,7 @@ interface PublicCrwConfig {
   timeoutMs: number
   sourceBudgetChars: number
   analysisMaxOutputTokens: number
+  searchEngines: CrwSearchEngine[]
 }
 
 function validateConfig(config: CrwConfig): string | null {
@@ -89,6 +98,16 @@ function validateConfig(config: CrwConfig): string | null {
   ) {
     return 'analysisMaxOutputTokens must be 0 (no limit) or an integer between 512 and 128000'
   }
+  // Rejected rather than silently dropped: a typo here would leave a shorter
+  // cascade than the operator thinks they configured, and the way they would
+  // find out is a run failing over to an engine that is not there.
+  if (!Array.isArray(config.searchEngines) || config.searchEngines.length === 0) {
+    return 'searchEngines must list at least one engine'
+  }
+  const unknown = config.searchEngines.find((e) => !isCrwSearchEngine(e))
+  if (unknown) {
+    return `searchEngines contains an unknown engine: ${unknown}`
+  }
   return null
 }
 
@@ -105,6 +124,7 @@ function toPublicConfig(config: CrwConfig): PublicCrwConfig {
     timeoutMs: config.timeoutMs,
     sourceBudgetChars: config.sourceBudgetChars,
     analysisMaxOutputTokens: config.analysisMaxOutputTokens,
+    searchEngines: config.searchEngines,
   }
 }
 
@@ -159,6 +179,11 @@ export function registerCrwHandlers(fastify: FastifyInstance) {
           sourceBudgetChars: body.sourceBudgetChars ?? current.sourceBudgetChars,
           analysisMaxOutputTokens:
             body.analysisMaxOutputTokens ?? current.analysisMaxOutputTokens,
+          // Sanitized before validation so duplicates and casing are fixed
+          // quietly, while a genuinely unknown name still fails loudly below.
+          searchEngines: body.searchEngines
+            ? sanitizeSearchEngines(body.searchEngines)
+            : current.searchEngines,
         }
 
         const validationError = validateConfig(newConfig)
@@ -216,11 +241,19 @@ export function registerCrwHandlers(fastify: FastifyInstance) {
           maxResults: 1,
           maxContentChars: current.maxContentChars,
           timeoutMs: current.timeoutMs,
+          // The same cascade the job walks. Testing one engine while the job
+          // tries three makes the button lie in both directions.
+          engines: current.searchEngines,
         })
 
         return reply.send(
           result.success
-            ? { success: true, resultCount: result.resultCount ?? 0, message: result.message }
+            ? {
+                success: true,
+                resultCount: result.resultCount ?? 0,
+                message: result.message,
+                engine: result.engine,
+              }
             : { success: false, error: result.message }
         )
       } catch (err) {
