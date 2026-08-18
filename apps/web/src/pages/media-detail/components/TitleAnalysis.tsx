@@ -11,6 +11,9 @@
  * than a synopsis is, because meaning lives there — the prompt asks only
  * pre-viewing questions to keep that structural rather than instructional, but
  * the same caution that puts `plot_full` behind a button in MediaHero applies.
+ * That structural answer is also why no standing disclaimer sits above the
+ * text: a notice hedging about spoilers on every title, forever, is a worse
+ * trade than the closed question set it would be apologising for.
  *
  * Three states, and they must stay distinguishable:
  *   - an analysis    -> render it
@@ -41,6 +44,12 @@ import type { MediaType } from '../types'
 interface AnalysisSource {
   title: string
   domain: string
+  /**
+   * Absent for anything written under native grounding, whose citations are
+   * short-lived redirects and are deliberately not stored, and for rows
+   * written before the field existed. A source without one is normal.
+   */
+  url?: string
 }
 
 interface AnalysisResponse {
@@ -141,10 +150,6 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
         </AccordionSummary>
 
         <AccordionDetails>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {t('mediaDetail.analysis.spoilerNote')}
-          </Typography>
-
           {error && (
             <Alert severity="warning" sx={{ mb: 2 }}>
               {error}
@@ -153,14 +158,27 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
 
           {hasAnalysis && (
             <>
-              {/* Plain paragraphs: the model writes markdown headings that would
-                  need a renderer, and a renderer for one panel is not worth the
-                  bundle. Blank-line splitting keeps the structure readable. */}
-              {(data?.analysis ?? '').split(/\n{2,}/).map((para, i) => (
-                <Typography key={i} variant="body2" sx={{ mb: 1.5, whiteSpace: 'pre-wrap' }}>
-                  {para.trim()}
-                </Typography>
-              ))}
+              {/* Plain paragraphs, no markdown renderer: the prompt asks for
+                  prose with no headings or lists, and a renderer for one panel
+                  is not worth the bundle. Blank-line splitting is what turns
+                  the model’s paragraphs back into paragraphs here.
+
+                  The measure is capped because this panel is as wide as the
+                  page: on a desktop screen an uncapped line runs past 200
+                  characters, roughly three times what the eye tracks
+                  comfortably, and several hundred words of that is exhausting
+                  however well it is written. */}
+              <Box sx={{ maxWidth: '78ch' }}>
+                {(data?.analysis ?? '').split(/\n{2,}/).map((para, i) => (
+                  <Typography
+                    key={i}
+                    variant="body2"
+                    sx={{ mb: 2, lineHeight: 1.75, whiteSpace: 'pre-wrap' }}
+                  >
+                    {para.trim()}
+                  </Typography>
+                ))}
+              </Box>
 
               {data?.sources && data.sources.length > 0 && (
                 <Box sx={{ mt: 2 }}>
@@ -168,10 +186,12 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
                     {t('mediaDetail.analysis.sourcesLabel')}
                   </Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {/* Domains, not links. Provenance is the durable and useful
-                        part — it says whether this came from a film journal or
-                        a listicle — while a link table in a cache that lives
-                        for months would rot. */}
+                    {/* The domain is the label because it is the part that says
+                        something — whether this came from a film journal or a
+                        listicle — while article titles are long and mostly
+                        repeat the film’s name. The link rides underneath, and
+                        only when the row carries one: analyses written under
+                        native grounding store no URL by design. */}
                     {data.sources.map((source, i) => (
                       <Chip
                         key={`${source.domain}-${i}`}
@@ -179,6 +199,15 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
                         variant="outlined"
                         label={source.domain || source.title}
                         title={source.title}
+                        {...(source.url
+                          ? {
+                              component: 'a' as const,
+                              href: source.url,
+                              target: '_blank',
+                              rel: 'noopener noreferrer',
+                              clickable: true,
+                            }
+                          : {})}
                         sx={{ height: 20, fontSize: '0.7rem' }}
                       />
                     ))}
