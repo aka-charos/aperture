@@ -174,76 +174,103 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
                   is not worth the bundle. Blank-line splitting is what turns
                   the model’s paragraphs back into paragraphs here.
 
-                  The measure is capped because this panel is as wide as the
-                  page: on a desktop screen an uncapped line runs past 200
-                  characters, roughly three times what the eye tracks
-                  comfortably, and several hundred words of that is exhausting
-                  however well it is written. */}
-              <Box sx={{ maxWidth: '78ch' }}>
-                {(data?.analysis ?? '').split(/\n{2,}/).map((para, i) => (
-                  <Typography
-                    key={i}
-                    variant="body2"
-                    sx={{ mb: 2, lineHeight: 1.75, whiteSpace: 'pre-wrap' }}
-                  >
-                    {para.trim()}
-                  </Typography>
-                ))}
-              </Box>
+                  The text and its sources sit side by side rather than stacked.
+                  The measure has to be capped — this panel is as wide as the
+                  page, and an uncapped desktop line runs past 200 characters,
+                  roughly three times what the eye tracks — but capping it alone
+                  left half the panel empty, which reads as a rendering fault
+                  rather than a margin. The rail puts something worth reading in
+                  that space and keeps provenance beside the claim.
 
-              {canRewrite && (
-                <Box sx={{ mt: 1.5 }}>
-                  <Button
-                    variant="text"
-                    size="small"
-                    onClick={generate}
-                    disabled={generating}
-                    startIcon={generating ? <CircularProgress size={14} /> : undefined}
-                  >
-                    {generating
-                      ? t('mediaDetail.analysis.generating')
-                      : t('mediaDetail.analysis.rewrite')}
-                  </Button>
-                  <Typography variant="caption" color="text.secondary" display="block">
-                    {t('mediaDetail.analysis.staleNote')}
-                  </Typography>
-                </Box>
-              )}
-
-              {data?.sources && data.sources.length > 0 && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-                    {t('mediaDetail.analysis.sourcesLabel')}
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {/* The domain is the label because it is the part that says
-                        something — whether this came from a film journal or a
-                        listicle — while article titles are long and mostly
-                        repeat the film’s name. The link rides underneath, and
-                        only when the row carries one: analyses written under
-                        native grounding store no URL by design. */}
-                    {data.sources.map((source, i) => (
-                      <Chip
-                        key={`${source.domain}-${i}`}
-                        size="small"
-                        variant="outlined"
-                        label={source.domain || source.title}
-                        title={source.title}
-                        {...(source.url
-                          ? {
-                              component: 'a' as const,
-                              href: source.url,
-                              target: '_blank',
-                              rel: 'noopener noreferrer',
-                              clickable: true,
-                            }
-                          : {})}
-                        sx={{ height: 20, fontSize: '0.7rem' }}
-                      />
+                  No breakpoints: this page also renders inside MediaDetailModal
+                  and beside the assistant dock, where a window-width media
+                  query would be wrong. flex-wrap collapses the rail underneath
+                  the text on its own when the container is narrow. */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'flex-start',
+                  gap: 3,
+                }}
+              >
+                <Box sx={{ flex: '1 1 30rem', maxWidth: '84ch' }}>
+                  {(data?.analysis ?? '')
+                    .split(/\n{2,}/)
+                    .map((para, i) => (
+                      <Typography
+                        key={i}
+                        variant="body2"
+                        // No pre-wrap. The model separates its sentences with
+                        // single newlines as well as its paragraphs with blank
+                        // ones, and preserving the former broke every sentence
+                        // onto its own line — an article rendered as a list,
+                        // each line ending wherever the sentence did. Letting
+                        // HTML collapse them is what makes paragraphs read as
+                        // paragraphs; the blank-line split above is the only
+                        // break that should survive.
+                        sx={{ mb: 2, lineHeight: 1.75 }}
+                      >
+                        {para.trim()}
+                      </Typography>
                     ))}
-                  </Box>
+
+                  {canRewrite && (
+                    <Box sx={{ mt: 1.5 }}>
+                      <Button
+                        variant="text"
+                        size="small"
+                        onClick={generate}
+                        disabled={generating}
+                        startIcon={generating ? <CircularProgress size={14} /> : undefined}
+                      >
+                        {generating
+                          ? t('mediaDetail.analysis.generating')
+                          : t('mediaDetail.analysis.rewrite')}
+                      </Button>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        {t('mediaDetail.analysis.staleNote')}
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
-              )}
+
+                {data?.sources && data.sources.length > 0 && (
+                  <Box sx={{ flex: '1 1 12rem', maxWidth: 260 }}>
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                      {t('mediaDetail.analysis.sourcesLabel')}
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {/* The domain is the label because it is the part that
+                          says something — whether this came from a film journal
+                          or a listicle — while article titles are long and
+                          mostly repeat the film’s name. The link rides
+                          underneath, and only when the row carries one:
+                          analyses written under native grounding store no URL
+                          by design. */}
+                      {data.sources.map((source, i) => (
+                        <Chip
+                          key={`${source.domain}-${i}`}
+                          size="small"
+                          variant="outlined"
+                          label={source.domain || source.title}
+                          title={source.title}
+                          {...(source.url
+                            ? {
+                                component: 'a' as const,
+                                href: source.url,
+                                target: '_blank',
+                                rel: 'noopener noreferrer',
+                                clickable: true,
+                              }
+                            : {})}
+                          sx={{ height: 20, fontSize: '0.7rem' }}
+                        />
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+              </Box>
             </>
           )}
 
