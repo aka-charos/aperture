@@ -1901,7 +1901,7 @@
   },
   "settingsCrw": {
     "title": "Retrieval Service (fastCRW)",
-    "description": "Self-hosted web search and page scraping. Runs a metasearch through its bundled SearXNG and returns each result as clean text, which Title Analysis writes from. No API quota — the limits are your hardware and how hard SearXNG can hit its upstream engines.",
+    "description": "Self-hosted web search and page scraping. One call runs a metasearch, fetches every hit and hands back clean text, which Title Analysis writes from. No API quota — the limits are your hardware and how hard the search backend can push its upstream engines.",
     "learnMoreLink": "Setup guide",
     "loadError": "Failed to load the retrieval configuration",
     "saved": "Retrieval settings saved",
@@ -1915,7 +1915,7 @@
     "maxResultsLabel": "Results per title",
     "maxResultsHelp": "How many pages to search and fetch (1–20).",
     "timeoutLabel": "Timeout (seconds)",
-    "timeoutHelp": "One call searches and then fetches every result, so allow generously.",
+    "timeoutHelp": "One call searches and then fetches every result, and a single page that falls through to the heavy browser tier can take over 80 seconds by itself — so allow generously. The service prints its own worst case when it starts up; look for ladder_min_ms in its log and keep this above it.",
     "sourceBudgetLabel": "Source text per analysis (characters)",
     "sourceBudgetHelp": "How much fetched text the model receives in one prompt. Set by your model’s context window, not by the service: roughly 4 characters per token, so 16,000 fits an 8k-context model with room for the answer. Raise it to match a larger window — more source text produces better analysis.",
     "maxContentLabel": "Maximum text per page (characters)",
