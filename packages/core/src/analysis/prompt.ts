@@ -47,8 +47,11 @@
  *    it can be discarded structurally rather than guessed at.
  * 4: paragraphs instead of one block, and a question about the circumstances
  *    of making and first release.
+ * 5: the questions are reordered so the reading opens on the work and closes
+ *    on its background, and they stop being a form filled in one paragraph
+ *    each.
  */
-export const ANALYSIS_PROMPT_VERSION = 4
+export const ANALYSIS_PROMPT_VERSION = 5
 
 /** Reception figures, passed as calibration only. All optional. */
 export interface ReceptionContext {
@@ -132,16 +135,44 @@ function receptionLine(r: ReceptionContext): string | null {
  * scope: they are already on the page as reception data the model is told not
  * to quote back, and a paragraph reciting a prize list is exactly the padding
  * this prompt is shaped to avoid.
+ *
+ * THE SECOND GUARD IS THE OPPOSITE OF THE FIRST, and it was needed within one
+ * pass. Fanny and Alexander went from having no production context to being
+ * mostly production context: a 150-word opening on the shoot length, the extras
+ * count, the funding bodies and the two running times, then a further paragraph
+ * repeating the same material because this question and the craft question both
+ * attract it when the sources are encyclopaedic. "Left a mark on the work" is
+ * the test, and the negative list is there because a budget figure reads like
+ * an answer to it while being nothing of the kind.
  */
 const CIRCUMSTANCES_QUESTION =
-  'What circumstances of its making or first release shaped the work - how it was produced, the form it was originally shown in, constraints or controversies that left a mark on it?'
+  'What circumstances of its making or first release left a mark on the work - how it was produced, the form it was originally shown in, constraints or controversies that changed what it became? Facts that did not change the work - budgets, shooting schedules, crew and extras counts, release dates - are not answers.'
 
+/**
+ * ORDER IS READING ORDER, and it is not the order these were first written in.
+ *
+ * The questions arrive in the output as paragraphs in sequence - one each, in
+ * order, however often the rules say otherwise - so the list is the article's
+ * structure whether or not it is meant to be. Version 4 opened on technique and
+ * put the circumstances of production third, which meant a reader met an
+ * equipment list first and had to cross a paragraph of production logistics to
+ * reach what the work is doing. Measured on three live analyses, every one of
+ * them opened on cameras, lenses and cutting rhythm.
+ *
+ * So: what the work is doing, where it sits, what is disputed about it - then
+ * the background. Anyone who stops halfway has read the half worth reading.
+ *
+ * The first question is also reframed rather than moved. "What is formally or
+ * technically distinctive about how it was made" reliably returns hardware,
+ * because that is a literal answer to it; asking what the work is doing and how
+ * its choices serve that makes technique the evidence instead of the subject.
+ */
 const MOVIE_QUESTIONS = [
-  'What is formally or technically distinctive about how it was made?',
-  'What did the people who made it say they were trying to do?',
-  CIRCUMSTANCES_QUESTION,
+  'What is this film doing, and how do its choices serve that? Name a choice, then say what it achieves - a list of equipment or techniques with no effect attached is not an answer.',
   'What tradition does it sit in - what was it responding to, what did it influence?',
   'What do critics genuinely disagree about?',
+  'What did the people who made it say they were trying to do?',
+  CIRCUMSTANCES_QUESTION,
 ]
 
 /**
@@ -151,12 +182,12 @@ const MOVIE_QUESTIONS = [
  * viewer choosing what to start wants to know.
  */
 const SERIES_QUESTIONS = [
-  'What is formally or technically distinctive about how it was made?',
-  'What did the people who made it say they were trying to do?',
-  CIRCUMSTANCES_QUESTION,
+  'What is this series doing, and how do its choices serve that? Name a choice, then say what it achieves - a list of equipment or techniques with no effect attached is not an answer.',
   'How is it structured across its run - serialised or episodic, and did it change?',
   'What tradition does it sit in - what was it responding to, what did it influence?',
   'What do critics genuinely disagree about?',
+  'What did the people who made it say they were trying to do?',
+  CIRCUMSTANCES_QUESTION,
 ]
 
 /**
@@ -178,10 +209,12 @@ const GROUNDED_RULE =
 
 const RULES = [
   'Describe how it works, never what happens in it. No third-act or ending discussion. Someone who has not seen it must be able to read this safely.',
-  'Match your register to the work. A stunt-driven action picture’s craft is its staging and choreography, and that is a legitimate subject - write about it as what it is. Do not apply art-cinema vocabulary to a genre entertainment.',
-  'If a question has no real answer in the sources, skip it. If none of them do, say so in two sentences and stop. A short honest answer is correct. Padding is not.',
+  'Match your register to the work. A stunt-driven action picture has real craft in its staging and choreography, and that is a legitimate subject - write about it as what it is. Do not apply art-cinema vocabulary to a genre entertainment.',
+  'The questions are what to cover and in what order, not a form to fill in. Do not write one paragraph per question. Merge the ones that belong together and let the whole read as continuous prose with a single line of thought.',
+  'Write in short paragraphs of three or four sentences, separated by a blank line. Keep each sentence to one idea and do not chain clauses with semicolons - if a sentence carries two ideas, make it two sentences. Plain prose only: no headings, bullet points, numbered lists or bold text.',
+  'Be specific. Name the people the sources name - the director, the writer, the cinematographer, whoever is credited with the choice you are describing - rather than writing "those behind the project" or "the creative team". Cut any sentence whose only content is that the work sits in a tradition, extends one, or hopes to influence something: say what and how, or say nothing.',
+  'Answer only what the sources genuinely support. It is normal for two or three of these questions to have no answer, and dropping them is the correct outcome rather than a gap to fill. If none of them do, say so in two sentences and stop.',
   'Do not cite, number or link the sources in your prose, and do not quote the reception figures back.',
-  'Write in paragraphs of three or four sentences, one idea each, separated by a blank line. Plain prose only - no headings, bullet points, numbered lists or bold text.',
   'Length follows the work and the sources. Some support 900 words. Many support 200.',
 ]
 
