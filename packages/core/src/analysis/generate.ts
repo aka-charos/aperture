@@ -46,6 +46,11 @@ import {
   type AnalysisSubject,
 } from './prompt.js'
 import {
+  describeResponseProblem,
+  findResponseProblem,
+  stripReasoningBlocks,
+} from './response.js'
+import {
   decideAnalysisFloor,
   type RetrievalEvidence,
   type RetrievedSource,
@@ -60,11 +65,23 @@ const MAX_EMPTY_RETRIES = 2
 const EMPTY_RETRY_DELAY_MS = 500
 
 /**
- * Ceiling on the answer. The prompt asks for length to follow the work (200
- * words is often right), so this is a bound on a runaway local model rather
- * than a target — generous enough that the ~900-word case is never clipped.
+ * Ceiling on the answer.
+ *
+ * NOT A TARGET, and not a budget for prose alone: a reasoning model bills its
+ * scratchpad from this same allowance, which is how the first live pass spent
+ * 2,000 tokens thinking and had nothing left to answer with. The prompt asks
+ * for length to follow the work — 200 words is often right, ~900 is the long
+ * case, so ~1,200 tokens covers any real answer — and everything above that is
+ * headroom for reasoning.
+ *
+ * Deliberately not raised further. maxOutputTokens is a cap rather than a
+ * reservation, so headroom is free on a healthy call, but this role usually
+ * points at a LOCAL model where the output shares one context window with a
+ * prompt that is already ~18k tokens of article text. 8k leaves a 32k-context
+ * model room for both; 16k would not, and would trade this bug for truncated
+ * prompts, which is the worse one.
  */
-const MAX_OUTPUT_TOKENS = 2000
+const MAX_OUTPUT_TOKENS = 8000
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
@@ -230,6 +247,13 @@ async function retrieveSources(subject: AnalysisSubject): Promise<Retrieval> {
 interface WriteResult {
   text: string
   modelId: string
+  /**
+   * Why generation stopped. 'length' means the answer was cut off, which is the
+   * one direct tell that the model ran out of room. The SDK returned it all
+   * along and this module dropped it, which is half of why a truncated
+   * scratchpad could be stored as an analysis.
+   */
+  finishReason?: string
   /** Only in grounding mode: what Google attached to the answer. */
   groundingChunks?: number
   groundingSources?: Array<{ title: string; domain: string }>
@@ -249,6 +273,7 @@ async function writeFromSources(prompt: string): Promise<WriteResult> {
   const startedAt = Date.now()
 
   let text = ''
+  let finishReason: string | undefined
   for (let attempt = 1; attempt <= MAX_EMPTY_RETRIES; attempt++) {
     const response = await generateText({
       model,
@@ -257,6 +282,7 @@ async function writeFromSources(prompt: string): Promise<WriteResult> {
       maxOutputTokens: MAX_OUTPUT_TOKENS,
     })
     text = response.text ?? ''
+    finishReason = response.finishReason
 
     if (text.trim()) break
     if (attempt < MAX_EMPTY_RETRIES) {
@@ -266,11 +292,11 @@ async function writeFromSources(prompt: string): Promise<WriteResult> {
   }
 
   logger.info(
-    { modelId, textChars: text.length, ms: Date.now() - startedAt },
+    { modelId, textChars: text.length, finishReason, ms: Date.now() - startedAt },
     'Analysis written'
   )
 
-  return { text, modelId }
+  return { text, modelId, finishReason }
 }
 
 /**
@@ -339,6 +365,7 @@ async function writeWithGrounding(prompt: string): Promise<WriteResult> {
       result = {
         text: response.text ?? '',
         modelId: response.response?.modelId ?? keyAttempt.modelId,
+        finishReason: response.finishReason,
         groundingChunks: grounding?.groundingChunks?.length ?? 0,
         groundingSources: extractGroundingSources(response.sources),
       }
@@ -439,6 +466,7 @@ export async function analyseTitle(
 
   let raw: string
   let modelId: string
+  let finishReason: string | undefined
   let evidence: RetrievalEvidence
   let foundSources: Array<{ title: string; domain: string }>
   let sourceCount: number
@@ -468,6 +496,7 @@ export async function analyseTitle(
 
     raw = result.text
     modelId = result.modelId
+    finishReason = result.finishReason
     evidence = { mode: 'grounding', chunkCount: result.groundingChunks ?? 0 }
     foundSources = result.groundingSources ?? []
     sourceCount = result.groundingChunks ?? 0
@@ -489,13 +518,41 @@ export async function analyseTitle(
     )
     raw = result.text
     modelId = result.modelId
+    finishReason = result.finishReason
     evidence = { mode: 'crw', sources: retrieval.evidence }
     foundSources = retrieval.sources.map((s) => ({ title: s.title, domain: s.domain }))
     sourceCount = retrieval.sources.length
     retrievedChars = retrieval.retrievedChars
   }
 
-  const { text, grade } = parseAnalysisResponse(raw)
+  // Reasoning tags off first, then the prompt's own output contract.
+  //
+  // A response that cannot be read as an answer THROWS rather than declining,
+  // which leaves the row unwritten and the title pending. That asymmetry is the
+  // whole point: a decline is permanent, and "the model ignored the output
+  // format" is a fact about the MODEL — point the role at one that can follow
+  // it and the same title succeeds. Declining here would retire the library
+  // over a settings mistake, which is the OMDb-401 incident exactly.
+  const { text, grade } = parseAnalysisResponse(stripReasoningBlocks(raw))
+  const problem = findResponseProblem({ text, grade, finishReason })
+  if (problem) {
+    logger.warn(
+      {
+        mediaType,
+        mediaId,
+        title: subject.title,
+        mode,
+        modelId,
+        problem: problem.kind,
+        finishReason,
+        rawChars: raw.length,
+        textChars: text.length,
+      },
+      'Analysis response was not an answer; leaving the title pending'
+    )
+    throw new Error(describeResponseProblem(problem, { title: subject.title, modelId }))
+  }
+
   const decision = decideAnalysisFloor({ text, grade, evidence })
 
   const analysis = decision.store ? text : null

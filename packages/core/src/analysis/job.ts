@@ -47,6 +47,29 @@ export const DEFAULT_MAX_TITLES_PER_RUN = 200
 /** How many pending rows to fetch at a time. Small — priority order shifts. */
 const SELECT_BATCH = 25
 
+/**
+ * Consecutive failures that mean the fault is systemic, not the titles.
+ *
+ * WHAT THIS IS FOR, measured on the first real pass: three titles succeeded,
+ * then the retrieval container stopped answering. Every remaining title failed
+ * in about ten milliseconds with `fetch failed`, so the run burned its entire
+ * 200-title budget in six seconds, wrote 197 identical stack traces, and
+ * reported success. Nothing was corrupted — a failure stores no row, so all 197
+ * stayed pending exactly as designed — but the run was worthless and said so
+ * nowhere, and a scheduled overnight pass would have done the same thing and
+ * filed another green tick.
+ *
+ * DELIBERATELY COUNTS ANY FAILURE, not just transport. The three storms this
+ * job can suffer look identical from here and want the same response: the
+ * retrieval service is unreachable; its metasearch is blocked, which answers
+ * 200 with zero results for every title; or the writing model cannot follow the
+ * output contract, which rejects every response. A genuinely difficult title is
+ * isolated and rare, so a single blip must not end an overnight run — but five
+ * in a row is a system, not a coincidence, and the right move is to stop and
+ * say which one broke rather than to keep asking 195 more times.
+ */
+const CONSECUTIVE_FAILURE_LIMIT = 5
+
 export interface AnalysisJobOptions {
   /** Maximum titles this run may attempt. */
   maxTitles?: number
@@ -151,6 +174,12 @@ export async function generateTitleAnalyses(
     say('info', 'Nothing pending — every title already has an analysis or a stored decline.')
   }
 
+  // Reset by any title that produces a row, so this only ever counts an
+  // unbroken run of failures rather than a total. Declared outside the media
+  // type loop: an outage does not respect the movie/series boundary.
+  let consecutiveFailures = 0
+  let lastFailure = ''
+
   for (const mediaType of mediaTypes) {
     // Per media type, since a movie id and a series id are different keyspaces.
     const attempted = new Set<string>()
@@ -192,6 +221,9 @@ export async function generateTitleAnalyses(
           const found = `${stored.sourceCount ?? 0} source(s)${
             stored.retrievedChars != null ? `, ${stored.retrievedChars.toLocaleString()} chars` : ''
           }`
+          // A row was written, so whatever the last failure was, it was not
+          // systemic.
+          consecutiveFailures = 0
           if (stored.analysis) {
             result.stored++
             say(
@@ -229,6 +261,27 @@ export async function generateTitleAnalyses(
             'Title analysis failed; leaving it pending for the next run'
           )
           say('warn', `⚠️ ${title.subject.title} — failed, staying pending: ${reason}`)
+
+          consecutiveFailures++
+          lastFailure = reason
+          if (consecutiveFailures >= CONSECUTIVE_FAILURE_LIMIT) {
+            // Stop the run rather than spend the rest of the budget proving the
+            // same thing 195 more times. Every title touched here stays
+            // pending, so the next run resumes with nothing lost.
+            const message =
+              `Stopped after ${consecutiveFailures} failures in a row — this is the retrieval ` +
+              `service or the Title Analysis model, not these titles. ` +
+              `Last error: ${lastFailure}`
+            logger.error(
+              { consecutiveFailures, processed: result.processed, stored: result.stored, lastFailure },
+              'Title analysis aborted: consecutive failures'
+            )
+            say(
+              'error',
+              `🛑 ${message} — ${result.stored} stored before this; the rest stay pending.`
+            )
+            throw new Error(message)
+          }
         }
 
         report()
