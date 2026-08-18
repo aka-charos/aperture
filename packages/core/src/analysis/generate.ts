@@ -75,12 +75,25 @@ const MAX_WRITE_ATTEMPTS = 3
 const RETRY_DELAY_MS = 500
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
+/**
+ * A source as stored and shown, with the page text dropped.
+ *
+ * `url` is optional because only one retrieval mode has a durable one - see
+ * `AnalysisSource.url`. Rows written before it was carried have none either,
+ * so the panel has to treat a missing link as ordinary rather than broken.
+ */
+export interface AnalysisSourceRef {
+  title: string
+  domain: string
+  url?: string
+}
+
 export interface StoredAnalysis {
   mediaType: 'movie' | 'series'
   mediaId: string
   analysis: string | null
   declineReason: string | null
-  sources: Array<{ title: string; domain: string }>
+  sources: AnalysisSourceRef[]
   sourceGrade: string | null
   sourceCount: number | null
   retrievedChars: number | null
@@ -99,7 +112,7 @@ export async function getStoredAnalysis(
   const row = await queryOne<{
     analysis: string | null
     decline_reason: string | null
-    sources: Array<{ title: string; domain: string }> | null
+    sources: AnalysisSourceRef[] | null
     source_grade: string | null
     source_count: number | null
     retrieved_chars: number | null
@@ -196,6 +209,7 @@ async function retrieveSources(subject: AnalysisSubject): Promise<Retrieval> {
     title: r.title,
     domain: r.domain,
     text: r.markdown,
+    url: r.url,
   }))
 
   const fetchedChars = fetched.reduce((sum, s) => sum + s.text.length, 0)
@@ -245,7 +259,7 @@ interface WriteResult {
   finishReason?: string
   /** Only in grounding mode: what Google attached to the answer. */
   groundingChunks?: number
-  groundingSources?: Array<{ title: string; domain: string }>
+  groundingSources?: AnalysisSourceRef[]
 }
 
 /**
@@ -333,10 +347,10 @@ async function writeFromSources(prompt: string, maxOutputTokens: number): Promis
  * every source, so showing it as provenance would tell a reader nothing — which
  * is why a domain that looks like one is blanked rather than displayed.
  */
-function extractGroundingSources(raw: unknown): Array<{ title: string; domain: string }> {
+function extractGroundingSources(raw: unknown): AnalysisSourceRef[] {
   if (!Array.isArray(raw)) return []
   const seen = new Set<string>()
-  const out: Array<{ title: string; domain: string }> = []
+  const out: AnalysisSourceRef[] = []
 
   for (const entry of raw) {
     const source = entry as { title?: unknown; url?: unknown }
@@ -513,7 +527,7 @@ export async function analyseTitle(
   let modelId: string
   let finishReason: string | undefined
   let evidence: RetrievalEvidence
-  let foundSources: Array<{ title: string; domain: string }>
+  let foundSources: AnalysisSourceRef[]
   let sourceCount: number
   let retrievedChars: number | null
 
@@ -573,7 +587,11 @@ export async function analyseTitle(
     modelId = result.modelId
     finishReason = result.finishReason
     evidence = { mode: 'crw', sources: retrieval.evidence }
-    foundSources = retrieval.sources.map((s) => ({ title: s.title, domain: s.domain }))
+    foundSources = retrieval.sources.map((s) => ({
+      title: s.title,
+      domain: s.domain,
+      ...(s.url ? { url: s.url } : {}),
+    }))
     sourceCount = retrieval.sources.length
     retrievedChars = retrieval.retrievedChars
   }

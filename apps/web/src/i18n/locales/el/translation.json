@@ -3070,21 +3070,20 @@
       "fallbackCenterTitle": "Πολυμέσο"
     },
     "analysis": {
-      "headingMovie": "About This Film",
-      "headingSeries": "About This Series",
-      "spoilerNote": "Written from published criticism and interviews. It discusses how the work is made rather than what happens in it, but it is not guaranteed to be free of detail.",
       "notYetGenerated": "No analysis has been written for this title yet.",
       "generate": "Write an analysis",
       "generating": "Reading what critics wrote…",
       "failed": "Could not write an analysis right now.",
-      "sourcesLabel": "Drawn from",
       "declinedThinSources": "There is too little published writing about this title to say anything grounded. Nothing was invented to fill the gap.",
       "declinedNoCraft": "Nothing substantive to report about how this one was made. That is an answer, not a failure.",
       "grade": {
         "substantial": "Well documented",
         "reviewsOnly": "Reviews only",
         "almostNothing": "Sparse sources"
-      }
+      },
+      "headingMovie": "Film Analysis",
+      "headingSeries": "Series Analysis",
+      "sourcesLabel": "Sources"
     }
   },
   "settingsCostEstimator": {

@@ -45,8 +45,10 @@
  *    searching for itself.
  * 3: the answer is delimited at both ends, so anything the model writes before
  *    it can be discarded structurally rather than guessed at.
+ * 4: paragraphs instead of one block, and a question about the circumstances
+ *    of making and first release.
  */
-export const ANALYSIS_PROMPT_VERSION = 3
+export const ANALYSIS_PROMPT_VERSION = 4
 
 /** Reception figures, passed as calibration only. All optional. */
 export interface ReceptionContext {
@@ -76,6 +78,16 @@ export interface AnalysisSource {
   title: string
   domain: string
   text: string
+  /**
+   * Where the document came from, carried so the panel can link it.
+   *
+   * Set on the retrieval path, where these are ordinary article URLs that
+   * will still resolve in a year. Left undefined under native grounding,
+   * whose citations are short-lived `vertexaisearch` redirects - a link
+   * table in a cache that lives for months would rot, so that mode keeps
+   * the domain alone.
+   */
+  url?: string
 }
 
 /**
@@ -102,9 +114,32 @@ function receptionLine(r: ReceptionContext): string | null {
   return parts.length > 0 ? parts.join(' | ') : null
 }
 
+/**
+ * Circumstances of making and first release.
+ *
+ * Added after the first real pass, because the analyses read as though every
+ * title had arrived from nowhere. Fanny and Alexander is the case that made it
+ * obvious: conceived as the last thing Bergman would direct, shot as a
+ * television serial and cut down for cinemas, the most expensive Swedish
+ * production of its day. All of that was on the Wikipedia page, all of it was
+ * retrieved, and none of it was used, because nothing asked for it. It is not
+ * trivia - the form a work was first shown in and the constraints it was made
+ * under are part of what it is.
+ *
+ * DELIBERATELY NOT "tell me some background". The question names its own test
+ * - did this shape the work - so a title whose production was unremarkable has
+ * nothing to answer and the existing skip rule removes it. Awards stay out of
+ * scope: they are already on the page as reception data the model is told not
+ * to quote back, and a paragraph reciting a prize list is exactly the padding
+ * this prompt is shaped to avoid.
+ */
+const CIRCUMSTANCES_QUESTION =
+  'What circumstances of its making or first release shaped the work - how it was produced, the form it was originally shown in, constraints or controversies that left a mark on it?'
+
 const MOVIE_QUESTIONS = [
   'What is formally or technically distinctive about how it was made?',
   'What did the people who made it say they were trying to do?',
+  CIRCUMSTANCES_QUESTION,
   'What tradition does it sit in - what was it responding to, what did it influence?',
   'What do critics genuinely disagree about?',
 ]
@@ -118,6 +153,7 @@ const MOVIE_QUESTIONS = [
 const SERIES_QUESTIONS = [
   'What is formally or technically distinctive about how it was made?',
   'What did the people who made it say they were trying to do?',
+  CIRCUMSTANCES_QUESTION,
   'How is it structured across its run - serialised or episodic, and did it change?',
   'What tradition does it sit in - what was it responding to, what did it influence?',
   'What do critics genuinely disagree about?',
@@ -144,7 +180,8 @@ const RULES = [
   'Describe how it works, never what happens in it. No third-act or ending discussion. Someone who has not seen it must be able to read this safely.',
   'Match your register to the work. A stunt-driven action picture’s craft is its staging and choreography, and that is a legitimate subject - write about it as what it is. Do not apply art-cinema vocabulary to a genre entertainment.',
   'If a question has no real answer in the sources, skip it. If none of them do, say so in two sentences and stop. A short honest answer is correct. Padding is not.',
-  'Do not cite, number or link the sources in your prose, and do not quote the reception figures back. Write continuous prose.',
+  'Do not cite, number or link the sources in your prose, and do not quote the reception figures back.',
+  'Write in paragraphs of three or four sentences, one idea each, separated by a blank line. Plain prose only - no headings, bullet points, numbered lists or bold text.',
   'Length follows the work and the sources. Some support 900 words. Many support 200.',
 ]
 
@@ -185,7 +222,7 @@ export const ANALYSIS_BEGIN_MARKER = '===ANALYSIS==='
 const SOURCE_GRADE_LINE =
   `Output format. Write this and nothing else:\n` +
   `${ANALYSIS_BEGIN_MARKER}\n` +
-  `<your analysis as continuous prose>\n` +
+  `<your analysis, in paragraphs separated by a blank line>\n` +
   `SOURCES: substantial | reviews-only | almost-nothing\n\n` +
   `The first line of your output must be ${ANALYSIS_BEGIN_MARKER} exactly. If you need to think first, do it above that line - everything above it is discarded. The SOURCES line is the last line and nothing follows it.`
 
@@ -354,9 +391,14 @@ function afterBeginMarker(body: string): { text: string; hadBeginMarker: boolean
  * title alone — which returns showtimes, streaming availability and store
  * pages. The year disambiguates remakes, which is the single commonest way to
  * retrieve confident writing about the wrong film.
+ *
+ * "production history" earns its place by pulling the encyclopaedia entries and
+ * making-of write-ups the circumstances question needs; "review" was dropped
+ * for it, since that word is what surfaces aggregator and listicle pages -
+ * precisely what ./sourceFloor.ts exists to catch.
  */
 export function buildAnalysisQuery(subject: AnalysisSubject): string {
   const kind = subject.mediaType === 'series' ? 'TV series' : 'film'
   const year = subject.year ? ` ${subject.year}` : ''
-  return `${subject.title}${year} ${kind} analysis criticism review themes style`
+  return `${subject.title}${year} ${kind} analysis criticism production history themes style`
 }
