@@ -22,6 +22,7 @@ import {
   validateCapabilityForFeature,
   getEmbeddingDimensions,
   getModelsForFunction,
+  isAIFunction,
   type AIFunction,
   type ModelCapabilities,
   type ModelMetadata,
@@ -1361,8 +1362,18 @@ export async function addCustomModel(
   modelId: string,
   embeddingDimensions?: number
 ): Promise<CustomModel> {
+  // Migration 0144 dropped the CHECK constraint that used to guard this column,
+  // because it was a hand-written copy of the role list and had been stale since
+  // `webSearch` was added. This is the replacement, and the difference that
+  // matters is that it is DERIVED from `AI_FUNCTIONS` and so cannot go stale.
+  // The caller's type says `AIFunction`, but the value arrives over HTTP and is
+  // cast at the route, so the narrowing is real work rather than ceremony.
+  if (!isAIFunction(fn)) {
+    throw new Error(`Unknown AI role "${fn}" — cannot add a custom model for a role that does not exist`)
+  }
+
   const { queryOne } = await import('./db.js')
-  
+
   const result = await queryOne<{
     id: number
     provider: 'ollama' | 'openai-compatible' | 'openrouter' | 'huggingface'
