@@ -67,7 +67,20 @@ function FactRow({
   children: ReactNode
 }) {
   return (
-    <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5, py: 1 }}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'flex-start',
+        // 3 everywhere a label meets its values, including the one nested
+        // inside the languages/countries row. The gutter is the basis PLUS
+        // this gap, so a row using 2 puts its values 8px off the rail every
+        // other row sits on.
+        columnGap: 3,
+        rowGap: 0.5,
+        py: 1,
+      }}
+    >
       <FactLabel icon={icon} label={label} />
       <Box sx={{ flex: '1 1 14rem', minWidth: 0 }}>{children}</Box>
     </Box>
@@ -77,24 +90,22 @@ function FactRow({
 /**
  * The label half of a row, on its own so two of them can share one line.
  *
- * `basis` is the gutter width. It defaults to the 7rem every full-width row
- * uses, so their labels line up down the left edge; the second group on a
- * shared line passes `auto` instead, since a fixed gutter in the middle of a
- * row is padding, not alignment.
+ * Always the same 7rem gutter, wherever it appears. That is what lets the
+ * values line up down a single rail: when languages and countries stack on a
+ * narrow container, "English" and "Argentina" start at the same x, and a label
+ * that sized itself to its own text put them 26px apart instead.
+ *
+ * `minHeight` is one chip tall. Rows align their label to the TOP of the block
+ * it names — a "Countries" that centred itself against twelve countries ended
+ * up beside the seventh one, naming nothing — and without a floor the caption
+ * would sit 3px high against a first row of chips.
  */
-function FactLabel({
-  icon,
-  label,
-  basis = '7rem',
-}: {
-  icon: ReactNode
-  label: string
-  basis?: string
-}) {
+function FactLabel({ icon, label }: { icon: ReactNode; label: string }) {
   return (
     <Box
       sx={{
-        flex: `0 0 ${basis}`,
+        flex: '0 0 7rem',
+        minHeight: 24,
         display: 'flex',
         alignItems: 'center',
         gap: 0.75,
@@ -221,14 +232,32 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
             twenty production companies, not after it.
 
             They also share a line, because a title has a handful of languages
-            and can have a dozen countries: two rows meant one of them was
-            three-quarters empty whichever way round they went. Countries take
-            the remaining width and their own inner gutter, so the eleventh
-            country wraps under the first one rather than back to the card's
-            left edge — a second line starting under `Languages` reads as a new
-            fact rather than a continuation. */}
+            and can have a dozen countries: two full rows meant one of them was
+            three-quarters empty whichever way round they went.
+
+            Sharing is conditional, and the condition is width, not a
+            breakpoint. Countries claim 24rem before they will sit beside the
+            languages; below that the whole group — label and chips together —
+            drops to its own line and takes the full card, which is the right
+            shape for twelve of them anyway. What it must never do is squeeze
+            into a narrow column beside three languages and wrap into five
+            rows, which is what an 18rem claim produced.
+
+            Both labels keep the card's 7rem gutter either way, so stacked they
+            line their chips up on one rail instead of 26px apart. */}
         {(hasLanguages || hasCountries) && (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5, py: 1 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'flex-start',
+              columnGap: 3,
+              // Wide enough to read as two separate facts once they stack —
+              // at 0.5 they ran together into one twelve-chip paragraph.
+              rowGap: 2,
+              py: 1,
+            }}
+          >
             {hasLanguages && (
               <>
                 <FactLabel icon={<LanguageIcon />} label={t('mediaDetail.infoCard.languages')} />
@@ -248,22 +277,16 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
             {hasCountries && (
               <Box
                 sx={{
-                  // Wraps to its own line as a whole once it cannot hold 18rem
-                  // beside the languages — never splitting the label off from
-                  // the chips it names.
-                  flex: '1 1 18rem',
+                  flex: '1 1 24rem',
                   minWidth: 0,
                   display: 'flex',
                   flexWrap: 'wrap',
-                  columnGap: 2,
+                  alignItems: 'flex-start',
+                  columnGap: 3,
                   rowGap: 0.5,
                 }}
               >
-                <FactLabel
-                  icon={<PublicIcon />}
-                  label={t('mediaDetail.infoCard.countries')}
-                  basis="auto"
-                />
+                <FactLabel icon={<PublicIcon />} label={t('mediaDetail.infoCard.countries')} />
                 <Stack
                   direction="row"
                   flexWrap="wrap"
