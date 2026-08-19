@@ -49,8 +49,8 @@ interface Country {
 }
 
 const COUNTRIES: Country[] = [
-  { name: 'United States', code: 'US', aliases: ['united states of america', 'usa', 'u.s.a.', 'u.s.', 'america'] },
-  { name: 'United Kingdom', code: 'GB', aliases: ['uk', 'u.k.', 'great britain', 'britain', 'england', 'scotland', 'wales', 'northern ireland'] },
+  { name: 'United States', code: 'US', aliases: ['united states of america', 'usa', 'u.s.a.', 'u.s.', 'america', 'ηνωμένες πολιτείες'] },
+  { name: 'United Kingdom', code: 'GB', aliases: ['uk', 'u.k.', 'great britain', 'britain', 'england', 'scotland', 'wales', 'northern ireland', 'ηνωμένο βασίλειο'] },
   { name: 'France', code: 'FR', aliases: ['γαλλία'] },
   { name: 'Italy', code: 'IT', aliases: ['ιταλία'] },
   { name: 'Germany', code: 'DE', aliases: ['γερμανία'] },
@@ -74,7 +74,7 @@ const COUNTRIES: Country[] = [
   { name: 'Brazil', code: 'BR', aliases: ['βραζιλία'] },
   { name: 'Norway', code: 'NO', aliases: ['νορβηγία'] },
   { name: 'Ireland', code: 'IE', aliases: ['ιρλανδία'] },
-  { name: 'Netherlands', code: 'NL', aliases: ['the netherlands', 'holland', 'ολλανδία'] },
+  { name: 'Netherlands', code: 'NL', aliases: ['the netherlands', 'holland', 'ολλανδία', 'κάτω χώρες'] },
   { name: 'India', code: 'IN', aliases: ['ινδία'] },
   { name: 'Finland', code: 'FI', aliases: ['φινλανδία'] },
   { name: 'Turkey', code: 'TR', aliases: ['türkiye', 'turkiye', 'τουρκία'] },
@@ -160,9 +160,41 @@ const COUNTRIES: Country[] = [
   { name: 'Kenya', code: 'KE' },
   { name: 'Ethiopia', code: 'ET' },
   { name: 'Cameroon', code: 'CM' },
+
+  // The long tail of a real library: one or two films each, and every one of
+  // them a country the vocabulary would otherwise have passed through blind.
+  { name: 'Malta', code: 'MT', aliases: ['μάλτα'] },
+  { name: 'Liechtenstein', code: 'LI' },
+  { name: 'North Macedonia', code: 'MK', aliases: ['macedonia', 'βόρεια μακεδονία'] },
+  { name: 'Montenegro', code: 'ME', aliases: ['μαυροβούνιο'] },
+  { name: 'Kosovo', code: 'XK', aliases: ['κοσσυφοπέδιο'] },
+  { name: 'Dominican Republic', code: 'DO' },
+  { name: 'Costa Rica', code: 'CR' },
+  { name: 'Panama', code: 'PA' },
+  { name: 'Nicaragua', code: 'NI' },
+  { name: 'Cayman Islands', code: 'KY' },
+  { name: 'Martinique', code: 'MQ' },
+  { name: 'Monaco', code: 'MC' },
+  { name: 'Andorra', code: 'AD' },
+  { name: 'Afghanistan', code: 'AF' },
+  { name: 'Kuwait', code: 'KW' },
+  { name: 'Laos', code: 'LA', aliases: ["lao people's democratic republic"] },
+  { name: 'Macao', code: 'MO', aliases: ['macau'] },
+  { name: 'Sudan', code: 'SD' },
+  { name: 'Gambia', code: 'GM', aliases: ['the gambia'] },
+  { name: 'Lesotho', code: 'LS' },
+  { name: 'Zimbabwe', code: 'ZW' },
+  { name: "Côte d'Ivoire", code: 'CI', aliases: ['ivory coast', "cote d'ivoire", 'côte d’ivoire'] },
+  { name: 'Vanuatu', code: 'VU' },
+  // Not a country, but a film really is filed under it, and dropping a value
+  // is not this module's job.
+  { name: 'Antarctica', code: 'AQ' },
+  // Namibia's code is deliberately absent from the reverse lookup — see
+  // AMBIGUOUS_CODES. The name still resolves, and still carries NA for flags.
+  { name: 'Namibia', code: 'NA' },
   // Three spellings of one place. "Occupied Palestinian Territory" is the UN
   // statistical label and PS is the ISO code; the name is Palestine.
-  { name: 'Palestine', code: 'PS', aliases: ['occupied palestinian territory', 'palestinian territory', 'state of palestine', 'παλαιστίνη'] },
+  { name: 'Palestine', code: 'PS', aliases: ['occupied palestinian territory', 'palestinian territory', 'palestinian territories', 'state of palestine', 'παλαιστίνη'] },
 
   // Gone, and deliberately kept. Spelling variants still collapse — "USSR"
   // and "Soviet Union" are the same state — but the state itself does not
@@ -175,6 +207,17 @@ const COUNTRIES: Country[] = [
   { name: 'Serbia and Montenegro', code: null, aliases: ['serbia & montenegro'] },
   { name: 'Czechoslovakia', code: null, aliases: ['τσεχοσλοβακία'] },
 ]
+
+/**
+ * Codes we refuse to read as codes.
+ *
+ * "NA" is written for "not applicable" far more often than for Namibia, and a
+ * scraper that emits it means the former every time. Turning an absent value
+ * into an African country is a worse failure than leaving "NA" in the column,
+ * so the name resolves and the code does not. Namibia still carries NA for
+ * flags — this only blocks the reverse direction.
+ */
+const AMBIGUOUS_CODES = new Set(['NA'])
 
 const BY_ALIAS = new Map<string, string>()
 const BY_CODE = new Map<string, string>()
@@ -205,6 +248,7 @@ export function canonicalCountry(value: string): string | null {
   if (!tidied) return null
   if (tidied.length === 2) {
     if (tidied !== tidied.toUpperCase()) return null
+    if (AMBIGUOUS_CODES.has(tidied)) return null
     // Codes first, then aliases: "UK" is written constantly and is not the
     // United Kingdom's ISO code, which is GB.
     return BY_CODE.get(tidied) ?? BY_ALIAS.get(tidied.toLowerCase()) ?? null
