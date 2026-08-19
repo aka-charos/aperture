@@ -143,6 +143,23 @@ const COUNTRIES: Country[] = [
   { name: 'Malawi', code: 'MW', aliases: ['μαλάουι'] },
   { name: 'Libya', code: 'LY', aliases: ['λιβύη'] },
   { name: 'Paraguay', code: 'PY', aliases: ['παραγουάη'] },
+
+  // Not (yet) seen in any surveyed library, but the assistant's demonym table
+  // already resolves nationalities to these names — "Kenyan", "Sri Lankan",
+  // "Burmese". A country one file knows and the other does not is how the two
+  // drift, so the vocabulary covers everything that table can produce.
+  { name: 'Haiti', code: 'HT' },
+  { name: 'Bangladesh', code: 'BD' },
+  { name: 'Sri Lanka', code: 'LK' },
+  { name: 'Nepal', code: 'NP' },
+  { name: 'Malaysia', code: 'MY' },
+  { name: 'Mongolia', code: 'MN' },
+  { name: 'Myanmar', code: 'MM', aliases: ['burma'] },
+  { name: 'Syria', code: 'SY', aliases: ['syrian arab republic'] },
+  { name: 'Mali', code: 'ML' },
+  { name: 'Kenya', code: 'KE' },
+  { name: 'Ethiopia', code: 'ET' },
+  { name: 'Cameroon', code: 'CM' },
   // Three spellings of one place. "Occupied Palestinian Territory" is the UN
   // statistical label and PS is the ISO code; the name is Palestine.
   { name: 'Palestine', code: 'PS', aliases: ['occupied palestinian territory', 'palestinian territory', 'state of palestine', 'παλαιστίνη'] },
