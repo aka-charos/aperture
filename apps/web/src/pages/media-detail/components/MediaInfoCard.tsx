@@ -15,8 +15,8 @@ import { Link as RouterLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { getProxiedImageUrl } from '@aperture/ui'
 import type { Media, Actor, StudioItem } from '../types'
-import { isMovie, isSeries } from '../types'
-import { personPath, studioPath } from '../helpers'
+import { isMovie } from '../types'
+import { badgeLinksTo, imdbUrl, personPath, studioPath, tmdbUrl, tvdbUrl } from '../helpers'
 
 interface MediaInfoCardProps {
   media: Media
@@ -125,27 +125,24 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
     }
   }
 
+  // What the hero's score badges do not already link. IMDb and TMDb are
+  // reachable from the badge that carries their score, which is where a reader
+  // looks for them — but a badge only exists where we hold a score, so an
+  // un-enriched title would otherwise lose the link along with the number.
+  // This row is that fallback, not a second copy of it.
   const externalLinks: Array<{ id: string; label: string; href: string }> = []
-  if (media.imdb_id) {
-    externalLinks.push({
-      id: 'imdb',
-      label: t('mediaDetail.infoCard.linkImdb'),
-      href: `https://www.imdb.com/title/${media.imdb_id}`,
-    })
+  const imdb = imdbUrl(media)
+  if (imdb && !badgeLinksTo(media, 'imdb')) {
+    externalLinks.push({ id: 'imdb', label: t('mediaDetail.infoCard.linkImdb'), href: imdb })
   }
-  if (media.tmdb_id) {
-    externalLinks.push({
-      id: 'tmdb',
-      label: t('mediaDetail.infoCard.linkTmdb'),
-      href: `https://www.themoviedb.org/${isMovie(media) ? 'movie' : 'tv'}/${media.tmdb_id}`,
-    })
+  const tmdb = tmdbUrl(media)
+  if (tmdb && !badgeLinksTo(media, 'tmdb')) {
+    externalLinks.push({ id: 'tmdb', label: t('mediaDetail.infoCard.linkTmdb'), href: tmdb })
   }
-  if (isSeries(media) && media.tvdb_id) {
-    externalLinks.push({
-      id: 'tvdb',
-      label: t('mediaDetail.infoCard.linkTvdb'),
-      href: `https://thetvdb.com/?id=${media.tvdb_id}&tab=series`,
-    })
+  // No badge carries a TVDb score, so this one is always the only route to it.
+  const tvdb = tvdbUrl(media)
+  if (tvdb) {
+    externalLinks.push({ id: 'tvdb', label: t('mediaDetail.infoCard.linkTvdb'), href: tvdb })
   }
 
   return (
