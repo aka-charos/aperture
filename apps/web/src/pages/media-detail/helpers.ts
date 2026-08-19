@@ -6,7 +6,7 @@
  * plain function trips the react-refresh lint rule, which this repo runs at
  * --max-warnings 0.
  */
-import type { Media } from './types'
+import type { Media, RecommendationInsights } from './types'
 import { isMovie, isSeries } from './types'
 
 /**
@@ -85,4 +85,28 @@ export function tvdbUrl(media: Media): string | null {
 export function badgeLinksTo(media: Media, service: 'imdb' | 'tmdb'): boolean {
   if (service === 'imdb') return media.imdb_rating != null && imdbUrl(media) != null
   return media.tmdb_rating != null && tmdbUrl(media) != null
+}
+
+/**
+ * Whether the insights panel has anything to show beyond its three meters:
+ * a written explanation, a taste-twin note, or a row of evidence posters.
+ *
+ * It decides both the panel's shape and where the page puts it, which is why
+ * it lives out here rather than inside the component. With detail, the panel
+ * is a full-width band above the two columns and its body opens and closes.
+ * Without it, there is nothing to open — the header already carries every
+ * number the body would repeat — so it renders flat, inside the left column,
+ * and stops where Related Movies begins.
+ *
+ * Keyed on content rather than on `isSelected`, because the two only usually
+ * coincide: a merely-scored title is the case with nothing but meters, but it
+ * is the emptiness that should drive the layout, not the label.
+ */
+export function insightsHaveDetail(insights: RecommendationInsights): boolean {
+  const twinMatch = insights.scoreBreakdown?.twinMatch
+  return Boolean(
+    insights.aiExplanation ||
+      (typeof twinMatch === 'object' && twinMatch !== null) ||
+      (insights.evidence && insights.evidence.length > 0)
+  )
 }

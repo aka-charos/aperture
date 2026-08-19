@@ -14,6 +14,7 @@ import {
   MovieInsights,
   TitleAnalysis,
 } from './components'
+import { insightsHaveDetail } from './helpers'
 import { isMovie, isSeries } from './types'
 import type { MediaType } from './types'
 
@@ -124,8 +125,14 @@ export function MediaDetailPage({
       />
 
       {/* AI Recommendation Insights — about the READER: why this was picked
-          for them, from measured pipeline output. */}
-      {insights && (
+          for them, from measured pipeline output.
+
+          Full width only when it has a written explanation, a taste-twin note
+          or evidence posters to fill it. A title the run merely scored has
+          three percentages and a genre count, which is a column's worth of
+          page, not a page's — so that form renders inside the left column
+          below. See insightsHaveDetail. */}
+      {insights && insightsHaveDetail(insights) && (
         <MovieInsights insights={insights} mediaType={mediaType} onOpenMedia={onOpenMedia} />
       )}
 
@@ -135,6 +142,14 @@ export function MediaDetailPage({
           {/* Left Column - Info */}
           <Grid item xs={12} md={6}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {/* The scores-only form of the panel above — see the note there. */}
+              {insights && !insightsHaveDetail(insights) && (
+                <MovieInsights
+                  insights={insights}
+                  mediaType={mediaType}
+                  onOpenMedia={onOpenMedia}
+                />
+              )}
               {/* Grounded critical analysis — about the WORK, identical for
                   every user, written from web sources. Below the personal
                   panel because a reader who came here from their
