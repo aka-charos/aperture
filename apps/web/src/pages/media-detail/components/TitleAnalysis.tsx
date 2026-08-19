@@ -161,6 +161,7 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
   // one rewrite per title per prompt version, not a button anyone can lean on.
   const canRewrite = hasAnalysis && Boolean(data?.stale)
   const provenanceLine = data ? describeProvenance(data, t) : null
+  const chip = analysisChip(data, t)
 
   // No outer padding or margin: this renders inside the detail page's left
   // column, which supplies both. It used to be a full-width band above the
@@ -175,7 +176,17 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
         sx={{ borderRadius: 2, '&:before': { display: 'none' } }}
       >
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {/* Wraps rather than overflowing: "No published sources" beside the
+              heading is wider than a phone's column. */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              columnGap: 1,
+              rowGap: 0.5,
+            }}
+          >
             <AutoStoriesIcon fontSize="small" color="primary" />
             <Typography variant="subtitle1" fontWeight={600}>
               {t(
@@ -184,36 +195,42 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
                   : 'mediaDetail.analysis.headingMovie'
               )}
             </Typography>
-            {/* Whether there is anything behind the chevron, before anyone
-                spends a click finding out. The three panel states collapse to
-                two here on purpose: "asked and declined" and "never asked" are
-                different things to act on but the same thing to read, and the
-                difference is spelled out inside.
+            {/* What state this title is in, before anyone spends a click
+                finding out. See `analysisChip` for the five readings.
 
-                How well sourced an analysis is stays on the tooltip rather
-                than on the label. It is worth knowing and it is not worth the
-                heading — "Well documented" answered a question nobody had
-                asked yet, while the one they had ("is there one?") went
-                unanswered. */}
-            <Tooltip
-              title={
-                hasAnalysis && data?.sourceGrade
-                  ? t(`mediaDetail.analysis.grade.${gradeKey(data.sourceGrade)}`)
-                  : ''
-              }
-            >
-              <Chip
+                A title nobody has asked about yet gets no chip at all — it
+                gets the button, here rather than inside, because the panel is
+                collapsed by default and an action nobody can see is an action
+                nobody takes. */}
+            {chip ? (
+              <Tooltip title={chip.tooltip}>
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  color={chip.color}
+                  label={chip.label}
+                  sx={{ height: 20, fontSize: '0.7rem' }}
+                />
+              </Tooltip>
+            ) : (
+              <Button
                 size="small"
                 variant="outlined"
-                color={hasAnalysis ? 'success' : 'error'}
-                label={t(
-                  hasAnalysis
-                    ? 'mediaDetail.analysis.available'
-                    : 'mediaDetail.analysis.notAvailable'
-                )}
-                sx={{ height: 20, fontSize: '0.7rem' }}
-              />
-            </Tooltip>
+                disabled={generating}
+                startIcon={generating ? <CircularProgress size={12} /> : undefined}
+                // AccordionSummary is itself a button. Without this the press
+                // toggles the panel instead of starting the run.
+                onClick={(event) => {
+                  event.stopPropagation()
+                  run(false)
+                }}
+                sx={{ py: 0, minHeight: 24, fontSize: '0.7rem', textTransform: 'none' }}
+              >
+                {generating
+                  ? t('mediaDetail.analysis.generating')
+                  : t('mediaDetail.analysis.generate')}
+              </Button>
+            )}
           </Box>
         </AccordionSummary>
 
@@ -339,23 +356,12 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
             </Typography>
           )}
 
+          {/* No button down here: it is in the header, where it is reachable
+              without opening the panel first. */}
           {!hasAnalysis && !declined && (
-            <Box>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                {t('mediaDetail.analysis.notYetGenerated')}
-              </Typography>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => run(false)}
-                disabled={generating}
-                startIcon={generating ? <CircularProgress size={16} /> : <AutoStoriesIcon />}
-              >
-                {generating
-                  ? t('mediaDetail.analysis.generating')
-                  : t('mediaDetail.analysis.generate')}
-              </Button>
-            </Box>
+            <Typography variant="body2" color="text.secondary">
+              {t('mediaDetail.analysis.notYetGenerated')}
+            </Typography>
           )}
           {/* Admin re-run.
 
@@ -519,9 +525,61 @@ function describeProvenance(data: AnalysisResponse, t: TFunction): string | null
   return parts.length > 0 ? parts.join(' · ') : null
 }
 
-/** Maps the stored grade onto an i18n key fragment. */
-function gradeKey(grade: string): string {
-  if (grade === 'substantial') return 'substantial'
-  if (grade === 'reviews-only') return 'reviewsOnly'
-  return 'almostNothing'
+/**
+ * The header chip: what state this title's analysis is in, at a glance.
+ *
+ * Five readings, and the point of all of them is to answer "is there anything
+ * behind this chevron" before the click rather than after it:
+ *
+ *   substantial     -> Available, green      (grade on the tooltip)
+ *   reviews-only    -> Partial, blue         (grade on the tooltip)
+ *   almost-nothing  -> Sparse sources, grey  (the label IS the grade)
+ *   declined        -> red, and WHICH decline
+ *   never asked     -> no chip; the caller puts the generate button here
+ *
+ * The two declines stay apart because one red label cannot be true for both:
+ * "No published sources" is simply false for a title with a shelf of writing
+ * about it and nothing to say about how it was made. The body still carries
+ * the full sentence for either.
+ */
+function analysisChip(
+  data: AnalysisResponse | null,
+  t: TFunction
+): { label: string; color: 'success' | 'info' | 'default' | 'error'; tooltip: string } | null {
+  if (!data?.attempted) return null
+
+  if (data.analysis) {
+    if (data.sourceGrade === 'reviews-only') {
+      return {
+        label: t('mediaDetail.analysis.partial'),
+        color: 'info',
+        tooltip: t('mediaDetail.analysis.grade.reviewsOnly'),
+      }
+    }
+    if (data.sourceGrade === 'almost-nothing') {
+      return {
+        label: t('mediaDetail.analysis.grade.almostNothing'),
+        color: 'default',
+        tooltip: '',
+      }
+    }
+    // Including rows written before the grade column existed, which carry
+    // none. The analysis is there either way, and inventing a grade for it
+    // would be worse than showing none.
+    return {
+      label: t('mediaDetail.analysis.available'),
+      color: 'success',
+      tooltip: data.sourceGrade ? t('mediaDetail.analysis.grade.substantial') : '',
+    }
+  }
+
+  return {
+    label: t(
+      data.declineReason === 'thin_sources'
+        ? 'mediaDetail.analysis.noPublishedSources'
+        : 'mediaDetail.analysis.nothingToReport'
+    ),
+    color: 'error',
+    tooltip: '',
+  }
 }
