@@ -474,25 +474,30 @@ export function MediaHero({
           </Box>
 
           {/* Title, with the viewer's own rating (indigo star, distinct from
-              the red favorite heart) opposite it.
+              the red favorite heart) beside it.
 
               The rating used to sit on its own line below the genres, where it
               read as a fifth action button. Up here it reads as a property of
-              the title, and it puts something in the half of the row that was
-              empty at desktop width.
+              the title.
 
-              The wrap is driven by flex basis, not a breakpoint: the title
-              claims 16rem before the rating's ~11rem, so below roughly 27rem
-              of *container* width the rating drops to its own line and sits
-              under the title, left-aligned. No `ml: 'auto'` — an auto margin
-              would still be in force on the wrapped line and would strand the
-              stars against the right edge on a phone. */}
+              Beside means beside: the title takes its own width (`0 1 auto`)
+              rather than growing, so the stars follow the last letter. Letting
+              the title grow pushed them to the far edge of a 1400px hero,
+              which paired them with nothing and made them look like a stray
+              control in the backdrop.
+
+              The wrap is driven by flex basis, not a breakpoint — the stars
+              drop under the title once the two no longer fit the *container*,
+              which is what a phone does, and also what MediaDetailModal and
+              the assistant dock do at full window width. No `ml: 'auto'`: an
+              auto margin would still be in force on the wrapped line and would
+              strand the stars against the right edge there too. */}
           <Box
             sx={{
               display: 'flex',
               flexWrap: 'wrap',
-              alignItems: 'baseline',
-              columnGap: 3,
+              alignItems: 'center',
+              columnGap: 2,
               rowGap: 1,
               mb: 1,
             }}
@@ -500,7 +505,7 @@ export function MediaHero({
             <Typography
               variant="h3"
               fontWeight={700}
-              sx={{ flex: '1 1 16rem', minWidth: 0, textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}
+              sx={{ flex: '0 1 auto', minWidth: 0, textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}
             >
               {media.title}
             </Typography>

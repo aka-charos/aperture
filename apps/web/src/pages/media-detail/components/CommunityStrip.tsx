@@ -175,13 +175,16 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
         display: 'flex',
         flexWrap: 'wrap',
         alignItems: 'center',
-        columnGap: 2.5,
+        // No rules above and below. They were there to mark the strip off from
+        // the genres above and the buttons below, but a rule can only run the
+        // full width of the hero, and the strip is a third of that — so the
+        // line carried on past the last number to no edge and nothing to align
+        // with, which read as a broken table. The icons already group these
+        // well enough to do without.
+        columnGap: 3,
         rowGap: 1,
-        py: 1,
+        mt: 0.5,
         mb: 2.5,
-        borderTop: '1px solid',
-        borderBottom: '1px solid',
-        borderColor: 'divider',
       }}
     >
       {stats.map(({ id, icon, value, label, tooltip }) => {
