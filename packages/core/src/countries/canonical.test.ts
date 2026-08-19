@@ -6,6 +6,7 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   canonicalCountry,
+  canonicalCountryNames,
   countryCode,
   normalizeCountries,
 } from './canonical.js'
@@ -218,5 +219,59 @@ describe('housekeeping', () => {
   test('case does not matter for names', () => {
     assert.equal(canonicalCountry('france'), 'France')
     assert.equal(canonicalCountry('SOUTH KOREA'), 'South Korea')
+  })
+})
+
+describe('the table itself', () => {
+  const names = canonicalCountryNames()
+
+  test('every canonical name resolves to itself', () => {
+    // A name that does not round-trip is a name the normaliser would rewrite
+    // on a second pass, which the backfill would do every time it ran.
+    for (const name of names) assert.equal(canonicalCountry(name), name, name)
+  })
+
+  test('no country is listed twice', () => {
+    assert.deepEqual(names.length, new Set(names).size)
+  })
+
+  test('no two countries share an ISO code', () => {
+    // A duplicated code is silent until it becomes a flag, and then one
+    // country wears another's.
+    const codes = names.map(countryCode).filter((code): code is string => code !== null)
+    const seen = new Map<string, string>()
+    const collisions: string[] = []
+    for (const name of names) {
+      const code = countryCode(name)
+      if (code === null) continue
+      const previous = seen.get(code)
+      if (previous) collisions.push(`${code}: ${previous} + ${name}`)
+      else seen.set(code, name)
+    }
+    assert.deepEqual(collisions, [])
+    assert.equal(codes.length, seen.size)
+  })
+
+  test('every code is two upper-case letters', () => {
+    for (const name of names) {
+      const code = countryCode(name)
+      if (code === null) continue
+      assert.match(code, /^[A-Z]{2}$/, `${name} -> ${code}`)
+    }
+  })
+
+  test('normalising twice changes nothing', () => {
+    // The backfill is re-runnable by design, so this is the property that
+    // makes running it a second time safe.
+    const messy = [
+      'USA',
+      'Ελλάδα',
+      'France, Belgium, Canada, United Kingdom, Latvia, United States',
+      'Wakanda',
+      'West Germany',
+      'PS',
+    ]
+    const once = normalizeCountries(messy)
+    assert.deepEqual(normalizeCountries(once), once)
   })
 })

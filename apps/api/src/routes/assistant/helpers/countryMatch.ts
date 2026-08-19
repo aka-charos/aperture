@@ -21,7 +21,7 @@
  */
 import { canonicalCountry } from '@aperture/core/countries'
 
-const DEMONYM_TO_COUNTRY: Record<string, string> = {
+export const DEMONYM_TO_COUNTRY: Record<string, string> = {
   // Europe
   french: 'France',
   german: 'Germany',

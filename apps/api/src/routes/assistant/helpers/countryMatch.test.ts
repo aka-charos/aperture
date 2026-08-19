@@ -8,7 +8,8 @@
  */
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizeCountryQuery } from './countryMatch.js'
+import { normalizeCountryQuery, DEMONYM_TO_COUNTRY } from './countryMatch.js'
+import { canonicalCountry } from '@aperture/core/countries'
 
 /** Mirrors the SQL: production_countries::text ILIKE '%value%'. */
 function wouldMatch(stored: string[], filter: string): boolean {
@@ -128,5 +129,44 @@ describe('countries that only exist after normalisation', () => {
     assert.equal(normalizeCountryQuery('Soviet'), 'Soviet Union')
     assert.ok(wouldMatch(['Soviet Union'], 'Soviet'))
     assert.equal(wouldMatch(['Russia'], 'Soviet'), false)
+  })
+})
+
+describe('the two tables agreeing', () => {
+  /**
+   * Deliberately not a country: a fragment that covers several stored
+   * spellings at once, which is the whole reason it is written this way.
+   */
+  const PARTIAL_ON_PURPOSE = new Set(['Czech'])
+
+  test('every country this table names is one the vocabulary knows', () => {
+    // Without this, a demonym can quietly point at a country the vocabulary
+    // has never heard of. Nothing breaks loudly — the name passes through and
+    // the filter still works — but that country gets no spelling collapse and
+    // no flag code, and the gap is invisible until someone goes looking. It
+    // caught 12 the first time it ran.
+    const missing = [...new Set(Object.values(DEMONYM_TO_COUNTRY))]
+      .filter((name) => !PARTIAL_ON_PURPOSE.has(name))
+      .filter((name) => canonicalCountry(name) === null)
+    assert.deepEqual(missing, [])
+  })
+
+  test('resolving twice changes nothing', () => {
+    // normalizeCountryQuery has to be idempotent: the assistant can hand back
+    // a value it was given, and a second pass must not walk it somewhere else.
+    for (const name of Object.values(DEMONYM_TO_COUNTRY)) {
+      const once = normalizeCountryQuery(name)
+      assert.equal(normalizeCountryQuery(once), once, name)
+    }
+  })
+})
+
+describe('the one target the canonical pass rewrites', () => {
+  test('Bosnian resolves to the full stored name', () => {
+    // "Bosnia" used to be a substring covering both spellings. It now resolves
+    // to the whole name, which is what the column actually holds — narrower,
+    // and exact.
+    assert.equal(normalizeCountryQuery('Bosnian'), 'Bosnia and Herzegovina')
+    assert.ok(wouldMatch(['Bosnia and Herzegovina'], 'Bosnian'))
   })
 })
