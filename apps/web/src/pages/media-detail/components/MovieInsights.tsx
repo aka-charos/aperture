@@ -25,6 +25,7 @@ import QueryStatsIcon from '@mui/icons-material/QueryStats'
 import GroupsIcon from '@mui/icons-material/Groups'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
 import { gradients } from '@/theme'
+import { insightsHaveDetail } from '../helpers'
 import type { RecommendationInsights, MediaType } from '../types'
 
 interface MovieInsightsProps {
@@ -32,6 +33,189 @@ interface MovieInsightsProps {
   mediaType?: MediaType
   /** Show an evidence item without routing (set when this sits inside a dialog). */
   onOpenMedia?: (mediaType: MediaType, id: string) => void
+}
+
+interface ScoreMeter {
+  id: string
+  icon: ReactElement
+  label: string
+  tooltip: string
+  value: number | null
+  /** Bar fill, which is not always the value — see noveltyFill. */
+  fill: number
+  color: 'info' | 'success' | 'warning'
+}
+
+/**
+ * The three components of the match, as labelled bars.
+ *
+ * One definition rendered in two places: the body rail of an expandable panel,
+ * and the header of a flat one. The tooltips travel with it — they used to
+ * live only in the body, so the variant with no body had no way to find out
+ * what "Discovery" measured.
+ */
+function ScoreMeters({
+  meters,
+  format,
+}: {
+  meters: ScoreMeter[]
+  format: (value: number | null) => string
+}) {
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(9rem, 1fr))',
+        columnGap: 2,
+        rowGap: 1.25,
+      }}
+    >
+      {meters.map(({ id, icon, label, tooltip, value, fill, color }) => (
+        <Tooltip key={id} title={tooltip} arrow>
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
+              <Box sx={{ display: 'flex', color: `${color}.main` }}>{icon}</Box>
+              <Typography variant="caption" sx={{ flex: 1 }} noWrap>
+                {label}
+              </Typography>
+              <Typography variant="body2" fontWeight={700} color={`${color}.main`}>
+                {format(value)}
+              </Typography>
+            </Box>
+            {/* Discovery fills against the band its curve can occupy rather
+                than 0-100 — see noveltyFill. The number above stays the real
+                value, so the arithmetic below still adds up. */}
+            <LinearProgress
+              variant="determinate"
+              value={fill}
+              sx={{
+                height: 4,
+                borderRadius: 1,
+                bgcolor: 'grey.800',
+                '& .MuiLinearProgress-bar': { bgcolor: `${color}.main` },
+              }}
+            />
+          </Box>
+        </Tooltip>
+      ))}
+    </Box>
+  )
+}
+
+/**
+ * The lines under the meters: how the three become the match, how much this
+ * pick varies from the rest of the list, and how its genres sit against the
+ * reader's. Everything here is one caption tall and none of it is a score.
+ */
+function MatchNotes({
+  basePct,
+  preferenceDeltaPct,
+  matchPct,
+  diversity,
+  enjoyedCount,
+  newCount,
+}: {
+  basePct: number | null
+  preferenceDeltaPct: number
+  matchPct: number
+  diversity: number | null
+  enjoyedCount: number
+  newCount: number
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <Box
+      sx={{
+        pt: 1.25,
+        borderTop: '1px solid',
+        borderColor: 'divider',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0.75,
+      }}
+    >
+      {/* How those three become the match.
+          Shown only when the run stored the pre-preference blend, i.e. from
+          migration 0141 on. Older runs kept neither that nor the similarity
+          value the blend consumed, and neither is recoverable — so rather than
+          imply an arithmetic it cannot show, the panel omits this line. */}
+      {basePct != null && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 0.75 }}>
+          <Typography variant="caption" color="text.secondary">
+            {t('mediaDetail.insights.blendedScore')}
+          </Typography>
+          <Typography variant="caption" fontWeight={700}>
+            {basePct}%
+          </Typography>
+          {preferenceDeltaPct !== 0 && (
+            <>
+              <Typography variant="caption" color="text.secondary">
+                {preferenceDeltaPct > 0
+                  ? t('mediaDetail.insights.preferenceLift')
+                  : t('mediaDetail.insights.preferenceDrop')}
+              </Typography>
+              <Typography
+                variant="caption"
+                fontWeight={700}
+                color={preferenceDeltaPct > 0 ? 'success.main' : 'error.main'}
+              >
+                {preferenceDeltaPct > 0 ? '+' : '−'}
+                {Math.abs(preferenceDeltaPct)}%
+              </Typography>
+            </>
+          )}
+          <Typography variant="caption" color="text.secondary">
+            {t('mediaDetail.insights.givesMatch')}
+          </Typography>
+          <Typography variant="caption" fontWeight={700} color="primary.main">
+            {matchPct}%
+          </Typography>
+        </Box>
+      )}
+
+      {/* Variety — a property of the LIST, not of the match. It measures how
+          much this pick differs from what was already chosen, and is blended
+          into the selection ordering rather than into the score above. It is
+          below the rule and outside the meter grid for that reason; rendering
+          it as a fourth component of "How We Calculated Your Match" claimed it
+          was one. The explainer stays on screen rather than moving into a
+          tooltip, because that sentence is the whole of the distinction. */}
+      {diversity != null && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 0.75 }}>
+          <ShuffleIcon sx={{ color: 'secondary.main', fontSize: 16 }} />
+          <Typography variant="caption" color="text.secondary">
+            {t('mediaDetail.insights.varietyHeading')}
+          </Typography>
+          <Typography variant="caption" fontWeight={700} color="secondary.main">
+            {Math.round(diversity * 100)}%
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {t('mediaDetail.insights.varietyExplainer')}
+          </Typography>
+        </Box>
+      )}
+
+      {/* Genre Analysis — the count only. The genres themselves are chips on
+          the title's own genre row at the top of the page, styled there with
+          this same enjoyed/new distinction. */}
+      {enjoyedCount + newCount > 0 && (
+        <Typography variant="caption" color="text.secondary">
+          {enjoyedCount > 0 && (
+            <Box component="span" sx={{ color: 'success.main', fontWeight: 600 }}>
+              {t('mediaDetail.insights.genresEnjoy', { count: enjoyedCount })}
+            </Box>
+          )}
+          {enjoyedCount > 0 && newCount > 0 && ' • '}
+          {newCount > 0 && (
+            <Box component="span" sx={{ color: 'info.main', fontWeight: 600 }}>
+              {t('mediaDetail.insights.genresNew', { count: newCount })}
+            </Box>
+          )}
+        </Typography>
+      )}
+    </Box>
+  )
 }
 
 export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: MovieInsightsProps) {
@@ -51,6 +235,13 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
   // says everything the meters below say.
   const isPick = insights.isSelected === true
   const [insightsExpanded, setInsightsExpanded] = useState(isPick)
+
+  // Whether there is a body worth opening. Without one the panel was a chevron
+  // over a copy of its own header: the same three percentages, again, with a
+  // genre count for company. It renders flat instead — meters and all — and
+  // the page puts it in a column rather than across the whole width. See
+  // insightsHaveDetail.
+  const collapsible = insightsHaveDetail(insights)
 
   if (!insights.isRecommended) {
     return null
@@ -147,16 +338,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
   // one-line summary in the header, and as meters in the body. Three `h4`
   // percentages in three padded cards used to cost 154px of page to say what
   // fits in the header of a collapsed panel.
-  const scoreMeters: Array<{
-    id: string
-    icon: ReactElement
-    label: string
-    tooltip: string
-    value: number | null
-    /** Bar fill, which is not always the value — see novelty above. */
-    fill: number
-    color: 'info' | 'success' | 'warning'
-  }> = [
+  const scoreMeters: ScoreMeter[] = [
     {
       id: 'taste',
       icon: <TrendingUpIcon sx={{ fontSize: 16 }} />,
@@ -190,7 +372,9 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
     value != null ? `${Math.round(value * 100)}%` : t('mediaDetail.insights.na')
 
   return (
-    <Box sx={{ mt: 4, px: 3 }}>
+    // Padding only for the full-width form. The flat one sits inside the
+    // detail page's left column, which supplies both margin and gutter.
+    <Box sx={collapsible ? { mt: 4, px: 3 } : undefined}>
       <Paper
         sx={{
           borderRadius: 3,
@@ -207,17 +391,19 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
       >
         {/* Header. Carries the whole score story, so the panel says something
             while collapsed and the body below is elaboration rather than the
-            only place the numbers exist. */}
+            only place the numbers exist — and so that a panel with no body
+            loses nothing by not having one. */}
         <Box
           sx={{
             p: 2,
             display: 'flex',
             alignItems: 'center',
             gap: 1,
-            cursor: 'pointer',
-            '&:hover': { bgcolor: 'action.hover' },
+            ...(collapsible
+              ? { cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }
+              : null),
           }}
-          onClick={() => setInsightsExpanded(!insightsExpanded)}
+          onClick={collapsible ? () => setInsightsExpanded(!insightsExpanded) : undefined}
         >
           <Box
             sx={{
@@ -281,28 +467,51 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
             </Box>
           </Box>
 
-            {/* The three component scores, inline. Wraps under the title on a
-                narrow container rather than at a breakpoint, because this
-                panel also renders inside MediaDetailModal. */}
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5 }}>
-              {scoreMeters.map(({ id, label, value, color }) => (
-                <Box key={id} sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    {label}
-                  </Typography>
-                  <Typography variant="body2" fontWeight={700} color={`${color}.main`}>
-                    {formatScore(value)}
-                  </Typography>
-                </Box>
-              ))}
-            </Box>
+            {/* The three component scores. Bars when this is all there is,
+                bare numbers when a body below repeats them with bars anyway.
+                Either way it wraps under the title on a narrow container
+                rather than at a breakpoint, because this panel also renders
+                inside MediaDetailModal. */}
+            {collapsible ? (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5 }}>
+                {scoreMeters.map(({ id, label, value, color }) => (
+                  <Box key={id} sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      {label}
+                    </Typography>
+                    <Typography variant="body2" fontWeight={700} color={`${color}.main`}>
+                      {formatScore(value)}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            ) : (
+              <Box sx={{ flex: '1 1 20rem', minWidth: 0 }}>
+                <ScoreMeters meters={scoreMeters} format={formatScore} />
+              </Box>
+            )}
           </Box>
-          <IconButton>
-            {insightsExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-          </IconButton>
+          {collapsible && (
+            <IconButton>
+              {insightsExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </IconButton>
+          )}
         </Box>
 
-        <Collapse in={insightsExpanded}>
+        {!collapsible && (
+          <Box sx={{ px: 2, pb: 2 }}>
+            <MatchNotes
+              basePct={basePct}
+              preferenceDeltaPct={preferenceDeltaPct}
+              matchPct={matchPct}
+              diversity={insights.scores?.diversity ?? null}
+              enjoyedCount={enjoyedCount}
+              newCount={newCount}
+            />
+          </Box>
+        )}
+
+        <Collapse in={collapsible && insightsExpanded}>
           <Divider />
           <Box sx={{ p: 2.5 }}>
             {/* Above the explanation because it is the reason this title is in
@@ -441,146 +650,18 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                   {t('mediaDetail.insights.howWeCalculated')}
                 </Typography>
 
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(9rem, 1fr))',
-                    columnGap: 2,
-                    rowGap: 1.25,
-                    mb: 1.5,
-                  }}
-                >
-                  {scoreMeters.map(({ id, icon, label, tooltip, value, fill, color }) => (
-                    <Tooltip key={id} title={tooltip} arrow>
-                      <Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
-                          <Box sx={{ display: 'flex', color: `${color}.main` }}>{icon}</Box>
-                          <Typography variant="caption" sx={{ flex: 1 }} noWrap>
-                            {label}
-                          </Typography>
-                          <Typography variant="body2" fontWeight={700} color={`${color}.main`}>
-                            {formatScore(value)}
-                          </Typography>
-                        </Box>
-                        {/* Discovery fills against the band its curve can
-                            occupy rather than 0-100 — see noveltyFill. The
-                            number above stays the real value, so the
-                            arithmetic below still adds up. */}
-                        <LinearProgress
-                          variant="determinate"
-                          value={fill}
-                          sx={{
-                            height: 4,
-                            borderRadius: 1,
-                            bgcolor: 'grey.800',
-                            '& .MuiLinearProgress-bar': { bgcolor: `${color}.main` },
-                          }}
-                        />
-                      </Box>
-                    </Tooltip>
-                  ))}
+                <Box sx={{ mb: 1.5 }}>
+                  <ScoreMeters meters={scoreMeters} format={formatScore} />
                 </Box>
 
-                <Box
-                  sx={{
-                    pt: 1.25,
-                    borderTop: '1px solid',
-                    borderColor: 'divider',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 0.75,
-                  }}
-                >
-                  {/* How those three become the match.
-                      Shown only when the run stored the pre-preference blend,
-                      i.e. from migration 0141 on. Older runs kept neither that
-                      nor the similarity value the blend consumed, and neither
-                      is recoverable — so rather than imply an arithmetic it
-                      cannot show, the panel simply omits this line for them. */}
-                  {basePct != null && (
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        alignItems: 'baseline',
-                        columnGap: 0.75,
-                      }}
-                    >
-                      <Typography variant="caption" color="text.secondary">
-                        {t('mediaDetail.insights.blendedScore')}
-                      </Typography>
-                      <Typography variant="caption" fontWeight={700}>
-                        {basePct}%
-                      </Typography>
-                      {preferenceDeltaPct !== 0 && (
-                        <>
-                          <Typography variant="caption" color="text.secondary">
-                            {preferenceDeltaPct > 0
-                              ? t('mediaDetail.insights.preferenceLift')
-                              : t('mediaDetail.insights.preferenceDrop')}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            fontWeight={700}
-                            color={preferenceDeltaPct > 0 ? 'success.main' : 'error.main'}
-                          >
-                            {preferenceDeltaPct > 0 ? '+' : '−'}
-                            {Math.abs(preferenceDeltaPct)}%
-                          </Typography>
-                        </>
-                      )}
-                      <Typography variant="caption" color="text.secondary">
-                        {t('mediaDetail.insights.givesMatch')}
-                      </Typography>
-                      <Typography variant="caption" fontWeight={700} color="primary.main">
-                        {matchPct}%
-                      </Typography>
-                    </Box>
-                  )}
-
-                  {/* Variety — a property of the LIST, not of the match. It
-                      measures how much this pick differs from what was already
-                      chosen, and is blended into the selection ordering rather
-                      than into the score above. It is below the rule and
-                      outside the meter grid for that reason; rendering it as a
-                      fourth component of "How We Calculated Your Match"
-                      claimed it was one. The explainer stays on screen rather
-                      than moving into a tooltip, because that sentence is the
-                      whole of the distinction. */}
-                  {insights.scores?.diversity != null && (
-                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
-                      <ShuffleIcon sx={{ color: 'secondary.main', fontSize: 16 }} />
-                      <Typography variant="caption" color="text.secondary">
-                        {t('mediaDetail.insights.varietyHeading')}
-                      </Typography>
-                      <Typography variant="caption" fontWeight={700} color="secondary.main">
-                        {Math.round(insights.scores.diversity * 100)}%
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {t('mediaDetail.insights.varietyExplainer')}
-                      </Typography>
-                    </Box>
-                  )}
-
-                  {/* Genre Analysis — the count only. The genres themselves are
-                      chips on the title's own genre row at the top of the page,
-                      styled there with this same enjoyed/new distinction. */}
-                  {enjoyedCount + newCount > 0 && (
-                    <Typography variant="caption" color="text.secondary">
-                      {enjoyedCount > 0 && (
-                        <Box component="span" sx={{ color: 'success.main', fontWeight: 600 }}>
-                          {t('mediaDetail.insights.genresEnjoy', { count: enjoyedCount })}
-                        </Box>
-                      )}
-                      {enjoyedCount > 0 && newCount > 0 && ' • '}
-                      {newCount > 0 && (
-                        <Box component="span" sx={{ color: 'info.main', fontWeight: 600 }}>
-                          {t('mediaDetail.insights.genresNew', { count: newCount })}
-                        </Box>
-                      )}
-                    </Typography>
-                  )}
-                </Box>
+                <MatchNotes
+                  basePct={basePct}
+                  preferenceDeltaPct={preferenceDeltaPct}
+                  matchPct={matchPct}
+                  diversity={insights.scores?.diversity ?? null}
+                  enjoyedCount={enjoyedCount}
+                  newCount={newCount}
+                />
               </Box>
             </Box>
 
