@@ -1350,3 +1350,10 @@ export {
   type AnalysisJobOptions,
   type AnalysisJobResult,
 } from './analysis/index.js'
+
+export {
+  canonicalCountry,
+  countryCode,
+  normalizeCountries,
+  canonicalCountryNames,
+} from './countries/canonical.js'
