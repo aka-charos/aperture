@@ -1,5 +1,6 @@
 import type { EmbyItem, EmbySeries, EmbyEpisode } from './types.js'
 import type { Movie, Series, Episode } from '../types.js'
+import { normalizeCountries } from '../../countries/canonical.js'
 import {
   extractPeopleNames,
   mapEmbyActors,
@@ -46,7 +47,8 @@ export function mapEmbyItemToMovie(item: EmbyItem, baseUrl: string): Movie {
     imdbId: item.ProviderIds?.Imdb,
     tmdbId: item.ProviderIds?.Tmdb,
     tags: item.Tags || [],
-    productionCountries: item.ProductionLocations || [],
+    // See the Jellyfin mapper: same field, same scraper-shaped mess.
+    productionCountries: normalizeCountries(item.ProductionLocations),
     awards: item.Awards,
     ...quality,
     userData: mapEmbyUserData(item.UserData, true),
@@ -88,7 +90,8 @@ export function mapEmbyItemToSeries(item: EmbySeries, baseUrl: string): Series {
     tmdbId: item.ProviderIds?.Tmdb,
     tvdbId: item.ProviderIds?.Tvdb,
     tags: item.Tags || [],
-    productionCountries: item.ProductionLocations || [],
+    // See the Jellyfin mapper: same field, same scraper-shaped mess.
+    productionCountries: normalizeCountries(item.ProductionLocations),
     awards: item.Awards,
     userData: mapEmbyUserData(item.UserData),
   }

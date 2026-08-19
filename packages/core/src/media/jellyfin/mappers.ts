@@ -4,6 +4,7 @@
  * Convert Jellyfin API responses to internal types
  */
 
+import { normalizeCountries } from '../../countries/canonical.js'
 import type { Movie, Series, Episode } from '../types.js'
 import type { JellyfinItem, JellyfinEpisode } from './types.js'
 
@@ -57,7 +58,11 @@ export function mapJellyfinItemToMovie(item: JellyfinItem, baseUrl: string): Mov
     imdbId: item.ProviderIds?.Imdb,
     tmdbId: item.ProviderIds?.Tmdb,
     tags: item.Tags || [],
-    productionCountries: item.ProductionLocations || [],
+    // ProductionLocations is whatever the server's scraper wrote into the
+    // NFO — localised ("Ελλάδα"), coded ("GR"), or a whole comma-joined list
+    // in one string. Canonicalised here so the sync cannot re-dirty a column
+    // that has been cleaned.
+    productionCountries: normalizeCountries(item.ProductionLocations),
     awards: item.Awards,
     userData: item.UserData
       ? {
@@ -121,7 +126,11 @@ export function mapJellyfinItemToSeries(item: JellyfinItem, baseUrl: string): Se
     tmdbId: item.ProviderIds?.Tmdb,
     tvdbId: item.ProviderIds?.Tvdb,
     tags: item.Tags || [],
-    productionCountries: item.ProductionLocations || [],
+    // ProductionLocations is whatever the server's scraper wrote into the
+    // NFO — localised ("Ελλάδα"), coded ("GR"), or a whole comma-joined list
+    // in one string. Canonicalised here so the sync cannot re-dirty a column
+    // that has been cleaned.
+    productionCountries: normalizeCountries(item.ProductionLocations),
     awards: item.Awards,
     userData: item.UserData
       ? {

@@ -3,6 +3,7 @@
  */
 
 import { omdbRequest } from './client.js'
+import { normalizeCountries } from '../countries/canonical.js'
 import type { OMDbMovieResponse, RatingsData } from './types.js'
 import type { ApiLogCallback } from '../tmdb/client.js'
 
@@ -90,9 +91,21 @@ export function extractRatingsData(data: OMDbMovieResponse): RatingsData {
   // Get awards summary
   const awardsSummary = parseAwards(data.Awards)
 
-  // Parse language and country fields
+  // Parse language and country fields.
+  //
+  // Countries go through the canonical vocabulary on the way out. OMDb writes
+  // "USA" and "UK" where the media server writes "United States of America"
+  // and "United Kingdom", and these are the two paths that put both spellings
+  // into the same column. Normalising here means the difference never reaches
+  // the database, rather than being cleaned up afterwards.
+  //
+  // Null still means "OMDb told us nothing", which the enrichment UPDATE
+  // depends on: `COALESCE($13, production_countries)` leaves whatever is
+  // already stored alone, where an empty array would wipe it.
   const languages = parseCommaSeparated(data.Language)
-  const countries = parseCommaSeparated(data.Country)
+  const rawCountries = parseCommaSeparated(data.Country)
+  const normalized = rawCountries ? normalizeCountries(rawCountries) : null
+  const countries = normalized && normalized.length > 0 ? normalized : null
 
   // The long synopsis. The client asks for plot=full, but OMDb falls back to
   // the short blurb when no long one exists, so this is often just the

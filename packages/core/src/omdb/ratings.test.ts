@@ -82,3 +82,40 @@ test('the existing fields still parse', () => {
   assert.deepEqual(data.countries, ['United States', 'France'])
   assert.match(data.awardsSummary ?? '', /Nominated for 2 Oscars/)
 })
+
+// ============================================================================
+// Country vocabulary
+//
+// OMDb writes "USA" and "UK" where the media server writes "United States of
+// America" and "United Kingdom". Both land in the same column, which is how
+// one library ended up holding four spellings of the United States across
+// 5,720 titles. Canonicalising at the point of extraction stops the two
+// vocabularies from ever meeting.
+// ============================================================================
+
+test('OMDb country abbreviations are canonicalised', () => {
+  const data = extractRatingsData(response({ Country: 'USA, UK' }))
+  assert.deepEqual(data.countries, ['United States', 'United Kingdom'])
+})
+
+test('two spellings of one country collapse to one entry', () => {
+  const data = extractRatingsData(response({ Country: 'USA, United States' }))
+  assert.deepEqual(data.countries, ['United States'])
+})
+
+test('a country OMDb names in a way we do not know is left alone', () => {
+  const data = extractRatingsData(response({ Country: 'Wakanda' }))
+  assert.deepEqual(data.countries, ['Wakanda'])
+})
+
+test('historic states survive extraction', () => {
+  const data = extractRatingsData(response({ Country: 'West Germany, Soviet Union' }))
+  assert.deepEqual(data.countries, ['West Germany', 'Soviet Union'])
+})
+
+test('absent countries stay null so enrichment does not wipe the column', () => {
+  // The UPDATE is `COALESCE($13, production_countries)`. An empty array here
+  // would overwrite whatever the media server already wrote.
+  assert.equal(extractRatingsData(response({ Country: 'N/A' })).countries, null)
+  assert.equal(extractRatingsData(response({ Country: '' })).countries, null)
+})
