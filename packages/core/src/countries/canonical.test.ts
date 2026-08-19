@@ -169,10 +169,26 @@ describe('refusing to guess', () => {
     ])
   })
 
-  test('the Palestine spellings are left alone pending a decision', () => {
+  test('an unknown value is not invented into a neighbour', () => {
+    assert.deepEqual(normalizeCountries(['Wakanda', 'Genovia']), [
+      'Wakanda',
+      'Genovia',
+    ])
+  })
+})
+
+describe('one place, one name', () => {
+  test('the UN label and the ISO code both resolve to Palestine', () => {
+    assert.equal(canonicalCountry('Occupied Palestinian Territory'), 'Palestine')
+    assert.equal(canonicalCountry('PS'), 'Palestine')
+    assert.equal(canonicalCountry('Palestine'), 'Palestine')
+    assert.equal(countryCode('Palestine'), 'PS')
+  })
+
+  test('the three stored spellings collapse to one', () => {
     assert.deepEqual(
       normalizeCountries(['Occupied Palestinian Territory', 'Palestine', 'PS']),
-      ['Occupied Palestinian Territory', 'Palestine', 'PS']
+      ['Palestine']
     )
   })
 })

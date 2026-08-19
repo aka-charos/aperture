@@ -143,6 +143,9 @@ const COUNTRIES: Country[] = [
   { name: 'Malawi', code: 'MW', aliases: ['μαλάουι'] },
   { name: 'Libya', code: 'LY', aliases: ['λιβύη'] },
   { name: 'Paraguay', code: 'PY', aliases: ['παραγουάη'] },
+  // Three spellings of one place. "Occupied Palestinian Territory" is the UN
+  // statistical label and PS is the ISO code; the name is Palestine.
+  { name: 'Palestine', code: 'PS', aliases: ['occupied palestinian territory', 'palestinian territory', 'state of palestine', 'παλαιστίνη'] },
 
   // Gone, and deliberately kept. Spelling variants still collapse — "USSR"
   // and "Soviet Union" are the same state — but the state itself does not
@@ -154,12 +157,6 @@ const COUNTRIES: Country[] = [
   { name: 'Federal Republic of Yugoslavia', code: null },
   { name: 'Serbia and Montenegro', code: null, aliases: ['serbia & montenegro'] },
   { name: 'Czechoslovakia', code: null, aliases: ['τσεχοσλοβακία'] },
-
-  // Deliberately absent: "Occupied Palestinian Territory", "Palestine" and
-  // "PS" are three spellings of one place in this data, and choosing which
-  // one survives is a political call rather than a data-cleaning one. Left
-  // unmapped, they pass through as they are stored today — no better, and no
-  // worse, than before this file existed.
 ]
 
 const BY_ALIAS = new Map<string, string>()
