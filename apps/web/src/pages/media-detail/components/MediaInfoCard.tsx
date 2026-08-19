@@ -36,6 +36,15 @@ interface MediaInfoCardProps {
 /** Cast shown before the count takes over. */
 const CAST_SHOWN = 12
 
+/** One cell of the languages/countries grid: the label gutter and its chips. */
+const FACT_CELL = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'flex-start',
+  columnGap: 3,
+  rowGap: 0.5,
+} as const
+
 function getActors(media: Media): Actor[] {
   return media.actors || []
 }
@@ -235,23 +244,31 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
             and can have a dozen countries: two full rows meant one of them was
             three-quarters empty whichever way round they went.
 
-            Sharing is conditional, and the condition is width, not a
-            breakpoint. Countries claim 24rem before they will sit beside the
-            languages; below that the whole group — label and chips together —
-            drops to its own line and takes the full card, which is the right
-            shape for twelve of them anyway. What it must never do is squeeze
-            into a narrow column beside three languages and wrap into five
-            rows, which is what an 18rem claim produced.
+            Sharing is conditional and the condition is width, not a
+            breakpoint — an auto-fit grid of two cells, each a label gutter and
+            its chips. Two columns when both fit 20rem, one when they don't,
+            and each cell keeps the card's 7rem gutter either way, so stacked
+            they put "English" and "Argentina" on the same rail as "Keywords"
+            above them.
 
-            Both labels keep the card's 7rem gutter either way, so stacked they
-            line their chips up on one rail instead of 26px apart. */}
+            The grid replaced nested flex, which could not hold both ends of
+            that. Sized to share a line, the second group's gutter left its
+            label 24px from its own chips and 19px from the previous group's,
+            so the eye read "English Countries" as one thing; sized to keep the
+            rail, it could not share a line at all. A grid column boundary
+            separates them without a gutter having to do it.
+
+            The 9rem values basis is what keeps the chips beside their label
+            rather than under it. A two-column cell is at least 20rem wide, so
+            7rem + gutter + 9rem always fits inside one; a larger basis wrapped
+            the values under the label at the narrower end of two columns and
+            broke the rail exactly where it had just been fixed. */}
         {(hasLanguages || hasCountries) && (
           <Box
             sx={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'flex-start',
-              columnGap: 3,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(20rem, 1fr))',
+              columnGap: 4,
               // Wide enough to read as two separate facts once they stack —
               // at 0.5 they ran together into one twelve-chip paragraph.
               rowGap: 2,
@@ -259,39 +276,29 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
             }}
           >
             {hasLanguages && (
-              <>
+              <Box sx={FACT_CELL}>
                 <FactLabel icon={<LanguageIcon />} label={t('mediaDetail.infoCard.languages')} />
                 <Stack
                   direction="row"
                   flexWrap="wrap"
                   gap={0.5}
-                  sx={{ flex: '0 1 auto', minWidth: 0 }}
+                  sx={{ flex: '1 1 9rem', minWidth: 0 }}
                 >
                   {media.languages!.map((language) => (
                     <Chip key={language} label={language} size="small" variant="outlined" />
                   ))}
                 </Stack>
-              </>
+              </Box>
             )}
 
             {hasCountries && (
-              <Box
-                sx={{
-                  flex: '1 1 24rem',
-                  minWidth: 0,
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'flex-start',
-                  columnGap: 3,
-                  rowGap: 0.5,
-                }}
-              >
+              <Box sx={FACT_CELL}>
                 <FactLabel icon={<PublicIcon />} label={t('mediaDetail.infoCard.countries')} />
                 <Stack
                   direction="row"
                   flexWrap="wrap"
                   gap={0.5}
-                  sx={{ flex: '1 1 12rem', minWidth: 0 }}
+                  sx={{ flex: '1 1 9rem', minWidth: 0 }}
                 >
                   {media.production_countries!.map((country) => (
                     <Chip key={country} label={country} size="small" variant="outlined" />
