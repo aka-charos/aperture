@@ -10,6 +10,7 @@ import {
   Chip,
   Avatar,
   Stack,
+  Tooltip,
 } from '@mui/material'
 import PersonIcon from '@mui/icons-material/Person'
 import BusinessIcon from '@mui/icons-material/Business'
@@ -36,13 +37,18 @@ interface MediaInfoCardProps {
 /** Cast shown before the count takes over. */
 const CAST_SHOWN = 12
 
-/** One cell of the languages/countries grid: the label gutter and its chips. */
+/** One half of the languages/countries line: the label gutter and its chips. */
 const FACT_CELL = {
   display: 'flex',
   flexWrap: 'wrap',
   alignItems: 'flex-start',
   columnGap: 3,
   rowGap: 0.5,
+  // Content-sized cells can otherwise be wider than the row that holds them.
+  // Some stored country values are an entire comma-joined list in a single
+  // array entry — "France, Belgium, Canada, United Kingdom, Latvia, United
+  // States" — and one of those in a 300px column overflowed the card by 81px.
+  maxWidth: '100%',
 } as const
 
 function getActors(media: Media): Actor[] {
@@ -130,6 +136,71 @@ function FactLabel({ icon, label }: { icon: ReactNode; label: string }) {
   )
 }
 
+/**
+ * The first value of a list, with the rest behind a count.
+ *
+ * Languages and countries are lists whose first entry carries almost all of
+ * the meaning — the library's own numbers say so: 8,997 of 13,504 titles lead
+ * with English, and the leading value alone accounts for the whole fact a
+ * reader is after ("this is a Greek film"). The remainder is the co-production
+ * paperwork. Printed in full it was twelve chips wrapping onto three lines,
+ * which is how a two-line metadata row became the tallest thing on the card.
+ *
+ * The count is a tooltip rather than an expander because the rest is a list to
+ * glance at, not to act on — nothing in it is a link, and an expander would
+ * reflow the card underneath it. `enterTouchDelay={0}` plus a controlled
+ * `open` is what makes that work without a mouse: on a touchscreen the chip is
+ * a button that toggles the same panel, so there is no hover-only content.
+ */
+function FactValues({ values }: { values: string[] }) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const [first, ...rest] = values
+  return (
+    <Stack
+      direction="row"
+      flexWrap="wrap"
+      gap={0.5}
+      // Shrink rather than overflow. A capped chip width would not do it —
+      // a fixed max-width wins against flex shrinking, and the value ran past
+      // the card edge again. Letting the chip's own ellipsis do the work needs
+      // the shrink to reach it, which is what minWidth 0 allows.
+      sx={{ flex: '0 1 auto', minWidth: 0, maxWidth: '100%' }}
+    >
+      <Chip
+        label={first}
+        size="small"
+        variant="outlined"
+        // Only where it can actually be cut off — a title on "English" is a
+        // tooltip that repeats the word under the cursor.
+        title={first.length > 28 ? first : undefined}
+      />
+      {rest.length > 0 && (
+        <Tooltip
+          arrow
+          open={open}
+          onOpen={() => setOpen(true)}
+          onClose={() => setOpen(false)}
+          enterTouchDelay={0}
+          leaveTouchDelay={6000}
+          title={<Box sx={{ py: 0.5, lineHeight: 1.7 }}>{rest.join(', ')}</Box>}
+        >
+          <Chip
+            label={t('mediaDetail.hero.plusMore', { count: rest.length })}
+            size="small"
+            variant="outlined"
+            onClick={() => setOpen((isOpen) => !isOpen)}
+            // Dashed, and quieter than the value beside it: this chip names a
+            // quantity rather than a language, and at the same weight the eye
+            // read "+11 more" as another country.
+            sx={{ color: 'text.secondary', borderStyle: 'dashed' }}
+          />
+        </Tooltip>
+      )}
+    </Stack>
+  )
+}
+
 export function MediaInfoCard({ media }: MediaInfoCardProps) {
   const { t } = useTranslation()
   // Critic scores, awards and the director/writer credits are not here any
@@ -140,10 +211,16 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
   // hero now. See CommunityStrip.
   const hasStreamingProviders =
     media.streaming_providers && media.streaming_providers.length > 0
-  const hasLanguages = Boolean(media.languages && media.languages.length > 0)
-  const hasCountries = Boolean(
-    media.production_countries && media.production_countries.length > 0
+  // OMDb writes the literal string "None" into the Language field when it
+  // holds no language for a title — 48 of them in this library. It is a
+  // placeholder, not a language, and a chip reading "None" tells a reader
+  // less than no chip at all.
+  const languages = (media.languages ?? []).filter(
+    (language) => language && language !== 'None'
   )
+  const countries = media.production_countries ?? []
+  const hasLanguages = languages.length > 0
+  const hasCountries = countries.length > 0
   const actors = getActors(media)
   const studios = getStudios(media)
   const extraActors = Math.max(0, actors.length - CAST_SHOWN)
@@ -240,70 +317,42 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
             co-production is the kind of thing a reader wants before a list of
             twenty production companies, not after it.
 
-            They also share a line, because a title has a handful of languages
-            and can have a dozen countries: two full rows meant one of them was
-            three-quarters empty whichever way round they went.
+            They also share a line, because each one is now a chip and a count:
+            see FactValues. Two full rows meant one of them was three-quarters
+            empty whichever way round they went.
 
-            Sharing is conditional and the condition is width, not a
-            breakpoint — an auto-fit grid of two cells, each a label gutter and
-            its chips. Two columns when both fit 20rem, one when they don't,
-            and each cell keeps the card's 7rem gutter either way, so stacked
-            they put "English" and "Argentina" on the same rail as "Keywords"
-            above them.
-
-            The grid replaced nested flex, which could not hold both ends of
-            that. Sized to share a line, the second group's gutter left its
-            label 24px from its own chips and 19px from the previous group's,
-            so the eye read "English Countries" as one thing; sized to keep the
-            rail, it could not share a line at all. A grid column boundary
-            separates them without a gutter having to do it.
-
-            The 9rem values basis is what keeps the chips beside their label
-            rather than under it. A two-column cell is at least 20rem wide, so
-            7rem + gutter + 9rem always fits inside one; a larger basis wrapped
-            the values under the label at the narrower end of two columns and
-            broke the rail exactly where it had just been fixed. */}
+            Plain flex, sized to content. The auto-fit grid this replaced gave
+            each group a 20rem column whether it needed one or not, so on a
+            wide container "English" and "Argentina" ended up half a screen
+            apart with nothing between them — the two-column minimum was doing
+            the separating, and once the values are two chips long there is
+            nothing left for it to separate. Content-sized cells sit next to
+            each other at any width and wrap when they run out of room, and
+            each keeps the card's 7rem gutter, so stacked they put "English"
+            and "Argentina" on the same rail as "Keywords" above them. */}
         {(hasLanguages || hasCountries) && (
           <Box
             sx={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(20rem, 1fr))',
-              columnGap: 4,
-              // Wide enough to read as two separate facts once they stack —
-              // at 0.5 they ran together into one twelve-chip paragraph.
-              rowGap: 2,
+              display: 'flex',
+              flexWrap: 'wrap',
+              // Wide enough that the countries label reads as the start of a
+              // new fact rather than as a caption on the languages beside it.
+              columnGap: 5,
+              rowGap: 1.5,
               py: 1,
             }}
           >
             {hasLanguages && (
               <Box sx={FACT_CELL}>
                 <FactLabel icon={<LanguageIcon />} label={t('mediaDetail.infoCard.languages')} />
-                <Stack
-                  direction="row"
-                  flexWrap="wrap"
-                  gap={0.5}
-                  sx={{ flex: '1 1 9rem', minWidth: 0 }}
-                >
-                  {media.languages!.map((language) => (
-                    <Chip key={language} label={language} size="small" variant="outlined" />
-                  ))}
-                </Stack>
+                <FactValues values={languages} />
               </Box>
             )}
 
             {hasCountries && (
               <Box sx={FACT_CELL}>
                 <FactLabel icon={<PublicIcon />} label={t('mediaDetail.infoCard.countries')} />
-                <Stack
-                  direction="row"
-                  flexWrap="wrap"
-                  gap={0.5}
-                  sx={{ flex: '1 1 9rem', minWidth: 0 }}
-                >
-                  {media.production_countries!.map((country) => (
-                    <Chip key={country} label={country} size="small" variant="outlined" />
-                  ))}
-                </Stack>
+                <FactValues values={countries} />
               </Box>
             )}
           </Box>
