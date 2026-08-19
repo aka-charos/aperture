@@ -19,12 +19,19 @@
  * and an unlisted nationality degrades to today's behaviour rather than to an
  * error.
  */
+import { canonicalCountry } from '@aperture/core/countries'
+
 const DEMONYM_TO_COUNTRY: Record<string, string> = {
   // Europe
   french: 'France',
   german: 'Germany',
-  'west german': 'Germany',
-  'east german': 'German Democratic Republic',
+  // Both of these named the wrong thing. "West German" resolved to "Germany",
+  // which as a substring returns every German film ever made rather than the
+  // 50 made in the FRG; "East German" resolved to "German Democratic
+  // Republic", a string that appears nowhere in the column — the library
+  // stores "East Germany" — so it matched nothing at all.
+  'west german': 'West Germany',
+  'east german': 'East Germany',
   italian: 'Italy',
   spanish: 'Spain',
   portuguese: 'Portugal',
@@ -149,10 +156,24 @@ const DEMONYM_TO_COUNTRY: Record<string, string> = {
  * Resolve a country filter written as either a nationality or a country name
  * into the form stored in `production_countries`. Whitespace is trimmed and
  * matching is case-insensitive; anything unrecognised is returned as given.
+ *
+ * Two passes, because there are two ways to be wrong. The table above turns a
+ * nationality into a country; the canonical vocabulary then turns whatever
+ * name came out — from the table or straight from the user — into the one
+ * spelling the column actually holds. That second pass is what lets a filter
+ * written as "USA", "Ελλάδα" or "Türkiye" find anything, which matters
+ * because the value arrives from a language model that will produce all
+ * three.
+ *
+ * Entries that are deliberately partial survive it. `czech` resolves to
+ * "Czech", which is not a country and so is left alone — and that is the
+ * point: it is a substring covering Czech Republic, Czechia and
+ * Czechoslovakia at once, which no single canonical name can do.
  */
 export function normalizeCountryQuery(input: string): string {
   const trimmed = input.trim()
   if (!trimmed) return trimmed
   const key = trimmed.toLowerCase().replace(/\s+/g, ' ')
-  return DEMONYM_TO_COUNTRY[key] ?? trimmed
+  const resolved = DEMONYM_TO_COUNTRY[key] ?? trimmed
+  return canonicalCountry(resolved) ?? resolved
 }

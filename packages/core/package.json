@@ -39,6 +39,10 @@
     "./watching": {
       "import": "./dist/watching/index.js",
       "types": "./dist/watching/index.d.ts"
+    },
+    "./countries": {
+      "import": "./dist/countries/canonical.js",
+      "types": "./dist/countries/canonical.d.ts"
     }
   },
   "scripts": {

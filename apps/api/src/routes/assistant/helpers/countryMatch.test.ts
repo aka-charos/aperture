@@ -69,3 +69,64 @@ describe('the filter this feeds', () => {
     assert.equal(wouldMatch(['France', 'Italy'], 'Italian'), true)
   })
 })
+
+describe('the canonical pass', () => {
+  test('a filter written in another vocabulary still resolves', () => {
+    // The value arrives from a language model, which will write any of these.
+    // Before the canonical pass, only the last one found anything.
+    assert.equal(normalizeCountryQuery('USA'), 'United States')
+    assert.equal(normalizeCountryQuery('UK'), 'United Kingdom')
+    assert.equal(normalizeCountryQuery('Ελλάδα'), 'Greece')
+    assert.equal(normalizeCountryQuery('Türkiye'), 'Turkey')
+    assert.equal(normalizeCountryQuery('Czechia'), 'Czech Republic')
+  })
+
+  test('deliberately partial entries survive it', () => {
+    // "Czech" is not a country, so the canonical pass leaves it — which is
+    // what lets one filter cover three stored spellings.
+    assert.equal(normalizeCountryQuery('Czech'), 'Czech')
+    assert.ok(wouldMatch(['Czech Republic'], 'Czech'))
+    assert.ok(wouldMatch(['Czechoslovakia'], 'Czech'))
+  })
+
+  test('an unknown filter is still passed through', () => {
+    assert.equal(normalizeCountryQuery('Wakanda'), 'Wakanda')
+  })
+})
+
+describe('the two German states', () => {
+  test('East German films are findable at all', () => {
+    // This resolved to "German Democratic Republic", which appears nowhere in
+    // the column — the library stores "East Germany" — so the filter matched
+    // nothing whatsoever.
+    assert.equal(normalizeCountryQuery('East German'), 'East Germany')
+    assert.ok(wouldMatch(['East Germany'], 'East German'))
+  })
+
+  test('West German means West German, not German', () => {
+    // This resolved to "Germany", and '%Germany%' matches every German film
+    // there is — the answer to "west german cinema" was the whole shelf.
+    assert.equal(normalizeCountryQuery('West German'), 'West Germany')
+    assert.ok(wouldMatch(['West Germany'], 'West German'))
+    assert.equal(wouldMatch(['Germany'], 'West German'), false)
+  })
+
+  test('plain German still covers both, which is the point of a substring', () => {
+    assert.ok(wouldMatch(['Germany'], 'German'))
+    assert.ok(wouldMatch(['West Germany'], 'German'))
+    assert.ok(wouldMatch(['East Germany'], 'German'))
+  })
+})
+
+describe('countries that only exist after normalisation', () => {
+  test('Palestinian films are findable now the spellings are merged', () => {
+    assert.equal(normalizeCountryQuery('Palestinian'), 'Palestine')
+    assert.ok(wouldMatch(['Palestine'], 'Palestinian'))
+  })
+
+  test('Soviet films are not Russian films', () => {
+    assert.equal(normalizeCountryQuery('Soviet'), 'Soviet Union')
+    assert.ok(wouldMatch(['Soviet Union'], 'Soviet'))
+    assert.equal(wouldMatch(['Russia'], 'Soviet'), false)
+  })
+})
