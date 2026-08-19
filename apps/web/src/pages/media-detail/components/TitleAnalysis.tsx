@@ -161,8 +161,12 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
   const canRewrite = hasAnalysis && Boolean(data?.stale)
   const provenanceLine = data ? describeProvenance(data, t) : null
 
+  // No outer padding or margin: this renders inside the detail page's left
+  // column, which supplies both. It used to be a full-width band above the
+  // two-column grid, where the prose ran the whole width of the page and the
+  // panel's right edge had nothing to line up with.
   return (
-    <Box sx={{ mt: 3, px: { xs: 2, sm: 3 } }}>
+    <Box>
       <Accordion
         // Collapsed by default even when present — see the spoiler note above.
         defaultExpanded={false}
@@ -201,16 +205,17 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
             <>
               {/* Plain paragraphs, no markdown renderer: the prompt asks for
                   prose with no headings or lists, and a renderer for one panel
-                  is not worth the bundle. Blank-line splitting is what turns
-                  the model’s paragraphs back into paragraphs here.
+                  is not worth the bundle. `toParagraphs` is what turns the
+                  model’s prose back into paragraphs here — see the note on it,
+                  and note that it cannot be a plain blank-line split, because
+                  some rows arrive with no blank lines in them at all.
 
                   The text and its sources sit side by side rather than stacked.
-                  The measure has to be capped — this panel is as wide as the
-                  page, and an uncapped desktop line runs past 200 characters,
-                  roughly three times what the eye tracks — but capping it alone
-                  left half the panel empty, which reads as a rendering fault
-                  rather than a margin. The rail puts something worth reading in
-                  that space and keeps provenance beside the claim.
+                  The measure has to be capped — an uncapped line here runs past
+                  what the eye tracks — but capping it alone left the panel half
+                  empty, which reads as a rendering fault rather than a margin.
+                  The rail puts something worth reading in that space and keeps
+                  provenance beside the claim.
 
                   No breakpoints: this page also renders inside MediaDetailModal
                   and beside the assistant dock, where a window-width media
@@ -224,26 +229,23 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
                   gap: 3,
                 }}
               >
-                <Box sx={{ flex: '1 1 30rem', maxWidth: '84ch' }}>
-                  {(data?.analysis ?? '')
-                    .split(/\n{2,}/)
-                    .map((para, i) => (
-                      <Typography
-                        key={i}
-                        variant="body2"
-                        // No pre-wrap. The model separates its sentences with
-                        // single newlines as well as its paragraphs with blank
-                        // ones, and preserving the former broke every sentence
-                        // onto its own line — an article rendered as a list,
-                        // each line ending wherever the sentence did. Letting
-                        // HTML collapse them is what makes paragraphs read as
-                        // paragraphs; the blank-line split above is the only
-                        // break that should survive.
-                        sx={{ mb: 2, lineHeight: 1.75 }}
-                      >
-                        {para.trim()}
-                      </Typography>
-                    ))}
+                <Box sx={{ flex: '1 1 26rem', maxWidth: '84ch' }}>
+                  {toParagraphs(data?.analysis ?? '').map((para, i) => (
+                    <Typography
+                      key={i}
+                      variant="body2"
+                      // No pre-wrap. The model separates its sentences with
+                      // single newlines as well as its paragraphs with blank
+                      // ones, and preserving the former broke every sentence
+                      // onto its own line — an article rendered as a list, each
+                      // line ending wherever the sentence did. Letting HTML
+                      // collapse whitespace is what makes paragraphs read as
+                      // paragraphs; `toParagraphs` decides where the breaks go.
+                      sx={{ mb: 2, lineHeight: 1.75 }}
+                    >
+                      {para}
+                    </Typography>
+                  ))}
 
                   {canRewrite && (
                     <Box sx={{ mt: 1.5 }}>
@@ -384,6 +386,90 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
       </Accordion>
     </Box>
   )
+}
+
+/** Sentences per paragraph when the model's own breaks have to be replaced. */
+const SENTENCES_PER_PARAGRAPH = 4
+
+/**
+ * A shorter run than this is not a sentence — it is an abbreviation the split
+ * below cut at ("The U.S.", "Directed by J. R. R."), so it joins what follows.
+ */
+const MIN_SENTENCE_CHARS = 40
+
+/**
+ * The analysis, broken into paragraphs.
+ *
+ * The prompt asks for paragraphs of three or four sentences separated by blank
+ * lines, and when the model complies that is exactly what renders. It does not
+ * always comply, and what it does instead varies by model and by title: some
+ * rows separate their paragraphs with a single newline, and some arrive as one
+ * unbroken block with no newline in them anywhere. Those two used to render as
+ * a wall of six hundred words, because a blank-line split found nothing to
+ * split on and produced a single paragraph.
+ *
+ * So the model's breaks are honoured where it wrote any and reconstructed where
+ * it did not. This reflows text rather than displaying it verbatim, which is
+ * worth being explicit about — but the shape it reflows to is the shape the
+ * prompt asked for, and the alternative on those rows is unreadable.
+ */
+function toParagraphs(text: string): string[] {
+  const trimmed = text.trim()
+  if (!trimmed) return []
+
+  // Blank lines are the model doing what it was asked. Authoritative.
+  const byBlankLine = trimmed
+    .split(/\n{2,}/)
+    .map((para) => para.trim())
+    .filter(Boolean)
+  if (byBlankLine.length > 1) return byBlankLine
+
+  // Nothing to honour. Single newlines are the next-best evidence of where the
+  // model meant to break; with none of those either, fall back to sentences.
+  const lines = trimmed
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const units = lines.length > 1 ? lines : splitSentences(trimmed)
+
+  // Accumulate until the paragraph is long enough, counting sentences rather
+  // than units — so a line holding one sentence merges with its neighbours,
+  // and a line already holding four stands alone.
+  const paragraphs: string[] = []
+  let current: string[] = []
+  let sentences = 0
+  for (const unit of units) {
+    current.push(unit)
+    sentences += splitSentences(unit).length
+    if (sentences >= SENTENCES_PER_PARAGRAPH) {
+      paragraphs.push(current.join(' '))
+      current = []
+      sentences = 0
+    }
+  }
+  if (current.length > 0) paragraphs.push(current.join(' '))
+  return paragraphs
+}
+
+/**
+ * Sentences, for the case where they are the only break available.
+ *
+ * Splits after terminal punctuation followed by a capital, then rejoins any
+ * piece too short to be a sentence — which is what keeps "U.S. Marines" and
+ * "Mr. Bergman" whole without carrying a list of abbreviations around.
+ */
+function splitSentences(text: string): string[] {
+  const pieces = text.split(/(?<=[.!?])\s+(?=["'“([]?[A-Z0-9])/)
+  const merged: string[] = []
+  for (const piece of pieces) {
+    const previous = merged[merged.length - 1]
+    if (previous !== undefined && previous.length < MIN_SENTENCE_CHARS) {
+      merged[merged.length - 1] = `${previous} ${piece}`
+    } else {
+      merged.push(piece)
+    }
+  }
+  return merged.filter(Boolean)
 }
 
 /**

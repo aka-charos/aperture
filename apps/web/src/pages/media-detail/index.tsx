@@ -129,17 +129,20 @@ export function MediaDetailPage({
         <MovieInsights insights={insights} mediaType={mediaType} onOpenMedia={onOpenMedia} />
       )}
 
-      {/* Grounded critical analysis — about the WORK, identical for every user,
-          written from web sources. Sits below the personal panel because a
-          reader who came here from their recommendations wants "why me" first. */}
-      {id && <TitleAnalysis mediaType={mediaType} mediaId={id} />}
-
       {/* Main Content */}
       <Box sx={{ mt: 4, px: { xs: 2, sm: 3 } }}>
         <Grid container spacing={3}>
           {/* Left Column - Info */}
           <Grid item xs={12} md={6}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {/* Grounded critical analysis — about the WORK, identical for
+                  every user, written from web sources. Below the personal
+                  panel because a reader who came here from their
+                  recommendations wants "why me" first, and inside this column
+                  rather than spanning the page: it is prose, and prose set to
+                  the full width of a desktop window has no right edge to line
+                  up with and a line nobody can track. */}
+              {id && <TitleAnalysis mediaType={mediaType} mediaId={id} />}
               <MediaInfoCard media={media} />
               {/* Aired episodes missing from the server + Seerr requests (series only) */}
               {isSeries(media) && (
