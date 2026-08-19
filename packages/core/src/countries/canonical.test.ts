@@ -275,3 +275,76 @@ describe('the table itself', () => {
     assert.deepEqual(normalizeCountries(once), once)
   })
 })
+
+describe('the long tail the full survey turned up', () => {
+  test('the second wave of Greek names', () => {
+    const pairs: Array<[string, string]> = [
+      ['Ιταλία', 'Italy'],
+      ['Ηνωμένο Βασίλειο', 'United Kingdom'],
+      ['Ηνωμένες Πολιτείες', 'United States'],
+      ['Κάτω Χώρες', 'Netherlands'],
+      ['Ελβετία', 'Switzerland'],
+      ['Ρουμανία', 'Romania'],
+      ['Βόρεια Μακεδονία', 'North Macedonia'],
+      ['Πολωνία', 'Poland'],
+      ['Ουγγαρία', 'Hungary'],
+      ['Σλοβενία', 'Slovenia'],
+      ['Ισπανία', 'Spain'],
+      ['Ισραήλ', 'Israel'],
+      ['Κροατία', 'Croatia'],
+      ['Νορβηγία', 'Norway'],
+    ]
+    for (const [greek, english] of pairs) {
+      assert.equal(canonicalCountry(greek), english, greek)
+    }
+  })
+
+  test('Palestinian Territories is the same place again', () => {
+    assert.equal(canonicalCountry('Palestinian Territories'), 'Palestine')
+  })
+
+  test('countries that appear once each still resolve', () => {
+    for (const name of [
+      'Malta',
+      'Liechtenstein',
+      'Kosovo',
+      'Montenegro',
+      'Macao',
+      'Vanuatu',
+      'Antarctica',
+      "Côte d'Ivoire",
+      'Cayman Islands',
+    ]) {
+      assert.equal(canonicalCountry(name), name, name)
+    }
+  })
+
+  test('the codes the column actually contains', () => {
+    const pairs: Array<[string, string]> = [
+      ['QA', 'Qatar'],
+      ['SA', 'Saudi Arabia'],
+      ['SE', 'Sweden'],
+      ['JO', 'Jordan'],
+      ['FI', 'Finland'],
+      ['DK', 'Denmark'],
+      ['DE', 'Germany'],
+      ['AU', 'Australia'],
+      ['NO', 'Norway'],
+    ]
+    for (const [code, name] of pairs) assert.equal(canonicalCountry(code), name, code)
+  })
+})
+
+describe('NA is not a country', () => {
+  test('the code is refused, the name is not', () => {
+    // A scraper writing "NA" means "not applicable" — turning that into an
+    // African country is worse than leaving it alone.
+    assert.equal(canonicalCountry('NA'), null)
+    assert.deepEqual(normalizeCountries(['NA']), ['NA'])
+    assert.equal(canonicalCountry('Namibia'), 'Namibia')
+  })
+
+  test('Namibia still carries its code for flags', () => {
+    assert.equal(countryCode('Namibia'), 'NA')
+  })
+})
