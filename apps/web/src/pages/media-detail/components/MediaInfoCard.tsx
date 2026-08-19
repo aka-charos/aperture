@@ -1,5 +1,16 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Box, Typography, Card, CardContent, Divider, Chip, Avatar, Stack } from '@mui/material'
+import {
+  Box,
+  Typography,
+  Button,
+  Card,
+  CardContent,
+  Divider,
+  Chip,
+  Avatar,
+  Stack,
+} from '@mui/material'
 import PersonIcon from '@mui/icons-material/Person'
 import BusinessIcon from '@mui/icons-material/Business'
 import PublicIcon from '@mui/icons-material/Public'
@@ -57,22 +68,44 @@ function FactRow({
 }) {
   return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5, py: 1 }}>
-      <Box
-        sx={{
-          flex: '0 0 7rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 0.75,
-          color: 'text.secondary',
-          '& .MuiSvgIcon-root': { fontSize: 16 },
-        }}
-      >
-        {icon}
-        <Typography variant="caption" color="text.secondary">
-          {label}
-        </Typography>
-      </Box>
+      <FactLabel icon={icon} label={label} />
       <Box sx={{ flex: '1 1 14rem', minWidth: 0 }}>{children}</Box>
+    </Box>
+  )
+}
+
+/**
+ * The label half of a row, on its own so two of them can share one line.
+ *
+ * `basis` is the gutter width. It defaults to the 7rem every full-width row
+ * uses, so their labels line up down the left edge; the second group on a
+ * shared line passes `auto` instead, since a fixed gutter in the middle of a
+ * row is padding, not alignment.
+ */
+function FactLabel({
+  icon,
+  label,
+  basis = '7rem',
+}: {
+  icon: ReactNode
+  label: string
+  basis?: string
+}) {
+  return (
+    <Box
+      sx={{
+        flex: `0 0 ${basis}`,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 0.75,
+        color: 'text.secondary',
+        '& .MuiSvgIcon-root': { fontSize: 16 },
+      }}
+    >
+      {icon}
+      <Typography variant="caption" color="text.secondary">
+        {label}
+      </Typography>
     </Box>
   )
 }
@@ -87,9 +120,19 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
   // hero now. See CommunityStrip.
   const hasStreamingProviders =
     media.streaming_providers && media.streaming_providers.length > 0
+  const hasLanguages = Boolean(media.languages && media.languages.length > 0)
+  const hasCountries = Boolean(
+    media.production_countries && media.production_countries.length > 0
+  )
   const actors = getActors(media)
   const studios = getStudios(media)
   const extraActors = Math.max(0, actors.length - CAST_SHOWN)
+  // The cut used to be silent, then it was a count, and a count is a question
+  // with no way to answer it — the twelfth name is where a supporting cast
+  // starts being the interesting part. Collapsed by default because a full
+  // cast is forty rows and most readers want the leads.
+  const [castExpanded, setCastExpanded] = useState(false)
+  const shownActors = castExpanded ? actors : actors.slice(0, CAST_SHOWN)
 
   // The three below-the-line craft credits. They share a row because each one
   // is a name or two: given a heading and a rule apiece they cost about 180px
@@ -148,22 +191,6 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
   return (
     <Card sx={{ backgroundColor: 'background.paper', borderRadius: 2 }}>
       <CardContent>
-        {hasStreamingProviders && (
-          <FactRow icon={<StreamIcon />} label={t('mediaDetail.infoCard.alsoAvailableOn')}>
-            <Stack direction="row" flexWrap="wrap" gap={0.5}>
-              {media.streaming_providers!.map((provider) => (
-                <Chip
-                  key={provider.id}
-                  label={provider.name}
-                  size="small"
-                  variant="outlined"
-                  sx={{ fontSize: '0.7rem' }}
-                />
-              ))}
-            </Stack>
-          </FactRow>
-        )}
-
         {isMovie(media) && media.collection_name && (
           <FactRow icon={<CollectionsIcon />} label={t('mediaDetail.infoCard.partOfCollection')}>
             <Typography variant="body2" fontWeight={500}>
@@ -191,25 +218,65 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
         {/* Language and country sit above the cast rather than at the very
             bottom of the card. They say what the film is — a Danish-language
             co-production is the kind of thing a reader wants before a list of
-            twenty production companies, not after it. */}
-        {media.languages && media.languages.length > 0 && (
-          <FactRow icon={<LanguageIcon />} label={t('mediaDetail.infoCard.languages')}>
-            <Stack direction="row" flexWrap="wrap" gap={0.5}>
-              {media.languages.map((language) => (
-                <Chip key={language} label={language} size="small" variant="outlined" />
-              ))}
-            </Stack>
-          </FactRow>
-        )}
+            twenty production companies, not after it.
 
-        {media.production_countries && media.production_countries.length > 0 && (
-          <FactRow icon={<PublicIcon />} label={t('mediaDetail.infoCard.countries')}>
-            <Stack direction="row" flexWrap="wrap" gap={0.5}>
-              {media.production_countries.map((country) => (
-                <Chip key={country} label={country} size="small" variant="outlined" />
-              ))}
-            </Stack>
-          </FactRow>
+            They also share a line, because a title has a handful of languages
+            and can have a dozen countries: two rows meant one of them was
+            three-quarters empty whichever way round they went. Countries take
+            the remaining width and their own inner gutter, so the eleventh
+            country wraps under the first one rather than back to the card's
+            left edge — a second line starting under `Languages` reads as a new
+            fact rather than a continuation. */}
+        {(hasLanguages || hasCountries) && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 2, rowGap: 0.5, py: 1 }}>
+            {hasLanguages && (
+              <>
+                <FactLabel icon={<LanguageIcon />} label={t('mediaDetail.infoCard.languages')} />
+                <Stack
+                  direction="row"
+                  flexWrap="wrap"
+                  gap={0.5}
+                  sx={{ flex: '0 1 auto', minWidth: 0 }}
+                >
+                  {media.languages!.map((language) => (
+                    <Chip key={language} label={language} size="small" variant="outlined" />
+                  ))}
+                </Stack>
+              </>
+            )}
+
+            {hasCountries && (
+              <Box
+                sx={{
+                  // Wraps to its own line as a whole once it cannot hold 18rem
+                  // beside the languages — never splitting the label off from
+                  // the chips it names.
+                  flex: '1 1 18rem',
+                  minWidth: 0,
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  columnGap: 2,
+                  rowGap: 0.5,
+                }}
+              >
+                <FactLabel
+                  icon={<PublicIcon />}
+                  label={t('mediaDetail.infoCard.countries')}
+                  basis="auto"
+                />
+                <Stack
+                  direction="row"
+                  flexWrap="wrap"
+                  gap={0.5}
+                  sx={{ flex: '1 1 12rem', minWidth: 0 }}
+                >
+                  {media.production_countries!.map((country) => (
+                    <Chip key={country} label={country} size="small" variant="outlined" />
+                  ))}
+                </Stack>
+              </Box>
+            )}
+          </Box>
         )}
 
         {actors.length > 0 && (
@@ -217,7 +284,7 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
             <Divider sx={{ my: 1.5 }} />
             <FactRow icon={<PersonIcon />} label={t('mediaDetail.infoCard.cast')}>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
-                {actors.slice(0, CAST_SHOWN).map((actor, idx) => (
+                {shownActors.map((actor, idx) => (
                   <Box
                     key={idx}
                     component={RouterLink}
@@ -249,11 +316,17 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
                     </Box>
                   </Box>
                 ))}
-                {/* The list was already cut at twelve, silently. */}
                 {extraActors > 0 && (
-                  <Typography variant="caption" color="text.secondary">
-                    {t('mediaDetail.hero.plusMore', { count: extraActors })}
-                  </Typography>
+                  <Button
+                    size="small"
+                    variant="text"
+                    onClick={() => setCastExpanded((open) => !open)}
+                    sx={{ minWidth: 0, px: 0.5, fontSize: '0.75rem', textTransform: 'none' }}
+                  >
+                    {castExpanded
+                      ? t('common.showLess')
+                      : t('mediaDetail.hero.plusMore', { count: extraActors })}
+                  </Button>
                 )}
               </Box>
             </FactRow>
@@ -307,7 +380,9 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
           </>
         )}
 
-        {(studios.length > 0 || externalLinks.length > 0) && <Divider sx={{ my: 1.5 }} />}
+        {(studios.length > 0 || externalLinks.length > 0 || hasStreamingProviders) && (
+          <Divider sx={{ my: 1.5 }} />
+        )}
 
         {studios.length > 0 && (
           <FactRow icon={<BusinessIcon />} label={t('mediaDetail.infoCard.studios')}>
@@ -343,6 +418,26 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
                   target="_blank"
                   rel="noopener noreferrer"
                   clickable
+                />
+              ))}
+            </Stack>
+          </FactRow>
+        )}
+
+        {/* Last, and it opened the card until now. Where else this title can be
+            streamed is about other services, not about the film — it is the
+            one row here a reader who came for the film itself never wanted
+            first. */}
+        {hasStreamingProviders && (
+          <FactRow icon={<StreamIcon />} label={t('mediaDetail.infoCard.alsoAvailableOn')}>
+            <Stack direction="row" flexWrap="wrap" gap={0.5}>
+              {media.streaming_providers!.map((provider) => (
+                <Chip
+                  key={provider.id}
+                  label={provider.name}
+                  size="small"
+                  variant="outlined"
+                  sx={{ fontSize: '0.7rem' }}
                 />
               ))}
             </Stack>

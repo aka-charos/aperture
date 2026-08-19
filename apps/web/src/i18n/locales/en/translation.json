@@ -693,7 +693,7 @@
       "scoreTooltipTmdbVotes": "TMDB: {{score}}/10 from {{votes}} votes",
       "scoreTooltipImdb": "IMDb: {{score}}/10",
       "scoreTooltipImdbVotes": "IMDb: {{score}}/10 from {{votes}} votes",
-      "alsoAvailableOn": "Also Available On",
+      "alsoAvailableOn": "Available On",
       "partOfCollection": "Part of Collection",
       "keywords": "Keywords",
       "cast": "Cast",
@@ -765,6 +765,8 @@
     "analysis": {
       "headingMovie": "Film Analysis",
       "headingSeries": "Series Analysis",
+      "available": "Available",
+      "notAvailable": "Not available",
       "notYetGenerated": "No analysis has been written for this title yet.",
       "generate": "Write an analysis",
       "generating": "Reading what critics wrote…",

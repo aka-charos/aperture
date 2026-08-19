@@ -33,6 +33,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Tooltip,
   Typography,
 } from '@mui/material'
 import {
@@ -183,14 +184,36 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
                   : 'mediaDetail.analysis.headingMovie'
               )}
             </Typography>
-            {hasAnalysis && data?.sourceGrade && (
+            {/* Whether there is anything behind the chevron, before anyone
+                spends a click finding out. The three panel states collapse to
+                two here on purpose: "asked and declined" and "never asked" are
+                different things to act on but the same thing to read, and the
+                difference is spelled out inside.
+
+                How well sourced an analysis is stays on the tooltip rather
+                than on the label. It is worth knowing and it is not worth the
+                heading — "Well documented" answered a question nobody had
+                asked yet, while the one they had ("is there one?") went
+                unanswered. */}
+            <Tooltip
+              title={
+                hasAnalysis && data?.sourceGrade
+                  ? t(`mediaDetail.analysis.grade.${gradeKey(data.sourceGrade)}`)
+                  : ''
+              }
+            >
               <Chip
                 size="small"
                 variant="outlined"
-                label={t(`mediaDetail.analysis.grade.${gradeKey(data.sourceGrade)}`)}
+                color={hasAnalysis ? 'success' : 'error'}
+                label={t(
+                  hasAnalysis
+                    ? 'mediaDetail.analysis.available'
+                    : 'mediaDetail.analysis.notAvailable'
+                )}
                 sx={{ height: 20, fontSize: '0.7rem' }}
               />
-            )}
+            </Tooltip>
           </Box>
         </AccordionSummary>
 
