@@ -44,6 +44,14 @@ interface ScoreMeter {
   /** Bar fill, which is not always the value — see noveltyFill. */
   fill: number
   color: 'info' | 'success' | 'warning'
+  /**
+   * The one-line qualifier under the bar: what share of the match this
+   * component carried, and for Discovery the band its number lives in.
+   *
+   * Absent rather than empty when the run recorded no weights, because a
+   * missing weight is "not stated", never a default — see blendWeightShares.
+   */
+  caption?: string
 }
 
 /**
@@ -70,7 +78,7 @@ function ScoreMeters({
         rowGap: 1.25,
       }}
     >
-      {meters.map(({ id, icon, label, tooltip, value, fill, color }) => (
+      {meters.map(({ id, icon, label, tooltip, value, fill, color, caption }) => (
         <Tooltip key={id} title={tooltip} arrow>
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
@@ -95,6 +103,20 @@ function ScoreMeters({
                 '& .MuiLinearProgress-bar': { bgcolor: `${color}.main` },
               }}
             />
+            {/* Deliberately not in the header's one-line summary, which has no
+                bars and no room — a weight without the thing it weighs is
+                noise. This component is the one both rails share, so wherever
+                a bar is drawn its multiplier is drawn with it. */}
+            {caption && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                display="block"
+                sx={{ mt: 0.25, fontSize: '0.65rem', lineHeight: 1.4 }}
+              >
+                {caption}
+              </Typography>
+            )}
           </Box>
         </Tooltip>
       ))}
@@ -114,6 +136,7 @@ function MatchNotes({
   diversity,
   enjoyedCount,
   newCount,
+  weightPct,
 }: {
   basePct: number | null
   preferenceDeltaPct: number
@@ -121,6 +144,7 @@ function MatchNotes({
   diversity: number | null
   enjoyedCount: number
   newCount: number
+  weightPct: { similarity: number; novelty: number; rating: number } | null
 }) {
   const { t } = useTranslation()
 
@@ -143,7 +167,13 @@ function MatchNotes({
       {basePct != null && (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 0.75 }}>
           <Typography variant="caption" color="text.secondary">
-            {t('mediaDetail.insights.blendedScore')}
+            {weightPct
+              ? t('mediaDetail.insights.blendedScoreWeighted', {
+                  similarity: weightPct.similarity,
+                  novelty: weightPct.novelty,
+                  rating: weightPct.rating,
+                })
+              : t('mediaDetail.insights.blendedScore')}
           </Typography>
           <Typography variant="caption" fontWeight={700}>
             {basePct}%
@@ -281,6 +311,20 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
   // scale comes from the API, which reads core's own constants — the web app
   // never imports @aperture/core, and hardcoding them here would let the bar
   // drift the first time the curve is retuned.
+  // The three multipliers, as percentages. Without them the panel asks the
+  // reader to accept that 75 / 76 / 28 makes 63 — which it does, at 50/25/25,
+  // but nothing on the page said so and the obvious reading (an average) gives
+  // 60, so a correct panel looked broken. Null for runs predating migration
+  // 0147, where the honest move is to say nothing rather than to assume the
+  // current config applied: weights are per user and an admin can move them.
+  const weightPct = insights.scoreWeights
+    ? {
+        similarity: Math.round(insights.scoreWeights.similarity * 100),
+        novelty: Math.round(insights.scoreWeights.novelty * 100),
+        rating: Math.round(insights.scoreWeights.rating * 100),
+      }
+    : null
+
   const noveltyScale = insights.scoreScales?.novelty
   const noveltyFill =
     insights.scores?.novelty != null && noveltyScale && noveltyScale.max > noveltyScale.min
@@ -347,6 +391,9 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
       value: tasteMatch,
       fill: (tasteMatch ?? 0) * 100,
       color: 'info',
+      caption: weightPct
+        ? t('mediaDetail.insights.weightShare', { pct: weightPct.similarity })
+        : undefined,
     },
     {
       id: 'discovery',
@@ -356,6 +403,22 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
       value: insights.scores?.novelty ?? null,
       fill: noveltyFill,
       color: 'success',
+      // Carries its range as well as its weight. This is the component whose
+      // number is least like a percentage — the curve is peaked, so it can
+      // never read below ~47% or above ~84% — and that was stated only in a
+      // tooltip, which is to say only to people using a mouse.
+      caption:
+        [
+          weightPct ? t('mediaDetail.insights.weightShare', { pct: weightPct.novelty }) : null,
+          noveltyScale
+            ? t('mediaDetail.insights.scaleRange', {
+                min: Math.round(noveltyScale.min * 100),
+                max: Math.round(noveltyScale.max * 100),
+              })
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' · ') || undefined,
     },
     {
       id: 'quality',
@@ -365,6 +428,9 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
       value: insights.scores?.rating ?? null,
       fill: (insights.scores?.rating ?? 0) * 100,
       color: 'warning',
+      caption: weightPct
+        ? t('mediaDetail.insights.weightShare', { pct: weightPct.rating })
+        : undefined,
     },
   ]
 
@@ -507,6 +573,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
               diversity={insights.scores?.diversity ?? null}
               enjoyedCount={enjoyedCount}
               newCount={newCount}
+              weightPct={weightPct}
             />
           </Box>
         )}
@@ -661,6 +728,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                   diversity={insights.scores?.diversity ?? null}
                   enjoyedCount={enjoyedCount}
                   newCount={newCount}
+                  weightPct={weightPct}
                 />
               </Box>
             </Box>

@@ -57,7 +57,10 @@ const jobsRoutes: FastifyPluginAsync = async (fastify) => {
     activeJobs.set(jobName, jobId)
 
     try {
-      await runJob(jobName, jobId)
+      // The one scheduled entry point. Every other caller of runJob (the Run
+      // button via startJob, the setup wizard, gap analysis) is a person asking
+      // for work and takes the 'manual' default.
+      await runJob(jobName, jobId, 'scheduled')
     } finally {
       activeJobs.delete(jobName)
     }

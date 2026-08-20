@@ -234,6 +234,22 @@ export interface ScoringConfig {
 }
 
 /**
+ * Exactly the weights calculateBaseScore consumes -- diversity is deliberately
+ * not among them, because it is blended into the selection ordering rather than
+ * into the match.
+ *
+ * Named as its own type because it is now also *stored*, per run, so the
+ * insights panel can state the arithmetic it used. The weights are resolved by
+ * loadConfigForUser and are therefore per user, which is why the admin's
+ * current global config is not a substitute: two people's runs on the same day
+ * can blend differently.
+ */
+export type BlendWeights = Pick<
+  ScoringConfig,
+  'similarityWeight' | 'noveltyWeight' | 'ratingWeight'
+>
+
+/**
  * Base candidate interface that both movies and series extend
  */
 export interface BaseCandidate {
@@ -297,7 +313,7 @@ export function calculateBaseScore(
   similarity: number,
   novelty: number,
   ratingScore: number,
-  config: Pick<ScoringConfig, 'similarityWeight' | 'noveltyWeight' | 'ratingWeight'>
+  config: BlendWeights
 ): number {
   // Cosine similarity can dip slightly negative for taste-opposite content;
   // a "match" is never negative, so floor it before blending.
@@ -314,6 +330,48 @@ export function calculateBaseScore(
       config.ratingWeight * ratingScore) /
     totalWeight
   )
+}
+
+/**
+ * The share of the blend each term actually carries, i.e. the multipliers
+ * calculateBaseScore applies once it has divided by the total weight.
+ *
+ * The sliders are independent 0-1 values with no sum-to-1 constraint, so the
+ * configured 0.4 / 0.2 / 0.2 is really 0.50 / 0.25 / 0.25 -- and it is the
+ * second set the reader needs, because those are the numbers that multiply the
+ * three bars on the insights panel to produce the match. Showing the raw
+ * slider values there would be a third scale on a page that already had three.
+ *
+ * Lives beside calculateBaseScore rather than in the API layer so the display
+ * cannot drift from the arithmetic: the zero-total fallback below is the same
+ * equal-thirds branch the blend takes, and if one changes the other has to.
+ *
+ * Returns null when any weight is missing, which is how a run predating
+ * migration 0147 reaches the panel. Null means "cannot be stated", never zero.
+ */
+export function blendWeightShares(
+  weights: Partial<BlendWeights> | null | undefined
+): { similarity: number; novelty: number; rating: number } | null {
+  if (!weights) return null
+
+  const { similarityWeight, noveltyWeight, ratingWeight } = weights
+  if (
+    !Number.isFinite(similarityWeight) ||
+    !Number.isFinite(noveltyWeight) ||
+    !Number.isFinite(ratingWeight)
+  ) {
+    return null
+  }
+
+  const total = similarityWeight! + noveltyWeight! + ratingWeight!
+  // Mirrors calculateBaseScore: with no weight at all it averages the three.
+  if (total <= 0) return { similarity: 1 / 3, novelty: 1 / 3, rating: 1 / 3 }
+
+  return {
+    similarity: similarityWeight! / total,
+    novelty: noveltyWeight! / total,
+    rating: ratingWeight! / total,
+  }
 }
 
 /**

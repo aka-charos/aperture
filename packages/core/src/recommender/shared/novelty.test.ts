@@ -8,6 +8,8 @@ import {
   NOVELTY_PEAK,
   NOVELTY_FAMILIAR_FLOOR,
   NOVELTY_ALIEN_FLOOR,
+  blendWeightShares,
+  calculateBaseScore,
 } from './scoring.js'
 
 /**
@@ -316,4 +318,82 @@ test('summarizeScoreComponents survives an empty pool and zeroed weights', () =>
   for (const value of Object.values(zeroed.influence)) {
     assert.ok(Number.isFinite(value), 'influence must stay finite when every slider is zero')
   }
+})
+
+
+/**
+ * The shares the insights panel prints under each bar. The property that
+ * matters is not the arithmetic — it is that the printed multipliers, applied
+ * to the printed components, reproduce the printed match. A panel that shows
+ * three numbers and a total the reader cannot derive is what this exists to
+ * stop.
+ */
+test('blendWeightShares reproduces calculateBaseScore', () => {
+  const weights = { similarityWeight: 0.4, noveltyWeight: 0.2, ratingWeight: 0.2 }
+  const shares = blendWeightShares(weights)
+  assert.ok(shares)
+
+  // The configured sliders are 0.4/0.2/0.2 but the blend divides by their sum,
+  // so what the reader must multiply by is 0.5/0.25/0.25.
+  assert.equal(shares.similarity, 0.5)
+  assert.equal(shares.novelty, 0.25)
+  assert.equal(shares.rating, 0.25)
+
+  // The live card that prompted this: 75 / 76 / 28 under a headline of 63.
+  const [s, n, r] = [0.7531, 0.7629, 0.28]
+  const byShares = shares.similarity * s + shares.novelty * n + shares.rating * r
+  assert.ok(
+    Math.abs(byShares - calculateBaseScore(s, n, r, weights)) < 1e-12,
+    'shares must reproduce the blend exactly, or the panel shows an arithmetic that does not close'
+  )
+  assert.equal(Math.round(byShares * 100), 64)
+})
+
+test('blendWeightShares sums to 1 for any slider combination', () => {
+  for (const similarityWeight of [0, 0.15, 0.4, 1]) {
+    for (const noveltyWeight of [0, 0.2, 0.75]) {
+      for (const ratingWeight of [0, 0.2, 0.9]) {
+        const shares = blendWeightShares({ similarityWeight, noveltyWeight, ratingWeight })
+        assert.ok(shares)
+        const total = shares.similarity + shares.novelty + shares.rating
+        assert.ok(
+          Math.abs(total - 1) < 1e-12,
+          `shares must total 1, got ${total} for ${similarityWeight}/${noveltyWeight}/${ratingWeight}`
+        )
+      }
+    }
+  }
+})
+
+test('blendWeightShares mirrors the zero-total fallback rather than dividing by zero', () => {
+  const shares = blendWeightShares({ similarityWeight: 0, noveltyWeight: 0, ratingWeight: 0 })
+  assert.ok(shares)
+  // calculateBaseScore averages the three when no slider carries weight.
+  assert.ok(Math.abs(shares.similarity - 1 / 3) < 1e-12)
+  const blended = shares.similarity * 0.6 + shares.novelty * 0.3 + shares.rating * 0.9
+  assert.ok(
+    Math.abs(
+      blended - calculateBaseScore(0.6, 0.3, 0.9, { similarityWeight: 0, noveltyWeight: 0, ratingWeight: 0 })
+    ) < 1e-12
+  )
+})
+
+/**
+ * A run predating migration 0147 recorded no weights, and there is no safe
+ * number to assume: they are resolved per user and an admin can move them. The
+ * panel must be told "cannot be stated", never handed a plausible default.
+ */
+test('blendWeightShares returns null for missing weights, never a default', () => {
+  assert.equal(blendWeightShares(null), null)
+  assert.equal(blendWeightShares(undefined), null)
+  assert.equal(blendWeightShares({}), null)
+  assert.equal(
+    blendWeightShares({ similarityWeight: 0.4, noveltyWeight: 0.2 }),
+    null,
+    'a partially recorded run is not a recorded run'
+  )
+  assert.equal(
+    blendWeightShares({ similarityWeight: Number.NaN, noveltyWeight: 0.2, ratingWeight: 0.2 }),
+    null
+  )
 })

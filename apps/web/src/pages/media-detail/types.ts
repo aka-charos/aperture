@@ -211,6 +211,17 @@ export interface RecommendationInsights {
   scoreScales?: {
     novelty: { min: number; max: number }
   }
+  /**
+   * The share of the match each component carried, summing to 1, as the run
+   * itself blended them. Null for runs predating migration 0147 — and null
+   * rather than a default, because the weights are per user and an admin can
+   * move them, so there is no safe number to assume.
+   */
+  scoreWeights?: {
+    similarity: number
+    novelty: number
+    rating: number
+  } | null
   scoreBreakdown?: Record<string, unknown>
   /**
    * The rarest titles the reader and their taste twin have both watched — the

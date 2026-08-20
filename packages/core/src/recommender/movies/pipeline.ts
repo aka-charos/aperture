@@ -805,7 +805,15 @@ export async function generateRecommendationsForUser(
     // transient condition like a missing embedding model would otherwise write
     // an empty completed run for every user at once and blank every page,
     // while the good picks from last week sat one row further down.
-    await finalizeRun(runId, scoredCandidates.length, finalSelected.length, duration, 'completed')
+    await finalizeRun(
+      runId,
+      scoredCandidates.length,
+      finalSelected.length,
+      duration,
+      'completed',
+      undefined,
+      cfg
+    )
 
     // Housekeeping, after this run is safely marked completed so the prefix we
     // keep is guaranteed to include it.
@@ -834,7 +842,24 @@ export async function generateRecommendationsForUser(
 /**
  * Generate recommendations for all enabled users
  */
-export async function generateRecommendationsForAllUsers(jobId?: string): Promise<{
+/**
+ * `skipIfUnchanged` defaults to OFF, and the scheduler opts in.
+ *
+ * It used to be hardcoded on here, which made the Jobs console Run button --
+ * unambiguously someone asking for the work -- silently do nothing for every
+ * user whose inputs had not moved. Worse, a skip writes no run row at all, so
+ * the operator got a green tick and no change. A code deploy is not one of the
+ * gate's signals, so after shipping anything that alters what a run stores,
+ * pressing Run was the obvious remedy and was the one thing that could not
+ * work.
+ *
+ * Defaulting off is also the safer direction: an unwanted regeneration costs
+ * compute, an unwanted skip costs correctness and says nothing.
+ */
+export async function generateRecommendationsForAllUsers(
+  jobId?: string,
+  options: { skipIfUnchanged?: boolean } = {}
+): Promise<{
   success: number
   failed: number
   /** Users left alone because no input had changed since their last run */
@@ -894,7 +919,7 @@ export async function generateRecommendationsForAllUsers(jobId?: string): Promis
           {},
           // The scheduled sweep is the one caller that should do nothing when
           // nothing changed; every manual path is someone asking for work.
-          { skipIfUnchanged: true, twinIndex }
+          { skipIfUnchanged: options.skipIfUnchanged ?? false, twinIndex }
         )
 
         if (recResult.skipped) {

@@ -10,6 +10,7 @@ import {
   getEffectiveAiExplanationSetting,
   refreshExplanations,
   NOVELTY_ALIEN_FLOOR,
+  blendWeightShares,
   NOVELTY_PEAK,
   type ExplanationMediaType,
 } from '@aperture/core'
@@ -185,8 +186,18 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
       // denominator that makes a rank mean anything ("#340 of 12,451"). Read
       // from the run rather than counted here: the pipeline already recorded
       // what it scored, and that stays true after old runs are thinned.
-      const latestRun = await queryOne<{ id: string; candidate_count: number }>(
-        `SELECT id, candidate_count FROM recommendation_runs
+      // NUMERIC columns arrive as strings, and the weights are nullable for runs
+      // predating migration 0147 — see the conversion below, where a null must
+      // stay null rather than becoming a confident 0.
+      const latestRun = await queryOne<{
+        id: string
+        candidate_count: number
+        similarity_weight: string | null
+        novelty_weight: string | null
+        rating_weight: string | null
+      }>(
+        `SELECT id, candidate_count, similarity_weight, novelty_weight, rating_weight
+           FROM recommendation_runs
          WHERE user_id = $1 AND status = 'completed' AND media_type = 'movie'
          ORDER BY created_at DESC
          LIMIT 1`,
@@ -199,6 +210,20 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
           message: 'No recommendations generated yet',
         })
       }
+
+      // The multipliers this run blended with, as shares that sum to 1.
+      //
+      // Mapping null to undefined rather than letting Number() see it is the
+      // whole correctness of this: Number(null) is 0, not NaN, so three nulls
+      // would total zero, take blendWeightShares' equal-thirds branch, and
+      // render a confident "33% / 33% / 33%" for a run whose weights were never
+      // recorded. Absent has to stay absent.
+      const runWeight = (value: string | null) => (value != null ? Number(value) : undefined)
+      const scoreWeights = blendWeightShares({
+        similarityWeight: runWeight(latestRun.similarity_weight),
+        noveltyWeight: runWeight(latestRun.novelty_weight),
+        ratingWeight: runWeight(latestRun.rating_weight),
+      })
 
       const candidate = await queryOne<{
         id: string
@@ -337,6 +362,10 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
         scoreScales: {
           novelty: { min: NOVELTY_ALIEN_FLOOR, max: NOVELTY_PEAK },
         },
+        // How much of the match each component carried. Null for runs written
+        // before 0147, which is what the panel branches on to decide whether it
+        // can state the arithmetic — the same rule it applies to base.
+        scoreWeights,
         scoreBreakdown: candidate.score_breakdown,
         twinShared,
         evidence: evidence.rows,

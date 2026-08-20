@@ -40,6 +40,7 @@ import {
   type InterestQueryResult,
   type TwinDonor,
   type TwinIndex,
+  type BlendWeights,
 } from '../shared/index.js'
 import { getDonorWatchedIds, getTwinPairs } from '../twinAffinity.js'
 import { getRecommendationConfig } from '../../lib/recommendationConfig.js'
@@ -778,20 +779,33 @@ async function storeSeriesCandidates(
 /**
  * Finalize a series recommendation run
  */
+/** Mirrors finalizeRun in the movie pipeline, including the stored weights. */
 async function finalizeSeriesRun(
   runId: string,
   candidateCount: number,
   selectedCount: number,
   durationMs: number,
   status: 'completed' | 'failed',
-  error?: string
+  error?: string,
+  weights?: BlendWeights
 ): Promise<void> {
   await query(
     `UPDATE recommendation_runs
      SET status = $2, candidate_count = $3, selected_count = $4,
-         duration_ms = $5, error_message = $6, completed_at = NOW()
+         duration_ms = $5, error_message = $6, completed_at = NOW(),
+         similarity_weight = $7, novelty_weight = $8, rating_weight = $9
      WHERE id = $1`,
-    [runId, status, candidateCount, selectedCount, durationMs, error || null]
+    [
+      runId,
+      status,
+      candidateCount,
+      selectedCount,
+      durationMs,
+      error || null,
+      weights?.similarityWeight ?? null,
+      weights?.noveltyWeight ?? null,
+      weights?.ratingWeight ?? null,
+    ]
   )
 }
 
@@ -1428,7 +1442,15 @@ export async function generateSeriesRecommendationsForUser(
     // The early returns above finalize as 'failed' with a reason instead, so a
     // transient condition can't blank every user's page while last week's good
     // picks sit one row further down. Mirrors the movie pipeline.
-    await finalizeSeriesRun(runId, scoredCandidates.length, finalSelected.length, duration, 'completed')
+    await finalizeSeriesRun(
+      runId,
+      scoredCandidates.length,
+      finalSelected.length,
+      duration,
+      'completed',
+      undefined,
+      cfg
+    )
 
     // Housekeeping, after this run is marked completed so the kept prefix
     // definitely includes it.
@@ -1451,7 +1473,11 @@ export async function generateSeriesRecommendationsForUser(
 /**
  * Generate series recommendations for all enabled users
  */
-export async function generateSeriesRecommendationsForAllUsers(jobId?: string): Promise<{
+/** See generateRecommendationsForAllUsers for why the gate defaults to off. */
+export async function generateSeriesRecommendationsForAllUsers(
+  jobId?: string,
+  options: { skipIfUnchanged?: boolean } = {}
+): Promise<{
   success: number
   failed: number
   /** Users left alone because no input had changed since their last run */
@@ -1510,7 +1536,7 @@ export async function generateSeriesRecommendationsForAllUsers(jobId?: string): 
           {},
           // Only the scheduled sweep skips; every manual path means someone
           // asked for the work.
-          { skipIfUnchanged: true, twinIndex }
+          { skipIfUnchanged: options.skipIfUnchanged ?? false, twinIndex }
         )
 
         if (recResult.skipped) {
