@@ -412,11 +412,6 @@
       "bodyTail": "για την καλύτερη εμπειρία, αλλά μπορείτε να εξερευνήσετε άλλους παρόχους, συμπεριλαμβανομένων τοπικών μοντέλων."
     }
   },
-  "graphControls": {
-    "connectionTypes": "Τύποι συνδέσεων",
-    "crossMedia": "Μεταξύ πολυμέσων",
-    "moviesSeriesToggle": "Ταινίες ↔ σειρές"
-  },
   "breadcrumbs": {
     "home": "Αρχική"
   },
@@ -2765,7 +2760,11 @@
     "semanticBuildingMsg2": "Διάταξη αποτελεσμάτων…",
     "semanticBuildingMsg3": "Οριστικοποίηση γραφήματος…",
     "semanticBuildingDetail1": "Υπολογισμός διάταξης",
-    "semanticBuildingDetail2": "Προετοιμασία προβολής"
+    "semanticBuildingDetail2": "Προετοιμασία προβολής",
+    "crossMediaHelp": "Off, a film only connects to other films and a series only to other series. On, each item also reaches across: a film can link to a series that resembles it, and the other way round.",
+    "crossMediaHelpSlots": "One connection per item is held for the other media type, so a cross-media match still appears when same-media matches score higher.",
+    "crossMediaUnavailable": "Applies to the Browse views only. Clear the search or press Start over to use it.",
+    "crossMediaHelpAria": "About cross-media connections"
   },
   "nav": {
     "dashboard": "Πίνακας Ελέγχου",

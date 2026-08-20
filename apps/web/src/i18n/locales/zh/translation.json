@@ -2564,12 +2564,11 @@
     "semanticBuildingMsg2": "整理结果...",
     "semanticBuildingMsg3": "正在完成图表...",
     "semanticBuildingDetail1": "计算布局",
-    "semanticBuildingDetail2": "准备显示"
-  },
-  "graphControls": {
-    "connectionTypes": "连接类型",
-    "crossMedia": "跨媒体",
-    "moviesSeriesToggle": "电影 ↔ 系列"
+    "semanticBuildingDetail2": "准备显示",
+    "crossMediaHelp": "Off, a film only connects to other films and a series only to other series. On, each item also reaches across: a film can link to a series that resembles it, and the other way round.",
+    "crossMediaHelpSlots": "One connection per item is held for the other media type, so a cross-media match still appears when same-media matches score higher.",
+    "crossMediaUnavailable": "Applies to the Browse views only. Clear the search or press Start over to use it.",
+    "crossMediaHelpAria": "About cross-media connections"
   },
   "seasonRequest": {
     "dialogTitle": "请求系列",

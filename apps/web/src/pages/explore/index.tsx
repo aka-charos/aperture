@@ -16,7 +16,9 @@ import {
   ListItemText,
   Collapse,
   Chip,
+  Tooltip,
 } from '@mui/material'
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
@@ -268,6 +270,16 @@ export function ExplorePage() {
   }
 
   const { data: displayData, loading, loadingStatus } = getDisplayData()
+
+  // The cross-media switch is a parameter of the browse graph only -- semantic
+  // search and the focused rabbit-hole graph come from endpoints that never
+  // receive it. Leaving it live on those views is what made it look broken:
+  // flipping it refetched browse data nobody was looking at.
+  const crossMediaApplies =
+    Boolean(selectedBrowseSource) &&
+    !focusedItemId &&
+    !semanticSearch.results &&
+    !semanticSearch.loading
 
   // Update URL when focus changes
   useEffect(() => {
@@ -687,16 +699,45 @@ export function ExplorePage() {
 
         {/* Cross-Media Toggle */}
         <Box sx={{ p: 2 }}>
-          <FormControlLabel
-            control={
-              <Switch
-                size="small"
-                checked={crossMediaEnabled}
-                onChange={(e) => setCrossMediaEnabled(e.target.checked)}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  size="small"
+                  checked={crossMediaEnabled}
+                  disabled={!crossMediaApplies}
+                  onChange={(e) => setCrossMediaEnabled(e.target.checked)}
+                />
+              }
+              label={<Typography variant="caption">{t('mediaGraph.crossMedia')}</Typography>}
+              sx={{ mr: 0 }}
+            />
+            <Tooltip
+              arrow
+              placement="top"
+              title={
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, py: 0.5 }}>
+                  <Typography variant="caption" component="span">
+                    {t('mediaGraph.crossMediaHelp')}
+                  </Typography>
+                  <Typography variant="caption" component="span" sx={{ opacity: 0.85 }}>
+                    {crossMediaApplies
+                      ? t('mediaGraph.crossMediaHelpSlots')
+                      : t('mediaGraph.crossMediaUnavailable')}
+                  </Typography>
+                </Box>
+              }
+            >
+              <InfoOutlinedIcon
+                sx={{ fontSize: 16, color: 'text.secondary', cursor: 'help' }}
+                // Reachable without a mouse: the tooltip is the only place the
+                // switch's behaviour is written down.
+                tabIndex={0}
+                role="button"
+                aria-label={t('mediaGraph.crossMediaHelpAria')}
               />
-            }
-            label={<Typography variant="caption">{t('mediaGraph.crossMedia')}</Typography>}
-          />
+            </Tooltip>
+          </Box>
         </Box>
       </Paper>
     </Box>

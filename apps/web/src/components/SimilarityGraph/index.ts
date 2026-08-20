@@ -14,8 +14,8 @@ export type {
 } from './types'
 export { CONNECTION_COLORS, CONNECTION_LABELS } from './types'
 
-// Controls
-export { GraphControls, GraphLegend } from './GraphControls'
+// Legend
+export { GraphLegend } from './GraphLegend'
 
 // Hooks
 export { useGraphData, useSimilarityData } from './useGraphData'
