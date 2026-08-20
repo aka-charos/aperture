@@ -2739,6 +2739,10 @@
     "recentSearches": "Recent searches",
     "connectionTypesHeading": "Connection types",
     "crossMedia": "Show cross-media connections",
+    "crossMediaHelp": "Off, a film only connects to other films and a series only to other series. On, each item also reaches across: a film can link to a series that resembles it, and the other way round.",
+    "crossMediaHelpSlots": "One connection per item is held for the other media type, so a cross-media match still appears when same-media matches score higher.",
+    "crossMediaUnavailable": "Applies to the Browse views only. Clear the search or press Start over to use it.",
+    "crossMediaHelpAria": "About cross-media connections",
     "semanticSearchingMsg1": "Searching your library…",
     "semanticSearchingMsg2": "Finding matching content…",
     "semanticSearchingMsg3": "Analyzing your query…",
@@ -2756,11 +2760,6 @@
     "semanticBuildingMsg3": "Finalizing graph…",
     "semanticBuildingDetail1": "Calculating layout",
     "semanticBuildingDetail2": "Preparing display"
-  },
-  "graphControls": {
-    "connectionTypes": "Connection types",
-    "crossMedia": "Cross media",
-    "moviesSeriesToggle": "Movies ↔ series"
   },
   "seasonRequest": {
     "dialogTitle": "Request series",

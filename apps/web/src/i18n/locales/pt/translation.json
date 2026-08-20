@@ -2564,12 +2564,11 @@
     "semanticBuildingMsg2": "Organizando resultados…",
     "semanticBuildingMsg3": "Finalizando gráfico…",
     "semanticBuildingDetail1": "Calculando layout",
-    "semanticBuildingDetail2": "Preparando exibição"
-  },
-  "graphControls": {
-    "connectionTypes": "Tipos de conexão",
-    "crossMedia": "Mídia cruzada",
-    "moviesSeriesToggle": "Filmes ↔ séries"
+    "semanticBuildingDetail2": "Preparando exibição",
+    "crossMediaHelp": "Off, a film only connects to other films and a series only to other series. On, each item also reaches across: a film can link to a series that resembles it, and the other way round.",
+    "crossMediaHelpSlots": "One connection per item is held for the other media type, so a cross-media match still appears when same-media matches score higher.",
+    "crossMediaUnavailable": "Applies to the Browse views only. Clear the search or press Start over to use it.",
+    "crossMediaHelpAria": "About cross-media connections"
   },
   "seasonRequest": {
     "dialogTitle": "Série de solicitações",

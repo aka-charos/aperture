@@ -2564,12 +2564,11 @@
     "semanticBuildingMsg2": "결과 정리 중…",
     "semanticBuildingMsg3": "그래프 마무리 중…",
     "semanticBuildingDetail1": "레이아웃 계산 중",
-    "semanticBuildingDetail2": "디스플레이 준비 중"
-  },
-  "graphControls": {
-    "connectionTypes": "연결 유형",
-    "crossMedia": "크로스미디어",
-    "moviesSeriesToggle": "영화 ⇔ 시리즈"
+    "semanticBuildingDetail2": "디스플레이 준비 중",
+    "crossMediaHelp": "Off, a film only connects to other films and a series only to other series. On, each item also reaches across: a film can link to a series that resembles it, and the other way round.",
+    "crossMediaHelpSlots": "One connection per item is held for the other media type, so a cross-media match still appears when same-media matches score higher.",
+    "crossMediaUnavailable": "Applies to the Browse views only. Clear the search or press Start over to use it.",
+    "crossMediaHelpAria": "About cross-media connections"
   },
   "seasonRequest": {
     "dialogTitle": "리퀘스트 시리즈",

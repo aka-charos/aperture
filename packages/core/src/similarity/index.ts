@@ -7,6 +7,7 @@ import {
 } from '../lib/ai-provider.js'
 import { embed } from 'ai'
 import { computeConnectionReasons, type ConnectionReason } from './reasons.js'
+import { selectWithCrossMediaSlots } from './crossMedia.js'
 
 const logger = createChildLogger('similarity')
 
@@ -127,11 +128,112 @@ async function getUserWatchedSeriesIds(userId: string): Promise<Set<string>> {
 // Movie Similarity
 // ============================================================================
 
+/** One row of a movie kNN query -- the columns every movie lookup here selects. */
+interface MovieSimilarityRow {
+  id: string
+  title: string
+  year: number | null
+  poster_url: string | null
+  genres: string[]
+  directors: string[]
+  actors: unknown
+  collection_name: string | null
+  keywords: string[]
+  studios: unknown
+  similarity: number
+}
+
+/** One row of a series kNN query. */
+interface SeriesSimilarityRow {
+  id: string
+  title: string
+  year: number | null
+  poster_url: string | null
+  genres: string[]
+  directors: string[]
+  actors: unknown
+  network: string | null
+  keywords: string[]
+  studios: unknown
+  similarity: number
+}
+
+const MOVIE_SIMILARITY_COLUMNS = `m.id, m.title, m.year, m.poster_url, m.genres, m.directors,
+            m.actors, m.collection_name, m.keywords, m.studios`
+
+const SERIES_SIMILARITY_COLUMNS = `s.id, s.title, s.year, s.poster_url, s.genres, s.directors,
+            s.actors, s.network, s.keywords, s.studios`
+
+function movieRowToItem(row: MovieSimilarityRow): SimilarityItem {
+  return {
+    id: row.id,
+    title: row.title,
+    year: row.year,
+    poster_url: row.poster_url,
+    type: 'movie',
+    genres: row.genres || [],
+    directors: row.directors || [],
+    actors: parseActors(row.actors),
+    collection_name: row.collection_name,
+    network: null,
+    keywords: row.keywords || [],
+    studios: parseStudios(row.studios),
+  }
+}
+
+function seriesRowToItem(row: SeriesSimilarityRow): SimilarityItem {
+  return {
+    id: row.id,
+    title: row.title,
+    year: row.year,
+    poster_url: row.poster_url,
+    type: 'series',
+    genres: row.genres || [],
+    directors: row.directors || [],
+    actors: parseActors(row.actors),
+    collection_name: null,
+    network: row.network,
+    keywords: row.keywords || [],
+    studios: parseStudios(row.studios),
+  }
+}
+
+function buildConnection(
+  center: SimilarityItem,
+  item: SimilarityItem,
+  similarity: number
+): SimilarityConnection {
+  return { item, similarity, reasons: computeConnectionReasons(center, item) }
+}
+
+/** Order-independent key for an edge, so A-B and B-A are drawn once. */
+function edgeKey(a: string, b: string): string {
+  return [a, b].sort().join('-')
+}
+
+/**
+ * Fold neighbours from the other media type into a same-media neighbour list.
+ *
+ * Ranked by similarity across both -- the vectors share a space, so the numbers
+ * are comparable -- but *selected* with a reserved cross-media share, because
+ * the two distance distributions are not identical and a plain top-N would let
+ * whichever sits higher take the whole list. See crossMedia.ts.
+ */
+function mergeCrossMedia(
+  sameMedia: SimilarityConnection[],
+  crossMedia: SimilarityConnection[],
+  centerType: 'movie' | 'series',
+  limit: number
+): SimilarityConnection[] {
+  const ranked = [...sameMedia, ...crossMedia].sort((a, b) => b.similarity - a.similarity)
+  return selectWithCrossMediaSlots(ranked, (conn) => conn.item.type !== centerType, limit)
+}
+
 export async function getSimilarMovies(
   movieId: string,
   options: SimilarityOptions = {}
 ): Promise<SimilarityResult> {
-  const { limit = 12 } = options
+  const { limit = 12, includeCrossMedia = false } = options
 
   // Get the source movie
   const sourceMovie = await queryOne<{
@@ -193,21 +295,8 @@ export async function getSimilarMovies(
   }
 
   // Find similar movies using vector similarity
-  const similarMovies = await query<{
-    id: string
-    title: string
-    year: number | null
-    poster_url: string | null
-    genres: string[]
-    directors: string[]
-    actors: unknown
-    collection_name: string | null
-    keywords: string[]
-    studios: unknown
-    similarity: number
-  }>(
-    `SELECT m.id, m.title, m.year, m.poster_url, m.genres, m.directors, 
-            m.actors, m.collection_name, m.keywords, m.studios,
+  const similarMovies = await query<MovieSimilarityRow>(
+    `SELECT ${MOVIE_SIMILARITY_COLUMNS},
             1 - (e.embedding <=> $1::halfvec) as similarity
      FROM ${tableName} e
      JOIN movies m ON m.id = e.movie_id
@@ -217,30 +306,46 @@ export async function getSimilarMovies(
     [embeddingResult.embedding, movieId, modelId, limit]
   )
 
-  const connections: SimilarityConnection[] = similarMovies.rows.map((row) => {
-    const target: SimilarityItem = {
-      id: row.id,
-      title: row.title,
-      year: row.year,
-      poster_url: row.poster_url,
-      type: 'movie',
-      genres: row.genres || [],
-      directors: row.directors || [],
-      actors: parseActors(row.actors),
-      collection_name: row.collection_name,
-      network: null,
-      keywords: row.keywords || [],
-      studios: parseStudios(row.studios),
-    }
+  let connections: SimilarityConnection[] = similarMovies.rows.map((row) =>
+    buildConnection(center, movieRowToItem(row), row.similarity)
+  )
 
-    return {
-      item: target,
-      similarity: row.similarity,
-      reasons: computeConnectionReasons(center, target),
-    }
-  })
+  if (includeCrossMedia) {
+    // Series live in their own table, written by their own canonical-text
+    // builder -- but at the same dimension, by the same model, since
+    // getActiveEmbeddingTableName derives both suffixes from one
+    // getCurrentEmbeddingDimensions() call. So this film's own vector can be
+    // measured against them without re-embedding anything.
+    const seriesTable = await getActiveEmbeddingTableName('series_embeddings')
+    const similarSeries = await query<SeriesSimilarityRow>(
+      `SELECT ${SERIES_SIMILARITY_COLUMNS},
+              1 - (e.embedding <=> $1::halfvec) as similarity
+       FROM ${seriesTable} e
+       JOIN series s ON s.id = e.series_id
+       WHERE e.model = $2
+       ORDER BY e.embedding <=> $1::halfvec
+       LIMIT $3`,
+      [embeddingResult.embedding, modelId, limit]
+    )
 
-  logger.debug({ movieId, connectionCount: connections.length }, 'Found similar movies')
+    connections = mergeCrossMedia(
+      connections,
+      similarSeries.rows.map((row) =>
+        buildConnection(center, seriesRowToItem(row), row.similarity)
+      ),
+      'movie',
+      limit
+    )
+  }
+
+  logger.debug(
+    {
+      movieId,
+      connectionCount: connections.length,
+      crossMediaCount: connections.filter((conn) => conn.item.type !== 'movie').length,
+    },
+    'Found similar movies'
+  )
   return { center, connections }
 }
 
@@ -252,7 +357,7 @@ export async function getSimilarSeries(
   seriesId: string,
   options: SimilarityOptions = {}
 ): Promise<SimilarityResult> {
-  const { limit = 12 } = options
+  const { limit = 12, includeCrossMedia = false } = options
 
   // Get the source series
   const sourceSeries = await queryOne<{
@@ -314,21 +419,8 @@ export async function getSimilarSeries(
   }
 
   // Find similar series using vector similarity
-  const similarSeries = await query<{
-    id: string
-    title: string
-    year: number | null
-    poster_url: string | null
-    genres: string[]
-    directors: string[]
-    actors: unknown
-    network: string | null
-    keywords: string[]
-    studios: unknown
-    similarity: number
-  }>(
-    `SELECT s.id, s.title, s.year, s.poster_url, s.genres, s.directors, 
-            s.actors, s.network, s.keywords, s.studios,
+  const similarSeries = await query<SeriesSimilarityRow>(
+    `SELECT ${SERIES_SIMILARITY_COLUMNS},
             1 - (e.embedding <=> $1::halfvec) as similarity
      FROM ${tableName} e
      JOIN series s ON s.id = e.series_id
@@ -338,30 +430,42 @@ export async function getSimilarSeries(
     [embeddingResult.embedding, seriesId, modelId, limit]
   )
 
-  const connections: SimilarityConnection[] = similarSeries.rows.map((row) => {
-    const target: SimilarityItem = {
-      id: row.id,
-      title: row.title,
-      year: row.year,
-      poster_url: row.poster_url,
-      type: 'series',
-      genres: row.genres || [],
-      directors: row.directors || [],
-      actors: parseActors(row.actors),
-      collection_name: null,
-      network: row.network,
-      keywords: row.keywords || [],
-      studios: parseStudios(row.studios),
-    }
+  let connections: SimilarityConnection[] = similarSeries.rows.map((row) =>
+    buildConnection(center, seriesRowToItem(row), row.similarity)
+  )
 
-    return {
-      item: target,
-      similarity: row.similarity,
-      reasons: computeConnectionReasons(center, target),
-    }
-  })
+  if (includeCrossMedia) {
+    // Same space, different table -- see the note in getSimilarMovies.
+    const movieTable = await getActiveEmbeddingTableName('embeddings')
+    const similarMovies = await query<MovieSimilarityRow>(
+      `SELECT ${MOVIE_SIMILARITY_COLUMNS},
+              1 - (e.embedding <=> $1::halfvec) as similarity
+       FROM ${movieTable} e
+       JOIN movies m ON m.id = e.movie_id
+       WHERE e.model = $2
+       ORDER BY e.embedding <=> $1::halfvec
+       LIMIT $3`,
+      [embeddingResult.embedding, modelId, limit]
+    )
 
-  logger.debug({ seriesId, connectionCount: connections.length }, 'Found similar series')
+    connections = mergeCrossMedia(
+      connections,
+      similarMovies.rows.map((row) =>
+        buildConnection(center, movieRowToItem(row), row.similarity)
+      ),
+      'series',
+      limit
+    )
+  }
+
+  logger.debug(
+    {
+      seriesId,
+      connectionCount: connections.length,
+      crossMediaCount: connections.filter((conn) => conn.item.type !== 'series').length,
+    },
+    'Found similar series'
+  )
   return { center, connections }
 }
 
@@ -799,35 +903,46 @@ export async function getGraphForSource(
 
   // Get connections for each center node
   for (const centerItem of centerItems) {
-    let result: SimilarityResult
+    const result: SimilarityResult =
+      centerItem.type === 'movie'
+        ? await getSimilarMovies(centerItem.id, {
+            limit: connectionsPerNode * 2,
+            includeCrossMedia,
+          })
+        : await getSimilarSeries(centerItem.id, {
+            limit: connectionsPerNode * 2,
+            includeCrossMedia,
+          })
 
-    if (centerItem.type === 'movie') {
-      result = await getSimilarMovies(centerItem.id, { limit: connectionsPerNode * 2 })
-    } else {
-      result = await getSimilarSeries(centerItem.id, { limit: connectionsPerNode * 2 })
-    }
+    // Rank: connections to other center nodes first (they tie the graph
+    // together), then by similarity. Edges already drawn are dropped before
+    // ranking rather than skipped during selection, or a duplicate would eat a
+    // slot and the node would come back with fewer connections than it has.
+    const ranked = result.connections
+      .filter((conn) => !seenEdges.has(edgeKey(centerItem.id, conn.item.id)))
+      .sort((a, b) => {
+        const aIsCenter = nodes.get(a.item.id)?.isCenter ?? false
+        const bIsCenter = nodes.get(b.item.id)?.isCenter ?? false
+        if (aIsCenter && !bIsCenter) return -1
+        if (!aIsCenter && bIsCenter) return 1
+        return b.similarity - a.similarity
+      })
 
-    // Add connections (limit per node, prioritize connections to other center nodes)
-    const sortedConnections = result.connections.sort((a, b) => {
-      // Prioritize connections to other center nodes
-      const aIsCenter = nodes.has(a.item.id) && nodes.get(a.item.id)!.isCenter
-      const bIsCenter = nodes.has(b.item.id) && nodes.get(b.item.id)!.isCenter
-      if (aIsCenter && !bIsCenter) return -1
-      if (!aIsCenter && bIsCenter) return 1
-      return b.similarity - a.similarity
-    })
+    // Only three connections are drawn per node, so cross-media needs its
+    // reserved slot here too: getSimilarMovies/Series already reserved one out
+    // of the six fetched, but a plain slice(0, 3) over a ranking the other
+    // media type sits low in would drop it again -- which is precisely how this
+    // feature managed to be a no-op for its whole existence.
+    const picked = includeCrossMedia
+      ? selectWithCrossMediaSlots(
+          ranked,
+          (conn) => conn.item.type !== centerItem.type,
+          connectionsPerNode
+        )
+      : ranked.slice(0, connectionsPerNode)
 
-    let addedConnections = 0
-    for (const conn of sortedConnections) {
-      if (addedConnections >= connectionsPerNode) break
-
-      // Skip cross-media if not enabled
-      if (!includeCrossMedia && conn.item.type !== centerItem.type) continue
-
-      // Create edge key to avoid duplicates
-      const edgeKey = [centerItem.id, conn.item.id].sort().join('-')
-      if (seenEdges.has(edgeKey)) continue
-      seenEdges.add(edgeKey)
+    for (const conn of picked) {
+      seenEdges.add(edgeKey(centerItem.id, conn.item.id))
 
       // Add target node if not exists
       if (!nodes.has(conn.item.id)) {
@@ -848,13 +963,27 @@ export async function getGraphForSource(
         similarity: conn.similarity,
         reasons: conn.reasons,
       })
-
-      addedConnections++
     }
   }
 
+  // Every browse source is one media type, so anything else on the graph
+  // arrived through a reserved cross-media slot. With the toggle on this must
+  // be non-zero on a library holding both; zero means the reservation is not
+  // reaching the graph, which is the failure this feature already had once.
+  const centerTypes = new Set(centerItems.map((item) => item.type))
+  const crossMediaNodeCount = Array.from(nodes.values()).filter(
+    (node) => !node.isCenter && !centerTypes.has(node.type)
+  ).length
+
   logger.debug(
-    { source, userId, nodeCount: nodes.size, edgeCount: edges.length },
+    {
+      source,
+      userId,
+      nodeCount: nodes.size,
+      edgeCount: edges.length,
+      includeCrossMedia,
+      crossMediaNodeCount,
+    },
     'Built graph for source'
   )
 

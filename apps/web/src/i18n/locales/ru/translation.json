@@ -2496,12 +2496,11 @@
     "semanticBuildingMsg2": "Оформление результатов…",
     "semanticBuildingMsg3": "Завершение графика…",
     "semanticBuildingDetail1": "Расчет планировки",
-    "semanticBuildingDetail2": "Подготовка дисплея"
-  },
-  "graphControls": {
-    "connectionTypes": "Типы подключения",
-    "crossMedia": "Кросс-медиа",
-    "moviesSeriesToggle": "Фильмы ↔ сериалы"
+    "semanticBuildingDetail2": "Подготовка дисплея",
+    "crossMediaHelp": "Off, a film only connects to other films and a series only to other series. On, each item also reaches across: a film can link to a series that resembles it, and the other way round.",
+    "crossMediaHelpSlots": "One connection per item is held for the other media type, so a cross-media match still appears when same-media matches score higher.",
+    "crossMediaUnavailable": "Applies to the Browse views only. Clear the search or press Start over to use it.",
+    "crossMediaHelpAria": "About cross-media connections"
   },
   "seasonRequest": {
     "dialogTitle": "Запросить серию",
