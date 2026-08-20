@@ -151,6 +151,22 @@ export const jobDefinitions: JobDefinition[] = [
     description: 'Fetch studio and network logos from TMDB',
     cron: '0 5 * * *', // Daily at 5 AM
   },
+  // === Ratings Refresh Job ===
+  // Deliberately NOT part of enrich-metadata. Enrichment selects a row that has
+  // never been enriched or whose schema version is behind, with no TTL at all,
+  // which is correct for a plot or a cast list and wrong for a number that moves
+  // every week. Measured live, that froze one film's IMDb vote count 28% below
+  // the truth, and the error is biased: a new release's rating decays from an
+  // enthusiastic start, so stale copies systematically overrate recent films.
+  //
+  // Every source inside it is opt-in, so a scheduled run on an instance that has
+  // enabled none does nothing and says so, rather than failing.
+  {
+    name: 'refresh-ratings',
+    description:
+      'Refresh ratings that change over time, from sources that publish current numbers. IMDb ships its own daily dataset — one 8 MB download covers the whole library with no API key and no quota. Sources are opt-in in Settings > Integrations > Ratings Refresh.',
+    cron: '30 2 * * *', // Daily, ahead of the recommendation run
+  },
   // === MDBList Enrichment Job ===
   {
     name: 'enrich-mdblist',

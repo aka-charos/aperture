@@ -518,8 +518,28 @@ async function enrichMovie(
          plot_full = COALESCE($15, plot_full),
          tmdb_rating = COALESCE($16, tmdb_rating),
          tmdb_vote_count = COALESCE($17, tmdb_vote_count),
-         imdb_rating = COALESCE($18, imdb_rating),
-         imdb_vote_count = COALESCE($19, imdb_vote_count),
+         -- OMDb yields these two to the ratings refresh job. It is not a
+         -- second opinion on them: measured live, OMDb was 31,240 votes (28%)
+         -- behind IMDb's own dataset and had not moved in five days, so letting
+         -- it write over a fresh value is a straight regression.
+         --
+         -- Conditional rather than deleted, because the dataset source is
+         -- opt-in: with it switched off OMDb is still the only thing that fills
+         -- these columns, and removing it outright would leave an instance that
+         -- declines IMDb's licence with no IMDb rating at all. Once the dataset
+         -- HAS spoken for a row the stamp is set and OMDb steps aside
+         -- permanently, so turning the source off later freezes the values
+         -- rather than silently reverting them to the stale ones.
+         --
+         -- The clobber this prevents is latent, not theoretical. Rows are
+         -- normally selected once and never again, so nothing collides today;
+         -- it fires the next time an enrichment_version bump or a stamp clear
+         -- (0137 and 0139 both did this) makes a row eligible again, and it
+         -- would arrive attached to a migration about something else entirely.
+         imdb_rating = CASE WHEN imdb_ratings_refreshed_at IS NULL
+           THEN COALESCE($18, imdb_rating) ELSE imdb_rating END,
+         imdb_vote_count = CASE WHEN imdb_ratings_refreshed_at IS NULL
+           THEN COALESCE($19, imdb_vote_count) ELSE imdb_vote_count END,
          enriched_at = NOW(),
          enrichment_version = COALESCE((SELECT value::int FROM system_settings WHERE key = 'enrichment_version'), 1),
          -- Only advance when OMDb was actually asked; CASE rather than COALESCE
@@ -677,8 +697,11 @@ async function enrichSeries(
          plot_full = COALESCE($10, plot_full),
          tmdb_rating = COALESCE($11, tmdb_rating),
          tmdb_vote_count = COALESCE($12, tmdb_vote_count),
-         imdb_rating = COALESCE($13, imdb_rating),
-         imdb_vote_count = COALESCE($14, imdb_vote_count),
+         -- See the movie statement above for why this is conditional.
+         imdb_rating = CASE WHEN imdb_ratings_refreshed_at IS NULL
+           THEN COALESCE($13, imdb_rating) ELSE imdb_rating END,
+         imdb_vote_count = CASE WHEN imdb_ratings_refreshed_at IS NULL
+           THEN COALESCE($14, imdb_vote_count) ELSE imdb_vote_count END,
          enriched_at = NOW(),
          enrichment_version = COALESCE((SELECT value::int FROM system_settings WHERE key = 'enrichment_version'), 1),
          -- Only advance when OMDb was actually asked; CASE rather than COALESCE

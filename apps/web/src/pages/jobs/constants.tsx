@@ -20,6 +20,7 @@ import AlternateEmailIcon from '@mui/icons-material/AlternateEmail'
 import FingerprintIcon from '@mui/icons-material/Fingerprint'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import TheatersIcon from '@mui/icons-material/Theaters'
+import StarHalfIcon from '@mui/icons-material/StarHalf'
 import type { JobCategory } from './types'
 import { getAppName } from '@/lib/branding'
 
@@ -108,6 +109,16 @@ export const GLOBAL_JOB_CATEGORIES: JobCategory[] = [
     color: '#e91e63',
     jobs: ['generate-title-analysis'],
   },
+  // Its own category rather than a line inside Metadata Enrichment, because
+  // the distinction is the entire point of the job: metadata is written once
+  // and stays correct, ratings move every week, and filing this under
+  // "Metadata" is how it would end up back behind the stamp-once predicate.
+  {
+    titleKey: 'admin.jobsPage.categories.globalRatings.title',
+    descriptionKey: 'admin.jobsPage.categories.globalRatings.description',
+    color: '#f97316',
+    jobs: ['refresh-ratings'],
+  },
   {
     titleKey: 'admin.jobsPage.categories.globalIntegrations.title',
     descriptionKey: 'admin.jobsPage.categories.globalIntegrations.description',
@@ -148,6 +159,7 @@ export const JOB_ICONS: Record<string, React.ReactNode> = {
   'rebuild-taste-profiles': <FingerprintIcon />,
   'refresh-recommendation-explanations': <AutoAwesomeIcon />,
   'generate-title-analysis': <TheatersIcon />,
+  'refresh-ratings': <StarHalfIcon />,
 }
 
 export const JOB_COLORS: Record<string, string> = {
@@ -176,6 +188,7 @@ export const JOB_COLORS: Record<string, string> = {
   'rebuild-taste-profiles': '#a855f7',
   'refresh-recommendation-explanations': '#06b6d4',
   'generate-title-analysis': '#e91e63',
+  'refresh-ratings': '#f97316',
 }
 
 const JOB_DISPLAY_NAME_KEYS: Record<string, string> = {

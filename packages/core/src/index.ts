@@ -1355,6 +1355,29 @@ export {
   type AnalysisJobResult,
 } from './analysis/index.js'
 
+// Ratings refresh (./ratings) — kept apart from ./enrichment because metadata
+// does not move and ratings do; one predicate governing both is what froze
+// every rating on the install date.
+export {
+  RATING_SOURCE_IDS,
+  DEFAULT_RATINGS_REFRESH_CONFIG,
+  IMDB_RATINGS_URL,
+  getRatingsRefreshConfig,
+  setRatingsRefreshConfig,
+  hasEnabledRatingSource,
+  isRatingSourceId,
+  parseRatingsLine,
+  refreshImdbRatings,
+  refreshRatings,
+  type RatingSourceId,
+  type RatingsRefreshConfig,
+  type ImdbRatingRow,
+  type ImdbRefreshOptions,
+  type ImdbRefreshResult,
+  type RatingsRefreshOptions,
+  type RatingsRefreshResult,
+} from './ratings/index.js'
+
 export {
   canonicalCountry,
   countryCode,
