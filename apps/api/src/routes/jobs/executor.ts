@@ -50,17 +50,34 @@ import { activeJobs } from './state.js'
 const logger = createChildLogger('jobs-executor')
 
 /**
+ * What caused this run. The only thing it currently decides is whether the
+ * recommendation pipelines consult the activity gate, but that one decision was
+ * previously impossible to express: the gate was hardcoded on inside the
+ * all-users loop, so pressing Run in the Jobs console skipped every user whose
+ * inputs had not moved and reported success having done nothing.
+ *
+ * Defaults to 'manual' at every entry point, and only the scheduler's injected
+ * executor passes 'scheduled'. That direction matters -- a caller that forgets
+ * gets the work done rather than silently getting nothing.
+ */
+export type JobTrigger = 'scheduled' | 'manual'
+
+/**
  * Run a job, tagging every LLM call it makes — at any depth — with the job that
  * caused it. Almost all background inference goes through here, so this one
  * wrapper is what lets the spend dashboard answer "which job is costing me
  * money" without threading a label through every recommender and enrichment
  * function. See core `lib/inferenceContext.ts`.
  */
-export async function runJob(name: string, jobId: string): Promise<void> {
-  return withInferenceContext({ feature: `job:${name}` }, () => executeJob(name, jobId))
+export async function runJob(
+  name: string,
+  jobId: string,
+  trigger: JobTrigger = 'manual'
+): Promise<void> {
+  return withInferenceContext({ feature: `job:${name}` }, () => executeJob(name, jobId, trigger))
 }
 
-async function executeJob(name: string, jobId: string): Promise<void> {
+async function executeJob(name: string, jobId: string, trigger: JobTrigger): Promise<void> {
   const startTime = Date.now()
 
   try {
@@ -123,7 +140,12 @@ async function executeJob(name: string, jobId: string): Promise<void> {
         break
       }
       case 'generate-movie-recommendations': {
-        const result = await generateRecommendationsForAllUsers(jobId)
+        // The gate belongs to the schedule, not to the job. Pressing Run is
+        // someone asking for the work -- including after a deploy that changed
+        // what a run stores, which is not one of the gate's signals.
+        const result = await generateRecommendationsForAllUsers(jobId, {
+          skipIfUnchanged: trigger === 'scheduled',
+        })
         logger.info(
           {
             job: name,
@@ -208,7 +230,9 @@ async function executeJob(name: string, jobId: string): Promise<void> {
         break
       }
       case 'generate-series-recommendations': {
-        const result = await generateSeriesRecommendationsForAllUsers(jobId)
+        const result = await generateSeriesRecommendationsForAllUsers(jobId, {
+          skipIfUnchanged: trigger === 'scheduled',
+        })
         logger.info(
           {
             job: name,

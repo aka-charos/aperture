@@ -798,7 +798,10 @@
       "givesMatch": "for a match of",
       "varietyHeading": "Variety In Your List",
       "varietyExplainer": "How much this pick differs from the others chosen with it. This shapes the order of your list, not the match above.",
-      "tooltipDiscoveryRanged": "How different this is from what you usually watch. Peaks when a pick mixes the familiar with something new, so this score always sits between {{min}}% and {{max}}%."
+      "tooltipDiscoveryRanged": "How different this is from what you usually watch. Peaks when a pick mixes the familiar with something new, so this score always sits between {{min}}% and {{max}}%.",
+      "weightShare": "{{pct}}% of the blend",
+      "scaleRange": "scale {{min}}–{{max}}%",
+      "blendedScoreWeighted": "At {{similarity}}% / {{novelty}}% / {{rating}}%, these blend to"
     },
     "seasons": {
       "title": "Эпизоды",

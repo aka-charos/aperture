@@ -1257,9 +1257,13 @@ export {
 // and looks like a measurement rather than the bottom of a band. The web app
 // never imports @aperture/core, and duplicating the numbers there would let
 // them drift the moment the curve is retuned.
+// blendWeightShares rides along for the same reason: the panel has to state
+// the multipliers it used, and the equal-thirds fallback for a zero total is a
+// branch of calculateBaseScore, not a UI decision.
 export {
   NOVELTY_ALIEN_FLOOR,
   NOVELTY_PEAK,
+  blendWeightShares,
 } from './recommender/shared/scoring.js'
 
 // User Algorithm Settings

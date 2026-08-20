@@ -1,6 +1,7 @@
 import { query, queryOne, transaction } from '../lib/db.js'
 import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../lib/ai-provider.js'
 import type { Candidate, WatchedMovie } from './types.js'
+import type { BlendWeights } from './shared/scoring.js'
 
 /**
  * Store recommendation candidates using bulk INSERT
@@ -327,19 +328,45 @@ export async function storeEvidence(
   }
 }
 
+/**
+ * `weights` records the blend this run actually used, so the insights panel can
+ * show the reader the multipliers rather than asking them to take 63% on faith.
+ *
+ * It has to come from the run rather than from current config for two separate
+ * reasons, either of which alone would be enough: weights are resolved per user
+ * by loadConfigForUser, and an admin can move a slider at any time. Reading
+ * today's global config against a stored run would repeat exactly the mistake
+ * migration 0141 fixed -- showing a number beside a score it did not produce.
+ *
+ * Optional, and NULL on the failure paths, which never produced picks to
+ * explain. The panel treats absent weights the way it treats an absent
+ * base_score: it omits the arithmetic rather than implying one it cannot show.
+ */
 export async function finalizeRun(
   runId: string,
   candidateCount: number,
   selectedCount: number,
   durationMs: number,
   status: 'completed' | 'failed',
-  errorMessage?: string
+  errorMessage?: string,
+  weights?: BlendWeights
 ): Promise<void> {
   await query(
     `UPDATE recommendation_runs
-     SET candidate_count = $2, selected_count = $3, duration_ms = $4, status = $5, error_message = $6
+     SET candidate_count = $2, selected_count = $3, duration_ms = $4, status = $5, error_message = $6,
+         similarity_weight = $7, novelty_weight = $8, rating_weight = $9
      WHERE id = $1`,
-    [runId, candidateCount, selectedCount, durationMs, status, errorMessage || null]
+    [
+      runId,
+      candidateCount,
+      selectedCount,
+      durationMs,
+      status,
+      errorMessage || null,
+      weights?.similarityWeight ?? null,
+      weights?.noveltyWeight ?? null,
+      weights?.ratingWeight ?? null,
+    ]
   )
 }
 
