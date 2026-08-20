@@ -43,6 +43,7 @@ import {
   N8nConfigSection,
   TavilyConfigSection,
   CrwConfigSection,
+  RatingsRefreshSection,
   StreamingDiscoverySettings,
   ChannelsWebExpandSettings,
   DiscoveryGenreStripsSettings,
@@ -312,6 +313,7 @@ export function SettingsPage() {
                   <N8nConfigSection />
                   <TavilyConfigSection />
                   <CrwConfigSection />
+                  <RatingsRefreshSection />
                 </Box>
                 <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
                   <StreamingDiscoverySettings />

@@ -35,6 +35,8 @@ import {
   isJobCancelled,
   updateJobProgress,
   generateTitleAnalyses,
+  refreshRatings,
+  RATING_SOURCE_IDS,
   syncUsersFromMediaServer,
   syncLldapEmails,
   createChildLogger,
@@ -447,6 +449,46 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
           },
           `✅ Assistant suggestions refresh complete`
         )
+        break
+      }
+      // === Ratings refresh (the numbers that move, unlike metadata) ===
+      case 'refresh-ratings': {
+        // Sized from RATING_SOURCE_IDS rather than a literal, because the
+        // executor has to create the progress record before the job reads its
+        // own config: a hand-written count here is the second copy that stops
+        // matching, and the bar then finishes at 50% or runs past 100%.
+        // Disabled sources still report a step, so the bar advances past them.
+        createJobProgress(jobId, name, RATING_SOURCE_IDS.length)
+
+        const result = await refreshRatings({
+          onLog: (level, message) => addLog(jobId, level, message),
+          onStep: (index, label) => setJobStep(jobId, index, label),
+          // Cancellation is polled inside the scan and between writes. An 8 MB
+          // download plus 1.5M lines is a minute or so, which is long enough
+          // that Stop has to do something observable.
+          shouldCancel: () => isJobCancelled(jobId),
+          onProgress: (processed, total, currentItem) =>
+            updateJobProgress(jobId, processed, total, currentItem),
+        })
+        logger.info(
+          {
+            job: name,
+            jobId,
+            sourcesRun: result.sourcesRun,
+            sourcesFailed: result.sourcesFailed,
+            sourcesSkipped: result.sourcesSkipped,
+            imdbMatched: result.imdb?.matched,
+            imdbMoviesUpdated: result.imdb?.moviesUpdated,
+            imdbSeriesUpdated: result.imdb?.seriesUpdated,
+            cancelled: result.cancelled,
+          },
+          `✅ Ratings refresh complete`
+        )
+        // Skipped when cancelled: cancelJob has already filed the job_runs row,
+        // and completing over it would flip a cancelled run to 'completed'.
+        if (!result.cancelled) {
+          completeJob(jobId, { ...result })
+        }
         break
       }
       // === Metadata Enrichment Job ===

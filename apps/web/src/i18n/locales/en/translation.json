@@ -437,6 +437,10 @@
         "globalIntegrations": {
           "title": "Integrations",
           "description": "Sync with Trakt and LLDAP, and update AI pricing data"
+        },
+        "globalRatings": {
+          "title": "Ratings Refresh",
+          "description": "Re-fetch the ratings the recommender scores on, from sources that publish current numbers"
         }
       },
       "jobNames": {
@@ -1959,6 +1963,23 @@
     "engineSlot3Label": "Then",
     "engineNone": "None",
     "enginesHelp": "Tried in order until one returns results. Each is a separate request, so a first choice that is permanently blocked costs one wasted search per title — drop it from the list rather than paying for it. After five empty answers in a row an engine is tried last for half an hour, then given another chance."
+  },
+  "settingsRatings": {
+    "title": "Ratings Refresh",
+    "description": "Ratings change; plots and cast lists do not. Metadata enrichment fetches a title once and never looks again, which is right for a synopsis and wrong for a vote count. This job re-fetches the numbers the recommender actually scores on, from sources that publish current ones.",
+    "chipEnabled": "Active",
+    "loadError": "Failed to load ratings refresh settings",
+    "saveError": "Failed to save ratings refresh settings",
+    "saved": "Ratings refresh settings saved",
+    "coverage": "{{rated}} of {{total}} titles have a stored IMDb rating",
+    "lastRun": "Last checked {{when}}",
+    "neverRun": "Never run — enable a source, then run Ratings Refresh from the Jobs page",
+    "imdbDataset": {
+      "name": "IMDb dataset",
+      "description": "IMDb publishes rating and vote count for every title as one file, refreshed daily. A single 8 MB download covers the whole library with no API key and no rate limit — far fresher than fetching them one at a time, where a free-tier key needs weeks for one pass and the ratings have moved before it finishes.",
+      "licence": "IMDb offers these datasets for personal and non-commercial use.",
+      "licenceLink": "Read the terms"
+    }
   },
   "settingsStreamingDiscovery": {
     "title": "Streaming discovery (JustWatch)",

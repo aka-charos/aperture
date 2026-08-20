@@ -21,5 +21,6 @@ export { registerDiscoveryGenreStripsSettingsHandlers } from './discoveryGenreSt
 export { registerN8nHandlers } from './n8n.js'
 export { registerTavilyHandlers } from './tavily.js'
 export { registerCrwHandlers } from './crw.js'
+export { registerRatingsHandlers } from './ratings.js'
 export { registerSystemHandlers } from './system.js'
 export { registerDeploymentHandlers } from './deployment.js'
