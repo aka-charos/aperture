@@ -16,6 +16,11 @@ import { query } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { bulkUpdateFranchisePreferences, bulkUpdateGenreWeights } from './index.js'
 import { newlyDetectedNames } from './detectionMerge.js'
+import {
+  selectionRatio,
+  genreWeightFromSelection,
+  type LibraryGenreCounts,
+} from './genrePreference.js'
 import type { MediaType } from './types.js'
 
 const logger = createChildLogger('franchise-detector')
@@ -827,13 +832,28 @@ export async function detectAndUpdateGenres(
   const { mode = 'reset' } = options
   logger.info({ userId, mediaType, mode }, 'Detecting genres from watch history')
 
-  const genreStats =
-    mediaType === 'movie'
-      ? await detectMovieGenres(userId)
-      : await detectSeriesGenres(userId)
+  const { getUserExcludedLibraries } = await import('../lib/libraryExclusions.js')
+  const [detection, library] = await Promise.all([
+    mediaType === 'movie' ? detectMovieGenres(userId) : detectSeriesGenres(userId),
+    getUserExcludedLibraries(userId).then((excluded) =>
+      getLibraryGenreCounts(mediaType, excluded)
+    ),
+  ])
+  const genreStats = detection.stats
 
   if (genreStats.length === 0) {
     logger.info({ userId, mediaType }, 'No genres detected')
+    return { updated: 0, newItems: [] }
+  }
+
+  // A missing denominator is not a reason to write flattened weights over good
+  // ones. Bail instead and let the next rebuild try again -- the stored weights
+  // stay as they were, which is the safe direction.
+  if (library.total === 0) {
+    logger.warn(
+      { userId, mediaType },
+      'No genre-bearing titles to compare against, leaving genre weights unchanged'
+    )
     return { updated: 0, newItems: [] }
   }
 
@@ -849,7 +869,7 @@ export async function detectAndUpdateGenres(
   // Weight range: 0 (avoid) to 2 (boost), default 1 (neutral)
   const genreWeights = genreStats.map((stat) => ({
     genre: stat.genre,
-    weight: calculateGenreWeight(stat, genreStats),
+    weight: calculateGenreWeight(stat, library, detection.totalTitles),
   }))
 
   // Highlighting only -- every detected genre is written on every run so the
@@ -873,7 +893,7 @@ export async function detectAndUpdateGenres(
 /**
  * Detect genres from movie watch history
  */
-async function detectMovieGenres(userId: string): Promise<GenreStats[]> {
+async function detectMovieGenres(userId: string): Promise<GenreDetection> {
   // Get user's excluded library IDs
   const { getUserExcludedLibraries } = await import('../lib/libraryExclusions.js')
   const excludedLibraryIds = await getUserExcludedLibraries(userId)
@@ -904,7 +924,7 @@ async function detectMovieGenres(userId: string): Promise<GenreStats[]> {
 /**
  * Detect genres from series watch history
  */
-async function detectSeriesGenres(userId: string): Promise<GenreStats[]> {
+async function detectSeriesGenres(userId: string): Promise<GenreDetection> {
   // Get user's excluded library IDs
   const { getUserExcludedLibraries } = await import('../lib/libraryExclusions.js')
   const excludedLibraryIds = await getUserExcludedLibraries(userId)
@@ -945,6 +965,17 @@ async function detectSeriesGenres(userId: string): Promise<GenreStats[]> {
 }
 
 /**
+ * A genre's share of what someone watched only means something against a
+ * denominator, so the title count travels with the per-genre stats. It counts
+ * TITLES, not genre appearances -- summing itemsWatched would count a
+ * crime-drama twice and make every share too small.
+ */
+interface GenreDetection {
+  stats: GenreStats[]
+  totalTitles: number
+}
+
+/**
  * Aggregate genre statistics from watch data
  */
 function aggregateGenreStats(
@@ -954,14 +985,16 @@ function aggregateGenreStats(
     user_rating: number | null
     is_favorite: boolean
   }>
-): GenreStats[] {
+): GenreDetection {
   const genreMap = new Map<
     string,
     { items: number; engagement: number; ratings: number[]; favorites: number }
   >()
+  let totalTitles = 0
 
   for (const row of rows) {
     const genres = row.genres || []
+    if (genres.some((genre) => !!genre)) totalTitles++
     for (const genre of genres) {
       if (!genre) continue
 
@@ -998,36 +1031,84 @@ function aggregateGenreStats(
   // Sort by engagement
   stats.sort((a, b) => b.totalEngagement - a.totalEngagement)
 
-  return stats
+  return { stats, totalTitles }
 }
 
 /**
- * Calculate genre weight based on relative engagement
+ * How many available titles carry each genre.
  *
- * The weight is relative to other genres the user has watched:
- * - Top genres get boosted (up to 2.0)
- * - Average genres stay neutral (1.0)
- * - Rarely watched genres stay at default (1.0)
- *
- * Ratings also influence the weight.
+ * This is the denominator that turns "watched a lot of comedy" into "prefers
+ * comedy", and its absence is why the old weight measured volume instead. It
+ * must be built from the SAME population the history query counted -- hence
+ * the excluded-library ids -- or a viewer who hides the horror library reads
+ * as horror-averse purely because the numerator lost those rows while the
+ * denominator kept them.
  */
-function calculateGenreWeight(stat: GenreStats, allStats: GenreStats[]): number {
-  if (allStats.length === 0) return 1.0
+async function getLibraryGenreCounts(
+  mediaType: MediaType,
+  excludedLibraryIds: string[]
+): Promise<LibraryGenreCounts> {
+  const table = mediaType === 'movie' ? 'movies' : 'series'
+  const exclusion =
+    excludedLibraryIds.length > 0
+      ? ` AND (t.provider_library_id IS NULL OR t.provider_library_id NOT IN (${excludedLibraryIds
+          .map((_, i) => `${i + 1}`)
+          .join(', ')}))`
+      : ''
 
-  // Calculate average engagement across all genres
-  const avgEngagement =
-    allStats.reduce((sum, s) => sum + s.totalEngagement, 0) / allStats.length
+  const [genreRows, totalRow] = await Promise.all([
+    query<{ genre: string; c: string }>(
+      `SELECT g AS genre, COUNT(*)::int AS c
+         FROM ${table} t, unnest(t.genres) g
+        WHERE array_length(t.genres, 1) > 0${exclusion}
+        GROUP BY g`,
+      excludedLibraryIds
+    ),
+    query<{ c: string }>(
+      `SELECT COUNT(*)::int AS c
+         FROM ${table} t
+        WHERE array_length(t.genres, 1) > 0${exclusion}`,
+      excludedLibraryIds
+    ),
+  ])
 
-  // Base weight from relative engagement
-  // Range: 0.8 to 1.4 based on how much above/below average
-  let weight = 1.0
-  if (avgEngagement > 0) {
-    const relativeEngagement = stat.totalEngagement / avgEngagement
-    // Clamp relative engagement to 0.5x to 2x average
-    const clamped = Math.max(0.5, Math.min(2, relativeEngagement))
-    // Map to 0.8 - 1.4 range
-    weight = 0.8 + (clamped - 0.5) * 0.4
+  const counts = new Map<string, number>()
+  for (const row of genreRows.rows) {
+    if (!row.genre) continue
+    counts.set(row.genre, Number(row.c))
   }
+
+  return { counts, total: Number(totalRow.rows[0]?.c ?? 0) }
+}
+
+/**
+ * Calculate a genre weight from how often the viewer takes the genre relative
+ * to how often the collection offers it, then adjusted by their ratings and
+ * favourites within it.
+ *
+ * The base term used to be engagement measured against the average across the
+ * viewer's OTHER genres, which answers a different question: it reports volume,
+ * so in a comedy-heavy library comedy reads as beloved and a viewer who has
+ * seen every one of the eleven noirs on the shelf reads as indifferent to noir.
+ * See genrePreference.ts for the live measurements and the band arithmetic.
+ *
+ * The rating and favourite adjustments below are unchanged, deliberately: what
+ * this change fixes is WHAT the base term measures, and moving the three
+ * components' relative strength at the same time would leave neither
+ * evaluable.
+ */
+function calculateGenreWeight(
+  stat: GenreStats,
+  library: LibraryGenreCounts,
+  watchedTotal: number
+): number {
+  const ratio = selectionRatio(
+    { watched: stat.itemsWatched, available: library.counts.get(stat.genre) ?? 0 },
+    watchedTotal,
+    library.total
+  )
+
+  let weight = genreWeightFromSelection(ratio, stat.itemsWatched)
 
   // Rating adjustment: +/- 0.3 based on average rating
   if (stat.avgRating !== null) {
