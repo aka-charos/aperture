@@ -6,6 +6,7 @@ export interface UpdateJobConfigParams {
   scheduleHour?: number | null
   scheduleMinute?: number | null
   scheduleDayOfWeek?: number | null
+  scheduleDaysOfWeek?: number[] | null
   scheduleIntervalHours?: number | null
   scheduleIntervalMinutes?: number | null
   isEnabled?: boolean

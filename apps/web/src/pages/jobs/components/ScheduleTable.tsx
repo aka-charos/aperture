@@ -68,14 +68,22 @@ function computeNextRun(schedule: JobSchedule, lastRun: Job['lastRun'], now: Dat
       nextRun.setDate(nextRun.getDate() + 1)
     }
   } else if (schedule.type === 'weekly' || schedule.type === 'biweekly') {
-    const targetDay = schedule.dayOfWeek ?? 0
+    // A weekly schedule can name several days, so this is the soonest match
+    // rather than the only one. Mirrors resolveScheduleDays in core: the array
+    // wins, an older schedule falls back to the scalar, nothing means Sunday.
+    const targetDays = schedule.daysOfWeek?.length
+      ? schedule.daysOfWeek
+      : [schedule.dayOfWeek ?? 0]
     nextRun.setHours(targetHour, targetMinute, 0, 0)
-    const daysUntil = (targetDay - now.getDay() + 7) % 7
-    if (daysUntil === 0 && nextRun <= now) {
-      nextRun.setDate(nextRun.getDate() + 7)
-    } else {
-      nextRun.setDate(nextRun.getDate() + daysUntil)
-    }
+    const daysUntil = Math.min(
+      ...targetDays.map((day) => {
+        const delta = (day - now.getDay() + 7) % 7
+        // Today only counts if the time has not already passed; otherwise this
+        // day's next firing is a week out.
+        return delta === 0 && nextRun <= now ? 7 : delta
+      })
+    )
+    nextRun.setDate(nextRun.getDate() + daysUntil)
     // A biweekly job fires on a weekly cron and the scheduler drops the
     // off-week firing, so the next weekday match is only the next *actual* run
     // when enough time has passed since the last one. Without this the column

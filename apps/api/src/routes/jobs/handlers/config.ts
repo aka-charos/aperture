@@ -7,13 +7,25 @@ import {
   getJobConfig,
   setJobConfig,
   formatSchedule,
-  getValidJobNames,
   createChildLogger,
   type ScheduleType,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
 import { refreshJobSchedule } from '../../../lib/scheduler.js'
 import { jobSchemas } from '../schemas.js'
+import { jobDefinitions } from '../definitions.js'
+
+/**
+ * Is this a job at all?
+ *
+ * Against the job catalogue, exactly as run.ts, list.ts and startJob.ts do.
+ * This used to ask core's `getValidJobNames()`, which returned the keys of a
+ * separate defaults map in another package -- so four correctly registered jobs
+ * answered 404 here while working everywhere else.
+ */
+function isKnownJob(name: string): boolean {
+  return jobDefinitions.some((j) => j.name === name)
+}
 
 const logger = createChildLogger('jobs-config')
 
@@ -28,14 +40,11 @@ export async function registerConfigHandlers(fastify: FastifyInstance) {
     async (request, reply) => {
       const { name } = request.params
 
-      if (!getValidJobNames().includes(name)) {
+      if (!isKnownJob(name)) {
         return reply.status(404).send({ error: 'Job not found' })
       }
 
       const config = await getJobConfig(name)
-      if (!config) {
-        return reply.status(404).send({ error: 'Job config not found' })
-      }
 
       return reply.send({
         config: {
@@ -44,6 +53,7 @@ export async function registerConfigHandlers(fastify: FastifyInstance) {
           scheduleHour: config.scheduleHour,
           scheduleMinute: config.scheduleMinute,
           scheduleDayOfWeek: config.scheduleDayOfWeek,
+          scheduleDaysOfWeek: config.scheduleDaysOfWeek,
           scheduleIntervalHours: config.scheduleIntervalHours,
           scheduleIntervalMinutes: config.scheduleIntervalMinutes,
           isEnabled: config.isEnabled,
@@ -64,6 +74,7 @@ export async function registerConfigHandlers(fastify: FastifyInstance) {
       scheduleHour?: number | null
       scheduleMinute?: number | null
       scheduleDayOfWeek?: number | null
+      scheduleDaysOfWeek?: number[] | null
       scheduleIntervalHours?: number | null
       scheduleIntervalMinutes?: number | null
       isEnabled?: boolean
@@ -75,7 +86,7 @@ export async function registerConfigHandlers(fastify: FastifyInstance) {
       const { name } = request.params
       const updates = request.body
 
-      if (!getValidJobNames().includes(name)) {
+      if (!isKnownJob(name)) {
         return reply.status(404).send({ error: 'Job not found' })
       }
 
@@ -109,6 +120,23 @@ export async function registerConfigHandlers(fastify: FastifyInstance) {
           return reply
             .status(400)
             .send({ error: 'Day of week must be between 0 (Sunday) and 6 (Saturday)' })
+        }
+      }
+
+      // Validate the day set. Rejected rather than silently filtered: a client
+      // sending 7 has a bug, and quietly scheduling on the remaining days would
+      // hide it behind a job that runs on the wrong days.
+      if (updates.scheduleDaysOfWeek !== undefined && updates.scheduleDaysOfWeek !== null) {
+        const days = updates.scheduleDaysOfWeek
+        if (!Array.isArray(days) || days.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) {
+          return reply
+            .status(400)
+            .send({ error: 'Days of week must be integers between 0 (Sunday) and 6 (Saturday)' })
+        }
+        if (updates.scheduleType === 'weekly' && days.length === 0) {
+          return reply
+            .status(400)
+            .send({ error: 'Weekly schedules need at least one day of the week' })
         }
       }
 
@@ -162,6 +190,7 @@ export async function registerConfigHandlers(fastify: FastifyInstance) {
             scheduleHour: config.scheduleHour,
             scheduleMinute: config.scheduleMinute,
             scheduleDayOfWeek: config.scheduleDayOfWeek,
+            scheduleDaysOfWeek: config.scheduleDaysOfWeek,
             scheduleIntervalHours: config.scheduleIntervalHours,
             scheduleIntervalMinutes: config.scheduleIntervalMinutes,
             isEnabled: config.isEnabled,

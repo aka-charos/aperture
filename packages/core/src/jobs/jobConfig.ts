@@ -37,7 +37,16 @@ export interface JobConfig {
   scheduleType: ScheduleType
   scheduleHour: number | null
   scheduleMinute: number | null
+  /**
+   * The earliest selected day, kept in step with scheduleDaysOfWeek.
+   *
+   * Not a second source of truth: every reader goes through
+   * resolveScheduleDays, which prefers the array. It survives so that a build
+   * predating the array column still finds a sane day here after a rollback.
+   */
   scheduleDayOfWeek: number | null
+  /** Every day a weekly schedule fires on. Null means "read the scalar". */
+  scheduleDaysOfWeek: number[] | null
   scheduleIntervalHours: number | null
   /** 15 or 30 when set; mutually exclusive with scheduleIntervalHours for interval schedules */
   scheduleIntervalMinutes: number | null
@@ -51,15 +60,83 @@ interface JobConfigRow {
   schedule_hour: number | null
   schedule_minute: number | null
   schedule_day_of_week: number | null
+  schedule_days_of_week: number[] | null
   schedule_interval_hours: number | null
   schedule_interval_minutes: number | null
   is_enabled: boolean
   updated_at: Date
 }
 
-// Default schedules (configurable via Admin → Jobs)
-// Jobs at same intervals are staggered by minute offset to avoid resource contention
-const ENV_DEFAULTS: Record<
+/**
+ * The days a weekly schedule fires on, from whichever column holds them.
+ *
+ * One reader for two columns, so the cron expression and the human-readable
+ * summary can never disagree about which days were picked -- the failure this
+ * codebase keeps meeting when a value has two homes. An absent or empty array
+ * falls back to the scalar, and an absent scalar means Sunday, matching what
+ * scheduleToCron did before the array existed.
+ */
+export function resolveScheduleDays(config: {
+  scheduleDayOfWeek: number | null
+  scheduleDaysOfWeek?: number[] | null
+}): number[] {
+  const days = config.scheduleDaysOfWeek
+  if (days && days.length > 0) return days
+  return [config.scheduleDayOfWeek ?? 0]
+}
+
+/**
+ * Clean a day selection on the way into the database.
+ *
+ * Sorted and de-duplicated because the cron field is read by humans and
+ * `0,3,3,1` is a worse answer than `0,1,3` to the same question. Out-of-range
+ * values are dropped rather than clamped: clamping would turn a client bug into
+ * a schedule that runs on a day nobody chose.
+ *
+ * BIWEEKLY IS TRUNCATED TO ONE DAY. Cron has no "every other week", so a
+ * biweekly job carries the weekly expression and isScheduledRunDue drops any
+ * firing under BIWEEKLY_MIN_DAYS (13) after the last completed run. Two firings
+ * in the same week are 3-4 days apart, so the second is always dropped --
+ * selecting Monday and Thursday would silently mean "every other Monday". A
+ * setting that cannot be honoured must not be stored as though it were.
+ */
+export function normalizeScheduleDays(
+  days: number[] | null | undefined,
+  scheduleType?: ScheduleType
+): number[] | null {
+  if (!days || days.length === 0) return null
+  const valid = [...new Set(days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort(
+    (a, b) => a - b
+  )
+  if (valid.length === 0) return null
+  return scheduleType === 'biweekly' ? valid.slice(0, 1) : valid
+}
+
+/**
+ * Seed schedules for a job that has no `job_config` row yet.
+ *
+ * THIS IS NOT A REGISTRY OF JOBS, and treating it as one is what broke the
+ * schedule dialog. `getValidJobNames()` used to return these keys, and the
+ * config route used that to decide whether a job existed -- so a job registered
+ * correctly in `definitions.ts`, the executor, `JOB_CATEGORIES` and the
+ * database still answered **404 "Job not found"** on both GET and PATCH of its
+ * schedule, from a dialog that had happily opened on defaults. Four jobs had
+ * drifted out of it (`cleanup-auth-state`, `generate-title-analysis`,
+ * `refresh-recommendation-explanations`, `refresh-ratings`) and nothing could
+ * see the drift, because the two lists live in different packages.
+ *
+ * The catalogue in `apps/api/.../jobs/definitions.ts` is the registry; every
+ * other jobs route already validated against it and the config route now does
+ * too. What remains here is only a default *schedule*, and a job absent from it
+ * is manual-only until someone configures it -- the safe direction, since the
+ * alternative is a job acquiring a cadence nobody chose.
+ *
+ * `jobDefaults.test.ts` in apps/api fails on a scheduled job with no entry here
+ * and on an entry naming a job that does not exist.
+ *
+ * Jobs at the same interval are staggered by minute offset to avoid contention.
+ */
+export const JOB_SCHEDULE_DEFAULTS: Record<
   string,
   {
     scheduleType: ScheduleType
@@ -94,7 +171,11 @@ const ENV_DEFAULTS: Record<
 
   // === DAILY ===
   'backup-database': { scheduleType: 'daily', hour: 2, minute: 0 },
+  // Ahead of the recommendation run, so a regenerate scores against the
+  // ratings that were refreshed the same night rather than the previous day's.
+  'refresh-ratings': { scheduleType: 'daily', hour: 2, minute: 30 },
   'sync-lldap-emails': { scheduleType: 'daily', hour: 3, minute: 15 },
+  'cleanup-auth-state': { scheduleType: 'daily', hour: 3, minute: 30 },
   'refresh-top-picks': { scheduleType: 'daily', hour: 5, minute: 0 },
   'enrich-studio-logos': { scheduleType: 'daily', hour: 5, minute: 30 },
   'enrich-mdblist': { scheduleType: 'daily', hour: 7, minute: 0 },
@@ -115,7 +196,13 @@ const ENV_DEFAULTS: Record<
   // refresh_interval_days, so this exists for the one-off sweep after an
   // algorithm change, not as an ongoing schedule.
   'rebuild-taste-profiles': { scheduleType: 'manual', hour: 0, minute: 0 },
+  'refresh-recommendation-explanations': { scheduleType: 'manual', hour: 0, minute: 0 },
+  'generate-title-analysis': { scheduleType: 'manual', hour: 0, minute: 0 },
 }
+
+const CONFIG_COLUMNS = `job_name, schedule_type, schedule_hour, schedule_minute,
+            schedule_day_of_week, schedule_days_of_week, schedule_interval_hours,
+            schedule_interval_minutes, is_enabled, updated_at`
 
 function rowToConfig(row: JobConfigRow): JobConfig {
   return {
@@ -124,6 +211,7 @@ function rowToConfig(row: JobConfigRow): JobConfig {
     scheduleHour: row.schedule_hour,
     scheduleMinute: row.schedule_minute,
     scheduleDayOfWeek: row.schedule_day_of_week,
+    scheduleDaysOfWeek: row.schedule_days_of_week,
     scheduleIntervalHours: row.schedule_interval_hours,
     scheduleIntervalMinutes: row.schedule_interval_minutes,
     isEnabled: row.is_enabled,
@@ -132,12 +220,18 @@ function rowToConfig(row: JobConfigRow): JobConfig {
 }
 
 /**
- * Get job configuration from database, falling back to ENV defaults
+ * Get job configuration from the database, falling back to a seed schedule.
+ *
+ * Never returns null. A job with no row and no entry in JOB_SCHEDULE_DEFAULTS
+ * reads as manual-only, which is what an unconfigured job should be -- the
+ * previous null meant the config route answered 404 for exactly the jobs whose
+ * schedule nobody had set yet, which is the one case a schedule dialog exists
+ * for. Callers are expected to have checked the name against the job catalogue
+ * first; every jobs route does.
  */
-export async function getJobConfig(jobName: string): Promise<JobConfig | null> {
+export async function getJobConfig(jobName: string): Promise<JobConfig> {
   const result = await queryOne<JobConfigRow>(
-    `SELECT job_name, schedule_type, schedule_hour, schedule_minute,
-            schedule_day_of_week, schedule_interval_hours, schedule_interval_minutes, is_enabled, updated_at
+    `SELECT ${CONFIG_COLUMNS}
      FROM job_config
      WHERE job_name = $1`,
     [jobName]
@@ -147,23 +241,20 @@ export async function getJobConfig(jobName: string): Promise<JobConfig | null> {
     return rowToConfig(result)
   }
 
-  // Fall back to defaults if not in database
-  const defaultConfig = ENV_DEFAULTS[jobName]
-  if (defaultConfig) {
-    return {
-      jobName,
-      scheduleType: defaultConfig.scheduleType,
-      scheduleHour: defaultConfig.hour,
-      scheduleMinute: defaultConfig.minute,
-      scheduleDayOfWeek: defaultConfig.dayOfWeek ?? null,
-      scheduleIntervalHours: defaultConfig.intervalHours ?? null,
-      scheduleIntervalMinutes: defaultConfig.intervalMinutes ?? null,
-      isEnabled: true,
-      updatedAt: new Date(),
-    }
+  const defaultConfig = JOB_SCHEDULE_DEFAULTS[jobName]
+  const dayOfWeek = defaultConfig?.dayOfWeek ?? null
+  return {
+    jobName,
+    scheduleType: defaultConfig?.scheduleType ?? 'manual',
+    scheduleHour: defaultConfig?.hour ?? null,
+    scheduleMinute: defaultConfig?.minute ?? null,
+    scheduleDayOfWeek: dayOfWeek,
+    scheduleDaysOfWeek: dayOfWeek === null ? null : [dayOfWeek],
+    scheduleIntervalHours: defaultConfig?.intervalHours ?? null,
+    scheduleIntervalMinutes: defaultConfig?.intervalMinutes ?? null,
+    isEnabled: true,
+    updatedAt: new Date(),
   }
-
-  return null
 }
 
 /**
@@ -171,20 +262,19 @@ export async function getJobConfig(jobName: string): Promise<JobConfig | null> {
  */
 export async function getAllJobConfigs(): Promise<JobConfig[]> {
   const result = await query<JobConfigRow>(
-    `SELECT job_name, schedule_type, schedule_hour, schedule_minute,
-            schedule_day_of_week, schedule_interval_hours, schedule_interval_minutes, is_enabled, updated_at
+    `SELECT ${CONFIG_COLUMNS}
      FROM job_config
      ORDER BY job_name`
   )
 
   const configs = result.rows.map(rowToConfig)
 
-  // Add any missing jobs from ENV_DEFAULTS
+  // Add any job that has no row yet, so a fresh install still schedules on the
+  // seed cadence rather than waiting for someone to open the dialog.
   const existingNames = new Set(configs.map((c) => c.jobName))
-  for (const jobName of Object.keys(ENV_DEFAULTS)) {
+  for (const jobName of Object.keys(JOB_SCHEDULE_DEFAULTS)) {
     if (!existingNames.has(jobName)) {
-      const config = await getJobConfig(jobName)
-      if (config) configs.push(config)
+      configs.push(await getJobConfig(jobName))
     }
   }
 
@@ -201,35 +291,48 @@ export async function setJobConfig(
     scheduleHour?: number | null
     scheduleMinute?: number | null
     scheduleDayOfWeek?: number | null
+    scheduleDaysOfWeek?: number[] | null
     scheduleIntervalHours?: number | null
     scheduleIntervalMinutes?: number | null
     isEnabled?: boolean
   }
 ): Promise<JobConfig> {
+  // The array is the selection; the scalar trails it at the earliest day so a
+  // rollback to a build without the column still reads a sensible schedule.
+  // A caller sending only the old scalar (an older client, or a settings
+  // handler that has no day picker) still gets a one-day array here.
+  const days = normalizeScheduleDays(
+    config.scheduleDaysOfWeek ??
+      (config.scheduleDayOfWeek == null ? null : [config.scheduleDayOfWeek]),
+    config.scheduleType
+  )
+
   const result = await queryOne<JobConfigRow>(
     `INSERT INTO job_config (job_name, schedule_type, schedule_hour, schedule_minute,
-                             schedule_day_of_week, schedule_interval_hours, schedule_interval_minutes, is_enabled)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                             schedule_day_of_week, schedule_days_of_week, schedule_interval_hours,
+                             schedule_interval_minutes, is_enabled)
+     VALUES ($1, $2, $3, $4, $5, $9, $6, $7, $8)
      ON CONFLICT (job_name) DO UPDATE SET
        schedule_type = COALESCE($2, job_config.schedule_type),
        schedule_hour = CASE WHEN $2 IS NOT NULL THEN $3 ELSE job_config.schedule_hour END,
        schedule_minute = CASE WHEN $2 IS NOT NULL THEN $4 ELSE job_config.schedule_minute END,
        schedule_day_of_week = CASE WHEN $2 IS NOT NULL THEN $5 ELSE job_config.schedule_day_of_week END,
+       schedule_days_of_week = CASE WHEN $2 IS NOT NULL THEN $9 ELSE job_config.schedule_days_of_week END,
        schedule_interval_hours = CASE WHEN $2 IS NOT NULL THEN $6 ELSE job_config.schedule_interval_hours END,
        schedule_interval_minutes = CASE WHEN $2 IS NOT NULL THEN $7 ELSE job_config.schedule_interval_minutes END,
        is_enabled = COALESCE($8, job_config.is_enabled),
        updated_at = NOW()
-     RETURNING job_name, schedule_type, schedule_hour, schedule_minute,
-               schedule_day_of_week, schedule_interval_hours, schedule_interval_minutes, is_enabled, updated_at`,
+     RETURNING ${CONFIG_COLUMNS}`,
     [
       jobName,
       config.scheduleType ?? 'daily',
       config.scheduleHour ?? null,
       config.scheduleMinute ?? null,
-      config.scheduleDayOfWeek ?? null,
+      days === null ? null : days[0],
       config.scheduleIntervalHours ?? null,
       config.scheduleIntervalMinutes ?? null,
       config.isEnabled ?? true,
+      days,
     ]
   )
 
@@ -259,10 +362,13 @@ export function scheduleToCron(config: JobConfig): string | null {
     // Biweekly deliberately produces the *weekly* expression. Cron cannot
     // express "every other week", so the task fires every week and
     // isBiweeklyRunDue drops the off-week firings (see scheduler.ts).
+    //
+    // A weekly schedule may name several days; cron's day-of-week field has
+    // always taken a list. normalizeScheduleDays keeps biweekly to one, since
+    // the drop rule would eat any second firing in the same week.
     case 'weekly':
     case 'biweekly': {
-      const dayOfWeek = config.scheduleDayOfWeek ?? 0
-      return `${minute} ${hour} * * ${dayOfWeek}`
+      return `${minute} ${hour} * * ${resolveScheduleDays(config).join(',')}`
     }
 
     case 'interval': {
@@ -311,10 +417,12 @@ export function formatSchedule(config: JobConfig): string {
 
     case 'weekly':
     case 'biweekly': {
-      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-      const dayName = days[config.scheduleDayOfWeek ?? 0]
+      const names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      // Same resolver as scheduleToCron, so the sentence an admin reads and the
+      // expression the scheduler runs cannot describe different days.
+      const dayNames = resolveScheduleDays(config).map((d) => names[d])
       const cadence = config.scheduleType === 'biweekly' ? 'Every 2 weeks on' : 'Weekly on'
-      return `${cadence} ${dayName} at ${formatTime(hour, minute)}`
+      return `${cadence} ${dayNames.join(', ')} at ${formatTime(hour, minute)}`
     }
 
     case 'interval': {
@@ -378,9 +486,7 @@ export async function isScheduledRunDue(
   }
 }
 
-/**
- * Get list of valid job names
- */
-export function getValidJobNames(): string[] {
-  return Object.keys(ENV_DEFAULTS)
-}
+// getValidJobNames() used to live here, returning the keys of the defaults map
+// above. It was the wrong authority -- see the comment on JOB_SCHEDULE_DEFAULTS
+// -- and is deliberately gone rather than fixed: the jobs routes validate
+// against their own catalogue, which is the list that decides what a job is.

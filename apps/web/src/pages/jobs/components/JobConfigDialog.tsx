@@ -19,6 +19,8 @@ import {
   Stack,
   Alert,
   CircularProgress,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import type { ScheduleType, JobSchedule } from '../types'
@@ -49,6 +51,21 @@ const WEEKDAY_KEYS = [
   'weekdaySat',
 ] as const
 
+/**
+ * Short forms for the day toggles. Seven full names do not fit across a dialog
+ * at `maxWidth="sm"`, and the group has to stay one row or it stops reading as
+ * a week.
+ */
+const WEEKDAY_SHORT_KEYS = [
+  'weekdayShortSun',
+  'weekdayShortMon',
+  'weekdayShortTue',
+  'weekdayShortWed',
+  'weekdayShortThu',
+  'weekdayShortFri',
+  'weekdayShortSat',
+] as const
+
 const INTERVAL_META: { value: number; labelKey: string }[] = [
   { value: 15, labelKey: 'intervalEvery15m' },
   { value: 30, labelKey: 'intervalEvery30m' },
@@ -72,6 +89,10 @@ export function JobConfigDialog({
   const { t } = useTranslation()
   const [scheduleType, setScheduleType] = useState<ScheduleType>('daily')
   const [hour, setHour] = useState<number>(3)
+  // Weekly holds a set; biweekly holds exactly one. They are separate pieces of
+  // state so that switching frequency back and forth does not quietly discard
+  // the other's selection.
+  const [daysOfWeek, setDaysOfWeek] = useState<number[]>([0])
   const [dayOfWeek, setDayOfWeek] = useState<number>(0)
   const [intervalMinutesTotal, setIntervalMinutesTotal] = useState<number>(360)
   const [isEnabled, setIsEnabled] = useState<boolean>(true)
@@ -95,11 +116,12 @@ export function JobConfigDialog({
     [t]
   )
 
-  const daysOfWeek = useMemo(
+  const weekdays = useMemo(
     () =>
       WEEKDAY_KEYS.map((key, value) => ({
         value,
         label: t(`admin.jobsPage.ui.${key}`),
+        short: t(`admin.jobsPage.ui.${WEEKDAY_SHORT_KEYS[value]}`),
       })),
     [t]
   )
@@ -118,6 +140,12 @@ export function JobConfigDialog({
       setScheduleType(currentSchedule.type)
       setHour(currentSchedule.hour ?? 3)
       setDayOfWeek(currentSchedule.dayOfWeek ?? 0)
+      // A schedule saved before multi-day existed carries only the scalar.
+      setDaysOfWeek(
+        currentSchedule.daysOfWeek?.length
+          ? currentSchedule.daysOfWeek
+          : [currentSchedule.dayOfWeek ?? 0]
+      )
       setIntervalMinutesTotal(
         currentSchedule.intervalMinutes ??
           (currentSchedule.intervalHours != null ? currentSchedule.intervalHours * 60 : 360)
@@ -131,9 +159,13 @@ export function JobConfigDialog({
     }
   }, [open, initialized, currentSchedule])
 
-  // Biweekly is weekly plus a skipped firing, so it takes exactly the same two
-  // inputs. Naming these keeps the three call sites below from drifting apart.
+  // Biweekly is weekly plus a skipped firing, so it takes the same inputs --
+  // except for the day *set*. The every-other-week rule drops any firing under
+  // 13 days after the last completed run, so a second day in the same week
+  // would never fire: picking Mon+Thu would silently mean "every other Monday".
+  // Biweekly therefore keeps the single-day picker (the API truncates anyway).
   const showsDayOfWeek = scheduleType === 'weekly' || scheduleType === 'biweekly'
+  const showsDaySet = scheduleType === 'weekly'
   const showsTimeOfDay = showsDayOfWeek || scheduleType === 'daily'
 
   const handleSave = async () => {
@@ -152,9 +184,19 @@ export function JobConfigDialog({
         payload.scheduleMinute = 0
       }
 
-      if (showsDayOfWeek) {
+      if (showsDaySet) {
+        // The scalar rides along at the earliest day so an older API build (or
+        // a rollback) still reads a sane schedule rather than defaulting to
+        // Sunday. The server derives the same value; sending it is belt and
+        // braces, not a second source of truth.
+        const sorted = [...daysOfWeek].sort((a, b) => a - b)
+        payload.scheduleDaysOfWeek = sorted
+        payload.scheduleDayOfWeek = sorted[0] ?? 0
+      } else if (showsDayOfWeek) {
+        payload.scheduleDaysOfWeek = [dayOfWeek]
         payload.scheduleDayOfWeek = dayOfWeek
       } else {
+        payload.scheduleDaysOfWeek = null
         payload.scheduleDayOfWeek = null
       }
 
@@ -184,11 +226,17 @@ export function JobConfigDialog({
       case 'daily':
         return t('admin.jobsPage.ui.configPreviewDaily', { time: timeLabel })
       case 'weekly': {
-        const dayLabel = daysOfWeek.find((d) => d.value === dayOfWeek)?.label ?? ''
+        if (daysOfWeek.length === 0) return t('admin.jobsPage.ui.configPreviewNoDays')
+        // Listed in week order regardless of the order they were clicked, so
+        // the preview reads the way the toggles look.
+        const dayLabel = [...daysOfWeek]
+          .sort((a, b) => a - b)
+          .map((d) => weekdays.find((w) => w.value === d)?.label ?? '')
+          .join(t('admin.jobsPage.ui.dayListSeparator'))
         return t('admin.jobsPage.ui.configPreviewWeekly', { day: dayLabel, time: timeLabel })
       }
       case 'biweekly': {
-        const dayLabel = daysOfWeek.find((d) => d.value === dayOfWeek)?.label ?? ''
+        const dayLabel = weekdays.find((d) => d.value === dayOfWeek)?.label ?? ''
         return t('admin.jobsPage.ui.configPreviewBiweekly', { day: dayLabel, time: timeLabel })
       }
       case 'interval':
@@ -288,11 +336,45 @@ export function JobConfigDialog({
             </FormControl>
           )}
 
-          {isEnabled && showsDayOfWeek && (
+          {isEnabled && showsDaySet && (
+            <FormControl fullWidth>
+              <FormLabel sx={{ mb: 1, fontWeight: 500 }}>
+                {t('admin.jobsPage.ui.configDaysOfWeek')}
+              </FormLabel>
+              <ToggleButtonGroup
+                value={daysOfWeek}
+                onChange={(_e, next: number[]) => {
+                  // MUI hands back the empty array when the last selected day
+                  // is clicked off. Refusing it keeps the control from reaching
+                  // a state Save would have to reject -- a weekly schedule with
+                  // no days is not a schedule.
+                  if (next.length > 0) setDaysOfWeek(next)
+                }}
+                size="small"
+                sx={{ flexWrap: 'wrap', gap: 0.5, '& .MuiToggleButton-root': { flex: '1 1 auto' } }}
+              >
+                {weekdays.map((d) => (
+                  <ToggleButton
+                    key={d.value}
+                    value={d.value}
+                    aria-label={d.label}
+                    sx={{ borderRadius: 1, px: 1.5 }}
+                  >
+                    {d.short}
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                {t('admin.jobsPage.ui.configDaysOfWeekHint')}
+              </Typography>
+            </FormControl>
+          )}
+
+          {isEnabled && showsDayOfWeek && !showsDaySet && (
             <FormControl fullWidth>
               <FormLabel sx={{ mb: 1, fontWeight: 500 }}>{t('admin.jobsPage.ui.configDayOfWeek')}</FormLabel>
               <Select value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value as number)} size="small">
-                {daysOfWeek.map((d) => (
+                {weekdays.map((d) => (
                   <MenuItem key={d.value} value={d.value}>
                     {d.label}
                   </MenuItem>

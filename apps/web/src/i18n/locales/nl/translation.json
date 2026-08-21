@@ -525,7 +525,18 @@
         "hourPm": "{{uur}}:00 uur",
         "configBiweekly": "Every 2 weeks",
         "configBiweeklyNote": "Cron cannot express a two-week cycle, so this job is checked every week and skipped unless at least 13 days have passed since its last successful run.",
-        "configPreviewBiweekly": "Runs every other {{day}} at {{time}}"
+        "configPreviewBiweekly": "Runs every other {{day}} at {{time}}",
+        "configDaysOfWeek": "Days of week",
+        "configDaysOfWeekHint": "Pick one or more days. The job runs at the same time on each.",
+        "configPreviewNoDays": "Pick at least one day",
+        "dayListSeparator": ", ",
+        "weekdayShortSun": "Sun",
+        "weekdayShortMon": "Mon",
+        "weekdayShortTue": "Tue",
+        "weekdayShortWed": "Wed",
+        "weekdayShortThu": "Thu",
+        "weekdayShortFri": "Fri",
+        "weekdayShortSat": "Sat"
       }
     },
     "translations": "Translations",

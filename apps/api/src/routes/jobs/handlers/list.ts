@@ -56,6 +56,7 @@ export async function registerListHandlers(fastify: FastifyInstance) {
                   hour: config.scheduleHour,
                   minute: config.scheduleMinute,
                   dayOfWeek: config.scheduleDayOfWeek,
+                  daysOfWeek: config.scheduleDaysOfWeek,
                   intervalHours: config.scheduleIntervalHours,
                   intervalMinutes: config.scheduleIntervalMinutes,
                   isEnabled: config.isEnabled,
