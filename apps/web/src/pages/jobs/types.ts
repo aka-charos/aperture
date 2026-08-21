@@ -12,6 +12,8 @@ export interface JobSchedule {
   hour: number | null
   minute: number | null
   dayOfWeek: number | null
+  /** Every day a weekly schedule fires on. Null on a schedule saved before multi-day existed. */
+  daysOfWeek: number[] | null
   intervalHours: number | null
   intervalMinutes: number | null
   isEnabled: boolean

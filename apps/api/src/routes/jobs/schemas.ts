@@ -28,7 +28,13 @@ export const jobComponentSchemas = {
           type: { type: 'string' as const, enum: ['daily', 'weekly', 'biweekly', 'interval', 'manual'], description: 'Schedule type' },
           hour: { type: 'integer' as const, nullable: true, description: 'Hour to run (0-23)' },
           minute: { type: 'integer' as const, nullable: true, description: 'Minute to run (0-59)' },
-          dayOfWeek: { type: 'integer' as const, nullable: true, description: 'Day of week (0=Sunday)' },
+          dayOfWeek: { type: 'integer' as const, nullable: true, description: 'Earliest selected day (0=Sunday). Kept in step with daysOfWeek.' },
+          daysOfWeek: {
+            type: 'array' as const,
+            nullable: true,
+            items: { type: 'integer' as const },
+            description: 'Every day a weekly schedule fires on (0=Sunday). Null means read dayOfWeek.',
+          },
           intervalHours: { type: 'integer' as const, nullable: true, description: 'Interval in hours (when not using sub-hour interval)' },
           intervalMinutes: { type: 'integer' as const, nullable: true, description: 'Sub-hour interval: 15 or 30 minutes' },
           isEnabled: { type: 'boolean' as const, description: 'Whether schedule is enabled' },
@@ -237,7 +243,21 @@ const updateJobConfig = {
           { type: 'null' as const },
           { type: 'number' as const, minimum: 0, maximum: 6 },
         ],
-        description: 'Day of week (0=Sunday, 6=Saturday). Required for weekly.',
+        description:
+          'Single day of week (0=Sunday, 6=Saturday). Superseded by scheduleDaysOfWeek; sending only this still works and is stored as a one-day selection.',
+      },
+      scheduleDaysOfWeek: {
+        anyOf: [
+          { type: 'null' as const },
+          {
+            type: 'array' as const,
+            items: { type: 'number' as const, minimum: 0, maximum: 6 },
+            minItems: 1,
+            maxItems: 7,
+          },
+        ],
+        description:
+          'Days a weekly schedule fires on (0=Sunday, 6=Saturday). Biweekly keeps only the first: the every-other-week rule drops any second firing in the same week.',
       },
       scheduleIntervalHours: {
         anyOf: [

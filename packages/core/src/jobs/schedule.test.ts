@@ -15,6 +15,8 @@ import {
   BIWEEKLY_MIN_DAYS,
   scheduleToCron,
   formatSchedule,
+  resolveScheduleDays,
+  normalizeScheduleDays,
   type JobConfig,
 } from './jobConfig.js'
 
@@ -32,6 +34,7 @@ function config(overrides: Partial<JobConfig> = {}): JobConfig {
     scheduleHour: 4,
     scheduleMinute: 0,
     scheduleDayOfWeek: 0,
+    scheduleDaysOfWeek: null,
     scheduleIntervalHours: null,
     scheduleIntervalMinutes: null,
     isEnabled: true,
@@ -93,5 +96,91 @@ describe('biweekly cron and label', () => {
     assert.match(label, /2 weeks/)
     assert.match(label, /Sunday/)
     assert.notEqual(label, formatSchedule(config({ scheduleType: 'weekly' })))
+  })
+})
+
+/**
+ * Multi-day weekly schedules.
+ *
+ * Two columns hold the answer -- an array added later, and the original scalar
+ * kept so a rollback still reads a sane day -- so the pinned property is that
+ * one resolver serves both the cron expression and the sentence an admin reads.
+ * Two homes for one value is how this codebase's worst bugs have started.
+ */
+describe('resolveScheduleDays', () => {
+  test('prefers the array', () => {
+    assert.deepEqual(
+      resolveScheduleDays({ scheduleDayOfWeek: 0, scheduleDaysOfWeek: [1, 4] }),
+      [1, 4]
+    )
+  })
+
+  test('falls back to the scalar for a row written before the array existed', () => {
+    assert.deepEqual(resolveScheduleDays({ scheduleDayOfWeek: 3, scheduleDaysOfWeek: null }), [3])
+  })
+
+  test('an empty array is not a selection', () => {
+    // The column rejects an empty array, but a caller can still construct one;
+    // reading it as "no days" would produce the cron expression `0 4 * * `.
+    assert.deepEqual(resolveScheduleDays({ scheduleDayOfWeek: 5, scheduleDaysOfWeek: [] }), [5])
+  })
+
+  test('nothing at all means Sunday, as it always did', () => {
+    assert.deepEqual(resolveScheduleDays({ scheduleDayOfWeek: null, scheduleDaysOfWeek: null }), [0])
+  })
+})
+
+describe('normalizeScheduleDays', () => {
+  test('sorts and de-duplicates', () => {
+    assert.deepEqual(normalizeScheduleDays([4, 1, 4, 0], 'weekly'), [0, 1, 4])
+  })
+
+  test('drops out-of-range days rather than clamping them', () => {
+    // Clamping would turn a client bug into a job running on a day nobody chose.
+    assert.deepEqual(normalizeScheduleDays([7, 2, -1], 'weekly'), [2])
+  })
+
+  test('a selection of nothing but rubbish reads as no selection', () => {
+    assert.equal(normalizeScheduleDays([9, 12], 'weekly'), null)
+    assert.equal(normalizeScheduleDays([], 'weekly'), null)
+    assert.equal(normalizeScheduleDays(null, 'weekly'), null)
+  })
+
+  test('biweekly keeps only the earliest day', () => {
+    // The every-other-week rule drops any firing under BIWEEKLY_MIN_DAYS after
+    // the last completed run, so Monday+Thursday would silently mean "every
+    // other Monday". Storing both would make the setting lie.
+    assert.deepEqual(normalizeScheduleDays([1, 4], 'biweekly'), [1])
+  })
+})
+
+describe('multi-day weekly schedules', () => {
+  test('every selected day reaches the cron expression', () => {
+    assert.equal(
+      scheduleToCron(config({ scheduleType: 'weekly', scheduleDaysOfWeek: [1, 3, 5] })),
+      '0 4 * * 1,3,5'
+    )
+  })
+
+  test('a single-day array matches what the scalar always produced', () => {
+    assert.equal(
+      scheduleToCron(config({ scheduleType: 'weekly', scheduleDaysOfWeek: [3] })),
+      scheduleToCron(config({ scheduleType: 'weekly', scheduleDayOfWeek: 3 }))
+    )
+  })
+
+  test('the summary names the same days the cron does', () => {
+    const label = formatSchedule(config({ scheduleType: 'weekly', scheduleDaysOfWeek: [1, 4] }))
+    assert.match(label, /Monday/)
+    assert.match(label, /Thursday/)
+    assert.doesNotMatch(label, /Sunday/)
+  })
+
+  test('the array wins over a stale scalar in both readers', () => {
+    // The scalar trails the array on write, but a hand-edited row could
+    // disagree; whichever way, cron and prose must not diverge.
+    const stale = config({ scheduleType: 'weekly', scheduleDayOfWeek: 0, scheduleDaysOfWeek: [2] })
+    assert.equal(scheduleToCron(stale), '0 4 * * 2')
+    assert.match(formatSchedule(stale), /Tuesday/)
   })
 })
