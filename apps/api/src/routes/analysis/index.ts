@@ -21,6 +21,7 @@ import {
   isAnalysisStale,
   loadAnalysisSubject,
   createChildLogger,
+  describeAiError,
   type StoredAnalysis,
 } from '@aperture/core'
 
@@ -186,13 +187,43 @@ const analysisRoutes: FastifyPluginAsync = async (fastify) => {
         // 500: the usual causes are the retrieval service being unreachable or
         // its upstream search engines throttling, both temporary and neither
         // the caller's fault.
-        logger.warn({ err, mediaType, id }, 'Title analysis generation failed')
+        // Summarised, not raw: pino copies an APICallError's enumerable own
+        // properties in declaration order, and `requestBodyValues` -- the whole
+        // ~16 KB prompt -- is declared before `statusCode`. Logging the error
+        // itself buried the only field that says what went wrong.
+        const described = describeAiError(err)
+        logger.warn({ ...described, mediaType, id }, 'Title analysis generation failed')
+
         const message = err instanceof Error ? err.message : 'Analysis failed'
         const unconfigured = /is not configured/i.test(message)
-        return reply.status(unconfigured ? 400 : 503).send({
-          error: unconfigured
-            ? 'Title Analysis is not configured. Set it up in Settings > AI.'
-            : 'Analysis is unavailable right now. This is usually the daily search quota; it resets overnight.',
+        if (unconfigured) {
+          return reply.status(400).send({
+            error: 'Title Analysis is not configured. Set it up in Settings > AI.',
+          })
+        }
+
+        // This message used to blame the daily search quota unconditionally --
+        // wrong twice over. It named the wrong half of the job for a model
+        // failure, and it was a leftover from grounding mode: the default
+        // retrieval mode is self-hosted and HAS no daily search quota, so the
+        // one suggestion it made could never be the cause. Measured live, an
+        // operator was told to wait until morning for a model endpoint that had
+        // been withdrawn by its provider and would never come back on its own.
+        //
+        // The two halves fail for unrelated reasons and have unrelated fixes,
+        // so the message says which one, and the status code when there is one
+        // -- 401/403 is a key, 429 is a rate limit, 404 means the provider no
+        // longer serves that model, 5xx is theirs to fix.
+        if (described.isProviderError) {
+          const status = described.status ? ` (HTTP ${described.status})` : ''
+          return reply.status(503).send({
+            error: `The Title Analysis model could not be reached${status}. Check the model and provider in Settings > AI; a free model may have been withdrawn by its provider.`,
+          })
+        }
+
+        return reply.status(503).send({
+          error:
+            'Could not retrieve sources for this title. Check the retrieval service in Settings > Integrations; its search engines may be throttled right now.',
         })
       }
     }

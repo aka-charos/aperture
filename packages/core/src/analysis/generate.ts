@@ -41,6 +41,7 @@ import {
 } from '../lib/crw.js'
 import { orderByHealth, recordEngineOutcome } from '../lib/crwEngines.js'
 import { query, queryOne } from '../lib/db.js'
+import { describeAiError } from '../lib/aiErrors.js'
 import { createChildLogger } from '../lib/logger.js'
 import { recordWebSearchCall } from '../lib/webSearchUsage.js'
 import { budgetSources } from './budget.js'
@@ -345,14 +346,31 @@ async function writeFromSources(prompt: string, maxOutputTokens: number): Promis
   let finishReason: string | undefined
 
   for (let attempt = 1; attempt <= MAX_WRITE_ATTEMPTS; attempt++) {
-    const response = await generateText({
-      model,
-      prompt,
-      maxRetries: MODEL_MAX_RETRIES,
-      // 0 means the operator asked for no ceiling, so none is sent and the
-      // provider default applies.
-      ...(maxOutputTokens > 0 ? { maxOutputTokens } : {}),
-    })
+    let response
+    try {
+      response = await generateText({
+        model,
+        prompt,
+        maxRetries: MODEL_MAX_RETRIES,
+        // 0 means the operator asked for no ceiling, so none is sent and the
+        // provider default applies.
+        ...(maxOutputTokens > 0 ? { maxOutputTokens } : {}),
+      })
+    } catch (err) {
+      // Logged here and rethrown, because this is the only frame that knows
+      // which model and which attempt. The throw still stands: a provider
+      // failure writes no row, so the title stays pending and is retried.
+      //
+      // describeAiError rather than the raw error on purpose. `APICallError`
+      // declares `requestBodyValues` before `statusCode`, and pino serializes
+      // in declaration order -- so logging `{ err }` put ~16 KB of scraped
+      // article text ahead of the one field that says what went wrong.
+      logger.error(
+        { ...describeAiError(err), modelId, attempt, promptChars: prompt.length },
+        'Title analysis model call failed'
+      )
+      throw err
+    }
     finishReason = response.finishReason
     reading = readAnalysis(response.text ?? '', response.finishReason)
 
