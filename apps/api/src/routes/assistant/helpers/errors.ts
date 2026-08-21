@@ -8,7 +8,12 @@
  * ToolResultError renders.
  */
 import { APICallError, LoadAPIKeyError, RetryError } from 'ai'
-import { parseApiError, logApiError, hasRecentSimilarError } from '@aperture/core'
+import {
+  parseApiError,
+  logApiError,
+  hasRecentSimilarError,
+  describeAiError,
+} from '@aperture/core'
 
 export type AssistantErrorCode =
   | 'not_configured'
@@ -132,7 +137,15 @@ export async function recordLlmError(
   const { context, provider, logger } = opts
   const status = httpStatusOf(err)
   const detail = errorDetail(err)
-  logger.warn({ err, context, provider, httpStatus: status }, `Assistant LLM call failed: ${context}`)
+  // Described rather than raw, for the reason documented on describeAiError:
+  // pino copies an APICallError's enumerable own properties in declaration
+  // order, and `requestBodyValues` comes before `statusCode` -- so `{ err }`
+  // writes the whole request (a full chat prompt here) ahead of the one field
+  // that identifies the fault.
+  logger.warn(
+    { ...describeAiError(err), context, provider },
+    `Assistant LLM call failed: ${context}`
+  )
 
   // Only persist to api_errors when we have a real HTTP status and a provider the
   // framework can classify (grounding is Google-only; chat may be another provider).
