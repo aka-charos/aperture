@@ -653,6 +653,39 @@ export async function embedText(text: string): Promise<number[] | null> {
 /**
  * Get embedding for a specific movie
  */
+/**
+ * Fetch many item embeddings in one round trip, keyed by movie id.
+ *
+ * buildTasteProfile used getMovieEmbedding inside its weighting loop, which is
+ * one query per watched film -- and that helper re-resolves the embedding model
+ * and table name on every call, so it was up to three round trips per item. At
+ * the old recentWatchLimit of 50 that was tolerable; the default is 200 now,
+ * and 200 sequential awaits per user per run is not.
+ *
+ * Returns a Map rather than an array because the caller must keep iterating its
+ * OWN ordered list: the position weight is derived from the index in the
+ * favourites-first watch history, so re-ordering by whatever the database
+ * returned would silently reweight the profile.
+ */
+export async function getMovieEmbeddings(movieIds: string[]): Promise<Map<string, number[]>> {
+  const byId = new Map<string, number[]>()
+  if (movieIds.length === 0) return byId
+
+  const config = await getFunctionConfig('embeddings')
+  const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
+  const tableName = await getActiveEmbeddingTableName('embeddings')
+
+  const result = await query<{ movie_id: string; embedding: string }>(
+    `SELECT movie_id, embedding::text FROM ${tableName} WHERE movie_id = ANY($1) AND model = $2`,
+    [movieIds, modelName]
+  )
+
+  for (const row of result.rows) {
+    byId.set(row.movie_id, row.embedding.replace(/[[]]/g, '').split(',').map(Number))
+  }
+  return byId
+}
+
 export async function getMovieEmbedding(movieId: string): Promise<number[] | null> {
   const config = await getFunctionConfig('embeddings')
   const modelName = config ? `${config.provider}:${config.model}` : 'unknown'

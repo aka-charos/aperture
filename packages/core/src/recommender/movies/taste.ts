@@ -1,6 +1,6 @@
 import { createChildLogger } from '../../lib/logger.js'
 import { query } from '../../lib/db.js'
-import { getMovieEmbedding } from './embeddings.js'
+import { getMovieEmbeddings } from './embeddings.js'
 import { averageEmbeddings } from '../shared/index.js'
 import { WATCH_HISTORY_TASTE_SQL } from '../watchedExclusion.js'
 import type { WatchedMovie } from '../types.js'
@@ -76,6 +76,11 @@ export async function buildTasteProfile(
   }>(`SELECT id, community_rating, genres FROM movies WHERE id = ANY($1)`, [movieIds])
   const movieData = new Map(movieDataResult.rows.map((r) => [r.id, r]))
 
+  // One round trip for the whole history, not one per title. The loop below
+  // still walks `watched` in its own order, because the position weight
+  // depends on it.
+  const embeddingsById = await getMovieEmbeddings(movieIds)
+
   // Calculate stats for normalization
   const maxPlayCount = Math.max(...watched.map((w) => w.playCount), 1)
   const favoriteCount = watched.filter((w) => w.isFavorite).length
@@ -94,7 +99,7 @@ export async function buildTasteProfile(
 
   for (let i = 0; i < watched.length; i++) {
     const movie = watched[i]
-    const emb = await getMovieEmbedding(movie.movieId)
+    const emb = embeddingsById.get(movie.movieId)
     if (emb) {
       embeddings.push(emb)
 
