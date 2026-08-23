@@ -120,7 +120,7 @@ export function findResponseProblem(input: ResponseCheckInput): ResponseProblem 
 /** An operator-facing sentence naming the model, because the model is the fix. */
 export function describeResponseProblem(
   problem: ResponseProblem,
-  context: { title: string; modelId: string }
+  context: { title: string; modelId: string; maxOutputTokens?: number; outputTokens?: number }
 ): string {
   const suffix =
     ` Model: ${context.modelId}. If this repeats for every title, the Title Analysis role is` +
@@ -128,11 +128,31 @@ export function describeResponseProblem(
     ` writes its scratchpad as ordinary text is the usual cause.`
 
   switch (problem.kind) {
-    case 'truncated':
+    case 'truncated': {
+      // Deliberately NOT the suffix above. `finishReason: 'length'` is the
+      // provider stating that the ceiling was reached, which is a fact about
+      // the SETTING, not about the model's ability to follow a format -- and
+      // telling an operator to change models when the fix is one number sent
+      // them looking in the wrong place. Measured live: an analysis truncated
+      // at the 8,000-token default, and the advice given was to swap the
+      // model. A reasoning model spends this allowance on its scratchpad
+      // before writing a word, so the ceiling that fits a 900-word answer is
+      // several times the answer's own length.
+      const ceiling = context.maxOutputTokens
+        ? ` The limit is currently ${context.maxOutputTokens.toLocaleString('en-US')} tokens`
+        : ' The limit is set'
+      const spent =
+        context.outputTokens != null
+          ? ` and the model used ${context.outputTokens.toLocaleString('en-US')} of it`
+          : ''
       return (
-        `The analysis for "${context.title}" was cut off before it finished` +
-        ` (the model hit the output limit).${suffix}`
+        `The analysis for "${context.title}" was cut off before it finished: the model hit its` +
+        ` output limit.${ceiling}${spent} (Settings > Integrations > Retrieval > "Max output` +
+        ` tokens"). Raise it — a reasoning model bills its thinking from the same allowance as` +
+        ` the prose, so it can spend the whole budget before writing any answer.` +
+        ` Model: ${context.modelId}.`
       )
+    }
     case 'reasoning_only':
       return (
         `The model returned only reasoning for "${context.title}" and no analysis.${suffix}`

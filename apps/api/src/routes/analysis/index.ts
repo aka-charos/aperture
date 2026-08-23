@@ -152,6 +152,14 @@ const analysisRoutes: FastifyPluginAsync = async (fastify) => {
       // stray query parameter into a broken page.
       const force = request.query.force === 'true' && admin
 
+      // Did THIS request start the work? Only the originator logs the failure.
+      // Single-flight means N concurrent POSTs share one analysis, and every
+      // joiner's catch used to log the same line: a live failure appeared three
+      // times, identically, which reads as three failures and pads a log that
+      // is already mostly HTTP noise. Joiners still get the error in their
+      // response, they just do not narrate it again.
+      let owned = false
+
       try {
         const stored = force ? null : await getStoredAnalysis(mediaType, id)
         // A stored decline counts as an answer: re-asking spends a request to
@@ -176,6 +184,7 @@ const analysisRoutes: FastifyPluginAsync = async (fastify) => {
         const subject = await loadAnalysisSubject(mediaType, id)
         if (!subject) return reply.status(404).send({ error: 'Title not found' })
 
+        owned = true
         const work = analyseTitle(mediaType, id, subject).finally(() => inFlight.delete(key))
         inFlight.set(key, work)
 
@@ -192,7 +201,9 @@ const analysisRoutes: FastifyPluginAsync = async (fastify) => {
         // ~16 KB prompt -- is declared before `statusCode`. Logging the error
         // itself buried the only field that says what went wrong.
         const described = describeAiError(err)
-        logger.warn({ ...described, mediaType, id }, 'Title analysis generation failed')
+        if (owned) {
+          logger.warn({ ...described, mediaType, id }, 'Title analysis generation failed')
+        }
 
         const message = err instanceof Error ? err.message : 'Analysis failed'
         const unconfigured = /is not configured/i.test(message)
