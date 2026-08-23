@@ -157,13 +157,26 @@ export function useJobsData(): UseJobsDataReturn {
         credentials: 'include',
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        connectToJobStream(jobName, data.jobId)
-        await fetchJobs()
+      if (!response.ok) {
+        // A 409 is the EXPECTED answer for a short window after cancelling: a
+        // cancelled job holds its slot until the work actually stops, and the
+        // message says which of the two it is. Swallowing it left the Run
+        // button looking dead, which is what sends an operator to `docker
+        // stop` -- the exact move that produced the double-run the guard
+        // exists to prevent. The server's own wording is the whole value here,
+        // so it is shown rather than replaced.
+        const body = (await response.json().catch(() => null)) as { error?: string } | null
+        setError(body?.error || `Failed to start ${jobName}`)
+        return
       }
+
+      setError(null)
+      const data = await response.json()
+      connectToJobStream(jobName, data.jobId)
+      await fetchJobs()
     } catch (err) {
       console.error('Failed to run job:', err)
+      setError('Could not connect to server')
     }
   }
 
@@ -177,11 +190,19 @@ export function useJobsData(): UseJobsDataReturn {
         credentials: 'include',
       })
 
-      if (response.ok) {
-        await fetchJobs()
+      if (!response.ok) {
+        // Same reasoning as the Run button: "No active job to cancel" is a
+        // real answer and the operator needs to see it rather than watch
+        // nothing happen.
+        const body = (await response.json().catch(() => null)) as { error?: string } | null
+        setError(body?.error || `Failed to cancel ${jobName}`)
+        return
       }
+
+      await fetchJobs()
     } catch (err) {
       console.error('Failed to cancel job:', err)
+      setError('Could not connect to server')
     } finally {
       setCancellingJobs((prev) => {
         const next = new Set(prev)
