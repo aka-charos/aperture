@@ -110,11 +110,29 @@ function MediaTypeCard({
   onUpdateField,
 }: MediaTypeCardProps) {
   const { t } = useTranslation()
-  const totalWeight =
-    config.similarityWeight +
-    config.noveltyWeight +
-    config.ratingWeight +
-    config.diversityWeight
+  // What each blend weight actually carries, which is not the same question as
+  // whether they add to 100%.
+  //
+  // calculateBaseScore divides by the sum of these THREE, so the sliders have
+  // no sum-to-1 constraint at all -- 0.4/0.2/0.2 and 0.8/0.4/0.4 are the same
+  // blend. The old badge totalled them and went green only near 100%, which
+  // asserted a rule the arithmetic does not impose and left every real setting
+  // showing an amber warning for nothing.
+  //
+  // Diversity is deliberately absent. It is applied when the final list is
+  // picked, never when candidates are scored -- its own help text says so --
+  // so counting it here presented it as competing for a budget it does not
+  // draw from, and pushed every other slider's apparent share about 1.5%
+  // below its real one.
+  const blendTotal = config.similarityWeight + config.noveltyWeight + config.ratingWeight
+  const blendShares = (
+    blendTotal > 0
+      ? [config.similarityWeight, config.noveltyWeight, config.ratingWeight].map(
+          (weight) => weight / blendTotal
+        )
+      : // Mirrors calculateBaseScore's own fallback when every slider is at zero.
+        [1 / 3, 1 / 3, 1 / 3]
+  ).map((share) => Math.round(share * 100))
 
   return (
     <Card variant="outlined" sx={{ height: '100%' }}>
@@ -233,9 +251,11 @@ function MediaTypeCard({
           <Typography variant="caption" color="text.secondary" fontWeight={600}>
             {t('settingsRecAlgo.sectionWeights')}
           </Typography>
+          {/* Reads in the order the sliders below appear, and matches the
+              shares the insights panel prints under each bar -- the two
+              surfaces are meant to be comparable. */}
           <Chip
-            label={`${(totalWeight * 100).toFixed(0)}%`}
-            color={Math.abs(totalWeight - 1) < 0.01 ? 'success' : 'warning'}
+            label={blendShares.join(' / ')}
             size="small"
             sx={{ height: 20, fontSize: '0.7rem' }}
           />
