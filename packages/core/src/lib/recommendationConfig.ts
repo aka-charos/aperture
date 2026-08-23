@@ -362,3 +362,91 @@ export async function resetRecommendationConfig(): Promise<LegacyRecommendationC
     updatedAt: config.updatedAt,
   }
 }
+
+export interface LibraryItemCounts {
+  movies: number
+  series: number
+}
+
+/**
+ * How many titles of each media type the library actually holds.
+ *
+ * This is the real ceiling on maxCandidates. Candidate retrieval is an
+ * `ORDER BY embedding <=> $1 LIMIT n` over ONE embedding table, so an n above
+ * the row count cannot return more rows -- it only makes the planner abandon
+ * the HNSW index and scan every vector exactly. Measured live: a configured
+ * 16,000 against 12,584 films returned the whole library minus what each user
+ * had watched, for all nine users. The series side was worse, 50,000 against
+ * roughly a thousand shows, set on the belief that series retrieval works at
+ * episode level -- it does not. `series_embeddings` holds one vector per show;
+ * `episode_embeddings` is a separate table whose only reader in the entire app
+ * is the assistant's searchEpisodes tool, and nothing pools episode vectors
+ * into the series vector.
+ */
+export async function getLibraryItemCounts(): Promise<LibraryItemCounts> {
+  const row = await queryOne<{ movies: string; series: string }>(
+    `SELECT (SELECT COUNT(*) FROM movies) AS movies,
+            (SELECT COUNT(*) FROM series) AS series`
+  )
+  return {
+    movies: row ? Number(row.movies) : 0,
+    series: row ? Number(row.series) : 0,
+  }
+}
+
+/**
+ * Pure half of the clamp, so the decision is testable without a database.
+ * Returns the value to store, or null when the current one is already fine.
+ *
+ * Only ever lowers. A library that GREW leaves the admin's number alone: it is
+ * an explicit choice about how much of the catalogue to score, and silently
+ * raising it would spend their compute without being asked. A count of 0 is
+ * treated as "don't know yet" -- an empty table mid-first-sync must not clamp
+ * the setting to nothing.
+ */
+export function clampedMaxCandidates(current: number, libraryCount: number): number | null {
+  if (libraryCount <= 0) return null
+  if (current <= libraryCount) return null
+  return libraryCount
+}
+
+/**
+ * Bring maxCandidates back under the library size, called after a sync changes
+ * the item count.
+ *
+ * Deliberately a direct UPDATE rather than updateConfigFor: maxCandidates is in
+ * SCORING_FIELDS, so the normal setter bumps scoring_updated_at, and the
+ * activity gate reads that column to decide the config changed -- which would
+ * regenerate recommendations for every user. Lowering a limit that already
+ * exceeded the table cannot change a single pick, so it must not cost a
+ * library-wide regenerate. The updated_at trigger still fires; nothing gates on
+ * that.
+ */
+export async function clampMaxCandidatesToLibrary(): Promise<Partial<LibraryItemCounts>> {
+  const counts = await getLibraryItemCounts()
+  const config = await getRecommendationConfig()
+  const applied: Partial<LibraryItemCounts> = {}
+
+  const movie = clampedMaxCandidates(config.movie.maxCandidates, counts.movies)
+  if (movie !== null) applied.movies = movie
+
+  const series = clampedMaxCandidates(config.series.maxCandidates, counts.series)
+  if (series !== null) applied.series = series
+
+  if (applied.movies === undefined && applied.series === undefined) return applied
+
+  const sets: string[] = []
+  const params: number[] = []
+  if (applied.movies !== undefined) {
+    params.push(applied.movies)
+    sets.push(`movie_max_candidates = $${params.length}`)
+  }
+  if (applied.series !== undefined) {
+    params.push(applied.series)
+    sets.push(`series_max_candidates = $${params.length}`)
+  }
+
+  await query(`UPDATE recommendation_config SET ${sets.join(', ')} WHERE id = 1`, params)
+  logger.info({ applied, counts }, 'Clamped max candidates to library size')
+  return applied
+}

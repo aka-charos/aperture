@@ -2359,7 +2359,7 @@
         "description": "How many library items the vector search returns for scoring. It also sets the field each match is judged against, since similarity is scored relative to this pool.",
         "increase": "Every title gets a chance to compete, and match scores are measured against a fuller picture of the library.",
         "decrease": "Faster runs, but titles outside the pool are never considered at all.",
-        "example": "Set it at or above your library size so nothing is excluded — 20-50K covers most libraries. Below ~2,000 the pool is too narrow to rank against."
+        "example": "The top of the slider is your whole library — the most that can ever be scored, since retrieval reads one row per title. Lowering it makes runs faster but leaves titles out of the running entirely; below ~2,000 the pool is too narrow to rank against."
       },
       "selectedCount": {
         "title": "Recommendations Per User",
@@ -2438,7 +2438,9 @@
         "decrease": "More viewers qualify, including weaker matches whose picks may feel arbitrary.",
         "example": "Below about 1.5 the bar approaches the middle of the distribution, which makes roughly half of all pairs a 'twin' and the label stops meaning anything."
       }
-    }
+    },
+    "maxCandidatesAll": "All {{total}}",
+    "maxCandidatesAllShort": "All"
   },
   "settingsWatching": {
     "title": "Shows You Watch",

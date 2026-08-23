@@ -2459,7 +2459,9 @@
     "sectionSlots": "RESERVED SLOTS",
     "slotBudget": "{{total}} recommendations per user",
     "slotBudgetSplit": "{{ranked}} top-ranked · {{interests}} for stated interests · {{twins}} from a taste twin",
-    "interestMaxSlots": "Reserved for stated interests"
+    "interestMaxSlots": "Reserved for stated interests",
+    "maxCandidatesAll": "All {{total}}",
+    "maxCandidatesAllShort": "All"
   },
   "settingsWatching": {
     "title": "Spettacoli che guardi",
