@@ -67,6 +67,13 @@ export interface SeriesForExplanation {
    * name must not be able to reach the prompt.
    */
   fromTasteTwin?: boolean
+  /**
+   * Set when the pick holds a reserved acclaimed slot. Mirrors
+   * MovieForExplanation.fromAcclaimed: the ranking is exactly what did NOT
+   * choose this title, so without the marker the model invents a taste
+   * connection that was never the reason.
+   */
+  fromAcclaimed?: boolean
 }
 
 export interface EvidenceSeries {
@@ -341,6 +348,10 @@ async function generateBatchSeriesExplanations(
         ? `\n   👥 A KINDRED VIEWER PICKED THIS: another viewer here whose taste closely overlaps theirs watched it — lead with that, and never name or describe that person`
         : ''
 
+      const acclaimedLine = s.fromAcclaimed
+        ? `\n   🏆 WIDELY ACCLAIMED: in the list because of its standing, not because the ranking chose it — lead with what the show is and why it is held in that regard`
+        : ''
+
       const keywords = titleContext.get(s.seriesId)?.keywords
       const themes = keywords?.length
         ? `\n   Themes: ${keywords.slice(0, KEYWORD_LIMIT).join(', ')}`
@@ -348,7 +359,7 @@ async function generateBatchSeriesExplanations(
 
       return `${i + 1}. "${s.title}" (${s.year || 'N/A'})
    Genres: ${s.genres.join(', ')}${s.network ? `\n   Network: ${s.network}` : ''}${s.status ? `\n   Status: ${s.status}` : ''}${themes}
-   Novelty: ${s.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${s.ratingScore > 0.7 ? 'critically acclaimed' : s.ratingScore > 0.5 ? 'well received' : 'mixed'}${interestLine}${twinLine}
+   Novelty: ${s.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${s.ratingScore > 0.7 ? 'critically acclaimed' : s.ratingScore > 0.5 ? 'well received' : 'mixed'}${interestLine}${twinLine}${acclaimedLine}
    Plot: ${clip(s.overview, PICK_PLOT_CHARS) ?? 'No overview available'}
    🎯 CLOSEST IN THEIR WATCH HISTORY (nearest first):
 ${evidenceStr}`
@@ -379,6 +390,8 @@ CRITICAL: Some of these shows will be obscure and you will not recognise them. T
 CRITICAL: A few recommendations are marked "THEY ASKED FOR THIS" with an interest the user typed in themselves. For those, open by connecting the show to that interest in the user's own words, then fill in with the similarity evidence. Never justify one of these on viewing-history similarity alone - that is not why it is in the list, and claiming otherwise would be wrong.
 
 CRITICAL: A few recommendations are marked "A KINDRED VIEWER PICKED THIS". Those are in the list because another viewer with strongly overlapping taste watched them, which is a different reason from similarity to the user's own history - say so, and then use the similarity evidence as support. Refer to that person only in general terms ("someone whose taste lines up with yours"). You do not know who they are, so never name them, guess at them, or describe them.
+
+CRITICAL: A few recommendations are marked "WIDELY ACCLAIMED". Those are in the list because the show is very highly rated by a large number of viewers, which is a different reason from similarity to this user's history - do not claim their viewing history led here. Say plainly that it is a landmark they have not started yet, then use the similarity evidence only as secondary support if it genuinely fits. The no-invention rule above still applies in full: describe what the show IS from the data given, and do not assert specific awards, ratings milestones or contemporary reception that is not in the data.
 
 Format: Return JSON with an "explanations" array containing objects with "index" (1-based) and "explanation" fields.
 
@@ -457,6 +470,11 @@ function generateFallbackSeriesExplanation(series: SeriesWithEvidence): string {
   // Same reasoning one step down: a twin pick is here because a like-minded
   // viewer watched it, so the evidence branch below would credit the wrong
   // thing. Kept deliberately anonymous.
+  // Highest precedence of the three, for the same reason as movies.
+  if (series.fromAcclaimed) {
+    return `One of the highest-rated shows in your library that you have not started yet — widely regarded, and still waiting for you.`
+  }
+
   if (series.fromTasteTwin) {
     return `Someone here whose taste closely overlaps yours has been watching this ${series.genres[0]?.toLowerCase() || 'series'} — it's the kind of thing the two of you keep landing on independently.`
   }

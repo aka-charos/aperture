@@ -29,7 +29,7 @@ export interface ContentItem {
    * recommendation results. Carried so a card can label a borrowed pick the way
    * the insights panel does — never carries the donor's identity.
    */
-  source?: 'ranked' | 'twin' | 'interest'
+  source?: 'ranked' | 'twin' | 'interest' | 'acclaimed'
   /** Only on a `twin` pick: titles the user and that viewer have both watched, rarest first. */
   sharedTitles?: string[]
   /**

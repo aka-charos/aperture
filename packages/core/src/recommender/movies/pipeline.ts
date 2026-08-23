@@ -33,6 +33,7 @@ import {
   clearAllRecommendations,
   getMovieOverviews,
   type StoredTwinPick,
+  type StoredAcclaimedPick,
 } from '../storage.js'
 import { syncWatchHistoryForUser } from './sync.js'
 import {
@@ -60,6 +61,9 @@ import {
   buildTwinIndex,
   computeReservedInterestSlots,
   computeReservedTwinSlots,
+  computeReservedAcclaimedSlots,
+  isAcclaimed,
+  pickAcclaimedSlotFillers,
   pickInterestSlotFillers,
   pickTwinSlotFillers,
   summarizeScoreComponents,
@@ -626,9 +630,31 @@ export async function generateRecommendationsForUser(
       cfg.twinMaxSlots
     )
 
+    // Acclaimed titles: the third and last claim on the budget, so it can only
+    // ever spend what the other two left. The gate is rating AND vote count --
+    // see shared/acclaimedSlots.ts for why a vote count belongs here and
+    // nowhere near the score.
+    const acclaimedEligible =
+      cfg.acclaimedMaxSlots > 0
+        ? scoredCandidates.filter((candidate) =>
+            isAcclaimed(
+              candidate.communityRating,
+              candidate.voteCount,
+              cfg.acclaimedMinRating,
+              cfg.acclaimedMinVotes
+            )
+          )
+        : []
+
+    const reservedAcclaimedSlots = computeReservedAcclaimedSlots(
+      cfg.selectedCount - reservedInterestSlots - reservedTwinSlots,
+      acclaimedEligible.length,
+      cfg.acclaimedMaxSlots
+    )
+
     const { selected } = applyDiversityAndSelect(
       scoredCandidates,
-      cfg.selectedCount - reservedInterestSlots - reservedTwinSlots,
+      cfg.selectedCount - reservedInterestSlots - reservedTwinSlots - reservedAcclaimedSlots,
       effectiveDiversityWeight
     )
 
@@ -691,10 +717,37 @@ export async function generateRecommendationsForUser(
       )
     }
 
+    // Last, so anything already spoken for by the ranking, an interest or a
+    // twin is not counted twice.
+    const acclaimedFillers = pickAcclaimedSlotFillers(
+      [...selected, ...interestFillers.map((f) => f.candidate), ...twinFillers.map((f) => f.candidate)],
+      acclaimedEligible,
+      reservedAcclaimedSlots
+    )
+
+    const acclaimedPicks = new Map<string, StoredAcclaimedPick>()
+    for (const filler of acclaimedFillers) {
+      acclaimedPicks.set(filler.movieId, {
+        rating: filler.communityRating ?? 0,
+        voteCount: filler.voteCount ?? 0,
+      })
+      logger.info(
+        { title: filler.title, rating: filler.communityRating, votes: filler.voteCount },
+        `🏆 Reserved slot for an acclaimed title: ${filler.title}`
+      )
+    }
+    if (reservedAcclaimedSlots > acclaimedFillers.length) {
+      logger.info(
+        { reserved: reservedAcclaimedSlots, filled: acclaimedFillers.length },
+        'Some reserved acclaimed slots had no qualifying candidate and were left unused'
+      )
+    }
+
     const selectedWithSlots = [
       ...selected,
       ...interestFillers.map((f) => f.candidate),
       ...twinFillers.map((f) => f.candidate),
+      ...acclaimedFillers,
     ]
 
     const finalSelected = includeWatched
@@ -765,7 +818,8 @@ export async function generateRecommendationsForUser(
       finalSelected,
       finalSelectedRanks,
       interestPicks,
-      twinPicks
+      twinPicks,
+      acclaimedPicks
     )
     // Deliberately NOT `watched`: that list is capped at recentWatchLimit
     // (default 50, favourites-first) because it builds a centroid, and reusing
@@ -806,6 +860,7 @@ export async function generateRecommendationsForUser(
           // Same idea for a borrowed pick: the reason is a like-minded viewer,
           // not the ranking. A flag, never the donor's identity.
           fromTasteTwin: twinPicks.has(s.movieId),
+          fromAcclaimed: acclaimedPicks.has(s.movieId),
         }))
 
         // Generate explanations using embedding-based evidence

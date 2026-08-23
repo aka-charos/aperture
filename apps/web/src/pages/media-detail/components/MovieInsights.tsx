@@ -383,7 +383,14 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
   const fromInterest =
     typeof insights.scoreBreakdown?.interestMatch === 'object' &&
     insights.scoreBreakdown.interestMatch !== null
-  const fromReservedSlot = fromTasteTwin || fromInterest
+
+  // And an acclaimed slot. Same rule: the ranking is precisely what did not
+  // choose this title, so the similarity lookup below must not be labelled as
+  // the reason it is here.
+  const fromAcclaimed =
+    typeof insights.scoreBreakdown?.acclaimedMatch === 'object' &&
+    insights.scoreBreakdown.acclaimedMatch !== null
+  const fromReservedSlot = fromTasteTwin || fromInterest || fromAcclaimed
 
   // Empty unless a twin slot placed this title *and* the run that produced it
   // recorded the overlap, which runs generated before that shipped did not.

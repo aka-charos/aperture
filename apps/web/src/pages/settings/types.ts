@@ -17,6 +17,18 @@ export interface MediaTypeConfig {
   twinMaxSlots: number
   /** Ceiling on picks reserved for stated interests; shares the selectedCount budget. */
   interestMaxSlots: number
+  /**
+   * Ceiling on picks reserved for widely-acclaimed titles; 0 disables, and is
+   * the default. Third claimant on the same selectedCount budget.
+   */
+  acclaimedMaxSlots: number
+  /** Rating a title must reach to be eligible for an acclaimed slot. */
+  acclaimedMinRating: number
+  /**
+   * Votes that rating must be built on. An eligibility gate only — vote count
+   * never enters any title’s score.
+   */
+  acclaimedMinVotes: number
   recentWatchLimit: number
   similarityWeight: number
   noveltyWeight: number

@@ -62,7 +62,7 @@ function validateConfigUpdates(updates: Partial<MediaTypeConfig>): string | null
 
   // 0 is meaningful for both of these and nowhere else in this function: it is
   // how each slot feature is switched off, which is why neither is in `counts`.
-  const slotCeilings = ['twinMaxSlots', 'interestMaxSlots'] as const
+  const slotCeilings = ['twinMaxSlots', 'interestMaxSlots', 'acclaimedMaxSlots'] as const
   for (const key of slotCeilings) {
     const value = updates[key]
     if (value !== undefined) {
@@ -77,9 +77,36 @@ function validateConfigUpdates(updates: Partial<MediaTypeConfig>): string | null
   // silently does less than it says is the exact problem these controls exist
   // to avoid -- better to refuse the save than to accept a lie.
   const selected = updates.selectedCount
-  if (selected !== undefined && updates.twinMaxSlots !== undefined && updates.interestMaxSlots !== undefined) {
-    if (updates.twinMaxSlots + updates.interestMaxSlots > selected) {
-      return 'twinMaxSlots and interestMaxSlots together cannot exceed selectedCount'
+  if (
+    selected !== undefined &&
+    updates.twinMaxSlots !== undefined &&
+    updates.interestMaxSlots !== undefined &&
+    updates.acclaimedMaxSlots !== undefined
+  ) {
+    if (updates.twinMaxSlots + updates.interestMaxSlots + updates.acclaimedMaxSlots > selected) {
+      return 'twinMaxSlots, interestMaxSlots and acclaimedMaxSlots together cannot exceed selectedCount'
+    }
+  }
+
+  // A floor nothing in the library can reach turns the feature off without
+  // saying so, and one at the bottom of the scale makes every title
+  // "acclaimed". Bounds are generous because what counts as acclaimed is a
+  // property of the library, not a universal constant.
+  if (updates.acclaimedMinRating !== undefined) {
+    if (
+      !Number.isFinite(updates.acclaimedMinRating) ||
+      updates.acclaimedMinRating < 5 ||
+      updates.acclaimedMinRating > 10
+    ) {
+      return 'acclaimedMinRating must be between 5 and 10'
+    }
+  }
+
+  // 0 would admit an unvoted rating, which is the one thing this gate
+  // exists to exclude.
+  if (updates.acclaimedMinVotes !== undefined) {
+    if (!Number.isInteger(updates.acclaimedMinVotes) || updates.acclaimedMinVotes < 1) {
+      return 'acclaimedMinVotes must be a whole number of at least 1'
     }
   }
 

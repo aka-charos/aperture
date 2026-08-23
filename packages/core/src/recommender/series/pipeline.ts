@@ -32,6 +32,10 @@ import {
   buildTwinIndex,
   computeReservedInterestSlots,
   computeReservedTwinSlots,
+  computeReservedAcclaimedSlots,
+  isAcclaimed,
+  pickAcclaimedSlotFillers,
+  type StoredAcclaimedPick,
   pickInterestSlotFillers,
   pickTwinSlotFillers,
   summarizeScoreComponents,
@@ -115,6 +119,13 @@ export interface SeriesCandidate {
   normalizedSimilarity: number
   novelty: number
   ratingScore: number
+  /** Raw rating, kept beside ratingScore for the acclaimed-slot gate. */
+  communityRating?: number | null
+  /**
+   * Votes behind communityRating. Read ONLY by the acclaimed-slot gate,
+   * never by scoring. See shared/acclaimedSlots.ts.
+   */
+  voteCount?: number | null
   diversityBoost: number
   /** Quality match, comparable across every candidate in a run. See BaseCandidate. */
   finalScore: number
@@ -582,14 +593,17 @@ async function scoreSeriesCandidates(
 ): Promise<ScoredSeriesPool> {
   // Get ratings for candidates
   const seriesIds = candidates.map((c) => c.seriesId)
-  const ratingsResult = await query<{ id: string; community_rating: number | null }>(
-    `SELECT id, community_rating FROM series WHERE id = ANY($1)`,
-    [seriesIds]
-  )
+  const ratingsResult = await query<{
+    id: string
+    community_rating: number | null
+    imdb_vote_count: number | null
+  }>(`SELECT id, community_rating, imdb_vote_count FROM series WHERE id = ANY($1)`, [seriesIds])
 
   const ratingsMap = new Map<string, number | null>()
+  const votesMap = new Map<string, number | null>()
   for (const row of ratingsResult.rows) {
     ratingsMap.set(row.id, row.community_rating)
+    votesMap.set(row.id, row.imdb_vote_count)
   }
 
   // Similarity is read against the pool it came from rather than as an absolute
@@ -605,6 +619,8 @@ async function scoreSeriesCandidates(
     ...candidate,
     // Use shared rating score calculation (handles bad data, proper scaling)
     ratingScore: calculateRatingScore(ratingsMap.get(candidate.seriesId)),
+    communityRating: ratingsMap.get(candidate.seriesId) ?? null,
+    voteCount: votesMap.get(candidate.seriesId) ?? null,
     // Use shared novelty score calculation (handles missing genres). The genre
     // baseline now comes from the user's whole history rather than the
     // recentWatchLimit slice this used to query for itself.
@@ -685,7 +701,8 @@ async function storeSeriesCandidates(
   selected: SeriesCandidate[],
   selectedRanks: Map<string, number>,
   interestPicks?: Map<string, InterestCandidateMatch>,
-  twinPicks?: Map<string, TwinDonor>
+  twinPicks?: Map<string, TwinDonor>,
+  acclaimedPicks?: Map<string, StoredAcclaimedPick>
 ): Promise<void> {
   if (candidates.length === 0) return
 
@@ -697,6 +714,7 @@ async function storeSeriesCandidates(
     const selectedRank = isSelected ? selectedRanks.get(candidate.seriesId) || null : null
     const interestPick = interestPicks?.get(candidate.seriesId)
     const twinPick = twinPicks?.get(candidate.seriesId)
+    const acclaimedPick = acclaimedPicks?.get(candidate.seriesId)
 
     return {
       seriesId: candidate.seriesId,
@@ -748,6 +766,14 @@ async function storeSeriesCandidates(
                       ...(twinPick.sharedTopIds?.length
                         ? { sharedIds: twinPick.sharedTopIds }
                         : {}),
+                    },
+                  }
+                : {}),
+              ...(acclaimedPick
+                ? {
+                    acclaimedMatch: {
+                      rating: acclaimedPick.rating,
+                      voteCount: acclaimedPick.voteCount,
                     },
                   }
                 : {}),
@@ -1287,9 +1313,29 @@ export async function generateSeriesRecommendationsForUser(
       cfg.twinMaxSlots
     )
 
+    // Third and last claim on the budget, so it can only spend what the other
+    // two left. Mirrors movies/pipeline.ts.
+    const acclaimedEligible =
+      cfg.acclaimedMaxSlots > 0
+        ? scoredCandidates.filter((candidate) =>
+            isAcclaimed(
+              candidate.communityRating,
+              candidate.voteCount,
+              cfg.acclaimedMinRating,
+              cfg.acclaimedMinVotes
+            )
+          )
+        : []
+
+    const reservedAcclaimedSlots = computeReservedAcclaimedSlots(
+      cfg.selectedCount - reservedInterestSlots - reservedTwinSlots,
+      acclaimedEligible.length,
+      cfg.acclaimedMaxSlots
+    )
+
     const { selected } = applySeriesDiversityAndSelect(
       scoredCandidates,
-      cfg.selectedCount - reservedInterestSlots - reservedTwinSlots,
+      cfg.selectedCount - reservedInterestSlots - reservedTwinSlots - reservedAcclaimedSlots,
       effectiveDiversityWeight
     )
 
@@ -1340,10 +1386,40 @@ export async function generateSeriesRecommendationsForUser(
       )
     }
 
+    // Last, so nothing already spoken for takes a second slot.
+    const acclaimedFillers = pickAcclaimedSlotFillers(
+      [
+        ...selected,
+        ...interestFillers.map((f) => f.candidate),
+        ...twinFillers.map((f) => f.candidate),
+      ],
+      acclaimedEligible,
+      reservedAcclaimedSlots
+    )
+
+    const acclaimedPicks = new Map<string, StoredAcclaimedPick>()
+    for (const filler of acclaimedFillers) {
+      acclaimedPicks.set(filler.seriesId, {
+        rating: filler.communityRating ?? 0,
+        voteCount: filler.voteCount ?? 0,
+      })
+      logger.info(
+        { title: filler.title, rating: filler.communityRating, votes: filler.voteCount },
+        `🏆 Reserved slot for an acclaimed series: ${filler.title}`
+      )
+    }
+    if (reservedAcclaimedSlots > acclaimedFillers.length) {
+      logger.info(
+        { reserved: reservedAcclaimedSlots, filled: acclaimedFillers.length },
+        'Some reserved acclaimed slots had no qualifying candidate and were left unused'
+      )
+    }
+
     const selectedWithSlots = [
       ...selected,
       ...interestFillers.map((f) => f.candidate),
       ...twinFillers.map((f) => f.candidate),
+      ...acclaimedFillers,
     ]
 
     const finalSelected = includeWatched
@@ -1404,7 +1480,8 @@ export async function generateSeriesRecommendationsForUser(
       finalSelected,
       finalSelectedRanks,
       interestPicks,
-      twinPicks
+      twinPicks,
+      acclaimedPicks
     )
 
     // 8. Store evidence (similar watched series for each recommendation)
@@ -1450,6 +1527,7 @@ export async function generateSeriesRecommendationsForUser(
           // Same idea for a borrowed pick: the reason is a like-minded viewer,
           // not the ranking. A flag, never the donor's identity.
           fromTasteTwin: twinPicks.has(s.seriesId),
+          fromAcclaimed: acclaimedPicks.has(s.seriesId),
         }))
 
         // Generate explanations using embedding-based evidence

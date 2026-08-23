@@ -94,6 +94,7 @@ function numOrNull(value: string | number | null): number | null {
 interface StoredBreakdown {
   interestMatch?: { interestText?: unknown }
   twinMatch?: unknown
+  acclaimedMatch?: unknown
 }
 
 /**
@@ -108,12 +109,14 @@ interface StoredBreakdown {
 function readSlotOrigin(breakdown: unknown): {
   interestText: string | null
   fromTasteTwin: boolean
+  fromAcclaimed: boolean
 } {
   const parsed = (breakdown ?? {}) as StoredBreakdown
   const interestText = parsed.interestMatch?.interestText
   return {
     interestText: typeof interestText === 'string' && interestText ? interestText : null,
     fromTasteTwin: parsed.twinMatch != null,
+    fromAcclaimed: parsed.acclaimedMatch != null,
   }
 }
 
@@ -223,6 +226,7 @@ async function refreshMovieRun(
       ratingScore: numOrNull(row.rating_score) ?? 0,
       interestText: origin.interestText,
       fromTasteTwin: origin.fromTasteTwin,
+      fromAcclaimed: origin.fromAcclaimed,
     }
   })
 
@@ -277,6 +281,7 @@ async function refreshSeriesRun(
       ratingScore: numOrNull(row.rating_score) ?? 0,
       interestText: origin.interestText,
       fromTasteTwin: origin.fromTasteTwin,
+      fromAcclaimed: origin.fromAcclaimed,
     }
   })
 

@@ -71,10 +71,11 @@ async function queryCandidatesForVector(
     year: number | null
     genres: string[]
     community_rating: number | null
+    imdb_vote_count: number | null
     similarity: number
   }>(
     ctx.hasLibraryConfigs
-      ? `SELECT m.id, m.title, m.year, m.genres, m.community_rating,
+      ? `SELECT m.id, m.title, m.year, m.genres, m.community_rating, m.imdb_vote_count,
                 1 - (e.embedding <=> $1::halfvec) as similarity
          FROM ${ctx.tableName} e
          JOIN movies m ON m.id = e.movie_id
@@ -85,7 +86,7 @@ async function queryCandidatesForVector(
          )${parentalFilter}
          ORDER BY e.embedding <=> $1::halfvec
          LIMIT $2`
-      : `SELECT m.id, m.title, m.year, m.genres, m.community_rating,
+      : `SELECT m.id, m.title, m.year, m.genres, m.community_rating, m.imdb_vote_count,
                 1 - (e.embedding <=> $1::halfvec) as similarity
          FROM ${ctx.tableName} e
          JOIN movies m ON m.id = e.movie_id
@@ -107,6 +108,7 @@ async function queryCandidatesForVector(
     year: row.year,
     genres: row.genres || [],
     communityRating: row.community_rating,
+    voteCount: row.imdb_vote_count,
     similarity: row.similarity,
     // Filled in by scoreCandidates, which needs the whole pool to set the scale.
     normalizedSimilarity: 0,

@@ -37,6 +37,17 @@ export interface StoredTwinPick {
   sharedIds?: string[]
 }
 
+/**
+ * A pick reserved for a widely-acclaimed title. Rating and vote count are the
+ * two facts the gate was satisfied by, and they are what the insights panel and
+ * the explanation prompt need to say WHY without inventing a taste connection
+ * the ranking never made.
+ */
+export interface StoredAcclaimedPick {
+  rating: number
+  voteCount: number
+}
+
 /** One prepared row per scored candidate, ready for the bulk INSERT. */
 export interface PreparedCandidateRow {
   movieId: string
@@ -96,7 +107,8 @@ export function buildCandidateRows(
   selected: Candidate[],
   selectedRanks?: Map<string, number>,
   interestPicks?: Map<string, StoredInterestPick>,
-  twinPicks?: Map<string, StoredTwinPick>
+  twinPicks?: Map<string, StoredTwinPick>,
+  acclaimedPicks?: Map<string, StoredAcclaimedPick>
 ): PreparedCandidateRow[] {
   const selectedIds = new Set(selected.map((s) => s.movieId))
 
@@ -117,6 +129,7 @@ export function buildCandidateRows(
     const isSelected = selectedIds.has(c.movieId)
     const interestPick = interestPicks?.get(c.movieId)
     const twinPick = twinPicks?.get(c.movieId)
+    const acclaimedPick = acclaimedPicks?.get(c.movieId)
 
     // Only what no column already holds. similarity, novelty, rating and
     // diversity each have their own column, so copying them into JSONB as well
@@ -143,6 +156,14 @@ export function buildCandidateRows(
               affinity: twinPick.affinity,
               sharedCount: twinPick.sharedCount,
               ...(twinPick.sharedIds?.length ? { sharedIds: twinPick.sharedIds } : {}),
+            },
+          }
+        : {}),
+      ...(acclaimedPick
+        ? {
+            acclaimedMatch: {
+              rating: acclaimedPick.rating,
+              voteCount: acclaimedPick.voteCount,
             },
           }
         : {}),
@@ -173,9 +194,17 @@ export async function storeCandidates(
   selected: Candidate[],
   selectedRanks?: Map<string, number>,
   interestPicks?: Map<string, StoredInterestPick>,
-  twinPicks?: Map<string, StoredTwinPick>
+  twinPicks?: Map<string, StoredTwinPick>,
+  acclaimedPicks?: Map<string, StoredAcclaimedPick>
 ): Promise<void> {
-  const data = buildCandidateRows(allCandidates, selected, selectedRanks, interestPicks, twinPicks)
+  const data = buildCandidateRows(
+    allCandidates,
+    selected,
+    selectedRanks,
+    interestPicks,
+    twinPicks,
+    acclaimedPicks
+  )
 
   if (data.length === 0) return
 

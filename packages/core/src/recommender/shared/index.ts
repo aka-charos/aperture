@@ -70,3 +70,13 @@ export {
   type TwinIndex,
 } from './twinSlots.js'
 
+
+export {
+  isAcclaimed,
+  computeReservedAcclaimedSlots,
+  pickAcclaimedSlotFillers,
+  DEFAULT_ACCLAIMED_MAX_SLOTS,
+  DEFAULT_ACCLAIMED_MIN_RATING,
+  DEFAULT_ACCLAIMED_MIN_VOTES,
+  type StoredAcclaimedPick,
+} from './acclaimedSlots.js'
