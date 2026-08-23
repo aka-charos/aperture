@@ -46,17 +46,32 @@ export function calculateRatingScore(rating: number | null | undefined): number 
 export const NOVELTY_SWEET_SPOT = 0.5
 
 /**
- * The three points the response curve passes through. These are the values the
- * previous branch-based implementation produced at its representative input
- * (its continuous term was pinned near 0.85, so its branches evaluated to
- * ~0.84 / ~0.57 / ~0.47), which keeps this change about *what* novelty
- * measures rather than quietly enlarging how much it counts. Novelty is 25% of
- * the base score at default weights, so widening this band would have
- * re-weighted the whole recommender as a side effect.
+ * The three points the response curve passes through, spanning the full [0,1].
+ *
+ * They used to be 0.84 / 0.57 / 0.47 -- the values the old branch-based
+ * implementation produced at its representative input -- held deliberately so
+ * that replacing the branches with a curve stayed a change about *what*
+ * novelty measures rather than how much it counts. That was the right call
+ * then and it left a structural handicap behind: a 0.37-wide output competing
+ * in a weighted average against two terms that use the whole range.
+ *
+ * Influence is weight share x realized spread, so the handicap came straight
+ * off the slider. Measured across nine users on a live instance, novelty's
+ * p10-p90 spread ran 0.133-0.289 against similarity's 0.577 and rating's
+ * steady 0.46; a novelty weight configured at 8.1% delivered between 2.1% and
+ * 4.5% of the actual movement, depending on the viewer. Turning the knob up
+ * and feeling nothing is the experience that produces a knob left at 1%.
+ *
+ * The stretch preserves the curve's PROPORTIONS exactly: the familiar floor
+ * still sits (0.57-0.47)/(0.84-0.47) = 0.27 of the way from the alien floor to
+ * the peak, so the shape of the response is untouched and only its scale
+ * changes. It also retires a display problem -- a bar that could never read
+ * below 47% or above 84% needed a "scale 47-84%" caption to be intelligible,
+ * and now needs none.
  */
-export const NOVELTY_PEAK = 0.84
-export const NOVELTY_FAMILIAR_FLOOR = 0.57
-export const NOVELTY_ALIEN_FLOOR = 0.47
+export const NOVELTY_PEAK = 1
+export const NOVELTY_FAMILIAR_FLOOR = 0.27
+export const NOVELTY_ALIEN_FLOOR = 0
 
 /**
  * Index a user's watched-genre counts as familiarity in [0,1], normalized by
@@ -96,10 +111,13 @@ export function buildGenreFamiliarity(genreCounts: Map<string, number>): Map<str
  *
  * Rises from NOVELTY_FAMILIAR_FLOOR (every genre is one of their staples) to
  * NOVELTY_PEAK at NOVELTY_SWEET_SPOT, then falls to NOVELTY_ALIEN_FLOOR (no
- * genre they have ever watched). The fall is deliberately shallower than the
- * rise: a genre-alien item already scores low on `similarity`, and penalizing
- * it twice was never the intent -- whereas an item made entirely of staples is
- * exactly what similarity over-rewards, so novelty is the counterweight.
+ * genre they have ever watched). Both ends are penalized and the alien end
+ * further -- it sits below the familiar floor, not above it. An older comment
+ * here claimed the opposite ("the fall is deliberately shallower than the
+ * rise"), which never matched the numbers in either implementation: the legacy
+ * branches put `tooNovel` a flat 0.1 below `allFamiliar` at every input.
+ * What is true is that an all-staples item is what similarity over-rewards, so
+ * novelty is the counterweight there.
  *
  * Genres the user has never watched contribute 0 familiarity rather than being
  * counted as a separate binary "novel genre" flag. That flag was the previous

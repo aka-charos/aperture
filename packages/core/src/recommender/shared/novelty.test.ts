@@ -34,37 +34,41 @@ const scoreAtFamiliarity = (value: number) =>
   calculateGenreNoveltyScore(['g'], atFamiliarity(value))
 
 // ============================================================================
-// 1. Range preservation -- this must not become a re-weighting
+// 1. Range: the full [0,1], with the old curve's proportions intact
 // ============================================================================
 
-test('the curve passes through the values the old branches produced', () => {
-  const legacy = legacyBranchValues(0.85)
+test('the band spans the whole range a weighted average assumes', () => {
+  // The blend is a weighted AVERAGE of three 0-1 terms, and influence is
+  // weight share x realized spread. A term confined to 0.37 of the range hands
+  // back most of its configured weight before any data is involved -- measured
+  // live, a novelty weight of 8.1% delivered 2.1-4.5% of the movement.
+  assert.equal(NOVELTY_ALIEN_FLOOR, 0)
+  assert.equal(NOVELTY_PEAK, 1)
+})
 
-  assert.ok(Math.abs(NOVELTY_PEAK - legacy.sweetSpot) < 1e-12, `peak ${NOVELTY_PEAK}`)
+test('widening rescaled the curve without reshaping it', () => {
+  // The whole point of a pure stretch: where the familiar floor sits BETWEEN
+  // the other two must not move, or this stops being a scale change and starts
+  // being a redesign of what novelty rewards.
+  const legacy = legacyBranchValues(0.85)
+  const legacyPosition =
+    (legacy.allFamiliar - legacy.tooNovel) / (legacy.sweetSpot - legacy.tooNovel)
+  const position =
+    (NOVELTY_FAMILIAR_FLOOR - NOVELTY_ALIEN_FLOOR) / (NOVELTY_PEAK - NOVELTY_ALIEN_FLOOR)
+
   assert.ok(
-    Math.abs(NOVELTY_FAMILIAR_FLOOR - legacy.allFamiliar) < 1e-12,
-    `familiar floor ${NOVELTY_FAMILIAR_FLOOR}`
-  )
-  assert.ok(
-    Math.abs(NOVELTY_ALIEN_FLOOR - legacy.tooNovel) < 1e-12,
-    `alien floor ${NOVELTY_ALIEN_FLOOR}`
+    Math.abs(position - legacyPosition) < 0.005,
+    `familiar floor moved: ${position} vs ${legacyPosition}`
   )
 })
 
-test('no input escapes the band, and the band is no wider than the old one', () => {
-  // Widest the old implementation could ever reach, across avgNovelty 0..1.
-  const widest = legacyBranchValues(1)
-  const narrowest = legacyBranchValues(0)
-  const oldMax = Math.max(widest.sweetSpot, widest.allFamiliar, widest.tooNovel)
-  const oldMin = Math.min(narrowest.sweetSpot, narrowest.allFamiliar, narrowest.tooNovel)
-
+test('no input escapes the band', () => {
   for (let f = 0; f <= 1.0001; f += 0.001) {
     const score = scoreAtFamiliarity(Math.min(1, f))
     assert.ok(
       score >= NOVELTY_ALIEN_FLOOR - 1e-12 && score <= NOVELTY_PEAK + 1e-12,
       `familiarity ${f} produced ${score}, outside [${NOVELTY_ALIEN_FLOOR}, ${NOVELTY_PEAK}]`
     )
-    assert.ok(score >= oldMin && score <= oldMax, `familiarity ${f} escaped the old range`)
   }
 })
 
@@ -114,10 +118,11 @@ test('novelty rises toward the sweet spot and falls past it', () => {
   }
 })
 
-test('the alien penalty is milder than the familiar one, on purpose', () => {
-  // A genre-alien item is already punished by low similarity; penalising it
-  // twice was never the design. An all-staples item is what similarity
-  // over-rewards, so novelty is the counterweight there.
+test('the alien end falls further from the peak than the familiar end', () => {
+  // Both ends are penalised, the alien one harder -- true of the legacy
+  // branches (tooNovel sat a flat 0.1 below allFamiliar at every input) and
+  // preserved by the stretch. A comment in scoring.ts used to claim the
+  // reverse; the code never did it.
   const alienDrop = NOVELTY_PEAK - NOVELTY_ALIEN_FLOOR
   const familiarDrop = NOVELTY_PEAK - NOVELTY_FAMILIAR_FLOOR
   assert.ok(alienDrop > familiarDrop, 'alien end should fall further from the peak')

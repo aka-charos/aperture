@@ -339,10 +339,20 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
         )
       : (insights.scores?.novelty ?? 0) * 100
 
-  const discoveryTooltip = noveltyScale
+  // A band is only worth stating when it is NARROWER than the full range. The
+  // curve used to floor at 47% and cap at 84%, which a reader could not guess
+  // and the caption had to spell out; it now spans all of [0,1], where the
+  // same caption would read "scale 0-100%" and the tooltip would promise that
+  // the score "always sits between 0% and 100%". Both are noise, so both go.
+  // Kept as a check rather than deleted outright because the scale rides in
+  // from core's constants and a future retune could narrow it again.
+  const noveltyBand =
+    noveltyScale && (noveltyScale.min > 0.001 || noveltyScale.max < 0.999) ? noveltyScale : null
+
+  const discoveryTooltip = noveltyBand
     ? t('mediaDetail.insights.tooltipDiscoveryRanged', {
-        min: Math.round(noveltyScale.min * 100),
-        max: Math.round(noveltyScale.max * 100),
+        min: Math.round(noveltyBand.min * 100),
+        max: Math.round(noveltyBand.max * 100),
       })
     : t('mediaDetail.insights.tooltipDiscovery')
 
@@ -403,17 +413,17 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
       value: insights.scores?.novelty ?? null,
       fill: noveltyFill,
       color: 'success',
-      // Carries its range as well as its weight. This is the component whose
-      // number is least like a percentage — the curve is peaked, so it can
-      // never read below ~47% or above ~84% — and that was stated only in a
-      // tooltip, which is to say only to people using a mouse.
+// Carries its weight, and its range too whenever that range is narrower
+      // than the bar it is drawn in (see noveltyBand). The curve is peaked, so
+      // a band is a real constraint on what this number can read — but only
+      // worth saying when there is one.
       caption:
         [
           weightPct ? t('mediaDetail.insights.weightShare', { pct: weightPct.novelty }) : null,
-          noveltyScale
+          noveltyBand
             ? t('mediaDetail.insights.scaleRange', {
-                min: Math.round(noveltyScale.min * 100),
-                max: Math.round(noveltyScale.max * 100),
+                min: Math.round(noveltyBand.min * 100),
+                max: Math.round(noveltyBand.max * 100),
               })
             : null,
         ]
