@@ -10,6 +10,10 @@ import {
   NOVELTY_ALIEN_FLOOR,
   blendWeightShares,
   calculateBaseScore,
+  effectiveBlendWeights,
+  noveltyGain,
+  spreadOf,
+  TARGET_COMPONENT_SPREAD,
 } from './scoring.js'
 
 /**
@@ -401,4 +405,161 @@ test('blendWeightShares returns null for missing weights, never a default', () =
     blendWeightShares({ similarityWeight: Number.NaN, noveltyWeight: 0.2, ratingWeight: 0.2 }),
     null
   )
+})
+
+// ============================================================================
+// 6. Weight correction -- does the slider buy the influence it claims?
+// ============================================================================
+
+/**
+ * An evenly spaced series whose p90 - p10 is exactly `spread`. Nearest-rank
+ * percentiles over 101 evenly spaced points sit at indices 10 and 90, so the
+ * gap covers 80% of the range.
+ */
+function poolWithSpread(spread: number, n = 101): number[] {
+  const range = spread / 0.8
+  return Array.from({ length: n }, (_, i) => 0.5 - range / 2 + (range * i) / (n - 1))
+}
+
+/** Influence normalised to shares, i.e. what fraction of the movement each term drives. */
+function influenceShares(inf: { similarity: number; novelty: number; rating: number }) {
+  const total = inf.similarity + inf.novelty + inf.rating
+  return {
+    similarity: inf.similarity / total,
+    novelty: inf.novelty / total,
+    rating: inf.rating / total,
+  }
+}
+
+function maxDeviation(
+  a: { similarity: number; novelty: number; rating: number },
+  b: { similarity: number; novelty: number; rating: number }
+) {
+  return Math.max(
+    Math.abs(a.similarity - b.similarity),
+    Math.abs(a.novelty - b.novelty),
+    Math.abs(a.rating - b.rating)
+  )
+}
+
+test('spreadOf is the same p90 - p10 the influence report uses', () => {
+  const values = poolWithSpread(0.4)
+  assert.ok(Math.abs(spreadOf(values) - 0.4) < 1e-9, `got ${spreadOf(values)}`)
+})
+
+test('spreadOf ignores non-finite values rather than propagating NaN', () => {
+  const values = [...poolWithSpread(0.4), NaN, Infinity]
+  assert.ok(Number.isFinite(spreadOf(values)))
+})
+
+test('a term already on scale gets no gain', () => {
+  assert.equal(noveltyGain(TARGET_COMPONENT_SPREAD), 1)
+})
+
+test('the novelty gain is clamped at both ends', () => {
+  // A pool with almost no novelty signal must not have the ranking handed to
+  // it. This is the guard against amplifying noise.
+  assert.equal(noveltyGain(0.001), 1.5)
+  assert.equal(noveltyGain(10), 0.7)
+})
+
+test('an unmeasurable spread means no gain, never an infinite one', () => {
+  for (const bad of [0, -1, NaN, Infinity]) {
+    assert.equal(noveltyGain(bad), 1, `spread ${bad}`)
+  }
+})
+
+test('similarity is the reference and is never re-gained', () => {
+  // normalizeSimilarity is already the correction for that term; applying a
+  // second one would double-count it.
+  const config = { similarityWeight: 0.7, noveltyWeight: 0.08, ratingWeight: 0.21 }
+  for (const spread of [0.1, 0.5, 0.9]) {
+    assert.equal(effectiveBlendWeights(config, spread).similarityWeight, 0.7)
+  }
+})
+
+test('the rating gain is fixed, because its shortfall is', () => {
+  // Measured 0.46 for eight of nine live users and 0.44 for the ninth, so
+  // there is nothing per-run to adapt to.
+  const config = { similarityWeight: 0.7, noveltyWeight: 0.08, ratingWeight: 0.21 }
+  const a = effectiveBlendWeights(config, 0.2).ratingWeight
+  const b = effectiveBlendWeights(config, 0.8).ratingWeight
+  assert.equal(a, b)
+  assert.ok(a > config.ratingWeight, 'rating is under-spread, so its weight must rise')
+})
+
+test('a zero weight stays zero whatever the gain', () => {
+  const off = { similarityWeight: 0.7, noveltyWeight: 0, ratingWeight: 0 }
+  const corrected = effectiveBlendWeights(off, 0.2)
+  assert.equal(corrected.noveltyWeight, 0)
+  assert.equal(corrected.ratingWeight, 0)
+})
+
+test('correcting the weights makes realised influence track the configured shares', () => {
+  // The live configuration on the instance this was measured from.
+  const config = { similarityWeight: 0.7, noveltyWeight: 0.08, ratingWeight: 0.21 }
+
+  // Measured spreads, with novelty at its post-widening value.
+  const sim = poolWithSpread(0.577)
+  const nov = poolWithSpread(0.65)
+  const rat = poolWithSpread(0.46)
+  const candidates = sim.map((s, i) => ({
+    similarity: s,
+    normalizedSimilarity: s,
+    novelty: nov[i],
+    ratingScore: rat[i],
+    finalScore: 0,
+  }))
+
+  const configured = blendWeightShares(config)
+  assert.ok(configured)
+
+  const before = influenceShares(summarizeScoreComponents(candidates, config).influence)
+  const corrected = effectiveBlendWeights(config, spreadOf(nov))
+  const after = influenceShares(summarizeScoreComponents(candidates, corrected).influence)
+
+  const errBefore = maxDeviation(before, configured)
+  const errAfter = maxDeviation(after, configured)
+
+  assert.ok(errAfter < errBefore, `correction made it worse: ${errAfter} vs ${errBefore}`)
+  // Within a percentage point of what the admin actually set.
+  assert.ok(errAfter < 0.01, `still off by ${errAfter}`)
+})
+
+test('the correction still helps when the clamp binds', () => {
+  // A viewer with concentrated genre taste: novelty barely varies, so the gain
+  // wants 2.4x and is held at 1.5. Partial correction, but correction.
+  const config = { similarityWeight: 0.7, noveltyWeight: 0.08, ratingWeight: 0.21 }
+  const sim = poolWithSpread(0.577)
+  const nov = poolWithSpread(0.24)
+  const rat = poolWithSpread(0.46)
+  const candidates = sim.map((s, i) => ({
+    similarity: s,
+    normalizedSimilarity: s,
+    novelty: nov[i],
+    ratingScore: rat[i],
+    finalScore: 0,
+  }))
+
+  const configured = blendWeightShares(config)
+  assert.ok(configured)
+
+  const before = influenceShares(summarizeScoreComponents(candidates, config).influence)
+  const after = influenceShares(
+    summarizeScoreComponents(candidates, effectiveBlendWeights(config, spreadOf(nov))).influence
+  )
+
+  assert.ok(maxDeviation(after, configured) < maxDeviation(before, configured))
+})
+
+test('correcting weights cannot push the blended score out of [0,1]', () => {
+  // calculateBaseScore divides by the total weight, so gains change the shares
+  // and never the bound -- but the gains are the first thing that can make a
+  // weight exceed its slider's 0-1 range, so pin it.
+  const config = { similarityWeight: 1, noveltyWeight: 1, ratingWeight: 1 }
+  const corrected = effectiveBlendWeights(config, 0.05)
+  for (const value of [0, 0.5, 1]) {
+    const score = calculateBaseScore(value, value, value, corrected)
+    assert.ok(score >= -1e-12 && score <= 1 + 1e-12, `${value} produced ${score}`)
+  }
 })
