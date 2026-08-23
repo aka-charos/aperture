@@ -41,6 +41,8 @@ import {
   type InterestQueryResult,
   type TwinDonor,
   type TwinIndex,
+  effectiveBlendWeights,
+  spreadOf,
   type BlendWeights,
 } from '../shared/index.js'
 import { getDonorWatchedIds, getTwinPairs } from '../twinAffinity.js'
@@ -567,11 +569,17 @@ export async function getSeriesInterestMatchIndex(
  * Score candidates using multiple factors
  * Uses shared scoring functions for consistency with movie recommendations.
  */
+interface ScoredSeriesPool {
+  candidates: SeriesCandidate[]
+  /** See ScoredPool in movies/scoring.ts -- what the blend actually used. */
+  weights: BlendWeights
+}
+
 async function scoreSeriesCandidates(
   candidates: SeriesCandidate[],
   genreFamiliarity: Map<string, number>,
   config: SeriesPipelineConfig
-): Promise<SeriesCandidate[]> {
+): Promise<ScoredSeriesPool> {
   // Get ratings for candidates
   const seriesIds = candidates.map((c) => c.seriesId)
   const ratingsResult = await query<{ id: string; community_rating: number | null }>(
@@ -589,30 +597,35 @@ async function scoreSeriesCandidates(
   // Mirrors movies/scoring.ts.
   const similarityScale = buildSimilarityScale(candidates.map((c) => c.similarity))
 
-  // Score each candidate using shared scoring functions
-  return candidates.map((candidate) => {
+  // Pass 1: the three components. Two passes rather than one because the
+  // novelty gain is a property of the pool -- it needs every candidate's
+  // novelty before any candidate's final score can be computed. Mirrors
+  // movies/scoring.ts.
+  const scored = candidates.map((candidate) => ({
+    ...candidate,
     // Use shared rating score calculation (handles bad data, proper scaling)
-    const ratingScore = calculateRatingScore(ratingsMap.get(candidate.seriesId))
-
+    ratingScore: calculateRatingScore(ratingsMap.get(candidate.seriesId)),
     // Use shared novelty score calculation (handles missing genres). The genre
     // baseline now comes from the user's whole history rather than the
     // recentWatchLimit slice this used to query for itself.
-    const noveltyScore = calculateGenreNoveltyScore(candidate.genres, genreFamiliarity)
-
+    novelty: calculateGenreNoveltyScore(candidate.genres, genreFamiliarity),
     // Raw similarity stays untouched for evidence, explanations and storage.
-    const normalizedSimilarity = normalizeSimilarity(candidate.similarity, similarityScale)
+    normalizedSimilarity: normalizeSimilarity(candidate.similarity, similarityScale),
+  }))
 
-    // Use shared base score calculation (bounded weighted average, same formula movies use)
-    const finalScore = calculateBaseScore(normalizedSimilarity, noveltyScore, ratingScore, config)
+  const weights = effectiveBlendWeights(config, spreadOf(scored.map((c) => c.novelty)))
 
-    return {
-      ...candidate,
-      novelty: noveltyScore,
-      normalizedSimilarity,
-      ratingScore,
-      finalScore,
-    }
-  })
+  // Pass 2: the blend (bounded weighted average, same formula movies use).
+  for (const candidate of scored) {
+    candidate.finalScore = calculateBaseScore(
+      candidate.normalizedSimilarity,
+      candidate.novelty,
+      candidate.ratingScore,
+      weights
+    )
+  }
+
+  return { candidates: scored, weights }
 }
 
 interface SeriesSelectionResult {
@@ -1094,7 +1107,13 @@ export async function generateSeriesRecommendationsForUser(
       await getWatchedGenreCounts(user.id, 'series')
     )
 
-    const scoredCandidates = await scoreSeriesCandidates(candidates, genreFamiliarity, cfg)
+    // See the movie pipeline: these are cfg's weights corrected for how much
+    // of its range each term actually uses, and they are what the run records.
+    const { candidates: scoredCandidates, weights: blendWeights } = await scoreSeriesCandidates(
+      candidates,
+      genreFamiliarity,
+      cfg
+    )
 
     // 5.5 Apply franchise, genre, and custom interest preference adjustments
     logger.info({ userId: user.id }, '🎯 Applying preference adjustments (franchise, genre, custom interests)...')
@@ -1228,9 +1247,16 @@ export async function generateSeriesRecommendationsForUser(
           novelty: cfg.noveltyWeight,
           rating: cfg.ratingWeight,
         },
+        // What the blend really used; `influence` is computed from these, or
+        // it would describe a blend that did not happen.
+        effectiveWeights: {
+          similarity: blendWeights.similarityWeight,
+          novelty: blendWeights.noveltyWeight,
+          rating: blendWeights.ratingWeight,
+        },
         ...summarizeScoreComponents(
           scoredCandidates.map((c) => ({ ...c, id: c.seriesId })),
-          cfg
+          blendWeights
         ),
       },
       'SCORE-DIAG'
@@ -1458,7 +1484,7 @@ export async function generateSeriesRecommendationsForUser(
       duration,
       'completed',
       undefined,
-      cfg
+      blendWeights
     )
 
     // Housekeeping, after this run is marked completed so the kept prefix

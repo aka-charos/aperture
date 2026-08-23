@@ -418,7 +418,14 @@ export async function generateRecommendationsForUser(
       await getWatchedGenreCounts(user.id, 'movie')
     )
 
-    const scoredCandidates = scoreCandidates(candidates, genreFamiliarity, cfg)
+    // blendWeights are cfg's, corrected for how much of its range each term
+    // actually uses. They are what the blend consumed, so they are what the run
+    // records and what the insights panel multiplies back out.
+    const { candidates: scoredCandidates, weights: blendWeights } = scoreCandidates(
+      candidates,
+      genreFamiliarity,
+      cfg
+    )
 
     // 4.5 Apply franchise, genre, and custom interest preference adjustments
     logger.info({ userId: user.id }, '🎯 Applying preference adjustments (franchise, genre, custom interests)...')
@@ -562,7 +569,15 @@ export async function generateRecommendationsForUser(
           novelty: cfg.noveltyWeight,
           rating: cfg.ratingWeight,
         },
-        ...summarizeScoreComponents(scoredCandidates, cfg),
+        // What the blend really used. The gap between these and the configured
+        // weights above is the correction; `influence` below is computed from
+        // these, or it would describe a blend that did not happen.
+        effectiveWeights: {
+          similarity: blendWeights.similarityWeight,
+          novelty: blendWeights.noveltyWeight,
+          rating: blendWeights.ratingWeight,
+        },
+        ...summarizeScoreComponents(scoredCandidates, blendWeights),
       },
       'SCORE-DIAG'
     )
@@ -827,7 +842,7 @@ export async function generateRecommendationsForUser(
       duration,
       'completed',
       undefined,
-      cfg
+      blendWeights
     )
 
     // Housekeeping, after this run is safely marked completed so the prefix we

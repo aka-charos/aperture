@@ -351,6 +351,94 @@ export function calculateBaseScore(
 }
 
 /**
+ * The spread a component needs before its configured weight buys the influence
+ * that weight claims.
+ *
+ * Not a tuning knob, and not an average of the three: normalizeSimilarity
+ * produces this by construction. tanh(z/2) over a roughly normal z lands its
+ * p10-p90 near 0.57 whatever the pool looks like, and measured across nine
+ * users on a live instance it read 0.546-0.577 -- the steadiest quantity in
+ * the whole pipeline. Similarity is therefore the term already on scale, and
+ * the other two are corrected onto it rather than all three onto some average.
+ */
+export const TARGET_COMPONENT_SPREAD = 0.57
+
+/**
+ * Rating's realized spread, measured rather than derived.
+ *
+ * calculateRatingScore maps 0-10 onto 0-1, but no real library holds films
+ * rated 2.0, so the bottom of that range is never used. What comes out is
+ * remarkably steady: 0.46 for eight of nine users on the live instance and
+ * 0.44 for the ninth. A constant is the right instrument for a constant
+ * shortfall -- there is nothing per-run to adapt to.
+ */
+const RATING_TYPICAL_SPREAD = 0.46
+
+/**
+ * How far a novelty gain may travel from 1.0.
+ *
+ * Novelty is the one term whose spread genuinely varies by viewer -- 2.2x
+ * across the same nine users, 0.133 to 0.289 before the band was widened -- so
+ * it gets a per-run gain where rating gets a constant. The bounds keep that
+ * honest in the direction that matters: a pool where every candidate shares a
+ * genre profile has almost no novelty signal, and dividing by its tiny spread
+ * would hand the ranking to noise. Measured against real pools the gains land
+ * in [0.73, 1.58], so the clamp binds on exactly one user and only just -- it
+ * is a guard rail, not a mechanism.
+ */
+const MIN_NOVELTY_GAIN = 0.7
+const MAX_NOVELTY_GAIN = 1.5
+
+/** p90 - p10, the same measure summarizeScoreComponents reports as influence. */
+export function spreadOf(values: number[]): number {
+  const summary = summarizeValues(values.filter((v) => Number.isFinite(v)))
+  return summary.p90 - summary.p10
+}
+
+/**
+ * Correct the configured weights by how much of the range each term actually
+ * uses, so that influence tracks the slider rather than the term's shape.
+ *
+ * Influence is weight share x realized spread. Nothing enforced the second
+ * factor, so the sliders were never the whole story: at a configured 70.4 /
+ * 8.1 / 21.4 one live run delivered 77.8 / 3.3 / 18.9, and the novelty figure
+ * varied by a factor of two between users on identical settings.
+ *
+ * The correction goes on the WEIGHT and not on the component, deliberately.
+ * Both produce identical rankings -- w/spread x value orders the same as w x
+ * value/spread -- but only this direction leaves the numbers on screen alone.
+ * "Quality 82%" means IMDb 8.2, exactly and checkably, and rescaling the
+ * component to fix an influence problem would destroy that to no purpose.
+ *
+ * Deliberately NOT a blanket standardization of all three. Similarity's
+ * compression is an artifact of the embedding cone and of ANN returning its
+ * nearest slice, which is why normalizeSimilarity corrects it per pool.
+ * Novelty's and rating's are often real: a pool where every candidate is a
+ * crime-thriller has no genre variation to report, and manufacturing some
+ * would be the same error as reading twin affinity off centroids that span
+ * 0.898-0.993.
+ */
+export function effectiveBlendWeights(weights: BlendWeights, noveltySpread: number): BlendWeights {
+  return {
+    // Already on scale: normalizeSimilarity is the correction.
+    similarityWeight: weights.similarityWeight,
+    noveltyWeight: weights.noveltyWeight * noveltyGain(noveltySpread),
+    ratingWeight: weights.ratingWeight * (TARGET_COMPONENT_SPREAD / RATING_TYPICAL_SPREAD),
+  }
+}
+
+/**
+ * A pool with no novelty spread at all gets no gain rather than an infinite
+ * one. Harmless either way -- a constant term cannot change an ordering -- but
+ * 1.0 is the honest answer to "we could not measure this".
+ */
+export function noveltyGain(spread: number): number {
+  if (!Number.isFinite(spread) || spread <= 0) return 1
+  const gain = TARGET_COMPONENT_SPREAD / spread
+  return Math.max(MIN_NOVELTY_GAIN, Math.min(MAX_NOVELTY_GAIN, gain))
+}
+
+/**
  * The share of the blend each term actually carries, i.e. the multipliers
  * calculateBaseScore applies once it has divided by the total weight.
  *
