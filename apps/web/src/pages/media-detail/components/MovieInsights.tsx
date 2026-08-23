@@ -317,6 +317,18 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
   // 60, so a correct panel looked broken. Null for runs predating migration
   // 0147, where the honest move is to say nothing rather than to assume the
   // current config applied: weights are per user and an admin can move them.
+  // These are the EFFECTIVE shares -- each configured weight after the
+  // spread correction in effectiveBlendWeights -- because they are what
+  // multiplies the three component scores to produce the match below, and a
+  // panel whose printed numbers do not reproduce its own headline is the fault
+  // migration 0147 exists to answer.
+  //
+  // They therefore do NOT equal the admin card's sliders, and cannot: the
+  // novelty gain is derived per run from this user's own candidate pool, which
+  // global config knows nothing about. The caption says "of this match" rather
+  // than "of the blend" for exactly that reason -- it is a property of this
+  // calculation, not a setting, and naming it as one invited a comparison that
+  // can never balance.
   const weightPct = insights.scoreWeights
     ? {
         similarity: Math.round(insights.scoreWeights.similarity * 100),
