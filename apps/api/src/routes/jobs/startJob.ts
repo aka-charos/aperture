@@ -8,9 +8,9 @@
  */
 
 import { randomUUID } from 'crypto'
-import { getJobProgress, createChildLogger } from '@aperture/core'
+import { createChildLogger } from '@aperture/core'
 import { jobDefinitions } from './definitions.js'
-import { activeJobs } from './state.js'
+import { claimJob } from './state.js'
 import { runJob } from './executor.js'
 
 const logger = createChildLogger('jobs-start')
@@ -31,16 +31,21 @@ export function startJob(name: string): StartJobResult {
     return { ok: false, status: 404, error: 'Job not found' }
   }
 
-  const existingJobId = activeJobs.get(name)
-  if (existingJobId) {
-    const progress = getJobProgress(existingJobId)
-    if (progress?.status === 'running') {
-      return { ok: false, status: 409, error: 'Job is already running', jobId: existingJobId }
+  const jobId = randomUUID()
+  const claim = claimJob(name, jobId)
+  if (!claim.ok) {
+    return {
+      ok: false,
+      status: 409,
+      // A cancelled job holds its slot until the work actually stops, so the
+      // operator needs to be told the difference between "still going" and
+      // "you already stopped this, it is finishing the title it is on".
+      error: claim.cancelling
+        ? 'Job was cancelled and is still winding down'
+        : 'Job is already running',
+      jobId: claim.jobId,
     }
   }
-
-  const jobId = randomUUID()
-  activeJobs.set(name, jobId)
 
   logger.info({ job: name, jobId }, `Starting job: ${name}`)
 

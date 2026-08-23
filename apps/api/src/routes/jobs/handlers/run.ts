@@ -67,9 +67,14 @@ export async function registerRunHandlers(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Job is not running or already finished' })
       }
 
-      // Clear the active job reference
-      activeJobs.delete(name)
-
+      // Deliberately NOT clearing activeJobs here. Cancellation is
+      // cooperative: this only sets the status and files the job_runs row, and
+      // the work stops when the job's own loop next polls isJobCancelled.
+      // Releasing the guard now admits a second run of the same job while the
+      // first is still going -- which is how one cancelled recommendations run
+      // ended up scoring every user alongside its own replacement, at double
+      // the cost, with job_runs recording only one of them. The executor's
+      // finally clears the slot when the work actually exits.
       logger.info({ job: name, jobId: activeJobId }, `Job cancelled: ${name}`)
 
       return reply.send({

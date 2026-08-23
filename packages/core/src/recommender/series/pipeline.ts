@@ -14,6 +14,7 @@ import {
   addLog,
   completeJob,
   failJob,
+  isJobCancelled,
 } from '../../jobs/progress.js'
 import { randomUUID } from 'crypto'
 import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../../lib/ai-provider.js'
@@ -822,6 +823,8 @@ export interface GenerateSeriesRecommendationsOptions {
    * per-user build would recompute the identical matrix for each viewer.
    */
   twinIndex?: TwinIndex
+  /** Mirrors GenerateRecommendationsOptions: see the movie side. */
+  shouldCancel?: () => boolean
 }
 
 /**
@@ -1424,7 +1427,13 @@ export async function generateSeriesRecommendationsForUser(
         }))
 
         // Generate explanations using embedding-based evidence
-        const explanations = await generateSeriesExplanations(runId, user.id, seriesForExplanation)
+        // Same seam as the movie side: batched paid calls, so Stop lands here.
+        const explanations = await generateSeriesExplanations(
+          runId,
+          user.id,
+          seriesForExplanation,
+          options.shouldCancel
+        )
         await storeSeriesExplanations(runId, explanations)
         logger.info({ runId, count: explanations.length }, '✅ AI explanations stored')
       } catch (explanationError) {
@@ -1520,7 +1529,21 @@ export async function generateSeriesRecommendationsForAllUsers(
 
     const twinIndex = await buildBatchSeriesTwinIndex()
 
+    // Cancellation is cooperative -- cancelJob only sets the status and files
+    // the job_runs row, so a loop that never asks keeps running to completion.
+    // This one is minutes long and every user costs a batch of paid
+    // explanation calls, which is how a cancelled run came to keep scoring
+    // alongside its own replacement.
+    const shouldCancel = () => isJobCancelled(actualJobId)
+    let cancelled = false
+
     for (let i = 0; i < result.rows.length; i++) {
+      if (shouldCancel()) {
+        cancelled = true
+        addLog(actualJobId, 'warn', `⏹️ Cancelled after ${i} of ${totalUsers} user(s)`)
+        break
+      }
+
       const user = result.rows[i]
 
       try {
@@ -1536,7 +1559,7 @@ export async function generateSeriesRecommendationsForAllUsers(
           {},
           // Only the scheduled sweep skips; every manual path means someone
           // asked for the work.
-          { skipIfUnchanged: options.skipIfUnchanged ?? false, twinIndex }
+          { skipIfUnchanged: options.skipIfUnchanged ?? false, twinIndex, shouldCancel }
         )
 
         if (recResult.skipped) {
@@ -1572,8 +1595,17 @@ export async function generateSeriesRecommendationsForAllUsers(
     }
 
     const finalResult = { success, failed, skipped, totalRecommendations, jobId: actualJobId }
-    completeJob(actualJobId, finalResult)
-    addLog(actualJobId, 'info', `🎉 Complete: ${success} succeeded, ${failed} failed, ${skipped} unchanged, ${totalRecommendations} total recommendations`)
+    // A cancelled run must not complete over itself: cancelJob has already
+    // filed the job_runs row, and completing on top of a terminal status is
+    // ignored with a warning.
+    if (!cancelled) completeJob(actualJobId, finalResult)
+    addLog(
+      actualJobId,
+      cancelled ? 'warn' : 'info',
+      cancelled
+        ? `⏹️ Stopped early: ${success} of ${totalUsers} user(s) done, ${totalRecommendations} recommendations kept`
+        : `🎉 Complete: ${success} succeeded, ${failed} failed, ${skipped} unchanged, ${totalRecommendations} total recommendations`
+    )
 
     return finalResult
   } catch (err) {
@@ -1646,7 +1678,21 @@ export async function clearAndRebuildAllSeriesRecommendations(existingJobId?: st
 
     const twinIndex = await buildBatchSeriesTwinIndex()
 
+    // Cancellation is cooperative -- cancelJob only sets the status and files
+    // the job_runs row, so a loop that never asks keeps running to completion.
+    // This one is minutes long and every user costs a batch of paid
+    // explanation calls, which is how a cancelled run came to keep scoring
+    // alongside its own replacement.
+    const shouldCancel = () => isJobCancelled(jobId)
+    let cancelled = false
+
     for (let i = 0; i < users.length; i++) {
+      if (shouldCancel()) {
+        cancelled = true
+        addLog(jobId, 'warn', `⏹️ Cancelled after ${i} of ${users.length} user(s)`)
+        break
+      }
+
       const user = users[i]
       updateJobProgress(jobId, i, users.length, user.username)
 
@@ -1660,7 +1706,7 @@ export async function clearAndRebuildAllSeriesRecommendations(existingJobId?: st
             maxParentalRating: user.max_parental_rating,
           },
           {},
-          { twinIndex }
+          { twinIndex, shouldCancel }
         )
         success++
         addLog(jobId, 'info', `✅ Done: ${user.username}`)
@@ -1671,9 +1717,12 @@ export async function clearAndRebuildAllSeriesRecommendations(existingJobId?: st
       }
     }
 
-    updateJobProgress(jobId, users.length, users.length)
+    if (!cancelled) updateJobProgress(jobId, users.length, users.length)
     const finalResult = { cleared: existingCount, success, failed, jobId }
-    completeJob(jobId, finalResult)
+    // A cancelled run must not complete over itself: cancelJob has already
+    // filed the job_runs row, and completing on top of a terminal status is
+    // ignored with a warning.
+    if (!cancelled) completeJob(jobId, finalResult)
     return finalResult
   } catch (err) {
     const error = err instanceof Error ? err.message : 'Unknown error'
