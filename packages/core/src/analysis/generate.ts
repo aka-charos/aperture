@@ -291,6 +291,38 @@ async function retrieveSources(subject: AnalysisSubject): Promise<Retrieval> {
   }
 }
 
+/**
+ * Token counts from one model call, all optional.
+ *
+ * Optional because a provider may report none, and an absent count must stay
+ * absent rather than becoming a confident zero -- "the model used 0 output
+ * tokens" and "this provider does not say" are different claims, and the first
+ * one would make a truncation look impossible.
+ *
+ * `reasoningTokens` is the one worth having. It is billed from the same
+ * allowance as the prose, so a reasoning model can exhaust the whole ceiling
+ * thinking and return a fragment or nothing; without it a truncation looks like
+ * a model that cannot follow instructions rather than a budget set too low.
+ */
+export interface AnalysisUsage {
+  inputTokens?: number
+  outputTokens?: number
+  reasoningTokens?: number
+  totalTokens?: number
+}
+
+/** Keep only the counts the provider actually reported. */
+function readUsage(usage: unknown): AnalysisUsage {
+  if (typeof usage !== 'object' || usage === null) return {}
+  const source = usage as Record<string, unknown>
+  const out: AnalysisUsage = {}
+  for (const key of ['inputTokens', 'outputTokens', 'reasoningTokens', 'totalTokens'] as const) {
+    const value = source[key]
+    if (typeof value === 'number' && Number.isFinite(value)) out[key] = value
+  }
+  return out
+}
+
 interface WriteResult {
   /** The prose, already unwrapped from the contract. */
   text: string
@@ -298,6 +330,10 @@ interface WriteResult {
   grade: SourceGrade | null
   /** Why the response is unusable, or null when it reads as an answer. */
   problem: ResponseProblem | null
+  /** What the call cost, for the log line and the truncation message. */
+  usage?: AnalysisUsage
+  /** The ceiling this call ran under, so a truncation can name it. */
+  maxOutputTokens?: number
   modelId: string
   finishReason?: string
   /** Only in grounding mode: what Google attached to the answer. */
@@ -344,8 +380,11 @@ async function writeFromSources(prompt: string, maxOutputTokens: number): Promis
 
   let reading = { text: '', grade: null as SourceGrade | null, problem: null as ResponseProblem | null }
   let finishReason: string | undefined
+  let usage: AnalysisUsage = {}
+  let attemptsMade = 0
 
   for (let attempt = 1; attempt <= MAX_WRITE_ATTEMPTS; attempt++) {
+    attemptsMade = attempt
     let response
     try {
       response = await generateText({
@@ -372,18 +411,31 @@ async function writeFromSources(prompt: string, maxOutputTokens: number): Promis
       throw err
     }
     finishReason = response.finishReason
+    usage = readUsage(response.usage)
     reading = readAnalysis(response.text ?? '', response.finishReason)
 
     if (!reading.problem) break
     if (attempt < MAX_WRITE_ATTEMPTS) {
       logger.warn(
-        { attempt, modelId, problem: reading.problem.kind, finishReason },
+        { attempt, modelId, problem: reading.problem.kind, finishReason, ...usage, maxOutputTokens },
         'Analysis response was not usable; retrying'
       )
       await sleep(RETRY_DELAY_MS)
     }
   }
 
+  // ONE SELF-CONTAINED LINE. This used to carry the outcome without the budget
+  // it was measured against: `finishReason: 'length'` said a ceiling had been
+  // hit but not which, so reading it meant finding the "Writing analysis" line
+  // from before the call -- thirteen minutes and several hundred HTTP request
+  // lines earlier in a live log. Whoever is diagnosing a failure should not
+  // have to correlate two lines to learn one number.
+  //
+  // `reasoningTokens` is the field that actually explains a truncation: it is
+  // billed from the SAME allowance as the prose, so a model can spend the whole
+  // budget thinking and emit nothing. Measured on the explanations path at
+  // 2,079 and 2,283 tokens against a 3,000 ceiling; this path had the identical
+  // failure and logged none of it, which is why the cause had to be guessed at.
   logger.info(
     {
       modelId,
@@ -391,12 +443,16 @@ async function writeFromSources(prompt: string, maxOutputTokens: number): Promis
       grade: reading.grade,
       problem: reading.problem?.kind,
       finishReason,
+      attempts: attemptsMade,
+      promptChars: prompt.length,
+      maxOutputTokens: maxOutputTokens || 'unlimited',
+      ...usage,
       ms: Date.now() - startedAt,
     },
     'Analysis written'
   )
 
-  return { ...reading, modelId, finishReason }
+  return { ...reading, modelId, finishReason, usage, maxOutputTokens }
 }
 /**
  * Turn Google's grounding sources into something worth storing.
@@ -474,6 +530,8 @@ async function writeWithGrounding(
         ...reading,
         modelId: response.response?.modelId ?? keyAttempt.modelId,
         finishReason: response.finishReason,
+        usage: readUsage(response.usage),
+        maxOutputTokens,
         groundingChunks: grounding?.groundingChunks?.length ?? 0,
         groundingSources: extractGroundingSources(response.sources),
       }
@@ -487,6 +545,9 @@ async function writeWithGrounding(
           groundingChunks: result.groundingChunks,
           textChars: result.text.length,
           problem: result.problem?.kind,
+          finishReason: response.finishReason,
+          maxOutputTokens: maxOutputTokens || 'unlimited',
+          ...result.usage,
         },
         'Title analysis grounding completed'
       )
@@ -586,6 +647,8 @@ export async function analyseTitle(
   let problem: ResponseProblem | null
   let modelId: string
   let finishReason: string | undefined
+  let usage: AnalysisUsage | undefined
+  let maxOutputTokens: number | undefined
   let evidence: RetrievalEvidence
   let foundSources: AnalysisSourceRef[]
   let sourceCount: number
@@ -621,6 +684,8 @@ export async function analyseTitle(
     problem = result.problem
     modelId = result.modelId
     finishReason = result.finishReason
+    usage = result.usage
+    maxOutputTokens = result.maxOutputTokens
     evidence = { mode: 'grounding', chunkCount: result.groundingChunks ?? 0 }
     foundSources = result.groundingSources ?? []
     sourceCount = result.groundingChunks ?? 0
@@ -646,6 +711,8 @@ export async function analyseTitle(
     problem = result.problem
     modelId = result.modelId
     finishReason = result.finishReason
+    usage = result.usage
+    maxOutputTokens = result.maxOutputTokens
     evidence = { mode: 'crw', sources: retrieval.evidence }
     foundSources = retrieval.sources.map((s) => ({
       title: s.title,
@@ -673,10 +740,21 @@ export async function analyseTitle(
         problem: problem.kind,
         finishReason,
         textChars: text.length,
+        // The budget travels with the verdict. Without it `problem: truncated`
+        // says a ceiling was hit and leaves the reader to go and find which.
+        maxOutputTokens: maxOutputTokens ?? 'unlimited',
+        ...(usage ?? {}),
       },
       'Analysis response was not an answer; leaving the title pending'
     )
-    throw new Error(describeResponseProblem(problem, { title: subject.title, modelId }))
+    throw new Error(
+      describeResponseProblem(problem, {
+        title: subject.title,
+        modelId,
+        maxOutputTokens,
+        outputTokens: usage?.outputTokens,
+      })
+    )
   }
 
   const decision = decideAnalysisFloor({ text, grade, evidence })
