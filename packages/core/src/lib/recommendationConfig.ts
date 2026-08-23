@@ -90,7 +90,11 @@ interface RecommendationConfigRow {
 const MOVIE_DEFAULTS: MediaTypeConfig = {
   maxCandidates: 50000,
   selectedCount: 20,
-  recentWatchLimit: 50,
+  // A centroid built from 50 titles is a thin summary of someone with
+  // thousands of plays, and the tail it drops is the least-engaged end
+  // (the ordering is favourites, then play count, then recency). 200 is
+  // cheap now that the embeddings are fetched in one query.
+  recentWatchLimit: 200,
   similarityWeight: 0.4,
   noveltyWeight: 0.2,
   ratingWeight: 0.2,
@@ -105,7 +109,7 @@ const MOVIE_DEFAULTS: MediaTypeConfig = {
 const SERIES_DEFAULTS: MediaTypeConfig = {
   maxCandidates: 50000,
   selectedCount: 20,
-  recentWatchLimit: 100,
+  recentWatchLimit: 200,
   similarityWeight: 0.4,
   noveltyWeight: 0.2,
   ratingWeight: 0.2,
