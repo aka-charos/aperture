@@ -99,6 +99,54 @@ export interface ProviderConfig {
    * has, and it is the reading that shows a ceiling rather than hiding one.
    */
   freeTier?: boolean
+  /**
+   * Models to try, in order, when the one above cannot be reached.
+   *
+   * WHY A MODEL LIST AND NOT ANOTHER KEY. `fallbackApiKeys` answers "this
+   * account is out of quota"; this answers "this model is gone". Measured live:
+   * `nvidia/nemotron-3.5-lightning:free` had exactly ONE upstream endpoint and
+   * its provider deranked it, so every call returned 404 with an empty body and
+   * `isRetryable: false`. No key, no backoff and no amount of waiting fixes
+   * that — a `:free` variant on OpenRouter usually has a single endpoint and
+   * therefore no route of its own, which makes "the model I chose has been
+   * withdrawn" an ordinary Tuesday rather than an exotic failure.
+   *
+   * Entries carry their own provider, so a cloud role can fall back to a local
+   * server and survive the provider being down rather than just the model. No
+   * key is stored here: credentials are resolved per provider from the shared
+   * store at call time, exactly as the primary's are.
+   */
+  fallbackModels?: FallbackModel[]
+  /**
+   * Minimum seconds between calls on this role's provider. 0 or absent = off.
+   *
+   * FOR FREE-TIER CREDENTIALS, whose limits are per MINUTE as well as per day.
+   * A batch job calls as fast as each item finishes and then spends its budget
+   * collecting 429s; the SDK's backoff cannot help, because it reacts in
+   * hundreds of milliseconds to a window measured in minutes. See
+   * ./callPacing.ts for why this is a reservation rather than a timestamp.
+   *
+   * DELIBERATELY NOT FOLDED INTO {@link freeTier}. That flag's absence reads as
+   * "free tier" — the right default for a meter, which only chooses a
+   * denominator — but the wrong one for something that delays work: every
+   * existing role would start pacing itself without anyone asking, including
+   * local models that have no rate limit to respect. A knob that slows a job
+   * down has to be switched on explicitly.
+   */
+  callSpacingSeconds?: number
+}
+
+/**
+ * A model to fall back to, with the provider it lives on.
+ *
+ * No credentials: they come from the shared per-provider store when the attempt
+ * is built. Storing a key per fallback would make a spare model a second place
+ * to keep a credential, and the one thing this file has learned repeatedly is
+ * that two homes for one value drift.
+ */
+export interface FallbackModel {
+  provider: ProviderType
+  model: string
 }
 
 /**
@@ -121,6 +169,39 @@ export function resolveFallbackKeys(config: ProviderConfig): string[] {
   const legacy = config.fallbackApiKey ? [config.fallbackApiKey] : []
   return [...fromList, ...legacy].map((k) => k.trim()).filter((k) => k.length > 0)
 }
+
+/**
+ * The fallback models on a role, cleaned. Blank ids and entries repeating the
+ * primary are dropped: a fallback identical to the model that just failed is a
+ * second doomed request, and it is an easy thing to save by accident.
+ */
+export function resolveFallbackModels(config: ProviderConfig): FallbackModel[] {
+  const seen = new Set<string>([`${config.provider}:${config.model}`])
+  const out: FallbackModel[] = []
+  for (const entry of config.fallbackModels ?? []) {
+    const model = (entry?.model ?? '').trim()
+    if (!model || !entry?.provider) continue
+    const key = `${entry.provider}:${model}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ provider: entry.provider, model })
+  }
+  return out
+}
+
+/** Spacing in milliseconds, or 0 when the operator has not asked for pacing. */
+export function resolveCallSpacingMs(config: Pick<ProviderConfig, 'callSpacingSeconds'> | null | undefined): number {
+  const seconds = config?.callSpacingSeconds
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0) return 0
+  return Math.min(seconds, MAX_CALL_SPACING_SECONDS) * 1000
+}
+
+/**
+ * Ceiling on the pacing knob. An hour between calls is already far beyond any
+ * published free tier; past that the setting stops being pacing and becomes a
+ * way to make a job appear hung.
+ */
+export const MAX_CALL_SPACING_SECONDS = 3600
 
 export interface AIConfig {
   embeddings: ProviderConfig | null
@@ -837,20 +918,42 @@ export async function getTextGenerationModelInstance(): Promise<LanguageModel> {
 }
 
 /**
- * Get the model that writes title analyses.
+ * One model the analysis writer may try, with everything it needs to log and
+ * pace the attempt.
  *
- * Returns the model id alongside the instance because `title_analysis.model`
+ * The model id travels alongside the instance because `title_analysis.model`
  * records which model produced each row — worth having when comparing output
- * after swapping a local model, which is the expected way to tune this.
- *
- * Not a grounding role: retrieval happens before this is called (see
- * ../analysis/generate.ts), so this is an ordinary writing role and any
- * provider will do — including a local one, which is the point.
+ * after swapping a model, which is the expected way to tune this.
  */
-export async function getTitleAnalysisModelInstance(): Promise<{
+export interface ModelAttempt {
   model: LanguageModel
   modelId: string
-}> {
+  provider: ProviderType
+  /**
+   * Milliseconds this provider's calls must be spaced by. Carried per attempt
+   * because the gate is keyed on the PROVIDER: falling back from one OpenRouter
+   * free model to another still shares an account limit, while falling back to
+   * a local server shares nothing and must not wait.
+   */
+  spacingMs: number
+  /** False for the primary. Only useful for saying so in a log line. */
+  isFallback: boolean
+}
+
+/**
+ * Every model the Title Analysis role may use, primary first.
+ *
+ * Instantiated up front rather than lazily, deliberately: a fallback whose
+ * provider has no credentials is a configuration mistake, and finding that out
+ * at the moment the primary dies — halfway through a library pass — is the
+ * worst possible time. Constructing them here surfaces it on the first title.
+ *
+ * Credentials for a fallback come from the shared per-provider store, the same
+ * lookup a primary uses when its own key is blank. A base URL is resolved too,
+ * which the primary path does not need to do: a local fallback is precisely the
+ * case where the role's own `baseUrl` belongs to a different provider entirely.
+ */
+export async function getTitleAnalysisModelAttempts(): Promise<ModelAttempt[]> {
   const config = await getFunctionConfig('titleAnalysis')
 
   if (!config) {
@@ -859,11 +962,50 @@ export async function getTitleAnalysisModelInstance(): Promise<{
     )
   }
 
-  const resolved = await withResolvedCredentials(config)
-  const provider = createProviderInstance(resolved, 'titleAnalysis')
+  const spacingMs = resolveCallSpacingMs(config)
+  const build = (providerConfig: ProviderConfig, isFallback: boolean): ModelAttempt => {
+    const instance = createProviderInstance(providerConfig, 'titleAnalysis')
+    return {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      model: (instance as any)(providerConfig.model) as LanguageModel,
+      modelId: providerConfig.model,
+      provider: providerConfig.provider,
+      spacingMs,
+      isFallback,
+    }
+  }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return { model: (provider as any)(resolved.model) as LanguageModel, modelId: resolved.model }
+  const attempts: ModelAttempt[] = [build(await withResolvedCredentials(config), false)]
+
+  for (const fallback of resolveFallbackModels(config)) {
+    const sameProvider = fallback.provider === config.provider
+    const resolved: ProviderConfig = {
+      provider: fallback.provider,
+      model: fallback.model,
+      // A fallback on the role's own provider reuses the role's key, which for
+      // a grounding role is the only place it is kept. A different provider has
+      // to be looked up, since nothing about this role knows its credentials.
+      apiKey: sameProvider
+        ? (config.apiKey ?? (await resolveApiKeyForProvider(fallback.provider)))
+        : await resolveApiKeyForProvider(fallback.provider),
+      baseUrl: sameProvider
+        ? config.baseUrl
+        : await resolveBaseUrlForProvider(fallback.provider),
+    }
+    try {
+      attempts.push(build(resolved, true))
+    } catch (err) {
+      // A fallback that cannot even be constructed must not take the primary
+      // down with it — the whole point of this list is to make failures
+      // survivable, and it would be perverse for it to create one.
+      logger.warn(
+        { err, provider: fallback.provider, model: fallback.model },
+        'Skipping an unusable Title Analysis fallback model'
+      )
+    }
+  }
+
+  return attempts
 }
 
 /**

@@ -27,9 +27,12 @@
 import { generateText } from 'ai'
 
 import {
+  getFunctionConfig,
   getGroundingProviderTools,
-  getTitleAnalysisModelInstance,
+  getTitleAnalysisModelAttempts,
+  resolveCallSpacingMs,
   withGroundingModel,
+  type ModelAttempt,
 } from '../lib/ai-provider.js'
 import {
   crwSearch,
@@ -42,6 +45,7 @@ import {
 import { orderByHealth, recordEngineOutcome } from '../lib/crwEngines.js'
 import { query, queryOne } from '../lib/db.js'
 import { describeAiError } from '../lib/aiErrors.js'
+import { waitForCallSlot } from '../lib/callPacing.js'
 import { createChildLogger } from '../lib/logger.js'
 import { recordWebSearchCall } from '../lib/webSearchUsage.js'
 import { budgetSources } from './budget.js'
@@ -362,9 +366,34 @@ function readAnalysis(raw: string, finishReason?: string) {
   }
 }
 
-/** One plain writing call over documents already in the prompt. */
-async function writeFromSources(prompt: string, maxOutputTokens: number): Promise<WriteResult> {
-  const { model, modelId } = await getTitleAnalysisModelInstance()
+/**
+ * How one model got on with one prompt.
+ *
+ * Three outcomes rather than a result-or-throw, because the caller's next move
+ * differs for each: an answer ends the search, a provider failure moves to the
+ * next model, and an unusable answer moves on too — except when it names a
+ * SETTING, which no other model would escape either.
+ */
+type AttemptOutcome =
+  | { kind: 'ok'; result: WriteResult }
+  | { kind: 'unusable'; result: WriteResult }
+  | { kind: 'error'; error: unknown }
+  | { kind: 'cancelled' }
+
+export interface WriteOptions {
+  shouldCancel?: () => Promise<boolean> | boolean
+  /** Told when a pacing cool-off begins, so a job console can say why it is idle. */
+  onWait?: (seconds: number) => void
+}
+
+/** Run one model until it answers, gives up, or proves it cannot follow the format. */
+async function runWriteAttempt(
+  attempt: ModelAttempt,
+  prompt: string,
+  maxOutputTokens: number,
+  options: WriteOptions
+): Promise<AttemptOutcome> {
+  const { model, modelId } = attempt
 
   // The other silent half. A local model chewing through ~18k tokens of article
   // text is minutes of wall clock with nothing to show for it, and on a
@@ -373,7 +402,13 @@ async function writeFromSources(prompt: string, maxOutputTokens: number): Promis
   // call, not just after. Together with the retrieval line above, every long
   // pause in a run now has a log line saying which of the two services owns it.
   logger.info(
-    { modelId, promptChars: prompt.length, maxOutputTokens: maxOutputTokens || 'unlimited' },
+    {
+      modelId,
+      provider: attempt.provider,
+      fallback: attempt.isFallback || undefined,
+      promptChars: prompt.length,
+      maxOutputTokens: maxOutputTokens || 'unlimited',
+    },
     'Writing analysis'
   )
   const startedAt = Date.now()
@@ -383,8 +418,16 @@ async function writeFromSources(prompt: string, maxOutputTokens: number): Promis
   let usage: AnalysisUsage = {}
   let attemptsMade = 0
 
-  for (let attempt = 1; attempt <= MAX_WRITE_ATTEMPTS; attempt++) {
-    attemptsMade = attempt
+  for (let i = 1; i <= MAX_WRITE_ATTEMPTS; i++) {
+    attemptsMade = i
+    // Immediately before EVERY request, including the retries below: a retry is
+    // a request the provider counts, so pacing that covered only the first one
+    // would let a title needing three attempts spend three of a per-minute
+    // allowance in as many seconds. Keyed on the provider, because the limit
+    // belongs to the account rather than to this role.
+    const paced = await waitForCallSlot('provider:' + attempt.provider, attempt.spacingMs, options)
+    if (paced.cancelled) return { kind: 'cancelled' }
+
     let response
     try {
       response = await generateText({
@@ -396,28 +439,29 @@ async function writeFromSources(prompt: string, maxOutputTokens: number): Promis
         ...(maxOutputTokens > 0 ? { maxOutputTokens } : {}),
       })
     } catch (err) {
-      // Logged here and rethrown, because this is the only frame that knows
-      // which model and which attempt. The throw still stands: a provider
-      // failure writes no row, so the title stays pending and is retried.
+      // Logged here because this is the only frame that knows which model and
+      // which attempt. RETURNED rather than thrown so the caller can move to a
+      // fallback model; with no fallback left it rethrows and the title stays
+      // pending, which is what gets it retried on the next run.
       //
       // describeAiError rather than the raw error on purpose. `APICallError`
       // declares `requestBodyValues` before `statusCode`, and pino serializes
       // in declaration order -- so logging `{ err }` put ~16 KB of scraped
       // article text ahead of the one field that says what went wrong.
       logger.error(
-        { ...describeAiError(err), modelId, attempt, promptChars: prompt.length },
+        { ...describeAiError(err), modelId, attempt: i, promptChars: prompt.length },
         'Title analysis model call failed'
       )
-      throw err
+      return { kind: 'error', error: err }
     }
     finishReason = response.finishReason
     usage = readUsage(response.usage)
     reading = readAnalysis(response.text ?? '', response.finishReason)
 
     if (!reading.problem) break
-    if (attempt < MAX_WRITE_ATTEMPTS) {
+    if (i < MAX_WRITE_ATTEMPTS) {
       logger.warn(
-        { attempt, modelId, problem: reading.problem.kind, finishReason, ...usage, maxOutputTokens },
+        { attempt: i, modelId, problem: reading.problem.kind, finishReason, ...usage, maxOutputTokens },
         'Analysis response was not usable; retrying'
       )
       await sleep(RETRY_DELAY_MS)
@@ -439,6 +483,8 @@ async function writeFromSources(prompt: string, maxOutputTokens: number): Promis
   logger.info(
     {
       modelId,
+      provider: attempt.provider,
+      fallback: attempt.isFallback || undefined,
       textChars: reading.text.length,
       grade: reading.grade,
       problem: reading.problem?.kind,
@@ -452,8 +498,83 @@ async function writeFromSources(prompt: string, maxOutputTokens: number): Promis
     'Analysis written'
   )
 
-  return { ...reading, modelId, finishReason, usage, maxOutputTokens }
+  const result: WriteResult = { ...reading, modelId, finishReason, usage, maxOutputTokens }
+  return reading.problem ? { kind: 'unusable', result } : { kind: 'ok', result }
 }
+
+/**
+ * Write the analysis, trying each configured model in turn.
+ *
+ * WHAT ROTATES AND WHAT DOES NOT. A provider failure rotates: 429, 5xx, the 404
+ * a withdrawn endpoint answers with, a dropped connection — every one of them
+ * means this model cannot answer right now and another one might. An answer
+ * that breaks the output contract rotates too, once this model has had its
+ * retries, because "cannot follow the format" is a fact about the model and a
+ * different one may manage it — that failure has already cost a library pass.
+ *
+ * A TRUNCATION DOES NOT ROTATE, and the exception is the interesting one. It
+ * names a SETTING: the output ceiling was reached, and every model would reach
+ * it identically, so rotating would spend a second model to reproduce the same
+ * result and then report the second model's name — sending the operator after
+ * the wrong thing entirely. The message thrown instead says which number to
+ * change and where it lives.
+ */
+async function writeFromSources(
+  prompt: string,
+  maxOutputTokens: number,
+  options: WriteOptions = {}
+): Promise<WriteResult> {
+  const attempts = await getTitleAnalysisModelAttempts()
+
+  let lastError: unknown
+  let lastUnusable: WriteResult | null = null
+
+  for (const [index, attempt] of attempts.entries()) {
+    const outcome = await runWriteAttempt(attempt, prompt, maxOutputTokens, options)
+
+    if (outcome.kind === 'ok') {
+      if (index > 0) {
+        logger.info(
+          { modelId: attempt.modelId, provider: attempt.provider, position: index },
+          'Analysis written by a fallback model'
+        )
+      }
+      return outcome.result
+    }
+
+    if (outcome.kind === 'cancelled') throw new AnalysisCancelledError()
+
+    if (outcome.kind === 'unusable') {
+      lastUnusable = outcome.result
+      // The setting, not the model. Stop here so the thrown message names the
+      // ceiling rather than whichever model happened to be last in the list.
+      if (outcome.result.problem?.kind === 'truncated') return outcome.result
+    } else {
+      lastError = outcome.error
+    }
+
+    const next = attempts[index + 1]
+    if (next) {
+      logger.warn(
+        {
+          failed: attempt.modelId,
+          reason: outcome.kind === 'error' ? 'provider' : outcome.result.problem?.kind,
+          fallingBackTo: next.modelId,
+          provider: next.provider,
+        },
+        'Title analysis falling back to the next model'
+      )
+    }
+  }
+
+  // Every model was tried. An unusable answer is preferred over a raw provider
+  // error because it produces the operator-facing sentence in ./response.ts,
+  // which names the fault in words; a rethrown provider error is the right
+  // answer only when nothing ever answered at all.
+  if (lastUnusable) return lastUnusable
+  throw lastError ?? new Error('The Title Analysis model produced no response.')
+}
+
 /**
  * Turn Google's grounding sources into something worth storing.
  *
@@ -496,9 +617,20 @@ function extractGroundingSources(raw: unknown): AnalysisSourceRef[] {
  */
 async function writeWithGrounding(
   prompt: string,
-  maxOutputTokens: number
+  maxOutputTokens: number,
+  options: WriteOptions = {}
 ): Promise<WriteResult> {
   const tools = await getGroundingProviderTools('titleAnalysis')
+  // Read once, outside the key loop: pacing is a property of the role's
+  // credentials, and re-reading it per attempt would just be another database
+  // round trip inside a retry.
+  //
+  // NOTE the deliberate asymmetry with the CRW path above: grounding mode does
+  // NOT rotate models. Its model choice is already constrained to Google's
+  // grounding-capable ones, and its characteristic failure is a spent daily
+  // quota — which `withGroundingModel` answers by rotating KEYS, since a second
+  // model on the same exhausted project would fail identically.
+  const spacingMs = resolveCallSpacingMs(await getFunctionConfig('titleAnalysis'))
 
   return withGroundingModel('titleAnalysis', async (model, keyAttempt) => {
     let result: WriteResult = {
@@ -510,6 +642,11 @@ async function writeWithGrounding(
     let usage: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | undefined
 
     for (let attempt = 1; attempt <= MAX_WRITE_ATTEMPTS; attempt++) {
+      // Same gate and same key as the CRW path, so the two modes cannot pace
+      // differently. Cancellation lands inside the wait rather than after it.
+      const paced = await waitForCallSlot('provider:' + keyAttempt.provider, spacingMs, options)
+      if (paced.cancelled) throw new AnalysisCancelledError()
+
       const response = await generateText({
         model,
         tools,
@@ -611,6 +748,17 @@ export interface AnalyseTitleOptions {
    * for minutes, which reads as a button that does not work.
    */
   shouldCancel?: () => Promise<boolean> | boolean
+  /**
+   * Told when a pacing cool-off starts, and how long it will last.
+   *
+   * A free-tier cool-off is a deliberate pause of up to a minute in the middle
+   * of a job whose other steps are already minutes long. Unannounced it is
+   * indistinguishable from a wedged run — the same failure the "Retrieving
+   * sources" and "Writing analysis" lines exist to prevent — so the batch job
+   * routes this into its console rather than leaving it only in the container
+   * log.
+   */
+  onWait?: (seconds: number) => void
 }
 
 export async function analyseTitle(
@@ -660,7 +808,8 @@ export async function analyseTitle(
     // result on, which is why the floor leans on the model's own verdict here.
     const result = await writeWithGrounding(
       buildAnalysisPrompt(subject, { mode }),
-      crwConfig.analysisMaxOutputTokens
+      crwConfig.analysisMaxOutputTokens,
+      { shouldCancel: options.shouldCancel, onWait: options.onWait }
     )
 
     // A grounded call that retrieved NOTHING did not answer the question — it
@@ -704,7 +853,8 @@ export async function analyseTitle(
 
     const result = await writeFromSources(
       buildAnalysisPrompt(subject, { mode, sources: retrieval.sources }),
-      crwConfig.analysisMaxOutputTokens
+      crwConfig.analysisMaxOutputTokens,
+      { shouldCancel: options.shouldCancel, onWait: options.onWait }
     )
     text = result.text
     grade = result.grade

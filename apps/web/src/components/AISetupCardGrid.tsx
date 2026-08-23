@@ -130,6 +130,10 @@ export function AISetupCardGrid({ config, onSave, variant }: AISetupCardGridProp
           compact={isSetup}
           isSetup={isSetup}
           supportsFallbackKey
+          // The one role that walks a spare-model list and honours a pacing
+          // delay (core `analysis/generate.ts`). Offered here and nowhere else
+          // because a setting no consumer reads is worse than an absent one.
+          supportsFallbackModels
           footer={
             config?.titleAnalysis?.provider === 'google' ? (
               <WebSearchUsagePanel role="titleAnalysis" />

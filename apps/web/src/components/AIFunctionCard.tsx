@@ -43,10 +43,22 @@ import {
 } from '@mui/icons-material'
 import {
   PROVIDER_INFO,
+  type FallbackModelConfig,
   type FunctionConfig,
   type ProviderInfo,
   type ProviderType,
 } from './aiProviderInfo'
+import { AIFallbackModels } from './AIFallbackModels'
+
+/**
+ * Pacing bounds, mirroring core's `MAX_CALL_SPACING_SECONDS`.
+ *
+ * Duplicated rather than imported because the web bundle never imports
+ * `@aperture/core` — server code would break it. The server clamps to the same
+ * ceiling, so a drift here costs a slider range, never a wrong stored value.
+ */
+const MAX_PACING_SECONDS = 3600
+const DEFAULT_PACING_SECONDS = 60
 
 export type AIFunction =
   | 'embeddings'
@@ -114,6 +126,16 @@ export interface AIFunctionCardProps {
   isSetup?: boolean // Use unauthenticated /api/setup/* endpoints during first-run
   /** Offer a second API key, used when the first one runs out of quota. */
   supportsFallbackKey?: boolean
+  /**
+   * Offer spare MODELS and a free-tier pacing delay.
+   *
+   * Separate from `supportsFallbackKey` because the two answer different
+   * questions — a spare key covers an exhausted account, a spare model covers a
+   * withdrawn endpoint — and because only a role whose consumer actually walks
+   * the list may show one. A setting that does nothing is worse than an absent
+   * one, so this is opt-in per card rather than on for every role.
+   */
+  supportsFallbackModels?: boolean
   /** Extra content rendered just above the Test/Save buttons (e.g. a usage meter). */
   footer?: React.ReactNode
 }
@@ -130,6 +152,7 @@ export function AIFunctionCard({
   compact = false,
   isSetup = false,
   supportsFallbackKey = false,
+  supportsFallbackModels = false,
   footer,
 }: AIFunctionCardProps) {
   const { t } = useTranslation()
@@ -171,6 +194,20 @@ export function AIFunctionCard({
   const [showFallbackKeys, setShowFallbackKeys] = useState(false)
   /** Whether the meter may assume Google's free-tier ceilings. See the checkbox below. */
   const [freeTier, setFreeTier] = useState(true)
+
+  // Spare models, and the pacing delay that goes with a free-tier account.
+  const [fallbackModels, setFallbackModels] = useState<FallbackModelConfig[]>([])
+  /**
+   * Pacing is ONE stored number, not a flag plus a number.
+   *
+   * 0 means off, so the checkbox is derived from the value rather than stored
+   * beside it — this codebase has been burned repeatedly by two places holding
+   * one answer, and a flag that can disagree with its own number is exactly
+   * that shape. `pacingDraft` is local only: it remembers what was typed so
+   * unticking and re-ticking does not throw away a tuned value.
+   */
+  const [pacingSeconds, setPacingSeconds] = useState(0)
+  const [pacingDraft, setPacingDraft] = useState(DEFAULT_PACING_SECONDS)
 
   // Custom model dialog state
   const [addModelDialogOpen, setAddModelDialogOpen] = useState(false)
@@ -225,6 +262,25 @@ export function AIFunctionCard({
   useEffect(() => {
     setFreeTier(storedFreeTier)
   }, [storedFreeTier])
+
+  const storedFallbackModels = useMemo(
+    () => config?.fallbackModels ?? [],
+    [config?.fallbackModels]
+  )
+  useEffect(() => {
+    setFallbackModels(storedFallbackModels)
+  }, [storedFallbackModels])
+
+  // Note the direction: ABSENT means off. The opposite of `freeTier`, and
+  // deliberately so — that flag only chooses a denominator for a meter, while
+  // this one delays real work. Reading absence as "on" would start pacing every
+  // already-configured role without anyone asking, including local models that
+  // have no rate limit to respect.
+  const storedPacing = config?.callSpacingSeconds ?? 0
+  useEffect(() => {
+    setPacingSeconds(storedPacing)
+    if (storedPacing > 0) setPacingDraft(storedPacing)
+  }, [storedPacing])
 
 
   // Check capability warning
@@ -398,6 +454,17 @@ export function AIFunctionCard({
       // what stops switching Title Analysis to a local model from silently
       // rewriting the tier it was told about its Google keys.
       ...(offersFreeTierToggle ? { freeTier } : {}),
+      // Sent whole, like the spare keys and for the same reason: the rows were
+      // seeded from what is stored, so a round-trip preserves what was not
+      // touched and an empty array is how the list gets cleared. Rows with no
+      // model chosen are dropped — a half-filled row is a fallback that
+      // resolves to nothing at the moment it is finally needed.
+      ...(supportsFallbackModels
+        ? {
+            fallbackModels: fallbackModels.filter((m) => m.model.trim().length > 0),
+            callSpacingSeconds: pacingSeconds,
+          }
+        : {}),
     }
 
     setSaving(true)
@@ -1004,6 +1071,62 @@ export function AIFunctionCard({
             />
             <FormHelperText sx={{ mt: 0 }}>{t('aiFunctionCard.freeTierHelp')}</FormHelperText>
           </Box>
+        )}
+
+        {/* Free-tier PACING. Unlike the checkbox above, this one changes what
+            the app does: it refuses to issue the next call until the delay has
+            passed. Free-tier keys are limited per MINUTE as well as per day, and
+            a batch job calls as fast as each title finishes — so a run spends
+            its budget collecting 429s that look, in the log, exactly like a
+            provider being down. The SDK's own backoff cannot help: it reacts in
+            hundreds of milliseconds to a window measured in minutes.
+
+            One stored number, with the checkbox derived from it — see the state
+            declaration above for why there is no separate flag. */}
+        {supportsFallbackModels && (
+          <Box sx={{ mb: 2 }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={pacingSeconds > 0}
+                  onChange={(e) => setPacingSeconds(e.target.checked ? pacingDraft : 0)}
+                />
+              }
+              label={t('aiFunctionCard.pacingLabel')}
+            />
+            {pacingSeconds > 0 && (
+              <TextField
+                label={t('aiFunctionCard.pacingSecondsLabel')}
+                type="number"
+                size="small"
+                value={pacingSeconds}
+                onChange={(e) => {
+                  const next = Math.max(1, Math.min(MAX_PACING_SECONDS, Number(e.target.value) || 0))
+                  setPacingSeconds(next)
+                  setPacingDraft(next)
+                }}
+                inputProps={{ min: 1, max: MAX_PACING_SECONDS }}
+                sx={{ mt: 1, maxWidth: 220 }}
+              />
+            )}
+            <FormHelperText sx={{ mt: pacingSeconds > 0 ? 1 : 0 }}>
+              {t('aiFunctionCard.pacingHelp')}
+            </FormHelperText>
+          </Box>
+        )}
+
+        {/* Spare models. Rendered only once a provider list has arrived, since
+            each row needs it to offer a choice. */}
+        {supportsFallbackModels && !loadingProviders && providers.length > 0 && (
+          <AIFallbackModels
+            functionType={functionType}
+            apiBase={apiBase}
+            value={fallbackModels}
+            onChange={setFallbackModels}
+            providers={providers}
+            primary={{ provider, model }}
+          />
         )}
 
         {/* Ollama Instructions */}
