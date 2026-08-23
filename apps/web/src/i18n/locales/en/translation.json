@@ -829,7 +829,7 @@
       "tasteMatch": "Taste Match",
       "discovery": "Discovery",
       "quality": "Quality",
-      "weightShare": "{{pct}}% of the blend",
+      "weightShare": "{{pct}}% of this match",
       "scaleRange": "scale {{min}}–{{max}}%",
       "na": "N/A",
       "blendedScore": "These blend to",
