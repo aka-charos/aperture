@@ -244,8 +244,8 @@ export async function generateExplanations(
   recommendations: MovieForExplanation[],
   /**
    * Checked between batches so an admin's Cancel lands within one request
-   * rather than at the end of the user. Optional because the pipelines have no
-   * job id to hand at this point; the explanations-only refresh does.
+   * rather than at the end of the user. Optional because the single-user paths
+   * have no job to cancel; every batch caller passes one.
    */
   shouldCancel?: () => boolean
 ): Promise<ExplanationResult[]> {

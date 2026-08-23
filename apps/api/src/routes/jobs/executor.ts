@@ -47,7 +47,7 @@ import {
 } from '@aperture/core'
 import { syncAllTraktRatings } from '../trakt/index.js'
 import { refreshAssistantSuggestions } from '../assistant/jobs/refreshSuggestions.js'
-import { activeJobs } from './state.js'
+import { releaseJob } from './state.js'
 
 const logger = createChildLogger('jobs-executor')
 
@@ -665,6 +665,6 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
     failJob(jobId, error)
     throw err
   } finally {
-    activeJobs.delete(name)
+    releaseJob(name, jobId)
   }
 }

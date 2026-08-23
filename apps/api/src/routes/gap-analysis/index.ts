@@ -17,12 +17,11 @@ import {
   updateDiscoveryRequestStatus,
   hasExistingRequest,
   resolveSeerrUserIdForProfile,
-  getJobProgress,
 } from '@aperture/core'
 import { requireAdmin, type SessionUser } from '../../plugins/auth.js'
 import { query, queryOne } from '../../lib/db.js'
 import { runJob } from '../jobs/executor.js'
-import { activeJobs } from '../jobs/state.js'
+import { claimJob } from '../jobs/state.js'
 
 const BLOCKING_STATUSES = new Set(['pending', 'submitted', 'approved'])
 
@@ -188,19 +187,17 @@ const gapAnalysisRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.post('/api/admin/gap-analysis/refresh', { preHandler: requireAdmin }, async (_request, reply) => {
     const name = 'refresh-library-gaps'
-    const existingJobId = activeJobs.get(name)
-    if (existingJobId) {
-      const progress = getJobProgress(existingJobId)
-      if (progress?.status === 'running') {
-        return reply.status(409).send({
-          error: 'Gap analysis is already running',
-          jobId: existingJobId,
-        })
-      }
+    const jobId = randomUUID()
+    const claim = claimJob(name, jobId)
+    if (!claim.ok) {
+      return reply.status(409).send({
+        error: claim.cancelling
+          ? 'Gap analysis was cancelled and is still winding down'
+          : 'Gap analysis is already running',
+        jobId: claim.jobId,
+      })
     }
 
-    const jobId = randomUUID()
-    activeJobs.set(name, jobId)
     runJob(name, jobId).catch((err) => {
       fastify.log.error({ err, jobId }, 'refresh-library-gaps failed')
     })

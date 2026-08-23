@@ -8,12 +8,11 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { randomUUID } from 'crypto'
 import {
-  getJobProgress,
   createChildLogger,
 } from '@aperture/core'
 import { setJobExecutor } from '../../lib/scheduler.js'
 import { jobDefinitions } from './definitions.js'
-import { activeJobs } from './state.js'
+import { claimJob, releaseJob } from './state.js'
 import { runJob } from './executor.js'
 import {
   registerListHandlers,
@@ -42,19 +41,15 @@ const jobsRoutes: FastifyPluginAsync = async (fastify) => {
       throw new Error(`Unknown job: ${jobName}`)
     }
 
-    // Check if job is already running
-    const existingJobId = activeJobs.get(jobName)
-    if (existingJobId) {
-      const progress = getJobProgress(existingJobId)
-      if (progress?.status === 'running') {
-        logger.info({ job: jobName }, 'Job already running, skipping scheduled run')
-        return
-      }
-    }
-
-    // Create new job ID and run
     const jobId = randomUUID()
-    activeJobs.set(jobName, jobId)
+    const claim = claimJob(jobName, jobId)
+    if (!claim.ok) {
+      logger.info(
+        { job: jobName, holder: claim.jobId, cancelling: claim.cancelling },
+        'Job still in flight, skipping scheduled run'
+      )
+      return
+    }
 
     try {
       // The one scheduled entry point. Every other caller of runJob (the Run
@@ -62,7 +57,7 @@ const jobsRoutes: FastifyPluginAsync = async (fastify) => {
       // for work and takes the 'manual' default.
       await runJob(jobName, jobId, 'scheduled')
     } finally {
-      activeJobs.delete(jobName)
+      releaseJob(jobName, jobId)
     }
   })
 
