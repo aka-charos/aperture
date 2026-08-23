@@ -45,6 +45,24 @@ export interface FunctionConfig {
    * Nothing throttles on it. Absent means free tier.
    */
   freeTier?: boolean
+  /**
+   * Models to try, in order, when the one above cannot be reached — a 429, a
+   * 5xx, or the 404 a provider answers with once it has withdrawn an endpoint.
+   * Each entry carries its own provider, so a cloud role can fall back to a
+   * local server. Omitted from a save means "leave alone"; an empty array
+   * clears the list.
+   */
+  fallbackModels?: FallbackModelConfig[]
+  /**
+   * Minimum seconds between calls on this role's provider; 0 or absent is off.
+   * For free-tier credentials, whose limits are per minute as well as per day.
+   */
+  callSpacingSeconds?: number
+}
+
+export interface FallbackModelConfig {
+  provider: ProviderType
+  model: string
 }
 
 export const PROVIDER_INFO: Record<ProviderType, ProviderInfo> = {

@@ -57,6 +57,7 @@ import {
   getGroundingKeySlots,
   resolveFallbackKeys,
   isFreeTierConfig,
+  MAX_CALL_SPACING_SECONDS,
   AI_FUNCTIONS,
   isAIFunction,
   type AIFunction,
@@ -807,11 +808,22 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       baseUrl?: string
       fallbackApiKeys?: string[]
       freeTier?: boolean
+      fallbackModels?: { provider: string; model: string }[]
+      callSpacingSeconds?: number
     }
   }>('/api/settings/ai/:function', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
     try {
       const fn = request.params.function
-      const { provider, model, apiKey, baseUrl, fallbackApiKeys, freeTier } = request.body
+      const {
+        provider,
+        model,
+        apiKey,
+        baseUrl,
+        fallbackApiKeys,
+        freeTier,
+        fallbackModels,
+        callSpacingSeconds,
+      } = request.body
 
       if (!isAIFunction(fn)) {
         return reply.status(400).send({ error: `Invalid function. Must be one of: ${AI_FUNCTIONS.join(', ')}` })
@@ -864,6 +876,35 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       // writing the default would just make every role's config noisier.
       const nextFreeTier = freeTier === undefined ? existing?.freeTier : freeTier
 
+      // Same rule again for the two fields the Title Analysis card adds. They
+      // live only here — there is no shared store for "which spare model" or
+      // "how fast may this role call" — so an omitted field is "leave alone"
+      // and an empty array is the only way to clear the list.
+      //
+      // Validated rather than trusted: an unknown provider id would be stored,
+      // reach `createProviderInstance`, and throw on the first title of a
+      // library pass. A blank model id is dropped for the same reason
+      // `resolveFallbackModels` drops it — a fallback that cannot resolve is
+      // worse than no fallback, because it is only discovered at the moment
+      // the primary has already failed.
+      const nextFallbackModels =
+        fallbackModels === undefined
+          ? existing?.fallbackModels
+          : fallbackModels
+              .filter((m) => PROVIDERS.some((p) => p.id === m?.provider) && m?.model?.trim())
+              .map((m) => ({ provider: m.provider as ProviderType, model: m.model.trim() }))
+
+      // Clamped, not rejected: this arrives from a number field, and a bad
+      // value costs pacing rather than correctness. 0 is meaningful — it is how
+      // the card says "pacing off" — so it survives the clamp untouched.
+      const nextSpacing =
+        callSpacingSeconds === undefined
+          ? existing?.callSpacingSeconds
+          : Math.min(
+              Math.max(Math.round(callSpacingSeconds) || 0, 0),
+              MAX_CALL_SPACING_SECONDS
+            )
+
       await setFunctionConfig(fn, {
         provider: provider as ProviderType,
         model,
@@ -871,6 +912,11 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         baseUrl,
         fallbackApiKeys: nextFallbackKeys?.length ? nextFallbackKeys : undefined,
         freeTier: nextFreeTier === false ? false : undefined,
+        fallbackModels: nextFallbackModels?.length ? nextFallbackModels : undefined,
+        // Stored only when it is doing something, like `freeTier` above:
+        // writing the default into every role's config would just make the blob
+        // noisier without saying anything.
+        callSpacingSeconds: nextSpacing && nextSpacing > 0 ? nextSpacing : undefined,
       })
 
       const config = await getFunctionConfig(fn)

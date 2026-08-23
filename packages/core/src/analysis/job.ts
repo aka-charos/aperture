@@ -216,6 +216,13 @@ export async function generateTitleAnalyses(
         try {
           const stored = await analyseTitle(title.mediaType, title.mediaId, title.subject, {
             shouldCancel: options.shouldCancel,
+            // Free-tier pacing pauses for up to a minute between model calls.
+            // Routed into the job console because a silent minute inside a run
+            // whose other steps are also minutes long reads as a wedged job —
+            // and an operator reaching for `docker stop` is exactly how the
+            // last failure storm started.
+            onWait: (seconds) =>
+              say('info', `⏸️ Free-tier pacing — waiting ${seconds}s before the next model call`),
           })
           const secs = ((Date.now() - startedAt) / 1000).toFixed(0)
           const found = `${stored.sourceCount ?? 0} source(s)${

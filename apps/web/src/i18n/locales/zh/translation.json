@@ -1468,7 +1468,18 @@
     "addFallbackKey": "Add spare key",
     "removeFallbackKey": "Remove this spare key",
     "freeTierLabel": "These keys are on the free tier",
-    "freeTierHelp": "Only affects the usage meter below: ticked, it draws the free-tier ceilings for the chosen model. Untick it on a paid project, where those ceilings are far too low and the bars would read as full. Nothing is throttled either way."
+    "freeTierHelp": "Only affects the usage meter below: ticked, it draws the free-tier ceilings for the chosen model. Untick it on a paid project, where those ceilings are far too low and the bars would read as full. Nothing is throttled either way.",
+    "pacingLabel": "This model is on a free tier — space out requests",
+    "pacingSecondsLabel": "Seconds between calls",
+    "pacingHelp": "Free plans limit requests per minute as well as per day. A library run calls as fast as each title finishes, which on a free key means most of the run is spent on refusals. With this on, the next call waits — including retries and any fallback on the same provider. Off by default; a local model has no limit to respect.",
+    "fallbackModelsTitle": "Fallback models",
+    "fallbackModelsHelp": "Tried in order when the model above cannot be reached — rate-limited, unavailable, or withdrawn by its provider. Free models often have a single upstream endpoint, so losing it is not unusual. Pick a different provider to survive an outage rather than just a dead model.",
+    "fallbackModelLabel": "Fallback {{number}}",
+    "fallbackModelProvider": "Provider",
+    "fallbackModelNoModels": "No models available",
+    "fallbackModelDuplicate": "Same as the primary model — it would fail the same way.",
+    "addFallbackModel": "Add fallback model",
+    "removeFallbackModel": "Remove fallback model"
   },
   "topPicksOutputConfig": {
     "accordionTitle": "图书馆、收藏和播放列表之间有什么区别？",

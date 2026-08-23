@@ -80,6 +80,9 @@ export {
   withGroundingModel,
   getGroundingProviderTools,
   resolveFallbackKeys,
+  resolveFallbackModels,
+  resolveCallSpacingMs,
+  MAX_CALL_SPACING_SECONDS,
   isFreeTierConfig,
   getTextGenerationModelInstance,
   // Capability Checking
@@ -128,6 +131,7 @@ export {
   // Types
   type ProviderType,
   type ProviderConfig,
+  type FallbackModel,
   type AIConfig,
   type FunctionStatus,
   type AICapabilitiesStatus,
