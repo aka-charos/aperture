@@ -160,6 +160,9 @@ export const updateRecommendationConfigSchema = {
       twinThresholdK: { type: 'number' as const, minimum: 1, maximum: 4, description: 'How closely another viewer must match before their picks are borrowed, as a multiple of the median absolute deviation of all pairs. Higher is stricter', example: 2 },
       twinMaxSlots: { type: 'integer' as const, minimum: 0, maximum: 10, description: 'Ceiling on recommendations drawn from a taste twin; 0 disables the feature. Spends from selectedCount, so this plus interestMaxSlots cannot exceed it', example: 4 },
       interestMaxSlots: { type: 'integer' as const, minimum: 0, maximum: 10, description: "Ceiling on recommendations reserved for the user's stated interests; 0 disables. Spends from the same selectedCount budget as twinMaxSlots", example: 3 },
+      acclaimedMaxSlots: { type: 'integer' as const, minimum: 0, maximum: 10, description: 'Ceiling on recommendations reserved for widely-acclaimed titles; 0 disables (the default). Spends from the same selectedCount budget as twinMaxSlots and interestMaxSlots', example: 0 },
+      acclaimedMinRating: { type: 'number' as const, minimum: 5, maximum: 10, description: 'Rating a title must reach to qualify for an acclaimed slot', example: 8.3 },
+      acclaimedMinVotes: { type: 'integer' as const, minimum: 1, description: 'Votes that rating must be built on. An eligibility gate only -- vote count never enters the quality score', example: 50000 },
     },
     example: {
       similarityWeight: 0.4,

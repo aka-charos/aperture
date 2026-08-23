@@ -175,6 +175,12 @@ export async function getEffectiveAlgorithmConfig(
       twinMaxSlots: mediaType === 'movie' ? dbConfig.movie.twinMaxSlots : dbConfig.series.twinMaxSlots,
       interestMaxSlots:
         mediaType === 'movie' ? dbConfig.movie.interestMaxSlots : dbConfig.series.interestMaxSlots,
+      acclaimedMaxSlots:
+        mediaType === 'movie' ? dbConfig.movie.acclaimedMaxSlots : dbConfig.series.acclaimedMaxSlots,
+      acclaimedMinRating:
+        mediaType === 'movie' ? dbConfig.movie.acclaimedMinRating : dbConfig.series.acclaimedMinRating,
+      acclaimedMinVotes:
+        mediaType === 'movie' ? dbConfig.movie.acclaimedMinVotes : dbConfig.series.acclaimedMinVotes,
     }
   } catch {
     logger.warn('Failed to load admin config, using fallback defaults')
@@ -184,6 +190,9 @@ export async function getEffectiveAlgorithmConfig(
       twinThresholdK: 2.0,
       twinMaxSlots: 4,
       interestMaxSlots: 3,
+      acclaimedMaxSlots: 0,
+      acclaimedMinRating: 8.3,
+      acclaimedMinVotes: 50000,
       ...DEFAULT_WEIGHTS,
     }
   }
@@ -217,6 +226,9 @@ export async function getEffectiveAlgorithmConfig(
     twinThresholdK: adminConfig.twinThresholdK, // Instance-wide: the bar is derived from every pair
     twinMaxSlots: adminConfig.twinMaxSlots, // User can't override this
     interestMaxSlots: adminConfig.interestMaxSlots, // User can't override this
+    acclaimedMaxSlots: adminConfig.acclaimedMaxSlots, // User can't override this
+    acclaimedMinRating: adminConfig.acclaimedMinRating,
+    acclaimedMinVotes: adminConfig.acclaimedMinVotes,
     ...normalizedWeights,
   }
 

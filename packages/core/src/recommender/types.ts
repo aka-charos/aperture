@@ -21,6 +21,12 @@ export interface Candidate {
   year: number | null
   genres: string[]
   communityRating: number | null
+  /**
+   * Votes behind communityRating. Read ONLY by the acclaimed-slot gate
+   * (shared/acclaimedSlots.ts) -- never by scoring, where it would promote
+   * obscure poorly-rated titles.
+   */
+  voteCount: number | null
   /** Raw cosine to the taste vector. See BaseCandidate. */
   similarity: number
   /** Pool-relative similarity, which is what the score blend reads. See BaseCandidate. */
@@ -51,6 +57,12 @@ export interface PipelineConfig {
   twinMaxSlots: number
   /** Ceiling on picks reserved for stated interests; 0 disables. */
   interestMaxSlots: number
+  /** Ceiling on picks reserved for widely-acclaimed titles; 0 disables (default). */
+  acclaimedMaxSlots: number
+  /** Rating an acclaimed pick must reach. */
+  acclaimedMinRating: number
+  /** Votes that rating must be built on. A gate, never a score term. */
+  acclaimedMinVotes: number
 }
 
 // Fallback defaults (used only if DB fetch fails)
@@ -67,5 +79,8 @@ export const FALLBACK_CONFIG: PipelineConfig = {
   twinThresholdK: 2.0,
   twinMaxSlots: 4,
   interestMaxSlots: 3,
+  acclaimedMaxSlots: 0,
+  acclaimedMinRating: 8.3,
+  acclaimedMinVotes: 50000,
 }
 

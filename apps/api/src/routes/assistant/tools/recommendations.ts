@@ -52,13 +52,16 @@ const asMedia = (type: 'movies' | 'series' | 'both'): 'movie' | 'series' =>
  * reading of a breakdown with no slot marker and the safe one: runs written
  * before reserved slots existed simply look like ordinary picks.
  */
-function pickSource(scoreBreakdown: unknown): 'ranked' | 'twin' | 'interest' {
+function pickSource(scoreBreakdown: unknown): 'ranked' | 'twin' | 'interest' | 'acclaimed' {
   if (typeof scoreBreakdown !== 'object' || scoreBreakdown === null) return 'ranked'
 
   const breakdown = scoreBreakdown as Record<string, unknown>
   if (typeof breakdown.twinMatch === 'object' && breakdown.twinMatch !== null) return 'twin'
   if (typeof breakdown.interestMatch === 'object' && breakdown.interestMatch !== null) {
     return 'interest'
+  }
+  if (typeof breakdown.acclaimedMatch === 'object' && breakdown.acclaimedMatch !== null) {
+    return 'acclaimed'
   }
   return 'ranked'
 }
@@ -69,7 +72,7 @@ function formatContentItem(
   type: 'movie' | 'series',
   playLink: string | null,
   rank?: number,
-  source?: 'ranked' | 'twin' | 'interest',
+  source?: 'ranked' | 'twin' | 'interest' | 'acclaimed',
   sharedTitles?: string[]
 ): ContentItem {
   const genres = item.genres?.slice(0, 2).join(', ') || ''

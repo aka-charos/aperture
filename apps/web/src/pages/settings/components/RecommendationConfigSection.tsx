@@ -35,6 +35,9 @@ type HelpSettingKey =
   | 'twinMaxSlots'
   | 'twinThresholdK'
   | 'interestMaxSlots'
+  | 'acclaimedMaxSlots'
+  | 'acclaimedMinRating'
+  | 'acclaimedMinVotes'
 
 function HelpIcon({ settingKey }: { settingKey: HelpSettingKey }) {
   const { t } = useTranslation()
@@ -242,6 +245,13 @@ function MediaTypeCard({
               if (twins !== config.twinMaxSlots) {
                 onUpdateField('twinMaxSlots', twins)
               }
+              const acclaimed = Math.min(
+                config.acclaimedMaxSlots,
+                Math.max(0, next - interests - twins)
+              )
+              if (acclaimed !== config.acclaimedMaxSlots) {
+                onUpdateField('acclaimedMaxSlots', acclaimed)
+              }
             }}
             size="small"
             InputProps={{
@@ -389,9 +399,16 @@ function MediaTypeCard({
           </Typography>
           <Typography variant="caption" color="text.secondary">
             {t('settingsRecAlgo.slotBudgetSplit', {
-              ranked: Math.max(0, config.selectedCount - config.interestMaxSlots - config.twinMaxSlots),
+              ranked: Math.max(
+                0,
+                config.selectedCount -
+                  config.interestMaxSlots -
+                  config.twinMaxSlots -
+                  config.acclaimedMaxSlots
+              ),
               interests: config.interestMaxSlots,
               twins: config.twinMaxSlots,
+              acclaimed: config.acclaimedMaxSlots,
             })}
           </Typography>
         </Box>
@@ -410,7 +427,10 @@ function MediaTypeCard({
             value={config.interestMaxSlots}
             onChange={(_, v) => onUpdateField('interestMaxSlots', v as number)}
             min={0}
-            max={Math.max(0, Math.min(10, config.selectedCount - config.twinMaxSlots))}
+            max={Math.max(
+              0,
+              Math.min(10, config.selectedCount - config.twinMaxSlots - config.acclaimedMaxSlots)
+            )}
             step={1}
             size="small"
             marks
@@ -431,13 +451,85 @@ function MediaTypeCard({
             value={config.twinMaxSlots}
             onChange={(_, v) => onUpdateField('twinMaxSlots', v as number)}
             min={0}
-            max={Math.max(0, Math.min(10, config.selectedCount - config.interestMaxSlots))}
+            max={Math.max(
+              0,
+              Math.min(10, config.selectedCount - config.interestMaxSlots - config.acclaimedMaxSlots)
+            )}
             step={1}
             size="small"
             marks
           />
         </FormControl>
 
+        <FormControl fullWidth sx={{ mb: 2 }} size="small">
+          <Box display="flex" alignItems="center" justifyContent="space-between">
+            <Box display="flex" alignItems="center">
+              <Typography variant="body2">{t('settingsRecAlgo.acclaimedMaxSlots')}</Typography>
+              <HelpIcon settingKey="acclaimedMaxSlots" />
+            </Box>
+            <Typography variant="body2" color="primary" fontWeight={600}>
+              {config.acclaimedMaxSlots}
+            </Typography>
+          </Box>
+          <Slider
+            value={config.acclaimedMaxSlots}
+            onChange={(_, v) => onUpdateField('acclaimedMaxSlots', v as number)}
+            min={0}
+            max={Math.max(
+              0,
+              Math.min(10, config.selectedCount - config.interestMaxSlots - config.twinMaxSlots)
+            )}
+            step={1}
+            size="small"
+            marks
+          />
+        </FormControl>
+
+        {/* The gate. Only shown once the feature is on: two thresholds for a
+            disabled feature is noise. */}
+        {config.acclaimedMaxSlots > 0 && (
+          <>
+            <FormControl fullWidth sx={{ mb: 2 }} size="small">
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box display="flex" alignItems="center">
+                  <Typography variant="body2">{t('settingsRecAlgo.acclaimedMinRating')}</Typography>
+                  <HelpIcon settingKey="acclaimedMinRating" />
+                </Box>
+                <Typography variant="body2" color="primary" fontWeight={600}>
+                  {config.acclaimedMinRating.toFixed(1)}
+                </Typography>
+              </Box>
+              <Slider
+                value={config.acclaimedMinRating}
+                onChange={(_, v) => onUpdateField('acclaimedMinRating', v as number)}
+                min={5}
+                max={10}
+                step={0.1}
+                size="small"
+              />
+            </FormControl>
+
+            <FormControl fullWidth sx={{ mb: 3 }} size="small">
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box display="flex" alignItems="center">
+                  <Typography variant="body2">{t('settingsRecAlgo.acclaimedMinVotes')}</Typography>
+                  <HelpIcon settingKey="acclaimedMinVotes" />
+                </Box>
+                <Typography variant="body2" color="primary" fontWeight={600}>
+                  {config.acclaimedMinVotes.toLocaleString()}
+                </Typography>
+              </Box>
+              <Slider
+                value={config.acclaimedMinVotes}
+                onChange={(_, v) => onUpdateField('acclaimedMinVotes', v as number)}
+                min={1000}
+                max={500000}
+                step={1000}
+                size="small"
+              />
+            </FormControl>
+          </>
+        )}
         <FormControl fullWidth sx={{ mb: 3 }} size="small">
           <Box display="flex" alignItems="center" justifyContent="space-between">
             <Box display="flex" alignItems="center">

@@ -60,7 +60,7 @@ export const ContentItemSchema = z.object({
     ),
   rank: z.number().optional().describe('Recommendation rank'),
   source: z
-    .enum(['ranked', 'twin', 'interest'])
+    .enum(['ranked', 'twin', 'interest', 'acclaimed'])
     .optional()
     .describe(
       'How a recommendation earned its place in the list. "ranked" = the recommender scored it ' +
@@ -69,7 +69,10 @@ export const ContentItemSchema = z.object({
         'is precisely what did NOT choose it, so do not explain it as being like something they ' +
         'watched, and never identify the other viewer: they are always "someone here whose taste ' +
         'closely overlaps yours". "interest" = a reserved slot for one of the interests the user ' +
-        'stated themselves. Absent for anything that is not a recommendation.'
+        'stated themselves. "acclaimed" = a reserved slot for a very highly rated title with a ' +
+        'large number of votes behind it, which the ranking did NOT choose — explain it as a ' +
+        'landmark they have not seen, never as a match to their taste. ' +
+        'Absent for anything that is not a recommendation.'
     ),
   sharedTitles: z
     .array(z.string())

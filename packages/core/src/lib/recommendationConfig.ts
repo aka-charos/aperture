@@ -1,5 +1,10 @@
 import { query, queryOne } from './db.js'
 import { createChildLogger } from './logger.js'
+import {
+  DEFAULT_ACCLAIMED_MAX_SLOTS,
+  DEFAULT_ACCLAIMED_MIN_RATING,
+  DEFAULT_ACCLAIMED_MIN_VOTES,
+} from '../recommender/shared/acclaimedSlots.js'
 
 const logger = createChildLogger('recommendation-config')
 
@@ -38,6 +43,28 @@ export interface MediaTypeConfig {
    * Spends from the same selectedCount budget as twinMaxSlots.
    */
   interestMaxSlots: number
+  /**
+   * Ceiling on picks reserved for widely-acclaimed titles. 0 disables, and is
+   * the default -- an upgrade must not change anybody's recommendations until
+   * an admin asks. Spends from the same selectedCount budget as the other two
+   * slot features, measured last (shared/acclaimedSlots.ts).
+   */
+  acclaimedMaxSlots: number
+  /**
+   * Rating a title must reach to be eligible for an acclaimed slot. Editable
+   * because "acclaimed" is a property of a library, not a universal constant:
+   * an instance of obscure world cinema may hold nothing above 8.3 at all.
+   */
+  acclaimedMinRating: number
+  /**
+   * Votes the rating must be built on. This is the one place a vote count
+   * belongs -- as a GATE, never as a score term. Measured on a 12,589-film
+   * library, thin-voted titles average 5.95 against a mean of 6.52, so folding
+   * votes into the quality score would promote obscure bad films; but the same
+   * number is what separates a 9.3 earned across two million viewers from a 9.3
+   * earned across two hundred.
+   */
+  acclaimedMinVotes: number
 }
 
 export interface RecommendationConfig {
@@ -70,6 +97,9 @@ interface RecommendationConfigRow {
   movie_twin_threshold_k: string
   movie_twin_max_slots: number
   movie_interest_max_slots: number
+  movie_acclaimed_max_slots: number
+  movie_acclaimed_min_rating: string
+  movie_acclaimed_min_votes: number
   series_max_candidates: number
   series_selected_count: number
   series_recent_watch_limit: number
@@ -82,6 +112,9 @@ interface RecommendationConfigRow {
   series_twin_threshold_k: string
   series_twin_max_slots: number
   series_interest_max_slots: number
+  series_acclaimed_max_slots: number
+  series_acclaimed_min_rating: string
+  series_acclaimed_min_votes: number
   updated_at: Date
   scoring_updated_at: Date
 }
@@ -104,6 +137,9 @@ const MOVIE_DEFAULTS: MediaTypeConfig = {
   twinThresholdK: 2.0,
   twinMaxSlots: 4,
   interestMaxSlots: 3,
+  acclaimedMaxSlots: DEFAULT_ACCLAIMED_MAX_SLOTS,
+  acclaimedMinRating: DEFAULT_ACCLAIMED_MIN_RATING,
+  acclaimedMinVotes: DEFAULT_ACCLAIMED_MIN_VOTES,
 }
 
 const SERIES_DEFAULTS: MediaTypeConfig = {
@@ -121,6 +157,9 @@ const SERIES_DEFAULTS: MediaTypeConfig = {
   twinThresholdK: 2.0,
   twinMaxSlots: 4,
   interestMaxSlots: 3,
+  acclaimedMaxSlots: DEFAULT_ACCLAIMED_MAX_SLOTS,
+  acclaimedMinRating: DEFAULT_ACCLAIMED_MIN_RATING,
+  acclaimedMinVotes: DEFAULT_ACCLAIMED_MIN_VOTES,
 }
 
 /**
@@ -140,6 +179,9 @@ const COLUMN_SUFFIX: Record<keyof MediaTypeConfig, string> = {
   twinThresholdK: 'twin_threshold_k',
   twinMaxSlots: 'twin_max_slots',
   interestMaxSlots: 'interest_max_slots',
+  acclaimedMaxSlots: 'acclaimed_max_slots',
+  acclaimedMinRating: 'acclaimed_min_rating',
+  acclaimedMinVotes: 'acclaimed_min_votes',
 }
 
 /**
@@ -161,6 +203,12 @@ const SCORING_FIELDS = new Set<keyof MediaTypeConfig>([
   'twinThresholdK',
   'twinMaxSlots',
   'interestMaxSlots',
+  // All three decide what reaches the final list, so an edit must invalidate
+  // the activity gate. Left out, raising the acclaimed ceiling would appear to
+  // do nothing until max_run_age_days eventually forced a run.
+  'acclaimedMaxSlots',
+  'acclaimedMinRating',
+  'acclaimedMinVotes',
 ])
 
 /**
@@ -173,10 +221,12 @@ export async function getRecommendationConfig(): Promise<RecommendationConfig> {
       movie_similarity_weight, movie_novelty_weight, movie_rating_weight, movie_diversity_weight,
       movie_new_candidate_threshold, movie_max_run_age_days,
       movie_twin_threshold_k, movie_twin_max_slots, movie_interest_max_slots,
+      movie_acclaimed_max_slots, movie_acclaimed_min_rating, movie_acclaimed_min_votes,
       series_max_candidates, series_selected_count, series_recent_watch_limit,
       series_similarity_weight, series_novelty_weight, series_rating_weight, series_diversity_weight,
       series_new_candidate_threshold, series_max_run_age_days,
       series_twin_threshold_k, series_twin_max_slots, series_interest_max_slots,
+      series_acclaimed_max_slots, series_acclaimed_min_rating, series_acclaimed_min_votes,
       updated_at, scoring_updated_at
      FROM recommendation_config WHERE id = 1`
   )
@@ -205,6 +255,9 @@ export async function getRecommendationConfig(): Promise<RecommendationConfig> {
       twinThresholdK: parseFloat(row.movie_twin_threshold_k),
       twinMaxSlots: row.movie_twin_max_slots,
       interestMaxSlots: row.movie_interest_max_slots,
+      acclaimedMaxSlots: row.movie_acclaimed_max_slots,
+      acclaimedMinRating: parseFloat(row.movie_acclaimed_min_rating),
+      acclaimedMinVotes: row.movie_acclaimed_min_votes,
     },
     series: {
       maxCandidates: row.series_max_candidates,
@@ -219,6 +272,9 @@ export async function getRecommendationConfig(): Promise<RecommendationConfig> {
       twinThresholdK: parseFloat(row.series_twin_threshold_k),
       twinMaxSlots: row.series_twin_max_slots,
       interestMaxSlots: row.series_interest_max_slots,
+      acclaimedMaxSlots: row.series_acclaimed_max_slots,
+      acclaimedMinRating: parseFloat(row.series_acclaimed_min_rating),
+      acclaimedMinVotes: row.series_acclaimed_min_votes,
     },
     updatedAt: row.updated_at,
     scoringUpdatedAt: row.scoring_updated_at,

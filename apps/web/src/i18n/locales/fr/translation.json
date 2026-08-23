@@ -2445,6 +2445,27 @@
         "increase": "Stated interests shape more of the list, at the cost of top-ranked picks.",
         "decrease": "More of the list is decided by the scores. Set to 0 to ignore stated interests when selecting.",
         "example": "The slot goes to the best-scoring title among an interest's strongest matches, so raising this surfaces more of that interest rather than more obscure examples of it."
+      },
+      "acclaimedMaxSlots": {
+        "title": "Reserved For Acclaimed Titles",
+        "description": "Highly-rated films can lose to a merely good one that happens to sit closer to a viewer in taste space — measured here, similarity outweighs rating about 5 to 1, so no realistic rating weight rescues them. This many recommendations are handed to acclaimed titles instead, chosen from the ones nearest that viewer’s own taste.",
+        "increase": "More landmarks the viewer has not seen. They come out of the top-ranked picks, so the rest of the list gets shorter.",
+        "decrease": "More of the list is decided by the scores. Set to 0 to switch the feature off entirely.",
+        "example": "A viewer whose library holds nothing above the rating floor reserves nothing regardless of this number, so raising it costs nothing for people it does not apply to."
+      },
+      "acclaimedMinRating": {
+        "title": "Minimum Rating To Qualify",
+        "description": "How highly rated a title must be to be eligible for one of the reserved slots. What counts as acclaimed depends on the library — a collection of obscure world cinema may hold very little above 8.3.",
+        "increase": "Fewer, more exceptional titles qualify. Set it too high and the slots go unfilled.",
+        "decrease": "More titles qualify, and \"acclaimed\" starts to mean \"quite good\".",
+        "example": "At 8.3 a typical library has a few hundred eligible films, which is ample for a handful of slots."
+      },
+      "acclaimedMinVotes": {
+        "title": "Minimum Votes Behind That Rating",
+        "description": "How many votes the rating must be built on. This is what separates a 9.3 earned across two million viewers from a 9.3 earned across two hundred. It is used only to decide eligibility and never affects any title’s score.",
+        "increase": "Only broadly-seen titles qualify, at the cost of excluding genuinely acclaimed rarities.",
+        "decrease": "Thinly-voted ratings start to qualify, which is exactly what lets an unearned high score into the list.",
+        "example": "At 50,000 a title needs a substantial audience behind its rating, which is what keeps a brigaded score out."
       }
     },
     "sectionRegeneration": "WHEN TO REGENERATE",
@@ -2461,7 +2482,10 @@
     "slotBudgetSplit": "{{ranked}} top-ranked · {{interests}} for stated interests · {{twins}} from a taste twin",
     "interestMaxSlots": "Reserved for stated interests",
     "maxCandidatesAll": "All {{total}}",
-    "maxCandidatesAllShort": "All"
+    "maxCandidatesAllShort": "All",
+    "acclaimedMaxSlots": "Reserved for acclaimed titles",
+    "acclaimedMinRating": "Minimum rating to qualify",
+    "acclaimedMinVotes": "Minimum votes behind that rating"
   },
   "settingsWatching": {
     "title": "Émissions que vous regardez",

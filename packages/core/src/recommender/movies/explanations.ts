@@ -68,6 +68,13 @@ export interface MovieForExplanation {
    * taste like yours", so an identity must not be able to reach the prompt.
    */
   fromTasteTwin?: boolean
+  /**
+   * Set when the pick holds a reserved acclaimed slot. Same reasoning as the
+   * two flags above: the ranking is exactly what did NOT choose this title, so
+   * without the marker the model reaches for the similarity evidence and
+   * invents a taste connection that was never the reason.
+   */
+  fromAcclaimed?: boolean
 }
 
 export interface EvidenceMovie {
@@ -360,6 +367,10 @@ async function generateBatchExplanations(
         ? `\n   👥 A KINDRED VIEWER PICKED THIS: another viewer here whose taste closely overlaps theirs watched it — lead with that, and never name or describe that person`
         : ''
 
+      const acclaimedLine = m.fromAcclaimed
+        ? `\n   🏆 WIDELY ACCLAIMED: in the list because of its standing, not because the ranking chose it — lead with what the film is and why it is held in that regard`
+        : ''
+
       const context = titleContext.get(m.movieId)
       const directors = context?.directors?.length
         ? `\n   Director: ${context.directors.slice(0, 3).join(', ')}`
@@ -370,7 +381,7 @@ async function generateBatchExplanations(
 
       return `${i + 1}. "${m.title}" (${m.year || 'N/A'})
    Genres: ${m.genres.join(', ')}${directors}${keywords}
-   Novelty: ${m.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${m.ratingScore > 0.7 ? 'highly acclaimed' : m.ratingScore > 0.5 ? 'well received' : 'mixed'}${interestLine}${twinLine}
+   Novelty: ${m.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${m.ratingScore > 0.7 ? 'highly acclaimed' : m.ratingScore > 0.5 ? 'well received' : 'mixed'}${interestLine}${twinLine}${acclaimedLine}
    Plot: ${clip(m.overview, PICK_PLOT_CHARS) ?? 'No overview available'}
    🎯 CLOSEST IN THEIR WATCH HISTORY (nearest first):
 ${evidenceStr}`
@@ -402,6 +413,8 @@ CRITICAL: A few recommendations are marked "THEY ASKED FOR THIS" with an interes
 CRITICAL: A few recommendations are marked "A KINDRED VIEWER PICKED THIS". Those are in the list because another viewer with strongly overlapping taste watched them, which is a different reason from similarity to the user's own history - say so, and then use the similarity evidence as support. Refer to that person only in general terms ("someone whose taste lines up with yours"). You do not know who they are, so never name them, guess at them, or describe them.
 
 Format: Return JSON with an "explanations" array containing objects with "index" (1-based) and "explanation" fields.
+
+CRITICAL: A few recommendations are marked "WIDELY ACCLAIMED". Those are in the list because the film is very highly rated by a large number of viewers, which is a different reason from similarity to this user's history - do not claim their viewing history led here. Say plainly that it is a landmark they have not seen yet, then use the similarity evidence only as secondary support if it genuinely fits. The no-invention rule above still applies in full: describe what the film IS from the data given, and do not assert specific awards, festival wins, box office or contemporary reception that is not in the data.
 
 CRITICAL: Never write a double quote inside the explanation text. Titles are shown in quotes above for readability, but repeating that in your answer breaks the JSON - write film titles as plain text, or in single quotes.${langBlock}`,
       prompt: `=== USER'S TASTE PROFILE ===
@@ -483,6 +496,13 @@ function generateFallbackExplanation(movie: MovieWithEvidence): string {
   // Same reasoning one step down: a twin pick is here because a like-minded
   // viewer watched it, so the evidence branch below would credit the wrong
   // thing. Kept deliberately anonymous.
+  // Highest precedence of the three: if a title took an acclaimed slot, that
+  // is the reason it is here, and the evidence branch below would credit the
+  // ranking that declined to pick it.
+  if (movie.fromAcclaimed) {
+    return `One of the highest-rated ${movie.genres[0]?.toLowerCase() || 'film'}s in your library that you have not seen yet — widely regarded, and still waiting for you.`
+  }
+
   if (movie.fromTasteTwin) {
     return `Someone here whose taste closely overlaps yours watched this ${movie.genres[0]?.toLowerCase() || 'film'} — it's the kind of thing the two of you keep landing on independently.`
   }
