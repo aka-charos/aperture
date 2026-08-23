@@ -4,6 +4,14 @@ import { VALID_EMBEDDING_DIMENSIONS } from './ai-provider.js'
 
 const logger = createChildLogger('purge')
 
+type EmbeddingBaseTable = 'embeddings' | 'series_embeddings' | 'episode_embeddings'
+
+const EMBEDDING_BASE_TABLES: EmbeddingBaseTable[] = [
+  'embeddings',
+  'series_embeddings',
+  'episode_embeddings',
+]
+
 export interface PurgeResult {
   // Content
   moviesDeleted: number
@@ -24,11 +32,45 @@ export interface PurgeResult {
 }
 
 /**
+ * Every table an embedding family may live in: one per supported dimension,
+ * plus the pre-0078 table that migration renamed to `*_legacy`.
+ *
+ * The legacy one exists ONLY on instances that predate the multi-dimension
+ * migration -- 0078 renames `embeddings`/`series_embeddings`/`episode_embeddings`
+ * if it finds them, so an instance created after 0078 never has them.
+ */
+function embeddingTableNames(baseTable: EmbeddingBaseTable): string[] {
+  return [
+    ...VALID_EMBEDDING_DIMENSIONS.map((dim) => `${baseTable}_${dim}`),
+    `${baseTable}_legacy`,
+  ]
+}
+
+/**
+ * Resolve which of `names` this instance actually has, in one catalog lookup.
+ *
+ * Probing a missing table and catching the failure is NOT equivalent: the
+ * statement still reaches Postgres, which logs `ERROR: relation ... does not
+ * exist` for every miss (three per Settings page load, from the stats route).
+ * Worse inside a transaction -- a failed statement aborts it, so every later
+ * statement fails with 25P02 whatever the JS `catch` does, which is what stopped
+ * the purge completing on any instance with no legacy tables.
+ */
+async function getExistingTables(names: string[]): Promise<Set<string>> {
+  const result = await query<{ table_name: string }>(
+    `SELECT table_name FROM information_schema.tables
+     WHERE table_schema = 'public' AND table_name = ANY($1)`,
+    [names]
+  )
+  return new Set(result.rows.map((row) => row.table_name))
+}
+
+/**
  * Purge all content data from the database.
- * This includes: movies, series, episodes, all embeddings, watch history, 
+ * This includes: movies, series, episodes, all embeddings, watch history,
  * ratings, recommendations, taste profiles, and assistant conversations.
  * Library configs and users are preserved.
- * 
+ *
  * Use this to reset the content database and start fresh.
  */
 export async function purgeMovieDatabase(): Promise<PurgeResult> {
@@ -49,7 +91,22 @@ export async function purgeMovieDatabase(): Promise<PurgeResult> {
     assistantMessagesDeleted: 0,
   }
 
+  // Resolved before the transaction opens, so a missing table can never abort it.
+  const existingTables = await getExistingTables(
+    EMBEDDING_BASE_TABLES.flatMap(embeddingTableNames)
+  )
+
   await transaction(async (client) => {
+    const deleteEmbeddings = async (baseTable: EmbeddingBaseTable): Promise<number> => {
+      let deleted = 0
+      for (const table of embeddingTableNames(baseTable)) {
+        if (!existingTables.has(table)) continue
+        const res = await client.query(`DELETE FROM ${table}`)
+        deleted += res.rowCount || 0
+      }
+      return deleted
+    }
+
     // 1. Delete assistant messages (FK to conversations)
     const messagesResult = await client.query('DELETE FROM assistant_messages')
     result.assistantMessagesDeleted = messagesResult.rowCount || 0
@@ -93,45 +150,15 @@ export async function purgeMovieDatabase(): Promise<PurgeResult> {
     logger.info(`Deleted ${result.watchHistoryDeleted} watch history records`)
 
     // 10. Delete episode embeddings from all dimension-specific tables (FK to episodes)
-    let episodeEmbeddingsDeleted = 0
-    for (const dim of VALID_EMBEDDING_DIMENSIONS) {
-      const res = await client.query(`DELETE FROM episode_embeddings_${dim}`)
-      episodeEmbeddingsDeleted += res.rowCount || 0
-    }
-    // Also try legacy table if it exists
-    try {
-      const legacyRes = await client.query('DELETE FROM episode_embeddings_legacy')
-      episodeEmbeddingsDeleted += legacyRes.rowCount || 0
-    } catch { /* table may not exist */ }
-    result.episodeEmbeddingsDeleted = episodeEmbeddingsDeleted
+    result.episodeEmbeddingsDeleted = await deleteEmbeddings('episode_embeddings')
     logger.info(`Deleted ${result.episodeEmbeddingsDeleted} episode embeddings`)
 
     // 11. Delete series embeddings from all dimension-specific tables (FK to series)
-    let seriesEmbeddingsDeleted = 0
-    for (const dim of VALID_EMBEDDING_DIMENSIONS) {
-      const res = await client.query(`DELETE FROM series_embeddings_${dim}`)
-      seriesEmbeddingsDeleted += res.rowCount || 0
-    }
-    // Also try legacy table if it exists
-    try {
-      const legacyRes = await client.query('DELETE FROM series_embeddings_legacy')
-      seriesEmbeddingsDeleted += legacyRes.rowCount || 0
-    } catch { /* table may not exist */ }
-    result.seriesEmbeddingsDeleted = seriesEmbeddingsDeleted
+    result.seriesEmbeddingsDeleted = await deleteEmbeddings('series_embeddings')
     logger.info(`Deleted ${result.seriesEmbeddingsDeleted} series embeddings`)
 
     // 12. Delete movie embeddings from all dimension-specific tables (FK to movies)
-    let movieEmbeddingsDeleted = 0
-    for (const dim of VALID_EMBEDDING_DIMENSIONS) {
-      const res = await client.query(`DELETE FROM embeddings_${dim}`)
-      movieEmbeddingsDeleted += res.rowCount || 0
-    }
-    // Also try legacy table if it exists
-    try {
-      const legacyRes = await client.query('DELETE FROM embeddings_legacy')
-      movieEmbeddingsDeleted += legacyRes.rowCount || 0
-    } catch { /* table may not exist */ }
-    result.movieEmbeddingsDeleted = movieEmbeddingsDeleted
+    result.movieEmbeddingsDeleted = await deleteEmbeddings('embeddings')
     logger.info(`Deleted ${result.movieEmbeddingsDeleted} movie embeddings`)
 
     // 13. Delete episodes (FK to series)
@@ -175,21 +202,19 @@ export interface DatabaseStats {
 }
 
 /**
- * Count embeddings across all dimension-specific tables
+ * Count embeddings across all dimension-specific tables (plus the legacy one,
+ * where the instance is old enough to have it).
  */
-async function countAllEmbeddings(baseTable: 'embeddings' | 'series_embeddings' | 'episode_embeddings'): Promise<number> {
+async function countAllEmbeddings(
+  baseTable: EmbeddingBaseTable,
+  existingTables: Set<string>
+): Promise<number> {
   let total = 0
-  for (const dim of VALID_EMBEDDING_DIMENSIONS) {
-    try {
-      const result = await query<{ count: string }>(`SELECT COUNT(*) FROM ${baseTable}_${dim}`)
-      total += parseInt(result.rows[0]?.count || '0', 10)
-    } catch { /* table may not exist */ }
-  }
-  // Also check legacy table
-  try {
-    const result = await query<{ count: string }>(`SELECT COUNT(*) FROM ${baseTable}_legacy`)
+  for (const table of embeddingTableNames(baseTable)) {
+    if (!existingTables.has(table)) continue
+    const result = await query<{ count: string }>(`SELECT COUNT(*) FROM ${table}`)
     total += parseInt(result.rows[0]?.count || '0', 10)
-  } catch { /* table may not exist */ }
+  }
   return total
 }
 
@@ -197,6 +222,10 @@ async function countAllEmbeddings(baseTable: 'embeddings' | 'series_embeddings' 
  * Get current database stats for display before purge
  */
 export async function getMovieDatabaseStats(): Promise<DatabaseStats> {
+  const existingTables = await getExistingTables(
+    EMBEDDING_BASE_TABLES.flatMap(embeddingTableNames)
+  )
+
   const [
     movies,
     series,
@@ -214,9 +243,9 @@ export async function getMovieDatabaseStats(): Promise<DatabaseStats> {
     query<{ count: string }>('SELECT COUNT(*) FROM movies'),
     query<{ count: string }>('SELECT COUNT(*) FROM series'),
     query<{ count: string }>('SELECT COUNT(*) FROM episodes'),
-    countAllEmbeddings('embeddings'),
-    countAllEmbeddings('series_embeddings'),
-    countAllEmbeddings('episode_embeddings'),
+    countAllEmbeddings('embeddings', existingTables),
+    countAllEmbeddings('series_embeddings', existingTables),
+    countAllEmbeddings('episode_embeddings', existingTables),
     query<{ count: string }>('SELECT COUNT(*) FROM watch_history'),
     query<{ count: string }>('SELECT COUNT(*) FROM user_ratings'),
     query<{ count: string }>('SELECT COUNT(*) FROM recommendation_candidates'),
