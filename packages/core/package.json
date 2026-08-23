@@ -75,7 +75,8 @@
     "test:pacing": "node --import tsx --test src/lib/callPacing.test.ts",
     "test:ratings": "node --import tsx --test src/ratings/imdbDataset.test.ts",
     "lint": "eslint src",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test:max-candidates": "node --import tsx --test src/lib/maxCandidates.test.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.0",

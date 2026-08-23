@@ -13,6 +13,7 @@
 import type { FastifyInstance } from 'fastify'
 import {
   getRecommendationConfig,
+  getLibraryItemCounts,
   updateMovieRecommendationConfig,
   updateSeriesRecommendationConfig,
   resetMovieRecommendationConfig,
@@ -133,14 +134,41 @@ function calculateRunsPerWeek(
   }
 }
 
+/**
+ * Hold maxCandidates at or below the number of rows its ANN query can return.
+ *
+ * A limit above the table size cannot retrieve more titles -- it only stops the
+ * planner using the HNSW index, so it buys an exact sequential scan of every
+ * vector and nothing else. The web slider is bounded the same way; this is the
+ * guard for anything that isn't the web slider.
+ *
+ * A count of 0 means the library has not synced yet, and clamping to nothing
+ * would be worse than leaving the setting alone.
+ */
+async function capMaxCandidates(
+  updates: Partial<MediaTypeConfig>,
+  mediaType: 'movies' | 'series'
+): Promise<Partial<MediaTypeConfig>> {
+  if (updates.maxCandidates === undefined) return updates
+  const counts = await getLibraryItemCounts()
+  const ceiling = counts[mediaType]
+  if (ceiling <= 0 || updates.maxCandidates <= ceiling) return updates
+  return { ...updates, maxCandidates: ceiling }
+}
+
 export function registerRecommendationHandlers(fastify: FastifyInstance) {
   /**
    * GET /api/settings/recommendations
    */
   fastify.get('/api/settings/recommendations', { preHandler: requireAdmin, schema: recommendationConfigSchema }, async (_request, reply) => {
     try {
-      const config = await getRecommendationConfig()
-      return reply.send({ config })
+      const [config, libraryCounts] = await Promise.all([
+        getRecommendationConfig(),
+        getLibraryItemCounts(),
+      ])
+      // The slider's ceiling. Sent live rather than stored, so it follows a
+      // sync without the settings page needing to be told one happened.
+      return reply.send({ config, libraryCounts })
     } catch (err) {
       fastify.log.error({ err }, 'Failed to get recommendation config')
       return reply.status(500).send({ error: 'Failed to get recommendation configuration' })
@@ -160,7 +188,8 @@ export function registerRecommendationHandlers(fastify: FastifyInstance) {
         return reply.status(400).send({ error: validationError })
       }
 
-      const config = await updateMovieRecommendationConfig(updates)
+      const capped = await capMaxCandidates(updates, 'movies')
+      const config = await updateMovieRecommendationConfig(capped)
       return reply.send({ config, message: 'Movie configuration updated successfully' })
     } catch (err) {
       fastify.log.error({ err }, 'Failed to update movie recommendation config')
@@ -181,7 +210,8 @@ export function registerRecommendationHandlers(fastify: FastifyInstance) {
         return reply.status(400).send({ error: validationError })
       }
 
-      const config = await updateSeriesRecommendationConfig(updates)
+      const capped = await capMaxCandidates(updates, 'series')
+      const config = await updateSeriesRecommendationConfig(capped)
       return reply.send({ config, message: 'Series configuration updated successfully' })
     } catch (err) {
       fastify.log.error({ err }, 'Failed to update series recommendation config')

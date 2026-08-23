@@ -387,6 +387,7 @@ export function SettingsPage() {
             <TabPanel value={aiSubTab} index={2}>
               <RecommendationConfigSection
                 recConfig={settings.recConfig}
+                libraryCounts={settings.libraryCounts}
                 loadingRecConfig={settings.loadingRecConfig}
                 savingRecConfig={settings.savingRecConfig}
                 recConfigError={settings.recConfigError}

@@ -21,7 +21,6 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import SaveIcon from '@mui/icons-material/Save'
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 import type { RecommendationConfig, MediaTypeConfig } from '../types'
-import { MAX_UNLIMITED } from '../types'
 
 type HelpSettingKey =
   | 'maxCandidates'
@@ -90,6 +89,15 @@ interface MediaTypeCardProps {
   title: string
   icon: React.ReactNode
   config: MediaTypeConfig
+  /**
+   * How many titles of this media type the library holds -- the ceiling on
+   * maxCandidates. Retrieval is one ANN query over one embedding table, so a
+   * limit above the row count cannot return more titles; it only costs the
+   * HNSW index and buys an exact sequential scan instead. 0 means "not known
+   * yet" (library unsynced, or the request has not landed), where falling back
+   * to the stored value keeps the slider usable instead of collapsing it.
+   */
+  libraryCount: number
   isDirty: boolean
   isSaving: boolean
   isLoading: boolean
@@ -102,6 +110,7 @@ function MediaTypeCard({
   title,
   icon,
   config,
+  libraryCount,
   isDirty,
   isSaving,
   isLoading,
@@ -110,6 +119,17 @@ function MediaTypeCard({
   onUpdateField,
 }: MediaTypeCardProps) {
   const { t } = useTranslation()
+  // The top of the slider is the whole library, because that IS unlimited here
+  // -- the old MAX_UNLIMITED sentinel only asked the planner for rows that do
+  // not exist. A stored value above the ceiling displays AS the ceiling rather
+  // than silently re-saving: it is already exactly what the run will score, and
+  // the stored copy is corrected by the next sync or the next save.
+  const candidateCeiling = libraryCount > 0 ? libraryCount : Math.max(config.maxCandidates, 1000)
+  const candidateFloor = Math.min(500, candidateCeiling)
+  const effectiveMaxCandidates = Math.min(
+    Math.max(config.maxCandidates, candidateFloor),
+    candidateCeiling
+  )
   // What each blend weight actually carries, which is not the same question as
   // whether they add to 100%.
   //
@@ -177,23 +197,24 @@ function MediaTypeCard({
           <Box display="flex" alignItems="center">
             <Typography variant="body2">
               {t('settingsRecAlgo.maxCandidatesLabel')}{' '}
-              <strong>{config.maxCandidates >= MAX_UNLIMITED ? '∞' : `${(config.maxCandidates / 1000).toFixed(0)}K`}</strong>
+              <strong>
+                {effectiveMaxCandidates >= candidateCeiling
+                  ? t('settingsRecAlgo.maxCandidatesAll', { total: candidateCeiling.toLocaleString() })
+                  : effectiveMaxCandidates.toLocaleString()}
+              </strong>
             </Typography>
             <HelpIcon settingKey="maxCandidates" />
           </Box>
           <Slider
-            value={config.maxCandidates >= MAX_UNLIMITED ? 100 : Math.min(config.maxCandidates / 1000, 100)}
-            onChange={(_, v) => {
-              const val = v as number
-              onUpdateField('maxCandidates', val >= 100 ? MAX_UNLIMITED : val * 1000)
-            }}
-            min={5}
-            max={100}
+            value={effectiveMaxCandidates}
+            onChange={(_, v) => onUpdateField('maxCandidates', v as number)}
+            min={candidateFloor}
+            max={candidateCeiling}
+            step={candidateCeiling > 5000 ? 100 : 10}
             size="small"
             marks={[
-              { value: 5, label: '5K' },
-              { value: 50, label: '50K' },
-              { value: 100, label: '∞' },
+              { value: candidateFloor, label: candidateFloor.toLocaleString() },
+              { value: candidateCeiling, label: t('settingsRecAlgo.maxCandidatesAllShort') },
             ]}
           />
         </FormControl>
@@ -489,6 +510,7 @@ function MediaTypeCard({
 
 interface RecommendationConfigSectionProps {
   recConfig: RecommendationConfig | null
+  libraryCounts: { movies: number; series: number } | null
   loadingRecConfig: boolean
   savingRecConfig: boolean
   recConfigError: string | null
@@ -507,6 +529,7 @@ interface RecommendationConfigSectionProps {
 
 export function RecommendationConfigSection({
   recConfig,
+  libraryCounts,
   loadingRecConfig,
   savingRecConfig,
   recConfigError,
@@ -555,6 +578,7 @@ export function RecommendationConfigSection({
               title={t('settingsRecAlgo.moviesCardTitle')}
               icon={<MovieIcon color="primary" />}
               config={recConfig.movie}
+              libraryCount={libraryCounts?.movies ?? 0}
               isDirty={movieConfigDirty}
               isSaving={savingRecConfig}
               isLoading={loadingRecConfig}
@@ -568,6 +592,7 @@ export function RecommendationConfigSection({
               title={t('settingsRecAlgo.seriesCardTitle')}
               icon={<TvIcon color="secondary" />}
               config={recConfig.series}
+              libraryCount={libraryCounts?.series ?? 0}
               isDirty={seriesConfigDirty}
               isSaving={savingRecConfig}
               isLoading={loadingRecConfig}

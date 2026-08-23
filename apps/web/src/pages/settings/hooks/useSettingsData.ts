@@ -17,6 +17,9 @@ export function useSettingsData(isAdmin: boolean) {
 
   // Recommendation config state
   const [recConfig, setRecConfig] = useState<RecommendationConfig | null>(null)
+  // Ceiling for the Max Candidates sliders. Arrives on the same request as the
+  // config, so the two can never describe different library sizes.
+  const [libraryCounts, setLibraryCounts] = useState<{ movies: number; series: number } | null>(null)
   const [loadingRecConfig, setLoadingRecConfig] = useState(false)
   const [savingRecConfig, setSavingRecConfig] = useState(false)
   const [recConfigError, setRecConfigError] = useState<string | null>(null)
@@ -172,6 +175,7 @@ export function useSettingsData(isAdmin: boolean) {
       if (response.ok) {
         const data = await response.json()
         setRecConfig(data.config)
+        setLibraryCounts(data.libraryCounts ?? null)
         setMovieConfigDirty(false)
         setSeriesConfigDirty(false)
       } else {
@@ -401,6 +405,7 @@ export function useSettingsData(isAdmin: boolean) {
 
     // Recommendation config state
     recConfig,
+    libraryCounts,
     loadingRecConfig,
     savingRecConfig,
     recConfigError,

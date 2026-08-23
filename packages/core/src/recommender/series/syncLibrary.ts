@@ -13,6 +13,7 @@ import {
 import { randomUUID } from 'crypto'
 import type { Episode } from '../../media/types.js'
 import { fetchParallel, streamingBatchProcess } from '../shared/syncHelpers.js'
+import { clampMaxCandidatesToLibrary } from '../../lib/recommendationConfig.js'
 import {
   SERIES_PAGE_SIZE,
   EPISODE_PAGE_SIZE,
@@ -398,6 +399,16 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
     const { seriesRemoved, episodesRemoved } = await reconcileRemovedSeries(jobId, librarySyncResults)
 
     const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1)
+
+    // See the movie mirror: a sync is when the library size changes, so it is
+    // also when a maxCandidates left above that size becomes fixable.
+    try {
+      await clampMaxCandidatesToLibrary()
+    } catch (clampErr) {
+      const why = clampErr instanceof Error ? clampErr.message : 'unknown error'
+      addLog(jobId, 'warn', `Failed to clamp max candidates after series sync: ${why}`)
+    }
+
     const finalResult = {
       seriesAdded,
       seriesUpdated,

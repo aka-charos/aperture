@@ -16,6 +16,7 @@ import { randomUUID } from 'crypto'
 import type { Movie, PaginatedResult } from '../../media/types.js'
 import type { MediaServerProvider } from '../../media/MediaServerProvider.js'
 import { clampRating } from '../shared/syncHelpers.js'
+import { clampMaxCandidatesToLibrary } from '../../lib/recommendationConfig.js'
 
 const logger = createChildLogger('sync')
 
@@ -685,6 +686,15 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
     const removed = await reconcileRemovedMovies(jobId, librarySyncResults)
 
     const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1)
+    // A sync is when the library size changes, so it is also when a
+    // maxCandidates left above that size becomes fixable. Never allowed to
+    // fail a sync that already succeeded.
+    try {
+      await clampMaxCandidatesToLibrary()
+    } catch (clampErr) {
+      logger.warn({ err: clampErr }, 'Failed to clamp max candidates after movie sync')
+    }
+
     const finalResult = { added, updated, removed, total: processed, jobId }
     completeJob(jobId, finalResult)
 
