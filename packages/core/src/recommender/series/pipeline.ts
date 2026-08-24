@@ -56,6 +56,12 @@ import { getRecommendationConfig } from '../../lib/recommendationConfig.js'
 import { storeSeriesEvidence, getSeriesOverviews } from './storage.js'
 import { getSeriesEmbeddings } from './embeddings.js'
 import {
+  embeddingColumnFor,
+  isCenteringReady,
+  resolveEmbeddingSpace,
+  type EmbeddingSpace,
+} from '../centering.js'
+import {
   generateSeriesExplanations,
   storeSeriesExplanations,
   type SeriesForExplanation,
@@ -282,6 +288,12 @@ async function storeSeriesTasteProfile(userId: string, profile: number[]): Promi
 interface SeriesCandidateQueryContext {
   model: string
   tableName: string
+  /**
+   * Which column this query compares against, resolved from the space the
+   * viewer's stored profile was built in. See recommender/centering.ts -- the
+   * movie mirror of this carries the same field for the same reason.
+   */
+  embeddingColumn: string
 }
 
 /**
@@ -289,14 +301,16 @@ interface SeriesCandidateQueryContext {
  * Hoisted out of the per-vector query path so multi-cluster retrieval
  * (getMultiClusterSeriesCandidates) resolves it once, not once per cluster.
  */
-async function resolveSeriesCandidateQueryContext(): Promise<SeriesCandidateQueryContext | null> {
+async function resolveSeriesCandidateQueryContext(
+  space: EmbeddingSpace
+): Promise<SeriesCandidateQueryContext | null> {
   const model = await getActiveEmbeddingModelId()
   if (!model) {
     logger.warn('No embedding model configured for series candidate generation')
     return null
   }
   const tableName = await getActiveEmbeddingTableName('series_embeddings')
-  return { model, tableName }
+  return { model, tableName, embeddingColumn: embeddingColumnFor(space) }
 }
 
 /**
@@ -353,11 +367,11 @@ async function querySeriesCandidatesForVector(
        s.network,
        s.status,
        s.community_rating,
-       1 - (se.embedding <=> $1::halfvec) as similarity
+       1 - (se.${ctx.embeddingColumn} <=> $1::halfvec) as similarity
      FROM series s
      JOIN ${ctx.tableName} se ON se.series_id = s.id AND se.model = $2
      WHERE 1=1 ${ratingFilter}
-     ORDER BY se.embedding <=> $1::halfvec
+     ORDER BY se.${ctx.embeddingColumn} <=> $1::halfvec
      LIMIT $3`,
     params
   )
@@ -397,9 +411,10 @@ async function getSeriesCandidates(
   watchedSeriesIds: Set<string>,
   maxCandidates: number,
   includeWatched: boolean,
-  maxParentalRating: number | null
+  maxParentalRating: number | null,
+  space: EmbeddingSpace = 'raw'
 ): Promise<SeriesCandidate[]> {
-  const ctx = await resolveSeriesCandidateQueryContext()
+  const ctx = await resolveSeriesCandidateQueryContext(space)
   if (!ctx) return []
 
   const vectorStr = `[${tasteProfile.join(',')}]`
@@ -447,14 +462,15 @@ export async function getMultiClusterSeriesCandidates(
   watchedSeriesIds: Set<string>,
   totalLimit: number,
   includeWatched: boolean,
-  maxParentalRating: number | null
+  maxParentalRating: number | null,
+  space: EmbeddingSpace = 'raw'
 ): Promise<SeriesCandidate[]> {
   if (clusters.length === 0) return []
   if (clusters.length === 1) {
     return getSeriesCandidates(clusters[0].embedding, watchedSeriesIds, totalLimit, includeWatched, maxParentalRating)
   }
 
-  const ctx = await resolveSeriesCandidateQueryContext()
+  const ctx = await resolveSeriesCandidateQueryContext(space)
   if (!ctx) return []
 
   const { allocateClusterCandidateLimits } = await import('../shared/index.js')
@@ -507,7 +523,11 @@ export async function getSeriesInterestMatchIndex(
 ): Promise<InterestMatchIndex> {
   if (interests.length === 0) return buildInterestMatchIndex([])
 
-  const ctx = await resolveSeriesCandidateQueryContext()
+  // Explicitly RAW, mirroring the movie interest path: the query vector is a
+  // fresh embedding of the interest TEXT, which nothing has centred, so it has
+  // to meet raw item vectors. Both sides raw is internally consistent, and this
+  // path is not what the centring measurement covered.
+  const ctx = await resolveSeriesCandidateQueryContext('raw')
   if (!ctx) return buildInterestMatchIndex([])
 
   // A stale-dimension embedding makes pgvector raise, and previously just
@@ -987,6 +1007,8 @@ export async function generateSeriesRecommendationsForUser(
     // Try to get stored profile first (will rebuild if stale)
     const storedProfile = await getUserTasteProfile(user.id, 'series')
     let tasteProfile: number[] | null = storedProfile?.embedding || null
+    // Which space that centroid lives in; the legacy fallback below is raw.
+    let profileSpace: EmbeddingSpace = storedProfile?.embeddingSpace ?? 'raw'
     
     // If no stored profile or missing embedding, build using legacy method as fallback
     if (!tasteProfile) {
@@ -999,7 +1021,9 @@ export async function generateSeriesRecommendationsForUser(
         const currentModelId = await getActiveEmbeddingModelId()
         
         // Store in new system with embedding model info
-        await storeNewTasteProfile(user.id, 'series', tasteProfile, currentModelId || undefined)
+        // The legacy builder reads the raw column, so this centroid is raw.
+        profileSpace = 'raw'
+        await storeNewTasteProfile(user.id, 'series', tasteProfile, currentModelId || undefined, 'raw')
         // Also detect franchises
         await detectAndUpdateFranchises(user.id, 'series')
         logger.info({ userId: user.id }, '💾 Stored new taste profile and detected franchises')
@@ -1089,6 +1113,30 @@ export async function generateSeriesRecommendationsForUser(
     // 4. Get candidate series
     logger.info({ userId: user.id }, '🔍 Finding candidate series...')
 
+    // Resolve the space BOTH sides of the coming comparison will be in, and
+    // refuse rather than fall back: a centroid from one space against items
+    // from another is a cosine between two different origins. Mirrors
+    // movies/pipeline.ts.
+    const retrievalSpace = resolveEmbeddingSpace(
+      profileSpace,
+      await isCenteringReady('series')
+    )
+    if (!retrievalSpace) {
+      logger.warn(
+        { userId: user.id, profileSpace },
+        '⚠️ Series taste profile is mean-centred but the centred column is not usable - rebuild taste profiles'
+      )
+      await finalizeSeriesRun(
+        runId,
+        0,
+        0,
+        Date.now() - startTime,
+        'failed',
+        'Taste profile space does not match available embeddings; run rebuild-taste-profiles'
+      )
+      return { runId, recommendations: [] }
+    }
+
     // Multi-centroid retrieval: mirrors movies/pipeline.ts. Falls open to the
     // single-centroid path whenever there's only one cluster, no clusters yet
     // (pre-rebuild), or the multi-cluster query itself fails for any reason.
@@ -1102,7 +1150,8 @@ export async function generateSeriesRecommendationsForUser(
           excludeIds,
           cfg.maxCandidates,
           includeWatched,
-          user.maxParentalRating ?? null
+          user.maxParentalRating ?? null,
+          retrievalSpace
         )
         logger.info(
           { userId: user.id, clusterCount: tasteClusters.length },
@@ -1118,7 +1167,8 @@ export async function generateSeriesRecommendationsForUser(
           excludeIds,
           cfg.maxCandidates,
           includeWatched,
-          user.maxParentalRating ?? null
+          user.maxParentalRating ?? null,
+          retrievalSpace
         )
       }
     } else {
@@ -1127,7 +1177,8 @@ export async function generateSeriesRecommendationsForUser(
         excludeIds,
         cfg.maxCandidates,
         includeWatched,
-        user.maxParentalRating ?? null
+        user.maxParentalRating ?? null,
+        retrievalSpace
       )
     }
 

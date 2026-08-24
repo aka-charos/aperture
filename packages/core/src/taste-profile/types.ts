@@ -2,6 +2,10 @@
  * Types for the User Taste Profile system
  */
 
+// Type-only: erased at compile time, so the centering.ts -> types.js edge
+// (it imports MediaType) never becomes a runtime cycle.
+import type { EmbeddingSpace } from '../recommender/centering.js'
+
 export type MediaType = 'movie' | 'series'
 
 export interface TasteProfile {
@@ -10,6 +14,18 @@ export interface TasteProfile {
   mediaType: MediaType
   embedding: number[] | null
   embeddingModel: string | null
+  /**
+   * Which embedding space `embedding` lives in (recommender/centering.ts).
+   *
+   * A profile is built once and read later, so without this the reader cannot
+   * tell whether the centroid it holds is comparable to the column it is about
+   * to query. Comparing across spaces is not "slightly worse" -- it is a cosine
+   * between two different origins, which returns a confident ranking that means
+   * nothing.
+   *
+   * Rows written before migration 0154 default to 'raw', which is what they are.
+   */
+  embeddingSpace: EmbeddingSpace
   autoUpdatedAt: Date | null
   userModifiedAt: Date | null
   isLocked: boolean

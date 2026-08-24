@@ -18,6 +18,8 @@ import type {
 } from './types.js'
 import { DEFAULT_MIN_FRANCHISE_ITEMS, DEFAULT_MIN_FRANCHISE_SIZE } from './types.js'
 import type { ClusterCentroid } from './clustering.js'
+import type { EmbeddingSpace } from '../recommender/centering.js'
+import { buildSpaceFor, isCenteringReady } from '../recommender/centering.js'
 // Imported from the leaf module rather than recommender/shared/index.js: that
 // barrel pulls in scoring/selection, and the recommender already imports this
 // file. interestSlots.ts has no imports of its own, so there's no cycle.
@@ -112,16 +114,27 @@ export async function getUserTasteProfile(
   // Build new profile
   logger.info({ userId, mediaType, forceRebuild }, 'Building taste profile')
 
+  // Which embedding space this build happens in, decided ONCE here and
+  // threaded into the centroid, the clusters and the stored row. Deciding it
+  // separately in each of those would let one user's profile end up half
+  // centred, which no downstream reader could detect.
+  //
+  // Note what this does NOT do: it never rewrites an existing profile's space
+  // on read. Centring only takes effect when a profile is deliberately rebuilt,
+  // which is what makes filling the centred column a no-op until someone runs
+  // rebuild-taste-profiles, and what makes rebuilding the rollback.
+  const space = buildSpaceFor(await isCenteringReady(mediaType))
+
   // Import builder dynamically to avoid circular dependencies
   const { buildTasteProfile } = await import('./builder.js')
-  const newProfile = await buildTasteProfile(userId, mediaType)
+  const newProfile = await buildTasteProfile(userId, mediaType, space)
 
   if (newProfile) {
     // Get current embedding model to store with profile
     const { getActiveEmbeddingModelId } = await import('../lib/ai-provider.js')
     const currentModelId = await getActiveEmbeddingModelId()
 
-    await storeTasteProfile(userId, mediaType, newProfile, currentModelId || undefined)
+    await storeTasteProfile(userId, mediaType, newProfile, currentModelId || undefined, space)
 
     if (refreshPreferences) {
       await refreshDetectedPreferences(userId, mediaType, existing)
@@ -131,7 +144,7 @@ export async function getUserTasteProfile(
     // franchise/genre detection specifically, see its own doc comment).
     // Clusters have no independent refresh schedule of their own; they
     // rebuild in lockstep with the overall profile.
-    await refreshTasteClusters(userId, mediaType, currentModelId || undefined)
+    await refreshTasteClusters(userId, mediaType, currentModelId || undefined, space)
 
     // Custom interests are not media-typed, so this runs on whichever profile
     // rebuilds first and the staleness filter makes the second call a no-op.
@@ -201,11 +214,12 @@ async function refreshDetectedPreferences(
 async function refreshTasteClusters(
   userId: string,
   mediaType: MediaType,
-  embeddingModel?: string
+  embeddingModel?: string,
+  space: EmbeddingSpace = 'raw'
 ): Promise<void> {
   try {
     const { buildTasteClusters } = await import('./builder.js')
-    const result = await buildTasteClusters(userId, mediaType)
+    const result = await buildTasteClusters(userId, mediaType, space)
     if (result) {
       await storeTasteClusters(userId, mediaType, result.clusters, result.dispersion, embeddingModel)
     }
@@ -244,8 +258,18 @@ async function backfillTasteClustersIfMissing(
     const { getActiveEmbeddingModelId } = await import('../lib/ai-provider.js')
     const currentModelId = await getActiveEmbeddingModelId()
 
-    logger.info({ userId, mediaType }, 'Profile is fresh but has no taste clusters, backfilling')
-    await refreshTasteClusters(userId, mediaType, currentModelId || undefined)
+    // Inherit the space the PROFILE was built in rather than deciding afresh.
+    // These clusters sit beside an existing centroid and are read against the
+    // same column; a fresh decision here could centre them while the centroid
+    // beside them stays raw.
+    const profileSpace = await queryOne<{ embedding_space: string }>(
+      `SELECT embedding_space FROM user_taste_profiles WHERE user_id = $1 AND media_type = $2`,
+      [userId, mediaType]
+    )
+    const space: EmbeddingSpace = profileSpace?.embedding_space === 'centered' ? 'centered' : 'raw'
+
+    logger.info({ userId, mediaType, space }, 'Profile is fresh but has no taste clusters, backfilling')
+    await refreshTasteClusters(userId, mediaType, currentModelId || undefined, space)
   } catch (err) {
     logger.warn({ err, userId, mediaType }, 'Failed to backfill missing taste clusters')
   }
@@ -320,6 +344,7 @@ export async function getStoredProfile(
     embedding: string | null
     embedding_model: string | null
     auto_updated_at: Date | null
+    embedding_space: string | null
     user_modified_at: Date | null
     is_locked: boolean
     refresh_interval_days: number
@@ -339,6 +364,9 @@ export async function getStoredProfile(
     mediaType: result.media_type as MediaType,
     embedding: result.embedding ? parseEmbedding(result.embedding) : null,
     embeddingModel: result.embedding_model,
+    // Anything unrecognised reads as 'raw', which is both the column default
+    // and the truthful answer for every row written before 0154.
+    embeddingSpace: result.embedding_space === 'centered' ? 'centered' : 'raw',
     autoUpdatedAt: result.auto_updated_at,
     userModifiedAt: result.user_modified_at,
     isLocked: result.is_locked,
@@ -387,19 +415,24 @@ export async function storeTasteProfile(
   userId: string,
   mediaType: MediaType,
   embedding: number[],
-  embeddingModel?: string
+  embeddingModel?: string,
+  // Required in practice but optional in the signature so an older caller
+  // cannot silently mislabel a raw centroid as centred; omitting it says
+  // "raw", which is the safe answer and the column default.
+  embeddingSpace: EmbeddingSpace = 'raw'
 ): Promise<void> {
   const vectorStr = `[${embedding.join(',')}]`
 
   await query(
-    `INSERT INTO user_taste_profiles (user_id, media_type, embedding, embedding_model, auto_updated_at)
-     VALUES ($1, $2, $3::halfvec, $4, NOW())
+    `INSERT INTO user_taste_profiles (user_id, media_type, embedding, embedding_model, embedding_space, auto_updated_at)
+     VALUES ($1, $2, $3::halfvec, $4, $5, NOW())
      ON CONFLICT (user_id, media_type) 
      DO UPDATE SET 
        embedding = $3::halfvec,
        embedding_model = $4,
+       embedding_space = $5,
        auto_updated_at = NOW()`,
-    [userId, mediaType, vectorStr, embeddingModel || null]
+    [userId, mediaType, vectorStr, embeddingModel || null, embeddingSpace]
   )
 
   logger.info({ userId, mediaType }, 'Stored taste profile')

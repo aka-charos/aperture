@@ -92,7 +92,7 @@ export const GLOBAL_JOB_CATEGORIES: JobCategory[] = [
     titleKey: 'admin.jobsPage.categories.globalTaste.title',
     descriptionKey: 'admin.jobsPage.categories.globalTaste.description',
     color: '#a855f7',
-    jobs: ['rebuild-taste-profiles'],
+    jobs: ['refresh-embedding-centering', 'rebuild-taste-profiles'],
   },
   // Same reasoning: one pass covers both media types. Note this list is an
   // allowlist and the only thing that renders a job card — a job missing from
@@ -168,6 +168,7 @@ export const JOB_ICONS: Record<string, React.ReactNode> = {
   'sync-lldap-emails': <AlternateEmailIcon />,
   'rebuild-taste-profiles': <FingerprintIcon />,
   'evaluate-recommender': <BiotechIcon />,
+  'refresh-embedding-centering': <PsychologyIcon />,
   'refresh-recommendation-explanations': <AutoAwesomeIcon />,
   'generate-title-analysis': <TheatersIcon />,
   'refresh-ratings': <StarHalfIcon />,
@@ -198,6 +199,7 @@ export const JOB_COLORS: Record<string, string> = {
   'sync-lldap-emails': '#0ea5e9',
   'rebuild-taste-profiles': '#a855f7',
   'evaluate-recommender': '#14b8a6',
+  'refresh-embedding-centering': '#a855f7',
   'refresh-recommendation-explanations': '#06b6d4',
   'generate-title-analysis': '#e91e63',
   'refresh-ratings': '#f97316',

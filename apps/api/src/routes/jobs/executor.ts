@@ -42,6 +42,7 @@ import {
   createChildLogger,
   runLibraryGapAnalysis,
   rebuildAllTasteProfiles,
+  refreshCenteredEmbeddings,
   runEvaluation,
   refreshAllExplanations,
   withInferenceContext,
@@ -376,6 +377,44 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
             qualifiedUsers: result?.qualifiedUsers ?? 0,
             skippedUsers: result?.skippedUsers ?? 0,
           })
+        }
+        break
+      }
+      case 'refresh-embedding-centering': {
+        // createJobProgress is mandatory: without it every function in
+        // jobs/progress.ts silently no-ops on this id -- empty bar, empty log,
+        // no job_runs row, and a Stop button that cannot work.
+        createJobProgress(jobId, name, 2)
+
+        let step = 0
+        const totals: Record<string, number> = {}
+        for (const mediaType of ['movie', 'series'] as const) {
+          if (isJobCancelled(jobId)) break
+          setJobStep(jobId, step++, `Centring ${mediaType} embeddings`)
+          addLog(jobId, 'info', `Recomputing the library mean for ${mediaType}...`)
+          const { updated, skipped } = await refreshCenteredEmbeddings(mediaType)
+          totals[mediaType] = updated
+          addLog(
+            jobId,
+            'info',
+            skipped
+              ? `No embedding model configured; skipped ${mediaType}`
+              : `Recentred ${updated} ${mediaType} embeddings`
+          )
+        }
+
+        // A rebuild is REQUIRED before any of this reaches a recommendation:
+        // profiles keep the space they were built in, so nothing changes until
+        // someone runs rebuild-taste-profiles. Said in the log because that is
+        // where an operator will look for what to do next.
+        addLog(
+          jobId,
+          'info',
+          'Done. No recommendation changes until rebuild-taste-profiles runs -- profiles keep the space they were built in.'
+        )
+
+        if (!isJobCancelled(jobId)) {
+          completeJob(jobId, totals)
         }
         break
       }

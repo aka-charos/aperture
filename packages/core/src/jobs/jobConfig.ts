@@ -197,6 +197,7 @@ export const JOB_SCHEDULE_DEFAULTS: Record<
   // algorithm change, not as an ongoing schedule.
   'rebuild-taste-profiles': { scheduleType: 'manual', hour: 0, minute: 0 },
   'evaluate-recommender': { scheduleType: 'manual', hour: 0, minute: 0 },
+  'refresh-embedding-centering': { scheduleType: 'manual', hour: 0, minute: 0 },
   'refresh-recommendation-explanations': { scheduleType: 'manual', hour: 0, minute: 0 },
   'generate-title-analysis': { scheduleType: 'manual', hour: 0, minute: 0 },
 }
