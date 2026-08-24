@@ -92,6 +92,14 @@ export const jobDefinitions: JobDefinition[] = [
     cron: null,
     manualOnly: true,
   },
+  // === Evaluation (both media types) ===
+  {
+    name: 'evaluate-recommender',
+    description:
+      "Measures the retrieval half of the recommender against a held-out slice of each viewer's history, and prints what a handful of well-known titles are actually nearest to, raw and mean-centred. Reads only; changes nothing. The neighbour dump is the part to judge a change on -- the numbers are a floor check against a random and a rating-only baseline, and tuning anything to maximise them would make the recommender worse.",
+    cron: null,
+    manualOnly: true,
+  },
   // === Taste Profiles (both media types) ===
   {
     name: 'rebuild-taste-profiles',

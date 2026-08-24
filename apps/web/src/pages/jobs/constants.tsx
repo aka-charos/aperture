@@ -21,6 +21,7 @@ import FingerprintIcon from '@mui/icons-material/Fingerprint'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import TheatersIcon from '@mui/icons-material/Theaters'
 import StarHalfIcon from '@mui/icons-material/StarHalf'
+import BiotechIcon from '@mui/icons-material/Biotech'
 import type { JobCategory } from './types'
 import { getAppName } from '@/lib/branding'
 
@@ -119,6 +120,15 @@ export const GLOBAL_JOB_CATEGORIES: JobCategory[] = [
     color: '#f97316',
     jobs: ['refresh-ratings'],
   },
+  // A measuring instrument rather than a step in any pipeline, so it gets its
+  // own category: filing it under Taste Profiles would suggest it changes
+  // something, and it deliberately writes nothing at all.
+  {
+    titleKey: 'admin.jobsPage.categories.globalEvaluation.title',
+    descriptionKey: 'admin.jobsPage.categories.globalEvaluation.description',
+    color: '#14b8a6',
+    jobs: ['evaluate-recommender'],
+  },
   {
     titleKey: 'admin.jobsPage.categories.globalIntegrations.title',
     descriptionKey: 'admin.jobsPage.categories.globalIntegrations.description',
@@ -157,6 +167,7 @@ export const JOB_ICONS: Record<string, React.ReactNode> = {
   'generate-discovery-suggestions': <ExploreIcon />,
   'sync-lldap-emails': <AlternateEmailIcon />,
   'rebuild-taste-profiles': <FingerprintIcon />,
+  'evaluate-recommender': <BiotechIcon />,
   'refresh-recommendation-explanations': <AutoAwesomeIcon />,
   'generate-title-analysis': <TheatersIcon />,
   'refresh-ratings': <StarHalfIcon />,
@@ -186,6 +197,7 @@ export const JOB_COLORS: Record<string, string> = {
   'generate-discovery-suggestions': '#ec4899',
   'sync-lldap-emails': '#0ea5e9',
   'rebuild-taste-profiles': '#a855f7',
+  'evaluate-recommender': '#14b8a6',
   'refresh-recommendation-explanations': '#06b6d4',
   'generate-title-analysis': '#e91e63',
   'refresh-ratings': '#f97316',

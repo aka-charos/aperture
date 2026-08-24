@@ -1239,6 +1239,17 @@ export {
 } from './taste-profile/rebuildAll.js'
 
 export {
+  // Offline evaluation of the retrieval half (jobs executor). A floor check and
+  // a neighbour dump, never a tuning target -- see evaluation/metrics.ts.
+  runEvaluation,
+  DEFAULT_RELEVANCE_WEIGHTS,
+  SKEPTICAL_RELEVANCE_WEIGHTS,
+  type EvaluationOptions,
+  type EvaluationReport,
+  type EvaluationVariant,
+} from './evaluation/index.js'
+
+export {
   shouldRegenerateRecommendations,
   pruneOldRecommendationRuns,
   DEFAULT_GATE_THRESHOLDS,

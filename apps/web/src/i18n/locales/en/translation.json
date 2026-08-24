@@ -422,6 +422,10 @@
           "title": "Discovery & Suggestions",
           "description": "AI-powered content discovery and recommendations"
         },
+        "globalEvaluation": {
+          "title": "Evaluation",
+          "description": "Measure how well recommendations retrieve what people actually watch"
+        },
         "globalTaste": {
           "title": "Taste Profiles",
           "description": "Rebuild what {{appName}} has learned about each user's taste"
