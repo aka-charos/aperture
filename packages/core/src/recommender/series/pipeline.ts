@@ -1032,7 +1032,12 @@ export async function generateSeriesRecommendationsForUser(
     // Get ALL watched series IDs for filtering (not just recent ones used for taste profile)
     // This ensures we exclude ALL series the user has watched, not just the recentWatchLimit
     // Also exclude disliked series if dislike_behavior is 'exclude'
+    // Two exclusions at two stages -- see the movie mirror for the reasoning.
+    // Watched series never reach retrieval; favorites are retrieved, scored and
+    // stored (so the detail page keeps their insights panel) and are simply never
+    // selected.
     let excludeIds: Set<string>
+    const selectionExcludeIds = new Set<string>()
     if (includeWatched) {
       // Only exclude disliked series (not watched ones)
       excludeIds = new Set(dislikedIds)
@@ -1041,11 +1046,12 @@ export async function generateSeriesRecommendationsForUser(
         '../watchedExclusion.js'
       )
       excludeIds = await getExpandedWatchedSeriesIds(user.id)
-      // Favorites stay taste input but stop being offered back as discoveries;
-      // see getExpandedFavoritedSeriesIds for why this isn't part of "watched".
+      // Favorites stay taste input and stay scored, but are not offered back as
+      // discoveries; see getExpandedFavoritedSeriesIds for why this is not part of
+      // "watched".
       const favoritedIds = await getExpandedFavoritedSeriesIds(user.id)
       for (const favoritedId of favoritedIds) {
-        excludeIds.add(favoritedId)
+        selectionExcludeIds.add(favoritedId)
       }
       for (const dislikedId of dislikedIds) {
         excludeIds.add(dislikedId)
@@ -1057,7 +1063,7 @@ export async function generateSeriesRecommendationsForUser(
           favoritedCount: favoritedIds.size,
           dislikedCount: dislikedIds.size,
         },
-        `📋 Loaded ${excludeIds.size} series to exclude (watched duplicates + favorited + disliked)`
+        `📋 Excluding ${excludeIds.size} series from retrieval (watched + disliked) and ${selectionExcludeIds.size} from selection only (favorited)`
       )
     }
 
@@ -1228,11 +1234,15 @@ export async function generateSeriesRecommendationsForUser(
       // show this adjustment rather than leave a gap it cannot account for.
       const originalScore = candidate.finalScore
       candidate.baseScore = originalScore
-      candidate.finalScore = applyPreferenceAdjustment(originalScore, {
-        franchise: franchiseAffinity,
-        genre: genreAffinity,
-        interest: interestAffinity,
-      })
+      candidate.finalScore = applyPreferenceAdjustment(
+        originalScore,
+        {
+          franchise: franchiseAffinity,
+          genre: genreAffinity,
+          interest: interestAffinity,
+        },
+        cfg.preferenceStrength
+      )
 
       if (franchiseAffinity !== 0.5) {
         franchiseSignalCount++
@@ -1313,11 +1323,19 @@ export async function generateSeriesRecommendationsForUser(
       cfg.twinMaxSlots
     )
 
+    // Everything scored is stored; only this narrower list may be picked, so a
+    // favorited show keeps its candidate row and its insights panel without
+    // spending a recommendation slot.
+    const selectableCandidates =
+      selectionExcludeIds.size > 0
+        ? scoredCandidates.filter((candidate) => !selectionExcludeIds.has(candidate.seriesId))
+        : scoredCandidates
+
     // Third and last claim on the budget, so it can only spend what the other
     // two left. Mirrors movies/pipeline.ts.
     const acclaimedEligible =
       cfg.acclaimedMaxSlots > 0
-        ? scoredCandidates.filter((candidate) =>
+        ? selectableCandidates.filter((candidate) =>
             isAcclaimed(
               candidate.communityRating,
               candidate.voteCount,
@@ -1334,13 +1352,13 @@ export async function generateSeriesRecommendationsForUser(
     )
 
     const { selected } = applySeriesDiversityAndSelect(
-      scoredCandidates,
+      selectableCandidates,
       cfg.selectedCount - reservedInterestSlots - reservedTwinSlots - reservedAcclaimedSlots,
       effectiveDiversityWeight
     )
 
     const interestFillers = interestIndex
-      ? pickInterestSlotFillers(selected, scoredCandidates, interestIndex, reservedInterestSlots)
+      ? pickInterestSlotFillers(selected, selectableCandidates, interestIndex, reservedInterestSlots)
       : []
 
     const interestPicks = new Map<string, InterestCandidateMatch>()
@@ -1361,7 +1379,7 @@ export async function generateSeriesRecommendationsForUser(
     // After the interest fillers so their picks are already spoken for.
     const twinFillers = pickTwinSlotFillers(
       [...selected, ...interestFillers.map((f) => f.candidate)],
-      scoredCandidates,
+      selectableCandidates,
       twins,
       donorWatched,
       reservedTwinSlots

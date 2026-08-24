@@ -38,6 +38,7 @@ type HelpSettingKey =
   | 'acclaimedMaxSlots'
   | 'acclaimedMinRating'
   | 'acclaimedMinVotes'
+  | 'preferenceStrength'
 
 function HelpIcon({ settingKey }: { settingKey: HelpSettingKey }) {
   const { t } = useTranslation()
@@ -485,6 +486,30 @@ function MediaTypeCard({
           />
         </FormControl>
 
+        <FormControl fullWidth sx={{ mb: 3 }} size="small">
+          <Box display="flex" alignItems="center" justifyContent="space-between">
+            <Box display="flex" alignItems="center">
+              <Typography variant="body2">{t('settingsRecAlgo.preferenceStrength')}</Typography>
+              <HelpIcon settingKey="preferenceStrength" />
+            </Box>
+            <Typography variant="body2" color="primary" fontWeight={600}>
+              {Math.round(config.preferenceStrength * 100)}%
+            </Typography>
+          </Box>
+          <Slider
+            value={Math.round(config.preferenceStrength * 100)}
+            onChange={(_, v) => onUpdateField('preferenceStrength', (v as number) / 100)}
+            min={0}
+            max={100}
+            step={5}
+            size="small"
+            marks={[
+              { value: 0, label: t('settingsRecAlgo.preferenceStrengthOff') },
+              { value: 50, label: t('settingsRecAlgo.preferenceStrengthDefault') },
+              { value: 100 },
+            ]}
+          />
+        </FormControl>
         {/* The gate. Only shown once the feature is on: two thresholds for a
             disabled feature is noise. */}
         {config.acclaimedMaxSlots > 0 && (

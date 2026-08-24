@@ -29,6 +29,11 @@ export interface MediaTypeConfig {
    * never enters any title’s score.
    */
   acclaimedMinVotes: number
+  /**
+   * Share of a candidate’s remaining gap to 1.0 that a maxed franchise/genre/
+   * interest signal may close. 0 disables the nudge.
+   */
+  preferenceStrength: number
   recentWatchLimit: number
   similarityWeight: number
   noveltyWeight: number

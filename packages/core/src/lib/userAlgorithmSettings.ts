@@ -181,6 +181,10 @@ export async function getEffectiveAlgorithmConfig(
         mediaType === 'movie' ? dbConfig.movie.acclaimedMinRating : dbConfig.series.acclaimedMinRating,
       acclaimedMinVotes:
         mediaType === 'movie' ? dbConfig.movie.acclaimedMinVotes : dbConfig.series.acclaimedMinVotes,
+      preferenceStrength:
+        mediaType === 'movie'
+          ? dbConfig.movie.preferenceStrength
+          : dbConfig.series.preferenceStrength,
     }
   } catch {
     logger.warn('Failed to load admin config, using fallback defaults')
@@ -193,6 +197,7 @@ export async function getEffectiveAlgorithmConfig(
       acclaimedMaxSlots: 0,
       acclaimedMinRating: 8.3,
       acclaimedMinVotes: 50000,
+      preferenceStrength: 0.5,
       ...DEFAULT_WEIGHTS,
     }
   }
@@ -229,6 +234,7 @@ export async function getEffectiveAlgorithmConfig(
     acclaimedMaxSlots: adminConfig.acclaimedMaxSlots, // User can't override this
     acclaimedMinRating: adminConfig.acclaimedMinRating,
     acclaimedMinVotes: adminConfig.acclaimedMinVotes,
+    preferenceStrength: adminConfig.preferenceStrength,
     ...normalizedWeights,
   }
 

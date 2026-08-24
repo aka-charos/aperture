@@ -102,6 +102,18 @@ function validateConfigUpdates(updates: Partial<MediaTypeConfig>): string | null
     }
   }
 
+  // 0 is meaningful here too: it switches the preference nudge off entirely,
+  // which is why this is not folded in with the ratio checks above.
+  if (updates.preferenceStrength !== undefined) {
+    if (
+      !Number.isFinite(updates.preferenceStrength) ||
+      updates.preferenceStrength < 0 ||
+      updates.preferenceStrength > 1
+    ) {
+      return 'preferenceStrength must be between 0 and 1'
+    }
+  }
+
   // 0 would admit an unvoted rating, which is the one thing this gate
   // exists to exclude.
   if (updates.acclaimedMinVotes !== undefined) {

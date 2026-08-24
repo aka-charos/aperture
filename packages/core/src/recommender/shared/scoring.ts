@@ -504,7 +504,17 @@ const PREFERENCE_TOTAL_WEIGHT =
  * toward a "perfect" match, but can't manufacture one out of a poor
  * content-fit score on its own.
  */
-const MAX_PREFERENCE_HEADROOM = 0.5
+export const DEFAULT_PREFERENCE_STRENGTH = 0.5
+
+/**
+ * Kept as the value used when a config read fails. This was the whole setting
+ * for as long as it existed: a hardcoded 0.5, invisible in the UI, moving the
+ * final score by up to half a candidate's remaining gap to 1.0 -- comfortably
+ * enough to reorder a list, and the one input to the score an admin could
+ * neither see nor change. It is now
+ * `recommendation_config.{movie,series}_preference_strength`.
+ */
+const MAX_PREFERENCE_HEADROOM = DEFAULT_PREFERENCE_STRENGTH
 
 /**
  * Franchise/genre/custom-interest affinities for a candidate, each on a
@@ -534,8 +544,14 @@ export interface PreferenceAffinities {
  */
 export function applyPreferenceAdjustment(
   qualityScore: number,
-  affinities: PreferenceAffinities
+  affinities: PreferenceAffinities,
+  strength: number = MAX_PREFERENCE_HEADROOM
 ): number {
+  // A negative or non-finite strength would invert the nudge rather than
+  // disable it, so it is clamped rather than trusted. 0 switches the whole
+  // mechanism off and leaves the blend exactly as calculateBaseScore left it.
+  const headroomShare = Number.isFinite(strength) ? Math.min(1, Math.max(0, strength)) : MAX_PREFERENCE_HEADROOM
+  if (headroomShare === 0) return qualityScore
   let netPull = 0 // -1 (fully disliked) .. +1 (fully loved)
 
   for (const dimension of Object.keys(PREFERENCE_DIMENSION_WEIGHTS) as Array<
@@ -548,7 +564,7 @@ export function applyPreferenceAdjustment(
   if (netPull === 0) return qualityScore
 
   const headroom = netPull > 0 ? 1 - qualityScore : qualityScore
-  return qualityScore + netPull * MAX_PREFERENCE_HEADROOM * headroom
+  return qualityScore + netPull * headroomShare * headroom
 }
 
 

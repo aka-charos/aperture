@@ -27,6 +27,7 @@ export async function loadConfig(): Promise<PipelineConfig> {
       acclaimedMaxSlots: dbConfig.movie.acclaimedMaxSlots,
       acclaimedMinRating: dbConfig.movie.acclaimedMinRating,
       acclaimedMinVotes: dbConfig.movie.acclaimedMinVotes,
+      preferenceStrength: dbConfig.movie.preferenceStrength,
     }
   } catch (err) {
     logger.warn({ err }, 'Failed to load movie recommendation config from DB, using fallback')
@@ -56,6 +57,7 @@ export async function loadSeriesConfig(): Promise<PipelineConfig> {
       acclaimedMaxSlots: dbConfig.series.acclaimedMaxSlots,
       acclaimedMinRating: dbConfig.series.acclaimedMinRating,
       acclaimedMinVotes: dbConfig.series.acclaimedMinVotes,
+      preferenceStrength: dbConfig.series.preferenceStrength,
     }
   } catch (err) {
     logger.warn({ err }, 'Failed to load series recommendation config from DB, using fallback')

@@ -1930,6 +1930,13 @@
         "increase": "Only broadly-seen titles qualify, at the cost of excluding genuinely acclaimed rarities.",
         "decrease": "Thinly-voted ratings start to qualify, which is exactly what lets an unearned high score into the list.",
         "example": "At 50,000 a title needs a substantial audience behind its rating, which is what keeps a brigaded score out."
+      },
+      "preferenceStrength": {
+        "title": "Preference Nudge",
+        "description": "After the three weights above produce a blended score, a title is nudged up or down depending on how much the viewer likes its franchise, its genres and the interests they typed in. This sets how far that nudge may move it — as a share of the distance still left to a perfect match, so it can narrow a gap but never manufacture one from a poor score.",
+        "increase": "Franchises and genres a viewer loves carry further, at the cost of the similarity, discovery and quality scores deciding less.",
+        "decrease": "The blended score decides more of the order. At 0 the nudge is off and the list is exactly what the three weights produced.",
+        "example": "At the default 50%, a title scoring 0.60 with a maxed-out preference signal lands at 0.80 — enough to reorder a list, which is why it is worth being able to see it."
       }
     },
     "sectionRegeneration": "WHEN TO REGENERATE",
@@ -1949,7 +1956,10 @@
     "maxCandidatesAllShort": "All",
     "acclaimedMaxSlots": "Reserved for acclaimed titles",
     "acclaimedMinRating": "Minimum rating to qualify",
-    "acclaimedMinVotes": "Minimum votes behind that rating"
+    "acclaimedMinVotes": "Minimum votes behind that rating",
+    "preferenceStrength": "Preference nudge",
+    "preferenceStrengthOff": "Off",
+    "preferenceStrengthDefault": "Default"
   },
   "settingsApiKeys": {
     "title": "Κλειδιά API",

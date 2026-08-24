@@ -1,5 +1,6 @@
 import { query, queryOne } from './db.js'
 import { createChildLogger } from './logger.js'
+import { DEFAULT_PREFERENCE_STRENGTH } from '../recommender/shared/scoring.js'
 import {
   DEFAULT_ACCLAIMED_MAX_SLOTS,
   DEFAULT_ACCLAIMED_MIN_RATING,
@@ -65,6 +66,12 @@ export interface MediaTypeConfig {
    * earned across two hundred.
    */
   acclaimedMinVotes: number
+  /**
+   * Share of a candidate's remaining gap to 1.0 that a maxed-out preference
+   * signal (franchise, genre, stated interest) may close. 0 switches the nudge
+   * off entirely and leaves the blended score untouched.
+   */
+  preferenceStrength: number
 }
 
 export interface RecommendationConfig {
@@ -100,6 +107,7 @@ interface RecommendationConfigRow {
   movie_acclaimed_max_slots: number
   movie_acclaimed_min_rating: string
   movie_acclaimed_min_votes: number
+  movie_preference_strength: string
   series_max_candidates: number
   series_selected_count: number
   series_recent_watch_limit: number
@@ -115,6 +123,7 @@ interface RecommendationConfigRow {
   series_acclaimed_max_slots: number
   series_acclaimed_min_rating: string
   series_acclaimed_min_votes: number
+  series_preference_strength: string
   updated_at: Date
   scoring_updated_at: Date
 }
@@ -140,6 +149,7 @@ const MOVIE_DEFAULTS: MediaTypeConfig = {
   acclaimedMaxSlots: DEFAULT_ACCLAIMED_MAX_SLOTS,
   acclaimedMinRating: DEFAULT_ACCLAIMED_MIN_RATING,
   acclaimedMinVotes: DEFAULT_ACCLAIMED_MIN_VOTES,
+  preferenceStrength: DEFAULT_PREFERENCE_STRENGTH,
 }
 
 const SERIES_DEFAULTS: MediaTypeConfig = {
@@ -160,6 +170,7 @@ const SERIES_DEFAULTS: MediaTypeConfig = {
   acclaimedMaxSlots: DEFAULT_ACCLAIMED_MAX_SLOTS,
   acclaimedMinRating: DEFAULT_ACCLAIMED_MIN_RATING,
   acclaimedMinVotes: DEFAULT_ACCLAIMED_MIN_VOTES,
+  preferenceStrength: DEFAULT_PREFERENCE_STRENGTH,
 }
 
 /**
@@ -182,6 +193,7 @@ const COLUMN_SUFFIX: Record<keyof MediaTypeConfig, string> = {
   acclaimedMaxSlots: 'acclaimed_max_slots',
   acclaimedMinRating: 'acclaimed_min_rating',
   acclaimedMinVotes: 'acclaimed_min_votes',
+  preferenceStrength: 'preference_strength',
 }
 
 /**
@@ -209,6 +221,8 @@ const SCORING_FIELDS = new Set<keyof MediaTypeConfig>([
   'acclaimedMaxSlots',
   'acclaimedMinRating',
   'acclaimedMinVotes',
+  // Moves every final score, so an edit has to invalidate the activity gate.
+  'preferenceStrength',
 ])
 
 /**
@@ -222,11 +236,13 @@ export async function getRecommendationConfig(): Promise<RecommendationConfig> {
       movie_new_candidate_threshold, movie_max_run_age_days,
       movie_twin_threshold_k, movie_twin_max_slots, movie_interest_max_slots,
       movie_acclaimed_max_slots, movie_acclaimed_min_rating, movie_acclaimed_min_votes,
+      movie_preference_strength,
       series_max_candidates, series_selected_count, series_recent_watch_limit,
       series_similarity_weight, series_novelty_weight, series_rating_weight, series_diversity_weight,
       series_new_candidate_threshold, series_max_run_age_days,
       series_twin_threshold_k, series_twin_max_slots, series_interest_max_slots,
       series_acclaimed_max_slots, series_acclaimed_min_rating, series_acclaimed_min_votes,
+      series_preference_strength,
       updated_at, scoring_updated_at
      FROM recommendation_config WHERE id = 1`
   )
@@ -258,6 +274,7 @@ export async function getRecommendationConfig(): Promise<RecommendationConfig> {
       acclaimedMaxSlots: row.movie_acclaimed_max_slots,
       acclaimedMinRating: parseFloat(row.movie_acclaimed_min_rating),
       acclaimedMinVotes: row.movie_acclaimed_min_votes,
+      preferenceStrength: parseFloat(row.movie_preference_strength),
     },
     series: {
       maxCandidates: row.series_max_candidates,
@@ -275,6 +292,7 @@ export async function getRecommendationConfig(): Promise<RecommendationConfig> {
       acclaimedMaxSlots: row.series_acclaimed_max_slots,
       acclaimedMinRating: parseFloat(row.series_acclaimed_min_rating),
       acclaimedMinVotes: row.series_acclaimed_min_votes,
+      preferenceStrength: parseFloat(row.series_preference_strength),
     },
     updatedAt: row.updated_at,
     scoringUpdatedAt: row.scoring_updated_at,
