@@ -19,6 +19,7 @@ import type { MediaType, WatchedItem } from './types.js'
 import {
   chooseK,
   clusterTasteEmbeddings,
+  l2Normalize,
   MAX_CLUSTERING_INPUT_ITEMS,
   MIN_MARGINAL_DISPERSION_REDUCTION,
   type WeightedEmbeddingItem,
@@ -595,12 +596,43 @@ function buildWeightedAverageEmbedding(
   const result = new Array(dimension).fill(0)
   let totalWeight = 0
 
+  // Unit-normalize each item before weighting it.
+  //
+  // A centroid is a SUM, not a comparison, and that distinction is the whole
+  // point. The 31 places that compare vectors all use pgvector's <=>, which is
+  // cosine and therefore magnitude-invariant, so an unnormalized vector costs
+  // them nothing. Summing is different: it makes a title's influence
+  // `weight * ||v||` instead of `weight`, quietly multiplying every tuned
+  // number that feeds `item.weight` -- log10(episode count), the completion
+  // bands, favourite x1.5, the 180-day recency half-life -- by an
+  // uncontrolled per-title factor. The trailing L2 normalize below does NOT
+  // fix that: it rescales the finished mean, long after the relative
+  // contributions have been decided.
+  //
+  // On an instance embedding at a model's NATIVE dimension this is inert,
+  // because the vectors already arrive unit-length -- gemini-embedding-001 at
+  // 3072 is the case in front of us, so this fixes nothing that is currently
+  // broken here. It stops being inert the moment the dimension is not native:
+  // Google's own documentation says "you must manually normalize non-3072
+  // dimensions", so every MRL-truncated setting (1536, 768, ...) returns
+  // vectors whose norm depends on how much of that text's energy happened to
+  // land in the kept dimensions. VALID_EMBEDDING_DIMENSIONS offers eight
+  // choices and seven of them are truncations, so the correctness of the taste
+  // vector should not rest on which one an operator picked.
+  //
+  // It also makes the two centroid paths agree by construction. The K>=2 path
+  // has always fed l2Normalize'd vectors to spherical k-means (see the
+  // UnitItem construction in clustering.ts), so at a truncated dimension the
+  // same viewer's taste was computed under one rule at K=1 and a different one
+  // at K>=2 -- and chooseK compared a raw-mean fallback against unit-based
+  // clusters to decide between them.
   for (const item of items) {
     const embedding = embeddings.get(item.id)
     if (!embedding) continue
 
+    const unit = l2Normalize(embedding)
     for (let i = 0; i < dimension; i++) {
-      result[i] += embedding[i] * item.weight
+      result[i] += unit[i] * item.weight
     }
     totalWeight += item.weight
   }
