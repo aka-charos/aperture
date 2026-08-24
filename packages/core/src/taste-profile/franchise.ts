@@ -22,6 +22,7 @@ import {
   type LibraryGenreCounts,
 } from './genrePreference.js'
 import type { MediaType } from './types.js'
+import { USER_RATING_SCALE_MAX } from '../recommender/ratingBands.js'
 
 const logger = createChildLogger('franchise-detector')
 
@@ -463,7 +464,7 @@ export async function detectAndUpdateFranchises(
 // Movie Franchise Detection
 // ============================================================================
 
-interface FranchiseStats {
+export interface FranchiseStats {
   franchiseName: string
   itemsWatched: number
   totalEngagement: number
@@ -703,7 +704,7 @@ async function getLibraryFranchiseTotals(
  * - Engagement intensity (high episode count)
  * - User ratings (if available)
  */
-function calculatePreferenceScore(stats: FranchiseStats): number {
+export function calculatePreferenceScore(stats: FranchiseStats): number {
   let score = 0
 
   // Base score from completion rate (0 to 0.4)
@@ -717,11 +718,18 @@ function calculatePreferenceScore(stats: FranchiseStats): number {
     score += 0.15
   }
 
-  // Rating bonus/penalty (0 to 0.3)
+  // Rating bonus/penalty, -0.3 (rated 1) to +0.3 (rated 10), 0 at a flat 5.
+  //
+  // user_ratings.rating is 1-10, fixed by a CHECK constraint since migration
+  // 0053, so there is no scale to detect. This used to read
+  // `avgRating > 5 ? /10 : /5`, which guessed at a 1-5 scale that does not
+  // exist and produced a cliff at exactly 5.0: a franchise averaging 5.0 got
+  // the FULL +0.3, the same as one averaging 10, while 5.1 got +0.006 -- a
+  // fiftyfold drop for a tenth of a point. Below the cliff it inverted too,
+  // handing a franchise rated 3/10 a positive boost. Same fault as the one
+  // removed from calculateEngagementWeight; see recommender/ratingBands.ts.
   if (stats.avgRating !== null) {
-    // Normalize rating to 0-1 (assuming 1-10 scale, adjust for 1-5)
-    const normalizedRating = stats.avgRating > 5 ? stats.avgRating / 10 : stats.avgRating / 5
-    // Convert to -0.15 to +0.3 range
+    const normalizedRating = stats.avgRating / USER_RATING_SCALE_MAX
     score += (normalizedRating - 0.5) * 0.6
   }
 
@@ -813,7 +821,7 @@ export async function getItemFranchises(
 // Genre Detection and Weight Calculation
 // ============================================================================
 
-interface GenreStats {
+export interface GenreStats {
   genre: string
   itemsWatched: number
   totalEngagement: number
@@ -1097,7 +1105,7 @@ async function getLibraryGenreCounts(
  * components' relative strength at the same time would leave neither
  * evaluable.
  */
-function calculateGenreWeight(
+export function calculateGenreWeight(
   stat: GenreStats,
   library: LibraryGenreCounts,
   watchedTotal: number
@@ -1110,10 +1118,13 @@ function calculateGenreWeight(
 
   let weight = genreWeightFromSelection(ratio, stat.itemsWatched)
 
-  // Rating adjustment: +/- 0.3 based on average rating
+  // Rating adjustment, -0.3 (rated 1) to +0.3 (rated 10), 0 at a flat 5.
+  // Same scale-guessing fault as calculatePreferenceScore above, and it landed
+  // on the genre weights that feed applyPreferenceAdjustment -- so a genre the
+  // viewer rates 5/10 was nudging their recommendations as hard as one they
+  // rate 10/10, and a genre rated 3/10 was nudging them upward at all.
   if (stat.avgRating !== null) {
-    const normalizedRating = stat.avgRating > 5 ? stat.avgRating / 10 : stat.avgRating / 5
-    // Convert 0-1 rating to -0.3 to +0.3 adjustment
+    const normalizedRating = stat.avgRating / USER_RATING_SCALE_MAX
     weight += (normalizedRating - 0.5) * 0.6
   }
 
