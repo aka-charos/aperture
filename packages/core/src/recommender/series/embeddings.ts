@@ -19,7 +19,7 @@ import { randomUUID } from 'crypto'
 import { getEpisodeEmbeddingsEnabled } from '../../settings/systemSettings.js'
 // One version for both media types: a builder change invalidates whichever
 // texts it touched, and two counters would drift.
-import { CANONICAL_TEXT_VERSION } from '../movies/embeddings.js'
+import { CANONICAL_TEXT_VERSION, PLOT_CHARS } from '../movies/embeddings.js'
 
 const logger = createChildLogger('embeddings-series')
 
@@ -142,10 +142,7 @@ export function buildSeriesCanonicalText(series: SeriesForEmbedding): string {
     sections.push(`Genres: ${series.genres.join(', ')}`)
   }
 
-  // Content rating indicates target audience
-  if (series.contentRating) {
-    sections.push(`Rated ${series.contentRating}`)
-  }
+  // Content rating is deliberately absent — see the movie builder.
 
   // === SECTION 3: Creative DNA ===
   // Network influences style (HBO vs Netflix vs Network TV)
@@ -185,7 +182,7 @@ export function buildSeriesCanonicalText(series: SeriesForEmbedding): string {
       ? series.plotFull
       : series.overview
   if (synopsis) {
-    const maxOverviewLength = 1000
+    const maxOverviewLength = PLOT_CHARS
     const text =
       synopsis.length > maxOverviewLength
         ? synopsis.substring(0, maxOverviewLength) + '...'
@@ -223,14 +220,7 @@ export function buildSeriesCanonicalText(series: SeriesForEmbedding): string {
     sections.push(`In ${series.languages.slice(0, 3).join(', ')}`)
   }
 
-  // Awards signal quality. OMDb's structured summary where available; the
-  // media server's free-text `awards` is usually empty. Scores stay out — see
-  // the movie builder.
-  const awards = series.awardsSummary || series.awards
-  if (awards) {
-    const awardsText = awards.length > 150 ? awards.substring(0, 150) + '...' : awards
-    sections.push(`Awards: ${awardsText}`)
-  }
+  // Awards are deliberately absent — see the movie builder.
 
   return sections.join('. ')
 }

@@ -56,10 +56,16 @@ interface Movie {
  * and `awards` for the sync, `0059` added `keywords` and `awards_summary` for
  * enrichment, and the builder was never repointed.
  */
-export const CANONICAL_TEXT_VERSION = 1
+export const CANONICAL_TEXT_VERSION = 2
 
 /** Enough to characterise a film; a few titles carry 100+ and would drown it. */
 const MAX_KEYWORDS = 18
+
+/**
+ * How much of a title's synopsis is embedded. See the long note at the use
+ * site; exported so the series builder cannot drift from it.
+ */
+export const PLOT_CHARS = 4000
 
 interface EmbeddingResult {
   movieId: string
@@ -99,10 +105,12 @@ export function buildCanonicalText(movie: Movie): string {
     sections.push(`Genres: ${movie.genres.join(', ')}`)
   }
 
-  // Content rating indicates target audience and content type
-  if (movie.contentRating) {
-    sections.push(`Rated ${movie.contentRating}`)
-  }
+  // Content rating is deliberately absent. "NR" means nobody submitted the
+  // film to the MPAA, which tracks age and non-US origin rather than anything
+  // about the work, and because it is a literal shared string every old or
+  // foreign title in the library carries it — so it functions as an era and
+  // nationality detector. Whatever real content signal R vs PG carries is
+  // already in genres and keywords, better.
 
   // === SECTION 3: Creative DNA ===
   // Directors have consistent styles (auteur theory)
@@ -124,9 +132,15 @@ export function buildCanonicalText(movie: Movie): string {
     sections.push(`Cinematography by ${movie.cinematographers.slice(0, 2).join(', ')}`)
   }
 
-  if (movie.composers && movie.composers.length > 0) {
-    sections.push(`Music by ${movie.composers.slice(0, 2).join(', ')}`)
-  }
+  // Composers are deliberately absent, and cinematographers deliberately are
+  // not. The argument for both was that a Deakins photograph or a Greenwood
+  // score is as identifying as the director, which is true of perhaps fifty
+  // people; for the rest of the ~10,000 crew names in a real library it is a
+  // proper noun appearing on two or three titles, contributing nothing to
+  // similarity except nationality. Six of the fields here were names or a
+  // country, against three describing what a film is like, which is how
+  // Metropolis came back nearest to Das Boot. Photography survives that test
+  // as a style signal; a single composer credit does not.
 
   // Lead actors (top 3) influence viewing choices significantly
   if (movie.actors && movie.actors.length > 0) {
@@ -157,7 +171,29 @@ export function buildCanonicalText(movie: Movie): string {
       ? movie.plotFull
       : movie.overview
   if (synopsis) {
-    const maxOverviewLength = 1000
+  // The cap is 4000, not 1000 and not absent, and both halves of that matter.
+  //
+  // `substring(0, 1000)` kept the FIRST thousand characters, which for any real
+  // synopsis is the setup — who, where, what the situation is. Setups are the
+  // most interchangeable part of any story, so the cap was not merely losing
+  // the turn and the ending, it was systematically embedding the one third of
+  // every long-plot film that is most like every other. It also largely
+  // cancelled the feature it fed: `plot_full` (migration 0139) exists because
+  // IMDb's synopsis narrates rather than pitches, and a real one runs 5,000 to
+  // 15,000 characters, so keeping the first 10% kept the part most similar to
+  // the blurb we already had.
+  //
+  // Removing it entirely is the other error. `plot_full` is present only where
+  // OMDb had a long synopsis, so uncapped a film with 12,000 characters gets a
+  // vector that is ~95% plot while one with a 250-character overview gets ~30%
+  // plot and 70% metadata — two documents that are not comparable, and cosine
+  // starts partly measuring "does this title have an IMDb synopsis". That is
+  // the same coverage-asymmetry argument that keeps the title-analysis prose
+  // out of here.
+  //
+  // 4000 captures the turn and the ending for almost every synopsis while
+  // keeping every document inside one order of magnitude of every other.
+    const maxOverviewLength = PLOT_CHARS
     const text =
       synopsis.length > maxOverviewLength
         ? synopsis.substring(0, maxOverviewLength) + '...'
@@ -198,18 +234,13 @@ export function buildCanonicalText(movie: Movie): string {
     sections.push(`Part of ${movie.collectionName}`)
   }
 
-  // Awards signal quality and recognition. OMDb's summary is the structured
-  // one ("Won 4 Oscars. 12 nominations."); `awards` is the media server's free
-  // text and is usually empty, which is why this used to contribute nothing.
-  // Scores are deliberately NOT here: a bare "82" embeds as noise, and quality
-  // already has its own term in scoring (calculateRatingScore) and its own
-  // filters in Browse.
-  const awards = movie.awardsSummary || movie.awards
-  if (awards) {
-    // Truncate very long awards text
-    const awardsText = awards.length > 150 ? awards.substring(0, 150) + '...' : awards
-    sections.push(`Awards: ${awardsText}`)
-  }
+  // Awards are gone for the reason scores were never here: a bare "82" embeds
+  // as noise, and quality already has its own blend term
+  // (calculateRatingScore) plus its own filters in Browse. Awards text is that
+  // same signal in prose, and worse — it hands every awarded title the tokens
+  // "Won", "Oscars", "nominations", so award films cluster with award films
+  // regardless of what any of them are about. A prestige detector inside a
+  // similarity vector.
 
   return sections.join('. ')
 }
