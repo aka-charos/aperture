@@ -93,7 +93,7 @@ function numOrNull(value: string | number | null): number | null {
 
 interface StoredBreakdown {
   interestMatch?: { interestText?: unknown }
-  twinMatch?: unknown
+  twinMatch?: { sharedIds?: unknown }
   acclaimedMatch?: unknown
 }
 
@@ -104,18 +104,29 @@ interface StoredBreakdown {
  * interest and a twin pick by the overlapping viewer, because for those two the
  * ranking is precisely what did *not* choose the title. score_breakdown is
  * where the pipeline recorded it, and a twin's donor id stays in the column —
- * only the flag travels onward, so no identity can reach a prompt.
+ * only the flag and the shared titles travel onward, so no identity can reach a
+ * prompt. Those shared ids are titles from the READER's own history, which is
+ * what makes them safe to name and also what makes them the one honest reason
+ * available for a borrowed pick.
+ *
+ * A run made before `sharedIds` was recorded yields an empty list, and the
+ * prompt falls back to the bare anonymous line.
  */
 function readSlotOrigin(breakdown: unknown): {
   interestText: string | null
   fromTasteTwin: boolean
+  twinSharedIds: string[]
   fromAcclaimed: boolean
 } {
   const parsed = (breakdown ?? {}) as StoredBreakdown
   const interestText = parsed.interestMatch?.interestText
+  const sharedIds = parsed.twinMatch?.sharedIds
   return {
     interestText: typeof interestText === 'string' && interestText ? interestText : null,
     fromTasteTwin: parsed.twinMatch != null,
+    twinSharedIds: Array.isArray(sharedIds)
+      ? sharedIds.filter((id): id is string => typeof id === 'string')
+      : [],
     fromAcclaimed: parsed.acclaimedMatch != null,
   }
 }
@@ -226,6 +237,7 @@ async function refreshMovieRun(
       ratingScore: numOrNull(row.rating_score) ?? 0,
       interestText: origin.interestText,
       fromTasteTwin: origin.fromTasteTwin,
+      twinSharedIds: origin.twinSharedIds,
       fromAcclaimed: origin.fromAcclaimed,
     }
   })
@@ -281,6 +293,7 @@ async function refreshSeriesRun(
       ratingScore: numOrNull(row.rating_score) ?? 0,
       interestText: origin.interestText,
       fromTasteTwin: origin.fromTasteTwin,
+      twinSharedIds: origin.twinSharedIds,
       fromAcclaimed: origin.fromAcclaimed,
     }
   })

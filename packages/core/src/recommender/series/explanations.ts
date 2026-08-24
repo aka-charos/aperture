@@ -18,6 +18,13 @@ import {
 import { resolveEffectiveAiLanguage } from '../../lib/userSettings.js'
 import { WATCH_HISTORY_TASTE_SQL } from '../watchedExclusion.js'
 import {
+  buildEvidenceRules,
+  buildSlotLines,
+  buildSlotRules,
+  evidenceHeading,
+  SERIES_NOUNS,
+} from '../shared/explanationPrompt.js'
+import {
   describeExplanationBatch,
   explanationBatchSettings,
   parseExplanationResponse,
@@ -74,6 +81,12 @@ export interface SeriesForExplanation {
    * connection that was never the reason.
    */
   fromAcclaimed?: boolean
+  /**
+   * Ids of the titles this viewer and the taste twin have both watched, from
+   * score_breakdown.twinMatch.sharedIds. Resolved to titles below, because
+   * this -- not the similarity evidence -- is why a borrowed pick is here.
+   */
+  twinSharedIds?: string[]
 }
 
 export interface EvidenceSeries {
@@ -92,6 +105,8 @@ interface SeriesTitleContext {
 
 export interface SeriesWithEvidence extends SeriesForExplanation {
   evidence: EvidenceSeries[]
+  /** Resolved from twinSharedIds; absent unless this is a twin pick. */
+  twinSharedTitles?: string[]
 }
 
 export interface SeriesExplanationResult {
@@ -228,6 +243,43 @@ async function getUserSeriesTasteContext(userId: string): Promise<UserSeriesTast
 }
 
 /**
+ * Resolve the ids a twin pick carries into display titles, in one round trip
+ * for the whole batch.
+ *
+ * These are titles out of the READER's own watch history -- the rarest ones
+ * they and the donor both watched -- so naming them in the prompt leaks nothing
+ * about the other viewer, which the donor id itself would.
+ */
+async function fetchTwinSharedTitles(
+  recommendations: SeriesForExplanation[]
+): Promise<Map<string, string[]>> {
+  const byPick = new Map<string, string[]>()
+
+  const allIds = new Set<string>()
+  for (const rec of recommendations) {
+    for (const id of rec.twinSharedIds ?? []) allIds.add(id)
+  }
+  if (allIds.size === 0) return byPick
+
+  const result = await query<{ id: string; title: string; year: number | null }>(
+    `SELECT id, title, year FROM series WHERE id = ANY($1)`,
+    [[...allIds]]
+  )
+  const titleById = new Map(
+    result.rows.map((row) => [row.id, row.year ? `${row.title} (${row.year})` : row.title])
+  )
+
+  for (const rec of recommendations) {
+    const titles = (rec.twinSharedIds ?? [])
+      .map((id) => titleById.get(id))
+      .filter((title): title is string => Boolean(title))
+    if (titles.length > 0) byPick.set(rec.seriesId, titles)
+  }
+
+  return byPick
+}
+
+/**
  * Generate AI explanations for series using actual embedding evidence
  */
 export async function generateSeriesExplanations(
@@ -250,16 +302,18 @@ export async function generateSeriesExplanations(
 
   // Fetch the actual embedding-based evidence
   const seriesIds = recommendations.map((r) => r.seriesId)
-  const [evidenceMap, titleContext, tasteContext] = await Promise.all([
+  const [evidenceMap, titleContext, tasteContext, twinSharedTitles] = await Promise.all([
     fetchSeriesEvidenceForRecommendations(runId, seriesIds),
     fetchSeriesTitleContext(seriesIds),
     getUserSeriesTasteContext(userId),
+    fetchTwinSharedTitles(recommendations),
   ])
 
   // Attach evidence to each recommendation
   const seriesWithEvidence: SeriesWithEvidence[] = recommendations.map((r) => ({
     ...r,
     evidence: evidenceMap.get(r.seriesId) || [],
+    twinSharedTitles: twinSharedTitles.get(r.seriesId),
   }))
 
   // Generate explanations in batches - size depends on provider context window
@@ -340,17 +394,8 @@ async function generateBatchSeriesExplanations(
               .join('\n')
           : '      (none — say so by writing about the show itself, not about a connection)'
 
-      const interestLine = s.interestText
-        ? `\n   ✍️ THEY ASKED FOR THIS: picked because they told us they like "${s.interestText}" — lead with that`
-        : ''
-
-      const twinLine = s.fromTasteTwin
-        ? `\n   👥 A KINDRED VIEWER PICKED THIS: another viewer here whose taste closely overlaps theirs watched it — lead with that, and never name or describe that person`
-        : ''
-
-      const acclaimedLine = s.fromAcclaimed
-        ? `\n   🏆 WIDELY ACCLAIMED: in the list because of its standing, not because the ranking chose it — lead with what the show is and why it is held in that regard`
-        : ''
+      // Shared with the movie generator; see explanationPrompt.ts.
+      const slotLines = buildSlotLines(s, SERIES_NOUNS)
 
       const keywords = titleContext.get(s.seriesId)?.keywords
       const themes = keywords?.length
@@ -359,9 +404,9 @@ async function generateBatchSeriesExplanations(
 
       return `${i + 1}. "${s.title}" (${s.year || 'N/A'})
    Genres: ${s.genres.join(', ')}${s.network ? `\n   Network: ${s.network}` : ''}${s.status ? `\n   Status: ${s.status}` : ''}${themes}
-   Novelty: ${s.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${s.ratingScore > 0.7 ? 'critically acclaimed' : s.ratingScore > 0.5 ? 'well received' : 'mixed'}${interestLine}${twinLine}${acclaimedLine}
+   Novelty: ${s.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${s.ratingScore > 0.7 ? 'critically acclaimed' : s.ratingScore > 0.5 ? 'well received' : 'mixed'}${slotLines}
    Plot: ${clip(s.overview, PICK_PLOT_CHARS) ?? 'No overview available'}
-   🎯 CLOSEST IN THEIR WATCH HISTORY (nearest first):
+${evidenceHeading(s, SERIES_NOUNS)}
 ${evidenceStr}`
     })
     .join('\n\n')
@@ -377,21 +422,14 @@ ${evidenceStr}`
 2. For each recommendation, the SPECIFIC watched series it's most similar to (via AI embedding analysis), with a short synopsis of each
 
 Write compelling 3-4 sentence explanations for each recommendation. Your explanations MUST:
-- Reference the SPECIFIC watched series listed in "CLOSEST IN THEIR WATCH HISTORY" for each recommendation
-- Explain what qualities those series share with the recommendation, drawing on the synopses and themes you have been given
 - Be warm and conversational, like a knowledgeable friend recommending their favorite shows
 - Be specific rather than superlative. Naming what two shows share is more persuasive than praising either one, and never spoil an ending
 - Mention if it's from a network/streaming service they seem to enjoy
+${buildEvidenceRules(SERIES_NOUNS)}
 
-CRITICAL: Each recommendation shows which of the user's watched series it's most similar to. USE THAT DATA - don't make up connections to random series.
+${buildSlotRules(SERIES_NOUNS)}
 
 CRITICAL: Some of these shows will be obscure and you will not recognise them. That is expected. Work only from the data given - the plot summaries, themes, genres and network above. Do NOT state awards, ratings performance, critical reception, cancellation history or production trivia unless it appears in the data. If all you have is two plot summaries, connect them on subject, tone and theme, and say nothing about how either was received. An honest sentence about what a show is beats a confident one about what it achieved.
-
-CRITICAL: A few recommendations are marked "THEY ASKED FOR THIS" with an interest the user typed in themselves. For those, open by connecting the show to that interest in the user's own words, then fill in with the similarity evidence. Never justify one of these on viewing-history similarity alone - that is not why it is in the list, and claiming otherwise would be wrong.
-
-CRITICAL: A few recommendations are marked "A KINDRED VIEWER PICKED THIS". Those are in the list because another viewer with strongly overlapping taste watched them, which is a different reason from similarity to the user's own history - say so, and then use the similarity evidence as support. Refer to that person only in general terms ("someone whose taste lines up with yours"). You do not know who they are, so never name them, guess at them, or describe them.
-
-CRITICAL: A few recommendations are marked "WIDELY ACCLAIMED". Those are in the list because the show is very highly rated by a large number of viewers, which is a different reason from similarity to this user's history - do not claim their viewing history led here. Say plainly that it is a landmark they have not started yet, then use the similarity evidence only as secondary support if it genuinely fits. The no-invention rule above still applies in full: describe what the show IS from the data given, and do not assert specific awards, ratings milestones or contemporary reception that is not in the data.
 
 Format: Return JSON with an "explanations" array containing objects with "index" (1-based) and "explanation" fields.
 

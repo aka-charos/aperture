@@ -80,3 +80,146 @@ export function clip(text: string | null | undefined, limit: number): string | n
   const body = lastSpace > limit * 0.6 ? cut.slice(0, lastSpace) : cut
   return `${body.replace(/[\s,;:]+$/, '')}…`
 }
+
+// ============================================================================
+// Reserved-slot picks: saying why the pick is there, and not saying why it isn't
+// ============================================================================
+
+/**
+ * The words that differ between the movie and series prompts. Everything below
+ * is shared, because the two generators are near-duplicates and a rule present
+ * in one and missing from the other is invisible until someone reads both.
+ */
+export interface ExplanationNouns {
+  /** "movies" / "series" */
+  plural: string
+  /** "movie" / "show" */
+  singular: string
+}
+
+export const MOVIE_NOUNS: ExplanationNouns = { plural: 'movies', singular: 'movie' }
+export const SERIES_NOUNS: ExplanationNouns = { plural: 'series', singular: 'show' }
+
+/**
+ * Why a pick is in the list when the ranking is not the answer.
+ *
+ * All three markers mean the same structural thing: the diversity selector did
+ * NOT choose this title, a reserved slot did. The similarity evidence is
+ * therefore an account of what the pick resembles, never of why it is here.
+ */
+export interface SlotMarkers {
+  interestText?: string | null
+  fromTasteTwin?: boolean
+  /**
+   * The titles both viewers watched, rarest first -- the quantity twin affinity
+   * is literally computed from (see recommender/twinAffinity.ts).
+   *
+   * This is the real reason a borrowed pick is in the list, and until now the
+   * model was never given it: it received a bare "a kindred viewer picked this"
+   * flag plus three unrelated nearest neighbours, and unsurprisingly wrote its
+   * explanation out of the neighbours. These are titles from the READER's own
+   * history, so naming them leaks nothing about the donor.
+   *
+   * Absent for runs made before this shipped and for twin matches predating
+   * `sharedIds`; the bare anonymous line is the fallback.
+   */
+  twinSharedTitles?: string[]
+  fromAcclaimed?: boolean
+}
+
+/**
+ * How many shared titles reach the prompt. Four establishes real overlap; the
+ * tail of that list is progressively less rare and so less evidential, and
+ * every entry costs prompt budget on every pick.
+ */
+export const TWIN_SHARED_TITLE_LIMIT = 4
+
+export function isReservedSlotPick(slot: SlotMarkers): boolean {
+  return Boolean(slot.interestText || slot.fromTasteTwin || slot.fromAcclaimed)
+}
+
+/**
+ * The two headings the evidence block can carry.
+ *
+ * Exported because the system prompt refers to them by name, and a rule naming
+ * a heading the picks do not actually use is a rule that never fires.
+ */
+export const EVIDENCE_HEADING_RANKED = 'CLOSEST IN THEIR WATCH HISTORY'
+export const EVIDENCE_HEADING_RESERVED = 'ALSO IN THEIR LIBRARY'
+
+/**
+ * Label the evidence block by what it can honestly claim.
+ *
+ * For a ranked pick, the three nearest titles in the viewer's history are a
+ * fair account of why it scored where it did. For a reserved-slot pick they are
+ * not -- the ranking is precisely what did not choose it -- and the insights
+ * panel already says so in as many words. The prompt used to say the opposite,
+ * which is how a Metropolis pick came to be explained by A Clockwork Orange and
+ * Cloud Atlas directly underneath a caption stating those were not the reason.
+ */
+export function evidenceHeading(slot: SlotMarkers, nouns: ExplanationNouns): string {
+  return isReservedSlotPick(slot)
+    ? `   📍 ${EVIDENCE_HEADING_RESERVED} (context only — NOT why this ${nouns.singular} was picked):`
+    : `   🎯 ${EVIDENCE_HEADING_RANKED} (nearest first):`
+}
+
+/** The marker lines telling the model which reserved slot a pick came from. */
+export function buildSlotLines(slot: SlotMarkers, nouns: ExplanationNouns): string {
+  const lines: string[] = []
+
+  if (slot.interestText) {
+    lines.push(
+      `\n   ✍️ THEY ASKED FOR THIS: picked because they told us they like "${slot.interestText}" — lead with that`
+    )
+  }
+
+  if (slot.fromTasteTwin) {
+    const shared = (slot.twinSharedTitles ?? []).slice(0, TWIN_SHARED_TITLE_LIMIT)
+    lines.push(
+      shared.length > 0
+        ? `\n   👥 A KINDRED VIEWER PICKED THIS: someone here whose taste closely overlaps theirs watched it. The two of them have both watched ${shared.join(', ')} — that shared ground is the reason this is in the list, so build the explanation on it. Never name or describe the other viewer`
+        : `\n   👥 A KINDRED VIEWER PICKED THIS: another viewer here whose taste closely overlaps theirs watched it — lead with that, and never name or describe that person`
+    )
+  }
+
+  if (slot.fromAcclaimed) {
+    lines.push(
+      `\n   🏆 WIDELY ACCLAIMED: in the list because of its standing, not because the ranking chose it — lead with what the ${nouns.singular} is and why it is held in that regard`
+    )
+  }
+
+  return lines.join('')
+}
+
+/**
+ * The bullets governing how the evidence block may be used.
+ *
+ * Replaces an unconditional `MUST: Reference the SPECIFIC watched movies listed
+ * in "CLOSEST IN THEIR WATCH HISTORY"`, which applied to every pick including
+ * the reserved-slot ones, and which the per-slot rules further down the prompt
+ * then tried to walk back with weaker wording ("then use the similarity
+ * evidence as support"). A model resolves that conflict toward the MUST, and
+ * did.
+ */
+export function buildEvidenceRules(nouns: ExplanationNouns): string {
+  return `- For a recommendation showing "${EVIDENCE_HEADING_RANKED}": reference those specific ${nouns.plural} and explain what qualities they share with the recommendation, drawing on the synopses, themes and crew you have been given
+- For a recommendation showing "${EVIDENCE_HEADING_RESERVED}": that list is context, not cause. It tells you what the viewer already has; it is NOT a reason and must never be presented as one. Lead with the marked reason instead, and mention those titles only if they genuinely illuminate the pick`
+}
+
+/**
+ * The three reserved-slot rules, in one place for both generators.
+ *
+ * Each now ends the same way -- the evidence may be used *only if it genuinely
+ * fits*. Previously only the acclaimed rule was phrased that way; the interest
+ * and twin rules said "then fill in with" and "then use as support", which are
+ * instructions to use it rather than permission.
+ */
+export function buildSlotRules(nouns: ExplanationNouns): string {
+  return `CRITICAL: Where a recommendation lists "${EVIDENCE_HEADING_RANKED}", those are the ${nouns.plural} it is genuinely closest to -- use that data and do not invent connections to random titles. Where it lists "${EVIDENCE_HEADING_RESERVED}" instead, the pick did NOT come from that similarity, and writing as though it did would be false.
+
+CRITICAL: A few recommendations are marked "THEY ASKED FOR THIS" with an interest the user typed in themselves. Open by connecting the ${nouns.singular} to that interest in the user's own words. Never justify one of these on viewing-history similarity -- that is not why it is in the list -- and draw on the titles listed beneath it only if they genuinely fit.
+
+CRITICAL: A few recommendations are marked "A KINDRED VIEWER PICKED THIS". Those are in the list because another viewer with strongly overlapping taste watched them, which is a different reason from similarity to this user's own history. Where the marker names titles the two of them have both watched, that shared ground IS the reason: name those titles and build the explanation on them, and draw on the titles listed beneath the recommendation only if they genuinely fit. Refer to the other viewer only in general terms ("someone whose taste lines up with yours") -- you do not know who they are, so never name, guess at or describe them.
+
+CRITICAL: A few recommendations are marked "WIDELY ACCLAIMED". Those are in the list because the ${nouns.singular} is very highly rated by a large number of viewers, which is a different reason from similarity to this user's history -- do not claim their viewing history led here. Say plainly that it is a landmark they have not seen yet, and use the titles listed beneath it only as secondary support if it genuinely fits.`
+}
