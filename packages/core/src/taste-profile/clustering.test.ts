@@ -39,6 +39,18 @@ function dot(a: number[], b: number[]): number {
 }
 
 /**
+ * Independent copy of production's l2Normalize. Written out rather than
+ * imported so the reference implementations below stay genuine cross-checks.
+ * Must match operation for operation -- the exactness tests assert bit
+ * equality, and float arithmetic is not associative.
+ */
+function unitVector(v: number[]): number[] {
+  const norm = Math.sqrt(v.reduce((sum, x) => sum + x * x, 0))
+  if (norm === 0) return v.slice()
+  return v.map((x) => x / norm)
+}
+
+/**
  * Independent reference implementation of the weighted mean + L2 normalize,
  * written directly from the formula in builder.ts's buildWeightedAverageEmbedding
  * rather than calling any production code -- so the K=1 exactness test below is
@@ -49,7 +61,8 @@ function referenceWeightedMean(items: WeightedEmbeddingItem[]): number[] {
   const acc = new Array(dim).fill(0)
   let totalWeight = 0
   for (const item of items) {
-    for (let i = 0; i < dim; i++) acc[i] += item.embedding[i] * item.weight
+    const unit = unitVector(item.embedding)
+    for (let i = 0; i < dim; i++) acc[i] += unit[i] * item.weight
     totalWeight += item.weight
   }
   for (let i = 0; i < dim; i++) acc[i] /= totalWeight
@@ -182,7 +195,8 @@ test('K=1 is BIT-identical to buildTasteProfile, not merely close', () => {
     for (const item of items) {
       const embedding = embeddings.get(item.id)
       if (!embedding) continue
-      for (let i = 0; i < dimension; i++) result[i] += embedding[i] * item.weight
+      const unit = unitVector(embedding)
+      for (let i = 0; i < dimension; i++) result[i] += unit[i] * item.weight
       totalWeight += item.weight
     }
     if (totalWeight === 0) return null
@@ -236,6 +250,54 @@ test('requesting more clusters than items degrades to a single cluster', () => {
   const clusters = clusterTasteEmbeddings(items, 3)
   assert.equal(clusters.length, 1)
   assert.equal(clusters[0].itemCount, 2)
+})
+
+
+test("an item's vector MAGNITUDE does not change the centroid, only its weight does", () => {
+  // The defect this pins: the weighted mean used to sum raw vectors, so a
+  // title's influence was `weight * ||v||` rather than `weight`. Inert while
+  // every vector arrives unit-length (a model at its native dimension), and
+  // silently wrong the moment one does not -- Google returns unnormalized
+  // vectors for every MRL-truncated dimension, which is seven of the eight
+  // entries in VALID_EMBEDDING_DIMENSIONS.
+  const base: WeightedEmbeddingItem[] = [
+    { id: 'a', weight: 2, embedding: [1, 0, 0] },
+    { id: 'b', weight: 1, embedding: [0, 1, 0] },
+    { id: 'c', weight: 1, embedding: [0, 0, 1] },
+  ]
+  // Same directions, same weights, wildly different magnitudes.
+  const scaled: WeightedEmbeddingItem[] = [
+    { id: 'a', weight: 2, embedding: [0.01, 0, 0] },
+    { id: 'b', weight: 1, embedding: [0, 40, 0] },
+    { id: 'c', weight: 1, embedding: [0, 0, 7] },
+  ]
+
+  const fromBase = clusterTasteEmbeddings(base, 1)[0].embedding
+  const fromScaled = clusterTasteEmbeddings(scaled, 1)[0].embedding
+
+  for (let i = 0; i < fromBase.length; i++) {
+    assert.ok(
+      Math.abs(fromBase[i] - fromScaled[i]) < 1e-12,
+      `dim ${i}: magnitude leaked into the centroid (${fromBase[i]} vs ${fromScaled[i]})`
+    )
+  }
+})
+
+test("doubling an item's WEIGHT still moves the centroid", () => {
+  // The guard above must not be satisfied by ignoring weights altogether.
+  const even: WeightedEmbeddingItem[] = [
+    { id: 'a', weight: 1, embedding: [1, 0, 0] },
+    { id: 'b', weight: 1, embedding: [0, 1, 0] },
+  ]
+  const tilted: WeightedEmbeddingItem[] = [
+    { id: 'a', weight: 4, embedding: [1, 0, 0] },
+    { id: 'b', weight: 1, embedding: [0, 1, 0] },
+  ]
+
+  const flat = clusterTasteEmbeddings(even, 1)[0].embedding
+  const leaning = clusterTasteEmbeddings(tilted, 1)[0].embedding
+
+  assert.ok(leaning[0] > flat[0] + 0.1, 'a heavier item must pull the centroid toward it')
 })
 
 // ============================================================================

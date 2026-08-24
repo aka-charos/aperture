@@ -151,7 +151,7 @@ export function describeDispersion(score: number): 'focused' | 'balanced' | 'ecl
 // Vector primitives
 // ============================================================================
 
-function l2Normalize(vector: number[]): number[] {
+export function l2Normalize(vector: number[]): number[] {
   const norm = Math.sqrt(vector.reduce((sum, v) => sum + v * v, 0))
   if (norm === 0) return vector.slice()
   return vector.map((v) => v / norm)
@@ -172,8 +172,9 @@ function arraysEqual(a: number[], b: number[]): boolean {
 }
 
 /**
- * Weighted mean of raw (not necessarily normalized) embeddings, then
- * L2-normalized. Deliberately a standalone copy of the formula in
+ * Weighted mean of UNIT-normalized embeddings, then L2-normalized. See the
+ * long note in buildWeightedAverageEmbedding for why the per-item normalize
+ * is load-bearing. Deliberately a standalone copy of the formula in
  * taste-profile/builder.ts's private buildWeightedAverageEmbedding (same
  * weighted-sum / totalWeight / L2-normalize steps) rather than importing it
  * from there -- builder.ts imports FROM this module (to call
@@ -189,8 +190,13 @@ function weightedMeanEmbedding(items: WeightedEmbeddingItem[]): number[] | null 
   let totalWeight = 0
 
   for (const item of items) {
+    // Same two operations in the same order as buildWeightedAverageEmbedding.
+    // The K=1 exactness tests assert BIT equality and float multiply is not
+    // associative, so `unit[i] * weight` and `raw[i] * (weight / norm)` are
+    // not interchangeable here.
+    const unit = l2Normalize(item.embedding)
     for (let i = 0; i < dimension; i++) {
-      sum[i] += item.embedding[i] * item.weight
+      sum[i] += unit[i] * item.weight
     }
     totalWeight += item.weight
   }
