@@ -8,6 +8,7 @@ import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import {
   regenerateUserSeriesRecommendations,
   getEffectiveAiExplanationSetting,
+  hasCausalEvidence,
   NOVELTY_ALIEN_FLOOR,
   blendWeightShares,
   NOVELTY_PEAK,
@@ -310,6 +311,17 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
         scoreBreakdown: candidate.score_breakdown,
         twinShared,
         evidence: evidence.rows,
+        // Whether the evidence below is close enough to be called the reason.
+        // The rows are the three nearest titles in this viewer's history with
+        // no floor applied, so a viewer whose history holds nothing near the
+        // pick still gets three of them -- see hasCausalEvidence. Sent as a
+        // decided boolean rather than a threshold because the number is a raw
+        // cosine tied to the embedding that produced it, and the web app never
+        // imports @aperture/core.
+        evidenceSupportsCause: hasCausalEvidence(
+          evidence.rows.map((row) => row.similarity)
+        ),
+
         genreAnalysis: {
           mediaGenres: seriesGenres,
           matchingGenres,

@@ -19,6 +19,7 @@ import {
   evidenceHeading,
   MOVIE_NOUNS,
 } from '../shared/explanationPrompt.js'
+import { hasCausalEvidence } from '../evidenceStrength.js'
 import {
   describeExplanationBatch,
   explanationBatchSettings,
@@ -429,7 +430,7 @@ async function generateBatchExplanations(
    Genres: ${m.genres.join(', ')}${directors}${keywords}
    Novelty: ${m.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${m.ratingScore > 0.7 ? 'highly acclaimed' : m.ratingScore > 0.5 ? 'well received' : 'mixed'}${slotLines}
    Plot: ${clip(m.overview, PICK_PLOT_CHARS) ?? 'No overview available'}
-${evidenceHeading(m, MOVIE_NOUNS)}
+${evidenceHeading(m, MOVIE_NOUNS, hasCausalEvidence(m.evidence.map((e) => e.similarity)))}
 ${evidenceStr}`
     })
     .join('\n\n')

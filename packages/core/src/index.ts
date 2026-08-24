@@ -1290,6 +1290,16 @@ export {
   blendWeightShares,
 } from './recommender/shared/scoring.js'
 
+// Same reasoning one more time: storeEvidence keeps the three nearest watched
+// titles with no distance floor, so "the best available" and "a good match"
+// arrive identical and the panel used to call both of them the reason. The
+// threshold that separates them is a raw cosine measured on a real library and
+// belongs beside the query that produced it, not in the web bundle.
+export {
+  EVIDENCE_CAUSAL_MIN_COSINE,
+  hasCausalEvidence,
+} from './recommender/evidenceStrength.js'
+
 // User Algorithm Settings
 export {
   getUserAlgorithmSettings,

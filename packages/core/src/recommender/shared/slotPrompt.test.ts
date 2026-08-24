@@ -22,11 +22,11 @@ const ACCLAIMED: SlotMarkers = { fromAcclaimed: true }
 
 test('a bare pick gets the causal heading, every reserved pick does not', () => {
   assert.equal(isReservedSlotPick(RANKED), false)
-  assert.match(evidenceHeading(RANKED, MOVIE_NOUNS), new RegExp(EVIDENCE_HEADING_RANKED))
+  assert.match(evidenceHeading(RANKED, MOVIE_NOUNS, true), new RegExp(EVIDENCE_HEADING_RANKED))
 
   for (const slot of [INTEREST, TWIN, ACCLAIMED]) {
     assert.equal(isReservedSlotPick(slot), true)
-    const heading = evidenceHeading(slot, MOVIE_NOUNS)
+    const heading = evidenceHeading(slot, MOVIE_NOUNS, true)
     assert.match(heading, new RegExp(EVIDENCE_HEADING_RESERVED))
     assert.doesNotMatch(
       heading,
@@ -41,8 +41,8 @@ test('the rules only name headings the picks can actually carry', () => {
   // picks carried another, so the rule never fired. Any rename has to move
   // both, and this is what forces that.
   const emitted = [
-    evidenceHeading(RANKED, MOVIE_NOUNS),
-    evidenceHeading(TWIN, MOVIE_NOUNS),
+    evidenceHeading(RANKED, MOVIE_NOUNS, true),
+    evidenceHeading(TWIN, MOVIE_NOUNS, true),
   ].join('\n')
 
   for (const nouns of [MOVIE_NOUNS, SERIES_NOUNS]) {
@@ -122,4 +122,41 @@ test('the movie and series rules differ only in their nouns', () => {
     series.replace(/\bseries\b/g, 'X').replace(/\bshow\b/g, 'Y'),
     'the two prompts have drifted beyond their media nouns'
   )
+})
+
+// ============================================================================
+// Distant evidence on a RANKED pick
+// ============================================================================
+
+test('a ranked pick whose evidence is far gets the non-causal heading', () => {
+  // The failure this closes: storeEvidence has no distance floor, so a viewer
+  // whose history holds nothing near the pick is still handed three rows, and
+  // the model -- told to use the data and invent nothing -- writes a reason out
+  // of them. Live, that is Das Boot at 0.67 explaining Metropolis.
+  const heading = evidenceHeading(RANKED, MOVIE_NOUNS, false)
+  assert.match(heading, new RegExp(EVIDENCE_HEADING_RESERVED))
+  assert.doesNotMatch(heading, new RegExp(EVIDENCE_HEADING_RANKED))
+})
+
+test('a ranked pick with close evidence still states the cause', () => {
+  // The guard must not simply demote everything -- that would be a different
+  // way of saying nothing.
+  const heading = evidenceHeading(RANKED, MOVIE_NOUNS, true)
+  assert.match(heading, new RegExp(EVIDENCE_HEADING_RANKED))
+})
+
+test('close evidence cannot re-promote a reserved-slot pick', () => {
+  // The two conditions are OR, not XOR. A twin pick whose evidence happens to
+  // be near is still not explained by the ranking that rejected it.
+  const heading = evidenceHeading(TWIN, MOVIE_NOUNS, true)
+  assert.match(heading, new RegExp(EVIDENCE_HEADING_RESERVED))
+})
+
+test('the softened heading reuses the reserved label rather than inventing a third', () => {
+  // Both rules in buildSlotRules are written against exactly two headings; a
+  // third would need a third rule, and the model would have one more thing to
+  // get wrong.
+  const distantRanked = evidenceHeading(RANKED, MOVIE_NOUNS, false)
+  const reserved = evidenceHeading(TWIN, MOVIE_NOUNS, true)
+  assert.equal(distantRanked, reserved)
 })

@@ -156,9 +156,30 @@ export const EVIDENCE_HEADING_RESERVED = 'ALSO IN THEIR LIBRARY'
  * panel already says so in as many words. The prompt used to say the opposite,
  * which is how a Metropolis pick came to be explained by A Clockwork Orange and
  * Cloud Atlas directly underneath a caption stating those were not the reason.
+ *
+ * `evidenceIsClose` is the second way that account stops being fair, and it
+ * applies to ranked picks too. storeEvidence keeps the three nearest watched
+ * titles with NO distance floor, so a viewer whose history holds nothing near
+ * the pick still gets three rows, and the model -- told to use this data and
+ * invent nothing -- dutifully builds a reason out of them. Measured live, that
+ * is how Das Boot at cosine 0.67 came to explain Metropolis. Decided by
+ * hasCausalEvidence (recommender/evidenceStrength.ts), which owns the number.
+ *
+ * The argument is REQUIRED rather than defaulted, because a default is a
+ * decision a caller can forget to make, and the two generators here are
+ * near-duplicates that this module exists to stop drifting apart.
+ *
+ * Note the softened case reuses EVIDENCE_HEADING_RESERVED rather than adding a
+ * third label: "context only, NOT why this was picked" is already exactly the
+ * claim being made, and the prompt is easier for a model to follow with two
+ * headings than with three.
  */
-export function evidenceHeading(slot: SlotMarkers, nouns: ExplanationNouns): string {
-  return isReservedSlotPick(slot)
+export function evidenceHeading(
+  slot: SlotMarkers,
+  nouns: ExplanationNouns,
+  evidenceIsClose: boolean
+): string {
+  return isReservedSlotPick(slot) || !evidenceIsClose
     ? `   📍 ${EVIDENCE_HEADING_RESERVED} (context only — NOT why this ${nouns.singular} was picked):`
     : `   🎯 ${EVIDENCE_HEADING_RANKED} (nearest first):`
 }
