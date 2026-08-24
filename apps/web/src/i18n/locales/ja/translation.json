@@ -318,6 +318,10 @@
         "globalRatings": {
           "title": "Ratings Refresh",
           "description": "Re-fetch the ratings the recommender scores on, from sources that publish current numbers"
+        },
+        "globalEvaluation": {
+          "title": "Evaluation",
+          "description": "Measure how well recommendations retrieve what people actually watch"
         }
       },
       "jobNames": {

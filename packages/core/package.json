@@ -76,6 +76,7 @@
     "test:ratings": "node --import tsx --test src/ratings/imdbDataset.test.ts",
     "lint": "eslint src",
     "clean": "rm -rf dist",
+    "test:evaluation": "node --import tsx --test src/evaluation/holdout.test.ts src/evaluation/metrics.test.ts",
     "test:max-candidates": "node --import tsx --test src/lib/maxCandidates.test.ts"
   },
   "dependencies": {

@@ -42,6 +42,7 @@ import {
   createChildLogger,
   runLibraryGapAnalysis,
   rebuildAllTasteProfiles,
+  runEvaluation,
   refreshAllExplanations,
   withInferenceContext,
 } from '@aperture/core'
@@ -342,6 +343,39 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
         // transition `hasFinished` exists to refuse.
         if (!result.cancelled) {
           completeJob(jobId, { ...result })
+        }
+        break
+      }
+      // === Evaluation (reads only; writes nothing anywhere) ===
+      case 'evaluate-recommender': {
+        // Same registration the title-analysis job was missing: without it
+        // every function in jobs/progress.ts silently no-ops on this id.
+        createJobProgress(jobId, name, 1)
+        setJobStep(jobId, 0, 'Evaluating retrieval')
+
+        const result = await runEvaluation({
+          mediaType: 'movie',
+          // The whole report is written through addLog, because the job log is
+          // where it gets read -- in the console and in `docker logs` -- and a
+          // structured return value nothing renders would be invisible.
+          onLog: (line) => addLog(jobId, 'info', line),
+          shouldCancel: () => isJobCancelled(jobId),
+        })
+        logger.info(
+          {
+            job: name,
+            jobId,
+            qualifiedUsers: result?.qualifiedUsers ?? 0,
+            skippedUsers: result?.skippedUsers ?? 0,
+            poolSize: result?.poolSize ?? 0,
+          },
+          `✅ Recommender evaluation complete`
+        )
+        if (!isJobCancelled(jobId)) {
+          completeJob(jobId, {
+            qualifiedUsers: result?.qualifiedUsers ?? 0,
+            skippedUsers: result?.skippedUsers ?? 0,
+          })
         }
         break
       }
