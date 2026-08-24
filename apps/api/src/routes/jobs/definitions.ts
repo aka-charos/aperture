@@ -100,6 +100,14 @@ export const jobDefinitions: JobDefinition[] = [
     cron: null,
     manualOnly: true,
   },
+  // === Embedding centering (both media types) ===
+  {
+    name: 'refresh-embedding-centering',
+    description:
+      "Recomputes the library mean and rewrites every title's mean-centred vector. Subtracting the mean removes the direction every canonical text shares (they all describe a film, in one template), which on the measured library lifts ndcg@100 from 20.5% to 31.9%. Reads nothing users see and changes no recommendation on its own -- a profile keeps whatever space it was built in until rebuild-taste-profiles is run, which is what makes this safe to run at any time. Run it after any re-embed.",
+    cron: null,
+    manualOnly: true,
+  },
   // === Taste Profiles (both media types) ===
   {
     name: 'rebuild-taste-profiles',

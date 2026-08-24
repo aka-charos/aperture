@@ -13,6 +13,7 @@
 import { query } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { WATCH_HISTORY_TASTE_SQL } from '../recommender/watchedExclusion.js'
+import { embeddingColumnFor, type EmbeddingSpace } from '../recommender/centering.js'
 import { isDislikedRating, USER_RATING_SCALE_MAX } from '../recommender/ratingBands.js'
 import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../lib/ai-provider.js'
 import type { MediaType, WatchedItem } from './types.js'
@@ -38,7 +39,14 @@ const logger = createChildLogger('taste-profile-builder')
  */
 export async function buildTasteProfile(
   userId: string,
-  mediaType: MediaType
+  mediaType: MediaType,
+  /**
+   * Which embedding space to build in. Passed in rather than decided here so
+   * one decision covers the profile and its clusters -- they are compared
+   * against each other downstream, and a build that mixed them would be the
+   * mixed-space bug inside a single user's profile.
+   */
+  space: EmbeddingSpace = 'raw'
 ): Promise<number[] | null> {
   logger.info({ userId, mediaType }, 'Building taste profile')
 
@@ -81,7 +89,8 @@ export async function buildTasteProfile(
   // Get embeddings for watched items
   const embeddings = await getItemEmbeddings(
     weightedItems.map((i) => i.id),
-    mediaType
+    mediaType,
+    space
   )
 
   if (embeddings.size === 0) {
@@ -122,7 +131,11 @@ export interface TasteClusterBuildResult {
  */
 export async function buildTasteClusters(
   userId: string,
-  mediaType: MediaType
+  mediaType: MediaType,
+  // Same space as the profile, from the same decision in index.ts. Clusters
+  // and the single centroid are compared against the same column downstream,
+  // so a mismatch here is the mixed-space bug inside one user.
+  space: EmbeddingSpace = 'raw'
 ): Promise<TasteClusterBuildResult | null> {
   logger.info({ userId, mediaType }, 'Building taste clusters')
 
@@ -154,7 +167,8 @@ export async function buildTasteClusters(
 
   const embeddings = await getItemEmbeddings(
     weightedItems.map((i) => i.id),
-    mediaType
+    mediaType,
+    space
   )
 
   if (embeddings.size === 0) {
@@ -549,7 +563,8 @@ async function getSeriesWatchHistory(userId: string): Promise<WatchedItem[]> {
  */
 async function getItemEmbeddings(
   itemIds: string[],
-  mediaType: MediaType
+  mediaType: MediaType,
+  space: EmbeddingSpace = 'raw'
 ): Promise<Map<string, number[]>> {
   if (itemIds.length === 0) return new Map()
 
@@ -566,10 +581,16 @@ async function getItemEmbeddings(
 
   const idColumn = mediaType === 'movie' ? 'movie_id' : 'series_id'
 
+  // The column, not a "- mean" term: see recommender/centering.ts. A centred
+  // profile must be built from centred item vectors, because L2-normalising the
+  // weighted mean means `normalize(mean(v)) - m` is NOT `normalize(mean(v - m))`
+  // -- centring a finished raw centroid would land somewhere else entirely.
+  const embeddingColumn = embeddingColumnFor(space)
+
   const result = await query<{ item_id: string; embedding: string }>(
-    `SELECT ${idColumn} as item_id, embedding::text as embedding
+    `SELECT ${idColumn} as item_id, ${embeddingColumn}::text as embedding
      FROM ${tableName}
-     WHERE ${idColumn} = ANY($1) AND model = $2`,
+     WHERE ${idColumn} = ANY($1) AND model = $2 AND ${embeddingColumn} IS NOT NULL`,
     [itemIds, modelId]
   )
 

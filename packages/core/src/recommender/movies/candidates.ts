@@ -7,6 +7,7 @@ import {
   type InterestQueryResult,
 } from '../shared/interestSlots.js'
 import type { Candidate } from '../types.js'
+import { embeddingColumnFor, type EmbeddingSpace } from '../centering.js'
 
 const logger = createChildLogger('recommender-candidates')
 
@@ -14,6 +15,13 @@ interface CandidateQueryContext {
   modelId: string
   tableName: string
   hasLibraryConfigs: boolean
+  /**
+   * Which column holds the vectors this query compares against. Resolved from
+   * the SPACE THE VIEWER'S STORED PROFILE WAS BUILT IN, never decided here --
+   * see recommender/centering.ts. Comparing a raw centroid against centred
+   * items yields a confident ranking between two different origins.
+   */
+  embeddingColumn: string
 }
 
 /**
@@ -21,7 +29,9 @@ interface CandidateQueryContext {
  * query. Hoisted out of the per-vector query path so multi-cluster retrieval
  * (getMultiClusterCandidates) resolves it once, not once per cluster.
  */
-async function resolveCandidateQueryContext(): Promise<CandidateQueryContext | null> {
+async function resolveCandidateQueryContext(
+  space: EmbeddingSpace
+): Promise<CandidateQueryContext | null> {
   const modelId = await getActiveEmbeddingModelId()
   if (!modelId) {
     logger.warn('No embedding model configured for candidate generation')
@@ -33,7 +43,7 @@ async function resolveCandidateQueryContext(): Promise<CandidateQueryContext | n
   const configCheck = await queryOne<{ count: string }>('SELECT COUNT(*) FROM library_config')
   const hasLibraryConfigs = Boolean(configCheck && parseInt(configCheck.count, 10) > 0)
 
-  return { modelId, tableName, hasLibraryConfigs }
+  return { modelId, tableName, hasLibraryConfigs, embeddingColumn: embeddingColumnFor(space) }
 }
 
 function buildParentalFilter(maxParentalRating: number | null): string {
@@ -76,7 +86,7 @@ async function queryCandidatesForVector(
   }>(
     ctx.hasLibraryConfigs
       ? `SELECT m.id, m.title, m.year, m.genres, m.community_rating, m.imdb_vote_count,
-                1 - (e.embedding <=> $1::halfvec) as similarity
+                1 - (e.${ctx.embeddingColumn} <=> $1::halfvec) as similarity
          FROM ${ctx.tableName} e
          JOIN movies m ON m.id = e.movie_id
          WHERE e.model = $3 AND EXISTS (
@@ -84,14 +94,14 @@ async function queryCandidatesForVector(
            WHERE lc.provider_library_id = m.provider_library_id
            AND lc.is_enabled = true
          )${parentalFilter}
-         ORDER BY e.embedding <=> $1::halfvec
+         ORDER BY e.${ctx.embeddingColumn} <=> $1::halfvec
          LIMIT $2`
       : `SELECT m.id, m.title, m.year, m.genres, m.community_rating, m.imdb_vote_count,
-                1 - (e.embedding <=> $1::halfvec) as similarity
+                1 - (e.${ctx.embeddingColumn} <=> $1::halfvec) as similarity
          FROM ${ctx.tableName} e
          JOIN movies m ON m.id = e.movie_id
          WHERE e.model = $3${parentalFilter}
-         ORDER BY e.embedding <=> $1::halfvec
+         ORDER BY e.${ctx.embeddingColumn} <=> $1::halfvec
          LIMIT $2`,
     [vectorStr, queryLimit, ctx.modelId]
   )
@@ -125,9 +135,16 @@ export async function getCandidates(
   watchedIds: Set<string>,
   limit: number,
   includeWatched: boolean = false,
-  maxParentalRating: number | null = null
+  maxParentalRating: number | null = null,
+  /**
+   * Must match the space `tasteProfile` was built in. Defaults to 'raw' so a
+   * caller that has not thought about it gets today's behaviour rather than a
+   * cross-space comparison; the pipeline resolves it explicitly through
+   * resolveEmbeddingSpace and refuses the run if the two cannot be reconciled.
+   */
+  space: EmbeddingSpace = 'raw'
 ): Promise<Candidate[]> {
-  const ctx = await resolveCandidateQueryContext()
+  const ctx = await resolveCandidateQueryContext(space)
   if (!ctx) return []
 
   const vectorStr = `[${tasteProfile.join(',')}]`
@@ -183,14 +200,15 @@ export async function getMultiClusterCandidates(
   watchedIds: Set<string>,
   totalLimit: number,
   includeWatched: boolean = false,
-  maxParentalRating: number | null = null
+  maxParentalRating: number | null = null,
+  space: EmbeddingSpace = 'raw'
 ): Promise<Candidate[]> {
   if (clusters.length === 0) return []
   if (clusters.length === 1) {
-    return getCandidates(clusters[0].embedding, watchedIds, totalLimit, includeWatched, maxParentalRating)
+    return getCandidates(clusters[0].embedding, watchedIds, totalLimit, includeWatched, maxParentalRating, space)
   }
 
-  const ctx = await resolveCandidateQueryContext()
+  const ctx = await resolveCandidateQueryContext(space)
   if (!ctx) return []
 
   const parentalFilter = buildParentalFilter(maxParentalRating)
@@ -266,7 +284,14 @@ export async function getInterestMatchIndex(
 ): Promise<InterestMatchIndex> {
   if (interests.length === 0) return buildInterestMatchIndex([])
 
-  const ctx = await resolveCandidateQueryContext()
+  // Explicitly RAW, and not an oversight. The query vector here is a fresh
+  // embedding of the interest TEXT, which no centring has been applied to, so
+  // it must be compared against raw item vectors. Centring the item side alone
+  // would be the mixed-space bug; centring the text would need the library mean
+  // at query time, which is the whole thing the stored column avoids. Both
+  // sides raw is internally consistent, and this path was never what the
+  // centring measurement covered -- that was centroid-to-item.
+  const ctx = await resolveCandidateQueryContext('raw')
   if (!ctx) return buildInterestMatchIndex([])
 
   const usable = interests.filter(

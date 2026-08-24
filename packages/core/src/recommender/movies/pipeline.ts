@@ -2,6 +2,11 @@
 import { createChildLogger } from '../../lib/logger.js'
 import { query, queryOne } from '../../lib/db.js'
 import {
+  isCenteringReady,
+  resolveEmbeddingSpace,
+  type EmbeddingSpace,
+} from '../centering.js'
+import {
   generateExplanations,
   storeExplanations,
   type MovieForExplanation,
@@ -256,6 +261,9 @@ export async function generateRecommendationsForUser(
     // Try to get stored profile first (will rebuild if stale)
     const storedProfile = await getUserTasteProfile(user.id, 'movie')
     let tasteProfile: number[] | null = storedProfile?.embedding || null
+    // Which space that centroid lives in. The legacy fallback below builds from
+    // raw item vectors, so it stays 'raw'; a stored profile says for itself.
+    let profileSpace: EmbeddingSpace = storedProfile?.embeddingSpace ?? 'raw'
     
     // If no stored profile or missing embedding, build using legacy method as fallback
     if (!tasteProfile) {
@@ -267,8 +275,11 @@ export async function generateRecommendationsForUser(
         const { getActiveEmbeddingModelId } = await import('../../lib/ai-provider.js')
         const currentModelId = await getActiveEmbeddingModelId()
         
-        // Store in new system with embedding model info
-        await storeNewTasteProfile(user.id, 'movie', tasteProfile, currentModelId || undefined)
+        // Store in new system with embedding model info. buildLegacyTasteProfile
+        // reads the raw column, so this centroid is raw whatever the centred
+        // column currently holds.
+        profileSpace = 'raw'
+        await storeNewTasteProfile(user.id, 'movie', tasteProfile, currentModelId || undefined, 'raw')
         // Also detect franchises
         await detectAndUpdateFranchises(user.id, 'movie')
         logger.info({ userId: user.id }, '💾 Stored new taste profile and detected franchises')
@@ -352,6 +363,30 @@ export async function generateRecommendationsForUser(
       )
     }
 
+    // Resolve the space BOTH sides of the coming comparison will be in. A
+    // centroid built in one space and items fetched from another is not a
+    // degraded ranking, it is a cosine between two different origins -- so this
+    // refuses rather than falling back, and the fix is to rebuild the profile.
+    const retrievalSpace = resolveEmbeddingSpace(
+      profileSpace,
+      await isCenteringReady('movie')
+    )
+    if (!retrievalSpace) {
+      logger.warn(
+        { userId: user.id, profileSpace },
+        '⚠️ Taste profile is mean-centred but the centred column is not usable - rebuild taste profiles'
+      )
+      await finalizeRun(
+        runId,
+        0,
+        0,
+        Date.now() - startTime,
+        'failed',
+        'Taste profile space does not match available embeddings; run rebuild-taste-profiles'
+      )
+      return { runId, recommendations: [] }
+    }
+
     // Multi-centroid retrieval: if the user's taste clustered into more than
     // one facet (taste-profile/clustering.ts), query each cluster's centroid
     // independently and merge by max similarity, so a candidate matching any
@@ -369,7 +404,8 @@ export async function generateRecommendationsForUser(
           excludeIds,
           cfg.maxCandidates,
           includeWatched,
-          user.maxParentalRating ?? null
+          user.maxParentalRating ?? null,
+          retrievalSpace
         )
         logger.info(
           { userId: user.id, clusterCount: tasteClusters.length },
@@ -385,7 +421,8 @@ export async function generateRecommendationsForUser(
           excludeIds,
           cfg.maxCandidates,
           includeWatched,
-          user.maxParentalRating ?? null
+          user.maxParentalRating ?? null,
+          retrievalSpace
         )
       }
     } else {
@@ -394,7 +431,8 @@ export async function generateRecommendationsForUser(
         excludeIds,
         cfg.maxCandidates,
         includeWatched,
-        user.maxParentalRating ?? null
+        user.maxParentalRating ?? null,
+        retrievalSpace
       )
     }
 

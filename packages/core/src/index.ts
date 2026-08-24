@@ -1300,6 +1300,15 @@ export {
   hasCausalEvidence,
 } from './recommender/evidenceStrength.js'
 
+// Mean-centred embeddings. The job needs the refresh; nothing outside core
+// needs to reason about spaces, which is the point of storing the centred
+// vectors rather than subtracting a mean at each call site.
+export {
+  isCenteringReady,
+  refreshCenteredEmbeddings,
+  type EmbeddingSpace,
+} from './recommender/centering.js'
+
 // User Algorithm Settings
 export {
   getUserAlgorithmSettings,
