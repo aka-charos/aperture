@@ -888,6 +888,11 @@ export async function generateRecommendationsForUser(
           // Same idea for a borrowed pick: the reason is a like-minded viewer,
           // not the ranking. A flag, never the donor's identity.
           fromTasteTwin: twinPicks.has(s.movieId),
+          // What the two of them have both watched. This is the actual reason a
+          // borrowed pick is in the list, and without it the model explains the
+          // film from the similarity evidence -- which is the ranking that did
+          // not choose it.
+          twinSharedIds: twinPicks.get(s.movieId)?.sharedIds,
           fromAcclaimed: acclaimedPicks.has(s.movieId),
         }))
 
