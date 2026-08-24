@@ -335,9 +335,10 @@ export function adjustDiversityWeightForDispersion(
   }
 
   if (dispersion > DISPERSION_ECLECTIC_THRESHOLD) {
-    // Eclectic taste - increase diversity (they enjoy variety). applyDiversitySelection
-    // blends this as `base*(1-w) + diversity*w`, which only stays within [0,1]
-    // if w does, so the 1.2x bump is clamped rather than trusted.
+    // Eclectic taste - increase diversity (they enjoy variety). selectWithMmr
+    // blends this as `(1-w)*relevance - w*gain*redundancy`, so w outside [0,1]
+    // would either invert the penalty or overshoot it; the 1.2x bump is
+    // clamped rather than trusted.
     return clamp(baseWeight * 1.2)
   }
 

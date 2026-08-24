@@ -26,7 +26,9 @@ import {
   normalizeSimilarity,
   calculateGenreNoveltyScore,
   calculateBaseScore,
-  applyDiversitySelection,
+  selectWithMmr,
+  shortlistIds,
+  similarityFromEmbeddings,
   applyPreferenceAdjustment,
   buildInterestMatchIndex,
   buildTwinIndex,
@@ -52,6 +54,7 @@ import {
 import { getDonorWatchedIds, getTwinPairs } from '../twinAffinity.js'
 import { getRecommendationConfig } from '../../lib/recommendationConfig.js'
 import { storeSeriesEvidence, getSeriesOverviews } from './storage.js'
+import { getSeriesEmbeddings } from './embeddings.js'
 import {
   generateSeriesExplanations,
   storeSeriesExplanations,
@@ -658,18 +661,34 @@ interface SeriesSelectionResult {
  * 3. Properly blends base score with diversity
  * 4. Includes network diversity for TV series
  */
-function applySeriesDiversityAndSelect(
+async function applySeriesDiversityAndSelect(
   candidates: SeriesCandidate[],
   targetCount: number,
   diversityWeight: number
-): SeriesSelectionResult {
-  // Use shared diversity selection with network diversity enabled (for TV series)
-  const result = applyDiversitySelection(
+): Promise<SeriesSelectionResult> {
+  if (targetCount <= 0 || candidates.length === 0) {
+    return { selected: [], selectedRanks: new Map() }
+  }
+
+  // Network diversity is gone as a separate term, and deliberately so: a
+  // series' canonical text already carries its network, so two shows on one
+  // service sit closer in embedding space and the redundancy penalty picks
+  // that up without a second hand-weighted axis to keep in balance. See
+  // shared/mmr.ts for why the old genre/network blend had to go.
+  const ids = shortlistIds(candidates, targetCount)
+  const embeddings = await getSeriesEmbeddings(ids)
+
+  const result = selectWithMmr(
     candidates,
     targetCount,
     diversityWeight,
-    true // Enable network diversity for TV series
+    similarityFromEmbeddings(embeddings)
   )
+
+  for (const candidate of result.selected) {
+    candidate.selectionScore = result.selectionScores.get(candidate.id)
+    candidate.diversityBoost = result.variety.get(candidate.id) ?? 0
+  }
 
   return {
     selected: result.selected,
@@ -1351,7 +1370,7 @@ export async function generateSeriesRecommendationsForUser(
       cfg.acclaimedMaxSlots
     )
 
-    const { selected } = applySeriesDiversityAndSelect(
+    const { selected } = await applySeriesDiversityAndSelect(
       selectableCandidates,
       cfg.selectedCount - reservedInterestSlots - reservedTwinSlots - reservedAcclaimedSlots,
       effectiveDiversityWeight

@@ -831,6 +831,33 @@ export async function generateMissingSeriesEmbeddings(
 /**
  * Get embedding for a specific series
  */
+/**
+ * Vectors for a set of series, in one round trip.
+ *
+ * The per-id version below is fine for a single lookup and is an N+1 anywhere
+ * a list is involved -- which diversity selection is, once redundancy is
+ * measured in embedding space rather than by counting genre labels.
+ */
+export async function getSeriesEmbeddings(seriesIds: string[]): Promise<Map<string, number[]>> {
+  const byId = new Map<string, number[]>()
+  if (seriesIds.length === 0) return byId
+
+  const config = await getFunctionConfig('embeddings')
+  const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
+  const tableName = await getActiveEmbeddingTableName('series_embeddings')
+
+  const result = await query<{ series_id: string; embedding: string }>(
+    `SELECT series_id, embedding::text FROM ${tableName} WHERE series_id = ANY($1) AND model = $2`,
+    [seriesIds, modelName]
+  )
+
+  for (const row of result.rows) {
+    byId.set(row.series_id, row.embedding.replace(/[[\]]/g, '').split(',').map(Number))
+  }
+
+  return byId
+}
+
 export async function getSeriesEmbedding(seriesId: string): Promise<number[] | null> {
   const config = await getFunctionConfig('embeddings')
   const modelName = config ? `${config.provider}:${config.model}` : 'unknown'

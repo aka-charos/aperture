@@ -680,14 +680,14 @@ export async function generateRecommendationsForUser(
       cfg.acclaimedMaxSlots
     )
 
-    const { selected } = applyDiversityAndSelect(
+    const { selected } = await applyDiversityAndSelect(
       selectableCandidates,
       cfg.selectedCount - reservedInterestSlots - reservedTwinSlots - reservedAcclaimedSlots,
       effectiveDiversityWeight
     )
 
-    // Fillers carry the same finalScore as everything else: applyDiversitySelection
-    // writes its diversity-blended ranking to `selectionScore` and leaves
+    // Fillers carry the same finalScore as everything else: the selector
+    // writes its redundancy-penalised ranking to `selectionScore` and leaves
     // finalScore alone, so slot fillers and diversity picks are directly
     // comparable. (It used to overwrite finalScore, which is what made the
     // "% Match" badge report a number that meant something different depending

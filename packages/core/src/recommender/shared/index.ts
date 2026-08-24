@@ -33,12 +33,20 @@ export {
 } from './scoring.js'
 
 export {
-  calculateDiversityBoost,
-  applyDiversitySelection,
-  applySimpleSelection,
-  type SelectableCandidate,
-  type SelectionResult,
-} from './selection.js'
+  MMR_MIN_POOL,
+  MMR_POOL_PER_SLOT,
+  MIN_PENALTY_GAIN,
+  MAX_PENALTY_GAIN,
+  mmrPoolSize,
+  pairwiseSimilarities,
+  penaltyGain,
+  selectWithMmr,
+  shortlistIds,
+  similarityFromEmbeddings,
+  spreadOfValues,
+  type MmrCandidate,
+  type MmrResult,
+} from './mmr.js'
 
 export { averageEmbeddings } from './embeddings.js'
 

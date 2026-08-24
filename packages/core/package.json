@@ -54,7 +54,7 @@
     "test:clustering": "node --import tsx --test src/taste-profile/clustering.test.ts src/taste-profile/dispersionBands.test.ts src/recommender/shared/clusterAllocation.test.ts src/recommender/movies/candidates.test.ts",
     "test:interests": "node --import tsx --test src/recommender/shared/interestSlots.test.ts",
     "test:preferences": "node --import tsx --test src/taste-profile/preferenceRating.test.ts src/taste-profile/genreAffinity.test.ts src/taste-profile/genrePreference.test.ts src/taste-profile/detectionMerge.test.ts src/lib/diversityAdjustment.test.ts",
-    "test:selection": "node --import tsx --test src/recommender/shared/selection.test.ts",
+    "test:selection": "node --import tsx --test src/recommender/shared/mmr.test.ts",
     "test:novelty": "node --import tsx --test src/recommender/shared/novelty.test.ts src/recommender/shared/preferenceStrength.test.ts",
     "test:similarity": "node --import tsx --test src/recommender/shared/similarityScale.test.ts",
     "test:cross-media": "node --import tsx --test src/similarity/crossMedia.test.ts",
