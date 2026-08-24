@@ -13,6 +13,7 @@
 import { query } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { WATCH_HISTORY_TASTE_SQL } from '../recommender/watchedExclusion.js'
+import { isDislikedRating, USER_RATING_SCALE_MAX } from '../recommender/ratingBands.js'
 import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../lib/ai-provider.js'
 import type { MediaType, WatchedItem } from './types.js'
 import {
@@ -56,11 +57,15 @@ export async function buildTasteProfile(
     `Found ${watchedItems.length} watched items for profile`
   )
 
-  // Calculate engagement weights
-  const weightedItems = watchedItems.map((item) => ({
-    ...item,
-    weight: calculateEngagementWeight(item, mediaType),
-  }))
+  // Calculate engagement weights. Zero-weight items are dropped outright -- a
+  // disliked title must not reach the average, and the total-weight-of-zero
+  // guard in buildWeightedAverageEmbedding is a guard, not a filter.
+  const weightedItems = watchedItems
+    .map((item) => ({
+      ...item,
+      weight: calculateEngagementWeight(item, mediaType),
+    }))
+    .filter((item) => item.weight > 0)
 
   // Sort by weight to prioritize most engaging content
   weightedItems.sort((a, b) => b.weight - a.weight)
@@ -133,6 +138,9 @@ export async function buildTasteClusters(
     ...item,
     weight: calculateEngagementWeight(item, mediaType),
   }))
+    // Same reason as buildTasteProfile: a disliked title must not become a
+    // point the clustering can place a centroid on.
+    .filter((item) => item.weight > 0)
 
   // Sorted by descending weight exactly as buildTasteProfile does above, and
   // for a second reason here: floating-point addition is not associative, so
@@ -304,12 +312,21 @@ export function calculateEngagementWeight(item: WatchedItem, mediaType: MediaTyp
     weight *= 1.5
   }
 
-  // User rating bonus (if they bothered to rate it, it matters to them)
+  // User rating (if they bothered to rate it, it matters to them).
+  //
+  // A disliked title contributes NOTHING rather than a little: a weighted mean
+  // can only express "more like this", so any positive weight pulls the centroid
+  // toward what the viewer said they disliked. See recommender/ratingBands.ts.
+  //
+  // The scale is 1-10, fixed by the CHECK constraint on user_ratings. This used
+  // to read `item.rating > 5 ? item.rating / 10 : item.rating / 5`, guessing at a
+  // 1-5 scale that does not exist, which made the curve non-monotonic: 5/10 got
+  // the maximum weight, tied with 10/10 and ahead of a 9, while a 6 scored below
+  // a 4.
   if (item.rating !== undefined) {
-    // Ratings typically 1-10 or 1-5
-    // High rating = boost, low rating = penalty
-    const normalizedRating = item.rating > 5 ? item.rating / 10 : item.rating / 5
-    // 0.5 rating = 0.75x, 1.0 rating = 1.25x
+    if (isDislikedRating(item.rating)) return 0
+    const normalizedRating = item.rating / USER_RATING_SCALE_MAX
+    // 4 -> 0.80x, 7 -> 1.03x, 10 -> 1.25x. Monotonic across the whole scale.
     weight *= 0.5 + normalizedRating * 0.75
   }
 

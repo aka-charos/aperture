@@ -3,6 +3,7 @@ import { query } from '../../lib/db.js'
 import { getMovieEmbeddings } from './embeddings.js'
 import { averageEmbeddings } from '../shared/index.js'
 import { WATCH_HISTORY_TASTE_SQL } from '../watchedExclusion.js'
+import { isDislikedRating, LIKED_RATING_MIN, DISLIKED_RATING_MAX } from '../ratingBands.js'
 import type { WatchedMovie } from '../types.js'
 
 const logger = createChildLogger('recommender-taste')
@@ -23,7 +24,8 @@ export async function getUserMovieRatings(userId: string): Promise<Map<string, n
 export async function getDislikedMovieIds(userId: string): Promise<Set<string>> {
   // Get all movies rated 1-3 (disliked)
   const result = await query<{ movie_id: string }>(
-    `SELECT movie_id FROM user_ratings WHERE user_id = $1 AND movie_id IS NOT NULL AND rating <= 3`,
+    `SELECT movie_id FROM user_ratings
+     WHERE user_id = $1 AND movie_id IS NOT NULL AND rating <= ${DISLIKED_RATING_MAX}`,
     [userId]
   )
   return new Set(result.rows.map((r) => r.movie_id))
@@ -101,6 +103,20 @@ export async function buildTasteProfile(
     const movie = watched[i]
     const emb = embeddingsById.get(movie.movieId)
     if (emb) {
+      // A title the viewer rated 1-3 is left out of the vector entirely. It used
+      // to enter at weight 0.2, under a comment saying it should not shape
+      // recommendations much -- but 0.2 still shapes them TOWARD the thing they
+      // disliked, because a weighted mean cannot express the opposite.
+      // See recommender/ratingBands.ts.
+      const rating = userRatings?.get(movie.movieId)
+      if (isDislikedRating(rating)) {
+        logger.debug(
+          { movieId: movie.movieId, userRating: rating },
+          "Excluded a disliked title from the taste vector"
+        )
+        continue
+      }
+
       embeddings.push(emb)
 
       // Balanced multi-factor weighting
@@ -131,21 +147,14 @@ export async function buildTasteProfile(
       }
 
       // 4. User rating boost - explicit user ratings are the strongest signal
-      const userRating = userRatings?.get(movie.movieId)
-      if (userRating !== undefined) {
-        if (userRating >= 7) {
-          // High ratings (7-10): significant boost
-          // Rating 7 = 1.4x, 8 = 1.6x, 9 = 1.8x, 10 = 2.0x
-          const ratingBoost = 1 + (userRating - 6) * 0.2
-          weight *= ratingBoost
-          logger.debug({ movieId: movie.movieId, userRating, ratingBoost }, 'Applied high rating boost')
-        } else if (userRating <= 3) {
-          // Low ratings (1-3): significantly reduce influence on taste profile
-          // This movie shouldn't shape recommendations much
-          weight *= 0.2
-          logger.debug({ movieId: movie.movieId, userRating }, 'Applied low rating penalty')
-        }
-        // Ratings 4-6 are neutral - no modification
+      // Ratings 4-6 are neutral; anything at or below DISLIKED_RATING_MAX never
+      // reached this point.
+      if (rating !== undefined && rating >= LIKED_RATING_MIN) {
+        // 7 = 1.2x, 8 = 1.4x, 9 = 1.6x, 10 = 1.8x. The old comment here claimed
+        // "Rating 7 = 1.4x" and was wrong about its own arithmetic.
+        const ratingBoost = 1 + (rating - 6) * 0.2
+        weight *= ratingBoost
+        logger.debug({ movieId: movie.movieId, userRating: rating, ratingBoost }, 'Applied high rating boost')
       }
 
       // 5. Community rating influence - slight boost for critically acclaimed choices
