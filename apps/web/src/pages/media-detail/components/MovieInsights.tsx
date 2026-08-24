@@ -392,6 +392,25 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
     insights.scoreBreakdown.acclaimedMatch !== null
   const fromReservedSlot = fromTasteTwin || fromInterest || fromAcclaimed
 
+  // The second reason the same carousel can stop being a reason, and it applies
+  // to ranked picks too. storeEvidence keeps the three nearest titles in this
+  // viewer's history with no distance floor, so a history holding nothing near
+  // the pick still yields three rows -- which is how Metropolis came to be
+  // explained by Das Boot at 0.67. The server decides (hasCausalEvidence, core
+  // recommender/evidenceStrength.ts) because the floor is a raw cosine tied to
+  // the embedding model, and this bundle never imports @aperture/core.
+  //
+  // `undefined` is a run from before the field existed and deliberately reads
+  // as permitted: `=== false` rather than `!`, so an older pick keeps the
+  // heading it shipped with instead of every historic run being demoted at
+  // once.
+  const evidenceIsTooFar = insights.evidenceSupportsCause === false
+
+  // Either route lands on the same non-causal heading: the carousel is still
+  // shown, still ordered, still labelled with its distances -- it just stops
+  // claiming to be the cause.
+  const evidenceIsNotTheReason = fromReservedSlot || evidenceIsTooFar
+
   // Empty unless a twin slot placed this title *and* the run that produced it
   // recorded the overlap, which runs generated before that shipped did not.
   const twinShared = insights.twinShared ?? []
@@ -785,12 +804,12 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                   }}
                 >
                   <Typography variant="subtitle2" fontWeight={600}>
-                    {fromReservedSlot
+                    {evidenceIsNotTheReason
                       ? t('mediaDetail.insights.closestInLibrary')
                       : t('mediaDetail.insights.whyWeThink')}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {fromReservedSlot
+                    {evidenceIsNotTheReason
                       ? isSeriesView
                         ? t('mediaDetail.insights.closestInLibrarySeries')
                         : t('mediaDetail.insights.closestInLibraryMovie')

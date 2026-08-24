@@ -239,6 +239,21 @@ export interface RecommendationInsights {
     year: number | null
     poster_url: string | null
   }>
+  /**
+   * Whether `evidence` below is close enough to be called the reason for the
+   * pick, decided server-side by hasCausalEvidence against a raw-cosine floor.
+   *
+   * The lookup that fills `evidence` keeps the three nearest titles in this
+   * viewer's watch history WITH NO DISTANCE FLOOR, so it always returns three
+   * and "the best available" is indistinguishable from "a good match" once
+   * rendered. Measured live, a viewer was shown Das Boot at 0.67 under a
+   * heading reading "based on your history with similar movies".
+   *
+   * ABSENT means the run predates this field, and absent must read as
+   * PERMITTED rather than denied: old runs keep the heading they shipped with,
+   * exactly as the preference chain and the weight shares do.
+   */
+  evidenceSupportsCause?: boolean
   evidence?: Array<{
     id: string
     similar_movie_id?: string

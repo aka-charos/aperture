@@ -24,6 +24,7 @@ import {
   evidenceHeading,
   SERIES_NOUNS,
 } from '../shared/explanationPrompt.js'
+import { hasCausalEvidence } from '../evidenceStrength.js'
 import {
   describeExplanationBatch,
   explanationBatchSettings,
@@ -406,7 +407,7 @@ async function generateBatchSeriesExplanations(
    Genres: ${s.genres.join(', ')}${s.network ? `\n   Network: ${s.network}` : ''}${s.status ? `\n   Status: ${s.status}` : ''}${themes}
    Novelty: ${s.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${s.ratingScore > 0.7 ? 'critically acclaimed' : s.ratingScore > 0.5 ? 'well received' : 'mixed'}${slotLines}
    Plot: ${clip(s.overview, PICK_PLOT_CHARS) ?? 'No overview available'}
-${evidenceHeading(s, SERIES_NOUNS)}
+${evidenceHeading(s, SERIES_NOUNS, hasCausalEvidence(s.evidence.map((e) => e.similarity)))}
 ${evidenceStr}`
     })
     .join('\n\n')
