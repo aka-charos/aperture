@@ -65,12 +65,13 @@ test('the band boundaries themselves do not adjust', () => {
 })
 
 // ============================================================================
-// The invariant applyDiversitySelection depends on
+// The invariant selectWithMmr depends on
 // ============================================================================
 
 test('the result is always a usable weight in [0,1]', () => {
-  // applyDiversitySelection blends as base*(1-w) + boost*w, which only stays
-  // bounded if w does -- and the 1.2x bump can push a high base past 1.
+  // selectWithMmr blends as (1-w)*relevance - w*gain*redundancy: above 1 the
+  // relevance term goes negative, below 0 the penalty becomes a bonus, and the
+  // 1.2x bump can push a high base past 1.
   for (const base of [0, 0.5, 0.9, 0.95, 1, 2, -1]) {
     for (const dispersion of [-1, 0, 0.1, 0.45, 0.8, 1, 2, NaN]) {
       const result = adjustDiversityWeightForDispersion(base, dispersion)
