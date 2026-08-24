@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildCanonicalText, CANONICAL_TEXT_VERSION, MOVIE_STALE_SQL } from './embeddings.js'
+import { PLOT_CHARS, buildCanonicalText, CANONICAL_TEXT_VERSION, MOVIE_STALE_SQL } from './embeddings.js'
 import { SERIES_STALE_SQL } from '../series/embeddings.js'
 
 /**
@@ -72,12 +72,23 @@ test('the long synopsis is used when there is no overview at all', () => {
   assert.match(text, /The whole story\./)
 })
 
-test('a very long synopsis is still capped', () => {
-  // Length is not the constraint — dilution is. A 2,000-word synopsis pulls the
-  // vector toward plot minutiae and away from what the film is.
-  const text = buildCanonicalText(movie({ plotFull: 'x'.repeat(5000) }))
-  assert.ok(text.length < 2000)
+test('a very long synopsis is capped, but well past the setup', () => {
+  // 1000 characters kept the FIRST thousand, which for a real IMDb synopsis is
+  // the setup — the most interchangeable part of any story — so long-plot films
+  // were made to look more alike, not less. Uncapped is the opposite error:
+  // plot_full only exists where OMDb had one, so a 12,000-character document
+  // and a 250-character one stop being comparable.
+  const text = buildCanonicalText(movie({ plotFull: 'x'.repeat(20000) }))
+  assert.ok(text.length > PLOT_CHARS, 'the cap must not be cutting into the setup')
+  assert.ok(text.length < PLOT_CHARS + 500, 'and the rest of the text is a rounding error beside it')
   assert.match(text, /\.\.\./)
+})
+
+test('a synopsis inside the cap is untouched and gains no ellipsis', () => {
+  const synopsis = 'A murder plan unravels over one night in Paris.'
+  const text = buildCanonicalText(movie({ plotFull: synopsis, overview: null }))
+  assert.match(text, /unravels over one night in Paris/)
+  assert.doesNotMatch(text, /\.\.\./)
 })
 
 // ============================================================================
@@ -103,25 +114,41 @@ test('collection membership is embedded', () => {
   assert.match(text, /Part of Wrong Turn Collection/)
 })
 
-test('below-the-line crew is embedded', () => {
+test('photography is embedded and the score is not', () => {
+  // Six of the fields here were proper nouns tied to a nationality against
+  // three describing what the film is like, which is how Metropolis came back
+  // nearest to Das Boot. Photography survives that as a style signal; a single
+  // composer credit, appearing on two or three titles in the whole library,
+  // contributes nothing to similarity except nationality.
   const text = buildCanonicalText(
     movie({ composers: ['Miles Davis'], cinematographers: ['Henri Decaë'] })
   )
-  assert.match(text, /Music by Miles Davis/)
   assert.match(text, /Cinematography by Henri Decaë/)
+  assert.doesNotMatch(text, /Music by/)
+  assert.doesNotMatch(text, /Miles Davis/)
 })
 
-test("OMDb's awards summary wins over the media server's free text", () => {
+test('awards never reach the vector, from either source', () => {
+  // Same rule that keeps scores out: quality has its own blend term. Worse,
+  // awards text hands every awarded title the tokens "Won"/"Oscars", so award
+  // films cluster with award films regardless of subject.
   const text = buildCanonicalText(
-    movie({ awards: 'Some awards', awardsSummary: 'Won 4 Oscars. 12 nominations.' })
+    movie({ awards: "Palme d'Or winner", awardsSummary: 'Won 4 Oscars. 12 nominations.' })
   )
-  assert.match(text, /Won 4 Oscars/)
-  assert.doesNotMatch(text, /Some awards/)
+  assert.doesNotMatch(text, /Won 4 Oscars/)
+  assert.doesNotMatch(text, /Palme d'Or/)
+  assert.doesNotMatch(text, /Awards:/)
 })
 
-test('the media server awards text is still used when OMDb has none', () => {
-  const text = buildCanonicalText(movie({ awards: 'Palme d\'Or winner' }))
-  assert.match(text, /Palme d'Or winner/)
+test('the content rating never reaches the vector', () => {
+  // "NR" means nobody submitted it to the MPAA, which tracks age and non-US
+  // origin rather than anything about the work — and as a literal shared string
+  // it makes an era-and-nationality detector out of every old foreign title.
+  for (const contentRating of ['NR', 'R', 'PG-13']) {
+    const text = buildCanonicalText(movie({ contentRating }))
+    assert.doesNotMatch(text, /Rated/)
+    assert.doesNotMatch(text, new RegExp(contentRating))
+  }
 })
 
 // ============================================================================
@@ -135,9 +162,7 @@ test('absent fields add no empty sections', () => {
   const text = buildCanonicalText(movie())
   assert.doesNotMatch(text, /Keywords:/)
   assert.doesNotMatch(text, /Part of/)
-  assert.doesNotMatch(text, /Music by/)
   assert.doesNotMatch(text, /Cinematography by/)
-  assert.doesNotMatch(text, /Awards:/)
   assert.doesNotMatch(text, /\bIn\s*$/)
   // No section is emitted with an empty value.
   assert.doesNotMatch(text, /:\s*(\.|$)/)
