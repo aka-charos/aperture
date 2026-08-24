@@ -163,6 +163,7 @@ export const updateRecommendationConfigSchema = {
       acclaimedMaxSlots: { type: 'integer' as const, minimum: 0, maximum: 10, description: 'Ceiling on recommendations reserved for widely-acclaimed titles; 0 disables (the default). Spends from the same selectedCount budget as twinMaxSlots and interestMaxSlots', example: 0 },
       acclaimedMinRating: { type: 'number' as const, minimum: 5, maximum: 10, description: 'Rating a title must reach to qualify for an acclaimed slot', example: 8.3 },
       acclaimedMinVotes: { type: 'integer' as const, minimum: 1, description: 'Votes that rating must be built on. An eligibility gate only -- vote count never enters the quality score', example: 50000 },
+      preferenceStrength: { type: 'number' as const, minimum: 0, maximum: 1, description: "Share of a candidate's remaining gap to 1.0 that a maxed franchise/genre/interest signal may close. 0 disables the nudge", example: 0.5 },
     },
     example: {
       similarityWeight: 0.4,

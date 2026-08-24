@@ -266,6 +266,10 @@ export async function scoreCandidates(
       }
     }
 
+    // No strength argument on purpose: this is the discovery pipeline, which
+    // has its own configuration and does not read recommendation_config. It
+    // keeps DEFAULT_PREFERENCE_STRENGTH so an admin tuning recommendations
+    // cannot silently change what gets requested from Seerr.
     const finalScore = applyPreferenceAdjustment(baseScore, {
       franchise: franchiseAffinity,
       genre: 0.5,

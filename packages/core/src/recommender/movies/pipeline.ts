@@ -306,7 +306,23 @@ export async function generateRecommendationsForUser(
     // Get ALL watched movie IDs for filtering (not just the ones used for taste profile)
     // Also exclude disliked movies if dislike_behavior is 'exclude'
     // Includes duplicate library copies that share TMDb/IMDb IDs with watched titles
+    // Two different exclusions, applied at two different stages.
+    //
+    // `excludeIds` is enforced at RETRIEVAL: these titles are never fetched,
+    // never scored and never stored. Right for watched titles, of which a real
+    // viewer has thousands -- scoring them would cost a recommendation_candidates
+    // row each for nothing that reads them.
+    //
+    // `selectionExcludeIds` is enforced at SELECTION: the title is retrieved,
+    // scored and stored like any other, and is simply never picked. That is what
+    // favorites need. Excluding them at retrieval meant a hearted film had no
+    // candidate row, so MovieInsights returned null and its match, discovery and
+    // quality bars silently disappeared at the next run -- the user had marked it
+    // as something they cared about and got less information about it as a
+    // result. There are tens of favorites, not thousands, so scoring them is
+    // cheap, and a favorite still spends no recommendation slot.
     let excludeIds: Set<string>
+    const selectionExcludeIds = new Set<string>()
     if (includeWatched) {
       // Only exclude disliked movies (not watched ones)
       excludeIds = new Set(dislikedIds)
@@ -315,11 +331,12 @@ export async function generateRecommendationsForUser(
         '../watchedExclusion.js'
       )
       excludeIds = await getExpandedWatchedMovieIds(user.id)
-      // Favorites stay taste input but stop being offered back as discoveries;
-      // see getExpandedFavoritedMovieIds for why this isn't part of "watched".
+      // Favorites stay taste input and stay scored, but are not offered back as
+      // discoveries; see getExpandedFavoritedMovieIds for why this isn't part of
+      // "watched".
       const favoritedIds = await getExpandedFavoritedMovieIds(user.id)
       for (const favoritedId of favoritedIds) {
-        excludeIds.add(favoritedId)
+        selectionExcludeIds.add(favoritedId)
       }
       for (const dislikedId of dislikedIds) {
         excludeIds.add(dislikedId)
@@ -331,7 +348,7 @@ export async function generateRecommendationsForUser(
           favoritedCount: favoritedIds.size,
           dislikedCount: dislikedIds.size,
         },
-        `📋 Loaded ${excludeIds.size} movies to exclude (watched duplicates + favorited + disliked)`
+        `📋 Excluding ${excludeIds.size} movies from retrieval (watched + disliked) and ${selectionExcludeIds.size} from selection only (favorited)`
       )
     }
 
@@ -525,11 +542,15 @@ export async function generateRecommendationsForUser(
       // unexplained gap between the components and the match.
       const originalScore = candidate.finalScore
       candidate.baseScore = originalScore
-      candidate.finalScore = applyPreferenceAdjustment(originalScore, {
-        franchise: franchiseAffinity,
-        genre: genreAffinity,
-        interest: interestAffinity,
-      })
+      candidate.finalScore = applyPreferenceAdjustment(
+        originalScore,
+        {
+          franchise: franchiseAffinity,
+          genre: genreAffinity,
+          interest: interestAffinity,
+        },
+        cfg.preferenceStrength
+      )
 
       if (franchiseAffinity !== 0.5) {
         franchiseSignalCount++
@@ -630,13 +651,20 @@ export async function generateRecommendationsForUser(
       cfg.twinMaxSlots
     )
 
+    // Everything scored is stored; only this narrower list may be picked. A
+    // favorite therefore keeps its candidate row -- and its insights panel --
+    // while never spending one of the ~20 slots on a title already found.
+    const selectableCandidates =
+      selectionExcludeIds.size > 0
+        ? scoredCandidates.filter((candidate) => !selectionExcludeIds.has(candidate.movieId))
+        : scoredCandidates
     // Acclaimed titles: the third and last claim on the budget, so it can only
     // ever spend what the other two left. The gate is rating AND vote count --
     // see shared/acclaimedSlots.ts for why a vote count belongs here and
     // nowhere near the score.
     const acclaimedEligible =
       cfg.acclaimedMaxSlots > 0
-        ? scoredCandidates.filter((candidate) =>
+        ? selectableCandidates.filter((candidate) =>
             isAcclaimed(
               candidate.communityRating,
               candidate.voteCount,
@@ -653,7 +681,7 @@ export async function generateRecommendationsForUser(
     )
 
     const { selected } = applyDiversityAndSelect(
-      scoredCandidates,
+      selectableCandidates,
       cfg.selectedCount - reservedInterestSlots - reservedTwinSlots - reservedAcclaimedSlots,
       effectiveDiversityWeight
     )
@@ -665,7 +693,7 @@ export async function generateRecommendationsForUser(
     // "% Match" badge report a number that meant something different depending
     // on how the item got picked.)
     const interestFillers = interestIndex
-      ? pickInterestSlotFillers(selected, scoredCandidates, interestIndex, reservedInterestSlots)
+      ? pickInterestSlotFillers(selected, selectableCandidates, interestIndex, reservedInterestSlots)
       : []
 
     const interestPicks = new Map<string, InterestCandidateMatch>()
@@ -687,7 +715,7 @@ export async function generateRecommendationsForUser(
     // must not occupy both an interest slot and a twin slot.
     const twinFillers = pickTwinSlotFillers(
       [...selected, ...interestFillers.map((f) => f.candidate)],
-      scoredCandidates,
+      selectableCandidates,
       twins,
       donorWatched,
       reservedTwinSlots

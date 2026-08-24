@@ -63,6 +63,11 @@ export interface PipelineConfig {
   acclaimedMinRating: number
   /** Votes that rating must be built on. A gate, never a score term. */
   acclaimedMinVotes: number
+  /**
+   * Share of the remaining gap to 1.0 a maxed preference signal may close.
+   * 0 switches the nudge off.
+   */
+  preferenceStrength: number
 }
 
 // Fallback defaults (used only if DB fetch fails)
@@ -82,5 +87,6 @@ export const FALLBACK_CONFIG: PipelineConfig = {
   acclaimedMaxSlots: 0,
   acclaimedMinRating: 8.3,
   acclaimedMinVotes: 50000,
+  preferenceStrength: 0.5,
 }
 
