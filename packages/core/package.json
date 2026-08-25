@@ -66,6 +66,7 @@
     "test:canonical": "node --import tsx --test src/recommender/movies/canonicalText.test.ts",
     "test:twins": "node --import tsx --test src/recommender/shared/twinSlots.test.ts src/recommender/shared/acclaimedSlots.test.ts",
     "test:explanations": "node --import tsx --test src/recommender/shared/explanationParsing.test.ts src/recommender/shared/explanationPrompt.test.ts src/recommender/shared/slotPrompt.test.ts src/recommender/evidenceStrength.test.ts",
+    "test:migrations": "node --import tsx --test src/migrations.test.ts",
     "test:schedule": "node --import tsx --test src/jobs/schedule.test.ts src/jobs/logWindow.test.ts",
     "test:discovery": "node --import tsx --test src/discover/scorer.test.ts",
     "test:enrichment": "node --import tsx --test src/enrichment/needsEnrichment.test.ts src/omdb/failures.test.ts src/omdb/ratings.test.ts",
