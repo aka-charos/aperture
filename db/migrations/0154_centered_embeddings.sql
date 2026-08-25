@@ -73,15 +73,13 @@ BEGIN
     END LOOP;
   END LOOP;
 END $$;
-
--- Guarded: migrations run at API startup, so an unconditional COMMENT on a
--- table a given instance never created would block boot.
-DO $ BEGIN
-  IF to_regclass('embeddings_3072') IS NOT NULL THEN
-    COMMENT ON COLUMN embeddings_3072.embedding_centered IS
-      'embedding minus the library mean for the same model. NULL until the refresh-embedding-centering job fills it; readers must treat a partially-filled column as unusable rather than mixing spaces.';
-  END IF;
-END $;
+-- The column deliberately carries no COMMENT ON. The first version of this
+-- migration wrapped one in a DO block to guard against a table an instance
+-- might not have, the escaping mangled its dollar-quoting to a single "$", and
+-- Postgres rejected the whole file -- which, because migrations run at API
+-- startup, crash-looped the container. A comment that can break boot is not
+-- worth what a comment buys; the header above says all of it, in git, where
+-- anyone changing this will actually read it.
 
 -- ============================================================================
 -- Which space a stored taste profile lives in
