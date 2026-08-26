@@ -2242,6 +2242,8 @@
     "setUnknown": "Coverage unknown",
     "setPending": "{{formatted}} to generate",
     "statsLine": "{{dimensions}}d • {{movies}} of {{movieTotal}} movies • {{series}} of {{seriesTotal}} series • {{episodes}} episodes",
+    "generatedOn": "Generated {{date}}",
+    "generatedRange": "Generated {{first}} — last written {{last}}",
     "pendingBreakdown": "Still to generate: {{movies}} movies, {{series}} series, {{episodes}} episodes",
     "sequenceTitle": "After changing the embeddings model",
     "sequenceTitleNeeded": "The active set is incomplete — run these to finish it",

@@ -52,6 +52,10 @@ interface EmbeddingSet {
   episodeCount: number
   totalCount: number
   isActive: boolean
+  /** ISO. When the oldest row was first written; null for an empty set. */
+  firstGeneratedAt: string | null
+  /** ISO. Most recent write; null for an empty set. */
+  lastGeneratedAt: string | null
   /** Null when the API could not measure it — render as unknown, never as zero. */
   pending: EmbeddingSetPending | null
   /** Decided by the API. The bundle never holds the rule, only the colour. */
@@ -154,6 +158,22 @@ function EmbeddingSetsManager() {
   const activeNeedsWork =
     activeSet != null && (activeSet.status === 'incomplete' || activeSet.status === 'empty')
 
+  /**
+   * When the set was written. A single date when it was generated in one pass,
+   * a range when the job has been back since — which is the honest shape, given
+   * new arrivals get embedded into an existing set as they sync.
+   */
+  const generatedLabel = (set: EmbeddingSet): string | null => {
+    if (!set.firstGeneratedAt) return null
+    const first = new Date(set.firstGeneratedAt)
+    const last = set.lastGeneratedAt ? new Date(set.lastGeneratedAt) : first
+    const firstText = first.toLocaleDateString()
+    const lastText = last.toLocaleDateString()
+    return firstText === lastText
+      ? t('settingsAiSetup.generatedOn', { date: firstText })
+      : t('settingsAiSetup.generatedRange', { first: firstText, last: lastText })
+  }
+
   const statusLabel = (set: EmbeddingSet): string => {
     if (set.status === 'ready') return t('settingsAiSetup.setReady')
     if (set.status === 'empty') return t('settingsAiSetup.setEmpty')
@@ -243,6 +263,11 @@ function EmbeddingSetsManager() {
                       episodes: set.episodeCount.toLocaleString(),
                     })}
                   </Typography>
+                  {generatedLabel(set) && (
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      {generatedLabel(set)}
+                    </Typography>
+                  )}
                   {set.status === 'incomplete' && set.pending && (
                     <Typography variant="caption" color="warning.main" display="block">
                       {t('settingsAiSetup.pendingBreakdown', {

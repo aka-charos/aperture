@@ -56,6 +56,23 @@ export interface EmbeddingSetSummary {
   totalCount: number
   isActive: boolean
   /**
+   * When the oldest row in this set was first written, ISO. `created_at`
+   * survives `ON CONFLICT DO UPDATE`, so this is genuinely the set's age rather
+   * than the last time something touched it.
+   */
+  firstGeneratedAt: string | null
+  /**
+   * The most recent write, ISO.
+   *
+   * Movie and series rows report `updated_at`; episode tables have no such
+   * column (`0138` added it to those two families only) so they report
+   * `created_at`. One caveat worth knowing: `0138` added `updated_at` as
+   * `NOT NULL DEFAULT NOW()`, so a row that has not been rewritten since that
+   * migration reports the migration's timestamp rather than its true write
+   * date. `firstGeneratedAt` has no such gap.
+   */
+  lastGeneratedAt: string | null
+  /**
    * What the embedding job would still generate if this set were the active
    * one. Null when it could not be measured — which the UI must render as
    * unknown rather than as zero.
@@ -83,6 +100,16 @@ export interface EmbeddingSetsReport {
 interface StoredSetKey {
   model: string
   dimensions: number
+}
+
+/** One GROUP BY row from a per-dimension embedding table. */
+interface StoredSetRow {
+  model: string
+  count: number
+  dimensions: number
+  /** pg returns TIMESTAMPTZ as a Date; both are null for an empty group. */
+  first_at: Date | null
+  last_at: Date | null
 }
 
 /**
@@ -219,9 +246,27 @@ function emptySummary(model: string, dimensions: number): EmbeddingSetSummary {
     episodeCount: 0,
     totalCount: 0,
     isActive: false,
+    firstGeneratedAt: null,
+    lastGeneratedAt: null,
     pending: null,
     status: 'empty',
   }
+}
+
+/** Earliest of two timestamps, either of which may be absent. */
+function earlier(current: string | null, candidate: Date | null): string | null {
+  if (candidate == null) return current
+  const iso = candidate.toISOString()
+  if (current == null) return iso
+  return iso < current ? iso : current
+}
+
+/** Latest of two timestamps, either of which may be absent. */
+function later(current: string | null, candidate: Date | null): string | null {
+  if (candidate == null) return current
+  const iso = candidate.toISOString()
+  if (current == null) return iso
+  return iso > current ? iso : current
 }
 
 /**
@@ -235,16 +280,22 @@ function emptySummary(model: string, dimensions: number): EmbeddingSetSummary {
  * for half its rows.
  */
 async function listStoredSets(): Promise<Map<string, EmbeddingSetSummary>> {
-  const familyUnion = (base: string): string =>
+  // `lastColumn` differs by family: only the movie and series tables carry
+  // `updated_at` (0138 added it to those two), so episodes fall back to
+  // `created_at` — which for them is the same thing, since episode rows are
+  // never rewritten by a staleness pass.
+  const familyUnion = (base: string, lastColumn: string): string =>
     VALID_EMBEDDING_DIMENSIONS.map(
       (d) =>
-        `SELECT model, COUNT(*)::int AS count, ${d} AS dimensions FROM ${base}_${d} GROUP BY model`
+        `SELECT model, COUNT(*)::int AS count, ${d} AS dimensions,
+                MIN(created_at) AS first_at, MAX(${lastColumn}) AS last_at
+           FROM ${base}_${d} GROUP BY model`
     ).join(' UNION ALL ')
 
   const [movieSets, seriesSets, episodeSets] = await Promise.all([
-    query<{ model: string; count: number; dimensions: number }>(familyUnion('embeddings')),
-    query<{ model: string; count: number; dimensions: number }>(familyUnion('series_embeddings')),
-    query<{ model: string; count: number; dimensions: number }>(familyUnion('episode_embeddings')),
+    query<StoredSetRow>(familyUnion('embeddings', 'updated_at')),
+    query<StoredSetRow>(familyUnion('series_embeddings', 'updated_at')),
+    query<StoredSetRow>(familyUnion('episode_embeddings', 'created_at')),
   ])
 
   const sets = new Map<string, EmbeddingSetSummary>()
@@ -259,20 +310,28 @@ async function listStoredSets(): Promise<Map<string, EmbeddingSetSummary>> {
     return entry
   }
 
+  const stampDates = (entry: EmbeddingSetSummary, row: StoredSetRow): void => {
+    entry.firstGeneratedAt = earlier(entry.firstGeneratedAt, row.first_at)
+    entry.lastGeneratedAt = later(entry.lastGeneratedAt, row.last_at)
+  }
+
   for (const row of movieSets.rows) {
     const entry = ensure(row.model, row.dimensions)
     entry.movieCount += row.count
     entry.totalCount += row.count
+    stampDates(entry, row)
   }
   for (const row of seriesSets.rows) {
     const entry = ensure(row.model, row.dimensions)
     entry.seriesCount += row.count
     entry.totalCount += row.count
+    stampDates(entry, row)
   }
   for (const row of episodeSets.rows) {
     const entry = ensure(row.model, row.dimensions)
     entry.episodeCount += row.count
     entry.totalCount += row.count
+    stampDates(entry, row)
   }
 
   return sets
