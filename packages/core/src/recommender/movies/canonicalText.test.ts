@@ -235,3 +235,33 @@ for (const [name, sql] of [
     assert.match(sql, new RegExp(`text_version, 0\\) < ${CANONICAL_TEXT_VERSION}\\b`))
   })
 }
+
+// ============================================================================
+// Release year (version 3)
+// ============================================================================
+
+test('the release year is not embedded', () => {
+  // Measured live: eight of nine viewers received ZERO picks from decades they
+  // barely watch, from candidate pools offering 3.4%-53.9% of exactly those
+  // decades -- while nothing in the recommender scores or filters on year. That
+  // era filter is emergent, hidden and absolute, and the year was the only
+  // literal era token in this document.
+  //
+  // Asserted against the LEADING SEGMENT rather than the whole string, because
+  // a synopsis may legitimately mention a year and that is not this bug.
+  const text = buildCanonicalText(movie({ title: 'Blast Radius', year: 1958 }))
+  assert.ok(text.startsWith('Blast Radius. '), text.slice(0, 60))
+  assert.ok(!text.startsWith('Blast Radius ('), 'the parenthesised year is back')
+})
+
+test('a title is still embedded when the year is missing', () => {
+  const text = buildCanonicalText(movie({ title: 'Blast Radius', year: null }))
+  assert.ok(text.startsWith('Blast Radius. '), text.slice(0, 60))
+})
+
+test('the year does not reappear anywhere else in the document', () => {
+  // The fixture carries no other 1958, so a match here means the number found
+  // its way back in through some other section.
+  const text = buildCanonicalText(movie({ title: 'Blast Radius', year: 1958 }))
+  assert.doesNotMatch(text, /1958/)
+})

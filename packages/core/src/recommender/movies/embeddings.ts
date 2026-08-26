@@ -56,7 +56,7 @@ interface Movie {
  * and `awards` for the sync, `0059` added `keywords` and `awards_summary` for
  * enrichment, and the builder was never repointed.
  */
-export const CANONICAL_TEXT_VERSION = 2
+export const CANONICAL_TEXT_VERSION = 3
 
 /** Enough to characterise a film; a few titles carry 100+ and would drown it. */
 const MAX_KEYWORDS = 18
@@ -90,9 +90,46 @@ export function buildCanonicalText(movie: Movie): string {
   const sections: string[] = []
 
   // === SECTION 1: Core Identity ===
-  // Title and year establish the movie's identity
-  const titleLine = movie.year ? `${movie.title} (${movie.year})` : movie.title
-  sections.push(titleLine)
+  //
+  // The release year is deliberately ABSENT, and this is an experiment with a
+  // stated prediction rather than a settled improvement.
+  //
+  // Nothing in the recommender scores, filters or diversifies on release year
+  // (see recommender/eraDiagnostics.ts). Yet measured live across nine viewers,
+  // EIGHT received ZERO picks from decades they barely watch, out of candidate
+  // pools offering between 3.4% and 53.9% of exactly those decades. For the
+  // most extreme viewer, 25 draws from a 53.9% pool should have produced ~13
+  // unfamiliar titles and produced none. So an era filter is running at close
+  // to full strength, with no era term anywhere in the code.
+  //
+  // That filter is emergent, hidden, un-tunable and absolute: a 1965 film whose
+  // themes match a 2020s viewer perfectly cannot reach them, and no setting can
+  // relax it. Era belongs in scoring as a bias someone can turn down, not in
+  // the vector as a fact about the work.
+  //
+  // The year is the only LITERAL era token in this document, so removing it
+  // tests whether it is the mechanism. Re-run the job and read ERA-DIAG:
+  //
+  //   unfamiliarShare rises toward poolUnfamiliarShare
+  //     -> the token was doing the work; era is now much weaker and tunable.
+  //   unfamiliarShare stays ~0
+  //     -> era lives in cast, studio, synopsis vocabulary and production style,
+  //        and no single field will move it. That is the finding that would
+  //        justify splitting the vector into content and identity halves.
+  //
+  // The prediction is the second. Version 2 removed the content rating -- which
+  // is itself an era-and-market artifact -- and quadrupled the plot budget,
+  // both of which should have diluted a single year token substantially, and
+  // the era lock was still total afterwards.
+  //
+  // Either result is worth having and NEITHER needs reverting: if the year
+  // changes nothing then it was contributing nothing, and a non-semantic token
+  // is better out of the document regardless.
+  //
+  // Episodes deliberately keep their year. Nothing in the recommender reads the
+  // episode index -- only the assistant's searchEpisodes tool does -- so
+  // changing it would re-embed 16,591 rows to affect nothing this measures.
+  sections.push(movie.title)
 
   // Tagline often captures the tone/theme brilliantly
   if (movie.tagline) {
