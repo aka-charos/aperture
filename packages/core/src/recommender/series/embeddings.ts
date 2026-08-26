@@ -111,18 +111,14 @@ export function buildSeriesCanonicalText(series: SeriesForEmbedding): string {
   const sections: string[] = []
 
   // === SECTION 1: Core Identity ===
-  // Title and year range establish the series' identity
-  let titleLine = series.title
-  if (series.year) {
-    if (series.endYear && series.endYear !== series.year) {
-      titleLine += ` (${series.year}-${series.endYear})`
-    } else if (series.status === 'Continuing') {
-      titleLine += ` (${series.year}-present)`
-    } else {
-      titleLine += ` (${series.year})`
-    }
-  }
-  sections.push(titleLine)
+  //
+  // No year range, mirroring the movie builder -- see the long note there for
+  // the measurement that prompted it and the prediction it is testing.
+  //
+  // Nothing is lost but the numbers: whether a show is still running was never
+  // carried by "(2010-present)" alone, because `status` is pushed as its own
+  // section immediately below ("Continuing TV Series").
+  sections.push(series.title)
 
   // Series type indicator
   if (series.status) {
