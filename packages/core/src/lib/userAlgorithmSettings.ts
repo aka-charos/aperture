@@ -185,6 +185,7 @@ export async function getEffectiveAlgorithmConfig(
         mediaType === 'movie'
           ? dbConfig.movie.preferenceStrength
           : dbConfig.series.preferenceStrength,
+      eraWeight: mediaType === 'movie' ? dbConfig.movie.eraWeight : dbConfig.series.eraWeight,
     }
   } catch {
     logger.warn('Failed to load admin config, using fallback defaults')
@@ -198,6 +199,7 @@ export async function getEffectiveAlgorithmConfig(
       acclaimedMinRating: 8.3,
       acclaimedMinVotes: 50000,
       preferenceStrength: 0.5,
+      eraWeight: 0,
       ...DEFAULT_WEIGHTS,
     }
   }
@@ -235,6 +237,7 @@ export async function getEffectiveAlgorithmConfig(
     acclaimedMinRating: adminConfig.acclaimedMinRating,
     acclaimedMinVotes: adminConfig.acclaimedMinVotes,
     preferenceStrength: adminConfig.preferenceStrength,
+    eraWeight: adminConfig.eraWeight, // Admin-only, like the slot ceilings
     ...normalizedWeights,
   }
 

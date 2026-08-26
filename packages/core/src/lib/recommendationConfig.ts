@@ -1,6 +1,6 @@
 import { query, queryOne } from './db.js'
 import { createChildLogger } from './logger.js'
-import { DEFAULT_PREFERENCE_STRENGTH } from '../recommender/shared/scoring.js'
+import { DEFAULT_ERA_WEIGHT, DEFAULT_PREFERENCE_STRENGTH } from '../recommender/shared/scoring.js'
 import {
   DEFAULT_ACCLAIMED_MAX_SLOTS,
   DEFAULT_ACCLAIMED_MIN_RATING,
@@ -72,6 +72,12 @@ export interface MediaTypeConfig {
    * off entirely and leaves the blended score untouched.
    */
   preferenceStrength: number
+  /**
+   * Relative strength of the decade-preference dimension inside that nudge,
+   * against franchise 0.5, genre 0.5 and interest 0.3. 0 disables it, which is
+   * the default and restores the other three to their exact pre-era shares.
+   */
+  eraWeight: number
 }
 
 export interface RecommendationConfig {
@@ -108,6 +114,7 @@ interface RecommendationConfigRow {
   movie_acclaimed_min_rating: string
   movie_acclaimed_min_votes: number
   movie_preference_strength: string
+  movie_era_weight: string
   series_max_candidates: number
   series_selected_count: number
   series_recent_watch_limit: number
@@ -124,6 +131,7 @@ interface RecommendationConfigRow {
   series_acclaimed_min_rating: string
   series_acclaimed_min_votes: number
   series_preference_strength: string
+  series_era_weight: string
   updated_at: Date
   scoring_updated_at: Date
 }
@@ -150,6 +158,7 @@ const MOVIE_DEFAULTS: MediaTypeConfig = {
   acclaimedMinRating: DEFAULT_ACCLAIMED_MIN_RATING,
   acclaimedMinVotes: DEFAULT_ACCLAIMED_MIN_VOTES,
   preferenceStrength: DEFAULT_PREFERENCE_STRENGTH,
+  eraWeight: DEFAULT_ERA_WEIGHT,
 }
 
 const SERIES_DEFAULTS: MediaTypeConfig = {
@@ -171,6 +180,7 @@ const SERIES_DEFAULTS: MediaTypeConfig = {
   acclaimedMinRating: DEFAULT_ACCLAIMED_MIN_RATING,
   acclaimedMinVotes: DEFAULT_ACCLAIMED_MIN_VOTES,
   preferenceStrength: DEFAULT_PREFERENCE_STRENGTH,
+  eraWeight: DEFAULT_ERA_WEIGHT,
 }
 
 /**
@@ -194,6 +204,7 @@ const COLUMN_SUFFIX: Record<keyof MediaTypeConfig, string> = {
   acclaimedMinRating: 'acclaimed_min_rating',
   acclaimedMinVotes: 'acclaimed_min_votes',
   preferenceStrength: 'preference_strength',
+  eraWeight: 'era_weight',
 }
 
 /**
@@ -223,6 +234,8 @@ const SCORING_FIELDS = new Set<keyof MediaTypeConfig>([
   'acclaimedMinVotes',
   // Moves every final score, so an edit has to invalidate the activity gate.
   'preferenceStrength',
+  // Same: it reweights the nudge, so turning era on or off changes every pick.
+  'eraWeight',
 ])
 
 /**
@@ -236,13 +249,13 @@ export async function getRecommendationConfig(): Promise<RecommendationConfig> {
       movie_new_candidate_threshold, movie_max_run_age_days,
       movie_twin_threshold_k, movie_twin_max_slots, movie_interest_max_slots,
       movie_acclaimed_max_slots, movie_acclaimed_min_rating, movie_acclaimed_min_votes,
-      movie_preference_strength,
+      movie_preference_strength, movie_era_weight,
       series_max_candidates, series_selected_count, series_recent_watch_limit,
       series_similarity_weight, series_novelty_weight, series_rating_weight, series_diversity_weight,
       series_new_candidate_threshold, series_max_run_age_days,
       series_twin_threshold_k, series_twin_max_slots, series_interest_max_slots,
       series_acclaimed_max_slots, series_acclaimed_min_rating, series_acclaimed_min_votes,
-      series_preference_strength,
+      series_preference_strength, series_era_weight,
       updated_at, scoring_updated_at
      FROM recommendation_config WHERE id = 1`
   )
@@ -275,6 +288,7 @@ export async function getRecommendationConfig(): Promise<RecommendationConfig> {
       acclaimedMinRating: parseFloat(row.movie_acclaimed_min_rating),
       acclaimedMinVotes: row.movie_acclaimed_min_votes,
       preferenceStrength: parseFloat(row.movie_preference_strength),
+      eraWeight: parseFloat(row.movie_era_weight),
     },
     series: {
       maxCandidates: row.series_max_candidates,
@@ -293,6 +307,7 @@ export async function getRecommendationConfig(): Promise<RecommendationConfig> {
       acclaimedMinRating: parseFloat(row.series_acclaimed_min_rating),
       acclaimedMinVotes: row.series_acclaimed_min_votes,
       preferenceStrength: parseFloat(row.series_preference_strength),
+      eraWeight: parseFloat(row.series_era_weight),
     },
     updatedAt: row.updated_at,
     scoringUpdatedAt: row.scoring_updated_at,

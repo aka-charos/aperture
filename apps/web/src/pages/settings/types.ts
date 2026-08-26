@@ -34,6 +34,7 @@ export interface MediaTypeConfig {
    * interest signal may close. 0 disables the nudge.
    */
   preferenceStrength: number
+  eraWeight: number
   recentWatchLimit: number
   similarityWeight: number
   noveltyWeight: number

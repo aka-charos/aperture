@@ -2492,6 +2492,13 @@
         "increase": "Franchises and genres a viewer loves carry further, at the cost of the similarity, discovery and quality scores deciding less.",
         "decrease": "The blended score decides more of the order. At 0 the nudge is off and the list is exactly what the three weights produced.",
         "example": "At the default 50%, a title scoring 0.60 with a maxed-out preference signal lands at 0.80 — enough to reorder a list, which is why it is worth being able to see it."
+      },
+      "eraWeight": {
+        "title": "Decade Preference",
+        "description": "A fourth signal inside the nudge above, beside franchise, genre and interests. It measures how often someone watches each decade relative to how much of it the library offers — so a viewer whose history is 40% recent films counts as era-neutral if the library is 40% recent, and as a real enthusiast if it is only 16%.",
+        "increase": "Decades a viewer seeks out are favoured and ones they pass over are held back. At Matched it carries the same weight as franchise and genre.",
+        "decrease": "Release year stops influencing the order at all. At 0 the other three signals keep exactly the shares they had before this setting existed, so turning it off changes nothing else.",
+        "example": "One viewer on a 12,589-film library watches the 2020s 2.4x more often than the shelf would predict, while another peaks at the 2000s and watches the 2020s less than chance. The same setting pulls them in opposite directions, which is the point."
       }
     },
     "sectionRegeneration": "WHEN TO REGENERATE",
@@ -2514,7 +2521,11 @@
     "acclaimedMinVotes": "Minimum votes behind that rating",
     "preferenceStrength": "Preference nudge",
     "preferenceStrengthOff": "Off",
-    "preferenceStrengthDefault": "Default"
+    "preferenceStrengthDefault": "Default",
+    "eraWeight": "Decade preference",
+    "eraWeightOff": "Off",
+    "eraWeightMatched": "Matched",
+    "eraWeightHint": "Compares each decade against what your library actually holds, so a taste for the 1990s is not mistaken for a shelf full of them."
   },
   "settingsWatching": {
     "title": "Serien, die du schaust",

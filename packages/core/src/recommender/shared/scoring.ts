@@ -486,16 +486,43 @@ export function blendWeightShares(
  * swing further than a custom interest match, which was always meant as a
  * lighter-touch signal.
  */
-const PREFERENCE_DIMENSION_WEIGHTS = {
+export interface PreferenceDimensionWeights {
+  franchise: number
+  genre: number
+  interest: number
+  era: number
+}
+
+/**
+ * Era ships at 0, i.e. OFF, following acclaimed slots: an upgrade must not
+ * change anybody's recommendations until an admin asks for it.
+ *
+ * Because the nudge divides by the total of whatever weights it is handed, a
+ * zero here restores the previous behaviour EXACTLY rather than approximately
+ * -- the remaining three revert to their original 0.5/0.5/0.3 shares of 1.3.
+ * That property is what makes this a real off switch rather than an attenuator,
+ * and preferenceStrength.test.ts pins it.
+ */
+export const DEFAULT_ERA_WEIGHT = 0
+
+/**
+ * The dimensions, as a list rather than a `keyof typeof` over one particular
+ * weight object -- the weights are now supplied per call, so the iteration
+ * order must not depend on which object arrived.
+ */
+const PREFERENCE_DIMENSIONS: Array<keyof PreferenceDimensionWeights> = [
+  'franchise',
+  'genre',
+  'interest',
+  'era',
+]
+
+export const DEFAULT_PREFERENCE_DIMENSION_WEIGHTS: PreferenceDimensionWeights = {
   franchise: 0.5,
   genre: 0.5,
   interest: 0.3,
-} as const
-
-const PREFERENCE_TOTAL_WEIGHT =
-  PREFERENCE_DIMENSION_WEIGHTS.franchise +
-  PREFERENCE_DIMENSION_WEIGHTS.genre +
-  PREFERENCE_DIMENSION_WEIGHTS.interest
+  era: DEFAULT_ERA_WEIGHT,
+}
 
 /**
  * Fraction of the remaining headroom to 1.0 (or down to 0.0, if disliked)
@@ -527,6 +554,15 @@ export interface PreferenceAffinities {
   franchise: number
   genre: number
   interest: number
+  /**
+   * How much the viewer seeks out or avoids this title's decade, relative to
+   * what the library offered them (recommender/eraAffinity.ts).
+   *
+   * Required rather than optional: a default here is a decision a caller can
+   * forget, and the two non-recommender callers genuinely want neutral for
+   * reasons worth stating at their call sites.
+   */
+  era: number
 }
 
 /**
@@ -545,7 +581,8 @@ export interface PreferenceAffinities {
 export function applyPreferenceAdjustment(
   qualityScore: number,
   affinities: PreferenceAffinities,
-  strength: number = MAX_PREFERENCE_HEADROOM
+  strength: number = MAX_PREFERENCE_HEADROOM,
+  weights: PreferenceDimensionWeights = DEFAULT_PREFERENCE_DIMENSION_WEIGHTS
 ): number {
   // A negative or non-finite strength would invert the nudge rather than
   // disable it, so it is clamped rather than trusted. 0 switches the whole
@@ -554,11 +591,21 @@ export function applyPreferenceAdjustment(
   if (headroomShare === 0) return qualityScore
   let netPull = 0 // -1 (fully disliked) .. +1 (fully loved)
 
-  for (const dimension of Object.keys(PREFERENCE_DIMENSION_WEIGHTS) as Array<
-    keyof typeof PREFERENCE_DIMENSION_WEIGHTS
-  >) {
+  // Normalised by the total of the weights ACTUALLY supplied, not by a module
+  // constant. That is what lets a dimension be switched off without silently
+  // attenuating the others: drop era to 0 and the remaining three divide by 1.3
+  // exactly as they did before this dimension existed.
+  let totalWeight = 0
+  for (const dimension of PREFERENCE_DIMENSIONS) {
+    totalWeight += Math.max(0, weights[dimension] ?? 0)
+  }
+  if (totalWeight <= 0) return qualityScore
+
+  for (const dimension of PREFERENCE_DIMENSIONS) {
+    const weight = Math.max(0, weights[dimension] ?? 0)
+    if (weight === 0) continue
     const signedAffinity = (affinities[dimension] - 0.5) * 2 // -1..1
-    netPull += (signedAffinity * PREFERENCE_DIMENSION_WEIGHTS[dimension]) / PREFERENCE_TOTAL_WEIGHT
+    netPull += (signedAffinity * weight) / totalWeight
   }
 
   if (netPull === 0) return qualityScore

@@ -270,10 +270,16 @@ export async function scoreCandidates(
     // has its own configuration and does not read recommendation_config. It
     // keeps DEFAULT_PREFERENCE_STRENGTH so an admin tuning recommendations
     // cannot silently change what gets requested from Seerr.
+    // Era is neutral here for the same reason genre and interest are: this is
+    // the discovery pipeline, scoring titles the library does NOT hold. An era
+    // affinity is built from what a viewer watched against what they were
+    // offered, and neither half of that comparison exists for a title nobody
+    // can watch yet.
     const finalScore = applyPreferenceAdjustment(baseScore, {
       franchise: franchiseAffinity,
       genre: 0.5,
       interest: 0.5,
+      era: 0.5,
     })
 
     return {

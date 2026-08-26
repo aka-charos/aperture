@@ -114,6 +114,14 @@ function validateConfigUpdates(updates: Partial<MediaTypeConfig>): string | null
     }
   }
 
+  // Same shape, and 0 is likewise meaningful: it is the shipped default and the
+  // feature's off switch, not a missing value.
+  if (updates.eraWeight !== undefined) {
+    if (!Number.isFinite(updates.eraWeight) || updates.eraWeight < 0 || updates.eraWeight > 1) {
+      return 'eraWeight must be between 0 and 1'
+    }
+  }
+
   // 0 would admit an unvoted rating, which is the one thing this gate
   // exists to exclude.
   if (updates.acclaimedMinVotes !== undefined) {

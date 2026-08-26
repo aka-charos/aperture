@@ -164,6 +164,7 @@ export const updateRecommendationConfigSchema = {
       acclaimedMinRating: { type: 'number' as const, minimum: 5, maximum: 10, description: 'Rating a title must reach to qualify for an acclaimed slot', example: 8.3 },
       acclaimedMinVotes: { type: 'integer' as const, minimum: 1, description: 'Votes that rating must be built on. An eligibility gate only -- vote count never enters the quality score', example: 50000 },
       preferenceStrength: { type: 'number' as const, minimum: 0, maximum: 1, description: "Share of a candidate's remaining gap to 1.0 that a maxed franchise/genre/interest signal may close. 0 disables the nudge", example: 0.5 },
+      eraWeight: { type: 'number' as const, minimum: 0, maximum: 1, description: 'Strength of the decade-preference dimension against franchise 0.5 / genre 0.5 / interest 0.3. 0 disables it and restores the other three to their exact pre-era shares', example: 0 },
     },
     example: {
       similarityWeight: 0.4,
