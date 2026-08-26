@@ -141,3 +141,85 @@ test('poolDrift shows how far the library sits from the user, independently of t
   assert.ok((report.poolDrift ?? 0) < -30, 'the library itself is decades older than the user')
   assert.ok((report.yearDrift ?? -99) > -5, 'but the picks are not')
 })
+
+// ============================================================================
+// Amplification -- the axis unfamiliarShare could not see
+// ============================================================================
+
+test('the live case: 80% recent picks from a 40% recent history reads as amplification', () => {
+  // Transcribed from viewer 78e0a1da. unfamiliarShare read 0 both before and
+  // after a change that moved these picks from 80% 2020s to 32%, because every
+  // decade from the 1990s up clears UNFAMILIAR_DECADE_SHARE for this viewer.
+  // This is the number that separates those two runs.
+  const watched = repeat([2021, 2015, 2005, 1995, 1985], 100) // 20% per decade
+  const before = repeat([2021, 2021, 2021, 2021, 2015], 25) // 80% 2020s
+  const after = repeat([2021, 2015, 2005, 1995, 1985], 25) // 20% 2020s
+
+  const beforeFit = summarizeEraFit(watched, watched, before)
+  const afterFit = summarizeEraFit(watched, watched, after)
+
+  assert.equal(beforeFit.amplified?.decade, 2020)
+  assert.ok(
+    beforeFit.amplified !== null && beforeFit.amplified.byPoints > 0.5,
+    `expected heavy 2020s amplification, got ${JSON.stringify(beforeFit.amplified)}`
+  )
+
+  // The corrected run matches the viewer, so there is nothing much to amplify.
+  assert.ok(
+    afterFit.amplified === null || afterFit.amplified.byPoints < 0.05,
+    `expected no meaningful amplification, got ${JSON.stringify(afterFit.amplified)}`
+  )
+
+  // And the old metric genuinely cannot tell them apart -- that is the point.
+  assert.equal(beforeFit.unfamiliarShare, afterFit.unfamiliarShare)
+})
+
+test('a suppressed decade is reported alongside an amplified one', () => {
+  const watched = repeat([2021, 1985], 100) // 50/50
+  const selected = repeat([2021], 20) // all recent
+  const fit = summarizeEraFit(watched, watched, selected)
+
+  assert.equal(fit.amplified?.decade, 2020)
+  assert.equal(fit.suppressed?.decade, 1980)
+  assert.ok(fit.suppressed !== null && fit.suppressed.byPoints < 0)
+})
+
+test('picks matching the viewer exactly have zero distance and no skew', () => {
+  const years = repeat([2021, 2015, 2005, 1995], 80)
+  const fit = summarizeEraFit(years, years, years)
+
+  assert.equal(fit.selectedToWatched, 0)
+  assert.equal(fit.amplified, null)
+  assert.equal(fit.suppressed, null)
+})
+
+test('distance separates "looks like the viewer" from "looks like the library"', () => {
+  // The question the module was written to answer, as one comparison.
+  const watched = repeat([2021, 2015], 100) // modern viewer
+  const pool = repeat([1955, 1965, 1975, 1985], 1000) // old library
+  const viewerLike = repeat([2021, 2015], 25)
+  const libraryLike = repeat([1955, 1965, 1975, 1985], 25)
+
+  const good = summarizeEraFit(watched, pool, viewerLike)
+  const bad = summarizeEraFit(watched, pool, libraryLike)
+
+  assert.ok(good.selectedToWatched! < good.selectedToPool!, 'picks should track the viewer')
+  assert.ok(bad.selectedToWatched! > bad.selectedToPool!, 'these track the library instead')
+})
+
+test('an empty history yields nulls rather than a confident zero', () => {
+  // Same rule as everywhere else here: absent is not the same as identical.
+  const fit = summarizeEraFit([], [2020], [2020])
+  assert.equal(fit.selectedToWatched, null)
+  assert.equal(fit.amplified, null)
+  assert.equal(fit.suppressed, null)
+})
+
+test('ties resolve deterministically to the earlier decade', () => {
+  const watched = repeat([2021, 1985], 100)
+  const selected = repeat([2021, 1985, 1955, 1965], 20) // 1950s and 1960s tie
+  const a = summarizeEraFit(watched, watched, selected)
+  const b = summarizeEraFit(watched, watched, selected)
+  assert.deepEqual(a.amplified, b.amplified)
+  assert.equal(a.amplified?.decade, 1950)
+})

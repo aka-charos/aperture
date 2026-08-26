@@ -19,8 +19,17 @@
  * `unfamiliarShare` against `poolUnfamiliarShare`: the candidate pool is
  * effectively the library's own era mix, so if the selected picks carry a much
  * smaller share of unfamiliar decades than the pool they were drawn from, the
- * emergent signal is doing real work and an era term would be solving a problem
- * nobody has. If the two are close, there is no era signal at all.
+ * emergent signal is doing real work. If the two are close, there is no era
+ * signal at all.
+ *
+ * That comparison turned out to be necessary and NOT sufficient, which a live
+ * run exposed. `unfamiliarShare` only counts decades holding under
+ * UNFAMILIAR_DECADE_SHARE of a history, so for a viewer who is 40% 2020s films
+ * every decade from the 1990s up is "familiar" -- and picks that were 80% 2020s
+ * scored exactly the same 0 as picks that were 32%. The metric answers "does
+ * the recommender ever leave your decades" and is blind to "does it exaggerate
+ * them", which is the filter-bubble question and the one people actually feel.
+ * `decadeSkew` and `decadeDistance` below cover that second axis.
  */
 
 import { query } from '../lib/db.js'
@@ -99,6 +108,20 @@ export interface EraFitReport {
   unfamiliarShare: number
   /** The control: the same share across the pool those picks were drawn from. */
   poolUnfamiliarShare: number
+  /**
+   * How far the picks' decade mix sits from the viewer's own, 0-1.
+   *
+   * Read beside `selectedToPool`: picks closer to the viewer than to the
+   * catalogue is the intended behaviour, and the reverse means era is being
+   * decided by what the library happens to hold.
+   */
+  selectedToWatched: number | null
+  /** Same distance, measured against the candidate pool instead. */
+  selectedToPool: number | null
+  /** The decade the picks most over-represent relative to the viewer's history. */
+  amplified: DecadeSkew | null
+  /** And the one they most under-represent. */
+  suppressed: DecadeSkew | null
 }
 
 function shareFromUnfamiliarDecades(
@@ -142,7 +165,84 @@ export function summarizeEraFit(
     poolDrift: drift(candidates),
     unfamiliarShare: shareFromUnfamiliarDecades(selectedYears, watched),
     poolUnfamiliarShare: shareFromUnfamiliarDecades(candidateYears, watched),
+    selectedToWatched: decadeDistance(selected, watched),
+    selectedToPool: decadeDistance(selected, candidates),
+    ...decadeSkew(selected, watched),
   }
+}
+
+/**
+ * Total variation distance between two decade mixes: 0 identical, 1 disjoint.
+ *
+ * Computed from the rounded `shares` rather than raw counts, which costs at
+ * most ~0.003 of accuracy across a realistic eleven decades. This is a log
+ * line, not an input to anything.
+ */
+export function decadeDistance(
+  a: DecadeDistribution,
+  b: DecadeDistribution
+): number | null {
+  if (a.counted === 0 || b.counted === 0) return null
+
+  const decades = new Set([...Object.keys(a.shares), ...Object.keys(b.shares)])
+  let total = 0
+  for (const decade of decades) {
+    total += Math.abs((a.shares[decade] ?? 0) - (b.shares[decade] ?? 0))
+  }
+  return Math.round((total / 2) * 1000) / 1000
+}
+
+export interface DecadeSkew {
+  decade: number
+  /** Selected share minus watched share. Positive is over-represented. */
+  byPoints: number
+}
+
+/**
+ * The single decade the picks most over- and under-represent relative to the
+ * viewer's own history.
+ *
+ * This is the number `unfamiliarShare` could not see, and the reason this
+ * module gained it. Measured live: a viewer whose history is 40.4% 2020s films
+ * was handed picks that were 80% 2020s, and `unfamiliarShare` read 0 -- because
+ * it only counts decades holding under UNFAMILIAR_DECADE_SHARE of a history,
+ * and for this viewer every decade from the 1990s up clears that bar. The
+ * metric answers "does the recommender ever leave your decades" and is blind to
+ * "does it exaggerate them", which is the filter-bubble question.
+ *
+ * Ties resolve to the earlier decade, so the output is deterministic.
+ */
+export function decadeSkew(
+  selected: DecadeDistribution,
+  watched: DecadeDistribution
+): { amplified: DecadeSkew | null; suppressed: DecadeSkew | null } {
+  if (selected.counted === 0 || watched.counted === 0) {
+    return { amplified: null, suppressed: null }
+  }
+
+  const decades = [
+    ...new Set([...Object.keys(selected.shares), ...Object.keys(watched.shares)]),
+  ]
+    .map(Number)
+    .sort((a, b) => a - b)
+
+  let amplified: DecadeSkew | null = null
+  let suppressed: DecadeSkew | null = null
+
+  for (const decade of decades) {
+    const delta =
+      (selected.shares[String(decade)] ?? 0) - (watched.shares[String(decade)] ?? 0)
+    const byPoints = Math.round(delta * 1000) / 1000
+
+    if (byPoints > 0 && (amplified === null || byPoints > amplified.byPoints)) {
+      amplified = { decade, byPoints }
+    }
+    if (byPoints < 0 && (suppressed === null || byPoints < suppressed.byPoints)) {
+      suppressed = { decade, byPoints }
+    }
+  }
+
+  return { amplified, suppressed }
 }
 
 /**
