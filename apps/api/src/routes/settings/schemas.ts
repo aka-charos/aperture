@@ -757,19 +757,37 @@ export const refreshAiPricingSchema = {
 export const embeddingSetsSchema = {
   tags: ['settings'],
   summary: 'Get embedding sets',
-  description: 'Get all embedding sets with their statistics and active status (admin only).',
+  description:
+    'Every stored embedding set with its row counts, which one is active, and how much work ' +
+    'the embedding job would still have for each (admin only). Embeddings are keyed by model, ' +
+    'so switching the embeddings model leaves the previous set intact and switching back reuses ' +
+    'it; the pending counts are what say whether a set is ready or needs generating.',
 }
 
 export const deleteEmbeddingSetSchema = {
   tags: ['settings'],
   summary: 'Delete embedding set',
-  description: 'Delete embeddings for a specific model (admin only).',
+  description:
+    'Delete embeddings for a specific model (admin only). Refuses the active set. Pass ' +
+    '`dimensions` to scope the delete to one dimension table; omitted, it removes the model ' +
+    'from every dimension.',
   params: {
     type: 'object' as const,
     properties: {
       model: { type: 'string' as const, description: 'Model name to delete embeddings for' },
     },
     required: ['model'] as string[],
+  },
+  // Declared so Fastify coerces it to a number — an undeclared query param
+  // arrives as a string and would never match a dimension.
+  querystring: {
+    type: 'object' as const,
+    properties: {
+      dimensions: {
+        type: 'integer' as const,
+        description: 'Restrict the delete to this embedding dimension',
+      },
+    },
   },
 }
 

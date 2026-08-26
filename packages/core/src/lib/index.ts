@@ -203,3 +203,13 @@ export {
 } from './inferenceUsage.js'
 
 export { type OpenRouterAccountStatus } from './openrouter-usage.js'
+
+// Stored embedding sets — what this instance holds per model, and what it
+// would still cost to switch to each one.
+export {
+  getEmbeddingSetsReport,
+  deleteEmbeddingSet,
+  type EmbeddingSetPending,
+  type EmbeddingSetSummary,
+  type EmbeddingSetsReport,
+} from './embeddingSets.js'

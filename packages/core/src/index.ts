@@ -49,6 +49,12 @@ export {
   VALID_EMBEDDING_DIMENSIONS,
   getEmbeddingTableSuffix,
   getActiveEmbeddingTableName,
+  // Stored embedding sets (what is held per model, and the cost of switching)
+  getEmbeddingSetsReport,
+  deleteEmbeddingSet,
+  type EmbeddingSetPending,
+  type EmbeddingSetSummary,
+  type EmbeddingSetsReport,
   // Legacy Embedding Cleanup
   checkLegacyEmbeddingsExist,
   dropLegacyEmbeddingTables,

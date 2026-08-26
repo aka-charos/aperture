@@ -38,6 +38,8 @@ import {
   setFunctionConfig,
   getAICapabilitiesStatus,
   VALID_EMBEDDING_DIMENSIONS,
+  getEmbeddingSetsReport,
+  deleteEmbeddingSet,
   checkLegacyEmbeddingsExist,
   dropLegacyEmbeddingTables,
   testProviderConnection,
@@ -511,64 +513,25 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
 
   /**
    * GET /api/settings/ai/embeddings/sets
+   *
+   * Every stored set, not just the inactive ones, and each with the work the
+   * embedding job would still have for it. Switching the embeddings model
+   * starts a new set beside the old one and never deletes anything, so the
+   * question an admin actually has at the dropdown is "have I already paid for
+   * this one?" — which a bare row count cannot answer, since a fully populated
+   * set still needs rebuilding when CANONICAL_TEXT_VERSION moves.
+   *
+   * `currentModel`/`totalSets` are kept for compatibility with anything still
+   * reading the old shape.
    */
   fastify.get('/api/settings/ai/embeddings/sets', { preHandler: requireAdmin, schema: embeddingSetsSchema }, async (_request, reply) => {
     try {
-      const movieUnions = VALID_EMBEDDING_DIMENSIONS.map(d => 
-        `SELECT model, COUNT(*)::int as count, ${d} as dimensions FROM embeddings_${d} GROUP BY model`
-      ).join(' UNION ALL ')
-      
-      const seriesUnions = VALID_EMBEDDING_DIMENSIONS.map(d => 
-        `SELECT model, COUNT(*)::int as count, ${d} as dimensions FROM series_embeddings_${d} GROUP BY model`
-      ).join(' UNION ALL ')
-      
-      const episodeUnions = VALID_EMBEDDING_DIMENSIONS.map(d => 
-        `SELECT model, COUNT(*)::int as count, ${d} as dimensions FROM episode_embeddings_${d} GROUP BY model`
-      ).join(' UNION ALL ')
-      
-      const movieSets = await query<{ model: string; count: number; dimensions: number }>(`${movieUnions}`)
-      const seriesSets = await query<{ model: string; count: number; dimensions: number }>(`${seriesUnions}`)
-      const episodeSets = await query<{ model: string; count: number; dimensions: number }>(`${episodeUnions}`)
-      
-      const setsMap = new Map<string, { model: string; dimensions: number; movieCount: number; seriesCount: number; episodeCount: number; totalCount: number }>()
-      
-      for (const row of movieSets.rows) {
-        const existing = setsMap.get(row.model) || { model: row.model, dimensions: row.dimensions, movieCount: 0, seriesCount: 0, episodeCount: 0, totalCount: 0 }
-        existing.movieCount += row.count
-        existing.totalCount += row.count
-        setsMap.set(row.model, existing)
-      }
-      
-      for (const row of seriesSets.rows) {
-        const existing = setsMap.get(row.model) || { model: row.model, dimensions: row.dimensions, movieCount: 0, seriesCount: 0, episodeCount: 0, totalCount: 0 }
-        existing.seriesCount += row.count
-        existing.totalCount += row.count
-        setsMap.set(row.model, existing)
-      }
-      
-      for (const row of episodeSets.rows) {
-        const existing = setsMap.get(row.model) || { model: row.model, dimensions: row.dimensions, movieCount: 0, seriesCount: 0, episodeCount: 0, totalCount: 0 }
-        existing.episodeCount += row.count
-        existing.totalCount += row.count
-        setsMap.set(row.model, existing)
-      }
-      
-      const aiConfig = await getAIConfig()
-      const currentModel = aiConfig.embeddings ? `${aiConfig.embeddings.provider}:${aiConfig.embeddings.model}` : null
-      
-      const sets = Array.from(setsMap.values()).map(set => ({
-        ...set,
-        isActive: set.model === currentModel,
-      })).sort((a, b) => {
-        if (a.isActive && !b.isActive) return -1
-        if (!a.isActive && b.isActive) return 1
-        return b.totalCount - a.totalCount
-      })
-      
+      const report = await getEmbeddingSetsReport()
+
       return reply.send({
-        sets,
-        currentModel,
-        totalSets: sets.length,
+        ...report,
+        currentModel: report.activeModel,
+        totalSets: report.sets.length,
       })
     } catch (err) {
       fastify.log.error({ err }, 'Failed to get embedding sets')
@@ -578,44 +541,40 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
 
   /**
    * DELETE /api/settings/ai/embeddings/sets/:model
+   *
+   * Refuses the active set: deleting the vectors the instance is currently
+   * querying would empty recommendations, the similarity graph and semantic
+   * search all at once, with a full re-embed as the only way back.
+   *
+   * `dimensions` is optional and scopes the delete to one table family. The
+   * listing is keyed on (model, dimension) because a custom model whose
+   * configured dimensions were edited after embedding owns rows in two tables;
+   * without the scope, deleting one row from the panel would take both.
    */
-  fastify.delete<{ Params: { model: string } }>('/api/settings/ai/embeddings/sets/:model', { preHandler: requireAdmin, schema: deleteEmbeddingSetSchema }, async (request, reply) => {
+  fastify.delete<{ Params: { model: string }; Querystring: { dimensions?: number } }>('/api/settings/ai/embeddings/sets/:model', { preHandler: requireAdmin, schema: deleteEmbeddingSetSchema }, async (request, reply) => {
     const { model } = request.params
     const decodedModel = decodeURIComponent(model)
-    
+    const { dimensions } = request.query
+
     try {
       const aiConfig = await getAIConfig()
       const currentModel = aiConfig.embeddings ? `${aiConfig.embeddings.provider}:${aiConfig.embeddings.model}` : null
-      
+
       if (decodedModel === currentModel) {
         return reply.status(400).send({ error: 'Cannot delete the active embedding set. Switch to a different model first.' })
       }
-      
-      let movieCount = 0
-      let seriesCount = 0
-      let episodeCount = 0
-      
-      for (const dim of VALID_EMBEDDING_DIMENSIONS) {
-        const movieResult = await query(`DELETE FROM embeddings_${dim} WHERE model = $1`, [decodedModel])
-        const seriesResult = await query(`DELETE FROM series_embeddings_${dim} WHERE model = $1`, [decodedModel])
-        const episodeResult = await query(`DELETE FROM episode_embeddings_${dim} WHERE model = $1`, [decodedModel])
-        
-        movieCount += movieResult.rowCount || 0
-        seriesCount += seriesResult.rowCount || 0
-        episodeCount += episodeResult.rowCount || 0
-      }
-      
-      const totalDeleted = movieCount + seriesCount + episodeCount
-      
-      fastify.log.info({ model: decodedModel, totalDeleted }, 'Deleted embedding set')
-      return reply.send({ 
-        success: true, 
+
+      const deleted = await deleteEmbeddingSet(decodedModel, dimensions)
+
+      fastify.log.info({ model: decodedModel, dimensions, totalDeleted: deleted.total }, 'Deleted embedding set')
+      return reply.send({
+        success: true,
         message: `Deleted embedding set for ${decodedModel}`,
         deleted: {
-          movies: movieCount,
-          series: seriesCount,
-          episodes: episodeCount,
-        }
+          movies: deleted.movies,
+          series: deleted.series,
+          episodes: deleted.episodes,
+        },
       })
     } catch (err) {
       fastify.log.error({ err, model: decodedModel }, 'Failed to delete embedding set')

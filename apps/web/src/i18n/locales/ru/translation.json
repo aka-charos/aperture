@@ -2030,7 +2030,20 @@
     "episodeEmbeddingsClearConfirm": "Delete every episode embedding? Regenerating them later means re-embedding every episode in the library.",
     "episodeEmbeddingsClearFailed": "Failed to delete episode embeddings",
     "cardTitleAnalysisTitle": "Google Gemini Title Analysis",
-    "cardTitleAnalysisDesc": "Optional. Writes a grounded, critic-informed analysis of a film or show — how it was made, what its makers were attempting, where it sits, what critics argue about. Cached per title and shared by everyone. Give it a key from a separate Google project: it spends the same daily grounding quota as Web Search, and a batch of analyses would otherwise starve the assistant."
+    "cardTitleAnalysisDesc": "Optional. Writes a grounded, critic-informed analysis of a film or show — how it was made, what its makers were attempting, where it sits, what critics argue about. Cached per title and shared by everyone. Give it a key from a separate Google project: it spends the same daily grounding quota as Web Search, and a batch of analyses would otherwise starve the assistant.",
+    "setReady": "Ready to use",
+    "setEmpty": "Nothing stored",
+    "setUnknown": "Coverage unknown",
+    "setPending": "{{formatted}} to generate",
+    "pendingBreakdown": "Still to generate: {{movies}} movies, {{series}} series, {{episodes}} episodes",
+    "sequenceTitle": "After changing the embeddings model",
+    "sequenceTitleNeeded": "The active set is incomplete — run these to finish it",
+    "sequenceIntro": "Item vectors are only half of it. A stored taste profile is a point in the old vector space and keeps being used until it is rebuilt, so run these in order from the Jobs page:",
+    "sequenceStepEmbeddings": "Generate embeddings — for movies and series. Only what is missing or out of date gets generated, so a set already marked ready costs nothing.",
+    "sequenceStepCentering": "Refresh embedding centering — recomputes the library mean for the new set. It has to come before profiles, because a profile records which space it was built in.",
+    "sequenceStepProfiles": "Rebuild taste profiles — without this, profiles stay in the old model's space for up to 30 days and recommendations quietly use stale taste.",
+    "sequenceStepRecommendations": "Generate recommendations — re-scores everyone against the new vectors.",
+    "sequenceNote": "Custom interests are re-embedded automatically during the profile rebuild. Until then they are treated as neutral rather than failing."
   },
   "settingsAiExplanation": {
     "loadFailed": "Не удалось загрузить конфигурацию объяснения AI.",
