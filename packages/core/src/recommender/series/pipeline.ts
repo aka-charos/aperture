@@ -30,6 +30,8 @@ import {
   shortlistIds,
   similarityFromEmbeddings,
   applyPreferenceAdjustment,
+  DEFAULT_PREFERENCE_DIMENSION_WEIGHTS,
+  type PreferenceDimensionWeights,
   buildInterestMatchIndex,
   buildTwinIndex,
   computeReservedInterestSlots,
@@ -94,6 +96,7 @@ import { getEffectiveAiExplanationSetting } from '../../lib/userSettings.js'
 import { WATCH_HISTORY_TASTE_SQL } from '../watchedExclusion.js'
 import { loadConfigForUser } from '../config.js'
 import type { PipelineConfig } from '../types.js'
+import { eraAffinityFor, loadEraAffinities, summarizeEraAffinities } from '../eraAffinity.js'
 
 const logger = createChildLogger('series-recommender')
 
@@ -1222,6 +1225,7 @@ export async function generateSeriesRecommendationsForUser(
     let franchiseSignalCount = 0
     let genreSignalCount = 0
     let interestSignalCount = 0
+    let eraSignalCount = 0
 
     // One indexed ANN query per custom interest instead of a per-candidate
     // embedding fetch plus affinity call, so every candidate is measured
@@ -1274,15 +1278,26 @@ export async function generateSeriesRecommendationsForUser(
     // item in the library, and getGenreAffinity re-issued the byte-identical
     // `WHERE user_id = $1` query every single iteration to get back the same
     // handful of rows. Three queries now, and the loop below is pure CPU.
-    const [candidateFranchises, franchiseAffinities, genreWeights] = await Promise.all([
-      getItemFranchises(
-        scoredCandidates.map((candidate) => candidate.seriesId),
-        'series'
-      ),
-      getFranchiseAffinityMap(user.id, 'series'),
-      getUserGenreWeights(user.id),
-    ])
+    // Era affinity joins them: one query for the viewer's decades, one for the
+    // library's. Loaded even when the dimension is switched off, because the
+    // summary is worth logging either way -- it is two GROUP BYs, and knowing a
+    // viewer seeks the 2000s at 1.46x is exactly what tells an admin whether
+    // raising the weight is worth doing.
+    const [candidateFranchises, franchiseAffinities, genreWeights, eraAffinities] =
+      await Promise.all([
+        getItemFranchises(
+          scoredCandidates.map((candidate) => candidate.seriesId),
+          'series'
+        ),
+        getFranchiseAffinityMap(user.id, 'series'),
+        getUserGenreWeights(user.id),
+        loadEraAffinities(user.id, 'series'),
+      ])
     const genreWeightMap = buildGenreWeightMap(genreWeights)
+    const preferenceWeights: PreferenceDimensionWeights = {
+      ...DEFAULT_PREFERENCE_DIMENSION_WEIGHTS,
+      era: cfg.eraWeight,
+    }
 
     for (const candidate of scoredCandidates) {
       // Franchise affinity: 0 (avoid) - 0.5 (neutral) - 1 (loved)
@@ -1297,6 +1312,11 @@ export async function generateSeriesRecommendationsForUser(
       // Custom interest affinity: 0.5 (no match) - 1 (strong match)
       const interestAffinity = interestIndex?.best.get(candidate.seriesId)?.affinity ?? 0.5
 
+      // Decade affinity: 0 (avoids this era) - 0.5 (neutral) - 1 (seeks it out).
+      // A show's year is its FIRST year, so a long-running series is scored by
+      // when it started -- which is what a viewer means by a 90s show.
+      const eraAffinity = eraAffinityFor(eraAffinities, candidate.year)
+
       // Nudge the score toward 1 or 0 based on preference affinities, bounded to [0,1]
       //
       // Mirrors the movie pipeline: the pre-nudge value is what the three
@@ -1310,8 +1330,10 @@ export async function generateSeriesRecommendationsForUser(
           franchise: franchiseAffinity,
           genre: genreAffinity,
           interest: interestAffinity,
+          era: eraAffinity,
         },
-        cfg.preferenceStrength
+        cfg.preferenceStrength,
+        preferenceWeights
       )
 
       if (franchiseAffinity !== 0.5) {
@@ -1331,14 +1353,25 @@ export async function generateSeriesRecommendationsForUser(
           'Applied custom interest preference'
         )
       }
+      if (eraAffinity !== 0.5) eraSignalCount++
     }
 
     // Re-sort after applying preference adjustments
     scoredCandidates.sort((a, b) => b.finalScore - a.finalScore)
 
     logger.info(
-      { userId: user.id, franchiseSignalCount, genreSignalCount, interestSignalCount },
-      `Applied ${franchiseSignalCount} franchise, ${genreSignalCount} genre, ${interestSignalCount} interest preference adjustments`
+      {
+        userId: user.id,
+        franchiseSignalCount,
+        genreSignalCount,
+        interestSignalCount,
+        eraSignalCount,
+        // Logged whether or not the dimension is switched on: it is what tells
+        // an admin whether raising eraWeight would do anything for this viewer.
+        eraWeight: cfg.eraWeight,
+        era: summarizeEraAffinities(eraAffinities),
+      },
+      `Applied ${franchiseSignalCount} franchise, ${genreSignalCount} genre, ${interestSignalCount} interest, ${eraSignalCount} era preference adjustments`
     )
 
     // What each scoring term actually contributed to the ordering -- see the

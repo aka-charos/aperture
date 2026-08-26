@@ -68,6 +68,12 @@ export interface PipelineConfig {
    * 0 switches the nudge off.
    */
   preferenceStrength: number
+  /**
+   * Relative strength of the decade-preference dimension inside that nudge.
+   * 0 disables it and restores the exact pre-era behaviour of the other three.
+   * See recommender/eraAffinity.ts.
+   */
+  eraWeight: number
 }
 
 // Fallback defaults (used only if DB fetch fails)
@@ -88,5 +94,10 @@ export const FALLBACK_CONFIG: PipelineConfig = {
   acclaimedMinRating: 8.3,
   acclaimedMinVotes: 50000,
   preferenceStrength: 0.5,
+  // Literal rather than imported: this module is types only and pulling in
+  // scoring.ts for one constant would make a type file a runtime dependency.
+  // scoring.ts's DEFAULT_ERA_WEIGHT is the value that governs; this is the
+  // fallback for a config read that threw, and both are the feature's off state.
+  eraWeight: 0,
 }
 

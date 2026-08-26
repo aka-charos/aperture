@@ -39,6 +39,7 @@ type HelpSettingKey =
   | 'acclaimedMinRating'
   | 'acclaimedMinVotes'
   | 'preferenceStrength'
+  | 'eraWeight'
 
 function HelpIcon({ settingKey }: { settingKey: HelpSettingKey }) {
   const { t } = useTranslation()
@@ -509,6 +510,40 @@ function MediaTypeCard({
               { value: 100 },
             ]}
           />
+        </FormControl>
+
+        {/* Sits directly under preference strength because it is a dimension
+            INSIDE that nudge, not a fourth scoring term. At 0 -- the default --
+            the other three dimensions keep their exact original shares, so this
+            is a real off switch rather than an attenuator. */}
+        <FormControl fullWidth sx={{ mb: 3 }} size="small">
+          <Box display="flex" alignItems="center" justifyContent="space-between">
+            <Box display="flex" alignItems="center">
+              <Typography variant="body2">{t('settingsRecAlgo.eraWeight')}</Typography>
+              <HelpIcon settingKey="eraWeight" />
+            </Box>
+            <Typography variant="body2" color="primary" fontWeight={600}>
+              {config.eraWeight === 0
+                ? t('settingsRecAlgo.eraWeightOff')
+                : config.eraWeight.toFixed(2)}
+            </Typography>
+          </Box>
+          <Slider
+            value={Math.round(config.eraWeight * 100)}
+            onChange={(_, v) => onUpdateField('eraWeight', (v as number) / 100)}
+            min={0}
+            max={100}
+            step={5}
+            size="small"
+            marks={[
+              { value: 0, label: t('settingsRecAlgo.eraWeightOff') },
+              { value: 50, label: t('settingsRecAlgo.eraWeightMatched') },
+              { value: 100 },
+            ]}
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+            {t('settingsRecAlgo.eraWeightHint')}
+          </Typography>
         </FormControl>
         {/* The gate. Only shown once the feature is on: two thresholds for a
             disabled feature is noise. */}

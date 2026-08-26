@@ -28,6 +28,9 @@ export {
   type BaseCandidate,
   type SimilarityScale,
   type PreferenceAffinities,
+  type PreferenceDimensionWeights,
+  DEFAULT_PREFERENCE_DIMENSION_WEIGHTS,
+  DEFAULT_ERA_WEIGHT,
   type ComponentSummary,
   type ScoreComponentReport,
 } from './scoring.js'
