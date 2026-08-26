@@ -2274,7 +2274,9 @@
     "sequenceStepCentering": "Refresh embedding centering — recomputes the library mean for the new set. It has to come before profiles, because a profile records which space it was built in.",
     "sequenceStepProfiles": "Rebuild taste profiles — without this, profiles stay in the old model's space for up to 30 days and recommendations quietly use stale taste.",
     "sequenceStepRecommendations": "Generate recommendations — re-scores everyone against the new vectors.",
-    "sequenceNote": "Custom interests are re-embedded automatically during the profile rebuild. Until then they are treated as neutral rather than failing."
+    "sequenceNote": "Custom interests are re-embedded automatically during the profile rebuild. Until then they are treated as neutral rather than failing.",
+    "generatedOn": "Generated {{date}}",
+    "generatedRange": "Generated {{first}} — last written {{last}}"
   },
   "settingsAiExplanation": {
     "loadFailed": "एआई स्पष्टीकरण कॉन्फ़िगरेशन लोड करने में विफल",
