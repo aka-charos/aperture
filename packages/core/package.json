@@ -78,7 +78,8 @@
     "lint": "eslint src",
     "clean": "rm -rf dist",
     "test:evaluation": "node --import tsx --test src/evaluation/holdout.test.ts src/evaluation/metrics.test.ts",
-    "test:max-candidates": "node --import tsx --test src/lib/maxCandidates.test.ts"
+    "test:max-candidates": "node --import tsx --test src/lib/maxCandidates.test.ts",
+    "test:embedding-sets": "node --import tsx --test src/lib/embeddingSets.test.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.0",

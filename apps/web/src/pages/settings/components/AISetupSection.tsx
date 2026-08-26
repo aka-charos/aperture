@@ -11,6 +11,7 @@ import {
   CircularProgress,
   Chip,
   Alert,
+  AlertTitle,
   IconButton,
   Divider,
   alpha,
@@ -36,6 +37,13 @@ interface AIConfig {
   exploration: FunctionConfig | null
 }
 
+interface EmbeddingSetPending {
+  movies: number
+  series: number
+  episodes: number
+  total: number
+}
+
 interface EmbeddingSet {
   model: string
   dimensions: number
@@ -44,14 +52,48 @@ interface EmbeddingSet {
   episodeCount: number
   totalCount: number
   isActive: boolean
+  /** Null when the API could not measure it — render as unknown, never as zero. */
+  pending: EmbeddingSetPending | null
+  /** Decided by the API. The bundle never holds the rule, only the colour. */
+  status: 'ready' | 'incomplete' | 'empty' | 'unknown'
+}
+
+interface EmbeddingSetsReport {
+  sets: EmbeddingSet[]
+  activeModel: string | null
+  activeDimensions: number | null
+  episodeEmbeddingsEnabled: boolean
+  library: { movies: number; series: number; episodes: number }
+}
+
+const SET_STATUS_COLOR: Record<EmbeddingSet['status'], 'success' | 'warning' | 'default'> = {
+  ready: 'success',
+  incomplete: 'warning',
+  empty: 'default',
+  unknown: 'default',
 }
 
 /**
- * Component to manage embedding sets - view and delete old embedding sets
+ * What this instance holds per embedding model, and what switching would cost.
+ *
+ * Embedding rows are keyed by model, every read filters on it, and nothing is
+ * ever deleted implicitly — so the old set survives a model change and a switch
+ * back reuses it. All of that is invisible at the dropdown, which is where the
+ * decision is actually made.
+ *
+ * The panel used to hide itself unless a *second* set already existed
+ * (`sets.length <= 1`), which is precisely backwards: it appeared only after
+ * the admin had committed to the switch it was meant to inform. It now renders
+ * whenever anything is stored or a model is configured.
+ *
+ * `status` and `pending` are computed server-side. A row count cannot answer
+ * "is this set ready" on its own — a fully populated set still needs work when
+ * CANONICAL_TEXT_VERSION moves or titles were re-enriched — and the rule that
+ * decides it lives in core, which this bundle must never import.
  */
 function EmbeddingSetsManager() {
   const { t } = useTranslation()
-  const [sets, setSets] = useState<EmbeddingSet[]>([])
+  const [report, setReport] = useState<EmbeddingSetsReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -61,7 +103,7 @@ function EmbeddingSetsManager() {
       const res = await fetch('/api/settings/ai/embeddings/sets', { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
-        setSets(data.sets || [])
+        setReport(data)
       }
     } catch {
       // Ignore
@@ -74,23 +116,23 @@ function EmbeddingSetsManager() {
     fetchSets()
   }, [fetchSets])
 
-  const handleDelete = async (model: string) => {
-    if (!confirm(t('settingsAiSetup.confirmDeleteSet', { model }))) {
+  const handleDelete = async (set: EmbeddingSet) => {
+    if (!confirm(t('settingsAiSetup.confirmDeleteSet', { model: set.model }))) {
       return
     }
 
-    setDeleting(model)
+    const key = `${set.model}|${set.dimensions}`
+    setDeleting(key)
     setError(null)
     try {
-      const res = await fetch(`/api/settings/ai/embeddings/sets/${encodeURIComponent(model)}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      })
+      const res = await fetch(
+        `/api/settings/ai/embeddings/sets/${encodeURIComponent(set.model)}?dimensions=${set.dimensions}`,
+        { method: 'DELETE', credentials: 'include' }
+      )
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || t('settingsAiSetup.deleteFailed'))
       }
-      // Refresh the list
       fetchSets()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('settingsAiSetup.deleteSetError'))
@@ -103,14 +145,24 @@ function EmbeddingSetsManager() {
     return null
   }
 
-  // Don't show if no sets or only one active set
-  if (sets.length <= 1) {
+  // Nothing configured and nothing stored — there is no decision to inform.
+  if (!report || (report.sets.length === 0 && !report.activeModel)) {
     return null
   }
 
-  const inactiveSets = sets.filter(s => !s.isActive)
-  if (inactiveSets.length === 0) {
-    return null
+  const activeSet = report.sets.find((s) => s.isActive) ?? null
+  const activeNeedsWork =
+    activeSet != null && (activeSet.status === 'incomplete' || activeSet.status === 'empty')
+
+  const statusLabel = (set: EmbeddingSet): string => {
+    if (set.status === 'ready') return t('settingsAiSetup.setReady')
+    if (set.status === 'empty') return t('settingsAiSetup.setEmpty')
+    if (set.status === 'unknown') return t('settingsAiSetup.setUnknown')
+    // No `count` key: passing one sends i18next down the plural-resolution path
+    // for a string that has no plural forms defined.
+    return t('settingsAiSetup.setPending', {
+      formatted: (set.pending?.total ?? 0).toLocaleString(),
+    })
   }
 
   return (
@@ -119,9 +171,12 @@ function EmbeddingSetsManager() {
         <Box display="flex" alignItems="center" gap={1} mb={2}>
           <StorageIcon color="primary" />
           <Typography variant="h6">{t('settingsAiSetup.embeddingSetsTitle')}</Typography>
-          <Chip 
-            size="small" 
-            label={t('settingsAiSetup.setsCount', { count: sets.length })} 
+          {/* `total`, not `count`: a `count` key sends i18next into plural
+              resolution, and 15 locales with different plural rules would each
+              need their own forms for a chip that is just a number. */}
+          <Chip
+            size="small"
+            label={t('settingsAiSetup.setsCount', { total: report.sets.length })}
             sx={{ ml: 'auto' }}
           />
         </Box>
@@ -137,65 +192,121 @@ function EmbeddingSetsManager() {
         )}
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {sets.map((set) => (
-            <Box
-              key={set.model}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-                p: 1.5,
-                borderRadius: 1,
-                bgcolor: set.isActive ? alpha('#4caf50', 0.1) : 'background.default',
-                border: 1,
-                borderColor: set.isActive ? 'success.main' : 'divider',
-              }}
-            >
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Box display="flex" alignItems="center" gap={1}>
-                  <Typography 
-                    variant="body2" 
-                    fontWeight={set.isActive ? 600 : 400}
-                    sx={{ 
-                      overflow: 'hidden', 
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {set.model}
+          {report.sets.map((set) => {
+            const key = `${set.model}|${set.dimensions}`
+            return (
+              <Box
+                key={key}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  p: 1.5,
+                  borderRadius: 1,
+                  bgcolor: set.isActive
+                    ? (theme) => alpha(theme.palette.success.main, 0.1)
+                    : 'background.default',
+                  border: 1,
+                  borderColor: set.isActive ? 'success.main' : 'divider',
+                }}
+              >
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                    <Typography
+                      variant="body2"
+                      fontWeight={set.isActive ? 600 : 400}
+                      sx={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {set.model}
+                    </Typography>
+                    {set.isActive && (
+                      <Chip size="small" label={t('settingsAiSetup.chipActive')} color="success" />
+                    )}
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={statusLabel(set)}
+                      color={SET_STATUS_COLOR[set.status]}
+                    />
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    {t('settingsAiSetup.statsLine', {
+                      dimensions: set.dimensions,
+                      movies: set.movieCount.toLocaleString(),
+                      movieTotal: report.library.movies.toLocaleString(),
+                      series: set.seriesCount.toLocaleString(),
+                      seriesTotal: report.library.series.toLocaleString(),
+                      episodes: set.episodeCount.toLocaleString(),
+                    })}
                   </Typography>
-                  {set.isActive && (
-                    <Chip size="small" label={t('settingsAiSetup.chipActive')} color="success" />
+                  {set.status === 'incomplete' && set.pending && (
+                    <Typography variant="caption" color="warning.main" display="block">
+                      {t('settingsAiSetup.pendingBreakdown', {
+                        movies: set.pending.movies.toLocaleString(),
+                        series: set.pending.series.toLocaleString(),
+                        episodes: set.pending.episodes.toLocaleString(),
+                      })}
+                    </Typography>
                   )}
                 </Box>
-                <Typography variant="caption" color="text.secondary">
-                  {t('settingsAiSetup.statsLine', {
-                    dimensions: set.dimensions,
-                    movies: set.movieCount.toLocaleString(),
-                    series: set.seriesCount.toLocaleString(),
-                    episodes: set.episodeCount.toLocaleString(),
-                  })}
-                </Typography>
+
+                {!set.isActive && set.totalCount > 0 && (
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() => handleDelete(set)}
+                    disabled={deleting === key}
+                    title={t('settingsAiSetup.deleteSetTooltip')}
+                  >
+                    {deleting === key ? (
+                      <CircularProgress size={16} />
+                    ) : (
+                      <DeleteIcon fontSize="small" />
+                    )}
+                  </IconButton>
+                )}
               </Box>
-              
-              {!set.isActive && (
-                <IconButton
-                  size="small"
-                  color="error"
-                  onClick={() => handleDelete(set.model)}
-                  disabled={deleting === set.model}
-                  title={t('settingsAiSetup.deleteSetTooltip')}
-                >
-                  {deleting === set.model ? (
-                    <CircularProgress size={16} />
-                  ) : (
-                    <DeleteIcon fontSize="small" />
-                  )}
-                </IconButton>
-              )}
-            </Box>
-          ))}
+            )
+          })}
         </Box>
+
+        {/* The sequence after a model change. Rebuilding taste profiles is the
+            step everyone misses: item vectors moving does not move a stored
+            centroid, and the recommender keeps using the old one until the
+            profile goes stale on its own — up to 30 days later. Centering runs
+            before it because buildTasteProfile records which space it was built
+            in. */}
+        <Alert severity={activeNeedsWork ? 'warning' : 'info'} sx={{ mt: 2 }}>
+          <AlertTitle>
+            {activeNeedsWork
+              ? t('settingsAiSetup.sequenceTitleNeeded')
+              : t('settingsAiSetup.sequenceTitle')}
+          </AlertTitle>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            {t('settingsAiSetup.sequenceIntro')}
+          </Typography>
+          <Box component="ol" sx={{ pl: 2.5, m: 0, '& li': { mb: 0.5 } }}>
+            <Typography component="li" variant="body2">
+              {t('settingsAiSetup.sequenceStepEmbeddings')}
+            </Typography>
+            <Typography component="li" variant="body2">
+              {t('settingsAiSetup.sequenceStepCentering')}
+            </Typography>
+            <Typography component="li" variant="body2">
+              {t('settingsAiSetup.sequenceStepProfiles')}
+            </Typography>
+            <Typography component="li" variant="body2">
+              {t('settingsAiSetup.sequenceStepRecommendations')}
+            </Typography>
+          </Box>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+            {t('settingsAiSetup.sequenceNote')}
+          </Typography>
+        </Alert>
       </CardContent>
     </Card>
   )
