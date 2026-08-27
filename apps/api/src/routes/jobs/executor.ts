@@ -393,7 +393,7 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
             ? stored.map((s) => ({ modelId: s.model, dimensions: s.dimensions }))
             : [undefined]
 
-        const measured: Array<{ modelId: string; poolSize: number }> = []
+        const measured: Array<{ modelId: string; dimensions: number; poolSize: number }> = []
         let result: Awaited<ReturnType<typeof runEvaluation>> = null
 
         for (const set of targets) {
@@ -409,7 +409,11 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
             shouldCancel: () => isJobCancelled(jobId),
           })
           if (one) {
-            measured.push({ modelId: one.modelId, poolSize: one.poolSize })
+            measured.push({
+              modelId: one.modelId,
+              dimensions: one.dimensions,
+              poolSize: one.poolSize,
+            })
             result = one
           }
         }
@@ -432,10 +436,17 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
           {
             job: name,
             jobId,
-            sets: measured.length,
+            // Per set, because poolSize is the confound that decides whether
+            // any of these numbers are comparable -- and a bare figure taken
+            // from whichever set happened to run last names nothing. The
+            // addLog report carries the detail, but this is the line that
+            // gets grepped out of docker logs.
+            sets: measured,
+            // Run-level, and correctly so: the splits are built from watch
+            // history and never from a matrix, so every set was scored
+            // against the same viewers and the same answer key.
             qualifiedUsers: result?.qualifiedUsers ?? 0,
             skippedUsers: result?.skippedUsers ?? 0,
-            poolSize: result?.poolSize ?? 0,
           },
           `✅ Recommender evaluation complete`
         )
