@@ -43,7 +43,9 @@ import {
   runLibraryGapAnalysis,
   rebuildAllTasteProfiles,
   refreshCenteredEmbeddings,
+  getEmbeddingSetsReport,
   runEvaluation,
+  type EmbeddingSetRef,
   refreshAllExplanations,
   withInferenceContext,
 } from '@aperture/core'
@@ -354,18 +356,61 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
         createJobProgress(jobId, name, 1)
         setJobStep(jobId, 0, 'Evaluating retrieval')
 
-        const result = await runEvaluation({
-          mediaType: 'movie',
-          // The whole report is written through addLog, because the job log is
-          // where it gets read -- in the console and in `docker logs` -- and a
-          // structured return value nothing renders would be invisible.
-          onLog: (line) => addLog(jobId, 'info', line),
-          shouldCancel: () => isJobCancelled(jobId),
-        })
+        // Measure EVERY stored embedding set, not only the active one.
+        // Rows are keyed (item, model) inside a per-dimension table, so
+        // changing model leaves the previous set in place rather than deleting
+        // it -- which is the whole reason two models can be compared without a
+        // re-embed in between. An instance holding one set behaves exactly as
+        // before; the extra cost is paid only when there is something to
+        // compare against.
+        const setsReport = await getEmbeddingSetsReport()
+        const stored = setsReport.sets.filter((s) => s.movieCount > 0)
+        // No stored set at all falls through to the implicit active-model
+        // path, which owns the "nothing to evaluate" message.
+        const targets: Array<EmbeddingSetRef | undefined> =
+          stored.length > 0
+            ? stored.map((s) => ({ modelId: s.model, dimensions: s.dimensions }))
+            : [undefined]
+
+        const measured: Array<{ modelId: string; poolSize: number }> = []
+        let result: Awaited<ReturnType<typeof runEvaluation>> = null
+
+        for (const set of targets) {
+          if (isJobCancelled(jobId)) break
+          const one = await runEvaluation({
+            mediaType: 'movie',
+            set,
+            // The whole report is written through addLog, because the job log is
+            // where it gets read -- in the console and in `docker logs` -- and a
+            // structured return value nothing renders would be invisible.
+            onLog: (line) => addLog(jobId, 'info', line),
+            shouldCancel: () => isJobCancelled(jobId),
+          })
+          if (one) {
+            measured.push({ modelId: one.modelId, poolSize: one.poolSize })
+            result = one
+          }
+        }
+
+        // Ranking two sets over two different libraries is not a comparison.
+        // A set the embedding job never finished is a smaller pool, and both
+        // medianPercentile and ndcg at a deep cutoff read better on one -- so
+        // say so rather than letting the table imply a winner.
+        if (new Set(measured.map((m) => m.poolSize)).size > 1) {
+          addLog(
+            jobId,
+            'warn',
+            `⚠️  Sets cover different numbers of titles (${measured
+              .map((m) => `${m.modelId}: ${m.poolSize}`)
+              .join(', ')}). Those figures are NOT directly comparable — finish the shorter set first.`
+          )
+        }
+
         logger.info(
           {
             job: name,
             jobId,
+            sets: measured.length,
             qualifiedUsers: result?.qualifiedUsers ?? 0,
             skippedUsers: result?.skippedUsers ?? 0,
             poolSize: result?.poolSize ?? 0,

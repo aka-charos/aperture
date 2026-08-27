@@ -15,7 +15,11 @@
  */
 
 import { query } from '../lib/db.js'
-import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../lib/ai-provider.js'
+import {
+  getActiveEmbeddingModelId,
+  getActiveEmbeddingTableName,
+  getEmbeddingTableSuffix,
+} from '../lib/ai-provider.js'
 import { createChildLogger } from '../lib/logger.js'
 
 const logger = createChildLogger('evaluation-matrix')
@@ -23,7 +27,32 @@ const logger = createChildLogger('evaluation-matrix')
 /** Rows per round trip. Bounds peak string memory while parsing. */
 const FETCH_CHUNK = 1000
 
+/**
+ * Which stored embedding set to measure.
+ *
+ * Two fields rather than one, because the dimension names the TABLE. Rows are
+ * keyed `(item, model)` inside a per-dimension table, so two models can hold
+ * complete sets side by side and a model change deletes nothing -- that is the
+ * entire reason one library can answer for two models without a re-embed in
+ * between. The dimension is passed rather than looked up because the only
+ * interesting case is a set that is NOT the active one, where the active
+ * configuration would resolve the wrong table.
+ */
+export interface EmbeddingSetRef {
+  /** `provider:model`, exactly as written into the `model` column. */
+  modelId: string
+  dimensions: number
+}
+
 export interface LibraryMatrix {
+  /**
+   * The set these vectors came from, `provider:model`.
+   *
+   * Carried on the matrix for the same reason as `centered` below: two sets are
+   * indistinguishable by inspection, and a report that cannot name what it
+   * measured is not a comparison.
+   */
+  modelId: string
   /** Row order; index i of `ids` is row i of `data`. */
   ids: string[]
   index: Map<string, number>
@@ -85,17 +114,22 @@ function normaliseRow(data: Float32Array, offset: number, dims: number): boolean
  * two configurations are being compared over two different libraries.
  */
 export async function loadLibraryMatrix(
-  mediaType: 'movie' | 'series'
+  mediaType: 'movie' | 'series',
+  set?: EmbeddingSetRef
 ): Promise<LibraryMatrix | null> {
-  const modelId = await getActiveEmbeddingModelId()
+  const modelId = set?.modelId ?? (await getActiveEmbeddingModelId())
   if (!modelId) {
     logger.warn('No embedding model configured')
     return null
   }
 
-  const tableName = await getActiveEmbeddingTableName(
-    mediaType === 'movie' ? 'embeddings' : 'series_embeddings'
-  )
+  const baseTable = mediaType === 'movie' ? 'embeddings' : 'series_embeddings'
+  // An explicit set names its own table. getEmbeddingTableSuffix throws on a
+  // dimension the schema has no table for, which is the right direction: a
+  // typo'd set should fail here rather than quietly measure the active one.
+  const tableName = set
+    ? `${baseTable}${getEmbeddingTableSuffix(set.dimensions)}`
+    : await getActiveEmbeddingTableName(baseTable)
   const idColumn = mediaType === 'movie' ? 'movie_id' : 'series_id'
 
   const countRow = await query<{ total: string; dims: string }>(
@@ -138,6 +172,7 @@ export async function loadLibraryMatrix(
   logger.info({ mediaType, rows: written, dims, tableName }, 'Loaded embedding matrix')
 
   return {
+    modelId,
     ids,
     index,
     dims,
@@ -201,7 +236,7 @@ export function meanCenter(matrix: LibraryMatrix): LibraryMatrix {
   }
   if (dropped > 0) logger.warn({ dropped }, 'Rows collapsed to the library mean')
 
-  return { ids, index: matrix.index, dims, data, centered: true, mean }
+  return { modelId: matrix.modelId, ids, index: matrix.index, dims, data, centered: true, mean }
 }
 
 /**

@@ -1250,6 +1250,7 @@ export {
   runEvaluation,
   DEFAULT_RELEVANCE_WEIGHTS,
   SKEPTICAL_RELEVANCE_WEIGHTS,
+  type EmbeddingSetRef,
   type EvaluationOptions,
   type EvaluationReport,
   type EvaluationVariant,
