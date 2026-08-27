@@ -15,6 +15,7 @@ import {
   getActiveEmbeddingTableName,
 } from '../../lib/ai-provider.js'
 import { embedMany } from 'ai'
+import { centreAfterGeneration } from '../centering.js'
 import { randomUUID } from 'crypto'
 import { getEpisodeEmbeddingsEnabled } from '../../settings/systemSettings.js'
 // One version for both media types: a builder change invalidates whichever
@@ -623,7 +624,13 @@ export async function generateMissingSeriesEmbeddings(
   // progress bar, depends on whether episodes are in scope.
   const shouldEmbedEpisodes = includeEpisodes ?? (await getEpisodeEmbeddingsEnabled())
   const jobId = existingJobId || randomUUID()
-  createJobProgress(jobId, 'generate-series-embeddings', shouldEmbedEpisodes ? 4 : 3)
+  // One more step than before at either width: the last is re-centring,
+  // which is part of leaving the library servable rather than a separate
+  // chore an operator must remember (it was manual-only, and nothing chained
+  // it). Episodes have no centred column -- 0154 added it to the movie and
+  // series families only -- so this centres series regardless of their scope.
+  const centringStep = shouldEmbedEpisodes ? 4 : 3
+  createJobProgress(jobId, 'generate-series-embeddings', centringStep + 1)
 
   try {
     // Step 1: Check AI provider configuration
@@ -798,6 +805,7 @@ export async function generateMissingSeriesEmbeddings(
     }
 
     const finalResult = { seriesGenerated, episodesGenerated, failed: totalFailed, jobId }
+    await centreAfterGeneration(jobId, 'series', seriesGenerated, centringStep)
     completeJob(jobId, finalResult)
 
     addLog(
