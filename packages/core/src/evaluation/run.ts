@@ -463,8 +463,23 @@ async function logNeighbours(
     seedIds = await popularSeedIds(mediaType, DEFAULT_SEED_COUNT)
   }
 
+  // A seed can name a real film that this SET has no vector for, which is
+  // invisible otherwise -- and it is exactly the case that matters when two
+  // sets are being compared, since a seed present in one dump and absent from
+  // the other reads as the models disagreeing rather than as missing data.
+  const unembedded = seedIds.filter((id) => !raw.index.has(id))
+  if (unembedded.length > 0) {
+    log(`  seeds with no embedding in this set: ${unembedded.length}`)
+  }
+
   seedIds = seedIds.filter((id) => raw.index.has(id))
-  if (seedIds.length === 0) return
+  if (seedIds.length === 0) {
+    // Returning quietly here would delete the primary instrument from the
+    // report and look like it simply had nothing to say.
+    log('')
+    log('Nearest neighbours — skipped: none of the requested seeds resolved to an embedded title.')
+    return
+  }
 
   log('')
   log('Nearest neighbours — the instrument to actually judge this on.')

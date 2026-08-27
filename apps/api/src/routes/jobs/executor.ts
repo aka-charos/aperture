@@ -44,6 +44,7 @@ import {
   rebuildAllTasteProfiles,
   refreshCenteredEmbeddings,
   getEmbeddingSetsReport,
+  getSystemSetting,
   runEvaluation,
   type EmbeddingSetRef,
   refreshAllExplanations,
@@ -363,6 +364,26 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
         // re-embed in between. An instance holding one set behaves exactly as
         // before; the extra cost is paid only when there is something to
         // compare against.
+        // Seeds for the neighbour dump, which the module header calls the
+        // PRIMARY instrument. The default is popularSeedIds -- whatever the
+        // most people finished -- and that is precisely where two embedding
+        // models agree, because a canonical, heavily-written-about film is the
+        // easy case both handle. The discriminating seeds are the obscure, the
+        // stylistic and the non-English, and popularity structurally excludes
+        // all three. So they have to be choosable.
+        //
+        // Newline-separated, because a film title may contain a comma. Misses
+        // are already reported by run.ts, so a wrongly-split list diagnoses
+        // itself on the next run rather than silently falling back.
+        const seedSetting = await getSystemSetting('evaluation_seed_titles')
+        const seedTitles = (seedSetting ?? '')
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean)
+        if (seedTitles.length > 0) {
+          addLog(jobId, 'info', `🌱 Seeds from settings: ${seedTitles.join(' | ')}`)
+        }
+
         const setsReport = await getEmbeddingSetsReport()
         const stored = setsReport.sets.filter((s) => s.movieCount > 0)
         // No stored set at all falls through to the implicit active-model
@@ -380,6 +401,7 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
           const one = await runEvaluation({
             mediaType: 'movie',
             set,
+            seedTitles: seedTitles.length > 0 ? seedTitles : undefined,
             // The whole report is written through addLog, because the job log is
             // where it gets read -- in the console and in `docker logs` -- and a
             // structured return value nothing renders would be invisible.
