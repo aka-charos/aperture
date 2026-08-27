@@ -132,7 +132,52 @@ export async function isCenteringReady(mediaType: MediaType): Promise<boolean> {
  * The `::vector` casts are not decoration. `-` and `avg()` are defined for
  * `vector` across every pgvector build that has halfvec at all, whereas the
  * halfvec overloads arrived later; casting costs one pass over a table this job
- * is already rewriting in full.
+ * is already rewriting in full. `l2_normalize` is applied to the same cast for
+ * the same reason (both arrived in pgvector 0.7.0, which this schema already
+ * requires -- 0024 and 0078 use halfvec, 0091 uses binary_quantize).
+ *
+ * ## Why the rows are normalised first
+ *
+ * Centring is a SUBTRACTION, and that makes it the odd one out. All 31 vector
+ * comparisons in this repo use `<=>`, which is cosine and therefore
+ * magnitude-invariant, so a non-unit stored vector costs them nothing and
+ * nothing on the read path has ever had to care. Subtracting a shared mean is
+ * different, and it fails twice over: `AVG` weights each row by its norm, so a
+ * long vector pulls the library mean toward itself; and subtracting a fixed
+ * vector from rows of differing magnitude moves each one by a different
+ * proportion of itself, so the results differ in DIRECTION, not merely in
+ * scale. Cosine cannot recover from that -- the centred column would be a
+ * confident set of wrong angles.
+ *
+ * `storeEmbeddings` normalises nothing; it stores what the provider returned.
+ * On this instance that is currently harmless, and measurably so -- norms over
+ * `embeddings_3072` span 0.999930 to 1.000079 around an average of exactly
+ * 1.000000, which is halfvec rounding of a vector that was unit-length when
+ * written. gemini-embedding-001 at its native 3072 returns unit vectors, so
+ * `l2_normalize` here is the identity to far below halfvec precision and this
+ * change cannot move the current column.
+ *
+ * It stops being the identity the moment the vectors are not native. Seven of
+ * the eight `VALID_EMBEDDING_DIMENSIONS` are MRL truncations, where the norm
+ * depends on how much of that text's energy happened to land in the kept
+ * dimensions -- Google's own documentation says non-3072 dimensions must be
+ * normalised manually. Other providers do not return unit vectors at any
+ * dimension: Qwen3-Embedding's reference usage applies `F.normalize` after
+ * pooling, leaving it to the caller. So this is a latent defect on the current
+ * schema rather than a new requirement, and it fires on a configuration an
+ * operator can already select today.
+ *
+ * This is the same argument `buildWeightedAverageEmbedding` makes for
+ * unit-normalising each item before it sums them. That was the first place
+ * vectors are added rather than compared; this is the second, and it was
+ * missed.
+ *
+ * Normalising HERE rather than in `storeEmbeddings` is deliberate. This job is
+ * idempotent and already re-run on demand, so the fix repairs existing rows
+ * with no re-embed; writing normalised vectors instead would leave old and new
+ * rows in different states until a full pass, and would discard what the
+ * provider actually returned, which is the only ground truth available when a
+ * model is behaving oddly.
  */
 export async function refreshCenteredEmbeddings(
   mediaType: MediaType
@@ -147,13 +192,13 @@ export async function refreshCenteredEmbeddings(
 
   const result = await query(
     `WITH library_mean AS (
-       SELECT AVG(embedding::vector) AS mean
+       SELECT AVG(l2_normalize(embedding::vector)) AS mean
          FROM ${tableName}
         WHERE model = $1
      )
      UPDATE ${tableName} AS t
         SET embedding_centered =
-              (t.embedding::vector - (SELECT mean FROM library_mean))::halfvec
+              (l2_normalize(t.embedding::vector) - (SELECT mean FROM library_mean))::halfvec
       WHERE t.model = $1
         AND (SELECT mean FROM library_mean) IS NOT NULL`,
     [modelId]
