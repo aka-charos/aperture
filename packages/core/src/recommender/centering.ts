@@ -21,6 +21,7 @@
 
 import { query, queryOne } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
+import { addLog, setJobStep } from '../jobs/progress.js'
 import {
   getActiveEmbeddingModelId,
   getActiveEmbeddingTableName,
@@ -120,6 +121,38 @@ export async function isCenteringReady(mediaType: MediaType): Promise<boolean> {
 }
 
 /**
+ * Whether the centred column has to be rewritten after an embedding pass.
+ *
+ * Pure, exported and pinned, because both embedding jobs ask it and a drift
+ * between them is invisible: one media type would quietly stop being servable
+ * for centred profiles while the other kept working.
+ *
+ * Why it is conditional at all. Rewriting the column is a full-table UPDATE
+ * -- ~77 MB for 12,589 movies at 3072 halfvec -- and both embedding jobs run
+ * on a six-hour interval that usually finds nothing new. Doing it
+ * unconditionally would rewrite the whole table four times a day to produce
+ * byte-identical vectors, for the autovacuum churn and WAL volume of a real
+ * change.
+ *
+ * Why each condition earns its place:
+ *
+ *   generated > 0   New rows land with `embedding_centered` NULL, which alone
+ *                   makes `isCenteringReady` false and every centred profile
+ *                   refuse. They also move the mean, so the rest of the column
+ *                   is now centred against a stale one.
+ *
+ *   !ready          Repairs a set left half-centred -- an interrupted refresh,
+ *                   a failure last run, or rows written before this became
+ *                   automatic. This is what makes a failed centring
+ *                   self-healing rather than permanent: the next scheduled
+ *                   pass sees an unready column and retries without anyone
+ *                   noticing it broke.
+ */
+export function centeringNeeded(generated: number, ready: boolean): boolean {
+  return generated > 0 || !ready
+}
+
+/**
  * Recompute the library mean and rewrite the centred column for every row of
  * the active model.
  *
@@ -207,6 +240,54 @@ export async function refreshCenteredEmbeddings(
   const updated = result.rowCount ?? 0
   logger.info({ mediaType, tableName, modelId, updated }, 'Recentred embeddings')
   return { updated, skipped: false }
+}
+
+
+/**
+ * Re-centre after writing vectors, so a centred taste profile stays servable.
+ *
+ * This runs inside the embedding job rather than after it in the executor,
+ * because the job owns its own progress record and calls `completeJob` itself
+ * -- centring afterwards would run against a job already reported finished,
+ * with the work outside both the progress bar and the recorded duration.
+ *
+ * One home for both embedding jobs rather than a copy in each. The movie and
+ * series pipelines are mirrored by design, but this is error handling rather
+ * than pipeline logic, and a copy that drifts here fails silently: one media
+ * type stops being servable for centred profiles while the other keeps working.
+ *
+ * It never rethrows. The embeddings are written and good by this point, so
+ * failing the job would report the wrong thing -- and `centeringNeeded` picks
+ * it up on the next pass because the column is still unready, which is the
+ * whole reason that second condition exists.
+ */
+export async function centreAfterGeneration(
+  jobId: string,
+  mediaType: MediaType,
+  generated: number,
+  stepIndex: number
+): Promise<void> {
+  try {
+    if (!centeringNeeded(generated, await isCenteringReady(mediaType))) return
+
+    setJobStep(jobId, stepIndex, 'Centring embeddings')
+    addLog(jobId, 'info', '🧭 Recomputing the library mean and re-centring...')
+
+    const { updated, skipped } = await refreshCenteredEmbeddings(mediaType)
+    if (skipped) {
+      addLog(jobId, 'warn', '⚠️ No embedding model configured; centred column left alone')
+      return
+    }
+    addLog(jobId, 'info', `✅ Re-centred ${updated} ${mediaType} embeddings`)
+  } catch (err) {
+    logger.error({ err, jobId, mediaType }, 'Failed to re-centre embeddings')
+    addLog(
+      jobId,
+      'error',
+      '❌ Re-centring failed. Centred taste profiles will refuse until it succeeds — ' +
+        'the next embedding pass retries automatically, or run refresh-embedding-centering now.'
+    )
+  }
 }
 
 async function resolveTable(mediaType: MediaType): Promise<string> {

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import {
   buildSpaceFor,
+  centeringNeeded,
   embeddingColumnFor,
   resolveEmbeddingSpace,
   type EmbeddingSpace,
@@ -63,4 +64,28 @@ test('a profile built now is immediately servable', () => {
     const built = buildSpaceFor(ready)
     assert.equal(resolveEmbeddingSpace(built, ready), built)
   }
+})
+
+// --- when an embedding pass has to rewrite the centred column ---------------
+//
+// Both embedding jobs ask this, and they run on a six-hour interval that
+// usually finds nothing. Getting it wrong in one direction rewrites ~77 MB of
+// table four times a day to produce identical vectors; in the other it leaves
+// centred profiles refusing until someone notices.
+
+test('new vectors always force a re-centre', () => {
+  // They land with embedding_centered NULL, which alone makes the column
+  // unready, and they move the mean the rest of the column was centred against.
+  assert.equal(centeringNeeded(1, true), true)
+  assert.equal(centeringNeeded(4200, true), true)
+})
+
+test('an unready column is repaired even when nothing was generated', () => {
+  // This is what makes a failed centring self-healing rather than permanent:
+  // the next scheduled pass sees an unready column and retries by itself.
+  assert.equal(centeringNeeded(0, false), true)
+})
+
+test('nothing generated against a ready column skips the rewrite', () => {
+  assert.equal(centeringNeeded(0, true), false)
 })

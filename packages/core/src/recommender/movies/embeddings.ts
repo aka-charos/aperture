@@ -14,10 +14,12 @@ import {
   getFunctionConfig,
   getActiveEmbeddingTableName,
 } from '../../lib/ai-provider.js'
+import { centreAfterGeneration } from '../centering.js'
 import { embed, embedMany } from 'ai'
 import { randomUUID } from 'crypto'
 
 const logger = createChildLogger('embeddings')
+
 
 interface Movie {
   id: string
@@ -528,7 +530,10 @@ export async function generateMissingEmbeddings(
   existingJobId?: string
 ): Promise<GenerateEmbeddingsResult> {
   const jobId = existingJobId || randomUUID()
-  createJobProgress(jobId, 'generate-movie-embeddings', 3)
+  // Four steps, not three: the last is re-centring, which is part of leaving
+  // the library servable rather than a separate chore an operator must
+  // remember (it was a manual-only job, and nothing chained it).
+  createJobProgress(jobId, 'generate-movie-embeddings', 4)
 
   try {
     // Step 1: Check AI provider configuration
@@ -579,6 +584,9 @@ export async function generateMissingEmbeddings(
 
     if (totalNeeded === 0) {
       addLog(jobId, 'info', '✅ All movie embeddings are up to date!')
+      // Still offered the centring check: nothing new to embed does not mean
+      // the centred column is intact, and this is the path that repairs it.
+      await centreAfterGeneration(jobId, 'movie', 0, 3)
       completeJob(jobId, { generated: 0, failed: 0, unchanged: 0 })
       return { generated: 0, failed: 0, unchanged: 0, jobId }
     }
@@ -688,6 +696,7 @@ export async function generateMissingEmbeddings(
       unchanged: totalUnchanged,
       jobId,
     }
+    await centreAfterGeneration(jobId, 'movie', totalGenerated, 3)
     completeJob(jobId, finalResult)
 
     addLog(
