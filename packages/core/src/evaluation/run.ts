@@ -22,6 +22,7 @@ import {
   meanCenter,
   scoreAll,
   weightedCentroid,
+  type EmbeddingSetRef,
   type LibraryMatrix,
 } from './embeddingMatrix.js'
 import {
@@ -75,6 +76,22 @@ export interface EvaluationOptions {
   minTestItems?: number
   variants?: EvaluationVariant[]
   weights?: RelevanceWeights
+  /**
+   * Which stored embedding set to measure. Defaults to the active one.
+   *
+   * This is how one library answers for two models. The splits below are
+   * rebuilt per call but `splitHoldout` is deterministic -- the N most recent
+   * engaged titles per viewer, never a sample -- so two runs over two sets are
+   * scored against an identical answer key without having to hold one in
+   * memory across both.
+   *
+   * What it does NOT control is the pool. `loadLibraryMatrix` applies no
+   * library filter precisely so the ranked population is stable, but a set the
+   * embedding job never finished is genuinely a smaller pool, and both
+   * `medianPercentile` and ndcg at a deep cutoff read better on one. Compare
+   * `poolSize` across runs before believing a difference.
+   */
+  set?: EmbeddingSetRef
   /** Titles to dump neighbours for, raw and mean-centred, side by side. */
   seedTitles?: string[]
   neighbourTopN?: number
@@ -92,6 +109,9 @@ export interface VariantResult {
 
 export interface EvaluationReport {
   mediaType: 'movie' | 'series'
+  /** The set that was measured, `provider:model`. */
+  modelId: string
+  dimensions: number
   poolSize: number
   holdoutSize: number
   qualifiedUsers: number
@@ -257,7 +277,7 @@ export async function runEvaluation(options: EvaluationOptions = {}): Promise<Ev
     options.onLog?.(line)
   }
 
-  const raw = await loadLibraryMatrix(mediaType)
+  const raw = await loadLibraryMatrix(mediaType, options.set)
   if (!raw) {
     log('No embeddings loaded — nothing to evaluate.')
     return null
@@ -300,6 +320,7 @@ export async function runEvaluation(options: EvaluationOptions = {}): Promise<Ev
   // could not be evaluated, that is the most important line in the report.
   log('')
   log(`Evaluation — ${mediaType}`)
+  log(`  set              ${raw.modelId}`)
   log(`  library          ${raw.ids.length} embedded titles, ${raw.dims} dimensions`)
   log(`  holdout          ${holdoutSize} most recent engaged titles per viewer`)
   log(`  qualified        ${splits.length} of ${users.rows.length} viewers (>= ${minTestItems} answers)`)
@@ -351,6 +372,8 @@ export async function runEvaluation(options: EvaluationOptions = {}): Promise<Ev
 
   return {
     mediaType,
+    modelId: raw.modelId,
+    dimensions: raw.dims,
     poolSize: raw.ids.length,
     holdoutSize,
     qualifiedUsers: splits.length,

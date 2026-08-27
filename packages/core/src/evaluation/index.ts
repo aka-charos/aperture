@@ -55,6 +55,7 @@ export {
   rowAsQuery,
   scoreAll,
   weightedCentroid,
+  type EmbeddingSetRef,
   type LibraryMatrix,
 } from './embeddingMatrix.js'
 
