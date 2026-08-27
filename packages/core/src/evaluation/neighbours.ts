@@ -95,10 +95,17 @@ export async function resolveSeedIds(
     const trimmed = input.trim()
     if (!trimmed) continue
 
+    // unaccent() on both sides, for the reason 0134 records: a `[^a-z0-9]`
+    // strip DELETES accented letters rather than folding them, so a film fails
+    // to match itself. It matters here specifically because a non-English
+    // title is one of the seeds worth stressing a model on, and nobody types
+    // "Ascenseur pour l'échafaud" with the accent. STABLE, so it costs the
+    // trigram index -- irrelevant for a handful of seeds once per run.
     const result = await query<{ id: string }>(
       `SELECT id FROM ${table}
-        WHERE title ILIKE $1 OR original_title ILIKE $1
-        ORDER BY (lower(title) = lower($2)) DESC, year ASC NULLS LAST
+        WHERE unaccent(title) ILIKE unaccent($1)
+           OR unaccent(original_title) ILIKE unaccent($1)
+        ORDER BY (lower(unaccent(title)) = lower(unaccent($2))) DESC, year ASC NULLS LAST
         LIMIT 1`,
       [`${trimmed}%`, trimmed]
     )
