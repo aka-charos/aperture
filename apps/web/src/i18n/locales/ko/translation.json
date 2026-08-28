@@ -4710,5 +4710,187 @@
       "licence": "IMDb offers these datasets for personal and non-commercial use.",
       "licenceLink": "Read the terms"
     }
+  },
+  "adminNav": {
+    "searchPlaceholder": "Search settings…",
+    "searchShortcutMac": "⌘⇧K",
+    "searchShortcutWin": "Ctrl+Shift+K",
+    "searchNoResults": "Nothing matches “{{query}}”",
+    "openNav": "Open admin navigation",
+    "groups": {
+      "overview": "Overview",
+      "library": "Library",
+      "integrations": "Integrations",
+      "ai": "AI models",
+      "recommendations": "Recommendations",
+      "appearance": "Appearance",
+      "access": "Access",
+      "ops": "Operations"
+    },
+    "overview": {
+      "title": "Overview",
+      "blurb": "How this instance is doing at a glance"
+    },
+    "mediaServer": {
+      "title": "Media server",
+      "blurb": "Where {{appName}} reads your library from"
+    },
+    "libraries": {
+      "title": "Libraries",
+      "blurb": "Which libraries are synced, and which stay hidden"
+    },
+    "fileLocations": {
+      "title": "File locations",
+      "blurb": "Where generated libraries and files are written"
+    },
+    "gapAnalysis": {
+      "title": "Gap analysis",
+      "blurb": "Collections and franchises your library is missing"
+    },
+    "tmdb": {
+      "title": "TMDB",
+      "blurb": "Metadata, posters and genre data"
+    },
+    "omdb": {
+      "title": "OMDb",
+      "blurb": "IMDb ratings, full plots and awards"
+    },
+    "mdblist": {
+      "title": "MDBList",
+      "blurb": "Curated lists and aggregate ratings"
+    },
+    "trakt": {
+      "title": "Trakt",
+      "blurb": "Push ratings and sync watch history"
+    },
+    "seerr": {
+      "title": "Seerr",
+      "blurb": "Send requests to Jellyseerr or Overseerr"
+    },
+    "lldap": {
+      "title": "LLDAP",
+      "blurb": "Import user email addresses from a directory"
+    },
+    "n8n": {
+      "title": "n8n",
+      "blurb": "Send events to an automation workflow"
+    },
+    "tavily": {
+      "title": "Tavily",
+      "blurb": "Web search for the assistant’s discovery turns"
+    },
+    "crw": {
+      "title": "fastCRW",
+      "blurb": "Self-hosted search and scraping for title analysis"
+    },
+    "streaming": {
+      "title": "Streaming providers",
+      "blurb": "JustWatch availability and regional charts"
+    },
+    "ratingsRefresh": {
+      "title": "Ratings refresh",
+      "blurb": "Keep IMDb ratings current from the daily dataset"
+    },
+    "aiRoles": {
+      "title": "Providers & roles",
+      "blurb": "Which model answers for each AI feature"
+    },
+    "aiSpend": {
+      "title": "Spend",
+      "blurb": "What model calls actually cost"
+    },
+    "aiEstimate": {
+      "title": "Cost estimate",
+      "blurb": "Projected spend before committing to a model"
+    },
+    "embeddings": {
+      "title": "Embeddings",
+      "blurb": "Stored vector sets, episodes and legacy tables"
+    },
+    "algorithm": {
+      "title": "Algorithm & weights",
+      "blurb": "How candidates are scored, ranked and selected"
+    },
+    "explanations": {
+      "title": "Explanations",
+      "blurb": "Whether picks come with a written reason"
+    },
+    "outputFormat": {
+      "title": "Output format",
+      "blurb": "How STRM files and their metadata are written"
+    },
+    "libraryNaming": {
+      "title": "Library naming",
+      "blurb": "What generated libraries are called"
+    },
+    "topPicks": {
+      "title": "Top Picks",
+      "blurb": "The trending row and its automatic requests"
+    },
+    "watching": {
+      "title": "Shows You Watch",
+      "blurb": "The continue-watching feature and its library"
+    },
+    "genreStrips": {
+      "title": "Genre strips",
+      "blurb": "The genre rows on the discovery page"
+    },
+    "channelsWebExpand": {
+      "title": "Channel web expansion",
+      "blurb": "Let playlists and collections draw on web picks"
+    },
+    "branding": {
+      "title": "Instance name & logo",
+      "blurb": "What this instance calls itself everywhere"
+    },
+    "themeColors": {
+      "title": "Theme colours",
+      "blurb": "The two brand colours used across the interface"
+    },
+    "posterDisplay": {
+      "title": "Poster display",
+      "blurb": "Rating badges and artwork defaults"
+    },
+    "languageDefaults": {
+      "title": "Language defaults",
+      "blurb": "The interface language new accounts start in"
+    },
+    "translations": {
+      "title": "Translations",
+      "blurb": "Override any interface string in any locale"
+    },
+    "users": {
+      "title": "Users",
+      "blurb": "Accounts, roles, and what each one may reach"
+    },
+    "apiKeys": {
+      "title": "API keys",
+      "blurb": "Keys that let other tools call this instance"
+    },
+    "deployment": {
+      "title": "Deployment & security",
+      "blurb": "How this instance is reached, and whether that is set up correctly"
+    },
+    "jobs": {
+      "title": "Jobs",
+      "blurb": "Run background work now, or set when it runs"
+    },
+    "backup": {
+      "title": "Backup & restore",
+      "blurb": "Snapshot the database, or restore one"
+    },
+    "posterRepair": {
+      "title": "Poster repair",
+      "blurb": "Find and refetch artwork that failed to load"
+    },
+    "logs": {
+      "title": "Logs",
+      "blurb": "How much detail the server writes"
+    },
+    "database": {
+      "title": "Database",
+      "blurb": "Purge stored data — the destructive controls"
+    },
+    "gateTmdb": "Needs TMDB configured before this can do anything"
   }
 }

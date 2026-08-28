@@ -227,7 +227,7 @@ export function AdminDashboard() {
                   </Typography>
                 </Box>
 
-                <Button variant="contained" startIcon={<PlayArrowIcon />} onClick={() => navigate('/admin/jobs')}>
+                <Button variant="contained" startIcon={<PlayArrowIcon />} onClick={() => navigate('/admin/ops/jobs')}>
                   {t('admin.dashboard.goToJobs')}
                 </Button>
               </CardContent>

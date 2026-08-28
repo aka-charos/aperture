@@ -27,7 +27,6 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import HistoryIcon from '@mui/icons-material/History'
 import PlaylistPlayIcon from '@mui/icons-material/PlaylistPlay'
 import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark'
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import LogoutIcon from '@mui/icons-material/Logout'
 import PersonIcon from '@mui/icons-material/Person'
 import FingerprintIcon from '@mui/icons-material/Fingerprint'
@@ -42,13 +41,14 @@ import VideoLibraryIcon from '@mui/icons-material/VideoLibrary'
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck'
 import MenuOpenIcon from '@mui/icons-material/MenuOpen'
 import SmartToyIcon from '@mui/icons-material/SmartToy'
-import FactCheckIcon from '@mui/icons-material/FactCheck'
 import { useAuth } from '@/hooks/useAuth'
 import { useAssistantDock } from '@/hooks/useAssistantDock'
 import { WelcomeModal } from './WelcomeModal'
 import { useWelcomeModal } from './useWelcomeModal'
 import { ExplorationConfigModal } from './ExplorationConfigModal'
 import { RunningJobsWidget } from './RunningJobsWidget'
+import { AdminMenuButton } from './AdminMenuButton'
+import { AdminSearchProvider } from '@/hooks/AdminSearchProvider'
 import { GlobalSearch } from './GlobalSearch'
 import { AppBarPageHeading } from './PageHeading'
 import { PageHeaderProvider } from '@/hooks/PageHeaderProvider'
@@ -85,11 +85,10 @@ const baseUserMenuItems: NavItem[] = [
   { textKey: 'nav.watchStats', icon: <InsightsIcon />, path: '/stats', feature: null },
 ]
 
-// Admin navigation items (shown only to admins)
-const adminMenuItems: { textKey: string; icon: React.ReactElement; path: string }[] = [
-  { textKey: 'nav.admin', icon: <AdminPanelSettingsIcon />, path: '/admin' },
-  { textKey: 'nav.gapAnalysis', icon: <FactCheckIcon />, path: '/admin/gaps' },
-]
+// Administration is no longer in the sidebar: it lives in the app bar beside
+// the avatar (see AdminMenuButton). The sidebar is the user's content
+// navigation, and "Administration" in the same list as "Browse" was a category
+// error that also cost two permanent slots at the bottom of it.
 
 // The user-settings tabs (see UserSettings/tabHelpers), surfaced directly in
 // the user menu instead of behind an intermediate "Settings" item — one click
@@ -113,9 +112,23 @@ const userSettingsMenuItems: {
 export function Layout() {
   return (
     <PageHeaderProvider>
-      <AppShell />
+      <AdminSearchGate>
+        <AppShell />
+      </AdminSearchGate>
     </PageHeaderProvider>
   )
+}
+
+/**
+ * The settings palette and its shortcut are admin-only, so the provider is
+ * mounted here rather than at the top of the tree — a non-admin pressing
+ * ⌘⇧K should get their browser's behaviour, not a list of pages they cannot
+ * open.
+ */
+function AdminSearchGate({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth()
+  if (!user?.isAdmin) return <>{children}</>
+  return <AdminSearchProvider>{children}</AdminSearchProvider>
 }
 
 function AppShell() {
@@ -313,20 +326,6 @@ function AppShell() {
     return location.pathname === itemPath || location.pathname.startsWith(itemPath + '/')
   }
 
-    /** Admin sidebar: avoid highlighting "Admin" when on Gap Analysis */
-  const isAdminPathActive = (itemPath: string) => {
-    if (itemPath === '/admin/gaps') {
-      return (
-        location.pathname === '/admin/gaps' || location.pathname.startsWith('/admin/gaps/')
-      )
-    }
-    if (itemPath === '/admin') {
-      if (location.pathname.startsWith('/admin/gaps')) return false
-      return location.pathname === '/admin' || location.pathname.startsWith('/admin/')
-    }
-    return isPathActive(itemPath)
-  }
-
   /**
    * `labels` is not the same question as "is the sidebar collapsed": the rail
    * shows its labels while flying out, and the mobile drawer is an overlay you
@@ -418,46 +417,6 @@ function AppShell() {
       {/* Spacer */}
       <Box flex={1} />
 
-      {/* Admin Section (only shown to admins) */}
-      {user?.isAdmin && (
-        <>
-          <Divider sx={{ mx: 2, my: 1 }} />
-          <List>
-            {adminMenuItems.map((item) => (
-              <ListItem key={item.path} disablePadding>
-                <Tooltip title={labels ? '' : t(item.textKey)} placement="right" arrow>
-                  <ListItemButton
-                    selected={isAdminPathActive(item.path)}
-                    onClick={() => handleNavClick(item.path)}
-                    sx={{
-                      justifyContent: labels ? 'flex-start' : 'center',
-                      px: labels ? 3 : 2,
-                    }}
-                  >
-                    <ListItemIcon
-                      sx={{
-                        color: isAdminPathActive(item.path) ? 'primary.main' : 'text.secondary',
-                        minWidth: labels ? 40 : 0,
-                        mr: labels ? 1 : 0,
-                      }}
-                    >
-                      {item.icon}
-                    </ListItemIcon>
-                    {labels && (
-                      <ListItemText
-                        primary={t(item.textKey)}
-                        primaryTypographyProps={{
-                          fontWeight: isAdminPathActive(item.path) ? 600 : 400,
-                        }}
-                      />
-                    )}
-                  </ListItemButton>
-                </Tooltip>
-              </ListItem>
-            ))}
-          </List>
-        </>
-      )}
 
       {/* Collapse toggle and version at bottom */}
       <Box
@@ -599,8 +558,14 @@ function AppShell() {
           <AppBarPageHeading />
           <Box sx={{ flexGrow: 1 }} />
 
-          {/* Running Jobs Widget (admin only) */}
+          {/* Running Jobs Widget (admin only). Deliberately not folded into
+              the admin button: it is a live progress bar, and a badge showing a
+              count cannot say the same thing. It renders nothing at rest, so
+              there is one control here unless work is actually running. */}
           <RunningJobsWidget />
+
+          {/* Administration */}
+          {user?.isAdmin && <AdminMenuButton />}
 
           {/* Global Search */}
           <GlobalSearch />

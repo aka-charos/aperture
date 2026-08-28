@@ -155,6 +155,8 @@ export function TraktConfigSection() {
 
         <Box display="flex" flexDirection="column" gap={2}>
           <TextField
+            id="trakt-client-id"
+            autoComplete="off"
             label={t('settingsTrakt.clientId')}
             value={clientId}
             onChange={(e) => {
@@ -167,6 +169,8 @@ export function TraktConfigSection() {
           />
 
           <TextField
+            id="trakt-client-secret"
+            autoComplete="off"
             label={t('settingsTrakt.clientSecret')}
             type={showClientSecret ? 'text' : 'password'}
             value={clientSecret || (config?.hasClientSecret ? '••••••••••••••••••••••••••••' : '')}
@@ -200,6 +204,7 @@ export function TraktConfigSection() {
           />
 
           <TextField
+            id="trakt-redirect-uri"
             label={t('settingsTrakt.redirectUri')}
             value={redirectUri}
             onChange={(e) => {

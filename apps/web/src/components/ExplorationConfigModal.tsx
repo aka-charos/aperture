@@ -81,7 +81,7 @@ export function ExplorationConfigModal({ open: controlledOpen, onClose }: Explor
   const handleConfigureNow = () => {
     localStorage.setItem(STORAGE_KEY, 'true') // Don't show again after they go to configure
     handleClose()
-    navigate('/admin/settings')
+    navigate('/admin/ai/roles')
   }
 
   // Don't show if not admin or exploration is already configured

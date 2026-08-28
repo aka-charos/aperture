@@ -183,6 +183,8 @@ export function TMDbConfigSection() {
 
         <Box display="flex" flexDirection="column" gap={2}>
           <TextField
+            id="tmdb-api-key"
+            autoComplete="off"
             label={t('settingsTmdb.apiKey')}
             type={showApiKey ? 'text' : 'password'}
             value={apiKey || (config?.hasApiKey ? '••••••••••••••••••••••••••••' : '')}
@@ -215,6 +217,7 @@ export function TMDbConfigSection() {
           />
 
           <FormControlLabel
+            id="tmdb-enabled"
             control={
               <Switch
                 checked={enabled}

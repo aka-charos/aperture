@@ -246,6 +246,8 @@ export function TavilyConfigSection() {
 
         <Box display="flex" flexDirection="column" gap={2}>
           <TextField
+            id="tavily-api-key"
+            autoComplete="off"
             label={t('settingsTavily.apiKey')}
             type={showApiKey ? 'text' : 'password'}
             value={apiKey || (config?.hasApiKey ? '••••••••••••••••••••••••••••' : '')}
@@ -274,6 +276,7 @@ export function TavilyConfigSection() {
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <TextField
+              id="tavily-max-results"
               label={t('settingsTavily.maxResults')}
               type="number"
               value={maxResults}
@@ -287,6 +290,7 @@ export function TavilyConfigSection() {
               helperText={t('settingsTavily.maxResultsHelper')}
             />
             <TextField
+              id="tavily-max-content"
               label={t('settingsTavily.maxContentChars')}
               type="number"
               value={maxContentChars}
@@ -303,6 +307,7 @@ export function TavilyConfigSection() {
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <TextField
+              id="tavily-search-depth"
               select
               label={t('settingsTavily.searchDepth')}
               value={searchDepth}

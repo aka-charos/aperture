@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "i18n:sync": "node scripts/i18n/sync-missing-from-en.mjs",
     "i18n:delta": "node scripts/i18n/export-missing-delta-from-git.mjs && node scripts/i18n/split-delta-chunks.mjs",
     "i18n:translate": "node scripts/i18n/translate-locales-from-en.mjs"
@@ -48,6 +49,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "openai": "^4.77.0",
     "vite": "^6.0.6",
-    "vite-plugin-checker": "^0.12.0"
+    "vite-plugin-checker": "^0.12.0",
+    "tsx": "^4.19.2"
   }
 }

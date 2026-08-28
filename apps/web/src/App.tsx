@@ -13,7 +13,7 @@ import { ViewModeProvider } from './hooks/ViewModeProvider'
 import { PosterPrefsProvider } from './hooks/PosterPrefsProvider'
 import { AssistantDockProvider } from './hooks/AssistantDockProvider'
 import { Layout } from './components/Layout'
-import { AdminLayout } from './components/AdminLayout'
+import { AdminShell } from './components/AdminShell'
 import { AssistantModal } from './components/AssistantModal'
 import { LoginPage } from './pages/Login'
 import { SetupPage } from './pages/setup'
@@ -38,14 +38,8 @@ import { ExplorePage } from './pages/explore'
 import { AssistantPage } from './pages/assistant'
 import { DiscoveryPage } from './pages/discovery'
 import { MyRequestsPage } from './pages/MyRequests'
-// Admin pages
-import { AdminDashboard } from './pages/admin'
-import { UsersPage } from './pages/Users'
-import { UserDetailPage } from './pages/UserDetail'
-import { JobsPage } from './pages/jobs'
-import { SettingsPage } from './pages/settings'
-import { GapAnalysisPage } from './pages/admin/GapAnalysisPage'
-import { TranslationsPage } from './pages/admin/translations/TranslationsPage'
+// Admin pages are lazy and reached through the registry, so none is imported here.
+import { adminChildRoutes } from './pages/admin/nav/routes'
 import { Box, CircularProgress } from '@mui/material'
 
 function SetupGuard({ children }: { children: React.ReactNode }) {
@@ -187,22 +181,19 @@ function AppRoutes() {
         <Route path="studio/:name" element={<StudioDetailPage />} />
         <Route path="settings" element={<UserSettingsPage />} />
 
-        {/* Admin Routes - nested under AdminLayout */}
+        {/* Admin Routes — the whole subtree is generated from the registry in
+            `pages/admin/nav`, which is also what the nav column and the
+            settings palette read. Listing routes here as well would be a second
+            copy that could disagree with the first. */}
         <Route
           path="admin"
           element={
             <AdminRoute>
-              <AdminLayout />
+              <AdminShell />
             </AdminRoute>
           }
         >
-          <Route index element={<AdminDashboard />} />
-          <Route path="users" element={<UsersPage />} />
-          <Route path="users/:id" element={<UserDetailPage />} />
-          <Route path="jobs" element={<JobsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="translations" element={<TranslationsPage />} />
-          <Route path="gaps" element={<GapAnalysisPage />} />
+          {adminChildRoutes()}
         </Route>
       </Route>
     </Routes>
