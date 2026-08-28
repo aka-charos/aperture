@@ -576,7 +576,21 @@ async function withResolvedCredentials(config: ProviderConfig): Promise<Provider
 // ============================================================================
 
 /**
- * Get an embedding model instance for the configured provider
+ * Get an embedding model instance for the configured provider.
+ *
+ * Credentials go through `withResolvedCredentials` for the same reason every
+ * other model factory here does, and this was the one that did not. The
+ * settings UI writes keys to the shared per-provider store
+ * (`ai_provider_credentials`), so a role's own `apiKey` is frequently absent —
+ * and `createProviderInstance` reads that field directly. The result was a
+ * provider reporting "API key is missing" while the settings page displayed the
+ * key correctly, because both statements were true about different places.
+ *
+ * It stayed latent because it only bites when the role config carries no inline
+ * copy, which is exactly what happens when the embeddings model is changed: the
+ * role gets rewritten and the key lives in the shared store from then on. So
+ * the failure arrives attached to a model switch and looks like the new model's
+ * fault.
  */
 export async function getEmbeddingModelInstance(): Promise<EmbeddingModel<string>> {
   const config = await getFunctionConfig('embeddings')
@@ -587,11 +601,12 @@ export async function getEmbeddingModelInstance(): Promise<EmbeddingModel<string
     )
   }
 
-  const provider = createProviderInstance(config, 'embeddings')
-  const modelId = config.model
+  const resolved = await withResolvedCredentials(config)
+  const provider = createProviderInstance(resolved, 'embeddings')
+  const modelId = resolved.model
 
   // Different providers have different APIs for embeddings
-  switch (config.provider) {
+  switch (resolved.provider) {
     case 'openai':
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (provider as any).embedding(modelId)
@@ -617,7 +632,7 @@ export async function getEmbeddingModelInstance(): Promise<EmbeddingModel<string
       return (provider as any).textEmbeddingModel(modelId)
 
     default:
-      throw new Error(`Provider ${config.provider} does not support embeddings`)
+      throw new Error(`Provider ${resolved.provider} does not support embeddings`)
   }
 }
 
