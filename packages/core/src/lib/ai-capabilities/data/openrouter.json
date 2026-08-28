@@ -10,7 +10,50 @@
   "supportsExploration": true,
   "requiresApiKey": true,
   "requiresBaseUrl": false,
-  "embeddingModels": [],
+  "embeddingModels": [
+    {
+      "id": "google/gemini-embedding-2",
+      "name": "Gemini Embedding 2",
+      "description": "Google's current embedding model (May 2026), 3072 dimensions, 8K context. Through OpenRouter its DEFAULT output is the semantic-similarity space -- byte-identical to input_type: semantic_similarity -- while search_query and search_document are distinct. Symmetric by default, which is what recommendations and related-titles want.",
+      "capabilities": {
+        "supportsToolCalling": false,
+        "supportsToolStreaming": false,
+        "supportsObjectGeneration": false,
+        "supportsEmbeddings": true
+      },
+      "embeddingDimensions": 3072,
+      "quality": "standard",
+      "costTier": "low"
+    },
+    {
+      "id": "google/gemini-embedding-001",
+      "name": "Gemini Embedding 001",
+      "description": "Previous-generation Google embedding model, 3072 dimensions. Through OpenRouter its default output is the RETRIEVAL space: default, search_query and search_document all return the identical vector, and only input_type: semantic_similarity differs (measured cosine 0.867 on the same text). Set the retrieval mode explicitly for item-to-item work.",
+      "capabilities": {
+        "supportsToolCalling": false,
+        "supportsToolStreaming": false,
+        "supportsObjectGeneration": false,
+        "supportsEmbeddings": true
+      },
+      "embeddingDimensions": 3072,
+      "quality": "standard",
+      "costTier": "low"
+    },
+    {
+      "id": "qwen/qwen3-embedding-8b",
+      "name": "Qwen3 Embedding 8B",
+      "description": "Open-weights embedder, 4096 dimensions, 32K context. Instruction-aware, but its documented recipe puts the instruction on the QUERY side against bare documents -- there is no official symmetric recipe, so it does not take a retrieval mode here. OpenRouter routes it across several upstream providers unless routing is pinned.",
+      "capabilities": {
+        "supportsToolCalling": false,
+        "supportsToolStreaming": false,
+        "supportsObjectGeneration": false,
+        "supportsEmbeddings": true
+      },
+      "embeddingDimensions": 4096,
+      "quality": "standard",
+      "costTier": "low"
+    }
+  ],
   "chatModels": [],
   "textGenerationModels": [],
   "explorationModels": []

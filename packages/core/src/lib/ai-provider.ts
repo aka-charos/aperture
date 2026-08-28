@@ -1728,6 +1728,37 @@ export async function getModelsForFunctionWithCustom(
   // Get built-in models
   const builtInModels = getModelsForFunction(providerId, fn)
 
+  // OpenRouter ships built-in models for embeddings only (its chat catalog is
+  // thousands of entries and belongs to the custom path), and those entries
+  // carry no price on purpose — `pricing-cache.ts` has no openrouter table, so
+  // a hardcoded number would be the only source and would silently go stale.
+  // The live catalog is the authority, and it is the same cached fetch the
+  // custom branch below already makes.
+  //
+  // Without this, promoting a model from custom to built-in would LOSE its
+  // price: the custom path enriches, the built-in path did not.
+  const enrichedBuiltIns =
+    providerId === 'openrouter' && builtInModels.length > 0
+      ? await Promise.all(
+          builtInModels.map(async (m) => {
+            const catalogInfo = await getOpenRouterModelInfo(m.id)
+            if (!catalogInfo) return m
+            return {
+              ...m,
+              ...(catalogInfo.inputCostPerMillion != null && {
+                inputCostPerMillion: catalogInfo.inputCostPerMillion,
+              }),
+              ...(catalogInfo.outputCostPerMillion != null && {
+                outputCostPerMillion: catalogInfo.outputCostPerMillion,
+              }),
+              ...(catalogInfo.contextLength != null && {
+                contextWindow: formatContextWindow(catalogInfo.contextLength),
+              }),
+            }
+          })
+        )
+      : builtInModels
+
   // Get custom models from database (only for ollama and openai-compatible)
   const customModels = await getCustomModels(providerId, fn)
 
@@ -1773,8 +1804,23 @@ export async function getModelsForFunctionWithCustom(
     })
   )
 
-  // Return built-in models first, then custom models
-  return [...builtInModels, ...customModelMetadata]
+  // Built-in models first, then any custom model that is not already one of
+  // them.
+  //
+  // The dedupe is not cosmetic. Anyone running this fork before a model was
+  // promoted to the built-in catalog had to add it by hand, so the same id now
+  // exists in both lists — and the picker would offer it twice, one row tagged
+  // "Custom model", with no way to tell which one a stored config refers to.
+  // The built-in wins because that is already the precedence everywhere else:
+  // `getCurrentEmbeddingDimensions` consults the catalog before the custom
+  // table, so keeping the custom row here would let a dropdown entry advertise
+  // a dimension the resolver would not use.
+  const builtInIds = new Set(enrichedBuiltIns.map((m) => m.id))
+
+  return [
+    ...enrichedBuiltIns,
+    ...customModelMetadata.filter((m) => !builtInIds.has(m.id)),
+  ]
 }
 
 // ============================================================================
