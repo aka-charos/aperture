@@ -205,8 +205,7 @@ function MediaTypeCard({
         </Typography>
 
         {/* Max Candidates */}
-        <FormControl fullWidth sx={{ mb: 2 }} size="small">
-          id={`${idPrefix}-max-candidates`}
+        <FormControl fullWidth sx={{ mb: 2 }} size="small" id={`${idPrefix}-max-candidates`}>
           <Box display="flex" alignItems="center">
             <Typography variant="body2">
               {t('settingsRecAlgo.maxCandidatesLabel')}{' '}
@@ -303,8 +302,7 @@ function MediaTypeCard({
         </Box>
 
         {/* Similarity Weight */}
-        <FormControl fullWidth sx={{ mb: 1.5 }} size="small">
-          id={`${idPrefix}-similarity-weight`}
+        <FormControl fullWidth sx={{ mb: 1.5 }} size="small" id={`${idPrefix}-similarity-weight`}>
           <Box display="flex" justifyContent="space-between" alignItems="center">
             <Box display="flex" alignItems="center">
               <Typography variant="body2">{t('settingsRecAlgo.weightSimilarity')}</Typography>
@@ -324,8 +322,7 @@ function MediaTypeCard({
         </FormControl>
 
         {/* Novelty Weight */}
-        <FormControl fullWidth sx={{ mb: 1.5 }} size="small">
-          id={`${idPrefix}-novelty-weight`}
+        <FormControl fullWidth sx={{ mb: 1.5 }} size="small" id={`${idPrefix}-novelty-weight`}>
           <Box display="flex" justifyContent="space-between" alignItems="center">
             <Box display="flex" alignItems="center">
               <Typography variant="body2">{t('settingsRecAlgo.weightDiscovery')}</Typography>
@@ -345,8 +342,7 @@ function MediaTypeCard({
         </FormControl>
 
         {/* Rating Weight */}
-        <FormControl fullWidth sx={{ mb: 1.5 }} size="small">
-          id={`${idPrefix}-rating-weight`}
+        <FormControl fullWidth sx={{ mb: 1.5 }} size="small" id={`${idPrefix}-rating-weight`}>
           <Box display="flex" justifyContent="space-between" alignItems="center">
             <Box display="flex" alignItems="center">
               <Typography variant="body2">{t('settingsRecAlgo.weightRating')}</Typography>
@@ -366,8 +362,7 @@ function MediaTypeCard({
         </FormControl>
 
         {/* Diversity Weight */}
-        <FormControl fullWidth sx={{ mb: 2 }} size="small">
-          id={`${idPrefix}-diversity-weight`}
+        <FormControl fullWidth sx={{ mb: 2 }} size="small" id={`${idPrefix}-diversity-weight`}>
           <Box display="flex" justifyContent="space-between" alignItems="center">
             <Box display="flex" alignItems="center">
               <Typography variant="body2">{t('settingsRecAlgo.weightDiversity')}</Typography>
@@ -427,8 +422,7 @@ function MediaTypeCard({
           </Typography>
         </Box>
 
-        <FormControl fullWidth sx={{ mb: 2 }} size="small">
-          id={`${idPrefix}-interest-slots`}
+        <FormControl fullWidth sx={{ mb: 2 }} size="small" id={`${idPrefix}-interest-slots`}>
           <Box display="flex" alignItems="center" justifyContent="space-between">
             <Box display="flex" alignItems="center">
               <Typography variant="body2">{t('settingsRecAlgo.interestMaxSlots')}</Typography>
@@ -452,8 +446,7 @@ function MediaTypeCard({
           />
         </FormControl>
 
-        <FormControl fullWidth sx={{ mb: 2 }} size="small">
-          id={`${idPrefix}-twin-slots`}
+        <FormControl fullWidth sx={{ mb: 2 }} size="small" id={`${idPrefix}-twin-slots`}>
           <Box display="flex" alignItems="center" justifyContent="space-between">
             <Box display="flex" alignItems="center">
               <Typography variant="body2">{t('settingsRecAlgo.twinMaxSlots')}</Typography>
@@ -477,8 +470,7 @@ function MediaTypeCard({
           />
         </FormControl>
 
-        <FormControl fullWidth sx={{ mb: 2 }} size="small">
-          id={`${idPrefix}-acclaimed-slots`}
+        <FormControl fullWidth sx={{ mb: 2 }} size="small" id={`${idPrefix}-acclaimed-slots`}>
           <Box display="flex" alignItems="center" justifyContent="space-between">
             <Box display="flex" alignItems="center">
               <Typography variant="body2">{t('settingsRecAlgo.acclaimedMaxSlots')}</Typography>
@@ -502,8 +494,7 @@ function MediaTypeCard({
           />
         </FormControl>
 
-        <FormControl fullWidth sx={{ mb: 3 }} size="small">
-          id={`${idPrefix}-preference-strength`}
+        <FormControl fullWidth sx={{ mb: 3 }} size="small" id={`${idPrefix}-preference-strength`}>
           <Box display="flex" alignItems="center" justifyContent="space-between">
             <Box display="flex" alignItems="center">
               <Typography variant="body2">{t('settingsRecAlgo.preferenceStrength')}</Typography>
@@ -606,8 +597,7 @@ function MediaTypeCard({
             </FormControl>
           </>
         )}
-        <FormControl fullWidth sx={{ mb: 3 }} size="small">
-          id={`${idPrefix}-twin-threshold`}
+        <FormControl fullWidth sx={{ mb: 3 }} size="small" id={`${idPrefix}-twin-threshold`}>
           <Box display="flex" alignItems="center" justifyContent="space-between">
             <Box display="flex" alignItems="center">
               <Typography variant="body2">{t('settingsRecAlgo.twinThresholdK')}</Typography>

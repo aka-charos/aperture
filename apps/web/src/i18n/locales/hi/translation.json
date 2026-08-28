@@ -4891,6 +4891,9 @@
       "title": "Database",
       "blurb": "Purge stored data — the destructive controls"
     },
-    "gateTmdb": "Needs TMDB configured before this can do anything"
+    "gateTmdb": "Needs TMDB configured before this can do anything",
+    "sectionErrorTitle": "This section could not be shown",
+    "sectionErrorBody": "The rest of the console still works. If this started after an update, reloading picks up the new version.",
+    "sectionErrorReload": "Reload"
   }
 }
