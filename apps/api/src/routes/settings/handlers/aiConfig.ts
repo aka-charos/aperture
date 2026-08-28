@@ -62,7 +62,12 @@ import {
   MAX_CALL_SPACING_SECONDS,
   AI_FUNCTIONS,
   isAIFunction,
+  embeddingSetId,
+  isEmbeddingInputType,
+  providerSupportsInputType,
+  EMBEDDING_INPUT_TYPES,
   type AIFunction,
+  type EmbeddingInputType,
   type ProviderType,
 } from '@aperture/core'
 import { query } from '../../../lib/db.js'
@@ -558,7 +563,10 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
 
     try {
       const aiConfig = await getAIConfig()
-      const currentModel = aiConfig.embeddings ? `${aiConfig.embeddings.provider}:${aiConfig.embeddings.model}` : null
+      // Through the shared helper, or the guard misses: with a mode selected
+      // the active set id carries a suffix, so a hand-built provider:model
+      // string never equals it and the active vectors become deletable.
+      const currentModel = aiConfig.embeddings ? embeddingSetId(aiConfig.embeddings) : null
 
       if (decodedModel === currentModel) {
         return reply.status(400).send({ error: 'Cannot delete the active embedding set. Switch to a different model first.' })
@@ -769,6 +777,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       freeTier?: boolean
       fallbackModels?: { provider: string; model: string }[]
       callSpacingSeconds?: number
+      embeddingInputType?: string | null
     }
   }>('/api/settings/ai/:function', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
     try {
@@ -782,6 +791,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         freeTier,
         fallbackModels,
         callSpacingSeconds,
+        embeddingInputType,
       } = request.body
 
       if (!isAIFunction(fn)) {
@@ -864,6 +874,34 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
               MAX_CALL_SPACING_SECONDS
             )
 
+      // The embedding mode. REJECTED rather than clamped or ignored, because
+      // it is the one field here that changes which vectors a value describes:
+      // storing a mode the provider cannot send would leave the set identity
+      // claiming a space nothing was embedded in, and no later measurement can
+      // detect that. `null` is how the card clears it.
+      //
+      // Same "omitted means leave alone" rule as the fields above.
+      let nextInputType: EmbeddingInputType | undefined
+      if (embeddingInputType === undefined) {
+        nextInputType = existing?.embeddingInputType
+      } else if (embeddingInputType === null || embeddingInputType === '') {
+        nextInputType = undefined
+      } else if (!isEmbeddingInputType(embeddingInputType)) {
+        return reply.status(400).send({
+          error: `Invalid embedding input type. Must be one of: ${EMBEDDING_INPUT_TYPES.join(', ')}`,
+        })
+      } else if (!providerSupportsInputType(provider)) {
+        return reply.status(400).send({
+          error: `Provider ${provider} cannot send an embedding input type. Remove it or choose a provider that supports one.`,
+        })
+      } else {
+        nextInputType = embeddingInputType
+      }
+
+      // A mode belongs to the embeddings role alone; carrying one on another
+      // role would be stored, never read, and read later as meaningful.
+      if (fn !== 'embeddings') nextInputType = undefined
+
       await setFunctionConfig(fn, {
         provider: provider as ProviderType,
         model,
@@ -876,6 +914,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         // writing the default into every role's config would just make the blob
         // noisier without saying anything.
         callSpacingSeconds: nextSpacing && nextSpacing > 0 ? nextSpacing : undefined,
+        embeddingInputType: nextInputType,
       })
 
       const config = await getFunctionConfig(fn)

@@ -43,6 +43,9 @@ import {
 } from '@mui/icons-material'
 import {
   PROVIDER_INFO,
+  EMBEDDING_INPUT_TYPE_VALUES,
+  PROVIDERS_WITH_INPUT_TYPE,
+  type EmbeddingInputTypeValue,
   type FallbackModelConfig,
   type FunctionConfig,
   type ProviderInfo,
@@ -209,6 +212,12 @@ export function AIFunctionCard({
   const [pacingSeconds, setPacingSeconds] = useState(0)
   const [pacingDraft, setPacingDraft] = useState(DEFAULT_PACING_SECONDS)
 
+  /**
+   * Retrieval mode for the Embeddings role. '' is the provider default, which
+   * is where every already-embedded vector lives.
+   */
+  const [inputType, setInputType] = useState<EmbeddingInputTypeValue | ''>('')
+
   // Custom model dialog state
   const [addModelDialogOpen, setAddModelDialogOpen] = useState(false)
   const [newModelName, setNewModelName] = useState('')
@@ -281,6 +290,21 @@ export function AIFunctionCard({
     setPacingSeconds(storedPacing)
     if (storedPacing > 0) setPacingDraft(storedPacing)
   }, [storedPacing])
+
+  // The retrieval mode. Offered only by the Embeddings role, and only on the
+  // two providers that can actually send one — a mode stored where it cannot be
+  // sent would leave the set identity naming a space nothing was embedded in.
+  //
+  // Derived from `functionType` rather than taking a prop like
+  // `supportsFallbackModels` does, because this is a property of the role
+  // itself, not of who happens to consume it.
+  const offersInputType =
+    functionType === 'embeddings' && PROVIDERS_WITH_INPUT_TYPE.includes(provider)
+
+  const storedInputType = config?.embeddingInputType ?? ''
+  useEffect(() => {
+    setInputType(storedInputType)
+  }, [storedInputType])
 
 
   // Check capability warning
@@ -465,6 +489,12 @@ export function AIFunctionCard({
             callSpacingSeconds: pacingSeconds,
           }
         : {}),
+      // Explicit `null` rather than omission when cleared: omitting means
+      // "leave alone" server-side, so a mode could never be switched back off.
+      // Sent only by the card showing the control — otherwise saving the
+      // Embeddings card from a provider that cannot carry a mode would silently
+      // drop one an admin set on a provider that can.
+      ...(offersInputType ? { embeddingInputType: inputType || null } : {}),
     }
 
     setSaving(true)
@@ -1113,6 +1143,39 @@ export function AIFunctionCard({
             <FormHelperText sx={{ mt: pacingSeconds > 0 ? 1 : 0 }}>
               {t('aiFunctionCard.pacingHelp')}
             </FormHelperText>
+          </Box>
+        )}
+
+        {/* Retrieval mode. The warning is not decoration: switching this starts
+            a SEPARATE set of vectors rather than converting the existing one,
+            so the library keeps answering from the old space until a full
+            re-embed, centring and taste-profile rebuild have run. */}
+        {offersInputType && (
+          <Box sx={{ mb: 2 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel id={`${functionType}-input-type-label`}>
+                {t('aiFunctionCard.inputTypeLabel')}
+              </InputLabel>
+              <Select
+                labelId={`${functionType}-input-type-label`}
+                value={inputType}
+                label={t('aiFunctionCard.inputTypeLabel')}
+                onChange={(e) => setInputType(e.target.value as EmbeddingInputTypeValue | '')}
+              >
+                <MenuItem value="">{t('aiFunctionCard.inputTypeDefault')}</MenuItem>
+                {EMBEDDING_INPUT_TYPE_VALUES.map((value) => (
+                  <MenuItem key={value} value={value}>
+                    {t(`aiFunctionCard.inputTypeOptions.${value}`)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormHelperText>{t('aiFunctionCard.inputTypeHelp')}</FormHelperText>
+            {inputType !== storedInputType && (
+              <Alert severity="warning" sx={{ mt: 1 }}>
+                {t('aiFunctionCard.inputTypeChangeWarning')}
+              </Alert>
+            )}
           </Box>
         )}
 

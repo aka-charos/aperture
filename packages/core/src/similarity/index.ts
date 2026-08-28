@@ -1,7 +1,7 @@
 import { createChildLogger } from '../lib/logger.js'
 import { query, queryOne } from '../lib/db.js'
 import {
-  getEmbeddingModelInstance,
+  getEmbeddingInvocation,
   getActiveEmbeddingModelId,
   getActiveEmbeddingTableName,
 } from '../lib/ai-provider.js'
@@ -1047,12 +1047,15 @@ export async function semanticSearch(
     return { query: searchQuery, results: [] }
   }
 
-  // Generate embedding for the search query
-  const model = await getEmbeddingModelInstance()
+  // Generate embedding for the search query. Through the same invocation as
+  // the library pass: a query embedded in a different space than the items it
+  // is about to be compared against still returns a confident ranking.
+  const { model, providerOptions } = await getEmbeddingInvocation()
 
   const { embedding: queryEmbedding } = await embed({
     model,
     value: searchQuery,
+    providerOptions,
   })
 
   const embeddingVector = `[${queryEmbedding.join(',')}]`

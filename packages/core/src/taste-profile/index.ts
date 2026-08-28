@@ -293,7 +293,7 @@ async function backfillTasteClustersIfMissing(
  */
 async function refreshCustomInterestEmbeddings(userId: string): Promise<void> {
   try {
-    const { getActiveEmbeddingModelId, getEmbeddingModelInstance } = await import(
+    const { getActiveEmbeddingModelId, getEmbeddingInvocation } = await import(
       '../lib/ai-provider.js'
     )
     const modelId = await getActiveEmbeddingModelId()
@@ -306,12 +306,15 @@ async function refreshCustomInterestEmbeddings(userId: string): Promise<void> {
     if (stale.length === 0) return
 
     const { embed } = await import('ai')
-    const model = await getEmbeddingModelInstance()
+    // `modelId` above is the set these vectors get stamped with, and it comes
+    // from the same config this invocation resolves — so the interest text
+    // lands in the space its stamp claims.
+    const { model, providerOptions } = await getEmbeddingInvocation()
 
     let repaired = 0
     for (const interest of stale) {
       try {
-        const result = await embed({ model, value: interest.interestText })
+        const result = await embed({ model, value: interest.interestText, providerOptions })
         await updateCustomInterestEmbedding(interest.id, result.embedding, modelId)
         repaired++
       } catch (err) {

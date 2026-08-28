@@ -9,11 +9,12 @@ import {
   failJob,
 } from '../../jobs/progress.js'
 import {
-  getEmbeddingModelInstance,
+  getEmbeddingInvocation,
   isAIFunctionConfigured,
   getFunctionConfig,
   getActiveEmbeddingTableName,
 } from '../../lib/ai-provider.js'
+import { embeddingSetId } from '../../lib/embeddingIdentity.js'
 import { embedMany } from 'ai'
 import { centreAfterGeneration } from '../centering.js'
 import { randomUUID } from 'crypto'
@@ -91,10 +92,14 @@ interface SeriesEmbeddingResult {
   seriesId: string
   embedding: number[]
   canonicalText: string
+  /** See the movie mirror: the set is captured where the vector is made. */
+  setId: string
 }
 
 interface EpisodeEmbeddingResult {
   episodeId: string
+  /** See the movie mirror: the set is captured where the vector is made. */
+  setId: string
   embedding: number[]
   canonicalText: string
 }
@@ -283,7 +288,7 @@ export async function embedSeries(series: SeriesForEmbedding[]): Promise<SeriesE
     return []
   }
 
-  const embeddingModel = await getEmbeddingModelInstance()
+  const { model, providerOptions, setId, inputType } = await getEmbeddingInvocation()
   const config = await getFunctionConfig('embeddings')
 
   // Build canonical texts
@@ -293,7 +298,7 @@ export async function embedSeries(series: SeriesForEmbedding[]): Promise<SeriesE
   }))
 
   logger.info(
-    { count: textsWithIds.length, provider: config?.provider, model: config?.model },
+    { count: textsWithIds.length, provider: config?.provider, model: config?.model, inputType, setId },
     'Generating series embeddings'
   )
 
@@ -306,8 +311,9 @@ export async function embedSeries(series: SeriesForEmbedding[]): Promise<SeriesE
 
     // Use AI SDK embedMany for batch embedding
     const { embeddings } = await embedMany({
-      model: embeddingModel,
+      model,
       values: texts,
+      providerOptions,
     })
 
     for (let j = 0; j < batch.length; j++) {
@@ -315,6 +321,7 @@ export async function embedSeries(series: SeriesForEmbedding[]): Promise<SeriesE
         seriesId: batch[j].seriesId,
         embedding: embeddings[j],
         canonicalText: batch[j].text,
+        setId,
       })
     }
 
@@ -337,7 +344,7 @@ export async function embedEpisodes(
     return []
   }
 
-  const embeddingModel = await getEmbeddingModelInstance()
+  const { model, providerOptions, setId, inputType } = await getEmbeddingInvocation()
   const config = await getFunctionConfig('embeddings')
 
   // Build canonical texts
@@ -347,7 +354,7 @@ export async function embedEpisodes(
   }))
 
   logger.info(
-    { count: textsWithIds.length, provider: config?.provider, model: config?.model },
+    { count: textsWithIds.length, provider: config?.provider, model: config?.model, inputType, setId },
     'Generating episode embeddings'
   )
 
@@ -360,8 +367,9 @@ export async function embedEpisodes(
 
     // Use AI SDK embedMany for batch embedding
     const { embeddings } = await embedMany({
-      model: embeddingModel,
+      model,
       values: texts,
+      providerOptions,
     })
 
     for (let j = 0; j < batch.length; j++) {
@@ -369,6 +377,7 @@ export async function embedEpisodes(
         episodeId: batch[j].episodeId,
         embedding: embeddings[j],
         canonicalText: batch[j].text,
+        setId,
       })
     }
 
@@ -385,8 +394,8 @@ export async function embedEpisodes(
  * Store series embeddings in the database
  */
 export async function storeSeriesEmbeddings(embeddings: SeriesEmbeddingResult[]): Promise<void> {
-  const config = await getFunctionConfig('embeddings')
-  const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
+  if (embeddings.length === 0) return
+
   const tableName = await getActiveEmbeddingTableName('series_embeddings')
 
   await query(
@@ -402,14 +411,18 @@ export async function storeSeriesEmbeddings(embeddings: SeriesEmbeddingResult[])
        updated_at = NOW()`,
     [
       embeddings.map((emb) => emb.seriesId),
-      Array(embeddings.length).fill(modelName),
+      // Per row, mirroring storeEmbeddings: the id travels with its vector.
+      embeddings.map((emb) => emb.setId),
       embeddings.map((emb) => `[${emb.embedding.join(',')}]`),
       embeddings.map((emb) => emb.canonicalText),
       CANONICAL_TEXT_VERSION,
     ]
   )
 
-  logger.info({ count: embeddings.length, table: tableName }, 'Series embeddings stored')
+  logger.info(
+    { count: embeddings.length, table: tableName, set: embeddings[0].setId },
+    'Series embeddings stored'
+  )
 }
 
 /**
@@ -420,7 +433,7 @@ export async function markSeriesEmbeddingsCurrent(seriesIds: string[]): Promise<
   if (seriesIds.length === 0) return
 
   const config = await getFunctionConfig('embeddings')
-  const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
+  const modelName = embeddingSetId(config)
   const tableName = await getActiveEmbeddingTableName('series_embeddings')
 
   await query(
@@ -435,8 +448,8 @@ export async function markSeriesEmbeddingsCurrent(seriesIds: string[]): Promise<
  * Store episode embeddings in the database
  */
 export async function storeEpisodeEmbeddings(embeddings: EpisodeEmbeddingResult[]): Promise<void> {
-  const config = await getFunctionConfig('embeddings')
-  const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
+  if (embeddings.length === 0) return
+
   const tableName = await getActiveEmbeddingTableName('episode_embeddings')
 
   await query(
@@ -449,13 +462,17 @@ export async function storeEpisodeEmbeddings(embeddings: EpisodeEmbeddingResult[
        canonical_text = EXCLUDED.canonical_text`,
     [
       embeddings.map((emb) => emb.episodeId),
-      Array(embeddings.length).fill(modelName),
+      // Per row, mirroring storeEmbeddings: the id travels with its vector.
+      embeddings.map((emb) => emb.setId),
       embeddings.map((emb) => `[${emb.embedding.join(',')}]`),
       embeddings.map((emb) => emb.canonicalText),
     ]
   )
 
-  logger.info({ count: embeddings.length, table: tableName }, 'Episode embeddings stored')
+  logger.info(
+    { count: embeddings.length, table: tableName, set: embeddings[0].setId },
+    'Episode embeddings stored'
+  )
 }
 
 /**
@@ -463,7 +480,7 @@ export async function storeEpisodeEmbeddings(embeddings: EpisodeEmbeddingResult[
  */
 export async function getSeriesNeedingEmbeddings(limit = 100): Promise<SeriesNeedingEmbedding[]> {
   const config = await getFunctionConfig('embeddings')
-  const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
+  const modelName = embeddingSetId(config)
   const tableName = await getActiveEmbeddingTableName('series_embeddings')
 
   // Check if any TV library configs exist
@@ -558,7 +575,7 @@ export async function getSeriesNeedingEmbeddings(limit = 100): Promise<SeriesNee
  */
 export async function getEpisodesWithoutEmbeddings(limit = 100): Promise<EpisodeForEmbedding[]> {
   const config = await getFunctionConfig('embeddings')
-  const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
+  const modelName = embeddingSetId(config)
   const tableName = await getActiveEmbeddingTableName('episode_embeddings')
 
   const result = await query<{
@@ -646,7 +663,7 @@ export async function generateMissingSeriesEmbeddings(
       return { seriesGenerated: 0, episodesGenerated: 0, failed: 0, jobId }
     }
 
-    const modelName = `${config.provider}:${config.model}`
+    const modelName = embeddingSetId(config)
     addLog(jobId, 'info', `🤖 Using embedding provider: ${config.provider}, model: ${config.model}`)
 
     // Step 2: Count series needing embeddings
@@ -837,7 +854,7 @@ export async function getSeriesEmbeddings(seriesIds: string[]): Promise<Map<stri
   if (seriesIds.length === 0) return byId
 
   const config = await getFunctionConfig('embeddings')
-  const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
+  const modelName = embeddingSetId(config)
   const tableName = await getActiveEmbeddingTableName('series_embeddings')
 
   const result = await query<{ series_id: string; embedding: string }>(
@@ -854,7 +871,7 @@ export async function getSeriesEmbeddings(seriesIds: string[]): Promise<Map<stri
 
 export async function getSeriesEmbedding(seriesId: string): Promise<number[] | null> {
   const config = await getFunctionConfig('embeddings')
-  const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
+  const modelName = embeddingSetId(config)
   const tableName = await getActiveEmbeddingTableName('series_embeddings')
 
   const result = await queryOne<{ embedding: string }>(
@@ -875,7 +892,7 @@ export async function getSeriesEmbedding(seriesId: string): Promise<number[] | n
  */
 export async function getEpisodeEmbedding(episodeId: string): Promise<number[] | null> {
   const config = await getFunctionConfig('embeddings')
-  const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
+  const modelName = embeddingSetId(config)
   const tableName = await getActiveEmbeddingTableName('episode_embeddings')
 
   const result = await queryOne<{ embedding: string }>(
@@ -898,7 +915,7 @@ export async function getSeriesEpisodeEmbeddings(
   seriesId: string
 ): Promise<Array<{ episodeId: string; embedding: number[] }>> {
   const config = await getFunctionConfig('embeddings')
-  const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
+  const modelName = embeddingSetId(config)
   const tableName = await getActiveEmbeddingTableName('episode_embeddings')
 
   const result = await query<{ episode_id: string; embedding: string }>(

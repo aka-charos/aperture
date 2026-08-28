@@ -323,11 +323,12 @@ export function registerRecommendationHandlers(fastify: FastifyInstance) {
             weeklyChatMessagesPerUser: 50,
           }
 
-      const { query, getCurrentEmbeddingDimensions, getFunctionConfig } = await import('@aperture/core')
+      const { query, getCurrentEmbeddingDimensions, getFunctionConfig, embeddingSetId } =
+        await import('@aperture/core')
 
       const embeddingConfig = await getFunctionConfig('embeddings')
       const dims = await getCurrentEmbeddingDimensions()
-      const modelName = embeddingConfig ? `${embeddingConfig.provider}:${embeddingConfig.model}` : null
+      const modelName = embeddingConfig ? embeddingSetId(embeddingConfig) : null
 
       const movieEmbedTable = dims ? `embeddings_${dims}` : 'embeddings_3072'
       const seriesEmbedTable = dims ? `series_embeddings_${dims}` : 'series_embeddings_3072'

@@ -387,26 +387,25 @@ export function registerTasteProfileHandlers(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'interestText must be 500 characters or less' })
       }
 
-      const { addCustomInterest, getActiveEmbeddingModelId, getEmbeddingModelInstance } = await import('@aperture/core')
+      const { addCustomInterest, getEmbeddingInvocation } = await import('@aperture/core')
       const { embed } = await import('ai')
 
       let embedding: number[] | undefined
       let embeddingModel: string | undefined
       try {
-        // Must be getActiveEmbeddingModelId (`provider:model`), not the legacy
-        // getEmbeddingModel (a bare OpenAI model name from the
-        // `embedding_model` system setting). getEmbeddingModelInstance resolves
-        // through the AI-function config and can hand back a Gemini or Ollama
-        // model, so the legacy call both mislabelled the row and produced an
-        // identifier that never compares equal to the one on the embeddings
-        // tables — which is what the recommender matches against.
-        const modelId = await getActiveEmbeddingModelId()
-        if (modelId) {
-          const model = await getEmbeddingModelInstance()
-          const result = await embed({ model, value: interestText.trim() })
-          embedding = result.embedding
-          embeddingModel = modelId
-        }
+        // The set id must be the one on the embeddings tables (`provider:model`,
+        // plus the retrieval mode when one is set) — not the legacy
+        // getEmbeddingModel, a bare OpenAI name from the `embedding_model`
+        // system setting, which both mislabelled the row and produced an
+        // identifier that never compares equal to what the recommender matches
+        // against.
+        //
+        // Vector and label come from one invocation, so the row cannot claim a
+        // space its vector was not embedded in.
+        const { model, providerOptions, setId } = await getEmbeddingInvocation()
+        const result = await embed({ model, value: interestText.trim(), providerOptions })
+        embedding = result.embedding
+        embeddingModel = setId
       } catch {
         fastify.log.warn('Failed to generate embedding for custom interest')
       }

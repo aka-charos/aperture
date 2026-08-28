@@ -71,6 +71,31 @@ const SET_STATUS_COLOR: Record<EmbeddingSet['status'], 'success' | 'warning' | '
 }
 
 /**
+ * The retrieval modes a set id can carry, for display only.
+ *
+ * Duplicated from core's `EMBEDDING_INPUT_TYPES` because the web bundle never
+ * imports `@aperture/core`. Only the label depends on it: an unrecognised
+ * suffix renders as part of the model name, which is the harmless direction.
+ */
+const SET_MODES = ['semantic_similarity', 'search_query', 'search_document'] as const
+
+/**
+ * A set id split into the model it names and the mode it was embedded in.
+ *
+ * Mirrors core's `describeEmbeddingSetId`. Kept purely cosmetic — every request
+ * still sends `set.model` whole, so a drift here cannot address the wrong set.
+ */
+function splitSetMode(setId: string): { base: string; mode?: string } {
+  const at = setId.lastIndexOf('~')
+  if (at === -1) return { base: setId }
+
+  const candidate = setId.slice(at + 1)
+  if (!(SET_MODES as readonly string[]).includes(candidate)) return { base: setId }
+
+  return { base: setId.slice(0, at), mode: candidate }
+}
+
+/**
  * What this instance holds per embedding model, and what switching would cost.
  *
  * Embedding rows are keyed by model, every read filters on it, and nothing is
@@ -234,8 +259,20 @@ function EmbeddingSetsManager() {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {set.model}
+                      {splitSetMode(set.model).base}
                     </Typography>
+                    {/* Two sets of the same model differ only by this suffix, so
+                        without a chip the panel shows what looks like a
+                        duplicate row with a stray tilde on one of them. */}
+                    {splitSetMode(set.model).mode && (
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        label={t(
+                          `aiFunctionCard.inputTypeOptions.${splitSetMode(set.model).mode}`
+                        )}
+                      />
+                    )}
                     {set.isActive && (
                       <Chip size="small" label={t('settingsAiSetup.chipActive')} color="success" />
                     )}

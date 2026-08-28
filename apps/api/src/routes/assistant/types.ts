@@ -2,7 +2,7 @@
  * Type definitions for the AI Assistant module
  */
 
-import type { EmbeddingModel } from 'ai'
+import type { EmbeddingInvocation } from '@aperture/core'
 import type { StatusEmitter } from './helpers/status.js'
 
 // Database query result types
@@ -98,8 +98,16 @@ export interface DiscoveryCandidate {
 export interface ToolContext {
   userId: string
   isAdmin: boolean
-  embeddingModel: EmbeddingModel<string>
-  embeddingModelId: string  // Model ID string for database queries
+  /**
+   * The model, its per-call provider options, and the set id those imply —
+   * resolved once per turn and handed over together.
+   *
+   * One field rather than a model plus an id, because the two must describe the
+   * same space. A query embedded through one configuration and then filtered
+   * against `WHERE model = <some other id>` still returns a confident ranking
+   * of the wrong population.
+   */
+  embedding: EmbeddingInvocation
   mediaServer: MediaServerInfo | null
   /** User asked for unwatched titles only (composer toggle → x-exclude-watched). */
   excludeWatched?: boolean

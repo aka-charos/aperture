@@ -14,7 +14,14 @@ import { createGroq } from '@ai-sdk/groq'
 import { createDeepSeek } from '@ai-sdk/deepseek'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { createHuggingFace } from '@ai-sdk/huggingface'
-import type { LanguageModel, EmbeddingModel, ToolSet } from 'ai'
+import type { LanguageModel, EmbeddingModel, JSONValue, ToolSet } from 'ai'
+import {
+  embeddingSetId,
+  googleTaskTypeFor,
+  providerSupportsInputType,
+  resolveEmbeddingInputType,
+  type EmbeddingInputType,
+} from './embeddingIdentity.js'
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
 import { createChildLogger } from './logger.js'
 import {
@@ -134,6 +141,34 @@ export interface ProviderConfig {
    * down has to be switched on explicitly.
    */
   callSpacingSeconds?: number
+  /**
+   * Which retrieval space the `embeddings` role embeds into. Absent = send
+   * nothing, which is the provider's default and where every vector written
+   * before this field existed lives.
+   *
+   * WHY IT MATTERS. Measured on OpenRouter with one canonical film document:
+   * for `google/gemini-embedding-001` the default, `search_query` and
+   * `search_document` all return the *byte-identical* vector, while
+   * `semantic_similarity` returns a different one — cosine 0.867 against the
+   * default, max coordinate difference 0.053. That is a different space, not
+   * rounding or nondeterminism. For `google/gemini-embedding-2` the mapping
+   * inverts: default *is* `semantic_similarity` (byte-identical), and the two
+   * retrieval modes are the distinct ones.
+   *
+   * This library's task is symmetric — film document against film document,
+   * and a taste centroid built by summing film vectors — which is what
+   * `semantic_similarity` is for. The default space is the asymmetric
+   * query→document one.
+   *
+   * A change here is a DIFFERENT SET OF VECTORS, not a tweak: it rides in the
+   * stored set identity via `embeddingSetId`, so switching it starts a new set
+   * beside the old one rather than overwriting it, exactly as changing the
+   * model does. It reaches the wire only on providers that can carry it (see
+   * `providerSupportsInputType`); selecting one elsewhere is refused at the
+   * settings route rather than stored, because an identity naming a mode the
+   * vectors were never embedded in is a confident number that means nothing.
+   */
+  embeddingInputType?: EmbeddingInputType
 }
 
 /**
@@ -592,7 +627,51 @@ async function withResolvedCredentials(config: ProviderConfig): Promise<Provider
  * the failure arrives attached to a model switch and looks like the new model's
  * fault.
  */
-export async function getEmbeddingModelInstance(): Promise<EmbeddingModel<string>> {
+/**
+ * The AI SDK's per-call provider options. Spelled out rather than imported:
+ * `ai` exports the shape's leaf type but not the alias itself.
+ */
+export type EmbeddingProviderOptions = Record<string, Record<string, JSONValue>>
+
+export interface EmbeddingInvocation {
+  /** The model to hand to `embed` / `embedMany`. */
+  model: EmbeddingModel<string>
+  /**
+   * Must be spread into the `embed`/`embedMany` call. Carries Google's native
+   * `taskType`; `undefined` for every other provider, where the mode is baked
+   * into the model instance instead.
+   */
+  providerOptions?: EmbeddingProviderOptions
+  /**
+   * The value to write into (and match against) the row's `model` column.
+   * Bundled with the model deliberately — see the function comment.
+   */
+  setId: string
+  /** The mode actually being sent, for logging. */
+  inputType?: EmbeddingInputType
+}
+
+/**
+ * Everything needed to produce a vector AND to file it correctly: the model,
+ * the per-call provider options, and the set identity those two imply.
+ *
+ * WHY ONE BUNDLE RATHER THAN A MODEL GETTER. The two halves cannot be allowed
+ * to disagree. A vector embedded in the semantic-similarity space and stored
+ * under the default space's identity is not detectably wrong from anywhere: it
+ * has the right dimension, a unit norm, and a plausible cosine against its
+ * neighbours. It simply answers a different question than the rows beside it,
+ * and the recommender averages the two into a centroid that means nothing —
+ * the same failure mode `resolveEmbeddingSpace` refuses outright for centred
+ * vs raw vectors, and for the same reason.
+ *
+ * The previous shape invited exactly that. `embedMovies` fetched the model,
+ * then `storeEmbeddings` separately re-read the config to build the identity
+ * string — two `getFunctionConfig` calls, so an admin saving the settings card
+ * mid-pass would have half a batch filed under the wrong set. Handing both out
+ * together closes it, and makes a new call site that forgets the mode a
+ * compile error rather than a silent mixture.
+ */
+export async function getEmbeddingInvocation(): Promise<EmbeddingInvocation> {
   const config = await getFunctionConfig('embeddings')
 
   if (!config) {
@@ -605,31 +684,72 @@ export async function getEmbeddingModelInstance(): Promise<EmbeddingModel<string
   const provider = createProviderInstance(resolved, 'embeddings')
   const modelId = resolved.model
 
+  // The mode is dropped for a provider that has nowhere to put it, so the set
+  // identity keeps describing what was actually sent. The settings route
+  // refuses the combination, so reaching this is a config written before that
+  // guard existed (or by hand); a warning is the right volume for something
+  // that degrades to the default space rather than failing.
+  const requested = resolveEmbeddingInputType(config)
+  const inputType = providerSupportsInputType(resolved.provider) ? requested : undefined
+
+  if (requested && !inputType) {
+    logger.warn(
+      { provider: resolved.provider, requested },
+      'Embedding input type ignored: provider cannot carry one'
+    )
+  }
+
+  const setId = embeddingSetId({
+    provider: resolved.provider,
+    model: modelId,
+    embeddingInputType: inputType,
+  })
+
   // Different providers have different APIs for embeddings
   switch (resolved.provider) {
     case 'openai':
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (provider as any).embedding(modelId)
+      return { model: (provider as any).embedding(modelId), setId }
 
     case 'ollama':
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (provider as any).embedding(modelId)
+      return { model: (provider as any).embedding(modelId), setId }
 
-    case 'google':
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (provider as any).textEmbeddingModel(modelId)
+    case 'google': {
+      // Google takes its native taskType per call, not at construction, so this
+      // one rides in providerOptions. The AI SDK validates the enum, which is
+      // why googleTaskTypeFor returns Google's spelling rather than ours.
+      const taskType = googleTaskTypeFor(inputType)
+      return {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        model: (provider as any).textEmbeddingModel(modelId),
+        providerOptions: taskType ? { google: { taskType } } : undefined,
+        setId,
+        inputType,
+      }
+    }
 
     case 'openai-compatible':
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (provider as any).textEmbeddingModel(modelId)
+      return { model: (provider as any).textEmbeddingModel(modelId), setId }
 
     case 'openrouter':
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (provider as any).embedding(modelId)
+      // `extraBody` is spread verbatim into the outgoing /embeddings JSON by
+      // @openrouter/ai-sdk-provider, which is what makes OpenAI-shaped extras
+      // like `input_type` reachable at all. Omitted entirely when there is no
+      // mode, so the request stays byte-identical to what shipped before.
+      return {
+        model: (provider as any).textEmbeddingModel( // eslint-disable-line @typescript-eslint/no-explicit-any
+          modelId,
+          inputType ? { extraBody: { input_type: inputType } } : undefined
+        ),
+        setId,
+        inputType,
+      }
 
     case 'huggingface':
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (provider as any).textEmbeddingModel(modelId)
+      return { model: (provider as any).textEmbeddingModel(modelId), setId }
 
     default:
       throw new Error(`Provider ${resolved.provider} does not support embeddings`)
@@ -1261,7 +1381,7 @@ export async function getCurrentEmbeddingDimensions(): Promise<number | undefine
 export async function getActiveEmbeddingModelId(): Promise<string | null> {
   const config = await getFunctionConfig('embeddings')
   if (!config) return null
-  return `${config.provider}:${config.model}`
+  return embeddingSetId(config)
 }
 
 // ============================================================================

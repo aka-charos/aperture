@@ -226,7 +226,11 @@ export async function createEpisodeTools(ctx: ToolContext): Promise<ToolSet> {
           const safeLimit = Math.min(limit ?? 10, 30)
           const tableName = await getActiveEmbeddingTableName('episode_embeddings')
 
-          const { embedding } = await embed({ model: ctx.embeddingModel, value: concept })
+          const { embedding } = await embed({
+            model: ctx.embedding.model,
+            value: concept,
+            providerOptions: ctx.embedding.providerOptions,
+          })
           const embeddingStr = `[${embedding.join(',')}]`
 
           // $1 embedding, $2 model, $3 limit are fixed; optional filters take
@@ -258,7 +262,7 @@ export async function createEpisodeTools(ctx: ToolContext): Promise<ToolSet> {
             WHERE ee.model = $2 ${clauses.join(' ')}
             ORDER BY ee.embedding <=> $1::halfvec
             LIMIT $3`
-          const params = [embeddingStr, ctx.embeddingModelId, safeLimit, ...extra]
+          const params = [embeddingStr, ctx.embedding.setId, safeLimit, ...extra]
 
           const hasPostFilter = clauses.length > 0
           const result = hasPostFilter

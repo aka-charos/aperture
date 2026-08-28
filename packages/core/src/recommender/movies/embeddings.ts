@@ -9,11 +9,12 @@ import {
   failJob,
 } from '../../jobs/progress.js'
 import {
-  getEmbeddingModelInstance,
+  getEmbeddingInvocation,
   isAIFunctionConfigured,
   getFunctionConfig,
   getActiveEmbeddingTableName,
 } from '../../lib/ai-provider.js'
+import { embeddingSetId } from '../../lib/embeddingIdentity.js'
 import { centreAfterGeneration } from '../centering.js'
 import { embed, embedMany } from 'ai'
 import { randomUUID } from 'crypto'
@@ -73,6 +74,17 @@ interface EmbeddingResult {
   movieId: string
   embedding: number[]
   canonicalText: string
+  /**
+   * The set this vector belongs to, captured at the moment it was produced.
+   *
+   * Carried on the row rather than re-derived by `storeEmbeddings` because the
+   * two used to read `getFunctionConfig` independently: an admin saving the AI
+   * settings card mid-pass could file a batch under an identity naming a space
+   * it was not embedded in, and nothing downstream can detect that — the vector
+   * has the right width, a unit norm and plausible neighbours, it just answers
+   * a different question than the rows beside it.
+   */
+  setId: string
 }
 
 /**
@@ -292,7 +304,10 @@ export async function embedMovies(movies: Movie[]): Promise<EmbeddingResult[]> {
     return []
   }
 
-  const embeddingModel = await getEmbeddingModelInstance()
+  // Resolved ONCE for the whole pass. Every row carries the set id this
+  // returned, so a settings change mid-pass cannot split one batch across two
+  // identities.
+  const { model, providerOptions, setId, inputType } = await getEmbeddingInvocation()
   const config = await getFunctionConfig('embeddings')
 
   // Build canonical texts
@@ -301,7 +316,10 @@ export async function embedMovies(movies: Movie[]): Promise<EmbeddingResult[]> {
     text: buildCanonicalText(movie),
   }))
 
-  logger.info({ count: textsWithIds.length, provider: config?.provider, model: config?.model }, 'Generating embeddings')
+  logger.info(
+    { count: textsWithIds.length, provider: config?.provider, model: config?.model, inputType, setId },
+    'Generating embeddings'
+  )
 
   // Process in batches of up to 100 texts
   const batchSize = 100
@@ -313,8 +331,9 @@ export async function embedMovies(movies: Movie[]): Promise<EmbeddingResult[]> {
 
     // Use AI SDK embedMany for batch embedding
     const { embeddings } = await embedMany({
-      model: embeddingModel,
+      model,
       values: texts,
+      providerOptions,
     })
 
     for (let j = 0; j < batch.length; j++) {
@@ -322,6 +341,7 @@ export async function embedMovies(movies: Movie[]): Promise<EmbeddingResult[]> {
         movieId: batch[j].movieId,
         embedding: embeddings[j],
         canonicalText: batch[j].text,
+        setId,
       })
     }
 
@@ -338,8 +358,8 @@ export async function embedMovies(movies: Movie[]): Promise<EmbeddingResult[]> {
  * Store embeddings in the database
  */
 export async function storeEmbeddings(embeddings: EmbeddingResult[]): Promise<void> {
-  const config = await getFunctionConfig('embeddings')
-  const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
+  if (embeddings.length === 0) return
+
   const tableName = await getActiveEmbeddingTableName('embeddings')
 
   await query(
@@ -356,14 +376,19 @@ export async function storeEmbeddings(embeddings: EmbeddingResult[]): Promise<vo
        updated_at = NOW()`,
     [
       embeddings.map((emb) => emb.movieId),
-      Array(embeddings.length).fill(modelName),
+      // Per row, not one value broadcast: the id travels with the vector it
+      // describes, so there is no second place for it to be decided.
+      embeddings.map((emb) => emb.setId),
       embeddings.map((emb) => `[${emb.embedding.join(',')}]`),
       embeddings.map((emb) => emb.canonicalText),
       CANONICAL_TEXT_VERSION,
     ]
   )
 
-  logger.info({ count: embeddings.length, table: tableName }, 'Embeddings stored')
+  logger.info(
+    { count: embeddings.length, table: tableName, set: embeddings[0].setId },
+    'Embeddings stored'
+  )
 }
 
 /**
@@ -406,7 +431,7 @@ export const MOVIE_STALE_SQL = `(
  */
 export async function getMoviesNeedingEmbeddings(limit = 100): Promise<MovieNeedingEmbedding[]> {
   const config = await getFunctionConfig('embeddings')
-  const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
+  const modelName = embeddingSetId(config)
   const tableName = await getActiveEmbeddingTableName('embeddings')
 
   // Check if any library configs exist
@@ -504,7 +529,7 @@ export async function markEmbeddingsCurrent(movieIds: string[]): Promise<void> {
   if (movieIds.length === 0) return
 
   const config = await getFunctionConfig('embeddings')
-  const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
+  const modelName = embeddingSetId(config)
   const tableName = await getActiveEmbeddingTableName('embeddings')
 
   await query(
@@ -549,7 +574,7 @@ export async function generateMissingEmbeddings(
       return { generated: 0, failed: 0, unchanged: 0, jobId }
     }
 
-    const modelName = `${config.provider}:${config.model}`
+    const modelName = embeddingSetId(config)
     addLog(jobId, 'info', `🤖 Using embedding provider: ${config.provider}, model: ${config.model}`)
 
     // Step 2: Count movies needing embeddings (only from enabled libraries)
@@ -722,8 +747,12 @@ export async function embedText(text: string): Promise<number[] | null> {
   const trimmed = text.trim()
   if (!trimmed) return null
 
-  const embeddingModel = await getEmbeddingModelInstance()
-  const { embedding } = await embed({ model: embeddingModel, value: trimmed })
+  // Same invocation as the library pass, so this lands in the same space. A
+  // bare `embed` here would put custom-interest text in the provider's default
+  // space and then compare it, by cosine, against library vectors embedded in
+  // another one.
+  const { model, providerOptions } = await getEmbeddingInvocation()
+  const { embedding } = await embed({ model, value: trimmed, providerOptions })
   return embedding
 }
 
@@ -749,7 +778,7 @@ export async function getMovieEmbeddings(movieIds: string[]): Promise<Map<string
   if (movieIds.length === 0) return byId
 
   const config = await getFunctionConfig('embeddings')
-  const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
+  const modelName = embeddingSetId(config)
   const tableName = await getActiveEmbeddingTableName('embeddings')
 
   const result = await query<{ movie_id: string; embedding: string }>(
@@ -765,7 +794,7 @@ export async function getMovieEmbeddings(movieIds: string[]): Promise<Map<string
 
 export async function getMovieEmbedding(movieId: string): Promise<number[] | null> {
   const config = await getFunctionConfig('embeddings')
-  const modelName = config ? `${config.provider}:${config.model}` : 'unknown'
+  const modelName = embeddingSetId(config)
   const tableName = await getActiveEmbeddingTableName('embeddings')
 
   const result = await queryOne<{ embedding: string }>(
