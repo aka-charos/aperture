@@ -21,7 +21,7 @@ export {
   setAIConfig,
   getFunctionConfig,
   setFunctionConfig,
-  getEmbeddingModelInstance,
+  getEmbeddingInvocation,
   getChatModelInstance,
   getWebSearchModelInstance,
   getWebSearchAttempts,
@@ -182,6 +182,15 @@ export {
   type CrwSearchParams,
   type CrwSearchResponse,
   type CrwSearchResultItem,
+  // Embedding set identity — the one place `provider:model[~mode]` is built.
+  embeddingSetId,
+  describeEmbeddingSetId,
+  resolveEmbeddingInputType,
+  isEmbeddingInputType,
+  providerSupportsInputType,
+  EMBEDDING_INPUT_TYPES,
+  type EmbeddingInputType,
+  type EmbeddingInvocation,
 } from './lib/index.js'
 
 // Migrations

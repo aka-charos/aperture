@@ -69,7 +69,8 @@ export {
   getFunctionConfig,
   setFunctionConfig,
   // Model Factory (returns AI SDK model instances)
-  getEmbeddingModelInstance,
+  getEmbeddingInvocation,
+  type EmbeddingInvocation,
   getChatModelInstance,
   getWebSearchModelInstance,
   getWebSearchAttempts,
@@ -213,3 +214,20 @@ export {
   type EmbeddingSetSummary,
   type EmbeddingSetsReport,
 } from './embeddingSets.js'
+
+// Embedding set identity — the one place `provider:model[~mode]` is built.
+export {
+  embeddingSetId,
+  describeEmbeddingSetId,
+  resolveEmbeddingInputType,
+  isEmbeddingInputType,
+  googleTaskTypeFor,
+  providerSupportsInputType,
+  EMBEDDING_INPUT_TYPES,
+  EMBEDDING_MODE_SEPARATOR,
+  UNKNOWN_EMBEDDING_SET,
+  PROVIDERS_SUPPORTING_INPUT_TYPE,
+  type EmbeddingInputType,
+  type EmbeddingIdentityConfig,
+} from './embeddingIdentity.js'
+

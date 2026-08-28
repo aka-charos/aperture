@@ -1483,7 +1483,16 @@
     "fallbackModelNoModels": "No models available",
     "fallbackModelDuplicate": "Same as the primary model — it would fail the same way.",
     "addFallbackModel": "Add fallback model",
-    "removeFallbackModel": "Remove fallback model"
+    "removeFallbackModel": "Remove fallback model",
+    "inputTypeLabel": "Retrieval mode",
+    "inputTypeDefault": "Provider default",
+    "inputTypeOptions": {
+      "semantic_similarity": "Semantic similarity (symmetric)",
+      "search_query": "Search query",
+      "search_document": "Search document"
+    },
+    "inputTypeHelp": "Which space the model embeds into. Recommendations compare a film against other films, and a taste profile is the average of films watched — both symmetric, which is what \"semantic similarity\" is for. The provider default is the asymmetric query-to-document space used for search. Only OpenRouter and Google can send this.",
+    "inputTypeChangeWarning": "Changing this starts a NEW set of vectors beside the existing one; nothing is deleted or converted. The library keeps using the current set until you re-run embedding generation, then centring, then Rebuild taste profiles, then recommendations."
   },
   "topPicksOutputConfig": {
     "accordionTitle": "ما الفرق بين المكتبة والمجموعة وقائمة التشغيل؟",

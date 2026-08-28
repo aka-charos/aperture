@@ -58,7 +58,41 @@ export interface FunctionConfig {
    * For free-tier credentials, whose limits are per minute as well as per day.
    */
   callSpacingSeconds?: number
+  /**
+   * Which retrieval space the Embeddings role embeds into. Absent = the
+   * provider's default, where every vector written before this existed lives.
+   *
+   * Changing it is a NEW SET OF VECTORS, not a setting tweak: it rides in the
+   * stored set identity, so the existing library stays untouched beside it and
+   * a full re-embed is needed before anything reads the new space. `null`
+   * clears it back to the default; omitting the field means "leave alone".
+   *
+   * The values are OpenRouter's; the server maps them to Google's native task
+   * types on that provider. Only providers that can actually send one accept
+   * it — the server rejects the rest rather than storing a mode that would
+   * never reach the model.
+   */
+  embeddingInputType?: EmbeddingInputTypeValue | null
 }
+
+/**
+ * The retrieval modes offered for the Embeddings role.
+ *
+ * Duplicated from core's `EMBEDDING_INPUT_TYPES` rather than imported — the web
+ * bundle never imports `@aperture/core`. The server is authoritative and
+ * rejects anything it does not recognise, so a drift here fails loudly at save
+ * rather than silently mislabelling vectors.
+ */
+export const EMBEDDING_INPUT_TYPE_VALUES = [
+  'semantic_similarity',
+  'search_query',
+  'search_document',
+] as const
+
+export type EmbeddingInputTypeValue = (typeof EMBEDDING_INPUT_TYPE_VALUES)[number]
+
+/** Providers whose embeddings API can carry a retrieval mode. Mirrors core. */
+export const PROVIDERS_WITH_INPUT_TYPE: readonly ProviderType[] = ['openrouter', 'google']
 
 export interface FallbackModelConfig {
   provider: ProviderType

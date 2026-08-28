@@ -17,7 +17,7 @@ import {
   type UIMessage,
   type ToolSet,
 } from 'ai'
-import { getChatModelInstance, getEmbeddingModelInstance, getActiveEmbeddingModelId, withInferenceContext } from '@aperture/core'
+import { getChatModelInstance, getEmbeddingInvocation, withInferenceContext } from '@aperture/core'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText, loadConversationHistory, withUnwatchedFilter, createStatusEmitter, withStatusEvents, withRequestContext } from '../helpers/index.js'
 import { createTools, createN8nTools, createEpisodeTools, createDiscoveryResolveTool, DISCOVERY_PROMPT } from '../tools/index.js'
@@ -162,15 +162,14 @@ export function registerChatHandler(fastify: FastifyInstance) {
 
       try {
         const chatModel = await getChatModelInstance()
-        const embeddingModel = await getEmbeddingModelInstance()
-        const embeddingModelId = await getActiveEmbeddingModelId()
+        const embedding = await getEmbeddingInvocation()
         const mediaServer = await getMediaServerInfo()
         // Composer toggle: only suggest titles the user hasn't watched. Enforced
         // on tool output (see withUnwatchedFilter) so it holds regardless of
         // whether the model honours the instruction.
         const excludeWatched = request.headers['x-exclude-watched'] === 'true'
 
-        if (!embeddingModelId) {
+        if (!embedding.setId) {
           return reply.status(500).send({ error: 'Embedding model not configured' })
         }
 
@@ -230,8 +229,9 @@ export function registerChatHandler(fastify: FastifyInstance) {
             const toolContext: ToolContext = {
               userId: user.id,
               isAdmin: user.isAdmin,
-              embeddingModel,
-              embeddingModelId, // Format: "provider:model" (e.g., "openai:text-embedding-3-large")
+              // setId is "provider:model", plus "~<mode>" when the embeddings
+              // role names a retrieval mode.
+              embedding,
               mediaServer,
               excludeWatched,
               // Only the discovery tool reads this: it hides nine sequential

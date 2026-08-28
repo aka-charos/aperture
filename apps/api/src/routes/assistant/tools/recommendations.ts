@@ -263,7 +263,11 @@ export function createRecommendationTools(ctx: ToolContext) {
       ),
       execute: async ({ concept, type = 'both', limit = 12 }) => {
         const safeLimit = Math.min(limit ?? 12, 30)
-        const { embedding } = await embed({ model: ctx.embeddingModel, value: concept })
+        const { embedding } = await embed({
+          model: ctx.embedding.model,
+          value: concept,
+          providerOptions: ctx.embedding.providerOptions,
+        })
         const embeddingStr = `[${embedding.join(',')}]`
 
         const items: ContentItem[] = []
@@ -327,7 +331,7 @@ export function createRecommendationTools(ctx: ToolContext) {
                  ON rc.${idColumn} = near.item_id
                 AND rc.run_id = (SELECT id FROM latest)
                JOIN ${contentTable} c ON c.id = near.item_id`,
-              [ctx.userId, media, embeddingStr, ctx.embeddingModelId, ANN_POOL_SIZE]
+              [ctx.userId, media, embeddingStr, ctx.embedding.setId, ANN_POOL_SIZE]
             )
           })
 

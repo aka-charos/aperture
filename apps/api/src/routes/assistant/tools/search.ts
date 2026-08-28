@@ -171,7 +171,7 @@ export async function findSimilarItems(
 
   const searchMovies = !type || type === 'movies'
   const searchSeries = !type || type === 'series'
-  const modelId = ctx.embeddingModelId
+  const modelId = ctx.embedding.setId
 
   interface MovieWithMeta {
     id: string
@@ -702,8 +702,9 @@ export function createSearchTools(ctx: ToolContext) {
 
           // Generate embedding for the search concept using AI SDK
           const { embedding: queryEmbedding } = await embed({
-            model: ctx.embeddingModel,
+            model: ctx.embedding.model,
             value: concept,
+            providerOptions: ctx.embedding.providerOptions,
           })
           const embeddingStr = `[${queryEmbedding.join(',')}]`
 
@@ -716,7 +717,7 @@ export function createSearchTools(ctx: ToolContext) {
           const excludeLower = excludeTitle?.toLowerCase()
 
           // Get model ID for database query (stored in db as string identifier)
-          const modelId = ctx.embeddingModelId
+          const modelId = ctx.embedding.setId
 
           // Watch status and country are both post-filters on the ANN scan, so
           // either one needs a wider search list to have anything left to
