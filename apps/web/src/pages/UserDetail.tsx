@@ -982,8 +982,8 @@ export function UserDetailPage() {
       <Box>
         <Breadcrumbs
           items={[
-            { label: t('nav.admin'), path: '/admin/users' },
-            { label: t('admin.users'), path: '/admin/users' },
+            { label: t('nav.admin'), path: '/admin' },
+            { label: t('admin.users'), path: '/admin/access/users' },
             { label: t('admin.userDetail.breadcrumbUser') },
           ]}
         />
@@ -996,8 +996,8 @@ export function UserDetailPage() {
     <Box>
       <Breadcrumbs
         items={[
-          { label: t('nav.admin'), path: '/admin/users' },
-          { label: t('admin.users'), path: '/admin/users' },
+          { label: t('nav.admin'), path: '/admin' },
+          { label: t('admin.users'), path: '/admin/access/users' },
         ]}
         currentLabel={user.display_name || user.username}
       />

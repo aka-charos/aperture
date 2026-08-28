@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Box,
@@ -15,23 +15,8 @@ import {
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import ErrorIcon from '@mui/icons-material/Error'
 import { useAuth } from '@/hooks/useAuth'
+import { useActiveJobs } from '@/hooks/activeJobs'
 
-interface JobProgress {
-  jobId: string
-  jobName: string
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
-  startedAt: string
-  completedAt?: string
-  currentStep: string
-  currentStepIndex: number
-  totalSteps: number
-  stepProgress: number
-  overallProgress: number
-  itemsProcessed: number
-  itemsTotal: number
-  currentItem?: string
-  error?: string
-}
 
 function prettifyJobName(jobName: string): string {
   return jobName.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
@@ -55,8 +40,9 @@ export function RunningJobsWidget() {
   const { t } = useTranslation()
   const theme = useTheme()
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
-  const [jobs, setJobs] = useState<JobProgress[]>([])
   const { user } = useAuth()
+  // Shared with the admin console's nav column: one interval, two readers.
+  const jobs = useActiveJobs(Boolean(user?.isAdmin))
 
   const getJobDisplayName = useCallback(
     (jobName: string) =>
@@ -78,38 +64,7 @@ export function RunningJobsWidget() {
     },
     [t]
   )
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
-
   const open = Boolean(anchorEl)
-
-  const fetchJobs = useCallback(async () => {
-    if (!user?.isAdmin) return
-    
-    try {
-      const response = await fetch('/api/jobs/active', {
-        credentials: 'include',
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setJobs(data.jobs || [])
-      }
-    } catch (error) {
-      console.error('Failed to fetch active jobs:', error)
-    }
-  }, [user?.isAdmin])
-
-  useEffect(() => {
-    if (!user?.isAdmin) return
-
-    fetchJobs()
-    intervalRef.current = setInterval(fetchJobs, 2000)
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
-    }
-  }, [user?.isAdmin, fetchJobs])
 
   const handleClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(anchorEl ? null : event.currentTarget)

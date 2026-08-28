@@ -346,6 +346,7 @@ export function CrwConfigSection() {
           )}
 
           <FormControlLabel
+            id="crw-enabled"
             control={
               <Switch
                 checked={enabled}
@@ -359,6 +360,7 @@ export function CrwConfigSection() {
           />
 
           <TextField
+            id="crw-base-url"
             fullWidth
             label={t('settingsCrw.baseUrlLabel')}
             value={baseUrl}
@@ -371,6 +373,8 @@ export function CrwConfigSection() {
           />
 
           <TextField
+            id="crw-api-key"
+            autoComplete="off"
             fullWidth
             label={t('settingsCrw.apiKeyLabel')}
             type={showApiKey ? 'text' : 'password'}
@@ -454,6 +458,7 @@ export function CrwConfigSection() {
           </Box>
 
           <TextField
+            id="crw-source-budget"
             fullWidth
             label={t('settingsCrw.sourceBudgetLabel')}
             type="number"
@@ -466,6 +471,7 @@ export function CrwConfigSection() {
           />
 
           <TextField
+            id="crw-analysis-output"
             fullWidth
             label={t('settingsCrw.analysisOutputLabel')}
             type="number"

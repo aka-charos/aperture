@@ -188,6 +188,8 @@ export function OMDbConfigSection() {
 
         <Box display="flex" flexDirection="column" gap={2}>
           <TextField
+            id="omdb-api-key"
+            autoComplete="off"
             label={t('settingsOmdb.apiKey')}
             type={showApiKey ? 'text' : 'password'}
             value={apiKey || (config?.hasApiKey ? '••••••••••••••••••••••••••••' : '')}
@@ -220,6 +222,7 @@ export function OMDbConfigSection() {
           />
 
           <FormControlLabel
+            id="omdb-enabled"
             control={
               <Switch
                 checked={enabled}
@@ -234,6 +237,7 @@ export function OMDbConfigSection() {
           />
 
           <FormControlLabel
+            id="omdb-paid-tier"
             control={
               <Switch
                 checked={paidTier}

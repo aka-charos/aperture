@@ -36,7 +36,7 @@ export function SetupPage() {
   const isAdminRerun = status && !status.needsSetup && status.isAdmin
 
   // Get the origin path from location state, default to admin settings
-  const exitPath = (location.state as { from?: string })?.from || '/admin/settings'
+  const exitPath = (location.state as { from?: string })?.from || '/admin'
 
   const renderStepContent = () => {
     switch (stepId) {

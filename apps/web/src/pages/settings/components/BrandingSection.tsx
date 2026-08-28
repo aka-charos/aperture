@@ -175,6 +175,7 @@ export function BrandingSection() {
         ) : (
           <Stack spacing={2}>
             <TextField
+              id="branding-name"
               label={t('settingsBranding.label')}
               value={value}
               onChange={(e) => setValue(e.target.value)}

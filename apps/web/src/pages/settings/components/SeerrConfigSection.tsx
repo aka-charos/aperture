@@ -226,6 +226,7 @@ export function SeerrConfigSection() {
 
         <Box display="flex" flexDirection="column" gap={2}>
           <TextField
+            id="seerr-url"
             label={t('settingsSeerr.seerrUrl')}
             value={url}
             onChange={(e) => {
@@ -239,6 +240,8 @@ export function SeerrConfigSection() {
           />
 
           <TextField
+            id="seerr-api-key"
+            autoComplete="off"
             label={t('settingsSeerr.apiKey')}
             type={showApiKey ? 'text' : 'password'}
             value={apiKey || (config?.hasApiKey ? '••••••••••••••••••••••••••••' : '')}

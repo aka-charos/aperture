@@ -219,6 +219,8 @@ export function MDBListConfigSection() {
 
         <Box display="flex" flexDirection="column" gap={2}>
           <TextField
+            id="mdblist-api-key"
+            autoComplete="off"
             label={t('settingsMdblist.apiKey')}
             type={showApiKey ? 'text' : 'password'}
             value={apiKey || (config?.hasApiKey ? '••••••••••••••••••••••••••••' : '')}
@@ -253,6 +255,7 @@ export function MDBListConfigSection() {
           />
 
           <FormControlLabel
+            id="mdblist-enabled"
             control={
               <Switch
                 checked={enabled}
@@ -267,6 +270,7 @@ export function MDBListConfigSection() {
           />
 
           <FormControlLabel
+            id="mdblist-supporter"
             control={
               <Switch
                 checked={supporterTier}

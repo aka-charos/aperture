@@ -1161,7 +1161,7 @@ export function useSetupWizard(): SetupWizardContext {
         markComplete()
         // Navigate appropriately based on whether this is admin re-run or initial setup
         if (isAdminRerun) {
-          navigate('/admin/settings')
+          navigate('/admin')
         } else {
           navigate('/login')
         }
