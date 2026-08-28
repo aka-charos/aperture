@@ -766,7 +766,10 @@
     "database": {
       "title": "Database",
       "blurb": "Purge stored data — the destructive controls"
-    }
+    },
+    "sectionErrorTitle": "This section could not be shown",
+    "sectionErrorBody": "The rest of the console still works. If this started after an update, reloading picks up the new version.",
+    "sectionErrorReload": "Reload"
   },
   "home": {
     "welcomeBack": "Welcome back, {{name}}",

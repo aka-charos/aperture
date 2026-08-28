@@ -15,6 +15,7 @@ import {
 } from '@mui/material'
 import MenuIcon from '@mui/icons-material/Menu'
 import NavigateNextIcon from '@mui/icons-material/NavigateNext'
+import { AdminErrorBoundary } from './AdminErrorBoundary'
 import { AdminNavColumn } from './AdminNavColumn'
 import { ApiErrorAlert } from './ApiErrorAlert'
 import { useAdminSearch } from '@/hooks/useAdminSearch'
@@ -236,15 +237,17 @@ export function AdminShell() {
               which is the whole group rather than any one card in it. */}
           {entry?.group === 'integrations' && <ApiErrorAlert maxErrors={5} />}
 
-          <Suspense
-            fallback={
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-                <CircularProgress />
-              </Box>
-            }
-          >
-            <Outlet />
-          </Suspense>
+          <AdminErrorBoundary resetKey={location.pathname}>
+            <Suspense
+              fallback={
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                  <CircularProgress />
+                </Box>
+              }
+            >
+              <Outlet />
+            </Suspense>
+          </AdminErrorBoundary>
         </Box>
       </Box>
     </>

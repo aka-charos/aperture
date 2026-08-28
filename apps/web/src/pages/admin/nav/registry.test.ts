@@ -193,6 +193,33 @@ function renderedIds(): Set<string> {
   const ids = new Set<string>()
   for (const file of files) {
     const source = readFileSync(file, 'utf8')
+
+    /**
+     * An `id=` sitting on its own line directly below a line that closes an
+     * opening tag is a JSX *child*, not a prop — React renders it as literal
+     * text and the element never gets the attribute. TypeScript accepts it
+     * (children can be anything), lint accepts it, and a plain text search for
+     * the anchor finds it, so this is the one shape that passes every other
+     * check while producing an anchor that does not exist and a page with
+     * `id=rec-movie-max-candidates` printed on it.
+     */
+    const lines = source.split('\n')
+    const isChildNotProp = (lineIndex: number): boolean => {
+      let j = lineIndex - 1
+      while (j >= 0 && lines[j].trim() === '') j--
+      return j >= 0 && /[^=]>\s*$/.test(lines[j])
+    }
+
+    lines.forEach((line, index) => {
+      const standalone = /^\s*id=("([a-z0-9-]+)"|\{`\$\{idPrefix\}-[a-z0-9-]+`\})\s*$/.exec(line)
+      if (standalone && isChildNotProp(index)) {
+        throw new Error(
+          `${file.split(/[\\/]/).pop()}:${index + 1} — \`${line.trim()}\` is a JSX child, ` +
+            `not a prop. Move it inside the opening tag.`
+        )
+      }
+    })
+
     for (const m of source.matchAll(/\bid="([a-z0-9-]+)"/g)) ids.add(m[1])
 
     // `idPrefix="rec-movie"` + id={`${idPrefix}-similarity-weight`}
