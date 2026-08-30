@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getModelsForFunction, getEmbeddingDimensions, getProvider } from './ai-capabilities.js'
 import { VALID_EMBEDDING_DIMENSIONS } from './ai-provider.js'
+import { isEmbeddingInputType } from './embeddingIdentity.js'
 
 /**
  * OpenRouter is a `CUSTOM_MODEL_PROVIDERS` member — it deliberately ships no
@@ -87,4 +88,38 @@ test('the other openrouter roles stay custom-only', () => {
   assert.equal(provider.chatModels.length, 0)
   assert.equal(provider.textGenerationModels.length, 0)
   assert.equal(provider.explorationModels.length, 0)
+})
+
+/**
+ * The catalog is where an operator finds out that gemini-embedding-001 without
+ * a mode lands in the retrieval space. A missing note is not cosmetic: the mode
+ * control would then sit there with no indication that leaving it blank is a
+ * choice, which is the state this whole change exists to fix.
+ */
+test('every entry explains its mode, including the ones needing none', () => {
+  for (const model of OPENROUTER_EMBEDDINGS) {
+    assert.ok(model.inputTypeNote, `${model.id} says nothing about its retrieval mode`)
+  }
+})
+
+test('a recommended mode is one the system can actually store', () => {
+  for (const model of OPENROUTER_EMBEDDINGS) {
+    if (model.recommendedInputType === undefined) continue
+    assert.ok(
+      isEmbeddingInputType(model.recommendedInputType),
+      `${model.id} recommends ${model.recommendedInputType}, which the settings route would reject`
+    )
+  }
+})
+
+test('only 001 carries a recommendation, and it is the symmetric space', () => {
+  // gemini-2's default already IS semantic_similarity (byte-identical), and
+  // Qwen takes no mode at all -- its instruction recipe is query-side against
+  // bare documents, and this recommender's query is a centroid, not text.
+  // Both still carry a note saying so; silence would read as an oversight.
+  const withRec = OPENROUTER_EMBEDDINGS.filter((m) => m.recommendedInputType)
+  assert.deepEqual(
+    withRec.map((m) => [m.id, m.recommendedInputType]),
+    [['google/gemini-embedding-001', 'semantic_similarity']]
+  )
 })

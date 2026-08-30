@@ -12,6 +12,30 @@ export interface ModelMetadata {
 
   embeddingDimensions?: number
 
+  /**
+   * The retrieval mode this model should be embedded with for THIS app, when
+   * leaving it unset would land in the wrong space.
+   *
+   * A recommendation, never an automatic action. Applying it silently would
+   * rewrite the set identity — a different population of vectors — off the back
+   * of someone opening a settings page, and the card shows it as a hint with an
+   * explicit Apply instead.
+   *
+   * Absent means the model's default is already right (gemini-embedding-2,
+   * whose default output is byte-identical to `semantic_similarity`), or that
+   * it takes no mode at all (Qwen, whose instruction recipe is query-side
+   * against bare documents and has no symmetric form).
+   */
+  recommendedInputType?: 'semantic_similarity' | 'search_query' | 'search_document'
+
+  /**
+   * Why {@link recommendedInputType} is what it is, or — when there is no
+   * recommendation — why this model needs none. Shown under the mode control,
+   * because "leave this alone" is exactly as much a decision as changing it and
+   * an empty hint reads as an oversight.
+   */
+  inputTypeNote?: string
+
   description?: string
   quality?: 'budget' | 'standard' | 'premium'
   speed?: 'slow' | 'medium' | 'fast'

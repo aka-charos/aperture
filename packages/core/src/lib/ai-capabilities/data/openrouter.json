@@ -23,7 +23,8 @@
       },
       "embeddingDimensions": 3072,
       "quality": "standard",
-      "costTier": "low"
+      "costTier": "low",
+      "inputTypeNote": "No mode needed. Measured through OpenRouter, its default output is byte-identical to semantic_similarity (max coordinate difference 0.0), which is the symmetric space this app wants. Setting it explicitly is harmless and documents the intent, but changes nothing."
     },
     {
       "id": "google/gemini-embedding-001",
@@ -37,7 +38,9 @@
       },
       "embeddingDimensions": 3072,
       "quality": "standard",
-      "costTier": "low"
+      "costTier": "low",
+      "recommendedInputType": "semantic_similarity",
+      "inputTypeNote": "Its default output is the RETRIEVAL space. Measured through OpenRouter, default, search_query and search_document all return the identical vector, and only semantic_similarity differs (cosine 0.867 on the same text). Recommendations compare films against other films and build a taste vector by averaging them, so this needs the symmetric space set explicitly."
     },
     {
       "id": "qwen/qwen3-embedding-8b",
@@ -51,7 +54,8 @@
       },
       "embeddingDimensions": 4096,
       "quality": "standard",
-      "costTier": "low"
+      "costTier": "low",
+      "inputTypeNote": "Takes no mode. Qwen is instruction-aware, but its documented recipe puts the instruction on the QUERY against bare documents, and this recommender has no text query -- the query is a centroid of item vectors. Prefixing every document identically is not an official Qwen form."
     }
   ],
   "chatModels": [],
