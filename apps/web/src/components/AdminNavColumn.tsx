@@ -99,7 +99,7 @@ export function AdminNavColumn({ onOpenSearch, onNavigate }: AdminNavColumnProps
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <Box sx={{ px: 2, pt: 2, pb: 1 }}>
         <Button
           fullWidth
@@ -119,7 +119,7 @@ export function AdminNavColumn({ onOpenSearch, onNavigate }: AdminNavColumnProps
         </Button>
       </Box>
 
-      <Box sx={{ flex: 1, overflowY: 'auto', pb: 1 }}>
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', pb: 1 }}>
         <List dense disablePadding>
           {ADMIN_GROUPS.map((group) => {
             const entries = adminEntriesInGroup(group.id)
