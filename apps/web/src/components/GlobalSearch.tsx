@@ -25,6 +25,7 @@ import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
 import CloseIcon from '@mui/icons-material/Close'
 import { getProxiedImageUrl } from '@aperture/ui'
+import { matchSearchShortcut } from '@/lib/searchShortcut'
 
 interface SearchResult {
   id: string
@@ -75,10 +76,12 @@ export function GlobalSearch() {
     setSelectedIndex(-1)
   }, [])
 
-  // Handle keyboard shortcut (Cmd/Ctrl + K)
+  // ⌘K / Ctrl+K. Which palette a keystroke belongs to is decided in one place,
+  // because this listener and the settings palette's both see every keydown and
+  // `preventDefault()` does not stop the other one — see `matchSearchShortcut`.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if (matchSearchShortcut(e) === 'global') {
         e.preventDefault()
         setOpen(true)
       }
