@@ -1,7 +1,7 @@
 /**
  * Recommendation tools with Tool UI output schemas
  */
-import { tool, embed } from 'ai'
+import { tool } from 'ai'
 import { nullSafe } from './utils.js'
 import { z } from 'zod'
 import { getActiveEmbeddingTableName } from '@aperture/core'
@@ -263,11 +263,7 @@ export function createRecommendationTools(ctx: ToolContext) {
       ),
       execute: async ({ concept, type = 'both', limit = 12 }) => {
         const safeLimit = Math.min(limit ?? 12, 30)
-        const { embedding } = await embed({
-          model: ctx.embedding.model,
-          value: concept,
-          providerOptions: ctx.embedding.providerOptions,
-        })
+        const embedding = await ctx.embedding.embedOne(concept)
         const embeddingStr = `[${embedding.join(',')}]`
 
         const items: ContentItem[] = []

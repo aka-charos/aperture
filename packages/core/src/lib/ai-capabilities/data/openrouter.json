@@ -24,7 +24,12 @@
       "embeddingDimensions": 3072,
       "quality": "standard",
       "costTier": "low",
-      "inputTypeNote": "input_type does NOT reach this model: semantic_similarity returns the byte-identical vector to sending nothing, which means the parameter is ignored, not that the default is already semantic. Its real semantic-similarity mechanism is a TEXT PREFIX on the canonical document (task: sentence similarity | query: ...), measured at cosine 0.811 from the bare text. That prefix is not yet supported here, so this model currently embeds in its generic default space."
+      "inputTypeNote": "Ignores input_type: its semantic_similarity output is byte-identical to sending nothing. The mode is delivered as a TEXT PREFIX on the document instead (task: sentence similarity | query: ...), which moves the vector to cosine 0.811 from bare text -- a far larger change than any parameter produces. Verified byte-identical between OpenRouter and Google native on both bare and prefixed input.",
+      "inputTypeMechanism": "textPrefix",
+      "inputTypePrefixes": {
+        "semantic_similarity": "task: sentence similarity | query: "
+      },
+      "recommendedInputType": "semantic_similarity"
     },
     {
       "id": "google/gemini-embedding-001",
@@ -40,7 +45,8 @@
       "quality": "standard",
       "costTier": "low",
       "recommendedInputType": "semantic_similarity",
-      "inputTypeNote": "Its default output is the RETRIEVAL space. Measured through OpenRouter, default, search_query and search_document all return the identical vector, and only semantic_similarity differs (cosine 0.867 on the same text). Recommendations compare films against other films and build a taste vector by averaging them, so this needs the symmetric space set explicitly."
+      "inputTypeNote": "Its default output is the RETRIEVAL space. Measured through OpenRouter, default, search_query and search_document all return the identical vector, and only semantic_similarity differs (cosine 0.867 on the same text). Recommendations compare films against other films and build a taste vector by averaging them, so this needs the symmetric space set explicitly.",
+      "inputTypeMechanism": "parameter"
     },
     {
       "id": "qwen/qwen3-embedding-8b",

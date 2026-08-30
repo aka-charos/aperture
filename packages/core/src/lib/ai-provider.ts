@@ -20,6 +20,7 @@ import {
   googleTaskTypeFor,
   providerSupportsInputType,
   resolveEmbeddingInputType,
+  resolveInputTypeDelivery,
   type EmbeddingInputType,
 } from './embeddingIdentity.js'
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
@@ -634,12 +635,16 @@ async function withResolvedCredentials(config: ProviderConfig): Promise<Provider
 export type EmbeddingProviderOptions = Record<string, Record<string, JSONValue>>
 
 export interface EmbeddingInvocation {
-  /** The model to hand to `embed` / `embedMany`. */
+  /**
+   * The raw model. Prefer {@link EmbeddingInvocation.embedOne} /
+   * {@link EmbeddingInvocation.embedBatch} — this is exposed for tests and for
+   * the rare caller that genuinely needs the handle, and using it directly
+   * bypasses {@link EmbeddingInvocation.prepareText}.
+   */
   model: EmbeddingModel<string>
   /**
-   * Must be spread into the `embed`/`embedMany` call. Carries Google's native
-   * `taskType`; `undefined` for every other provider, where the mode is baked
-   * into the model instance instead.
+   * Carries Google's native `taskType`; `undefined` for every other provider,
+   * where the mode is baked into the model instance or into the text instead.
    */
   providerOptions?: EmbeddingProviderOptions
   /**
@@ -647,8 +652,19 @@ export interface EmbeddingInvocation {
    * Bundled with the model deliberately — see the function comment.
    */
   setId: string
-  /** The mode actually being sent, for logging. */
+  /** The mode actually in force, for logging. */
   inputType?: EmbeddingInputType
+  /** How that mode reaches the model, for logging. */
+  inputTypeMechanism: 'parameter' | 'textPrefix' | 'none'
+  /**
+   * Applies this model's task prefix. Identity when the model takes its mode as
+   * a parameter, or takes none at all.
+   */
+  prepareText(text: string): string
+  /** Embed one value in this space, prefix applied. */
+  embedOne(text: string): Promise<number[]>
+  /** Embed a batch in this space, prefix applied to every value. */
+  embedBatch(texts: string[]): Promise<number[][]>
 }
 
 /**
@@ -705,56 +721,109 @@ export async function getEmbeddingInvocation(): Promise<EmbeddingInvocation> {
     embeddingInputType: inputType,
   })
 
-  // Different providers have different APIs for embeddings
-  switch (resolved.provider) {
-    case 'openai':
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return { model: (provider as any).embedding(modelId), setId }
+  // HOW the mode is delivered is a property of the model, not the provider.
+  //
+  // gemini-embedding-2 dropped `task_type` and moved task conditioning into the
+  // prompt, so it ignores `input_type` outright — measured, its
+  // `semantic_similarity` output is byte-identical to sending nothing, while
+  // the documented text prefix moves the vector to cosine 0.811 from bare text.
+  // Reading that byte-identity as "its default is already semantic" is the
+  // mistake this branch exists to make impossible.
+  //
+  // Exactly one path is taken. A `textPrefix` model is sent no parameter: a
+  // field it ignores is noise in the request, and worse, reads to the next
+  // maintainer as though the mode were being delivered that way.
+  const metadata = getModel(resolved.provider, modelId, 'embeddings')
+  const { mechanism, prefix: textPrefix } = resolveInputTypeDelivery({
+    inputType,
+    mechanism: metadata?.inputTypeMechanism,
+    prefixes: metadata?.inputTypePrefixes,
+  })
 
-    case 'ollama':
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return { model: (provider as any).embedding(modelId), setId }
+  // A `textPrefix` model asked for a mode it has no verified prefix for cannot
+  // deliver it. Refused at the settings route; reaching here means a config
+  // written before that guard, and the safe direction is the unconditioned
+  // space every other row of that set would be in.
+  if (inputType && mechanism === 'none') {
+    logger.warn(
+      { provider: resolved.provider, model: modelId, requested: inputType },
+      'No verified way to deliver this mode on this model; embedding unconditioned'
+    )
+  }
 
-    case 'google': {
-      // Google takes its native taskType per call, not at construction, so this
-      // one rides in providerOptions. The AI SDK validates the enum, which is
-      // why googleTaskTypeFor returns Google's spelling rather than ours.
-      const taskType = googleTaskTypeFor(inputType)
-      return {
+  const prepareText = (text: string): string =>
+    textPrefix ? `${textPrefix}${text}` : text
+
+  // Only a `parameter` model is sent the field.
+  const parameterMode = mechanism === 'parameter' ? inputType : undefined
+
+  const model = ((): EmbeddingModel<string> => {
+    switch (resolved.provider) {
+      case 'openai':
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        model: (provider as any).textEmbeddingModel(modelId),
-        providerOptions: taskType ? { google: { taskType } } : undefined,
-        setId,
-        inputType,
-      }
-    }
+        return (provider as any).embedding(modelId)
 
-    case 'openai-compatible':
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return { model: (provider as any).textEmbeddingModel(modelId), setId }
+      case 'ollama':
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (provider as any).embedding(modelId)
 
-    case 'openrouter':
-      // `extraBody` is spread verbatim into the outgoing /embeddings JSON by
-      // @openrouter/ai-sdk-provider, which is what makes OpenAI-shaped extras
-      // like `input_type` reachable at all. Omitted entirely when there is no
-      // mode, so the request stays byte-identical to what shipped before.
-      return {
-        model: (provider as any).textEmbeddingModel( // eslint-disable-line @typescript-eslint/no-explicit-any
+      case 'google':
+      case 'openai-compatible':
+      case 'huggingface':
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (provider as any).textEmbeddingModel(modelId)
+
+      case 'openrouter':
+        // `extraBody` is spread verbatim into the outgoing /embeddings JSON by
+        // @openrouter/ai-sdk-provider, which is what makes OpenAI-shaped extras
+        // like `input_type` reachable at all. Omitted entirely when there is no
+        // parameter mode, so the request stays byte-identical to what shipped
+        // before this existed.
+        return (provider as any).textEmbeddingModel( // eslint-disable-line @typescript-eslint/no-explicit-any
           modelId,
-          inputType ? { extraBody: { input_type: inputType } } : undefined
-        ),
-        setId,
-        inputType,
-      }
+          parameterMode ? { extraBody: { input_type: parameterMode } } : undefined
+        )
 
-    case 'huggingface':
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return { model: (provider as any).textEmbeddingModel(modelId), setId }
+      default:
+        throw new Error(`Provider ${resolved.provider} does not support embeddings`)
+    }
+  })()
 
-    default:
-      throw new Error(`Provider ${resolved.provider} does not support embeddings`)
+  // Google takes its native taskType per call rather than at construction, so
+  // this one rides in providerOptions. The AI SDK validates the enum, which is
+  // why googleTaskTypeFor returns Google's spelling rather than ours.
+  const googleTask =
+    resolved.provider === 'google' ? googleTaskTypeFor(parameterMode) : undefined
+  const providerOptions = googleTask ? { google: { taskType: googleTask } } : undefined
+
+  const { embed, embedMany } = await import('ai')
+
+  return {
+    model,
+    providerOptions,
+    setId,
+    inputType,
+    inputTypeMechanism: mechanism,
+    prepareText,
+    async embedOne(text: string): Promise<number[]> {
+      const { embedding } = await embed({
+        model,
+        value: prepareText(text),
+        providerOptions,
+      })
+      return embedding
+    },
+    async embedBatch(texts: string[]): Promise<number[][]> {
+      const { embeddings } = await embedMany({
+        model,
+        values: texts.map(prepareText),
+        providerOptions,
+      })
+      return embeddings
+    },
   }
 }
+
 
 /**
  * Get a chat model instance (with tool calling) for the configured provider

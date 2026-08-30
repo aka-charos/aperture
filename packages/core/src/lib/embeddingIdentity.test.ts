@@ -10,6 +10,7 @@ import {
   isEmbeddingInputType,
   providerSupportsInputType,
   resolveEmbeddingInputType,
+  resolveInputTypeDelivery,
 } from './embeddingIdentity.js'
 
 /**
@@ -214,4 +215,80 @@ test('isEmbeddingInputType rejects near-misses and non-strings', () => {
   assert.ok(!isEmbeddingInputType(undefined))
   assert.ok(!isEmbeddingInputType(null))
   assert.ok(!isEmbeddingInputType(3))
+})
+
+// ============================================================================
+// How a mode is delivered
+// ============================================================================
+
+/**
+ * Three ways to be silently wrong, none of which raises anything: send a
+ * parameter the model ignores, prepend a prefix the model does not expect, or
+ * read a byte-identical response as proof a mode was honoured rather than
+ * dropped. The third is what actually happened — gemini-embedding-2 returns the
+ * identical vector for `semantic_similarity` and for nothing at all, and that
+ * was read as "its default is already semantic".
+ */
+
+test('no mode asked for means nothing is delivered', () => {
+  assert.deepEqual(resolveInputTypeDelivery({}), { mechanism: 'none' })
+  assert.deepEqual(
+    resolveInputTypeDelivery({ mechanism: 'textPrefix', prefixes: { semantic_similarity: 'x' } }),
+    { mechanism: 'none' }
+  )
+})
+
+test('a parameter model gets the parameter and no prefix', () => {
+  assert.deepEqual(
+    resolveInputTypeDelivery({ inputType: 'semantic_similarity', mechanism: 'parameter' }),
+    { mechanism: 'parameter' }
+  )
+})
+
+test('an unstated mechanism defaults to parameter', () => {
+  // Every model but gemini-2, and every custom model, which has no catalog entry.
+  assert.deepEqual(resolveInputTypeDelivery({ inputType: 'search_query' }), {
+    mechanism: 'parameter',
+  })
+})
+
+test('a textPrefix model gets the prefix and no parameter', () => {
+  const out = resolveInputTypeDelivery({
+    inputType: 'semantic_similarity',
+    mechanism: 'textPrefix',
+    prefixes: { semantic_similarity: 'task: sentence similarity | query: ' },
+  })
+  assert.deepEqual(out, {
+    mechanism: 'textPrefix',
+    prefix: 'task: sentence similarity | query: ',
+  })
+})
+
+test('a textPrefix model with no prefix for that mode delivers nothing', () => {
+  // Google documents an asymmetric `title: … | text: …` form this app has never
+  // measured and does not want. Absent rather than guessed, and asking for it
+  // must fall back to the unconditioned space -- which is where every other row
+  // of a fresh set will be -- not to a parameter the model ignores.
+  assert.deepEqual(
+    resolveInputTypeDelivery({
+      inputType: 'search_document',
+      mechanism: 'textPrefix',
+      prefixes: { semantic_similarity: 'task: sentence similarity | query: ' },
+    }),
+    { mechanism: 'none' }
+  )
+})
+
+test('a textPrefix model is never sent the parameter as a consolation', () => {
+  // The whole point: gemini-2 ignores input_type, so sending it alongside would
+  // be noise in the request and would read to the next maintainer as though the
+  // mode were being delivered that way.
+  for (const mode of EMBEDDING_INPUT_TYPES) {
+    const out = resolveInputTypeDelivery({
+      inputType: mode,
+      mechanism: 'textPrefix',
+      prefixes: { semantic_similarity: 'p' },
+    })
+    assert.notEqual(out.mechanism, 'parameter', `${mode} must not fall back to a parameter`)
+  }
 })

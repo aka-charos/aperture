@@ -220,6 +220,7 @@ export {
   embeddingSetId,
   describeEmbeddingSetId,
   resolveEmbeddingInputType,
+  resolveInputTypeDelivery,
   isEmbeddingInputType,
   googleTaskTypeFor,
   providerSupportsInputType,

@@ -16,7 +16,6 @@ import {
 } from '../../lib/ai-provider.js'
 import { embeddingSetId } from '../../lib/embeddingIdentity.js'
 import { centreAfterGeneration } from '../centering.js'
-import { embed, embedMany } from 'ai'
 import { randomUUID } from 'crypto'
 
 const logger = createChildLogger('embeddings')
@@ -307,7 +306,7 @@ export async function embedMovies(movies: Movie[]): Promise<EmbeddingResult[]> {
   // Resolved ONCE for the whole pass. Every row carries the set id this
   // returned, so a settings change mid-pass cannot split one batch across two
   // identities.
-  const { model, providerOptions, setId, inputType } = await getEmbeddingInvocation()
+  const { embedBatch, setId, inputType, inputTypeMechanism } = await getEmbeddingInvocation()
   const config = await getFunctionConfig('embeddings')
 
   // Build canonical texts
@@ -317,7 +316,7 @@ export async function embedMovies(movies: Movie[]): Promise<EmbeddingResult[]> {
   }))
 
   logger.info(
-    { count: textsWithIds.length, provider: config?.provider, model: config?.model, inputType, setId },
+    { count: textsWithIds.length, provider: config?.provider, model: config?.model, inputType, inputTypeMechanism, setId },
     'Generating embeddings'
   )
 
@@ -329,12 +328,9 @@ export async function embedMovies(movies: Movie[]): Promise<EmbeddingResult[]> {
     const batch = textsWithIds.slice(i, i + batchSize)
     const texts = batch.map((t) => t.text)
 
-    // Use AI SDK embedMany for batch embedding
-    const { embeddings } = await embedMany({
-      model,
-      values: texts,
-      providerOptions,
-    })
+    // Through the invocation, never embedMany directly: a task prefix is part
+    // of the space, and applying it is not something a call site may skip.
+    const embeddings = await embedBatch(texts)
 
     for (let j = 0; j < batch.length; j++) {
       results.push({
@@ -751,9 +747,8 @@ export async function embedText(text: string): Promise<number[] | null> {
   // bare `embed` here would put custom-interest text in the provider's default
   // space and then compare it, by cosine, against library vectors embedded in
   // another one.
-  const { model, providerOptions } = await getEmbeddingInvocation()
-  const { embedding } = await embed({ model, value: trimmed, providerOptions })
-  return embedding
+  const { embedOne } = await getEmbeddingInvocation()
+  return embedOne(trimmed)
 }
 
 /**
