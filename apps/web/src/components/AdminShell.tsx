@@ -142,12 +142,21 @@ export function AdminShell() {
               flexShrink: 0,
               position: 'sticky',
               top: 88,
-              maxHeight: 'calc(100vh - 112px)',
+              // A definite height, not a cap. `maxHeight` leaves the Paper's own
+              // height content-driven, and a child asking to fill that resolves
+              // against nothing: with `height: 100%` it grew past the cap and got
+              // clipped with no scrollbar, and with `flex: 1` it collapsed to
+              // zero. Either way the last groups and the footer were unreachable.
+              height: 'calc(100vh - 112px)',
               borderRadius: 2,
               border: 1,
               borderColor: 'divider',
               overflow: 'hidden',
               display: 'flex',
+              // Column, so the nav's own flex:1 means "fill the height" rather
+              // than "fill the width" — this Paper is the only ancestor with a
+              // bounded height for it to fill.
+              flexDirection: 'column',
             }}
           >
             {nav}
