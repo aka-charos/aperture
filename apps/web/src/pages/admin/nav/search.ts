@@ -3,6 +3,7 @@ import {
   ADMIN_GROUPS,
   adminEntryPath,
   type AdminEntry,
+  type AdminField,
   type AdminGroupId,
 } from './registry'
 
@@ -60,36 +61,102 @@ function matchScore(haystack: string, needle: string, weight: number): number {
   return 0
 }
 
-function scoreEntry(entry: AdminEntry, needle: string, t: Translate): number {
-  const title = t(entry.titleKey)
-  const blurb = t(entry.blurbKey)
+/** A weighted piece of text a result can be found by. */
+type Haystack = readonly [text: string, weight: number]
 
-  let best = Math.max(matchScore(title, needle, 100), matchScore(blurb, needle, 20))
-  for (const alias of entry.aliases) {
-    best = Math.max(best, matchScore(alias, needle, 70))
+const GROUP_LABELS = new Map<AdminGroupId, string>()
+
+function entryHaystacks(entry: AdminEntry, t: Translate): Haystack[] {
+  return [
+    [t(entry.titleKey), 100],
+    // The group name is part of how people say where a thing is — "ai
+    // embedding model" names the group, the subject and the noun, and only the
+    // middle word is in the title.
+    [GROUP_LABELS.get(entry.group) ?? '', 40],
+    [t(entry.blurbKey), 20],
+    ...entry.aliases.map((alias): Haystack => [alias, 70]),
+  ]
+}
+
+function fieldHaystacks(field: AdminField, parentTitle: string, t: Translate): Haystack[] {
+  return [
+    [t(field.labelKey), 90],
+    // A control is almost never named in full: people type one word for the
+    // control and one for the section it lives in ("novelty weight", where the
+    // label is "Genre Discovery" and only the section says "weights").
+    [parentTitle, 45],
+    ...(field.aliases ?? []).map((alias): Haystack => [alias, 60]),
+  ]
+}
+
+/**
+ * How well one token does against a result's text, taking its best hit.
+ * Zero means the token found nothing here at all.
+ */
+function scoreToken(haystacks: readonly Haystack[], token: string): number {
+  let best = 0
+  for (const [text, weight] of haystacks) {
+    best = Math.max(best, matchScore(text, token, weight))
   }
   return best
+}
+
+interface TokenScore {
+  matched: number
+  score: number
+}
+
+/**
+ * Every token is scored separately and they are summed.
+ *
+ * The query used to be matched as one string, on the reasoning that settings
+ * names are often two words and splitting them makes two weak matches instead
+ * of one strong one. That was wrong in the way that matters: nobody types a
+ * label verbatim. "ai embedding model", "novelty weight", "backup database" and
+ * "trusted proxy" all returned **nothing**, because no single indexed string
+ * contains any of them — the words are spread across the group name, the title,
+ * the blurb and the aliases, which is exactly where you would expect to find
+ * them.
+ */
+function scoreTokens(haystacks: readonly Haystack[], tokens: readonly string[]): TokenScore {
+  let matched = 0
+  let score = 0
+  for (const token of tokens) {
+    const best = scoreToken(haystacks, token)
+    if (best > 0) {
+      matched++
+      score += best
+    }
+  }
+  return { matched, score }
 }
 
 const GROUP_ORDER = new Map<AdminGroupId, number>(ADMIN_GROUPS.map((g, i) => [g.id, i]))
 
 /**
- * `query` is matched as a whole rather than tokenised: two-word settings names
- * are common here ("poster display", "gap analysis") and splitting turns them
- * into two weak matches instead of one strong one.
+ * Ranked destinations for a query.
+ *
+ * A result must match at least one token, and results that matched *more* of
+ * them always rank above results that matched fewer — so a full match wins
+ * outright, and a query with a stray word ("the api key") degrades to the best
+ * partial matches instead of returning nothing.
  */
 export function searchAdmin(query: string, t: Translate): AdminSearchResult[] {
-  const needle = query.trim().toLowerCase()
-  if (needle.length < 1) return []
+  const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  if (tokens.length === 0) return []
 
-  const results: AdminSearchResult[] = []
+  // Translated once per search rather than once per entry per token.
+  GROUP_LABELS.clear()
+  for (const group of ADMIN_GROUPS) GROUP_LABELS.set(group.id, t(group.labelKey))
+
+  const results: (AdminSearchResult & { matched: number })[] = []
 
   for (const entry of ADMIN_ENTRIES) {
     const path = adminEntryPath(entry)
     const title = t(entry.titleKey)
 
-    const entryScore = scoreEntry(entry, needle, t)
-    if (entryScore > 0) {
+    const entryHit = scoreTokens(entryHaystacks(entry, t), tokens)
+    if (entryHit.matched > 0) {
       results.push({
         key: entry.id,
         entryId: entry.id,
@@ -97,40 +164,39 @@ export function searchAdmin(query: string, t: Translate): AdminSearchResult[] {
         path,
         title,
         blurb: t(entry.blurbKey),
-        score: entryScore,
+        score: entryHit.score,
+        matched: entryHit.matched,
       })
     }
 
     for (const field of entry.fields ?? []) {
-      const label = t(field.labelKey)
-      let fieldScore = matchScore(label, needle, 90)
-      for (const alias of field.aliases ?? []) {
-        fieldScore = Math.max(fieldScore, matchScore(alias, needle, 60))
-      }
-      // Breaks a tie toward the section: a query that scores a section and
-      // one of its own fields equally means the section. It does not hold a
-      // field below every section — a query naming a control ("api key")
-      // should reach the control, not the eleven cards that mention one.
-      if (fieldScore > 0) {
-        results.push({
-          key: `${entry.id}#${field.anchor}`,
-          entryId: entry.id,
-          group: entry.group,
-          path: `${path}#${field.anchor}`,
-          title: label,
-          parentTitle: title,
-          score: fieldScore - 1,
-        })
-      }
+      const fieldHit = scoreTokens(fieldHaystacks(field, title, t), tokens)
+      if (fieldHit.matched === 0) continue
+      results.push({
+        key: `${entry.id}#${field.anchor}`,
+        entryId: entry.id,
+        group: entry.group,
+        path: `${path}#${field.anchor}`,
+        title: t(field.labelKey),
+        parentTitle: title,
+        // Breaks a tie toward the section: a query that scores a section and
+        // one of its own fields equally means the section. It does not hold a
+        // field below every section — a query naming a control ("api key")
+        // should reach the control, not the eleven cards that mention one.
+        score: fieldHit.score - 1,
+        matched: fieldHit.matched,
+      })
     }
   }
 
   results.sort((a, b) => {
+    // Covering more of what was typed beats scoring higher on less of it.
+    if (b.matched !== a.matched) return b.matched - a.matched
     if (b.score !== a.score) return b.score - a.score
     const groupDelta = (GROUP_ORDER.get(a.group) ?? 0) - (GROUP_ORDER.get(b.group) ?? 0)
     if (groupDelta !== 0) return groupDelta
     return a.title.localeCompare(b.title)
   })
 
-  return results.slice(0, MAX_RESULTS)
+  return results.slice(0, MAX_RESULTS).map(({ matched: _matched, ...result }) => result)
 }
