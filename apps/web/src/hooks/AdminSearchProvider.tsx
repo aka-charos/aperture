@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { AdminSearchContext } from './admin-search-context'
 import { AdminSearchPalette } from '@/components/AdminSearchPalette'
+import { matchSearchShortcut } from '@/lib/searchShortcut'
 
 /**
  * Holds the settings palette and its shortcut.
@@ -10,7 +11,8 @@ import { AdminSearchPalette } from '@/components/AdminSearchPalette'
  * path to a setting should not start with navigating to the settings.
  *
  * ⌘⇧K / Ctrl+Shift+K. ⌘K stays with `GlobalSearch`; see the note there on why
- * these are two palettes and not one.
+ * these are two palettes and not one, and `matchSearchShortcut` for why
+ * neither listener is allowed to decide which of them a keystroke belongs to.
  */
 export function AdminSearchProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -20,9 +22,7 @@ export function AdminSearchProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // `e.key` is 'K' when shift is held, so compare case-insensitively —
-      // matching 'k' alone silently never fires.
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
+      if (matchSearchShortcut(e) === 'admin') {
         e.preventDefault()
         setIsOpen((v) => !v)
       }
