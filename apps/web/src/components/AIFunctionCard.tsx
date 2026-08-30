@@ -19,6 +19,7 @@ import {
   InputAdornment,
   IconButton,
   Alert,
+  AlertTitle,
   Chip,
   CircularProgress,
   Link,
@@ -79,6 +80,10 @@ export interface ModelInfo {
   embeddingDimensions?: number
   inputCostPerMillion?: number
   outputCostPerMillion?: number
+  /** Retrieval mode this model should use here; absent when its default is right. */
+  recommendedInputType?: EmbeddingInputTypeValue
+  /** Why that is the recommendation — or, when there is none, why none is needed. */
+  inputTypeNote?: string
   capabilities: {
     supportsToolCalling: boolean
     supportsEmbeddings: boolean
@@ -1171,6 +1176,44 @@ export function AIFunctionCard({
               </Select>
             </FormControl>
             <FormHelperText>{t('aiFunctionCard.inputTypeHelp')}</FormHelperText>
+
+            {/* What this model needs, from the catalog. A hint with an explicit
+                Apply, never an automatic correction: applying it rewrites the
+                set identity, which is a different population of vectors, and
+                that must not happen because someone opened a settings page.
+
+                The "no mode needed" note is shown too — for gemini-2 the
+                default already IS the semantic space, and silence there reads
+                as an oversight rather than as a decision. */}
+            {selectedModel?.inputTypeNote && (
+              <Alert
+                severity="info"
+                sx={{ mt: 1 }}
+                action={
+                  selectedModel.recommendedInputType &&
+                  inputType !== selectedModel.recommendedInputType ? (
+                    <Button
+                      size="small"
+                      onClick={() => setInputType(selectedModel.recommendedInputType!)}
+                    >
+                      {t('aiFunctionCard.inputTypeApplyRecommended')}
+                    </Button>
+                  ) : undefined
+                }
+              >
+                {selectedModel.recommendedInputType && (
+                  <AlertTitle sx={{ mb: 0.5 }}>
+                    {t('aiFunctionCard.inputTypeRecommended', {
+                      mode: t(
+                        `aiFunctionCard.inputTypeOptions.${selectedModel.recommendedInputType}`
+                      ),
+                    })}
+                  </AlertTitle>
+                )}
+                {selectedModel.inputTypeNote}
+              </Alert>
+            )}
+
             {inputType !== storedInputType && (
               <Alert severity="warning" sx={{ mt: 1 }}>
                 {t('aiFunctionCard.inputTypeChangeWarning')}

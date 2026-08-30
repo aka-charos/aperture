@@ -1016,7 +1016,9 @@
       "search_document": "Search document"
     },
     "inputTypeHelp": "Which space the model embeds into. Recommendations compare a film against other films, and a taste profile is the average of films watched — both symmetric, which is what \"semantic similarity\" is for. The provider default is the asymmetric query-to-document space used for search. Only OpenRouter and Google can send this.",
-    "inputTypeChangeWarning": "Changing this starts a NEW set of vectors beside the existing one; nothing is deleted or converted. The library keeps using the current set until you re-run embedding generation, then centring, then Rebuild taste profiles, then recommendations."
+    "inputTypeChangeWarning": "Changing this starts a NEW set of vectors beside the existing one; nothing is deleted or converted. The library keeps using the current set until you re-run embedding generation, then centring, then Rebuild taste profiles, then recommendations.",
+    "inputTypeRecommended": "Recommended for this model: {{mode}}",
+    "inputTypeApplyRecommended": "Apply"
   },
   "aiCapability": {
     "configure": "Настроить",
