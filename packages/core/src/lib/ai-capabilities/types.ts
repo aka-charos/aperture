@@ -29,6 +29,38 @@ export interface ModelMetadata {
   recommendedInputType?: 'semantic_similarity' | 'search_query' | 'search_document'
 
   /**
+   * HOW a retrieval mode reaches this model. Absent means `parameter`.
+   *
+   * `parameter` — an API field (OpenRouter's `input_type`, Google's native
+   * `taskType`). What `gemini-embedding-001` and every older model use.
+   *
+   * `textPrefix` — the mode is written into the text being embedded.
+   * `gemini-embedding-2` dropped `task_type` and moved task conditioning into
+   * the prompt, so it **ignores** `input_type` entirely: measured, its
+   * `semantic_similarity` output is byte-identical to sending nothing, while
+   * the documented prefix moves the vector to cosine 0.811 from bare text.
+   *
+   * Exactly one path is taken. A model on `textPrefix` is sent no parameter,
+   * because a field it ignores is noise in the request and, worse, reads to a
+   * later maintainer as though the mode were being delivered that way.
+   */
+  inputTypeMechanism?: 'parameter' | 'textPrefix'
+
+  /**
+   * For `textPrefix` models: the exact string prepended for each mode.
+   *
+   * A mode absent from this map is **not supported** on this model, and the
+   * settings route refuses it rather than storing a mode that would be recorded
+   * in the set identity and then never applied. Only prefixes that have been
+   * verified against the provider belong here — Google documents an asymmetric
+   * `title: … | text: …` form for documents that this app has no use for and
+   * has never measured, so it is deliberately absent rather than guessed.
+   */
+  inputTypePrefixes?: Partial<
+    Record<'semantic_similarity' | 'search_query' | 'search_document', string>
+  >
+
+  /**
    * Why {@link recommendedInputType} is what it is, or — when there is no
    * recommendation — why this model needs none. Shown under the mode control,
    * because "leave this alone" is exactly as much a decision as changing it and

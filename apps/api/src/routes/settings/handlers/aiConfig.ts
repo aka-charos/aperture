@@ -65,6 +65,8 @@ import {
   embeddingSetId,
   isEmbeddingInputType,
   providerSupportsInputType,
+  resolveInputTypeDelivery,
+  getModel,
   EMBEDDING_INPUT_TYPES,
   type AIFunction,
   type EmbeddingInputType,
@@ -893,6 +895,21 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       } else if (!providerSupportsInputType(provider)) {
         return reply.status(400).send({
           error: `Provider ${provider} cannot send an embedding input type. Remove it or choose a provider that supports one.`,
+        })
+      } else if (
+        resolveInputTypeDelivery({
+          inputType: embeddingInputType,
+          mechanism: getModel(provider, model, 'embeddings')?.inputTypeMechanism,
+          prefixes: getModel(provider, model, 'embeddings')?.inputTypePrefixes,
+        }).mechanism === 'none'
+      ) {
+        // The provider could carry a mode, but THIS model has no way to deliver
+        // this one — a prefix-conditioned model asked for a mode with no
+        // verified prefix. Refused rather than stored, because the set identity
+        // would then name a space the vectors were never embedded in, and no
+        // later measurement can detect that.
+        return reply.status(400).send({
+          error: `Model ${model} has no verified way to apply the "${embeddingInputType}" mode. Leave it unset or choose a mode this model supports.`,
         })
       } else {
         nextInputType = embeddingInputType

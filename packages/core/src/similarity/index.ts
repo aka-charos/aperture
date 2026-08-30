@@ -5,7 +5,6 @@ import {
   getActiveEmbeddingModelId,
   getActiveEmbeddingTableName,
 } from '../lib/ai-provider.js'
-import { embed } from 'ai'
 import { computeConnectionReasons, type ConnectionReason } from './reasons.js'
 import { selectWithCrossMediaSlots } from './crossMedia.js'
 
@@ -1050,13 +1049,8 @@ export async function semanticSearch(
   // Generate embedding for the search query. Through the same invocation as
   // the library pass: a query embedded in a different space than the items it
   // is about to be compared against still returns a confident ranking.
-  const { model, providerOptions } = await getEmbeddingInvocation()
-
-  const { embedding: queryEmbedding } = await embed({
-    model,
-    value: searchQuery,
-    providerOptions,
-  })
+  const { embedOne } = await getEmbeddingInvocation()
+  const queryEmbedding = await embedOne(searchQuery)
 
   const embeddingVector = `[${queryEmbedding.join(',')}]`
 

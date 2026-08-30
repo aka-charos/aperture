@@ -186,6 +186,7 @@ export {
   embeddingSetId,
   describeEmbeddingSetId,
   resolveEmbeddingInputType,
+  resolveInputTypeDelivery,
   isEmbeddingInputType,
   providerSupportsInputType,
   EMBEDDING_INPUT_TYPES,

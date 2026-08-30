@@ -388,7 +388,6 @@ export function registerTasteProfileHandlers(fastify: FastifyInstance) {
       }
 
       const { addCustomInterest, getEmbeddingInvocation } = await import('@aperture/core')
-      const { embed } = await import('ai')
 
       let embedding: number[] | undefined
       let embeddingModel: string | undefined
@@ -402,9 +401,8 @@ export function registerTasteProfileHandlers(fastify: FastifyInstance) {
         //
         // Vector and label come from one invocation, so the row cannot claim a
         // space its vector was not embedded in.
-        const { model, providerOptions, setId } = await getEmbeddingInvocation()
-        const result = await embed({ model, value: interestText.trim(), providerOptions })
-        embedding = result.embedding
+        const { embedOne, setId } = await getEmbeddingInvocation()
+        embedding = await embedOne(interestText.trim())
         embeddingModel = setId
       } catch {
         fastify.log.warn('Failed to generate embedding for custom interest')

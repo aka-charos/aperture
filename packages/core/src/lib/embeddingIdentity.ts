@@ -175,6 +175,34 @@ export function googleTaskTypeFor(
 }
 
 /**
+ * How a mode reaches a given model, and the prefix to prepend if it is text.
+ *
+ * Pure, because the decision has three ways to be silently wrong and none of
+ * them raises anything: sending a parameter a model ignores, prepending a
+ * prefix a model does not expect, or believing a byte-identical response proves
+ * a mode was honoured rather than dropped.
+ *
+ * `'none'` covers both "no mode was asked for" and "a mode was asked for that
+ * this model has no verified way to deliver". The caller logs the second; from
+ * here they are the same instruction — embed the text unconditioned, which is
+ * the space every other row of a fresh set will be in.
+ */
+export function resolveInputTypeDelivery(input: {
+  inputType?: EmbeddingInputType
+  mechanism?: 'parameter' | 'textPrefix'
+  prefixes?: Partial<Record<EmbeddingInputType, string>>
+}): { mechanism: 'parameter' | 'textPrefix' | 'none'; prefix?: string } {
+  const { inputType, mechanism = 'parameter', prefixes } = input
+
+  if (!inputType) return { mechanism: 'none' }
+
+  if (mechanism === 'parameter') return { mechanism: 'parameter' }
+
+  const prefix = prefixes?.[inputType]
+  return prefix ? { mechanism: 'textPrefix', prefix } : { mechanism: 'none' }
+}
+
+/**
  * Which providers can actually carry a mode.
  *
  * `openrouter` puts it in the request body as `input_type` (the provider's

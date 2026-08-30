@@ -1,7 +1,7 @@
 /**
  * Search and similarity tools with Tool UI output schemas
  */
-import { tool, embed } from 'ai'
+import { tool } from 'ai'
 import { nullSafe } from './utils.js'
 import { z } from 'zod'
 import { getActiveEmbeddingTableName } from '@aperture/core'
@@ -701,11 +701,7 @@ export function createSearchTools(ctx: ToolContext) {
           const safeLimit = Math.min(limit ?? 15, 50)
 
           // Generate embedding for the search concept using AI SDK
-          const { embedding: queryEmbedding } = await embed({
-            model: ctx.embedding.model,
-            value: concept,
-            providerOptions: ctx.embedding.providerOptions,
-          })
+          const queryEmbedding = await ctx.embedding.embedOne(concept)
           const embeddingStr = `[${queryEmbedding.join(',')}]`
 
           const items: ContentItem[] = []

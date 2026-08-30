@@ -305,17 +305,16 @@ async function refreshCustomInterestEmbeddings(userId: string): Promise<void> {
     )
     if (stale.length === 0) return
 
-    const { embed } = await import('ai')
     // `modelId` above is the set these vectors get stamped with, and it comes
     // from the same config this invocation resolves — so the interest text
-    // lands in the space its stamp claims.
-    const { model, providerOptions } = await getEmbeddingInvocation()
+    // lands in the space its stamp claims, task prefix included.
+    const { embedOne } = await getEmbeddingInvocation()
 
     let repaired = 0
     for (const interest of stale) {
       try {
-        const result = await embed({ model, value: interest.interestText, providerOptions })
-        await updateCustomInterestEmbedding(interest.id, result.embedding, modelId)
+        const embedding = await embedOne(interest.interestText)
+        await updateCustomInterestEmbedding(interest.id, embedding, modelId)
         repaired++
       } catch (err) {
         logger.warn({ err, userId, interestId: interest.id }, 'Failed to re-embed custom interest')

@@ -1,9 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { query, queryOne } from '../../lib/db.js'
 import { requireAuth } from '../../plugins/auth.js'
-import { embed } from 'ai'
-import { getEmbeddingModel, getOpenAIApiKey, getActiveEmbeddingTableName } from '@aperture/core'
-import { createOpenAI } from '@ai-sdk/openai'
+import { getEmbeddingInvocation, getActiveEmbeddingTableName } from '@aperture/core'
 import { searchSchemas, searchSchema, searchSuggestionsSchema, searchFiltersSchema } from './schemas.js'
 
 interface SearchResult {
@@ -40,25 +38,29 @@ interface SearchResponse {
   }
 }
 
-async function getQueryEmbedding(queryText: string): Promise<number[] | null> {
+/**
+ * The query vector, and the set it has to be compared against.
+ *
+ * This used to build its own OpenAI client from `getEmbeddingModel()` — the
+ * LEGACY bare model name in `system_settings.embedding_model` — and
+ * `getOpenAIApiKey()`. Two things were wrong with that. On any instance not
+ * using OpenAI it returned null, so semantic search was silently off and the
+ * route quietly degraded to text and trigram matching. And on an instance that
+ * *did* have an OpenAI key while embedding its library with something else, it
+ * would have compared OpenAI query vectors against Gemini item vectors — a
+ * confident ranking of two unrelated spaces.
+ *
+ * Going through the invocation fixes both and picks up the task prefix, so the
+ * query lands in the same space as the rows it is scored against.
+ */
+async function getQueryEmbedding(
+  queryText: string
+): Promise<{ embedding: number[]; setId: string } | null> {
   try {
-    const model = await getEmbeddingModel()
-    const apiKey = await getOpenAIApiKey()
-    
-    if (!apiKey) {
-      // OpenAI not configured, skip semantic search
-      return null
-    }
-    
-    const openai = createOpenAI({ apiKey })
-
-    const { embedding } = await embed({
-      model: openai.embedding(model),
-      value: queryText,
-    })
-
-    return embedding
+    const { embedOne, setId } = await getEmbeddingInvocation()
+    return { embedding: await embedOne(queryText), setId }
   } catch {
+    // Embeddings unconfigured or unreachable: text and trigram search still work.
     return null
   }
 }
@@ -177,10 +179,16 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
 
     // Get semantic embedding for query if enabled
     let queryEmbedding: number[] | null = null
+    // The set the query vector belongs to. Load-bearing now that one dimension
+    // table can hold several sets at once: without it the ANN join reads every
+    // model's rows for a title, in spaces that were never comparable.
+    let querySetId: string | null = null
     let movieEmbeddingTable = 'embeddings_1536' // default fallback
     let seriesEmbeddingTable = 'series_embeddings_1536' // default fallback
     if (useSemantic) {
-      queryEmbedding = await getQueryEmbedding(searchQuery)
+      const q = await getQueryEmbedding(searchQuery)
+      queryEmbedding = q?.embedding ?? null
+      querySetId = q?.setId ?? null
       // Get the correct embedding table names based on configured model
       try {
         movieEmbeddingTable = await getActiveEmbeddingTableName('embeddings')
@@ -210,12 +218,13 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
                    1 - (e.embedding <=> $${movieParams.length + 3}::halfvec) as semantic_sim
             FROM ${movieEmbeddingTable} e
             WHERE e.movie_id IN (SELECT id FROM text_search)
+              AND e.model = $${movieParams.length + 4}
           )
           SELECT t.*, COALESCE(s.semantic_sim, 0) as semantic_similarity
           FROM text_search t
           LEFT JOIN semantic_search s ON t.id = s.id
           ORDER BY (t.text_rank * 0.3 + t.fuzzy_sim * 0.3 + COALESCE(s.semantic_sim, 0) * 0.4) DESC
-          LIMIT $${movieParams.length + 4}
+          LIMIT $${movieParams.length + 5}
         `
         : `
           SELECT id, title, original_title, year, genres, overview, poster_url,
@@ -231,7 +240,7 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
         `
 
       const movieQueryParams = queryEmbedding
-        ? [tsqueryStr, queryLower, ...movieParams, `[${queryEmbedding.join(',')}]`, limit]
+        ? [tsqueryStr, queryLower, ...movieParams, `[${queryEmbedding.join(',')}]`, querySetId, limit]
         : [tsqueryStr, queryLower, ...movieParams, limit]
 
       const movieResults = await query<{
@@ -297,12 +306,13 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
                    1 - (e.embedding <=> $${seriesParams.length + 3}::halfvec) as semantic_sim
             FROM ${seriesEmbeddingTable} e
             WHERE e.series_id IN (SELECT id FROM text_search)
+              AND e.model = $${seriesParams.length + 4}
           )
           SELECT t.*, COALESCE(s.semantic_sim, 0) as semantic_similarity
           FROM text_search t
           LEFT JOIN semantic_search s ON t.id = s.id
           ORDER BY (t.text_rank * 0.3 + t.fuzzy_sim * 0.3 + COALESCE(s.semantic_sim, 0) * 0.4) DESC
-          LIMIT $${seriesParams.length + 4}
+          LIMIT $${seriesParams.length + 5}
         `
         : `
           SELECT id, title, original_title, year, genres, overview, poster_url,
@@ -318,7 +328,7 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
         `
 
       const seriesQueryParams = queryEmbedding
-        ? [tsqueryStr, queryLower, ...seriesParams, `[${queryEmbedding.join(',')}]`, limit]
+        ? [tsqueryStr, queryLower, ...seriesParams, `[${queryEmbedding.join(',')}]`, querySetId, limit]
         : [tsqueryStr, queryLower, ...seriesParams, limit]
 
       const seriesResults = await query<{

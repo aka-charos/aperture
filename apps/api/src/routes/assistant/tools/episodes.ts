@@ -15,7 +15,7 @@
  * the series index however good it is — it is a question about the content of
  * one episode, and the only place that content is vectorized is here.
  */
-import { tool, embed, type ToolSet } from 'ai'
+import { tool, type ToolSet } from 'ai'
 import { z } from 'zod'
 import { getActiveEmbeddingTableName, getEpisodeEmbeddingsEnabled } from '@aperture/core'
 import { query, transaction } from '../../../lib/db.js'
@@ -226,11 +226,7 @@ export async function createEpisodeTools(ctx: ToolContext): Promise<ToolSet> {
           const safeLimit = Math.min(limit ?? 10, 30)
           const tableName = await getActiveEmbeddingTableName('episode_embeddings')
 
-          const { embedding } = await embed({
-            model: ctx.embedding.model,
-            value: concept,
-            providerOptions: ctx.embedding.providerOptions,
-          })
+          const embedding = await ctx.embedding.embedOne(concept)
           const embeddingStr = `[${embedding.join(',')}]`
 
           // $1 embedding, $2 model, $3 limit are fixed; optional filters take

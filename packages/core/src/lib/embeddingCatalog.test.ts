@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getModelsForFunction, getEmbeddingDimensions, getProvider } from './ai-capabilities.js'
 import { VALID_EMBEDDING_DIMENSIONS } from './ai-provider.js'
-import { isEmbeddingInputType } from './embeddingIdentity.js'
+import { isEmbeddingInputType, resolveInputTypeDelivery } from './embeddingIdentity.js'
 
 /**
  * OpenRouter is a `CUSTOM_MODEL_PROVIDERS` member — it deliberately ships no
@@ -112,14 +112,50 @@ test('a recommended mode is one the system can actually store', () => {
   }
 })
 
-test('only 001 carries a recommendation, and it is the symmetric space', () => {
-  // gemini-2's default already IS semantic_similarity (byte-identical), and
-  // Qwen takes no mode at all -- its instruction recipe is query-side against
-  // bare documents, and this recommender's query is a centroid, not text.
-  // Both still carry a note saying so; silence would read as an oversight.
-  const withRec = OPENROUTER_EMBEDDINGS.filter((m) => m.recommendedInputType)
-  assert.deepEqual(
-    withRec.map((m) => [m.id, m.recommendedInputType]),
-    [['google/gemini-embedding-001', 'semantic_similarity']]
-  )
+test('both Gemini models want the symmetric space, by different mechanisms', () => {
+  // The correction this test exists to hold. Both recommend the same mode, but
+  // 001 takes it as a PARAMETER and gemini-2 as a TEXT PREFIX -- it ignores
+  // input_type outright, returning the byte-identical vector to sending
+  // nothing. Reading that identity as "its default is already semantic" is the
+  // mistake that shipped here once.
+  //
+  // Qwen recommends nothing: its instruction recipe is query-side against bare
+  // documents, and this recommender's query is a centroid, not text. It still
+  // carries a note saying so; silence would read as an oversight.
+  const byId = Object.fromEntries(OPENROUTER_EMBEDDINGS.map((m) => [m.id, m]))
+
+  assert.equal(byId['google/gemini-embedding-001'].recommendedInputType, 'semantic_similarity')
+  assert.equal(byId['google/gemini-embedding-001'].inputTypeMechanism, 'parameter')
+
+  assert.equal(byId['google/gemini-embedding-2'].recommendedInputType, 'semantic_similarity')
+  assert.equal(byId['google/gemini-embedding-2'].inputTypeMechanism, 'textPrefix')
+
+  assert.equal(byId['qwen/qwen3-embedding-8b'].recommendedInputType, undefined)
+})
+
+test('every recommended mode can actually be delivered by its model', () => {
+  // A recommendation the Apply button would produce a 400 for.
+  for (const model of OPENROUTER_EMBEDDINGS) {
+    if (!model.recommendedInputType) continue
+    const { mechanism } = resolveInputTypeDelivery({
+      inputType: model.recommendedInputType,
+      mechanism: model.inputTypeMechanism,
+      prefixes: model.inputTypePrefixes,
+    })
+    assert.notEqual(
+      mechanism,
+      'none',
+      `${model.id} recommends ${model.recommendedInputType} but has no way to send it`
+    )
+  }
+})
+
+test('a textPrefix model ships the prefix it needs', () => {
+  for (const model of OPENROUTER_EMBEDDINGS) {
+    if (model.inputTypeMechanism !== 'textPrefix') continue
+    assert.ok(
+      Object.keys(model.inputTypePrefixes ?? {}).length > 0,
+      `${model.id} is prefix-conditioned but ships no prefixes, so no mode reaches it`
+    )
+  }
 })

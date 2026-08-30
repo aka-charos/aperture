@@ -15,7 +15,6 @@ import {
   getActiveEmbeddingTableName,
 } from '../../lib/ai-provider.js'
 import { embeddingSetId } from '../../lib/embeddingIdentity.js'
-import { embedMany } from 'ai'
 import { centreAfterGeneration } from '../centering.js'
 import { randomUUID } from 'crypto'
 import { getEpisodeEmbeddingsEnabled } from '../../settings/systemSettings.js'
@@ -288,7 +287,7 @@ export async function embedSeries(series: SeriesForEmbedding[]): Promise<SeriesE
     return []
   }
 
-  const { model, providerOptions, setId, inputType } = await getEmbeddingInvocation()
+  const { embedBatch, setId, inputType, inputTypeMechanism } = await getEmbeddingInvocation()
   const config = await getFunctionConfig('embeddings')
 
   // Build canonical texts
@@ -298,7 +297,7 @@ export async function embedSeries(series: SeriesForEmbedding[]): Promise<SeriesE
   }))
 
   logger.info(
-    { count: textsWithIds.length, provider: config?.provider, model: config?.model, inputType, setId },
+    { count: textsWithIds.length, provider: config?.provider, model: config?.model, inputType, inputTypeMechanism, setId },
     'Generating series embeddings'
   )
 
@@ -309,12 +308,8 @@ export async function embedSeries(series: SeriesForEmbedding[]): Promise<SeriesE
     const batch = textsWithIds.slice(i, i + batchSize)
     const texts = batch.map((t) => t.text)
 
-    // Use AI SDK embedMany for batch embedding
-    const { embeddings } = await embedMany({
-      model,
-      values: texts,
-      providerOptions,
-    })
+    // Through the invocation — see the movie mirror.
+    const embeddings = await embedBatch(texts)
 
     for (let j = 0; j < batch.length; j++) {
       results.push({
@@ -344,7 +339,7 @@ export async function embedEpisodes(
     return []
   }
 
-  const { model, providerOptions, setId, inputType } = await getEmbeddingInvocation()
+  const { embedBatch, setId, inputType, inputTypeMechanism } = await getEmbeddingInvocation()
   const config = await getFunctionConfig('embeddings')
 
   // Build canonical texts
@@ -354,7 +349,7 @@ export async function embedEpisodes(
   }))
 
   logger.info(
-    { count: textsWithIds.length, provider: config?.provider, model: config?.model, inputType, setId },
+    { count: textsWithIds.length, provider: config?.provider, model: config?.model, inputType, inputTypeMechanism, setId },
     'Generating episode embeddings'
   )
 
@@ -365,12 +360,8 @@ export async function embedEpisodes(
     const batch = textsWithIds.slice(i, i + batchSize)
     const texts = batch.map((t) => t.text)
 
-    // Use AI SDK embedMany for batch embedding
-    const { embeddings } = await embedMany({
-      model,
-      values: texts,
-      providerOptions,
-    })
+    // Through the invocation — see the movie mirror.
+    const embeddings = await embedBatch(texts)
 
     for (let j = 0; j < batch.length; j++) {
       results.push({
