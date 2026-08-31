@@ -41,13 +41,19 @@
  *                requests is being routed to different upstreams, and no
  *                per-document reading of the matrix means anything until that
  *                is settled.
- *   --pin TAG    pin OpenRouter routing to one upstream and disable fallbacks.
- *                The tags are REGION-SCOPED and come from
- *                GET /api/v1/models/<id>/endpoints -- verified 2026-08-31:
- *                  gemini-embedding-001: google-vertex/us-central1, google-ai-studio
- *                  gemini-embedding-2:   google-vertex/us, google-vertex/global,
- *                                        google-vertex/eu, google-ai-studio
- *                Do not guess these; a bare "google-vertex" is not a tag.
+ *   --pin SLUG   pin OpenRouter routing to one upstream and disable fallbacks.
+ *                Use the BASE slug -- google-vertex or google-ai-studio.
+ *                Note the endpoints API reports region-scoped TAGS
+ *                (google-vertex/us-central1, google-vertex/eu) and those are
+ *                NOT what provider.only accepts: passing one 404s with
+ *                "No allowed providers are available", which helpfully lists
+ *                the real values. Verified against that error 2026-08-31.
+ *
+ *                What pinning revealed on gemini-embedding-001: both upstreams
+ *                return the byte-identical vector with no input_type, and
+ *                disagree only about the parameter -- google-vertex honours it
+ *                (cosine 0.841 from default), google-ai-studio drops it. Each
+ *                is deterministic alone; unpinned is a coin flip between them.
  *   --require-params  send provider.require_parameters. OpenRouter defaults
  *                this to FALSE, meaning it may route to an upstream that does
  *                not support a field in your request and drop that field
