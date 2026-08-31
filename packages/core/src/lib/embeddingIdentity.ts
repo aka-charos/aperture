@@ -82,7 +82,27 @@ export interface EmbeddingIdentityConfig {
   provider: string
   model: string
   embeddingInputType?: string
+  /**
+   * The single OpenRouter upstream this role is pinned to, if any.
+   *
+   * Part of the identity ONLY when the mode is delivered as a parameter,
+   * because that is the only case where the pin decides the space. Measured on
+   * `gemini-embedding-001`: pinned to `google-vertex`, `input_type` is honoured
+   * (cosine 0.841 from default); pinned to `google-ai-studio` it is dropped and
+   * the default vector comes back. Both upstreams agree when no mode is sent,
+   * so an unmoded set is the same population either way and takes no suffix —
+   * which is what keeps every existing row's id unchanged.
+   */
+  embeddingProviderOnly?: string
 }
+
+/**
+ * Separator between the mode and the upstream it was delivered by.
+ *
+ * `@` is a legal `pchar` in RFC 3986, so like `~` it survives a URL path
+ * segment intact — and the set id is one, in the delete route.
+ */
+export const EMBEDDING_PIN_SEPARATOR = '@'
 
 /**
  * The mode on a config, normalised — or `undefined` for "send nothing".
@@ -115,14 +135,26 @@ export function resolveEmbeddingInputType(
  * module comment.
  */
 export function embeddingSetId(
-  config: EmbeddingIdentityConfig | null | undefined
+  config: EmbeddingIdentityConfig | null | undefined,
+  /**
+   * How the mode is being delivered. Only a `parameter` mode makes the upstream
+   * pin part of the identity — see {@link EmbeddingIdentityConfig.embeddingProviderOnly}.
+   * Callers that do not know pass nothing, and get the un-pinned id.
+   */
+  mechanism?: 'parameter' | 'textPrefix' | 'none'
 ): string {
   if (!config?.provider || !config?.model) return UNKNOWN_EMBEDDING_SET
 
   const base = `${config.provider}:${config.model}`
   const mode = resolveEmbeddingInputType(config)
+  if (!mode) return base
 
-  return mode ? `${base}${EMBEDDING_MODE_SEPARATOR}${mode}` : base
+  const withMode = `${base}${EMBEDDING_MODE_SEPARATOR}${mode}`
+
+  const pin = config.embeddingProviderOnly?.trim()
+  if (mechanism !== 'parameter' || !pin) return withMode
+
+  return `${withMode}${EMBEDDING_PIN_SEPARATOR}${pin}`
 }
 
 /**
@@ -139,14 +171,50 @@ export function embeddingSetId(
 export function describeEmbeddingSetId(setId: string): {
   base: string
   mode?: EmbeddingInputType
+  pin?: string
 } {
-  const at = setId.lastIndexOf(EMBEDDING_MODE_SEPARATOR)
+  // The pin comes off first: it is appended after the mode, and a model id can
+  // contain neither separator.
+  let rest = setId
+  let pin: string | undefined
+  const pinAt = rest.lastIndexOf(EMBEDDING_PIN_SEPARATOR)
+  if (pinAt !== -1) {
+    pin = rest.slice(pinAt + EMBEDDING_PIN_SEPARATOR.length)
+    rest = rest.slice(0, pinAt)
+  }
+
+  const at = rest.lastIndexOf(EMBEDDING_MODE_SEPARATOR)
   if (at === -1) return { base: setId }
 
-  const candidate = setId.slice(at + EMBEDDING_MODE_SEPARATOR.length)
+  const candidate = rest.slice(at + EMBEDDING_MODE_SEPARATOR.length)
   if (!isEmbeddingInputType(candidate)) return { base: setId }
 
-  return { base: setId.slice(0, at), mode: candidate }
+  return { base: rest.slice(0, at), mode: candidate, ...(pin ? { pin } : {}) }
+}
+
+/**
+ * Whether this configuration would silently produce a MIXTURE of two spaces.
+ *
+ * True when a mode is delivered as a request parameter on OpenRouter with no
+ * upstream pinned. OpenRouter routes each call independently between upstreams
+ * that need not treat an undocumented field the same way — measured on
+ * `gemini-embedding-001`, five identical requests returned two different
+ * vectors, one of them the unmoded one. A library pass in that state writes an
+ * unpredictable blend of two populations into one set, and nothing downstream
+ * can detect it.
+ *
+ * A `textPrefix` mode is exempt because it conditions the TEXT: every upstream
+ * receives a different input and computes the same answer for it, so routing
+ * cannot drop it.
+ */
+export function requiresProviderPin(input: {
+  provider: string
+  mechanism: 'parameter' | 'textPrefix' | 'none'
+  pin?: string
+}): boolean {
+  if (input.provider !== 'openrouter') return false
+  if (input.mechanism !== 'parameter') return false
+  return !input.pin?.trim()
 }
 
 /**

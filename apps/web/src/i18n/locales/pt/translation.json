@@ -1494,7 +1494,11 @@
     "inputTypeHelp": "Which space the model embeds into. Recommendations compare a film against other films, and a taste profile is the average of films watched — both symmetric, which is what \"semantic similarity\" is for. The provider default is the asymmetric query-to-document space used for search. Only OpenRouter and Google can send this.",
     "inputTypeChangeWarning": "Changing this starts a NEW set of vectors beside the existing one; nothing is deleted or converted. The library keeps using the current set until you re-run embedding generation, then centring, then Rebuild taste profiles, then recommendations.",
     "inputTypeRecommended": "Recommended for this model: {{mode}}",
-    "inputTypeApplyRecommended": "Apply"
+    "inputTypeApplyRecommended": "Apply",
+    "upstreamLabel": "OpenRouter upstream",
+    "upstreamAuto": "Automatic (OpenRouter chooses)",
+    "upstreamHelp": "OpenRouter serves one model from several companies. Automatic is fine when no retrieval mode is set, because the upstreams agree on unconditioned text. Pinning also makes latency and price predictable.",
+    "upstreamRequired": "Required for this retrieval mode. The mode is sent as a request field, and OpenRouter picks an upstream per call — they do not all honour it, so leaving this automatic would embed your library as an unpredictable mixture of two different spaces, with nothing able to detect it afterwards."
   },
   "topPicksOutputConfig": {
     "accordionTitle": "Qual é a diferença entre Biblioteca, Coleção e Playlist?",

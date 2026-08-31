@@ -46,6 +46,7 @@ import {
   PROVIDER_INFO,
   EMBEDDING_INPUT_TYPE_VALUES,
   PROVIDERS_WITH_INPUT_TYPE,
+  OPENROUTER_UPSTREAMS,
   type EmbeddingInputTypeValue,
   type FallbackModelConfig,
   type FunctionConfig,
@@ -84,6 +85,8 @@ export interface ModelInfo {
   recommendedInputType?: EmbeddingInputTypeValue
   /** Why that is the recommendation — or, when there is none, why none is needed. */
   inputTypeNote?: string
+  /** How the mode reaches the model; absent means a request parameter. */
+  inputTypeMechanism?: 'parameter' | 'textPrefix'
   capabilities: {
     supportsToolCalling: boolean
     supportsEmbeddings: boolean
@@ -223,6 +226,9 @@ export function AIFunctionCard({
    */
   const [inputType, setInputType] = useState<EmbeddingInputTypeValue | ''>('')
 
+  /** Pinned OpenRouter upstream; '' means let OpenRouter choose. */
+  const [providerOnly, setProviderOnly] = useState('')
+
   // Custom model dialog state
   const [addModelDialogOpen, setAddModelDialogOpen] = useState(false)
   const [newModelName, setNewModelName] = useState('')
@@ -310,6 +316,20 @@ export function AIFunctionCard({
   useEffect(() => {
     setInputType(storedInputType)
   }, [storedInputType])
+
+  const storedProviderOnly = config?.embeddingProviderOnly ?? ''
+  useEffect(() => {
+    setProviderOnly(storedProviderOnly)
+  }, [storedProviderOnly])
+
+  // A pin is only load-bearing for a mode delivered as a request parameter.
+  // The catalog says which mechanism a model uses; absent means parameter.
+  const pinRequired =
+    offersInputType &&
+    provider === 'openrouter' &&
+    inputType !== '' &&
+    (selectedModel?.inputTypeMechanism ?? 'parameter') === 'parameter' &&
+    providerOnly === ''
 
 
   // Check capability warning
@@ -500,6 +520,9 @@ export function AIFunctionCard({
       // Embeddings card from a provider that cannot carry a mode would silently
       // drop one an admin set on a provider that can.
       ...(offersInputType ? { embeddingInputType: inputType || null } : {}),
+      ...(offersInputType && provider === 'openrouter'
+        ? { embeddingProviderOnly: providerOnly || null }
+        : {}),
     }
 
     setSaving(true)
@@ -1214,6 +1237,40 @@ export function AIFunctionCard({
               </Alert>
             )}
 
+            {/* The pin. Offered whenever OpenRouter is the provider, since an
+                operator may want deterministic routing regardless — but it is
+                REQUIRED for a parameter-delivered mode, because OpenRouter
+                picks an upstream per call and they do not all honour an
+                undocumented field. Unpinned, the library becomes a mixture of
+                two spaces that nothing downstream can detect. */}
+            {provider === 'openrouter' && (
+              <Box sx={{ mt: 2 }}>
+                <FormControl fullWidth size="small" error={pinRequired}>
+                  <InputLabel id={`${functionType}-upstream-label`}>
+                    {t('aiFunctionCard.upstreamLabel')}
+                  </InputLabel>
+                  <Select
+                    labelId={`${functionType}-upstream-label`}
+                    value={providerOnly}
+                    label={t('aiFunctionCard.upstreamLabel')}
+                    onChange={(e) => setProviderOnly(e.target.value)}
+                  >
+                    <MenuItem value="">{t('aiFunctionCard.upstreamAuto')}</MenuItem>
+                    {OPENROUTER_UPSTREAMS.map((slug) => (
+                      <MenuItem key={slug} value={slug}>
+                        {slug}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormHelperText error={pinRequired}>
+                  {pinRequired
+                    ? t('aiFunctionCard.upstreamRequired')
+                    : t('aiFunctionCard.upstreamHelp')}
+                </FormHelperText>
+              </Box>
+            )}
+
             {inputType !== storedInputType && (
               <Alert severity="warning" sx={{ mt: 1 }}>
                 {t('aiFunctionCard.inputTypeChangeWarning')}
@@ -1336,7 +1393,9 @@ export function AIFunctionCard({
             variant="contained"
             size="small"
             onClick={handleSave}
-            disabled={saving || !model}
+            // Blocked rather than warned: an unpinned parameter mode produces a
+            // set that is a mixture of two spaces, and no later step can repair it.
+            disabled={saving || !model || pinRequired}
           >
             {saving ? <CircularProgress size={16} /> : t('common.save')}
           </Button>

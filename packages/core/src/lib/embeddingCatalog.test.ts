@@ -2,7 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getModelsForFunction, getEmbeddingDimensions, getProvider } from './ai-capabilities.js'
 import { VALID_EMBEDDING_DIMENSIONS } from './ai-provider.js'
-import { isEmbeddingInputType, resolveInputTypeDelivery } from './embeddingIdentity.js'
+import {
+  isEmbeddingInputType,
+  requiresProviderPin,
+  resolveInputTypeDelivery,
+} from './embeddingIdentity.js'
 
 /**
  * OpenRouter is a `CUSTOM_MODEL_PROVIDERS` member — it deliberately ships no
@@ -112,26 +116,25 @@ test('a recommended mode is one the system can actually store', () => {
   }
 })
 
-test('only the model that reliably delivers a mode recommends one', () => {
+test('both Gemini models want the symmetric space, by different mechanisms', () => {
   const byId = Object.fromEntries(OPENROUTER_EMBEDDINGS.map((m) => [m.id, m]))
 
-  // gemini-2 conditions on a TEXT PREFIX, and measured over five identical
-  // requests it is byte-stable. Because the prefix changes the input, no cache
-  // or route can collapse it into the unconditioned vector.
+  // gemini-2 conditions on a TEXT PREFIX and is byte-stable over five identical
+  // requests. The prefix changes the input, so no route can collapse it into
+  // the unconditioned vector, and no pin is needed.
   assert.equal(byId['google/gemini-embedding-2'].recommendedInputType, 'semantic_similarity')
   assert.equal(byId['google/gemini-embedding-2'].inputTypeMechanism, 'textPrefix')
 
-  // 001 recommends NOTHING, and that is a measurement rather than caution.
-  // The same request with input_type: semantic_similarity returned two
-  // different vectors at random across five identical calls -- sometimes the
-  // default vector, sometimes a distinct one -- while the same model with no
-  // mode set was stable over the same five. A pass would write a random
-  // mixture of two spaces into one set, undetectable afterwards.
-  //
-  // It keeps `parameter` as its mechanism because that is what the model IS;
-  // the reason not to use it belongs in the note, not in a fake mechanism.
-  assert.equal(byId['google/gemini-embedding-001'].recommendedInputType, undefined)
+  // 001 takes the mode as a request PARAMETER, which OpenRouter's two upstreams
+  // treat differently -- google-vertex honours it, google-ai-studio drops it.
+  // Usable, but ONLY pinned, which `requiresProviderPin` enforces at the
+  // settings route rather than leaving to whoever reads the note.
+  assert.equal(byId['google/gemini-embedding-001'].recommendedInputType, 'semantic_similarity')
   assert.equal(byId['google/gemini-embedding-001'].inputTypeMechanism, 'parameter')
+  assert.ok(
+    requiresProviderPin({ provider: 'openrouter', mechanism: 'parameter' }),
+    'recommending a parameter mode on openrouter must still demand a pin'
+  )
 
   // Qwen: its instruction recipe is query-side against bare documents, and this
   // recommender's query is a centroid, not text.

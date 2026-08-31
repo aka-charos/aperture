@@ -21,6 +21,7 @@ import {
   providerSupportsInputType,
   resolveEmbeddingInputType,
   resolveInputTypeDelivery,
+  requiresProviderPin,
   type EmbeddingInputType,
 } from './embeddingIdentity.js'
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
@@ -170,6 +171,28 @@ export interface ProviderConfig {
    * vectors were never embedded in is a confident number that means nothing.
    */
   embeddingInputType?: EmbeddingInputType
+  /**
+   * Pin OpenRouter routing for the `embeddings` role to one upstream, with
+   * fallbacks off. Absent = OpenRouter picks per request.
+   *
+   * REQUIRED whenever a mode is delivered as a request parameter, and refused
+   * at the settings route otherwise. OpenRouter serves one model from several
+   * upstreams that need not treat an undocumented field alike: measured on
+   * `gemini-embedding-001`, `google-vertex` honours `input_type` (cosine 0.841
+   * from unmoded) while `google-ai-studio` drops it and returns the unmoded
+   * vector — each deterministic alone, a coin flip together. Unpinned, a
+   * library pass writes a blend of two populations into one set.
+   *
+   * It is part of the set identity for exactly that reason, so re-pinning
+   * starts a new set rather than contaminating one. Only when the mode is a
+   * parameter: both upstreams agree when no mode is sent, which is what keeps
+   * every already-stored row's id unchanged.
+   *
+   * Takes the BASE slug — `google-vertex`, `google-ai-studio` — not the
+   * region-scoped tag the endpoints API reports (`google-vertex/us-central1`).
+   * A tag 404s with "No allowed providers are available", listing the real ones.
+   */
+  embeddingProviderOnly?: string
 }
 
 /**
@@ -656,6 +679,8 @@ export interface EmbeddingInvocation {
   inputType?: EmbeddingInputType
   /** How that mode reaches the model, for logging. */
   inputTypeMechanism: 'parameter' | 'textPrefix' | 'none'
+  /** The pinned OpenRouter upstream, if any. */
+  providerOnly?: string
   /**
    * Applies this model's task prefix. Identity when the model takes its mode as
    * a parameter, or takes none at all.
@@ -715,12 +740,6 @@ export async function getEmbeddingInvocation(): Promise<EmbeddingInvocation> {
     )
   }
 
-  const setId = embeddingSetId({
-    provider: resolved.provider,
-    model: modelId,
-    embeddingInputType: inputType,
-  })
-
   // HOW the mode is delivered is a property of the model, not the provider.
   //
   // gemini-embedding-2 dropped `task_type` and moved task conditioning into the
@@ -748,6 +767,34 @@ export async function getEmbeddingInvocation(): Promise<EmbeddingInvocation> {
     logger.warn(
       { provider: resolved.provider, model: modelId, requested: inputType },
       'No verified way to deliver this mode on this model; embedding unconditioned'
+    )
+  }
+
+  // Pinned routing. Only meaningful on OpenRouter, and only load-bearing for a
+  // parameter mode -- but sent whenever configured, because an operator who
+  // pinned an upstream meant it.
+  const providerOnly =
+    resolved.provider === 'openrouter' ? config.embeddingProviderOnly?.trim() : undefined
+
+  // The identity has to know the mechanism AND the pin, since for a parameter
+  // mode the pin is what decides whether the mode landed at all.
+  const setId = embeddingSetId(
+    {
+      provider: resolved.provider,
+      model: modelId,
+      embeddingInputType: inputType,
+      embeddingProviderOnly: providerOnly,
+    },
+    mechanism
+  )
+
+  // Refused at the settings route, so reaching this means a config written
+  // before that guard. Loud, because the result is a set that cannot be
+  // repaired by anything short of re-embedding it.
+  if (requiresProviderPin({ provider: resolved.provider, mechanism, pin: providerOnly })) {
+    logger.error(
+      { provider: resolved.provider, model: modelId, mode: inputType },
+      'Embedding mode is a request parameter with no pinned upstream: this set will be a MIXTURE of two spaces'
     )
   }
 
@@ -781,7 +828,16 @@ export async function getEmbeddingInvocation(): Promise<EmbeddingInvocation> {
         // before this existed.
         return (provider as any).textEmbeddingModel( // eslint-disable-line @typescript-eslint/no-explicit-any
           modelId,
-          parameterMode ? { extraBody: { input_type: parameterMode } } : undefined
+          parameterMode || providerOnly
+            ? {
+                extraBody: {
+                  ...(parameterMode ? { input_type: parameterMode } : {}),
+                  ...(providerOnly
+                    ? { provider: { only: [providerOnly], allow_fallbacks: false } }
+                    : {}),
+                },
+              }
+            : undefined
         )
 
       default:
@@ -804,6 +860,7 @@ export async function getEmbeddingInvocation(): Promise<EmbeddingInvocation> {
     setId,
     inputType,
     inputTypeMechanism: mechanism,
+    providerOnly,
     prepareText,
     async embedOne(text: string): Promise<number[]> {
       const { embedding } = await embed({
