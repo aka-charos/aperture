@@ -44,7 +44,7 @@
       "embeddingDimensions": 3072,
       "quality": "standard",
       "costTier": "low",
-      "inputTypeNote": "Do NOT set a mode on this model. Measured live: the SAME request with input_type: semantic_similarity returns two different vectors at random -- five identical calls produced the default vector on some and a distinct one on others, while the model with no mode set was perfectly stable over the same five. A full pass would write an unpredictable mixture of two spaces into one set, which nothing downstream can detect. Leave it unset; that is what every vector currently stored used.",
+      "inputTypeNote": "Do NOT set a mode on this model. Measured live: the SAME request with input_type: semantic_similarity returns two different vectors at random -- five identical calls produced the default vector on some and a distinct one on others, while the model with no mode set was perfectly stable over the same five. A full pass would write an unpredictable mixture of two spaces into one set, which nothing downstream can detect. Leave it unset; that is what every vector currently stored used. Compounding it, input_type is not in OpenRouter embeddings documentation at all -- it is in the SDK type as an unconstrained string with two retrieval examples -- so there is no contract that any upstream honours it, and no notice if that changes.",
       "inputTypeMechanism": "parameter"
     },
     {

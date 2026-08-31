@@ -21,10 +21,11 @@ export interface ModelMetadata {
    * of someone opening a settings page, and the card shows it as a hint with an
    * explicit Apply instead.
    *
-   * Absent means the model's default is already right (gemini-embedding-2,
-   * whose default output is byte-identical to `semantic_similarity`), or that
-   * it takes no mode at all (Qwen, whose instruction recipe is query-side
-   * against bare documents and has no symmetric form).
+   * Absent means there is no mode worth asking for on this model. That covers
+   * two quite different cases and neither is "the default is fine":
+   * gemini-embedding-001 CAN take one and must not, because the endpoint
+   * delivers it only sometimes; Qwen has no symmetric form to ask for, its
+   * instruction recipe being query-side against bare documents.
    */
   recommendedInputType?: 'semantic_similarity' | 'search_query' | 'search_document'
 
@@ -51,10 +52,21 @@ export interface ModelMetadata {
    *
    * A mode absent from this map is **not supported** on this model, and the
    * settings route refuses it rather than storing a mode that would be recorded
-   * in the set identity and then never applied. Only prefixes that have been
-   * verified against the provider belong here — Google documents an asymmetric
-   * `title: … | text: …` form for documents that this app has no use for and
-   * has never measured, so it is deliberately absent rather than guessed.
+   * in the set identity and then never applied.
+   *
+   * Google documents eight prefixes for gemini-embedding-2 (verified against
+   * ai.google.dev 2026-08-31). Only the symmetric one is offered here, and the
+   * two retrieval ones are omitted on PURPOSE rather than for lack of
+   * verification:
+   *
+   * - `task: search result | query: {content}` is the query half of an
+   *   ASYMMETRIC pair. It only means anything against documents embedded as
+   *   `title: {title} | text: {content}` — and this app has ONE index that the
+   *   recommender, the similarity graph and semantic search all read, so a
+   *   query-space vector would be compared against item-space ones. Splitting
+   *   into two indexes is a much larger change than a settings field.
+   * - the document form is not a prefix at all: it is a two-part template
+   *   needing the title separately, which `prepareText(text)` cannot express.
    */
   inputTypePrefixes?: Partial<
     Record<'semantic_similarity' | 'search_query' | 'search_document', string>
