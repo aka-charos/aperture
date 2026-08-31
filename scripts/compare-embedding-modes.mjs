@@ -41,16 +41,25 @@
  *                requests is being routed to different upstreams, and no
  *                per-document reading of the matrix means anything until that
  *                is settled.
- *   --pin SLUG   pin OpenRouter routing to one upstream and disable fallbacks
- *                (e.g. google-vertex, google-ai-studio).
+ *   --pin TAG    pin OpenRouter routing to one upstream and disable fallbacks.
+ *                The tags are REGION-SCOPED and come from
+ *                GET /api/v1/models/<id>/endpoints -- verified 2026-08-31:
+ *                  gemini-embedding-001: google-vertex/us-central1, google-ai-studio
+ *                  gemini-embedding-2:   google-vertex/us, google-vertex/global,
+ *                                        google-vertex/eu, google-ai-studio
+ *                Do not guess these; a bare "google-vertex" is not a tag.
  *   --require-params  send provider.require_parameters. OpenRouter defaults
  *                this to FALSE, meaning it may route to an upstream that does
  *                not support a field in your request and drop that field
  *                silently. With two upstreams for one model and only one of
  *                them honouring input_type, that is a coin flip per call --
  *                which is what gemini-embedding-001 measured as. This is the
- *                documented opt-out, and the only thing that might make that
- *                configuration usable.
+ *                documented opt-out, but note that supported_parameters on
+ *                every Google embedding endpoint is the generic chat list
+ *                (max_tokens, temperature, top_p, seed, response_format) and
+ *                names no embedding field at all -- so this may simply find no
+ *                qualifying endpoint rather than a compliant one. --pin is the
+ *                likelier fix.
  *   --reverse    run the variants in reverse order. If a pair's result CHANGES
  *                when the order does, the endpoint is caching on (model, input)
  *                without input_type, and the second call is being served the
