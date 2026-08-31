@@ -679,6 +679,17 @@ export interface EmbeddingInvocation {
   inputType?: EmbeddingInputType
   /** How that mode reaches the model, for logging. */
   inputTypeMechanism: 'parameter' | 'textPrefix' | 'none'
+  /**
+   * The literal string put in `input_type`, which is NOT always the mode's
+   * canonical name — Google's upstreams want their own upper-case enum.
+   *
+   * Exposed purely so it can be LOGGED. A wrong value here is what killed a
+   * library embed run on its first batch, and the job log named the canonical
+   * mode, the mechanism and the set id while saying nothing about the one
+   * string that was actually wrong. Undefined for a text-prefix or unmoded
+   * model, which send no field at all.
+   */
+  inputTypeWire?: string
   /** The pinned OpenRouter upstream, if any. */
   providerOnly?: string
   /**
@@ -870,6 +881,7 @@ export async function getEmbeddingInvocation(): Promise<EmbeddingInvocation> {
     setId,
     inputType,
     inputTypeMechanism: mechanism,
+    inputTypeWire: parameterWire,
     providerOnly,
     prepareText,
     async embedOne(text: string): Promise<number[]> {

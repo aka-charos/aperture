@@ -306,7 +306,8 @@ export async function embedMovies(movies: Movie[]): Promise<EmbeddingResult[]> {
   // Resolved ONCE for the whole pass. Every row carries the set id this
   // returned, so a settings change mid-pass cannot split one batch across two
   // identities.
-  const { embedBatch, setId, inputType, inputTypeMechanism } = await getEmbeddingInvocation()
+  const { embedBatch, setId, inputType, inputTypeMechanism, inputTypeWire } =
+    await getEmbeddingInvocation()
   const config = await getFunctionConfig('embeddings')
 
   // Build canonical texts
@@ -316,7 +317,17 @@ export async function embedMovies(movies: Movie[]): Promise<EmbeddingResult[]> {
   }))
 
   logger.info(
-    { count: textsWithIds.length, provider: config?.provider, model: config?.model, inputType, inputTypeMechanism, setId },
+    {
+      count: textsWithIds.length,
+      provider: config?.provider,
+      model: config?.model,
+      inputType,
+      inputTypeMechanism,
+      // The string actually sent. Differs from inputType on Google upstreams,
+      // and a wrong one is a 400 on the first batch rather than bad vectors.
+      inputTypeWire,
+      setId,
+    },
     'Generating embeddings'
   )
 

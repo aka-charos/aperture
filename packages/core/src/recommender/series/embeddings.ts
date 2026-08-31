@@ -287,7 +287,8 @@ export async function embedSeries(series: SeriesForEmbedding[]): Promise<SeriesE
     return []
   }
 
-  const { embedBatch, setId, inputType, inputTypeMechanism } = await getEmbeddingInvocation()
+  const { embedBatch, setId, inputType, inputTypeMechanism, inputTypeWire } =
+    await getEmbeddingInvocation()
   const config = await getFunctionConfig('embeddings')
 
   // Build canonical texts
@@ -297,7 +298,17 @@ export async function embedSeries(series: SeriesForEmbedding[]): Promise<SeriesE
   }))
 
   logger.info(
-    { count: textsWithIds.length, provider: config?.provider, model: config?.model, inputType, inputTypeMechanism, setId },
+    {
+      count: textsWithIds.length,
+      provider: config?.provider,
+      model: config?.model,
+      inputType,
+      inputTypeMechanism,
+      // The string actually sent. Differs from inputType on Google upstreams,
+      // and a wrong one is a 400 on the first batch rather than bad vectors.
+      inputTypeWire,
+      setId,
+    },
     'Generating series embeddings'
   )
 
@@ -339,7 +350,8 @@ export async function embedEpisodes(
     return []
   }
 
-  const { embedBatch, setId, inputType, inputTypeMechanism } = await getEmbeddingInvocation()
+  const { embedBatch, setId, inputType, inputTypeMechanism, inputTypeWire } =
+    await getEmbeddingInvocation()
   const config = await getFunctionConfig('embeddings')
 
   // Build canonical texts
@@ -349,7 +361,17 @@ export async function embedEpisodes(
   }))
 
   logger.info(
-    { count: textsWithIds.length, provider: config?.provider, model: config?.model, inputType, inputTypeMechanism, setId },
+    {
+      count: textsWithIds.length,
+      provider: config?.provider,
+      model: config?.model,
+      inputType,
+      inputTypeMechanism,
+      // The string actually sent. Differs from inputType on Google upstreams,
+      // and a wrong one is a 400 on the first batch rather than bad vectors.
+      inputTypeWire,
+      setId,
+    },
     'Generating episode embeddings'
   )
 
