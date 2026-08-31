@@ -35,6 +35,14 @@
  *
  * Options:
  *   --docs N     how many seed documents to test (default 3)
+ *   --repeat N   embed each variant N times and report hash stability. Use
+ *                this when a pair reads IDENTICAL on one document and not on
+ *                another: a variant whose OWN hash changes between identical
+ *                requests is being routed to different upstreams, and no
+ *                per-document reading of the matrix means anything until that
+ *                is settled.
+ *   --pin SLUG   pin OpenRouter routing to one upstream and disable fallbacks
+ *                (e.g. google-vertex, google-ai-studio). The fix for the above.
  *   --series     use series seeds instead of movies
  *   --json PATH  also write the full result, vectors excluded, as JSON
  */
@@ -53,6 +61,8 @@ const flag = (name, fallback) => {
 const docCount = Number(flag('--docs', '3'))
 const mediaType = argv.includes('--series') ? 'series' : 'movie'
 const jsonPath = flag('--json', null)
+const repeat = Math.max(1, Number(flag('--repeat', '1')))
+const pin = flag('--pin', null)
 
 const SEMANTIC_PREFIX = 'task: sentence similarity | query: '
 
@@ -232,6 +242,10 @@ async function embed(variant, text) {
     encoding_format: 'float',
   }
   if (variant.inputType) body.input_type = variant.inputType
+  // Unpinned, OpenRouter may serve one model from several upstreams, and they
+  // need not honour the same request fields -- which shows up as a parameter
+  // that works on one call and is ignored on the next.
+  if (pin) body.provider = { only: [pin], allow_fallbacks: false }
 
   const res = await fetch(ENDPOINT, {
     method: 'POST',
@@ -274,6 +288,8 @@ const sha = (v) => createHash('sha256').update(Buffer.from(new Float32Array(v).b
 // ---------------------------------------------------------------------------
 
 console.log(`Comparing ${VARIANTS.length} configurations on ${picked.length} real document(s).`)
+if (repeat > 1) console.log(`Each variant embedded ${repeat}x to check hash stability.`)
+if (pin) console.log(`Routing pinned to "${pin}", fallbacks disabled.`)
 console.log(`Seeds from ${seedTitles.length > 0 ? 'evaluation_seed_titles' : 'most-watched fallback'}.`)
 console.log()
 
@@ -287,9 +303,27 @@ for (const doc of picked) {
   const vectors = {}
   for (const variant of VARIANTS) {
     try {
-      const v = await embed(variant, doc.text)
-      vectors[variant.name] = v
-      console.log(`  ${variant.name.padEnd(15)} dim=${v.length}  sha256=${sha(v).slice(0, 16)}…`)
+      // Repeated calls are byte-identical from a deterministic endpoint. When
+      // they are not, the variant is being answered by more than one upstream
+      // and every cosine below it is measuring routing rather than mode.
+      const runs = []
+      for (let r = 0; r < repeat; r++) runs.push(await embed(variant, doc.text))
+      const hashes = runs.map(sha)
+      const distinct = new Set(hashes)
+      vectors[variant.name] = runs[0]
+
+      const stability =
+        repeat === 1
+          ? ''
+          : distinct.size === 1
+            ? `  stable over ${repeat}`
+            : `  UNSTABLE: ${distinct.size} distinct vectors over ${repeat} identical requests`
+      console.log(
+        `  ${variant.name.padEnd(15)} dim=${runs[0].length}  sha256=${hashes[0].slice(0, 16)}…${stability}`
+      )
+      if (distinct.size > 1) {
+        for (const h of distinct) console.log(`      variant hash: ${h.slice(0, 32)}…`)
+      }
     } catch (err) {
       console.log(`  ${variant.name.padEnd(15)} FAILED: ${err.message}`)
     }
