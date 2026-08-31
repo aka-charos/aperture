@@ -273,6 +273,19 @@ This matters because **this library's task is symmetric**. Film document against
 
 The request was confirmed correct by printing the outgoing body: `input_type` is on the wire on every call. So the field reaches OpenRouter and is honoured *sometimes*.
 
+**Pinning identified the mechanism exactly.** With `provider.only` set and fallbacks off, each upstream is individually deterministic and they disagree about one thing:
+
+| pinned to | no `input_type` | `semantic_similarity` |
+|---|---|---|
+| `google-ai-studio` | `39e7998b…` stable | `39e7998b…` stable — **dropped** |
+| `google-vertex` | `39e7998b…` stable | `87bd9a32…` stable — **honoured**, cosine 0.841 |
+
+So it is not nondeterminism in any model: it is two correct implementations of an **undocumented** field, selected per request by a router that has no reason to prefer either. **Both upstreams agree on the no-mode vector**, which is what makes the existing 12,589-film library safe no matter how any given call routed.
+
+That also means the configuration is technically rescuable by pinning, and should still not be used. `input_type` appears nowhere in OpenRouter's embeddings documentation, so neither upstream is failing to meet a contract and nothing constrains either to keep behaving this way; pinning a single region removes the fallback that an hour-long job wants; and it buys nothing that G2a-vs-G2b does not already give, since that pair isolates the same variable on the current model with a mechanism no router can drop.
+
+**`provider.only` takes the BASE slug** (`google-vertex`, `google-ai-studio`), not the region-scoped `tag` the endpoints API reports (`google-vertex/us-central1`). Passing a tag 404s with "No allowed providers are available" — an error that helpfully lists the accepted values, and the fastest way to get them right.
+
 **This is worse than the parameter not working.** A full pass over 12,589 films would write an unpredictable mixture of two spaces into one table under one set identity — every downstream check passes, since each row has the right width and a unit norm, and the mixture is undetectable afterwards. Every centroid built on it would be a mean over two unrelated coordinate systems.
 
 **How this presented, and why it was nearly misdiagnosed twice.** The first run compared four variants across three documents and showed `001-default` vs `001-semantic` as *different* on a 356-char document and byte-*identical* on a 763-char and a 2,238-char one. That was read as provider routing, which does not fit — routing is random with respect to document length, and this looked like a clean length correlation (an earlier 371-char probe had also come out different). The second reading blamed the script's own call order, since `001-default` ran first and a cache keyed on `(model, input)` without `input_type` would serve the second call the first one's vector. Reversing the order flipped the result on two documents **in opposite directions**, which is not order-dependence either. Only repeating one request five times settled it: there is no length effect and no ordering effect, just a coin flip, and every single-sample comparison was reading one toss of it.
