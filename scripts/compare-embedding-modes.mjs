@@ -43,6 +43,14 @@
  *                is settled.
  *   --pin SLUG   pin OpenRouter routing to one upstream and disable fallbacks
  *                (e.g. google-vertex, google-ai-studio).
+ *   --require-params  send provider.require_parameters. OpenRouter defaults
+ *                this to FALSE, meaning it may route to an upstream that does
+ *                not support a field in your request and drop that field
+ *                silently. With two upstreams for one model and only one of
+ *                them honouring input_type, that is a coin flip per call --
+ *                which is what gemini-embedding-001 measured as. This is the
+ *                documented opt-out, and the only thing that might make that
+ *                configuration usable.
  *   --reverse    run the variants in reverse order. If a pair's result CHANGES
  *                when the order does, the endpoint is caching on (model, input)
  *                without input_type, and the second call is being served the
@@ -78,6 +86,7 @@ const jsonPath = flag('--json', null)
 const repeat = Math.max(1, Number(flag('--repeat', '1')))
 const pin = flag('--pin', null)
 const reverse = argv.includes('--reverse')
+const requireParams = argv.includes('--require-params')
 const only = flag('--only', null)
 const showRequest = argv.includes('--show-request')
 
@@ -268,7 +277,12 @@ async function embed(variant, text) {
   // Unpinned, OpenRouter may serve one model from several upstreams, and they
   // need not honour the same request fields -- which shows up as a parameter
   // that works on one call and is ignored on the next.
-  if (pin) body.provider = { only: [pin], allow_fallbacks: false }
+  if (pin || requireParams) {
+    body.provider = {
+      ...(pin ? { only: [pin], allow_fallbacks: false } : {}),
+      ...(requireParams ? { require_parameters: true } : {}),
+    }
+  }
 
   if (showRequest) {
     // Truncated input, full everything else: what matters here is whether
@@ -321,6 +335,7 @@ console.log(`Comparing ${VARIANTS.length} configurations on ${picked.length} rea
 if (repeat > 1) console.log(`Each variant embedded ${repeat}x to check hash stability.`)
 if (pin) console.log(`Routing pinned to "${pin}", fallbacks disabled.`)
 if (reverse) console.log('Variant order REVERSED (cache-ordering check).')
+if (requireParams) console.log('provider.require_parameters = true (no silent field dropping).')
 console.log(`Seeds from ${seedTitles.length > 0 ? 'evaluation_seed_titles' : 'most-watched fallback'}.`)
 console.log()
 
