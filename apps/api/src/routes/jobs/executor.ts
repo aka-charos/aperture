@@ -44,8 +44,8 @@ import {
   rebuildAllTasteProfiles,
   refreshCenteredEmbeddings,
   getEmbeddingSetsReport,
-  getSystemSetting,
   runEvaluation,
+  getEvaluationSeedTitles,
   type EmbeddingSetRef,
   refreshAllExplanations,
   withInferenceContext,
@@ -375,11 +375,7 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
         // Newline-separated, because a film title may contain a comma. Misses
         // are already reported by run.ts, so a wrongly-split list diagnoses
         // itself on the next run rather than silently falling back.
-        const seedSetting = await getSystemSetting('evaluation_seed_titles')
-        const seedTitles = (seedSetting ?? '')
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter(Boolean)
+        const seedTitles = await getEvaluationSeedTitles()
         if (seedTitles.length > 0) {
           addLog(jobId, 'info', `🌱 Seeds from settings: ${seedTitles.join(' | ')}`)
         }

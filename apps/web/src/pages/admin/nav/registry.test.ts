@@ -129,14 +129,22 @@ test('every settings section has a home in the console', () => {
   // The anti-drift clause. A new section fails this suite until it is placed,
   // and it is what would have caught ProfileSection and
   // PersonalPreferencesSection sitting in the barrel, rendered by nothing.
+  //
+  // The route sources are READ FROM THE DIRECTORY, not from a hand-written
+  // list. A list here is the same duplicated-registry shape this whole suite
+  // exists to catch: a new route added everywhere else still leaves the test
+  // blind to it, and the failure mode is the test wrongly claiming a placed
+  // section is homeless -- which teaches people to edit the test rather than
+  // the thing it is checking.
   const elementsSource = read('./elements.tsx')
-  const routeSources = ['LibrariesRoute', 'AlgorithmRoute', 'DatabaseRoute', 'EmbeddingsRoute', 'GenreStripsRoute']
-    .map((name) => read(`../routes/${name}.tsx`))
+  const routesDir = resolve(HERE, '../routes')
+  const routeSources = readdirSync(routesDir)
+    .filter((file) => file.endsWith('.tsx'))
+    .map((file) => readFileSync(resolve(routesDir, file), 'utf8'))
     .join('\n')
 
   for (const name of barrelExports()) {
-    const referenced =
-      elementsSource.includes(`'${name}'`) || routeSources.includes(name)
+    const referenced = elementsSource.includes(`'${name}'`) || routeSources.includes(name)
     assert.ok(referenced, `${name} is exported from the settings barrel but reachable from nowhere`)
   }
 })
