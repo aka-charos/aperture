@@ -776,17 +776,16 @@ export async function getEmbeddingInvocation(): Promise<EmbeddingInvocation> {
   const providerOnly =
     resolved.provider === 'openrouter' ? config.embeddingProviderOnly?.trim() : undefined
 
-  // The identity has to know the mechanism AND the pin, since for a parameter
-  // mode the pin is what decides whether the mode landed at all.
-  const setId = embeddingSetId(
-    {
-      provider: resolved.provider,
-      model: modelId,
-      embeddingInputType: inputType,
-      embeddingProviderOnly: providerOnly,
-    },
-    mechanism
-  )
+  // Built from the SAME raw fields every reader passes, and from no local
+  // knowledge at all. `embeddingSetId` applies the provider rules itself, so
+  // the writer cannot pre-filter its way to an id no reader would reproduce --
+  // which is exactly what a mechanism argument here used to do.
+  const setId = embeddingSetId({
+    provider: resolved.provider,
+    model: modelId,
+    embeddingInputType: config.embeddingInputType,
+    embeddingProviderOnly: config.embeddingProviderOnly,
+  })
 
   // Refused at the settings route, so reaching this means a config written
   // before that guard. Loud, because the result is a set that cannot be

@@ -133,26 +133,46 @@ export function resolveEmbeddingInputType(
  * `provider:model` when no mode is set — byte-identical to what this repo has
  * always written, which is what keeps existing libraries visible. See the
  * module comment.
+ *
+ * Takes the config and NOTHING ELSE, deliberately. An earlier version accepted
+ * the delivery mechanism as a second argument so the upstream pin could be
+ * folded in for a parameter mode only. That is a footgun of exactly the kind
+ * this module exists to remove: the writer in `getEmbeddingInvocation` knew the
+ * mechanism and passed it, while all sixteen READERS -- the staleness queries,
+ * the recommender's `WHERE model = $n`, the centering refresh, the sets report
+ * -- did not, and silently got a different id. Rows would be written under one
+ * name and looked for under another: a library that reads as permanently empty
+ * AND permanently pending, re-embedding every title on every run and paying for
+ * it each time.
+ *
+ * So the pin rides on the config, and every call site gets the same answer. It
+ * still cannot disturb an existing set, because a pin without a mode is dropped
+ * by the early return above it -- measured, and the reason that is sound: with
+ * no mode both upstreams return the byte-identical vector, so pinning genuinely
+ * does not change what is stored.
  */
-export function embeddingSetId(
-  config: EmbeddingIdentityConfig | null | undefined,
-  /**
-   * How the mode is being delivered. Only a `parameter` mode makes the upstream
-   * pin part of the identity — see {@link EmbeddingIdentityConfig.embeddingProviderOnly}.
-   * Callers that do not know pass nothing, and get the un-pinned id.
-   */
-  mechanism?: 'parameter' | 'textPrefix' | 'none'
-): string {
+export function embeddingSetId(config: EmbeddingIdentityConfig | null | undefined): string {
   if (!config?.provider || !config?.model) return UNKNOWN_EMBEDDING_SET
 
   const base = `${config.provider}:${config.model}`
-  const mode = resolveEmbeddingInputType(config)
+
+  // Every rule that decides the id is applied HERE, from the raw config, so a
+  // reader and the writer cannot reach different answers. A mode on a provider
+  // that cannot send one is dropped rather than named: those vectors are in the
+  // default space, and an id claiming otherwise is a confident lie.
+  const mode = providerSupportsInputType(config.provider)
+    ? resolveEmbeddingInputType(config)
+    : undefined
+  // No mode means the default space, where every pre-existing row lives, and
+  // where both upstreams agree. The pin cannot matter here and must not appear.
   if (!mode) return base
 
   const withMode = `${base}${EMBEDDING_MODE_SEPARATOR}${mode}`
 
-  const pin = config.embeddingProviderOnly?.trim()
-  if (mechanism !== 'parameter' || !pin) return withMode
+  // Routing is an OpenRouter concept; a pin stored against any other provider
+  // describes nothing and must not split the set.
+  const pin = config.provider === 'openrouter' ? config.embeddingProviderOnly?.trim() : undefined
+  if (!pin) return withMode
 
   return `${withMode}${EMBEDDING_PIN_SEPARATOR}${pin}`
 }
