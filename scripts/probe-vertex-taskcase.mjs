@@ -127,6 +127,12 @@ console.log(
 const CASES = [
   { label: 'lowercase  semantic_similarity', inputType: 'semantic_similarity' },
   { label: 'UPPERCASE  SEMANTIC_SIMILARITY', inputType: 'SEMANTIC_SIMILARITY' },
+  // The other two modes, in the spelling the upstream actually accepts.
+  // The catalog claims these are byte-identical to the default -- but that was
+  // measured lower-case on the string path, which normalises, so it may have
+  // been measuring DROPPED rather than same-space. Asked properly here.
+  { label: 'UPPERCASE  RETRIEVAL_QUERY     ', inputType: 'RETRIEVAL_QUERY' },
+  { label: 'UPPERCASE  RETRIEVAL_DOCUMENT  ', inputType: 'RETRIEVAL_DOCUMENT' },
 ]
 
 for (const shape of [false, true]) {
