@@ -50,7 +50,10 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--repeat", type=int, default=6)
     p.add_argument("--require-parameters", action="store_true")
-    p.add_argument("--pin", default=None, help="e.g. google-vertex, google-ai-studio")
+    # Region-scoped tags from GET /api/v1/models/<id>/endpoints, verified
+    # 2026-08-31: google-vertex/us-central1, google-ai-studio. A bare
+    # "google-vertex" is not a tag.
+    p.add_argument("--pin", default=None, help="google-vertex/us-central1 | google-ai-studio")
     p.add_argument("--timeout", type=float, default=90)
     return p.parse_args()
 
