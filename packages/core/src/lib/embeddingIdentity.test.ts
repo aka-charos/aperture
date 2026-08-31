@@ -307,7 +307,7 @@ test('a textPrefix model is never sent the parameter as a consolation', () => {
  * input and computes the same answer for it.
  */
 
-test('a pin joins the identity only for a parameter mode', () => {
+test('a pin joins the identity whenever a mode is set', () => {
   const config = {
     provider: 'openrouter',
     model: 'google/gemini-embedding-001',
@@ -316,14 +316,34 @@ test('a pin joins the identity only for a parameter mode', () => {
   }
 
   assert.equal(
-    embeddingSetId(config, 'parameter'),
+    embeddingSetId(config),
     'openrouter:google/gemini-embedding-001~semantic_similarity@google-vertex'
   )
-  // A prefix-delivered mode is route-independent, so the pin is not identity.
-  assert.equal(
-    embeddingSetId(config, 'textPrefix'),
-    'openrouter:google/gemini-embedding-001~semantic_similarity'
-  )
+})
+
+/**
+ * The regression this file exists for, in its most direct form.
+ *
+ * `embeddingSetId` took a second argument naming how the mode was delivered,
+ * and folded the pin in only for a `parameter` one. The writer knew that and
+ * passed it; the sixteen readers -- staleness, the recommender's
+ * `WHERE model = $n`, centering, the sets report -- did not, and got a
+ * DIFFERENT string. Rows written under one name, looked for under another: a
+ * library permanently empty and permanently pending, re-embedding every title
+ * on every run and paying for it each time. Nothing errors; nothing is typed
+ * wrong; the job just never finishes and the recommender finds no candidates.
+ *
+ * One argument is the fix, and this asserts the property that makes it one.
+ */
+test('every caller gets the same id from the same config', () => {
+  const config = {
+    provider: 'openrouter',
+    model: 'google/gemini-embedding-001',
+    embeddingInputType: 'semantic_similarity',
+    embeddingProviderOnly: 'google-vertex',
+  }
+  assert.equal(embeddingSetId(config), embeddingSetId({ ...config }))
+  assert.equal(embeddingSetId.length, 1, 'a second argument is a second answer')
 })
 
 test('two pins under one mode are two different sets', () => {
@@ -332,8 +352,8 @@ test('two pins under one mode are two different sets', () => {
     model: 'google/gemini-embedding-001',
     embeddingInputType: 'semantic_similarity',
   }
-  const vertex = embeddingSetId({ ...base, embeddingProviderOnly: 'google-vertex' }, 'parameter')
-  const studio = embeddingSetId({ ...base, embeddingProviderOnly: 'google-ai-studio' }, 'parameter')
+  const vertex = embeddingSetId({ ...base, embeddingProviderOnly: 'google-vertex' })
+  const studio = embeddingSetId({ ...base, embeddingProviderOnly: 'google-ai-studio' })
   assert.notEqual(vertex, studio)
 })
 
@@ -342,28 +362,41 @@ test('a pin with no mode leaves the id completely alone', () => {
   // the byte-identical vector when no mode is sent, so an unmoded set is one
   // population however it routed, and its id must not move.
   assert.equal(
-    embeddingSetId(
-      {
-        provider: 'openrouter',
-        model: 'google/gemini-embedding-001',
-        embeddingProviderOnly: 'google-vertex',
-      },
-      'none'
-    ),
+    embeddingSetId({
+      provider: 'openrouter',
+      model: 'google/gemini-embedding-001',
+      embeddingProviderOnly: 'google-vertex',
+    }),
     'openrouter:google/gemini-embedding-001'
   )
 })
 
-test('an omitted mechanism yields the unpinned id', () => {
-  // Callers that do not know how the mode is delivered must not invent a pin.
+test('a pin on a provider that has no routing is not identity', () => {
+  // Google native takes a mode but has no upstream to pin; a stray pin there
+  // describes nothing and must not split the set. Enforced here rather than
+  // only at the settings route, so a hand-edited config cannot diverge the
+  // writer from the readers.
   assert.equal(
     embeddingSetId({
-      provider: 'openrouter',
-      model: 'google/gemini-embedding-001',
+      provider: 'google',
+      model: 'gemini-embedding-001',
       embeddingInputType: 'semantic_similarity',
       embeddingProviderOnly: 'google-vertex',
     }),
-    'openrouter:google/gemini-embedding-001~semantic_similarity'
+    'google:gemini-embedding-001~semantic_similarity'
+  )
+})
+
+test('a mode on a provider that cannot send one is not named', () => {
+  // Those vectors are in the default space. An id claiming a mode they were
+  // never embedded in is the confident-number-meaning-nothing failure.
+  assert.equal(
+    embeddingSetId({
+      provider: 'openai',
+      model: 'text-embedding-3-large',
+      embeddingInputType: 'semantic_similarity',
+    }),
+    'openai:text-embedding-3-large'
   )
 })
 
