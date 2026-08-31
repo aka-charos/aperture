@@ -73,7 +73,20 @@ export interface FunctionConfig {
    * never reach the model.
    */
   embeddingInputType?: EmbeddingInputTypeValue | null
+  /**
+   * Pin OpenRouter routing for the Embeddings role to one upstream.
+   *
+   * Required when the chosen mode reaches the model as a request PARAMETER:
+   * OpenRouter routes each call to whichever upstream it likes and they do not
+   * all honour an undocumented field, so an unpinned parameter mode makes the
+   * library a mixture of two spaces. Not needed for a text-prefix mode, which
+   * conditions the input and so cannot be dropped by a route.
+   */
+  embeddingProviderOnly?: string | null
 }
+
+/** OpenRouter upstreams worth pinning to, base slugs (not region-scoped tags). */
+export const OPENROUTER_UPSTREAMS = ['google-vertex', 'google-ai-studio'] as const
 
 /**
  * The retrieval modes offered for the Embeddings role.

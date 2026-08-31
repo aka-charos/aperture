@@ -66,6 +66,7 @@ import {
   isEmbeddingInputType,
   providerSupportsInputType,
   resolveInputTypeDelivery,
+  requiresProviderPin,
   getModel,
   EMBEDDING_INPUT_TYPES,
   type AIFunction,
@@ -780,6 +781,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       fallbackModels?: { provider: string; model: string }[]
       callSpacingSeconds?: number
       embeddingInputType?: string | null
+      embeddingProviderOnly?: string | null
     }
   }>('/api/settings/ai/:function', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
     try {
@@ -794,6 +796,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         fallbackModels,
         callSpacingSeconds,
         embeddingInputType,
+        embeddingProviderOnly,
       } = request.body
 
       if (!isAIFunction(fn)) {
@@ -919,6 +922,43 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       // role would be stored, never read, and read later as meaningful.
       if (fn !== 'embeddings') nextInputType = undefined
 
+      // Same omitted-means-leave-alone rule; null or '' clears the pin.
+      let nextProviderOnly: string | undefined
+      if (embeddingProviderOnly === undefined) {
+        nextProviderOnly = existing?.embeddingProviderOnly
+      } else if (embeddingProviderOnly === null || embeddingProviderOnly.trim() === '') {
+        nextProviderOnly = undefined
+      } else {
+        nextProviderOnly = embeddingProviderOnly.trim()
+      }
+      if (fn !== 'embeddings' || provider !== 'openrouter') nextProviderOnly = undefined
+
+      // The combination that silently produces a MIXTURE of two spaces:
+      // a mode delivered as a request parameter, with routing left to
+      // OpenRouter. Refused rather than stored, because the resulting set
+      // cannot be repaired by anything short of re-embedding it, and nothing
+      // downstream can tell it apart from a good one.
+      const delivery = resolveInputTypeDelivery({
+        inputType: nextInputType,
+        mechanism: getModel(provider, model, 'embeddings')?.inputTypeMechanism,
+        prefixes: getModel(provider, model, 'embeddings')?.inputTypePrefixes,
+      })
+      if (
+        requiresProviderPin({
+          provider,
+          mechanism: delivery.mechanism,
+          pin: nextProviderOnly,
+        })
+      ) {
+        return reply.status(400).send({
+          error:
+            `"${nextInputType}" reaches ${model} as a request parameter, and OpenRouter routes ` +
+            'each call to whichever upstream it likes — they do not all honour it, so the ' +
+            'library would end up a mixture of two spaces. Pin an upstream (google-vertex or ' +
+            'google-ai-studio) or leave the mode unset.',
+        })
+      }
+
       await setFunctionConfig(fn, {
         provider: provider as ProviderType,
         model,
@@ -932,6 +972,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         // noisier without saying anything.
         callSpacingSeconds: nextSpacing && nextSpacing > 0 ? nextSpacing : undefined,
         embeddingInputType: nextInputType,
+        embeddingProviderOnly: nextProviderOnly,
       })
 
       const config = await getFunctionConfig(fn)

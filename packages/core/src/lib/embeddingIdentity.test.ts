@@ -11,6 +11,7 @@ import {
   providerSupportsInputType,
   resolveEmbeddingInputType,
   resolveInputTypeDelivery,
+  requiresProviderPin,
 } from './embeddingIdentity.js'
 
 /**
@@ -291,4 +292,105 @@ test('a textPrefix model is never sent the parameter as a consolation', () => {
     })
     assert.notEqual(out.mechanism, 'parameter', `${mode} must not fall back to a parameter`)
   }
+})
+
+// ============================================================================
+// The upstream pin
+// ============================================================================
+
+/**
+ * OpenRouter picks an upstream per call, and they need not treat an
+ * undocumented field alike. Measured on gemini-embedding-001: google-vertex
+ * honours input_type, google-ai-studio drops it, each deterministic alone. So
+ * for a PARAMETER mode the pin decides the space, and must be in the identity.
+ * For a TEXT PREFIX mode it decides nothing -- every upstream gets a different
+ * input and computes the same answer for it.
+ */
+
+test('a pin joins the identity only for a parameter mode', () => {
+  const config = {
+    provider: 'openrouter',
+    model: 'google/gemini-embedding-001',
+    embeddingInputType: 'semantic_similarity',
+    embeddingProviderOnly: 'google-vertex',
+  }
+
+  assert.equal(
+    embeddingSetId(config, 'parameter'),
+    'openrouter:google/gemini-embedding-001~semantic_similarity@google-vertex'
+  )
+  // A prefix-delivered mode is route-independent, so the pin is not identity.
+  assert.equal(
+    embeddingSetId(config, 'textPrefix'),
+    'openrouter:google/gemini-embedding-001~semantic_similarity'
+  )
+})
+
+test('two pins under one mode are two different sets', () => {
+  const base = {
+    provider: 'openrouter',
+    model: 'google/gemini-embedding-001',
+    embeddingInputType: 'semantic_similarity',
+  }
+  const vertex = embeddingSetId({ ...base, embeddingProviderOnly: 'google-vertex' }, 'parameter')
+  const studio = embeddingSetId({ ...base, embeddingProviderOnly: 'google-ai-studio' }, 'parameter')
+  assert.notEqual(vertex, studio)
+})
+
+test('a pin with no mode leaves the id completely alone', () => {
+  // The case that protects every row already on disk: both upstreams return
+  // the byte-identical vector when no mode is sent, so an unmoded set is one
+  // population however it routed, and its id must not move.
+  assert.equal(
+    embeddingSetId(
+      {
+        provider: 'openrouter',
+        model: 'google/gemini-embedding-001',
+        embeddingProviderOnly: 'google-vertex',
+      },
+      'none'
+    ),
+    'openrouter:google/gemini-embedding-001'
+  )
+})
+
+test('an omitted mechanism yields the unpinned id', () => {
+  // Callers that do not know how the mode is delivered must not invent a pin.
+  assert.equal(
+    embeddingSetId({
+      provider: 'openrouter',
+      model: 'google/gemini-embedding-001',
+      embeddingInputType: 'semantic_similarity',
+      embeddingProviderOnly: 'google-vertex',
+    }),
+    'openrouter:google/gemini-embedding-001~semantic_similarity'
+  )
+})
+
+test('a pinned id round-trips through describe', () => {
+  assert.deepEqual(
+    describeEmbeddingSetId(
+      'openrouter:google/gemini-embedding-001~semantic_similarity@google-vertex'
+    ),
+    {
+      base: 'openrouter:google/gemini-embedding-001',
+      mode: 'semantic_similarity',
+      pin: 'google-vertex',
+    }
+  )
+})
+
+test('requiresProviderPin fires only on the mixture case', () => {
+  const yes = { provider: 'openrouter', mechanism: 'parameter' as const }
+  assert.ok(requiresProviderPin(yes), 'unpinned parameter mode on openrouter is the mixture')
+  assert.ok(!requiresProviderPin({ ...yes, pin: 'google-vertex' }), 'pinned is fine')
+  // A whitespace pin is no pin. It arrives that way from a cleared text field.
+  assert.ok(requiresProviderPin({ ...yes, pin: '   ' }), 'blank pin must not satisfy the guard')
+
+  // A prefix conditions the input, so no route can drop it.
+  assert.ok(!requiresProviderPin({ provider: 'openrouter', mechanism: 'textPrefix' }))
+  // No mode, nothing to lose.
+  assert.ok(!requiresProviderPin({ provider: 'openrouter', mechanism: 'none' }))
+  // Google direct is one upstream by definition.
+  assert.ok(!requiresProviderPin({ provider: 'google', mechanism: 'parameter' }))
 })
