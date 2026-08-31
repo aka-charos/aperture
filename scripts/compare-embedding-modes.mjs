@@ -42,7 +42,16 @@
  *                per-document reading of the matrix means anything until that
  *                is settled.
  *   --pin SLUG   pin OpenRouter routing to one upstream and disable fallbacks
- *                (e.g. google-vertex, google-ai-studio). The fix for the above.
+ *                (e.g. google-vertex, google-ai-studio).
+ *   --reverse    run the variants in reverse order. If a pair's result CHANGES
+ *                when the order does, the endpoint is caching on (model, input)
+ *                without input_type, and the second call is being served the
+ *                first one's vector. That is an artifact of asking, not a fact
+ *                about the model — and it is indistinguishable from "the
+ *                parameter was ignored" from a single ordering.
+ *   --show-request  print the exact JSON body sent for each call, minus the
+ *                key. The only way to confirm input_type is actually on the
+ *                wire rather than taking this script's word for it.
  *   --series     use series seeds instead of movies
  *   --json PATH  also write the full result, vectors excluded, as JSON
  */
@@ -63,6 +72,8 @@ const mediaType = argv.includes('--series') ? 'series' : 'movie'
 const jsonPath = flag('--json', null)
 const repeat = Math.max(1, Number(flag('--repeat', '1')))
 const pin = flag('--pin', null)
+const reverse = argv.includes('--reverse')
+const showRequest = argv.includes('--show-request')
 
 const SEMANTIC_PREFIX = 'task: sentence similarity | query: '
 
@@ -247,6 +258,13 @@ async function embed(variant, text) {
   // that works on one call and is ignored on the next.
   if (pin) body.provider = { only: [pin], allow_fallbacks: false }
 
+  if (showRequest) {
+    // Truncated input, full everything else: what matters here is whether
+    // input_type is present, not re-reading the document.
+    const shown = { ...body, input: `${body.input.slice(0, 60)}… (${body.input.length} chars)` }
+    console.log('    -> POST', JSON.stringify(shown))
+  }
+
   const res = await fetch(ENDPOINT, {
     method: 'POST',
     headers: {
@@ -290,6 +308,7 @@ const sha = (v) => createHash('sha256').update(Buffer.from(new Float32Array(v).b
 console.log(`Comparing ${VARIANTS.length} configurations on ${picked.length} real document(s).`)
 if (repeat > 1) console.log(`Each variant embedded ${repeat}x to check hash stability.`)
 if (pin) console.log(`Routing pinned to "${pin}", fallbacks disabled.`)
+if (reverse) console.log('Variant order REVERSED (cache-ordering check).')
 console.log(`Seeds from ${seedTitles.length > 0 ? 'evaluation_seed_titles' : 'most-watched fallback'}.`)
 console.log()
 
@@ -301,7 +320,8 @@ for (const doc of picked) {
   console.log('='.repeat(72))
 
   const vectors = {}
-  for (const variant of VARIANTS) {
+  const order = reverse ? [...VARIANTS].reverse() : VARIANTS
+  for (const variant of order) {
     try {
       // Repeated calls are byte-identical from a deterministic endpoint. When
       // they are not, the variant is being answered by more than one upstream
@@ -329,7 +349,7 @@ for (const doc of picked) {
     }
   }
 
-  const names = Object.keys(vectors)
+  const names = VARIANTS.map((v) => v.name).filter((n) => n in vectors)
   console.log()
   console.log('  pairwise cosine (1.000000 = same vector, so the difference is a no-op):')
   const pairs = []
