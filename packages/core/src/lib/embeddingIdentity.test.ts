@@ -242,7 +242,8 @@ test('no mode asked for means nothing is delivered', () => {
 test('a parameter model gets the parameter and no prefix', () => {
   assert.deepEqual(
     resolveInputTypeDelivery({ inputType: 'semantic_similarity', mechanism: 'parameter' }),
-    { mechanism: 'parameter' }
+    // No declared spelling, so the canonical name is what would be sent.
+    { mechanism: 'parameter', parameterValue: 'semantic_similarity' }
   )
 })
 
@@ -250,6 +251,7 @@ test('an unstated mechanism defaults to parameter', () => {
   // Every model but gemini-2, and every custom model, which has no catalog entry.
   assert.deepEqual(resolveInputTypeDelivery({ inputType: 'search_query' }), {
     mechanism: 'parameter',
+    parameterValue: 'search_query',
   })
 })
 
@@ -306,6 +308,54 @@ test('a textPrefix model is never sent the parameter as a consolation', () => {
  * For a TEXT PREFIX mode it decides nothing -- every upstream gets a different
  * input and computes the same answer for it.
  */
+
+/**
+ * The wire spelling is the UPSTREAM's, not ours.
+ *
+ * `input_type` on OpenRouter is a passthrough. Measured on
+ * gemini-embedding-001 pinned to google-vertex: the lower-case canonical name
+ * is accepted when `input` is a single string and rejected with HTTP 400 when
+ * `input` is an array, because OpenRouter normalises on one path and forwards
+ * verbatim on the other. `embedMany` always sends an array, so every probe that
+ * embedded one document at a time passed while the library job failed on its
+ * first batch of 25.
+ */
+test('a declared spelling is what goes on the wire', () => {
+  const { mechanism, parameterValue } = resolveInputTypeDelivery({
+    inputType: 'semantic_similarity',
+    mechanism: 'parameter',
+    values: { semantic_similarity: 'SEMANTIC_SIMILARITY' },
+  })
+  assert.equal(mechanism, 'parameter')
+  assert.equal(parameterValue, 'SEMANTIC_SIMILARITY')
+})
+
+test('an undeclared spelling falls back to the canonical name', () => {
+  // Cohere's input_type on this same field genuinely is lower-case, so the
+  // fallback must be the canonical name and never an upper-casing transform.
+  const { parameterValue } = resolveInputTypeDelivery({
+    inputType: 'search_document',
+    mechanism: 'parameter',
+  })
+  assert.equal(parameterValue, 'search_document')
+})
+
+test('a textPrefix model gets no parameter value at all', () => {
+  const { mechanism, parameterValue, prefix } = resolveInputTypeDelivery({
+    inputType: 'semantic_similarity',
+    mechanism: 'textPrefix',
+    prefixes: { semantic_similarity: 'task: sentence similarity | query: ' },
+    values: { semantic_similarity: 'SEMANTIC_SIMILARITY' },
+  })
+  assert.equal(mechanism, 'textPrefix')
+  assert.equal(parameterValue, undefined, 'a prefix model must not also be sent the field')
+  assert.ok(prefix)
+})
+
+test('no mode means no parameter value', () => {
+  assert.equal(resolveInputTypeDelivery({}).parameterValue, undefined)
+})
+
 
 test('a pin joins the identity whenever a mode is set', () => {
   const config = {

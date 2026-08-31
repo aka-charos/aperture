@@ -167,3 +167,54 @@ test('a textPrefix model ships the prefix it needs', () => {
     )
   }
 })
+
+/**
+ * A catalog entry whose declared spelling the upstream rejects is a job that
+ * dies on its first batch, and nothing before runtime can tell. Google's enum
+ * is the one Vertex named in its own 400: [CLASSIFICATION, CLUSTERING,
+ * CODE_RETRIEVAL_QUERY, DEFAULT, FACT_VERIFICATION, QUESTION_ANSWERING,
+ * RETRIEVAL_DOCUMENT, RETRIEVAL_QUERY, SEMANTIC_SIMILARITY].
+ */
+test('google models on openrouter declare google spellings', () => {
+  const VERTEX_TASK_TYPES = new Set([
+    'CLASSIFICATION',
+    'CLUSTERING',
+    'CODE_RETRIEVAL_QUERY',
+    'DEFAULT',
+    'FACT_VERIFICATION',
+    'QUESTION_ANSWERING',
+    'RETRIEVAL_DOCUMENT',
+    'RETRIEVAL_QUERY',
+    'SEMANTIC_SIMILARITY',
+  ])
+
+  for (const model of OPENROUTER_EMBEDDINGS) {
+    if (model.inputTypeMechanism !== 'parameter') continue
+    if (!model.id.startsWith('google/')) continue
+    assert.ok(
+      model.inputTypeValues,
+      `${model.id} sends input_type to a Google upstream but declares no spelling; ` +
+        'the canonical lower-case name is a 400 on the batch path'
+    )
+    for (const [mode, wire] of Object.entries(model.inputTypeValues)) {
+      assert.ok(
+        VERTEX_TASK_TYPES.has(wire),
+        `${model.id} maps ${mode} to "${wire}", which Vertex does not accept`
+      )
+    }
+  }
+})
+
+test('every recommended mode has a spelling that will actually be sent', () => {
+  for (const model of OPENROUTER_EMBEDDINGS) {
+    if (!model.recommendedInputType) continue
+    const { mechanism, parameterValue } = resolveInputTypeDelivery({
+      inputType: model.recommendedInputType,
+      mechanism: model.inputTypeMechanism,
+      prefixes: model.inputTypePrefixes,
+      values: model.inputTypeValues,
+    })
+    if (mechanism !== 'parameter') continue
+    assert.ok(parameterValue, `${model.id} would send an empty input_type`)
+  }
+})

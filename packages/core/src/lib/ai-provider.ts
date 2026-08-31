@@ -753,10 +753,15 @@ export async function getEmbeddingInvocation(): Promise<EmbeddingInvocation> {
   // field it ignores is noise in the request, and worse, reads to the next
   // maintainer as though the mode were being delivered that way.
   const metadata = getModel(resolved.provider, modelId, 'embeddings')
-  const { mechanism, prefix: textPrefix } = resolveInputTypeDelivery({
+  const {
+    mechanism,
+    prefix: textPrefix,
+    parameterValue,
+  } = resolveInputTypeDelivery({
     inputType,
     mechanism: metadata?.inputTypeMechanism,
     prefixes: metadata?.inputTypePrefixes,
+    values: metadata?.inputTypeValues,
   })
 
   // A `textPrefix` model asked for a mode it has no verified prefix for cannot
@@ -800,8 +805,14 @@ export async function getEmbeddingInvocation(): Promise<EmbeddingInvocation> {
   const prepareText = (text: string): string =>
     textPrefix ? `${textPrefix}${text}` : text
 
-  // Only a `parameter` model is sent the field.
+  // Only a `parameter` model is sent the field. Two values, deliberately not
+  // one: `parameterMode` is OUR canonical name and is what the set identity and
+  // the Google native path speak; `parameterWire` is the literal string the
+  // upstream accepts, which for gemini-embedding-001 through OpenRouter is
+  // Google's own upper-case enum. Collapsing them sends `semantic_similarity`
+  // to a Vertex batch endpoint, which answers 400 rather than ignoring it.
   const parameterMode = mechanism === 'parameter' ? inputType : undefined
+  const parameterWire = mechanism === 'parameter' ? parameterValue : undefined
 
   const model = ((): EmbeddingModel<string> => {
     switch (resolved.provider) {
@@ -827,10 +838,10 @@ export async function getEmbeddingInvocation(): Promise<EmbeddingInvocation> {
         // before this existed.
         return (provider as any).textEmbeddingModel( // eslint-disable-line @typescript-eslint/no-explicit-any
           modelId,
-          parameterMode || providerOnly
+          parameterWire || providerOnly
             ? {
                 extraBody: {
-                  ...(parameterMode ? { input_type: parameterMode } : {}),
+                  ...(parameterWire ? { input_type: parameterWire } : {}),
                   ...(providerOnly
                     ? { provider: { only: [providerOnly], allow_fallbacks: false } }
                     : {}),
