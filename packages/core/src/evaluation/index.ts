@@ -81,6 +81,7 @@ export {
   type EvaluationOptions,
   type EvaluationReport,
   type EvaluationVariant,
+  type NeighbourDump,
   type VariantResult,
 } from './run.js'
 
@@ -93,3 +94,13 @@ export {
   suggestSeedTitles,
   type SeedSuggestion,
 } from './seeds.js'
+
+export { CSV_BOM, csvCell, toCsv, type CsvCell } from './csv.js'
+
+export {
+  evaluationMetricsCsv,
+  evaluationNeighboursCsv,
+  listEvaluationRuns,
+  saveEvaluationReport,
+  type EvaluationRunSummary,
+} from './store.js'

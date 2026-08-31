@@ -4,6 +4,9 @@ import {
   setEvaluationSeedTitles,
   suggestSeedTitles,
   resolveSeedIds,
+  listEvaluationRuns,
+  evaluationMetricsCsv,
+  evaluationNeighboursCsv,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
 
@@ -131,6 +134,72 @@ export function registerEvaluationHandlers(fastify: FastifyInstance) {
       return reply.send({
         suggestions: await suggestSeedTitles(mediaType, request.query.limit ?? 20),
       })
+    }
+  )
+
+  /**
+   * Archived runs.
+   *
+   * The job log cannot serve this. A set's report is around 450 entries and the
+   * log keeps a head plus a tail within 300, so the middle — where a second
+   * set's summary table lives — is gone by the time anyone opens it.
+   */
+  fastify.get('/api/settings/evaluation/runs', { preHandler: requireAdmin }, async (_request, reply) => {
+    const runs = await listEvaluationRuns()
+    return reply.send({
+      runs: runs.map((run) => ({
+        ...run,
+        createdAt: run.createdAt.toISOString(),
+        // Decided here rather than in the bundle: the panel should show what
+        // the run was pointed at without re-deriving the fallback rule.
+        usedDefaultSeeds: run.seedTitles.length === 0,
+      })),
+    })
+  })
+
+  /**
+   * CSV export, the whole archive by default.
+   *
+   * Defaulting to everything is the point: the reason to keep these is
+   * comparing across models and seed lists, and a per-run file leaves the
+   * reader to concatenate them by hand — which is what the provenance columns
+   * on every row exist to make unnecessary.
+   */
+  fastify.get<{ Querystring: { kind?: string; runId?: string } }>(
+    '/api/settings/evaluation/export',
+    {
+      preHandler: requireAdmin,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            kind: { type: 'string', enum: ['metrics', 'neighbours'] },
+            // `pattern` rather than `format: 'uuid'`: no route schema in this
+            // app uses a format keyword, so whether ajv-formats is loaded is
+            // unverified, and an unknown format throws at route registration.
+            // A malformed id would otherwise reach Postgres and 500.
+            runId: { type: 'string', pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const kind = request.query.kind === 'neighbours' ? 'neighbours' : 'metrics'
+      const runId = request.query.runId
+      const csv =
+        kind === 'neighbours'
+          ? await evaluationNeighboursCsv(runId)
+          : await evaluationMetricsCsv(runId)
+
+      const stamp = new Date().toISOString().slice(0, 10)
+      const scope = runId ? runId.slice(0, 8) : 'all'
+      return reply
+        .type('text/csv; charset=utf-8')
+        .header(
+          'Content-Disposition',
+          `attachment; filename="aperture-evaluation-${kind}-${scope}-${stamp}.csv"`
+        )
+        .send(csv)
     }
   )
 }

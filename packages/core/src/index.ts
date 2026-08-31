@@ -1275,6 +1275,14 @@ export {
   suggestSeedTitles,
   resolveSeedIds,
   type SeedSuggestion,
+  // Archived results. The job log is trimmed from the middle, which is exactly
+  // where a two-set comparison lives, so the figures are kept in a table and
+  // exported as CSV rather than read back out of a console.
+  evaluationMetricsCsv,
+  evaluationNeighboursCsv,
+  listEvaluationRuns,
+  saveEvaluationReport,
+  type EvaluationRunSummary,
 } from './evaluation/index.js'
 
 export {
