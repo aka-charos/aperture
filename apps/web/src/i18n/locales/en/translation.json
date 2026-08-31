@@ -4911,12 +4911,10 @@
   },
   "settingsEvaluation": {
     "title": "Evaluation seeds",
-    "description": "The evaluation job prints the nearest neighbours of a handful of titles, and that list is what a retrieval change is actually judged on. Left empty it uses your most-watched titles — which is exactly where two embedding models tend to agree, so the comparison reports no difference whatever the truth. Pick titles you know well: obscure, non-English and stylistically distinctive ones separate the spaces best.",
+    "description": "The evaluation job prints the nearest neighbours of a handful of titles, and that list is what a retrieval change is actually judged on. Left empty it uses your most-watched titles — which is exactly where two embedding models tend to agree, so the comparison reports no difference whatever the truth. Pick films you know well: obscure, non-English and stylistically distinctive ones separate the spaces best. The evaluation covers movies, so these are film titles.",
     "usingDefaults": "No seeds set, so the evaluation will use your most-watched titles. Those are the easy case for every model and will understate any difference.",
     "seedsLabel": "Seed titles",
     "seedsHelp": "One title per line. Matching ignores accents and matches from the start of the title.",
-    "movies": "Movies",
-    "series": "Series",
     "check": "Check titles",
     "checking": "Checking…",
     "suggest": "Suggest titles",
@@ -4932,6 +4930,7 @@
     "loadError": "Could not load the evaluation settings.",
     "saveError": "Could not save the seed titles.",
     "checkError": "Could not check those titles.",
-    "suggestError": "Could not fetch suggestions."
+    "suggestError": "Could not fetch suggestions.",
+    "scope": "Every stored embedding set with movie vectors is measured in one run, so two models or two retrieval modes can be compared without re-embedding in between. Sets covering different numbers of titles are not directly comparable — the job says so when it finds any."
   }
 }

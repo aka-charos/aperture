@@ -11,8 +11,6 @@ import {
   Chip,
   Stack,
   CircularProgress,
-  ToggleButton,
-  ToggleButtonGroup,
   Tooltip,
 } from '@mui/material'
 import ScienceIcon from '@mui/icons-material/Science'
@@ -61,7 +59,12 @@ export function EvaluationSeedsSection() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  const [mediaType, setMediaType] = useState<MediaType>('movie')
+  // The evaluate-recommender job hardcodes mediaType: 'movie' -- series sets
+  // are never measured. A media-type switch here would let someone store
+  // series titles that then resolve against `movies`, miss every one, and
+  // delete the neighbour dump from the report with only a line in the job log
+  // to say so. Offering the choice would be offering a way to break it.
+  const mediaType: MediaType = 'movie'
   const [text, setText] = useState('')
   const [savedText, setSavedText] = useState('')
   const [seeds, setSeeds] = useState<SeedResolution[]>([])
@@ -215,6 +218,10 @@ export function EvaluationSeedsSection() {
           {t('settingsEvaluation.description')}
         </Typography>
 
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          {t('settingsEvaluation.scope')}
+        </Typography>
+
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
             {error}
@@ -231,19 +238,6 @@ export function EvaluationSeedsSection() {
             {t('settingsEvaluation.usingDefaults')}
           </Alert>
         )}
-
-        <ToggleButtonGroup
-          size="small"
-          exclusive
-          value={mediaType}
-          onChange={(_e, value: MediaType | null) => {
-            if (value) setMediaType(value)
-          }}
-          sx={{ mb: 2 }}
-        >
-          <ToggleButton value="movie">{t('settingsEvaluation.movies')}</ToggleButton>
-          <ToggleButton value="series">{t('settingsEvaluation.series')}</ToggleButton>
-        </ToggleButtonGroup>
 
         <TextField
           id="evaluation-seed-titles"
