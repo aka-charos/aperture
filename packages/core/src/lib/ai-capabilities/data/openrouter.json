@@ -34,7 +34,7 @@
     {
       "id": "google/gemini-embedding-001",
       "name": "Gemini Embedding 001",
-      "description": "Previous-generation Google embedding model, 3072 dimensions. Through OpenRouter its default output is the RETRIEVAL space: default, search_query and search_document all return the identical vector, and only input_type: semantic_similarity differs (measured cosine 0.867 on the same text). Set the retrieval mode explicitly for item-to-item work.",
+      "description": "Previous-generation Google embedding model, 3072 dimensions. Its DEFAULT output space is RETRIEVAL_QUERY: sending search_query returns the byte-identical vector to sending nothing, while semantic_similarity (cosine 0.860 from default) and search_document (0.910) are each a genuinely different space. That identity reads as \"the default is this mode\" rather than \"the field was ignored\", because on the very same call the other two values do move the vector -- so the field is provably being read. A library embedded with no mode is therefore in the QUERY space, which is the one tuned for encoding short searches rather than comparing whole documents.",
       "capabilities": {
         "supportsToolCalling": false,
         "supportsToolStreaming": false,
