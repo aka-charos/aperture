@@ -112,24 +112,29 @@ test('a recommended mode is one the system can actually store', () => {
   }
 })
 
-test('both Gemini models want the symmetric space, by different mechanisms', () => {
-  // The correction this test exists to hold. Both recommend the same mode, but
-  // 001 takes it as a PARAMETER and gemini-2 as a TEXT PREFIX -- it ignores
-  // input_type outright, returning the byte-identical vector to sending
-  // nothing. Reading that identity as "its default is already semantic" is the
-  // mistake that shipped here once.
-  //
-  // Qwen recommends nothing: its instruction recipe is query-side against bare
-  // documents, and this recommender's query is a centroid, not text. It still
-  // carries a note saying so; silence would read as an oversight.
+test('only the model that reliably delivers a mode recommends one', () => {
   const byId = Object.fromEntries(OPENROUTER_EMBEDDINGS.map((m) => [m.id, m]))
 
-  assert.equal(byId['google/gemini-embedding-001'].recommendedInputType, 'semantic_similarity')
-  assert.equal(byId['google/gemini-embedding-001'].inputTypeMechanism, 'parameter')
-
+  // gemini-2 conditions on a TEXT PREFIX, and measured over five identical
+  // requests it is byte-stable. Because the prefix changes the input, no cache
+  // or route can collapse it into the unconditioned vector.
   assert.equal(byId['google/gemini-embedding-2'].recommendedInputType, 'semantic_similarity')
   assert.equal(byId['google/gemini-embedding-2'].inputTypeMechanism, 'textPrefix')
 
+  // 001 recommends NOTHING, and that is a measurement rather than caution.
+  // The same request with input_type: semantic_similarity returned two
+  // different vectors at random across five identical calls -- sometimes the
+  // default vector, sometimes a distinct one -- while the same model with no
+  // mode set was stable over the same five. A pass would write a random
+  // mixture of two spaces into one set, undetectable afterwards.
+  //
+  // It keeps `parameter` as its mechanism because that is what the model IS;
+  // the reason not to use it belongs in the note, not in a fake mechanism.
+  assert.equal(byId['google/gemini-embedding-001'].recommendedInputType, undefined)
+  assert.equal(byId['google/gemini-embedding-001'].inputTypeMechanism, 'parameter')
+
+  // Qwen: its instruction recipe is query-side against bare documents, and this
+  // recommender's query is a centroid, not text.
   assert.equal(byId['qwen/qwen3-embedding-8b'].recommendedInputType, undefined)
 })
 
