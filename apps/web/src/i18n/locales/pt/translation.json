@@ -4938,6 +4938,7 @@
     "loadError": "Could not load the evaluation settings.",
     "saveError": "Could not save the seed titles.",
     "checkError": "Could not check those titles.",
-    "suggestError": "Could not fetch suggestions."
+    "suggestError": "Could not fetch suggestions.",
+    "scope": "Every stored embedding set with movie vectors is measured in one run, so two models or two retrieval modes can be compared without re-embedding in between. Sets covering different numbers of titles are not directly comparable — the job says so when it finds any."
   }
 }
