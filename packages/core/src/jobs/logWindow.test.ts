@@ -44,3 +44,38 @@ test('a tiny budget still produces a valid window', () => {
   }
   assert.deepEqual(condenseLogs(logs, 0), [])
 })
+
+test('condensing twice does not restart the count', () => {
+  // The live buffer is condensed on every append once it is over budget, so
+  // the second pass reads a list that already contains a marker. Recomputing
+  // from that list reported "2 earlier entries not kept" for a run that had
+  // dropped hundreds.
+  const first = condenseLogs(
+    Array.from({ length: 500 }, (_, i) => entry(`line ${i}`)),
+    100
+  )
+  const second = condenseLogs([...first, entry('line 500')], 100)
+  const marker = second[LOG_HEAD_ENTRIES]
+
+  // 401 already gone, plus the one entry pushed off the front by the append.
+  assert.match(marker.message, /402/)
+  assert.equal(second.length, 100)
+})
+
+test('the count keeps accumulating over many passes', () => {
+  let logs = Array.from({ length: 100 }, (_, i) => entry(`line ${i}`))
+  for (let i = 0; i < 250; i++) logs = condenseLogs([...logs, entry(`extra ${i}`)], 100)
+
+  const marker = logs[LOG_HEAD_ENTRIES]
+  // 350 entries existed, 100 survive, one of which is the marker itself.
+  assert.match(marker.message, /251/)
+  assert.equal(logs.length, 100)
+})
+
+test('a marker that never gets re-elided keeps its own count', () => {
+  const logs = Array.from({ length: 500 }, (_, i) => entry(`line ${i}`))
+  const out = condenseLogs(logs, 100)
+  const marker = out[LOG_HEAD_ENTRIES] as JobLogEntry
+  // Detection is on the data field rather than the message, which is prose.
+  assert.deepEqual(marker.data, { marker: 'aperture:log-elision', elided: 401 })
+})
