@@ -262,6 +262,27 @@ This matters because **this library's task is symmetric**. Film document against
 
 **`dimensions` is deliberately NOT plumbed**, though it is equally reachable. Seven of the eight `VALID_EMBEDDING_DIMENSIONS` are MRL truncations, and truncating requires re-normalising (F-036, F-037) — `storeEmbeddings` normalises nothing. A dimensions knob without that renormalisation is a footgun that produces plausible, wrong vectors. Neither planned experiment needs it: gemini-embedding-001 is 3072 native and gemini-embedding-2's recommended top size is also 3072.
 
+**`input_type` on `gemini-embedding-001` is NONDETERMINISTIC through OpenRouter, and must not be used.** Measured live on this instance, five identical requests for one 356-character canonical document:
+
+| variant | five identical requests |
+|---|---|
+| `001-default` (no `input_type`) | **stable** — one vector |
+| `001-semantic` (`input_type: semantic_similarity`) | **UNSTABLE — two distinct vectors**, one of them byte-identical to the default |
+| `gemini2-bare` | stable |
+| `gemini2-prefix` | stable |
+
+The request was confirmed correct by printing the outgoing body: `input_type` is on the wire on every call. So the field reaches OpenRouter and is honoured *sometimes*.
+
+**This is worse than the parameter not working.** A full pass over 12,589 films would write an unpredictable mixture of two spaces into one table under one set identity — every downstream check passes, since each row has the right width and a unit norm, and the mixture is undetectable afterwards. Every centroid built on it would be a mean over two unrelated coordinate systems.
+
+**How this presented, and why it was nearly misdiagnosed twice.** The first run compared four variants across three documents and showed `001-default` vs `001-semantic` as *different* on a 356-char document and byte-*identical* on a 763-char and a 2,238-char one. That was read as provider routing, which does not fit — routing is random with respect to document length, and this looked like a clean length correlation (an earlier 371-char probe had also come out different). The second reading blamed the script's own call order, since `001-default` ran first and a cache keyed on `(model, input)` without `input_type` would serve the second call the first one's vector. Reversing the order flipped the result on two documents **in opposite directions**, which is not order-dependence either. Only repeating one request five times settled it: there is no length effect and no ordering effect, just a coin flip, and every single-sample comparison was reading one toss of it.
+
+**The lesson generalises past this parameter.** A single embedding comparison cannot distinguish "these configurations differ" from "this endpoint is nondeterministic". Any conclusion drawn from one call per configuration is unfalsifiable, and three separate mechanisms were confidently proposed here from exactly that evidence. Repeat before interpreting.
+
+Whether the underlying cause is routing (OpenRouter serves this model from both Google Vertex and Google AI Studio, which need not honour the same fields) or a distributed cache keyed without `input_type` is not settled and does not change the conclusion. `--only` and `--pin` on `scripts/compare-embedding-modes.mjs` exist to finish that diagnosis if it ever matters; `--pin` is also the only thing that could plausibly rescue the configuration.
+
+**gemini-2 is unaffected and this is structural, not luck.** Its mode conditions the *text*, so the two calls send genuinely different inputs — no cache and no route can collapse them into each other. Both its variants were byte-stable over five, and their separation held at 0.699–0.794 across documents from 356 to 2,238 characters. That is why the catalog recommends a mode on gemini-2 and recommends **none** on 001.
+
 **Gemini-2's semantic mode is a TEXT PREFIX, and OpenRouter is a faithful pipe.** A second probe embedded the same canonical document four ways — Google's native API and OpenRouter, each bare and each prefixed with Google's documented `task: sentence similarity | query: `:
 
 | | vs Google bare | sha256 |

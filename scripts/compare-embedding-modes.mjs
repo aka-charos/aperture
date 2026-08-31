@@ -49,6 +49,11 @@
  *                first one's vector. That is an artifact of asking, not a fact
  *                about the model — and it is indistinguishable from "the
  *                parameter was ignored" from a single ordering.
+ *   --only NAME  run one variant alone (e.g. 001-semantic). Separates a
+ *                shared cache from a nondeterministic route: if a variant is
+ *                unstable only when another variant asked for the same input
+ *                first, the endpoint is caching without input_type; if it is
+ *                unstable on its own, the route itself disagrees.
  *   --show-request  print the exact JSON body sent for each call, minus the
  *                key. The only way to confirm input_type is actually on the
  *                wire rather than taking this script's word for it.
@@ -73,6 +78,7 @@ const jsonPath = flag('--json', null)
 const repeat = Math.max(1, Number(flag('--repeat', '1')))
 const pin = flag('--pin', null)
 const reverse = argv.includes('--reverse')
+const only = flag('--only', null)
 const showRequest = argv.includes('--show-request')
 
 const SEMANTIC_PREFIX = 'task: sentence similarity | query: '
@@ -84,7 +90,7 @@ const SEMANTIC_PREFIX = 'task: sentence similarity | query: '
  * different mechanisms and gemini-2 reads only the first, which is the fact
  * this whole comparison exists to make visible rather than assumed.
  */
-const VARIANTS = [
+const ALL_VARIANTS = [
   { name: '001-default', model: 'google/gemini-embedding-001' },
   {
     name: '001-semantic',
@@ -94,6 +100,12 @@ const VARIANTS = [
   { name: 'gemini2-bare', model: 'google/gemini-embedding-2' },
   { name: 'gemini2-prefix', model: 'google/gemini-embedding-2', prefix: SEMANTIC_PREFIX },
 ]
+
+const VARIANTS = only ? ALL_VARIANTS.filter((v) => v.name === only) : ALL_VARIANTS
+if (only && VARIANTS.length === 0) {
+  console.error(`Unknown variant "${only}". One of: ${ALL_VARIANTS.map((v) => v.name).join(', ')}`)
+  process.exit(2)
+}
 
 const { getSystemSetting, getFunctionConfig, query, buildCanonicalText, buildSeriesCanonicalText } =
   await import(CORE)
