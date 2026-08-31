@@ -36,6 +36,7 @@ import SyncAltIcon from '@mui/icons-material/SyncAlt'
 import TranslateIcon from '@mui/icons-material/Translate'
 import TravelExploreIcon from '@mui/icons-material/TravelExplore'
 import TuneIcon from '@mui/icons-material/Tune'
+import ScienceIcon from '@mui/icons-material/Science'
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary'
 import VpnKeyIcon from '@mui/icons-material/VpnKey'
 import WhatshotIcon from '@mui/icons-material/Whatshot'
@@ -207,6 +208,10 @@ export const ADMIN_ELEMENTS: Record<string, AdminElement> = {
   algorithm: {
     icon: <TuneIcon />,
     Component: lazy(() => import('@/pages/admin/routes/AlgorithmRoute')),
+  },
+  evaluation: {
+    icon: <ScienceIcon />,
+    Component: lazy(() => import('@/pages/admin/routes/EvaluationRoute')),
   },
   explanations: {
     icon: <PsychologyIcon />,

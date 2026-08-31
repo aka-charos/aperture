@@ -4909,6 +4909,35 @@
     "gateTmdb": "Needs TMDB configured before this can do anything",
     "sectionErrorTitle": "This section could not be shown",
     "sectionErrorBody": "The rest of the console still works. If this started after an update, reloading picks up the new version.",
-    "sectionErrorReload": "Reload"
+    "sectionErrorReload": "Reload",
+    "evaluation": {
+      "title": "Evaluation",
+      "blurb": "Choose the titles the recommender evaluation is judged on."
+    }
+  },
+  "settingsEvaluation": {
+    "title": "Evaluation seeds",
+    "description": "The evaluation job prints the nearest neighbours of a handful of titles, and that list is what a retrieval change is actually judged on. Left empty it uses your most-watched titles — which is exactly where two embedding models tend to agree, so the comparison reports no difference whatever the truth. Pick titles you know well: obscure, non-English and stylistically distinctive ones separate the spaces best.",
+    "usingDefaults": "No seeds set, so the evaluation will use your most-watched titles. Those are the easy case for every model and will understate any difference.",
+    "seedsLabel": "Seed titles",
+    "seedsHelp": "One title per line. Matching ignores accents and matches from the start of the title.",
+    "movies": "Movies",
+    "series": "Series",
+    "check": "Check titles",
+    "checking": "Checking…",
+    "suggest": "Suggest titles",
+    "suggesting": "Finding…",
+    "saved": "Seed titles saved.",
+    "resolutionTitle": "What each seed will match",
+    "resolutionHelp": "Titles match from the start, and only the first match is used — so a shared name can land on a different film than you meant. Check the year.",
+    "noMatch": "no match in your library",
+    "suggestionsTitle": "Suggestions from your library",
+    "suggestionsHelp": "Watched titles, one per country, least-voted first — the cases where a model has least to fall back on. Click to add.",
+    "votes": "{{count}} votes",
+    "noVotes": "no vote count",
+    "loadError": "Could not load the evaluation settings.",
+    "saveError": "Could not save the seed titles.",
+    "checkError": "Could not check those titles.",
+    "suggestError": "Could not fetch suggestions."
   }
 }

@@ -87,9 +87,14 @@ export async function fetchTitleFacts(
 export async function resolveSeedIds(
   mediaType: 'movie' | 'series',
   titles: string[]
-): Promise<Array<{ input: string; id: string | null }>> {
+): Promise<Array<{ input: string; id: string | null; title?: string; year?: number | null }>> {
   const table = mediaType === 'movie' ? 'movies' : 'series'
-  const resolved: Array<{ input: string; id: string | null }> = []
+  const resolved: Array<{
+    input: string
+    id: string | null
+    title?: string
+    year?: number | null
+  }> = []
 
   for (const input of titles) {
     const trimmed = input.trim()
@@ -101,15 +106,27 @@ export async function resolveSeedIds(
     // title is one of the seeds worth stressing a model on, and nobody types
     // "Ascenseur pour l'échafaud" with the accent. STABLE, so it costs the
     // trigram index -- irrelevant for a handful of seeds once per run.
-    const result = await query<{ id: string }>(
-      `SELECT id FROM ${table}
+    //
+    // The match is a PREFIX, and the settings UI shows which title each seed
+    // landed on for exactly that reason: "The Three Musketeers" names four
+    // films here and this returns the earliest. The admin preview calls THIS
+    // function rather than one of its own, so a preview cannot promise a
+    // different film from the one the run will use.
+    const result = await query<{ id: string; title: string; year: number | null }>(
+      `SELECT id, title, year FROM ${table}
         WHERE unaccent(title) ILIKE unaccent($1)
            OR unaccent(original_title) ILIKE unaccent($1)
         ORDER BY (lower(unaccent(title)) = lower(unaccent($2))) DESC, year ASC NULLS LAST
         LIMIT 1`,
       [`${trimmed}%`, trimmed]
     )
-    resolved.push({ input: trimmed, id: result.rows[0]?.id ?? null })
+    const hit = result.rows[0]
+    resolved.push({
+      input: trimmed,
+      id: hit?.id ?? null,
+      title: hit?.title,
+      year: hit?.year ?? null,
+    })
   }
 
   return resolved

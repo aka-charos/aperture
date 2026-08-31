@@ -366,6 +366,21 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     ],
   },
   {
+    id: 'evaluation',
+    group: 'recommendations',
+    segment: 'evaluation',
+    titleKey: 'adminNav.evaluation.title',
+    blurbKey: 'adminNav.evaluation.blurb',
+    aliases: ['evaluation', 'evaluate', 'benchmark', 'seeds', 'neighbours', 'neighbors', 'ndcg', 'holdout', 'ab test'],
+    fields: [
+      {
+        anchor: 'evaluation-seed-titles',
+        labelKey: 'settingsEvaluation.seedsLabel',
+        aliases: ['seed titles', 'neighbour dump', 'sample titles'],
+      },
+    ],
+  },
+  {
     id: 'explanations',
     group: 'recommendations',
     segment: 'explanations',

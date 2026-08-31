@@ -1265,6 +1265,16 @@ export {
   type EvaluationOptions,
   type EvaluationReport,
   type EvaluationVariant,
+  // Seed titles for the neighbour dump. The default (most-watched) is exactly
+  // where two embedding spaces agree, so choosing them is what makes the
+  // primary instrument able to answer a comparison at all.
+  EVALUATION_SEED_SETTING,
+  getEvaluationSeedTitles,
+  parseSeedTitles,
+  setEvaluationSeedTitles,
+  suggestSeedTitles,
+  resolveSeedIds,
+  type SeedSuggestion,
 } from './evaluation/index.js'
 
 export {
