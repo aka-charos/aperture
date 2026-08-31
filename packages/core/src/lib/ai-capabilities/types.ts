@@ -71,6 +71,32 @@ export interface ModelMetadata {
   inputTypePrefixes?: Partial<
     Record<'semantic_similarity' | 'search_query' | 'search_document', string>
   >
+  /**
+   * The literal spelling to put in `input_type` for each mode, when it differs
+   * from the mode's canonical name.
+   *
+   * OpenRouter's `input_type` is a PASSTHROUGH, not a vocabulary of its own, so
+   * the accepted values are the upstream's. Measured on `gemini-embedding-001`
+   * pinned to `google-vertex`: `input_type: "semantic_similarity"` is accepted
+   * when `input` is a single string and rejected outright when `input` is an
+   * array — HTTP 400, "cannot be parsed as a valid embedding task type" —
+   * because OpenRouter normalises the field on the string path and forwards it
+   * verbatim on the batch path. `embedMany` always sends an array, so the
+   * library embed job hit the 400 on its very first batch while every probe
+   * that sent one document at a time had passed.
+   *
+   * `SEMANTIC_SIMILARITY` is accepted on BOTH shapes and returns the
+   * byte-identical vector to the lowercase form where lowercase works, so the
+   * upstream spelling is simply the correct one to send always.
+   *
+   * Declared per model rather than upper-cased in code: Cohere's `input_type`
+   * on this same field genuinely is lower-case (`search_document`), so a
+   * transform that fixed Google would break the first Cohere model added. The
+   * canonical name is used when a model declares nothing.
+   */
+  inputTypeValues?: Partial<
+    Record<'semantic_similarity' | 'search_query' | 'search_document', string>
+  >
 
   /**
    * Why {@link recommendedInputType} is what it is, or — when there is no

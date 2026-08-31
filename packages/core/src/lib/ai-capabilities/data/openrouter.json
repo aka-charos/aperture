@@ -46,7 +46,12 @@
       "costTier": "low",
       "inputTypeNote": "Setting a mode here REQUIRES pinning an upstream. OpenRouter serves this model from two that disagree: pinned to google-vertex, input_type: semantic_similarity is honoured and stable (cosine 0.841 from unmoded); pinned to google-ai-studio it is dropped and the unmoded vector comes back. Unpinned, each request is a coin flip and the library becomes a mixture of two spaces -- so the settings page refuses that combination. Both upstreams do agree on the unmoded vector, which is why the library embedded without a mode is unaffected however it routed.",
       "inputTypeMechanism": "parameter",
-      "recommendedInputType": "semantic_similarity"
+      "recommendedInputType": "semantic_similarity",
+      "inputTypeValues": {
+        "semantic_similarity": "SEMANTIC_SIMILARITY",
+        "search_query": "RETRIEVAL_QUERY",
+        "search_document": "RETRIEVAL_DOCUMENT"
+      }
     },
     {
       "id": "qwen/qwen3-embedding-8b",

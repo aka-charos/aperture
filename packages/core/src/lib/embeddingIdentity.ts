@@ -279,12 +279,28 @@ export function resolveInputTypeDelivery(input: {
   inputType?: EmbeddingInputType
   mechanism?: 'parameter' | 'textPrefix'
   prefixes?: Partial<Record<EmbeddingInputType, string>>
-}): { mechanism: 'parameter' | 'textPrefix' | 'none'; prefix?: string } {
-  const { inputType, mechanism = 'parameter', prefixes } = input
+  values?: Partial<Record<EmbeddingInputType, string>>
+}): {
+  mechanism: 'parameter' | 'textPrefix' | 'none'
+  prefix?: string
+  /**
+   * The literal string to put in `input_type`, which is NOT always the mode's
+   * canonical name — see {@link EmbeddingIdentityConfig} and the `values` note
+   * on the catalog entry.
+   */
+  parameterValue?: string
+} {
+  const { inputType, mechanism = 'parameter', prefixes, values } = input
 
   if (!inputType) return { mechanism: 'none' }
 
-  if (mechanism === 'parameter') return { mechanism: 'parameter' }
+  if (mechanism === 'parameter') {
+    // The declared spelling, or the canonical name when a model declares none.
+    // Never a computed transform of the mode: which vocabulary an upstream
+    // speaks is a fact about that upstream, and guessing it is what produced
+    // the 400 this argument exists to prevent.
+    return { mechanism: 'parameter', parameterValue: values?.[inputType] ?? inputType }
+  }
 
   const prefix = prefixes?.[inputType]
   return prefix ? { mechanism: 'textPrefix', prefix } : { mechanism: 'none' }
