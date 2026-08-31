@@ -47,6 +47,7 @@ import {
   formatNeighbourReport,
   popularSeedIds,
   resolveSeedIds,
+  type NeighbourReport,
 } from './neighbours.js'
 
 const logger = createChildLogger('evaluation')
@@ -107,6 +108,20 @@ export interface VariantResult {
   byBucket: Record<string, AggregateMetrics>
 }
 
+/**
+ * One seed's neighbours in one space, with the nationality number beside them.
+ *
+ * Returned as well as logged because the log is trimmed twice on the way out
+ * and a two-set run loses one of the two dumps every time. Whatever archives
+ * this needs the rows, not the fixed-width rendering of them.
+ */
+export interface NeighbourDump {
+  variant: 'raw' | 'centered'
+  report: NeighbourReport
+  /** Null when the seed has no country recorded, never 0 — see `countryConcentration`. */
+  sameCountryShare: number | null
+}
+
 export interface EvaluationReport {
   mediaType: 'movie' | 'series'
   /** The set that was measured, `provider:model`. */
@@ -117,6 +132,16 @@ export interface EvaluationReport {
   qualifiedUsers: number
   skippedUsers: number
   variants: VariantResult[]
+  /**
+   * The seeds as REQUESTED, not as resolved.
+   *
+   * A seed that matched nothing is part of what the run was asked to do, and
+   * dropping it here would make a later reader think the dump was complete.
+   */
+  seedTitles: string[]
+  neighbours: NeighbourDump[]
+  /** Viewer ids to usernames, so an archived per-viewer row is readable. */
+  usernames: Record<string, string>
 }
 
 interface UserSplit {
@@ -368,7 +393,7 @@ export async function runEvaluation(options: EvaluationOptions = {}): Promise<Ev
   }
 
   logReport(results, splits, log)
-  await logNeighbours(mediaType, raw, centered, options, log)
+  const neighbours = await logNeighbours(mediaType, raw, centered, options, log)
 
   return {
     mediaType,
@@ -379,6 +404,9 @@ export async function runEvaluation(options: EvaluationOptions = {}): Promise<Ev
     qualifiedUsers: splits.length,
     skippedUsers: skipped,
     variants: results,
+    seedTitles: options.seedTitles ?? [],
+    neighbours,
+    usernames: Object.fromEntries(splits.map((split) => [split.userId, split.username])),
   }
 }
 
@@ -448,7 +476,7 @@ async function logNeighbours(
   centered: LibraryMatrix | null,
   options: EvaluationOptions,
   log: (line: string) => void
-): Promise<void> {
+): Promise<NeighbourDump[]> {
   const topN = options.neighbourTopN ?? DEFAULT_NEIGHBOUR_TOP_N
 
   let seedIds: string[]
@@ -478,11 +506,16 @@ async function logNeighbours(
     // report and look like it simply had nothing to say.
     log('')
     log('Nearest neighbours — skipped: none of the requested seeds resolved to an embedded title.')
-    return
+    return []
   }
 
   log('')
-  log('Nearest neighbours — the instrument to actually judge this on.')
+  // The set id goes on this heading, not only on the summary table far above.
+  // A run measuring two sets emits both reports into one log, the log is
+  // trimmed from the middle, and what survives is one set's table sitting
+  // directly above ANOTHER set's dump with nothing to say they differ. That
+  // is not a missing label, it is a report that reads as coherent and is not.
+  log(`Nearest neighbours — the instrument to actually judge this on — ${raw.modelId}`)
   log('Country is shown because six of the fifteen canonical-text fields are')
   log('nationality-coded proper nouns; if it dominates, it shows up as a column.')
 
@@ -491,12 +524,15 @@ async function logNeighbours(
     ? await buildNeighbourReports(mediaType, centered, seedIds, topN)
     : []
 
+  const dumps: NeighbourDump[] = []
+
   for (let i = 0; i < rawReports.length; i++) {
     log('')
     for (const line of formatNeighbourReport(rawReports[i], 'raw')) log(line)
 
     const rawShare = countryConcentration(rawReports[i])
     if (rawShare != null) log(`     same-country share: ${pct(rawShare)}`)
+    dumps.push({ variant: 'raw', report: rawReports[i], sameCountryShare: rawShare })
 
     const centeredReport = centeredReports[i]
     if (centeredReport) {
@@ -504,6 +540,9 @@ async function logNeighbours(
       for (const line of formatNeighbourReport(centeredReport, 'mean-centred')) log(line)
       const share = countryConcentration(centeredReport)
       if (share != null) log(`     same-country share: ${pct(share)}`)
+      dumps.push({ variant: 'centered', report: centeredReport, sameCountryShare: share })
     }
   }
+
+  return dumps
 }

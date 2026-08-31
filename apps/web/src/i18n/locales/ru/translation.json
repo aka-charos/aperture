@@ -4939,6 +4939,22 @@
     "saveError": "Could not save the seed titles.",
     "checkError": "Could not check those titles.",
     "suggestError": "Could not fetch suggestions.",
-    "scope": "Every stored embedding set with movie vectors is measured in one run, so two models or two retrieval modes can be compared without re-embedding in between. Sets covering different numbers of titles are not directly comparable — the job says so when it finds any."
+    "scope": "Every stored embedding set with movie vectors is measured in one run, so two models or two retrieval modes can be compared without re-embedding in between. Sets covering different numbers of titles are not directly comparable — the job says so when it finds any.",
+    "results": {
+      "title": "Archived results",
+      "description": "Every evaluation is stored here as well as printed to the job log. The log is trimmed from the middle, and on a run measuring two embedding sets that is exactly where the second set’s figures land — so the log alone cannot show you a comparison.",
+      "downloadMetrics": "Download figures (CSV)",
+      "downloadNeighbours": "Download neighbours (CSV)",
+      "empty": "No evaluations archived yet. Run the Recommender evaluation job from the Jobs console.",
+      "poolWarning": "Two sets are only comparable when they cover the same number of titles: a half-embedded set is a smaller pool and scores better for it.",
+      "colDate": "Run",
+      "colSet": "Embedding set",
+      "colTitles": "Titles",
+      "colViewers": "Viewers",
+      "colSeeds": "Seeds",
+      "colDownload": "CSV",
+      "defaultSeeds": "default",
+      "loadError": "Could not load the archived evaluations."
+    }
   }
 }

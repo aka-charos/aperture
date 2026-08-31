@@ -46,6 +46,7 @@ import {
   getEmbeddingSetsReport,
   runEvaluation,
   getEvaluationSeedTitles,
+  saveEvaluationReport,
   type EmbeddingSetRef,
   refreshAllExplanations,
   withInferenceContext,
@@ -390,6 +391,7 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
             : [undefined]
 
         const measured: Array<{ modelId: string; dimensions: number; poolSize: number }> = []
+        const reports: NonNullable<Awaited<ReturnType<typeof runEvaluation>>>[] = []
         let result: Awaited<ReturnType<typeof runEvaluation>> = null
 
         for (const set of targets) {
@@ -410,8 +412,80 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
               dimensions: one.dimensions,
               poolSize: one.poolSize,
             })
+            reports.push(one)
             result = one
+
+            // Archived because the log cannot hold this. The report is ~450
+            // entries per set and the log is trimmed to 500 live / 300 stored,
+            // so a two-set run -- the only kind that can answer a comparison --
+            // loses one of the two summary tables every time.
+            //
+            // Swallowed like pruneOldRecommendationRuns: forty minutes of
+            // measurement has already happened, and failing the job over the
+            // bookkeeping would throw away the log report as well.
+            try {
+              const runId = await saveEvaluationReport(one, { jobId })
+              addLog(jobId, 'info', `💾 Archived as run ${runId} (${one.modelId})`)
+            } catch (err) {
+              logger.warn({ job: name, jobId, err }, 'Failed to archive evaluation report')
+              addLog(
+                jobId,
+                'warn',
+                `⚠️  Could not archive this set's results — the report below is the only copy.`
+              )
+            }
           }
+        }
+
+        // The comparison, re-stated at the very end.
+        //
+        // Each set's own report is ~450 log entries and the log keeps a 30-entry
+        // head plus a tail, so on a two-set run the second set's summary table
+        // is always in the discarded middle. What survived was one set's table
+        // sitting above ANOTHER set's neighbour dump, with nothing on screen
+        // saying they were different sets -- a report that reads as coherent
+        // and is not. The tail is the half that survives, so the numbers go
+        // here, with the set named on every row.
+        if (reports.length > 0) {
+          const asPct = (value: number | undefined) => `${((value ?? 0) * 100).toFixed(1)}%`
+
+          addLog(jobId, 'info', '')
+          addLog(jobId, 'info', '═══ Comparison — every set measured in this run ═══')
+          reports.forEach((report, index) => {
+            addLog(
+              jobId,
+              'info',
+              `  [${index + 1}] ${report.modelId} — ${report.poolSize} titles, ${report.dimensions}d`
+            )
+          })
+
+          addLog(jobId, 'info', '')
+          addLog(
+            jobId,
+            'info',
+            `  set ${'variant'.padEnd(10)} ${'med pct'.padStart(8)} ${'ndcg@20'.padStart(9)} ` +
+              `${'ndcg@100'.padStart(9)} ${'ndcg@500'.padStart(9)}`
+          )
+          reports.forEach((report, index) => {
+            for (const variant of report.variants) {
+              const aggregate = variant.aggregate
+              addLog(
+                jobId,
+                'info',
+                `  [${index + 1}] ${variant.variant.padEnd(10)} ` +
+                  `${asPct(aggregate.medianPercentile).padStart(8)} ` +
+                  `${asPct(aggregate.ndcg[20]).padStart(9)} ` +
+                  `${asPct(aggregate.ndcg[100]).padStart(9)} ` +
+                  `${asPct(aggregate.ndcg[500]).padStart(9)}`
+              )
+            }
+          })
+          addLog(jobId, 'info', '')
+          addLog(
+            jobId,
+            'info',
+            '📥 Per-viewer figures and the full neighbour dump are archived — download them as CSV from Admin → Recommendations → Evaluation.'
+          )
         }
 
         // Ranking two sets over two different libraries is not a comparison.
