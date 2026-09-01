@@ -24,7 +24,7 @@
       "embeddingDimensions": 3072,
       "quality": "standard",
       "costTier": "low",
-      "inputTypeNote": "Ignores input_type: its semantic_similarity output is byte-identical to sending nothing. The mode is delivered as a TEXT PREFIX on the document instead (task: sentence similarity | query: ...), which moves the vector to cosine 0.811 from bare text -- a far larger change than any parameter produces. Verified byte-identical between OpenRouter and Google native on both bare and prefixed input.",
+      "inputTypeNote": "Ignores input_type: its semantic_similarity output is byte-identical to sending nothing. The mode is delivered as a TEXT PREFIX on the document instead (task: sentence similarity | query: ...), which moves the vector to cosine 0.811 from bare text -- a far larger change than any parameter produces. Verified byte-identical between OpenRouter and Google native on both bare and prefixed input, and byte-identical across repeats despite four listed upstreams (all Google), which is why its routing needs no pin. Measured separately: unlike 001, this model RENORMALISES its own Matryoshka truncations -- 768 dimensions come back unit-length. That removes the renormalisation objection for this model specifically, though `dimensions` stays unplumbed because it does not hold for 001 or pplx-embed.",
       "inputTypeMechanism": "textPrefix",
       "inputTypePrefixes": {
         "semantic_similarity": "task: sentence similarity | query: ",
@@ -45,7 +45,7 @@
       "embeddingDimensions": 3072,
       "quality": "standard",
       "costTier": "low",
-      "inputTypeNote": "Setting a mode here REQUIRES pinning an upstream. OpenRouter serves this model from two that disagree: pinned to google-vertex, input_type: semantic_similarity is honoured and stable (cosine 0.841 from unmoded); pinned to google-ai-studio it is dropped and the unmoded vector comes back. Unpinned, each request is a coin flip and the library becomes a mixture of two spaces -- so the settings page refuses that combination. Both upstreams do agree on the unmoded vector, which is why the library embedded without a mode is unaffected however it routed.",
+      "inputTypeNote": "Its Matryoshka truncations are NOT unit-length -- measured L2 norm 0.598 at 768 dimensions, confirming Google's own instruction to normalise non-3072 output manually, and unlike gemini-2 which renormalises its own. Setting a mode here REQUIRES pinning an upstream. OpenRouter serves this model from two that disagree: pinned to google-vertex, input_type: semantic_similarity is honoured and stable (cosine 0.841 from unmoded); pinned to google-ai-studio it is dropped and the unmoded vector comes back. Unpinned, each request is a coin flip and the library becomes a mixture of two spaces -- so the settings page refuses that combination. Both upstreams do agree on the unmoded vector, which is why the library embedded without a mode is unaffected however it routed.",
       "inputTypeMechanism": "parameter",
       "recommendedInputType": "semantic_similarity",
       "inputTypeValues": {
@@ -68,7 +68,7 @@
       "embeddingDimensions": 4096,
       "quality": "standard",
       "costTier": "low",
-      "inputTypeNote": "Takes no mode. Qwen is instruction-aware, but its documented recipe puts the instruction on the QUERY against bare documents, and this recommender has no text query -- the query is a centroid of item vectors. Prefixing every document identically is not an official Qwen form."
+      "inputTypeNote": "Takes no mode. Qwen is instruction-aware, but its documented recipe puts the instruction on the QUERY against bare documents, and this recommender has no text query -- the query is a centroid of item vectors. Prefixing every document identically is not an official Qwen form. Worth knowing, and it came out REASSURING: this is the only catalogue model whose repeats are not byte-identical, because OpenRouter lists three third-party upstreams for it (Nebius, DeepInfra, SiliconFlow at fp8) and routes each call independently. Measured, they agree to cosine 0.999922 -- float noise that reorders nothing, not a mixture of spaces. So a set embedded here is one population despite the routing, and it also renormalises its own Matryoshka truncations (768 comes back unit-length)."
     },
     {
       "id": "perplexity/pplx-embed-v1-4b",
@@ -83,7 +83,7 @@
       "embeddingDimensions": 2560,
       "quality": "standard",
       "costTier": "low",
-      "inputTypeNote": "Takes no mode, by design rather than omission: the model card states it is deliberately not instruction-tuned, so text is embedded bare with no task prefix to choose or maintain -- which also means no mode can be invented for it later the way gemini-2's prefix was measured. Matryoshka-truncatable to 128, which this app does not offer: `dimensions` is not plumbed, and a truncated vector needs the renormalisation storeEmbeddings does not do."
+      "inputTypeNote": "Takes no mode, by design rather than omission: the model card states it is deliberately not instruction-tuned, so text is embedded bare with no task prefix to choose or maintain -- which also means no mode can be invented for it later the way gemini-2's prefix was measured. Matryoshka-truncatable to 128, which this app does not offer: `dimensions` is not plumbed, and its truncations are NOT unit-length (measured L2 norm 9.02 at 768) so the caller would have to renormalise. Its NATIVE output is not unit-length either -- measured norm 15.90 at 2560, confirming the card. Harmless for the 31 cosine comparisons, which are magnitude-invariant; the two places vectors are summed already l2Normalize per item."
     }
   ],
   "chatModels": [],
