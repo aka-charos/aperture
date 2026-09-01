@@ -104,7 +104,7 @@ export const jobDefinitions: JobDefinition[] = [
   {
     name: 'refresh-embedding-centering',
     description:
-      "Recomputes the library mean and rewrites every title's mean-centred vector. Subtracting the mean removes the direction every canonical text shares (they all describe a film, in one template), which on the measured library lifts ndcg@100 from 20.5% to 31.9%. Reads nothing users see and changes no recommendation on its own -- a profile keeps whatever space it was built in until rebuild-taste-profiles is run, which is what makes this safe to run at any time. Run it after any re-embed.",
+      "Recomputes the library mean and rewrites every title's mean-centred vector. Subtracting the mean removes the direction every canonical text shares (they all describe a film, in one template), which on the measured library lifts ndcg@100 from 20.5% to 31.9%. You do not normally need this: both embedding jobs centre automatically when they generate anything, when the column is left half-filled, and when rows have gone since the last pass. Reach for it to repair a column that is populated but wrong -- the automatic check cannot tell a bad mean from a good one -- or to force the work now rather than at the next embedding run. It moves every item vector, so profiles built against the old mean stay slightly out of step until they age out or rebuild-taste-profiles is run; nothing refuses in the meantime.",
     cron: null,
     manualOnly: true,
   },

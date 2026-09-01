@@ -20,6 +20,7 @@
  */
 
 import { query, queryOne } from '../lib/db.js'
+import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
 import { createChildLogger } from '../lib/logger.js'
 import { addLog, setJobStep } from '../jobs/progress.js'
 import {
@@ -105,19 +106,78 @@ export function buildSpaceFor(centeringReady: boolean): EmbeddingSpace {
  * happened to be filled, and nothing would report an error.
  */
 export async function isCenteringReady(mediaType: MediaType): Promise<boolean> {
+  const state = await inspectCentering(mediaType)
+  return state != null && state.missing === 0
+}
+
+/**
+ * The centred column's current shape for the active model: how many rows it
+ * holds and how many of them are uncentred.
+ *
+ * One scan rather than two. The gate needs both numbers and `isCenteringReady`
+ * needs one of them, and asking separately meant two sequential COUNTs over the
+ * same rows every time an embedding job finished.
+ *
+ * Null means no embedding model is configured, which is not the same as an
+ * empty set and must not read as "ready".
+ */
+export async function inspectCentering(
+  mediaType: MediaType
+): Promise<{ modelId: string; rows: number; missing: number } | null> {
   const modelId = await getActiveEmbeddingModelId()
-  if (!modelId) return false
+  if (!modelId) return null
 
   const tableName = await resolveTable(mediaType)
 
-  const row = await queryOne<{ missing: string }>(
-    `SELECT COUNT(*) AS missing
+  const row = await queryOne<{ rows: string; missing: string }>(
+    `SELECT COUNT(*) AS rows,
+            COUNT(*) FILTER (WHERE embedding_centered IS NULL) AS missing
        FROM ${tableName}
-      WHERE model = $1 AND embedding_centered IS NULL`,
+      WHERE model = $1`,
     [modelId]
   )
+  if (row == null) return null
 
-  return row != null && Number(row.missing) === 0
+  return { modelId, rows: Number(row.rows), missing: Number(row.missing) }
+}
+
+/**
+ * What the centred column looked like the last time it was successfully
+ * rewritten, so the gate can notice rows leaving.
+ *
+ * Keyed by model because a set switch is not drift: switching to a previously
+ * centred set would otherwise compare its row count against a different set's,
+ * and fire a full rewrite for nothing.
+ */
+const CENTERING_STATE_KEY = 'embedding_centering_state'
+
+type CentringState = Partial<Record<MediaType, { modelId: string; rows: number }>>
+
+async function readCentringState(): Promise<CentringState> {
+  const raw = await getSystemSetting(CENTERING_STATE_KEY)
+  if (!raw) return {}
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? (parsed as CentringState) : {}
+  } catch {
+    // A corrupt blob must read as "unknown", which the gate treats as needing
+    // work — never as a row count that happens to match.
+    logger.warn({ key: CENTERING_STATE_KEY }, 'Centring state did not parse; treating as unknown')
+    return {}
+  }
+}
+
+async function writeCentringState(
+  mediaType: MediaType,
+  modelId: string,
+  rows: number
+): Promise<void> {
+  const next = { ...(await readCentringState()), [mediaType]: { modelId, rows } }
+  await setSystemSetting(
+    CENTERING_STATE_KEY,
+    JSON.stringify(next),
+    'Rows per media type at the last successful centring, so deletions can be detected'
+  )
 }
 
 /**
@@ -147,9 +207,35 @@ export async function isCenteringReady(mediaType: MediaType): Promise<boolean> {
  *                   self-healing rather than permanent: the next scheduled
  *                   pass sees an unready column and retries without anyone
  *                   noticing it broke.
+ *
+ *   row count moved Rows can LEAVE without leaving a NULL behind. Every
+ *                   embedding table declares `REFERENCES movies(id) ON DELETE
+ *                   CASCADE` (0007, 0030, 0078), so a title removed from the
+ *                   media server takes its vector with it on the next sync.
+ *                   Nothing was generated and nothing is NULL, so the two
+ *                   conditions above both say no — while the mean the whole
+ *                   column is centred against still counts the deleted films.
+ *                   The drift scales with the fraction removed: noise for a
+ *                   handful, real for a library section.
+ *
+ * An UNKNOWN previous count (`null`) reads as needing work. That costs one
+ * rewrite on an instance upgrading into this check, and the alternative is to
+ * trust a column whose history we cannot see — the asymmetry runs the same way
+ * as everywhere else here, since a redundant rewrite is minutes and a stale
+ * mean is silent for as long as nobody re-embeds.
+ *
+ * Takes an object rather than four positionals: the two counts are both
+ * numbers, transposing them would still typecheck, and it forces every call
+ * site to be revisited when the shape changes.
  */
-export function centeringNeeded(generated: number, ready: boolean): boolean {
-  return generated > 0 || !ready
+export function centeringNeeded(input: {
+  generated: number
+  ready: boolean
+  rows: number
+  centredRows: number | null
+}): boolean {
+  const { generated, ready, rows, centredRows } = input
+  return generated > 0 || !ready || centredRows == null || centredRows !== rows
 }
 
 /**
@@ -238,6 +324,11 @@ export async function refreshCenteredEmbeddings(
   )
 
   const updated = result.rowCount ?? 0
+  // Recorded HERE rather than at the one caller that gates, because the manual
+  // refresh-embedding-centering job calls this directly: bookkeeping attached
+  // to the gate would leave that path writing a correct column and a stale
+  // count, and the next embedding pass would redo the whole rewrite.
+  await writeCentringState(mediaType, modelId, updated)
   logger.info({ mediaType, tableName, modelId, updated }, 'Recentred embeddings')
   return { updated, skipped: false }
 }
@@ -268,10 +359,41 @@ export async function centreAfterGeneration(
   stepIndex: number
 ): Promise<void> {
   try {
-    if (!centeringNeeded(generated, await isCenteringReady(mediaType))) return
+    const current = await inspectCentering(mediaType)
+    if (current == null) {
+      addLog(jobId, 'warn', '⚠️ No embedding model configured; centred column left alone')
+      return
+    }
+
+    // Only the count recorded for THIS model counts as a previous observation.
+    // A set switch leaves the other set's number behind, and comparing across
+    // sets would fire a full rewrite that changes nothing.
+    const previous = (await readCentringState())[mediaType]
+    const centredRows = previous?.modelId === current.modelId ? previous.rows : null
+
+    if (
+      !centeringNeeded({
+        generated,
+        ready: current.missing === 0,
+        rows: current.rows,
+        centredRows,
+      })
+    ) {
+      return
+    }
 
     setJobStep(jobId, stepIndex, 'Centring embeddings')
-    addLog(jobId, 'info', '🧭 Recomputing the library mean and re-centring...')
+    if (generated === 0 && current.missing === 0 && centredRows != null) {
+      // Worth naming: this is the deletion path, and it is the one case where
+      // the column looked complete and was still wrong.
+      addLog(
+        jobId,
+        'info',
+        `🧭 ${centredRows - current.rows} ${mediaType} embeddings have gone since the last centring; recomputing the mean...`
+      )
+    } else {
+      addLog(jobId, 'info', '🧭 Recomputing the library mean and re-centring...')
+    }
 
     const { updated, skipped } = await refreshCenteredEmbeddings(mediaType)
     if (skipped) {
