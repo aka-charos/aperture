@@ -242,8 +242,8 @@ importers:
         specifier: ^2.0.0
         version: 2.0.89(zod@3.25.76)
       '@ai-sdk/openai-compatible':
-        specifier: ^2.0.0
-        version: 2.0.10(zod@3.25.76)
+        specifier: ^1.0.53
+        version: 1.0.53(zod@3.25.76)
       '@openrouter/ai-sdk-provider':
         specifier: ^1.5.4
         version: 1.5.4(ai@5.0.118(zod@3.25.76))(zod@3.25.76)
@@ -347,8 +347,8 @@ packages:
     peerDependencies:
       zod: ^3.23.8
 
-  '@ai-sdk/openai-compatible@2.0.10':
-    resolution: {integrity: sha512-dM+CXjW3+QAZVl2NKhch9T5gCa8p7CMJR16KtaRS9HzY8H/ASD8hiAssnDGz00XyOKYpDkd9Mj2mwK25u5LxnQ==}
+  '@ai-sdk/openai-compatible@1.0.53':
+    resolution: {integrity: sha512-KKtoWZmer+aKsGpkUeSypjZyo9CT+WXZTiOhpqkUrfqG9P6lS92yadYRe6tPpMtnWjLwynj03uMxCT9uIjumKA==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.23.8
@@ -371,6 +371,12 @@ packages:
     peerDependencies:
       zod: ^3.23.8
 
+  '@ai-sdk/provider-utils@3.0.36':
+    resolution: {integrity: sha512-2eSw90hn32Je6n2a8Gf4dJ2EoecPJuOCWqwZCw+BkhPq2LOS01HX3s6ljgOm0iIkZiD5aAuMdpOw17rYKQF/Zg==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.23.8
+
   '@ai-sdk/provider-utils@4.0.6':
     resolution: {integrity: sha512-o/SP1GQOrpXAzHjMosPHI0Pu+YkwxIMndSjSLrEXtcVixdrjqrGaA9I7xJcWf+XpRFJ9byPHrKYnprwS+36gMg==}
     engines: {node: '>=18'}
@@ -385,6 +391,10 @@ packages:
 
   '@ai-sdk/provider@2.0.1':
     resolution: {integrity: sha512-KCUwswvsC5VsW2PWFqF8eJgSCu5Ysj7m1TxiHTVA6g7k360bk0RNQENT8KTMAYEs+8fWPD3Uu4dEmzGHc+jGng==}
+    engines: {node: '>=18'}
+
+  '@ai-sdk/provider@2.0.3':
+    resolution: {integrity: sha512-h88OPkavHTiN9tMn2l5awAznGB0lXzjcLhgR1/rvjB2zlLprsNxbM2tt6OJsHUxduLC3klq0/eqaSf6fX5XVww==}
     engines: {node: '>=18'}
 
   '@ai-sdk/provider@3.0.3':
@@ -967,6 +977,10 @@ packages:
 
   '@fastify/ajv-compiler@4.0.5':
     resolution: {integrity: sha512-KoWKW+MhvfTRWL4qrhUwAAZoaChluo0m0vbiJlGMt2GXvL4LVPQEjt8kSpHI3IBq5Rez8fg+XeH3cneztq+C7A==}
+
+  '@fastify/busboy@2.1.1':
+    resolution: {integrity: sha512-vBZP4NlzfOlerQTnba4aqZoMhE/a9HY7HRqoOPaETQcSQuWEIyZMHGfVu6w9wGtGK5fED5qRs2DteVCjOH60sA==}
+    engines: {node: '>=14'}
 
   '@fastify/busboy@3.2.0':
     resolution: {integrity: sha512-m9FVDXU3GT2ITSe0UaMA5rU3QkfC/UXtCU8y0gSN/GugTqtVldOBWIB5V6V3sbmenVZUIpU6f+mPEO2+m5iTaA==}
@@ -3707,6 +3721,10 @@ packages:
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
+  undici@5.29.0:
+    resolution: {integrity: sha512-raqeBD6NQK4SkWhQzeYKd1KmIG6dllBOTt55Rmkt4HtI9mwdWtJljnrXjAFUBLTSN67HWrOIZ3EPF4kjUw80Bg==}
+    engines: {node: '>=14.0'}
+
   unicorn-magic@0.3.0:
     resolution: {integrity: sha512-+QBBXBCvifc56fsbuxZQ6Sic3wqqc3WWaqxs58gvJrcOuN83HGTCwz3oS5phzU9LthRNE9VrJCFCLUgHeeFnfA==}
     engines: {node: '>=18'}
@@ -4030,10 +4048,10 @@ snapshots:
       '@ai-sdk/provider-utils': 4.0.8(zod@3.25.76)
       zod: 3.25.76
 
-  '@ai-sdk/openai-compatible@2.0.10(zod@3.25.76)':
+  '@ai-sdk/openai-compatible@1.0.53(zod@3.25.76)':
     dependencies:
-      '@ai-sdk/provider': 3.0.3
-      '@ai-sdk/provider-utils': 4.0.6(zod@3.25.76)
+      '@ai-sdk/provider': 2.0.3
+      '@ai-sdk/provider-utils': 3.0.36(zod@3.25.76)
       zod: 3.25.76
 
   '@ai-sdk/openai-compatible@2.0.13(zod@3.25.76)':
@@ -4055,6 +4073,14 @@ snapshots:
       eventsource-parser: 3.0.6
       zod: 3.25.76
 
+  '@ai-sdk/provider-utils@3.0.36(zod@3.25.76)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.3
+      '@standard-schema/spec': 1.1.0
+      eventsource-parser: 3.0.6
+      undici: 5.29.0
+      zod: 3.25.76
+
   '@ai-sdk/provider-utils@4.0.6(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider': 3.0.3
@@ -4070,6 +4096,10 @@ snapshots:
       zod: 3.25.76
 
   '@ai-sdk/provider@2.0.1':
+    dependencies:
+      json-schema: 0.4.0
+
+  '@ai-sdk/provider@2.0.3':
     dependencies:
       json-schema: 0.4.0
 
@@ -4571,6 +4601,8 @@ snapshots:
       ajv: 8.17.1
       ajv-formats: 3.0.1(ajv@8.17.1)
       fast-uri: 3.1.0
+
+  '@fastify/busboy@2.1.1': {}
 
   '@fastify/busboy@3.2.0': {}
 
@@ -7508,6 +7540,10 @@ snapshots:
   undici-types@5.26.5: {}
 
   undici-types@6.21.0: {}
+
+  undici@5.29.0:
+    dependencies:
+      '@fastify/busboy': 2.1.1
 
   unicorn-magic@0.3.0: {}
 
