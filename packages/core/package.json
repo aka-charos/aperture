@@ -80,7 +80,8 @@
     "test:evaluation": "node --import tsx --test src/evaluation/holdout.test.ts src/evaluation/metrics.test.ts src/evaluation/csv.test.ts",
     "test:max-candidates": "node --import tsx --test src/lib/maxCandidates.test.ts",
     "test:embedding-sets": "node --import tsx --test src/lib/embeddingSets.test.ts",
-    "test:embedding-identity": "node --import tsx --test src/lib/embeddingIdentity.test.ts src/lib/embeddingCatalog.test.ts src/lib/embeddingCallSites.test.ts"
+    "test:embedding-identity": "node --import tsx --test src/lib/embeddingIdentity.test.ts src/lib/embeddingCatalog.test.ts src/lib/embeddingCallSites.test.ts",
+    "test:reasoning": "node --import tsx --test src/lib/reasoningEffort.test.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.0",

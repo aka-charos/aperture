@@ -83,6 +83,76 @@ export interface FunctionConfig {
    * conditions the input and so cannot be dropped by a route.
    */
   embeddingProviderOnly?: string | null
+  /**
+   * How hard this role's model is asked to think. Absent/null = the provider
+   * default, which is what every role got before this existed.
+   *
+   * A plain string, because the accepted words belong to the MODEL rather than
+   * to this app: OpenRouter publishes 21 distinct vocabularies over seven words
+   * and no model takes all seven. The list for the chosen model rides in the
+   * models response as `supportedEfforts`; the server validates against the
+   * same list, so a value that saves is a value that reaches the wire.
+   */
+  reasoningEffort?: string | null
+}
+
+/**
+ * Display order for effort words, weakest first, mirroring core's
+ * `KNOWN_REASONING_EFFORTS`.
+ *
+ * An ORDER and a label-key set — never a filter. A model's own list is the
+ * authority on what is offered; a word absent from here still appears (sorted
+ * last, labelled with its own name) because filtering would hide a capability
+ * the model genuinely has. Duplicated rather than imported: the web bundle
+ * never imports `@aperture/core`.
+ */
+export const KNOWN_REASONING_EFFORTS: readonly string[] = [
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+]
+
+/**
+ * The roles that read one, and therefore the only ones that may store one.
+ * Mirrors core's `ROLES_WITH_REASONING_EFFORT`.
+ */
+export const ROLES_WITH_REASONING_EFFORT: readonly string[] = ['textGeneration', 'titleAnalysis']
+
+/**
+ * What to put in the effort dropdown: what THIS model accepts, plus whatever
+ * this instance has already stored.
+ *
+ * The stored value is re-added for the same reason
+ * {@link embeddingInputTypeOptions} does it: a MUI Select whose value is not
+ * among its options renders blank, and the next save would write that blank
+ * over a real setting for someone who only opened the page. That is not
+ * hypothetical here — OpenRouter's catalog moves under stored settings, and
+ * switching models is the ordinary way to end up off-list.
+ */
+export function reasoningEffortOptions(
+  supported: readonly string[] | undefined,
+  current: string
+): readonly string[] {
+  const offered = supported ?? []
+  if (!current || offered.includes(current)) return offered
+  return [...offered, current]
+}
+
+/**
+ * The label key for an effort word, or null when there is no translation.
+ *
+ * A word OpenRouter adds after this ships has no key, and `t()` would render
+ * the raw key path — so the caller falls back to the word itself, which is
+ * already the vendor's own English name for it.
+ */
+export function reasoningEffortLabelKey(effort: string): string | null {
+  return KNOWN_REASONING_EFFORTS.includes(effort)
+    ? `aiFunctionCard.reasoningOptions.${effort}`
+    : null
 }
 
 /** OpenRouter upstreams worth pinning to, base slugs (not region-scoped tags). */

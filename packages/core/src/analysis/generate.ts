@@ -33,6 +33,8 @@ import {
   resolveCallSpacingMs,
   withGroundingModel,
   type ModelAttempt,
+  getReasoningEffortFor,
+  getReasoningProviderOptionsFor,
 } from '../lib/ai-provider.js'
 import {
   crwSearch,
@@ -395,6 +397,19 @@ async function runWriteAttempt(
 ): Promise<AttemptOutcome> {
   const { model, modelId } = attempt
 
+  // Resolved against THIS attempt's provider AND model, not the role's. A
+  // fallback may live on a different provider, and two models on one provider
+  // need not share a vocabulary — OpenRouter publishes 21 of them. Getting
+  // either wrong is not an error: providerOptions in a namespace the active
+  // provider does not own are silently ignored, so the scratchpad quietly stays
+  // uncapped on exactly the fallback path that already means something is wrong.
+  const reasoning = await getReasoningProviderOptionsFor(
+    attempt.provider,
+    modelId,
+    'titleAnalysis',
+    await getReasoningEffortFor('titleAnalysis')
+  )
+
   // The other silent half. A local model chewing through ~18k tokens of article
   // text is minutes of wall clock with nothing to show for it, and on a
   // self-hosted setup this is the step most likely to be the slow one - so the
@@ -434,6 +449,9 @@ async function runWriteAttempt(
         model,
         prompt,
         maxRetries: MODEL_MAX_RETRIES,
+        // Omitted entirely when unset, so a role that has never chosen an
+        // effort sends the request it sent before this existed.
+        ...(reasoning ? { providerOptions: reasoning } : {}),
         // 0 means the operator asked for no ceiling, so none is sent and the
         // provider default applies.
         ...(maxOutputTokens > 0 ? { maxOutputTokens } : {}),
@@ -631,6 +649,10 @@ async function writeWithGrounding(
   // quota — which `withGroundingModel` answers by rotating KEYS, since a second
   // model on the same exhausted project would fail identically.
   const spacingMs = resolveCallSpacingMs(await getFunctionConfig('titleAnalysis'))
+  // Read once beside the spacing and for the same reason: a property of the
+  // role, not of the attempt, so re-reading it inside the key loop would be a
+  // database round trip per retry.
+  const reasoningEffort = await getReasoningEffortFor('titleAnalysis')
 
   return withGroundingModel('titleAnalysis', async (model, keyAttempt) => {
     let result: WriteResult = {
@@ -647,11 +669,19 @@ async function writeWithGrounding(
       const paced = await waitForCallSlot('provider:' + keyAttempt.provider, spacingMs, options)
       if (paced.cancelled) throw new AnalysisCancelledError()
 
+      const reasoning = await getReasoningProviderOptionsFor(
+        keyAttempt.provider,
+        keyAttempt.modelId,
+        'titleAnalysis',
+        reasoningEffort
+      )
+
       const response = await generateText({
         model,
         tools,
         prompt,
         maxRetries: MODEL_MAX_RETRIES,
+        ...(reasoning ? { providerOptions: reasoning } : {}),
         ...(maxOutputTokens > 0 ? { maxOutputTokens } : {}),
       })
       usage = response.usage

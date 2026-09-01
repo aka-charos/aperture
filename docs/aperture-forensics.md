@@ -838,3 +838,63 @@ Found while auditing whether AI SDK v6/v7 was worth migrating to. `packages/core
 
 **Why neither surfaced.** Both are runtime failures on a provider nobody here uses, reached only by an admin changing the Embeddings role; `pnpm validate` cannot see them because every branch of `getEmbeddingInvocation`'s switch is cast `as any` — a deliberate escape from nine incompatible provider types that also erases the one signal that would have caught this. The generalisable rule is that **the `as any` in that switch buys provider-agnosticism at the cost of spec-version checking**, so a range bump there needs the resolved provider major read by hand.
 
+## F-099
+
+**A reasoning model bills its scratchpad from the answer's allowance, and until now the only lever was to buy more allowance.**
+
+[F-030](#f-030) records the explanations path measuring 2,079 and 2,283 reasoning tokens against a 3,000 ceiling, answered by raising the large-context ceiling to **16,000**; [F-064](#f-064) records the identical failure in the title-analysis writer, answered by `analysisMaxOutputTokens` defaulting to **8,000**. Both treat the symptom. The cause is that a reasoning model deliberates before it writes, and both roles are batch work producing short structured prose from data already assembled for them — the shape of task that needs the least deliberation and pays for it per item, across a whole library.
+
+**The lever already existed and nothing used it.** `@ai-sdk/google@2.0.52` (installed) takes `providerOptions.google.thinkingConfig.thinkingLevel`; `@openrouter/ai-sdk-provider@1.5.4` (installed) takes `providerOptions.openrouter.reasoning.effort`. Both on the versions already in the lockfile, on the two providers these roles actually run on. Before this change the repo passed `providerOptions` to exactly **one** call in the tree — the embedding `taskType` — and never to a text generation. This was briefly written up as a reason to migrate to AI SDK v7, whose provider-agnostic top-level `reasoning` option covers the same ground; checking the installed packages first showed v7 would have bought **portability, not capability**, on a feature reachable that afternoon.
+
+**THE FIRST VERSION SHIPPED A FIXED VOCABULARY AND WAS WRONG THREE WAYS.** It defined `minimal | low | medium | high` as a union, offered it on an allowlist of two *providers*, and mapped it per provider. Measured against OpenRouter's live `/api/v1/models` (418 entries, 2026-09-01), an effort vocabulary is a property of the **model**:
+
+| | count |
+|---|---|
+| models with no `reasoning` object at all | 124 |
+| models that reason but expose **no effort parameter** (`deepseek-r1`, `gemini-2.5-flash`) | 140 |
+| models publishing `reasoning.supported_efforts` | 147 |
+| **distinct vocabularies among those 147** | **21** |
+| distinct words across all of them | 7 |
+| models offering all 7 | **0** |
+
+Anthropic's models take `max` and reject `minimal`. OpenAI's take `xhigh` and `none`. Google's take `minimal` and neither of the others. `sakana/fugu-ultra` takes exactly `max, xhigh, high`. So a fixed union is wrong in three directions at once — it **offers words the model rejects** (`minimal` to Anthropic, a 400 on a batch job), **hides words it accepts** (`none` is the strongest form of the thing this feature exists to do, and was unreachable), and **cannot grow** when a vendor adds one. The provider allowlist was wrong the same way one level up: 264 of OpenRouter's 418 models take no effort, so the control rendered for models that have none.
+
+**The native-Google half was wrong differently, and worse.** `thinkingLevel` reaches the wire as `thinking_level`, a **Gemini 3.x** field. Gemini 2.5 uses `thinkingBudget` — a token count, not a level — and Gemini 1.5 has no thinking at all. Of the seven models in `google.json`, four are 3.x and **three would have 400'd**. A provider-level guard cannot see that; only a per-model declaration can.
+
+**Rebuilt so the vocabulary is data.** `openrouter-capabilities.ts` already fetched and cached `/api/v1/models` daily with a `CACHE_VERSION` designed to be bumped, so `supported_efforts` rides in beside pricing and context length (version 2 → 3). `getModelsForFunctionWithCustom` stamps it onto each model's metadata — the same enrichment path that already fixed pricing, and the only one that works, since OpenRouter's chat models are all user-entered and no static file could know what an operator typed. Native Google declares `reasoningMechanism: "thinkingLevel"` per model in the catalogue JSON, where the SDK's own `z.enum` fixes the four words. The dropdown renders the selected model's list; the settings route validates against **the same call**; the request builder re-checks per call.
+
+**Eight rules, each the safe side of an asymmetry.**
+
+1. **Absent means send nothing.** No default effort, so every role stored before this field existed builds a byte-identical request. Which effort suits a given model is unmeasured here, and this repo does not threshold blind.
+2. **Absent also means the model takes none.** `reasoningMechanism` undefined is a positive fact, never a default to fall through — the exact discipline [F-097](#f-097) had to retrofit onto `inputTypeMechanism` after its `'parameter'` default sent a mode to models that read none.
+3. **Nothing is rounded.** An effort the model does not list is refused and nothing is sent, leaving the provider default. Mapping `minimal` onto `low` would leave the settings page and the wire disagreeing about what was asked for — the class of fault [F-093](#f-093) records — and the silent direction of that error is *cheaper thinking than asked for*, which surfaces as quality nobody can trace. Falling back errs toward **more** thinking: a cost an operator can see.
+4. **`KNOWN_REASONING_EFFORTS` is a display order and a label-key set, never a filter.** OpenRouter's field is an open string; a word added tomorrow is offered as-is, sorted last, labelled with the vendor's own English name. Filtering would hide a capability the model genuinely has, which is the bug being fixed.
+5. **The roles stay an allowlist** (`textGeneration`, `titleAnalysis`). A role storing an effort nothing reads is a control that appears to work while no request changes, and the only trace is a bill that did not move. `chat` is excluded on purpose — it is interactive, a reader is watching, and thinking is often the point.
+6. **The namespace key must be the provider id.** The SDK hands `providerOptions.<id>` to that provider and silently ignores every other key, so a mechanism/provider mismatch is not an error — it is a setting that saves, displays and does nothing. `MECHANISM_PROVIDER` is a table, and a test asserts every delivered payload's sole key is the provider it was resolved for.
+7. **The title-analysis writer resolves per ATTEMPT, against provider *and* model.** A fallback may live on a different provider, and two models on one provider need not share a vocabulary. Getting either wrong leaves the scratchpad quietly uncapped on exactly the fallback path that already means something has gone wrong.
+8. **Validation happens at save AND at send.** OpenRouter's catalogue moves under stored settings, and switching models is the ordinary way to end up off-list. The route refuses an unlistable word; the request builder re-checks and warns rather than sending it; and the dropdown re-adds an off-list stored value so a MUI Select cannot render blank and have the next save write that blank over a real setting.
+
+**`@openrouter/ai-sdk-provider`'s `effort` type is a stale narrow annotation, not an enforcement.** It is declared `'high' | 'medium' | 'low'` in `index.d.ts`, but `doGenerate` spreads `providerOptions.openrouter` **verbatim** into the request body with no schema in the way — the same mechanism [F-038](#f-038) records for `extraBody` on the embeddings side — so `xhigh`, `max`, `minimal` and `none` all reach the wire. `@ai-sdk/google` is the opposite and must be read that way: `thinkingLevel` is validated against a real `z.enum` before the request is built, so an off-list value **throws locally** rather than reaching Google. One provider's type is advisory and the other's is load-bearing; the code treats them differently because they are different.
+
+**The three router pseudo-models are the interesting negative.** `openrouter/auto`, `/free` and `/auto-beta` declare `reasoning_effort` in `supported_parameters` and carry **no** `reasoning` object. That is correct of them — they pick a real model per request, so no vocabulary is knowable in advance — and it is why `supported_parameters` is not the field to read. They land on "no efforts" and get no control, which is the right answer rather than a gap.
+
+**MEASURED, and the feature does what it claims.** `scripts/probe-reasoning-effort.mjs` against `google/gemini-3.5-flash`, two runs per level:
+
+| effort | reasoning tokens |
+|---|---|
+| `minimal` | **0 / 0** |
+| `low` | 765 / 768 |
+| `medium` | 1033 / 918 |
+| `high` | 1476 / 1529 |
+| *(no effort sent)* | 1084 / 897 |
+| `aperture_not_a_level` (control) | **rejected, HTTP 400** |
+
+Four things settle at once. (1) Every catalogued word is accepted and the invented one is **refused**, so `supported_efforts` is a real capability read and not decoration — without that control the other three rows prove nothing. (2) The level is **honoured**, not merely accepted: 0 to ~1,500 tokens is a 1,500-token swing in the same allowance the prose is billed from, which is precisely [F-030](#f-030)'s and [F-064](#f-064)'s failure being paid for at every level except the lowest. (3) `minimal` reasons **not at all** — for a batch role writing short structured prose from data already assembled, that is the setting the feature exists to reach, and it was unreachable while the ceiling was the only lever. (4) The no-effort baseline (~990) lands on `medium`, matching the catalogue's own `default_effort: "medium"` — so the catalogue is accurate about the default as well as the vocabulary, and every role shipped before this was silently buying the middle rung.
+
+The repeats are what make the middle rungs readable: `high` varied by 53 tokens between its own two runs, so a single sample could not have separated `medium` from `high`, though it would have been enough for `minimal` against anything. This is the instrument lesson [F-097](#f-097) paid for, applied at a cost of one extra call per level.
+
+**The probe's own first version was the same mistake in miniature.** It defaulted to three models from three vendors — chosen to watch their vocabularies disagree — which is ~35 paid generations to re-establish a fact that reading `/api/v1/models` already settles for free. The operator paid for two of them before stopping it. The default is now the model a reasoning-reading role is **actually configured with**, its weakest and strongest levels only, plus the control: **six calls**, and it refuses to run at all when no role is on OpenRouter. `--all-levels` buys the full ladder above. A verification script bills the person running it, so its default scope is a design decision with a price, not a thoroughness setting.
+
+**What remains per-model.** That gemini honours the field is not a promise that every model does; a model may accept a level and ignore it, which makes the setting cosmetic *for that model* — nothing breaks and no answer room is bought. Six calls answers it for whatever a role is pointed at, which is the only model whose answer matters.
+
+**Deliberately not built:** `thinkingBudget` for Gemini 2.5. Turning an effort word into a token count is a number nobody has measured, and this repo does not threshold blind. Those models declare no mechanism and get no control — honest, and visibly so.

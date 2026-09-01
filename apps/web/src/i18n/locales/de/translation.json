@@ -1499,7 +1499,19 @@
     "upstreamLabel": "OpenRouter upstream",
     "upstreamAuto": "Automatic (OpenRouter chooses)",
     "upstreamHelp": "OpenRouter serves one model from several companies. Automatic is fine when no retrieval mode is set, because the upstreams agree on unconditioned text. Pinning also makes latency and price predictable.",
-    "upstreamRequired": "Required for this retrieval mode. The mode is sent as a request field, and OpenRouter picks an upstream per call — they do not all honour it, so leaving this automatic would embed your library as an unpredictable mixture of two different spaces, with nothing able to detect it afterwards."
+    "upstreamRequired": "Required for this retrieval mode. The mode is sent as a request field, and OpenRouter picks an upstream per call — they do not all honour it, so leaving this automatic would embed your library as an unpredictable mixture of two different spaces, with nothing able to detect it afterwards.",
+    "reasoningLabel": "Reasoning effort",
+    "reasoningDefault": "Provider default",
+    "reasoningHelp": "Reasoning models bill their internal scratchpad from the same output budget as the answer, so a long think can crowd out the text and leave it cut short. Lowering this leaves more of the budget for the answer itself. Leave it on the provider default if you are unsure.",
+    "reasoningOptions": {
+      "minimal": "Minimal",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "none": "None",
+      "xhigh": "Very high",
+      "max": "Maximum"
+    }
   },
   "topPicksOutputConfig": {
     "accordionTitle": "Was ist der Unterschied zwischen Bibliothek, Sammlung und Wiedergabeliste?",

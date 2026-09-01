@@ -27,12 +27,35 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 const FETCH_FAILURE_RETRY_MS = 5 * 60 * 1000
 const CACHE_KEY = 'openrouter_models_cache'
 // Bump when CatalogModel gains fields so stale DB caches are refetched
-const CACHE_VERSION = 2
+const CACHE_VERSION = 3
 
 interface CatalogModel {
   id: string
   // null = the catalog entry doesn't declare its parameters (unknown, not "none")
   supportedParameters: string[] | null
+  /**
+   * The reasoning-effort words THIS model accepts, verbatim from the catalog.
+   *
+   * null covers two cases the caller must treat identically — the entry
+   * declares no `reasoning` object at all (124 of 418 models), or it reasons but
+   * exposes no effort parameter (140 more, deepseek-r1 among them) — because
+   * both mean "offer no effort control here".
+   *
+   * NOT a fixed vocabulary, which is the whole reason it is read rather than
+   * declared. Measured across the live catalog: 21 distinct lists drawn from
+   * seven words (none, minimal, low, medium, high, xhigh, max), and no model
+   * offers all seven. Anthropic's take `max` and not `minimal`; OpenAI's take
+   * `xhigh` and `none`; Google's take `minimal` and neither of those. A
+   * hardcoded union is wrong in three directions at once — it offers words a
+   * model rejects, hides words it accepts, and cannot grow.
+   *
+   * The three router pseudo-models (`openrouter/auto`, `/free`, `/auto-beta`)
+   * declare `reasoning_effort` in supported_parameters and no reasoning object,
+   * which is correct of them: they pick a real model per request, so their
+   * vocabulary is not knowable in advance. They land on null and get no control,
+   * which is the right answer rather than a gap.
+   */
+  supportedEfforts: string[] | null
   // USD per 1M tokens; null when the catalog has no parseable price
   inputCostPerMillion: number | null
   outputCostPerMillion: number | null
@@ -75,6 +98,7 @@ async function fetchCatalog(): Promise<CatalogModel[]> {
       supported_parameters?: string[]
       context_length?: number
       pricing?: { prompt?: string; completion?: string }
+      reasoning?: { supported_efforts?: string[] }
     }>
   }
 
@@ -86,6 +110,11 @@ async function fetchCatalog(): Promise<CatalogModel[]> {
     .map((m) => ({
       id: m.id as string,
       supportedParameters: Array.isArray(m.supported_parameters) ? m.supported_parameters : null,
+      // Kept exactly as written. Filtering to a known set here would silently
+      // drop a word a model really accepts, the first time OpenRouter adds one.
+      supportedEfforts: Array.isArray(m.reasoning?.supported_efforts)
+        ? m.reasoning.supported_efforts.filter((e): e is string => typeof e === 'string')
+        : null,
       inputCostPerMillion: perTokenToPerMillion(m.pricing?.prompt),
       outputCostPerMillion: perTokenToPerMillion(m.pricing?.completion),
       contextLength: typeof m.context_length === 'number' ? m.context_length : null,
@@ -196,6 +225,11 @@ export interface OpenRouterModelInfo {
   inputCostPerMillion: number | null
   outputCostPerMillion: number | null
   contextLength: number | null
+  /**
+   * The effort words this model accepts, or null for "offer no effort control".
+   * See {@link CatalogModel.supportedEfforts} — this is data, not a type.
+   */
+  supportedEfforts: string[] | null
 }
 
 /**
@@ -215,5 +249,6 @@ export async function getOpenRouterModelInfo(modelId: string): Promise<OpenRoute
     inputCostPerMillion: entry.inputCostPerMillion,
     outputCostPerMillion: entry.outputCostPerMillion,
     contextLength: entry.contextLength,
+    supportedEfforts: entry.supportedEfforts,
   }
 }
