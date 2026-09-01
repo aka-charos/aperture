@@ -715,3 +715,54 @@ So `getEmbeddingInvocation` returns `embedOne` / `embedBatch`, which apply the p
 
 - **A UTF-8 BOM.** Excel on Windows reads a BOM-less UTF-8 file in the system codepage, and this library is full of accented titles (*Utøya: July 22*, *Aniara*, *Alice In The Cities*). Without it the export opens as mojibake and reads as a data bug rather than an encoding one.
 - **A formula guard on text cells only, with a numeric-text exclusion that is load-bearing.** Excel and LibreOffice execute a cell opening with `=`, `+`, `-` or `@`. But **pg returns NUMERIC as TEXT** (the invariant, running backwards for once), so every score, share and cosine in these exports reaches the escaper as a *string* — and a negative one opens with a minus. Guarding it would prefix an apostrophe and turn the entire cosine column into text, breaking exactly the pivot the file exists for. So a string matching a plain number is passed through untouched, while `-A1` is still defused. Pinned by `csv.test.ts`.
+
+## F-095
+
+**The retrieval mode is one lever with two opposite effects, and the metrics cannot see either of them.**
+
+Five embedding sets were measured on one library, all at **12,589 rows fully centred**, so `poolSize` — the confound [F-092](#f-092) says to check first — is eliminated by construction: `openrouter:google/gemini-embedding-001`, the same pinned `~semantic_similarity@google-vertex`, `gemini-embedding-2~semantic_similarity`, bare `gemini-embedding-2`, and `qwen/qwen3-embedding-8b` at 4096. Macro over 33 qualified viewers, holdout 20, 18 seeds.
+
+**The metrics rank them and the ranking does not decide anything.** Centred, overall: gemini-2~semantic 89.40% median / 12.83% ndcg@20 / 26.67% ndcg@100; bare gemini-2 89.42 / 11.88 / 26.76; 001 87.54 / 9.30 / 23.79; qwen 84.82 / 7.90 / 23.36; 001~semantic 84.83 / 9.85 / 20.28. Baselines sane (random 50.96% median, 0.46% ndcg@100; rating-only 68.92 / 8.51), so the harness is measuring something. But the two gemini-2 configurations are a **dead heat** — the prefixed one wins shallow (ndcg@20, recall@100), the bare one wins deep (ndcg@500 51.32 vs 49.21, recall@500 40.72 vs 38.68), and the medians differ by 0.02pp. Nothing in `metrics.ts` separates them, which is what [F-057](#f-057) means by calling it a guard rail rather than a target.
+
+**Centring replicates on four spaces it was never derived from.** Raw→centred ndcg@100: 001 +41%, bare gemini-2 +43%, gemini-2~semantic +50%, qwen +64%, 001~semantic +65% relative. It is the largest single effect in the dataset, larger than any difference between models. Contrary to a widely repeated claim, unit-norm MRL embeddings do **not** make it unnecessary — normalising fixes magnitude, centring removes a shared *direction*, and every canonical text here is built from one template, so a large common component is exactly what to expect.
+
+**The aggregate ndcg@20 win exists in a minority of viewers.** Paired per viewer, gemini-2~semantic minus 001: median percentile +1.86pp (t=2.36, **22/33** improved), ndcg@100 +2.87pp (t=1.48, 19/33), ndcg@20 +3.54pp (t=1.97, **13/33**). The headline number — a 38% relative gain on the cutoff users actually see — is the one where *most viewers get worse*, and the positive mean comes from a few winners at +28pp against many small losers. Median percentile is the only metric whose win is also a per-viewer majority, and it is the smallest. Same trap as the decade gradient: read the aggregate as a mechanism and it describes nobody.
+
+**`input_type` on 001 is a measurable loss, which contradicts the a priori argument in [F-038](#f-038).** That entry reasons that this library's task is symmetric — item↔item, and a taste centroid is a mean of item vectors — so `semantic_similarity` is the mode it wants. Measured, on the identical model and pool, the pinned semantic set ranks **last of five** while the unmoded set ranks second. The pin is not the cause: both upstreams agree on the unmoded vector, which is the same fact that makes a pin-without-mode safe. The symmetry argument is sound about the *task* and simply does not predict what the mode does to the *space*.
+
+**On gemini-2 the prefix does two things at once, and they pull in opposite directions.** Centred, over 18 seeds — mean same-country share of the top ten, and the share of top-ten slots holding a neighbour that shares a title word with the seed:
+
+| | country share | title-word share |
+|---|---|---|
+| gemini-2 `~semantic_similarity` | **75.0%** | 10.0% |
+| gemini-2 bare | 83.9% | **3.3%** |
+| gemini-001 | 87.2% | 2.8% |
+| qwen3-8b | 75.6% | 6.7% |
+
+Removing the prefix fixes the lexical attraction outright — to 001's level — and hands back most of the nationality gain. Bare is higher than prefixed on 13 of 18 seeds and tied on 4, so this is not an average concealing a mixed picture. The `task: sentence similarity` cue is a single mechanism producing both effects, and the documentation's own mode table contains the tell: it lists *near-duplicate detection* and *recommendations* as use cases for the same mode, and those are opposite requirements about whether surface overlap should count.
+
+**The lexical attraction is inside the model, not in a ranking layer.** This app has no BM25, no term-frequency scoring and no keyword boost anywhere in the vector path; the neighbour dump is a bare pgvector `<=>` kNN. `scripts/probe-title-label.mjs` holds the seed, the pool and the metric constant and varies only the document text and the prefix, ranking a pool of known-wrong and known-right neighbours drawn from the archived dump. It reports **separation** — mean intruder rank minus mean anchor rank — which should be positive. On the shipping document with the prefix it is **−0.56**: the intruders are *closer* than the correct neighbours. On *The Conversation*, both *Conversation Piece*s took ranks 1 and 2 ahead of the entire 70s surveillance cluster.
+
+**Four treatments, and three of the results are negative.**
+
+| gemini-2 separation | title bare | labelled | title at end | title removed |
+|---|---|---|---|---|
+| `task: sentence similarity` | **−0.56** | −0.56 | +0.54 | +2.43 |
+| no prefix | +1.17 | +1.33 | +1.17 | +2.12 |
+| `task: clustering` | +1.33 | +1.01 | +1.96 | +2.43 |
+| *gemini-001, any prefix* | +2.27 | +2.27 | +2.27 | +2.27 |
+
+**There is one ceiling and it is reachable four ways.** Removing the title, changing the prefix, or using 001 all land between +2.1 and +2.4, and nothing combines past it — prefix-off *plus* stripped (+2.12) is no better than either alone. Title tokens and task cue contribute somewhat independently and both are bounded by the same limit, which is what a real ceiling looks like rather than an additive pair of fixes.
+
+**`task: clustering` is lexically clean but not measurably cleaner than sending nothing** (+1.33 vs +1.17, inside the half-rank noise floor of this pool). Its *Alice In The Cities* result is the cleanest single case measured anywhere — anchors 1–5, intruders 6–8 — but on the axis the probe can see it buys nothing over the bare set already shipped. Its whole remaining case is the untested one: whether it recovers `sentence similarity`'s nationality benefit without the lexical cost, which no probe can answer because same-country share needs kNN over the whole library and therefore a full embed pass.
+
+- **Labelling the title does nothing.** 25 of 26 rankings identical and separation unchanged to two decimals. The model is not reading "first bare string" as a role it can be talked out of; it reads *Conversation* and *Evil* as content words wherever they sit and however they are tagged. This rules out the whole class of re-framing fixes.
+- **Moving the title to the end is a half-measure** (+0.54 with the prefix, a literal no-op without it). Only deleting the tokens works.
+- **gemini-001 is immune, not merely less affected**: +2.27 under all four treatments, identical to two decimals. The title field does not participate in its space at all, so this is not a flaw in the canonical text that every model suffers.
+- **The two fixes are not additive.** Prefix-off + stripped (+2.12) is no better than prefix-on + stripped (+2.43), and both land where 001 already sits untreated. That is the ceiling, reachable three different ways.
+
+**Country concentration overstates the quality gap, and the neighbour dumps say so.** The measure earns its place — 001's *Aniara* neighbours include *Midsommar*, *Triangle of Sadness* and *Stormskerry Maja*, Nordic films that are not science fiction, which is [F-084](#f-084)'s nationality detector caught firing. But bare gemini-2 scores 83.9% and returns *The Colony*, *Cargo*, *Stowaway*, *High Life*, *Space Sweepers*, *Slingshot*, *Europa Report* — concept-correct contained-spacecraft films that happen to share a passport. A high share is not by itself the failure; **read the dump before treating the number as one.**
+
+**Decision: bare `gemini-embedding-2`, no mode.** Best deep retrieval of any set, lexical artifact gone, neighbours read well, and the vectors already existed — the switch costs only `rebuild-taste-profiles` and a regenerate, since moving item vectors does not move a stored centroid ([F-088](#f-088)). The prefixed-plus-stripped-title configuration has a higher ceiling on paper and is **not** worth the bill yet: the probe measured the lexical artifact only, nothing has measured what removing the title does to ndcg or to country concentration, and a `CANONICAL_TEXT_VERSION` bump marks all five sets stale while rebuilding only the active one — after which the evaluator will measure v3 and v4 documents side by side in one table with nothing saying so. The archived runs ([F-094](#f-094)) are what make that experiment answerable later, since `splitHoldout` is deterministic and the pool is unchanged, so a v4 set can be compared against its own v3 figures rather than against whatever the next multi-set run prints.
+
+**None of this was visible from the job log**, and that is what the archive bought. The comparison spans two runs a day apart and five sets; every figure above came from the CSVs.
