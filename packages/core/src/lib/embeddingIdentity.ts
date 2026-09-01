@@ -60,6 +60,7 @@ export const EMBEDDING_INPUT_TYPES = [
   'semantic_similarity',
   'search_query',
   'search_document',
+  'clustering',
 ] as const
 
 export type EmbeddingInputType = (typeof EMBEDDING_INPUT_TYPES)[number]
@@ -249,7 +250,12 @@ export function requiresProviderPin(input: {
  */
 export function googleTaskTypeFor(
   mode: EmbeddingInputType | undefined
-): 'SEMANTIC_SIMILARITY' | 'RETRIEVAL_QUERY' | 'RETRIEVAL_DOCUMENT' | undefined {
+):
+  | 'SEMANTIC_SIMILARITY'
+  | 'RETRIEVAL_QUERY'
+  | 'RETRIEVAL_DOCUMENT'
+  | 'CLUSTERING'
+  | undefined {
   switch (mode) {
     case 'semantic_similarity':
       return 'SEMANTIC_SIMILARITY'
@@ -257,6 +263,8 @@ export function googleTaskTypeFor(
       return 'RETRIEVAL_QUERY'
     case 'search_document':
       return 'RETRIEVAL_DOCUMENT'
+    case 'clustering':
+      return 'CLUSTERING'
     default:
       return undefined
   }

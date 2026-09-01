@@ -27,7 +27,11 @@ export interface ModelMetadata {
    * delivers it only sometimes; Qwen has no symmetric form to ask for, its
    * instruction recipe being query-side against bare documents.
    */
-  recommendedInputType?: 'semantic_similarity' | 'search_query' | 'search_document'
+  recommendedInputType?:
+    | 'semantic_similarity'
+    | 'search_query'
+    | 'search_document'
+    | 'clustering'
 
   /**
    * HOW a retrieval mode reaches this model. Absent means `parameter`.
@@ -55,9 +59,9 @@ export interface ModelMetadata {
    * in the set identity and then never applied.
    *
    * Google documents eight prefixes for gemini-embedding-2 (verified against
-   * ai.google.dev 2026-08-31). Only the symmetric one is offered here, and the
-   * two retrieval ones are omitted on PURPOSE rather than for lack of
-   * verification:
+   * ai.google.dev 2026-08-31). Two are offered here — `sentence similarity`
+   * and `clustering` — and the two retrieval ones are omitted on PURPOSE
+   * rather than for lack of verification:
    *
    * - `task: search result | query: {content}` is the query half of an
    *   ASYMMETRIC pair. It only means anything against documents embedded as
@@ -69,7 +73,7 @@ export interface ModelMetadata {
    *   needing the title separately, which `prepareText(text)` cannot express.
    */
   inputTypePrefixes?: Partial<
-    Record<'semantic_similarity' | 'search_query' | 'search_document', string>
+    Record<'semantic_similarity' | 'search_query' | 'search_document' | 'clustering', string>
   >
   /**
    * The literal spelling to put in `input_type` for each mode, when it differs
@@ -95,7 +99,7 @@ export interface ModelMetadata {
    * canonical name is used when a model declares nothing.
    */
   inputTypeValues?: Partial<
-    Record<'semantic_similarity' | 'search_query' | 'search_document', string>
+    Record<'semantic_similarity' | 'search_query' | 'search_document' | 'clustering', string>
   >
 
   /**

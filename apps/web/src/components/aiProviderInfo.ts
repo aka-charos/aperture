@@ -100,9 +100,51 @@ export const EMBEDDING_INPUT_TYPE_VALUES = [
   'semantic_similarity',
   'search_query',
   'search_document',
+  'clustering',
 ] as const
 
 export type EmbeddingInputTypeValue = (typeof EMBEDDING_INPUT_TYPE_VALUES)[number]
+
+/**
+ * The subset the dropdown OFFERS, which is deliberately not everything the
+ * server accepts.
+ *
+ * `search_query` is withheld. Measured on `gemini-embedding-001` — the only
+ * catalogued model that takes it — it returns the byte-identical vector to
+ * sending nothing, because that model's default output space already IS
+ * `RETRIEVAL_QUERY`; on `gemini-embedding-2` there is no verified prefix for it
+ * and the settings route refuses it outright. So on every model available here
+ * it is either a no-op or an error, and its one achievable effect is to
+ * re-embed the whole library into a NEW set identity holding vectors that
+ * already exist — full cost, doubled storage, zero difference.
+ *
+ * It stays in {@link EMBEDDING_INPUT_TYPE_VALUES} rather than being deleted,
+ * because core still accepts it: an instance that already stored it must keep
+ * resolving to the same set id. Dropping it from the vocabulary would make
+ * `embeddingSetId` return the bare `provider:model`, every read would miss rows
+ * written under `…~search_query`, and the library would read as permanently
+ * empty AND permanently pending while silently re-embedding.
+ */
+export const EMBEDDING_INPUT_TYPES_OFFERED: readonly EmbeddingInputTypeValue[] = [
+  'semantic_similarity',
+  'clustering',
+  'search_document',
+]
+
+/**
+ * What to put in the mode dropdown: the offered set, plus whatever this
+ * instance has already stored.
+ *
+ * A MUI Select whose `value` is absent from its options renders blank, and the
+ * next save would then write that blank over a real setting — changing the set
+ * identity and orphaning every vector, for someone who only opened the page.
+ */
+export function embeddingInputTypeOptions(current: string): readonly EmbeddingInputTypeValue[] {
+  if (!current || EMBEDDING_INPUT_TYPES_OFFERED.includes(current as EmbeddingInputTypeValue)) {
+    return EMBEDDING_INPUT_TYPES_OFFERED
+  }
+  return [...EMBEDDING_INPUT_TYPES_OFFERED, current as EmbeddingInputTypeValue]
+}
 
 /** Providers whose embeddings API can carry a retrieval mode. Mirrors core. */
 export const PROVIDERS_WITH_INPUT_TYPE: readonly ProviderType[] = ['openrouter', 'google']
