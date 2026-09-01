@@ -27,7 +27,8 @@
       "inputTypeNote": "Ignores input_type: its semantic_similarity output is byte-identical to sending nothing. The mode is delivered as a TEXT PREFIX on the document instead (task: sentence similarity | query: ...), which moves the vector to cosine 0.811 from bare text -- a far larger change than any parameter produces. Verified byte-identical between OpenRouter and Google native on both bare and prefixed input.",
       "inputTypeMechanism": "textPrefix",
       "inputTypePrefixes": {
-        "semantic_similarity": "task: sentence similarity | query: "
+        "semantic_similarity": "task: sentence similarity | query: ",
+        "clustering": "task: clustering | query: "
       },
       "recommendedInputType": "semantic_similarity"
     },
@@ -50,7 +51,8 @@
       "inputTypeValues": {
         "semantic_similarity": "SEMANTIC_SIMILARITY",
         "search_query": "RETRIEVAL_QUERY",
-        "search_document": "RETRIEVAL_DOCUMENT"
+        "search_document": "RETRIEVAL_DOCUMENT",
+        "clustering": "CLUSTERING"
       }
     },
     {

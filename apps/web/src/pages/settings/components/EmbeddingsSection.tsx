@@ -77,7 +77,15 @@ const SET_STATUS_COLOR: Record<EmbeddingSet['status'], 'success' | 'warning' | '
  * imports `@aperture/core`. Only the label depends on it: an unrecognised
  * suffix renders as part of the model name, which is the harmless direction.
  */
-const SET_MODES = ['semantic_similarity', 'search_query', 'search_document'] as const
+// Every mode core can store, NOT the subset the settings dropdown offers: this
+// parses set ids that already exist, so a withdrawn mode must stay listed or an
+// older set renders its suffix as part of the model name.
+const SET_MODES = [
+  'semantic_similarity',
+  'search_query',
+  'search_document',
+  'clustering',
+] as const
 
 /**
  * A set id split into the model it names and the mode it was embedded in.

@@ -44,7 +44,7 @@ import {
 } from '@mui/icons-material'
 import {
   PROVIDER_INFO,
-  EMBEDDING_INPUT_TYPE_VALUES,
+  embeddingInputTypeOptions,
   PROVIDERS_WITH_INPUT_TYPE,
   OPENROUTER_UPSTREAMS,
   type EmbeddingInputTypeValue,
@@ -1191,7 +1191,7 @@ export function AIFunctionCard({
                 onChange={(e) => setInputType(e.target.value as EmbeddingInputTypeValue | '')}
               >
                 <MenuItem value="">{t('aiFunctionCard.inputTypeDefault')}</MenuItem>
-                {EMBEDDING_INPUT_TYPE_VALUES.map((value) => (
+                {embeddingInputTypeOptions(inputType).map((value) => (
                   <MenuItem key={value} value={value}>
                     {t(`aiFunctionCard.inputTypeOptions.${value}`)}
                   </MenuItem>
