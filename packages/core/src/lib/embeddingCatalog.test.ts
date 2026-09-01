@@ -1,6 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getModelsForFunction, getEmbeddingDimensions, getProvider } from './ai-capabilities.js'
+import {
+  getModelsForFunction,
+  getEmbeddingDimensions,
+  getModel,
+  getProvider,
+  getProvidersForFunction,
+} from './ai-capabilities.js'
 import { VALID_EMBEDDING_DIMENSIONS } from './ai-provider.js'
 import {
   isEmbeddingInputType,
@@ -216,5 +222,79 @@ test('every recommended mode has a spelling that will actually be sent', () => {
     })
     if (mechanism !== 'parameter') continue
     assert.ok(parameterValue, `${model.id} would send an empty input_type`)
+  }
+})
+
+/**
+ * The retrieval-mode control is offered per MODEL, not per provider, and the
+ * catalog is the only thing that says which models can carry one.
+ *
+ * `resolveInputTypeDelivery` used to default an undeclared model to `parameter`.
+ * That was true of native Google and false of everything else, and the cost was
+ * not a rejected request: OpenRouter takes `input_type` as an unconstrained
+ * string, so a mode set on Qwen or pplx-embed was sent, ignored, and then
+ * written into the set identity anyway -- because `embeddingSetId` reads the
+ * config and never the mechanism. A paid-for re-embed producing byte-identical
+ * vectors under a second name.
+ */
+test('a model that can carry a mode declares how, on every provider', () => {
+  // `getProvidersForFunction` returns METADATA, not ids. Passing the object
+  // straight to `getModelsForFunction` type-errors but does not throw at
+  // runtime -- it just returns nothing, so the loop body never runs and the
+  // test passes having asserted precisely nothing. Caught by tsc, not by the
+  // test runner, which is the whole argument for `pnpm validate` over `--test`.
+  const providers = getProvidersForFunction('embeddings').map((p) => p.id)
+  assert.ok(providers.length > 0, 'no provider offers embeddings, so this test checks nothing')
+
+  let inspected = 0
+  for (const providerId of providers) {
+    for (const model of getModelsForFunction(providerId, 'embeddings')) {
+      inspected++
+      if (!model.recommendedInputType) continue
+      assert.ok(
+        model.inputTypeMechanism,
+        `${providerId}/${model.id} recommends a mode but declares no mechanism, ` +
+          'so nothing would deliver it'
+      )
+    }
+  }
+  assert.ok(inspected > 0, 'no built-in embedding models were reached')
+})
+
+test('native google declares its parameter mechanism rather than leaning on a default', () => {
+  // The one entry the old default was right about, and therefore the one a
+  // change to that default silently breaks. Its taskType rides in
+  // providerOptions per call; reached natively there is a single upstream, so
+  // unlike the same model through OpenRouter it needs no pin.
+  const google = getModel('google', 'gemini-embedding-001', 'embeddings')
+  assert.ok(google, 'the native google embedding model went missing')
+  assert.equal(google.inputTypeMechanism, 'parameter')
+  assert.equal(
+    resolveInputTypeDelivery({
+      inputType: 'semantic_similarity',
+      mechanism: google.inputTypeMechanism,
+    }).mechanism,
+    'parameter'
+  )
+})
+
+test('a model declaring no mechanism delivers no mode, whatever is asked of it', () => {
+  // Qwen and pplx-embed both say in their own notes that they take no mode.
+  // This is what makes that a fact the code acts on rather than prose.
+  for (const id of ['qwen/qwen3-embedding-8b', 'perplexity/pplx-embed-v1-4b']) {
+    const model = getModel('openrouter', id, 'embeddings')
+    assert.ok(model, `${id} went missing from the catalog`)
+    assert.equal(model.inputTypeMechanism, undefined)
+    const { mechanism } = resolveInputTypeDelivery({
+      inputType: 'semantic_similarity',
+      mechanism: model.inputTypeMechanism,
+      prefixes: model.inputTypePrefixes,
+    })
+    assert.equal(mechanism, 'none', `${id} would be sent a mode it cannot read`)
+    assert.equal(
+      requiresProviderPin({ provider: 'openrouter', mechanism }),
+      false,
+      `${id} would demand a Gemini upstream pin for a mode it cannot read`
+    )
   }
 })

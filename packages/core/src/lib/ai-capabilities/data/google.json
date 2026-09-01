@@ -24,7 +24,9 @@
       "embeddingDimensions": 3072,
       "quality": "standard",
       "costTier": "low",
-      "inputCostPerMillion": 0.15
+      "inputCostPerMillion": 0.15,
+      "inputTypeMechanism": "parameter",
+      "inputTypeNote": "Carries a mode as Google's native task_type, sent per call in providerOptions rather than baked into the model instance. Reached directly there is only one upstream, so unlike the same model through OpenRouter it needs no provider pin. No mode is recommended: this model's DEFAULT output space is already RETRIEVAL_QUERY, so search_query returns the byte-identical vector to sending nothing, and semantic_similarity measured as a LOSS on the one library this has been evaluated against -- last of five sets, against second place for the same model with no mode at all."
     }
   ],
   "chatModels": [
