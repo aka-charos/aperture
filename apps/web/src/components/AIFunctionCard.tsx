@@ -311,26 +311,40 @@ export function AIFunctionCard({
   // Derived from `functionType` rather than taking a prop like
   // `supportsFallbackModels` does, because this is a property of the role
   // itself, not of who happens to consume it.
-  const offersInputType =
-    functionType === 'embeddings' && PROVIDERS_WITH_INPUT_TYPE.includes(provider)
-
   const storedInputType = config?.embeddingInputType ?? ''
   useEffect(() => {
     setInputType(storedInputType)
   }, [storedInputType])
+
+  // ...and only for a MODEL that declares how it carries one. The modes on
+  // offer are Google's taxonomy, and the control used to appear for every model
+  // on a mode-capable provider — so picking Qwen or pplx-embed showed a Gemini
+  // dropdown, and choosing from it demanded a Gemini upstream pin for a model
+  // that reads neither. Worse than confusing: the mode rides in the set
+  // identity whether or not it reaches the model, so it would have bought a
+  // full re-embed storing byte-identical vectors under a second name.
+  //
+  // A stored mode keeps the control visible even if the model stops declaring
+  // one, so it can be seen and cleared rather than stranded — the same reason
+  // `embeddingInputTypeOptions` re-adds a current value that is off the list.
+  const offersInputType =
+    functionType === 'embeddings' &&
+    PROVIDERS_WITH_INPUT_TYPE.includes(provider) &&
+    (selectedModel?.inputTypeMechanism !== undefined || storedInputType !== '')
 
   const storedProviderOnly = config?.embeddingProviderOnly ?? ''
   useEffect(() => {
     setProviderOnly(storedProviderOnly)
   }, [storedProviderOnly])
 
-  // A pin is only load-bearing for a mode delivered as a request parameter.
-  // The catalog says which mechanism a model uses; absent means parameter.
+  // A pin is only load-bearing for a mode delivered as a request parameter, and
+  // the catalog is the only thing that says which. An absent mechanism is not
+  // "parameter" — it is a model that carries no mode at all.
   const pinRequired =
     offersInputType &&
     provider === 'openrouter' &&
     inputType !== '' &&
-    (selectedModel?.inputTypeMechanism ?? 'parameter') === 'parameter' &&
+    selectedModel?.inputTypeMechanism === 'parameter' &&
     providerOnly === ''
 
 

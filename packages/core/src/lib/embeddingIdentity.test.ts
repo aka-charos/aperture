@@ -247,12 +247,38 @@ test('a parameter model gets the parameter and no prefix', () => {
   )
 })
 
-test('an unstated mechanism defaults to parameter', () => {
-  // Every model but gemini-2, and every custom model, which has no catalog entry.
-  assert.deepEqual(resolveInputTypeDelivery({ inputType: 'search_query' }), {
-    mechanism: 'parameter',
-    parameterValue: 'search_query',
-  })
+test('an unstated mechanism delivers NOTHING, it does not fall back to parameter', () => {
+  // This defaulted to `parameter`, which was true of the one model in front of
+  // it and false of every model that simply takes no mode. OpenRouter accepts
+  // `input_type` as an unconstrained string, so asking Qwen or pplx-embed for a
+  // mode sent a field they ignore and returned the unmoded vector -- which then
+  // got stored under an identity claiming `~semantic_similarity`, because
+  // `embeddingSetId` reads the config and never the mechanism. A full re-embed
+  // paid for to write byte-identical vectors under a second name, and an
+  // evaluation comparing two sets that are one population.
+  //
+  // Absent is now a positive fact: no verified way to carry a mode. Every model
+  // that has one declares it, including native `google`, whose taskType rides
+  // in providerOptions and was the only thing the old default got right.
+  for (const mode of EMBEDDING_INPUT_TYPES) {
+    assert.deepEqual(
+      resolveInputTypeDelivery({ inputType: mode }),
+      { mechanism: 'none' },
+      `${mode} on a model declaring no mechanism must not be delivered`
+    )
+  }
+})
+
+test('a mode on an undeclared model does not drag in a provider pin', () => {
+  // The visible end of the same mistake: `requiresProviderPin` keys on the
+  // resolved mechanism, so defaulting to `parameter` made the Save button
+  // demand a Gemini upstream (google-vertex) for a Qwen model.
+  const { mechanism } = resolveInputTypeDelivery({ inputType: 'semantic_similarity' })
+  assert.equal(
+    requiresProviderPin({ provider: 'openrouter', mechanism }),
+    false,
+    'a model that cannot carry a mode cannot need an upstream pinned for one'
+  )
 })
 
 test('a textPrefix model gets the prefix and no parameter', () => {

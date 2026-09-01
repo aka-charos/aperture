@@ -282,6 +282,24 @@ export function googleTaskTypeFor(
  * this model has no verified way to deliver". The caller logs the second; from
  * here they are the same instruction — embed the text unconditioned, which is
  * the space every other row of a fresh set will be in.
+ *
+ * AN ABSENT MECHANISM MEANS NONE, NOT PARAMETER. It defaulted to `'parameter'`,
+ * which was true of the one model in front of it and false of every model that
+ * simply takes no mode. The consequence was not a wrong request but a wrong
+ * *set*: OpenRouter accepts `input_type` as an unconstrained string, so asking
+ * `qwen3-embedding-8b` or `pplx-embed-v1-4b` for `semantic_similarity` sent a
+ * field they ignore, returned the unmoded vector, and stored it under an
+ * identity saying `~semantic_similarity` — a full re-embed paid for to write
+ * byte-identical vectors under a second name, and an evaluation comparing two
+ * sets that are the same population. It also made `requiresProviderPin` demand
+ * a Gemini upstream (`google-vertex`) for a Qwen model, which is the visible
+ * end of the same mistake.
+ *
+ * So a model must SAY how it carries a mode. Every entry that can carry one now
+ * declares it, including the native `google` model, whose `taskType` rides in
+ * `providerOptions` and was the sole thing the old default was right about.
+ * Absent is now a positive fact: this model has no verified mechanism, matching
+ * the rule that only *verified* prefixes ship.
  */
 export function resolveInputTypeDelivery(input: {
   inputType?: EmbeddingInputType
@@ -298,9 +316,14 @@ export function resolveInputTypeDelivery(input: {
    */
   parameterValue?: string
 } {
-  const { inputType, mechanism = 'parameter', prefixes, values } = input
+  const { inputType, mechanism, prefixes, values } = input
 
   if (!inputType) return { mechanism: 'none' }
+
+  // No declared mechanism, no delivery. See the note above: this is the branch
+  // that stops a mode being stored in a set identity for a model that will
+  // never receive it.
+  if (!mechanism) return { mechanism: 'none' }
 
   if (mechanism === 'parameter') {
     // The declared spelling, or the canonical name when a model declares none.
