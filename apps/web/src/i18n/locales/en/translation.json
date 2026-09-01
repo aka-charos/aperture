@@ -1169,7 +1169,7 @@
     "embeddingVectorTitle": "Vector Dimension Must Match Model Output",
     "embeddingVectorBody": "The embedding dimension you select must exactly match the number of dimensions your model outputs. If these don't match, embedding generation will fail or produce incorrect results.",
     "embeddingCommonDimensionsTitle": "Common dimensions:",
-    "embeddingCommonDimensionsList": "384 — granite-embedding-30m-english, all-MiniLM-L6-v2\n768 — nomic-embed-text, snowflake-arctic-embed-m, e5-base-v2\n1024 — mxbai-embed-large, snowflake-arctic-embed-l, voyage-multilingual-2\n1536 — OpenAI text-embedding-3-small, text-embedding-ada-002\n3072 — OpenAI text-embedding-3-large\n4096 — nv-embed-v2, larger custom models",
+    "embeddingCommonDimensionsList": "384 — granite-embedding-30m-english, all-MiniLM-L6-v2\n768 — nomic-embed-text, snowflake-arctic-embed-m, e5-base-v2\n1024 — mxbai-embed-large, snowflake-arctic-embed-l, voyage-multilingual-2\n1536 — OpenAI text-embedding-3-small, text-embedding-ada-002\n2560 — pplx-embed-v1-4b\n3072 — OpenAI text-embedding-3-large, Gemini Embedding 001/2\n4096 — Qwen3-Embedding-8B, nv-embed-v2, larger custom models",
     "embeddingCheckDocs": "Check your model's documentation to find the correct dimension.",
     "embeddingDimensionsLabel": "Embedding Dimensions *",
     "selectDimensions": "Select dimensions",

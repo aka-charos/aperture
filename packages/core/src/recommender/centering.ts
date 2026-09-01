@@ -276,15 +276,21 @@ export function centeringNeeded(input: {
  * `l2_normalize` here is the identity to far below halfvec precision and this
  * change cannot move the current column.
  *
- * It stops being the identity the moment the vectors are not native. Seven of
- * the eight `VALID_EMBEDDING_DIMENSIONS` are MRL truncations, where the norm
- * depends on how much of that text's energy happened to land in the kept
- * dimensions -- Google's own documentation says non-3072 dimensions must be
- * normalised manually. Other providers do not return unit vectors at any
- * dimension: Qwen3-Embedding's reference usage applies `F.normalize` after
- * pooling, leaving it to the caller. So this is a latent defect on the current
- * schema rather than a new requirement, and it fires on a configuration an
- * operator can already select today.
+ * It stops being the identity the moment the vectors are not native. For any
+ * one model at most one entry in `VALID_EMBEDDING_DIMENSIONS` is its native
+ * width and the rest are MRL truncations, where the norm depends on how much of
+ * that text's energy happened to land in the kept dimensions -- Google's own
+ * documentation says non-3072 dimensions must be normalised manually. (Do not
+ * restate that as a count of the list; it went stale the first time a width was
+ * added.)
+ *
+ * A native width is no guarantee either, and two catalogue models say so
+ * outright. Qwen3-Embedding's reference usage applies `F.normalize` after
+ * pooling, leaving it to the caller; pplx-embed-v1-4b is served int8-quantised
+ * and its model card describes what it returns as unnormalised in as many
+ * words. So this is a latent defect on the current schema rather than a new
+ * requirement, and it fires on a configuration an operator can already select
+ * today.
  *
  * This is the same argument `buildWeightedAverageEmbedding` makes for
  * unit-normalising each item before it sums them. That was the first place

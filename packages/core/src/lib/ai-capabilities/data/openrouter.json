@@ -69,6 +69,21 @@
       "quality": "standard",
       "costTier": "low",
       "inputTypeNote": "Takes no mode. Qwen is instruction-aware, but its documented recipe puts the instruction on the QUERY against bare documents, and this recommender has no text query -- the query is a centroid of item vectors. Prefixing every document identically is not an official Qwen form."
+    },
+    {
+      "id": "perplexity/pplx-embed-v1-4b",
+      "name": "Perplexity Embed V1 4B",
+      "description": "Perplexity's 4B retrieval embedding model, 2560 dimensions, 32K context -- by far the longest context of anything here, though this app's canonical text never approaches it. OpenRouter serves it from Perplexity alone: one upstream endpoint, so there is no routing to pin. That endpoint is int8-quantised, and the model card says the vectors come back UNNORMALISED, so the per-item l2Normalize in buildWeightedAverageEmbedding and refreshCenteredEmbeddings is load-bearing here rather than the identity it is for Gemini at its native 3072.",
+      "capabilities": {
+        "supportsToolCalling": false,
+        "supportsToolStreaming": false,
+        "supportsObjectGeneration": false,
+        "supportsEmbeddings": true
+      },
+      "embeddingDimensions": 2560,
+      "quality": "standard",
+      "costTier": "low",
+      "inputTypeNote": "Takes no mode, by design rather than omission: the model card states it is deliberately not instruction-tuned, so text is embedded bare with no task prefix to choose or maintain -- which also means no mode can be invented for it later the way gemini-2's prefix was measured. Matryoshka-truncatable to 128, which this app does not offer: `dimensions` is not plumbed, and a truncated vector needs the renormalisation storeEmbeddings does not do."
     }
   ],
   "chatModels": [],

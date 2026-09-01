@@ -637,9 +637,12 @@ function buildWeightedAverageEmbedding(
   // Google's own documentation says "you must manually normalize non-3072
   // dimensions", so every MRL-truncated setting (1536, 768, ...) returns
   // vectors whose norm depends on how much of that text's energy happened to
-  // land in the kept dimensions. VALID_EMBEDDING_DIMENSIONS offers eight
-  // choices and seven of them are truncations, so the correctness of the taste
-  // vector should not rest on which one an operator picked.
+  // land in the kept dimensions. For any given model at most one entry in
+  // VALID_EMBEDDING_DIMENSIONS is native and the rest are truncations -- and a
+  // native width is not itself a promise, since pplx-embed-v1-4b at its own
+  // 2560 is served int8-quantised and documented as unnormalised. The
+  // correctness of the taste vector should not rest on which one an operator
+  // picked.
   //
   // It also makes the two centroid paths agree by construction. The K>=2 path
   // has always fed l2Normalize'd vectors to spherical k-means (see the
