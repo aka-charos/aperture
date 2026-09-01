@@ -3159,6 +3159,8 @@
   "assistant": {
     "fabTooltip": "AI Assistant",
     "newChat": "New chat",
+    "renameChat": "Rename chat",
+    "deleteChat": "Delete chat",
     "noConversations": "No conversations yet",
     "saving": "Saving…",
     "title": "{{appName}} Encore",

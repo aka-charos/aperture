@@ -387,17 +387,24 @@ export function AssistantChatSurface({
                   void handleSelectConversation(convo.id)
                 }}
                 sx={{
+                  position: 'relative',
                   borderRadius: 1,
                   mb: 0.5,
+                  pr: 1,
                   '&.Mui-selected': {
                     bgcolor: alpha(theme.palette.primary.main, 0.15),
                   },
-                  '&:hover .action-btn': {
+                  // The row actions float over the title rather than standing
+                  // beside it. Reserving ~70px for two buttons that are
+                  // invisible most of the time is what cut every title to
+                  // three words in a 232px rail.
+                  '&:hover .convo-actions, &:focus-within .convo-actions': {
                     opacity: 1,
+                    pointerEvents: 'auto',
                   },
                 }}
               >
-                <ListItemIcon sx={{ minWidth: 36 }}>
+                <ListItemIcon sx={{ minWidth: 28 }}>
                   <ChatIcon fontSize="small" sx={{ color: 'text.secondary' }} />
                 </ListItemIcon>
                 {editingConversationId === convo.id ? (
@@ -427,45 +434,67 @@ export function AssistantChatSurface({
                     }}
                   />
                 ) : (
-                  <ListItemText
-                    primary={convo.title}
-                    secondary={formatDate(convo.updated_at)}
-                    primaryTypographyProps={{
-                      noWrap: true,
-                      variant: 'body2',
-                    }}
-                    secondaryTypographyProps={{
-                      variant: 'caption',
-                    }}
-                  />
+                  <Tooltip title={convo.title} enterDelay={600} placement="right">
+                    <ListItemText
+                      primary={convo.title}
+                      secondary={formatDate(convo.updated_at)}
+                      primaryTypographyProps={{
+                        variant: 'body2',
+                        sx: {
+                          // Two lines, then ellipsis. A chat title is the first
+                          // words of a question, so one line of a narrow rail
+                          // clipped nearly all of them mid-word; the tooltip
+                          // carries the rest.
+                          display: '-webkit-box',
+                          WebkitBoxOrient: 'vertical',
+                          WebkitLineClamp: 2,
+                          overflow: 'hidden',
+                          overflowWrap: 'anywhere',
+                        },
+                      }}
+                      secondaryTypographyProps={{
+                        variant: 'caption',
+                      }}
+                    />
+                  </Tooltip>
                 )}
                 {editingConversationId !== convo.id && (
-                  <>
+                  <Box
+                    className="convo-actions"
+                    sx={{
+                      position: 'absolute',
+                      insetInlineEnd: 4,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      borderRadius: 1,
+                      // Opaque enough to read against whatever title it covers
+                      // while it is open.
+                      bgcolor: alpha(theme.palette.background.paper, 0.92),
+                      backdropFilter: 'blur(2px)',
+                      opacity: 0,
+                      pointerEvents: 'none',
+                      transition: 'opacity 0.2s',
+                    }}
+                  >
                     <IconButton
-                      className="action-btn"
                       size="small"
+                      aria-label={t('assistant.renameChat')}
                       onClick={(e) => handleStartRename(convo.id, convo.title, e)}
-                      sx={{
-                        opacity: 0,
-                        transition: 'opacity 0.2s',
-                        '&:hover': { color: 'primary.main' },
-                      }}
+                      sx={{ '&:hover': { color: 'primary.main' } }}
                     >
                       <EditIcon fontSize="small" />
                     </IconButton>
                     <IconButton
-                      className="action-btn"
                       size="small"
+                      aria-label={t('assistant.deleteChat')}
                       onClick={(e) => handleDeleteConversation(convo.id, e)}
-                      sx={{
-                        opacity: 0,
-                        transition: 'opacity 0.2s',
-                        '&:hover': { color: 'error.main' },
-                      }}
+                      sx={{ '&:hover': { color: 'error.main' } }}
                     >
                       <DeleteOutlineIcon fontSize="small" />
                     </IconButton>
-                  </>
+                  </Box>
                 )}
               </ListItemButton>
             ))}
