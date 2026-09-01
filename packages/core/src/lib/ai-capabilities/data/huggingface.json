@@ -4,7 +4,7 @@
   "type": "cloud",
   "website": "https://huggingface.co",
   "logoPath": "/huggingface.svg",
-  "supportsEmbeddings": true,
+  "supportsEmbeddings": false,
   "supportsChat": true,
   "supportsTextGeneration": true,
   "supportsExploration": true,
