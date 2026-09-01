@@ -24,6 +24,13 @@ import {
   requiresProviderPin,
   type EmbeddingInputType,
 } from './embeddingIdentity.js'
+import {
+  orderReasoningEfforts,
+  reasoningEffortsFor,
+  resolveReasoningEffort,
+  resolveReasoningOptions,
+  type ReasoningCapableModel,
+} from './reasoningEffort.js'
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
 import { createChildLogger } from './logger.js'
 import {
@@ -193,6 +200,25 @@ export interface ProviderConfig {
    * A tag 404s with "No allowed providers are available", listing the real ones.
    */
   embeddingProviderOnly?: string
+  /**
+   * How hard this role's model is asked to think. Absent = send nothing, which
+   * is the provider's default and what every role built before this field
+   * existed was already getting.
+   *
+   * FOR THE BATCH WRITING ROLES, where a scratchpad is billed from the same
+   * output allowance as the prose and the visible symptom is a truncation --
+   * see ./reasoningEffort.ts for the measurements. Deliberately not defaulted:
+   * which effort suits a given model is unmeasured, and a default would change
+   * every existing role's requests on deploy.
+   *
+   * A plain string, not a union: the accepted words are a property of the
+   * MODEL, not of this app. OpenRouter publishes 21 distinct vocabularies over
+   * seven words and no model takes all seven, so what is valid here can only be
+   * answered with the model in hand — see `reasoningEffort.ts`. The settings
+   * route refuses anything the chosen model does not list, rather than storing
+   * a word that would be dropped at the request builder.
+   */
+  reasoningEffort?: string
 }
 
 /**
@@ -903,6 +929,127 @@ export async function getEmbeddingInvocation(): Promise<EmbeddingInvocation> {
   }
 }
 
+
+/**
+ * What this provider+model declares about reasoning, or null for "takes none".
+ *
+ * The two providers are asked differently on purpose. OpenRouter publishes
+ * `reasoning.supported_efforts` per model in a catalog this app already caches
+ * daily, so the answer is LIVE — which matters, because its chat models are all
+ * user-entered and no static file could know what an operator typed in. Native
+ * Google has no such endpoint, so its models declare `reasoningMechanism` in
+ * `google.json` and the SDK's own enum fixes the words.
+ *
+ * A model the catalog does not list returns null and therefore gets no control,
+ * which is the safe direction: the failure of guessing wrong is a 400 on a batch
+ * job an operator just reconfigured.
+ */
+export async function getReasoningModelFacts(
+  provider: string,
+  modelId: string,
+  fn: AIFunction
+): Promise<ReasoningCapableModel | null> {
+  if (provider === 'openrouter') {
+    const info = await getOpenRouterModelInfo(modelId)
+    // An empty list is not the same as a missing one only in that both mean
+    // "no control"; collapsing them here keeps every caller from having to care.
+    if (!info?.supportedEfforts?.length) return null
+    return { reasoningMechanism: 'effort', supportedEfforts: info.supportedEfforts }
+  }
+
+  const model = getModel(provider, modelId, fn)
+  return model?.reasoningMechanism ? model : null
+}
+
+/**
+ * The effort words this role's chosen model accepts, weakest first.
+ *
+ * Empty means offer no control. Shared by the settings route's validation and
+ * the models endpoint that feeds the dropdown, so the list an operator is shown
+ * and the list they are allowed to save cannot drift apart.
+ */
+export async function getSupportedReasoningEfforts(
+  provider: string,
+  modelId: string,
+  fn: AIFunction
+): Promise<readonly string[]> {
+  return orderReasoningEfforts(reasoningEffortsFor(await getReasoningModelFacts(provider, modelId, fn)))
+}
+
+/**
+ * The reasoning effort configured for a role, or undefined for "send nothing".
+ *
+ * Separate from {@link getReasoningProviderOptionsFor} because the two answer
+ * different questions and one caller needs only the first: the title-analysis
+ * writer walks a list of model ATTEMPTS that each carry their own provider and
+ * model id, so it reads the effort once and resolves it per attempt.
+ */
+export async function getReasoningEffortFor(fn: AIFunction): Promise<string | undefined> {
+  return resolveReasoningEffort(await getFunctionConfig(fn))
+}
+
+/**
+ * The `providerOptions` capping reasoning for one specific provider+model.
+ *
+ * Undefined means send nothing, and the call must then omit the key entirely
+ * rather than passing undefined through.
+ *
+ * The warn is the only place an operator learns a saved effort is not reaching
+ * the model. The settings route refuses every combination that lands here, so
+ * arriving means a config written before that guard existed — or, far more
+ * likely, a role whose MODEL was changed afterwards to one with a different
+ * vocabulary. That second case is why this is resolved per call instead of
+ * validated once at save: OpenRouter's catalog moves under a stored setting.
+ */
+export async function getReasoningProviderOptionsFor(
+  provider: string,
+  modelId: string,
+  fn: AIFunction,
+  effort: string | undefined
+): Promise<Record<string, Record<string, JSONValue>> | undefined> {
+  if (!effort) return undefined
+
+  const model = await getReasoningModelFacts(provider, modelId, fn)
+  const { providerOptions, undeliverable } = resolveReasoningOptions({ provider, model, effort })
+
+  if (undeliverable) {
+    logger.warn(
+      {
+        role: fn,
+        provider,
+        model: modelId,
+        effort,
+        undeliverable,
+        supported: reasoningEffortsFor(model),
+      },
+      undeliverable === 'effort'
+        ? 'Reasoning effort ignored: this model does not offer that level'
+        : undeliverable === 'provider'
+          ? 'Reasoning effort ignored: that mechanism belongs to another provider'
+          : 'Reasoning effort ignored: this model takes no reasoning effort'
+    )
+    return undefined
+  }
+
+  return providerOptions as Record<string, Record<string, JSONValue>> | undefined
+}
+
+/**
+ * The `providerOptions` capping this role's reasoning, resolved against the
+ * role's own configured provider and model.
+ */
+export async function getReasoningProviderOptions(
+  fn: AIFunction
+): Promise<Record<string, Record<string, JSONValue>> | undefined> {
+  const config = await getFunctionConfig(fn)
+  if (!config) return undefined
+  return getReasoningProviderOptionsFor(
+    config.provider,
+    config.model,
+    fn,
+    resolveReasoningEffort(config)
+  )
+}
 
 /**
  * Get a chat model instance (with tool calling) for the configured provider
@@ -1881,6 +2028,25 @@ function formatContextWindow(tokens: number): string {
  * Get models for a provider/function including custom models from the database.
  * Use this instead of getModelsForFunction when you need custom models included.
  */
+/**
+ * The reasoning fields a catalog entry contributes to a model's metadata.
+ *
+ * Stamped rather than declared because OpenRouter's chat models are all
+ * user-entered — there is no static entry to write it on — and because the
+ * vocabulary is OpenRouter's to change. A model that lists no efforts
+ * contributes NOTHING, leaving `reasoningMechanism` absent so every reader
+ * treats it as "takes none" rather than as an empty list to fall through.
+ */
+function reasoningFromCatalog(
+  info: { supportedEfforts: string[] | null } | null
+): Pick<ModelMetadata, 'reasoningMechanism' | 'supportedEfforts'> {
+  if (!info?.supportedEfforts?.length) return {}
+  return {
+    reasoningMechanism: 'effort',
+    supportedEfforts: orderReasoningEfforts(info.supportedEfforts),
+  }
+}
+
 export async function getModelsForFunctionWithCustom(
   providerId: string,
   fn: AIFunction
@@ -1914,6 +2080,7 @@ export async function getModelsForFunctionWithCustom(
               ...(catalogInfo.contextLength != null && {
                 contextWindow: formatContextWindow(catalogInfo.contextLength),
               }),
+              ...reasoningFromCatalog(catalogInfo),
             }
           })
         )
@@ -1958,6 +2125,7 @@ export async function getModelsForFunctionWithCustom(
         ...(catalogInfo?.contextLength != null && {
           contextWindow: formatContextWindow(catalogInfo.contextLength),
         }),
+        ...reasoningFromCatalog(catalogInfo),
         // Mark as custom for UI
         isCustom: true,
       }

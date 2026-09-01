@@ -46,6 +46,9 @@ import {
   PROVIDER_INFO,
   embeddingInputTypeOptions,
   PROVIDERS_WITH_INPUT_TYPE,
+  ROLES_WITH_REASONING_EFFORT,
+  reasoningEffortOptions,
+  reasoningEffortLabelKey,
   OPENROUTER_UPSTREAMS,
   type EmbeddingInputTypeValue,
   type FallbackModelConfig,
@@ -87,6 +90,14 @@ export interface ModelInfo {
   inputTypeNote?: string
   /** How the mode reaches the model; absent means a request parameter. */
   inputTypeMechanism?: 'parameter' | 'textPrefix'
+  /** How this model takes a reasoning effort; absent means it takes none. */
+  reasoningMechanism?: 'effort' | 'thinkingLevel'
+  /**
+   * The effort words THIS model accepts, weakest first, resolved server-side —
+   * live from OpenRouter's catalog, or the SDK's fixed enum for native Google.
+   * Absent means offer no control.
+   */
+  supportedEfforts?: readonly string[]
   capabilities: {
     supportsToolCalling: boolean
     supportsEmbeddings: boolean
@@ -228,6 +239,7 @@ export function AIFunctionCard({
 
   /** Pinned OpenRouter upstream; '' means let OpenRouter choose. */
   const [providerOnly, setProviderOnly] = useState('')
+  const [reasoningEffort, setReasoningEffort] = useState('')
 
   // Custom model dialog state
   const [addModelDialogOpen, setAddModelDialogOpen] = useState(false)
@@ -331,6 +343,30 @@ export function AIFunctionCard({
     functionType === 'embeddings' &&
     PROVIDERS_WITH_INPUT_TYPE.includes(provider) &&
     (selectedModel?.inputTypeMechanism !== undefined || storedInputType !== '')
+
+  // Reasoning effort. Offered only where it is both READ (the batch writing
+  // roles) and TAKEN BY THIS MODEL — the server enforces both, and a control
+  // that cannot save is a control that should not render.
+  //
+  // Keyed on the SELECTED MODEL, never the provider. Provider-level was the
+  // first version of this and it was wrong in both directions: OpenRouter hosts
+  // 124 models that do not reason at all and 140 more that reason without
+  // taking an effort, while the models that do take one draw on 21 different
+  // vocabularies. On native Google it offered `thinking_level` — a Gemini 3.x
+  // field — for gemini-2.5 and gemini-1.5, where it is a 400.
+  //
+  // A stored value keeps the control visible even when the current model takes
+  // none, so it can be seen and cleared rather than stranded — the same reason
+  // `reasoningEffortOptions` re-adds an off-list current value.
+  const storedReasoningEffort = config?.reasoningEffort ?? ''
+  useEffect(() => {
+    setReasoningEffort(storedReasoningEffort)
+  }, [storedReasoningEffort])
+
+  const modelEfforts = selectedModel?.supportedEfforts
+  const offersReasoningEffort =
+    ROLES_WITH_REASONING_EFFORT.includes(functionType) &&
+    ((modelEfforts?.length ?? 0) > 0 || storedReasoningEffort !== '')
 
   const storedProviderOnly = config?.embeddingProviderOnly ?? ''
   useEffect(() => {
@@ -536,6 +572,11 @@ export function AIFunctionCard({
       // Embeddings card from a provider that cannot carry a mode would silently
       // drop one an admin set on a provider that can.
       ...(offersInputType ? { embeddingInputType: inputType || null } : {}),
+      // Explicit null when cleared, and sent only by the card showing the
+      // control — same rule as the embedding mode above, for the same reason.
+      ...(offersReasoningEffort
+        ? { reasoningEffort: (reasoningEffort || null) as FunctionConfig['reasoningEffort'] }
+        : {}),
       ...(offersInputType && provider === 'openrouter'
         ? { embeddingProviderOnly: providerOnly || null }
         : {}),
@@ -1187,6 +1228,40 @@ export function AIFunctionCard({
             <FormHelperText sx={{ mt: pacingSeconds > 0 ? 1 : 0 }}>
               {t('aiFunctionCard.pacingHelp')}
             </FormHelperText>
+          </Box>
+        )}
+
+        {/* How hard to think. A reasoning model bills its scratchpad from the
+            SAME output allowance as the answer, so on a batch role the budget
+            is spent silently and the symptom is a truncation. Absent means the
+            provider default, which is what every role had before this existed. */}
+        {offersReasoningEffort && (
+          <Box sx={{ mb: 2 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel id={`${functionType}-reasoning-label`}>
+                {t('aiFunctionCard.reasoningLabel')}
+              </InputLabel>
+              <Select
+                labelId={`${functionType}-reasoning-label`}
+                value={reasoningEffort}
+                label={t('aiFunctionCard.reasoningLabel')}
+                onChange={(e) => setReasoningEffort(e.target.value)}
+              >
+                <MenuItem value="">{t('aiFunctionCard.reasoningDefault')}</MenuItem>
+                {reasoningEffortOptions(modelEfforts, reasoningEffort).map((value) => {
+                  // A word OpenRouter adds after this ships has no translation.
+                  // Rendering the vendor's own English name beats rendering a
+                  // raw key path, and beats hiding a level the model accepts.
+                  const key = reasoningEffortLabelKey(value)
+                  return (
+                    <MenuItem key={value} value={value}>
+                      {key ? t(key) : value}
+                    </MenuItem>
+                  )
+                })}
+              </Select>
+            </FormControl>
+            <FormHelperText>{t('aiFunctionCard.reasoningHelp')}</FormHelperText>
           </Box>
         )}
 

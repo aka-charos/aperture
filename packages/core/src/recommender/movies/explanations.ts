@@ -7,7 +7,11 @@
 
 import { query } from '../../lib/db.js'
 import { createChildLogger } from '../../lib/logger.js'
-import { getTextGenerationModelInstance, getFunctionConfig } from '../../lib/ai-provider.js'
+import {
+  getTextGenerationModelInstance,
+  getFunctionConfig,
+  getReasoningProviderOptions,
+} from '../../lib/ai-provider.js'
 import { generateText } from 'ai'
 import { buildAiLanguageInstruction, DEFAULT_LOCALE, type AppLocaleCode } from '../../lib/locales.js'
 import { resolveEffectiveAiLanguage } from '../../lib/userSettings.js'
@@ -439,8 +443,13 @@ ${evidenceStr}`
 
   try {
     const model = await getTextGenerationModelInstance()
+    // A reasoning model bills its scratchpad from the SAME allowance as these
+    // explanations, which is what `explanationBatchSettings` buys headroom for.
+    // Absent unless an operator chose one, so the request is unchanged by default.
+    const reasoning = await getReasoningProviderOptions('textGeneration')
     const { text, finishReason } = await generateText({
       model,
+      ...(reasoning ? { providerOptions: reasoning } : {}),
       system: `You are an expert film curator writing personalized recommendation explanations. You have access to:
 1. The user's taste profile and favorite films
 2. For each recommendation, the SPECIFIC watched movies it's most similar to (via AI embedding analysis), with a short synopsis of each

@@ -22,6 +22,11 @@ export {
   getFunctionConfig,
   setFunctionConfig,
   getEmbeddingInvocation,
+  getReasoningEffortFor,
+  getReasoningProviderOptions,
+  getReasoningProviderOptionsFor,
+  getReasoningModelFacts,
+  getSupportedReasoningEfforts,
   getChatModelInstance,
   getWebSearchModelInstance,
   getWebSearchAttempts,
@@ -193,6 +198,18 @@ export {
   EMBEDDING_INPUT_TYPES,
   type EmbeddingInputType,
   type EmbeddingInvocation,
+  // Reasoning effort — the batch roles' scratchpad cap. Per-model vocabulary.
+  KNOWN_REASONING_EFFORTS,
+  THINKING_LEVELS,
+  ROLES_WITH_REASONING_EFFORT,
+  roleReadsReasoningEffort,
+  isThinkingLevel,
+  reasoningEffortsFor,
+  orderReasoningEfforts,
+  resolveReasoningEffort,
+  resolveReasoningOptions,
+  type ReasoningMechanism,
+  type ReasoningCapableModel,
 } from './lib/index.js'
 
 // Migrations

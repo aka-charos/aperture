@@ -45,7 +45,8 @@
       "costTier": "low",
       "contextWindow": "1M",
       "inputCostPerMillion": 0.3,
-      "outputCostPerMillion": 2.5
+      "outputCostPerMillion": 2.5,
+      "reasoningMechanism": "thinkingLevel"
     },
     {
       "id": "gemini-3.7-flash",
@@ -62,7 +63,8 @@
       "costTier": "medium",
       "contextWindow": "1M",
       "inputCostPerMillion": 0.75,
-      "outputCostPerMillion": 3.75
+      "outputCostPerMillion": 3.75,
+      "reasoningMechanism": "thinkingLevel"
     },
     {
       "id": "gemini-3.5-flash",
@@ -79,7 +81,8 @@
       "costTier": "medium",
       "contextWindow": "1M",
       "inputCostPerMillion": 1.5,
-      "outputCostPerMillion": 9
+      "outputCostPerMillion": 9,
+      "reasoningMechanism": "thinkingLevel"
     },
     {
       "id": "gemini-3.1-flash-lite",
@@ -96,7 +99,8 @@
       "costTier": "low",
       "contextWindow": "1M",
       "inputCostPerMillion": 0.25,
-      "outputCostPerMillion": 1.5
+      "outputCostPerMillion": 1.5,
+      "reasoningMechanism": "thinkingLevel"
     },
     {
       "id": "gemini-1.5-pro",

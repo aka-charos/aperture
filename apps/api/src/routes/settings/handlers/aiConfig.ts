@@ -67,6 +67,8 @@ import {
   providerSupportsInputType,
   resolveInputTypeDelivery,
   requiresProviderPin,
+  getSupportedReasoningEfforts,
+  roleReadsReasoningEffort,
   getModel,
   EMBEDDING_INPUT_TYPES,
   type AIFunction,
@@ -782,6 +784,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       callSpacingSeconds?: number
       embeddingInputType?: string | null
       embeddingProviderOnly?: string | null
+      reasoningEffort?: string | null
     }
   }>('/api/settings/ai/:function', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
     try {
@@ -797,6 +800,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         callSpacingSeconds,
         embeddingInputType,
         embeddingProviderOnly,
+        reasoningEffort,
       } = request.body
 
       if (!isAIFunction(fn)) {
@@ -933,6 +937,50 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       }
       if (fn !== 'embeddings' || provider !== 'openrouter') nextProviderOnly = undefined
 
+      // How hard this role's model is asked to think. REJECTED rather than
+      // ignored, on the same principle as the embedding mode above: the failure
+      // this guards is not a bad request but a control that appears to work. An
+      // effort stored where nothing sends it leaves the settings page describing
+      // a configuration no request carries, and the only visible trace is a bill
+      // that did not change.
+      //
+      // Validated against THIS MODEL'S OWN vocabulary, never a fixed list. The
+      // words are the model's, not this app's — OpenRouter publishes 21 distinct
+      // vocabularies over seven words and no model accepts all seven, so a
+      // hardcoded enum would reject "xhigh" on a model that takes it and accept
+      // "minimal" on one that answers 400. The same call backs the dropdown, so
+      // what is offered and what is accepted are one list by construction.
+      //
+      // Same "omitted means leave alone" rule; `null` or '' clears it.
+      let nextReasoningEffort: string | undefined
+      if (reasoningEffort === undefined) {
+        nextReasoningEffort = existing?.reasoningEffort
+      } else if (reasoningEffort === null || reasoningEffort === '') {
+        nextReasoningEffort = undefined
+      } else if (!roleReadsReasoningEffort(fn)) {
+        return reply.status(400).send({
+          error: `The ${fn} role does not apply a reasoning effort. It is read by the batch writing roles, where a scratchpad is billed from the same allowance as the answer.`,
+        })
+      } else {
+        const supported = await getSupportedReasoningEfforts(provider, model, fn)
+        if (supported.length === 0) {
+          return reply.status(400).send({
+            error: `${model} does not take a reasoning effort. Leave it unset, or choose a model that does.`,
+          })
+        }
+        if (!supported.includes(reasoningEffort)) {
+          return reply.status(400).send({
+            error: `${model} has no "${reasoningEffort}" level. It accepts: ${supported.join(', ')}.`,
+          })
+        }
+        nextReasoningEffort = reasoningEffort
+      }
+
+      // A role that changed model since the effort was stored keeps the value
+      // but stops sending it — the request builder re-checks per call and warns.
+      // Clearing it here would silently discard a choice on a save that never
+      // mentioned it, and OpenRouter's catalog moves under stored settings.
+
       // The combination that silently produces a MIXTURE of two spaces:
       // a mode delivered as a request parameter, with routing left to
       // OpenRouter. Refused rather than stored, because the resulting set
@@ -973,6 +1021,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         callSpacingSeconds: nextSpacing && nextSpacing > 0 ? nextSpacing : undefined,
         embeddingInputType: nextInputType,
         embeddingProviderOnly: nextProviderOnly,
+        reasoningEffort: nextReasoningEffort,
       })
 
       const config = await getFunctionConfig(fn)

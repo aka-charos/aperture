@@ -70,6 +70,11 @@ export {
   setFunctionConfig,
   // Model Factory (returns AI SDK model instances)
   getEmbeddingInvocation,
+  getReasoningEffortFor,
+  getReasoningProviderOptions,
+  getReasoningProviderOptionsFor,
+  getReasoningModelFacts,
+  getSupportedReasoningEfforts,
   type EmbeddingInvocation,
   getChatModelInstance,
   getWebSearchModelInstance,
@@ -233,4 +238,23 @@ export {
   type EmbeddingInputType,
   type EmbeddingIdentityConfig,
 } from './embeddingIdentity.js'
+
+// Reasoning effort — how hard a role's model is asked to think, for the batch
+// roles where the scratchpad is billed from the prose's own allowance. The
+// vocabulary is per MODEL and lives in the catalog, not in a union here.
+export {
+  KNOWN_REASONING_EFFORTS,
+  THINKING_LEVELS,
+  ROLES_WITH_REASONING_EFFORT,
+  roleReadsReasoningEffort,
+  isThinkingLevel,
+  reasoningEffortsFor,
+  orderReasoningEfforts,
+  resolveReasoningEffort,
+  resolveReasoningOptions,
+  type ReasoningMechanism,
+  type ReasoningCapableModel,
+  type ReasoningDelivery,
+  type ReasoningProviderOptions,
+} from './reasoningEffort.js'
 

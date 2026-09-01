@@ -1,3 +1,5 @@
+import type { ReasoningMechanism } from '../reasoningEffort.js'
+
 export interface ModelCapabilities {
   supportsToolCalling: boolean
   supportsToolStreaming: boolean
@@ -109,6 +111,35 @@ export interface ModelMetadata {
    * an empty hint reads as an oversight.
    */
   inputTypeNote?: string
+
+  /**
+   * HOW this model takes a reasoning-effort instruction. Absent means it takes
+   * none, and none is offered or sent.
+   *
+   * See `reasoningEffort.ts` for the mechanisms. Declared in the catalog JSON
+   * for native Google, whose `thinkingLevel` is a raw model capability with no
+   * endpoint to ask; stamped at runtime for OpenRouter, whose catalog publishes
+   * it per model. The two must not be guarded the same way — normalising this
+   * across a catalog is what OpenRouter is *for*.
+   *
+   * Same discipline as {@link inputTypeMechanism}: absent is a positive fact,
+   * not a default to fall through. It defaulting to 'parameter' is precisely
+   * how the input-type control came to be offered for models that take none.
+   */
+  reasoningMechanism?: ReasoningMechanism
+
+  /**
+   * The effort words this model accepts, for the `effort` mechanism.
+   *
+   * Live from OpenRouter's catalog, filled by `getModelsForFunctionWithCustom`
+   * — never written in the catalog JSON, because it changes when OpenRouter
+   * changes it and a stale copy would offer a model words it now rejects.
+   * Ignored for `thinkingLevel`, whose vocabulary the SDK fixes.
+   *
+   * NOT a union: 21 distinct vocabularies across the live catalog, drawn from
+   * seven words, no model offering all seven. See {@link ReasoningMechanism}.
+   */
+  supportedEfforts?: readonly string[]
 
   description?: string
   quality?: 'budget' | 'standard' | 'premium'
