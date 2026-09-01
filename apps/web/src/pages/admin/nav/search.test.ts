@@ -4,6 +4,12 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { searchAdmin } from './search'
+import {
+  ALL_JOB_NAMES,
+  JOB_DISPLAY_NAME_KEYS,
+  jobAnchor,
+  titleCaseJobName,
+} from '@/pages/jobs/registry'
 
 /**
  * What the settings palette must find.
@@ -109,4 +115,70 @@ test('every result carries a resolvable path and a non-key title', () => {
     assert.ok(result.path.startsWith('/admin'), `bad path: ${result.path}`)
     assert.ok(!result.title.includes('.'), `title looks like an unresolved key: ${result.title}`)
   }
+})
+
+/**
+ * Jobs.
+ *
+ * Twenty-eight named, runnable things, none of which were indexed — so typing
+ * one landed on a settings page that merely mentioned the word. Measured before
+ * the fix: `sync movies` reached Libraries, `rebuild taste profiles` reached a
+ * slider called "Borrowed from a taste twin", `studio logos` reached nothing at
+ * all, and `full reset recommendations` put the destructive database purge on
+ * top.
+ */
+
+test('every job is findable by the name the page shows', () => {
+  for (const name of ALL_JOB_NAMES) {
+    const displayName = JOB_DISPLAY_NAME_KEYS[name]
+      ? t(JOB_DISPLAY_NAME_KEYS[name])
+      : titleCaseJobName(name)
+    const hits = searchAdmin(displayName, t)
+    assert.ok(
+      hits.some((r) => r.path.endsWith(`#${jobAnchor(name)}`)),
+      `"${displayName}" does not find the ${name} job (got ${hits.map((r) => r.title).join(', ') || 'nothing'})`
+    )
+  }
+})
+
+test('a job name beats a settings page that merely mentions the word', () => {
+  const cases: Array<[query: string, job: string]> = [
+    ['sync movies', 'sync-movies'],
+    ['rebuild taste profiles', 'rebuild-taste-profiles'],
+    ['studio logos', 'enrich-studio-logos'],
+    ['enrich metadata', 'enrich-metadata'],
+    ['generate movie embeddings', 'generate-movie-embeddings'],
+    ['discovery suggestions', 'generate-discovery-suggestions'],
+  ]
+  for (const [query, job] of cases) {
+    const top = topFor(query)
+    assert.equal(top?.path, `/admin/ops/jobs#${jobAnchor(job)}`, `"${query}" led to ${top?.title}`)
+  }
+})
+
+test('a job can be found by its kebab id, as pasted from a log', () => {
+  const top = topFor('generate-title-analysis')
+  assert.equal(top?.path, `/admin/ops/jobs#${jobAnchor('generate-title-analysis')}`)
+})
+
+test('searching "jobs" reaches the page, not all twenty-eight cards', () => {
+  // The entry answers this; flooding the palette with every card would make
+  // the plural of the section name useless.
+  const results = searchAdmin('jobs', t)
+  assert.equal(results[0]?.entryId, 'jobs')
+  assert.ok(results.every((r) => !r.path.includes('#job-')), 'a bare "jobs" listed job cards')
+})
+
+test('a full match hides the partial ones', () => {
+  // `api key` returned fifteen rows and `tmdb key` seventeen: the useful ones,
+  // then every card that happens to mention a key.
+  const results = searchAdmin('purge database', t)
+  assert.equal(results.length, 1)
+  assert.equal(results[0].entryId, 'database')
+})
+
+test('the floor is relative, so a weak query still answers', () => {
+  // If nothing matches more than one token, every one-token result survives —
+  // the floor must never turn "few results" into "no results".
+  assert.ok(searchAdmin('please show me the logs', t).length > 0)
 })

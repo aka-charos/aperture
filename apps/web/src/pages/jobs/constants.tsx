@@ -22,126 +22,14 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import TheatersIcon from '@mui/icons-material/Theaters'
 import StarHalfIcon from '@mui/icons-material/StarHalf'
 import BiotechIcon from '@mui/icons-material/Biotech'
-import type { JobCategory } from './types'
+import { JOB_DISPLAY_NAME_KEYS, titleCaseJobName } from './registry'
 import { getAppName } from '@/lib/branding'
 
-export const MOVIE_JOB_CATEGORIES: JobCategory[] = [
-  {
-    titleKey: 'admin.jobsPage.categories.movieSync.title',
-    descriptionKey: 'admin.jobsPage.categories.movieSync.description',
-    color: '#3b82f6',
-    jobs: ['sync-movies', 'sync-movie-watch-history'],
-  },
-  {
-    titleKey: 'admin.jobsPage.categories.movieAi.title',
-    descriptionKey: 'admin.jobsPage.categories.movieAi.description',
-    color: '#8b5cf6',
-    jobs: ['generate-movie-embeddings', 'generate-movie-recommendations', 'full-reset-movie-recommendations'],
-  },
-  {
-    titleKey: 'admin.jobsPage.categories.movieLib.title',
-    descriptionKey: 'admin.jobsPage.categories.movieLib.description',
-    color: '#6366f1',
-    jobs: ['sync-movie-libraries'],
-  },
-]
-
-export const SERIES_JOB_CATEGORIES: JobCategory[] = [
-  {
-    titleKey: 'admin.jobsPage.categories.seriesSync.title',
-    descriptionKey: 'admin.jobsPage.categories.seriesSync.description',
-    color: '#0891b2',
-    jobs: ['sync-series', 'sync-series-watch-history'],
-  },
-  {
-    titleKey: 'admin.jobsPage.categories.seriesAi.title',
-    descriptionKey: 'admin.jobsPage.categories.seriesAi.description',
-    color: '#7c3aed',
-    jobs: ['generate-series-embeddings', 'generate-series-recommendations', 'full-reset-series-recommendations'],
-  },
-  {
-    titleKey: 'admin.jobsPage.categories.seriesLib.title',
-    descriptionKey: 'admin.jobsPage.categories.seriesLib.description',
-    color: '#4f46e5',
-    jobs: ['sync-series-libraries'],
-  },
-]
-
-export const GLOBAL_JOB_CATEGORIES: JobCategory[] = [
-  {
-    titleKey: 'admin.jobsPage.categories.globalMeta.title',
-    descriptionKey: 'admin.jobsPage.categories.globalMeta.description',
-    color: '#10b981',
-    jobs: ['enrich-metadata', 'enrich-studio-logos', 'enrich-mdblist'],
-  },
-  {
-    titleKey: 'admin.jobsPage.categories.globalCurated.title',
-    descriptionKey: 'admin.jobsPage.categories.globalCurated.description',
-    color: '#f59e0b',
-    jobs: ['refresh-top-picks', 'auto-request-top-picks', 'sync-watching-favorites'],
-  },
-  {
-    titleKey: 'admin.jobsPage.categories.globalDiscovery.title',
-    descriptionKey: 'admin.jobsPage.categories.globalDiscovery.description',
-    color: '#ec4899',
-    jobs: ['generate-discovery-suggestions'],
-  },
-  // Taste profiles are per-user but span both media types, so they belong here
-  // rather than under Movies or Series.
-  {
-    titleKey: 'admin.jobsPage.categories.globalTaste.title',
-    descriptionKey: 'admin.jobsPage.categories.globalTaste.description',
-    color: '#a855f7',
-    jobs: ['refresh-embedding-centering', 'rebuild-taste-profiles'],
-  },
-  // Same reasoning: one pass covers both media types. Note this list is an
-  // allowlist and the only thing that renders a job card — a job missing from
-  // every category has no Run button and, more to the point, no Cancel button,
-  // however correctly it is registered in the API.
-  {
-    titleKey: 'admin.jobsPage.categories.globalExplanations.title',
-    descriptionKey: 'admin.jobsPage.categories.globalExplanations.description',
-    color: '#06b6d4',
-    jobs: ['refresh-recommendation-explanations'],
-  },
-  {
-    titleKey: 'admin.jobsPage.categories.globalAnalysis.title',
-    descriptionKey: 'admin.jobsPage.categories.globalAnalysis.description',
-    color: '#e91e63',
-    jobs: ['generate-title-analysis'],
-  },
-  // Its own category rather than a line inside Metadata Enrichment, because
-  // the distinction is the entire point of the job: metadata is written once
-  // and stays correct, ratings move every week, and filing this under
-  // "Metadata" is how it would end up back behind the stamp-once predicate.
-  {
-    titleKey: 'admin.jobsPage.categories.globalRatings.title',
-    descriptionKey: 'admin.jobsPage.categories.globalRatings.description',
-    color: '#f97316',
-    jobs: ['refresh-ratings'],
-  },
-  // A measuring instrument rather than a step in any pipeline, so it gets its
-  // own category: filing it under Taste Profiles would suggest it changes
-  // something, and it deliberately writes nothing at all.
-  {
-    titleKey: 'admin.jobsPage.categories.globalEvaluation.title',
-    descriptionKey: 'admin.jobsPage.categories.globalEvaluation.description',
-    color: '#14b8a6',
-    jobs: ['evaluate-recommender'],
-  },
-  {
-    titleKey: 'admin.jobsPage.categories.globalIntegrations.title',
-    descriptionKey: 'admin.jobsPage.categories.globalIntegrations.description',
-    color: '#ed1c24',
-    jobs: ['sync-trakt-ratings', 'refresh-ai-pricing', 'sync-lldap-emails'],
-  },
-]
-
-export const JOB_CATEGORIES: JobCategory[] = [
-  ...MOVIE_JOB_CATEGORIES,
-  ...SERIES_JOB_CATEGORIES,
-  ...GLOBAL_JOB_CATEGORIES,
-]
+// The catalogue itself is pure data and lives in ./registry, so the settings
+// search can read it without pulling in these icons. Import it from there
+// directly — re-exporting it through this module makes eslint's react-refresh
+// rule treat every export here as a possible component, and the file lints
+// clean only while it holds no pass-throughs.
 
 export const JOB_ICONS: Record<string, React.ReactNode> = {
   'sync-movies': <MovieIcon />,
@@ -205,14 +93,6 @@ export const JOB_COLORS: Record<string, string> = {
   'refresh-ratings': '#f97316',
 }
 
-const JOB_DISPLAY_NAME_KEYS: Record<string, string> = {
-  'sync-movie-libraries': 'admin.jobsPage.jobNames.syncMovieLibraries',
-  'sync-series-libraries': 'admin.jobsPage.jobNames.syncSeriesLibraries',
-  'full-reset-movie-recommendations': 'admin.jobsPage.jobNames.fullResetMovieRecommendations',
-  'full-reset-series-recommendations': 'admin.jobsPage.jobNames.fullResetSeriesRecommendations',
-  // Auto title-casing turns "lldap" into "Lldap" — the acronym needs its own key.
-  'sync-lldap-emails': 'admin.jobsPage.jobNames.syncLldapEmails',
-}
 
 // Only reached when a caller has no `t` to hand; the translated names above are
 // the normal path. A function rather than a const because the brand is fetched
@@ -238,10 +118,7 @@ export function formatJobName(name: string, t?: TFunction): string {
   if (t && key) return t(key)
   const legacy = legacyJobName(name)
   if (legacy) return legacy
-  return name
-    .split('-')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ')
+  return titleCaseJobName(name)
 }
 
 export function formatRelativePastTime(dateString: string, t: TFunction): string {

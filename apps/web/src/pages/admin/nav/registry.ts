@@ -304,6 +304,12 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
       'fallback',
       'embeddings model',
       'chat',
+      // The retrieval-mode control lives on the embeddings role's card here,
+      // not on the Embeddings section — searching for it reached fastCRW.
+      'retrieval mode',
+      'input type',
+      'semantic similarity',
+      'task type',
     ],
   },
   {
