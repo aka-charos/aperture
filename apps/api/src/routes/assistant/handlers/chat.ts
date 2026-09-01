@@ -348,12 +348,15 @@ export function registerChatHandler(fastify: FastifyInstance) {
               'Starting chat stream'
             )
 
+            const system = [systemPrompt, systemAppend, discoveryAppend].filter(Boolean).join('\n\n')
+            const modelMessages = convertToModelMessages(processedMessages)
+
             // Stream the response using AI SDK v5
             // stopWhen allows the model to continue generating text after tool results
             const result = streamText({
               model: chatModel,
-              system: [systemPrompt, systemAppend, discoveryAppend].filter(Boolean).join('\n\n'),
-              messages: convertToModelMessages(processedMessages),
+              system,
+              messages: modelMessages,
               tools,
               toolChoice: 'auto',
               stopWhen: stepCountIs(MAX_STEPS),
@@ -398,6 +401,54 @@ export function registerChatHandler(fastify: FastifyInstance) {
             // sendStart: false — `start` was already written above, and a second
             // one would open a second assistant message.
             writer.merge(result.toUIMessageStream({ sendStart: false, onError: onStreamError }))
+
+            // The step budget is not the only way a turn ends without an answer,
+            // and it turned out not to be the common one. The loop also stops
+            // the moment a step calls no tools — normally because the model just
+            // wrote the answer, but a model that returns an EMPTY step ends the
+            // turn exactly the same way. Measured on deepseek-v4-flash: step 1
+            // wrote a 122-character opener and called the discovery tool, step 2
+            // came back `tools: [], hasText: false`, and the reader was left
+            // with fifteen cards under a sentence that stops mid-clause. No
+            // warning fired, because prepareStep only guards the budget and only
+            // two of five steps had been spent.
+            //
+            // So the guarantee has to be about the ANSWER, not the budget: if
+            // the last step wrote nothing, ask once more with the tools taken
+            // away. Only the final step counts — an opener before a tool call is
+            // not an answer, which is precisely the case that fails here.
+            const steps = await result.steps
+            if (!steps.at(-1)?.text?.trim()) {
+              request.log.warn(
+                { steps: steps.length, maxSteps: MAX_STEPS },
+                'Turn ended with no answer — asking again without tools'
+              )
+              emit('composing')
+              const forced = streamText({
+                model: chatModel,
+                system,
+                // The model's own turn so far: its opener, its tool calls and
+                // their results. Without them the retry has no idea what those
+                // fifteen cards are.
+                messages: [...modelMessages, ...(await result.response).messages],
+                // Tools stay declared but unusable: a history holding tool calls
+                // is only valid against the tool set that produced it, and
+                // toolChoice 'none' is what makes this a second attempt at
+                // prose rather than a second attempt at searching.
+                tools,
+                toolChoice: 'none',
+              })
+              writer.merge(forced.toUIMessageStream({ sendStart: false, onError: onStreamError }))
+              // One retry, then let it go: the cards are still a useful answer,
+              // and a third round trip on a turn that already took two minutes
+              // spends the reader's time to say the same nothing twice.
+              if (!(await forced.text).trim()) {
+                request.log.warn(
+                  { model: typeof chatModel === 'string' ? chatModel : chatModel.modelId },
+                  'Forced answer came back empty too'
+                )
+              }
+            }
           },
           })
         )

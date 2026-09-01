@@ -42,8 +42,15 @@ const MAX_REASON_CHARS = 320
  * (24 asked, 12 answered), which silently left the trailing section — "Also
  * worth checking" — with no notes at all. Small chunks run concurrently, so
  * this is both more reliable and faster than a single long completion.
+ *
+ * 4 rather than 8 because this stage is the wait. Measured on one live turn:
+ * 115 of its 138 seconds were spent here, as two concurrent calls of ~1,160
+ * output tokens each. A completion's latency is paid mostly per output token,
+ * so halving the chunk roughly halves the wall clock — the same tokens, twice
+ * as wide. It costs more requests against the writing model's rate limit,
+ * which is the trade being made.
  */
-const BATCH_SIZE = 8
+const BATCH_SIZE = 4
 /** Output budget per title, generous enough that a 30-word answer never truncates. */
 const TOKENS_PER_REASON = 120
 
