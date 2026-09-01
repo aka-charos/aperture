@@ -238,8 +238,10 @@ export function AIFunctionCard({
   const [dialogTesting, setDialogTesting] = useState(false)
   const [dialogTestResult, setDialogTestResult] = useState<{ success: boolean; error?: string } | null>(null)
   
-  // Valid embedding dimensions
-  const VALID_EMBEDDING_DIMENSIONS = [256, 384, 512, 768, 1024, 1536, 3072, 4096]
+  // Valid embedding dimensions. Hand-mirrored from core's
+  // VALID_EMBEDDING_DIMENSIONS (the web bundle never imports core); each one
+  // needs its embeddings_<n> tables to exist before it appears here.
+  const VALID_EMBEDDING_DIMENSIONS = [256, 384, 512, 768, 1024, 1536, 2560, 3072, 4096]
   
   // Status
   const [saving, setSaving] = useState(false)

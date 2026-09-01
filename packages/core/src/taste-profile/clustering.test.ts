@@ -256,10 +256,11 @@ test('requesting more clusters than items degrades to a single cluster', () => {
 test("an item's vector MAGNITUDE does not change the centroid, only its weight does", () => {
   // The defect this pins: the weighted mean used to sum raw vectors, so a
   // title's influence was `weight * ||v||` rather than `weight`. Inert while
-  // every vector arrives unit-length (a model at its native dimension), and
-  // silently wrong the moment one does not -- Google returns unnormalized
-  // vectors for every MRL-truncated dimension, which is seven of the eight
-  // entries in VALID_EMBEDDING_DIMENSIONS.
+  // every vector arrives unit-length, and silently wrong the moment one does
+  // not -- Google returns unnormalized vectors for every MRL-truncated
+  // dimension, which for any given model is all but one entry in
+  // VALID_EMBEDDING_DIMENSIONS, and pplx-embed-v1-4b returns them unnormalized
+  // even at its own native width.
   const base: WeightedEmbeddingItem[] = [
     { id: 'a', weight: 2, embedding: [1, 0, 0] },
     { id: 'b', weight: 1, embedding: [0, 1, 0] },

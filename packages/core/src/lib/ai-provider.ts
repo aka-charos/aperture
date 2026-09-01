@@ -1539,8 +1539,20 @@ export async function getActiveEmbeddingModelId(): Promise<string | null> {
 /**
  * Valid embedding dimensions supported by the system.
  * Each dimension has a corresponding table (e.g., embeddings_768, embeddings_3072)
+ *
+ * Adding an entry here REQUIRES a migration creating all three of
+ * `embeddings_<n>`, `series_embeddings_<n>` and `episode_embeddings_<n>` first
+ * (0157 is the worked example, and lists the columns later migrations added).
+ * `listStoredSets` in embeddingSets.ts UNIONs across every entry with no
+ * existence guard, so a width with no tables does not degrade the Embeddings
+ * panel -- it fails every load of it.
+ *
+ * `apps/web/src/components/AIFunctionCard.tsx` keeps a hand copy of this list,
+ * because the web bundle never imports core.
  */
-export const VALID_EMBEDDING_DIMENSIONS = [256, 384, 512, 768, 1024, 1536, 3072, 4096] as const
+export const VALID_EMBEDDING_DIMENSIONS = [
+  256, 384, 512, 768, 1024, 1536, 2560, 3072, 4096,
+] as const
 
 export type ValidEmbeddingDimension = (typeof VALID_EMBEDDING_DIMENSIONS)[number]
 
