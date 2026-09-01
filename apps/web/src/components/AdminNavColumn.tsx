@@ -32,12 +32,15 @@ import { GATE_TOOLTIP_KEYS, useAdminGates } from '@/pages/admin/nav/gates'
  * The admin console's navigation, as a vertical tree instead of the three
  * stacked horizontal tab strips it replaces.
  *
- * Two rules keep it legible. Only the current group is expanded, so the column
- * is a list of eight headings rather than forty-one rows — but expanding
- * another group does *not* navigate, so browsing the tree costs nothing and
- * never loses your place. And depth stops at two: a group that outgrows about a
+ * Two rules keep it legible. One group is open at a time, so the column is a
+ * list of eight headings rather than forty-two rows — but expanding another
+ * group does *not* navigate, so browsing the tree costs nothing and never
+ * loses your place. And depth stops at two: a group that outgrows about a
  * dozen leaves splits rather than growing a third tier, which is the rule that
  * keeps the failure this replaced from coming back in a new shape.
+ *
+ * Integrations is at eleven and is the one group that still needs an inner
+ * scrollbar on a short screen. It is the next thing to split.
  */
 
 interface AdminNavColumnProps {
@@ -79,18 +82,34 @@ export function AdminNavColumn({ onOpenSearch, onNavigate }: AdminNavColumnProps
     return state.ready && !state.passed ? t(GATE_TOOLTIP_KEYS[entry.gate]) : null
   }
 
-  // Expansion is the reader's, not the route's — but arriving somewhere new
-  // opens the group it lives in, or the current page would sit inside a
-  // collapsed heading.
-  const [expanded, setExpanded] = useState<AdminGroupId[]>(activeGroup ? [activeGroup] : [])
+  /**
+   * One group open at a time.
+   *
+   * This started as a list of open groups, which meant expansion accumulated:
+   * browsing opened a group and nothing ever closed one, so after visiting a
+   * few sections the column held forty rows in a viewport-height box and grew
+   * an inner scrollbar it could never lose. Measured, the content ran from 676
+   * to 1461 pixels with everything open — no arrangement of eight groups and
+   * forty-two leaves fits on a screen, so the fix has to be to show less rather
+   * than to find more room.
+   *
+   * Expansion is still the reader's rather than the route's — opening a group
+   * does not navigate, so the tree can be browsed without losing your place —
+   * and arriving somewhere new opens the group it lives in, or the current page
+   * would sit inside a collapsed heading.
+   */
+  const [expanded, setExpanded] = useState<AdminGroupId | null>(activeGroup ?? null)
 
+  // Keyed on the entry as well as the group: someone who collapsed the group
+  // they are standing in and then jumped to another page inside it — which is
+  // what a search result does — would otherwise arrive with the selected row
+  // hidden, since the group itself never changed.
   useEffect(() => {
-    if (!activeGroup) return
-    setExpanded((prev) => (prev.includes(activeGroup) ? prev : [...prev, activeGroup]))
-  }, [activeGroup])
+    if (activeGroup) setExpanded(activeGroup)
+  }, [activeGroup, activeEntry?.id])
 
   const toggleGroup = (id: AdminGroupId) => {
-    setExpanded((prev) => (prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]))
+    setExpanded((prev) => (prev === id ? null : id))
   }
 
   const go = (path: string) => {
@@ -151,7 +170,7 @@ export function AdminNavColumn({ onOpenSearch, onNavigate }: AdminNavColumnProps
               )
             }
 
-            const isOpen = expanded.includes(group.id)
+            const isOpen = expanded === group.id
             const holdsActive = activeGroup === group.id
 
             return (

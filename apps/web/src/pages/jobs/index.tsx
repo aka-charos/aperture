@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { Box, Typography, Chip, Alert, Stack, Tabs, Tab, Button, AlertTitle } from '@mui/material'
@@ -9,8 +10,13 @@ import ScheduleIcon from '@mui/icons-material/Schedule'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import { useJobsData, useEnrichmentStatus, useDiscoveryPrerequisites } from './hooks'
-import { MOVIE_JOB_CATEGORIES, SERIES_JOB_CATEGORIES, GLOBAL_JOB_CATEGORIES } from './constants'
+import {
+  MOVIE_JOB_CATEGORIES,
+  SERIES_JOB_CATEGORIES,
+  GLOBAL_JOB_CATEGORIES,
+} from './registry'
 import { JobCard, JobConfigDialog, JobHistoryDialog, CancelDialog, LoadingSkeleton, ScheduleTable } from './components'
+import { jobFromAnchor, jobTabIndex } from './registry'
 import type { JobCategory } from './types'
 import { PageHeading } from '@/components/PageHeading'
 
@@ -156,6 +162,24 @@ export function JobsPage() {
   const { prerequisites: discoveryPrerequisites } = useDiscoveryPrerequisites()
 
   const [tabValue, setTabValue] = useState(0)
+  const location = useLocation()
+
+  /**
+   * A `#job-…` link from the settings search opens the tab holding that job.
+   *
+   * The inactive panels are unmounted rather than hidden, so without this the
+   * anchor a search result points at does not exist and the scroll silently
+   * does nothing — landing on the right page and visibly the wrong place.
+   * Keyed on `location.key` too, so searching for the same job a second time
+   * still switches back if the reader has changed tab since.
+   */
+  useEffect(() => {
+    const job = jobFromAnchor(location.hash)
+    if (!job) return
+    const tab = jobTabIndex(job)
+    if (tab != null) setTabValue(tab)
+  }, [location.hash, location.key])
+
   const [configDialogJob, setConfigDialogJob] = useState<string | null>(null)
   const [historyDialogJob, setHistoryDialogJob] = useState<string | null>(null)
   const [clearingInterrupted, setClearingInterrupted] = useState(false)

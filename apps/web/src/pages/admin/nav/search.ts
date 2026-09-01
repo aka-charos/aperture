@@ -6,15 +6,31 @@ import {
   type AdminField,
   type AdminGroupId,
 } from './registry'
+import {
+  ALL_JOB_NAMES,
+  JOB_DISPLAY_NAME_KEYS,
+  jobAnchor,
+  jobCategoryFor,
+  titleCaseJobName,
+} from '@/pages/jobs/registry'
 
 /**
  * The settings palette's index, built from the registry.
  *
- * Two tiers. Every entry is searchable by its own title for free, which is what
- * makes the index impossible to forget to update — a section that has a route
- * has a search result. Fields are opt-in per entry, for the controls people
- * actually hunt for, and they carry an anchor so Enter lands on the control
- * rather than on the page holding it.
+ * Three tiers. Every entry is searchable by its own title for free, which is
+ * what makes the index impossible to forget to update — a section that has a
+ * route has a search result. Fields are opt-in per entry, for the controls
+ * people actually hunt for, and they carry an anchor so Enter lands on the
+ * control rather than on the page holding it.
+ *
+ * The third tier is the **jobs**, and it is not optional the way fields are.
+ * Jobs are the largest set of named, actionable things in the console — 28 of
+ * them — and until they were indexed, typing one of their names landed you on a
+ * settings page that merely mentioned the word: `sync movies` reached Libraries,
+ * `rebuild taste profiles` reached a slider called "Borrowed from a taste twin",
+ * `studio logos` reached nothing at all, and `full reset recommendations` put
+ * the destructive database purge at the top of the list. They come from the same
+ * array the jobs page renders, so the index cannot list a job that has no card.
  *
  * Matching runs against the *translated* title and blurb, so an operator
  * running the console in German searches in German, plus the entry's
@@ -89,6 +105,19 @@ function fieldHaystacks(field: AdminField, parentTitle: string, t: Translate): H
   ]
 }
 
+/** What a job can be found by. Its name is the whole of it. */
+function jobHaystacks(name: string, displayName: string): Haystack[] {
+  return [
+    [displayName, 100],
+    // The kebab id with its hyphens opened up, so `sync-movies` pasted from a
+    // log line or an API response finds the card, and so the words match in
+    // either order.
+    [name.replace(/-/g, ' '), 80],
+  ]
+  // Deliberately no "job" keyword here: a bare `jobs` should reach the jobs
+  // page, which the entry already answers, not list all twenty-eight cards.
+}
+
 /**
  * How well one token does against a result's text, taking its best hit.
  * Zero means the token found nothing here at all.
@@ -142,7 +171,9 @@ const GROUP_ORDER = new Map<AdminGroupId, number>(ADMIN_GROUPS.map((g, i) => [g.
  * partial matches instead of returning nothing.
  */
 export function searchAdmin(query: string, t: Translate): AdminSearchResult[] {
-  const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  // Hyphens split like whitespace, so a kebab id pasted from a log or an API
+  // response (`generate-title-analysis`) searches as the words it is made of.
+  const tokens = query.trim().toLowerCase().split(/[\s-]+/).filter(Boolean)
   if (tokens.length === 0) return []
 
   // Translated once per search rather than once per entry per token.
@@ -189,6 +220,31 @@ export function searchAdmin(query: string, t: Translate): AdminSearchResult[] {
     }
   }
 
+  // Jobs. One entry owns them all, so the path is resolved once.
+  const jobsEntry = ADMIN_ENTRIES.find((e) => e.id === 'jobs')
+  if (jobsEntry) {
+    const jobsPath = adminEntryPath(jobsEntry)
+    for (const name of ALL_JOB_NAMES) {
+      const key = JOB_DISPLAY_NAME_KEYS[name]
+      const displayName = key ? t(key) : titleCaseJobName(name)
+      const hit = scoreTokens(jobHaystacks(name, displayName), tokens)
+      if (hit.matched === 0) continue
+      results.push({
+        key: `job:${name}`,
+        entryId: jobsEntry.id,
+        group: jobsEntry.group,
+        path: `${jobsPath}#${jobAnchor(name)}`,
+        title: displayName,
+        // The category, so a result reads "Movie AI › Generate Movie
+        // Embeddings" rather than leaving two similarly-named jobs to be told
+        // apart by their titles alone.
+        parentTitle: t(jobCategoryFor(name)?.titleKey ?? jobsEntry.titleKey),
+        score: hit.score - 1,
+        matched: hit.matched,
+      })
+    }
+  }
+
   results.sort((a, b) => {
     // Covering more of what was typed beats scoring higher on less of it.
     if (b.matched !== a.matched) return b.matched - a.matched
@@ -198,5 +254,16 @@ export function searchAdmin(query: string, t: Translate): AdminSearchResult[] {
     return a.title.localeCompare(b.title)
   })
 
-  return results.slice(0, MAX_RESULTS).map(({ matched: _matched, ...result }) => result)
+  /**
+   * Once something answers the whole query, nothing answering less of it is
+   * worth showing. `api key` used to return fifteen rows and `tmdb key`
+   * seventeen — the two useful ones, then every card that happens to mention a
+   * key. This is a floor relative to the best result rather than an absolute
+   * one, so it never empties a search: if the best any result manages is one
+   * token of three, all the one-token results stay.
+   */
+  const bestMatched = results[0]?.matched ?? 0
+  const kept = results.filter((r) => r.matched === bestMatched)
+
+  return kept.slice(0, MAX_RESULTS).map(({ matched: _matched, ...result }) => result)
 }

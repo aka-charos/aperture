@@ -142,12 +142,23 @@ export function AdminShell() {
               flexShrink: 0,
               position: 'sticky',
               top: 88,
-              // A definite height, not a cap. `maxHeight` leaves the Paper's own
-              // height content-driven, and a child asking to fill that resolves
-              // against nothing: with `height: 100%` it grew past the cap and got
-              // clipped with no scrollbar, and with `flex: 1` it collapsed to
-              // zero. Either way the last groups and the footer were unreachable.
-              height: 'calc(100vh - 112px)',
+              /**
+               * The rail is as tall as its content, up to the viewport.
+               *
+               * It was a fixed `height: calc(100vh - 112px)`, which is wrong in
+               * both directions at once: measured, a collapsed column of 676px
+               * of content sat in a 788px box with 112px of dead space under
+               * the footer, and an expanded one of 1461px sat in the same 788px
+               * box behind an inner scrollbar. The height simply never moved.
+               *
+               * A cap works here only because the Paper is a column flex
+               * container and the scrolling child is `flex: 1; minHeight: 0` —
+               * that pair is what lets the child fill a bounded parent and
+               * still shrink. The earlier attempt failed because the child
+               * asked for `height: 100%` of a parent with no definite height,
+               * which resolves to `auto` and overflows a `maxHeight` silently.
+               */
+              maxHeight: 'calc(100vh - 112px)',
               borderRadius: 2,
               border: 1,
               borderColor: 'divider',

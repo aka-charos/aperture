@@ -10,6 +10,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import ErrorIcon from '@mui/icons-material/Error'
 import CancelIcon from '@mui/icons-material/Cancel'
 import { JOB_ICONS, JOB_COLORS, formatJobName, formatJobDurationMs, formatRelativePastTime } from '../constants'
+import { jobAnchor } from '../registry'
 import { JobProgressSection } from './JobProgressSection'
 import { JobResult } from './JobResult'
 import type { Job, JobProgress } from '../types'
@@ -80,7 +81,15 @@ export function JobCard({
 
   return (
     <Box
+      // The settings search links straight at a job, so the card is the anchor.
+      // Spelled by `jobAnchor` rather than inline, so the link and the target
+      // cannot disagree.
+      id={jobAnchor(job.name)}
+      // A card scrolled to from search sits behind the sticky app bar without
+      // this; the shell scrolls to `block: 'center'`, and this keeps a card at
+      // the very top of the page reachable too.
       sx={{
+        scrollMarginTop: 96,
         borderRadius: 3,
         bgcolor: 'background.paper',
         border: '1px solid',
