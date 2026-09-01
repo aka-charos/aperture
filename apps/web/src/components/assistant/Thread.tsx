@@ -823,9 +823,11 @@ const AT_BOTTOM_SLOP = 8
 const ANSWER_ABOVE_SLOP = 24
 /** Breathing room left above the answer when jumping to it. */
 const ANSWER_SCROLL_PADDING = 12
+/** Keys that scroll a focused viewport; pressing one is the reader steering. */
+const SCROLL_KEYS = new Set([' ', 'PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown'])
 
 /**
- * Floating scroll controls for the thread, plus the anchor that usually makes
+ * Floating scroll controls for the thread, plus the follow that usually makes
  * them unnecessary.
  *
  * An answer's prose is one screen; its cards are several. Classic chat pins the
@@ -833,14 +835,27 @@ const ANSWER_SCROLL_PADDING = 12
  * renders first (see OrderedMessageParts) that pin leaves the reader staring at
  * the tail of a card list while the actual answer is written far above them.
  *
- * So once per turn we scroll the start of the answer to the top of the viewport:
- * the moment prose appears, or when the turn ends if it never does. The text
- * then streams downward in full view and the cards follow it, which is the
- * order it all wants to be read in. The anchor is skipped if the reader has
- * scrolled away — scrolling is how someone says they're steering, and we don't
- * take the wheel back.
+ * So while a turn is ours to follow, the viewport sits at
+ * `min(answer start, bottom of thread)`. The `min` is the whole rule: an answer
+ * still shorter than one screen is entirely visible from the bottom, so we
+ * follow the bottom exactly as a chat should; the moment it outgrows the screen
+ * the target stops moving, and the answer's first line stays under the top edge
+ * while its prose streams and its cards pile up below.
  *
- * The controls then cover what the anchor can't: re-reading an older answer, or
+ * This has to be continuous rather than one jump per turn, and `autoScroll` on
+ * the viewport has to be off for it. A single anchoring scroll loses a race it
+ * cannot see: assistant-ui re-pins to the bottom on every content resize, a
+ * streamed answer resizes tens of times a second, and the pin lands on top of
+ * our jump — which is exactly the reported symptom, an answer written offscreen
+ * above a card list the reader is left staring at.
+ *
+ * Steering is read from the reader's own input, never from the scroll position:
+ * a smooth programmatic jump reports a dozen intermediate positions, none of
+ * them the one we asked for, so position alone cannot tell "the reader grabbed
+ * it" from "we are still animating". Once they steer we stay out of the way
+ * until the next turn — scrolling is how someone says they are driving.
+ *
+ * The controls then cover what the follow can't: re-reading an older answer, or
  * returning to the newest one after wandering up the thread.
  */
 function ThreadScrollControls({ viewportRef }: { viewportRef: RefObject<HTMLDivElement | null> }) {
@@ -856,45 +871,87 @@ function ThreadScrollControls({ viewportRef }: { viewportRef: RefObject<HTMLDivE
   })
   const [{ answerAbove, atBottom }, setPosition] = useState({ answerAbove: false, atBottom: true })
 
-  /** Pixels the viewport must scroll for the last answer to start at its top. */
-  const answerDelta = useCallback((): number | null => {
+  /**
+   * Whether the viewport is still following the turn. A ref, not state: it
+   * changes on wheels and resizes, and a re-render per streamed token is the
+   * thing this component exists to avoid. It starts false so opening a
+   * conversation lands where it always has — at the bottom — rather than
+   * hoisting the last saved answer on arrival. Only a fresh turn takes it back.
+   */
+  const following = useRef(false)
+
+  /**
+   * Pixels the viewport must scroll for an answer to start at its top.
+   *
+   * An answer whose parts haven't arrived yet is display:none (see
+   * AssistantMessage) and reports an empty box at the origin. `latest` reports
+   * nothing in that case, which is what the follow wants: mid-turn the newest
+   * answer with a box is the *previous* one, and anchoring to it would drag the
+   * reader backwards out of the turn they just asked for. The buttons want the
+   * fallback instead — an older answer is still somewhere to go.
+   */
+  const answerDelta = useCallback(
+    (latest = false): number | null => {
+      const viewport = viewportRef.current
+      if (!viewport) return null
+      const answers = viewport.querySelectorAll('[data-aperture-answer]')
+      const viewportTop = viewport.getBoundingClientRect().top
+      for (let i = answers.length - 1; i >= 0; i--) {
+        const rect = answers[i].getBoundingClientRect()
+        if (rect.height > 0) return rect.top - viewportTop
+        if (latest) return null
+      }
+      return null
+    },
+    [viewportRef]
+  )
+
+  /** Where a following viewport wants to sit. See the note above the component. */
+  const followTarget = useCallback((): number | null => {
     const viewport = viewportRef.current
     if (!viewport) return null
-    const answers = viewport.querySelectorAll('[data-aperture-answer]')
-    for (let i = answers.length - 1; i >= 0; i--) {
-      const rect = answers[i].getBoundingClientRect()
-      // An answer whose parts haven't arrived yet is display:none (see
-      // AssistantMessage) and reports an empty box at the origin — jumping to
-      // that would be a jump to nowhere. Fall back to the last real one.
-      if (rect.height > 0) return rect.top - viewport.getBoundingClientRect().top
-    }
-    return null
-  }, [viewportRef])
+    const maxTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight)
+    const delta = answerDelta(true)
+    if (delta === null) return maxTop
+    return Math.max(0, Math.min(viewport.scrollTop + delta - ANSWER_SCROLL_PADDING, maxTop))
+  }, [answerDelta, viewportRef])
 
   const scrollToAnswer = useCallback(() => {
     const viewport = viewportRef.current
     const delta = answerDelta()
     if (!viewport || delta === null) return
+    // Asking to go back to the answer is asking to be kept there.
+    following.current = true
     viewport.scrollTo({ top: viewport.scrollTop + delta - ANSWER_SCROLL_PADDING, behavior: 'smooth' })
   }, [answerDelta, viewportRef])
 
   const scrollToLatest = useCallback(() => {
     const viewport = viewportRef.current
     if (!viewport) return
+    // The bottom is a different place from the anchor, so following would pull
+    // them straight back off it.
+    following.current = false
     viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' })
   }, [viewportRef])
 
-  // Content only grows while the viewport is pinned to the bottom, and pinning
-  // scrolls — so a scroll listener catches every change that matters. The
-  // isRunning dependency re-measures across a turn boundary, where the last
-  // answer changes identity without anything scrolling.
+  // The viewport no longer pins itself to the bottom, so content grows without
+  // anything scrolling and a scroll listener alone would miss most of a turn.
+  // The observer pair is the one assistant-ui uses internally, for the same
+  // reason: a ResizeObserver misses a streamed token, which changes a text node
+  // inside a box that has already been sized.
   useEffect(() => {
     const viewport = viewportRef.current
     if (!viewport) return
 
     let frame = 0
-    const measure = () => {
+    const settle = () => {
       frame = 0
+      if (following.current) {
+        const target = followTarget()
+        // Writing an unchanged scrollTop is free, but the guard keeps a
+        // rounding wobble from looking like motion.
+        if (target !== null && Math.abs(viewport.scrollTop - target) > 1) viewport.scrollTop = target
+      }
       const delta = answerDelta()
       const next = {
         answerAbove: delta !== null && delta < -ANSWER_ABOVE_SLOP,
@@ -906,41 +963,48 @@ function ThreadScrollControls({ viewportRef }: { viewportRef: RefObject<HTMLDivE
     }
     const schedule = () => {
       if (frame) return
-      frame = requestAnimationFrame(measure)
+      frame = requestAnimationFrame(settle)
     }
 
-    measure()
+    const release = () => {
+      following.current = false
+    }
+    // A press inside the scrollbar gutter is the one steering gesture that
+    // produces no wheel and no touch.
+    const releaseOnScrollbar = (e: PointerEvent) => {
+      if (e.offsetX > viewport.clientWidth) release()
+    }
+    const releaseOnKey = (e: KeyboardEvent) => {
+      if (SCROLL_KEYS.has(e.key)) release()
+    }
+
+    const resize = new ResizeObserver(schedule)
+    resize.observe(viewport)
+    const mutations = new MutationObserver(schedule)
+    mutations.observe(viewport, { childList: true, subtree: true, attributes: true, characterData: true })
+
+    settle()
     viewport.addEventListener('scroll', schedule, { passive: true })
+    viewport.addEventListener('wheel', release, { passive: true })
+    viewport.addEventListener('touchmove', release, { passive: true })
+    viewport.addEventListener('pointerdown', releaseOnScrollbar)
+    viewport.addEventListener('keydown', releaseOnKey)
     return () => {
+      resize.disconnect()
+      mutations.disconnect()
       viewport.removeEventListener('scroll', schedule)
+      viewport.removeEventListener('wheel', release)
+      viewport.removeEventListener('touchmove', release)
+      viewport.removeEventListener('pointerdown', releaseOnScrollbar)
+      viewport.removeEventListener('keydown', releaseOnKey)
       if (frame) cancelAnimationFrame(frame)
     }
-  }, [answerDelta, viewportRef, isRunning])
+  }, [answerDelta, followTarget, viewportRef])
 
-  // Starts latched so opening a conversation lands where it always has — at the
-  // bottom — rather than yanking the last saved answer up on arrival. Only a
-  // fresh turn unlatches it.
-  const anchored = useRef(true)
+  // A new turn takes the wheel back — the reader asked for this one.
   useEffect(() => {
-    if (isRunning) anchored.current = false
+    if (isRunning) following.current = true
   }, [isRunning])
-
-  useEffect(() => {
-    if (anchored.current) return
-    // Still mid-turn with nothing written yet: there's no answer to anchor to.
-    if (isRunning && !answerHasText) return
-
-    const viewport = viewportRef.current
-    if (!viewport) return
-    if (viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight >= AT_BOTTOM_SLOP) return
-
-    const delta = answerDelta()
-    // Only ever scroll up: an answer short enough to already fit needs nothing.
-    if (delta === null || delta >= -ANSWER_ABOVE_SLOP) return
-
-    anchored.current = true
-    scrollToAnswer()
-  }, [isRunning, answerHasText, answerDelta, scrollToAnswer, viewportRef])
 
   // Mid-turn, before a word is written, the newest thing above the reader is the
   // *previous* answer — offering to jump there would be answering a question
@@ -1014,6 +1078,13 @@ export function Thread({ historicalMessages = [], suggestions = [] }: ThreadProp
         {/* Messages */}
         <ThreadPrimitive.Viewport
           ref={viewportRef}
+          // ThreadScrollControls owns the scrolling. assistant-ui's own pin
+          // re-scrolls to the bottom on every content resize — tens of times a
+          // second through a streamed answer — which is what kept overwriting
+          // the anchor and leaving the prose written offscreen above the cards.
+          // The scroll-to-bottom on run start, initialize and thread switch are
+          // separate props and stay on.
+          autoScroll={false}
           style={{
             flex: 1,
             overflowY: 'auto',
