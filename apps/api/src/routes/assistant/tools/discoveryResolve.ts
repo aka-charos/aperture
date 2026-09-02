@@ -34,6 +34,19 @@ import type { ToolContext } from '../types.js'
 const logger = createChildLogger('discovery-resolve')
 
 /**
+ * How many embeddings neighbours to fetch for "Also worth checking", before
+ * deduping against the web picks. Also the ceiling when they are promoted to
+ * the primary answer, which happens when web search returned nothing usable.
+ */
+const SUPPLEMENT_POOL = 12
+/**
+ * How many survive when they are only a supplement. They are neighbours of the
+ * SEED, not answers to the question, so past a handful they stop adding and
+ * start burying — and each one costs a note the writing model has to pay for.
+ */
+const SUPPLEMENT_MAX = 6
+
+/**
  * Loose title key for comparing a candidate against the referenced seed title.
  * Shared so that dropping a seed echo, deduping cards and matching the library
  * all fold accents identically — "Le Samouraï" and "Le Samourai" are one film.
@@ -157,10 +170,20 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
           try {
             const webIds = new Set(webItems.map((i) => i.id))
             const sim = await findSimilarItems(ctx, seedTitle.trim(), {
-              limit: 12,
+              limit: SUPPLEMENT_POOL,
               excludeWatched: ctx.excludeWatched ?? false,
             })
-            alsoItems = sim.items.filter((i) => !webIds.has(i.id))
+            // How many survive depends on the job they are doing. As a
+            // SUPPLEMENT they are capped: a request answered by four direct
+            // homages ended up with ten nearest-neighbours-of-the-seed stacked
+            // under them, and once the notes got good enough to read, they said
+            // so themselves — The Count of Monte Cristo came back captioned
+            // "this Dumas revenge thriller possesses no vampire mythology".
+            // With no web picks at all they are PROMOTED to the whole answer
+            // (see below), and the whole answer should not be six.
+            alsoItems = sim.items
+              .filter((i) => !webIds.has(i.id))
+              .slice(0, webItems.length > 0 ? SUPPLEMENT_MAX : SUPPLEMENT_POOL)
           } catch (err) {
             logger.warn({ err }, 'Embeddings supplement failed; continuing with web results only')
           }
