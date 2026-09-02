@@ -18,6 +18,7 @@
  * `withToolErrorHandling` and `withStatusEvents`.
  */
 import type { ToolSet } from 'ai'
+import { mapToolResult } from './toolStream.js'
 
 /**
  * Long enough for a paragraph of intent, short enough that a pasted essay can't
@@ -62,13 +63,15 @@ export function withRequestContext<T extends ToolSet>(tools: T, request: string)
     Object.entries(tools).map(([name, toolDef]) => {
       const execute = toolDef.execute
       if (!execute) return [name, toolDef]
-      const stamping: typeof execute = async (input, options) => {
-        const result = await execute(input, options)
-        for (const container of carouselContainers(result)) {
-          container.request = trimmed
-        }
-        return result
-      }
+      // Not `async`: a streamed result must stay an async iterable all the way
+      // to the SDK, and each chunk carries the request (see toolStream.ts).
+      const stamping: typeof execute = (input, options) =>
+        mapToolResult(execute(input, options), (result) => {
+          for (const container of carouselContainers(result)) {
+            container.request = trimmed
+          }
+          return result
+        })
       return [name, { ...toolDef, execute: stamping }]
     })
   ) as T

@@ -123,6 +123,12 @@ interface IndexedItem {
   item: ContentItem
 }
 
+/** One rewritten note, against its position in the caller's list. */
+interface RewrittenReason {
+  index: number
+  reason: string
+}
+
 /**
  * Rewrite one chunk. The prompt numbers titles from 1 within the chunk; the
  * returned indices are translated back to the caller's positions.
@@ -158,25 +164,42 @@ function chunkBy<T>(list: T[], size: number): T[][] {
 }
 
 /**
- * Return the items with richer `reason` notes. Never throws and never returns
- * fewer items than it was given; any item the model didn't cover keeps its
- * original note.
+ * The items with richer `reason` notes, yielded again each time a chunk lands.
+ *
+ * This is the slowest stage of a discovery turn by a wide margin — measured at
+ * 115 of one turn's 138 seconds — and the cards are perfectly readable before
+ * it runs, carrying the notes the web structuring already wrote. So the whole
+ * list is emitted early and re-emitted as each chunk of rewrites arrives,
+ * rather than the reader watching a spinner until every title is done.
+ *
+ * Chunks are raced rather than awaited as a group: `Promise.all` would collapse
+ * the progress back into one update at the end of each pass, which is the thing
+ * being fixed.
+ *
+ * Never throws, and every yield is the FULL list — any item the model hasn't
+ * covered (yet, or at all) keeps its original note.
  */
-export async function enrichCardReasons(
+export async function* enrichCardReasonsProgressive(
   items: ContentItem[],
   queryText: string
-): Promise<ContentItem[]> {
-  if (items.length === 0) return items
+): AsyncGenerator<ContentItem[]> {
+  if (items.length === 0) return
 
   let model: LanguageModel
   try {
     model = await getWritingModel()
   } catch (err) {
     await recordLlmError(err, { context: 'discovery reason enrichment', logger })
-    return items
+    return
   }
 
   const rewritten = new Map<number, string>()
+  const applied = () =>
+    items.map((item, i) => {
+      const reason = rewritten.get(i)
+      return reason ? { ...item, reason } : item
+    })
+
   let remaining: IndexedItem[] = items.map((item, index) => ({ index, item }))
   let firstError: unknown = null
 
@@ -184,15 +207,31 @@ export async function enrichCardReasons(
   // for, so a single dropped chunk costs one extra short call rather than the
   // whole trailing half of the list.
   for (let pass = 0; pass < 2 && remaining.length > 0; pass++) {
-    const results = await Promise.all(
-      chunkBy(remaining, BATCH_SIZE).map((chunk) =>
-        rewriteChunk(model, queryText, chunk).catch((err) => {
-          firstError ??= err
-          return [] as Array<{ index: number; reason: string }>
-        })
+    // All chunks are in flight at once; the loop below only decides the order
+    // results are consumed in, never when they start.
+    const inFlight = new Map<number, Promise<{ id: number; done: RewrittenReason[] }>>()
+    chunkBy(remaining, BATCH_SIZE).forEach((chunk, id) => {
+      inFlight.set(
+        id,
+        rewriteChunk(model, queryText, chunk)
+          .catch((err) => {
+            firstError ??= err
+            return [] as RewrittenReason[]
+          })
+          .then((done) => ({ id, done }))
       )
-    )
-    for (const { index, reason } of results.flat()) rewritten.set(index, reason)
+    })
+
+    while (inFlight.size > 0) {
+      // Safe to race: the catch above is attached before the promise reaches
+      // this map, so none of them can reject.
+      const { id, done } = await Promise.race(inFlight.values())
+      inFlight.delete(id)
+      if (done.length === 0) continue
+      for (const { index, reason } of done) rewritten.set(index, reason)
+      yield applied()
+    }
+
     remaining = remaining.filter((entry) => !rewritten.has(entry.index))
   }
 
@@ -203,15 +242,27 @@ export async function enrichCardReasons(
 
   if (rewritten.size === 0) {
     logger.warn({ items: items.length }, 'Reason enrichment produced nothing; keeping original notes')
-    return items
+    return
   }
 
   logger.info(
     { items: items.length, rewritten: rewritten.size, missing: remaining.length },
     'Card reasons enriched'
   )
-  return items.map((item, i) => {
-    const reason = rewritten.get(i)
-    return reason ? { ...item, reason } : item
-  })
+}
+
+/**
+ * Return the items with richer `reason` notes. Never throws and never returns
+ * fewer items than it was given; any item the model didn't cover keeps its
+ * original note.
+ *
+ * The awaited form, for callers that have nowhere to put a partial result.
+ */
+export async function enrichCardReasons(
+  items: ContentItem[],
+  queryText: string
+): Promise<ContentItem[]> {
+  let latest = items
+  for await (const partial of enrichCardReasonsProgressive(items, queryText)) latest = partial
+  return latest
 }

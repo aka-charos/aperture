@@ -24,7 +24,7 @@ import { createCarouselResult, type ContentCarousel } from '../schemas/contentCa
 import { resolveCandidates } from '../discovery/resolveCandidates.js'
 import { gatherWebCandidates } from '../discovery/webCandidates.js'
 import { buildTasteBrief } from '../discovery/tasteBrief.js'
-import { enrichCardReasons } from '../discovery/enrichReasons.js'
+import { enrichCardReasonsProgressive } from '../discovery/enrichReasons.js'
 import { filterUnwatchedItems } from '../helpers/unwatched.js'
 import { normalizeTitle } from '../helpers/titleMatch.js'
 import { findSimilarItems } from './search.js'
@@ -86,7 +86,13 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
             'If the request references a specific title (e.g. "movies similar to X"), the title X — used to add embeddings-based related picks from the library.'
           ),
       })),
-      execute: async ({ seedTitle }) => {
+      // A generator, not an async function: every value it yields reaches the
+      // client as a preliminary tool result, and the LAST one it yields is the
+      // real output — what the model reads and what the client persists. That is
+      // what lets the cards appear as soon as they are resolved instead of after
+      // the reason rewrite, which on a measured turn was 115 of its 138 seconds.
+      // See helpers/toolStream.ts for what this costs the wrapper layer.
+      execute: async function* ({ seedTitle }) {
         // This one tool call runs nine sequential stages, several of them slow, so
         // it reports its own sub-phases — the per-tool status wrapper only ever
         // sees "entering findCandidatesInLibrary".
@@ -144,87 +150,112 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
           }
         }
 
+        const combined = [...webItems, ...alsoItems]
+        // One stamp for the whole turn. These ids are React keys on the client,
+        // so a fresh Date.now() per emission would remount the entire list on
+        // every progress update instead of rewriting the notes in place.
+        const stamp = Date.now()
+
+        /** The tool's output for a given state of the cards. */
+        const build = (cards: ContentItem[]) => {
+          const webCards = cards.slice(0, webItems.length)
+          const alsoCards = cards.slice(webItems.length)
+
+          // Per-pick rationale: grounding for the model's closing synthesis. Keyed
+          // off the CARDS, so whatever the pipeline dropped — not in the library,
+          // already watched — can never reach the model as something to talk about.
+          const enrichedByTitle = new Map(
+            [...webCards, ...alsoCards]
+              .filter((i) => i.reason)
+              .map((i) => [normalizeTitleKey(i.name), i.reason as string])
+          )
+          const shownTitleKeys = new Set(
+            [...webCards, ...alsoCards].map((i) => normalizeTitleKey(i.name))
+          )
+          const picks = candidates
+            .filter((c) => shownTitleKeys.has(normalizeTitleKey(c.title)))
+            .map((c) => ({
+              title: c.title,
+              year: c.year,
+              reason: enrichedByTitle.get(normalizeTitleKey(c.title)) ?? c.reason,
+            }))
+
+          const carousels: ContentCarousel[] = []
+          if (webCards.length > 0) {
+            // Web picks carry a per-title reason + synopsis → render as the rich
+            // vertical list, with the embeddings section as a secondary carousel.
+            carousels.push(
+              createCarouselResult(`discovery-${stamp}`, webCards, {
+                title: 'Recommendations',
+                layout: 'list',
+              })
+            )
+            if (alsoCards.length > 0) {
+              carousels.push(
+                createCarouselResult(`discovery-also-${stamp}`, alsoCards, {
+                  title: 'Also worth checking',
+                  layout: 'carousel',
+                })
+              )
+            }
+          } else if (alsoCards.length > 0) {
+            // Web search yielded nothing (rate limit / empty grounding), but a seed
+            // title gave us embeddings-similar picks — promote them to the PRIMARY
+            // section so "movies like X" still returns a coherent answer instead of
+            // an orphaned "Also worth checking". These cards get their "why" from the
+            // enrichment pass above (the embeddings search itself provides none).
+            carousels.push(
+              createCarouselResult(`discovery-similar-${stamp}`, alsoCards, {
+                title: seedTitle?.trim() ? `Similar to ${seedTitle.trim()}` : 'Recommendations',
+                layout: 'carousel',
+              })
+            )
+          }
+
+          if (carousels.length === 0) {
+            // The all-watched case is a distinct outcome from an empty search —
+            // saying "nothing found" there would be misleading.
+            const allWatched = resolved.items.length > 0 && webItems.length === 0
+            carousels.push(
+              createCarouselResult(`discovery-empty-${stamp}`, [], {
+                description: allWatched
+                  ? 'Every match for this request has already been watched.'
+                  : notInLibrary.length > 0
+                    ? 'None of the web-sourced picks are in the library.'
+                    : 'No web-sourced picks were found for this request.',
+              })
+            )
+          }
+
+          // Deliberately NOT returning the unmatched titles: anything the model can
+          // see, it will eventually mention, and nothing outside the library should
+          // ever reach the user.
+          return { carousels, picks }
+        }
+
+        // The cards are already readable: every web pick carries the note the
+        // structuring pass wrote for it. Everything after this only improves
+        // those notes, so ship the list now rather than holding all of it back
+        // for the slowest stage in the turn.
+        onStatus?.('discoveryAssembling')
+        let cards = combined
+        yield build(cards)
+
         // Rewrite the per-title notes so they read like insight instead of condensed
         // search copy. BOTH sections go through one call: the embeddings picks carry
         // no rationale of their own, which is why "Also worth checking" used to show
         // bare cards next to fully-explained ones. Order/length are preserved, so the
         // two lists split back out cleanly. Fails open to the original notes.
         onStatus?.('discoveryReasons')
-        const enriched = await enrichCardReasons([...webItems, ...alsoItems], queryText)
-        const webCards = enriched.slice(0, webItems.length)
-        const alsoCards = enriched.slice(webItems.length)
-
-        // Per-pick rationale: grounding for the model's closing synthesis. Keyed
-        // off the CARDS, so whatever the pipeline dropped — not in the library,
-        // already watched — can never reach the model as something to talk about.
-        const enrichedByTitle = new Map(
-          [...webCards, ...alsoCards]
-            .filter((i) => i.reason)
-            .map((i) => [normalizeTitleKey(i.name), i.reason as string])
-        )
-        const shownTitleKeys = new Set(
-          [...webCards, ...alsoCards].map((i) => normalizeTitleKey(i.name))
-        )
-        const picks = candidates
-          .filter((c) => shownTitleKeys.has(normalizeTitleKey(c.title)))
-          .map((c) => ({
-            title: c.title,
-            year: c.year,
-            reason: enrichedByTitle.get(normalizeTitleKey(c.title)) ?? c.reason,
-          }))
-
-        onStatus?.('discoveryAssembling')
-        const carousels: ContentCarousel[] = []
-        if (webCards.length > 0) {
-          // Web picks carry a per-title reason + synopsis → render as the rich
-          // vertical list, with the embeddings section as a secondary carousel.
-          carousels.push(
-            createCarouselResult(`discovery-${Date.now()}`, webCards, {
-              title: 'Recommendations',
-              layout: 'list',
-            })
-          )
-          if (alsoCards.length > 0) {
-            carousels.push(
-              createCarouselResult(`discovery-also-${Date.now()}`, alsoCards, {
-                title: 'Also worth checking',
-                layout: 'carousel',
-              })
-            )
-          }
-        } else if (alsoCards.length > 0) {
-          // Web search yielded nothing (rate limit / empty grounding), but a seed
-          // title gave us embeddings-similar picks — promote them to the PRIMARY
-          // section so "movies like X" still returns a coherent answer instead of
-          // an orphaned "Also worth checking". These cards get their "why" from the
-          // enrichment pass above (the embeddings search itself provides none).
-          carousels.push(
-            createCarouselResult(`discovery-similar-${Date.now()}`, alsoCards, {
-              title: seedTitle?.trim() ? `Similar to ${seedTitle.trim()}` : 'Recommendations',
-              layout: 'carousel',
-            })
-          )
+        for await (const partial of enrichCardReasonsProgressive(combined, queryText)) {
+          cards = partial
+          yield build(cards)
         }
 
-        if (carousels.length === 0) {
-          // The all-watched case is a distinct outcome from an empty search —
-          // saying "nothing found" there would be misleading.
-          const allWatched = resolved.items.length > 0 && webItems.length === 0
-          carousels.push(
-            createCarouselResult(`discovery-empty-${Date.now()}`, [], {
-              description: allWatched
-                ? 'Every match for this request has already been watched.'
-                : notInLibrary.length > 0
-                  ? 'None of the web-sourced picks are in the library.'
-                  : 'No web-sourced picks were found for this request.',
-            })
-          )
-        }
-
-        // Deliberately NOT returning the unmatched titles: anything the model can
-        // see, it will eventually mention, and nothing outside the library should
-        // ever reach the user.
-        return { carousels, picks }
+        // The final yield is the output proper — the one the model reasons from
+        // and the one the client saves. It has to happen even when enrichment
+        // yielded nothing at all, which is why it is not folded into the loop.
+        yield build(cards)
       },
     }),
   }
