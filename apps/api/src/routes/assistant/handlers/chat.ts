@@ -22,7 +22,8 @@ import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText, loadConversationHistory, withUnwatchedFilter, createStatusEmitter, withStatusEvents, withRequestContext } from '../helpers/index.js'
 import { createTools, createN8nTools, createEpisodeTools, createDiscoveryResolveTool, DISCOVERY_PROMPT } from '../tools/index.js'
 import { withToolErrorHandling } from '../tools/utils.js'
-import { persistTurn, type TurnPart } from '../helpers/persistTurn.js'
+import { persistTurn, persistQuestion, type TurnPart } from '../helpers/persistTurn.js'
+import { markTurnStarted, markTurnFinished } from '../helpers/activeTurns.js'
 import type { ToolContext } from '../types.js'
 
 interface ChatBody {
@@ -185,6 +186,10 @@ export function registerChatHandler(fastify: FastifyInstance) {
         // the one on toUIMessageStream covers mid-stream model/provider failures.
         const onStreamError = (error: unknown) => {
           fastify.log.error({ err: error }, 'Assistant stream error')
+          // The turn is over however badly. Without this the conversation keeps
+          // telling a returning reader that an answer is coming until the
+          // staleness sweep gives up on it fifteen minutes later.
+          if (conversationId) markTurnFinished(conversationId)
           return assistantErrorText(error)
         }
 
@@ -280,6 +285,22 @@ export function registerChatHandler(fastify: FastifyInstance) {
             // Fails open to library.
             let discoveryTools: ToolSet = {}
             let discoveryAppend = ''
+
+            // The question goes in NOW, not with the answer at the end. A turn
+            // runs for minutes, and a reader who came back to the conversation
+            // while it was working found it entirely empty — which reads as a
+            // lost conversation rather than as work in progress. Marking the
+            // turn active is what lets that reader be told an answer is coming.
+            if (conversationId) {
+              markTurnStarted(conversationId)
+              await persistQuestion({
+                conversationId,
+                userId: user.id,
+                userText: latestUserText(messages),
+                log: request.log,
+              })
+            }
+
             emit('understanding')
             const intent = await classifyIntent(processedMessages)
             request.log.info({ intent }, 'Assistant intent classified')
@@ -482,10 +503,13 @@ export function registerChatHandler(fastify: FastifyInstance) {
               await persistTurn({
                 conversationId,
                 userId: user.id,
-                userText: userRequest,
                 parts: turnParts,
                 log: request.log,
               })
+              // Cleared after the write, never before: a reader polling this
+              // conversation takes "no longer generating" as "the answer is
+              // saved", and clearing first would hand them an empty turn.
+              markTurnFinished(conversationId)
             }
           },
           })

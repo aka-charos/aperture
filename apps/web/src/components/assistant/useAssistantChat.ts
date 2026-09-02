@@ -30,6 +30,9 @@ export interface BackendMessage {
  * recent one — how the floating surface hands its thread to the page. Read once,
  * at mount; later changes don't move an open surface off what it's showing.
  */
+/** How often to re-ask while a turn is running somewhere else. */
+const GENERATING_POLL_MS = 4000
+
 export function useAssistantChat(active: boolean, initialConversationId?: string) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(
@@ -38,6 +41,10 @@ export function useAssistantChat(active: boolean, initialConversationId?: string
   const [loadingConversations, setLoadingConversations] = useState(false)
   const [savingMessages, setSavingMessages] = useState(false)
   const [historicalMessages, setHistoricalMessages] = useState<BackendMessage[]>([])
+  // Whether a turn is running for the active conversation, as the SERVER sees
+  // it — which is the only place that knows, once the runtime that started it
+  // has been destroyed by a conversation switch.
+  const [generating, setGenerating] = useState(false)
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [suggestions, setSuggestions] = useState<string[]>([])
@@ -91,11 +98,33 @@ export function useAssistantChat(active: boolean, initialConversationId?: string
       if (res.ok) {
         const data = await res.json()
         setHistoricalMessages(data.messages || [])
+        setGenerating(data.generating === true)
       }
     } catch {
       // Keep the messages we already have
     }
   }, [])
+
+  /**
+   * Re-read a conversation whose turn is still running somewhere else.
+   *
+   * Switching conversations destroys the chat runtime, so a turn started here
+   * and walked away from streams to nobody. It still completes and is still
+   * saved — but the reader who comes back has the question, no answer, and no
+   * reason to ask again. So while the server says a turn is in flight, ask
+   * every few seconds until it lands.
+   *
+   * Deliberately not a websocket or an SSE reconnect: this is a handful of
+   * cheap reads over a few minutes, only while a turn is genuinely running,
+   * and it stops on its own.
+   */
+  useEffect(() => {
+    if (!generating || !activeConversationId) return
+    const id = setInterval(() => {
+      void refreshConversation(activeConversationId)
+    }, GENERATING_POLL_MS)
+    return () => clearInterval(id)
+  }, [generating, activeConversationId, refreshConversation])
 
   // Initialize chat when the surface becomes active - load most recent
   // conversation or create a new one
@@ -284,6 +313,7 @@ export function useAssistantChat(active: boolean, initialConversationId?: string
     savingMessages,
     setSavingMessages,
     historicalMessages,
+    generating,
     editingConversationId,
     editTitle,
     setEditTitle,
