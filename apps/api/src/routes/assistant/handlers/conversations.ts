@@ -5,6 +5,7 @@ import type { FastifyInstance } from 'fastify'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import type { ConversationRow, MessageRow } from '../types.js'
+import { isTurnActive } from '../helpers/activeTurns.js'
 
 export function registerConversationHandlers(fastify: FastifyInstance) {
   /**
@@ -85,6 +86,11 @@ export function registerConversationHandlers(fastify: FastifyInstance) {
             ...m,
             toolInvocations: m.tool_invocations || undefined,
           })),
+          // A turn can be running with nobody watching: the chat runtime is
+          // destroyed when the reader switches conversations, and a discovery
+          // turn takes minutes. Without this the conversation looks finished —
+          // the question is here, no answer, no sign one is coming.
+          generating: isTurnActive(id),
         })
       } catch (err) {
         request.log.error({ err }, 'Failed to fetch conversation')

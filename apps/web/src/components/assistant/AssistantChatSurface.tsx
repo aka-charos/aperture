@@ -43,6 +43,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function ChatThreadArea({
   conversationId,
   historicalMessages,
+  generating,
   suggestions,
   setSavingMessages,
   fetchConversations,
@@ -50,6 +51,8 @@ function ChatThreadArea({
 }: {
   conversationId: string | null
   historicalMessages: BackendMessage[]
+  /** A turn is running for this conversation, in a request this runtime cannot see. */
+  generating: boolean
   suggestions: string[]
   setSavingMessages: (saving: boolean) => void
   fetchConversations: () => Promise<void>
@@ -116,7 +119,11 @@ function ChatThreadArea({
       {/* Inside the provider, so a retry re-renders into the same runtime and
           the conversation survives. */}
       <ThreadErrorBoundary>
-        <Thread historicalMessages={historicalMessages} suggestions={suggestions} />
+        <Thread
+          historicalMessages={historicalMessages}
+          pending={generating}
+          suggestions={suggestions}
+        />
       </ThreadErrorBoundary>
     </AssistantRuntimeProvider>
   )
@@ -252,6 +259,7 @@ export function AssistantChatSurface({
     savingMessages,
     setSavingMessages,
     historicalMessages,
+    generating,
     editingConversationId,
     editTitle,
     setEditTitle,
@@ -566,6 +574,7 @@ export function AssistantChatSurface({
               key={activeConversationId || 'new'}
               conversationId={activeConversationId}
               historicalMessages={historicalMessages}
+              generating={generating}
               suggestions={suggestions}
               setSavingMessages={setSavingMessages}
               fetchConversations={fetchConversations}

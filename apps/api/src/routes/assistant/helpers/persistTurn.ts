@@ -31,11 +31,10 @@ const TITLE_MAX = 50
 export async function persistTurn(opts: {
   conversationId: string
   userId: string
-  userText: string
   parts: TurnPart[]
   log: { warn(obj: object, msg?: string): void }
 }): Promise<void> {
-  const { conversationId, userId, userText, parts, log } = opts
+  const { conversationId, userId, parts, log } = opts
   try {
     // Ownership is checked here rather than trusted from the request, because
     // the conversation id arrives as a header.
@@ -44,15 +43,8 @@ export async function persistTurn(opts: {
       [conversationId, userId]
     )
     if (!owned) {
-      log.warn({ conversationId }, 'Not saving turn: conversation is not this user\'s')
+      log.warn({ conversationId }, 'Not saving answer: conversation is not this user\'s')
       return
-    }
-
-    if (userText.trim()) {
-      await query(
-        `INSERT INTO assistant_messages (conversation_id, role, content) VALUES ($1, 'user', $2)`,
-        [conversationId, userText]
-      )
     }
 
     // The flat pair stays authoritative for everything that reads a message as
@@ -82,11 +74,52 @@ export async function persistTurn(opts: {
       )
     }
 
-    const existing = await queryOne<{ title: string }>(
-      `SELECT title FROM assistant_conversations WHERE id = $1`,
-      [conversationId]
+    await query(`UPDATE assistant_conversations SET updated_at = NOW() WHERE id = $1`, [
+      conversationId,
+    ])
+  } catch (err) {
+    log.warn({ err, conversationId }, 'Failed to save answer')
+  }
+}
+
+/**
+ * Store the question, at the moment it is asked rather than when the answer
+ * lands.
+ *
+ * A turn runs for minutes. Saving the pair together at the end meant that a
+ * reader who came back to the conversation while it was still working found it
+ * completely empty — not "your question, no answer yet", which is honest, but
+ * nothing at all, which reads as a lost conversation. It also sets the title,
+ * so the sidebar stops saying "New Chat" as soon as there is something to call
+ * it rather than three minutes later.
+ *
+ * Never throws, for the same reason as persistTurn: this is called on the path
+ * to a live stream.
+ */
+export async function persistQuestion(opts: {
+  conversationId: string
+  userId: string
+  userText: string
+  log: { warn(obj: object, msg?: string): void }
+}): Promise<void> {
+  const { conversationId, userId, userText, log } = opts
+  if (!userText.trim()) return
+  try {
+    const owned = await queryOne<{ id: string; title: string }>(
+      `SELECT id, title FROM assistant_conversations WHERE id = $1 AND user_id = $2`,
+      [conversationId, userId]
     )
-    if (existing?.title === DEFAULT_TITLE && userText.trim()) {
+    if (!owned) {
+      log.warn({ conversationId }, 'Not saving question: conversation is not this user\'s')
+      return
+    }
+
+    await query(
+      `INSERT INTO assistant_messages (conversation_id, role, content) VALUES ($1, 'user', $2)`,
+      [conversationId, userText]
+    )
+
+    if (owned.title === DEFAULT_TITLE) {
       const title =
         userText.length > TITLE_MAX ? `${userText.substring(0, TITLE_MAX)}...` : userText
       await query(`UPDATE assistant_conversations SET title = $1, updated_at = NOW() WHERE id = $2`, [
@@ -99,6 +132,6 @@ export async function persistTurn(opts: {
       ])
     }
   } catch (err) {
-    log.warn({ err, conversationId }, 'Failed to save turn')
+    log.warn({ err, conversationId }, 'Failed to save question')
   }
 }

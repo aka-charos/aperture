@@ -1116,12 +1116,47 @@ function ThreadScrollControls({ viewportRef }: { viewportRef: RefObject<HTMLDivE
 // Props for Thread component
 interface ThreadProps {
   historicalMessages?: HistoricalMessage[]
+  /**
+   * A turn is running that this runtime knows nothing about — started here,
+   * then abandoned when the reader switched conversations, and still being
+   * written server-side. `ThreadPrimitive.If running` cannot see it, so the
+   * loading line has to be driven from outside.
+   */
+  pending?: boolean
   suggestions?: string[]
 }
 
 // Main Thread component
-export function Thread({ historicalMessages = [], suggestions = [] }: ThreadProps) {
-  const hasHistoricalMessages = historicalMessages.length > 0
+/**
+ * The saved messages to draw, minus the one the live runtime is already showing.
+ *
+ * The question is written when it is ASKED now, not when the answer lands — so
+ * that a reader returning mid-turn sees what they asked instead of an empty
+ * conversation. The cost is that a refresh during a live turn can hand the page
+ * that same question twice: once from the database, once from the runtime that
+ * is streaming it. The runtime only ever holds the current turn (it starts
+ * empty), so the overlap is exactly one message — the trailing saved question,
+ * when it matches the live one.
+ */
+function useVisibleHistory(historicalMessages: HistoricalMessage[]): HistoricalMessage[] {
+  const liveFirstUserText = useThread((s) => {
+    const first = s.messages[0]
+    if (first?.role !== 'user') return null
+    return first.content
+      .map((part) => (part.type === 'text' ? part.text : ''))
+      .join('')
+      .trim()
+  })
+
+  if (!liveFirstUserText) return historicalMessages
+  const last = historicalMessages[historicalMessages.length - 1]
+  if (last?.role !== 'user' || last.content.trim() !== liveFirstUserText) return historicalMessages
+  return historicalMessages.slice(0, -1)
+}
+
+export function Thread({ historicalMessages = [], pending = false, suggestions = [] }: ThreadProps) {
+  const visibleHistory = useVisibleHistory(historicalMessages)
+  const hasHistoricalMessages = visibleHistory.length > 0
   const viewportRef = useRef<HTMLDivElement | null>(null)
 
   return (
@@ -1176,7 +1211,7 @@ export function Thread({ historicalMessages = [], suggestions = [] }: ThreadProp
           )}
 
           {/* Render historical messages manually */}
-          {historicalMessages.map((msg) => (
+          {visibleHistory.map((msg) => (
             msg.role === 'user'
               ? <HistoricalUserMessage key={msg.id} message={msg} />
               : <HistoricalAssistantMessage key={msg.id} message={msg} />
@@ -1193,6 +1228,15 @@ export function Thread({ historicalMessages = [], suggestions = [] }: ThreadProp
           <ThreadPrimitive.If running>
             <LoadingIndicator />
           </ThreadPrimitive.If>
+          {/* The same line for a turn this runtime never saw. `If running`
+              reads the local runtime, which is empty after a conversation
+              switch, so an answer being written elsewhere would show nothing
+              at all — a question with no reply and no explanation. */}
+          {pending && (
+            <ThreadPrimitive.If running={false}>
+              <LoadingIndicator />
+            </ThreadPrimitive.If>
+          )}
         </ThreadPrimitive.Viewport>
 
         <ThreadScrollControls viewportRef={viewportRef} />
