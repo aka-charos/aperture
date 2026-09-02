@@ -22,6 +22,7 @@ import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText, loadConversationHistory, withUnwatchedFilter, createStatusEmitter, withStatusEvents, withRequestContext } from '../helpers/index.js'
 import { createTools, createN8nTools, createEpisodeTools, createDiscoveryResolveTool, DISCOVERY_PROMPT } from '../tools/index.js'
 import { withToolErrorHandling } from '../tools/utils.js'
+import { persistTurn, type TurnPart } from '../helpers/persistTurn.js'
 import type { ToolContext } from '../types.js'
 
 interface ChatBody {
@@ -418,6 +419,27 @@ export function registerChatHandler(fastify: FastifyInstance) {
             // away. Only the final step counts — an opener before a tool call is
             // not an answer, which is precisely the case that fails here.
             const steps = await result.steps
+            // Everything the answer is made of, in order. Rebuilt from the
+            // steps rather than taken off the UI stream, because this has to
+            // happen whether or not a browser is still attached — the whole
+            // point of saving it here (see helpers/persistTurn.ts).
+            const turnParts: TurnPart[] = []
+            const collect = (from: typeof steps) => {
+              for (const step of from) {
+                if (step.text?.trim()) turnParts.push({ type: 'text', text: step.text })
+                for (const call of step.toolResults ?? []) {
+                  turnParts.push({
+                    type: 'tool',
+                    toolCallId: call.toolCallId,
+                    toolName: call.toolName,
+                    args: call.input,
+                    result: call.output,
+                  })
+                }
+              }
+            }
+            collect(steps)
+
             if (!steps.at(-1)?.text?.trim()) {
               request.log.warn(
                 { steps: steps.length, maxSteps: MAX_STEPS },
@@ -448,6 +470,22 @@ export function registerChatHandler(fastify: FastifyInstance) {
                   'Forced answer came back empty too'
                 )
               }
+              collect(await forced.steps)
+            }
+
+            // Written here, from inside the request that produced it, rather
+            // than by the browser after the fact. A reader who switches
+            // conversation mid-turn used to lose the entire exchange — question
+            // and answer both, since the client saved them as one batch once
+            // `isRunning` went false, and switching empties the runtime first.
+            if (conversationId) {
+              await persistTurn({
+                conversationId,
+                userId: user.id,
+                userText: userRequest,
+                parts: turnParts,
+                log: request.log,
+              })
             }
           },
           })
