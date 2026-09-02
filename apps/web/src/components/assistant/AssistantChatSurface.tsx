@@ -182,6 +182,14 @@ function MessageSaver({
         // live one did, rather than running two paragraphs into one line.
         const textParts: string[] = []
         const toolInvocations: Array<{ toolCallId: string; toolName: string; args: unknown; result?: unknown }> = []
+        // The same answer as a SEQUENCE. `content` and `toolInvocations` are two
+        // flattened columns and cannot express "prose, cards, more prose" — which
+        // is what made a reloaded answer render prose-first, which in turn is why
+        // the live renderer hoisted its text above its cards to match. Sent
+        // alongside the old pair rather than instead of it: everything else that
+        // reads a message (conversation history for the model, the suggestion
+        // refresh) still wants the flat form.
+        const parts: Array<Record<string, unknown>> = []
 
         const contentParts = Array.isArray(msg.content) ? msg.content : []
         for (const part of contentParts) {
@@ -189,19 +197,24 @@ function MessageSaver({
             continue
           }
           if (part.type === 'text' && typeof part.text === 'string') {
-            if (part.text.trim()) textParts.push(part.text)
+            if (part.text.trim()) {
+              textParts.push(part.text)
+              parts.push({ type: 'text', text: part.text })
+            }
           } else if (
             part.type === 'tool-call' &&
             typeof part.toolCallId === 'string' &&
             typeof part.toolName === 'string'
           ) {
             // In ThreadMessage, the result is embedded directly in the tool-call part
-            toolInvocations.push({
+            const invocation = {
               toolCallId: part.toolCallId,
               toolName: part.toolName,
               args: part.args,
               result: part.result,
-            })
+            }
+            toolInvocations.push(invocation)
+            parts.push({ type: 'tool', ...invocation })
           }
         }
 
@@ -209,6 +222,7 @@ function MessageSaver({
           role: msg.role,
           content: textParts.join('\n\n'),
           ...(toolInvocations.length > 0 && { toolInvocations }),
+          ...(parts.length > 0 && { parts }),
         }
       })
 

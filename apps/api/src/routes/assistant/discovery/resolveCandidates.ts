@@ -154,11 +154,16 @@ export async function resolveCandidates(
          LIMIT 5`,
         [`%${cand.title}%`, cand.title, cand.year ?? 0]
       )
-      const row = res.rows.find((r) => {
-        if (usedRowIds.has(r.id)) return false
-        if (cand.year && r.year && Math.abs(r.year - cand.year) > 1) return false
-        return true
-      })
+      const free = res.rows.filter((r) => !usedRowIds.has(r.id))
+      // A candidate with NO year matched anything sharing the title, and
+      // exact-title rank decides — so "Beauty and the Beast", researched as
+      // Cocteau's 1946 film, claimed Disney's 1991 one and carried the note
+      // about Cocteau onto its card. When the year is missing and the library
+      // holds more than one film by that name, we genuinely do not know which
+      // was meant, and a confident note on the wrong film is worse than one
+      // fewer card.
+      if (!cand.year && free.length > 1) continue
+      const row = free.find((r) => !(cand.year && r.year && Math.abs(r.year - cand.year) > 1))
       if (row) claim(row, cand)
     }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { Box, Paper, Typography, Avatar, CircularProgress, TextField, IconButton, Button, Tooltip, Checkbox, FormControlLabel, Fab } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { useTranslation } from 'react-i18next'
@@ -399,18 +399,25 @@ const ASSISTANT_PART_COMPONENTS = {
 }
 
 /**
- * Renders the message's parts with every text part hoisted above everything else.
+ * Renders the message's parts in the order the model produced them.
  *
- * The model calls its tools before it writes a word, so the parts arrive
- * tool-first and a live answer used to show its cards above its prose. The same
- * answer reloaded from the database showed prose first, because the save path
- * splits a message into a text column and a tool_invocations column and
- * HistoricalAssistantMessage renders them in that order. One answer, two
- * layouts, depending only on whether you had just asked for it.
+ * This used to hoist every text part above every tool part, because the save
+ * path flattened an answer into a text column and a tool_invocations column, so
+ * a RELOADED answer could only ever be drawn prose-first. Hoisting made the
+ * live answer match — by making it match the lossy one, and it cost more than
+ * it looked. A closing note written after the cards appeared above them, and
+ * mid-stream each new sentence was inserted above the card list and shoved it
+ * down the page: you would be watching a skeleton at the bottom while finished
+ * prose landed two blocks above you.
  *
- * Reordering the indices rather than reordering with CSS `order` keeps the DOM
- * in reading order, so selection, copy and screen readers agree with the page.
- * Parts within each group keep their relative order.
+ * Migration 0158 records the sequence, so both renderers now show what actually
+ * happened: opener, cards, transition, more cards, closing note. Rows saved
+ * before it keep the old prose-then-cards layout in
+ * HistoricalAssistantMessage — their order was never written down, so it cannot
+ * be recovered, and that layout is what they already looked like.
+ *
+ * The natural order is also the DOM order, so selection, copy and screen
+ * readers agree with the page.
  *
  * The part list MUST come from `useAssistantState` — the same store
  * `MessagePrimitive.PartByIndex` resolves an index against. `useMessage` is a
@@ -423,18 +430,9 @@ const ASSISTANT_PART_COMPONENTS = {
 function OrderedMessageParts() {
   const parts = useAssistantState(({ message }) => message.parts)
 
-  const order = useMemo(() => {
-    const text: number[] = []
-    const rest: number[] = []
-    parts.forEach((part, index) => {
-      ;(part.type === 'text' ? text : rest).push(index)
-    })
-    return [...text, ...rest]
-  }, [parts])
-
   return (
     <>
-      {order.map((index) => (
+      {parts.map((_part, index) => (
         <MessagePrimitive.PartByIndex key={index} index={index} components={ASSISTANT_PART_COMPONENTS} />
       ))}
     </>
@@ -731,16 +729,41 @@ function Composer() {
 }
 
 // Historical message type (from backend)
+interface HistoricalToolInvocation {
+  toolCallId: string
+  toolName: string
+  args: unknown
+  result?: unknown
+}
+
+/** One part of a saved answer, in the order the model produced it (0158). */
+type HistoricalPart =
+  | { type: 'text'; text: string }
+  | ({ type: 'tool' } & HistoricalToolInvocation)
+
 interface HistoricalMessage {
   id: string
   role: string
   content: string
-  tool_invocations?: Array<{
-    toolCallId: string
-    toolName: string
-    args: unknown
-    result?: unknown
-  }>
+  tool_invocations?: HistoricalToolInvocation[]
+  /**
+   * Absent on every row saved before 0158, and unrecoverable for those — their
+   * order was never written down. Absent therefore means "render the old way",
+   * prose then cards, which is exactly what those rows already looked like.
+   */
+  parts?: HistoricalPart[]
+}
+
+/** A saved answer's parts, or null when this row predates the column. */
+function orderedParts(message: HistoricalMessage): HistoricalPart[] | null {
+  const parts = message.parts
+  if (!Array.isArray(parts) || parts.length === 0) return null
+  return parts.filter(
+    (part): part is HistoricalPart =>
+      !!part &&
+      ((part.type === 'text' && typeof part.text === 'string' && !!part.text.trim()) ||
+        (part.type === 'tool' && typeof part.toolName === 'string'))
+  )
 }
 
 // Render a historical user message
@@ -768,7 +791,34 @@ function HistoricalUserMessage({ message }: { message: HistoricalMessage }) {
 }
 
 // Render a historical assistant message
+/** One saved prose block, styled exactly as the live renderer styles its own. */
+function HistoricalText({ text }: { text: string }) {
+  return (
+    <Paper
+      sx={{
+        ...bubbleSx('90%'),
+        ...partGapSx,
+        bgcolor: 'rgba(26, 26, 26, 0.7)',
+        borderRadius: 2,
+        borderStartStartRadius: 0,
+      }}
+    >
+      <Box
+        sx={{
+          '& p': { my: 1.5 },
+          '& p:first-of-type': { mt: 0 },
+          '& p:last-of-type': { mb: 0 },
+        }}
+      >
+        <ReactMarkdown components={{ a: MarkdownLink as Components['a'] }}>{text}</ReactMarkdown>
+      </Box>
+    </Paper>
+  )
+}
+
 function HistoricalAssistantMessage({ message }: { message: HistoricalMessage }) {
+  const parts = orderedParts(message)
+
   return (
     <Box {...ANSWER_MARKER_PROP} sx={messageRowSx}>
       <Avatar
@@ -780,8 +830,22 @@ function HistoricalAssistantMessage({ message }: { message: HistoricalMessage })
         <SmartToyIcon fontSize="small" />
       </Avatar>
       <Box sx={{ flex: 1, minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
-        {/* Render text content */}
-        {message.content && (
+        {parts
+          ? parts.map((part, index) =>
+              part.type === 'text' ? (
+                <HistoricalText key={`text-${index}`} text={part.text} />
+              ) : (
+                <Box
+                  key={part.toolCallId ?? `tool-${index}`}
+                  sx={{ maxWidth: '100%', overflow: 'hidden', ...partGapSx }}
+                >
+                  <ToolUI toolName={part.toolName} result={part.result} />
+                </Box>
+              )
+            )
+          : null}
+        {/* Pre-0158 rows: prose, then cards. Their order was never recorded. */}
+        {!parts && message.content && (
           <Paper
             sx={{
               ...bubbleSx('90%'),
@@ -802,12 +866,12 @@ function HistoricalAssistantMessage({ message }: { message: HistoricalMessage })
             </Box>
           </Paper>
         )}
-        {/* Render tool results */}
-        {message.tool_invocations?.map((invocation) => (
-          <Box key={invocation.toolCallId} sx={{ maxWidth: '100%', overflow: 'hidden', ...partGapSx }}>
-            <ToolUI toolName={invocation.toolName} result={invocation.result} />
-          </Box>
-        ))}
+        {!parts &&
+          message.tool_invocations?.map((invocation) => (
+            <Box key={invocation.toolCallId} sx={{ maxWidth: '100%', overflow: 'hidden', ...partGapSx }}>
+              <ToolUI toolName={invocation.toolName} result={invocation.result} />
+            </Box>
+          ))}
       </Box>
     </Box>
   )

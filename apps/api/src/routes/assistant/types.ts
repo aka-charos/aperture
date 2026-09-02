@@ -79,6 +79,8 @@ export interface MessageRow {
   role: string
   content: string
   tool_invocations: unknown[] | null
+  /** Ordered parts as produced (migration 0158). NULL on older rows. */
+  parts: unknown[] | null
   created_at: Date
 }
 
