@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { query, queryOne } from '../../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../../plugins/auth.js'
 import { requireSelfOrAdmin } from './shared.js'
+import { WATCHED_SQL } from './watchStatsFilters.js'
 
 export function registerWatchStatsHandlers(fastify: FastifyInstance) {
   /**
@@ -17,12 +18,9 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
 
       if (!requireSelfOrAdmin(id, currentUser, reply)) return
 
-      // Only count genuinely-watched history — played, replayed, or resumed
-      // in progress. Excludes bookmark-only favorites (favorited but never
-      // played), matching the watch history page. `wh` is the watch_history
-      // alias in every query below.
-      const WATCHED =
-        '(wh.played = true OR wh.play_count > 0 OR COALESCE(wh.playback_position_ticks, 0) > 0)'
+      // The drill-in behind each number filters on the same predicate, so it
+      // is shared rather than restated (see watchStatsFilters.ts).
+      const WATCHED = WATCHED_SQL
 
       try {
         // Genre distribution for movies
@@ -53,7 +51,12 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
         }))
 
         // Watch timeline (monthly activity for last 12 months)
-        const timelineResult = await query<{ month: string; movies: string; episodes: string }>(
+        const timelineResult = await query<{
+          month: string
+          month_key: string
+          movies: string
+          episodes: string
+        }>(
           `WITH months AS (
              SELECT generate_series(
                date_trunc('month', NOW() - INTERVAL '11 months'),
@@ -84,6 +87,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
            )
            SELECT 
              to_char(m.month, 'Mon YYYY') as month,
+             to_char(m.month, 'YYYY-MM') as month_key,
              COALESCE(mc.count, 0) as movies,
              COALESCE(ec.count, 0) as episodes
            FROM months m
@@ -95,6 +99,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
 
         const watchTimeline = timelineResult.rows.map(r => ({
           month: r.month,
+          monthKey: r.month_key,
           movies: parseInt(r.movies),
           episodes: parseInt(r.episodes)
         }))

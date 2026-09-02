@@ -33,16 +33,12 @@ import LockOpenIcon from '@mui/icons-material/LockOpen'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
 import LocalMoviesIcon from '@mui/icons-material/LocalMovies'
-import TheaterComedyIcon from '@mui/icons-material/TheaterComedy'
-import StarIcon from '@mui/icons-material/Star'
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth'
-import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import AddIcon from '@mui/icons-material/Add'
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh'
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import Markdown from 'react-markdown'
+import { WatcherIdentityCard } from '@/components/WatcherIdentityCard'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslation } from 'react-i18next'
 import { useTheme } from '@mui/material/styles'
@@ -88,21 +84,6 @@ interface TasteProfileData {
   minFranchiseSizeOptions: number[]
 }
 
-interface ProfileStats {
-  totalWatched: number
-  totalSeriesStarted?: number
-  totalEpisodesWatched?: number
-  topGenres: string[]
-  avgRating: number
-  favoriteDecade: string | null
-  favoriteNetworks?: string[]
-}
-
-interface ProfileOutput {
-  synopsis: string
-  stats: ProfileStats
-}
-
 interface AccessibleLibrary {
   id: string
   name: string
@@ -130,17 +111,14 @@ export function WatcherIdentitySection({ mediaType, onGenresDetected }: WatcherI
   
   // Data states
   const [data, setData] = useState<TasteProfileData | null>(null)
-  const [profileOutput, setProfileOutput] = useState<ProfileOutput | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   
   // Action states
   const [analyzing, setAnalyzing] = useState(false)
-  const [generating, setGenerating] = useState(false)
   const [, setSavingSettings] = useState(false)
   const [savingSlider, setSavingSlider] = useState<string | null>(null)
-  const justGeneratedRef = useRef(false)
   
   // Editable states
   const [refreshInterval, setRefreshInterval] = useState(30)
@@ -149,10 +127,6 @@ export function WatcherIdentitySection({ mediaType, onGenresDetected }: WatcherI
   const [isLocked, setIsLocked] = useState(false)
   const [interests, setInterests] = useState<string[]>([])
   const [interestInput, setInterestInput] = useState('')
-  
-  // Streaming state
-  const [streamingText, setStreamingText] = useState('')
-  const [isStreaming, setIsStreaming] = useState(false)
   
   // Modal state
   const [showAnalyzeModal, setShowAnalyzeModal] = useState(false)
@@ -180,10 +154,10 @@ export function WatcherIdentitySection({ mediaType, onGenresDetected }: WatcherI
     setLoading(true)
     setError(null)
     try {
-      const [prefsResponse, profileResponse] = await Promise.all([
-        fetch(`/api/settings/taste-profile?mediaType=${mediaType}`, { credentials: 'include' }),
-        fetch(`/api/users/${user?.id}/${mediaType === 'movie' ? 'taste-profile' : 'series-taste-profile'}`, { credentials: 'include' }),
-      ])
+      const prefsResponse = await fetch(
+        `/api/settings/taste-profile?mediaType=${mediaType}`,
+        { credentials: 'include' }
+      )
       
       if (prefsResponse.ok) {
         const prefsData = await prefsResponse.json()
@@ -194,19 +168,12 @@ export function WatcherIdentitySection({ mediaType, onGenresDetected }: WatcherI
         setIsLocked(prefsData.profile?.isLocked || false)
         setInterests(prefsData.customInterests?.map((i: CustomInterest) => i.interestText) || [])
       }
-      
-      if (profileResponse.ok && !justGeneratedRef.current) {
-        const profileData = await profileResponse.json()
-        setProfileOutput(profileData)
-      }
-      // Reset the flag after fetch completes
-      justGeneratedRef.current = false
     } catch (err) {
       setError(err instanceof Error ? err.message : t('watcherIdentity.errFetchData'))
     } finally {
       setLoading(false)
     }
-  }, [mediaType, user?.id, t])
+  }, [mediaType, t])
   
   // Fetch accessible libraries (only once per component)
   const fetchLibraries = useCallback(async () => {
@@ -471,91 +438,6 @@ export function WatcherIdentitySection({ mediaType, onGenresDetected }: WatcherI
     }
   }
 
-  // Generate Identity with streaming
-  const handleGenerateIdentity = async () => {
-    setGenerating(true)
-    setIsStreaming(true)
-    setStreamingText('')
-    setError(null)
-    
-    try {
-      const endpoint = mediaType === 'movie' 
-        ? `/api/users/${user?.id}/taste-profile/regenerate`
-        : `/api/users/${user?.id}/series-taste-profile/regenerate`
-      
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        credentials: 'include',
-      })
-      
-      if (!response.ok) throw new Error(t('watcherIdentity.errGenerateIdentity'))
-      
-      // Check if streaming response (SSE)
-      const contentType = response.headers.get('content-type')
-      if (contentType?.includes('text/event-stream')) {
-        const reader = response.body?.getReader()
-        const decoder = new TextDecoder()
-        
-        if (reader) {
-          let fullText = ''
-          let buffer = ''
-          
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            
-            buffer += decoder.decode(value, { stream: true })
-            
-            // Parse SSE events (data: {...}\n\n format)
-            const events = buffer.split('\n\n')
-            buffer = events.pop() || '' // Keep incomplete event in buffer
-            
-            for (const event of events) {
-              if (!event.trim()) continue
-              
-              // Extract data from "data: {...}" format
-              const dataMatch = event.match(/^data:\s*(.+)$/m)
-              if (dataMatch) {
-                try {
-                  const data = JSON.parse(dataMatch[1])
-                  if (data.type === 'text') {
-                    fullText += data.content
-                    setStreamingText(fullText)
-                  } else if (data.type === 'done' && data.stats) {
-                    // Update profile output with final stats
-                    // Mark that we just generated to prevent fetchData from overwriting
-                    justGeneratedRef.current = true
-                    setProfileOutput({
-                      synopsis: fullText,
-                      stats: data.stats,
-                    })
-                  } else if (data.type === 'error') {
-                    throw new Error(data.message || t('watcherIdentity.errStreamError'))
-                  }
-                } catch (parseErr) {
-                  // Ignore parse errors, might be malformed chunk
-                  console.warn('Failed to parse SSE event:', parseErr)
-                }
-              }
-            }
-          }
-        }
-      } else {
-        // Non-streaming response (fallback)
-        const result = await response.json()
-        setProfileOutput(result)
-        setStreamingText(result.synopsis || '')
-      }
-      
-      setSuccess(t('watcherIdentity.successIdentityGenerated'))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('watcherIdentity.errGenerateIdentity'))
-    } finally {
-      setGenerating(false)
-      setIsStreaming(false)
-    }
-  }
-
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return t('watcherIdentity.analyzedNever')
     return new Date(dateStr).toLocaleDateString(undefined, {
@@ -572,9 +454,6 @@ export function WatcherIdentitySection({ mediaType, onGenresDetected }: WatcherI
       </Box>
     )
   }
-
-  const displaySynopsis = isStreaming ? streamingText : (profileOutput?.synopsis || '')
-  const stats = profileOutput?.stats
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -1229,176 +1108,9 @@ export function WatcherIdentitySection({ mediaType, onGenresDetected }: WatcherI
         </CardContent>
       </Card>
 
-      {/* Section 4: Identity Output */}
-      <Card sx={{ backgroundColor: 'background.default', borderRadius: 2 }}>
-        <CardContent>
-          <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
-          <Box display="flex" alignItems="center" gap={2}>
-            <Box
-              sx={{
-                width: 48,
-                height: 48,
-                borderRadius: 2,
-                background: `linear-gradient(135deg, ${accentColor} 0%, ${isMovie ? theme.palette.secondary.main : '#f472b6'} 100%)`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {isMovie ? <MovieIcon sx={{ color: 'white', fontSize: 28 }} /> : <TvIcon sx={{ color: 'white', fontSize: 28 }} />}
-            </Box>
-            <Box>
-              <Typography variant="h6" fontWeight={700}>
-                {isMovie ? t('watcherIdentity.movieIdentityTitle') : t('watcherIdentity.seriesIdentityTitle')}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {t('watcherIdentity.identitySubtitle')}
-              </Typography>
-            </Box>
-          </Box>
-          
-          <Button
-            variant="contained"
-            startIcon={generating ? <CircularProgress size={18} color="inherit" /> : <AutoAwesomeIcon />}
-            onClick={handleGenerateIdentity}
-            disabled={generating}
-            sx={{ 
-              bgcolor: accentColor,
-              '&:hover': { bgcolor: accentColor, filter: 'brightness(1.1)' },
-            }}
-          >
-            {generating ? t('watcherIdentity.generating') : t('watcherIdentity.generateIdentity')}
-          </Button>
-        </Box>
-
-        {/* Synopsis Output */}
-        {displaySynopsis ? (
-          <Box
-            sx={{
-              p: 3,
-              borderRadius: 2,
-              bgcolor: 'background.default',
-              border: '1px solid',
-              borderColor: 'divider',
-              mb: 3,
-            }}
-          >
-            <Box
-              sx={{
-                pl: 2,
-                borderLeft: '3px solid',
-                borderColor: accentColor,
-                '& p': {
-                  margin: 0,
-                  mb: 1.5,
-                  lineHeight: 1.8,
-                  color: 'text.primary',
-                  '&:last-child': { mb: 0 },
-                },
-                '& strong': {
-                  color: accentColor,
-                  fontWeight: 600,
-                },
-              }}
-            >
-              <Markdown>{displaySynopsis}</Markdown>
-              {isStreaming && (
-                <Box component="span" sx={{ 
-                  display: 'inline-block',
-                  width: 8,
-                  height: 16,
-                  bgcolor: accentColor,
-                  ml: 0.5,
-                  animation: 'blink 1s infinite',
-                  '@keyframes blink': {
-                    '0%, 50%': { opacity: 1 },
-                    '51%, 100%': { opacity: 0 },
-                  },
-                }} />
-              )}
-            </Box>
-          </Box>
-        ) : (
-          <Box
-            sx={{
-              py: 6,
-              textAlign: 'center',
-              border: '1px dashed',
-              borderColor: 'divider',
-              borderRadius: 2,
-              mb: 3,
-            }}
-          >
-            <Typography color="text.secondary" gutterBottom>
-              {t('watcherIdentity.noIdentityYet')}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {isMovie
-                ? t('watcherIdentity.generateIdentityHintMovie', { action: t('watcherIdentity.generateIdentity') })
-                : t('watcherIdentity.generateIdentityHintSeries', { action: t('watcherIdentity.generateIdentity') })}
-            </Typography>
-          </Box>
-        )}
-
-        {/* Metric Widgets */}
-        {stats && (
-          <Grid container spacing={2}>
-            <Grid item xs={6} sm={3}>
-              <Card sx={{ p: 2, textAlign: 'center', bgcolor: 'background.default' }}>
-                <PlayCircleOutlineIcon sx={{ color: accentColor, fontSize: 32, mb: 1 }} />
-                <Typography variant="h5" fontWeight={700}>
-                  {isMovie 
-                    ? stats.totalWatched?.toLocaleString() || 0
-                    : `${stats.totalSeriesStarted || 0} / ${stats.totalEpisodesWatched?.toLocaleString() || 0}`
-                  }
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {isMovie ? t('watcherIdentity.moviesWatched') : t('watcherIdentity.seriesEpisodesLabel')}
-                </Typography>
-              </Card>
-            </Grid>
-            
-            <Grid item xs={6} sm={3}>
-              <Card sx={{ p: 2, textAlign: 'center', bgcolor: 'background.default' }}>
-                <StarIcon sx={{ color: '#facc15', fontSize: 32, mb: 1 }} />
-                <Typography variant="h5" fontWeight={700}>
-                  {stats.avgRating?.toFixed(1) || '—'}/10
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {t('watcherIdentity.avgRating')}
-                </Typography>
-              </Card>
-            </Grid>
-            
-            <Grid item xs={6} sm={3}>
-              <Card sx={{ p: 2, textAlign: 'center', bgcolor: 'background.default' }}>
-                <CalendarMonthIcon sx={{ color: theme.palette.success.main, fontSize: 32, mb: 1 }} />
-                <Typography variant="h5" fontWeight={700}>
-                  {stats.favoriteDecade || '—'}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {t('watcherIdentity.favoriteEra')}
-                </Typography>
-              </Card>
-            </Grid>
-            
-            <Grid item xs={6} sm={3}>
-              <Card sx={{ p: 2, textAlign: 'center', bgcolor: 'background.default' }}>
-                <TheaterComedyIcon sx={{ color: '#f472b6', fontSize: 32, mb: 1 }} />
-                <Box display="flex" gap={0.5} flexWrap="wrap" justifyContent="center" mt={1}>
-                  {stats.topGenres?.slice(0, 3).map((genre) => (
-                    <Chip key={genre} label={genre} size="small" sx={{ fontSize: '0.65rem', height: 20 }} />
-                  ))}
-                </Box>
-                <Typography variant="caption" color="text.secondary" display="block" mt={1}>
-                  {t('watcherIdentity.topGenres')}
-                </Typography>
-              </Card>
-            </Grid>
-          </Grid>
-        )}
-        </CardContent>
-      </Card>
+      {/* Section 4: Identity Output — shared with the Watch Stats page, which
+          shows the same account of your taste beside the charts that count it. */}
+      <WatcherIdentityCard mediaType={mediaType} />
     </Box>
   )
 }
