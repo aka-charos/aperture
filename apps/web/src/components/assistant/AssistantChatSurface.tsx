@@ -122,7 +122,15 @@ function ChatThreadArea({
   )
 }
 
-// Component to handle message saving inside the runtime context
+/**
+ * Watches for a finished turn and refreshes the conversation list.
+ *
+ * It no longer SAVES anything — `/api/assistant/chat` writes the turn itself,
+ * from inside the request that produced it. `setSavingMessages` and
+ * `onSaveError` are inert as a result: a save failure is now a server-side
+ * warning, not a snackbar. Left wired rather than ripped out of four
+ * components, but nothing drives them.
+ */
 function MessageSaver({
   conversationId,
   setSavingMessages,
@@ -173,90 +181,20 @@ function MessageSaver({
         }
       }
 
-      // Convert to backend format
-      // ThreadMessage uses 'content' as the parts array
-      const messagesToSave = unsavedMessages.map(msg => {
-        // Extract text content and tool invocations from message content (parts array)
-        // A model that talks either side of a tool call produces several text
-        // parts; they're kept apart so the reloaded answer reads the way the
-        // live one did, rather than running two paragraphs into one line.
-        const textParts: string[] = []
-        const toolInvocations: Array<{ toolCallId: string; toolName: string; args: unknown; result?: unknown }> = []
-        // The same answer as a SEQUENCE. `content` and `toolInvocations` are two
-        // flattened columns and cannot express "prose, cards, more prose" — which
-        // is what made a reloaded answer render prose-first, which in turn is why
-        // the live renderer hoisted its text above its cards to match. Sent
-        // alongside the old pair rather than instead of it: everything else that
-        // reads a message (conversation history for the model, the suggestion
-        // refresh) still wants the flat form.
-        const parts: Array<Record<string, unknown>> = []
 
-        const contentParts = Array.isArray(msg.content) ? msg.content : []
-        for (const part of contentParts) {
-          if (!isRecord(part) || typeof part.type !== 'string') {
-            continue
-          }
-          if (part.type === 'text' && typeof part.text === 'string') {
-            if (part.text.trim()) {
-              textParts.push(part.text)
-              parts.push({ type: 'text', text: part.text })
-            }
-          } else if (
-            part.type === 'tool-call' &&
-            typeof part.toolCallId === 'string' &&
-            typeof part.toolName === 'string'
-          ) {
-            // In ThreadMessage, the result is embedded directly in the tool-call part
-            const invocation = {
-              toolCallId: part.toolCallId,
-              toolName: part.toolName,
-              args: part.args,
-              result: part.result,
-            }
-            toolInvocations.push(invocation)
-            parts.push({ type: 'tool', ...invocation })
-          }
-        }
-
-        return {
-          role: msg.role,
-          content: textParts.join('\n\n'),
-          ...(toolInvocations.length > 0 && { toolInvocations }),
-          ...(parts.length > 0 && { parts }),
-        }
-      })
-
-      // Save to backend
-      isSavingRef.current = true
-      setSavingMessages(true)
-
-      fetch(`/api/assistant/conversations/${conversationId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ messages: messagesToSave }),
-      })
-        .then((res) => {
-          if (!res.ok) {
-            return res.text().then(text => {
-              console.error('Failed to save messages:', text)
-              onSaveError()
-            })
-          }
-          savedCountRef.current = messages.length
-          if (lastMessage && lastMessage.role === 'assistant') {
-            lastSavedAssistantIdRef.current = lastMessage.id
-          }
-          fetchConversations() // Refresh to update titles
-        })
-        .catch(err => {
-          console.error('Failed to save messages:', err)
-          onSaveError()
-        })
-        .finally(() => {
-          isSavingRef.current = false
-          setSavingMessages(false)
-        })
+      // The turn is already saved. `/api/assistant/chat` writes it from inside
+      // the request that produced it, so a reader who switches conversation
+      // mid-turn no longer loses the exchange — which is what happened while
+      // this was the only writer, because it fires on `isRunning` going false
+      // and switching empties the runtime before that ever happens.
+      //
+      // What remains is the refresh: the conversation was just retitled from
+      // the first question, and the list in the sidebar still says "New Chat".
+      savedCountRef.current = messages.length
+      if (lastMessage && lastMessage.role === 'assistant') {
+        lastSavedAssistantIdRef.current = lastMessage.id
+      }
+      void fetchConversations()
     })
 
     return () => unsubscribe()
