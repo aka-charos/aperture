@@ -43,16 +43,29 @@ const MAX_REASON_CHARS = 320
  * worth checking" — with no notes at all. Small chunks run concurrently, so
  * this is both more reliable and faster than a single long completion.
  *
- * 4 rather than 8 because this stage is the wait. Measured on one live turn:
- * 115 of its 138 seconds were spent here, as two concurrent calls of ~1,160
- * output tokens each. A completion's latency is paid mostly per output token,
- * so halving the chunk roughly halves the wall clock — the same tokens, twice
- * as wide. It costs more requests against the writing model's rate limit,
- * which is the trade being made.
+ * It was briefly 4, on the theory that a completion's latency is paid per
+ * output token so a narrower chunk would finish sooner. Measured, it went the
+ * other way — 115 seconds became 135 — because a reasoning model pays a large
+ * FIXED cost per call to think before it writes anything, and halving the
+ * chunk doubles the number of calls paying it. Latency here is per call, not
+ * per token. Back to 8.
  */
-const BATCH_SIZE = 4
+const BATCH_SIZE = 8
 /** Output budget per title, generous enough that a 30-word answer never truncates. */
 const TOKENS_PER_REASON = 120
+/**
+ * Floor under the output budget, because a REASONING model bills its scratchpad
+ * from the same allowance as its prose (see the recommendation explanations,
+ * which hit this first). At 120 tokens a title the model spent the whole budget
+ * planning and the "answers" that came back were the plan, cut off mid-word:
+ * `The Queen of Spades (1949) - No research note provided… I need to check if
+ * it's actually inspired by Nosferatu… However, the rule says "Never invent
+ * facts. If y` — printed on a card, under a lightbulb icon.
+ *
+ * A cap is not a reservation, so headroom costs nothing on a model that answers
+ * straight away.
+ */
+const MIN_OUTPUT_TOKENS = 4000
 
 /**
  * A model chosen for prose. Text-generation first (its whole purpose), then the
@@ -97,6 +110,51 @@ function buildPrompt(queryText: string, items: ContentItem[]): string {
 }
 
 /**
+ * Phrases that mean the model is talking to ITSELF, not to the reader.
+ *
+ * A reasoning model asked for one sentence per title will, when it runs out of
+ * room or simply feels like it, hand back its plan in the answer's shape —
+ * numbered, one line per title, indistinguishable to the parser and grammatical
+ * enough to look deliberate. Live examples, printed on cards:
+ *
+ *   "Herzog's remake directly homage… I need to mention the direct homage"
+ *   "No research note provided, only synopsis… But the user included it in the
+ *    list, so I must write something. However, the rule says …"
+ *
+ * Any of these is proof the line is scratchpad. Second person is deliberately
+ * NOT here: "you'll recognise the silhouette" is a fine thing to tell a reader.
+ */
+const SCRATCHPAD_MARKERS = [
+  /\bI (?:need|have|want|should|must|will|can|could|am|'m)\b/i,
+  /\b(?:need|have|going) to (?:mention|check|write|say|note|verify)\b/i,
+  /\blet me\b/i,
+  /\bthe (?:user|prompt|rule|rules|instruction|instructions|request) (?:said|says|asked|wants|included|is)\b/i,
+  /\b(?:no |the )?research note\b/i,
+  /\bthe synopsis (?:doesn't|does not|suggests?|says)\b/i,
+  /\bnot (?:sure|aware) (?:if|whether|of)\b/i,
+]
+
+/**
+ * Whether a parsed line is something to show a reader.
+ *
+ * Fails toward the ORIGINAL note: every rejection here costs a sharper sentence
+ * and keeps the web-sourced one, while every false accept prints the model's
+ * inner monologue on a card. Those are not symmetric, so the bar is "obviously
+ * addressed to the reader", not "probably fine".
+ *
+ * Pure and exported so it can be pinned by a test.
+ */
+export function isPresentableReason(reason: string): boolean {
+  const text = reason.trim()
+  // Long enough to be a sentence. Short fragments are the tail of a thought.
+  if (text.length < 25) return false
+  // Truncation is the tell that the budget ran out mid-thought, and MAX_REASON_CHARS
+  // marks its own clipping with the same character.
+  if (text.endsWith('…')) return false
+  return !SCRATCHPAD_MARKERS.some((marker) => marker.test(text))
+}
+
+/**
  * Parse `<number> | <reason>` lines tolerantly (accepts . ) : - as separators too,
  * and strips stray markdown/quotes). Returns 1-based index → reason.
  */
@@ -112,7 +170,11 @@ export function parseReasonLines(text: string): Map<number, string> {
       .replace(/^["'`]|["'`]$/g, '')
       .trim()
     if (!reason) continue
-    if (!out.has(index)) out.set(index, truncate(reason, MAX_REASON_CHARS))
+    // Clip first, then judge: the clip is what makes an over-long line end in an
+    // ellipsis, and an answer cut off mid-thought is exactly what to reject.
+    const clipped = truncate(reason, MAX_REASON_CHARS)
+    if (!isPresentableReason(clipped)) continue
+    if (!out.has(index)) out.set(index, clipped)
   }
   return out
 }
@@ -141,7 +203,7 @@ async function rewriteChunk(
   const { text } = await generateText({
     model,
     maxRetries: SDK_MAX_RETRIES,
-    maxOutputTokens: chunk.length * TOKENS_PER_REASON + 200,
+    maxOutputTokens: Math.max(chunk.length * TOKENS_PER_REASON + 200, MIN_OUTPUT_TOKENS),
     prompt: buildPrompt(
       queryText,
       chunk.map((entry) => entry.item)

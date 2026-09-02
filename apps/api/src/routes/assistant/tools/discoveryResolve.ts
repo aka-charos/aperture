@@ -133,6 +133,22 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
           ? await filterUnwatchedItems(ctx.userId, resolved.items)
           : resolved.items
 
+        // The library's answer rate for this request, which nothing recorded
+        // before: a turn that shipped four cards out of eleven web picks looked
+        // from the log exactly like a turn that found four, and the only way to
+        // tell them apart was counting posters in a screenshot. `matched` is
+        // also the number the model reads when it decides whether to supplement,
+        // so it belongs next to the decision it drives.
+        logger.info(
+          {
+            candidates: candidates.length,
+            matched: resolved.items.length,
+            notInLibrary: resolved.notInLibrary.length,
+            droppedAsWatched: resolved.items.length - webItems.length,
+          },
+          'Discovery candidates resolved against the library'
+        )
+
         // Secondary section: embeddings-similar to the referenced title, deduped
         // against the web picks so nothing appears twice. Only when a title was given.
         let alsoItems: ContentItem[] = []
