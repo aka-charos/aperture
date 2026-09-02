@@ -41,7 +41,7 @@ import { useTranslation } from 'react-i18next'
 import { RankBadge, getProxiedImageUrl } from '@aperture/ui'
 import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
 import { gradients, extraColors } from '@/theme'
-import { COMPACT_THREAD } from '../density'
+import { COMPACT_THREAD, chatText } from '../density'
 import type { ContentItem } from './types'
 
 interface ContentCardProps {
@@ -69,8 +69,15 @@ const POSTER_HEIGHT = 126
  * two cards have to line up.
  */
 const LIST_OVERVIEW_CHARS = 320
-/** Average glyph advance at caption size (12px), off the rendered cards. */
-const CAPTION_CHAR_PX = 6.5
+/**
+ * Average glyph advance at caption size, off the rendered cards: 6.5px was
+ * measured at MUI's 12px caption, and the chat now renders that variant
+ * `CHAT_TEXT_SCALE` larger. It has to travel with the font — the budget above is
+ * in characters and this is the only thing converting it to lines, so leaving it
+ * behind would silently hand every list card an extra line of synopsis it has no
+ * room for.
+ */
+const CAPTION_CHAR_PX = chatText(6.5)
 const LIST_OVERVIEW_MIN_LINES = 4
 const LIST_OVERVIEW_MAX_LINES = 8
 /** Carousel cards are a fixed width everywhere, so their clamps can be fixed too. */
@@ -275,7 +282,7 @@ export function ContentCard({
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#666',
-                fontSize: 10,
+                fontSize: chatText(10),
                 textAlign: 'center',
                 px: 0.5,
               }}
@@ -322,7 +329,7 @@ export function ContentCard({
                 <StarIcon sx={{ fontSize: 12, color: '#ffc107' }} />
                 <Typography
                   variant="caption"
-                  sx={{ color: '#ffc107', fontWeight: 600, fontSize: 11, lineHeight: 1.3 }}
+                  sx={{ color: '#ffc107', fontWeight: 600, fontSize: chatText(11), lineHeight: 1.3 }}
                 >
                   {Number(item.rating).toFixed(1)}
                 </Typography>
@@ -336,7 +343,7 @@ export function ContentCard({
                 <StarIcon sx={{ fontSize: 12, color: '#ec4899' }} />
                 <Typography
                   variant="caption"
-                  sx={{ color: '#ec4899', fontWeight: 600, fontSize: 11, lineHeight: 1.3 }}
+                  sx={{ color: '#ec4899', fontWeight: 600, fontSize: chatText(11), lineHeight: 1.3 }}
                 >
                   {item.userRating}
                 </Typography>
@@ -350,7 +357,7 @@ export function ContentCard({
         {genreLine && (
           <Typography
             variant="caption"
-            sx={{ color: '#71717a', fontSize: 10, lineHeight: 1.35, ...clampLines(2) }}
+            sx={{ color: '#71717a', fontSize: chatText(10), lineHeight: 1.35, ...clampLines(2) }}
           >
             {genreLine}
           </Typography>
@@ -395,7 +402,7 @@ export function ContentCard({
               height: 18,
               bgcolor: item.type === 'movie' ? alpha(theme.palette.primary.main, 0.15) : 'rgba(16, 185, 129, 0.15)',
               color: item.type === 'movie' ? theme.palette.primary.light : '#10b981',
-              '& .MuiChip-label': { px: 0.625, fontSize: 10 },
+              '& .MuiChip-label': { px: 0.625, fontSize: chatText(10) },
             }}
           />
         </Box>
@@ -482,7 +489,7 @@ export function ContentCard({
               minWidth: 0,
               px: 0.5,
               py: 0,
-              fontSize: 11,
+              fontSize: chatText(11),
               textTransform: 'none',
               color: theme.palette.primary.light,
               '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
@@ -506,7 +513,7 @@ export function ContentCard({
               minWidth: 0,
               px: 1,
               py: 0.25,
-              fontSize: 11,
+              fontSize: chatText(11),
               borderColor: extraColors.subtleBorder,
               color: '#a1a1aa',
               '&:hover': {
@@ -530,7 +537,7 @@ export function ContentCard({
                 minWidth: 0,
                 px: 1,
                 py: 0.25,
-                fontSize: 11,
+                fontSize: chatText(11),
                 background: gradients.primaryToSecondary,
                 '&:hover': {
                   background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.secondary.dark} 100%)`,
