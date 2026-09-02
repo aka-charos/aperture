@@ -72,7 +72,7 @@ export function registerConversationHandlers(fastify: FastifyInstance) {
         }
 
         const messages = await query<MessageRow>(
-          `SELECT id, role, content, tool_invocations, created_at
+          `SELECT id, role, content, tool_invocations, parts, created_at
            FROM assistant_messages
            WHERE conversation_id = $1
            ORDER BY created_at ASC`,
@@ -152,7 +152,17 @@ export function registerConversationHandlers(fastify: FastifyInstance) {
    */
   fastify.post<{
     Params: { id: string }
-    Body: { messages: Array<{ role: string; content: string; toolInvocations?: unknown[] }> }
+    Body: {
+      messages: Array<{
+        role: string
+        content: string
+        toolInvocations?: unknown[]
+        // The same answer as a sequence rather than two flattened columns; see
+        // migration 0158. Optional, because a client that does not send it must
+        // keep saving perfectly usable rows.
+        parts?: unknown[]
+      }>
+    }
   }>(
     '/api/assistant/conversations/:id/messages',
     { preHandler: requireAuth, schema: { tags: ["ai-assistant"] } },
@@ -174,9 +184,17 @@ export function registerConversationHandlers(fastify: FastifyInstance) {
       // Insert messages
       for (const msg of messages) {
         await query(
-          `INSERT INTO assistant_messages (conversation_id, role, content, tool_invocations)
-           VALUES ($1, $2, $3, $4)`,
-          [id, msg.role, msg.content, msg.toolInvocations ? JSON.stringify(msg.toolInvocations) : null]
+          `INSERT INTO assistant_messages (conversation_id, role, content, tool_invocations, parts)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [
+            id,
+            msg.role,
+            msg.content,
+            msg.toolInvocations ? JSON.stringify(msg.toolInvocations) : null,
+            // An empty array is as good as absent and would only make a row
+            // claim an order it does not have.
+            msg.parts?.length ? JSON.stringify(msg.parts) : null,
+          ]
         )
       }
 
