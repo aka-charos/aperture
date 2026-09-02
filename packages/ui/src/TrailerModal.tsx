@@ -112,6 +112,15 @@ export function TrailerModal({ open, onClose, watchUrl, title }: TrailerModalPro
               src={embedUrl}
               title={heading}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              // Load-bearing, and it looks like noise: the API answers every request
+              // with `Referrer-Policy: no-referrer`, and the YouTube player refuses to
+              // initialise without a Referer — it replaces itself with its own "Video
+              // player configuration error / Error 153" page inside the frame. An
+              // element's referrerpolicy overrides the document's, so this is the
+              // narrow fix: YouTube learns the origin, every other request on the site
+              // still sends nothing. Loosening the global header would work too and is
+              // the wrong trade — this is the only cross-origin frame in the app.
+              referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
               sx={{
                 position: 'absolute',
