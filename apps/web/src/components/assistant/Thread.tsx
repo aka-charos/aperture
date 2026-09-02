@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { Box, Paper, Typography, Avatar, CircularProgress, TextField, IconButton, Button, Tooltip, Checkbox, FormControlLabel, Fab } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
+import { ThemeProvider, useTheme } from '@mui/material/styles'
 import { useTranslation } from 'react-i18next'
 import SendIcon from '@mui/icons-material/Send'
 import StopIcon from '@mui/icons-material/Stop'
@@ -41,7 +41,7 @@ import {
 import { ToolResultError } from './ToolResultError'
 import { useUnwatchedOnly, setUnwatchedOnly } from './unwatchedPreference'
 import { useStatusPhase, setStatusPhase } from './assistantStatus'
-import { NARROW_THREAD, COMPACT_THREAD } from './density'
+import { NARROW_THREAD, COMPACT_THREAD, chatText, scaleChatTypography } from './density'
 import { gradients, extraColors } from '@/theme'
 
 /** Shared avatar geometry; it shrinks on a compact thread and goes on a narrow one. */
@@ -1154,7 +1154,28 @@ function useVisibleHistory(historicalMessages: HistoricalMessage[]): HistoricalM
   return historicalMessages.slice(0, -1)
 }
 
-export function Thread({ historicalMessages = [], pending = false, suggestions = [] }: ThreadProps) {
+/**
+ * The chat runs its text a notch larger than the rest of the app (see
+ * CHAT_TEXT_SCALE). The nested theme is what reaches every `Typography` variant
+ * in the conversation and the composer, since those resolve against the root
+ * font size and so ignore any font-size the thread sets on its own box.
+ *
+ * It is mounted here rather than on the surface deliberately: the surface also
+ * hosts MediaDetailModalProvider, which renders a whole media page, and that
+ * page is not chat text.
+ */
+export function Thread(props: ThreadProps) {
+  const outerTheme = useTheme()
+  const chatTheme = useMemo(() => scaleChatTypography(outerTheme), [outerTheme])
+
+  return (
+    <ThemeProvider theme={chatTheme}>
+      <ThreadBody {...props} />
+    </ThemeProvider>
+  )
+}
+
+function ThreadBody({ historicalMessages = [], pending = false, suggestions = [] }: ThreadProps) {
   const visibleHistory = useVisibleHistory(historicalMessages)
   const hasHistoricalMessages = visibleHistory.length > 0
   const viewportRef = useRef<HTMLDivElement | null>(null)
@@ -1196,6 +1217,11 @@ export function Thread({ historicalMessages = [], pending = false, suggestions =
             flexDirection: 'column',
             gap: 4,
             minWidth: 0,
+            // Markdown prose declares no size of its own and inherits from the
+            // body, so the nested theme above cannot reach it — this is the
+            // answer text itself. Nothing double-scales: a MUI variant resolves
+            // against the root font size and ignores this.
+            fontSize: chatText(16),
             // Query target for NARROW_THREAD. The thread is squeezed by things the
             // viewport knows nothing about — the dock's width, a dialog on a phone
             // — so its own box is the only honest source for "how narrow are we".

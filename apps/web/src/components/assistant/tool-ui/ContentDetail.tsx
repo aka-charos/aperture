@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next'
 import { getProxiedImageUrl } from '@aperture/ui'
 import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
 import { gradients, extraColors } from '@/theme'
+import { chatText } from '../density'
 import type { ContentDetailData } from './types'
 
 interface ContentDetailProps {
@@ -79,7 +80,7 @@ export function ContentDetail({ data }: ContentDetailProps) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#666',
-                fontSize: 12,
+                fontSize: chatText(12),
               }}
             >
               {t('assistantToolUi.noImage')}

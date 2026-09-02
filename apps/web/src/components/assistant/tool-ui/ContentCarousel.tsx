@@ -16,7 +16,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd'
 import { ContentCard } from './ContentCard'
 import { CreatePlaylistFromSuggestionsDialog } from './CreatePlaylistFromSuggestionsDialog'
-import { COMPACT_THREAD } from '../density'
+import { COMPACT_THREAD, chatText } from '../density'
 import { extraColors } from '@/theme'
 import type { ContentCarouselData, ContentItem } from './types'
 
@@ -238,7 +238,7 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
           onClick={() => setDialogOpen(true)}
           sx={{
             flexShrink: 0,
-            fontSize: 11,
+            fontSize: chatText(11),
             py: 0.25,
             whiteSpace: 'nowrap',
             borderColor: extraColors.subtleBorder,
