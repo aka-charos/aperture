@@ -5,6 +5,7 @@
 import { z } from 'zod'
 import type { ToolSet } from 'ai'
 import { toolErrorText } from '../helpers/errors.js'
+import { isAsyncToolResult } from '../helpers/toolStream.js'
 
 /**
  * Normalize tool arguments for local LLM compatibility.
@@ -75,13 +76,32 @@ export function withToolErrorHandling<T extends ToolSet>(tools: T): T {
     Object.entries(tools).map(([name, toolDef]) => {
       const execute = toolDef.execute
       if (!execute) return [name, toolDef]
-      const guarded: typeof execute = async (input, options) => {
+      const failure = (err: unknown) => {
+        console.error(`[${name}] Tool error:`, err)
+        return { id: `error-${Date.now()}`, error: toolErrorText(err) }
+      }
+      // Not `async`: a tool that streams its results returns an async iterable,
+      // and awaiting one here would hand the SDK a promise of a generator,
+      // whose output serialises to `{}` (see helpers/toolStream.ts). A stream
+      // that fails partway yields the error payload LAST, which is what makes
+      // it the final output — the same contract as returning it.
+      const guarded: typeof execute = (input, options) => {
+        let raw: unknown
         try {
-          return await execute(input, options)
+          raw = execute(input, options)
         } catch (err) {
-          console.error(`[${name}] Tool error:`, err)
-          return { id: `error-${Date.now()}`, error: toolErrorText(err) }
+          return failure(err)
         }
+        if (isAsyncToolResult(raw)) {
+          return (async function* () {
+            try {
+              for await (const chunk of raw) yield chunk
+            } catch (err) {
+              yield failure(err)
+            }
+          })()
+        }
+        return Promise.resolve(raw).catch(failure)
       }
       return [name, { ...toolDef, execute: guarded }]
     })

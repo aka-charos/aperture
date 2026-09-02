@@ -14,6 +14,7 @@
 import type { ToolSet } from 'ai'
 import { query } from '../../../lib/db.js'
 import type { ContentItem } from '../schemas/index.js'
+import { mapToolResult } from './toolStream.js'
 
 /** Ids the user has already watched, out of the ones asked about. */
 async function watchedIds(
@@ -148,15 +149,18 @@ export function withUnwatchedFilter<T extends ToolSet>(tools: T, userId: string)
     Object.entries(tools).map(([name, toolDef]) => {
       const execute = toolDef.execute
       if (!execute || EXEMPT_TOOLS.has(name)) return [name, toolDef]
-      const filtered: typeof execute = async (input, options) => {
-        const result = await execute(input, options)
+      // Not `async`, and every result goes through mapToolResult: a tool that
+      // streams its cards hands back an async iterable, and awaiting one here
+      // would filter nothing and destroy the stream (see toolStream.ts).
+      const filtered: typeof execute = (input, options) => {
         // An explicit `watchStatus: 'watched'` IS the question ("which noir have
         // I seen?"), so stripping watched titles would empty the answer — the
         // same reason EXEMPT_TOOLS exists, but decided per CALL rather than per
         // tool, because the same search tool serves both kinds of request.
         // Only 'watched' overrides: 'all' is the model's default, not a user
         // intent, and must still honour the composer's preference.
-        if (isRecord(input) && input.watchStatus === 'watched') return result
+        if (isRecord(input) && input.watchStatus === 'watched') return execute(input, options)
+        return mapToolResult(execute(input, options), async (result) => {
         const containers = cardContainers(result)
         if (containers.length === 0) return result
 
@@ -177,6 +181,7 @@ export function withUnwatchedFilter<T extends ToolSet>(tools: T, userId: string)
           })
         )
         return result
+        })
       }
       return [name, { ...toolDef, execute: filtered }]
     })
