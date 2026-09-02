@@ -3,6 +3,7 @@ import { registerWatchHistoryHandlers } from './profile/watchHistory.js'
 import { registerUserPreferencesHandlers } from './profile/userPreferences.js'
 import { registerTasteProfileHandlers } from './profile/tasteProfile.js'
 import { registerWatchStatsHandlers } from './profile/watchStats.js'
+import { registerWatchStatsBreakdownHandlers } from './profile/watchStatsBreakdown.js'
 import { registerWatchHistoryManagementHandlers } from './profile/watchHistoryManagement.js'
 import { registerLibraryExclusionsHandlers } from './profile/libraryExclusions.js'
 import { registerAlgorithmSettingsHandlers } from './profile/algorithmSettings.js'
@@ -13,6 +14,7 @@ export function registerProfileHandlers(fastify: FastifyInstance) {
   registerUserPreferencesHandlers(fastify)
   registerTasteProfileHandlers(fastify)
   registerWatchStatsHandlers(fastify)
+  registerWatchStatsBreakdownHandlers(fastify)
   registerWatchHistoryManagementHandlers(fastify)
   registerLibraryExclusionsHandlers(fastify)
   registerAlgorithmSettingsHandlers(fastify)

@@ -1828,7 +1828,8 @@
     "topGenres": "Top-Genres",
     "errSaveInterest": "Couldn't save that interest",
     "errRemoveInterest": "Couldn't remove that interest",
-    "genreSharedNote": "These weights are shared between movies and TV series."
+    "genreSharedNote": "These weights are shared between movies and TV series.",
+    "regenerateIdentity": "Regenerate"
   },
   "algorithmSettings": {
     "weightSimilarity": "Ähnlichkeit",
@@ -4147,7 +4148,23 @@
     "sectionMostRewatched": "Most Rewatched",
     "rewatchPlayCount_one": "{{count}} plays",
     "rewatchPlayCount_other": "{{count}} plays",
-    "emptyRewatchData": "You haven't rewatched anything yet"
+    "emptyRewatchData": "You haven't rewatched anything yet",
+    "sectionSeriesGenres": "TV Genres You Watch",
+    "emptySeriesGenreData": "No TV genre data available",
+    "clickHintMonth": "Pick a month to see what you watched",
+    "ratingBucketLabel": "Rated {{rating}}",
+    "heatmapCellLabel": "{{day}} at {{hour}}",
+    "breakdownLoading": "Looking these up…",
+    "breakdownCount_one": "{{count}} title",
+    "breakdownCount_other": "{{count}} titles",
+    "breakdownShowingOf": "Showing {{shown}} of {{total}}, most recent first",
+    "breakdownEmpty": "Nothing to show here",
+    "breakdownError": "Could not load these titles",
+    "breakdownPlays": "×{{count}}",
+    "breakdownEpisodes_one": "{{count}} episode",
+    "breakdownEpisodes_other": "{{count}} episodes",
+    "breakdownViewPerson": "Full filmography",
+    "breakdownViewStudio": "All titles"
   },
   "jobsUi": {
     "logsEmpty": "Noch keine Protokolleinträge.",
