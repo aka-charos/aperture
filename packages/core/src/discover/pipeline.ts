@@ -325,10 +325,22 @@ export async function getDiscoveryEnabledUsers(): Promise<DiscoveryUser[]> {
     discover_request_enabled: boolean
     trakt_access_token: string | null
   }>(
+    // `provider_disabled` belongs here, and discovery was the only per-user
+    // work loop in the codebase without it. Every other one gates on it -- both
+    // recommender pipelines, both STRM writers, both watch-history syncs,
+    // twinAffinity and rebuildAllTasteProfiles -- and strm/cleanup.ts treats it
+    // as grounds to DELETE a user's generated output. So discovery was building
+    // suggestions, spending TMDb and embedding calls, and holding Seerr request
+    // rights for viewers the media server no longer has.
+    //
+    // The column is synced from the server's own Policy.IsDisabled by
+    // users/sync.ts, so it is the media server's answer rather than ours.
     `SELECT id, username, provider_user_id, max_parental_rating,
             discover_enabled, discover_request_enabled, trakt_access_token
      FROM users
-     WHERE is_enabled = true AND discover_enabled = true`
+     WHERE is_enabled = true
+       AND discover_enabled = true
+       AND provider_disabled = false`
   )
 
   return result.rows.map(row => ({
@@ -555,9 +567,11 @@ export async function regenerateUserDiscovery(
     discover_enabled: boolean
     discover_request_enabled: boolean
     trakt_access_token: string | null
+    provider_disabled: boolean
   }>(
     `SELECT id, username, provider_user_id, max_parental_rating,
-            discover_enabled, discover_request_enabled, trakt_access_token
+            discover_enabled, discover_request_enabled, trakt_access_token,
+            provider_disabled
      FROM users WHERE id = $1`,
     [userId]
   )
@@ -568,6 +582,15 @@ export async function regenerateUserDiscovery(
 
   if (!user.discover_enabled) {
     throw new Error('Discovery not enabled for user')
+  }
+
+  // Checked here as well as in the job's user list, because the auth plugin
+  // gates on is_enabled ALONE -- it never reads provider_disabled -- so a
+  // viewer the media server has dropped can still hold a valid session and
+  // press Refresh. Guarding only the scheduled path would leave the manual one
+  // as the way around it.
+  if (user.provider_disabled) {
+    throw new Error('Discovery is unavailable: this account is disabled on the media server')
   }
 
   // The stored configuration, not the shipped defaults — the scheduled job and
