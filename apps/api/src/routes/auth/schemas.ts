@@ -235,6 +235,28 @@ export const deleteFilterPresetSchema = {
   },
 }
 
+export const startImpersonationSchema = {
+  tags: ['auth'],
+  summary: 'View the app as another user',
+  description:
+    'Admin only. Layers a read-only assumed session on top of the admin’s own session — their session cookie is untouched, so stopping is always possible. Nothing is written to the target account: no login timestamp, no session row, and every unsafe HTTP method is refused while the assumption is active.',
+  body: {
+    type: 'object',
+    required: ['userId'],
+    additionalProperties: false,
+    properties: {
+      userId: { type: 'string', format: 'uuid', description: 'Aperture user to view the app as' },
+    },
+  },
+}
+
+export const stopImpersonationSchema = {
+  tags: ['auth'],
+  summary: 'Return to your own session',
+  description:
+    'Ends an assumed session and returns the caller to their own account. Succeeds even when no assumption is active.',
+}
+
 export const authCheckSchema = {
   tags: ['auth'],
   summary: 'Check authentication',

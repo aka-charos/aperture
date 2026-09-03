@@ -7,9 +7,10 @@
 
 import { useState, useEffect, useCallback, type ReactNode } from 'react'
 import { ViewModeContext, type PageKey, type ViewMode } from './view-mode-context'
+import { VIEW_MODES_CACHE_KEY } from '@/lib/clientCaches'
 
 const DEFAULT_VIEW_MODE: ViewMode = 'grid'
-const STORAGE_KEY = 'aperture-view-modes'
+const STORAGE_KEY = VIEW_MODES_CACHE_KEY
 
 // Get initial state from localStorage for instant loading (no flash)
 function getInitialViewModes(): Record<PageKey, ViewMode> {

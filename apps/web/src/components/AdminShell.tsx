@@ -141,7 +141,9 @@ export function AdminShell() {
               width: NAV_WIDTH,
               flexShrink: 0,
               position: 'sticky',
-              top: 88,
+              // App bar + 24px. Same reason as the cap below: the bar's height is
+              // not a constant while an assumed session is on screen.
+              top: 'calc(var(--aperture-chrome-top, 64px) + 24px)',
               /**
                * The rail is as tall as its content, up to the viewport.
                *
@@ -158,7 +160,9 @@ export function AdminShell() {
                * asked for `height: 100%` of a parent with no definite height,
                * which resolves to `auto` and overflows a `maxHeight` silently.
                */
-              maxHeight: 'calc(100vh - 112px)',
+              // 112px was the app bar plus Layout's main padding. The bar half is
+              // a variable now because it grows by the impersonation banner.
+              maxHeight: 'calc(100vh - var(--aperture-chrome-top, 64px) - 48px)',
               borderRadius: 2,
               border: 1,
               borderColor: 'divider',

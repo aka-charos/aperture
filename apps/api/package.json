@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "test:security": "node --import tsx --test src/config/security.test.ts",
+    "test:auth": "node --import tsx --test src/lib/impersonation.test.ts",
     "test:schemas": "node --import tsx --test src/routes/aiFunctionSchemas.test.ts",
     "test:jobs": "node --import tsx --test src/routes/jobs/jobDefaults.test.ts src/routes/jobs/state.test.ts",
     "lint": "eslint src",

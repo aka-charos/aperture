@@ -14,8 +14,9 @@
 import { useState, useCallback, useEffect, type ReactNode } from 'react'
 import { PosterDisplaySettingsContext } from '@aperture/ui'
 import { PosterPrefsContext } from './poster-prefs-context'
+import { POSTER_PREFS_CACHE_KEY } from '@/lib/clientCaches'
 
-const STORAGE_KEY = 'aperture-poster-prefs'
+const STORAGE_KEY = POSTER_PREFS_CACHE_KEY
 
 interface CachedPrefs {
   /** User override: true/false explicit, null = inherit the server default */

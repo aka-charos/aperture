@@ -6,13 +6,14 @@
  */
 
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
+import { WATCHING_CACHE_KEY } from '@/lib/clientCaches'
 import {
   WatchingContext,
   type WatchingRefreshResult,
   type WatchingSeries,
 } from './watching-context'
 
-const CACHE_KEY = 'aperture_watching_cache'
+const CACHE_KEY = WATCHING_CACHE_KEY
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 1 day in milliseconds
 
 interface CachedData {

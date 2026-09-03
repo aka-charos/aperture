@@ -99,11 +99,23 @@ export interface UserUiPreferences {
 }
 
 /**
- * Get user settings, creating default if not exists
+ * Get user settings.
+ *
+ * Reads only. It used to INSERT a defaults row when none existed, which made a
+ * getter a writer — and it is reached from several GET handlers, including
+ * `GET /api/auth/me/preferences` on every page load. That was invisible until
+ * an assumed session (an admin viewing the app as someone else) had to promise
+ * it wrote nothing to the target: the first page load stamped a row, with
+ * created_at/updated_at saying that user did something they did not do.
+ *
+ * Removing it is behaviour-preserving because an absent row and a defaults row
+ * mean the same thing to every reader, and the function already had the
+ * "return defaults" branch below for a case it thought could not happen. The
+ * two writers that need the row (`updateUserSettings`,
+ * `updateUserUiPreferences`) each do their own INSERT ... ON CONFLICT first.
  */
 export async function getUserSettings(userId: string): Promise<UserSettings> {
-  // Try to get existing settings
-  let settings = await queryOne<{
+  const settings = await queryOne<{
     user_id: string
     library_name: string | null
     series_library_name: string | null
@@ -116,25 +128,9 @@ export async function getUserSettings(userId: string): Promise<UserSettings> {
     [userId]
   )
 
-  // Create default settings if not exists
   if (!settings) {
-    await query(`INSERT INTO user_settings (user_id) VALUES ($1) ON CONFLICT DO NOTHING`, [userId])
-    settings = await queryOne<{
-      user_id: string
-      library_name: string | null
-      series_library_name: string | null
-      settings_json: Record<string, unknown>
-      created_at: Date
-      updated_at: Date
-    }>(
-      `SELECT user_id, library_name, series_library_name, settings_json, created_at, updated_at
-       FROM user_settings WHERE user_id = $1`,
-      [userId]
-    )
-  }
-
-  if (!settings) {
-    // This shouldn't happen, but return defaults just in case
+    // No row yet. Defaults are exactly what an absent row means, so this is the
+    // answer rather than a fallback — and nothing is written to get here.
     return {
       userId,
       libraryName: null,

@@ -28,6 +28,7 @@ export interface AuthCleanupResult {
   expiredSessions: number
   idleSessions: number
   staleLoginAttempts: number
+  expiredImpersonations: number
 }
 
 /**
@@ -48,10 +49,19 @@ export async function cleanupExpiredAuthState(): Promise<AuthCleanupResult> {
         AND last_failed_at < NOW() - INTERVAL '1 day'`
   )
 
+  // Assumption grants ("view as user"). Deleting on the exact deadline is safe
+  // here, unlike sessions above: the auth plugin already refuses a lapsed grant
+  // before this job ever sees it, so the row is dead either way and there is no
+  // live state for a boundary disagreement to cost.
+  const impersonations = await query(
+    'DELETE FROM impersonation_sessions WHERE expires_at < NOW()'
+  )
+
   const result: AuthCleanupResult = {
     expiredSessions: expired.rowCount ?? 0,
     idleSessions: idle.rowCount ?? 0,
     staleLoginAttempts: attempts.rowCount ?? 0,
+    expiredImpersonations: impersonations.rowCount ?? 0,
   }
 
   logger.info(result, 'Auth cleanup complete')

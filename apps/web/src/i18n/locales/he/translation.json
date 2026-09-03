@@ -243,7 +243,14 @@
       "sortLastLogin": "Web Login",
       "sortLastActivity": "{{provider}} Activity",
       "sortAscending": "Ascending — click to reverse",
-      "sortDescending": "Descending — click to reverse"
+      "sortDescending": "Descending — click to reverse",
+      "menuViewAs": "View the app as this user",
+      "menuViewAsSecondary": "Read-only. Nothing is saved to their account.",
+      "viewAsNotImported": "Only imported users can be viewed",
+      "viewAsDisabled": "This account is disabled",
+      "viewAsSelf": "This is your own account",
+      "viewAsAlreadyActive": "You are already viewing the app as someone else",
+      "viewAsError": "Could not view the app as {{name}}: {{error}}"
     },
     "userDetail": {
       "userNotFound": "המשתמש לא נמצא",
@@ -4988,5 +4995,14 @@
       "defaultSeeds": "default",
       "loadError": "Could not load the archived evaluations."
     }
+  },
+  "impersonation": {
+    "bannerViewingAs": "Viewing as {{name}}",
+    "bannerReadOnly": "Read-only — nothing is saved to their account",
+    "bannerExit": "Back to {{name}}",
+    "bannerAutoEnd_one": "Ends in {{count}} min",
+    "bannerAutoEnd_other": "Ends in {{count}} min",
+    "bannerAutoEndTooltip_one": "This view ends by itself in {{count}} minute, and you return to your own session.",
+    "bannerAutoEndTooltip_other": "This view ends by itself in {{count}} minutes, and you return to your own session."
   }
 }
