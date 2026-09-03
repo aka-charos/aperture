@@ -180,6 +180,11 @@ export const JOB_SCHEDULE_DEFAULTS: Record<
   'enrich-studio-logos': { scheduleType: 'daily', hour: 5, minute: 30 },
   'enrich-mdblist': { scheduleType: 'daily', hour: 7, minute: 0 },
   'generate-discovery-suggestions': { scheduleType: 'daily', hour: 6, minute: 0 },
+  // Scheduled ahead of generate-discovery-suggestions (06:00) on purpose: the
+  // exclusion set is rebuilt from request status at the start of every run, so
+  // reconciling first is what lets a title declined in Seerr come back in the
+  // same night's suggestions rather than a day later.
+  'reconcile-discovery-requests': { scheduleType: 'daily', hour: 4, minute: 30 },
 
   // === WEEKLY (Sunday) ===
   'refresh-assistant-suggestions': { scheduleType: 'weekly', hour: 0, minute: 0, dayOfWeek: 0 },

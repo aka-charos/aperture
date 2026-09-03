@@ -143,6 +143,19 @@ export interface DiscoveryConfig {
   recencyWeight: number
   // Time period for Trakt trending/popular
   traktPeriod: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all'
+  /**
+   * Ceiling on how many pool rows are merged into one user's run.
+   *
+   * The pool only ever grows -- a global fetch adds titles and never removes
+   * them -- so an unbounded read makes every run slower than the last while
+   * dragging progressively staler titles into the candidate mix. Read
+   * popularity-first, so the cap drops the tail rather than a random slice.
+   * Comfortably above maxTotalCandidates, since filtering removes a large
+   * share before anything is stored.
+   */
+  maxPoolCandidates: number
+  /** Pool rows not re-seen by any global fetch for this long are pruned. */
+  poolMaxAgeDays: number
 }
 
 export const DEFAULT_DISCOVERY_CONFIG: DiscoveryConfig = {
@@ -156,6 +169,8 @@ export const DEFAULT_DISCOVERY_CONFIG: DiscoveryConfig = {
   popularityWeight: 0.3,
   recencyWeight: 0.2,
   traktPeriod: 'weekly',
+  maxPoolCandidates: 3000,
+  poolMaxAgeDays: 30,
 }
 
 export interface RawCandidate {
@@ -179,6 +194,24 @@ export interface RawCandidate {
   directors?: string[]
   runtimeMinutes?: number | null
   tagline?: string | null
+  /**
+   * Whether full metadata (cast, crew, runtime, tagline, IMDb id) has already
+   * been fetched for this candidate -- set when it arrives from a pool row that
+   * a previous run enriched, so enrichMissingData can skip it.
+   *
+   * Absent means "not known to be enriched" and therefore re-enriches, which is
+   * the safe direction: paying for a redundant lookup costs a request, whereas
+   * trusting an absent flag would ship cards with no cast.
+   */
+  isEnriched?: boolean
+  /**
+   * The shared pool row this candidate came from, when it came from one.
+   *
+   * Absent for a candidate from a personalized source, which has no pool row.
+   * Carried so storeDiscoveryCandidates can populate discovery_candidates
+   * .pool_id -- a column added by migration 0098 that nothing ever wrote.
+   */
+  poolId?: string
 }
 
 export interface ScoredCandidate extends RawCandidate {

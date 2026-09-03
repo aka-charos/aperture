@@ -18,7 +18,6 @@ export {
 
 // Sources
 export {
-  fetchAllCandidates,
   fetchFilteredCandidates,
   fetchGenreStripDiscoverCandidates,
   enrichFullData,
@@ -36,13 +35,36 @@ export {
 export {
   filterCandidates,
   getCandidateExclusionTmdbIds,
-  isInLibrary,
-  hasWatched,
 } from './filter.js'
+
+// Candidate embeddings (the taste term's vectors)
+export {
+  getCandidateEmbeddings,
+  buildCandidateCanonicalText,
+  getLibraryEmbeddingMean,
+  centreVector,
+  clearOrphanedCandidateEmbeddings,
+} from './embeddings.js'
+
+// Configuration (admin-tunable pipeline knobs)
+export {
+  getDiscoveryConfig,
+  setDiscoveryConfig,
+  sanitizeDiscoveryConfig,
+  DISCOVERY_CONFIG_BOUNDS,
+} from './config.js'
+
+// Reconciliation (Seerr request status sweep)
+export {
+  reconcileDiscoveryRequests,
+  resolveRequestStatus,
+  type ReconcileResult,
+} from './reconcile.js'
 
 // Scorer
 export {
   scoreCandidates,
+  popularityScoresBySource,
 } from './scorer.js'
 
 // Storage
@@ -63,9 +85,6 @@ export {
   // Pool storage (shared candidates)
   upsertPoolCandidates,
   getPoolCandidates,
-  getPoolCandidateByTmdbId,
-  updatePoolCandidateEnrichment,
-  getUnenrichedPoolCandidates,
   clearOldPoolEntries,
   poolCandidateToRaw,
 } from './storage.js'

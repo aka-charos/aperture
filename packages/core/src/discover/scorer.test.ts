@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { maxTasteSimilarity } from './scorer.js'
+import { maxTasteSimilarity, franchiseKeys } from './scorer.js'
 
 /** Plain cosine, normalized to [0,1] the way the scorer reports similarity. */
 function normalizedCosine(a: number[], b: number[]): number {
@@ -91,4 +91,51 @@ test('result always lands inside [0,1]', () => {
     const result = maxTasteSimilarity(clusters, candidate)!
     assert.ok(result >= 0 && result <= 1, `${result} out of range for ${candidate}`)
   }
+})
+
+// ---------------------------------------------------------------------------
+// franchiseKeys
+// ---------------------------------------------------------------------------
+
+test('a TMDb collection name and the canonical name resolve to a common key', () => {
+  // The defect this exists to prevent: stored movie preferences are keyed on
+  // `movies.collection_name` ("The Avengers Collection") while the scorer
+  // identifies a candidate with detectFranchiseFromTitle ("Marvel Cinematic
+  // Universe"), so the lookup missed on every enriched library and the
+  // franchise nudge silently never fired for movies.
+  const stored = franchiseKeys('The Avengers Collection')
+  const candidate = franchiseKeys('Avengers: Endgame')
+
+  const shared = stored.filter((k) => candidate.includes(k))
+  assert.ok(
+    shared.length > 0,
+    `no shared key between ${JSON.stringify(stored)} and ${JSON.stringify(candidate)}`
+  )
+  assert.ok(stored.includes('marvel cinematic universe'))
+})
+
+test('the trailing "Collection" is stripped, covering franchises with no regex pattern', () => {
+  // "Alien Collection" has a pattern, but the stripped form is what carries
+  // collections the table has never heard of.
+  const stored = franchiseKeys('Some Indie Trilogy Collection')
+  assert.ok(stored.includes('some indie trilogy'))
+  assert.ok(stored.includes('some indie trilogy collection'))
+})
+
+test('keys are lowercased and the original name is always present', () => {
+  const keys = franchiseKeys('Star Wars')
+  assert.ok(keys.includes('star wars'))
+  for (const key of keys) {
+    assert.equal(key, key.toLowerCase(), `${key} is not lowercased`)
+  }
+})
+
+test('an unrecognised name still yields its own key rather than nothing', () => {
+  assert.deepEqual(franchiseKeys('Some Unknown Thing'), ['some unknown thing'])
+})
+
+test('an empty or whitespace name yields no keys', () => {
+  // Guards the lookup map against a blank key that would match a blank title.
+  assert.deepEqual(franchiseKeys(''), [])
+  assert.deepEqual(franchiseKeys('   '), [])
 })

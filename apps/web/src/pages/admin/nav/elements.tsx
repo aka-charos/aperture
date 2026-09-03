@@ -35,6 +35,7 @@ import StorageIcon from '@mui/icons-material/Storage'
 import SyncAltIcon from '@mui/icons-material/SyncAlt'
 import TranslateIcon from '@mui/icons-material/Translate'
 import TravelExploreIcon from '@mui/icons-material/TravelExplore'
+import ExploreIcon from '@mui/icons-material/Explore'
 import TuneIcon from '@mui/icons-material/Tune'
 import ScienceIcon from '@mui/icons-material/Science'
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary'
@@ -243,6 +244,13 @@ export const ADMIN_ELEMENTS: Record<string, AdminElement> = {
     Component: section(
       () => import('@/pages/settings/components/WatchingSection'),
       'WatchingSection'
+    ),
+  },
+  'discovery-tuning': {
+    icon: <ExploreIcon />,
+    Component: section(
+      () => import('@/pages/settings/components/DiscoveryConfigSection'),
+      'DiscoveryConfigSection'
     ),
   },
   'genre-strips': {

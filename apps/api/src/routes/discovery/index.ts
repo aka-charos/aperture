@@ -4,7 +4,7 @@
  * API routes for suggesting content not in the user's library
  */
 
-import type { FastifyPluginAsync } from 'fastify'
+import type { FastifyInstance, FastifyPluginAsync, FastifyReply } from 'fastify'
 import { requireAuth, requireAdmin, type SessionUser } from '../../plugins/auth.js'
 import { queryOne, query } from '../../lib/db.js'
 import {
@@ -13,10 +13,13 @@ import {
   getLatestDiscoveryRun,
   regenerateUserDiscovery,
   isSeerrConfigured,
+  hasDiscoverySources,
   fetchFilteredCandidates,
   scoreCandidates,
   filterCandidates,
-  DEFAULT_DISCOVERY_CONFIG,
+  getDiscoveryConfig,
+  setDiscoveryConfig,
+  DISCOVERY_CONFIG_BOUNDS,
   appLocaleToTmdbLanguage,
   getMovieGenresList,
   getTVGenresList,
@@ -36,6 +39,7 @@ import {
   expandDiscoverySchema,
   getDiscoveryStatusSchema,
   getDiscoveryPrerequisitesSchema,
+  updateDiscoveryConfigSchema,
 } from './schemas.js'
 
 // Helper to parse filter query params
@@ -87,6 +91,73 @@ function parseFilterParams(queryParams: {
   }
 
   return options
+}
+
+/**
+ * Users with a refresh in flight, keyed `${userId}:${mediaType}`.
+ *
+ * The regenerate path runs the pipeline inside the request, so without this a
+ * user clicking Refresh twice starts two full pipelines against the same rows --
+ * and since storeDiscoveryCandidates deletes the user's existing candidates
+ * before inserting, the two runs race over the same delete/insert window.
+ * In-memory is the right scope: it guards one API process against one user's
+ * double-click, which is the case that actually happens.
+ */
+const refreshInFlight = new Set<string>()
+
+/**
+ * Start a per-user regeneration in the background and answer immediately.
+ *
+ * The pipeline used to run inside the request: a cold run is a few hundred TMDb
+ * calls and a full candidate rewrite, which meant minutes with no progress, no
+ * way to leave the page, and a real chance of dying on a reverse-proxy timeout
+ * after the previous candidates had already been replaced.
+ *
+ * There is no new job type behind this, deliberately. The pipeline already
+ * records a `discovery_runs` row and moves it from 'running' to 'completed' or
+ * 'failed', and the page already polls `GET /api/discovery/status`, which
+ * returns that row. So the progress signal exists — it just was not being used.
+ *
+ * The work is intentionally not awaited. `refreshInFlight` is released in the
+ * background promise's `finally`, not the handler's, or the guard would clear
+ * the moment the response was sent and a second click would start a second run.
+ */
+function startRefresh(
+  fastify: FastifyInstance,
+  userId: string,
+  mediaType: MediaType,
+  reply: FastifyReply
+) {
+  const refreshKey = `${userId}:${mediaType}`
+  if (refreshInFlight.has(refreshKey)) {
+    return reply.status(409).send({
+      error: 'A discovery refresh is already running for your account',
+      mediaType,
+    })
+  }
+  refreshInFlight.add(refreshKey)
+
+  void regenerateUserDiscovery(userId, mediaType)
+    .then((result) => {
+      fastify.log.info(
+        { userId, mediaType, runId: result.runId, stored: result.candidatesStored },
+        'Discovery refresh complete'
+      )
+    })
+    .catch((err) => {
+      // Already recorded on the run row as status='failed' by the pipeline, so
+      // the page learns about it from the status poll. This is for the operator.
+      fastify.log.error({ err, userId, mediaType }, 'Discovery refresh failed')
+    })
+    .finally(() => {
+      refreshInFlight.delete(refreshKey)
+    })
+
+  return reply.status(202).send({
+    message: 'Discovery refresh started',
+    mediaType,
+    started: true,
+  })
 }
 
 const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
@@ -269,18 +340,7 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
         })
       }
 
-      try {
-        const result = await regenerateUserDiscovery(currentUser.id, 'movie')
-        return reply.send({
-          message: 'Movie discovery suggestions regenerated',
-          runId: result.runId,
-          candidatesStored: result.candidatesStored,
-        })
-      } catch (err) {
-        const error = err instanceof Error ? err.message : 'Unknown error'
-        fastify.log.error({ err, userId: currentUser.id }, 'Failed to regenerate movie discovery')
-        return reply.status(500).send({ error: `Failed to regenerate: ${error}` })
-      }
+      return startRefresh(fastify, currentUser.id, 'movie', reply)
     }
   )
 
@@ -306,18 +366,7 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
         })
       }
 
-      try {
-        const result = await regenerateUserDiscovery(currentUser.id, 'series')
-        return reply.send({
-          message: 'Series discovery suggestions regenerated',
-          runId: result.runId,
-          candidatesStored: result.candidatesStored,
-        })
-      } catch (err) {
-        const error = err instanceof Error ? err.message : 'Unknown error'
-        fastify.log.error({ err, userId: currentUser.id }, 'Failed to regenerate series discovery')
-        return reply.status(500).send({ error: `Failed to regenerate: ${error}` })
-      }
+      return startRefresh(fastify, currentUser.id, 'series', reply)
     }
   )
 
@@ -362,6 +411,10 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       try {
+        // The stored configuration, so expanded rows are fetched and scored on
+        // the same terms as the list they get merged into.
+        const config = await getDiscoveryConfig()
+
         // Build filter options for dynamic fetching
         const filters: DynamicFetchFilters = {
           languages,
@@ -369,7 +422,9 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
           yearStart,
           yearEnd,
           excludeTmdbIds: excludeTmdbIds || [],
-          limit: targetCount || DEFAULT_DISCOVERY_CONFIG.targetDisplayCount,
+          limit: targetCount || config.targetDisplayCount,
+          minVoteCount: config.minVoteCount,
+          minVoteAverage: config.minVoteAverage,
         }
 
         // Fetch filtered candidates from TMDb
@@ -397,7 +452,7 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
           currentUser.id,
           coreMediaType,
           filteredCandidates,
-          DEFAULT_DISCOVERY_CONFIG
+          config
         )
 
         // Return the scored candidates (frontend will merge with existing)
@@ -499,6 +554,41 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
   )
 
   /**
+   * GET /api/discovery/config
+   * The active discovery tuning (admin only).
+   *
+   * Returns the bounds alongside the values so the settings card can enforce
+   * the same limits the server does without the web bundle importing core.
+   */
+  fastify.get(
+    '/api/discovery/config',
+    { preHandler: requireAdmin, schema: { tags: ['discovery'] } },
+    async (_request, reply) => {
+      const config = await getDiscoveryConfig()
+      return reply.send({ config, bounds: DISCOVERY_CONFIG_BOUNDS })
+    }
+  )
+
+  /**
+   * PATCH /api/discovery/config
+   * Update discovery tuning (admin only).
+   *
+   * Body is a partial: an omitted field keeps its stored value. The response
+   * carries what was actually stored after sanitising, so a clamped value shows
+   * up in the UI immediately rather than on the next load.
+   */
+  fastify.patch<{ Body: Record<string, unknown> }>(
+    '/api/discovery/config',
+    { preHandler: requireAdmin, schema: updateDiscoveryConfigSchema },
+    async (request, reply) => {
+      const current = await getDiscoveryConfig()
+      const merged = { ...current, ...(request.body ?? {}) }
+      const config = await setDiscoveryConfig(merged)
+      return reply.send({ config, bounds: DISCOVERY_CONFIG_BOUNDS })
+    }
+  )
+
+  /**
    * GET /api/discovery/prerequisites
    * Check if discovery feature prerequisites are met (admin only)
    */
@@ -506,8 +596,15 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/discovery/prerequisites',
     { preHandler: requireAdmin, schema: getDiscoveryPrerequisitesSchema },
     async (_request, reply) => {
-      // Check Seerr configuration
-      const seerrConfigured = await isSeerrConfigured()
+      // Check Seerr configuration, and whether anything can be fetched at all.
+      // sourcesAvailable goes through hasDiscoverySources rather than being
+      // re-derived here: that helper existed but returned a hardcoded true, so
+      // this panel could report "ready" on an instance with no TMDb key, where
+      // every run produces nothing.
+      const [seerrConfigured, sourcesAvailable] = await Promise.all([
+        isSeerrConfigured(),
+        hasDiscoverySources(),
+      ])
 
       // Check how many users have discovery enabled
       const usersResult = await query<{ count: string }>(
@@ -520,17 +617,20 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
         `SELECT username FROM users WHERE discover_enabled = true ORDER BY username LIMIT 10`
       )
 
-      const ready = seerrConfigured && enabledUserCount > 0
+      const ready = seerrConfigured && sourcesAvailable && enabledUserCount > 0
 
       return reply.send({
         ready,
         seerrConfigured,
+        sourcesAvailable,
         enabledUserCount,
         enabledUsernames: enabledUsers.rows.map(u => u.username),
         message: !ready
-          ? !seerrConfigured
-            ? 'Seerr integration is not configured. Configure it in Settings → Integrations.'
-            : 'No users have discovery enabled. Enable discovery for users in Admin → Users.'
+          ? !sourcesAvailable
+            ? 'TMDb is not configured. Discovery cannot fetch candidates without it. Configure it in Settings → Integrations.'
+            : !seerrConfigured
+              ? 'Seerr integration is not configured. Configure it in Settings → Integrations.'
+              : 'No users have discovery enabled. Enable discovery for users in Admin → Users.'
           : null,
       })
     }

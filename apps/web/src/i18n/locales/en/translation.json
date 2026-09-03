@@ -714,6 +714,10 @@
       "title": "Shows You Watch",
       "blurb": "The continue-watching feature and its library"
     },
+    "discoveryTuning": {
+      "title": "Discovery tuning",
+      "blurb": "How much Discover fetches, how hard it filters, and what it ranks by"
+    },
     "genreStrips": {
       "title": "Genre strips",
       "blurb": "The genre rows on the discovery page"
@@ -2136,6 +2140,50 @@
     "testConnection": "Test Connection",
     "errSave": "Failed to save configuration",
     "errConnect": "Could not connect to server"
+  },
+  "settingsDiscovery": {
+    "intro": "Discover suggests titles that are not in your library yet, from TMDb and Trakt, and hands them to Seerr when someone requests one. These settings control how much it fetches, how hard it filters, and what it ranks by.",
+    "loadFailed": "Could not load discovery settings.",
+    "saveFailed": "Could not save discovery settings.",
+    "saved": "Discovery settings saved. They take effect on the next run.",
+    "save": "Save",
+    "revert": "Revert",
+    "fetchTitle": "How much to fetch",
+    "fetchBlurb": "Larger numbers mean more choice and more TMDb requests. Enrichment is the expensive one: each title costs two requests for a film and three for a show, per person, per run.",
+    "maxCandidatesPerSource": "Candidates per source",
+    "maxCandidatesPerSourceHelp": "TMDb returns 20 per page and Discover walks at most 10 pages, so 200 is the most it can reach.",
+    "maxTotalCandidates": "Candidates kept per person",
+    "maxTotalCandidatesHelp": "How many scored titles are stored. Everything past this is discarded after ranking.",
+    "maxEnrichedCandidates": "Titles enriched with cast and crew",
+    "maxEnrichedCandidatesHelp": "Only the top titles get full metadata. Results are cached and shared, so the second person costs far less than the first.",
+    "targetDisplayCount": "Titles shown per page",
+    "targetDisplayCountHelp": "How many appear on the Discover page before paging.",
+    "qualityTitle": "Quality floors",
+    "qualityBlurb": "Applied when fetching from TMDb, so poorly-rated and barely-voted titles never enter the pool.",
+    "minVoteCount": "Minimum votes",
+    "minVoteCountHelp": "A rating from six people is not the same claim as one from twenty thousand.",
+    "minVoteAverage": "Minimum rating",
+    "minVoteAverageHelp": "Out of 10. Titles below this are not fetched.",
+    "traktPeriod": "Trakt trending window",
+    "traktPeriodOption": {
+      "daily": "Today",
+      "weekly": "This week",
+      "monthly": "This month",
+      "yearly": "This year",
+      "all": "All time"
+    },
+    "poolTitle": "Shared candidate pool",
+    "poolBlurb": "Titles fetched once and reused for everyone. It is pruned each run, so these two decide how big and how fresh it stays.",
+    "maxPoolCandidates": "Pool ceiling",
+    "maxPoolCandidatesHelp": "The most pool titles merged into one person's run, most popular first.",
+    "poolMaxAgeDays": "Drop titles unseen for (days)",
+    "poolMaxAgeDaysHelp": "A title no source has returned in this long is removed from the pool.",
+    "weightsTitle": "Ranking weights",
+    "weightsBlurb": "What decides the order. The percentage beside each is the share of the ranking it actually buys — the three do not need to add up to anything in particular.",
+    "similarityWeight": "Taste match",
+    "popularityWeight": "Popularity",
+    "recencyWeight": "Recency",
+    "weightsNote": "Changes apply on the next run. Use Refresh on the Discover page to see them sooner."
   },
   "settingsSeerr": {
     "title": "Seerr Integration",

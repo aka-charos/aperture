@@ -5,7 +5,8 @@
  */
 
 import { createChildLogger } from '../lib/logger.js'
-import { query, queryOne } from '../lib/db.js'
+import { query, queryOne, transaction } from '../lib/db.js'
+import { PERSONALIZED_SOURCES } from './types.js'
 import type {
   MediaType,
   DiscoveryRun,
@@ -19,6 +20,7 @@ import type {
   PoolCandidate,
   RawCandidate,
   GlobalDiscoverySource,
+  PersonalizedDiscoverySource,
 } from './types.js'
 
 const logger = createChildLogger('discover:storage')
@@ -164,9 +166,36 @@ export async function getLatestDiscoveryRun(
 // Discovery Pool (Shared Candidates)
 // ============================================================================
 
+/** Columns bound per pool row by {@link upsertPoolCandidates}. */
+const POOL_COLUMN_COUNT = 15
+
+/** Rows per pool upsert statement. 15 columns -> 3,000 bind parameters. */
+const POOL_UPSERT_CHUNK = 200
+
 /**
- * Upsert candidates into the shared discovery pool
- * Global candidates are shared across all users to avoid duplicate storage
+ * Upsert candidates into the shared discovery pool.
+ *
+ * One statement per chunk via ON CONFLICT, rather than the SELECT-then-
+ * UPDATE-or-INSERT round trip per candidate this used to do (~1,200 round trips
+ * per media type). That form also raced: two overlapping runs could both read
+ * "not present", and the loser's insert hit the unique constraint and was
+ * swallowed by the catch.
+ *
+ * Two guards ride in the VALUES rather than the conflict clause:
+ *
+ * - The numeric columns are NULLIF'd to 0. Trakt's payloads carry no TMDb vote
+ *   data and trakt_popular/trakt_recommendations hardcode popularity 0, so the
+ *   old `COALESCE($n, existing)` -- which only guards NULL -- wrote a literal 0
+ *   straight over a good rating (and over popularity, which feeds the ranking)
+ *   whenever a title was seen by Trakt but had dropped out of TMDb Discover's
+ *   window that run. 0 means "no data" for every writer here, so storing NULL
+ *   loses nothing and lets a later sighting fill the column in.
+ * - `sources` is unioned rather than replaced, preserving the merge the old
+ *   read-then-write did in JavaScript.
+ *
+ * `is_enriched` and the enrichment columns are deliberately absent: they are
+ * owned by updatePoolEnrichmentBatch and a metadata refresh must not discard
+ * cast and crew someone already paid to fetch.
  */
 export async function upsertPoolCandidates(
   mediaType: MediaType,
@@ -174,85 +203,99 @@ export async function upsertPoolCandidates(
 ): Promise<{ inserted: number; updated: number }> {
   if (candidates.length === 0) return { inserted: 0, updated: 0 }
 
+  // Last write wins within a batch: ON CONFLICT cannot touch the same row twice
+  // in one statement ("cannot affect row a second time").
+  const deduped = [...new Map(candidates.map((c) => [c.tmdbId, c])).values()]
+
   let inserted = 0
   let updated = 0
 
-  for (const c of candidates) {
+  for (let start = 0; start < deduped.length; start += POOL_UPSERT_CHUNK) {
+    const chunk = deduped.slice(start, start + POOL_UPSERT_CHUNK)
+    const values: unknown[] = []
+    const tuples: string[] = []
+
+    chunk.forEach((c, i) => {
+      const b = i * POOL_COLUMN_COUNT
+      tuples.push(
+        // sources is cast explicitly: in a multi-row VALUES the inference for a
+        // bare array parameter is less forgiving than in the single-row insert
+        // this replaced, and the failure would only appear at runtime.
+        `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}::text[], ` +
+        `$${b + 5}, $${b + 6}, $${b + 7}, $${b + 8}, ` +
+        `$${b + 9}, $${b + 10}, $${b + 11}, $${b + 12}::jsonb, ` +
+        `NULLIF($${b + 13}::numeric, 0), NULLIF($${b + 14}::integer, 0), NULLIF($${b + 15}::numeric, 0))`
+      )
+      values.push(
+        mediaType, c.tmdbId, c.imdbId, [c.source],
+        c.title, c.originalTitle, c.originalLanguage, c.releaseYear,
+        c.posterPath, c.backdropPath, c.overview,
+        JSON.stringify(c.genres || []),
+        c.voteAverage, c.voteCount, c.popularity
+      )
+    })
+
     try {
-      // Check if candidate already exists
-      const existing = await queryOne<{ id: string; sources: string[] }>(
-        `SELECT id, sources FROM discovery_pool WHERE media_type = $1 AND tmdb_id = $2`,
-        [mediaType, c.tmdbId]
+      // xmax = 0 distinguishes a fresh insert from a conflict update; it is
+      // only used for the log line.
+      const res = await query<{ inserted: boolean }>(
+        `INSERT INTO discovery_pool (
+           media_type, tmdb_id, imdb_id, sources,
+           title, original_title, original_language, release_year,
+           poster_path, backdrop_path, overview,
+           genres, vote_average, vote_count, popularity
+         ) VALUES ${tuples.join(', ')}
+         ON CONFLICT (media_type, tmdb_id) DO UPDATE SET
+           sources = ARRAY(SELECT DISTINCT unnest(discovery_pool.sources || EXCLUDED.sources)),
+           imdb_id = COALESCE(EXCLUDED.imdb_id, discovery_pool.imdb_id),
+           title = COALESCE(NULLIF(EXCLUDED.title, ''), discovery_pool.title),
+           original_title = COALESCE(EXCLUDED.original_title, discovery_pool.original_title),
+           original_language = COALESCE(EXCLUDED.original_language, discovery_pool.original_language),
+           release_year = COALESCE(EXCLUDED.release_year, discovery_pool.release_year),
+           poster_path = COALESCE(EXCLUDED.poster_path, discovery_pool.poster_path),
+           backdrop_path = COALESCE(EXCLUDED.backdrop_path, discovery_pool.backdrop_path),
+           overview = COALESCE(NULLIF(EXCLUDED.overview, ''), discovery_pool.overview),
+           genres = CASE WHEN EXCLUDED.genres != '[]'::jsonb THEN EXCLUDED.genres ELSE discovery_pool.genres END,
+           vote_average = COALESCE(EXCLUDED.vote_average, discovery_pool.vote_average),
+           vote_count = COALESCE(EXCLUDED.vote_count, discovery_pool.vote_count),
+           popularity = COALESCE(EXCLUDED.popularity, discovery_pool.popularity),
+           updated_at = NOW()
+         RETURNING (xmax = 0) AS inserted`,
+        values
       )
 
-      if (existing) {
-        // Update existing - merge sources and update metadata if better
-        const existingSources = existing.sources || []
-        const newSources = [...new Set([...existingSources, c.source])]
-        
-        await query(
-          `UPDATE discovery_pool SET
-            sources = $3,
-            title = COALESCE(NULLIF($4, ''), title),
-            original_title = COALESCE($5, original_title),
-            original_language = COALESCE($6, original_language),
-            release_year = COALESCE($7, release_year),
-            poster_path = COALESCE($8, poster_path),
-            backdrop_path = COALESCE($9, backdrop_path),
-            overview = COALESCE(NULLIF($10, ''), overview),
-            genres = CASE WHEN $11::jsonb != '[]'::jsonb THEN $11::jsonb ELSE genres END,
-            vote_average = COALESCE($12, vote_average),
-            vote_count = COALESCE($13, vote_count),
-            popularity = COALESCE($14, popularity),
-            updated_at = NOW()
-          WHERE id = $1 AND media_type = $2`,
-          [
-            existing.id, mediaType, newSources,
-            c.title, c.originalTitle, c.originalLanguage, c.releaseYear,
-            c.posterPath, c.backdropPath, c.overview,
-            JSON.stringify(c.genres || []),
-            c.voteAverage, c.voteCount, c.popularity,
-          ]
-        )
-        updated++
-      } else {
-        // Insert new
-        await query(
-          `INSERT INTO discovery_pool (
-            media_type, tmdb_id, imdb_id, sources,
-            title, original_title, original_language, release_year,
-            poster_path, backdrop_path, overview,
-            genres, vote_average, vote_count, popularity
-          ) VALUES (
-            $1, $2, $3, $4,
-            $5, $6, $7, $8,
-            $9, $10, $11,
-            $12, $13, $14, $15
-          )`,
-          [
-            mediaType, c.tmdbId, c.imdbId, [c.source],
-            c.title, c.originalTitle, c.originalLanguage, c.releaseYear,
-            c.posterPath, c.backdropPath, c.overview,
-            JSON.stringify(c.genres || []),
-            c.voteAverage, c.voteCount, c.popularity,
-          ]
-        )
-        inserted++
+      for (const row of res.rows) {
+        if (row.inserted) inserted++
+        else updated++
       }
     } catch (err) {
-      logger.warn({ err, tmdbId: c.tmdbId, title: c.title }, 'Failed to upsert pool candidate')
+      logger.warn(
+        { err, mediaType, chunkStart: start, chunkSize: chunk.length },
+        'Failed to upsert pool candidate chunk'
+      )
     }
   }
 
-  logger.info({ mediaType, inserted, updated, total: candidates.length }, 'Upserted pool candidates')
+  logger.info({ mediaType, inserted, updated, total: deduped.length }, 'Upserted pool candidates')
   return { inserted, updated }
 }
 
 /**
- * Get all candidates from the pool for a media type
+ * Candidates from the pool for a media type, newest-relevant first.
+ *
+ * Bounded on purpose. Nothing in a global fetch removes a title, so the pool
+ * only grows -- an unbounded read made every run slower than the last, drove
+ * the popularity normalisation's cost, and merged progressively staler titles
+ * into every user's candidate list. `limit` keeps the popularity-ordered head
+ * and drops the tail; `maxAgeDays` drops rows no global fetch has re-seen in
+ * that long, matching what the prune sweep deletes so a read never returns
+ * rows that are about to disappear.
+ *
+ * Both are optional so an admin/diagnostic caller can still ask for everything.
  */
 export async function getPoolCandidates(
-  mediaType: MediaType
+  mediaType: MediaType,
+  options: { limit?: number; maxAgeDays?: number } = {}
 ): Promise<PoolCandidate[]> {
   const result = await query<{
     id: string
@@ -279,174 +322,17 @@ export async function getPoolCandidates(
     created_at: Date
     updated_at: Date
   }>(
-    `SELECT * FROM discovery_pool WHERE media_type = $1 ORDER BY popularity DESC NULLS LAST`,
-    [mediaType]
-  )
-
-  return result.rows.map(row => ({
-    id: row.id,
-    mediaType: row.media_type,
-    tmdbId: row.tmdb_id,
-    imdbId: row.imdb_id,
-    title: row.title,
-    originalTitle: row.original_title,
-    originalLanguage: row.original_language,
-    releaseYear: row.release_year,
-    posterPath: row.poster_path,
-    backdropPath: row.backdrop_path,
-    overview: row.overview,
-    genres: row.genres || [],
-    voteAverage: row.vote_average ? parseFloat(row.vote_average) : null,
-    voteCount: row.vote_count,
-    popularity: row.popularity ? parseFloat(row.popularity) : null,
-    castMembers: row.cast_members,
-    directors: row.directors,
-    runtimeMinutes: row.runtime_minutes,
-    tagline: row.tagline,
-    isEnriched: row.is_enriched,
-    sources: row.sources as GlobalDiscoverySource[],
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }))
-}
-
-/**
- * Get pool candidate by TMDb ID
- */
-export async function getPoolCandidateByTmdbId(
-  mediaType: MediaType,
-  tmdbId: number
-): Promise<PoolCandidate | null> {
-  const result = await queryOne<{
-    id: string
-    media_type: MediaType
-    tmdb_id: number
-    imdb_id: string | null
-    title: string
-    original_title: string | null
-    original_language: string | null
-    release_year: number | null
-    poster_path: string | null
-    backdrop_path: string | null
-    overview: string | null
-    genres: { id: number; name: string }[]
-    vote_average: string | null
-    vote_count: number | null
-    popularity: string | null
-    cast_members: { id: number; name: string; character: string; profilePath: string | null }[] | null
-    directors: string[] | null
-    runtime_minutes: number | null
-    tagline: string | null
-    is_enriched: boolean
-    sources: string[]
-    created_at: Date
-    updated_at: Date
-  }>(
-    `SELECT * FROM discovery_pool WHERE media_type = $1 AND tmdb_id = $2`,
-    [mediaType, tmdbId]
-  )
-
-  if (!result) return null
-
-  return {
-    id: result.id,
-    mediaType: result.media_type,
-    tmdbId: result.tmdb_id,
-    imdbId: result.imdb_id,
-    title: result.title,
-    originalTitle: result.original_title,
-    originalLanguage: result.original_language,
-    releaseYear: result.release_year,
-    posterPath: result.poster_path,
-    backdropPath: result.backdrop_path,
-    overview: result.overview,
-    genres: result.genres || [],
-    voteAverage: result.vote_average ? parseFloat(result.vote_average) : null,
-    voteCount: result.vote_count,
-    popularity: result.popularity ? parseFloat(result.popularity) : null,
-    castMembers: result.cast_members,
-    directors: result.directors,
-    runtimeMinutes: result.runtime_minutes,
-    tagline: result.tagline,
-    isEnriched: result.is_enriched,
-    sources: result.sources as GlobalDiscoverySource[],
-    createdAt: result.created_at,
-    updatedAt: result.updated_at,
-  }
-}
-
-/**
- * Mark pool candidates as enriched and update their metadata
- */
-export async function updatePoolCandidateEnrichment(
-  poolId: string,
-  enrichmentData: {
-    castMembers?: { id: number; name: string; character: string; profilePath: string | null }[]
-    directors?: string[]
-    runtimeMinutes?: number | null
-    tagline?: string | null
-    imdbId?: string | null
-  }
-): Promise<void> {
-  await query(
-    `UPDATE discovery_pool SET
-      cast_members = COALESCE($2, cast_members),
-      directors = COALESCE($3, directors),
-      runtime_minutes = COALESCE($4, runtime_minutes),
-      tagline = COALESCE($5, tagline),
-      imdb_id = COALESCE($6, imdb_id),
-      is_enriched = TRUE,
-      updated_at = NOW()
-    WHERE id = $1`,
+    `SELECT * FROM discovery_pool
+     WHERE media_type = $1
+       ${options.maxAgeDays != null ? `AND updated_at >= NOW() - INTERVAL '1 day' * $2::int` : ''}
+     ORDER BY popularity DESC NULLS LAST
+     ${options.limit != null ? `LIMIT $${options.maxAgeDays != null ? 3 : 2}` : ''}`,
     [
-      poolId,
-      enrichmentData.castMembers ? JSON.stringify(enrichmentData.castMembers) : null,
-      enrichmentData.directors || null,
-      enrichmentData.runtimeMinutes ?? null,
-      enrichmentData.tagline ?? null,
-      enrichmentData.imdbId ?? null,
+      mediaType,
+      ...(options.maxAgeDays != null ? [options.maxAgeDays] : []),
+      ...(options.limit != null ? [options.limit] : []),
     ]
   )
-}
-
-/**
- * Get pool candidates that need enrichment
- */
-export async function getUnenrichedPoolCandidates(
-  mediaType: MediaType,
-  limit: number = 100
-): Promise<PoolCandidate[]> {
-  const result = await query<{
-    id: string
-    media_type: MediaType
-    tmdb_id: number
-    imdb_id: string | null
-    title: string
-    original_title: string | null
-    original_language: string | null
-    release_year: number | null
-    poster_path: string | null
-    backdrop_path: string | null
-    overview: string | null
-    genres: { id: number; name: string }[]
-    vote_average: string | null
-    vote_count: number | null
-    popularity: string | null
-    cast_members: { id: number; name: string; character: string; profilePath: string | null }[] | null
-    directors: string[] | null
-    runtime_minutes: number | null
-    tagline: string | null
-    is_enriched: boolean
-    sources: string[]
-    created_at: Date
-    updated_at: Date
-  }>(
-    `SELECT * FROM discovery_pool 
-     WHERE media_type = $1 AND is_enriched = FALSE
-     ORDER BY popularity DESC NULLS LAST
-     LIMIT $2`,
-    [mediaType, limit]
-  )
 
   return result.rows.map(row => ({
     id: row.id,
@@ -473,6 +359,76 @@ export async function getUnenrichedPoolCandidates(
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }))
+}
+
+/**
+ * Write full-enrichment metadata back onto the pool rows for these candidates,
+ * so the next user's run can skip the lookup.
+ *
+ * This is the half of the pool that was built and never wired up: the columns,
+ * `is_enriched`, and a single-row updater all existed, but nothing
+ * called them, so every user independently re-fetched details + credits for the
+ * same overlapping set of popular titles -- by far the largest external cost in
+ * the job.
+ *
+ * Deliberately UPDATE-only, keyed on (media_type, tmdb_id). A candidate from a
+ * personalized source has no pool row and must not gain one: `sources` is
+ * NOT NULL and typed as global-only sources, so inserting here would corrupt
+ * what the pool means. Those candidates simply go unenriched-cached, which is
+ * correct -- they are per-user by nature.
+ *
+ * A candidate carrying no cast is skipped rather than written as enriched: a
+ * lookup that came back empty is not a lookup worth caching, and marking it
+ * done would freeze a blank card in place for every future user.
+ */
+export async function updatePoolEnrichmentBatch(
+  mediaType: MediaType,
+  candidates: RawCandidate[]
+): Promise<number> {
+  const enrichable = candidates.filter((c) => c.castMembers && c.castMembers.length > 0)
+  if (enrichable.length === 0) return 0
+
+  let updated = 0
+
+  try {
+    await transaction(async (client) => {
+      for (const c of enrichable) {
+        const res = await client.query(
+          `UPDATE discovery_pool SET
+             cast_members = $3::jsonb,
+             directors = COALESCE($4::text[], directors),
+             runtime_minutes = COALESCE($5::integer, runtime_minutes),
+             tagline = COALESCE($6::text, tagline),
+             imdb_id = COALESCE($7::text, imdb_id),
+             is_enriched = TRUE,
+             updated_at = NOW()
+           WHERE media_type = $1 AND tmdb_id = $2`,
+          [
+            mediaType,
+            c.tmdbId,
+            JSON.stringify(c.castMembers ?? []),
+            c.directors && c.directors.length > 0 ? c.directors : null,
+            c.runtimeMinutes ?? null,
+            c.tagline ?? null,
+            c.imdbId ?? null,
+          ]
+        )
+        updated += res.rowCount ?? 0
+      }
+    })
+  } catch (err) {
+    // Caching is an optimisation. The run has already paid for this metadata
+    // and stored it on the user's own candidate rows, so a failure here must
+    // not fail the run -- it just means the next user pays again.
+    logger.warn({ err, mediaType, count: enrichable.length }, 'Failed to cache pool enrichment')
+    return 0
+  }
+
+  logger.info(
+    { mediaType, offered: candidates.length, cached: updated },
+    'Cached full enrichment onto pool rows'
+  )
+  return updated
 }
 
 /**
@@ -482,9 +438,12 @@ export async function clearOldPoolEntries(
   mediaType: MediaType,
   olderThanDays: number = 30
 ): Promise<number> {
+  // $2 is cast explicitly: `INTERVAL * $2` on its own leaves the parameter's
+  // type for Postgres to infer from the multiply operator, which it can refuse
+  // outright ("could not determine data type of parameter").
   const result = await query(
-    `DELETE FROM discovery_pool 
-     WHERE media_type = $1 AND updated_at < NOW() - INTERVAL '1 day' * $2`,
+    `DELETE FROM discovery_pool
+     WHERE media_type = $1 AND updated_at < NOW() - INTERVAL '1 day' * $2::int`,
     [mediaType, olderThanDays]
   )
 
@@ -515,6 +474,11 @@ export function poolCandidateToRaw(pool: PoolCandidate): RawCandidate {
     directors: pool.directors ?? undefined,
     runtimeMinutes: pool.runtimeMinutes,
     tagline: pool.tagline,
+    // Carried so enrichMissingData can skip a row a previous run already paid
+    // to enrich. Without this the pool's cached cast/crew was loaded and then
+    // re-fetched anyway.
+    isEnriched: pool.isEnriched,
+    poolId: pool.id,
   }
 }
 
@@ -525,6 +489,20 @@ export function poolCandidateToRaw(pool: PoolCandidate): RawCandidate {
 /**
  * Store discovery candidates (upsert to handle duplicates)
  */
+/** Columns bound per candidate row by {@link storeDiscoveryCandidates}. */
+const CANDIDATE_COLUMN_COUNT = 31
+
+/**
+ * Rows per INSERT statement.
+ *
+ * Postgres caps a statement at 65,535 bind parameters. At 29 columns the full
+ * default set (maxTotalCandidates 1000) is 29,000 -- under the ceiling, but a
+ * single statement that large is needlessly close to it and would break the
+ * moment either number grew. 200 rows is 5,800 parameters, and all the chunks
+ * commit together.
+ */
+const CANDIDATE_INSERT_CHUNK = 200
+
 export async function storeDiscoveryCandidates(
   runId: string,
   userId: string,
@@ -533,40 +511,33 @@ export async function storeDiscoveryCandidates(
 ): Promise<number> {
   if (candidates.length === 0) return 0
 
-  // Delete old candidates for this user/media type
-  await query(
-    `DELETE FROM discovery_candidates WHERE user_id = $1 AND media_type = $2`,
-    [userId, mediaType]
-  )
+  // Delete and insert in ONE transaction. Previously the DELETE was committed
+  // on its own and then up to 1,000 single-row INSERTs followed, each with a
+  // catch that logged and continued -- so a crash, a restart, or the HTTP
+  // timeout on the manual-refresh path left the user with a half-populated or
+  // completely empty Discover page and no way to tell that had happened.
+  // Rolling back to the previous candidate set is strictly better than
+  // presenting a truncated one as complete.
+  const stored = await transaction(async (client) => {
+    await client.query(
+      `DELETE FROM discovery_candidates WHERE user_id = $1 AND media_type = $2`,
+      [userId, mediaType]
+    )
 
-  // Insert new candidates
-  let stored = 0
-  for (let i = 0; i < candidates.length; i++) {
-    const c = candidates[i]
-    
-    try {
-      await query(
-        `INSERT INTO discovery_candidates (
-          run_id, user_id, media_type, tmdb_id, imdb_id, rank,
-          final_score, similarity_score, popularity_score, recency_score, source_score,
-          source, source_media_id,
-          title, original_title, original_language, release_year,
-          poster_path, backdrop_path, overview,
-          genres, vote_average, vote_count, score_breakdown,
-          cast_members, directors, runtime_minutes, tagline,
-          is_enriched
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6,
-          $7, $8, $9, $10, $11,
-          $12, $13,
-          $14, $15, $16, $17,
-          $18, $19, $20,
-          $21, $22, $23, $24,
-          $25, $26, $27, $28,
-          $29
-        )`,
-        [
-          runId, userId, mediaType, c.tmdbId, c.imdbId, i + 1,
+    let inserted = 0
+
+    for (let start = 0; start < candidates.length; start += CANDIDATE_INSERT_CHUNK) {
+      const chunk = candidates.slice(start, start + CANDIDATE_INSERT_CHUNK)
+      const values: unknown[] = []
+      const tuples: string[] = []
+
+      chunk.forEach((c, offsetInChunk) => {
+        const base = offsetInChunk * CANDIDATE_COLUMN_COUNT
+        tuples.push(
+          `(${Array.from({ length: CANDIDATE_COLUMN_COUNT }, (_, k) => `$${base + k + 1}`).join(', ')})`
+        )
+        values.push(
+          runId, userId, mediaType, c.tmdbId, c.imdbId, start + offsetInChunk + 1,
           c.finalScore, c.similarityScore, c.popularityScore, c.recencyScore, c.sourceScore,
           c.source, c.sourceMediaId ?? null,
           c.title, c.originalTitle, c.originalLanguage ?? null, c.releaseYear,
@@ -578,13 +549,33 @@ export async function storeDiscoveryCandidates(
           c.runtimeMinutes ?? null,
           c.tagline ?? null,
           c.isEnriched ?? false,
-        ]
+          // Both added by migration 0098 and never written until now, so
+          // pool_id was always NULL and is_personalized always FALSE.
+          // is_personalized is the only stored signal that separates "picked
+          // for you" from "trending everywhere".
+          c.poolId ?? null,
+          PERSONALIZED_SOURCES.includes(c.source as PersonalizedDiscoverySource)
+        )
+      })
+
+      const res = await client.query(
+        `INSERT INTO discovery_candidates (
+          run_id, user_id, media_type, tmdb_id, imdb_id, rank,
+          final_score, similarity_score, popularity_score, recency_score, source_score,
+          source, source_media_id,
+          title, original_title, original_language, release_year,
+          poster_path, backdrop_path, overview,
+          genres, vote_average, vote_count, score_breakdown,
+          cast_members, directors, runtime_minutes, tagline,
+          is_enriched, pool_id, is_personalized
+        ) VALUES ${tuples.join(', ')}`,
+        values
       )
-      stored++
-    } catch (err) {
-      logger.warn({ err, tmdbId: c.tmdbId, title: c.title }, 'Failed to store discovery candidate')
+      inserted += res.rowCount ?? chunk.length
     }
-  }
+
+    return inserted
+  })
 
   logger.info({ runId, userId, mediaType, stored, total: candidates.length }, 'Stored discovery candidates')
   return stored
