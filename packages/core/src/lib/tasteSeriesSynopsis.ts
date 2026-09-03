@@ -256,7 +256,11 @@ Rules:
 - Use **bold** markdown for trait names${langBlock}`,
       prompt: abstractPrompt,
       temperature: 0.4,
-      maxOutputTokens: 400,
+      // The prompt asks for three sections; 400 tokens cut every profile off
+      // mid-sentence, and a reasoning model spends this same allowance on its
+      // scratchpad before writing a word. A cap is not a reservation, so the
+      // headroom costs nothing on a model that answers directly.
+      maxOutputTokens: 4000,
     })
 
     // Consume fullStream (not textStream): under AI SDK v5 textStream silently

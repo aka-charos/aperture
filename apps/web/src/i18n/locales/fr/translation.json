@@ -4171,7 +4171,17 @@
     "breakdownEpisodes_one": "{{count}} episode",
     "breakdownEpisodes_other": "{{count}} episodes",
     "breakdownViewPerson": "Full filmography",
-    "breakdownViewStudio": "All titles"
+    "breakdownViewStudio": "All titles",
+    "sectionGenres": "Genres You Watch",
+    "genreTooltipSeries_one": "{{count}} series ({{pct}}%)",
+    "genreTooltipSeries_other": "{{count}} series ({{pct}}%)",
+    "tasteCardSubtitle": "How the crowd rates what you watch",
+    "avgLabel": "Community average",
+    "hoursSubtitle": "Movies against TV, all time",
+    "activitySubtitle": "Last 12 months · pick a month to see what you watched",
+    "heatmapSubtitleAllTime": "All time, by day and hour",
+    "coverageSpan": "All-time, from your first tracked play in {{from}} — except the activity chart, which covers the last 12 months",
+    "coverageAllTime": "All-time — except the activity chart, which covers the last 12 months"
   },
   "jobsUi": {
     "logsEmpty": "Aucune entrée de journal pour l'instant.",

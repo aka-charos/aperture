@@ -499,6 +499,22 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
           .filter(g => avgCommunityRating > 0 && g.avgRating < avgCommunityRating)
           .slice(0, 6)
 
+        // How far back the history reaches. Every figure below is all-time
+        // except the timeline, which is a rolling twelve months, so the page
+        // needs to be able to state its own coverage rather than leave the
+        // reader guessing whether an empty decade means "never watched" or
+        // "before we were looking".
+        const spanRow = await queryOne<{ first_at: Date | null; last_at: Date | null }>(
+          `SELECT MIN(wh.last_played_at) as first_at, MAX(wh.last_played_at) as last_at
+           FROM watch_history wh
+           WHERE wh.user_id = $1 AND wh.last_played_at IS NOT NULL`,
+          [id]
+        )
+        const historySpan = {
+          firstWatchedAt: spanRow?.first_at ? new Date(spanRow.first_at).toISOString() : null,
+          lastWatchedAt: spanRow?.last_at ? new Date(spanRow.last_at).toISOString() : null,
+        }
+
         // Busiest single day (movies + episodes combined)
         const busiestDayRow = await queryOne<{ date: string; count: string }>(
           `SELECT to_char(date_trunc('day', wh.last_played_at), 'YYYY-MM-DD') as date,
@@ -574,6 +590,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
           avgCommunityRating,
           guiltyPleasureGenres,
           busiestDay,
+          historySpan,
           totalRewatched,
           mostRewatched
         })
