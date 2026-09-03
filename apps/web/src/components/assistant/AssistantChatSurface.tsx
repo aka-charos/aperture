@@ -20,7 +20,6 @@ import {
 import { alpha } from '@mui/material/styles'
 import SmartToyIcon from '@mui/icons-material/SmartToy'
 import AddIcon from '@mui/icons-material/Add'
-import ChatIcon from '@mui/icons-material/Chat'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import EditIcon from '@mui/icons-material/Edit'
 import HistoryIcon from '@mui/icons-material/History'
@@ -349,8 +348,14 @@ export function AssistantChatSurface({
                 sx={{
                   position: 'relative',
                   borderRadius: 1,
-                  mb: 0.5,
+                  mb: 0.25,
+                  // MUI's own 16px inset is sized for a full-width list. In a
+                  // 184px rail it is a tenth of the row spent on nothing, and
+                  // every character it costs the title is one that pushes the
+                  // title onto a second line — which costs 20px more.
+                  pl: 1,
                   pr: 1,
+                  py: 0.5,
                   '&.Mui-selected': {
                     bgcolor: alpha(theme.palette.primary.main, 0.15),
                   },
@@ -364,8 +369,33 @@ export function AssistantChatSurface({
                   },
                 }}
               >
-                <ListItemIcon sx={{ minWidth: 28 }}>
-                  <ChatIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                {/* A dot, not an icon. Every row in a list of chats is a chat,
+                    so a speech bubble on each one names what they all are — it
+                    spent 20px of glyph and a 28px slot to say nothing. The dot
+                    keeps the alignment the icon gave the titles and earns its
+                    place by marking which conversation is open. */}
+                <ListItemIcon
+                  sx={{
+                    minWidth: 18,
+                    // Aligned to the first line of the title, not to the row.
+                    // Centred, it drifts down as the title wraps to two lines
+                    // and the date pulls it further — pointing at whitespace
+                    // between the lines rather than at the chat it marks.
+                    alignSelf: 'flex-start',
+                    mt: '6px',
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      bgcolor:
+                        convo.id === activeConversationId
+                          ? theme.palette.primary.main
+                          : alpha(theme.palette.text.secondary, 0.5),
+                    }}
+                  />
                 </ListItemIcon>
                 {editingConversationId === convo.id ? (
                   <TextField
@@ -398,9 +428,14 @@ export function AssistantChatSurface({
                     <ListItemText
                       primary={convo.title}
                       secondary={formatDate(convo.updated_at)}
+                      // MUI reserves 6px above and below for a list whose rows
+                      // are one line of text. Here the row already carries its
+                      // own padding, so that margin is 12px of nothing per row.
+                      sx={{ my: 0 }}
                       primaryTypographyProps={{
                         variant: 'body2',
                         sx: {
+                          lineHeight: 1.35,
                           // Two lines, then ellipsis. A chat title is the first
                           // words of a question, so one line of a narrow rail
                           // clipped nearly all of them mid-word; the tooltip
@@ -414,6 +449,9 @@ export function AssistantChatSurface({
                       }}
                       secondaryTypographyProps={{
                         variant: 'caption',
+                        // caption's 1.66 buys a 12px date a 20px line, taller
+                        // than the title above it.
+                        sx: { lineHeight: 1.3, display: 'block' },
                       }}
                     />
                   </Tooltip>
