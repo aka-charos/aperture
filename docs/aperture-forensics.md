@@ -1151,3 +1151,80 @@ Three things fixed:
 - A `Taste similarity measured` log line carrying `compared` and the **raw** min/max, before normalisation. The existing line reported only `embeddingsUsable` (the size of the candidate map) and the post-normalisation spread, which cannot distinguish *"the vectors could not be compared at all"* from *"they compared and every answer agreed"*. Those two have completely different causes and the same symptom, and separating them by hand is what cost the five round trips. The job-console warning also gained the candidate count and a named remedy.
 
 **Instrument lesson.** A diagnostic that reports the size of an input is not a diagnostic. `embeddingsUsable: 331` was true, reassuring, and irrelevant — the failure was one step further on, in a comparison that consumed those 331 vectors and produced nothing. Log the output of the step that can fail, not the input to it.
+
+## F-105
+
+**Requesting without leaving Aperture: attribution, the search boundary, and the admin scope.** Built 2026-09-04 as phases 1–2 of making Seerr an admin-only backend. Sources read at Seerr v3.4.1 (`seerr-team/seerr`, formerly `fallenbagel/jellyseerr`) and the Overseerr OpenAPI spec.
+
+### Everything Aperture submitted to Seerr was filed by the admin
+
+`seerrRequest` sent only `X-Api-Key`. Seerr's `checkUser` middleware resolves an API-key request to **user id 1 — the original administrator** — unless the request also carries `X-API-User`, in which case that user becomes `req.user` for the whole request:
+
+```ts
+if (req.header('X-API-Key') === settings.main.apiKey) {
+  let userId = 1;                                    // original administrator
+  if (req.header('X-API-User')) {                    // act on that user's behalf
+    userId = Number(req.header('X-API-User'));
+  }
+  user = await userRepository.findOne({ where: { id: userId } });
+}
+```
+
+Requests partly escaped this because `POST /request` accepts a `userId` body field, which Aperture was already sending. Nothing else does. Measured across release tags:
+
+| Endpoint | On-behalf-of via body | Available since |
+|---|---|---|
+| `POST /request` | `userId` | Overseerr |
+| `POST /issue` | `userId` | **Seerr v3.4.0** (absent in v3.3.0 and all 2.x) |
+| `POST /issue/:id/comment` | — | **never** (hardcodes `user: req.user` in v3.4.1) |
+
+So the header is the only mechanism that attributes every endpoint, and it is the one that has been there longest. Adopted for requests now, and it is what makes phase 3 (issues) possible at all — without it every issue and every comment from every user would be authored by admin #1.
+
+### Sending both attributions is a 403, not redundancy
+
+`MediaRequest.request()` resolves `X-API-User` into `req.user` **before** it looks at the body:
+
+```ts
+let requestUser = user;                              // already the header's user
+if (requestBody.userId && !requestUser.hasPermission([MANAGE_USERS, MANAGE_REQUESTS])) {
+  throw new RequestPermissionError('You do not have permission to modify the request user.');
+}
+```
+
+An ordinary viewer holds neither permission, so header + body together refuse for every non-admin — the exact population the feature is for. `createRequest` therefore drops the body field whenever `actAsUserId` is set.
+
+### What the header actually changes, and what it does not
+
+Reading the same function: the target user's REQUEST permission (~line 82) and their quota (~line 114) were **already** enforced under the body-field path. The one behavioural change is auto-approval, which reads the **caller**:
+
+```ts
+status: user.hasPermission(Permission.AUTO_APPROVE, ...) ? APPROVED : PENDING
+```
+
+Under the API key the caller was admin, so every request Aperture ever submitted was auto-approved regardless of the requester's own settings. With the header, caller and target are the same person and their own auto-approve setting decides. Requests from users without it now land pending — which is why phase 2 (approve/decline in-app) shipped alongside rather than after.
+
+An unmapped user (`users.seerr_user_id` NULL) sends no header and falls back to the previous behaviour, so this cannot break anyone it fails to identify.
+
+### A null answer cannot carry a refusal
+
+`seerrRequest` returned `T | null` and logged the error body. Fine for a lookup, wrong for anything a user triggered: Seerr refuses with a specific actionable sentence ("Movie Quota exceeded", "You do not have permission to make 4K movie requests") and the user saw `'Failed to create request'`. Survivable while Seerr was a second window they could open; not survivable once Aperture is the only surface. `seerrCall` returns `{ ok, status, data, message }`; `seerrRequest` is now a thin reader over it for the lookups that genuinely do not care. Routes map an upstream 4xx to itself rather than 500, since a quota refusal is the user's answer, not a server fault.
+
+### The search boundary is where a later native fallback is cheap or expensive
+
+Search is proxied to Seerr's `GET /search` — itself a TMDb `search/multi` wrapper that decorates each result with `mediaInfo`, so one call answers both "what matches" and "is it already here". Chosen over calling TMDb directly because the annotation is free and it is a day less work; the cost is that in-app search goes down with Seerr, which the panel states as *"Content search is unavailable"* rather than rendering an empty list ("nothing matched" and "search is off" look identical in a list and mean opposite things).
+
+What makes the later native fallback a drop-in rather than a rewrite is that **the route owns the response shape**. Seerr speaks `mediaType: 'tv'`, `posterPath`, and availability as integers 1–5; Aperture speaks `'series'` and decided strings. Had that vocabulary reached the web bundle, a second source would mean changing the page, its types and its translations. `sources/types.ts` holds the contract, `seerrSource.ts` the only implementation, and `resolveSearchSource()` picks the first available one — the same shape as the `WebSearchSource` registry in `assistant/discovery/sources/`. No merging: two sources would return the same TMDb rows, so the question is which is authoritative, not how to combine them.
+
+Library membership is deliberately **not** taken from the search backend. It comes from Aperture's own `movies`/`series` tables via `attachLibraryMediaIds`, because the two can disagree — a library Seerr does not scan, or a scan that is behind — and when they do, ours decides whether the user can actually play the thing. Taking Seerr's word would offer a Request button for a film already on the server.
+
+`mapSeerrSearchItem` is split into `seerrMapping.ts` importing nothing at runtime, so it can be pinned without dragging the core barrel and its database pool into the test process. Nine cases in `seerrMapping.test.ts`, verified to fail on an injected regression (reading `status` alone instead of `max(status, status4k)` — a 4K-only title would be offered for request again).
+
+### Admin scope is a nullable user, not a second query
+
+`getDiscoveryRequests`/`countDiscoveryRequests` take `userId: string | null`, null meaning every user. One `buildRequestFilter` feeds both, because a count and a page that describe different populations produce a "12 requests" header over a table of 9 — the same duplicated-predicate failure this repo splits into pure modules everywhere else. `scope=all` from a non-admin is **narrowed to their own rows rather than refused**: the toggle is only rendered for admins, so a non-admin arriving there is a stale tab, and their own list is the right answer for them.
+
+Approve/decline is keyed by the **Aperture** request id, not the Seerr one — that is what the table on screen holds, and the local row has to be updated too or the list keeps showing the old state until `reconcile-discovery-requests` next runs. A row with no `seerr_request_id` answers 409 ("never submitted") rather than a 502 from a call that was never going to work.
+
+### Left for later
+
+The Emby half of `matchApertureProfileToSeerrUser` is still string matching. Seerr has no Emby columns — it stores Emby users in `jellyfinUserId`/`jellyfinUsername` with `userType = EMBY` (4), and the import endpoint is literally `POST /user/import-from-jellyfin` — but the matcher guards the id path with `provider === 'jellyfin'`, so on an Emby instance the one stable GUID both systems already hold is skipped and matching falls to email (frequently absent on Emby) then username. The compare is also `pid === String(u.jellyfinUserId).trim()` with no normalization, while Seerr runs every id through `normalizeJellyfinGuid` (strip dashes, lowercase, require 32 hex) — so a dashed-vs-undashed GUID misses even on Jellyfin. And the resolved id is cached in `users.seerr_user_id` and only recomputed when NULL, so a user deleted and re-imported in Seerr keeps a stale id forever. Not blocking: an unmatched user simply sends no header and behaves as before.

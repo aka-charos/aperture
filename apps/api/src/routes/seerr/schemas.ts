@@ -309,6 +309,7 @@ export const getRequestsSchema = {
       limit: { type: 'string', description: 'Page size (max 100)', default: '25', example: '25' },
       offset: { type: 'string', description: 'Rows to skip for pagination', default: '0', example: '0' },
       source: { type: 'string', enum: ['discovery', 'gap_analysis'], description: 'Filter by origin (Discovery vs Gap Analysis)' },
+      scope: { type: 'string', enum: ['mine', 'all'], description: 'Admins only: "all" returns every user’s requests. Narrowed to "mine" for non-admins.' },
     },
   },
 }
@@ -329,6 +330,35 @@ export const getRequestStatusSchema = {
     required: ['requestId'],
     properties: {
       requestId: { type: 'string', format: 'uuid', description: 'Aperture request ID' },
+    },
+  },
+}
+
+export const searchContentSchema = {
+  tags: ['seerr'],
+  summary: 'Search movies, TV shows and people',
+  description:
+    'Search for content that may not be in the library. Results are in Aperture’s own shape regardless of which backend answered, and carry decided values (inLibrary, availability, requested) rather than provider status codes.',
+  querystring: {
+    type: 'object',
+    required: ['query'],
+    properties: {
+      query: { type: 'string', minLength: 1, description: 'Search text. Fewer than 2 characters returns an empty page.' },
+      page: { type: 'string', description: 'Result page, 1-based', default: '1', example: '1' },
+    },
+  },
+}
+
+export const decideRequestSchema = {
+  tags: ['seerr'],
+  summary: 'Approve or decline a request',
+  description: 'Admin only. Actions the request in Seerr and updates the Aperture row so the list does not lag behind until the next reconcile.',
+  params: {
+    type: 'object',
+    required: ['id', 'decision'],
+    properties: {
+      id: { type: 'string', format: 'uuid', description: 'Aperture request ID' },
+      decision: { type: 'string', enum: ['approve', 'decline'], description: 'New status' },
     },
   },
 }

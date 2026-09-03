@@ -901,45 +901,83 @@ export async function updateDiscoveryRequestStatus(
 }
 
 /**
- * Count discovery requests for a user (same filters as getDiscoveryRequests, no limit/offset).
+ * The WHERE fragment both the count and the page share.
+ *
+ * One builder rather than two copies, because the count and the list have to
+ * describe the same population — a "12 requests" header over a table of 9 is
+ * a bug report, and the two predicates drift the moment they are written
+ * twice. `userId === null` means every user, which is the admin scope.
+ */
+function buildRequestFilter(
+  userId: string | null,
+  options: {
+    mediaType?: MediaType
+    status?: DiscoveryRequestStatus
+    source?: DiscoveryRequestSource
+  }
+): { where: string; params: (string | number)[]; nextIndex: number } {
+  const clauses: string[] = []
+  const params: (string | number)[] = []
+  let i = 1
+
+  if (userId !== null) {
+    clauses.push(`r.user_id = $${i}`)
+    params.push(userId)
+    i++
+  }
+  if (options.mediaType) {
+    clauses.push(`r.media_type = $${i}`)
+    params.push(options.mediaType)
+    i++
+  }
+  if (options.status) {
+    clauses.push(`r.status = $${i}`)
+    params.push(options.status)
+    i++
+  }
+  if (options.source) {
+    clauses.push(`r.source = $${i}`)
+    params.push(options.source)
+    i++
+  }
+
+  return {
+    where: clauses.length > 0 ? ` WHERE ${clauses.join(' AND ')}` : '',
+    params,
+    nextIndex: i,
+  }
+}
+
+/**
+ * Count discovery requests (same filters as getDiscoveryRequests, no limit/offset).
+ *
+ * `userId` of null counts every user's requests — the admin scope.
  */
 export async function countDiscoveryRequests(
-  userId: string,
+  userId: string | null,
   options: {
     mediaType?: MediaType
     status?: DiscoveryRequestStatus
     source?: DiscoveryRequestSource
   } = {}
 ): Promise<number> {
-  let sql = `SELECT COUNT(*)::int AS c FROM discovery_requests WHERE user_id = $1`
-  const params: (string | number)[] = [userId]
-  let paramIndex = 2
-
-  if (options.mediaType) {
-    sql += ` AND media_type = $${paramIndex}`
-    params.push(options.mediaType)
-    paramIndex++
-  }
-  if (options.status) {
-    sql += ` AND status = $${paramIndex}`
-    params.push(options.status)
-    paramIndex++
-  }
-  if (options.source) {
-    sql += ` AND source = $${paramIndex}`
-    params.push(options.source)
-    paramIndex++
-  }
-
-  const row = await queryOne<{ c: number }>(sql, params)
+  const filter = buildRequestFilter(userId, options)
+  const row = await queryOne<{ c: number }>(
+    `SELECT COUNT(*)::int AS c FROM discovery_requests r${filter.where}`,
+    filter.params
+  )
   return row?.c ?? 0
 }
 
 /**
- * Get discovery requests for a user
+ * Get discovery requests.
+ *
+ * `userId` of null returns every user's requests — the admin scope. The
+ * requester's name is joined in rather than resolved by a second query per
+ * row, since the admin view renders it on every line.
  */
 export async function getDiscoveryRequests(
-  userId: string,
+  userId: string | null,
   options: {
     mediaType?: MediaType
     status?: DiscoveryRequestStatus
@@ -948,27 +986,16 @@ export async function getDiscoveryRequests(
     offset?: number
   } = {}
 ): Promise<DiscoveryRequest[]> {
-  let sql = `SELECT * FROM discovery_requests WHERE user_id = $1`
-  const params: (string | number)[] = [userId]
-  let paramIndex = 2
+  const filter = buildRequestFilter(userId, options)
+  const params = [...filter.params]
+  let paramIndex = filter.nextIndex
 
-  if (options.mediaType) {
-    sql += ` AND media_type = $${paramIndex}`
-    params.push(options.mediaType)
-    paramIndex++
-  }
-  if (options.status) {
-    sql += ` AND status = $${paramIndex}`
-    params.push(options.status)
-    paramIndex++
-  }
-  if (options.source) {
-    sql += ` AND source = $${paramIndex}`
-    params.push(options.source)
-    paramIndex++
-  }
-
-  sql += ` ORDER BY created_at DESC`
+  let sql =
+    `SELECT r.*, u.username AS requested_by_username, u.display_name AS requested_by_display_name
+     FROM discovery_requests r
+     LEFT JOIN users u ON u.id = r.user_id` +
+    filter.where +
+    ` ORDER BY r.created_at DESC`
 
   if (options.limit != null) {
     sql += ` LIMIT $${paramIndex}`
@@ -994,6 +1021,8 @@ export async function getDiscoveryRequests(
     source: DiscoveryRequestSource
     created_at: Date
     updated_at: Date
+    requested_by_username: string | null
+    requested_by_display_name: string | null
   }>(sql, params)
 
   return result.rows.map(row => ({
@@ -1010,6 +1039,8 @@ export async function getDiscoveryRequests(
     source: row.source ?? 'discovery',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    requestedByUsername: row.requested_by_username,
+    requestedByDisplayName: row.requested_by_display_name,
   }))
 }
 

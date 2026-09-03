@@ -22,13 +22,23 @@ import {
   MenuItem,
   Stack,
   TablePagination,
+  Snackbar,
+  FormControlLabel,
+  Switch,
 } from '@mui/material'
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck'
+import CheckIcon from '@mui/icons-material/Check'
+import CloseIcon from '@mui/icons-material/Close'
 import {
   TmdbExternalDetailModal,
   type TmdbExternalDetailPayload,
 } from '../components/TmdbExternalDetailModal'
+import {
+  ContentSearchPanel,
+  type ContentSearchItem,
+} from '../components/ContentSearchPanel'
 import { PageHeading } from '@/components/PageHeading'
+import { useAuth } from '@/hooks/useAuth'
 
 type SeerrLive = {
   status: 'pending' | 'approved' | 'declined'
@@ -51,6 +61,9 @@ interface DiscoveryRequestRow {
   updatedAt: string
   seerrLive: SeerrLive
   libraryMediaId?: string | null
+  /** Present only in the admin scope, where rows belong to other people. */
+  requestedByUsername?: string | null
+  requestedByDisplayName?: string | null
 }
 
 function getRequestStatusKey(row: DiscoveryRequestRow): string | null {
@@ -89,12 +102,28 @@ function statusColor(row: DiscoveryRequestRow): 'default' | 'primary' | 'seconda
 
 type SourceFilter = 'all' | 'discovery' | 'gap_analysis'
 
+/** Whether an admin can still act on this row — Seerr has it and it is undecided. */
+function isActionable(row: DiscoveryRequestRow): boolean {
+  if (row.seerrRequestId == null) return false
+  const key = getRequestStatusKey(row)
+  return key === 'pendingApproval' || key === 'submitted' || key === 'pending'
+}
+
 export function MyRequestsPage() {
   const { t } = useTranslation()
+  const { user } = useAuth()
+  const isAdmin = user?.isAdmin ?? false
   const [rows, setRows] = useState<DiscoveryRequestRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
+  const [allUsers, setAllUsers] = useState(false)
+  const [deciding, setDeciding] = useState<string | null>(null)
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean
+    message: string
+    severity: 'success' | 'error'
+  }>({ open: false, message: '', severity: 'success' })
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(25)
   const [total, setTotal] = useState(0)
@@ -110,6 +139,7 @@ export function MyRequestsPage() {
     try {
       const u = new URL('/api/seerr/requests', window.location.origin)
       if (sourceFilter !== 'all') u.searchParams.set('source', sourceFilter)
+      if (allUsers && isAdmin) u.searchParams.set('scope', 'all')
       u.searchParams.set('limit', String(rowsPerPage))
       u.searchParams.set('offset', String(page * rowsPerPage))
       const res = await fetch(u.toString(), { credentials: 'include' })
@@ -129,7 +159,7 @@ export function MyRequestsPage() {
     } finally {
       setLoading(false)
     }
-  }, [sourceFilter, page, rowsPerPage, t])
+  }, [sourceFilter, allUsers, isAdmin, page, rowsPerPage, t])
 
   useEffect(() => {
     void load()
@@ -141,7 +171,7 @@ export function MyRequestsPage() {
     if (page > maxPage) setPage(maxPage)
   }, [total, rowsPerPage, page])
 
-  const openTmdbModal = (r: DiscoveryRequestRow) => {
+  const openTmdbModal = (r: { mediaType: 'movie' | 'series'; tmdbId: number }) => {
     setTmdbModalOpen(true)
     setTmdbModalLoading(true)
     setTmdbModalError(null)
@@ -174,12 +204,54 @@ export function MyRequestsPage() {
     return t('myRequests.requestStatus.fallback', { status: row.status })
   }
 
+  const decide = async (row: DiscoveryRequestRow, decision: 'approve' | 'decline') => {
+    setDeciding(row.id)
+    try {
+      const res = await fetch(`/api/seerr/requests/${row.id}/${decision}`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string }
+      if (!res.ok) {
+        // Seerr's own sentence where it sent one, so a refusal explains itself.
+        throw new Error(body.message || body.error || t('myRequests.decisionFailed'))
+      }
+      setSnackbar({
+        open: true,
+        message: t(decision === 'approve' ? 'myRequests.approved' : 'myRequests.declined', {
+          title: row.title,
+        }),
+        severity: 'success',
+      })
+      await load()
+    } catch (e) {
+      setSnackbar({
+        open: true,
+        message: e instanceof Error ? e.message : t('myRequests.decisionFailed'),
+        severity: 'error',
+      })
+    } finally {
+      setDeciding(null)
+    }
+  }
+
+  const showRequesterColumn = isAdmin && allUsers
+
   return (
-    <Box sx={{ maxWidth: 1100, mx: 'auto', p: { xs: 2, md: 3 } }}>
+    <Box sx={{ maxWidth: 1400, mx: 'auto', p: { xs: 2, md: 3 } }}>
       <PageHeading
         title={t('nav.myRequests')}
         description={t('myRequests.pageSubtitle')}
         icon={<PlaylistAddCheckIcon color="primary" />}
+      />
+
+      <ContentSearchPanel
+        onShowDetails={(item: ContentSearchItem) => {
+          if (item.mediaType === 'person') return
+          openTmdbModal({ mediaType: item.mediaType, tmdbId: item.tmdbId })
+        }}
+        onRequested={() => void load()}
+        onNotify={(message, severity) => setSnackbar({ open: true, message, severity })}
       />
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mb={3} alignItems={{ sm: 'center' }}>
@@ -199,6 +271,21 @@ export function MyRequestsPage() {
             <MenuItem value="gap_analysis">{t('myRequests.sourceGapAnalysis')}</MenuItem>
           </Select>
         </FormControl>
+
+        {isAdmin && (
+          <FormControlLabel
+            control={
+              <Switch
+                checked={allUsers}
+                onChange={(e) => {
+                  setPage(0)
+                  setAllUsers(e.target.checked)
+                }}
+              />
+            }
+            label={t('myRequests.showAllUsers')}
+          />
+        )}
       </Stack>
 
       {error && (
@@ -225,10 +312,13 @@ export function MyRequestsPage() {
                 <TableRow>
                   <TableCell>{t('myRequests.tableTitle')}</TableCell>
                   <TableCell width={100}>{t('myRequests.tableType')}</TableCell>
+                  {showRequesterColumn && (
+                    <TableCell width={150}>{t('myRequests.tableRequestedBy')}</TableCell>
+                  )}
                   <TableCell width={130}>{t('myRequests.tableSource')}</TableCell>
                   <TableCell width={140}>{t('myRequests.tableRequested')}</TableCell>
                   <TableCell width={180}>{t('myRequests.tableStatus')}</TableCell>
-                  <TableCell width={180} align="right">
+                  <TableCell width={isAdmin ? 340 : 180} align="right">
                     {t('myRequests.tableActions')}
                   </TableCell>
                 </TableRow>
@@ -251,6 +341,15 @@ export function MyRequestsPage() {
                         variant="outlined"
                       />
                     </TableCell>
+                    {showRequesterColumn && (
+                      <TableCell>
+                        <Typography variant="body2">
+                          {r.requestedByDisplayName ||
+                            r.requestedByUsername ||
+                            t('myRequests.unknownUser')}
+                        </Typography>
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Chip
                         size="small"
@@ -288,24 +387,58 @@ export function MyRequestsPage() {
                       </Tooltip>
                     </TableCell>
                     <TableCell align="right">
-                      {isRowAvailable(r) && r.libraryMediaId ? (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          component={RouterLink}
-                          to={
-                            r.mediaType === 'movie'
-                              ? `/movies/${r.libraryMediaId}`
-                              : `/series/${r.libraryMediaId}`
-                          }
-                        >
-                          {t('myRequests.openInLibrary')}
-                        </Button>
-                      ) : (
-                        <Button size="small" variant="outlined" onClick={() => openTmdbModal(r)}>
-                          {t('myRequests.details')}
-                        </Button>
-                      )}
+                      <Stack direction="row" spacing={1} justifyContent="flex-end">
+                        {isAdmin && isActionable(r) && (
+                          <>
+                            <Tooltip title={t('myRequests.approve')}>
+                              <span>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="success"
+                                  disabled={deciding === r.id}
+                                  onClick={() => void decide(r, 'approve')}
+                                  startIcon={<CheckIcon />}
+                                >
+                                  {t('myRequests.approve')}
+                                </Button>
+                              </span>
+                            </Tooltip>
+                            <Tooltip title={t('myRequests.decline')}>
+                              <span>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="error"
+                                  disabled={deciding === r.id}
+                                  onClick={() => void decide(r, 'decline')}
+                                  startIcon={<CloseIcon />}
+                                >
+                                  {t('myRequests.decline')}
+                                </Button>
+                              </span>
+                            </Tooltip>
+                          </>
+                        )}
+                        {isRowAvailable(r) && r.libraryMediaId ? (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            component={RouterLink}
+                            to={
+                              r.mediaType === 'movie'
+                                ? `/movies/${r.libraryMediaId}`
+                                : `/series/${r.libraryMediaId}`
+                            }
+                          >
+                            {t('myRequests.openInLibrary')}
+                          </Button>
+                        ) : (
+                          <Button size="small" variant="outlined" onClick={() => openTmdbModal(r)}>
+                            {t('myRequests.details')}
+                          </Button>
+                        )}
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -339,6 +472,21 @@ export function MyRequestsPage() {
         sourceLabel="TMDb"
         canRequest={false}
       />
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          variant="filled"
+          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   )
 }
