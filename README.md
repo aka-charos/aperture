@@ -21,7 +21,9 @@ This repository ([aka-charos/aperture](https://github.com/aka-charos/aperture)) 
 - Images are published to **`ghcr.io/aka-charos/aperture:dev`** on every push to `dev`.
 - Version identity is two fields, not one string: `APP_VERSION` is the upstream lineage (`0.7.8`), `APP_BUILD` is the fork build (`mod.<commits>.g<sha>`). Both appear in the admin console and in `/api/health`.
 
-### Headline additions over upstream
+**This README is written as a delta.** Upstream's own documentation still describes the base application; what follows concentrates on what is different here — [what the fork changes](#what-this-fork-changes), section by section, with the parts that arrived unchanged gathered under [Inherited from upstream](#inherited-from-upstream). If you are comparing the two projects, the next table and that section are the whole answer.
+
+### At a glance
 
 | Area                | What the fork adds                                                                                                                                                                                                                                                                                                                                                              |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -114,79 +116,92 @@ Migrations run at startup (`RUN_MIGRATIONS_ON_START`), so an update is pull-and-
 
 ---
 
-## Feature tour
+## What this fork changes
 
-### Recommendations
+Everything in this section is fork work on top of upstream v0.7.8. Where a heading names something upstream already had, the text describes what is now different about it; the parts that arrived unchanged are listed separately under [Inherited from upstream](#inherited-from-upstream).
 
-- **Per-user libraries** written into your media server as STRM files or symlinks, with NFOs, artwork and subtitles preserved.
-- **Taste profiles** built from watch history, favourites, ratings and completion — weighted by how much of a series someone actually finished, and split into up to three clusters so a viewer with two distinct tastes is not averaged into one.
-- **Scoring** blends similarity, novelty and rating, each weight admin-tunable per media type, then corrected so a weight buys the influence it claims.
-- **Selection** uses MMR (maximal marginal relevance) rather than a genre-coverage sort, with reserved slots for:
-  - **stated interests** — free-text things you want more of,
-  - **taste twins** — picks borrowed from the viewer whose history overlaps yours far more than chance, and
-  - **acclaimed titles** the ranking would otherwise never reach.
-- **Match insights** on every title the recommender scored — not just the twenty it picked. The panel shows the blended score, the preference adjustment, the per-term weight shares, variety, and the titles in your own history that support the pick.
-- **AI explanations** written from real data (plot, keywords, directors, nearest neighbours in your history) with an explicit no-invention rule, refreshable on their own without re-scoring.
-- **Activity gate** — scheduled runs skip users whose library and history have not changed enough to move a pick; a manual run always runs.
+### AI providers and models — rebuilt
 
-### AI assistant
+Upstream took one OpenAI key and used one model for everything.
 
-- Chat that routes each turn: **library** questions search your shelf, **discovery** questions run a grounded web search and resolve the results back against your library by IMDb ID → TMDB ID → title + year.
-- Available as a **dockable side panel**, a **dialog**, or the full **`/assistant`** page, with conversation history and live phase status ("searching the web", "checking your library") instead of a static spinner.
-- Tools for semantic search, filtered search, watch history, ratings, similar titles, person lookups, episode-level search, and your own recommendation run.
-- Rich cards with synopsis, reason, director, favourite state and watched state; open a title in place without leaving the conversation.
+- **Six independent roles** — embeddings, chat, text generation, exploration, web search, title analysis — each with its own provider, model, key and options.
+- **Nine provider families**: OpenAI, Anthropic, Google, Groq, DeepSeek, OpenRouter, Ollama, LM Studio / any OpenAI-compatible endpoint, Hugging Face. Local servers are probed for what they actually have installed rather than assumed.
+- **Live model catalogs** with per-1M-token pricing, tool-calling and reasoning badges; retired models drop out on their own.
+- **Reasoning effort** per role, offered in each model's own vocabulary rather than an invented one, because a reasoning model bills its scratchpad from the same output allowance as the answer.
+- **Fallback models and fallback API keys** for free-tier work, with call pacing and per-key cooldowns — a spare key answers "this account is out of quota", a spare model answers "this model is gone".
+- **Spend dashboard** measuring what OpenRouter actually charged. Unpriced calls are reported as unknown, never as $0.
+- Sibling key resolution: configure a provider once and every role on that provider reuses it.
+
+### Embeddings — model, width and vector space are settings now
+
+- **Model and dimension are configurable** (768 through 4096, including 2560), each width in its own table, so switching starts a new set beside the old one instead of destroying it. Switch back and the old set is still there.
+- **Stored-sets panel** showing every set, its coverage, its dates and exactly what switching would cost — re-embed → re-centre → rebuild taste profiles → regenerate.
+- **Mean-centred vectors**: subtracting what every title in the library has in common measurably improved retrieval, and centring runs at the end of each embedding job rather than being a chore to remember.
+- **Retrieval mode** offered only for models that document how to carry one, delivered as a request parameter or a text prefix depending on the model.
+- **Canonical text reworked** — six of fifteen fields were nationality-coded, so the vector partly worked as a nationality detector; content rating, awards and composers came out, and OMDb's longer plot came in.
+- **Episode-level embeddings** (optional) power episode search in the assistant.
+- **Offline evaluation harness** (`evaluate-recommender`) so a retrieval change can be measured instead of argued about: held-out ranking against random and rating-only baselines, nearest-neighbour dumps raw and centred side by side, every stored set measured, results archived and exported as CSV.
+
+### Recommender — how a pick is chosen, and why
+
+- **MMR diversity** replaces the old genre-coverage sort, which let one Drama close Drama for the rest of the list.
+- **Reserved slots** for things the ranking will never reach on its own: **stated interests**, **taste twins** (the viewer whose history overlaps yours far more than chance), and **acclaimed titles**. Every slot count is admin-visible; there are no hidden shares underneath.
+- **Taste clustering** — a profile splits into up to three clusters, so a viewer with two distinct tastes is not averaged into one vector that matches neither.
+- **Era affinity** — decade preference measured against the viewer's own shelf.
+- **Genre preference is availability-adjusted**, not volume-based: someone who hides the horror library no longer reads as horror-averse.
+- **Engagement weighting** by how much of a series was actually finished, so forty abandoned shows stop outvoting five finished ones.
+- **Disliked titles weigh zero** instead of being scaled onto a curve that peaked at 5/10.
+- **Activity gate** — a scheduled run skips users whose library and history have not changed enough to move a pick; a manual run always runs.
+- **Match insights on every scored title**, not just the twenty that were picked: blended score, preference adjustment, per-term weight shares, variety, and the titles in your own history that support the pick — with a different, honest heading when the pick came from a reserved slot and the ranking is not the reason.
+- **Explanations** are written from real data (plot, keywords, directors, neighbours in your history) under a no-invention rule, survive a truncated response instead of replacing all ten with a template, and can be re-run on their own without re-scoring.
+- **Admin controls** for preference strength, gate thresholds, slot budgets and candidate pool size, with the pool bounded by the number of items that actually exist.
+
+### AI assistant — new
+
+- Chat that **routes each turn**: library questions search your shelf, discovery questions run a grounded web search and resolve the results back against your library by IMDb ID → TMDB ID → title + year.
+- Available as a **dockable side panel**, a **dialog**, or the full **`/assistant`** page, with conversation history that survives a reload and renders in the order it was written.
+- **Live phase status** ("searching the web", "checking your library") in place of a static spinner, and cards that stream in rather than waiting for the slow part.
+- Tools for semantic search, filtered search, watch history, ratings, similar titles, person lookups, episode search, and your own recommendation run — including a library-scoped personalized search over the pool the recommender already scored.
+- **National cinema is searchable** (country, not language — languages are populated for under 1% of a real library), with ~120 demonyms mapped to the stored country names.
+- Rich cards with synopsis, grounded reason, director, favourite and watched state; open a title in place without leaving the conversation.
 - **Build a playlist or collection from chat picks**, carrying the request that produced them.
 - Optional **unwatched-only** mode, and suggestion chips drawn from your newest completed run.
 
-### Discovery and requests
+### Discovery, web search and title analysis — new
 
-- **Discovery engine** — finds content you do _not_ own, scores it against your taste clusters, and offers it for request through **Jellyseerr / Overseerr**.
-- **My Requests** page tracking what you asked for and where it got to.
-- **Gap analysis** — finds incomplete TMDB collections in your library and shows what is missing.
-- **Missing episodes and seasons** surfaced on series pages, with per-season requests.
+- **Discovery engine** — finds content you do _not_ own, scores it against your taste clusters, and files requests through **Jellyseerr / Overseerr**.
+- **Grounded web search** as its own AI role, with Google grounding plus **Tavily** as a second source; sources compose and fall back for one another, and free-tier grounding quota is metered per key with automatic rotation.
+- The taste brief personalises **which candidates win, never which searches run** — the profile is structurally unable to reach a search call.
+- **Title analysis** — an optional critic-informed account of what a film or show actually is, retrieved from the open web through self-hosted **fastCRW** search or Google grounding, cached per title and shared by every user.
+- **Gap analysis** — incomplete TMDB collections in your library, with what is missing.
+- **Missing episodes and seasons** surfaced on series pages with per-season requests.
 
-### Browse, search and detail pages
+### Watch statistics — every number opens
 
-- **Browse** with filters for genre, year, rating, content rating, network, studio, people and **production country** (with AND/OR matching), grid and list views, and saved sort.
-- **Global search** (⌘K) plus a **semantic search** page that finds by concept rather than keyword.
-- **Movie and series detail pages** — each fact stated once: ratings and awards on the hero line, full cast and crew, languages and countries, related titles, watch progress, trailer, favourite and mark-watched actions.
-- **Series detail** with per-season and per-episode progress and inline episode descriptions.
-- **Person, studio and franchise pages** built from your library and TMDB.
-- **Title analysis** — an optional critic-informed account of what a film or show actually is, retrieved from the open web (self-hosted fastCRW search, or Google grounding) and cached per title.
-
-### Watching and history
-
-- **Shows You Watch** — everything in flight, with a segmented bar combining progress, availability and what is missing, plus Airing/Ended filters driven by TMDB status.
-- **Watch history** with full-history search, status filters, resume bars and last-played timestamps.
-- **Watch Stats** — genres, decades, ratings, people, studios, networks, a time-of-day heatmap, a rewatch breakdown, TV vs film time, and a "your taste vs the crowd" comparison. **Every number opens the titles behind it.**
+- Genres (film and TV), decades, ratings, people, studios, networks, a time-of-day heatmap, a rewatch breakdown, TV vs film time, and a "your taste vs the crowd" comparison.
+- **Every figure on the page opens the titles behind it**, counted with the same SQL that produced the number, so a "7 films" chip cannot open five.
 - **Watcher identity** — a natural-language description of what your viewing says about you.
 
-### Playlists, collections and channels
+### Browse, detail pages and the rest of the UI
 
-- **Channels** — rule-based playlists and collections for both movies and series, written to your media server as playlists or Emby Box Sets.
-- **Two-phase generation**: preview the list (with an AI note on each pick) and approve it before anything is written.
-- **Graph playlists** built by walking the similarity graph out from a seed title.
-- **AI text generation** for names and descriptions, with a "build on what I wrote" option on every sparkle button.
+- **Production-country filter** with search, multi-select and AND/OR matching, plus a searchable network filter and reordered content ratings.
+- **Detail pages say each thing once** — ratings and awards on the hero line, director and writer beside them, one info card below; the duplicate genre, critic-rating and awards panels are gone.
+- **Series detail** with per-season and per-episode progress and inline episode descriptions.
+- **Person and studio pages** with biography and birth/death data.
+- **Shows You Watch** — a segmented bar combining progress, availability and what is missing, plus Airing/Ended tabs driven by TMDB status rather than a stale server field.
+- **Watch history** searches the whole history rather than the loaded page, with status filters and real resume bars.
+- **Channels build collections and playlists from TV series too**, with a preview-and-approve step and an AI note on each pick before anything is written.
+- **Cross-media connections** in the Explore graph — films to series and back — which was previously a toggle that could never match anything.
+- **Collapsible sidebar** with a hover flyout, page titles in the app bar instead of 80px of repeated heading, a welcome guide that snoozes instead of nagging, and a resizable assistant dock.
 
-### Explore
+### Admin console — rebuilt
 
-- **Similarity graph** — an interactive, multi-hop map of how titles relate, with reasons on each edge and optional **cross-media connections** (films to series and back).
+- Generated from **one registry**: 8 groups, 40+ sections, with the route table, the nav and the search index all derived from the same data, so a section cannot exist in one and not the others.
+- **⌘⇧K search palette** indexing sections, ~33 individual settings _and_ all 33 jobs, scored per word so "novelty weight" finds the slider even though neither word is its label.
+- **Per-section preconditions** shown as a dimmed row with a reason, rather than an unclickable tab.
+- An error boundary per section, so one broken panel cannot take the console down with it.
 
-### Top Picks
-
-- Global, popularity-driven libraries, collections or playlists across all users, with rank badges on posters and optional automatic requesting of missing entries.
-
-### Ratings
-
-- **1–10 star ratings**, ratable from any poster, with a server-wide default and a per-user override for whether rating badges show on posters.
-- **Trakt.tv** two-way sync.
-- Library ratings kept fresh from the **IMDb daily dataset** (one file, no API key) rather than frozen on the day a title was first enriched, plus TMDB and OMDb scores, and Rotten Tomatoes / Metacritic where available.
-
----
-
-## Administration
-
-The admin console lives under **`/admin`**, reached from the app bar. It is generated from a single registry — 8 groups, 40+ sections — with a **⌘⇧K search palette** that finds sections, individual settings and every job by name.
+It lives at **`/admin`**, reached from the app bar:
 
 | Group               | Covers                                                                                                                              |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
@@ -199,52 +214,45 @@ The admin console lives under **`/admin`**, reached from the app bar. It is gene
 | **Access**          | Users, API keys, deployment posture                                                                                                 |
 | **Ops**             | Jobs, backup, poster repair, logs, database                                                                                         |
 
-### AI configuration
+### Branding, languages and text
 
-Six independent roles — **embeddings**, **chat**, **text generation**, **exploration**, **web search**, **title analysis** — each with its own provider, model, API key and options:
-
-- Providers: **OpenAI, Anthropic, Google, Groq, DeepSeek, OpenRouter, Ollama, LM Studio / OpenAI-compatible, Hugging Face**.
-- Live model catalogs with **per-1M-token pricing**, tool-calling and reasoning badges; local servers are probed for what they actually have installed.
-- **Reasoning effort** per role, offered in each model's own vocabulary rather than an invented one.
-- **Fallback models** and **fallback API keys** for free-tier work, with call pacing and per-key cooldowns.
-- **Spend dashboard** measuring what OpenRouter actually charged (unpriced calls are reported as unknown, never as $0), alongside a forward-looking cost estimator.
-
-### Embeddings
-
-- Model **and dimension** are settings — 768 through 4096, including 2560 — each stored in its own table, so switching models starts a new set beside the old one rather than destroying it.
-- A **stored sets panel** shows every set, its coverage, its dates, and exactly what switching would cost (re-embed → re-centre → rebuild taste profiles → regenerate).
-- **Mean-centred vectors**: subtracting what every title in the library has in common measurably improved retrieval, and centring now runs at the end of each embedding job rather than being a chore to remember.
-- **Retrieval mode** offered only for models that document how to carry one, delivered as a parameter or a text prefix depending on the model.
-- **Episode-level embeddings** (optional) power episode search in the assistant.
-
-### Algorithm tuning and evaluation
-
-- Per-media-type controls for similarity / novelty / rating weights, diversity, preference strength, candidate pool size, selected count, and the reserved-slot budgets — with the budget enforced in the controls so the slot features cannot over-reserve.
-- **Evaluation harness** (`evaluate-recommender`, manual, read-only): ranks a held-out slice of each viewer's history against random and rating-only baselines, dumps the nearest neighbours of chosen seed titles raw and centred side by side, measures every stored embedding set, archives the results and exports them as CSV.
-- Seed titles are editable from the admin UI.
-
-### Branding and languages
-
-- **Rename the instance** — the name reaches all 15 locales, and the browser tab from the first byte.
-- **Mount your own logo and favicon** (`BRANDING_DIR`), and set the two brand colours from the UI.
+- **Rename the instance** — the name reaches all 15 locales and the browser tab from the first byte.
+- **Mount your own logo and favicon** (`BRANDING_DIR`) and set the two brand colours from the UI.
 - **Edit any UI string** in the app or via CSV round-trip, or drop `overrides.<lng>.json` into `I18N_OVERRIDES_DIR` to customize text without rebuilding the image.
-- **Language allowlists** — choose which UI and AI languages users may select, and the default for each.
-- 15 locales: ar, de, el, en, es, fr, he, hi, it, ja, ko, nl, pt, ru, zh (ar and he render right-to-left).
+- **Language allowlists** — choose which UI and AI languages users may pick, and the default for each.
+- **Greek (el) added**, bringing the locale count to 15; ar and he render right-to-left.
+- **Configurable media-server display name** used throughout the UI, and a separate public URL for user-facing media-server links.
 
-### Security and access
+### Security, access and deployment
 
-- Sessions are bearer tokens with a 30-day absolute lifetime and a 7-day idle timeout; disabling an account revokes them immediately.
-- Login protection on two axes: an IP-keyed rate limit plus per-account progressive lockout, so neither a spray nor a distributed attack on one account gets through.
-- **API keys** for automation.
+- **An HTTP header no longer grants admin access.**
 - **Admin "view as user"** — see the app exactly as another user sees it, read-only, on a one-hour lease, with a persistent banner and an exit that is always on screen. The admin's own session is never swapped out.
-- **Deployment posture panel** that checks configuration _against live traffic_ — an instance behind a tunnel with no trusted proxy looks healthy from config alone, so it watches for forwarded headers it is not trusting.
-- **Trusted proxies editable at runtime**, no restart.
-- First-run setup restricted to local addresses; CSP, HSTS and referrer policy set by helmet.
+- **Deployment posture panel** that checks configuration _against live traffic_: an instance behind a tunnel with no trusted proxy looks perfectly healthy from config alone, so it watches for forwarded headers it is not trusting.
+- **Trusted proxies editable at runtime**, applied without a restart.
+- Session hardening (30-day absolute lifetime, 7-day idle timeout, immediate revocation on disable), per-account login lockout alongside the IP rate limit, and a cleanup job for both.
+- **Optional LLDAP email import**, with email, login and activity shown on Admin → Users.
+- Search engines told to stay away from the instance.
 
-### Backups
+### Jobs and operations
 
-- Automatic daily database backups with configurable retention.
-- Restore during setup (for migrations) or from Admin → Ops → Backup.
+- **Editable schedules** — daily, weekly on as many weekdays as you like, biweekly, every N hours or minutes, or manual — with the next run date shown from the same resolver the scheduler uses.
+- **Cancellation that works**: a cancelled job holds its slot until it actually stops, and a refused start says why instead of silently doing nothing.
+- **Log windowing** that keeps the head as well as the tail, and says how many entries were actually lost.
+- **API error tracking**, poll-log quieting, URL masking, and credentials redacted from settings logs.
+- **n8n integration** — webhook client with timeout and auth, a provider-agnostic `search_web` tool, and an optional pre-processing hook on the chat pipeline that fails open if n8n is unreachable.
+
+---
+
+## Inherited from upstream
+
+These arrived with upstream v0.7.8 and work as they always did, apart from the changes listed above:
+
+- **Per-user recommendation libraries** written into your media server as STRM files or symlinks, with NFOs, artwork and subtitles preserved.
+- **Top Picks** — global, popularity-driven libraries, collections or playlists, with rank badges on posters and optional automatic requesting of missing entries.
+- **1–10 star ratings** from any poster, and **Trakt.tv** two-way sync.
+- **Global search**, the similarity graph and graph playlists, franchises, the dashboard.
+- **The 11-step setup wizard**, automatic daily database backups with configurable retention, and restore from either setup or the admin console.
+- **TMDB, OMDb, MDBList, JustWatch and Seerr** integrations.
 
 ---
 
