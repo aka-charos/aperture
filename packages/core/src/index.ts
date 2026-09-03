@@ -1030,7 +1030,9 @@ export {
   getMediaStatus as getSeerrMediaStatus,
   listAllSeerrUsers,
   matchApertureProfileToSeerrUser,
+  resolveSeerrUserMatch,
   resolveSeerrUserIdForProfile,
+  seerrUserExists,
   // Request Management
   createRequest as createSeerrRequest,
   updateRequestStatus as updateSeerrRequestStatus,
