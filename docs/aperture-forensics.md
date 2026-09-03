@@ -1228,3 +1228,40 @@ Approve/decline is keyed by the **Aperture** request id, not the Seerr one — t
 ### Left for later
 
 The Emby half of `matchApertureProfileToSeerrUser` is still string matching. Seerr has no Emby columns — it stores Emby users in `jellyfinUserId`/`jellyfinUsername` with `userType = EMBY` (4), and the import endpoint is literally `POST /user/import-from-jellyfin` — but the matcher guards the id path with `provider === 'jellyfin'`, so on an Emby instance the one stable GUID both systems already hold is skipped and matching falls to email (frequently absent on Emby) then username. The compare is also `pid === String(u.jellyfinUserId).trim()` with no normalization, while Seerr runs every id through `normalizeJellyfinGuid` (strip dashes, lowercase, require 32 hex) — so a dashed-vs-undashed GUID misses even on Jellyfin. And the resolved id is cached in `users.seerr_user_id` and only recomputed when NULL, so a user deleted and re-imported in Seerr keeps a stale id forever. Not blocking: an unmatched user simply sends no header and behaves as before.
+
+### Addendum — anything that SCORES a taste profile must be able to MAINTAIN it
+
+Chasing the flat series term further turned up the underlying structural fault, and it is not a discovery bug.
+
+The first live run after the parse fix showed every user comparing successfully (`compared` equal to `candidateCount` on all sixteen rows) but split cleanly into two populations by the raw similarity spread:
+
+| Profile space | Users | Raw spread |
+|---|---:|---|
+| `centered` | 4 | ~0.23 wide (e.g. 0.427–0.661) |
+| `raw` | 4 | **~0.04 wide** (e.g. 0.497–0.534) |
+
+A perfect correlation with `user_taste_profiles.embedding_space`, no exceptions — F-036's centring claim reproduced on a population it was never measured against, and roughly a six-fold difference in usable signal. The raw group's cosines sit at −0.01 to +0.07, which is what a raw comparison between a thin candidate document and a centroid built from full library documents looks like.
+
+The reason four users were still `raw` was NOT that centring was unready (`uncentred = 0` on every set, both media types) and NOT that their profiles were locked (`is_locked = false` everywhere). It was `auto_updated_at`: the centred profiles were stamped the night of the rebuild, the raw ones were from **weeks earlier**. `rebuild-taste-profiles` had never processed them.
+
+**The gate.** `rebuildAllTasteProfiles` selected:
+
+```
+WHERE is_enabled = true AND provider_disabled = false
+  AND (movies_enabled = true OR series_enabled = true)
+```
+
+while `getDiscoveryEnabledUsers` selects `is_enabled = true AND discover_enabled = true`. Those are different populations. A viewer with `discover_enabled = true` and both recommendation flags false is **scored by Discover on a profile no job will ever refresh** — through model changes, through space changes, indefinitely. On the live instance exactly four users matched that signature (aggelos, dimmous, jelena, Turamarth), and they were exactly the four narrow-spread rows in the log. The arithmetic closed too: 6 maintained + 4 unmaintained = the 10 users the discovery job reported.
+
+Fixed in two halves, and both are required:
+
+- the WHERE clause gains `OR discover_enabled = true`;
+- the per-user `mediaTypes` list gains `|| user.discover_enabled` on both branches. That list was built purely from the two recommendation flags, so widening the gate alone would have admitted these users and then rebuilt **nothing** — an empty `mediaTypes` array, reported as success. Discovery's pipeline loops both media types unconditionally for every enabled viewer, so a discover-only viewer needs both profiles.
+
+**The general rule, which outlives this feature.** A per-feature enablement flag creates a population, and every job that reads a shared artefact for that population has to admit it. The taste profile is read by the recommender *and* by discovery, but only the recommender's flags gated its maintenance — so adding a consumer silently created a set of users whose data rots. Any future surface that reads `user_taste_profiles` or `user_taste_clusters` has to be added to this gate at the same time, or it inherits the same fault.
+
+**Why it stayed invisible.** The same reason as everything else in this entry: while the similarity term was pinned at 0.5, a stale profile and a fresh one produced identical output. Three independent faults — the empty candidate map, the unparsed legacy vector, and this gate — all had exactly one symptom, and each had to be removed before the next became visible. Repairing a dead path does not surface one bug; it surfaces the whole stack of them, in order.
+
+**Instrument note.** The spread figures are what made this findable at all, and only because they were logged per user rather than aggregated. An instance-wide average would have read as a mediocre-but-plausible middle and hidden a clean bimodal split — the same trap the repo-wide "measure per user before reading an aggregate as a mechanism" invariant already warns about, encountered from a new direction.
+
+**Still open, deliberately.** `getDiscoveryEnabledUsers` does not check `provider_disabled`, so a viewer removed from the media server still gets discovery runs. Inert on the instance measured (nobody is provider-disabled) and not changed here, since it alters who receives a feature rather than fixing a fault.

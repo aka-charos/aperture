@@ -52,6 +52,7 @@ interface UserRow {
   username: string
   movies_enabled: boolean
   series_enabled: boolean
+  discover_enabled: boolean
 }
 
 /**
@@ -110,12 +111,24 @@ export async function rebuildAllTasteProfiles(
     setJobStep(actualJobId, 0, 'Finding enabled users')
     addLog(actualJobId, 'info', '🔍 Finding enabled users...')
 
+    // `discover_enabled` belongs in this gate, not just the recommendations
+    // flags.
+    //
+    // Discovery scores a viewer's taste exactly as the recommender does -- it
+    // reads the same clusters through getUserTasteClusters -- but it has its own
+    // enablement flag, which this WHERE clause never consulted. So a viewer with
+    // discover_enabled = true and both recommendation flags false was SCORED by
+    // Discover on a profile that no job would ever refresh: measured on a live
+    // instance, four such users were still on profiles built weeks earlier under
+    // a since-replaced embedding model, and their similarity spread was a sixth
+    // of everyone else's. Anything that scores a profile has to be able to
+    // maintain it.
     const users = await query<UserRow>(
-      `SELECT id, username, movies_enabled, series_enabled
+      `SELECT id, username, movies_enabled, series_enabled, discover_enabled
          FROM users
         WHERE is_enabled = true
           AND provider_disabled = false
-          AND (movies_enabled = true OR series_enabled = true)
+          AND (movies_enabled = true OR series_enabled = true OR discover_enabled = true)
         ORDER BY username`
     )
 
@@ -134,9 +147,14 @@ export async function rebuildAllTasteProfiles(
       const user = users.rows[i]
       result.usersProcessed++
 
+      // Discovery runs BOTH media types for every discovery-enabled viewer --
+      // its pipeline loops them unconditionally -- so a discover-only viewer
+      // needs both profiles. Widening the WHERE clause without this would admit
+      // them and then rebuild nothing, since both recommendation flags are
+      // false and the list would come out empty.
       const mediaTypes: MediaType[] = []
-      if (user.movies_enabled) mediaTypes.push('movie')
-      if (user.series_enabled) mediaTypes.push('series')
+      if (user.movies_enabled || user.discover_enabled) mediaTypes.push('movie')
+      if (user.series_enabled || user.discover_enabled) mediaTypes.push('series')
 
       const outcomes: string[] = []
 
