@@ -91,6 +91,13 @@ export function invalidateDiscoveryCache() {
 const TARGET_DISPLAY_COUNT = 50
 const EXPANSION_THRESHOLD = 20 // Trigger expansion when below this count
 
+// The refresh endpoint answers 202 and runs the pipeline in the background, so
+// the page watches the run row instead of holding a request open. Capped at
+// four minutes: a cold run on an empty pool is the slow case, and a process
+// killed mid-run leaves the row at 'running' with nothing to move it.
+const REFRESH_POLL_INTERVAL_MS = 3000
+const REFRESH_POLL_ATTEMPTS = 80
+
 export function useDiscoveryData(filters: DiscoveryFilterOptions = {}) {
   const [status, setStatus] = useState<DiscoveryStatus | null>(null)
   const [movieCandidates, setMovieCandidates] = useState<DiscoveryCandidate[]>([])
@@ -208,6 +215,28 @@ export function useDiscoveryData(filters: DiscoveryFilterOptions = {}) {
         method: 'POST',
         credentials: 'include',
       })
+
+      // 202: the run was started in the background. The request no longer waits
+      // for the pipeline -- a cold run is minutes -- so poll the run row until
+      // it leaves 'running' before refetching. Bounded, because a killed process
+      // leaves a run row at 'running' forever and the spinner must not.
+      if (response.status === 202) {
+        const runKey = mediaType === 'movie' ? 'movieRun' : 'seriesRun'
+        for (let attempt = 0; attempt < REFRESH_POLL_ATTEMPTS; attempt++) {
+          await new Promise((r) => setTimeout(r, REFRESH_POLL_INTERVAL_MS))
+          const statusRes = await fetch('/api/discovery/status', { credentials: 'include' })
+          if (!statusRes.ok) break
+          const statusData = await statusRes.json()
+          const run = statusData?.[runKey]
+          if (run && run.status !== 'running') {
+            if (run.status === 'failed') {
+              return { success: false, error: run.errorMessage || 'Refresh failed' }
+            }
+            break
+          }
+        }
+      }
+
       if (response.ok) {
         // Refresh the candidates
         const movieResult = await fetchCandidates('movie')

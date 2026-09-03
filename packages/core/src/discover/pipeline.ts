@@ -1,16 +1,26 @@
 /**
  * Discovery Pipeline
- * 
- * Main orchestration for generating discovery suggestions
- * Uses a two-phase approach:
- * 1. Fetch global candidates ONCE (TMDb Discover, Trakt Trending/Popular) into shared pool
- * 2. For each user: fetch personalized + merge with pool + filter + score + store
+ *
+ * Main orchestration for generating discovery suggestions.
+ *
+ * There is ONE per-user implementation (runDiscoveryForUser) and it always
+ * takes its global candidates from the shared pool. That matters: this file
+ * previously held two near-identical ~200-line functions -- one that read the
+ * pool and one that re-fetched every global source per user via the deprecated
+ * fetchAllCandidates -- whose last four steps were copy-paste. The scheduled
+ * job used the good one and the user-facing refresh button used the other, so
+ * the two entry points could drift in behaviour and cost while both typechecked.
+ *
+ * Shape of a run:
+ *   Phase 1 (once per media type): prune stale pool rows, fetch global sources
+ *           (TMDb Discover, Trakt Trending/Popular), upsert into the pool.
+ *   Phase 2 (per user, per media type): fetch personalized sources, merge with
+ *           the pool, filter, score, enrich the top slice, store.
  */
 
 import { createChildLogger } from '../lib/logger.js'
 import { query, queryOne } from '../lib/db.js'
-import { 
-  fetchAllCandidates, 
+import {
   enrichFullData,
   fetchGlobalCandidates,
   fetchPersonalizedCandidates,
@@ -18,6 +28,7 @@ import {
   enrichBasicData,
 } from './sources.js'
 import { filterCandidates } from './filter.js'
+import { clearOrphanedCandidateEmbeddings } from './embeddings.js'
 import { scoreCandidates } from './scorer.js'
 import {
   createDiscoveryRun,
@@ -27,10 +38,13 @@ import {
   upsertPoolCandidates,
   getPoolCandidates,
   poolCandidateToRaw,
+  clearOldPoolEntries,
+  updatePoolEnrichmentBatch,
 } from './storage.js'
 import {
   addLog,
   updateJobProgress,
+  isJobCancelled,
 } from '../jobs/progress.js'
 import type {
   MediaType,
@@ -43,104 +57,179 @@ import type {
 
 const logger = createChildLogger('discover:pipeline')
 
+/** Returns true when the caller wants the run to stop. */
+type ShouldCancel = () => boolean
+
+const MEDIA_TYPES: MediaType[] = ['movie', 'series']
+
+/** An empty result, for the several early exits that legitimately produce none. */
+function emptyResult(runId: string, fetched: number, durationMs: number): DiscoveryPipelineResult {
+  return {
+    runId,
+    candidates: [],
+    candidatesFetched: fetched,
+    candidatesFiltered: 0,
+    candidatesScored: 0,
+    candidatesStored: 0,
+    durationMs,
+  }
+}
+
 /**
- * Generate discovery suggestions for a single user
- * Uses lazy enrichment: only top candidates get full metadata (cast, crew, etc.)
+ * Read the pool for a media type, seeding it from the global sources if it is
+ * empty.
+ *
+ * The seed is what lets the user-facing refresh work on an instance where the
+ * scheduled job has never run, without that path reverting to fetching every
+ * global source for one user and throwing the results away. Anything it fetches
+ * lands in the pool, so the next caller -- any user -- reuses it.
  */
-export async function generateDiscoveryForUser(
+async function loadPoolCandidates(
+  mediaType: MediaType,
+  config: DiscoveryConfig
+): Promise<RawCandidate[]> {
+  const read = () =>
+    getPoolCandidates(mediaType, {
+      limit: config.maxPoolCandidates,
+      maxAgeDays: config.poolMaxAgeDays,
+    })
+
+  let pool = await read()
+  if (pool.length > 0) return pool.map(poolCandidateToRaw)
+
+  logger.info({ mediaType }, 'Pool is empty, seeding from global sources')
+  const globalResult = await fetchGlobalCandidates(mediaType, config)
+  if (globalResult.candidates.length > 0) {
+    const enriched = await enrichBasicData(globalResult.candidates, mediaType)
+    await upsertPoolCandidates(mediaType, enriched)
+  }
+
+  pool = await read()
+  return pool.map(poolCandidateToRaw)
+}
+
+/**
+ * The one per-user implementation. Takes pool candidates already in hand so the
+ * all-users job can read them once and share them across every user.
+ */
+async function runDiscoveryForUser(
   user: DiscoveryUser,
   mediaType: MediaType,
   config: DiscoveryConfig,
-  runType: 'scheduled' | 'manual' = 'scheduled'
+  poolCandidates: RawCandidate[],
+  runType: 'scheduled' | 'manual',
+  shouldCancel?: ShouldCancel,
+  /** Present only on the all-users job, which is the surface with a log pane. */
+  jobId?: string
 ): Promise<DiscoveryPipelineResult> {
   const startTime = Date.now()
-  
+  const cancelled = () => shouldCancel?.() === true
+
   logger.info({ userId: user.id, username: user.username, mediaType }, 'Starting discovery generation')
 
-  // Create discovery run record
   const runId = await createDiscoveryRun(user.id, mediaType, runType)
-  
+
   try {
-    // Step 1: Fetch candidates from all sources (with basic enrichment only)
-    // This is faster because we skip full cast/crew enrichment at this stage
-    logger.info({ userId: user.id }, 'Fetching candidates from sources...')
-    const rawCandidates = await fetchAllCandidates(user.id, mediaType, config, { skipEnrichment: true })
-    
-    await updateDiscoveryRunStats(runId, { candidatesFetched: rawCandidates.length })
-    
-    if (rawCandidates.length === 0) {
-      logger.warn({ userId: user.id, mediaType }, 'No candidates fetched from any source')
+    // Step 1: personalized sources (TMDb recommendations/similar, Trakt recs)
+    const personalizedResult = await fetchPersonalizedCandidates(user.id, mediaType, config)
+
+    // Step 2: merge with the pool (personalized takes precedence by tmdbId)
+    const mergedCandidates = mergeWithPool(personalizedResult.candidates, poolCandidates)
+
+    await updateDiscoveryRunStats(runId, { candidatesFetched: mergedCandidates.length })
+
+    logger.info({
+      userId: user.id,
+      personalized: personalizedResult.totalFetched,
+      pool: poolCandidates.length,
+      merged: mergedCandidates.length,
+    }, 'Merged candidates')
+
+    if (mergedCandidates.length === 0) {
+      logger.warn({ userId: user.id, mediaType }, 'No candidates available')
       const durationMs = Date.now() - startTime
       await finalizeDiscoveryRun(runId, 'completed', durationMs)
-      return {
-        runId,
-        candidates: [],
-        candidatesFetched: 0,
-        candidatesFiltered: 0,
-        candidatesScored: 0,
-        candidatesStored: 0,
-        durationMs,
-      }
+      return emptyResult(runId, 0, durationMs)
     }
 
-    // Step 2: Filter out content already in library or watched
-    logger.info({ userId: user.id }, 'Filtering candidates...')
-    const filteredCandidates = await filterCandidates(user.id, mediaType, rawCandidates)
-    
+    // Step 3: drop anything already in the library, watched, or requested
+    const filteredCandidates = await filterCandidates(user.id, mediaType, mergedCandidates)
+
     await updateDiscoveryRunStats(runId, { candidatesFiltered: filteredCandidates.length })
-    
+
     if (filteredCandidates.length === 0) {
       logger.warn({ userId: user.id, mediaType }, 'All candidates filtered out')
       const durationMs = Date.now() - startTime
       await finalizeDiscoveryRun(runId, 'completed', durationMs)
-      return {
-        runId,
-        candidates: [],
-        candidatesFetched: rawCandidates.length,
-        candidatesFiltered: 0,
-        candidatesScored: 0,
-        candidatesStored: 0,
-        durationMs,
-      }
+      return emptyResult(runId, mergedCandidates.length, durationMs)
     }
 
-    // Step 3: Score and rank candidates (quick scoring without full metadata)
-    logger.info({ userId: user.id }, 'Scoring candidates...')
+    // Cheap exit before the two expensive stages.
+    if (cancelled()) {
+      const durationMs = Date.now() - startTime
+      logger.info({ userId: user.id, mediaType }, 'Cancelled before scoring')
+      await finalizeDiscoveryRun(runId, 'completed', durationMs)
+      return emptyResult(runId, mergedCandidates.length, durationMs)
+    }
+
+    // Step 4: score and rank
     const allScoredCandidates = await scoreCandidates(user.id, mediaType, filteredCandidates, config)
-    
-    // Step 4: Limit to maxTotalCandidates for storage
+
     const maxTotal = config.maxTotalCandidates || 200
     const candidatesToStore = allScoredCandidates.slice(0, maxTotal)
-    
+
     await updateDiscoveryRunStats(runId, { candidatesScored: candidatesToStore.length })
 
-    // Step 5: Lazy enrichment - only enrich top candidates with full metadata
-    // This saves 60-80% of API calls compared to enriching all candidates
+    // Report the taste term's realised spread to the job console.
+    //
+    // This is the one number that says whether the taste half of the scorer is
+    // actually running. It was the constant 0.5 for every candidate on every
+    // run for as long as the feature existed, and nothing said so -- the run
+    // looked healthy, the log looked healthy, and popularity silently decided
+    // the order. A spread of zero here means every candidate scored alike, so
+    // the term is contributing nothing to the ranking whatever its weight says.
+    //
+    // Emitted with addLog rather than the logger because the container log is
+    // not where an operator looks after a deploy.
+    if (jobId && candidatesToStore.length > 0) {
+      const similarities = candidatesToStore.map((c) => c.similarityScore)
+      const low = Math.min(...similarities)
+      const high = Math.max(...similarities)
+      const spread = high - low
+      addLog(
+        jobId,
+        spread > 0 ? 'info' : 'warn',
+        spread > 0
+          ? `🎯 ${user.username}: taste match ${low.toFixed(2)}–${high.toFixed(2)} across ${candidatesToStore.length} ${mediaType}s`
+          : `⚠️ ${user.username}: taste match is flat at ${low.toFixed(2)} — the taste term is not ranking anything (no profile, no candidate vectors, or a refused embedding space)`
+      )
+    }
+
+    // Step 5: lazy enrichment -- only the top slice gets cast/crew/runtime.
+    // Anything the pool already enriched is skipped inside enrichFullData.
     const maxEnriched = config.maxEnrichedCandidates || 75
     const candidatesToEnrich = candidatesToStore.slice(0, maxEnriched)
     const candidatesToSkipEnrichment = candidatesToStore.slice(maxEnriched)
-    
-    logger.info({ 
-      userId: user.id, 
+
+    logger.info({
+      userId: user.id,
       toEnrich: candidatesToEnrich.length,
-      toSkip: candidatesToSkipEnrichment.length 
+      toSkip: candidatesToSkipEnrichment.length,
     }, 'Enriching top candidates with full metadata...')
-    
-    // Enrich top candidates with full metadata (cast, crew, runtime, tagline)
-    // enrichFullData returns RawCandidate[], so we need to merge back with scored data
-    const enrichedRawCandidates = await enrichFullData(candidatesToEnrich, mediaType)
-    
-    // Create a map of enriched data by tmdbId
+
+    const enrichedRawCandidates = await enrichFullData(candidatesToEnrich, mediaType, shouldCancel)
     const enrichedMap = new Map(enrichedRawCandidates.map(c => [c.tmdbId, c]))
-    
-    // Mark enriched vs non-enriched candidates, preserving scoring data
+
+    // Cache what we just paid for onto the shared pool rows, so the next user's
+    // run skips these lookups entirely. UPDATE-only, so personalized-source
+    // candidates with no pool row are silently no-ops.
+    await updatePoolEnrichmentBatch(mediaType, enrichedRawCandidates)
+
     const finalCandidates: ScoredCandidate[] = [
-      // For enriched candidates, merge the raw enriched data with the scoring data
       ...candidatesToEnrich.map(scored => {
         const enriched = enrichedMap.get(scored.tmdbId)
         return {
           ...scored,
-          // Merge enriched data (cast, crew, runtime, tagline, etc.)
           castMembers: enriched?.castMembers ?? scored.castMembers,
           directors: enriched?.directors ?? scored.directors,
           runtimeMinutes: enriched?.runtimeMinutes ?? scored.runtimeMinutes,
@@ -150,22 +239,27 @@ export async function generateDiscoveryForUser(
           backdropPath: enriched?.backdropPath ?? scored.backdropPath,
           overview: enriched?.overview ?? scored.overview,
           originalLanguage: enriched?.originalLanguage ?? scored.originalLanguage,
-          isEnriched: true,
+          voteAverage: enriched?.voteAverage || scored.voteAverage,
+          voteCount: enriched?.voteCount || scored.voteCount,
+          // Not blindly true: enrichFullData can return a candidate untouched
+          // when it was cancelled mid-way or the lookup failed, and claiming
+          // otherwise would let the pool cache a blank card.
+          isEnriched: (enriched?.castMembers?.length ?? 0) > 0,
         }
       }),
       ...candidatesToSkipEnrichment.map(c => ({ ...c, isEnriched: false })),
     ]
-    
-    // Re-sort by score after enrichment (scores shouldn't change, but ensure order)
+
+    // Both halves are already score-ordered, so the concatenation is too. Kept
+    // as a guard rather than a correction.
     finalCandidates.sort((a, b) => b.finalScore - a.finalScore)
 
-    // Step 6: Store results
-    logger.info({ userId: user.id }, 'Storing candidates...')
+    // Step 6: store. A cancelled run still stores what it has already paid for
+    // -- the rows are complete, some just carry less metadata.
     const storedCount = await storeDiscoveryCandidates(runId, user.id, finalCandidates, mediaType)
-    
+
     await updateDiscoveryRunStats(runId, { candidatesStored: storedCount })
 
-    // Finalize run
     const durationMs = Date.now() - startTime
     await finalizeDiscoveryRun(runId, 'completed', durationMs)
 
@@ -173,18 +267,19 @@ export async function generateDiscoveryForUser(
       userId: user.id,
       username: user.username,
       mediaType,
-      candidatesFetched: rawCandidates.length,
+      candidatesFetched: mergedCandidates.length,
       candidatesFiltered: filteredCandidates.length,
       candidatesScored: candidatesToStore.length,
       candidatesEnriched: candidatesToEnrich.length,
       candidatesStored: storedCount,
+      cancelled: cancelled(),
       durationMs,
     }, 'Discovery generation complete')
 
     return {
       runId,
       candidates: finalCandidates,
-      candidatesFetched: rawCandidates.length,
+      candidatesFetched: mergedCandidates.length,
       candidatesFiltered: filteredCandidates.length,
       candidatesScored: candidatesToStore.length,
       candidatesStored: storedCount,
@@ -193,12 +288,28 @@ export async function generateDiscoveryForUser(
   } catch (err) {
     const error = err instanceof Error ? err.message : 'Unknown error'
     const durationMs = Date.now() - startTime
-    
+
     logger.error({ userId: user.id, err }, 'Discovery generation failed')
     await finalizeDiscoveryRun(runId, 'failed', durationMs, error)
-    
+
     throw err
   }
+}
+
+/**
+ * Generate discovery suggestions for a single user, reading the pool itself.
+ *
+ * For one user this is the right entry point. The all-users job calls the
+ * shared implementation directly so it can read the pool once.
+ */
+export async function generateDiscoveryForUser(
+  user: DiscoveryUser,
+  mediaType: MediaType,
+  config: DiscoveryConfig,
+  runType: 'scheduled' | 'manual' = 'scheduled'
+): Promise<DiscoveryPipelineResult> {
+  const poolCandidates = await loadPoolCandidates(mediaType, config)
+  return runDiscoveryForUser(user, mediaType, config, poolCandidates, runType)
 }
 
 /**
@@ -214,9 +325,9 @@ export async function getDiscoveryEnabledUsers(): Promise<DiscoveryUser[]> {
     discover_request_enabled: boolean
     trakt_access_token: string | null
   }>(
-    `SELECT id, username, provider_user_id, max_parental_rating, 
+    `SELECT id, username, provider_user_id, max_parental_rating,
             discover_enabled, discover_request_enabled, trakt_access_token
-     FROM users 
+     FROM users
      WHERE is_enabled = true AND discover_enabled = true`
   )
 
@@ -232,10 +343,14 @@ export async function getDiscoveryEnabledUsers(): Promise<DiscoveryUser[]> {
 }
 
 /**
- * Generate discovery suggestions for all enabled users
- * Uses two-phase approach for efficiency:
- * Phase 1: Fetch global candidates ONCE into shared pool
- * Phase 2: For each user, fetch personalized + merge + filter + score + store
+ * Generate discovery suggestions for all enabled users.
+ *
+ * Cancellable: the work polls isJobCancelled between media types, between
+ * users, and between enrichment batches inside each user. Cancellation in this
+ * codebase is cooperative -- cancelJob only sets a status -- so without these
+ * checks Stop had no effect on what is the longest-running job in the system by
+ * external call count, and the job appeared wedged because its slot is held
+ * until the work actually exits.
  */
 export async function generateDiscoveryForAllUsers(
   config: DiscoveryConfig,
@@ -243,21 +358,28 @@ export async function generateDiscoveryForAllUsers(
 ): Promise<{
   success: number
   failed: number
+  cancelled: boolean
   jobId: string
 }> {
   const actualJobId = jobId || crypto.randomUUID()
-  
+  // With no job id there is no progress record, so isJobCancelled would always
+  // read false -- don't hand the work a predicate that cannot fire.
+  const shouldCancel: ShouldCancel | undefined = jobId
+    ? () => isJobCancelled(actualJobId)
+    : undefined
+  const cancelled = () => shouldCancel?.() === true
+
   const users = await getDiscoveryEnabledUsers()
-  
+
   if (users.length === 0) {
     logger.info('No users with discovery enabled')
-    return { success: 0, failed: 0, jobId: actualJobId }
+    return { success: 0, failed: 0, cancelled: false, jobId: actualJobId }
   }
 
   // Total items: 2 global phases + (users * 2 media types)
   const totalItems = 2 + (users.length * 2)
   let processedItems = 0
-  
+
   logger.info({ userCount: users.length }, 'Starting discovery generation for all users')
   addLog(actualJobId, 'info', `👥 Found ${users.length} user(s) with discovery enabled`)
 
@@ -265,33 +387,63 @@ export async function generateDiscoveryForAllUsers(
   let failed = 0
 
   // =========================================================================
-  // Phase 1: Fetch global candidates into shared pool (ONCE per media type)
+  // Phase 1: prune, then fetch global candidates into the shared pool
   // =========================================================================
-  
-  for (const mediaType of ['movie', 'series'] as MediaType[]) {
+
+  for (const mediaType of MEDIA_TYPES) {
+    if (cancelled()) break
+
     addLog(actualJobId, 'info', `🌍 Fetching global ${mediaType} candidates for shared pool...`)
-    
+
     try {
+      // Prune first, so the pool cannot grow without bound. Nothing else in the
+      // system deletes from it, and every read merges it into a user's
+      // candidate list -- so an unpruned pool makes each run slower than the
+      // last and drags in titles nothing has seen for months.
+      const pruned = await clearOldPoolEntries(mediaType, config.poolMaxAgeDays)
+      // The candidate-vector cache is pruned on the same schedule and against
+      // the same window, so it cannot become the unbounded thing the pool was.
+      // Runs after the pool delete, so "no longer in the pool" is already true
+      // for anything that just aged out.
+      const embeddingsPruned = await clearOrphanedCandidateEmbeddings(
+        mediaType,
+        config.poolMaxAgeDays
+      )
+      if (embeddingsPruned > 0) {
+        addLog(
+          actualJobId,
+          'info',
+          `🧹 Dropped ${embeddingsPruned} cached ${mediaType} candidate vector(s) for titles no longer offered`
+        )
+      }
+      if (pruned > 0) {
+        addLog(
+          actualJobId,
+          'info',
+          `🧹 Pruned ${pruned} ${mediaType} pool entr${pruned === 1 ? 'y' : 'ies'} not seen in ${config.poolMaxAgeDays} days`
+        )
+      }
+
       const globalResult = await fetchGlobalCandidates(mediaType, config)
-      
-      // Basic enrich Trakt candidates that lack poster/language
+
+      // Basic enrich Trakt candidates that lack poster/language/votes
       const enrichedGlobal = await enrichBasicData(globalResult.candidates, mediaType)
-      
-      // Upsert into shared pool
+
       const poolResult = await upsertPoolCandidates(mediaType, enrichedGlobal)
-      
+
       addLog(
-        actualJobId, 
-        'info', 
+        actualJobId,
+        'info',
         `✅ Pool: ${poolResult.inserted} new, ${poolResult.updated} updated ${mediaType}s`
       )
-      
+
       logger.info({
         mediaType,
         fetched: globalResult.totalFetched,
         unique: globalResult.uniqueCount,
         poolInserted: poolResult.inserted,
         poolUpdated: poolResult.updated,
+        poolPruned: pruned,
       }, 'Global candidates added to pool')
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error'
@@ -299,35 +451,61 @@ export async function generateDiscoveryForAllUsers(
       addLog(actualJobId, 'error', `❌ Failed to fetch global ${mediaType} candidates: ${errorMsg}`)
       // Continue with other media type
     }
-    
+
     processedItems++
     updateJobProgress(actualJobId, processedItems, totalItems, `Pool: ${mediaType}`)
   }
 
-  // =========================================================================
-  // Phase 2: Process each user (personalized fetch + merge + filter + score)
-  // =========================================================================
-  
-  addLog(actualJobId, 'info', `🔄 Processing ${users.length} user(s)...`)
-  
-  // Get pool candidates for merging (only fetch once per media type)
-  const moviePoolCandidates = (await getPoolCandidates('movie')).map(poolCandidateToRaw)
-  const seriesPoolCandidates = (await getPoolCandidates('series')).map(poolCandidateToRaw)
-  
-  addLog(actualJobId, 'info', `📦 Pool: ${moviePoolCandidates.length} movies, ${seriesPoolCandidates.length} series`)
+  if (cancelled()) {
+    addLog(actualJobId, 'warn', '🛑 Cancelled before processing users')
+    logger.info({ jobId: actualJobId }, 'Discovery generation cancelled')
+    return { success, failed, cancelled: true, jobId: actualJobId }
+  }
 
-  for (let userIndex = 0; userIndex < users.length; userIndex++) {
-    const user = users[userIndex]
-    
-    // Generate for both movies and series
-    for (const mediaType of ['movie', 'series'] as MediaType[]) {
-      const poolCandidates = mediaType === 'movie' ? moviePoolCandidates : seriesPoolCandidates
-      
+  // =========================================================================
+  // Phase 2: process each user against the shared pool
+  // =========================================================================
+
+  addLog(actualJobId, 'info', `🔄 Processing ${users.length} user(s)...`)
+
+  const poolByMediaType = new Map<MediaType, RawCandidate[]>()
+  for (const mediaType of MEDIA_TYPES) {
+    poolByMediaType.set(
+      mediaType,
+      (await getPoolCandidates(mediaType, {
+        limit: config.maxPoolCandidates,
+        maxAgeDays: config.poolMaxAgeDays,
+      })).map(poolCandidateToRaw)
+    )
+  }
+
+  addLog(
+    actualJobId,
+    'info',
+    `📦 Pool: ${poolByMediaType.get('movie')?.length ?? 0} movies, ${poolByMediaType.get('series')?.length ?? 0} series`
+  )
+
+  let wasCancelled = false
+
+  for (const user of users) {
+    if (cancelled()) {
+      wasCancelled = true
+      break
+    }
+
+    for (const mediaType of MEDIA_TYPES) {
+      if (cancelled()) {
+        wasCancelled = true
+        break
+      }
+
+      const poolCandidates = poolByMediaType.get(mediaType) ?? []
+
       try {
         addLog(actualJobId, 'info', `🎬 ${user.username}: ${mediaType}...`)
-        
-        await generateDiscoveryForUserWithPool(user, mediaType, config, poolCandidates, 'scheduled')
-        
+
+        await runDiscoveryForUser(user, mediaType, config, poolCandidates, 'scheduled', shouldCancel, actualJobId)
+
         success++
         addLog(actualJobId, 'info', `✅ ${user.username}: ${mediaType} complete`)
       } catch (err) {
@@ -336,190 +514,39 @@ export async function generateDiscoveryForAllUsers(
         addLog(actualJobId, 'error', `❌ ${user.username}: ${mediaType} failed: ${errorMsg}`)
         failed++
       }
-      
+
       processedItems++
       updateJobProgress(actualJobId, processedItems, totalItems, `${user.username}: ${mediaType}`)
     }
   }
 
+  if (wasCancelled || cancelled()) {
+    addLog(actualJobId, 'warn', `🛑 Cancelled after ${success} successful, ${failed} failed`)
+    logger.info({ success, failed, jobId: actualJobId }, 'Discovery generation cancelled')
+    return { success, failed, cancelled: true, jobId: actualJobId }
+  }
+
   logger.info({ success, failed, jobId: actualJobId }, 'Discovery generation for all users complete')
   addLog(
-    actualJobId, 
-    success > 0 ? 'info' : 'warn', 
+    actualJobId,
+    success > 0 ? 'info' : 'warn',
     `🏁 Complete: ${success} successful, ${failed} failed`
   )
 
-  return { success, failed, jobId: actualJobId }
+  return { success, failed, cancelled: false, jobId: actualJobId }
 }
 
 /**
- * Generate discovery for a user using pre-fetched pool candidates
- * This is faster because global candidates are already fetched
- */
-async function generateDiscoveryForUserWithPool(
-  user: DiscoveryUser,
-  mediaType: MediaType,
-  config: DiscoveryConfig,
-  poolCandidates: RawCandidate[],
-  runType: 'scheduled' | 'manual' = 'scheduled'
-): Promise<DiscoveryPipelineResult> {
-  const startTime = Date.now()
-  
-  logger.info({ userId: user.id, username: user.username, mediaType }, 'Starting discovery generation with pool')
-
-  // Create discovery run record
-  const runId = await createDiscoveryRun(user.id, mediaType, runType)
-  
-  try {
-    // Step 1: Fetch personalized candidates only (TMDb/Trakt recommendations)
-    logger.info({ userId: user.id }, 'Fetching personalized candidates...')
-    const personalizedResult = await fetchPersonalizedCandidates(user.id, mediaType, config)
-    
-    // Step 2: Merge personalized with pool (personalized takes precedence)
-    const mergedCandidates = mergeWithPool(personalizedResult.candidates, poolCandidates)
-    
-    await updateDiscoveryRunStats(runId, { candidatesFetched: mergedCandidates.length })
-    
-    logger.info({ 
-      userId: user.id, 
-      personalized: personalizedResult.totalFetched,
-      pool: poolCandidates.length,
-      merged: mergedCandidates.length,
-    }, 'Merged candidates')
-    
-    if (mergedCandidates.length === 0) {
-      logger.warn({ userId: user.id, mediaType }, 'No candidates available')
-      const durationMs = Date.now() - startTime
-      await finalizeDiscoveryRun(runId, 'completed', durationMs)
-      return {
-        runId,
-        candidates: [],
-        candidatesFetched: 0,
-        candidatesFiltered: 0,
-        candidatesScored: 0,
-        candidatesStored: 0,
-        durationMs,
-      }
-    }
-
-    // Step 3: Filter out content already in library or watched
-    logger.info({ userId: user.id }, 'Filtering candidates...')
-    const filteredCandidates = await filterCandidates(user.id, mediaType, mergedCandidates)
-    
-    await updateDiscoveryRunStats(runId, { candidatesFiltered: filteredCandidates.length })
-    
-    if (filteredCandidates.length === 0) {
-      logger.warn({ userId: user.id, mediaType }, 'All candidates filtered out')
-      const durationMs = Date.now() - startTime
-      await finalizeDiscoveryRun(runId, 'completed', durationMs)
-      return {
-        runId,
-        candidates: [],
-        candidatesFetched: mergedCandidates.length,
-        candidatesFiltered: 0,
-        candidatesScored: 0,
-        candidatesStored: 0,
-        durationMs,
-      }
-    }
-
-    // Step 4: Score and rank candidates
-    logger.info({ userId: user.id }, 'Scoring candidates...')
-    const allScoredCandidates = await scoreCandidates(user.id, mediaType, filteredCandidates, config)
-    
-    // Limit to maxTotalCandidates for storage
-    const maxTotal = config.maxTotalCandidates || 200
-    const candidatesToStore = allScoredCandidates.slice(0, maxTotal)
-    
-    await updateDiscoveryRunStats(runId, { candidatesScored: candidatesToStore.length })
-
-    // Step 5: Lazy enrichment - only enrich top candidates with full metadata
-    const maxEnriched = config.maxEnrichedCandidates || 75
-    const candidatesToEnrich = candidatesToStore.slice(0, maxEnriched)
-    const candidatesToSkipEnrichment = candidatesToStore.slice(maxEnriched)
-    
-    logger.info({ 
-      userId: user.id, 
-      toEnrich: candidatesToEnrich.length,
-      toSkip: candidatesToSkipEnrichment.length 
-    }, 'Enriching top candidates...')
-    
-    const enrichedRawCandidates = await enrichFullData(candidatesToEnrich, mediaType)
-    const enrichedMap = new Map(enrichedRawCandidates.map(c => [c.tmdbId, c]))
-    
-    // Merge enriched data with scoring data
-    const finalCandidates: ScoredCandidate[] = [
-      ...candidatesToEnrich.map(scored => {
-        const enriched = enrichedMap.get(scored.tmdbId)
-        return {
-          ...scored,
-          castMembers: enriched?.castMembers ?? scored.castMembers,
-          directors: enriched?.directors ?? scored.directors,
-          runtimeMinutes: enriched?.runtimeMinutes ?? scored.runtimeMinutes,
-          tagline: enriched?.tagline ?? scored.tagline,
-          imdbId: enriched?.imdbId ?? scored.imdbId,
-          posterPath: enriched?.posterPath ?? scored.posterPath,
-          backdropPath: enriched?.backdropPath ?? scored.backdropPath,
-          overview: enriched?.overview ?? scored.overview,
-          originalLanguage: enriched?.originalLanguage ?? scored.originalLanguage,
-          isEnriched: true,
-        }
-      }),
-      ...candidatesToSkipEnrichment.map(c => ({ ...c, isEnriched: false })),
-    ]
-    
-    finalCandidates.sort((a, b) => b.finalScore - a.finalScore)
-
-    // Step 6: Store results
-    logger.info({ userId: user.id }, 'Storing candidates...')
-    const storedCount = await storeDiscoveryCandidates(runId, user.id, finalCandidates, mediaType)
-    
-    await updateDiscoveryRunStats(runId, { candidatesStored: storedCount })
-
-    // Finalize run
-    const durationMs = Date.now() - startTime
-    await finalizeDiscoveryRun(runId, 'completed', durationMs)
-
-    logger.info({
-      userId: user.id,
-      username: user.username,
-      mediaType,
-      candidatesFetched: mergedCandidates.length,
-      candidatesFiltered: filteredCandidates.length,
-      candidatesScored: candidatesToStore.length,
-      candidatesEnriched: candidatesToEnrich.length,
-      candidatesStored: storedCount,
-      durationMs,
-    }, 'Discovery generation complete')
-
-    return {
-      runId,
-      candidates: finalCandidates,
-      candidatesFetched: mergedCandidates.length,
-      candidatesFiltered: filteredCandidates.length,
-      candidatesScored: candidatesToStore.length,
-      candidatesStored: storedCount,
-      durationMs,
-    }
-  } catch (err) {
-    const error = err instanceof Error ? err.message : 'Unknown error'
-    const durationMs = Date.now() - startTime
-    
-    logger.error({ userId: user.id, err }, 'Discovery generation failed')
-    await finalizeDiscoveryRun(runId, 'failed', durationMs, error)
-    
-    throw err
-  }
-}
-
-/**
- * Regenerate discovery for a single user (user-initiated)
+ * Regenerate discovery for a single user (user-initiated).
+ *
+ * Goes through the pool like every other path. It used to call the deprecated
+ * all-in-one fetch, which re-requested every global source for this one user
+ * and discarded the results afterwards.
  */
 export async function regenerateUserDiscovery(
   userId: string,
   mediaType: MediaType
 ): Promise<DiscoveryPipelineResult> {
-  // Get user info
   const user = await queryOne<{
     id: string
     username: string
@@ -529,7 +556,7 @@ export async function regenerateUserDiscovery(
     discover_request_enabled: boolean
     trakt_access_token: string | null
   }>(
-    `SELECT id, username, provider_user_id, max_parental_rating, 
+    `SELECT id, username, provider_user_id, max_parental_rating,
             discover_enabled, discover_request_enabled, trakt_access_token
      FROM users WHERE id = $1`,
     [userId]
@@ -543,8 +570,11 @@ export async function regenerateUserDiscovery(
     throw new Error('Discovery not enabled for user')
   }
 
-  // Import default config
-  const { DEFAULT_DISCOVERY_CONFIG } = await import('./types.js')
+  // The stored configuration, not the shipped defaults — the scheduled job and
+  // this path must agree on how much to fetch and how hard to filter, or the
+  // Refresh button quietly produces a different list from the nightly run.
+  const { getDiscoveryConfig } = await import('./config.js')
+  const config = await getDiscoveryConfig()
 
   return generateDiscoveryForUser(
     {
@@ -557,8 +587,7 @@ export async function regenerateUserDiscovery(
       traktAccessToken: user.trakt_access_token,
     },
     mediaType,
-    DEFAULT_DISCOVERY_CONFIG,
+    config,
     'manual'
   )
 }
-

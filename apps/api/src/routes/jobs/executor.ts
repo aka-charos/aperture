@@ -26,7 +26,8 @@ import {
   getPricingCacheStatus,
   cleanupExpiredAuthState,
   generateDiscoveryForAllUsers,
-  DEFAULT_DISCOVERY_CONFIG,
+  reconcileDiscoveryRequests,
+  getDiscoveryConfig,
   createJobProgress,
   setJobStep,
   addLog,
@@ -847,14 +848,25 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
         setJobStep(jobId, 0, 'Checking prerequisites')
         addLog(jobId, 'info', '🔍 Checking Seerr configuration and user enablement...')
 
-        const result = await generateDiscoveryForAllUsers(DEFAULT_DISCOVERY_CONFIG, jobId)
+        const result = await generateDiscoveryForAllUsers(await getDiscoveryConfig(), jobId)
 
-        if (result.success === 0 && result.failed === 0) {
+        if (result.success === 0 && result.failed === 0 && !result.cancelled) {
           addLog(
             jobId,
             'warn',
             '⚠️ No users have discovery enabled. Enable discovery for users in Admin → Users.'
           )
+        }
+
+        // A cancelled run keeps what it already generated but must not call
+        // completeJob -- cancelJob has already written the job_runs row, and
+        // reporting completion would overwrite the fact that it was stopped.
+        if (result.cancelled) {
+          logger.info(
+            { job: name, jobId, success: result.success, failed: result.failed },
+            `🛑 Discovery suggestions generation cancelled`
+          )
+          break
         }
 
         setJobStep(jobId, 1, 'Complete')
@@ -872,6 +884,39 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
           },
           `✅ Discovery suggestions generation complete`
         )
+        break
+      }
+      case 'reconcile-discovery-requests': {
+        createJobProgress(jobId, 'reconcile-discovery-requests', 1)
+
+        setJobStep(jobId, 0, 'Reconciling request statuses')
+        addLog(jobId, 'info', '🔄 Checking Seerr for request status changes...')
+
+        const result = await reconcileDiscoveryRequests(() => isJobCancelled(jobId))
+
+        addLog(
+          jobId,
+          'info',
+          `📋 Checked ${result.checked}, updated ${result.updated}` +
+            (result.strandedFailed > 0
+              ? `, wrote off ${result.strandedFailed} submission(s) that never reached Seerr`
+              : '') +
+            (result.unreachable > 0 ? `, ${result.unreachable} unreachable` : '')
+        )
+
+        if (result.cancelled) {
+          logger.info({ job: name, jobId, ...result }, `🛑 Discovery request reconciliation cancelled`)
+          break
+        }
+
+        completeJob(jobId, {
+          checked: result.checked,
+          updated: result.updated,
+          strandedFailed: result.strandedFailed,
+          unreachable: result.unreachable,
+        })
+
+        logger.info({ job: name, jobId, ...result }, `✅ Discovery request reconciliation complete`)
         break
       }
       default:

@@ -201,3 +201,36 @@ export const getDiscoveryPrerequisitesSchema = {
   summary: 'Check discovery prerequisites',
   description: 'Check if discovery feature prerequisites are met (admin only). Returns status of Seerr config and enabled users.',
 }
+
+/**
+ * PATCH /api/discovery/config
+ *
+ * Every field optional: the handler merges over the stored config, so a card
+ * that only touches one slider does not have to send the rest. Values outside
+ * their bounds are clamped by `sanitizeDiscoveryConfig` rather than rejected,
+ * and the response carries what was actually stored.
+ */
+export const updateDiscoveryConfigSchema = {
+  tags: ['discovery'],
+  summary: 'Update discovery tuning',
+  description:
+    'Update the discovery pipeline configuration (admin only). Partial body; omitted fields keep their stored value.',
+  body: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      maxCandidatesPerSource: { type: 'number' },
+      maxTotalCandidates: { type: 'number' },
+      maxEnrichedCandidates: { type: 'number' },
+      targetDisplayCount: { type: 'number' },
+      minVoteCount: { type: 'number' },
+      minVoteAverage: { type: 'number' },
+      similarityWeight: { type: 'number' },
+      popularityWeight: { type: 'number' },
+      recencyWeight: { type: 'number' },
+      traktPeriod: { type: 'string', enum: ['daily', 'weekly', 'monthly', 'yearly', 'all'] },
+      maxPoolCandidates: { type: 'number' },
+      poolMaxAgeDays: { type: 'number' },
+    },
+  },
+}

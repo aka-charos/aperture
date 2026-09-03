@@ -1079,17 +1079,27 @@ export {
   regenerateUserDiscovery,
   getDiscoveryEnabledUsers,
   // Sources
-  fetchAllCandidates,
   fetchFilteredCandidates,
   fetchGenreStripDiscoverCandidates,
   hasDiscoverySources,
   // Filter
   filterCandidates,
   getCandidateExclusionTmdbIds,
-  isInLibrary,
-  hasWatched,
+  // Configuration
+  getDiscoveryConfig,
+  setDiscoveryConfig,
+  sanitizeDiscoveryConfig,
+  DISCOVERY_CONFIG_BOUNDS,
+  // Reconciliation
+  reconcileDiscoveryRequests,
+  resolveRequestStatus,
+  // Candidate embeddings
+  getCandidateEmbeddings,
+  buildCandidateCanonicalText,
+  clearOrphanedCandidateEmbeddings,
   // Scorer
   scoreCandidates,
+  popularityScoresBySource,
   // Storage
   createDiscoveryRun,
   updateDiscoveryRunStats,

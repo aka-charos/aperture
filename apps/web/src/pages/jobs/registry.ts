@@ -76,7 +76,7 @@ export const GLOBAL_JOB_CATEGORIES: JobCategory[] = [
     titleKey: 'admin.jobsPage.categories.globalDiscovery.title',
     descriptionKey: 'admin.jobsPage.categories.globalDiscovery.description',
     color: '#ec4899',
-    jobs: ['generate-discovery-suggestions'],
+    jobs: ['generate-discovery-suggestions', 'reconcile-discovery-requests'],
   },
   // Taste profiles are per-user but span both media types, so they belong here
   // rather than under Movies or Series.

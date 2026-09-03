@@ -32,8 +32,9 @@ import {
   getUserTraktTokens,
 } from '../trakt/index.js'
 import type { TMDbMovieResult, TMDbTVResult } from '../tmdb/types.js'
-import { GENRE_STRIP_MAX_ROW_LIMIT } from '../settings/systemSettings.js'
+import { GENRE_STRIP_MAX_ROW_LIMIT, getTMDbApiKey } from '../settings/systemSettings.js'
 import { getCandidateExclusionTmdbIds } from './filter.js'
+import { DEFAULT_DISCOVERY_CONFIG } from './types.js'
 import type {
   MediaType,
   RawCandidate,
@@ -751,19 +752,31 @@ interface EnrichedData {
  */
 async function enrichMissingData(
   candidates: RawCandidate[],
-  mediaType: MediaType
+  mediaType: MediaType,
+  shouldCancel?: () => boolean
 ): Promise<RawCandidate[]> {
   // Find candidates missing poster paths, IMDb IDs, original language, or cast/crew info
   // This ensures Trakt candidates (which lack language) get enriched from TMDb
-  const needsEnrichment = candidates.filter(c => 
-    !c.posterPath || !c.imdbId || !c.castMembers?.length || !c.originalLanguage
+  //
+  // `isEnriched === true` short-circuits all of it: the candidate arrived from a
+  // pool row a previous run already paid to enrich. Checked explicitly against
+  // true, because absent means "not known to be enriched" and must re-enrich --
+  // this is the whole reason every user used to re-fetch details + credits for
+  // the same overlapping set of popular titles. The imdbId clause alone
+  // guaranteed it, since no TMDb list response carries one.
+  const needsEnrichment = candidates.filter(c =>
+    c.isEnriched !== true &&
+    (!c.posterPath || !c.imdbId || !c.castMembers?.length || !c.originalLanguage)
   )
-  
+
   if (needsEnrichment.length === 0) {
     return candidates
   }
 
-  logger.info({ mediaType, count: needsEnrichment.length }, 'Enriching candidates with metadata and credits')
+  logger.info(
+    { mediaType, count: needsEnrichment.length, skipped: candidates.length - needsEnrichment.length },
+    'Enriching candidates with metadata and credits'
+  )
 
   // Create a map for quick lookup
   const enrichmentMap = new Map<number, EnrichedData>()
@@ -771,8 +784,21 @@ async function enrichMissingData(
   // Batch fetch with concurrency limit (5 at a time to avoid rate limits)
   const batchSize = 5
   for (let i = 0; i < needsEnrichment.length; i += batchSize) {
+    // Between batches, not just between users: this loop is where a discovery
+    // run actually spends its minutes (two or three TMDb requests per title,
+    // for up to maxEnrichedCandidates titles), so a cancel check any coarser
+    // than this leaves Stop looking broken. Whatever has been collected so far
+    // is still applied below.
+    if (shouldCancel?.() === true) {
+      logger.info(
+        { mediaType, enrichedBeforeCancel: enrichmentMap.size, remaining: needsEnrichment.length - i },
+        'Enrichment cancelled, applying what was already fetched'
+      )
+      break
+    }
+
     const batch = needsEnrichment.slice(i, i + batchSize)
-    
+
     const results = await Promise.all(
       batch.map(async (candidate) => {
         try {
@@ -1039,78 +1065,6 @@ export function mergeWithPool(
   return merged
 }
 
-// ============================================================================
-// Legacy: All-in-one Fetching (for backwards compatibility)
-// ============================================================================
-
-/**
- * Fetch all candidates from enabled sources (without full enrichment)
- * Returns candidates with basic data - enrichment should be done separately after scoring
- * 
- * @deprecated Use fetchGlobalCandidates + fetchPersonalizedCandidates for better performance
- */
-export async function fetchAllCandidates(
-  userId: string,
-  mediaType: MediaType,
-  config: DiscoveryConfig,
-  options: { skipEnrichment?: boolean } = {}
-): Promise<RawCandidate[]> {
-  logger.info({ userId, mediaType }, 'Fetching candidates from all sources')
-
-  // Fetch from all sources in parallel
-  const [
-    tmdbRecommendations,
-    tmdbSimilar,
-    tmdbDiscover,
-    traktTrending,
-    traktPopular,
-    traktRecommendations,
-  ] = await Promise.all([
-    fetchTmdbRecommendations(userId, mediaType, config),
-    fetchTmdbSimilar(userId, mediaType, config),
-    fetchTmdbDiscover(mediaType, config),
-    fetchTraktTrending(mediaType, config),
-    fetchTraktPopular(mediaType, config),
-    fetchTraktRecommendations(userId, mediaType, config),
-  ])
-
-  const allCandidates = [
-    ...tmdbRecommendations,
-    ...tmdbSimilar,
-    ...tmdbDiscover,
-    ...traktTrending,
-    ...traktPopular,
-    ...traktRecommendations,
-  ]
-
-  logger.info({
-    userId,
-    mediaType,
-    sources: {
-      tmdbRecommendations: tmdbRecommendations.length,
-      tmdbSimilar: tmdbSimilar.length,
-      tmdbDiscover: tmdbDiscover.length,
-      traktTrending: traktTrending.length,
-      traktPopular: traktPopular.length,
-      traktRecommendations: traktRecommendations.length,
-    },
-    total: allCandidates.length,
-  }, 'Fetched candidates from all sources')
-
-  // If skipping enrichment (for faster pipeline), return raw candidates
-  // Enrichment will be done later for only top candidates
-  if (options.skipEnrichment) {
-    // Still do basic enrichment for Trakt candidates that lack poster/language
-    const basicEnriched = await enrichBasicData(allCandidates, mediaType)
-    return basicEnriched
-  }
-
-  // Full enrichment (legacy behavior)
-  const enrichedCandidates = await enrichMissingData(allCandidates, mediaType)
-
-  return enrichedCandidates
-}
-
 /**
  * Basic enrichment - only fetch essential display data (poster, language)
  * This is fast since we can skip cast/crew/runtime which require additional API calls
@@ -1119,19 +1073,34 @@ export async function enrichBasicData(
   candidates: RawCandidate[],
   mediaType: MediaType
 ): Promise<RawCandidate[]> {
-  // Only enrich candidates missing poster or language (typically from Trakt)
-  const needsBasicEnrichment = candidates.filter(c => 
-    !c.posterPath || !c.originalLanguage
+  // Trakt's list payloads carry no TMDb vote data, so a Trakt candidate arrives
+  // with voteAverage/voteCount of 0 -- and MediaPosterCard hides its rating
+  // badge on `> 0`, which is why some cards showed a rating and others did not.
+  // `!c.voteCount` is the tell for "we have no vote data" rather than "the
+  // rating is genuinely zero", and it is also what heals a pool row that an
+  // earlier build clobbered to 0: such a row comes back WITH a poster and
+  // language, so the first two clauses alone would never re-select it. A title
+  // that genuinely has no votes at TMDb re-requests once per run, which is a
+  // bounded cost against permanently missing ratings.
+  const needsBasicEnrichment = candidates.filter(c =>
+    !c.posterPath || !c.originalLanguage || !c.voteCount
   )
-  
+
   if (needsBasicEnrichment.length === 0) {
     return candidates
   }
 
-  logger.info({ mediaType, count: needsBasicEnrichment.length }, 'Basic enriching candidates (poster/language only)')
+  logger.info({ mediaType, count: needsBasicEnrichment.length }, 'Basic enriching candidates (poster/language/votes)')
 
   // Create a map for quick lookup
-  const enrichmentMap = new Map<number, { posterPath: string | null; backdropPath: string | null; originalLanguage: string; overview: string | null }>()
+  const enrichmentMap = new Map<number, {
+    posterPath: string | null
+    backdropPath: string | null
+    originalLanguage: string
+    overview: string | null
+    voteAverage: number
+    voteCount: number
+  }>()
 
   // Batch fetch with higher concurrency since we're only fetching details (no credits)
   const batchSize = 10
@@ -1150,6 +1119,11 @@ export async function enrichBasicData(
                 backdropPath: details.backdrop_path,
                 originalLanguage: details.original_language,
                 overview: details.overview,
+                // Already on this response -- previously fetched and discarded,
+                // leaving the rating to whether the title happened to land in
+                // the top maxEnrichedCandidates for that user.
+                voteAverage: details.vote_average,
+                voteCount: details.vote_count,
               }
             }
           } else {
@@ -1161,6 +1135,8 @@ export async function enrichBasicData(
                 backdropPath: details.backdrop_path,
                 originalLanguage: details.original_language,
                 overview: details.overview,
+                voteAverage: details.vote_average,
+                voteCount: details.vote_count,
               }
             }
           }
@@ -1189,6 +1165,12 @@ export async function enrichBasicData(
         backdropPath: candidate.backdropPath || enriched.backdropPath || null,
         originalLanguage: candidate.originalLanguage || enriched.originalLanguage || null,
         overview: candidate.overview || enriched.overview || null,
+        // Keep whatever the candidate already had -- a TMDb-sourced candidate
+        // carries the list response's own figures -- and fill in only when it
+        // has none. `||` is correct here rather than `??`, because the value
+        // being replaced is a literal 0 standing in for "no data".
+        voteAverage: candidate.voteAverage || enriched.voteAverage || 0,
+        voteCount: candidate.voteCount || enriched.voteCount || 0,
       }
     }
     return candidate
@@ -1203,13 +1185,24 @@ export async function enrichBasicData(
 export { enrichMissingData as enrichFullData }
 
 /**
- * Check if any discovery sources are available
+ * Whether discovery has any source it can actually fetch from.
+ *
+ * This used to `return true` unconditionally under a comment saying it should
+ * check -- so it answered "yes" on an instance with no integrations at all,
+ * which is exactly the case it exists to catch.
+ *
+ * TMDb alone is sufficient and is the only source that can stand on its own:
+ * the Trakt sources supply bare ids that the TMDb-backed enrichment has to
+ * resolve into something displayable, so Trakt without TMDb yields nothing
+ * renderable.
  */
 export async function hasDiscoverySources(): Promise<boolean> {
-  // TMDb is always available if configured
-  // For now, we'll assume TMDb is the primary requirement
-  // We could also check Trakt, MDBList, etc.
-  return true
+  const tmdbKey = await getTMDbApiKey()
+  if (tmdbKey && tmdbKey.trim().length > 0) return true
+
+  // No TMDb: Trakt cannot carry a run on its own, so report no sources rather
+  // than letting a run fetch ids it can never turn into cards.
+  return false
 }
 
 /**
@@ -1224,6 +1217,14 @@ export interface DynamicFetchFilters {
   yearEnd?: number
   excludeTmdbIds?: number[]
   limit?: number
+  /**
+   * Quality floors. Default to DEFAULT_DISCOVERY_CONFIG rather than to
+   * hardcoded values: this path used its own 20 / 5.0 against the config's
+   * 50 / 5.0, so expanded results were drawn from a laxer pool than the
+   * primary list they get merged into and ranked against.
+   */
+  minVoteCount?: number
+  minVoteAverage?: number
 }
 
 /**
@@ -1239,8 +1240,13 @@ export async function fetchFilteredCandidates(
   const limit = filters.limit || 100  // Default to 100 items (5 pages)
   const excludeSet = new Set(filters.excludeTmdbIds || [])
   const seenIds = new Set<number>()
+  // The same floors the primary list is built with, so expanded rows are not
+  // drawn from a laxer pool than the ones they are merged in beside and ranked
+  // against.
+  const minVoteCount = filters.minVoteCount ?? DEFAULT_DISCOVERY_CONFIG.minVoteCount
+  const minVoteAverage = filters.minVoteAverage ?? DEFAULT_DISCOVERY_CONFIG.minVoteAverage
 
-  logger.info({ mediaType, filters, limit }, 'Fetching filtered candidates dynamically')
+  logger.info({ mediaType, filters, limit, minVoteCount, minVoteAverage }, 'Fetching filtered candidates dynamically')
 
   try {
     // For single language, use TMDb's language filter
@@ -1262,8 +1268,8 @@ export async function fetchFilteredCandidates(
             withOriginCountry: filters.withOriginCountry,
             releaseDateGte: filters.yearStart ? `${filters.yearStart}-01-01` : undefined,
             releaseDateLte: filters.yearEnd ? `${filters.yearEnd}-12-31` : undefined,
-            minVoteCount: 20,
-            minVoteAverage: 5.0,
+            minVoteCount,
+            minVoteAverage,
             page,
           })
 
@@ -1301,8 +1307,8 @@ export async function fetchFilteredCandidates(
             withOriginCountry: filters.withOriginCountry,
             firstAirDateGte: filters.yearStart ? `${filters.yearStart}-01-01` : undefined,
             firstAirDateLte: filters.yearEnd ? `${filters.yearEnd}-12-31` : undefined,
-            minVoteCount: 20,
-            minVoteAverage: 5.0,
+            minVoteCount,
+            minVoteAverage,
             page,
           })
 

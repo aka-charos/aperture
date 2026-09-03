@@ -5,12 +5,61 @@
  */
 
 import { createChildLogger } from '../lib/logger.js'
-import { query, queryOne } from '../lib/db.js'
-import { getActiveEmbeddingTableName } from '../lib/ai-provider.js'
+import { queryOne } from '../lib/db.js'
+import { getEmbeddingInvocation } from '../lib/ai-provider.js'
 import type { MediaType, RawCandidate, ScoredCandidate, DiscoveryConfig } from './types.js'
 import { getUserFranchisePreferences, getUserTasteClusters } from '../taste-profile/index.js'
 import { detectFranchiseFromTitle } from '../taste-profile/franchise.js'
 import { applyPreferenceAdjustment } from '../recommender/shared/index.js'
+import { resolveEmbeddingSpace, isCenteringReady } from '../recommender/centering.js'
+import type { EmbeddingSpace } from '../recommender/centering.js'
+import {
+  getCandidateEmbeddings,
+  getLibraryEmbeddingMean,
+  centreVector,
+} from './embeddings.js'
+import { getMovieGenresList, getTVGenresList } from '../tmdb/index.js'
+
+/**
+ * The space the viewer's stored taste profile was built in.
+ *
+ * Read here rather than inferred: a profile is built once and read later, so
+ * the two sides of the comparison are resolved at different times, and
+ * `resolveEmbeddingSpace` is the only thing allowed to reconcile them. An
+ * absent profile row reads as 'raw', matching what buildSpaceFor produces on an
+ * instance that has never centred.
+ */
+async function getProfileEmbeddingSpace(
+  userId: string,
+  mediaType: MediaType
+): Promise<EmbeddingSpace> {
+  const row = await queryOne<{ embedding_space: string | null }>(
+    `SELECT embedding_space FROM user_taste_profiles WHERE user_id = $1 AND media_type = $2`,
+    [userId, mediaType]
+  )
+  return row?.embedding_space === 'centered' ? 'centered' : 'raw'
+}
+
+/**
+ * TMDb genre id -> name, for the candidate document.
+ *
+ * Discovery candidates carry `{ id, name: '' }` from list responses and only
+ * gain real names after full enrichment, but the document is built at scoring
+ * time. Without this the "Genres:" line -- one of the strongest classification
+ * signals in the library's canonical text -- would be missing from exactly the
+ * candidates that have not been enriched yet. The list is small, static and
+ * cached by the TMDb client.
+ */
+async function buildGenreNameLookup(mediaType: MediaType): Promise<(id: number) => string | undefined> {
+  try {
+    const genres = mediaType === 'movie' ? await getMovieGenresList() : await getTVGenresList()
+    const byId = new Map(genres.map((g) => [g.id, g.name]))
+    return (id: number) => byId.get(id)
+  } catch (err) {
+    logger.warn({ err, mediaType }, 'Could not load TMDb genre names for candidate documents')
+    return () => undefined
+  }
+}
 
 const logger = createChildLogger('discover:scorer')
 
@@ -113,27 +162,137 @@ function normalize(value: number, min: number, max: number): number {
 }
 
 /**
- * Calculate popularity score (0-1)
+ * Min and max popularity across the candidate pool, measured once.
+ *
+ * This used to be computed inside a per-candidate function that received the
+ * whole array -- so scoring n candidates allocated n throwaway arrays of
+ * length n and scanned n² values. It was also a spread into Math.max, which
+ * blows the argument limit outright on a large enough pool. The pool grows
+ * every run (see getPoolCandidates), so this was getting worse over time.
  */
-function calculatePopularityScore(candidate: RawCandidate, allCandidates: RawCandidate[]): number {
-  const popularities = allCandidates.map(c => c.popularity)
-  const maxPopularity = Math.max(...popularities, 1)
-  const minPopularity = Math.min(...popularities)
-  
-  return normalize(candidate.popularity, minPopularity, maxPopularity)
+function popularityRange(values: number[]): { min: number; max: number } {
+  let min = Number.POSITIVE_INFINITY
+  let max = Number.NEGATIVE_INFINITY
+
+  for (const v of values) {
+    if (v < min) min = v
+    if (v > max) max = v
+  }
+
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return { min: 0, max: 0 }
+  return { min, max }
 }
 
 /**
- * Calculate recency score (0-1) - newer content gets higher scores
+ * Popularity scores, normalised WITHIN each source rather than across the pool.
+ *
+ * `candidate.popularity` does not hold one quantity. It holds TMDb's unbounded
+ * popularity metric for the three TMDb sources, a Trakt watcher count (an
+ * integer in the tens or hundreds) for trakt_trending, and a hardcoded 0 for
+ * trakt_popular and trakt_recommendations, whose payloads carry no popularity
+ * at all. Normalising all of that together meant TMDb's larger numbers set the
+ * range, Trakt trending collapsed to near zero, and the other two scored
+ * exactly zero -- on a term carrying a large share of the ranking. So the
+ * source the code itself calls "most personalized", and hands the top source
+ * score of 1.0, was systematically buried by the term beside it.
+ *
+ * Per-source min-max fixes both halves. Within trakt_trending the watcher
+ * ordering is preserved and rescaled onto the same 0-1 as TMDb's. Within
+ * trakt_popular and trakt_recommendations every value is identical, so
+ * `normalize` returns 0.5 for all of them -- which is the honest answer: we have
+ * no popularity signal for these titles, not "these titles are unpopular".
+ *
+ * Pure and exported so the neutral case can be pinned without a database.
+ */
+export function popularityScoresBySource(candidates: RawCandidate[]): Map<number, number> {
+  const bySource = new Map<string, number[]>()
+  for (const c of candidates) {
+    const list = bySource.get(c.source)
+    if (list) list.push(c.popularity)
+    else bySource.set(c.source, [c.popularity])
+  }
+
+  const ranges = new Map<string, { min: number; max: number }>()
+  for (const [source, values] of bySource) {
+    ranges.set(source, popularityRange(values))
+  }
+
+  const scores = new Map<number, number>()
+  for (const c of candidates) {
+    const range = ranges.get(c.source) ?? { min: 0, max: 0 }
+    scores.set(c.tmdbId, normalize(c.popularity, range.min, range.max))
+  }
+  return scores
+}
+
+/**
+ * Every name one franchise can be known by here, lowercased.
+ *
+ * The two sides of the franchise comparison were built from different
+ * vocabularies and so could never meet for movies. Stored preferences come from
+ * detectMovieFranchises, which keys on `movies.collection_name` first -- TMDb
+ * collection names like "The Avengers Collection" -- while this scorer
+ * identifies a candidate with detectFranchiseFromTitle, which returns canonical
+ * names like "Marvel Cinematic Universe". The lookup therefore missed on every
+ * enriched library, and the nudge silently never fired for movies. Series were
+ * unaffected, because detectSeriesFranchises uses the detector for both sides.
+ *
+ * Running BOTH sides through the same expansion bridges them: the detector maps
+ * "The Avengers Collection" to the canonical name, and stripping the trailing
+ * "Collection" covers franchises the regex table has no pattern for (a stored
+ * "Alien Collection" then meets a candidate titled "Alien").
+ *
+ * Exported for the test that pins the bridge.
+ */
+export function franchiseKeys(name: string): string[] {
+  const keys = new Set<string>()
+  const lower = name.trim().toLowerCase()
+  if (!lower) return []
+
+  keys.add(lower)
+
+  const stripped = lower.replace(/\s+collection$/, '').trim()
+  if (stripped) keys.add(stripped)
+
+  for (const candidate of [name, stripped]) {
+    const canonical = candidate ? detectFranchiseFromTitle(candidate) : null
+    if (canonical) keys.add(canonical.toLowerCase())
+  }
+
+  return [...keys]
+}
+
+/**
+ * Half-life in years for the recency term. At 12 years a title scores 0.5, at
+ * 24 years 0.25, and so on -- it keeps approaching zero without ever reaching
+ * it, so older titles stay ordered relative to each other.
+ */
+const RECENCY_HALF_LIFE_YEARS = 12
+
+/**
+ * Recency score in (0, 1] -- newer content scores higher.
+ *
+ * Exponential decay rather than the previous `1 - age/10` clamped to zero. That
+ * form had a hard cliff: every title ten years old or older scored exactly 0,
+ * so a 1954 classic and a 2015 flop were indistinguishable on a term that
+ * carries a meaningful share of the ranking, and no amount of quality could
+ * separate them. Decay keeps a recency preference (which is defensible for a
+ * "what should I add" feature) while leaving the back catalogue ranked.
+ *
+ * An unknown year scores as OLD, not as average. It previously returned 0.5,
+ * which put missing metadata ahead of every real title released more than five
+ * years ago -- absence of data was outranking known films.
+ *
+ * A future-dated release (an announced title) is clamped to the present rather
+ * than scoring above 1.
  */
 function calculateRecencyScore(candidate: RawCandidate): number {
-  if (!candidate.releaseYear) return 0.5
-  
+  if (!candidate.releaseYear) return 0
+
   const currentYear = new Date().getFullYear()
-  const age = currentYear - candidate.releaseYear
-  
-  // 0 years old = 1.0, 10+ years old = 0.0
-  return Math.max(0, Math.min(1, 1 - (age / 10)))
+  const age = Math.max(0, currentYear - candidate.releaseYear)
+
+  return Math.pow(0.5, age / RECENCY_HALF_LIFE_YEARS)
 }
 
 /**
@@ -172,63 +331,122 @@ export async function scoreCandidates(
   // Get the user's taste vectors (one per cluster, or the legacy average)
   const tasteVectors = await getUserTasteVectors(userId, mediaType)
 
-  // Get embeddings for candidates that are in our database
-  const embeddingTable = await getActiveEmbeddingTableName(mediaType === 'movie' ? 'embeddings' : 'series_embeddings')
-  const mediaTable = mediaType === 'movie' ? 'movies' : 'series'
-  
-  // Build a map of TMDb ID -> embedding for candidates we have in DB
-  const tmdbIds = candidates.map(c => c.tmdbId.toString())
-  
+  // ---------------------------------------------------------------------
+  // Candidate vectors
+  //
+  // This used to join `movies`/`series` on tmdb_id against the library
+  // embedding table -- for candidates that filterCandidates had ALREADY removed
+  // precisely because they have a row there. The match set was a strict subset
+  // of the exclusion set, so the map was empty on every run and similarityScore
+  // was the constant 0.5: 45.5% of the configured blend contributing zero
+  // ranking variance, with popularity silently deciding half the order.
+  //
+  // A candidate is not in the library, so its vector has to be made rather than
+  // found. getCandidateEmbeddings embeds from TMDb metadata and caches the
+  // result per (media_type, tmdb_id, set id), shared across every user.
+  // ---------------------------------------------------------------------
   const embeddingMap = new Map<number, number[]>()
-  
-  if (tasteVectors.length > 0 && tmdbIds.length > 0) {
+
+  if (tasteVectors.length > 0) {
     try {
-      const embeddingResult = await query<{ tmdb_id: string; embedding: number[] }>(
-        `SELECT m.tmdb_id, e.embedding 
-         FROM ${mediaTable} m
-         JOIN ${embeddingTable} e ON e.${mediaType === 'movie' ? 'movie_id' : 'series_id'} = m.id
-         WHERE m.tmdb_id = ANY($1::text[])`,
-        [tmdbIds]
-      )
-      
-      for (const row of embeddingResult.rows) {
-        const id = parseInt(row.tmdb_id, 10)
-        if (!isNaN(id)) {
-          embeddingMap.set(id, row.embedding)
+      const genreNameFor = await buildGenreNameLookup(mediaType)
+      const raw = await getCandidateEmbeddings(mediaType, candidates, genreNameFor)
+
+      // Which space the comparison happens in is the viewer's profile's
+      // decision, not this function's. resolveEmbeddingSpace refuses rather
+      // than mixing: a centred centroid against a raw candidate is a confident
+      // cosine between two different spaces.
+      const profileSpace = await getProfileEmbeddingSpace(userId, mediaType)
+      const space = resolveEmbeddingSpace(profileSpace, await isCenteringReady(mediaType))
+
+      if (space === null) {
+        logger.warn(
+          { userId, mediaType },
+          'Taste profile is centred but the centred column is not ready; scoring without a taste term until it is rebuilt'
+        )
+      } else if (space === 'raw') {
+        for (const [id, vector] of raw) embeddingMap.set(id, vector)
+      } else {
+        // Centred: a candidate has never been through refreshCenteredEmbeddings,
+        // so this is the one place the library mean genuinely has to be
+        // recomputed. Once per run, not once per candidate.
+        const { setId } = await getEmbeddingInvocation()
+        const mean = await getLibraryEmbeddingMean(mediaType, setId)
+        if (!mean) {
+          logger.warn({ mediaType }, 'No library mean available; skipping the taste term')
+        } else {
+          for (const [id, vector] of raw) {
+            const centred = centreVector(vector, mean)
+            if (centred) embeddingMap.set(id, centred)
+          }
         }
       }
-      
-      logger.debug({
-        mediaType,
-        candidateCount: candidates.length,
-        embeddingsFound: embeddingMap.size,
-        tasteVectors: tasteVectors.length,
-      }, 'Loaded embeddings for candidates')
+
+      logger.info(
+        {
+          userId,
+          mediaType,
+          candidateCount: candidates.length,
+          embeddingsUsable: embeddingMap.size,
+          tasteVectors: tasteVectors.length,
+          space,
+        },
+        'Resolved candidate embeddings for taste scoring'
+      )
     } catch (err) {
-      logger.warn({ err }, 'Failed to load embeddings for candidates')
+      // No taste term rather than no run. This is the state the feature was
+      // permanently in before, so degrading to it is safe.
+      logger.warn({ err, userId, mediaType }, 'Failed to build candidate embeddings')
     }
   }
+
+  // Raw cosines crowd into a narrow band, so a candidate's absolute similarity
+  // says little while its position says a lot. Normalising across the pool --
+  // the same treatment popularity already gets -- is what makes the configured
+  // weight buy the influence it claims. Measured only among candidates that HAVE
+  // a vector, so titles we could not embed do not drag the floor down and
+  // inflate everyone else.
+  const rawSimilarities = new Map<number, number>()
+  for (const candidate of candidates) {
+    const vector = embeddingMap.get(candidate.tmdbId)
+    if (!vector) continue
+    const similarity = maxTasteSimilarity(tasteVectors, vector)
+    if (similarity !== null) rawSimilarities.set(candidate.tmdbId, similarity)
+  }
+  const similarityValues = [...rawSimilarities.values()]
+  const similarityMin = similarityValues.length > 0 ? Math.min(...similarityValues) : 0
+  const similarityMax = similarityValues.length > 0 ? Math.max(...similarityValues) : 0
 
   // Get user's franchise preferences for boosting
   // Note: Genre weights are not applied here since discovery uses TMDb genre IDs, not names
   const franchisePrefs = await getUserFranchisePreferences(userId, mediaType)
-  
-  // Build franchise lookup map
+
+  // Build the lookup under every name a franchise can go by, because the two
+  // sides of this comparison speak different vocabularies (see franchiseKeys).
   const franchiseScoreMap = new Map<string, number>()
   for (const pref of franchisePrefs) {
-    franchiseScoreMap.set(pref.franchiseName.toLowerCase(), pref.preferenceScore)
+    for (const key of franchiseKeys(pref.franchiseName)) {
+      // First writer wins, so a preference's own name beats a name it only
+      // shares by derivation.
+      if (!franchiseScoreMap.has(key)) franchiseScoreMap.set(key, pref.preferenceScore)
+    }
   }
 
-  // Score each candidate
-  const scoredCandidates: ScoredCandidate[] = candidates.map(candidate => {
-    // Calculate similarity score against the user's best-matching taste facet
-    let similarityScore = 0.5 // Default if no embedding available
-    const candidateEmbedding = embeddingMap.get(candidate.tmdbId)
-    if (candidateEmbedding) {
-      similarityScore = maxTasteSimilarity(tasteVectors, candidateEmbedding) ?? 0.5
-    }
+  // Both measured once over the pool, not per candidate.
+  const popularityScores = popularityScoresBySource(candidates)
 
-    const popularityScore = calculatePopularityScore(candidate, candidates)
+  const scoredCandidates: ScoredCandidate[] = candidates.map(candidate => {
+    // Taste match against the user's best-matching facet, rescaled across the
+    // pool. A candidate we could not embed scores 0.5 -- neutral, so a missing
+    // vector neither promotes nor buries a title, which is what the whole pool
+    // silently got before candidate embeddings existed.
+    const rawSimilarity = rawSimilarities.get(candidate.tmdbId)
+    const similarityScore =
+      rawSimilarity === undefined
+        ? 0.5
+        : normalize(rawSimilarity, similarityMin, similarityMax)
+
+    const popularityScore = popularityScores.get(candidate.tmdbId) ?? 0.5
     const recencyScore = calculateRecencyScore(candidate)
     const sourceScore = calculateSourceScore(candidate)
 
@@ -257,12 +475,15 @@ export async function scoreCandidates(
     // (discovery candidates carry TMDb genre IDs, not names), so they're
     // passed as neutral no-ops.
     let franchiseAffinity = 0.5
-    const detectedFranchise = detectFranchiseFromTitle(candidate.title)
-    if (detectedFranchise) {
-      const prefScore = franchiseScoreMap.get(detectedFranchise.toLowerCase())
+    // Expanded the same way the stored names were, so the canonical name the
+    // detector produces and the collection name the library recorded resolve to
+    // a common key. Ordered, so the match is deterministic.
+    for (const key of franchiseKeys(candidate.title)) {
+      const prefScore = franchiseScoreMap.get(key)
       if (prefScore !== undefined) {
         // preference_score is stored clamped to -1..1 (see setFranchisePreference)
         franchiseAffinity = 0.5 + prefScore * 0.5
+        break
       }
     }
 
@@ -303,10 +524,11 @@ export async function scoreCandidates(
   // Sort by final score descending
   scoredCandidates.sort((a, b) => b.finalScore - a.finalScore)
 
-  // Assign ranks (to all candidates, not limited)
-  scoredCandidates.forEach((c, i) => {
-    (c as ScoredCandidate & { rank: number }).rank = i + 1
-  })
+  // No rank is assigned here on purpose. This used to write `rank` onto each
+  // candidate through a cast, on a type that declares no such field and that
+  // nobody reads: storeDiscoveryCandidates numbers the rows from its own loop
+  // index, which is the only rank that reaches the database or the UI. Sorted
+  // order is the contract of this function; position is the storage layer's.
 
   logger.info({
     userId,

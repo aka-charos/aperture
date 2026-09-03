@@ -427,6 +427,47 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     aliases: ['watching', 'shows you watch', 'upcoming episodes', 'continue'],
   },
   {
+    id: 'discovery-tuning',
+    group: 'recommendations',
+    segment: 'discovery',
+    titleKey: 'adminNav.discoveryTuning.title',
+    blurbKey: 'adminNav.discoveryTuning.blurb',
+    aliases: ['discovery', 'discover', 'seerr', 'candidates', 'pool', 'trakt', 'tmdb', 'tuning'],
+    gate: 'tmdbConfigured',
+    fields: [
+      {
+        anchor: 'discovery-max-per-source',
+        labelKey: 'settingsDiscovery.maxCandidatesPerSource',
+        aliases: ['pages', 'fetch', 'source'],
+      },
+      {
+        anchor: 'discovery-max-enriched',
+        labelKey: 'settingsDiscovery.maxEnrichedCandidates',
+        aliases: ['enrich', 'cast', 'credits', 'api calls'],
+      },
+      {
+        anchor: 'discovery-max-pool',
+        labelKey: 'settingsDiscovery.maxPoolCandidates',
+        aliases: ['pool', 'shared', 'ceiling'],
+      },
+      {
+        anchor: 'discovery-pool-age',
+        labelKey: 'settingsDiscovery.poolMaxAgeDays',
+        aliases: ['prune', 'stale', 'age'],
+      },
+      {
+        anchor: 'discovery-min-vote-count',
+        labelKey: 'settingsDiscovery.minVoteCount',
+        aliases: ['votes', 'quality', 'floor'],
+      },
+      {
+        anchor: 'discovery-weight-popularity',
+        labelKey: 'settingsDiscovery.popularityWeight',
+        aliases: ['weight', 'popularity', 'ranking'],
+      },
+    ],
+  },
+  {
     id: 'genre-strips',
     group: 'recommendations',
     segment: 'genre-strips',
