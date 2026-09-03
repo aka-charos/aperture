@@ -58,6 +58,15 @@ export interface MoviePosterProps {
   loading?: boolean
   /** Make poster fill container width with 2:3 aspect ratio (for responsive grids) */
   responsive?: boolean
+  /**
+   * How many lines the title may use before it is clipped. Defaults to 1, which
+   * is what every existing grid renders — a narrow card in a dense row wants one
+   * line and an ellipsis. Pass 2 where the title is the point and the reader has
+   * no other way to tell two entries apart ("The Lord of the Ri…" three times
+   * over). At 2 the block reserves both lines whether or not the second is used,
+   * so cards in a row still line up.
+   */
+  titleLines?: 1 | 2
   children?: React.ReactNode
 }
 
@@ -92,6 +101,7 @@ export function MoviePoster({
   metaLine,
   loading = false,
   responsive = false,
+  titleLines = 1,
   children,
 }: MoviePosterProps) {
   const [isHovered, setIsHovered] = useState(false)
@@ -457,9 +467,20 @@ export function MoviePoster({
         <Typography
           variant="body2"
           fontWeight={500}
-          noWrap
+          noWrap={titleLines === 1}
           title={title}
-          sx={{ lineHeight: 1.3 }}
+          sx={{
+            lineHeight: 1.3,
+            ...(titleLines > 1 && {
+              display: '-webkit-box',
+              WebkitLineClamp: titleLines,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              // Reserved whether or not the second line is used, so a one-line
+              // title does not shorten its card and stagger the row.
+              minHeight: `${1.3 * titleLines}em`,
+            }),
+          }}
         >
           {title}
         </Typography>

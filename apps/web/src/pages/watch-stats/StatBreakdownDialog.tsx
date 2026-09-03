@@ -103,8 +103,15 @@ export function StatBreakdownDialog({ request, onClose }: StatBreakdownDialogPro
   const shown = items.length
   const truncated = total > shown
 
+  // A drill-in is usually a handful of titles, and at a fixed maxWidth="lg" two
+  // results sat in a 1400px dialog with four empty columns beside them. The
+  // width follows the answer instead. Loading settles at "md" because the count
+  // is not known until the fetch lands, so there is at most one resize and it
+  // happens as the posters appear.
+  const maxWidth = loading ? 'md' : shown <= 4 ? 'sm' : shown <= 10 ? 'md' : 'lg'
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth scroll="paper">
+    <Dialog open={open} onClose={onClose} maxWidth={maxWidth} fullWidth scroll="paper">
       <DialogTitle sx={{ pr: 6, pb: 1 }}>
         <Typography variant="h6" fontWeight={700} component="div" noWrap>
           {request?.label ?? ''}
@@ -151,63 +158,73 @@ export function StatBreakdownDialog({ request, onClose }: StatBreakdownDialogPro
             sx={{
               display: 'grid',
               gap: 2,
-              // Sized off the container, not the viewport: the dialog is
-              // narrower than the window and a breakpoint-keyed grid would
-              // keep its full-desktop column count inside it.
-              gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))',
+              // Fixed tracks rather than 1fr: `auto-fit` collapses the tracks
+              // nothing lands in, so `justifyContent` can centre a short row
+              // instead of leaving it hugging the left edge of empty columns.
+              // Sized off the container, not the viewport — the dialog is
+              // narrower than the window, and a breakpoint-keyed grid would keep
+              // its full-desktop column count inside it.
+              gridTemplateColumns: 'repeat(auto-fit, 140px)',
+              justifyContent: 'center',
             }}
           >
             {loading &&
-              Array.from({ length: 12 }, (_, i) => (
-                <Skeleton key={i} variant="rectangular" sx={{ borderRadius: 2, aspectRatio: '2 / 3' }} />
+              Array.from({ length: 6 }, (_, i) => (
+                <Skeleton
+                  key={i}
+                  variant="rectangular"
+                  sx={{ borderRadius: 2, width: 140, aspectRatio: '2 / 3' }}
+                />
               ))}
 
             {!loading &&
-              items.map(item => (
-                <Box key={`${item.mediaType}-${item.id}`} sx={{ position: 'relative' }}>
+              items.map(item => {
+                // The badge is a child of the poster rather than an overlay
+                // positioned over it: as a sibling it was anchored by an offset
+                // measured from the bottom of the card, which the two-line title
+                // silently moved. MoviePoster renders children inside the poster
+                // itself, which is what the offset was trying to approximate.
+                const badge =
+                  (item.playCount ?? 0) > 1
+                    ? t('watchStats.breakdownPlays', { count: item.playCount })
+                    : item.episodesWatched != null
+                      ? t('watchStats.breakdownEpisodes', { count: item.episodesWatched })
+                      : null
+
+                return (
                   <MoviePoster
+                    key={`${item.mediaType}-${item.id}`}
                     title={item.title}
                     year={item.year}
                     posterUrl={item.poster}
                     rating={item.rating}
                     responsive
+                    titleLines={2}
                     hideUserRating
                     hideWatchingToggle
                     hideExploreButton
                     onClick={() => openItem(item)}
-                  />
-                  {(item.playCount ?? 0) > 1 && (
-                    <Chip
-                      label={t('watchStats.breakdownPlays', { count: item.playCount })}
-                      size="small"
-                      sx={{
-                        position: 'absolute',
-                        bottom: 44,
-                        insetInlineStart: 6,
-                        height: 20,
-                        fontSize: '0.65rem',
-                        fontWeight: 600,
-                        pointerEvents: 'none',
-                      }}
-                    />
-                  )}
-                  {item.episodesWatched != null && (
-                    <Chip
-                      label={t('watchStats.breakdownEpisodes', { count: item.episodesWatched })}
-                      size="small"
-                      sx={{
-                        position: 'absolute',
-                        bottom: 44,
-                        insetInlineStart: 6,
-                        height: 20,
-                        fontSize: '0.65rem',
-                        fontWeight: 600,
-                        pointerEvents: 'none',
-                      }}
-                    />
-                  )}
-                </Box>
-              ))}
+                  >
+                    {badge && (
+                      <Chip
+                        label={badge}
+                        size="small"
+                        sx={{
+                          position: 'absolute',
+                          bottom: 6,
+                          insetInlineStart: 6,
+                          height: 20,
+                          fontSize: '0.65rem',
+                          fontWeight: 600,
+                          pointerEvents: 'none',
+                          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                          color: 'common.white',
+                        }}
+                      />
+                    )}
+                  </MoviePoster>
+                )
+              })}
           </Box>
         )}
 
