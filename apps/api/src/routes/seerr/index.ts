@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync } from 'fastify'
+import type { FastifyPluginAsync, FastifyBaseLogger } from 'fastify'
 import { requireAuth, requireAdmin, type SessionUser } from '../../plugins/auth.js'
 import { query, queryOne } from '../../lib/db.js'
 import {
@@ -18,7 +18,9 @@ import {
   countDiscoveryRequests,
   hasExistingRequest,
   getSystemSetting,
-  resolveSeerrUserIdForProfile,
+  listAllSeerrUsers,
+  resolveSeerrUserMatch,
+  seerrUserExists,
   listRadarrServers,
   getRadarrServerDetails,
   listSonarrServers,
@@ -45,7 +47,18 @@ import {
 } from './schemas.js'
 import { resolveSearchSource } from './sources/index.js'
 
-async function ensureSeerrUserIdForRequest(userId: string): Promise<number | null> {
+/**
+ * The Seerr user to act as for this Aperture user, or null to act as the API
+ * key's own account.
+ *
+ * Null is always safe: it is exactly the behaviour every request had before
+ * `X-API-User` existed. A *wrong* id is not safe, which is why a contested
+ * match is refused rather than guessed.
+ */
+async function ensureSeerrUserIdForRequest(
+  userId: string,
+  log: FastifyBaseLogger
+): Promise<number | null> {
   const row = await queryOne<{
     seerr_user_id: number | null
     email: string | null
@@ -61,22 +74,60 @@ async function ensureSeerrUserIdForRequest(userId: string): Promise<number | nul
   if (!row) return null
   if (row.seerr_user_id != null) return row.seerr_user_id
 
-  const resolved = await resolveSeerrUserIdForProfile({
-    email: row.email,
-    username: row.username,
-    displayName: row.display_name,
-    provider: row.provider,
-    providerUserId: row.provider_user_id,
-  })
-  if (resolved != null) {
+  const seerrUsers = await listAllSeerrUsers()
+  const match = resolveSeerrUserMatch(
+    {
+      email: row.email,
+      username: row.username,
+      displayName: row.display_name,
+      provider: row.provider,
+      providerUserId: row.provider_user_id,
+    },
+    seerrUsers
+  )
+
+  if (match.userId == null) {
+    log.warn(
+      { userId, ambiguous: match.ambiguous, matchedBy: match.matchedBy },
+      match.ambiguous
+        ? 'Several Seerr users match this account; requests will be filed by the API key owner'
+        : 'No Seerr user matches this account; requests will be filed by the API key owner'
+    )
+    return null
+  }
+
+  try {
     await query(`UPDATE users SET seerr_user_id = $1, updated_at = NOW() WHERE id = $2`, [
-      resolved,
+      match.userId,
       userId,
     ])
+  } catch (err) {
+    // idx_users_seerr_user_id_unique (0104). Another Aperture account already
+    // claims this Seerr user, so at least one of the two matches is wrong.
+    // Acting as a contested identity would file this request under someone
+    // else's name; declining to send the header only costs attribution.
+    if ((err as { code?: string }).code === '23505') {
+      log.warn(
+        { userId, seerrUserId: match.userId, matchedBy: match.matchedBy },
+        'Seerr user already linked to another Aperture account; not acting as them'
+      )
+      return null
+    }
+    throw err
   }
-  return resolved
+
+  log.info({ userId, seerrUserId: match.userId, matchedBy: match.matchedBy }, 'Linked Seerr user')
+  return match.userId
 }
 
+/**
+ * Forget a Seerr link that no longer names a live account, so the next
+ * request re-resolves instead of failing the same way forever.
+ */
+async function clearStaleSeerrUserId(userId: string, log: FastifyBaseLogger): Promise<void> {
+  await query(`UPDATE users SET seerr_user_id = NULL, updated_at = NOW() WHERE id = $1`, [userId])
+  log.warn({ userId }, 'Cleared stale Seerr user link')
+}
 /**
  * Resolve Aperture library UUIDs for TMDb IDs so available requests can link to /movies/:id or /series/:id.
  */
@@ -471,7 +522,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
 
       const requireMapping =
         (await getSystemSetting('seerr_require_user_mapping')) === 'true'
-      const seerrUserId = await ensureSeerrUserIdForRequest(currentUser.id)
+      const seerrUserId = await ensureSeerrUserIdForRequest(currentUser.id, request.log)
       if (requireMapping && seerrUserId == null) {
         return reply.status(422).send({
           error: 'Seerr account not linked',
@@ -494,15 +545,32 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
       // auto-approve setting. Unmapped users fall back to the API key's own
       // identity, which is what happened for everyone before.
       const seerrMediaType = mediaType === 'movie' ? 'movie' : 'tv'
-      const result = await createSeerrRequest(tmdbId, seerrMediaType, {
+      const requestOptions = {
         seasons,
-        ...(seerrUserId != null ? { actAsUserId: seerrUserId } : {}),
         ...(rootFolder !== undefined ? { rootFolder } : {}),
         ...(profileId !== undefined ? { profileId } : {}),
         ...(serverId !== undefined ? { serverId } : {}),
         ...(languageProfileId !== undefined ? { languageProfileId } : {}),
         ...(is4k !== undefined ? { is4k } : {}),
+      }
+
+      let result = await createSeerrRequest(tmdbId, seerrMediaType, {
+        ...requestOptions,
+        ...(seerrUserId != null ? { actAsUserId: seerrUserId } : {}),
       })
+
+      // A 403 while acting as someone has two very different causes, and
+      // guessing between them is not acceptable in either direction: a stale
+      // link left alone strands the user forever behind "You do not have
+      // permission to access this endpoint", while retrying blindly would
+      // escalate a viewer who genuinely lacks REQUEST into an admin-attributed,
+      // auto-approved request. So ask Seerr which one it is.
+      if (!result.success && result.status === 403 && seerrUserId != null) {
+        if (!(await seerrUserExists(seerrUserId))) {
+          await clearStaleSeerrUserId(currentUser.id, request.log)
+          result = await createSeerrRequest(tmdbId, seerrMediaType, requestOptions)
+        }
+      }
 
       if (!result.success) {
         // Update Aperture request as failed

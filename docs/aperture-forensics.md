@@ -1265,3 +1265,39 @@ Fixed in two halves, and both are required:
 **Instrument note.** The spread figures are what made this findable at all, and only because they were logged per user rather than aggregated. An instance-wide average would have read as a mediocre-but-plausible middle and hidden a clean bimodal split — the same trap the repo-wide "measure per user before reading an aggregate as a mechanism" invariant already warns about, encountered from a new direction.
 
 **Still open, deliberately.** `getDiscoveryEnabledUsers` does not check `provider_disabled`, so a viewer removed from the media server still gets discovery runs. Inert on the instance measured (nobody is provider-disabled) and not changed here, since it alters who receives a feature rather than fixing a fault.
+
+### Addendum, same day: the Emby matcher, fixed
+
+`POST /user/import-from-jellyfin` at v3.4.1 settles what Seerr actually stores:
+
+```ts
+const newUser = new User({
+  jellyfinUsername: jellyfinUser?.Name,
+  jellyfinUserId:   jellyfinUser?.Id,      // stored RAW; the lookup above normalizes
+  email:            jellyfinUser?.Name,    // the USERNAME, not an email address
+  userType: mediaServerType === JELLYFIN ? UserType.JELLYFIN : UserType.EMBY,
+});
+```
+
+So `username` is never set for an imported user, and `email` holds a username. Tracing an Emby account through the old matcher: the email tier compared Aperture's real address against Seerr's `"haris"` and missed; the id tier was skipped by `provider === 'jellyfin'`; the username tier matched `jellyfinUsername` and returned. It worked — by string comparison, on the third try, having skipped the only field that is an identifier. That is why this was invisible: the common case passes.
+
+It fails on a rename on either side (`sync-users` sets `username` on INSERT only, and Seerr stamps `jellyfinUsername` at import), on any name needing Unicode normalization (`.toLowerCase()` alone — the lesson `helpers/titleMatch.ts` already exists for), and permanently, since `ensureSeerrUserIdForRequest` recomputes only when the column is NULL.
+
+Rewritten as ordered tiers — **mediaServerId, email, username, displayName** — where the first tier producing **exactly one** candidate wins. Two rules carry it. A tier matching several users **stops the search** instead of falling through: a weaker signal breaking a tie the stronger one could not is noise, and the result is cached forever. And the email tier requires an `@` on **both** sides, because matching a real address against Seerr's username-in-the-email-column is a coincidence, not an identity. `normalizeMediaServerId` copies Seerr's own rule (strip dashes, lowercase, require 32 hex; anything else returns null and skips the tier).
+
+Two failures that only the header made reachable, both now handled at the write and use sites rather than in the pure matcher:
+
+- **A contested match was a 500.** `0104`'s `idx_users_seerr_user_id_unique` is a unique partial index and the write was a bare `UPDATE` with no catch, so a second Aperture user resolving to the same Seerr account died on an unhandled 23505. A 23505 now means at least one of the two matches is wrong, so the header is not sent — attribution is lost, which is the old behaviour, rather than a request filed under someone else's name.
+- **A stale id now fails harder than it used to.** Delete and re-import someone in Seerr and they return with a new id; `checkUser` then resolves `X-API-User` to nothing, `req.user` is never set, and every route answers `isAuthenticated`'s flat 403 *"You do not have permission to access this endpoint"* — true of nobody, and (since this entry's error propagation) shown to the user verbatim. Guessing is unacceptable in both directions: leaving it strands them forever, and retrying blindly would escalate a viewer who genuinely lacks REQUEST into an admin-attributed, auto-approved request. So a 403 while acting as someone asks `GET /user/:id` which case it is. **Only a 404 clears the link** — an outage must not be read as "this account is gone" and wipe a correct mapping.
+
+`userMapping.test.ts` is the first test in `packages/core/src/seerr/`; verified to fail on the reinstated `provider === 'jellyfin'` guard, which breaks the three Emby cases and leaves the Jellyfin one passing — the exact shape of the original bug.
+
+### Addendum — discovery was the only per-user loop not gating on provider_disabled
+
+Recorded above as "still open, deliberately". Closed, because the codebase had already decided and discovery was simply the outlier.
+
+Every other per-user work loop gates on `provider_disabled = false`: both recommender pipelines (four call sites), both STRM writers, both watch-history syncs, `twinAffinity`, and `rebuildAllTasteProfiles`. `strm/cleanup.ts` goes further and treats the flag as grounds to DELETE a user's generated output. Only `getDiscoveryEnabledUsers` ignored it, so discovery kept building suggestions, spending TMDb and embedding calls, and holding Seerr request rights for viewers the media server no longer has. The column is synced from the server's own `Policy.IsDisabled` by `users/sync.ts`, so it is the media server's answer rather than an Aperture preference.
+
+Guarded in **two** places, and the second is the one that matters. The auth plugin gates on `is_enabled` **alone** — it never reads `provider_disabled` (zero occurrences in `plugins/auth.ts`) — so a dropped viewer can still hold a valid session and press Refresh. Gating only the scheduled job would have left the manual path as the way around it, which is the same class of mistake as the enablement-flag mismatch above: two entry points to one feature, gated differently.
+
+Deliberately NOT extended to the read routes. `GET /api/discovery/movies|series` still serves whatever candidates already exist for such a user, which is right — the guard is about spending money and holding request rights on their behalf, not about hiding rows already paid for.

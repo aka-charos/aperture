@@ -22,6 +22,7 @@ export {
   getMediaStatus,
   listAllSeerrUsers,
   resolveSeerrUserIdForProfile,
+  seerrUserExists,
   // Request Management
   createRequest,
   updateRequestStatus,
@@ -39,6 +40,10 @@ export {
 
 export {
   matchApertureProfileToSeerrUser,
+  resolveSeerrUserMatch,
+  normalizeMediaServerId,
   type ApertureUserProfileForSeerr,
+  type SeerrMatchTier,
+  type SeerrUserMatchResult,
 } from './userMapping.js'
 

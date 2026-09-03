@@ -380,6 +380,28 @@ export async function listAllSeerrUsers(): Promise<SeerrUser[]> {
 }
 
 /**
+ * Whether a Seerr user id still exists (GET /user/:id).
+ *
+ * Needed because a cached `users.seerr_user_id` can outlive the account it
+ * names — delete and re-import someone in Seerr and they come back with a new
+ * id. Sending the old one as `X-API-User` leaves `req.user` unset, so every
+ * route answers a flat 403 "You do not have permission to access this
+ * endpoint", which is true of nobody and names the wrong problem.
+ *
+ * Only worth calling on that failure path: it is the one thing that separates
+ * a stale link from a genuine permission refusal, and guessing between them
+ * would either strand the user or silently escalate a request they were not
+ * allowed to make.
+ */
+export async function seerrUserExists(seerrUserId: number): Promise<boolean> {
+  const result = await seerrCall<SeerrUser>(`/user/${seerrUserId}`)
+  if (result.ok) return true
+  // Only a 404 is evidence of absence. An outage or a permissions change must
+  // not be read as "this account is gone" and clear a correct mapping.
+  return result.status !== 404
+}
+
+/**
  * Resolve Seerr user id for an Aperture profile using GET /user (cached in DB by API).
  */
 export async function resolveSeerrUserIdForProfile(
