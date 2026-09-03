@@ -13,7 +13,9 @@ import {
   requireAuth,
   setSessionCookie,
   clearSessionCookie,
+  clearImpersonationCookie,
   type SessionUser,
+  type ImpersonationContext,
 } from '../../plugins/auth.js'
 import {
   checkLoginLockout,
@@ -26,6 +28,7 @@ import {
   loginOptionsRateLimit,
   authCheckRateLimit,
 } from '../../config/rateLimits.js'
+import impersonationRoutes from './impersonation.js'
 import {
   authSchemas,
   loginOptionsSchema,
@@ -73,6 +76,8 @@ interface LoginResponse {
 
 interface MeResponse {
   user: SessionUser
+  /** Non-null only while an admin is viewing the app as someone else. */
+  impersonation: ImpersonationContext | null
 }
 
 const authRoutes: FastifyPluginAsync = async (fastify) => {
@@ -80,6 +85,8 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   for (const [name, schema] of Object.entries(authSchemas)) {
     fastify.addSchema({ $id: name, ...schema })
   }
+
+  await fastify.register(impersonationRoutes)
 
   /**
    * GET /api/auth/login-options
@@ -251,9 +258,14 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.post('/api/auth/logout', { schema: logoutSchema }, async (request, reply) => {
     if (request.sessionId) {
+      // Any assumption hanging off this session goes with it (the grant's
+      // admin_session_id cascades), so signing out is also a way out of one.
       await deleteSession(request.sessionId)
     }
     clearSessionCookie(reply)
+    // Cleared here rather than relying on the next request to notice it is
+    // stale — a signed-out browser should not be carrying it at all.
+    clearImpersonationCookie(reply)
     return reply.send({ success: true })
   })
 
@@ -264,7 +276,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/auth/me',
     { preHandler: requireAuth, schema: getMeSchema },
     async (request, reply) => {
-      return reply.send({ user: request.user! })
+      return reply.send({ user: request.user!, impersonation: request.impersonation ?? null })
     }
   )
 
@@ -415,7 +427,14 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       if (request.user) {
-        return reply.send({ authenticated: true, user: request.user })
+        // `user` is the assumed account when an admin is viewing as someone
+        // else, so the client renders that user's app; `impersonation` is what
+        // tells it to also render the way back out.
+        return reply.send({
+          authenticated: true,
+          user: request.user,
+          impersonation: request.impersonation ?? null,
+        })
       }
 
       if (request.sessionError) {

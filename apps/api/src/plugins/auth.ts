@@ -5,6 +5,13 @@ import { query, queryOne } from '../lib/db.js'
 import { validateApiKey } from '@aperture/core'
 import { createChildLogger } from '../lib/logger.js'
 import { useSecureCookies } from '../config/security.js'
+import {
+  IMPERSONATION_COOKIE_NAME,
+  IMPERSONATION_DURATION_MINUTES,
+  IMPERSONATION_TOKEN_BYTES,
+  IMPERSONATION_READ_ONLY_ERROR,
+  impersonationBlocksRequest,
+} from '../lib/impersonation.js'
 
 const sessionLogger = createChildLogger('auth-session')
 
@@ -21,11 +28,30 @@ export interface SessionUser {
   avatarUrl: string | null
 }
 
+/**
+ * An admin looking at the app as another user.
+ *
+ * While this is set, `request.user` is the TARGET — every handler downstream
+ * sees the assumed account and needs no knowledge of this feature at all — and
+ * this holds the admin who is really there, which is what the exit control
+ * reads.
+ */
+export interface ImpersonationContext {
+  /** The real operator. Never the target. */
+  admin: SessionUser
+  /** When the grant lapses on its own, ISO-8601. */
+  expiresAt: string
+}
+
 declare module 'fastify' {
   interface FastifyRequest {
     user?: SessionUser
     sessionId?: string
+    /** The `sessions.id` behind the cookie. An assumption is bound to it. */
+    sessionRowId?: string
     sessionError?: boolean
+    /** Set only while an admin is viewing the app as another user. */
+    impersonation?: ImpersonationContext
     /** True if the request was authenticated via API key */
     isApiKeyAuth?: boolean
     /** The API key ID if authenticated via API key */
@@ -33,10 +59,7 @@ declare module 'fastify' {
   }
 }
 
-interface SessionLookupRow {
-  session_id: string
-  expires_at: Date
-  last_seen_at: Date
+interface UserLookupRow {
   id: string
   username: string
   display_name: string | null
@@ -47,6 +70,26 @@ interface SessionLookupRow {
   can_manage_watch_history: boolean
   collections_enabled: boolean
 }
+
+interface SessionLookupRow extends UserLookupRow {
+  session_id: string
+  expires_at: Date
+  last_seen_at: Date
+}
+
+interface ImpersonationLookupRow extends UserLookupRow {
+  impersonation_id: string
+  impersonation_expires_at: Date
+  admin_session_id: string
+}
+
+/**
+ * The user columns every lookup here selects, written once. `alias` is the
+ * table the columns come from.
+ */
+const USER_COLUMNS = (alias: string) =>
+  `${alias}.id, ${alias}.username, ${alias}.display_name, ${alias}.provider, ${alias}.provider_user_id,
+   ${alias}.is_admin, ${alias}.is_enabled, ${alias}.can_manage_watch_history, ${alias}.collections_enabled`
 
 const SESSION_COOKIE_NAME = 'aperture_session'
 /** Absolute lifetime: a session dies this long after it was created. */
@@ -111,13 +154,39 @@ export async function deleteAllUserSessions(userId: string): Promise<void> {
   await query('DELETE FROM sessions WHERE user_id = $1', [userId])
 }
 
-async function getSessionUser(token: string): Promise<SessionUser | null> {
+/**
+ * A `users` row as the rest of the app sees it. Shared by the session lookup
+ * and the assumption lookup so the two cannot describe the same account
+ * differently.
+ */
+function toSessionUser(row: UserLookupRow): SessionUser {
+  return {
+    id: row.id,
+    username: row.username,
+    displayName: row.display_name,
+    provider: row.provider,
+    providerUserId: row.provider_user_id,
+    isAdmin: row.is_admin,
+    isEnabled: row.is_enabled,
+    canManageWatchHistory: row.can_manage_watch_history,
+    collectionsEnabled: row.collections_enabled,
+    // Local avatar proxy URL, to avoid mixed content issues — the avatar
+    // endpoint proxies to the media server.
+    avatarUrl: `/api/users/${row.id}/avatar`,
+  }
+}
+
+interface SessionLookupResult {
+  user: SessionUser
+  /** `sessions.id`, not the token. */
+  sessionRowId: string
+}
+
+async function getSessionUser(token: string): Promise<SessionLookupResult | null> {
   const tokenHash = hashSessionToken(token)
 
   const row = await queryOne<SessionLookupRow>(
-    `SELECT s.id AS session_id, s.expires_at, s.last_seen_at,
-            u.id, u.username, u.display_name, u.provider, u.provider_user_id,
-            u.is_admin, u.is_enabled, u.can_manage_watch_history, u.collections_enabled
+    `SELECT s.id AS session_id, s.expires_at, s.last_seen_at, ${USER_COLUMNS('u')}
        FROM sessions s
        JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = $1`,
@@ -158,22 +227,104 @@ async function getSessionUser(token: string): Promise<SessionUser | null> {
     )
   }
 
-  // Use local avatar proxy URL to avoid mixed content issues
-  // The avatar endpoint proxies to the media server
-  const avatarUrl = `/api/users/${row.id}/avatar`
+  return { user: toSessionUser(row), sessionRowId: row.session_id }
+}
 
-  return {
-    id: row.id,
-    username: row.username,
-    displayName: row.display_name,
-    provider: row.provider,
-    providerUserId: row.provider_user_id,
-    isAdmin: row.is_admin,
-    isEnabled: row.is_enabled,
-    canManageWatchHistory: row.can_manage_watch_history,
-    collectionsEnabled: row.collections_enabled,
-    avatarUrl,
+/* ------------------------------------------------------------------ *
+ * Account assumption ("view as user")
+ *
+ * The admin's session cookie is never touched. A grant is a second cookie
+ * beside it, so stopping is a delete of one row and one cookie — the admin's
+ * own credential is still in the browser and still valid, which is what makes
+ * "get me out of here" unfailable rather than a restore that could go wrong.
+ * ------------------------------------------------------------------ */
+
+export interface ImpersonationTarget {
+  target: SessionUser
+  expiresAt: Date
+}
+
+/**
+ * Start an assumption. Returns the token, which is handed to the browser once
+ * and never stored — only its digest is.
+ *
+ * Nothing here writes to the target's row: no session is created for them, so
+ * `users.last_login_at` and `sessions.last_seen_at` stay exactly as the target
+ * left them.
+ */
+export async function createImpersonation(
+  adminUserId: string,
+  adminSessionRowId: string,
+  targetUserId: string
+): Promise<{ token: string; expiresAt: Date }> {
+  const token = randomBytes(IMPERSONATION_TOKEN_BYTES).toString('base64url')
+  const expiresAt = new Date(Date.now() + IMPERSONATION_DURATION_MINUTES * 60 * 1000)
+
+  // One assumption per admin session. Starting a second replaces the first
+  // rather than leaving an orphan that the cookie no longer points at.
+  await query('DELETE FROM impersonation_sessions WHERE admin_session_id = $1', [
+    adminSessionRowId,
+  ])
+
+  await query(
+    `INSERT INTO impersonation_sessions (token_hash, admin_user_id, admin_session_id, target_user_id, expires_at)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [hashSessionToken(token), adminUserId, adminSessionRowId, targetUserId, expiresAt]
+  )
+
+  return { token, expiresAt }
+}
+
+export async function deleteImpersonation(token: string): Promise<void> {
+  await query('DELETE FROM impersonation_sessions WHERE token_hash = $1', [
+    hashSessionToken(token),
+  ])
+}
+
+/**
+ * Resolve an assumption cookie against the session that is presenting it.
+ *
+ * Every failure returns null and the caller clears the cookie, so a grant that
+ * has lapsed, been revoked, or belongs to a different session degrades to
+ * "you are yourself again" rather than to an error page.
+ */
+async function getImpersonationTarget(
+  token: string,
+  adminSessionRowId: string
+): Promise<ImpersonationTarget | null> {
+  const tokenHash = hashSessionToken(token)
+
+  const row = await queryOne<ImpersonationLookupRow>(
+    `SELECT i.id AS impersonation_id, i.expires_at AS impersonation_expires_at, i.admin_session_id,
+            ${USER_COLUMNS('u')}
+       FROM impersonation_sessions i
+       JOIN users u ON u.id = i.target_user_id
+      WHERE i.token_hash = $1`,
+    [tokenHash]
+  )
+
+  if (!row) return null
+
+  const expiresAt = new Date(row.impersonation_expires_at)
+
+  // Presented by a different session than the one that started it. Not deleted:
+  // the grant may still be live for its real owner, and a stray cookie must not
+  // be able to end someone else's assumption.
+  if (row.admin_session_id !== adminSessionRowId) return null
+
+  if (expiresAt.getTime() < Date.now()) {
+    await query('DELETE FROM impersonation_sessions WHERE id = $1', [row.impersonation_id])
+    return null
   }
+
+  // The target was disabled while being viewed. Same rule as a session: a
+  // disabled account is not browsable, by anyone, immediately.
+  if (!row.is_enabled) {
+    await query('DELETE FROM impersonation_sessions WHERE id = $1', [row.impersonation_id])
+    return null
+  }
+
+  return { target: toSessionUser(row), expiresAt }
 }
 
 const authPlugin: FastifyPluginAsync = async (fastify) => {
@@ -183,7 +334,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorateRequest('apiKeyId', undefined)
 
   // Add hook to parse authentication from API key or session cookie
-  fastify.addHook('onRequest', async (request) => {
+  fastify.addHook('onRequest', async (request, reply) => {
     // First, check for API key authentication (takes precedence)
     const apiKey = request.headers['x-api-key'] as string | undefined
     if (apiKey) {
@@ -219,7 +370,9 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     if (sessionToken) {
       request.sessionId = sessionToken
       try {
-        request.user = (await getSessionUser(sessionToken)) || undefined
+        const session = await getSessionUser(sessionToken)
+        request.user = session?.user
+        request.sessionRowId = session?.sessionRowId
       } catch (err) {
         // Log error but don't crash the request - this allows static files to load
         // even if there's a database issue. Protected routes will still fail properly
@@ -227,8 +380,82 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
         // The token is a live credential, so no prefix of it goes to the log.
         fastify.log.warn({ err }, 'Failed to get session user')
         request.user = undefined
+        request.sessionRowId = undefined
         request.sessionError = true
       }
+    }
+
+    // An assumption only ever layers on top of a live cookie session. An API
+    // key has no session row to bind to, and nothing to return the caller to.
+    const impersonationToken = request.cookies[IMPERSONATION_COOKIE_NAME]
+    if (!impersonationToken || !request.user || !request.sessionRowId) {
+      // A leftover cookie with no session behind it is cleared rather than
+      // ignored, so it cannot resurrect an assumption at the next sign-in.
+      // Not on `sessionError` though: a database hiccup is not evidence that
+      // the assumption is over, and clearing there would end a live one.
+      //
+      // Scoped to API requests so a Set-Cookie is not stapled to every static
+      // asset response — those are the ones an intermediary might cache, and a
+      // cached cookie header is somebody else's problem to debug. The SPA
+      // cannot render without calling the API, so the clear still always lands.
+      if (
+        impersonationToken &&
+        !request.user &&
+        !request.sessionError &&
+        request.url.startsWith('/api/')
+      ) {
+        clearImpersonationCookie(reply)
+      }
+      return
+    }
+
+    const admin = request.user
+
+    // Only an admin may hold one, re-checked on every request rather than only
+    // at the start: demoting an account ends its assumptions at once.
+    //
+    // The row is deliberately NOT deleted here, matching the session-mismatch
+    // branch below. The grant belongs to a session other than this one, and
+    // letting a non-admin's request delete it is a cross-session write handed
+    // to the wrong party. Clearing this browser's cookie ends it here, and
+    // every other request re-runs this same check, so the row is inert.
+    if (!admin.isAdmin) {
+      clearImpersonationCookie(reply)
+      return
+    }
+
+    let assumed: ImpersonationTarget | null = null
+    try {
+      assumed = await getImpersonationTarget(impersonationToken, request.sessionRowId)
+    } catch (err) {
+      // Deliberately not fatal, and deliberately not a fallback to the target:
+      // a database hiccup leaves the admin as themselves, which is the safe
+      // side of this particular failure.
+      fastify.log.warn({ err }, 'Failed to resolve impersonation')
+      return
+    }
+
+    if (!assumed) {
+      clearImpersonationCookie(reply)
+      return
+    }
+
+    // From here down every handler sees the target and needs no knowledge of
+    // this feature. The admin is kept beside it for the exit control.
+    request.user = assumed.target
+    request.impersonation = { admin, expiresAt: assumed.expiresAt.toISOString() }
+
+    if (impersonationBlocksRequest(request.method, request.url)) {
+      request.log.info(
+        {
+          adminUserId: admin.id,
+          targetUserId: assumed.target.id,
+          method: request.method,
+          url: request.url,
+        },
+        'Refused a write from an assumed session'
+      )
+      return reply.status(403).send(IMPERSONATION_READ_ONLY_ERROR)
     }
   })
 }
@@ -295,5 +522,18 @@ export function clearSessionCookie(reply: FastifyReply): void {
   reply.clearCookie(SESSION_COOKIE_NAME, sessionCookieOptions())
 }
 
-export { SESSION_COOKIE_NAME }
+/**
+ * Same attributes as the session cookie, minus the 30-day `maxAge`: an
+ * assumption is a session cookie in the browser sense, so closing the browser
+ * ends it even before the server-side lease does.
+ */
+export function setImpersonationCookie(reply: FastifyReply, token: string): void {
+  reply.setCookie(IMPERSONATION_COOKIE_NAME, token, sessionCookieOptions())
+}
+
+export function clearImpersonationCookie(reply: FastifyReply): void {
+  reply.clearCookie(IMPERSONATION_COOKIE_NAME, sessionCookieOptions())
+}
+
+export { SESSION_COOKIE_NAME, IMPERSONATION_COOKIE_NAME }
 

@@ -35,8 +35,14 @@ export function AssistantPage() {
   return (
     <Box
       sx={{
-        // Fill the viewport below the app bar, minus Layout's main padding
-        height: { xs: 'calc(100vh - 96px)', sm: 'calc(100vh - 112px)' },
+        // Fill the viewport below the app bar, minus Layout's main padding.
+        // The chrome above is a variable rather than a literal 64 because it
+        // grows by the impersonation banner's height while an admin is viewing
+        // the app as someone else.
+        height: {
+          xs: 'calc(100vh - var(--aperture-chrome-top, 64px) - 32px)',
+          sm: 'calc(100vh - var(--aperture-chrome-top, 64px) - 48px)',
+        },
         border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: 3,
         overflow: 'hidden',

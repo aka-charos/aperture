@@ -54,7 +54,9 @@ import EmailIcon from '@mui/icons-material/Email'
 import LoginIcon from '@mui/icons-material/Login'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
+import VisibilityIcon from '@mui/icons-material/Visibility'
 import { usePageHeader } from '@/hooks/usePageHeader'
+import { useAuth } from '@/hooks/useAuth'
 
 interface ProviderUser {
   providerUserId: string
@@ -113,6 +115,7 @@ interface GlobalAiConfig {
 export function UsersPage() {
   const { t } = useTranslation()
   usePageHeader(t('admin.users'))
+  const { user: currentUser, impersonation, impersonate } = useAuth()
   const navigate = useNavigate()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
@@ -482,6 +485,71 @@ export function UsersPage() {
     } else if (field === 'email') {
       setSortDirection('asc')
     }
+  }
+
+  /**
+   * Step into this user's view of the app.
+   *
+   * Succeeding ends in a full page load, so nothing here resets on success —
+   * only a failure returns to this component, and that is the only case the
+   * snackbar has to describe.
+   */
+  const handleViewAsUser = async (user: ProviderUser) => {
+    handleMenuClose()
+    if (!user.apertureUserId) return
+
+    try {
+      await impersonate(user.apertureUserId)
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: t('admin.usersPage.viewAsError', {
+          name: user.name,
+          error: err instanceof Error ? err.message : t('admin.usersPage.jobFailed'),
+        }),
+        severity: 'error',
+      })
+    }
+  }
+
+  /**
+   * Why "view as" is unavailable for this row, or null when it is available.
+   *
+   * Returned as a reason rather than a boolean because a control that is
+   * simply greyed out with no explanation is the thing an admin files a ticket
+   * about — the same reasoning as the admin nav's dimmed-with-a-reason gates.
+   */
+  const viewAsBlockedReason = (user: ProviderUser | null): string | null => {
+    if (!user?.apertureUserId) return t('admin.usersPage.viewAsNotImported')
+    if (!user.isEnabled) return t('admin.usersPage.viewAsDisabled')
+    if (user.apertureUserId === currentUser?.id) return t('admin.usersPage.viewAsSelf')
+    // Assumptions do not stack: there has to be exactly one account to return
+    // to, so the server refuses a second one and the menu says so first.
+    if (impersonation) return t('admin.usersPage.viewAsAlreadyActive')
+    return null
+  }
+
+  /**
+   * One definition, rendered into both action menus — the mobile card list and
+   * the desktop table each own a copy of the menu, and a second hand-written
+   * item is a second thing to keep in step.
+   */
+  const renderViewAsMenuItem = () => {
+    const blocked = viewAsBlockedReason(menuUser)
+    return (
+      <MenuItem
+        onClick={() => menuUser && handleViewAsUser(menuUser)}
+        disabled={blocked !== null}
+      >
+        <ListItemIcon>
+          <VisibilityIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText
+          primary={t('admin.usersPage.menuViewAs')}
+          secondary={blocked ?? t('admin.usersPage.menuViewAsSecondary')}
+        />
+      </MenuItem>
+    )
   }
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, user: ProviderUser) => {
@@ -945,6 +1013,8 @@ export function UsersPage() {
             </ListItemIcon>
             <ListItemText primary={t('admin.usersPage.menuUpdateStrm')} />
           </MenuItem>
+          <Divider />
+          {renderViewAsMenuItem()}
         </Menu>
 
         {/* Snackbar for notifications */}
@@ -1356,6 +1426,8 @@ export function UsersPage() {
           </ListItemIcon>
           <ListItemText primary={t('admin.usersPage.menuUpdateStrm')} />
         </MenuItem>
+        <Divider />
+        {renderViewAsMenuItem()}
       </Menu>
 
       {/* Snackbar for notifications */}

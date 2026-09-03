@@ -474,7 +474,9 @@ export function ExplorePage() {
     <Box 
       sx={{ 
         display: 'flex', 
-        height: 'calc(100vh - 64px)', 
+        // Grows to include the impersonation banner when one is on screen —
+        // see --aperture-chrome-top in Layout.
+        height: 'calc(100vh - var(--aperture-chrome-top, 64px))',
         // Break out of parent Layout padding
         m: { xs: -2, sm: -3 },
         width: { xs: 'calc(100% + 32px)', sm: 'calc(100% + 48px)' },

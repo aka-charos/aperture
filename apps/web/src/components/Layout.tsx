@@ -48,6 +48,7 @@ import { useWelcomeModal } from './useWelcomeModal'
 import { ExplorationConfigModal } from './ExplorationConfigModal'
 import { RunningJobsWidget } from './RunningJobsWidget'
 import { AdminMenuButton } from './AdminMenuButton'
+import { ImpersonationBanner, IMPERSONATION_BANNER_HEIGHT } from './ImpersonationBanner'
 import { AdminSearchProvider } from '@/hooks/AdminSearchProvider'
 import { GlobalSearch } from './GlobalSearch'
 import { AppBarPageHeading } from './PageHeading'
@@ -59,6 +60,8 @@ import { applyEffectiveUiLanguage } from '@/i18n/syncUiLanguage'
 
 const DRAWER_WIDTH = 260
 const DRAWER_WIDTH_COLLAPSED = 72
+/** The app bar's own height. Everything below it is positioned off this. */
+const APP_BAR_HEIGHT = 64
 /** Shown in the sidebar footer, and in the rail's tooltip where there's no room for it. */
 const APP_VERSION = 'v0.7.8'
 /** Pointer intent: brushing past the rail on the way somewhere else must not open it. */
@@ -160,7 +163,7 @@ function AppShell() {
   const flyoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [watchingEnabled, setWatchingEnabled] = useState(true) // Default to true until we know
-  const { user, logout } = useAuth()
+  const { user, logout, impersonation } = useAuth()
   const { open: welcomeOpen, showWelcome, hideWelcome } = useWelcomeModal()
   // Space reserved on the inline-end side for the docked AI assistant;
   // while its resize handle is dragged, transitions are dropped so the
@@ -493,8 +496,21 @@ function AppShell() {
     </Box>
   )
 
+  // How much fixed chrome sits above the page. Published as a CSS variable
+  // rather than passed down, because the two full-viewport pages (/assistant,
+  // /explore) size themselves against it from inside the outlet and would
+  // otherwise each need a copy of this arithmetic — and would each be a place
+  // for it to go stale.
+  const chromeTop = APP_BAR_HEIGHT + (impersonation ? IMPERSONATION_BANNER_HEIGHT : 0)
+
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        minHeight: '100vh',
+        '--aperture-chrome-top': `${chromeTop}px`,
+      }}
+    >
       {/* App Bar */}
       <AppBar
         position="fixed"
@@ -510,6 +526,13 @@ function AppShell() {
         }}
         elevation={0}
       >
+        {/* The exit from an assumed session. It rides in the app bar because
+            that is the one piece of chrome every authenticated page renders, so
+            the way out cannot be missing from a page that forgot to add it.
+            Above the toolbar rather than inside it: the toolbar's contents are
+            about the page, and this is about who you currently are. */}
+        <ImpersonationBanner />
+
         <Toolbar>
           {/* Mobile: Hamburger on left */}
           <IconButton
@@ -716,9 +739,9 @@ function AppShell() {
           marginInlineEnd: { md: `${dockWidth}px` },
           maxWidth: '100%',
           overflowX: 'hidden',
-          mt: '64px',
+          mt: 'var(--aperture-chrome-top, 64px)',
           backgroundColor: 'background.default',
-          minHeight: 'calc(100vh - 64px)',
+          minHeight: 'calc(100vh - var(--aperture-chrome-top, 64px))',
           transition: dockResizing
             ? 'none'
             : theme.transitions.create(['width', 'margin'], {
