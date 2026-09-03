@@ -1301,3 +1301,24 @@ Every other per-user work loop gates on `provider_disabled = false`: both recomm
 Guarded in **two** places, and the second is the one that matters. The auth plugin gates on `is_enabled` **alone** — it never reads `provider_disabled` (zero occurrences in `plugins/auth.ts`) — so a dropped viewer can still hold a valid session and press Refresh. Gating only the scheduled job would have left the manual path as the way around it, which is the same class of mistake as the enablement-flag mismatch above: two entry points to one feature, gated differently.
 
 Deliberately NOT extended to the read routes. `GET /api/discovery/movies|series` still serves whatever candidates already exist for such a user, which is right — the guard is about spending money and holding request rights on their behalf, not about hiding rows already paid for.
+
+### Addendum — post-fix confirmation, measured
+
+All four faults deployed and re-measured on the same instance, same pools (candidate counts within one or two of the previous run), one `rebuild-taste-profiles` in between. The four viewers the maintenance gate had stranded:
+
+| Viewer | Before, movie / series | After, movie / series |
+|---|---|---|
+| `4df29461` | 0.037 / 0.032 | **0.210 / 0.162** |
+| `3a7850de` | 0.038 / 0.027 | **0.253 / 0.187** |
+| `517262f8` | 0.037 / 0.034 | **0.202 / 0.188** |
+| `08eb8546` | 0.040 / 0.031 | **0.241 / 0.160** |
+
+Five to seven times wider. Across all twenty rows the raw spread now runs **0.160 to 0.288 with no outliers** — the narrow population is gone, not merely reduced, which is the shape a fixed gate should produce rather than a partial improvement.
+
+**The control holds.** Viewers already in the centred space are unchanged to four decimal places: goca's movie row reads 0.4274–0.6605 before and 0.4274–0.6605 after. So the rebuild repaired the broken profiles without disturbing the sound ones, which is what distinguishes this from a change that simply moved everybody. `compared` equals `candidateCount` on every row, so the halfvec parse fix holds under the new profiles too.
+
+**Series spreads sit consistently below movie spreads** — roughly 0.16–0.21 against 0.20–0.29, on every viewer without exception. Not a fault and not worth chasing: the series library is 986 titles against 12,589 movies, so both the centring mean and the taste centroid are built from an order of magnitude fewer items. Worth recording precisely so it is not mistaken for a series-side defect later; the correlation is with library size, not with media type.
+
+**What this closes.** F-036's centring gain is now demonstrated in both directions on a population it was never measured against — first observed as a defect (four viewers stuck at a sixth of everyone else's signal), then corrected and re-measured. That is a stronger form of evidence than the original A/B, because the failure and the repair were both accidental rather than designed: nobody set out to test centring, and the split fell out of a gate nobody knew was there.
+
+**Method note.** The whole chain was only diagnosable because the spread was logged **per viewer**. An instance-wide average across these twenty rows reads as an unremarkable ~0.15 both before and after, which would have hidden a clean bimodal split first and a complete repair second. This is the repo-wide "measure per user before reading an aggregate as a mechanism" invariant, encountered twice in one investigation from opposite directions.
