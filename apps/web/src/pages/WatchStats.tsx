@@ -1,5 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Box, Typography, Grid, Skeleton, Alert, Chip, Tooltip as MuiTooltip } from '@mui/material'
+import { Fragment, useEffect, useMemo, useState } from 'react'
+import {
+  Box,
+  Typography,
+  Grid,
+  Skeleton,
+  Alert,
+  Chip,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip as MuiTooltip,
+} from '@mui/material'
 import InsightsIcon from '@mui/icons-material/Insights'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
@@ -17,7 +27,6 @@ import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth'
 import TheatersIcon from '@mui/icons-material/Theaters'
 import CategoryIcon from '@mui/icons-material/Category'
 import HistoryIcon from '@mui/icons-material/History'
-import StarIcon from '@mui/icons-material/Star'
 import TimelineIcon from '@mui/icons-material/Timeline'
 import { alpha, useTheme } from '@mui/material/styles'
 import {
@@ -82,6 +91,8 @@ interface WatchStats {
   avgCommunityRating: number
   guiltyPleasureGenres: { genre: string; count: number; avgRating: number }[]
   busiestDay: { date: string; count: number } | null
+  /** Absent on an instance running an older API — the caption then omits the span. */
+  historySpan?: { firstWatchedAt: string | null; lastWatchedAt: string | null }
   totalRewatched: number
   mostRewatched: { movieId: string; title: string; poster: string | null; playCount: number }[]
 }
@@ -129,6 +140,8 @@ function WatchStatsContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [breakdown, setBreakdown] = useState<BreakdownRequest | null>(null)
+  // Movie and TV genres share one card; this is which library it is showing.
+  const [genreScope, setGenreScope] = useState<'movie' | 'series'>('movie')
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -192,7 +205,7 @@ function WatchStatsContent() {
         {heading}
         <Grid container spacing={2} mb={3}>
           {Array.from({ length: 8 }, (_, i) => (
-            <Grid item xs={6} sm={4} lg={3} key={i}>
+            <Grid item xs={6} sm={4} md={3} key={i}>
               <Skeleton variant="rectangular" height={78} sx={{ borderRadius: 2.5 }} />
             </Grid>
           ))}
@@ -261,7 +274,32 @@ function WatchStatsContent() {
       })
     : '—'
 
-  const topSeriesGenreCount = stats.seriesGenreDistribution[0]?.count ?? 0
+  // The two genre lists are counted the same way — tag occurrences across the
+  // watched population — so the TV side gets its percentage the same way the
+  // API already computes the movie one, and the toggle swaps like for like.
+  const seriesGenreTotal = stats.seriesGenreDistribution.reduce((sum, g) => sum + g.count, 0)
+  const genreDimension = genreScope === 'movie' ? ('genre' as const) : ('seriesGenre' as const)
+  const genreSlices =
+    genreScope === 'movie'
+      ? stats.genreDistribution.slice(0, 8)
+      : stats.seriesGenreDistribution.slice(0, 8).map(g => ({
+          genre: g.genre,
+          count: g.count,
+          percentage: seriesGenreTotal > 0 ? Math.round((g.count / seriesGenreTotal) * 100) : 0,
+        }))
+
+  // Everything on the page is all-time except the activity chart, so the page
+  // says so rather than leaving an empty early decade ambiguous between "never
+  // watched" and "before we were looking".
+  const firstWatched = stats.historySpan?.firstWatchedAt
+  const coverageLabel = firstWatched
+    ? t('watchStats.coverageSpan', {
+        from: new Date(firstWatched).toLocaleDateString(i18n.language, {
+          month: 'short',
+          year: 'numeric',
+        }),
+      })
+    : t('watchStats.coverageAllTime')
 
   return (
     <Box>
@@ -273,10 +311,14 @@ function WatchStatsContent() {
         </Alert>
       ) : (
         <>
+          <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
+            {coverageLabel}
+          </Typography>
+
           {/* Every scalar the page knows, in one band. Tiles that stand for a
               population open it; the derived ones (time, plays) do not. */}
           <Grid container spacing={2} mb={3}>
-            <Grid item xs={6} sm={4} lg={3}>
+            <Grid item xs={6} sm={4} md={3}>
               <MetricTile
                 icon={<MovieIcon />}
                 color={theme.palette.primary.main}
@@ -287,7 +329,7 @@ function WatchStatsContent() {
                 }
               />
             </Grid>
-            <Grid item xs={6} sm={4} lg={3}>
+            <Grid item xs={6} sm={4} md={3}>
               <MetricTile
                 icon={<TvIcon />}
                 color={theme.palette.secondary.main}
@@ -298,7 +340,7 @@ function WatchStatsContent() {
                 }
               />
             </Grid>
-            <Grid item xs={6} sm={4} lg={3}>
+            <Grid item xs={6} sm={4} md={3}>
               <MetricTile
                 icon={<PlayArrowIcon />}
                 color="#ec4899"
@@ -306,7 +348,7 @@ function WatchStatsContent() {
                 label={t('watchStats.summaryEpisodes')}
               />
             </Grid>
-            <Grid item xs={6} sm={4} lg={3}>
+            <Grid item xs={6} sm={4} md={3}>
               <MetricTile
                 icon={<AccessTimeIcon />}
                 color="#f97316"
@@ -314,7 +356,7 @@ function WatchStatsContent() {
                 label={t('watchStats.summaryWatchTime')}
               />
             </Grid>
-            <Grid item xs={6} sm={4} lg={3}>
+            <Grid item xs={6} sm={4} md={3}>
               <MetricTile
                 icon={<PlayArrowIcon />}
                 color={theme.palette.success.main}
@@ -322,7 +364,7 @@ function WatchStatsContent() {
                 label={t('watchStats.summaryTotalPlays')}
               />
             </Grid>
-            <Grid item xs={6} sm={4} lg={3}>
+            <Grid item xs={6} sm={4} md={3}>
               <MetricTile
                 icon={<FavoriteIcon />}
                 color={theme.palette.error.main}
@@ -333,7 +375,7 @@ function WatchStatsContent() {
                 }
               />
             </Grid>
-            <Grid item xs={6} sm={4} lg={3}>
+            <Grid item xs={6} sm={4} md={3}>
               <MetricTile
                 icon={<ReplayIcon />}
                 color={ACCENT.rewatch}
@@ -344,7 +386,7 @@ function WatchStatsContent() {
                 }
               />
             </Grid>
-            <Grid item xs={6} sm={4} lg={3}>
+            <Grid item xs={6} sm={4} md={3}>
               <MetricTile
                 icon={<WhatshotIcon />}
                 color={theme.palette.warning.main}
@@ -369,30 +411,81 @@ function WatchStatsContent() {
           </Grid>
 
           <Grid container spacing={2.5} mb={2.5}>
-            {/* Taste vs the crowd — a metric, so it sits with the metrics
-                rather than five sections down. */}
+            {/* Taste vs the crowd — a metric, so it sits with the metrics rather
+                than five sections down. The rating histogram lives here too: it
+                is the distribution whose mean is the number beside it, and split
+                across two cards each was half an answer. */}
             <Grid item xs={12} md={7}>
               <StatCard
                 title={t('watchStats.sectionTasteVsCrowd')}
+                subtitle={t('watchStats.tasteCardSubtitle')}
                 icon={<ThumbsUpDownIcon fontSize="small" />}
                 color={ACCENT.taste}
               >
                 {stats.avgCommunityRating > 0 ? (
-                  <Box display="flex" gap={3} flexWrap="wrap" alignItems="flex-start">
-                    <Box sx={{ minWidth: 120 }}>
-                      <Box display="flex" alignItems="baseline" gap={0.5}>
-                        <Typography variant="h3" fontWeight={700} color="primary.main" lineHeight={1}>
-                          {stats.avgCommunityRating.toFixed(1)}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          / 10
+                  <>
+                    <Box display="flex" gap={2} alignItems="center">
+                      <Box sx={{ width: 96, flexShrink: 0 }}>
+                        <Box display="flex" alignItems="baseline" gap={0.5}>
+                          <Typography variant="h3" fontWeight={700} color="primary.main" lineHeight={1}>
+                            {stats.avgCommunityRating.toFixed(1)}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            / 10
+                          </Typography>
+                        </Box>
+                        <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
+                          {t('watchStats.avgLabel')}
                         </Typography>
                       </Box>
-                      <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
-                        {t('watchStats.avgCommunityRating')}
-                      </Typography>
+                      <Box flex={1} minWidth={0}>
+                        {stats.ratingDistribution.length > 0 ? (
+                          <ResponsiveContainer width="100%" height={132}>
+                            <BarChart data={stats.ratingDistribution} margin={{ top: 4, right: 4, bottom: 0, left: -28 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                              <XAxis dataKey="rating" stroke={theme.palette.text.secondary} fontSize={10} />
+                              <YAxis stroke={theme.palette.text.secondary} fontSize={10} />
+                              <Tooltip
+                                cursor={{ fill: alpha(theme.palette.warning.main, 0.08) }}
+                                contentStyle={{
+                                  backgroundColor: theme.palette.background.paper,
+                                  border: `1px solid ${theme.palette.divider}`,
+                                  borderRadius: 8,
+                                }}
+                                formatter={(value) => {
+                                  const count = typeof value === 'number' ? value : Number(value)
+                                  return [
+                                    t('watchStats.ratingTooltipMovies', { count }),
+                                    t('watchStats.chartCountLabel'),
+                                  ]
+                                }}
+                              />
+                              <Bar
+                                dataKey="count"
+                                fill={theme.palette.warning.main}
+                                radius={[3, 3, 0, 0]}
+                                cursor="pointer"
+                                onClick={(entry: unknown) => {
+                                  const d = clickedDatum<{ rating: string }>(entry)
+                                  if (d.rating)
+                                    setBreakdown({
+                                      dimension: 'rating',
+                                      value: d.rating,
+                                      label: t('watchStats.ratingBucketLabel', { rating: d.rating }),
+                                    })
+                                }}
+                              />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            {t('watchStats.emptyRatingData')}
+                          </Typography>
+                        )}
+                      </Box>
                     </Box>
-                    <Box flex={1} minWidth={220}>
+
+                    <Box mt={1.5}>
                       <Typography variant="subtitle2" fontWeight={600}>
                         {t('watchStats.guiltyPleasuresTitle')}
                       </Typography>
@@ -400,7 +493,7 @@ function WatchStatsContent() {
                         {t('watchStats.guiltyPleasuresHint')}
                       </Typography>
                       {stats.guiltyPleasureGenres.length > 0 ? (
-                        <Box display="flex" flexWrap="wrap" gap={1} mt={1.5}>
+                        <Box display="flex" flexWrap="wrap" gap={1} mt={1.25}>
                           {stats.guiltyPleasureGenres.map(g => (
                             <Chip
                               key={g.genre}
@@ -409,11 +502,7 @@ function WatchStatsContent() {
                               })}`}
                               size="small"
                               onClick={() =>
-                                setBreakdown({
-                                  dimension: 'genre',
-                                  value: g.genre,
-                                  label: g.genre,
-                                })
+                                setBreakdown({ dimension: 'genre', value: g.genre, label: g.genre })
                               }
                               sx={{
                                 backgroundColor: alpha(ACCENT.taste, 0.15),
@@ -425,12 +514,12 @@ function WatchStatsContent() {
                           ))}
                         </Box>
                       ) : (
-                        <Typography variant="body2" color="text.secondary" mt={1.5}>
+                        <Typography variant="body2" color="text.secondary" mt={1.25}>
                           —
                         </Typography>
                       )}
                     </Box>
-                  </Box>
+                  </>
                 ) : (
                   <Typography variant="body2" color="text.secondary">
                     {t('watchStats.emptyTasteData')}
@@ -443,19 +532,20 @@ function WatchStatsContent() {
             <Grid item xs={12} md={5}>
               <StatCard
                 title={t('watchStats.sectionWhereHoursGo')}
+                subtitle={t('watchStats.hoursSubtitle')}
                 icon={<TheatersIcon fontSize="small" />}
                 color={theme.palette.primary.main}
               >
                 {timeSplitTotal > 0 ? (
                   <Box display="flex" alignItems="center" gap={1}>
-                    <ResponsiveContainer width="45%" height={140}>
+                    <ResponsiveContainer width="48%" height={150}>
                       <PieChart>
                         <Pie
                           data={timeSplitData}
                           cx="50%"
                           cy="50%"
-                          innerRadius={38}
-                          outerRadius={62}
+                          innerRadius={40}
+                          outerRadius={66}
                           paddingAngle={2}
                           dataKey="value"
                           onClick={(entry: unknown) => {
@@ -503,18 +593,15 @@ function WatchStatsContent() {
                             '&:hover': { bgcolor: alpha(d.color, 0.12) },
                           }}
                         >
-                          <Box sx={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: d.color }} />
+                          <Box sx={{ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, backgroundColor: d.color }} />
                           <Typography variant="body2" flex={1} noWrap>
                             {d.name}
                           </Typography>
-                          <Typography variant="body2" color="text.secondary">
+                          <Typography variant="caption" color="text.secondary" noWrap>
                             {t('watchStats.watchTimeHoursMinutes', { hours: d.value, minutes: 0 })}
                           </Typography>
                         </Box>
                       ))}
-                      <Typography variant="caption" color="text.secondary">
-                        {formatWatchTime(stats.totalWatchTimeMinutes)}
-                      </Typography>
                     </Box>
                   </Box>
                 ) : (
@@ -526,30 +613,34 @@ function WatchStatsContent() {
             </Grid>
           </Grid>
 
+
           {/* The sentence version of everything below it. */}
           <Grid container spacing={2.5} mb={2.5}>
-            <Grid item xs={12} lg={6}>
+            <Grid item xs={12} md={6}>
               <WatcherIdentityCard mediaType="movie" />
             </Grid>
-            <Grid item xs={12} lg={6}>
+            <Grid item xs={12} md={6}>
               <WatcherIdentityCard mediaType="series" />
             </Grid>
           </Grid>
-
-          {/* Watching activity — full width, because it is the only chart with
-              a time axis and squeezing it into a half column loses the shape. */}
+          {/* Activity and the weekly rhythm are the same question at two
+              resolutions — when across the year, when across the week — so they
+              share a row. Neither needed the whole width; the heatmap sizes its
+              cells off the column rather than at a fixed 16px, which is what
+              made it look like it was hiding in the corner of a full-width card. */}
           <Grid container spacing={2.5} mb={2.5}>
-            <Grid item xs={12}>
+            <Grid item xs={12} md={6}>
               <StatCard
                 title={t('watchStats.sectionWatchingActivity')}
-                subtitle={t('watchStats.clickHintMonth')}
+                subtitle={t('watchStats.activitySubtitle')}
                 icon={<TimelineIcon fontSize="small" />}
                 color={theme.palette.info.main}
               >
                 {stats.watchTimeline.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={220}>
+                  <ResponsiveContainer width="100%" height={224}>
                     <AreaChart
                       data={stats.watchTimeline}
+                      margin={{ top: 4, right: 4, bottom: 0, left: -20 }}
                       onClick={(state: { activeLabel?: string | number }) => {
                         const point = stats.watchTimeline.find(p => p.month === state?.activeLabel)
                         if (!point?.monthKey) return
@@ -566,10 +657,10 @@ function WatchStatsContent() {
                       <XAxis
                         dataKey="month"
                         stroke={theme.palette.text.secondary}
-                        fontSize={11}
+                        fontSize={10}
                         tickFormatter={(value: string) => value.split(' ')[0]}
                       />
-                      <YAxis stroke={theme.palette.text.secondary} fontSize={11} />
+                      <YAxis stroke={theme.palette.text.secondary} fontSize={10} />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: theme.palette.background.paper,
@@ -577,7 +668,7 @@ function WatchStatsContent() {
                           borderRadius: 8,
                         }}
                       />
-                      <Legend />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
                       <Area
                         type="monotone"
                         dataKey="movies"
@@ -605,22 +696,160 @@ function WatchStatsContent() {
                 )}
               </StatCard>
             </Grid>
-          </Grid>
 
-          <Grid container spacing={2.5} mb={2.5}>
-            {/* Genre distribution */}
             <Grid item xs={12} md={6}>
               <StatCard
-                title={t('watchStats.sectionFavoriteGenres')}
+                title={t('watchStats.sectionWhenYouWatch')}
+                subtitle={t('watchStats.heatmapSubtitleAllTime')}
+                icon={<CalendarViewMonthIcon fontSize="small" />}
+                color={theme.palette.primary.main}
+              >
+                {hasHeatmap ? (
+                  <Box>
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        // Cells take their width from the column, so the grid
+                        // fills whatever space it is given instead of ending at
+                        // 24 × 16px and leaving the rest of the card empty.
+                        gridTemplateColumns: 'auto repeat(24, minmax(0, 1fr))',
+                        gap: '3px',
+                        alignItems: 'center',
+                      }}
+                    >
+                      {dayOrder.map(dow => (
+                        <Fragment key={dow}>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ pr: 0.5, textAlign: 'end', fontSize: '0.65rem', whiteSpace: 'nowrap' }}
+                          >
+                            {weekdayShort(dow)}
+                          </Typography>
+                          {Array.from({ length: 24 }, (_, hour) => {
+                            const count = heatmapMap.get(`${dow}-${hour}`) ?? 0
+                            const intensity = count > 0 ? 0.15 + 0.85 * (count / heatmapMax) : 0
+                            return (
+                              <MuiTooltip
+                                key={hour}
+                                arrow
+                                title={t('watchStats.heatmapTooltip', {
+                                  day: weekdayLong(dow),
+                                  hour: `${hour.toString().padStart(2, '0')}:00`,
+                                  count,
+                                })}
+                              >
+                                <Box
+                                  onClick={
+                                    count > 0
+                                      ? () =>
+                                          setBreakdown({
+                                            dimension: 'timeOfDay',
+                                            value: String(dow),
+                                            value2: String(hour),
+                                            label: t('watchStats.heatmapCellLabel', {
+                                              day: weekdayLong(dow),
+                                              hour: `${hour.toString().padStart(2, '0')}:00`,
+                                            }),
+                                          })
+                                      : undefined
+                                  }
+                                  sx={{
+                                    aspectRatio: '1 / 1',
+                                    borderRadius: 0.5,
+                                    cursor: count > 0 ? 'pointer' : 'default',
+                                    backgroundColor:
+                                      count > 0
+                                        ? alpha(theme.palette.primary.main, intensity)
+                                        : alpha(theme.palette.text.disabled, 0.12),
+                                    '&:hover': count > 0 ? { outline: `1px solid ${theme.palette.primary.main}` } : {},
+                                  }}
+                                />
+                              </MuiTooltip>
+                            )
+                          })}
+                        </Fragment>
+                      ))}
+                      {/* Hour axis, sharing the same columns as the cells above it */}
+                      <Box />
+                      {Array.from({ length: 24 }, (_, hour) => (
+                        <Typography
+                          key={hour}
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ fontSize: '0.6rem', textAlign: 'center', mt: 0.25 }}
+                        >
+                          {hour % 6 === 0 ? hour : ''}
+                        </Typography>
+                      ))}
+                    </Box>
+                    <Box display="flex" alignItems="center" gap={0.5} mt={1.5}>
+                      <Typography variant="caption" color="text.secondary">
+                        {t('watchStats.heatmapLess')}
+                      </Typography>
+                      {[0.15, 0.4, 0.65, 0.85, 1].map(a => (
+                        <Box
+                          key={a}
+                          sx={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: 0.5,
+                            backgroundColor: alpha(theme.palette.primary.main, a),
+                          }}
+                        />
+                      ))}
+                      <Typography variant="caption" color="text.secondary">
+                        {t('watchStats.heatmapMore')}
+                      </Typography>
+                    </Box>
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    {t('watchStats.emptyHeatmapData')}
+                  </Typography>
+                )}
+              </StatCard>
+            </Grid>
+          </Grid>
+
+          {/* Movie and TV genres are one question asked of two libraries, so
+              they share one card and one representation — side by side they were
+              two different chart types inviting a comparison neither supported. */}
+          <Grid container spacing={2.5} mb={2.5}>
+            <Grid item xs={12} md={6}>
+              <StatCard
+                title={t('watchStats.sectionGenres')}
                 icon={<CategoryIcon fontSize="small" />}
                 color={GENRE_COLORS[0]}
+                action={
+                  <ToggleButtonGroup
+                    size="small"
+                    exclusive
+                    value={genreScope}
+                    onChange={(_, next) => {
+                      if (next) setGenreScope(next)
+                    }}
+                    sx={{
+                      '& .MuiToggleButton-root': {
+                        py: 0.25,
+                        px: 1.25,
+                        fontSize: '0.7rem',
+                        textTransform: 'none',
+                        lineHeight: 1.6,
+                      },
+                    }}
+                  >
+                    <ToggleButton value="movie">{t('watchStats.splitMovies')}</ToggleButton>
+                    <ToggleButton value="series">{t('watchStats.splitTv')}</ToggleButton>
+                  </ToggleButtonGroup>
+                }
               >
-                {stats.genreDistribution.length > 0 ? (
+                {genreSlices.length > 0 ? (
                   <Box display="flex" alignItems="center" gap={2}>
-                    <ResponsiveContainer width="45%" height={200}>
+                    <ResponsiveContainer width="45%" height={210}>
                       <PieChart>
                         <Pie
-                          data={stats.genreDistribution.slice(0, 8)}
+                          data={genreSlices}
                           cx="50%"
                           cy="50%"
                           innerRadius={48}
@@ -629,11 +858,12 @@ function WatchStatsContent() {
                           dataKey="count"
                           onClick={(entry: unknown) => {
                             const d = clickedDatum<{ genre: string }>(entry)
-                            if (d.genre) setBreakdown({ dimension: 'genre', value: d.genre, label: d.genre })
+                            if (d.genre)
+                              setBreakdown({ dimension: genreDimension, value: d.genre, label: d.genre })
                           }}
                           style={{ cursor: 'pointer', outline: 'none' }}
                         >
-                          {stats.genreDistribution.slice(0, 8).map((_, index) => (
+                          {genreSlices.map((_, index) => (
                             <Cell key={`cell-${index}`} fill={GENRE_COLORS[index % GENRE_COLORS.length]} />
                           ))}
                         </Pie>
@@ -649,10 +879,12 @@ function WatchStatsContent() {
                             const payload = props.payload as { genre: string; percentage: number } | undefined
                             const count = typeof value === 'number' ? value : Number(value)
                             return [
-                              t('watchStats.genreTooltipMovies', {
-                                count,
-                                pct: payload?.percentage ?? 0,
-                              }),
+                              t(
+                                genreScope === 'movie'
+                                  ? 'watchStats.genreTooltipMovies'
+                                  : 'watchStats.genreTooltipSeries',
+                                { count, pct: payload?.percentage ?? 0 }
+                              ),
                               payload?.genre || '',
                             ]
                           }}
@@ -660,24 +892,22 @@ function WatchStatsContent() {
                       </PieChart>
                     </ResponsiveContainer>
                     <Box flex={1} minWidth={0}>
-                      {stats.genreDistribution.slice(0, 8).map((item, index) => (
+                      {genreSlices.map((item, index) => (
                         <Box
                           key={item.genre}
                           onClick={() =>
-                            setBreakdown({ dimension: 'genre', value: item.genre, label: item.genre })
+                            setBreakdown({ dimension: genreDimension, value: item.genre, label: item.genre })
                           }
                           sx={{
                             display: 'flex',
                             alignItems: 'center',
                             gap: 1,
                             px: 0.75,
-                            py: 0.25,
+                            py: 0.3,
                             mx: -0.75,
                             borderRadius: 1,
                             cursor: 'pointer',
-                            '&:hover': {
-                              bgcolor: alpha(GENRE_COLORS[index % GENRE_COLORS.length], 0.14),
-                            },
+                            '&:hover': { bgcolor: alpha(GENRE_COLORS[index % GENRE_COLORS.length], 0.14) },
                           }}
                         >
                           <Box
@@ -692,7 +922,14 @@ function WatchStatsContent() {
                           <Typography variant="body2" flex={1} noWrap>
                             {item.genre}
                           </Typography>
-                          <Typography variant="body2" color="text.secondary">
+                          <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                            {item.count}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ width: 34, textAlign: 'end', fontVariantNumeric: 'tabular-nums' }}
+                          >
                             {item.percentage}%
                           </Typography>
                         </Box>
@@ -701,85 +938,14 @@ function WatchStatsContent() {
                   </Box>
                 ) : (
                   <Typography variant="body2" color="text.secondary">
-                    {t('watchStats.emptyGenreData')}
+                    {genreScope === 'movie'
+                      ? t('watchStats.emptyGenreData')
+                      : t('watchStats.emptySeriesGenreData')}
                   </Typography>
                 )}
               </StatCard>
             </Grid>
 
-            {/* TV genres — collected all along and never shown, which left the
-                page silent about half of what gets watched. */}
-            <Grid item xs={12} md={6}>
-              <StatCard
-                title={t('watchStats.sectionSeriesGenres')}
-                icon={<TvIcon fontSize="small" />}
-                color={theme.palette.secondary.main}
-              >
-                {stats.seriesGenreDistribution.length > 0 ? (
-                  <Box display="flex" flexDirection="column" gap={0.25}>
-                    {stats.seriesGenreDistribution.slice(0, 8).map((item, index) => (
-                      <Box
-                        key={item.genre}
-                        onClick={() =>
-                          setBreakdown({
-                            dimension: 'seriesGenre',
-                            value: item.genre,
-                            label: item.genre,
-                          })
-                        }
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1.5,
-                          px: 0.75,
-                          py: 0.5,
-                          mx: -0.75,
-                          borderRadius: 1,
-                          cursor: 'pointer',
-                          '&:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.12) },
-                        }}
-                      >
-                        <Typography variant="body2" sx={{ width: 110, flexShrink: 0 }} noWrap>
-                          {item.genre}
-                        </Typography>
-                        <Box
-                          sx={{
-                            flex: 1,
-                            height: 8,
-                            borderRadius: 4,
-                            backgroundColor: alpha(theme.palette.secondary.main, 0.15),
-                            overflow: 'hidden',
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              height: '100%',
-                              width: `${topSeriesGenreCount > 0 ? (item.count / topSeriesGenreCount) * 100 : 0}%`,
-                              borderRadius: 4,
-                              backgroundColor: GENRE_COLORS[index % GENRE_COLORS.length],
-                            }}
-                          />
-                        </Box>
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{ width: 28, textAlign: 'end', fontVariantNumeric: 'tabular-nums' }}
-                        >
-                          {item.count}
-                        </Typography>
-                      </Box>
-                    ))}
-                  </Box>
-                ) : (
-                  <Typography variant="body2" color="text.secondary">
-                    {t('watchStats.emptySeriesGenreData')}
-                  </Typography>
-                )}
-              </StatCard>
-            </Grid>
-          </Grid>
-
-          <Grid container spacing={2.5} mb={2.5}>
             {/* Decade distribution */}
             <Grid item xs={12} md={6}>
               <StatCard
@@ -788,16 +954,16 @@ function WatchStatsContent() {
                 color={theme.palette.primary.main}
               >
                 {stats.decadeDistribution.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={stats.decadeDistribution} layout="vertical">
+                  <ResponsiveContainer width="100%" height={210}>
+                    <BarChart data={stats.decadeDistribution} layout="vertical" margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
-                      <XAxis type="number" stroke={theme.palette.text.secondary} fontSize={11} />
+                      <XAxis type="number" stroke={theme.palette.text.secondary} fontSize={10} />
                       <YAxis
                         type="category"
                         dataKey="decade"
                         stroke={theme.palette.text.secondary}
-                        fontSize={11}
-                        width={50}
+                        fontSize={10}
+                        width={46}
                       />
                       <Tooltip
                         cursor={{ fill: alpha(theme.palette.primary.main, 0.08) }}
@@ -830,60 +996,8 @@ function WatchStatsContent() {
                 )}
               </StatCard>
             </Grid>
-
-            {/* Rating distribution */}
-            <Grid item xs={12} md={6}>
-              <StatCard
-                title={t('watchStats.sectionRatingDistribution')}
-                icon={<StarIcon fontSize="small" />}
-                color={theme.palette.warning.main}
-              >
-                {stats.ratingDistribution.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={stats.ratingDistribution}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
-                      <XAxis dataKey="rating" stroke={theme.palette.text.secondary} fontSize={11} />
-                      <YAxis stroke={theme.palette.text.secondary} fontSize={11} />
-                      <Tooltip
-                        cursor={{ fill: alpha(theme.palette.warning.main, 0.08) }}
-                        contentStyle={{
-                          backgroundColor: theme.palette.background.paper,
-                          border: `1px solid ${theme.palette.divider}`,
-                          borderRadius: 8,
-                        }}
-                        formatter={(value) => {
-                          const count = typeof value === 'number' ? value : Number(value)
-                          return [
-                            t('watchStats.ratingTooltipMovies', { count }),
-                            t('watchStats.chartCountLabel'),
-                          ]
-                        }}
-                      />
-                      <Bar
-                        dataKey="count"
-                        fill={theme.palette.warning.main}
-                        radius={[4, 4, 0, 0]}
-                        cursor="pointer"
-                        onClick={(entry: unknown) => {
-                          const d = clickedDatum<{ rating: string }>(entry)
-                          if (d.rating)
-                            setBreakdown({
-                              dimension: 'rating',
-                              value: d.rating,
-                              label: t('watchStats.ratingBucketLabel', { rating: d.rating }),
-                            })
-                        }}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <Typography variant="body2" color="text.secondary">
-                    {t('watchStats.emptyRatingData')}
-                  </Typography>
-                )}
-              </StatCard>
-            </Grid>
           </Grid>
+
 
           <Grid container spacing={2.5} mb={2.5}>
             <Grid item xs={12} md={6}>
@@ -987,116 +1101,6 @@ function WatchStatsContent() {
             </Grid>
           </Grid>
 
-          {/* Activity heatmap */}
-          <Grid container spacing={2.5} mb={2.5}>
-            <Grid item xs={12}>
-              <StatCard
-                title={t('watchStats.sectionWhenYouWatch')}
-                subtitle={t('watchStats.heatmapSubtitle')}
-                icon={<CalendarViewMonthIcon fontSize="small" />}
-                color={theme.palette.primary.main}
-              >
-                {hasHeatmap ? (
-                  <Box sx={{ overflowX: 'auto' }}>
-                    <Box sx={{ display: 'inline-flex', flexDirection: 'column', gap: 0.5, minWidth: 'min-content' }}>
-                      {dayOrder.map(dow => (
-                        <Box key={dow} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ width: 32, flexShrink: 0, textAlign: 'end', pr: 0.5 }}
-                          >
-                            {weekdayShort(dow)}
-                          </Typography>
-                          {Array.from({ length: 24 }, (_, hour) => {
-                            const count = heatmapMap.get(`${dow}-${hour}`) ?? 0
-                            const intensity = count > 0 ? 0.15 + 0.85 * (count / heatmapMax) : 0
-                            return (
-                              <MuiTooltip
-                                key={hour}
-                                arrow
-                                title={t('watchStats.heatmapTooltip', {
-                                  day: weekdayLong(dow),
-                                  hour: `${hour.toString().padStart(2, '0')}:00`,
-                                  count,
-                                })}
-                              >
-                                <Box
-                                  onClick={
-                                    count > 0
-                                      ? () =>
-                                          setBreakdown({
-                                            dimension: 'timeOfDay',
-                                            value: String(dow),
-                                            value2: String(hour),
-                                            label: t('watchStats.heatmapCellLabel', {
-                                              day: weekdayLong(dow),
-                                              hour: `${hour.toString().padStart(2, '0')}:00`,
-                                            }),
-                                          })
-                                      : undefined
-                                  }
-                                  sx={{
-                                    width: 16,
-                                    height: 16,
-                                    borderRadius: 0.5,
-                                    flexShrink: 0,
-                                    cursor: count > 0 ? 'pointer' : 'default',
-                                    backgroundColor:
-                                      count > 0
-                                        ? alpha(theme.palette.primary.main, intensity)
-                                        : alpha(theme.palette.text.disabled, 0.12),
-                                    '&:hover': count > 0 ? { outline: `1px solid ${theme.palette.primary.main}` } : {},
-                                  }}
-                                />
-                              </MuiTooltip>
-                            )
-                          })}
-                        </Box>
-                      ))}
-                      {/* Hour axis */}
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-                        <Box sx={{ width: 32, flexShrink: 0 }} />
-                        {Array.from({ length: 24 }, (_, hour) => (
-                          <Box key={hour} sx={{ width: 16, flexShrink: 0, textAlign: 'center' }}>
-                            {hour % 6 === 0 && (
-                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>
-                                {hour}
-                              </Typography>
-                            )}
-                          </Box>
-                        ))}
-                      </Box>
-                    </Box>
-                    {/* Legend */}
-                    <Box display="flex" alignItems="center" gap={0.5} mt={1.5}>
-                      <Typography variant="caption" color="text.secondary">
-                        {t('watchStats.heatmapLess')}
-                      </Typography>
-                      {[0.15, 0.4, 0.65, 0.85, 1].map(a => (
-                        <Box
-                          key={a}
-                          sx={{
-                            width: 14,
-                            height: 14,
-                            borderRadius: 0.5,
-                            backgroundColor: alpha(theme.palette.primary.main, a),
-                          }}
-                        />
-                      ))}
-                      <Typography variant="caption" color="text.secondary">
-                        {t('watchStats.heatmapMore')}
-                      </Typography>
-                    </Box>
-                  </Box>
-                ) : (
-                  <Typography variant="body2" color="text.secondary">
-                    {t('watchStats.emptyHeatmapData')}
-                  </Typography>
-                )}
-              </StatCard>
-            </Grid>
-          </Grid>
 
           {/* Most rewatched */}
           <Grid container spacing={2.5}>
