@@ -110,6 +110,9 @@ export interface DiscoveryRequest {
   source: DiscoveryRequestSource
   createdAt: Date
   updatedAt: Date
+  /** Joined for the admin scope; absent when the row was fetched another way. */
+  requestedByUsername?: string | null
+  requestedByDisplayName?: string | null
 }
 
 export interface DiscoveryUser {

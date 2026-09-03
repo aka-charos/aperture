@@ -90,6 +90,9 @@ export interface SeerrSearchItem {
   popularity?: number
   genreIds?: number[]
   mediaInfo?: SeerrMediaInfo
+  /** Person results only. */
+  profilePath?: string
+  knownFor?: SeerrSearchItem[]
 }
 
 export interface SeerrMovieDetails {
@@ -226,7 +229,13 @@ export interface SeerrSonarrServerDetailsResponse {
 export type SeerrCreateRequestOptions = {
   seasons?: number[]
   is4k?: boolean
+  /**
+   * Legacy attribution: Seerr's `userId` body field. Ignored when
+   * `actAsUserId` is set, because sending both is a 403 — see createRequest.
+   */
   userId?: number
+  /** Seerr user to act as, delivered as the `X-API-User` header. */
+  actAsUserId?: number
   rootFolder?: string
   profileId?: number
   serverId?: number

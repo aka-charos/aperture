@@ -80,46 +80,134 @@ export async function isSeerrConfigured(): Promise<boolean> {
 // ============================================================================
 
 /**
- * Make a request to the Seerr API
+ * The outcome of one Seerr call, including the reason a failure failed.
+ *
+ * `seerrRequest` collapses everything to `T | null`, which is enough for a
+ * lookup — a missing poster is a missing poster. It is not enough for anything
+ * a *user* triggered. Seerr refuses with a specific, actionable sentence
+ * ("Movie Quota exceeded", "You do not have permission to make 4K movie
+ * requests") and flattening that to null surfaced as "Failed to create
+ * request", which reads as a broken integration rather than a rule the user
+ * hit and could act on.
+ *
+ * That was survivable while Seerr was a second window they could go and look
+ * at. It stops being survivable once Aperture is the only surface they have.
  */
-async function seerrRequest<T>(
+export interface SeerrCallResult<T> {
+  ok: boolean
+  /** HTTP status, or null when the request never reached Seerr at all. */
+  status: number | null
+  data: T | null
+  /** Seerr's own message where it sent one, else a transport-level reason. */
+  message: string | null
+}
+
+/** Seerr error bodies are `{ status, message }`; fall back to clipped raw text. */
+function readSeerrError(status: number, raw: string): string {
+  try {
+    const parsed = JSON.parse(raw) as { message?: unknown }
+    if (typeof parsed.message === 'string' && parsed.message.trim()) {
+      return parsed.message.trim()
+    }
+  } catch {
+    // Not JSON — an upstream proxy's HTML error page, most likely.
+  }
+  const text = raw.trim()
+  return text ? text.slice(0, 300) : `Seerr returned ${status}`
+}
+
+interface SeerrCallOptions {
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
+  body?: Record<string, unknown>
+  config?: SeerrConfig
+  /**
+   * Seerr user to act as, sent as `X-API-User`.
+   *
+   * Seerr's auth middleware resolves an `X-Api-Key` request to user id 1 — the
+   * original administrator — unless this header names someone else, in which
+   * case `req.user` becomes that user for the whole request. So this is what
+   * makes a call happen *as* the person who clicked, and it is the only
+   * mechanism that attributes every endpoint correctly: the `userId` body
+   * field works on POST /request, but it arrived on POST /issue only in Seerr
+   * v3.4.0 and does not exist for issue comments in any version.
+   *
+   * Acting as someone means their permissions and quota apply, and their
+   * auto-approve setting decides whether the request goes straight through.
+   */
+  actAsUserId?: number
+}
+
+/**
+ * Make a request to the Seerr API, reporting why it failed.
+ */
+async function seerrCall<T>(
   endpoint: string,
-  options: {
-    method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
-    body?: Record<string, unknown>
-    config?: SeerrConfig
-  } = {}
-): Promise<T | null> {
+  options: SeerrCallOptions = {}
+): Promise<SeerrCallResult<T>> {
   const config = options.config || await getSeerrConfig()
-  
+
   if (!config) {
     logger.warn('Seerr not configured')
-    return null
+    return { ok: false, status: null, data: null, message: 'Seerr not configured' }
   }
 
   const url = `${config.url}/api/v1${endpoint}`
-  
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Api-Key': config.apiKey,
+  }
+  if (options.actAsUserId != null) {
+    headers['X-API-User'] = String(options.actAsUserId)
+  }
+
   try {
     const response = await fetch(url, {
       method: options.method || 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': config.apiKey,
-      },
+      headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
     })
 
     if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error')
-      logger.error({ status: response.status, endpoint, error: errorText }, 'Seerr API request failed')
-      return null
+      const errorText = await response.text().catch(() => '')
+      const message = readSeerrError(response.status, errorText)
+      logger.error(
+        { status: response.status, endpoint, error: errorText, actAsUserId: options.actAsUserId },
+        'Seerr API request failed'
+      )
+      return { ok: false, status: response.status, data: null, message }
     }
 
-    return (await response.json()) as T
+    // 204 No Content (DELETE) has no body to parse.
+    if (response.status === 204) {
+      return { ok: true, status: 204, data: null, message: null }
+    }
+
+    return { ok: true, status: response.status, data: (await response.json()) as T, message: null }
   } catch (err) {
     logger.error({ err, endpoint }, 'Seerr API request error')
-    return null
+    return {
+      ok: false,
+      status: null,
+      data: null,
+      message: err instanceof Error ? err.message : 'Could not reach Seerr',
+    }
   }
+}
+
+/**
+ * Make a request to the Seerr API
+ *
+ * Thin reader over `seerrCall` for the lookups that only care whether an
+ * answer arrived. Anything a user triggered should call `seerrCall` directly
+ * and pass the message on.
+ */
+async function seerrRequest<T>(
+  endpoint: string,
+  options: SeerrCallOptions = {}
+): Promise<T | null> {
+  const result = await seerrCall<T>(endpoint, options)
+  return result.ok ? result.data : null
 }
 
 /**
@@ -339,6 +427,15 @@ export async function getSonarrServerDetails(sonarrId: number): Promise<SeerrSon
 
 /**
  * Create a new content request
+ *
+ * `actAsUserId` and `options.userId` are two ways to attribute the request to
+ * a person, and sending BOTH is a 403 rather than belt-and-braces. Seerr
+ * resolves `X-API-User` into `req.user` first, then checks that *that* user
+ * holds MANAGE_USERS or MANAGE_REQUESTS before honouring a `userId` in the
+ * body — which an ordinary viewer does not, so the pair refuses with "You do
+ * not have permission to modify the request user." The header wins here and
+ * the body field is dropped, because the header is what also attributes
+ * issues and issue comments correctly.
  */
 export async function createRequest(
   tmdbId: number,
@@ -348,13 +445,16 @@ export async function createRequest(
   success: boolean
   requestId?: number
   message?: string
+  /** HTTP status from Seerr, so a caller can tell a refusal from an outage. */
+  status?: number | null
 }> {
+  const actAsUserId = options.actAsUserId
   const body: SeerrRequestBody = {
     mediaType,
     mediaId: tmdbId,
     is4k: options.is4k,
   }
-  if (options.userId !== undefined) {
+  if (actAsUserId == null && options.userId !== undefined) {
     body.userId = options.userId
   }
   if (options.rootFolder !== undefined) {
@@ -390,20 +490,49 @@ export async function createRequest(
     }
   }
 
-  const result = await seerrRequest<SeerrRequestResponse>('/request', {
+  const result = await seerrCall<SeerrRequestResponse>('/request', {
     method: 'POST',
     body: body as unknown as Record<string, unknown>,
+    ...(actAsUserId != null ? { actAsUserId } : {}),
   })
 
-  if (!result) {
-    return { success: false, message: 'Failed to create request' }
+  if (!result.ok || !result.data) {
+    return {
+      success: false,
+      message: result.message ?? 'Failed to create request',
+      status: result.status,
+    }
   }
 
   return {
     success: true,
-    requestId: result.id,
+    requestId: result.data.id,
     message: 'Request created successfully',
+    status: result.status,
   }
+}
+
+/**
+ * Approve or decline an existing request (POST /request/:id/:status).
+ *
+ * Requires MANAGE_REQUESTS or ADMIN, which the API key's own user has — so
+ * this deliberately does NOT act as anyone. An admin approving from Aperture
+ * is acting as themselves, and attributing the approval to the requester
+ * would put their name on their own approval.
+ */
+export async function updateRequestStatus(
+  requestId: number,
+  status: 'approve' | 'decline'
+): Promise<{ success: boolean; message?: string; status?: number | null }> {
+  const result = await seerrCall<SeerrRequestResponse>(`/request/${requestId}/${status}`, {
+    method: 'POST',
+  })
+
+  if (!result.ok) {
+    return { success: false, message: result.message ?? `Failed to ${status} request`, status: result.status }
+  }
+
+  return { success: true, status: result.status }
 }
 
 /**

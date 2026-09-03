@@ -6,6 +6,7 @@
 
 // Types
 export * from './types.js'
+export type { SeerrCallResult } from './provider.js'
 
 // Provider functions
 export {
@@ -23,6 +24,7 @@ export {
   resolveSeerrUserIdForProfile,
   // Request Management
   createRequest,
+  updateRequestStatus,
   getRequest,
   getRequestStatus,
   deleteRequest,

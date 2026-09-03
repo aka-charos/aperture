@@ -10,6 +10,7 @@ import {
   getSeerrTVDetails,
   batchGetSeerrMediaStatus,
   createSeerrRequest,
+  updateSeerrRequestStatus,
   getSeerrRequestStatus,
   createDiscoveryRequest,
   updateDiscoveryRequestStatus,
@@ -39,7 +40,10 @@ import {
   getRadarrServiceSchema,
   listSonarrServiceSchema,
   getSonarrServiceSchema,
+  searchContentSchema,
+  decideRequestSchema,
 } from './schemas.js'
+import { resolveSearchSource } from './sources/index.js'
 
 async function ensureSeerrUserIdForRequest(userId: string): Promise<number | null> {
   const row = await queryOne<{
@@ -485,11 +489,14 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
         discoveryCandidateId
       )
 
-      // Submit to Seerr
+      // Submit to Seerr, acting as this user rather than as the API key's
+      // owner, so the request carries their name, their quota and their
+      // auto-approve setting. Unmapped users fall back to the API key's own
+      // identity, which is what happened for everyone before.
       const seerrMediaType = mediaType === 'movie' ? 'movie' : 'tv'
       const result = await createSeerrRequest(tmdbId, seerrMediaType, {
         seasons,
-        ...(seerrUserId != null ? { userId: seerrUserId } : {}),
+        ...(seerrUserId != null ? { actAsUserId: seerrUserId } : {}),
         ...(rootFolder !== undefined ? { rootFolder } : {}),
         ...(profileId !== undefined ? { profileId } : {}),
         ...(serverId !== undefined ? { serverId } : {}),
@@ -503,7 +510,13 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
           statusMessage: result.message,
         })
 
-        return reply.status(500).send({
+        // A quota or permission refusal is the user's answer, not a server
+        // fault — pass Seerr's own status and sentence through, or "Movie
+        // Quota exceeded" reaches them as a generic failure they cannot act on.
+        const upstream = result.status
+        const statusCode = upstream != null && upstream >= 400 && upstream < 500 ? upstream : 502
+
+        return reply.status(statusCode).send({
           error: 'Failed to submit request to Seerr',
           message: result.message,
           apertureRequestId,
@@ -535,13 +548,21 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
       limit?: string
       offset?: string
       source?: string
+      scope?: string
     }
   }>(
     '/api/seerr/requests',
     { preHandler: requireAuth, schema: getRequestsSchema },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
-      const { mediaType, status, limit, offset, source } = request.query
+      const { mediaType, status, limit, offset, source, scope } = request.query
+
+      // `scope=all` widens the list to every user's requests. Admin only, and
+      // silently narrowed rather than refused for a non-admin: the toggle is
+      // only rendered for admins, so a non-admin arriving here is a stale tab,
+      // and their own list is the right answer for them.
+      const wantsAllUsers = scope === 'all' && currentUser.isAdmin
+      const scopedUserId = wantsAllUsers ? null : currentUser.id
 
       const filter = {
         mediaType: mediaType as 'movie' | 'series' | undefined,
@@ -560,13 +581,15 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
       const offsetN = Number.isFinite(offsetRaw) && offsetRaw > 0 ? offsetRaw : 0
 
       const [total, requests] = await Promise.all([
-        countDiscoveryRequests(currentUser.id, filter),
-        getDiscoveryRequests(currentUser.id, {
+        countDiscoveryRequests(scopedUserId, filter),
+        getDiscoveryRequests(scopedUserId, {
           ...filter,
           limit: pageSize,
           offset: offsetN,
         }),
       ])
+
+      const resultScope = wantsAllUsers ? 'all' : 'mine'
 
       if (!(await isSeerrConfigured())) {
         const withLibrary = await attachLibraryMediaIds(
@@ -575,7 +598,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
             seerrLive: null,
           }))
         )
-        return reply.send({ requests: withLibrary, total })
+        return reply.send({ requests: withLibrary, total, scope: resultScope })
       }
 
       const enriched = await Promise.all(
@@ -589,7 +612,156 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
       )
 
       const withLibrary = await attachLibraryMediaIds(enriched)
-      return reply.send({ requests: withLibrary, total })
+      return reply.send({ requests: withLibrary, total, scope: resultScope })
+    }
+  )
+
+  /**
+   * GET /api/seerr/search
+   * Search for movies, TV shows and people that may not be in the library.
+   *
+   * The response is Aperture's own shape, never the source's — see
+   * `sources/types.ts` for why that boundary is where it is.
+   */
+  fastify.get<{
+    Querystring: { query?: string; page?: string }
+  }>(
+    '/api/seerr/search',
+    { preHandler: requireAuth, schema: searchContentSchema },
+    async (request, reply) => {
+      const currentUser = request.user as SessionUser
+      const rawQuery = (request.query.query ?? '').trim()
+
+      if (rawQuery.length < 2) {
+        return reply.send({
+          results: [],
+          page: 1,
+          totalPages: 0,
+          totalResults: 0,
+          canRequest: false,
+          source: null,
+        })
+      }
+
+      const pageRaw = request.query.page ? parseInt(request.query.page, 10) : 1
+      const page = Number.isFinite(pageRaw) ? Math.min(1000, Math.max(1, pageRaw)) : 1
+
+      const source = await resolveSearchSource()
+      if (!source) {
+        // Deliberately not an empty result. "Nothing matched" and "search is
+        // switched off" render identically in a list and mean opposite
+        // things, and only the second is something an operator can fix.
+        return reply.status(503).send({
+          error: 'Content search unavailable',
+          message: 'No search source is configured',
+        })
+      }
+
+      let found
+      try {
+        found = await source.search(rawQuery, page)
+      } catch (err) {
+        request.log.error({ err, source: source.id }, 'Content search failed')
+        return reply.status(502).send({
+          error: 'Content search failed',
+          message: 'The search backend did not respond',
+        })
+      }
+
+      const user = await queryOne<{ discover_request_enabled: boolean }>(
+        `SELECT discover_request_enabled FROM users WHERE id = $1`,
+        [currentUser.id]
+      )
+      const canRequest = user?.discover_request_enabled ?? false
+
+      // Library membership comes from Aperture's own tables, not the search
+      // backend's. The two can disagree — a library Seerr does not scan, or a
+      // scan that is behind — and when they do, ours is the one that decides
+      // whether the user can actually play the thing.
+      const requestable = found.results.filter(
+        (r): r is typeof r & { mediaType: 'movie' | 'series' } => r.mediaType !== 'person'
+      )
+      const withLibrary = await attachLibraryMediaIds(requestable)
+      const libraryById = new Map(
+        withLibrary.map((r) => [`${r.mediaType}-${r.tmdbId}`, r.libraryMediaId])
+      )
+
+      return reply.send({
+        page: found.page,
+        totalPages: found.totalPages,
+        totalResults: found.totalResults,
+        canRequest,
+        source: source.id,
+        results: found.results.map((r) => {
+          const libraryMediaId =
+            r.mediaType === 'person'
+              ? null
+              : libraryById.get(`${r.mediaType}-${r.tmdbId}`) ?? null
+          return { ...r, libraryMediaId, inLibrary: libraryMediaId !== null }
+        }),
+      })
+    }
+  )
+
+  /**
+   * POST /api/seerr/requests/:id/:decision
+   * Approve or decline a request (admin only).
+   *
+   * Keyed by the Aperture request id rather than the Seerr one, because that
+   * is what the table on screen holds, and because the local row has to be
+   * updated too — otherwise the list keeps showing the old state until the
+   * reconcile job next runs.
+   */
+  fastify.post<{
+    Params: { id: string; decision: string }
+  }>(
+    '/api/seerr/requests/:id/:decision',
+    { preHandler: requireAdmin, schema: decideRequestSchema },
+    async (request, reply) => {
+      const { id, decision } = request.params
+
+      if (decision !== 'approve' && decision !== 'decline') {
+        return reply.status(400).send({ error: 'Invalid decision' })
+      }
+
+      if (!(await isSeerrConfigured())) {
+        return reply.status(503).send({
+          error: 'Seerr not configured',
+          message: 'Requests cannot be actioned',
+        })
+      }
+
+      const row = await queryOne<{ id: string; seerr_request_id: number | null }>(
+        `SELECT id, seerr_request_id FROM discovery_requests WHERE id = $1`,
+        [id]
+      )
+      if (!row) {
+        return reply.status(404).send({ error: 'Request not found' })
+      }
+      if (row.seerr_request_id == null) {
+        // A row that never reached Seerr has nothing to approve. Saying so
+        // beats a 502 from a call that was never going to work; the reconcile
+        // job writes these off after a day.
+        return reply.status(409).send({
+          error: 'Request was never submitted to Seerr',
+          message: 'There is nothing to approve or decline yet',
+        })
+      }
+
+      const result = await updateSeerrRequestStatus(row.seerr_request_id, decision)
+      if (!result.success) {
+        const upstream = result.status
+        const statusCode = upstream != null && upstream >= 400 && upstream < 500 ? upstream : 502
+        return reply.status(statusCode).send({
+          error: `Failed to ${decision} request`,
+          message: result.message,
+        })
+      }
+
+      const newStatus = decision === 'approve' ? 'approved' : 'declined'
+      await updateDiscoveryRequestStatus(id, newStatus)
+
+      return reply.send({ success: true, status: newStatus })
     }
   )
 

@@ -1033,6 +1033,7 @@ export {
   resolveSeerrUserIdForProfile,
   // Request Management
   createRequest as createSeerrRequest,
+  updateRequestStatus as updateSeerrRequestStatus,
   getRequest as getSeerrRequest,
   getRequestStatus as getSeerrRequestStatus,
   deleteRequest as deleteSeerrRequest,
@@ -1044,6 +1045,7 @@ export {
   getSonarrServerDetails,
   // Types
   type SeerrConfig,
+  type SeerrCallResult,
   type SeerrUser,
   type ApertureUserProfileForSeerr,
   type SeerrMediaInfo,

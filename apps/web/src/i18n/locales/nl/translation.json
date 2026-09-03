@@ -3152,7 +3152,15 @@
       "pending": "In behandeling",
       "failed": "Mislukt",
       "fallback": "{{status}}"
-    }
+    },
+    "tableRequestedBy": "Requested by",
+    "showAllUsers": "All users",
+    "unknownUser": "Unknown user",
+    "approve": "Approve",
+    "decline": "Decline",
+    "approved": "Approved {{title}}",
+    "declined": "Declined {{title}}",
+    "decisionFailed": "Could not update the request"
   },
   "watchHistoryPage": {
     "title": "Bekijk Geschiedenis",
@@ -5062,5 +5070,17 @@
     "popularityWeight": "Popularity",
     "recencyWeight": "Recency",
     "weightsNote": "Changes apply on the next run. Use Refresh on the Discover page to see them sooner."
+  },
+  "contentSearch": {
+    "heading": "Request something new",
+    "subheading": "Search for a film, show or person. Anything missing from the library can be requested from here.",
+    "placeholder": "Search by title or person…",
+    "people": "People",
+    "noResults": "Nothing matched “{{query}}”.",
+    "unavailable": "Content search is unavailable right now. It needs a configured request backend.",
+    "requestsDisabled": "Requests are not enabled for your account. Ask an admin to turn them on.",
+    "errorSearch": "Search failed",
+    "requestSubmitted": "Requested {{title}}",
+    "requestFailed": "Could not submit the request"
   }
 }

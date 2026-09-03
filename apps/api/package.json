@@ -14,7 +14,8 @@
     "test:jobs": "node --import tsx --test src/routes/jobs/jobDefaults.test.ts src/routes/jobs/state.test.ts",
     "lint": "eslint src",
     "clean": "rm -rf dist",
-    "test:assistant": "node --import tsx --test src/routes/assistant/discovery/enrichReasons.test.ts src/routes/assistant/tools/tasteBlend.test.ts src/routes/assistant/tools/episodes.test.ts src/routes/assistant/helpers/routeIntent.test.ts src/routes/assistant/helpers/titleMatch.test.ts src/routes/assistant/helpers/countryMatch.test.ts"
+    "test:assistant": "node --import tsx --test src/routes/assistant/discovery/enrichReasons.test.ts src/routes/assistant/tools/tasteBlend.test.ts src/routes/assistant/tools/episodes.test.ts src/routes/assistant/helpers/routeIntent.test.ts src/routes/assistant/helpers/titleMatch.test.ts src/routes/assistant/helpers/countryMatch.test.ts",
+    "test:search": "node --import tsx --test src/routes/seerr/sources/seerrMapping.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.0",
