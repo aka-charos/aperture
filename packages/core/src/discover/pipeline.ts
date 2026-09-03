@@ -201,7 +201,7 @@ async function runDiscoveryForUser(
         spread > 0 ? 'info' : 'warn',
         spread > 0
           ? `🎯 ${user.username}: taste match ${low.toFixed(2)}–${high.toFixed(2)} across ${candidatesToStore.length} ${mediaType}s`
-          : `⚠️ ${user.username}: taste match is flat at ${low.toFixed(2)} — the taste term is not ranking anything (no profile, no candidate vectors, or a refused embedding space)`
+          : `⚠️ ${user.username}: taste match is flat at ${low.toFixed(2)} across ${candidatesToStore.length} ${mediaType}s — the taste term is not ranking anything. Most often a taste profile built under a different embedding model: run rebuild-taste-profiles.`
       )
     }
 

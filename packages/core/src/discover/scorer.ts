@@ -94,11 +94,35 @@ async function getUserTasteVectors(userId: string, mediaType: MediaType): Promis
 
   const embeddingColumn = mediaType === 'movie' ? 'taste_embedding' : 'series_taste_embedding'
 
-  const result = await queryOne<{ embedding: number[] }>(
-    `SELECT ${embeddingColumn} as embedding FROM user_preferences WHERE user_id = $1`,
+  // `::text` and an explicit parse, exactly as getUserTasteClusters does.
+  //
+  // This column is a halfvec, and pg hands a halfvec back as a STRING. The
+  // previous form selected it bare and annotated the row as `number[]` -- a
+  // claim TypeScript cannot check against a runtime driver -- so the fallback
+  // returned a ~40,000 character string where a 3,072-element array was
+  // expected. maxTasteSimilarity then compared `vector.length` (the string
+  // length) against the candidate's 3072, skipped every taste vector, and
+  // returned null for every candidate, which the caller reads as "no taste
+  // signal" and scores a flat neutral.
+  //
+  // It failed silently and totally, and it was invisible until now only because
+  // the similarity term was dead for an unrelated reason: with the candidate
+  // embedding map always empty, this function's output was never used. Fixing
+  // the map is what exposed it.
+  const result = await queryOne<{ embedding: string | null }>(
+    `SELECT ${embeddingColumn}::text as embedding FROM user_preferences WHERE user_id = $1`,
     [userId]
   )
-  return result?.embedding ? [result.embedding] : []
+  if (!result?.embedding) return []
+
+  const parsed = result.embedding
+    .replace(/[[\]]/g, '')
+    .split(',')
+    .map((n) => parseFloat(n.trim()))
+
+  // A vector that did not parse is worse than none: it would be silently
+  // skipped downstream and read as an absent taste signal.
+  return parsed.length > 0 && parsed.every((n) => Number.isFinite(n)) ? [parsed] : []
 }
 
 /**
@@ -413,9 +437,38 @@ export async function scoreCandidates(
     const similarity = maxTasteSimilarity(tasteVectors, vector)
     if (similarity !== null) rawSimilarities.set(candidate.tmdbId, similarity)
   }
-  const similarityValues = [...rawSimilarities.values()]
-  const similarityMin = similarityValues.length > 0 ? Math.min(...similarityValues) : 0
-  const similarityMax = similarityValues.length > 0 ? Math.max(...similarityValues) : 0
+  // A loop rather than a spread into Math.min/Math.max. maxTotalCandidates is
+  // an admin slider reaching 5000, and spreading an array that large throws
+  // RangeError. Same pattern removed from popularityRange in this module.
+  let similarityMin = Number.POSITIVE_INFINITY
+  let similarityMax = Number.NEGATIVE_INFINITY
+  for (const value of rawSimilarities.values()) {
+    if (value < similarityMin) similarityMin = value
+    if (value > similarityMax) similarityMax = value
+  }
+  if (!Number.isFinite(similarityMin) || !Number.isFinite(similarityMax)) {
+    similarityMin = 0
+    similarityMax = 0
+  }
+
+  // The raw figures, before normalisation flattens them into 0-1. This is the
+  // line that names a dead taste term: `compared` well below the candidate
+  // count means the taste vectors could not be compared at all (a width
+  // mismatch, or an unparsed vector), while compared == count with
+  // rawMin == rawMax means they compared and agreed, which is a different
+  // fault entirely. Reporting only the post-normalisation spread made those two
+  // indistinguishable and cost five round trips to separate by hand.
+  logger.info(
+    {
+      userId,
+      mediaType,
+      candidateCount: candidates.length,
+      compared: rawSimilarities.size,
+      rawMin: Number.isFinite(similarityMin) ? similarityMin : null,
+      rawMax: Number.isFinite(similarityMax) ? similarityMax : null,
+    },
+    'Taste similarity measured'
+  )
 
   // Get user's franchise preferences for boosting
   // Note: Genre weights are not applied here since discovery uses TMDb genre IDs, not names
