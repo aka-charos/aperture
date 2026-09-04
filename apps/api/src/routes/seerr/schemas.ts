@@ -308,7 +308,7 @@ export const getRequestsSchema = {
       status: { type: 'string', enum: ['pending', 'submitted', 'approved', 'declined', 'available', 'failed'], description: 'Filter by status' },
       limit: { type: 'string', description: 'Page size (max 100)', default: '25', example: '25' },
       offset: { type: 'string', description: 'Rows to skip for pagination', default: '0', example: '0' },
-      source: { type: 'string', enum: ['discovery', 'gap_analysis'], description: 'Filter by origin (Discovery vs Gap Analysis)' },
+      source: { type: 'string', enum: ['discovery', 'gap_analysis', 'direct'], description: 'Filter by origin (Discovery suggestion, admin Gap Analysis, or a direct search request)' },
       scope: { type: 'string', enum: ['mine', 'all'], description: 'Admins only: "all" returns every user’s requests. Narrowed to "mine" for non-admins.' },
     },
   },

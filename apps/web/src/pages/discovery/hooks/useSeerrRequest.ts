@@ -122,7 +122,13 @@ export function useSeerrRequest() {
     title: string,
     discoveryCandidateId?: string,
     seasons?: number[],
-    seerrOptions?: SeerrRequestOptions
+    seerrOptions?: SeerrRequestOptions,
+    /**
+     * Where the request came from. Omitted means `discovery`, which is what
+     * every caller that accepts a suggestion wants; searching for a title by
+     * hand passes `direct`, so the column can tell the two apart.
+     */
+    source?: 'discovery' | 'direct'
   ): Promise<{ success: boolean; error?: string }> => {
     setRequesting(tmdbId)
     try {
@@ -136,6 +142,7 @@ export function useSeerrRequest() {
           title,
           discoveryCandidateId,
           seasons,
+          ...(source !== undefined ? { source } : {}),
           ...(seerrOptions?.rootFolder !== undefined ? { rootFolder: seerrOptions.rootFolder } : {}),
           ...(seerrOptions?.profileId !== undefined ? { profileId: seerrOptions.profileId } : {}),
           ...(seerrOptions?.serverId !== undefined ? { serverId: seerrOptions.serverId } : {}),

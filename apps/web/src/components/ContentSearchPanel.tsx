@@ -254,7 +254,11 @@ export function ContentSearchPanel({
         item.title,
         undefined,
         seasons,
-        opts
+        opts,
+        // Someone searched for this and asked for it, which is a different act
+        // from accepting a Discovery suggestion — and telling the two apart is
+        // the whole point of the source column.
+        'direct'
       )
       if (result.success) {
         setJustRequested((prev) => new Set(prev).add(item.tmdbId))
@@ -270,8 +274,14 @@ export function ContentSearchPanel({
     [submitRequest, onNotify, onRequested, t]
   )
 
-  const titles = (data?.results ?? []).filter((r) => r.mediaType !== 'person')
-  const people = (data?.results ?? []).filter((r) => r.mediaType === 'person')
+  // Split rather than one mixed grid. Relevance order interleaves a film, a
+  // show and a film again, so scanning for "the series called X" means reading
+  // every card; within each section the backend's ordering is preserved.
+  const results = data?.results ?? []
+  const movies = results.filter((r) => r.mediaType === 'movie')
+  const series = results.filter((r) => r.mediaType === 'series')
+  const people = results.filter((r) => r.mediaType === 'person')
+  const titles = movies.length + series.length
   const hasQuery = query.trim().length >= MIN_QUERY_LENGTH
 
   return (
@@ -317,7 +327,7 @@ export function ContentSearchPanel({
         </Alert>
       )}
 
-      {data && data.canRequest === false && titles.length > 0 && (
+      {data && data.canRequest === false && titles > 0 && (
         <Alert severity="info" sx={{ mt: 2 }}>
           {t('contentSearch.requestsDisabled')}
         </Alert>
@@ -358,34 +368,44 @@ export function ContentSearchPanel({
         </Box>
       )}
 
-      {titles.length > 0 && (
-        <Box
-          sx={{
-            mt: 3,
-            display: 'grid',
-            // Sized off this container, not the viewport: the panel sits in a
-            // page that narrows when the assistant is docked, so a breakpoint
-            // grid would keep its full-desktop column count in half the width.
-            gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-            gap: 2,
-          }}
-        >
-          {titles.map((item) => (
-            <SearchResultCard
-              key={`${item.mediaType}-${item.tmdbId}`}
-              item={
-                justRequested.has(item.tmdbId)
-                  ? { ...item, requested: true, requestStatus: item.requestStatus ?? 'pending' }
-                  : item
-              }
-              canRequest={data?.canRequest ?? false}
-              isRequesting={isRequesting(item.tmdbId)}
-              onRequest={handleRequest}
-              onShowDetails={onShowDetails}
-              fetchTVDetails={fetchTVDetails}
-            />
-          ))}
-        </Box>
+      {([
+        { key: 'movies', heading: t('contentSearch.movies'), items: movies },
+        { key: 'series', heading: t('contentSearch.series'), items: series },
+      ] as const).map(({ key, heading, items }) =>
+        items.length === 0 ? null : (
+          <Box key={key} sx={{ mt: 3 }}>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+              {heading} ({items.length})
+            </Typography>
+            <Box
+              sx={{
+                display: 'grid',
+                // Sized off this container, not the viewport: the panel sits in
+                // a page that narrows when the assistant is docked, so a
+                // breakpoint grid would keep its full-desktop column count in
+                // half the width.
+                gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                gap: 2,
+              }}
+            >
+              {items.map((item) => (
+                <SearchResultCard
+                  key={`${item.mediaType}-${item.tmdbId}`}
+                  item={
+                    justRequested.has(item.tmdbId)
+                      ? { ...item, requested: true, requestStatus: item.requestStatus ?? 'pending' }
+                      : item
+                  }
+                  canRequest={data?.canRequest ?? false}
+                  isRequesting={isRequesting(item.tmdbId)}
+                  onRequest={handleRequest}
+                  onShowDetails={onShowDetails}
+                  fetchTVDetails={fetchTVDetails}
+                />
+              ))}
+            </Box>
+          </Box>
+        )
       )}
     </Paper>
   )
