@@ -2183,7 +2183,14 @@
     "similarityWeight": "Taste match",
     "popularityWeight": "Popularity",
     "recencyWeight": "Recency",
-    "weightsNote": "Changes apply on the next run. Use Refresh on the Discover page to see them sooner."
+    "sourceWeight": "Source quality",
+    "weightsNote": "Changes apply on the next run. Use Refresh on the Discover page to see them sooner.",
+    "measuredTitle": "What the weights actually do",
+    "measuredBlurb": "A term only moves the ranking as much as its scores vary. Two terms set to the same weight have different influence when one spreads across its whole range and the other clusters. Source quality has no slider, but it takes a fixed share of the blend.",
+    "measuredConfigured": "Set to",
+    "measured_movie": "Movies",
+    "measured_series": "Series",
+    "measuredFootnote": "Measured across {{runs}} recent runs and {{candidates}} scored titles. Highlighted rows differ from what you set by 5 points or more."
   },
   "settingsSeerr": {
     "title": "Seerr Integration",

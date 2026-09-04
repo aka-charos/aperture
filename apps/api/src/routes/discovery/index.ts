@@ -19,6 +19,8 @@ import {
   filterCandidates,
   getDiscoveryConfig,
   setDiscoveryConfig,
+  getDiscoveryBlendDiagnostics,
+  SOURCE_TERM_WEIGHT,
   DISCOVERY_CONFIG_BOUNDS,
   appLocaleToTmdbLanguage,
   getMovieGenresList,
@@ -567,7 +569,34 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: requireAdmin, schema: { tags: ['discovery'] } },
     async (_request, reply) => {
       const config = await getDiscoveryConfig()
-      return reply.send({ config, bounds: DISCOVERY_CONFIG_BOUNDS })
+      // The source term is a real claimant on the blend but has no slider, so
+      // the card cannot compute honest shares without it -- and a hardcoded 0.1
+      // in the web bundle is the copy that drifts when the scorer is retuned.
+      return reply.send({ config, bounds: DISCOVERY_CONFIG_BOUNDS, sourceTermWeight: SOURCE_TERM_WEIGHT })
+    }
+  )
+
+  /**
+   * GET /api/discovery/blend
+   * What the scoring weights claim against what they actually do (admin only).
+   *
+   * Measured from the newest stored run per viewer, per run and then averaged
+   * -- never pooled, since a spread is a property of one viewer's candidate
+   * pool. Sent as DECIDED percentages because the web bundle never imports core
+   * and would otherwise need its own copy of the blend arithmetic.
+   *
+   * Separate from /config on purpose: the config is a fast settings read that
+   * the card cannot render without, while this is an aggregate over every
+   * stored candidate and is allowed to be absent. The panel shows the sliders
+   * either way.
+   */
+  fastify.get(
+    '/api/discovery/blend',
+    { preHandler: requireAdmin, schema: { tags: ['discovery'] } },
+    async (_request, reply) => {
+      const config = await getDiscoveryConfig()
+      const blend = await getDiscoveryBlendDiagnostics(config)
+      return reply.send({ blend })
     }
   )
 

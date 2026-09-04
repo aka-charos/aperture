@@ -465,6 +465,11 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
         labelKey: 'settingsDiscovery.popularityWeight',
         aliases: ['weight', 'popularity', 'ranking'],
       },
+      {
+        anchor: 'discovery-weight-measured',
+        labelKey: 'settingsDiscovery.measuredTitle',
+        aliases: ['measured', 'influence', 'realised', 'realized', 'spread', 'shares'],
+      },
     ],
   },
   {
