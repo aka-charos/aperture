@@ -2903,7 +2903,8 @@
     "statusFailed": "נִכשָׁל",
     "statusCancelled": "בּוּטלָה",
     "statusPending": "תָלוּי וְעוֹמֵד",
-    "statusRunning": "רִיצָה"
+    "statusRunning": "רִיצָה",
+    "openJob": "Open {{name}} and view its logs"
   },
   "apiError": {
     "errorTypeAuth": "שגיאת אימות",

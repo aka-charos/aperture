@@ -629,6 +629,17 @@ export function adminEntryPath(entry: AdminEntry): string {
 }
 
 /**
+ * The console address of an entry, by id, for the handful of links that come
+ * from outside the console and would otherwise hardcode a path the registry is
+ * free to change. Falls back to the console root rather than throwing — a
+ * broken link is a worse answer than a general one.
+ */
+export function adminPathFor(id: string): string {
+  const entry = ADMIN_ENTRIES.find((e) => e.id === id)
+  return entry ? adminEntryPath(entry) : '/admin'
+}
+
+/**
  * The same address relative to the `/admin` route, which is what `<Route path>`
  * takes. An empty string marks the index route.
  */

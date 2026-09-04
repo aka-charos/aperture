@@ -3415,7 +3415,8 @@
     "statusFailed": "failed",
     "statusCancelled": "cancelled",
     "statusPending": "pending",
-    "statusRunning": "running"
+    "statusRunning": "running",
+    "openJob": "Open {{name}} and view its logs"
   },
   "apiError": {
     "errorTypeAuth": "Authentication Error",

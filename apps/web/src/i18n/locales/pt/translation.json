@@ -2903,7 +2903,8 @@
     "statusFailed": "fracassada",
     "statusCancelled": "cancelada",
     "statusPending": "pendente",
-    "statusRunning": "correndo"
+    "statusRunning": "correndo",
+    "openJob": "Open {{name}} and view its logs"
   },
   "apiError": {
     "errorTypeAuth": "Erro de autenticação",

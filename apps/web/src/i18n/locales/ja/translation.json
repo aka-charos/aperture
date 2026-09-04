@@ -2903,7 +2903,8 @@
     "statusFailed": "失敗した",
     "statusCancelled": "キャンセル",
     "statusPending": "保留中",
-    "statusRunning": "走っている"
+    "statusRunning": "走っている",
+    "openJob": "Open {{name}} and view its logs"
   },
   "apiError": {
     "errorTypeAuth": "認証エラー",

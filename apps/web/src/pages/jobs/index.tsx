@@ -151,6 +151,7 @@ export function JobsPage() {
     handleCancelJob,
     handleUpdateConfig,
     toggleLogs,
+    expandLogs,
     setCancelDialogJob,
   } = useJobsData()
 
@@ -165,19 +166,23 @@ export function JobsPage() {
   const location = useLocation()
 
   /**
-   * A `#job-…` link from the settings search opens the tab holding that job.
+   * A `#job-…` link opens the tab holding that job, and its logs.
    *
-   * The inactive panels are unmounted rather than hidden, so without this the
-   * anchor a search result points at does not exist and the scroll silently
-   * does nothing — landing on the right page and visibly the wrong place.
-   * Keyed on `location.key` too, so searching for the same job a second time
-   * still switches back if the reader has changed tab since.
+   * The inactive panels are unmounted rather than hidden, so without the tab
+   * switch the anchor does not exist and the scroll silently does nothing —
+   * landing on the right page and visibly the wrong place. The logs open
+   * because of where these links come from: the settings palette, and the app
+   * bar's progress widget, where the reason to click a running job is to see
+   * what it is doing. Keyed on `location.key` too, so following the same link
+   * twice still works if the reader has since changed tab or closed the logs.
    */
   useEffect(() => {
     const job = jobFromAnchor(location.hash)
     if (!job) return
     const tab = jobTabIndex(job)
     if (tab != null) setTabValue(tab)
+    expandLogs(job)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.hash, location.key])
 
   const [configDialogJob, setConfigDialogJob] = useState<string | null>(null)

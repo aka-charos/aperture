@@ -6,8 +6,10 @@ import { dirname, resolve } from 'node:path'
 import { searchAdmin } from './search'
 import {
   ALL_JOB_NAMES,
+  JOBS_CONSOLE_PATH,
   JOB_DISPLAY_NAME_KEYS,
   jobAnchor,
+  jobConsoleLink,
   titleCaseJobName,
 } from '@/pages/jobs/registry'
 
@@ -175,6 +177,25 @@ test('a full match hides the partial ones', () => {
   const results = searchAdmin('purge database', t)
   assert.equal(results.length, 1)
   assert.equal(results[0].entryId, 'database')
+})
+
+test('the console link and the search result address the same place', () => {
+  // The app bar's progress widget links a running job through
+  // `jobConsoleLink`; the palette builds its own path. Two spellings of one
+  // address is how one of them ends up pointing at nothing.
+  for (const name of ALL_JOB_NAMES) {
+    assert.equal(jobConsoleLink(name), `${JOBS_CONSOLE_PATH}#${jobAnchor(name)}`)
+  }
+  const fromSearch = searchAdmin('sync movies', t)[0]
+  assert.equal(fromSearch?.path, jobConsoleLink('sync-movies'))
+})
+
+test('a job with no card links to the page, not a dead anchor', () => {
+  // `JOB_CATEGORIES` is an allowlist: a job registered in the API but absent
+  // from it renders no card, so its anchor would resolve to nothing and the
+  // click would silently do nothing at all.
+  assert.equal(jobConsoleLink('not-a-real-job'), JOBS_CONSOLE_PATH)
+  assert.ok(!JOBS_CONSOLE_PATH.includes('#'))
 })
 
 test('the floor is relative, so a weak query still answers', () => {

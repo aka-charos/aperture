@@ -2903,7 +2903,8 @@
     "statusFailed": "fallito",
     "statusCancelled": "annullata",
     "statusPending": "in attesa di",
-    "statusRunning": "corsa"
+    "statusRunning": "corsa",
+    "openJob": "Open {{name}} and view its logs"
   },
   "apiError": {
     "errorTypeAuth": "Errore di autenticazione",

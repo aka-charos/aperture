@@ -1,4 +1,5 @@
 import type { JobCategory } from './types'
+import { adminPathFor } from '../admin/nav/registry'
 
 /**
  * The job catalogue as pure data: which jobs exist, how they are grouped, and
@@ -181,6 +182,23 @@ export function jobTabIndex(name: string): number | null {
   const tabs = [MOVIE_JOB_CATEGORIES, SERIES_JOB_CATEGORIES, GLOBAL_JOB_CATEGORIES]
   const index = tabs.findIndex((categories) => categories.some((c) => c.jobs.includes(name)))
   return index === -1 ? null : index
+}
+
+/** Where the console shows the jobs. */
+export const JOBS_CONSOLE_PATH = adminPathFor('jobs')
+
+/**
+ * The link that opens a job in the console.
+ *
+ * A job with no category has no card — the `JOB_CATEGORIES` allowlist decides
+ * what renders — so its anchor would point at nothing and the jump would
+ * silently do nothing. Those link to the page itself, where the Schedule tab
+ * at least lists them.
+ */
+export function jobConsoleLink(name: string): string {
+  return jobTabIndex(name) === null
+    ? JOBS_CONSOLE_PATH
+    : `${JOBS_CONSOLE_PATH}#${jobAnchor(name)}`
 }
 
 /** `sync-movies` → `Sync Movies`. */
