@@ -2133,7 +2133,8 @@
     "statusFailed": "απέτυχε",
     "statusCancelled": "ακυρώθηκε",
     "statusPending": "σε αναμονή",
-    "statusRunning": "σε εξέλιξη"
+    "statusRunning": "σε εξέλιξη",
+    "openJob": "Open {{name}} and view its logs"
   },
   "sortPopper": {
     "sortBy": "Ταξινόμηση Κατά",

@@ -2903,7 +2903,8 @@
     "statusFailed": "échoué",
     "statusCancelled": "annulé",
     "statusPending": "en attente",
-    "statusRunning": "en cours d'exécution"
+    "statusRunning": "en cours d'exécution",
+    "openJob": "Open {{name}} and view its logs"
   },
   "apiError": {
     "errorTypeAuth": "Erreur d'authentification",

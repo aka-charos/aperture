@@ -2903,7 +2903,8 @@
     "statusFailed": "失败的",
     "statusCancelled": "取消",
     "statusPending": "待办的",
-    "statusRunning": "跑步"
+    "statusRunning": "跑步",
+    "openJob": "Open {{name}} and view its logs"
   },
   "apiError": {
     "errorTypeAuth": "认证错误",

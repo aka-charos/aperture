@@ -1,7 +1,9 @@
 import React, { useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Box,
+  ButtonBase,
   Typography,
   LinearProgress,
   Popper,
@@ -13,14 +15,15 @@ import {
   useTheme,
 } from '@mui/material'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ErrorIcon from '@mui/icons-material/Error'
 import { useAuth } from '@/hooks/useAuth'
 import { useActiveJobs } from '@/hooks/activeJobs'
-
-
-function prettifyJobName(jobName: string): string {
-  return jobName.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-}
+import {
+  JOB_DISPLAY_NAME_KEYS,
+  jobConsoleLink,
+  titleCaseJobName,
+} from '@/pages/jobs/registry'
 
 function formatDuration(startedAt: string): string {
   const start = new Date(startedAt).getTime()
@@ -39,15 +42,36 @@ function formatDuration(startedAt: string): string {
 export function RunningJobsWidget() {
   const { t } = useTranslation()
   const theme = useTheme()
+  const navigate = useNavigate()
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const { user } = useAuth()
   // Shared with the admin console's nav column: one interval, two readers.
   const jobs = useActiveJobs(Boolean(user?.isAdmin))
 
+  /**
+   * This widget names a job in the progressive tense ("Syncing Movies")
+   * because it is watching one run, which the jobs page has no use for. Only
+   * some jobs have such a string, though, so the fallback is **the page's own
+   * name**, not a second title-caser — that drift is how the same job read
+   * "Sync Lldap Emails" here and "Sync LLDAP Emails" on its card.
+   */
   const getJobDisplayName = useCallback(
-    (jobName: string) =>
-      t(`runningJobs.jobNames.${jobName}`, { defaultValue: prettifyJobName(jobName) }),
+    (jobName: string) => {
+      const progressive = t(`runningJobs.jobNames.${jobName}`, { defaultValue: '' })
+      if (progressive) return progressive
+      const pageKey = JOB_DISPLAY_NAME_KEYS[jobName]
+      return pageKey ? t(pageKey) : titleCaseJobName(jobName)
+    },
     [t]
+  )
+
+  /** Opens the job's card in the console, with its logs expanded. */
+  const openJob = useCallback(
+    (jobName: string) => {
+      setAnchorEl(null)
+      navigate(jobConsoleLink(jobName))
+    },
+    [navigate]
   )
 
   const jobStatusLabel = useCallback(
@@ -217,22 +241,38 @@ export function RunningJobsWidget() {
                   {/* Running Jobs */}
                   <Box sx={{ p: 2 }}>
                     {runningJobs.map((job) => (
-                      <Box
+                      <ButtonBase
                         key={job.jobId}
+                        onClick={() => openJob(job.jobName)}
+                        aria-label={t('runningJobs.openJob', {
+                          name: getJobDisplayName(job.jobName),
+                        })}
                         sx={{
-                          mb: 2,
-                          '&:last-child': { mb: 0 },
+                          width: '100%',
+                          display: 'block',
+                          textAlign: 'start',
+                          borderRadius: 1.5,
+                          p: 1,
+                          mx: -1,
+                          // The row is the affordance, so it needs a hit area
+                          // wider than its text and a hover that says so.
+                          '&:hover': { backgroundColor: 'action.hover' },
+                          mb: 1.5,
+                          '&:last-of-type': { mb: 0 },
                         }}
                       >
-                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
-                          <Typography variant="body2" fontWeight={500}>
+                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5} gap={1}>
+                          <Typography variant="body2" fontWeight={500} noWrap>
                             {getJobDisplayName(job.jobName)}
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {formatDuration(job.startedAt)}
-                          </Typography>
+                          <Box display="flex" alignItems="center" gap={0.25} flexShrink={0}>
+                            <Typography variant="caption" color="text.secondary">
+                              {formatDuration(job.startedAt)}
+                            </Typography>
+                            <ChevronRightIcon sx={{ fontSize: 16, color: 'text.disabled' }} />
+                          </Box>
                         </Box>
-                        
+
                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
                           {job.currentStep}
                           {job.itemsTotal > 0 && ` • ${job.itemsProcessed}/${job.itemsTotal}`}
@@ -262,7 +302,7 @@ export function RunningJobsWidget() {
                             {Math.round(job.overallProgress || 0)}%
                           </Typography>
                         </Box>
-                      </Box>
+                      </ButtonBase>
                     ))}
                   </Box>
 
@@ -274,31 +314,48 @@ export function RunningJobsWidget() {
                         <Typography variant="caption" color="text.secondary" fontWeight={500}>
                           {t('runningJobs.recentSection')}
                         </Typography>
+                        {/* A finished job is the one an admin most often wants
+                            to open — a failure is why they looked. */}
                         {recentJobs.map((job) => (
-                          <Box
+                          <ButtonBase
                             key={job.jobId}
-                            display="flex"
-                            alignItems="center"
-                            justifyContent="space-between"
-                            sx={{ py: 0.75 }}
+                            onClick={() => openJob(job.jobName)}
+                            aria-label={t('runningJobs.openJob', {
+                              name: getJobDisplayName(job.jobName),
+                            })}
+                            sx={{
+                              width: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 1,
+                              borderRadius: 1.5,
+                              px: 1,
+                              mx: -1,
+                              py: 0.75,
+                              '&:hover': { backgroundColor: 'action.hover' },
+                            }}
                           >
-                            <Box display="flex" alignItems="center" gap={1}>
+                            <Box display="flex" alignItems="center" gap={1} minWidth={0}>
                               {job.status === 'completed' ? (
                                 <CheckCircleIcon sx={{ fontSize: 16, color: 'success.main' }} />
                               ) : (
                                 <ErrorIcon sx={{ fontSize: 16, color: 'error.main' }} />
                               )}
-                              <Typography variant="caption">
+                              <Typography variant="caption" noWrap>
                                 {getJobDisplayName(job.jobName)}
                               </Typography>
                             </Box>
-                            <Chip
-                              label={jobStatusLabel(job.status)}
-                              size="small"
-                              color={job.status === 'completed' ? 'success' : 'error'}
-                              sx={{ height: 18, fontSize: '0.65rem' }}
-                            />
-                          </Box>
+                            <Box display="flex" alignItems="center" gap={0.25} flexShrink={0}>
+                              <Chip
+                                label={jobStatusLabel(job.status)}
+                                size="small"
+                                color={job.status === 'completed' ? 'success' : 'error'}
+                                sx={{ height: 18, fontSize: '0.65rem' }}
+                              />
+                              <ChevronRightIcon sx={{ fontSize: 16, color: 'text.disabled' }} />
+                            </Box>
+                          </ButtonBase>
                         ))}
                       </Box>
                     </>

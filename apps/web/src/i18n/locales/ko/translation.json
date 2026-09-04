@@ -2903,7 +2903,8 @@
     "statusFailed": "실패한",
     "statusCancelled": "취소",
     "statusPending": "보류 중",
-    "statusRunning": "달리기"
+    "statusRunning": "달리기",
+    "openJob": "Open {{name}} and view its logs"
   },
   "apiError": {
     "errorTypeAuth": "인증 오류",

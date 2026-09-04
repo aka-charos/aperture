@@ -2903,7 +2903,8 @@
     "statusFailed": "असफल",
     "statusCancelled": "रद्द कर दिया गया",
     "statusPending": "लंबित",
-    "statusRunning": "दौड़ना"
+    "statusRunning": "दौड़ना",
+    "openJob": "Open {{name}} and view its logs"
   },
   "apiError": {
     "errorTypeAuth": "प्रमाणीकरण त्रुटि",

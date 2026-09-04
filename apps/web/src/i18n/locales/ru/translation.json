@@ -2887,7 +2887,8 @@
     "statusFailed": "неуспешный",
     "statusCancelled": "отменен",
     "statusPending": "в ожидании",
-    "statusRunning": "бег"
+    "statusRunning": "бег",
+    "openJob": "Open {{name}} and view its logs"
   },
   "apiError": {
     "errorTypeAuth": "Ошибка аутентификации",

@@ -2887,7 +2887,8 @@
     "statusFailed": "mislukt",
     "statusCancelled": "geannuleerd",
     "statusPending": "in behandeling",
-    "statusRunning": "rennen"
+    "statusRunning": "rennen",
+    "openJob": "Open {{name}} and view its logs"
   },
   "apiError": {
     "errorTypeAuth": "Authenticatiefout",

@@ -26,6 +26,8 @@ export interface UseJobsDataReturn {
   handleCancelJob: (jobName: string) => Promise<void>
   handleUpdateConfig: (jobName: string, config: UpdateJobConfigParams) => Promise<void>
   toggleLogs: (jobName: string) => void
+  /** Idempotent, unlike `toggleLogs` — see the note at the implementation. */
+  expandLogs: (jobName: string) => void
   setCancelDialogJob: (jobName: string | null) => void
 }
 
@@ -224,6 +226,18 @@ export function useJobsData(): UseJobsDataReturn {
     })
   }
 
+  /**
+   * Opens a job's logs without closing them if they are already open.
+   *
+   * Arriving from the app bar's progress widget means "show me what this is
+   * doing", and a toggle would close the logs of anyone who had already opened
+   * them — including on a second click of the same link, which is the natural
+   * thing to do when the first one did not seem to work.
+   */
+  const expandLogs = (jobName: string) => {
+    setExpandedLogs((prev) => (prev.has(jobName) ? prev : new Set(prev).add(jobName)))
+  }
+
   const handleUpdateConfig = async (jobName: string, config: UpdateJobConfigParams) => {
     const response = await fetch(`/api/jobs/${jobName}/config`, {
       method: 'PATCH',
@@ -262,6 +276,7 @@ export function useJobsData(): UseJobsDataReturn {
     handleCancelJob,
     handleUpdateConfig,
     toggleLogs,
+    expandLogs,
     setCancelDialogJob,
   }
 }
