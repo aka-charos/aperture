@@ -252,8 +252,16 @@ export async function getCandidateEmbeddings(
   }
 
   // Embed what is missing, or what now has a richer document than the cached
-  // vector was built from. Ordered by the candidate array, which arrives
-  // score-ordered, so a capped run embeds the titles nearest the top first.
+  // vector was built from.
+  //
+  // Order is the candidate array's, which is NOT score-ordered and cannot be:
+  // this runs inside scoreCandidates, before anything has been scored. It is
+  // mergeWithPool's order -- the viewer's personalized candidates first, then
+  // the pool -- which is a defensible priority for a capped run, since the
+  // personalized ones are the picks made for this viewer specifically. The pool
+  // half is ordered by how recently a source last offered the title
+  // (getPoolCandidates), so within it the priority is arbitrary. Nothing better
+  // is available without scoring first, and scoring needs these vectors.
   const stale = candidates.filter((c) => {
     const hash = hashText(documents.get(c.tmdbId) ?? '')
     const previous = cachedHash.get(c.tmdbId)

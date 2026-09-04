@@ -356,10 +356,36 @@ export async function getPoolCandidates(
     created_at: Date
     updated_at: Date
   }>(
+    // ORDER BY decides which rows SURVIVE the LIMIT, so it must be a quantity
+    // every row shares. `popularity DESC NULLS LAST` was not: the column holds
+    // TMDb's metric, a Trakt watcher count and NULL for a source with no
+    // popularity signal at all (migration 0162), so once the pool outgrew
+    // maxPoolCandidates the cap stopped being a bound and became a filter --
+    // dropping every Trakt-only title first, then the least globally popular.
+    //
+    // That last part is the one worth naming: this is a cap for a list scored
+    // IN MEMORY per viewer, a resource bound and not a quality judgement, and
+    // ranking is what the scorer exists to do afterwards. Truncating by global
+    // popularity removes the niche title that best matches one person's taste
+    // before it can ever be scored -- on the feature whose whole purpose is
+    // personalization, with similarity carrying more of the blend than
+    // popularity does.
+    //
+    // `updated_at` is a unit every row shares: how recently a source last
+    // offered this title. It is not an ideal answer -- a whole night's batch
+    // shares a timestamp, so within a batch it decides nothing -- but it is an
+    // honest one, and it cannot fragment the way a mixed unit does. The
+    // tmdb_id tiebreak makes truncation deterministic; without it Postgres may
+    // order ties freely and which rows survive would vary between runs, which
+    // is the defect 0162 just removed from `sources`.
+    //
+    // Inert when measured (279 movies, 263 series against a cap of 3,000), and
+    // changed anyway: the trigger is an admin raising poolMaxAgeDays, and by
+    // then nobody remembers the column holds three units.
     `SELECT * FROM discovery_pool
      WHERE media_type = $1
        ${options.maxAgeDays != null ? `AND updated_at >= NOW() - INTERVAL '1 day' * $2::int` : ''}
-     ORDER BY popularity DESC NULLS LAST
+     ORDER BY updated_at DESC, tmdb_id ASC
      ${options.limit != null ? `LIMIT $${options.maxAgeDays != null ? 3 : 2}` : ''}`,
     [
       mediaType,
