@@ -226,14 +226,31 @@ function popularityRange(values: number[]): { min: number; max: number } {
  * `normalize` returns 0.5 for all of them -- which is the honest answer: we have
  * no popularity signal for these titles, not "these titles are unpopular".
  *
+ * The group is `popularitySource` -- who supplied the NUMBER -- and only falls
+ * back to `source` for a candidate straight from a fetcher, where they are the
+ * same thing. They diverge on a pool row: `sources` records every source that
+ * ever offered the title while `popularity` holds whichever one last supplied a
+ * figure, and the array's order was not even stable. Measured live, 16 of 279
+ * pooled movies listed a Trakt source first while carrying a TMDb-scaled
+ * number, so they were normalised inside a 4.13-point window instead of the
+ * 873-point one they belong to: a title at popularity 33.01 scored 1.00 rather
+ * than 0.006, on a term carrying 27% of the blend. Migration 0162 records the
+ * provenance of the number so the unit and the label cannot drift.
+ *
  * Pure and exported so the neutral case can be pinned without a database.
  */
 export function popularityScoresBySource(candidates: RawCandidate[]): Map<number, number> {
+  // An unlabelled figure is its own group rather than being folded in with a
+  // named one. That is the honest treatment of an unknown unit, and it is what
+  // a pool row written before 0162 and not since re-upserted looks like.
+  const groupOf = (c: RawCandidate): string => c.popularitySource ?? c.source
+
   const bySource = new Map<string, number[]>()
   for (const c of candidates) {
-    const list = bySource.get(c.source)
+    const group = groupOf(c)
+    const list = bySource.get(group)
     if (list) list.push(c.popularity)
-    else bySource.set(c.source, [c.popularity])
+    else bySource.set(group, [c.popularity])
   }
 
   const ranges = new Map<string, { min: number; max: number }>()
@@ -243,7 +260,7 @@ export function popularityScoresBySource(candidates: RawCandidate[]): Map<number
 
   const scores = new Map<number, number>()
   for (const c of candidates) {
-    const range = ranges.get(c.source) ?? { min: 0, max: 0 }
+    const range = ranges.get(groupOf(c)) ?? { min: 0, max: 0 }
     scores.set(c.tmdbId, normalize(c.popularity, range.min, range.max))
   }
   return scores

@@ -39,10 +39,15 @@ import type { RawCandidate } from './types.js'
  * obvious. The field does not hold one quantity -- it is TMDb's unbounded
  * metric for the TMDb sources, a Trakt watcher count for `trakt_trending`, and
  * a hardcoded 0 for `trakt_popular`/`trakt_recommendations` -- and
- * `popularityScoresBySource` normalises it within the group named by `source`.
- * Taking the pool's number while keeping the personalized label would file a
- * TMDb-scaled value under a group of zeros and normalise it to 1.0. The unit
- * and the label have to travel together.
+ * `popularityScoresBySource` normalises it within the group its unit names.
+ * Taking the pool's number would import a TMDb-scaled value into a candidate
+ * whose own unit is something else entirely.
+ *
+ * `popularitySource` therefore stays untouched alongside it. Both ride the
+ * spread of `candidate` and neither is overridden below, which is what keeps
+ * them paired -- the pairing migration 0162 exists to enforce. If a reason ever
+ * appears to take the pool's popularity here, its `popularitySource` has to
+ * come with it in the same expression.
  */
 export function fillFromPoolRow(candidate: RawCandidate, pool: RawCandidate): RawCandidate {
   // The pool's cached cast is only trustworthy alongside the flag: enrichFullData

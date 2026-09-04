@@ -199,6 +199,21 @@ export interface RawCandidate {
   voteCount: number
   popularity: number
   source: DiscoverySource
+  /**
+   * Which source supplied `popularity`, and therefore what unit it is in.
+   *
+   * Separate from `source` because they answer different questions and only
+   * looked like one field. `source` is provenance of the RECOMMENDATION and
+   * drives `calculateSourceScore`; this is provenance of the NUMBER and drives
+   * which group `popularityScoresBySource` normalises it inside. They diverge
+   * on a pool row that several sources contributed to: the array records every
+   * source that ever offered the title, while `popularity` holds whichever one
+   * last supplied a figure. See migration 0162.
+   *
+   * Absent means "the same source that made the recommendation", which is true
+   * of every candidate that arrives straight from a fetcher.
+   */
+  popularitySource?: DiscoverySource
   sourceMediaId?: number
   // Cast/crew metadata
   castMembers?: CastMember[]
@@ -289,6 +304,8 @@ export interface PoolCandidate {
   voteAverage: number | null
   voteCount: number | null
   popularity: number | null
+  /** Which source supplied `popularity` (migration 0162). NULL means unknown. */
+  popularitySource: GlobalDiscoverySource | null
   // Enrichment data
   castMembers: CastMember[] | null
   directors: string[] | null

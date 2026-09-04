@@ -173,3 +173,38 @@ test('every candidate gets a score', () => {
     assert.ok(score !== undefined && score >= 0 && score <= 1, `${c.tmdbId} -> ${score}`)
   }
 })
+
+test('the number is grouped by who measured it, not by who recommended it', () => {
+  // The live case, with the measured figures. A pool row lists every source
+  // that ever offered the title and `sources[0]` -- which becomes `source` --
+  // was not even in a stable order, while `popularity` holds whichever source
+  // last supplied a figure. 16 of 279 pooled movies listed a Trakt source first
+  // while carrying a TMDb-scaled number.
+  //
+  // Grouped by `source`, tmdbId 3 sits alone in a trakt_trending group and
+  // min-max hands it 0.5 -- or 1.0 with company -- when against the TMDb scale
+  // it belongs near the floor.
+  const scores = popularityScoresBySource([
+    candidate({ tmdbId: 1, source: 'tmdb_discover', popularitySource: 'tmdb_discover', popularity: 901.11 }),
+    candidate({ tmdbId: 2, source: 'tmdb_discover', popularitySource: 'tmdb_discover', popularity: 28.01 }),
+    candidate({ tmdbId: 3, source: 'trakt_trending', popularitySource: 'tmdb_discover', popularity: 33.01 }),
+  ])
+
+  // (33.01 - 28.01) / (901.11 - 28.01) = 0.00573
+  assert.ok(scores.get(3)! < 0.01, `expected a floor-adjacent score, got ${scores.get(3)}`)
+  assert.equal(scores.get(1), 1)
+  assert.equal(scores.get(2), 0)
+})
+
+test('an unlabelled figure falls back to the source that recommended it', () => {
+  // A pool row written before migration 0162 and not since re-upserted. Absent
+  // means "the same source", which is true of anything straight from a fetcher.
+  const scores = popularityScoresBySource([
+    candidate({ tmdbId: 1, source: 'trakt_trending', popularity: 500 }),
+    candidate({ tmdbId: 2, source: 'trakt_trending', popularity: 10 }),
+    candidate({ tmdbId: 3, source: 'tmdb_discover', popularity: 5000 }),
+  ])
+
+  assert.equal(scores.get(1), 1)
+  assert.equal(scores.get(2), 0)
+})
