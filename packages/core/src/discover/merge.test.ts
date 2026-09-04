@@ -162,12 +162,38 @@ test('a title repeated within the personalized list appears once', () => {
   assert.equal(merged[0].source, 'trakt_recommendations')
 })
 
-test('a release year of zero is not mistaken for a missing one', () => {
-  // `??` rather than `||` on this field: releaseYear is a number, and while 0 is
-  // not a real year it is also not what "absent" looks like here (that is null).
+test('a missing release year is filled from the pool', () => {
   const merged = fillFromPoolRow(
     traktCandidate({ releaseYear: null }),
     poolRow({ releaseYear: 1999 })
   )
   assert.equal(merged.releaseYear, 1999)
+})
+
+test('a release year of zero is absence, not a year, so the pool wins', () => {
+  // There is no year 0 in the calendar, so a 0 can only be bad data -- and
+  // calculateRecencyScore already reads it as unknown, since its guard is
+  // `!candidate.releaseYear`. Keeping it would preserve the worse value.
+  const merged = fillFromPoolRow(
+    traktCandidate({ releaseYear: 0 }),
+    poolRow({ releaseYear: 1999 })
+  )
+  assert.equal(merged.releaseYear, 1999)
+})
+
+test('a runtime of zero is absence too', () => {
+  const merged = fillFromPoolRow(
+    traktCandidate({ runtimeMinutes: 0 }),
+    poolRow({ runtimeMinutes: 139 })
+  )
+  assert.equal(merged.runtimeMinutes, 139)
+})
+
+test('a real value is never replaced by the pool, even a smaller one', () => {
+  const merged = fillFromPoolRow(
+    traktCandidate({ releaseYear: 1977, runtimeMinutes: 90 }),
+    poolRow({ releaseYear: 1999, runtimeMinutes: 139 })
+  )
+  assert.equal(merged.releaseYear, 1977)
+  assert.equal(merged.runtimeMinutes, 90)
 })

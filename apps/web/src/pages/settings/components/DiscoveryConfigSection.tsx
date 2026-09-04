@@ -198,6 +198,31 @@ export function DiscoveryConfigSection() {
   const share = (v: number) => (weightTotal > 0 ? `${Math.round((v / weightTotal) * 100)}%` : '—')
 
   const pct = (v: number | undefined) => (typeof v === 'number' ? `${Math.round(v)}%` : '—')
+
+  /**
+   * The configured share, computed LOCALLY rather than taken from the blend
+   * response.
+   *
+   * The response carries the server's stored config, which stops matching the
+   * moment a slider moves — and the share is already printed beside each
+   * slider, so taking it from the server would put two different numbers for
+   * the same term on one card. Both columns are then individually true: this is
+   * what you have it set to, that is what recent runs did. The one subtlety —
+   * those runs happened under whatever was set at the time — is what the
+   * footnote says out loud, and `weightsNote` above already warns that changes
+   * land on the next run.
+   */
+  const configuredPct = (term: BlendTerm): number | undefined => {
+    if (weightTotal <= 0) return undefined
+    const weights: Record<BlendTerm, number> = {
+      similarity: config.similarityWeight,
+      popularity: config.popularityWeight,
+      recency: config.recencyWeight,
+      source: sourceTermWeight,
+    }
+    return (weights[term] / weightTotal) * 100
+  }
+
   const measured = blend.filter((b) => b.realised !== null)
   const blendRows: { term: BlendTerm; label: string }[] = [
     { term: 'similarity', label: t('settingsDiscovery.similarityWeight') },
@@ -440,10 +465,10 @@ export function DiscoveryConfigSection() {
                         variant="body2"
                         sx={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
                       >
-                        {pct(measured[0]?.configured?.[term])}
+                        {pct(configuredPct(term))}
                       </Typography>
                       {measured.map((b) => {
-                        const configuredShare = b.configured?.[term]
+                        const configuredShare = configuredPct(term)
                         const realisedShare = b.realised?.[term]
                         // Flagged only when the gap is big enough to change a
                         // decision. Colouring every rounding difference would
