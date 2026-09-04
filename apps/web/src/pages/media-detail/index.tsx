@@ -10,6 +10,7 @@ import {
   MediaInfoCard,
   SeasonsList,
   MissingSeasonsCard,
+  ReportIssueCard,
   SimilarMedia,
   MovieInsights,
   TitleAnalysis,
@@ -166,6 +167,17 @@ export function MediaDetailPage({
               {/* Episodes List (Series only) */}
               {isSeries(media) && Object.keys(seasons).length > 0 && (
                 <SeasonsList seasons={seasons} seasonAvailability={seasonAvailability} />
+              )}
+              {/* Report a problem with this title. Self-hiding when the
+                  request backend has no record of it, so it costs nothing on
+                  an instance without one. */}
+              {media.tmdb_id && (
+                <ReportIssueCard
+                  title={media.title}
+                  tmdbId={Number(media.tmdb_id)}
+                  mediaType={mediaType}
+                  seasons={Object.keys(seasons).map(Number).filter((n) => Number.isFinite(n) && n > 0)}
+                />
               )}
             </Box>
           </Grid>

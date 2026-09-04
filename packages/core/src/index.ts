@@ -1036,6 +1036,11 @@ export {
   // Request Management
   createRequest as createSeerrRequest,
   updateRequestStatus as updateSeerrRequestStatus,
+  // Issues
+  createIssue as createSeerrIssue,
+  listIssues as listSeerrIssues,
+  getIssue as getSeerrIssue,
+  createIssueComment as createSeerrIssueComment,
   getRequest as getSeerrRequest,
   getRequestStatus as getSeerrRequestStatus,
   deleteRequest as deleteSeerrRequest,
@@ -1048,6 +1053,13 @@ export {
   // Types
   type SeerrConfig,
   type SeerrCallResult,
+  type SeerrActAs,
+  type SeerrIssue,
+  type SeerrIssueComment,
+  type SeerrIssueListResponse,
+  type SeerrIssueTypeCode,
+  type SeerrIssueStatusCode,
+  type SeerrCreateIssueBody,
   type SeerrUser,
   type ApertureUserProfileForSeerr,
   type SeerrMediaInfo,
