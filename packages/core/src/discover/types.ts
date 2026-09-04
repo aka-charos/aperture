@@ -35,7 +35,15 @@ export type DiscoveryRequestStatus =
   | 'failed'
 
 /** Where the Seerr request was initiated */
-export type DiscoveryRequestSource = 'discovery' | 'gap_analysis'
+/**
+ * Where a request came from.
+ *
+ * `direct` is someone searching for a title and asking for it, which is a
+ * different act from accepting a suggestion the Discovery run produced — and
+ * the distinction is the whole value of the column, since it separates what
+ * the recommender proposed from what people went looking for.
+ */
+export type DiscoveryRequestSource = 'discovery' | 'gap_analysis' | 'direct'
 
 export interface CastMember {
   id: number

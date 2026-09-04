@@ -26,6 +26,7 @@ import {
   listSonarrServers,
   getSonarrServerDetails,
   type DiscoveryRequestStatus,
+  type DiscoveryRequestSource,
 } from '@aperture/core'
 import {
   seerrSchemas,
@@ -46,6 +47,7 @@ import {
   decideRequestSchema,
 } from './schemas.js'
 import { resolveSearchSource } from './sources/index.js'
+import { pickRequestOverrides, resolveRequestSource } from './requestOptions.js'
 
 /**
  * The Seerr user to act as for this Aperture user, or null to act as the API
@@ -386,7 +388,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
    * GET /api/seerr/service/radarr
    * List Radarr servers (for movie request options)
    */
-  fastify.get('/api/seerr/service/radarr', { preHandler: requireAuth, schema: listRadarrServiceSchema }, async (request, reply) => {
+  fastify.get('/api/seerr/service/radarr', { preHandler: requireAdmin, schema: listRadarrServiceSchema }, async (request, reply) => {
     const currentUser = request.user as SessionUser
     const gate = await ensureUserCanRequestSeerr(currentUser.id)
     if (!gate.ok) return reply.status(gate.reply.status).send(gate.reply.body)
@@ -402,7 +404,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.get<{ Params: { id: string } }>(
     '/api/seerr/service/radarr/:id',
-    { preHandler: requireAuth, schema: getRadarrServiceSchema },
+    { preHandler: requireAdmin, schema: getRadarrServiceSchema },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
       const gate = await ensureUserCanRequestSeerr(currentUser.id)
@@ -422,7 +424,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * GET /api/seerr/service/sonarr
    */
-  fastify.get('/api/seerr/service/sonarr', { preHandler: requireAuth, schema: listSonarrServiceSchema }, async (request, reply) => {
+  fastify.get('/api/seerr/service/sonarr', { preHandler: requireAdmin, schema: listSonarrServiceSchema }, async (request, reply) => {
     const currentUser = request.user as SessionUser
     const gate = await ensureUserCanRequestSeerr(currentUser.id)
     if (!gate.ok) return reply.status(gate.reply.status).send(gate.reply.body)
@@ -438,7 +440,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.get<{ Params: { id: string } }>(
     '/api/seerr/service/sonarr/:id',
-    { preHandler: requireAuth, schema: getSonarrServiceSchema },
+    { preHandler: requireAdmin, schema: getSonarrServiceSchema },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
       const gate = await ensureUserCanRequestSeerr(currentUser.id)
@@ -471,24 +473,20 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
       serverId?: number
       languageProfileId?: number
       is4k?: boolean
+      source?: string
     }
   }>(
     '/api/seerr/request',
     { preHandler: requireAuth, schema: createRequestSchema },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
-      const {
-        tmdbId,
-        mediaType,
-        title,
-        discoveryCandidateId,
-        seasons,
-        rootFolder,
-        profileId,
-        serverId,
-        languageProfileId,
-        is4k,
-      } = request.body
+      const { tmdbId, mediaType, title, discoveryCandidateId, seasons } = request.body
+
+      // Overrides name real directories on the server, so what the caller may
+      // set is decided here rather than trusted from the body — the dialog
+      // that collects them is admin-only, but a dialog is UI.
+      const overrides = pickRequestOverrides(request.body, currentUser.isAdmin)
+      const requestSource = resolveRequestSource(request.body.source)
 
       // Check if Seerr is configured
       if (!await isSeerrConfigured()) {
@@ -537,7 +535,8 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
         mediaType,
         tmdbId,
         title,
-        discoveryCandidateId
+        discoveryCandidateId,
+        requestSource
       )
 
       // Submit to Seerr, acting as this user rather than as the API key's
@@ -545,14 +544,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
       // auto-approve setting. Unmapped users fall back to the API key's own
       // identity, which is what happened for everyone before.
       const seerrMediaType = mediaType === 'movie' ? 'movie' : 'tv'
-      const requestOptions = {
-        seasons,
-        ...(rootFolder !== undefined ? { rootFolder } : {}),
-        ...(profileId !== undefined ? { profileId } : {}),
-        ...(serverId !== undefined ? { serverId } : {}),
-        ...(languageProfileId !== undefined ? { languageProfileId } : {}),
-        ...(is4k !== undefined ? { is4k } : {}),
-      }
+      const requestOptions = { seasons, ...overrides }
 
       let result = await createSeerrRequest(tmdbId, seerrMediaType, {
         ...requestOptions,
@@ -636,8 +628,8 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
         mediaType: mediaType as 'movie' | 'series' | undefined,
         status: status as DiscoveryRequestStatus | undefined,
         source:
-          source === 'gap_analysis' || source === 'discovery'
-            ? (source as 'discovery' | 'gap_analysis')
+          source === 'gap_analysis' || source === 'discovery' || source === 'direct'
+            ? (source as DiscoveryRequestSource)
             : undefined,
       }
 

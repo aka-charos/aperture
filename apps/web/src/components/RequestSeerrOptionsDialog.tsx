@@ -16,6 +16,7 @@ import {
   Alert,
 } from '@mui/material'
 import type { SeerrRequestOptions } from '../types/seerrRequest'
+import { useAuth } from '@/hooks/useAuth'
 
 type RadarrServer = {
   id: number
@@ -43,6 +44,20 @@ interface RequestSeerrOptionsDialogProps {
   onConfirm: (options: SeerrRequestOptions) => void
 }
 
+/**
+ * Where a request is filed, and at what quality.
+ *
+ * Admin-only, and the gate lives HERE rather than at each of the six call
+ * sites. Every field on this dialog is an operator decision — a root folder is
+ * a real directory on the server, and showing `D:\Downloads\TV` to whoever
+ * opens the page hands out the filesystem layout and invites someone to file
+ * into a library that was never meant for them. A rule enforced by six callers
+ * is a rule one of them will forget the next time a Request button is added.
+ *
+ * For everyone else it is a pass-through: no dialog, no overrides, and Seerr
+ * applies its own defaults for that user. The server refuses these fields from
+ * a non-admin independently (`pickRequestOverrides`), because this is UI.
+ */
 export function RequestSeerrOptionsDialog({
   open,
   mediaType,
@@ -51,6 +66,17 @@ export function RequestSeerrOptionsDialog({
   onConfirm,
 }: RequestSeerrOptionsDialogProps) {
   const { t } = useTranslation()
+  const { user } = useAuth()
+  const isAdmin = user?.isAdmin ?? false
+
+  // Confirm straight through for a viewer, so the caller's flow (options →
+  // seasons → submit) is unchanged and simply has nothing to ask about here.
+  // Keyed on `open` so it fires once per opening rather than once per render.
+  useEffect(() => {
+    if (open && !isAdmin) {
+      onConfirm({})
+    }
+  }, [open, isAdmin, onConfirm])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [servers, setServers] = useState<(RadarrServer | SonarrServer)[]>([])
@@ -81,7 +107,10 @@ export function RequestSeerrOptionsDialog({
   }, [])
 
   useEffect(() => {
-    if (!open) {
+    // A viewer never sees this dialog, and the service endpoints are admin-only
+    // now — so without this guard every non-admin request fires a 403 that
+    // nothing renders and only the log remembers.
+    if (!open || !isAdmin) {
       resetState()
       return
     }
@@ -116,7 +145,7 @@ export function RequestSeerrOptionsDialog({
     return () => {
       cancelled = true
     }
-  }, [open, isMovie, resetState, t])
+  }, [open, isAdmin, isMovie, resetState, t])
 
   useEffect(() => {
     if (!open || serverId === '') {
@@ -201,6 +230,9 @@ export function RequestSeerrOptionsDialog({
     }
     onConfirm(opts)
   }
+
+  // Nothing to render for a viewer — the effect above has already confirmed.
+  if (!isAdmin) return null
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>

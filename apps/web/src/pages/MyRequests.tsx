@@ -100,7 +100,14 @@ function statusColor(row: DiscoveryRequestRow): 'default' | 'primary' | 'seconda
   return 'default'
 }
 
-type SourceFilter = 'all' | 'discovery' | 'gap_analysis'
+type SourceFilter = 'all' | 'discovery' | 'gap_analysis' | 'direct'
+
+/** Label and tone for a request's origin, in one place so the chip and the filter agree. */
+function sourceChip(source: string | undefined): { key: string; color: 'default' | 'secondary' | 'primary' } {
+  if (source === 'gap_analysis') return { key: 'myRequests.sourceGapAnalysis', color: 'secondary' }
+  if (source === 'direct') return { key: 'myRequests.sourceDirect', color: 'primary' }
+  return { key: 'myRequests.sourceDiscovery', color: 'default' }
+}
 
 /** Whether an admin can still act on this row — Seerr has it and it is undecided. */
 function isActionable(row: DiscoveryRequestRow): boolean {
@@ -267,6 +274,7 @@ export function MyRequestsPage() {
             }}
           >
             <MenuItem value="all">{t('myRequests.sourceAll')}</MenuItem>
+            <MenuItem value="direct">{t('myRequests.sourceDirect')}</MenuItem>
             <MenuItem value="discovery">{t('myRequests.sourceDiscovery')}</MenuItem>
             <MenuItem value="gap_analysis">{t('myRequests.sourceGapAnalysis')}</MenuItem>
           </Select>
@@ -353,9 +361,9 @@ export function MyRequestsPage() {
                     <TableCell>
                       <Chip
                         size="small"
-                        label={r.source === 'gap_analysis' ? t('myRequests.sourceGapAnalysis') : t('myRequests.sourceDiscovery')}
+                        label={t(sourceChip(r.source).key)}
                         variant="outlined"
-                        color={r.source === 'gap_analysis' ? 'secondary' : 'default'}
+                        color={sourceChip(r.source).color}
                       />
                     </TableCell>
                     <TableCell>

@@ -3176,7 +3176,8 @@
     "decline": "Decline",
     "approved": "Approved {{title}}",
     "declined": "Declined {{title}}",
-    "decisionFailed": "Could not update the request"
+    "decisionFailed": "Could not update the request",
+    "sourceDirect": "Direct request"
   },
   "watchHistoryPage": {
     "title": "观看历史",
@@ -5081,6 +5082,8 @@
     "requestsDisabled": "Requests are not enabled for your account. Ask an admin to turn them on.",
     "errorSearch": "Search failed",
     "requestSubmitted": "Requested {{title}}",
-    "requestFailed": "Could not submit the request"
+    "requestFailed": "Could not submit the request",
+    "movies": "Movies",
+    "series": "TV shows"
   }
 }
