@@ -3046,6 +3046,8 @@
       "trailer": "Trailer",
       "aiMatchScore": "AI match score",
       "similarity": "Similarity",
+      "tasteRank": "Taste match",
+      "tasteRankValue": "#{{rank}} of {{total}}",
       "director": "Director",
       "createdBy": "Created by",
       "cast": "Cast",

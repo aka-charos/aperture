@@ -298,6 +298,24 @@ export function franchiseKeys(name: string): string[] {
 }
 
 /**
+ * Rank each candidate by taste similarity, strongest first, 1-based.
+ *
+ * Pure and exported because both of its ways of being wrong are silent and
+ * reach the user's screen: a rank starting at 0 renders "#0 of 245", and a sort
+ * in the wrong direction confidently presents the WEAKEST match as the best
+ * one. Neither is a type error and neither shows up in a log.
+ *
+ * Ties keep the input Map's order, which is the candidate array's, so the
+ * result is deterministic between runs rather than depending on sort internals.
+ */
+export function tasteSimilarityRanks(rawSimilarities: Map<number, number>): Map<number, number> {
+  const ranks = new Map<number, number>()
+  const ordered = [...rawSimilarities.entries()].sort((a, b) => b[1] - a[1])
+  ordered.forEach(([tmdbId], index) => ranks.set(tmdbId, index + 1))
+  return ranks
+}
+
+/**
  * Half-life in years for the recency term. At 12 years a title scores 0.5, at
  * 24 years 0.25, and so on -- it keeps approaching zero without ever reaching
  * it, so older titles stay ordered relative to each other.
@@ -526,6 +544,27 @@ export async function scoreCandidates(
   // Both measured once over the pool, not per candidate.
   const popularityScores = popularityScoresBySource(candidates)
 
+  // Where each candidate's taste similarity places among the candidates that
+  // HAVE one, strongest first.
+  //
+  // The stored `similarityScore` is min-max normalised, so its top is 1.0 and
+  // its bottom 0.0 by construction, and the detail card rendered that as a
+  // percentage: the best candidate in every batch read "100% similarity" and
+  // the worst "0%", whatever the real spread. Measured live that spread runs
+  // 0.43-0.66 in raw terms -- cosines of about -0.15 to +0.32 -- so a card
+  // claiming 0% was a hair behind one claiming 90%, and the same title read
+  // differently in a different batch.
+  //
+  // A rank needs no calibration to be true, survives a model change, and is
+  // what the number actually is. Carried in scoreBreakdown, which is JSONB with
+  // additionalProperties through the API, so this costs no migration.
+  // `similarityRaw` rides along for a future calibrated display; nothing shows
+  // it yet, because a raw band that never leaves 0.43-0.66 has a false FLOOR in
+  // exactly the way the normalised one has a false spread (see the cosine-band
+  // invariant -- the distribution has to be measured before it can be scaled).
+  const similarityRankOf = rawSimilarities.size
+  const similarityRanks = tasteSimilarityRanks(rawSimilarities)
+
   const scoredCandidates: ScoredCandidate[] = candidates.map(candidate => {
     // Taste match against the user's best-matching facet, rescaled across the
     // pool. A candidate we could not embed scores 0.5 -- neutral, so a missing
@@ -606,6 +645,17 @@ export async function scoreCandidates(
         popularity: popularityScore,
         recency: recencyScore,
         source: sourceScore,
+        // Absent -- not zero -- for a candidate with no vector, which has no
+        // place in a taste ranking at all. The card falls back to its old
+        // display when these are missing, which is also what every row stored
+        // before this change looks like.
+        ...(rawSimilarity !== undefined
+          ? {
+              similarityRaw: rawSimilarity,
+              similarityRank: similarityRanks.get(candidate.tmdbId) ?? 0,
+              similarityRankOf,
+            }
+          : {}),
       },
       // isEnriched will be set by the pipeline after lazy enrichment
       isEnriched: false,

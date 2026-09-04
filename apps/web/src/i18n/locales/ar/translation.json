@@ -1226,7 +1226,9 @@
       "cast": "يقذف",
       "castAs": "ك {{شخصية}}",
       "castUnavailable": "معلومات الإرسال غير متوفرة",
-      "loadingTmdb": "جارٍ تحميل التفاصيل الكاملة…"
+      "loadingTmdb": "جارٍ تحميل التفاصيل الكاملة…",
+      "tasteRank": "Taste match",
+      "tasteRankValue": "#{{rank}} of {{total}}"
     },
     "tabBrowsePopular": "TMDb شائع بشكل عام",
     "tabBrowseGenre": "شعبية حسب النوع",

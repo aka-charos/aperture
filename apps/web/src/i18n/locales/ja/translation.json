@@ -836,7 +836,9 @@
       "cast": "キャスト",
       "castAs": "{{文字}}として",
       "castUnavailable": "キャスト情報はありません",
-      "loadingTmdb": "詳細を読み込み中…"
+      "loadingTmdb": "詳細を読み込み中…",
+      "tasteRank": "Taste match",
+      "tasteRankValue": "#{{rank}} of {{total}}"
     },
     "tabBrowsePopular": "TMDb 全体的に人気",
     "tabBrowseGenre": "ジャンル別の人気",

@@ -611,7 +611,9 @@
       "cast": "Πρωταγωνιστές",
       "castAs": "ως {{character}}",
       "castUnavailable": "Δεν υπάρχουν διαθέσιμες πληροφορίες πρωταγωνιστών",
-      "loadingTmdb": "Φόρτωση πλήρων λεπτομερειών…"
+      "loadingTmdb": "Φόρτωση πλήρων λεπτομερειών…",
+      "tasteRank": "Taste match",
+      "tasteRankValue": "#{{rank}} of {{total}}"
     }
   },
   "settingsDiscoveryGenreStrips": {

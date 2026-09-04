@@ -1226,7 +1226,9 @@
       "cast": "Lancio",
       "castAs": "come {{carattere}}",
       "castUnavailable": "Informazioni sul cast non disponibili",
-      "loadingTmdb": "Caricamento dettagli completi..."
+      "loadingTmdb": "Caricamento dettagli completi...",
+      "tasteRank": "Taste match",
+      "tasteRankValue": "#{{rank}} of {{total}}"
     },
     "tabBrowsePopular": "TMDb popolare nel complesso",
     "tabBrowseGenre": "Popolare per genere",

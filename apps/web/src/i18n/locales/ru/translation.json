@@ -2557,7 +2557,9 @@
       "cast": "Бросать",
       "castAs": "как {{character}}",
       "castUnavailable": "Информация об актерах недоступна",
-      "loadingTmdb": "Загрузка полной информации…"
+      "loadingTmdb": "Загрузка полной информации…",
+      "tasteRank": "Taste match",
+      "tasteRankValue": "#{{rank}} of {{total}}"
     },
     "tabBrowsePopular": "TMDb в целом популярен",
     "tabBrowseGenre": "Популярный по жанру",

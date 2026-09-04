@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { maxTasteSimilarity, franchiseKeys } from './scorer.js'
+import { maxTasteSimilarity, franchiseKeys, tasteSimilarityRanks } from './scorer.js'
 
 /** Plain cosine, normalized to [0,1] the way the scorer reports similarity. */
 function normalizedCosine(a: number[], b: number[]): number {
@@ -138,4 +138,61 @@ test('an empty or whitespace name yields no keys', () => {
   // Guards the lookup map against a blank key that would match a blank title.
   assert.deepEqual(franchiseKeys(''), [])
   assert.deepEqual(franchiseKeys('   '), [])
+})
+
+// ---------------------------------------------------------------------------
+// tasteSimilarityRanks
+// ---------------------------------------------------------------------------
+
+test('the strongest taste match ranks first, not last', () => {
+  // The failure this guards is silent and user-facing: a sort in the wrong
+  // direction presents the WEAKEST match as #1 on the detail card, and nothing
+  // in a type or a log would say so.
+  const ranks = tasteSimilarityRanks(
+    new Map([
+      [10, 0.43],
+      [20, 0.66],
+      [30, 0.55],
+    ])
+  )
+
+  assert.equal(ranks.get(20), 1)
+  assert.equal(ranks.get(30), 2)
+  assert.equal(ranks.get(10), 3)
+})
+
+test('ranks are 1-based, so nothing renders as "#0 of n"', () => {
+  const ranks = tasteSimilarityRanks(new Map([[1, 0.5]]))
+  assert.equal(ranks.get(1), 1)
+})
+
+test('every candidate given a similarity gets a rank, and none is skipped', () => {
+  const input = new Map([
+    [1, 0.51],
+    [2, 0.49],
+    [3, 0.60],
+    [4, 0.44],
+  ])
+  const ranks = tasteSimilarityRanks(input)
+
+  assert.equal(ranks.size, input.size)
+  assert.deepEqual([...ranks.values()].sort((a, b) => a - b), [1, 2, 3, 4])
+})
+
+test('ties keep input order, so the ranking is stable between runs', () => {
+  const ranks = tasteSimilarityRanks(
+    new Map([
+      [7, 0.5],
+      [8, 0.5],
+      [9, 0.5],
+    ])
+  )
+
+  assert.equal(ranks.get(7), 1)
+  assert.equal(ranks.get(8), 2)
+  assert.equal(ranks.get(9), 3)
+})
+
+test('no similarities means no ranks rather than a phantom first place', () => {
+  assert.equal(tasteSimilarityRanks(new Map()).size, 0)
 })

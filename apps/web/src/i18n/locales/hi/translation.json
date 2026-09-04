@@ -1226,7 +1226,9 @@
       "cast": "ढालना",
       "castAs": "{{चरित्र}} के रूप में",
       "castUnavailable": "कास्ट की जानकारी उपलब्ध नहीं है",
-      "loadingTmdb": "पूरी जानकारी लोड हो रही है..."
+      "loadingTmdb": "पूरी जानकारी लोड हो रही है...",
+      "tasteRank": "Taste match",
+      "tasteRankValue": "#{{rank}} of {{total}}"
     },
     "tabBrowsePopular": "टीएमडीबी कुल मिलाकर लोकप्रिय है",
     "tabBrowseGenre": "शैली के अनुसार लोकप्रिय",

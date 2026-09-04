@@ -1226,7 +1226,9 @@
       "cast": "Besetzung",
       "castAs": "als {{character}}",
       "castUnavailable": "Besetzungsinformationen nicht verfügbar",
-      "loadingTmdb": "Lade vollständige Details…"
+      "loadingTmdb": "Lade vollständige Details…",
+      "tasteRank": "Taste match",
+      "tasteRankValue": "#{{rank}} of {{total}}"
     },
     "tabBrowsePopular": "TMDb beliebteste insgesamt",
     "tabBrowseGenre": "Beliebt nach Genre",
