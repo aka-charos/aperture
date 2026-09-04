@@ -52,6 +52,23 @@ interface DiscoveryConfig {
 
 type Bounds = Record<string, { min: number; max: number }>
 
+type BlendTerm = 'similarity' | 'popularity' | 'recency' | 'source'
+
+/**
+ * What the weights claim against what they actually do.
+ *
+ * Percentages arrive decided from the API. The web bundle never imports core,
+ * and this is the blend arithmetic itself -- a hand copy here would be the one
+ * that drifts the first time the scorer is retuned.
+ */
+interface BlendDiagnostics {
+  mediaType: 'movie' | 'series'
+  runs: number
+  candidates: number
+  configured: Record<BlendTerm, number>
+  realised: Record<BlendTerm, number> | null
+}
+
 const TRAKT_PERIODS: TraktPeriod[] = ['daily', 'weekly', 'monthly', 'yearly', 'all']
 
 const gridSx = {
@@ -68,6 +85,8 @@ export function DiscoveryConfigSection() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [blend, setBlend] = useState<BlendDiagnostics[]>([])
+  const [sourceTermWeight, setSourceTermWeight] = useState(0)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -80,6 +99,10 @@ export function DiscoveryConfigSection() {
       const data = await res.json()
       setConfig(data.config)
       setBounds(data.bounds ?? {})
+      // Absent means an API that predates the field, in which case the shares
+      // sum over the three sliders exactly as they used to. Defaulting to 0.1
+      // here would reintroduce the hand copy this field exists to remove.
+      setSourceTermWeight(typeof data.sourceTermWeight === 'number' ? data.sourceTermWeight : 0)
       setError(null)
     } catch {
       setError(t('settingsDiscovery.loadFailed'))
@@ -88,9 +111,28 @@ export function DiscoveryConfigSection() {
     }
   }, [t])
 
+  /**
+   * Fetched separately and allowed to fail in silence. It is an aggregate over
+   * every stored candidate, so it is slower than the config and it is absent
+   * until a run has happened -- neither of which should stop the sliders
+   * rendering. A card that cannot be tuned because a diagnostic is missing is
+   * worse than one that cannot show the diagnostic.
+   */
+  const loadBlend = useCallback(async () => {
+    try {
+      const res = await fetch('/api/discovery/blend', { credentials: 'include' })
+      if (!res.ok) return
+      const data = await res.json()
+      setBlend(Array.isArray(data.blend) ? data.blend : [])
+    } catch {
+      // Left as it was; the panel simply shows configured shares alone.
+    }
+  }, [])
+
   useEffect(() => {
     load()
-  }, [load])
+    loadBlend()
+  }, [load, loadBlend])
 
   // Functional update: these fire in quick succession while typing or dragging,
   // and closing over `config` would drop all but the last.
@@ -148,8 +190,21 @@ export function DiscoveryConfigSection() {
     return <Alert severity="error">{error ?? t('settingsDiscovery.loadFailed')}</Alert>
   }
 
-  const weightTotal = config.similarityWeight + config.popularityWeight + config.recencyWeight
+  // The source-quality term has no slider but is a real claimant on the same
+  // budget: the scorer divides by a total that includes it. Leaving it out is
+  // what made this card report 50/30/20 for a blend that is 45.5/27.3/18.2/9.1.
+  const weightTotal =
+    config.similarityWeight + config.popularityWeight + config.recencyWeight + sourceTermWeight
   const share = (v: number) => (weightTotal > 0 ? `${Math.round((v / weightTotal) * 100)}%` : '—')
+
+  const pct = (v: number | undefined) => (typeof v === 'number' ? `${Math.round(v)}%` : '—')
+  const measured = blend.filter((b) => b.realised !== null)
+  const blendRows: { term: BlendTerm; label: string }[] = [
+    { term: 'similarity', label: t('settingsDiscovery.similarityWeight') },
+    { term: 'popularity', label: t('settingsDiscovery.popularityWeight') },
+    { term: 'recency', label: t('settingsDiscovery.recencyWeight') },
+    { term: 'source', label: t('settingsDiscovery.sourceWeight') },
+  ]
 
   return (
     <Stack spacing={3}>
@@ -333,6 +388,94 @@ export function DiscoveryConfigSection() {
           <Typography variant="caption" color="text.secondary">
             {t('settingsDiscovery.weightsNote')}
           </Typography>
+
+          {/*
+            What the weights CLAIM against what they DO.
+            A term's real influence is its share times the range it actually
+            uses, so two terms with the same weight move the ranking by
+            different amounts when their spreads differ. Reported rather than
+            silently corrected: correcting it was simulated on live data and
+            bought no better matching, only a trade of new-and-obscure for
+            old-and-popular -- which is an operator's preference, not a defect.
+          */}
+          {measured.length > 0 && (
+            <Box id="discovery-weight-measured" sx={{ mt: 2.5 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                {t('settingsDiscovery.measuredTitle')}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                {t('settingsDiscovery.measuredBlurb')}
+              </Typography>
+
+              <Box sx={{ overflowX: 'auto' }}>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: `minmax(9rem, 1.4fr) repeat(${measured.length + 1}, minmax(4.5rem, 1fr))`,
+                    columnGap: 2,
+                    rowGap: 0.75,
+                    minWidth: '22rem',
+                    alignItems: 'baseline',
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary" />
+                  <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'right' }}>
+                    {t('settingsDiscovery.measuredConfigured')}
+                  </Typography>
+                  {measured.map((b) => (
+                    <Typography
+                      key={`head-${b.mediaType}`}
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ textAlign: 'right' }}
+                    >
+                      {t(`settingsDiscovery.measured_${b.mediaType}`)}
+                    </Typography>
+                  ))}
+
+                  {blendRows.map(({ term, label }) => (
+                    <Box key={term} sx={{ display: 'contents' }}>
+                      <Typography variant="body2">{label}</Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                      >
+                        {pct(measured[0]?.configured?.[term])}
+                      </Typography>
+                      {measured.map((b) => {
+                        const configuredShare = b.configured?.[term]
+                        const realisedShare = b.realised?.[term]
+                        // Flagged only when the gap is big enough to change a
+                        // decision. Colouring every rounding difference would
+                        // make the whole column look broken.
+                        const drifted =
+                          typeof configuredShare === 'number' &&
+                          typeof realisedShare === 'number' &&
+                          Math.abs(realisedShare - configuredShare) >= 5
+                        return (
+                          <Typography
+                            key={`${term}-${b.mediaType}`}
+                            variant="body2"
+                            color={drifted ? 'warning.main' : 'text.primary'}
+                            sx={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                          >
+                            {pct(realisedShare)}
+                          </Typography>
+                        )
+                      })}
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
+                {t('settingsDiscovery.measuredFootnote', {
+                  runs: measured.reduce((n, b) => n + b.runs, 0),
+                  candidates: measured.reduce((n, b) => n + b.candidates, 0),
+                })}
+              </Typography>
+            </Box>
+          )}
         </CardContent>
       </Card>
 

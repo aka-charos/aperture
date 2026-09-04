@@ -65,7 +65,19 @@ export {
 export {
   scoreCandidates,
   popularityScoresBySource,
+  tasteSimilarityRanks,
+  SOURCE_TERM_WEIGHT,
 } from './scorer.js'
+
+// Blend diagnostics (what the weights claim vs what they do)
+export {
+  getDiscoveryBlendDiagnostics,
+  configuredBlendShares,
+  realisedBlendShares,
+  type BlendDiagnostics,
+  type BlendTerms,
+  type TermSpreads,
+} from './blendDiagnostics.js'
 
 // Storage
 export {

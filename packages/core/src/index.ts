@@ -1104,6 +1104,12 @@ export {
   // Scorer
   scoreCandidates,
   popularityScoresBySource,
+  tasteSimilarityRanks,
+  SOURCE_TERM_WEIGHT,
+  // Blend diagnostics
+  getDiscoveryBlendDiagnostics,
+  configuredBlendShares,
+  realisedBlendShares,
   // Storage
   createDiscoveryRun,
   updateDiscoveryRunStats,
