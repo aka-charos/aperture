@@ -173,36 +173,63 @@ async function runDiscoveryForUser(
     }
 
     // Step 4: score and rank
-    const allScoredCandidates = await scoreCandidates(user.id, mediaType, filteredCandidates, config)
+    const { candidates: allScoredCandidates, taste } = await scoreCandidates(
+      user.id,
+      mediaType,
+      filteredCandidates,
+      config
+    )
 
     const maxTotal = config.maxTotalCandidates || 200
     const candidatesToStore = allScoredCandidates.slice(0, maxTotal)
 
     await updateDiscoveryRunStats(runId, { candidatesScored: candidatesToStore.length })
 
-    // Report the taste term's realised spread to the job console.
+    // Report the taste term's RAW spread to the job console.
     //
     // This is the one number that says whether the taste half of the scorer is
     // actually running. It was the constant 0.5 for every candidate on every
     // run for as long as the feature existed, and nothing said so -- the run
     // looked healthy, the log looked healthy, and popularity silently decided
-    // the order. A spread of zero here means every candidate scored alike, so
-    // the term is contributing nothing to the ranking whatever its weight says.
+    // the order.
+    //
+    // The first version of this line read `candidatesToStore[].similarityScore`,
+    // which is the value AFTER min-max normalisation across the pool -- so it
+    // printed `0.00–1.00` on every run where any two candidates differed, and
+    // could distinguish only "completely flat" from "not flat". The band that
+    // started the whole investigation was 0.037 wide and would have rendered
+    // identically. Raw figures are the diagnostic; they come from the scorer
+    // because the normalisation destroys them.
     //
     // Emitted with addLog rather than the logger because the container log is
     // not where an operator looks after a deploy.
     if (jobId && candidatesToStore.length > 0) {
-      const similarities = candidatesToStore.map((c) => c.similarityScore)
-      const low = Math.min(...similarities)
-      const high = Math.max(...similarities)
-      const spread = high - low
-      addLog(
-        jobId,
-        spread > 0 ? 'info' : 'warn',
-        spread > 0
-          ? `🎯 ${user.username}: taste match ${low.toFixed(2)}–${high.toFixed(2)} across ${candidatesToStore.length} ${mediaType}s`
-          : `⚠️ ${user.username}: taste match is flat at ${low.toFixed(2)} across ${candidatesToStore.length} ${mediaType}s — the taste term is not ranking anything. Most often a taste profile built under a different embedding model: run rebuild-taste-profiles.`
-      )
+      const { compared, candidateCount, rawMin, rawMax } = taste
+      const spread = rawMin != null && rawMax != null ? rawMax - rawMin : 0
+
+      if (compared === 0) {
+        addLog(
+          jobId,
+          'warn',
+          `⚠️ ${user.username}: no ${mediaType} candidate could be compared against the taste profile — the term is contributing nothing. Most often a taste profile built under a different embedding model: run rebuild-taste-profiles.`
+        )
+      } else if (spread <= 0) {
+        addLog(
+          jobId,
+          'warn',
+          `⚠️ ${user.username}: taste match is flat at ${(rawMin ?? 0).toFixed(3)} across ${compared} ${mediaType}s — the taste term is not ranking anything.`
+        )
+      } else {
+        // `compared` beside the count is the tell that separates "could not
+        // compare" from "compared and disagreed usefully"; both look like a
+        // healthy run without it.
+        const partial = compared < candidateCount ? `, ${compared}/${candidateCount} comparable` : ''
+        addLog(
+          jobId,
+          spread < 0.05 ? 'warn' : 'info',
+          `🎯 ${user.username}: taste match ${rawMin!.toFixed(3)}–${rawMax!.toFixed(3)} (spread ${spread.toFixed(3)}) across ${candidatesToStore.length} ${mediaType}s${partial}`
+        )
+      }
     }
 
     // Step 5: lazy enrichment -- only the top slice gets cast/crew/runtime.

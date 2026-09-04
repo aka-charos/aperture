@@ -447,8 +447,10 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
           })
         }
 
-        // Score the candidates (quick scoring without embeddings)
-        const scoredCandidates = await scoreCandidates(
+        // Score the candidates. The taste diagnostics are for the job console,
+        // which this path does not have -- an expand-filters request answers a
+        // person waiting on a list, not an operator reading a run.
+        const { candidates: scoredCandidates } = await scoreCandidates(
           currentUser.id,
           coreMediaType,
           filteredCandidates,
