@@ -1427,6 +1427,39 @@ Three ways out, and **the obvious one is a trap**. Storing and showing the raw v
 
 So: **say what the number is.** `tasteSimilarityRanks` (pure, exported, pinned) ranks candidates by raw similarity, and the card reads *"#12 of 245"*. True without calibration, stable across a model change, and more useful to someone deciding what to request. It rides in `scoreBreakdown` — JSONB with `additionalProperties` through the API — so it costs **no migration**, and `similarityRaw` rides along for a future calibrated display that nothing shows yet. Absent, not zero, for a candidate with no vector, which has no place in a taste ranking at all; rows stored before this keep the old percentage. The rank function is pinned because both of its ways of being wrong are silent and user-facing: 0-based renders *"#0 of 245"*, and a sort in the wrong direction confidently presents the **weakest** match as the best one.
 
-#### One thing deliberately not changed
+#### The one deliberately not changed, measured and rejected
 
-**Two of the four scoring terms are normalised and two are not.** Similarity and popularity are min-max'd across the pool and realise the full [0,1]; recency is `0.5^(age/12)` over a pool skewed recent and realises perhaps [0.6, 1.0], while source is a lookup table spanning [0.5, 1.0]. By [F-058](#f-058)'s own argument — influence is weight share × realised spread — a configured recency weight of 0.2 buys roughly 0.08 of movement while similarity's 0.5 buys the whole 0.5. The Discovery tuning panel now invites an operator to reason about those four numbers, which raises the cost of them meaning something other than what they say. Correcting it is [F-059](#f-059)'s gain treatment applied to a second pipeline, and worth doing deliberately rather than as a footnote to a bug fix.
+The entry above recorded the weights as a real discrepancy wanting a measured before/after. It got one (`scripts/probe-discovery-weights.sql`), and **the correction was rejected** — F-060's outcome for a different reason.
+
+**The first estimate here was wrong, and in the direction that matters.** It predicted recency would be *compressed* and under-deliver. Measured across twenty runs, recency has the **largest** spread of the four (sd 0.348 movie, 0.294 series, against similarity's 0.210 and 0.194) and spans the full 0.000–1.000. The assumption behind the estimate — that the candidate pool skews recent — was simply false: the personalized sources draw on watch history, which spans decades.
+
+| term | configured | realised (movie) | realised (series) |
+|---|---:|---:|---:|
+| similarity | 45.5% | 43.9% | 43.3% |
+| popularity | 27.3% | **18.9%** | **21.8%** |
+| recency | 18.2% | **29.1%** | **26.2%** |
+| source | 9.1% | 8.1% | 8.7% |
+
+Both confounds were checked and are dead. Missing release years are 6 of 2,528 movies and 11 of 3,310 series, and `recency_zero` equals `no_year` **exactly** in both — consistent, since `0.5^(age/12)` cannot reach 0.000 for any real film (a 1900 release decays to 0.001). So the spread is real and not a metadata artifact. The recency/popularity correlation is +0.031 for movies and −0.191 for series, so the terms do not meaningfully double-count.
+
+**And the mechanism is not the one first named.** "Unnormalised terms under-deliver" is wrong. Two different things are happening: popularity is min-max normalised on a **long-tailed** distribution, so the endpoints are 0 and 1 but nearly everything clusters near the bottom (sd 0.151 against 0.289 for a uniform) — **normalising guarantees the range, not the spread**; and recency's exponential decay over a genuinely wide age range produces more variation than either. Only a gain correction handles both directions; "normalise the other two" would not.
+
+**Churn was fine and it was rejected anyway.** The simulation moved 1–5 titles into each top 20, against F-060's rejected 10–13 of 20. The blocker was report 4 — the titles:
+
+| | leaving | entering |
+|---|---|---|
+| k1a, series | Sherwood 0.86, Accused 0.84, Ellis 0.82 | Law & Order 0.85, CSI 0.83, Criminal Minds 0.80 |
+| popularity | 0.01 – 0.10 | 0.38 – 0.54 |
+| recency | 0.79 – 1.00 | 0.13 – 0.30 |
+
+**Taste is flat across the swap.** Sherwood at 0.86 leaves so Law & Order at 0.85 can enter. The correction cannot improve matching, because report 2 shows similarity was *already* on its configured share — the correction only redistributes between recency and popularity. It trades *new and obscure* for *old and popular* at constant personalization, which is an operator's preference and not a defect. In one case it is outright worse: charos's movies promote Forrest Gump (taste **0.41**) to rank 2 and an obscure TV movie (taste **0.30**) to rank 3, while the batch's best taste match at **0.87** reaches only 19.
+
+So the panel reports the discrepancy instead (`blendDiagnostics.ts`, Admin → Recommendations → Discovery tuning), which is the call [F-054](#f-054) made when the recommender's weight badge asserted a rule the arithmetic did not impose. Two things it fixes at once: the card divided by the **three slider weights alone** and so reported 50/30/20 for a blend that is 45.5/27.3/18.2/9.1 — a fourth claimant nobody could see was spending the budget — and it now shows measured influence beside the configured share, flagged when they differ by five points or more. `SOURCE_TERM_WEIGHT` is exported and rides in the config response rather than being hand-copied into the bundle, and the shares arrive as **decided percentages** because the blend arithmetic is exactly the thing that must not exist twice.
+
+#### A thin source was getting a deep source's range
+
+The simulation surfaced a separate defect on its way past. Min-max makes group size irrelevant to the scale: a group of 3 and a group of 128 each produce exactly one 1.0 and one 0.0. Measured on one live run — `tmdb_similar` 128, `tmdb_discover` 112, `tmdb_recommendations` 100, `trakt_trending` **3** — being the most-watched of three Trakt trending titles scored identically to being the most popular of 128, and that three-member ceiling was an obscure TV movie the taste model scored 0.30, sitting beside Forrest Gump.
+
+Shrunk toward neutral by `n / (n + 10)`, which is `genrePreference.ts`'s constant for the same shape of problem and is **inherited rather than re-derived** — a thin population and a real signal look identical from inside the function, and the safe direction is the one that claims less. It generalises the existing lone-candidate case rather than sitting beside it: a group of one already resolved to 0.5 because min equals max, and a group of three is now most of the way there instead of all the way to the edges. At 10, a group of 3 keeps 23% of its range and a group of 100 keeps 91%.
+
+Worth naming that it costs a little of popularity's realised spread — the term that was *already* under-delivering. That is the argument above, deliberately left where it is: reporting the discrepancy and damping an unearned range are different questions, and conflating them is how a measurement becomes a justification.
