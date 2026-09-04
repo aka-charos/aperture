@@ -2190,7 +2190,7 @@
     "measuredConfigured": "Set to",
     "measured_movie": "Movies",
     "measured_series": "Series",
-    "measuredFootnote": "Measured across {{runs}} recent runs and {{candidates}} scored titles. Highlighted rows differ from what you set by 5 points or more."
+    "measuredFootnote": "Measured across {{runs}} completed runs and {{candidates}} scored titles, using whatever these weights were set to at the time. Highlighted rows differ from your current setting by 5 points or more."
   },
   "settingsSeerr": {
     "title": "Seerr Integration",

@@ -700,10 +700,10 @@ export async function scoreCandidates(
         // place in a taste ranking at all. The card falls back to its old
         // display when these are missing, which is also what every row stored
         // before this change looks like.
-        ...(rawSimilarity !== undefined
+        ...(rawSimilarity !== undefined && similarityRanks.has(candidate.tmdbId)
           ? {
               similarityRaw: rawSimilarity,
-              similarityRank: similarityRanks.get(candidate.tmdbId) ?? 0,
+              similarityRank: similarityRanks.get(candidate.tmdbId)!,
               similarityRankOf,
             }
           : {}),

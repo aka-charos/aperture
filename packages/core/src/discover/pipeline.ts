@@ -220,14 +220,28 @@ async function runDiscoveryForUser(
           `⚠️ ${user.username}: taste match is flat at ${(rawMin ?? 0).toFixed(3)} across ${compared} ${mediaType}s — the taste term is not ranking anything.`
         )
       } else {
+        // The population named here is the one the spread was MEASURED over --
+        // every scored candidate -- not `candidatesToStore`, which is the top
+        // slice that gets written. Quoting the stored count beside figures
+        // computed over a larger set is the sort of small mismatch that makes a
+        // later reader distrust the whole line.
+        //
         // `compared` beside the count is the tell that separates "could not
         // compare" from "compared and disagreed usefully"; both look like a
         // healthy run without it.
-        const partial = compared < candidateCount ? `, ${compared}/${candidateCount} comparable` : ''
+        const scope =
+          compared < candidateCount
+            ? `${compared} of ${candidateCount} ${mediaType}s`
+            : `all ${candidateCount} ${mediaType}s`
+
+        // 0.05 sits in the gap between the two populations this feature has
+        // actually produced: the four viewers stranded by the maintenance gate
+        // measured 0.032-0.040, everyone else 0.160-0.288. It warns across the
+        // whole of the known-broken range without firing on any known-good one.
         addLog(
           jobId,
           spread < 0.05 ? 'warn' : 'info',
-          `🎯 ${user.username}: taste match ${rawMin!.toFixed(3)}–${rawMax!.toFixed(3)} (spread ${spread.toFixed(3)}) across ${candidatesToStore.length} ${mediaType}s${partial}`
+          `🎯 ${user.username}: taste match ${rawMin!.toFixed(3)}–${rawMax!.toFixed(3)} (spread ${spread.toFixed(3)}) across ${scope}`
         )
       }
     }

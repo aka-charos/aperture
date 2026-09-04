@@ -65,7 +65,11 @@ export function fillFromPoolRow(candidate: RawCandidate, pool: RawCandidate): Ra
     originalTitle: candidate.originalTitle || pool.originalTitle || null,
     originalLanguage: candidate.originalLanguage || pool.originalLanguage || null,
     overview: candidate.overview || pool.overview || null,
-    releaseYear: candidate.releaseYear ?? pool.releaseYear ?? null,
+    // `||` here too, and it is not the obvious choice. There is no year 0 in
+    // the calendar, so a 0 can only be bad data -- and `calculateRecencyScore`
+    // already reads it as unknown, since its guard is `!candidate.releaseYear`.
+    // Keeping it over the pool's real year would preserve the worse value.
+    releaseYear: candidate.releaseYear || pool.releaseYear || null,
     posterPath: candidate.posterPath || pool.posterPath || null,
     backdropPath: candidate.backdropPath || pool.backdropPath || null,
 
@@ -84,7 +88,9 @@ export function fillFromPoolRow(candidate: RawCandidate, pool: RawCandidate): Ra
         : pool.castMembers,
     directors:
       candidate.directors && candidate.directors.length > 0 ? candidate.directors : pool.directors,
-    runtimeMinutes: candidate.runtimeMinutes ?? pool.runtimeMinutes ?? null,
+    // Same argument as releaseYear: no title runs for 0 minutes, so a 0 is
+    // absence rather than a measurement.
+    runtimeMinutes: candidate.runtimeMinutes || pool.runtimeMinutes || null,
     tagline: candidate.tagline || pool.tagline || null,
 
     isEnriched: candidate.isEnriched === true || poolIsEnriched,
