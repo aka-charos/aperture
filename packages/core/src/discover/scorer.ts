@@ -202,6 +202,32 @@ function popularityRange(values: number[]): { min: number; max: number } {
 }
 
 /**
+ * Observations before a source's popularity range is taken at full strength.
+ *
+ * Inherited from `genrePreference.ts` rather than re-derived: it damps the same
+ * thing there (a thin watch history, a thin library section) for the same
+ * reason, and one number doing one job in two places beats two numbers nobody
+ * can compare. At 10 a group of 3 keeps 23% of its range and a group of 100
+ * keeps 91%.
+ */
+const POPULARITY_CONFIDENCE = 10
+
+/**
+ * The source-quality term's weight in the blend.
+ *
+ * Exported because it is a real claimant on the score and two places need to
+ * agree on it: `scoreCandidates` divides by a total that includes it, and the
+ * admin panel's shares are wrong without it -- that card divided by the three
+ * slider weights alone and so reported 50/30/20 for a blend that is actually
+ * 45.5/27.3/18.2/9.1. A fourth term nobody can see is still spending the
+ * budget.
+ *
+ * Fixed rather than configurable on purpose: it encodes how much to trust each
+ * SOURCE, which is a property of the sources rather than of an instance.
+ */
+export const SOURCE_TERM_WEIGHT = 0.1
+
+/**
  * Popularity scores, normalised WITHIN each source rather than across the pool.
  *
  * `candidate.popularity` does not hold one quantity. It holds TMDb's unbounded
@@ -231,6 +257,27 @@ function popularityRange(values: number[]): { min: number; max: number } {
  * than 0.006, on a term carrying 27% of the blend. Migration 0162 records the
  * provenance of the number so the unit and the label cannot drift.
  *
+ * A THIN GROUP DOES NOT GET FULL RANGE. Min-max makes group size irrelevant to
+ * the scale: a group of 3 and a group of 128 each produce exactly one 1.0 and
+ * one 0.0, so being the most-watched of three Trakt trending titles scored
+ * identically to being the most popular of 128. Measured on one live run --
+ * tmdb_similar 128, tmdb_discover 112, tmdb_recommendations 100,
+ * trakt_trending 3 -- and the three-member group's ceiling was an obscure TV
+ * movie the taste model scored 0.30, sitting alongside Forrest Gump.
+ *
+ * Shrunk toward neutral by `n / (n + POPULARITY_CONFIDENCE)`, which is
+ * `genrePreference.ts`'s treatment of the same shape of problem: a thin
+ * population and a real signal look identical from inside the function, and the
+ * safe direction is the one that claims less. It also generalises the existing
+ * lone-candidate case rather than sitting beside it -- a group of one already
+ * resolved to 0.5 because min equals max, and now a group of three is merely
+ * most of the way there instead of all the way to the edges.
+ *
+ * It costs a little of popularity's realised spread (the 100+ groups keep about
+ * 93% of theirs), which is worth naming because popularity was already
+ * UNDER-delivering against its configured weight. That is a separate argument,
+ * deliberately not settled here.
+ *
  * Pure and exported so the neutral case can be pinned without a database.
  */
 export function popularityScoresBySource(candidates: RawCandidate[]): Map<number, number> {
@@ -254,8 +301,12 @@ export function popularityScoresBySource(candidates: RawCandidate[]): Map<number
 
   const scores = new Map<number, number>()
   for (const c of candidates) {
-    const range = ranges.get(groupOf(c)) ?? { min: 0, max: 0 }
-    scores.set(c.tmdbId, normalize(c.popularity, range.min, range.max))
+    const group = groupOf(c)
+    const range = ranges.get(group) ?? { min: 0, max: 0 }
+    const groupSize = bySource.get(group)?.length ?? 0
+    const confidence = groupSize / (groupSize + POPULARITY_CONFIDENCE)
+    const raw = normalize(c.popularity, range.min, range.max)
+    scores.set(c.tmdbId, 0.5 + (raw - 0.5) * confidence)
   }
   return scores
 }
@@ -584,7 +635,7 @@ export async function scoreCandidates(
     // weight, including the flat 0.1 source-quality term) so it's always
     // bounded to [0,1] rather than able to run past 1.0 (0.5+0.3+0.2+0.1=1.1
     // if taken as a raw weighted sum).
-    const sourceTermWeight = 0.1
+    const sourceTermWeight = SOURCE_TERM_WEIGHT
     const totalWeight =
       config.similarityWeight + config.popularityWeight + config.recencyWeight + sourceTermWeight
     // DiscoveryConfig weights are currently fixed defaults (never exposed
