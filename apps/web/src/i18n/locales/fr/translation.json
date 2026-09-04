@@ -1226,7 +1226,9 @@
       "cast": "Distribution",
       "castAs": "comme {{character}}",
       "castUnavailable": "Informations de distribution indisponibles",
-      "loadingTmdb": "Chargement de tous les détails…"
+      "loadingTmdb": "Chargement de tous les détails…",
+      "tasteRank": "Taste match",
+      "tasteRankValue": "#{{rank}} of {{total}}"
     },
     "tabBrowsePopular": "TMDb populaire dans l'ensemble",
     "tabBrowseGenre": "Populaire par genre",

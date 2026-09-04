@@ -836,7 +836,9 @@
       "cast": "投掷",
       "castAs": "作为{{字符}}",
       "castUnavailable": "演员信息不可用",
-      "loadingTmdb": "正在加载完整详细信息..."
+      "loadingTmdb": "正在加载完整详细信息...",
+      "tasteRank": "Taste match",
+      "tasteRankValue": "#{{rank}} of {{total}}"
     },
     "tabBrowsePopular": "TMDb 整体受欢迎",
     "tabBrowseGenre": "按类型受欢迎",

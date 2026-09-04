@@ -2557,7 +2557,9 @@
       "cast": "Vorm",
       "castAs": "als {{karakter}}",
       "castUnavailable": "Castinformatie niet beschikbaar",
-      "loadingTmdb": "Volledige details laden…"
+      "loadingTmdb": "Volledige details laden…",
+      "tasteRank": "Taste match",
+      "tasteRankValue": "#{{rank}} of {{total}}"
     },
     "tabBrowsePopular": "TMDb is over het algemeen populair",
     "tabBrowseGenre": "Populair per genre",

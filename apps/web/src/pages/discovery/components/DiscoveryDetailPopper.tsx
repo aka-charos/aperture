@@ -158,6 +158,25 @@ export function DiscoveryDetailPopper({
   const hideAiMatchSection =
     candidate?.source === 'justwatch_streaming' || candidate?.source === 'tmdb_genre_row'
 
+  /**
+   * Where this title placed on taste, among the candidates that had a taste
+   * vector at all.
+   *
+   * Read off scoreBreakdown rather than a top-level field because it rides in
+   * that JSONB object and costs no migration. Both halves must be present and
+   * sane: a run before this shipped carries neither, and a rank without a total
+   * cannot be rendered as "#12 of 245".
+   */
+  const tasteRank = useMemo(() => {
+    const breakdown = displayCandidate?.scoreBreakdown
+    if (!breakdown) return null
+    const rank = breakdown.similarityRank
+    const total = breakdown.similarityRankOf
+    if (typeof rank !== 'number' || typeof total !== 'number') return null
+    if (rank < 1 || total < 1 || rank > total) return null
+    return { rank, total }
+  }, [displayCandidate])
+
   const handleOpenTrailer = useCallback(async () => {
     if (!displayCandidate) return
     const path =
@@ -461,15 +480,39 @@ export function DiscoveryDetailPopper({
                           {(displayCandidate.finalScore * 100).toFixed(0)}%
                         </Typography>
                       </Grid>
-                      {displayCandidate.similarityScore !== null && (
+                      {/*
+                        A rank, not a percentage. `similarityScore` is min-max
+                        normalised across the batch, so its top is 1.0 and its
+                        bottom 0.0 by construction -- the best candidate always
+                        read "100%" and the worst "0%", whatever the real
+                        spread, which in raw terms is a narrow 0.43-0.66 band.
+                        "#12 of 245" is true without needing that band
+                        calibrated, and stays true across a model change.
+                        Older rows carry no rank and keep the old display.
+                      */}
+                      {tasteRank !== null ? (
                         <Grid item xs={6}>
                           <Typography variant="body2" color="text.secondary">
-                            {t('discovery.detail.similarity')}
+                            {t('discovery.detail.tasteRank')}
                           </Typography>
                           <Typography variant="h6" fontWeight={600}>
-                            {(displayCandidate.similarityScore * 100).toFixed(0)}%
+                            {t('discovery.detail.tasteRankValue', {
+                              rank: tasteRank.rank,
+                              total: tasteRank.total,
+                            })}
                           </Typography>
                         </Grid>
+                      ) : (
+                        displayCandidate.similarityScore !== null && (
+                          <Grid item xs={6}>
+                            <Typography variant="body2" color="text.secondary">
+                              {t('discovery.detail.similarity')}
+                            </Typography>
+                            <Typography variant="h6" fontWeight={600}>
+                              {(displayCandidate.similarityScore * 100).toFixed(0)}%
+                            </Typography>
+                          </Grid>
+                        )
                       )}
                     </Grid>
                   </Box>

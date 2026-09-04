@@ -1226,7 +1226,9 @@
       "cast": "יָצוּק",
       "castAs": "בתור {{תו}}",
       "castUnavailable": "מידע השחקנים אינו זמין",
-      "loadingTmdb": "טוען פרטים מלאים..."
+      "loadingTmdb": "טוען פרטים מלאים...",
+      "tasteRank": "Taste match",
+      "tasteRankValue": "#{{rank}} of {{total}}"
     },
     "tabBrowsePopular": "TMDb פופולרי בסך הכל",
     "tabBrowseGenre": "פופולרי לפי ז'אנר",

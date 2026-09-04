@@ -1226,7 +1226,9 @@
       "cast": "깁스",
       "castAs": "{{문자}}로",
       "castUnavailable": "캐스트 정보를 사용할 수 없습니다.",
-      "loadingTmdb": "전체 세부정보 로드 중…"
+      "loadingTmdb": "전체 세부정보 로드 중…",
+      "tasteRank": "Taste match",
+      "tasteRankValue": "#{{rank}} of {{total}}"
     },
     "tabBrowsePopular": "TMDb 전반적으로 인기",
     "tabBrowseGenre": "장르별 인기",

@@ -1226,7 +1226,9 @@
       "cast": "Reparto",
       "castAs": "como {{character}}",
       "castUnavailable": "Información de reparto no disponible",
-      "loadingTmdb": "Cargando todos los detalles…"
+      "loadingTmdb": "Cargando todos los detalles…",
+      "tasteRank": "Taste match",
+      "tasteRankValue": "#{{rank}} of {{total}}"
     },
     "tabBrowsePopular": "TMDb popular en general",
     "tabBrowseGenre": "Popular por género",
