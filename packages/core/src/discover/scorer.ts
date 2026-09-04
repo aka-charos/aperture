@@ -64,20 +64,42 @@ async function buildGenreNameLookup(mediaType: MediaType): Promise<(id: number) 
 const logger = createChildLogger('discover:scorer')
 
 /**
- * The vectors a discovery candidate gets scored against: the user's taste
- * clusters when they have them, otherwise the single averaged vector this used
- * to be limited to.
+ * The vectors a discovery candidate gets scored against: the viewer's taste
+ * clusters, or nothing.
  *
- * That average is the "semantic middle" problem multi-centroid profiles exist
- * to fix -- someone who loves both horror and rom-coms averages into a vector
- * that matches neither well -- and discovery is the surface that decides what
- * gets requested from Seerr, so it was the worst place left to still be doing
- * it. Note the legacy read is `user_preferences.taste_embedding`, a different
- * table from `user_taste_profiles`, kept current by storeLegacyTasteProfile.
+ * There is no fallback, and the deletion of the one that was here is the point.
+ * It read `user_preferences.taste_embedding` -- a different table from
+ * `user_taste_profiles`, written only by the two RECOMMENDER pipelines -- and
+ * three things are true of that column and not of the clusters:
  *
- * getUserTasteClusters already discards clusters embedded with a model other
- * than the active one, so a stale profile falls through to the legacy vector
- * instead of silently cosine-ing to zero against every candidate.
+ * 1. `rebuild-taste-profiles` never writes it. Nothing in `taste-profile/`
+ *    mentions the column. So for the discover-only viewers F-104's gate fix
+ *    just admitted, it is STILL unmaintained -- the same fault, one artefact
+ *    over.
+ * 2. It carries no `embedding_model`. `getUserTasteClusters` discards a stale
+ *    model explicitly; this read had no way to.
+ * 3. It carries no `embedding_space`. That column exists on
+ *    `user_taste_profiles` alone (migration 0154), so `getProfileEmbeddingSpace`
+ *    asked one table which space to use and the answer was applied to a vector
+ *    from another table maintained by another job.
+ *
+ * Together those let the fallback hand back a vector from a superseded model,
+ * in an unknown space, labelled `centered` by a row describing something else
+ * -- and then the candidates were centred to match. The width guard in
+ * `maxTasteSimilarity` catches a dimension change, but a same-width model
+ * change (gemini-embedding-001 to -2, both 3072) passes it and produces a
+ * confident cosine between two unrelated spaces. That is precisely what
+ * `resolveEmbeddingSpace` exists to refuse, reached by a path that went around
+ * it.
+ *
+ * No clusters therefore means no taste term and a neutral 0.5 for every
+ * candidate -- the state the whole feature was in before F-104, and strictly
+ * safer than a confident wrong number. The remedy is `rebuild-taste-profiles`,
+ * which is also the remedy the job console now names.
+ *
+ * The recommender's own use of that column is different in kind and stays: it
+ * writes the vector itself, in the same run, so the model and space are its
+ * own.
  */
 async function getUserTasteVectors(userId: string, mediaType: MediaType): Promise<number[][]> {
   try {
@@ -85,44 +107,15 @@ async function getUserTasteVectors(userId: string, mediaType: MediaType): Promis
     if (clusters.length > 0) {
       return clusters.map((cluster) => cluster.embedding)
     }
-  } catch (err) {
     logger.warn(
-      { err, userId, mediaType },
-      'Failed to load taste clusters, falling back to the averaged taste vector'
+      { userId, mediaType },
+      'No taste clusters at the active embedding model; scoring without a taste term until rebuild-taste-profiles runs'
     )
+  } catch (err) {
+    logger.warn({ err, userId, mediaType }, 'Failed to load taste clusters')
   }
 
-  const embeddingColumn = mediaType === 'movie' ? 'taste_embedding' : 'series_taste_embedding'
-
-  // `::text` and an explicit parse, exactly as getUserTasteClusters does.
-  //
-  // This column is a halfvec, and pg hands a halfvec back as a STRING. The
-  // previous form selected it bare and annotated the row as `number[]` -- a
-  // claim TypeScript cannot check against a runtime driver -- so the fallback
-  // returned a ~40,000 character string where a 3,072-element array was
-  // expected. maxTasteSimilarity then compared `vector.length` (the string
-  // length) against the candidate's 3072, skipped every taste vector, and
-  // returned null for every candidate, which the caller reads as "no taste
-  // signal" and scores a flat neutral.
-  //
-  // It failed silently and totally, and it was invisible until now only because
-  // the similarity term was dead for an unrelated reason: with the candidate
-  // embedding map always empty, this function's output was never used. Fixing
-  // the map is what exposed it.
-  const result = await queryOne<{ embedding: string | null }>(
-    `SELECT ${embeddingColumn}::text as embedding FROM user_preferences WHERE user_id = $1`,
-    [userId]
-  )
-  if (!result?.embedding) return []
-
-  const parsed = result.embedding
-    .replace(/[[\]]/g, '')
-    .split(',')
-    .map((n) => parseFloat(n.trim()))
-
-  // A vector that did not parse is worse than none: it would be silently
-  // skipped downstream and read as an absent taste signal.
-  return parsed.length > 0 && parsed.every((n) => Number.isFinite(n)) ? [parsed] : []
+  return []
 }
 
 /**
