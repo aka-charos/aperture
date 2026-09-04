@@ -167,9 +167,9 @@ export async function getLatestDiscoveryRun(
 // ============================================================================
 
 /** Columns bound per pool row by {@link upsertPoolCandidates}. */
-const POOL_COLUMN_COUNT = 15
+const POOL_COLUMN_COUNT = 16
 
-/** Rows per pool upsert statement. 15 columns -> 3,000 bind parameters. */
+/** Rows per pool upsert statement. 16 columns -> 3,200 bind parameters. */
 const POOL_UPSERT_CHUNK = 200
 
 /**
@@ -191,7 +191,18 @@ const POOL_UPSERT_CHUNK = 200
  *   window that run. 0 means "no data" for every writer here, so storing NULL
  *   loses nothing and lets a later sighting fill the column in.
  * - `sources` is unioned rather than replaced, preserving the merge the old
- *   read-then-write did in JavaScript.
+ *   read-then-write did in JavaScript. The union keeps FIRST-SEEN order, which
+ *   `ARRAY(SELECT DISTINCT unnest(...))` did not: SELECT DISTINCT with no
+ *   ORDER BY guarantees nothing, and `sources[1]` is what poolCandidateToRaw
+ *   hands calculateSourceScore -- so a title's source score could change
+ *   between runs without the title changing. The live pool held the same source
+ *   set in both orders, which is that non-determinism showing up in the data.
+ *
+ * `popularity_source` is written in the SAME expression as `popularity` and is
+ * NULL whenever the figure is, so the unit and the number cannot drift apart.
+ * That pairing is the whole of migration 0162: `popularity` holds three
+ * different quantities depending on who supplied it, and the scorer normalises
+ * within the group the label names.
  *
  * `is_enriched` and the enrichment columns are deliberately absent: they are
  * owned by updatePoolEnrichmentBatch and a metadata refresh must not discard
@@ -224,14 +235,20 @@ export async function upsertPoolCandidates(
         `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}::text[], ` +
         `$${b + 5}, $${b + 6}, $${b + 7}, $${b + 8}, ` +
         `$${b + 9}, $${b + 10}, $${b + 11}, $${b + 12}::jsonb, ` +
-        `NULLIF($${b + 13}::numeric, 0), NULLIF($${b + 14}::integer, 0), NULLIF($${b + 15}::numeric, 0))`
+        `NULLIF($${b + 13}::numeric, 0), NULLIF($${b + 14}::integer, 0), ` +
+        // The unit is claimed only when the figure is actually stored: a
+        // popularity of 0 means "this source has no popularity signal", and
+        // labelling an absent number would be a claim about nothing.
+        `NULLIF($${b + 15}::numeric, 0), ` +
+        `CASE WHEN NULLIF($${b + 15}::numeric, 0) IS NULL THEN NULL ELSE $${b + 16}::text END)`
       )
       values.push(
         mediaType, c.tmdbId, c.imdbId, [c.source],
         c.title, c.originalTitle, c.originalLanguage, c.releaseYear,
         c.posterPath, c.backdropPath, c.overview,
         JSON.stringify(c.genres || []),
-        c.voteAverage, c.voteCount, c.popularity
+        c.voteAverage, c.voteCount, c.popularity,
+        c.popularitySource ?? c.source
       )
     })
 
@@ -243,10 +260,19 @@ export async function upsertPoolCandidates(
            media_type, tmdb_id, imdb_id, sources,
            title, original_title, original_language, release_year,
            poster_path, backdrop_path, overview,
-           genres, vote_average, vote_count, popularity
+           genres, vote_average, vote_count, popularity, popularity_source
          ) VALUES ${tuples.join(', ')}
          ON CONFLICT (media_type, tmdb_id) DO UPDATE SET
-           sources = ARRAY(SELECT DISTINCT unnest(discovery_pool.sources || EXCLUDED.sources)),
+           -- Append-only, so the existing order survives untouched and
+           -- sources[1] stays whichever source saw this title first. The
+           -- previous form, ARRAY(SELECT DISTINCT unnest(...)), reordered the
+           -- whole array on every write: SELECT DISTINCT with no ORDER BY
+           -- guarantees nothing, and the live pool held the same source set in
+           -- both orders as a result.
+           sources = discovery_pool.sources || ARRAY(
+             SELECT s FROM unnest(EXCLUDED.sources) AS s
+              WHERE NOT (s = ANY(discovery_pool.sources))
+           ),
            imdb_id = COALESCE(EXCLUDED.imdb_id, discovery_pool.imdb_id),
            title = COALESCE(NULLIF(EXCLUDED.title, ''), discovery_pool.title),
            original_title = COALESCE(EXCLUDED.original_title, discovery_pool.original_title),
@@ -259,6 +285,13 @@ export async function upsertPoolCandidates(
            vote_average = COALESCE(EXCLUDED.vote_average, discovery_pool.vote_average),
            vote_count = COALESCE(EXCLUDED.vote_count, discovery_pool.vote_count),
            popularity = COALESCE(EXCLUDED.popularity, discovery_pool.popularity),
+           -- Moves with the number, never independently. This is the pairing
+           -- migration 0162 exists to enforce: whichever source's figure won
+           -- above is the source whose unit the column is now in.
+           popularity_source = CASE
+             WHEN EXCLUDED.popularity IS NOT NULL THEN EXCLUDED.popularity_source
+             ELSE discovery_pool.popularity_source
+           END,
            updated_at = NOW()
          RETURNING (xmax = 0) AS inserted`,
         values
@@ -313,6 +346,7 @@ export async function getPoolCandidates(
     vote_average: string | null
     vote_count: number | null
     popularity: string | null
+    popularity_source: string | null
     cast_members: { id: number; name: string; character: string; profilePath: string | null }[] | null
     directors: string[] | null
     runtime_minutes: number | null
@@ -350,6 +384,7 @@ export async function getPoolCandidates(
     voteAverage: row.vote_average ? parseFloat(row.vote_average) : null,
     voteCount: row.vote_count,
     popularity: row.popularity ? parseFloat(row.popularity) : null,
+    popularitySource: (row.popularity_source as GlobalDiscoverySource | null) ?? null,
     castMembers: row.cast_members,
     directors: row.directors,
     runtimeMinutes: row.runtime_minutes,
@@ -492,6 +527,13 @@ export function poolCandidateToRaw(pool: PoolCandidate): RawCandidate {
     voteAverage: pool.voteAverage ?? 0,
     voteCount: pool.voteCount ?? 0,
     popularity: pool.popularity ?? 0,
+    // The unit travels with the number. `sources[0]` answers a different
+    // question -- which source's RECOMMENDATION this is, for
+    // calculateSourceScore -- and a pool row's array records every source that
+    // ever offered the title, not the one whose popularity figure is stored.
+    // Reading the unit off it filed TMDb-scaled values in a group of Trakt ones
+    // and normalised them to 1.0 (migration 0162).
+    popularitySource: pool.popularitySource ?? undefined,
     source: pool.sources[0] || 'tmdb_discover', // Use first source
     castMembers: pool.castMembers ?? undefined,
     directors: pool.directors ?? undefined,

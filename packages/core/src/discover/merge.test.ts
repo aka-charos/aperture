@@ -71,10 +71,22 @@ test('a personalized candidate keeps its own source and gains the pool rating', 
 test('popularity stays with the source that measured it', () => {
   // The pool's 61.4 is TMDb's unbounded metric; the candidate's 0 is
   // trakt_recommendations having no popularity signal at all. Taking the pool's
-  // number under the Trakt label would file a TMDb-scaled value in a group of
-  // zeros, and popularityScoresBySource would normalise it to 1.0.
+  // number would import a TMDb-scaled value into a candidate whose own unit is
+  // something else, and popularityScoresBySource normalises within the unit.
   const [merged] = mergeWithPool([traktCandidate()], [poolRow()])
   assert.equal(merged.popularity, 0)
+})
+
+test('the popularity unit does not arrive without the number', () => {
+  // The pairing migration 0162 exists to enforce: a candidate that keeps its
+  // own popularity must keep its own unit, or the scorer normalises a Trakt
+  // zero inside TMDb's 873-point range.
+  const [merged] = mergeWithPool(
+    [traktCandidate()],
+    [poolRow({ popularitySource: 'tmdb_discover' })]
+  )
+  assert.equal(merged.popularity, 0)
+  assert.equal(merged.popularitySource, undefined)
 })
 
 test('cached enrichment is carried across so the run does not pay for it twice', () => {
