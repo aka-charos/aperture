@@ -133,8 +133,12 @@ test('a source with no popularity signal scores neutral, not zero', () => {
 
   assert.equal(scores.get(3), 0.5)
   assert.equal(scores.get(4), 0.5)
-  assert.equal(scores.get(1), 1)
-  assert.equal(scores.get(2), 0)
+
+  // The two-member group keeps its ORDER but not the full range: two
+  // observations do not establish one. Endpoints are deliberately not asserted
+  // here -- that is the confidence shrinkage's own test.
+  assert.ok(scores.get(1)! > 0.5, `expected above neutral, got ${scores.get(1)}`)
+  assert.ok(scores.get(2)! < 0.5, `expected below neutral, got ${scores.get(2)}`)
 })
 
 test('a watcher count is ranked within its own source, not against TMDb', () => {
@@ -148,9 +152,15 @@ test('a watcher count is ranked within its own source, not against TMDb', () => 
     candidate({ tmdbId: 4, source: 'trakt_trending', popularity: 10 }),
   ])
 
-  assert.equal(scores.get(2), 1)
-  assert.equal(scores.get(4), 0)
-  assert.ok(scores.get(3)! > 0 && scores.get(3)! < 1)
+  // The internal ordering is the thing being preserved. Pooled against TMDb's
+  // unbounded metric all three would have collapsed to the same floor.
+  assert.ok(scores.get(2)! > scores.get(3)!)
+  assert.ok(scores.get(3)! > scores.get(4)!)
+  assert.ok(scores.get(2)! > 0.5 && scores.get(4)! < 0.5)
+
+  // The lone TMDb candidate has no spread of its own, so it is neutral rather
+  // than top -- and unaffected by anything happening inside the Trakt group.
+  assert.equal(scores.get(1), 0.5)
 })
 
 test('a lone candidate in a source is neutral rather than top', () => {
@@ -190,10 +200,17 @@ test('the number is grouped by who measured it, not by who recommended it', () =
     candidate({ tmdbId: 3, source: 'trakt_trending', popularitySource: 'tmdb_discover', popularity: 33.01 }),
   ])
 
-  // (33.01 - 28.01) / (901.11 - 28.01) = 0.00573
-  assert.ok(scores.get(3)! < 0.01, `expected a floor-adjacent score, got ${scores.get(3)}`)
-  assert.equal(scores.get(1), 1)
-  assert.equal(scores.get(2), 0)
+  // The counterfactual is what makes this sharp. Grouped by `source`, tmdbId 3
+  // is alone in a trakt_trending group, min equals max, and it scores EXACTLY
+  // 0.5. Grouped by who measured the number it sits near the floor with tmdbId
+  // 2, because (33.01 - 28.01) / (901.11 - 28.01) is 0.006. Anything clearly
+  // below neutral can only have come from the correct grouping.
+  assert.ok(scores.get(3)! < 0.45, `expected a floor-adjacent score, got ${scores.get(3)}`)
+  assert.ok(
+    Math.abs(scores.get(3)! - scores.get(2)!) < Math.abs(scores.get(3)! - scores.get(1)!),
+    'the mislabelled row belongs with the floor, not the ceiling'
+  )
+  assert.ok(scores.get(1)! > scores.get(3)!)
 })
 
 test('an unlabelled figure falls back to the source that recommended it', () => {
@@ -205,6 +222,50 @@ test('an unlabelled figure falls back to the source that recommended it', () => 
     candidate({ tmdbId: 3, source: 'tmdb_discover', popularity: 5000 }),
   ])
 
-  assert.equal(scores.get(1), 1)
-  assert.equal(scores.get(2), 0)
+  assert.ok(scores.get(1)! > 0.5)
+  assert.ok(scores.get(2)! < 0.5)
+  assert.equal(scores.get(3), 0.5)
+})
+
+test('a thin source does not get the same range as a deep one', () => {
+  // Min-max makes group size irrelevant to the scale: three candidates and 128
+  // each produce exactly one 1.0 and one 0.0, so being the most-watched of
+  // three Trakt trending titles scored identically to being the most popular of
+  // 128 TMDb ones. Measured on a live run, that three-member ceiling was an
+  // obscure TV movie the taste model scored 0.30, sitting beside Forrest Gump.
+  const thin = [
+    candidate({ tmdbId: 1, source: 'trakt_trending', popularity: 300 }),
+    candidate({ tmdbId: 2, source: 'trakt_trending', popularity: 200 }),
+    candidate({ tmdbId: 3, source: 'trakt_trending', popularity: 100 }),
+  ]
+  const deep = Array.from({ length: 128 }, (_, i) =>
+    candidate({ tmdbId: 1000 + i, source: 'tmdb_discover', popularity: i })
+  )
+
+  const scores = popularityScoresBySource([...thin, ...deep])
+
+  const thinTop = scores.get(1)!
+  const deepTop = scores.get(1000 + 127)!
+
+  assert.ok(deepTop > thinTop, `deep ceiling ${deepTop} should beat thin ceiling ${thinTop}`)
+  // n/(n+10): 3/13 = 0.231 of the range, so the top of three lands near 0.62.
+  assert.ok(thinTop > 0.55 && thinTop < 0.70, `thin ceiling out of band: ${thinTop}`)
+  // 128/138 = 0.928, so a deep group keeps nearly all of its range.
+  assert.ok(deepTop > 0.9, `deep ceiling should stay near the top: ${deepTop}`)
+
+  // Ordering inside the thin group survives being damped -- it is scaled toward
+  // neutral, not flattened.
+  assert.ok(scores.get(1)! > scores.get(2)!)
+  assert.ok(scores.get(2)! > scores.get(3)!)
+})
+
+test('shrinkage is symmetric about neutral, so it cannot invent a preference', () => {
+  const scores = popularityScoresBySource([
+    candidate({ tmdbId: 1, source: 'tmdb_discover', popularity: 100 }),
+    candidate({ tmdbId: 2, source: 'tmdb_discover', popularity: 0 }),
+  ])
+
+  const above = scores.get(1)! - 0.5
+  const below = 0.5 - scores.get(2)!
+  assert.ok(Math.abs(above - below) < 1e-12, 'the pull toward neutral must be even')
 })
