@@ -338,6 +338,36 @@ function calculateSourceScore(candidate: RawCandidate): number {
 }
 
 /**
+ * What the taste term actually did on this run, in RAW units.
+ *
+ * Reported alongside the candidates rather than recovered from them, because
+ * `ScoredCandidate.similarityScore` is the value AFTER min-max normalisation
+ * across the pool -- so its minimum is 0 and its maximum is 1 by construction
+ * whenever any two candidates differ at all. An operator-facing line built from
+ * it reads `0.00-1.00` on every healthy run and cannot show the one failure it
+ * exists to catch: the four-fault chain that made this term dead produced a raw
+ * band 0.037 wide, which normalises to exactly the same confident full range.
+ *
+ * `compared` against `candidateCount` separates the two ways the term dies, and
+ * that distinction cost five round trips to make by hand: well below the count
+ * means the taste vectors could not be compared at all (a width mismatch, or an
+ * unparsed halfvec), while equal to the count with `rawMin === rawMax` means
+ * they compared and agreed, which is a different fault entirely.
+ */
+export interface TasteScoringDiagnostics {
+  candidateCount: number
+  compared: number
+  /** Null when nothing was comparable. */
+  rawMin: number | null
+  rawMax: number | null
+}
+
+export interface DiscoveryScoringResult {
+  candidates: ScoredCandidate[]
+  taste: TasteScoringDiagnostics
+}
+
+/**
  * Score candidates based on similarity to user's taste and other factors
  */
 export async function scoreCandidates(
@@ -345,9 +375,12 @@ export async function scoreCandidates(
   mediaType: MediaType,
   candidates: RawCandidate[],
   config: DiscoveryConfig
-): Promise<ScoredCandidate[]> {
+): Promise<DiscoveryScoringResult> {
   if (candidates.length === 0) {
-    return []
+    return {
+      candidates: [],
+      taste: { candidateCount: 0, compared: 0, rawMin: null, rawMax: null },
+    }
   }
 
   logger.info({ userId, mediaType, candidateCount: candidates.length }, 'Scoring candidates')
@@ -451,24 +484,18 @@ export async function scoreCandidates(
     similarityMax = 0
   }
 
-  // The raw figures, before normalisation flattens them into 0-1. This is the
-  // line that names a dead taste term: `compared` well below the candidate
-  // count means the taste vectors could not be compared at all (a width
-  // mismatch, or an unparsed vector), while compared == count with
-  // rawMin == rawMax means they compared and agreed, which is a different
-  // fault entirely. Reporting only the post-normalisation spread made those two
-  // indistinguishable and cost five round trips to separate by hand.
-  logger.info(
-    {
-      userId,
-      mediaType,
-      candidateCount: candidates.length,
-      compared: rawSimilarities.size,
-      rawMin: Number.isFinite(similarityMin) ? similarityMin : null,
-      rawMax: Number.isFinite(similarityMax) ? similarityMax : null,
-    },
-    'Taste similarity measured'
-  )
+  // The raw figures, before normalisation flattens them into 0-1. Returned as
+  // well as logged: the container log is not where an operator looks after a
+  // deploy, which is the whole reason the job console needs these rather than
+  // the normalised spread (see TasteScoringDiagnostics).
+  const taste: TasteScoringDiagnostics = {
+    candidateCount: candidates.length,
+    compared: rawSimilarities.size,
+    rawMin: rawSimilarities.size > 0 ? similarityMin : null,
+    rawMax: rawSimilarities.size > 0 ? similarityMax : null,
+  }
+
+  logger.info({ userId, mediaType, ...taste }, 'Taste similarity measured')
 
   // Get user's franchise preferences for boosting
   // Note: Genre weights are not applied here since discovery uses TMDb genre IDs, not names
@@ -593,6 +620,6 @@ export async function scoreCandidates(
   }, 'Scored and ranked candidates')
 
   // Return all scored candidates - limiting is done in the pipeline
-  return scoredCandidates
+  return { candidates: scoredCandidates, taste }
 }
 

@@ -380,6 +380,15 @@ export async function getPoolCandidates(
  * A candidate carrying no cast is skipped rather than written as enriched: a
  * lookup that came back empty is not a lookup worth caching, and marking it
  * done would freeze a blank card in place for every future user.
+ *
+ * It writes the DISPLAY fields too, not only cast and crew. The same TMDb
+ * response carried `vote_average`, `vote_count`, the poster, the backdrop, the
+ * overview, the original language and the real genre list, and dropping them
+ * meant a pool row that a run had already paid to enrich kept its blank rating
+ * forever -- so the missing-rating gap could not heal itself, and every user in
+ * every future run paid the same lookup while the pool never learned the
+ * answer. The numeric pair is `NULLIF`'d to 0 for the reason the upsert does
+ * the same: on this table NULL is "no vote data" and 0 would be a claim.
  */
 export async function updatePoolEnrichmentBatch(
   mediaType: MediaType,
@@ -400,6 +409,13 @@ export async function updatePoolEnrichmentBatch(
              runtime_minutes = COALESCE($5::integer, runtime_minutes),
              tagline = COALESCE($6::text, tagline),
              imdb_id = COALESCE($7::text, imdb_id),
+             vote_average = COALESCE(NULLIF($8::numeric, 0), vote_average),
+             vote_count = COALESCE(NULLIF($9::integer, 0), vote_count),
+             poster_path = COALESCE($10::text, poster_path),
+             backdrop_path = COALESCE($11::text, backdrop_path),
+             overview = COALESCE(NULLIF($12::text, ''), overview),
+             original_language = COALESCE($13::text, original_language),
+             genres = CASE WHEN $14::jsonb <> '[]'::jsonb THEN $14::jsonb ELSE genres END,
              is_enriched = TRUE,
              updated_at = NOW()
            WHERE media_type = $1 AND tmdb_id = $2`,
@@ -411,6 +427,13 @@ export async function updatePoolEnrichmentBatch(
             c.runtimeMinutes ?? null,
             c.tagline ?? null,
             c.imdbId ?? null,
+            c.voteAverage || null,
+            c.voteCount || null,
+            c.posterPath ?? null,
+            c.backdropPath ?? null,
+            c.overview ?? null,
+            c.originalLanguage ?? null,
+            JSON.stringify(c.genres ?? []),
           ]
         )
         updated += res.rowCount ?? 0

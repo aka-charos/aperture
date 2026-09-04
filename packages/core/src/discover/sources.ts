@@ -1035,35 +1035,10 @@ export async function fetchPersonalizedCandidates(
   }
 }
 
-/**
- * Merge personalized candidates with pool candidates
- * Personalzied candidates take precedence (override pool entries by tmdbId)
- */
-export function mergeWithPool(
-  personalizedCandidates: RawCandidate[],
-  poolCandidates: RawCandidate[]
-): RawCandidate[] {
-  const merged: RawCandidate[] = []
-  const seenIds = new Set<number>()
-
-  // Add personalized first (they take precedence)
-  for (const candidate of personalizedCandidates) {
-    if (!seenIds.has(candidate.tmdbId)) {
-      seenIds.add(candidate.tmdbId)
-      merged.push(candidate)
-    }
-  }
-
-  // Add pool candidates that aren't already included
-  for (const candidate of poolCandidates) {
-    if (!seenIds.has(candidate.tmdbId)) {
-      seenIds.add(candidate.tmdbId)
-      merged.push(candidate)
-    }
-  }
-
-  return merged
-}
+// mergeWithPool moved to ./merge.js, which has no runtime imports so its fill
+// rules can be pinned without a database or a TMDb key. Re-exported here
+// because this module is where every caller already looks for it.
+export { mergeWithPool, fillFromPoolRow } from './merge.js'
 
 /**
  * Basic enrichment - only fetch essential display data (poster, language)
