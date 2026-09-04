@@ -28,7 +28,7 @@ import {
   enrichBasicData,
 } from './sources.js'
 import { filterCandidates } from './filter.js'
-import { clearOrphanedCandidateEmbeddings } from './embeddings.js'
+import { clearOrphanedCandidateEmbeddings, clearDiscoveryRunCaches } from './embeddings.js'
 import { scoreCandidates } from './scorer.js'
 import {
   createDiscoveryRun,
@@ -335,6 +335,7 @@ export async function generateDiscoveryForUser(
   config: DiscoveryConfig,
   runType: 'scheduled' | 'manual' = 'scheduled'
 ): Promise<DiscoveryPipelineResult> {
+  clearDiscoveryRunCaches()
   const poolCandidates = await loadPoolCandidates(mediaType, config)
   return runDiscoveryForUser(user, mediaType, config, poolCandidates, runType)
 }
@@ -407,6 +408,11 @@ export async function generateDiscoveryForAllUsers(
     ? () => isJobCancelled(actualJobId)
     : undefined
   const cancelled = () => shouldCancel?.() === true
+
+  // The library mean and the centring readiness do not vary by viewer, and
+  // nothing inside a discovery run writes an embedding or re-centres a column.
+  // Cleared here so their lifetime is exactly this run.
+  clearDiscoveryRunCaches()
 
   const users = await getDiscoveryEnabledUsers()
 

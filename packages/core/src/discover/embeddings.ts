@@ -23,6 +23,7 @@ import { createHash } from 'node:crypto'
 import { createChildLogger } from '../lib/logger.js'
 import { query } from '../lib/db.js'
 import { getEmbeddingInvocation, getActiveEmbeddingTableName } from '../lib/ai-provider.js'
+import { isCenteringReady } from '../recommender/centering.js'
 import type { MediaType, RawCandidate } from './types.js'
 
 const logger = createChildLogger('discover:embeddings')
@@ -99,22 +100,75 @@ function parseVector(raw: string): number[] {
 }
 
 /**
+ * Per-run answers to the questions that do not vary by viewer.
+ *
+ * The unit of a discovery "run" is a JOB, not a user, and the two were being
+ * confused: `runDiscoveryForUser` is called `users x 2` times, and each call
+ * re-asked the library for two constants. The expensive one is the mean --
+ * `AVG(l2_normalize(embedding::vector))` over 12,589 rows of 3,072 halfvec is
+ * a ~77 MB read cast to ~155 MB of float4 and 38.6M additions, and on a
+ * ten-viewer instance it ran twenty times a night for one number that could not
+ * have changed. Neither can move mid-run: nothing inside a discovery job writes
+ * an embedding or re-centres a column.
+ *
+ * Cleared explicitly at the start of every run rather than given a TTL, so the
+ * lifetime is a fact about the code and not a guess about the clock. A stale
+ * entry would centre candidates against a mean the library has moved away from,
+ * which is a wrong DIRECTION rather than a wrong scale (F-036 rule 6).
+ */
+const libraryMeanCache = new Map<string, number[] | null>()
+const centeringReadyCache = new Map<MediaType, boolean>()
+
+/** Drop the per-run caches. Call at the start of a discovery run. */
+export function clearDiscoveryRunCaches(): void {
+  libraryMeanCache.clear()
+  centeringReadyCache.clear()
+}
+
+/**
+ * Whether the centred column is fully populated, asked once per run.
+ *
+ * Wraps `isCenteringReady` here rather than memoizing it in `centering.ts`,
+ * because that function is shared with both recommender pipelines and the
+ * embedding jobs -- which do write embeddings, and for which a cached answer
+ * would be wrong.
+ */
+export async function isCenteringReadyForRun(mediaType: MediaType): Promise<boolean> {
+  const cached = centeringReadyCache.get(mediaType)
+  if (cached !== undefined) return cached
+
+  const ready = await isCenteringReady(mediaType)
+  centeringReadyCache.set(mediaType, ready)
+  return ready
+}
+
+/**
  * The library mean, for putting a fresh vector into the centred space.
  *
  * `refreshCenteredEmbeddings` stores `l2_normalize(embedding) - AVG(l2_normalize(embedding))`,
  * and F-036 records that the mean is never stored because a profile built from
  * the centred column is already centred and needs none. That holds for every
  * existing reader — but a candidate vector has never been in that column, so it
- * is the one case where the mean genuinely has to be recomputed. Once per run,
- * not once per candidate.
+ * is the one case where the mean genuinely has to be recomputed.
+ *
+ * Once per run and per (media type, set id) — see the cache above. The SQL is
+ * form-identical to `refreshCenteredEmbeddings`' own, and filters on the same
+ * string, since `getActiveEmbeddingModelId` returns `embeddingSetId(config)`.
+ * Those two must stay in step or candidates are centred against a different
+ * population than the library rows were.
  *
  * Returns null when there is nothing to average, which the caller treats as
- * "cannot serve the centred space" rather than falling back to raw.
+ * "cannot serve the centred space" rather than falling back to raw. A null is
+ * cached too: it means the set is empty, which will not change mid-run either.
  */
 export async function getLibraryEmbeddingMean(
   mediaType: MediaType,
   setId: string
 ): Promise<number[] | null> {
+  const cacheKey = `${mediaType}:${setId}`
+  const cached = libraryMeanCache.get(cacheKey)
+  if (cached !== undefined) return cached
+
   const table = await getActiveEmbeddingTableName(
     mediaType === 'movie' ? 'embeddings' : 'series_embeddings'
   )
@@ -127,8 +181,9 @@ export async function getLibraryEmbeddingMean(
   )
 
   const raw = result.rows[0]?.mean
-  if (!raw) return null
-  return parseVector(raw)
+  const mean = raw ? parseVector(raw) : null
+  libraryMeanCache.set(cacheKey, mean)
+  return mean
 }
 
 /** L2-normalise, matching what centring does to a row before subtracting. */

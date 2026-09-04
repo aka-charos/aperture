@@ -11,11 +11,12 @@ import type { MediaType, RawCandidate, ScoredCandidate, DiscoveryConfig } from '
 import { getUserFranchisePreferences, getUserTasteClusters } from '../taste-profile/index.js'
 import { detectFranchiseFromTitle } from '../taste-profile/franchise.js'
 import { applyPreferenceAdjustment } from '../recommender/shared/index.js'
-import { resolveEmbeddingSpace, isCenteringReady } from '../recommender/centering.js'
+import { resolveEmbeddingSpace } from '../recommender/centering.js'
 import type { EmbeddingSpace } from '../recommender/centering.js'
 import {
   getCandidateEmbeddings,
   getLibraryEmbeddingMean,
+  isCenteringReadyForRun,
   centreVector,
 } from './embeddings.js'
 import { getMovieGenresList, getTVGenresList } from '../tmdb/index.js'
@@ -424,7 +425,7 @@ export async function scoreCandidates(
       // than mixing: a centred centroid against a raw candidate is a confident
       // cosine between two different spaces.
       const profileSpace = await getProfileEmbeddingSpace(userId, mediaType)
-      const space = resolveEmbeddingSpace(profileSpace, await isCenteringReady(mediaType))
+      const space = resolveEmbeddingSpace(profileSpace, await isCenteringReadyForRun(mediaType))
 
       if (space === null) {
         logger.warn(
