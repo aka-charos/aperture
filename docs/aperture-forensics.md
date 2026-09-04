@@ -1463,3 +1463,66 @@ The simulation surfaced a separate defect on its way past. Min-max makes group s
 Shrunk toward neutral by `n / (n + 10)`, which is `genrePreference.ts`'s constant for the same shape of problem and is **inherited rather than re-derived** — a thin population and a real signal look identical from inside the function, and the safe direction is the one that claims less. It generalises the existing lone-candidate case rather than sitting beside it: a group of one already resolved to 0.5 because min equals max, and a group of three is now most of the way there instead of all the way to the edges. At 10, a group of 3 keeps 23% of its range and a group of 100 keeps 91%.
 
 Worth naming that it costs a little of popularity's realised spread — the term that was *already* under-delivering. That is the argument above, deliberately left where it is: reporting the discrepancy and damping an unearned range are different questions, and conflating them is how a measurement becomes a justification.
+
+## F-107
+
+**Issue reporting: proxied rather than mirrored, and why the earlier plan was wrong about that.** Built 2026-09-05 as phase 3a of making Seerr an admin-only backend. Sources read at Seerr v3.4.1.
+
+### The mirror this was supposed to need
+
+[F-105](docs/aperture-forensics.md#f-105)'s feasibility pass concluded a local `seerr_issues` table was "near-required", on one observation: `GET /issue` takes `take/skip/sort/filter/createdBy` and **no `mediaId`**, so "issues on this title" cannot be one upstream call.
+
+That reasoning missed what `X-API-User` already buys. Seerr scopes the list itself:
+
+```ts
+if (!req.user?.hasPermission([MANAGE_ISSUES, VIEW_ISSUES], { type: 'or' })) {
+  query = query.andWhere('createdBy.id = :id', { id: req.user?.id });
+}
+```
+
+A viewer holding only `CREATE_ISSUES` gets **their own** rows, server-side, whatever is asked for. So one `take=100&filter=all` call answers "what have I reported" completely, and a mirror would buy a per-title index nobody needs at the price of comments going stale exactly while someone is having a conversation on them. **No table, no reconcile job, no sync.** The estimate went from 1–2 weeks to under one.
+
+The mirror becomes necessary only for issues visible while Seerr is down, or a user whose own issue count outgrows a page. Neither is true.
+
+### One attribution rule, both directions
+
+A user-scoped read or write acts as the user; an **admin-scoped read acts as the API key's owner**, who is Seerr user 1 and holds `MANAGE_ISSUES`. Choosing who to act as *is* choosing the audience, so there is no local filter that could disagree with Seerr's own — and because these are real Seerr issues by real Seerr users, **Seerr's notification agents fire with the right person attached**. Aperture has no notification system and needs none for this.
+
+Two consequences that are not symmetric with requests:
+
+- **An unmapped user cannot comment, and is refused rather than silently misattributed.** `POST /issue/:id/comment` has no on-behalf-of field in *any* version — it hardcodes `user: req.user` — so an unlinked user's reply would appear under the admin's name: someone else's words attributed to the operator. A 422 naming the fix is the only honest answer.
+- **An unmapped user's list is empty, not everyone's.** Acting as nobody means acting as the API key's owner, whose view is *all* issues — so the unscoped call would hand a non-admin the whole instance's reports. The route checks for that explicitly and answers `{ issues: [], unlinked: true }`, which the panel states as a sentence.
+
+### The report is the first comment, and rendering it twice is the easy mistake
+
+Seerr's `Issue` entity has **no description column**. `POST /issue` stores the reporter's message as the thread's opening `IssueComment`:
+
+```ts
+const issue = new Issue({ createdBy, issueType, media, comments: [
+  new IssueComment({ user: createdBy, message: req.body.message }),
+]});
+```
+
+So a faithful thread is *a report followed by replies*, and mapping every comment uniformly shows the report twice — once as the summary and once as the opening reply. `mapSeerrIssue` splits them (`description` plus `comments`), pinned by a test verified to fail on the uniform version.
+
+Same file, two more silent ones. **`problemSeason`/`problemEpisode` default to `0`**, which is Seerr's "the whole title" and not season zero — mapped to `null`, or a film reads "Season 0". And **author names come from `displayName`**, which Seerr sets on `@AfterLoad` as `username || plexUsername || jellyfinUsername || email`; the chain is repeated rather than trusted, because [F-105](docs/aperture-forensics.md#f-105) rule 7 established that an Emby-imported user has an **empty** `username` with their name in `jellyfinUsername` — so reading the wrong field puts a blank, or an email address, beside every comment.
+
+`issueMapping.ts` imports nothing at runtime, so the test runs without dragging the core barrel's database pool in — the reason `seerr/sources/seerrMapping.ts` is split the same way.
+
+### The precondition, and which half of it belongs on the button
+
+An issue is filed against **Seerr's internal media row id**, not a TMDb id, and that row exists only for titles its own scan has seen. `getMediaStatus` was already fetching the response holding it and discarding it; it returns `seerrMediaId` now, and the status endpoint ships a decided `canReportIssue` (web-never-imports-core), so the control is absent rather than present-and-broken.
+
+**Only the instance-level half is decided there.** Whether *this viewer* is linked to a Seerr account is deliberately not folded in, for two reasons. It is per-user and fixable, and a control that silently vanishes teaches nobody what to do — whereas the create route refuses with a sentence naming the fix. And resolving a link **writes** (`ensureSeerrUserIdForRequest` caches the id), which on a GET would be [F-103](docs/aperture-forensics.md#f-103)'s trap: a getter that writes defeats the account-assumption guard silently, and this one would write to the *target's* row.
+
+`ReportIssueCard` self-hides on `canReportIssue !== true`, so **absent reads as false** — an older server that does not send the field cannot accept the report either.
+
+### Two extractions this forced, both of them the repo's own rule
+
+`ensureSeerrUserIdForRequest` and `clearStaleSeerrUserId` moved to `lib/seerrActingUser.ts`, and `attachLibraryMediaIds` to `lib/libraryLinks.ts`. Copying either would have been the duplicated-predicate failure this codebase keeps re-learning: the acting-user resolution has **three** failure modes that must be answered identically everywhere (no match, a contested match, a cached id outliving its account), and a second copy would answer one of them differently with nobody noticing until an issue was filed under the wrong name.
+
+`attachLibraryMediaIds` also gained `libraryTitle`, because **Seerr's issue payload carries `media.tmdbId` and no name at all** — the issue list would otherwise have nothing to render. A title known to Seerr but absent from this library resolves to `null` and the panel falls back to `TMDb #123`, which is the honest form of not knowing.
+
+### Left for 3b
+
+Resolve/reopen (`POST /issue/:id/:status`, MANAGE_ISSUES only) and an admin triage view. The panel already takes `scope`, and the admin switch on My Requests already drives it, so 3b is the route plus a button rather than a second page.

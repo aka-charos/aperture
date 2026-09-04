@@ -25,6 +25,8 @@ import {
   Snackbar,
   FormControlLabel,
   Switch,
+  Tabs,
+  Tab,
 } from '@mui/material'
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck'
 import CheckIcon from '@mui/icons-material/Check'
@@ -37,6 +39,7 @@ import {
   ContentSearchPanel,
   type ContentSearchItem,
 } from '../components/ContentSearchPanel'
+import { MyIssuesPanel } from '../components/MyIssuesPanel'
 import { PageHeading } from '@/components/PageHeading'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -125,6 +128,7 @@ export function MyRequestsPage() {
   const [error, setError] = useState<string | null>(null)
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
   const [allUsers, setAllUsers] = useState(false)
+  const [tab, setTab] = useState<'requests' | 'issues'>('requests')
   const [deciding, setDeciding] = useState<string | null>(null)
   const [snackbar, setSnackbar] = useState<{
     open: boolean
@@ -252,6 +256,42 @@ export function MyRequestsPage() {
         icon={<PlaylistAddCheckIcon color="primary" />}
       />
 
+      {/* The admin scope sits above the tabs because it applies to both
+          lists, not to the requests table alone. */}
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
+      >
+        <Tabs value={tab} onChange={(_, next: 'requests' | 'issues') => setTab(next)}>
+          <Tab value="requests" label={t('myRequests.tabRequests')} />
+          <Tab value="issues" label={t('myRequests.tabIssues')} />
+        </Tabs>
+        {isAdmin && (
+          <FormControlLabel
+            sx={{ mr: 0 }}
+            control={
+              <Switch
+                checked={allUsers}
+                onChange={(e) => {
+                  setPage(0)
+                  setAllUsers(e.target.checked)
+                }}
+              />
+            }
+            label={t('myRequests.showAllUsers')}
+          />
+        )}
+      </Stack>
+
+      {/* Both panels are unmounted when inactive rather than hidden: each
+          owns a fetch, and a hidden one would keep refetching on every
+          filter change the other made. */}
+      {tab === 'issues' && <MyIssuesPanel scope={isAdmin && allUsers ? 'all' : 'mine'} />}
+
+      {tab === 'requests' && (
+      <>
       <ContentSearchPanel
         onShowDetails={(item: ContentSearchItem) => {
           if (item.mediaType === 'person') return
@@ -280,20 +320,6 @@ export function MyRequestsPage() {
           </Select>
         </FormControl>
 
-        {isAdmin && (
-          <FormControlLabel
-            control={
-              <Switch
-                checked={allUsers}
-                onChange={(e) => {
-                  setPage(0)
-                  setAllUsers(e.target.checked)
-                }}
-              />
-            }
-            label={t('myRequests.showAllUsers')}
-          />
-        )}
       </Stack>
 
       {error && (
@@ -470,6 +496,8 @@ export function MyRequestsPage() {
           />
         )}
       </Paper>
+      </>
+      )}
 
       <TmdbExternalDetailModal
         open={tmdbModalOpen}

@@ -3163,7 +3163,9 @@
     "approved": "Approved {{title}}",
     "declined": "Declined {{title}}",
     "decisionFailed": "Could not update the request",
-    "sourceDirect": "Direct request"
+    "sourceDirect": "Direct request",
+    "tabRequests": "Requests",
+    "tabIssues": "Issues"
   },
   "watchHistoryPage": {
     "title": "История просмотра",
@@ -5094,5 +5096,53 @@
     "requestFailed": "Could not submit the request",
     "movies": "Movies",
     "series": "TV shows"
+  },
+  "reportIssue": {
+    "title": "Report a problem",
+    "subtitle": "Tell the team what is wrong with “{{title}}”. Be specific — where it happens matters more than how bad it is.",
+    "cardTitle": "Something wrong with this?",
+    "cardBody": "Report a playback problem so it can be looked at.",
+    "cardAction": "Report",
+    "kind": "What is wrong",
+    "kinds": {
+      "video": "Video",
+      "audio": "Audio",
+      "subtitles": "Subtitles",
+      "other": "Something else"
+    },
+    "season": "Season",
+    "seasonNumber": "Season {{number}}",
+    "wholeTitle": "Whole show",
+    "episode": "Episode",
+    "episodeHelp": "Optional",
+    "message": "What happens",
+    "messagePlaceholder": "e.g. the audio drifts out of sync about forty minutes in",
+    "submit": "Send report",
+    "submitting": "Sending…",
+    "reported": "Thanks — your report has been sent.",
+    "errorSubmit": "Could not send the report"
+  },
+  "myIssues": {
+    "empty": "You have not reported any problems.",
+    "unavailable": "Issue reporting is unavailable. It needs a configured request backend.",
+    "unlinked": "Your account is not linked to a request-backend account yet, so reports you file cannot be tracked here. Ask an admin to link it.",
+    "unknownTitle": "TMDb #{{tmdbId}}",
+    "unknownAuthor": "Unknown",
+    "state": {
+      "open": "Open",
+      "resolved": "Resolved"
+    },
+    "scopeSeason": "Season {{season}}",
+    "scopeEpisode": "S{{season}} E{{episode}}",
+    "reportedOn": "Reported {{date}}",
+    "reportedByOn": "Reported by {{name}} · {{date}}",
+    "replies_one": "{{count}} reply",
+    "replies_other": "{{count}} replies",
+    "noReplies": "No replies yet.",
+    "reply": "Reply",
+    "replyPlaceholder": "Add a reply…",
+    "replyPosted": "Reply posted.",
+    "errorLoad": "Could not load issues",
+    "errorReply": "Could not post the reply"
   }
 }

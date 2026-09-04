@@ -21,6 +21,9 @@ import type {
   SeerrRadarrServerDetailsResponse,
   SeerrSonarrServerDetailsResponse,
   SeerrCreateRequestOptions,
+  SeerrCreateIssueBody,
+  SeerrIssue,
+  SeerrIssueListResponse,
 } from './types.js'
 import {
   matchApertureProfileToSeerrUser,
@@ -301,6 +304,13 @@ export async function getMediaStatus(
   requested: boolean
   requestStatus?: 'pending' | 'approved' | 'declined'
   requestId?: number
+  /**
+   * Seerr's internal media row id, which `POST /issue` needs and a TMDb id
+   * cannot stand in for. Absent when Seerr has never scanned this title —
+   * which is also exactly when no issue can be filed against it, so the two
+   * facts travel together rather than being discovered separately at submit.
+   */
+  seerrMediaId?: number
 } | null> {
   const details = mediaType === 'movie' 
     ? await getMovieDetails(tmdbId)
@@ -351,6 +361,7 @@ export async function getMediaStatus(
       inPipeline(fourK),
     requestStatus: latestRequest ? requestStatusMap[latestRequest.status] : undefined,
     requestId: latestRequest?.id,
+    seerrMediaId: mediaInfo.id,
   }
 }
 
@@ -659,3 +670,112 @@ export async function batchGetMediaStatus(
   return results
 }
 
+
+// ============================================================================
+// Issues
+// ============================================================================
+
+/**
+ * Who a call is made as.
+ *
+ * A user-scoped read or write passes that person's Seerr id, so Seerr scopes
+ * `GET /issue` to their own rows and stamps `createdBy` correctly. An
+ * admin-scoped read passes nothing and runs as the API key's owner — Seerr
+ * user 1, who holds MANAGE_ISSUES and therefore sees everyone's. One rule,
+ * both directions, no permission juggling.
+ */
+export interface SeerrActAs {
+  actAsUserId?: number
+}
+
+/**
+ * File an issue against a title Seerr knows about.
+ *
+ * `mediaId` is Seerr's internal media row id — see SeerrCreateIssueBody. A 404
+ * here means Seerr has no row for the title, which is a fact about its library
+ * scan rather than about this request, so callers should have established that
+ * before offering the control at all.
+ */
+export async function createIssue(
+  body: SeerrCreateIssueBody,
+  options: SeerrActAs = {}
+): Promise<{ success: boolean; issueId?: number; message?: string; status?: number | null }> {
+  const result = await seerrCall<SeerrIssue>('/issue', {
+    method: 'POST',
+    body: body as unknown as Record<string, unknown>,
+    ...(options.actAsUserId != null ? { actAsUserId: options.actAsUserId } : {}),
+  })
+
+  if (!result.ok || !result.data) {
+    return { success: false, message: result.message ?? 'Failed to create issue', status: result.status }
+  }
+
+  return { success: true, issueId: result.data.id, status: result.status }
+}
+
+/**
+ * List issues.
+ *
+ * Seerr applies the scoping itself: a user holding only CREATE_ISSUES gets
+ * `createdBy = them` regardless of what is asked for, while the API key's
+ * owner gets everything. So the caller chooses the audience by choosing who
+ * to act as, and there is no filter here that could disagree with Seerr's.
+ *
+ * Note `filter` defaults to `open` upstream and `take` to 10 — both are passed
+ * explicitly, because a list that silently omits resolved issues reads as data
+ * loss to whoever filed one.
+ */
+export async function listIssues(
+  options: SeerrActAs & {
+    take?: number
+    skip?: number
+    filter?: 'all' | 'open' | 'resolved'
+    sort?: 'added' | 'modified'
+  } = {}
+): Promise<SeerrIssueListResponse | null> {
+  const params = new URLSearchParams({
+    take: String(options.take ?? 100),
+    skip: String(options.skip ?? 0),
+    filter: options.filter ?? 'all',
+    sort: options.sort ?? 'modified',
+  })
+
+  return seerrRequest<SeerrIssueListResponse>(`/issue?${params.toString()}`, {
+    ...(options.actAsUserId != null ? { actAsUserId: options.actAsUserId } : {}),
+  })
+}
+
+/** One issue with its comments. Seerr refuses unless the caller created it or can manage issues. */
+export async function getIssue(
+  issueId: number,
+  options: SeerrActAs = {}
+): Promise<SeerrIssue | null> {
+  return seerrRequest<SeerrIssue>(`/issue/${issueId}`, {
+    ...(options.actAsUserId != null ? { actAsUserId: options.actAsUserId } : {}),
+  })
+}
+
+/**
+ * Add a comment to an issue.
+ *
+ * `POST /issue/:id/comment` has no `userId` field in ANY Seerr version — it
+ * hardcodes `user: req.user` — so acting as the commenter is the only way a
+ * thread reads as a conversation rather than as the admin talking to himself.
+ */
+export async function createIssueComment(
+  issueId: number,
+  message: string,
+  options: SeerrActAs = {}
+): Promise<{ success: boolean; message?: string; status?: number | null }> {
+  const result = await seerrCall<SeerrIssue>(`/issue/${issueId}/comment`, {
+    method: 'POST',
+    body: { message },
+    ...(options.actAsUserId != null ? { actAsUserId: options.actAsUserId } : {}),
+  })
+
+  if (!result.ok) {
+    return { success: false, message: result.message ?? 'Failed to add comment', status: result.status }
+  }
+
+  return { success: true, status: result.status }
+}

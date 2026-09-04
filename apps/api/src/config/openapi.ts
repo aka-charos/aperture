@@ -316,6 +316,11 @@ const tags = [
     },
   },
   {
+    name: 'issues',
+    description:
+      'Reporting problems with a title (bad audio, missing subtitles) and the reply thread on each. Proxied to Seerr, filed as the reporting user.',
+  },
+  {
     name: 'mdblist',
     description:
       'MDBList integration for additional ratings and list imports. Provides Trakt, IMDb, and community list data.',

@@ -6,7 +6,7 @@
 
 // Types
 export * from './types.js'
-export type { SeerrCallResult } from './provider.js'
+export type { SeerrCallResult, SeerrActAs } from './provider.js'
 
 // Provider functions
 export {
@@ -26,6 +26,11 @@ export {
   // Request Management
   createRequest,
   updateRequestStatus,
+  // Issues
+  createIssue,
+  listIssues,
+  getIssue,
+  createIssueComment,
   getRequest,
   getRequestStatus,
   deleteRequest,

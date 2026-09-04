@@ -12,6 +12,8 @@ export interface SeerrUser {
   id: number
   email: string
   username: string
+  /** Set by Seerr's @AfterLoad: username || plexUsername || jellyfinUsername || email. */
+  displayName?: string
   plexToken: string | null
   jellyfinUsername: string | null
   jellyfinUserId: string | null
@@ -282,3 +284,59 @@ export function getRequestStatusLabel(status: SeerrRequestStatus): RequestStatus
   return SEERR_REQUEST_STATUS[status] ?? 'pending'
 }
 
+
+// ============================================================================
+// Issues
+// ============================================================================
+
+/** Seerr's IssueType enum. The names are its own; do not renumber. */
+export type SeerrIssueTypeCode = 1 | 2 | 3 | 4
+
+/** Seerr's IssueStatus enum: 1 OPEN, 2 RESOLVED. */
+export type SeerrIssueStatusCode = 1 | 2
+
+export interface SeerrIssueComment {
+  id: number
+  message: string
+  user?: SeerrUser
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SeerrIssue {
+  id: number
+  issueType: SeerrIssueTypeCode
+  status: SeerrIssueStatusCode
+  /** 0 means "the whole title" — Seerr's column default, not a real season. */
+  problemSeason: number
+  problemEpisode: number
+  media: SeerrMediaInfo
+  createdBy?: SeerrUser
+  modifiedBy?: SeerrUser
+  comments?: SeerrIssueComment[]
+  createdAt: string
+  updatedAt: string
+}
+
+/** Response shape for GET /issue */
+export interface SeerrIssueListResponse {
+  pageInfo: { page: number; pages: number; pageSize: number; results: number }
+  results: SeerrIssue[]
+}
+
+/**
+ * Body for POST /issue.
+ *
+ * `mediaId` is Seerr's INTERNAL media row id, not a TMDb id — it comes from
+ * `mediaInfo.id` on a movie/tv detail response, and it exists only for titles
+ * Seerr has actually scanned. There is no `userId` here on purpose: attribution
+ * rides on the `X-API-User` header, which is the only mechanism that also
+ * covers comments.
+ */
+export interface SeerrCreateIssueBody {
+  issueType: SeerrIssueTypeCode
+  message: string
+  mediaId: number
+  problemSeason?: number
+  problemEpisode?: number
+}

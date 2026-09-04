@@ -42,6 +42,11 @@ export const seerrSchemas = {
         enum: ['pending_approval', 'approved', 'declined', 'available'],
         description: 'Request status if requested'
       },
+      seerrMediaId: {
+        type: 'integer',
+        nullable: true,
+        description: "Seerr's internal media row id — what POST /issue is keyed by, not the TMDb id",
+      },
     },
     example: {
       exists: true,
@@ -63,6 +68,11 @@ export const seerrSchemas = {
         description: 'Aperture-tracked request if exists'
       },
       canRequest: { type: 'boolean', description: 'Whether user can create a new request' },
+      canReportIssue: {
+        type: 'boolean',
+        description:
+          'Whether Seerr holds a media row for this title, which is what an issue is filed against. Per-user account linking is checked at submit, not here.',
+      },
     },
   },
 
