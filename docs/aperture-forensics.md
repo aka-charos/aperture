@@ -1338,3 +1338,85 @@ Three things the deployed page made obvious that no test could.
 `resolveRequestSource` is what the route trusts, not the body. **`gap_analysis` is deliberately unreachable from a browser** — those rows are written by the gap-analysis job through core, and letting a client claim that origin would corrupt the column in the other direction. Anything unrecognised reads as `discovery`, the pre-existing default and the safe fallback. Both decisions are pure and pinned in `requestOptions.test.ts`, verified to fail on an injected regression (a viewer keeping every override).
 
 Related surface deliberately left alone: requests from `PersonDetail` still record as `discovery`. They are arguably direct too, but that is a separate call site and a separate judgement about what the column should say.
+
+## F-106
+
+### One column, several units — the second pass over Discover
+
+[F-104](#f-104) repaired the taste term and closed four chained faults. Re-reading the feature afterwards turned up five more, and three of them are the same defect wearing different clothes: **a single column carrying several different quantities, with the unit recorded nowhere.**
+
+`discovery_pool.popularity` holds TMDb's unbounded metric for the TMDb sources, a Trakt watcher count for `trakt_trending`, and a hardcoded 0 for `trakt_popular`. `RawCandidate.voteAverage` holds a rating, a genuine zero, and "no data". F-104's per-source popularity fix treated the ambiguity at the last possible moment — in the scorer — while the same ambiguity was still deciding which rows exist at all and which fields survive a merge.
+
+#### The merge threw away everything the pool knew
+
+`mergeWithPool` gave personalized candidates precedence by pushing the whole object and skipping the pool row. A `trakt_recommendations` candidate is constructed with `voteAverage: 0`, `voteCount: 0`, no poster and no genres, because Trakt's list payload carries none of it. So when Trakt recommended a title the pool already held with a real TMDb rating, poster, genre list and cached cast, that row was discarded and the bare Trakt row won.
+
+The source this hits is the **highest-scoring one in the system** — `trakt_recommendations` carries `sourceScore` 1.0, the one the code itself calls "most personalized". It was reliably producing cards with a missing rating, and below `maxEnrichedCandidates` a missing poster too. It also lost `isEnriched` and `poolId`, so the run re-paid two or three TMDb requests per title the pool had already bought.
+
+The earlier ratings work does not reach this. `NULLIF` fixed what the pool **stores** and `enrichBasicData`'s selection fixed what the pool **enriches**; both are correct, and this path never touched the pool row on its way past. **A fix applied at one end of a pipeline does not travel to the other end**, and the merge is a third place the same question gets answered.
+
+`updatePoolEnrichmentBatch` was the other half: it wrote back cast, directors, runtime, tagline and `imdb_id` while dropping the vote average, vote count, poster, backdrop, overview, language and genre list from the same TMDb response. So an enriched pool row kept its blank rating forever and the gap could not heal itself — every viewer in every future run paid the same lookup while the pool never learned the answer.
+
+#### The unit and the label were maintained independently
+
+`popularityScoresBySource` normalises within the group named by `source`, which for a pool row is `sources[1]`. That array was maintained by
+
+```sql
+sources = ARRAY(SELECT DISTINCT unnest(sources || EXCLUDED.sources))
+```
+
+and `SELECT DISTINCT` with no `ORDER BY` guarantees nothing about order, while `popularity` was separately `COALESCE`'d from whichever source last supplied a non-null figure. Two independent maintainers, one implied invariant, no enforcement.
+
+Measured on the live pool — and the same source set appears in **both orders**, which is the non-determinism showing up directly in the data:
+
+| `sources` | rows | popularity |
+|---|---:|---|
+| `{tmdb_discover}` | 222 | 28.01 – 901.11 |
+| `{tmdb_discover,trakt_trending}` | 38 | 28.71 – 104.79 |
+| `{trakt_trending,tmdb_discover}` | 15 | 28.88 – 33.01 |
+| `{tmdb_discover,trakt_popular}` | 3 | 28.02 – 54.76 |
+| `{trakt_popular,tmdb_discover}` | 1 | 53.60 |
+
+Every figure there is on TMDb's decimal scale: TMDb Discover is first in `fetchGlobalCandidates`' concatenation and the dedupe keeps the first occurrence, so a title both sources return enters as the TMDb candidate. But **16 of 279 movies list a Trakt source first**, so the scorer filed a TMDb-scaled number in a group of 15 spanning 4.13 points and min-max stretched it across the full 0–1. A title at popularity 33.01 scored **1.00** there against **0.006** in the 873-point group it belongs to. Popularity carries 27% of the blend, so that is most of a term handed out by an arbitrary array order — and **F-104's per-source fix is what created the exposure**, since before it every pool row normalised together on the one scale it actually shares.
+
+Migration `0162` adds `popularity_source`, written in the **same expression** as `popularity` and NULL whenever the figure is, so a source is never claimed for a number that was not stored; on conflict it moves only when the number moves. The backfill is provable rather than inferred: every row in the pool lists `tmdb_discover` among its sources (there is not one Trakt-only row) and TMDb Discover is the only global source supplying a non-null popularity at all. Anything else keeps NULL, which the scorer groups separately rather than guessing at.
+
+Ordering the `DISTINCT` would only have made the wrong answer deterministic. `sources` is now **appended to rather than rebuilt**, preserving first-seen order — which matters on its own account, because `sources[1]` still decides `calculateSourceScore`, so a title's source score could previously change between runs without the title changing.
+
+**Still open, and inert here:** `getPoolCandidates` truncates with `ORDER BY popularity DESC NULLS LAST LIMIT maxPoolCandidates`, on that same mixed-unit column — so once a pool exceeds the cap the `LIMIT` drops Trakt-only rows first and the pool degrades toward TMDb Discover alone. Measured 279 movies and 263 series against a cap of 3,000, with **zero** NULL popularity, so it cannot fire on this instance. Recorded rather than fixed, because the honest replacement (`updated_at DESC`, "most recently seen") is a behaviour change to which candidates survive, and there is no evidence here to choose it against.
+
+#### The fallback nobody maintained
+
+`getUserTasteVectors` fell back to `user_preferences.taste_embedding` whenever `getUserTasteClusters` came back empty. Three things are true of that column and not of the clusters:
+
+1. **`rebuild-taste-profiles` never writes it.** Nothing in `taste-profile/` mentions the column — it is written only by the two *recommender* pipelines. So for the discover-only viewers F-104's gate fix just admitted, it is still unmaintained: the same fault, one artefact over.
+2. **It carries no `embedding_model`.** `getUserTasteClusters` discards a stale model explicitly; this read had no way to.
+3. **It carries no `embedding_space`.** That column exists on `user_taste_profiles` alone (`0154`), so `getProfileEmbeddingSpace` asked one table which space to use and the answer was applied to a vector from another table maintained by another job.
+
+Together those let the fallback return a vector from a superseded model, in an unknown space, labelled `centered` by a row describing something else — and the candidates were then centred to match. `maxTasteSimilarity`'s width guard catches a dimension change, but a **same-width** model change (gemini-embedding-001 → -2, both 3072) passes it and yields a confident cosine between two unrelated spaces. That is exactly what `resolveEmbeddingSpace` exists to refuse, **reached by a path that went around it**.
+
+Deleted rather than repaired. Gating it on a model and a space it does not record means adding both, to a path that should be empty. No clusters at the active model now means no taste term and a neutral 0.5 — the state the feature was in before F-104 — plus a warn naming `rebuild-taste-profiles`. The halfvec-as-string parse F-104 records went with it: a real fix to a real bug, which existed only to make a fallback work that should not run.
+
+#### The diagnostic that shipped was not the one that worked
+
+F-104's own instrument note says the chain was only diagnosable because the spread was logged per viewer. The line that shipped to the **job console** read `candidatesToStore[].similarityScore` — the value *after* min-max normalisation across the pool — so its minimum is 0 and its maximum is 1 by construction whenever any two candidates differ. The first live run printed exactly that:
+
+```
+🎯 goca: taste match 0.00–1.00 across 245 movies
+```
+
+It could distinguish "completely flat" from "not flat", and nothing else. The 0.037-wide band that started the whole investigation would have rendered identically. The raw figures existed only inside the scorer, and went to the container log — which the code's own comment says is not where an operator looks after a deploy.
+
+`scoreCandidates` now returns `{ candidates, taste }`, the shape the recommender's own `scoreCandidates` already uses for `{ candidates, weights }`, and the console reports raw min/max/spread plus **`compared` against the candidate count** — the pair that separates "could not compare at all" from "compared and agreed", which cost five round trips to tell apart by hand.
+
+**The general rule: a normalised measure cannot report on its own normalisation.** Min-max output is a rank, and a rank always spans its full range; if the instrument is meant to catch a collapsed input, it has to read the input.
+
+#### Once per run means once per job
+
+`runDiscoveryForUser` is called `users × 2` times, and each call re-asked the library for two constants: `AVG(l2_normalize(embedding::vector))` over 12,589 × 3,072 halfvec — a ~77 MB read cast to ~155 MB of float4 and 38.6M additions — and a `COUNT(*) FILTER` over the same table. Twenty full-table aggregations a night for one vector. The module's own comment already claimed the mean was computed "once per run, not once per candidate": true, and **the run it meant was the wrong one**. Both are now cached per (media type, set id) and cleared explicitly at the top of a run rather than given a TTL, so the lifetime is a fact about the code and not a guess about the clock — a stale mean is a wrong *direction*, not a wrong scale (F-036 rule 6).
+
+#### Two things deliberately not changed
+
+**The displayed "Similarity" percentage is a rank.** `discovery_candidates.similarity_score` stores the pool-normalised value, and `DiscoveryDetailPopper` renders it as `(similarityScore * 100).toFixed(0)`, so the best candidate in a batch always reads 100% and the worst always 0%, whatever the real spread — which in raw cosines is narrow. The precedent for fixing it exists (`0141` stores `normalized_similarity` beside the raw `similarity_score` for exactly this reason), but choosing between storing both and relabelling the field is a decision about what to claim, not a repair.
+
+**Two of the four scoring terms are normalised and two are not.** Similarity and popularity are min-max'd across the pool and realise the full [0,1]; recency is `0.5^(age/12)` over a pool skewed recent and realises perhaps [0.6, 1.0], while source is a lookup table spanning [0.5, 1.0]. By [F-058](#f-058)'s own argument — influence is weight share × realised spread — a configured recency weight of 0.2 buys roughly 0.08 of movement while similarity's 0.5 buys the whole 0.5. The Discovery tuning panel now invites an operator to reason about those four numbers, which raises the cost of them meaning something other than what they say. Correcting it is [F-059](#f-059)'s gain treatment applied to a second pipeline, and worth doing deliberately rather than as a footnote to a bug fix.
