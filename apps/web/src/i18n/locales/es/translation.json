@@ -2987,7 +2987,9 @@
     "noRatingsHint": "Califica películas y series para verlas aquí",
     "ratedOn": "Calificada el {{fecha}}",
     "typeMovie": "Película",
-    "typeSeries": "Serie"
+    "typeSeries": "Serie",
+    "statsWindow": "Last {{count}} days",
+    "statsMoreDetails": "More details"
   },
   "playlists": {
     "pageTitle": "Listas de reproducción",

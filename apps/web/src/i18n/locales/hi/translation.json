@@ -2987,7 +2987,9 @@
     "noRatingsHint": "फिल्मों और श्रृंखलाओं को यहां देखने के लिए उन्हें रेट करें",
     "ratedOn": "{{दिनांक}} को रेट किया गया",
     "typeMovie": "चलचित्र",
-    "typeSeries": "शृंखला"
+    "typeSeries": "शृंखला",
+    "statsWindow": "Last {{count}} days",
+    "statsMoreDetails": "More details"
   },
   "playlists": {
     "pageTitle": "प्लेलिस्ट",

@@ -72,6 +72,7 @@ export function DashboardPage() {
           seriesWatched={data?.stats.seriesWatched || 0}
           ratingsCount={data?.stats.ratingsCount || 0}
           watchTimeMinutes={data?.stats.watchTimeMinutes || 0}
+          windowDays={data?.stats.windowDays}
           loading={loading}
         />
       </Box>

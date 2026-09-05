@@ -1,5 +1,6 @@
-import { Box, Card, Typography, Skeleton } from '@mui/material'
+import { Box, Card, Typography, Skeleton, Link as MuiLink } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
+import { Link as RouterLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import MovieIcon from '@mui/icons-material/Movie'
@@ -12,6 +13,12 @@ interface QuickStatsBarProps {
   seriesWatched: number
   ratingsCount: number
   watchTimeMinutes: number
+  /**
+   * The window the four figures cover, as decided by the API. Absent means an
+   * older server that answered all-time, so the caption is left off rather
+   * than naming a window nobody applied.
+   */
+  windowDays?: number
   loading?: boolean
 }
 
@@ -87,55 +94,85 @@ export function QuickStatsBar({
   seriesWatched,
   ratingsCount,
   watchTimeMinutes,
+  windowDays,
   loading,
 }: QuickStatsBarProps) {
   const { t } = useTranslation()
   const theme = useTheme()
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        gap: 2,
-        flexWrap: { xs: 'wrap', sm: 'nowrap' },
-        overflowX: { xs: 'visible', sm: 'auto' },
-        pb: 1,
-        '&::-webkit-scrollbar': { height: 6 },
-        '&::-webkit-scrollbar-thumb': { 
-          backgroundColor: 'divider',
-          borderRadius: 3,
-        },
-      }}
-    >
-      <StatCard
-        icon={<MovieIcon />}
-        label={t('dashboard.statMoviesWatched')}
-        value={moviesWatched.toLocaleString()}
-        color={theme.palette.primary.main}
-        loading={loading}
-      />
-      <StatCard
-        icon={<TvIcon />}
-        label={t('dashboard.statSeriesWatched')}
-        value={seriesWatched.toLocaleString()}
-        color={theme.palette.secondary.main}
-        loading={loading}
-      />
-      <StatCard
-        icon={<FavoriteIcon />}
-        label={t('dashboard.statRatings')}
-        value={ratingsCount.toLocaleString()}
-        color="#ec4899"
-        loading={loading}
-      />
-      <StatCard
-        icon={<AccessTimeIcon />}
-        label={t('dashboard.statWatchTime')}
-        value={formatWatchTime(watchTimeMinutes, t)}
-        color="#10b981"
-        loading={loading}
-      />
+    <Box>
+      {/* The bar states the period it covers, because four bare numbers do
+          not say whether they mean this month or all the years on the
+          server — and the link is where the all-time figures went. */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          gap: 2,
+          mb: 1,
+        }}
+      >
+        {windowDays != null ? (
+          <Typography variant="caption" color="text.secondary">
+            {t('dashboard.statsWindow', { count: windowDays })}
+          </Typography>
+        ) : (
+          <span />
+        )}
+        <MuiLink
+          component={RouterLink}
+          to="/stats"
+          variant="caption"
+          underline="hover"
+          sx={{ flexShrink: 0 }}
+        >
+          {t('dashboard.statsMoreDetails')}
+        </MuiLink>
+      </Box>
+      <Box
+        sx={{
+          display: 'flex',
+          gap: 2,
+          flexWrap: { xs: 'wrap', sm: 'nowrap' },
+          overflowX: { xs: 'visible', sm: 'auto' },
+          pb: 1,
+          '&::-webkit-scrollbar': { height: 6 },
+          '&::-webkit-scrollbar-thumb': {
+            backgroundColor: 'divider',
+            borderRadius: 3,
+          },
+        }}
+      >
+        <StatCard
+          icon={<MovieIcon />}
+          label={t('dashboard.statMoviesWatched')}
+          value={moviesWatched.toLocaleString()}
+          color={theme.palette.primary.main}
+          loading={loading}
+        />
+        <StatCard
+          icon={<TvIcon />}
+          label={t('dashboard.statSeriesWatched')}
+          value={seriesWatched.toLocaleString()}
+          color={theme.palette.secondary.main}
+          loading={loading}
+        />
+        <StatCard
+          icon={<FavoriteIcon />}
+          label={t('dashboard.statRatings')}
+          value={ratingsCount.toLocaleString()}
+          color="#ec4899"
+          loading={loading}
+        />
+        <StatCard
+          icon={<AccessTimeIcon />}
+          label={t('dashboard.statWatchTime')}
+          value={formatWatchTime(watchTimeMinutes, t)}
+          color="#10b981"
+          loading={loading}
+        />
+      </Box>
     </Box>
   )
 }
-
-

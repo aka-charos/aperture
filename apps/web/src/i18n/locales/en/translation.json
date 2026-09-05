@@ -3464,6 +3464,8 @@
     "subtitlePopularSeries": "Popular TV series across all users",
     "emptyTrendingSeries": "No trending series yet",
     "carouselEmpty": "No items to display",
+    "statsWindow": "Last {{count}} days",
+    "statsMoreDetails": "More details",
     "statMoviesWatched": "Movies Watched",
     "statSeriesWatched": "Series Watched",
     "statRatings": "Ratings",

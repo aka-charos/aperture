@@ -2987,7 +2987,9 @@
     "noRatingsHint": "对电影和连续剧进行评分以在此处观看",
     "ratedOn": "评分于 {{date}}",
     "typeMovie": "电影",
-    "typeSeries": "系列"
+    "typeSeries": "系列",
+    "statsWindow": "Last {{count}} days",
+    "statsMoreDetails": "More details"
   },
   "playlists": {
     "pageTitle": "播放列表",

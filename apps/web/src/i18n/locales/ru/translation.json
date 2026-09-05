@@ -2971,7 +2971,9 @@
     "noRatingsHint": "Оцените фильмы и сериалы, чтобы увидеть их здесь.",
     "ratedOn": "Оценка на {{date}}",
     "typeMovie": "Фильм",
-    "typeSeries": "Ряд"
+    "typeSeries": "Ряд",
+    "statsWindow": "Last {{count}} days",
+    "statsMoreDetails": "More details"
   },
   "playlists": {
     "pageTitle": "Плейлисты",

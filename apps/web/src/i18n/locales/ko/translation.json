@@ -2987,7 +2987,9 @@
     "noRatingsHint": "영화와 시리즈를 평가하여 여기에서 확인하세요.",
     "ratedOn": "{{date}}에 평가됨",
     "typeMovie": "영화",
-    "typeSeries": "시리즈"
+    "typeSeries": "시리즈",
+    "statsWindow": "Last {{count}} days",
+    "statsMoreDetails": "More details"
   },
   "playlists": {
     "pageTitle": "재생목록",

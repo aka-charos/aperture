@@ -3710,7 +3710,9 @@
     "noRatingsHint": "Βαθμολογήστε ταινίες και σειρές για να τις δείτε εδώ",
     "ratedOn": "Βαθμολογήθηκε {{date}}",
     "typeMovie": "Ταινία",
-    "typeSeries": "Σειρά"
+    "typeSeries": "Σειρά",
+    "statsWindow": "Last {{count}} days",
+    "statsMoreDetails": "More details"
   },
   "algorithmSettings": {
     "weightSimilarity": "Ομοιότητα",
