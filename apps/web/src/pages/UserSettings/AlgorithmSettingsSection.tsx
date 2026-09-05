@@ -33,6 +33,7 @@ import CloseIcon from '@mui/icons-material/Close'
 import { useTranslation } from 'react-i18next'
 import { useTheme } from '@mui/material/styles'
 import { StarRating } from '@aperture/ui'
+import { useUserRatings } from '@/hooks/useUserRatings'
 
 interface AlgorithmWeights {
   similarityWeight: number
@@ -84,6 +85,7 @@ export function AlgorithmSettingsSection({ userId }: Props) {
     }),
     [t]
   )
+  const { setRating: setSharedRating } = useUserRatings()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -242,27 +244,24 @@ export function AlgorithmSettingsSection({ userId }: Props) {
     type: 'movie' | 'series'
   ) => {
     try {
-      const response = await fetch(`/api/ratings/${type}/${itemId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ rating: newRating }),
-      })
-      if (response.ok) {
-        // Update local state
-        if (type === 'movie') {
-          setDislikedMovies((prev) =>
-            newRating > 3
-              ? prev.filter((m) => m.id !== itemId)
-              : prev.map((m) => (m.id === itemId ? { ...m, rating: newRating } : m))
-          )
-        } else {
-          setDislikedSeries((prev) =>
-            newRating > 3
-              ? prev.filter((s) => s.id !== itemId)
-              : prev.map((s) => (s.id === itemId ? { ...s, rating: newRating } : s))
-          )
-        }
+      // Through the provider, not a fetch of its own: this list changes
+      // ratings that cards elsewhere are already showing, and a direct post
+      // leaves the shared map holding the old number until a reload.
+      await setSharedRating(type, itemId, newRating)
+
+      // Rated above the disliked band, so it leaves this list entirely.
+      if (type === 'movie') {
+        setDislikedMovies((prev) =>
+          newRating > 3
+            ? prev.filter((m) => m.id !== itemId)
+            : prev.map((m) => (m.id === itemId ? { ...m, rating: newRating } : m))
+        )
+      } else {
+        setDislikedSeries((prev) =>
+          newRating > 3
+            ? prev.filter((s) => s.id !== itemId)
+            : prev.map((s) => (s.id === itemId ? { ...s, rating: newRating } : s))
+        )
       }
     } catch {
       setError(t('algorithmSettings.errUpdateRating'))
@@ -271,17 +270,13 @@ export function AlgorithmSettingsSection({ userId }: Props) {
 
   const handleClearRating = async (itemId: string, type: 'movie' | 'series') => {
     try {
-      const response = await fetch(`/api/ratings/${type}/${itemId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      })
-      if (response.ok) {
-        // Remove from list with animation
-        if (type === 'movie') {
-          setDislikedMovies((prev) => prev.filter((m) => m.id !== itemId))
-        } else {
-          setDislikedSeries((prev) => prev.filter((s) => s.id !== itemId))
-        }
+      await setSharedRating(type, itemId, null)
+
+      // Remove from list with animation
+      if (type === 'movie') {
+        setDislikedMovies((prev) => prev.filter((m) => m.id !== itemId))
+      } else {
+        setDislikedSeries((prev) => prev.filter((s) => s.id !== itemId))
       }
     } catch {
       setError(t('algorithmSettings.errClearRating'))
