@@ -119,10 +119,17 @@ export function MediaPosterCard({
   }
 
   const handleCardClick = (e: React.MouseEvent) => {
-    if (onClick) {
-      e.preventDefault()
-      onClick()
-    }
+    if (!onClick) return
+
+    // A library card is wrapped in a real <Link>, so the modifier clicks that
+    // mean "somewhere else" have to reach the browser. Swallowing them made the
+    // href decorative: ctrl/cmd-click opened the in-place view instead of a new
+    // tab, which is the one case where the reader has already said they do not
+    // want to leave this page.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
+
+    e.preventDefault()
+    onClick()
   }
 
   // Build the detail link for library items

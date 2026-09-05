@@ -40,6 +40,8 @@ import {
   type ContentSearchItem,
 } from '../components/ContentSearchPanel'
 import { MyIssuesPanel } from '../components/MyIssuesPanel'
+import { MediaDetailModalProvider } from '../hooks/MediaDetailModalProvider'
+import { useMediaDetailModal } from '../hooks/useMediaDetailModal'
 import { PageHeading } from '@/components/PageHeading'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -120,8 +122,21 @@ function isActionable(row: DiscoveryRequestRow): boolean {
 }
 
 export function MyRequestsPage() {
+  // Search results reach into two different detail views, and one of them is a
+  // library page. Opening it in place keeps the query and its results, which is
+  // the whole reason someone is on this page — routing away to a title they
+  // already own would throw away the search they just typed.
+  return (
+    <MediaDetailModalProvider>
+      <MyRequestsContent />
+    </MediaDetailModalProvider>
+  )
+}
+
+function MyRequestsContent() {
   const { t } = useTranslation()
   const { user } = useAuth()
+  const openMediaDetail = useMediaDetailModal()
   const isAdmin = user?.isAdmin ?? false
   const [rows, setRows] = useState<DiscoveryRequestRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -295,6 +310,22 @@ export function MyRequestsPage() {
       <ContentSearchPanel
         onShowDetails={(item: ContentSearchItem) => {
           if (item.mediaType === 'person') return
+
+          // A title the library already holds gets the LIBRARY view, not the
+          // TMDb one. Search results carry both identities -- `libraryMediaId`
+          // is Aperture's own row, resolved server-side from our tables rather
+          // than the search backend's (F-105) -- and the card is already greyed
+          // out to say so, so opening a stranger's summary of a film sitting on
+          // the server reads as a bug.
+          //
+          // The card wraps a library item in a real <Link> to that page, which
+          // is what makes ctrl-click work; this intercepts the plain click so
+          // the search survives.
+          if (item.inLibrary && item.libraryMediaId) {
+            openMediaDetail?.(item.mediaType, item.libraryMediaId)
+            return
+          }
+
           openTmdbModal({ mediaType: item.mediaType, tmdbId: item.tmdbId })
         }}
         onRequested={() => void load()}
