@@ -12,6 +12,7 @@ import type {
   SeasonAvailability,
 } from '../types'
 import { DEFAULT_SIMILAR_MEDIA_LIMIT } from '../constants'
+import { useUserRatings } from '@/hooks/useUserRatings'
 
 export type WatchStats = MovieWatchStats | SeriesWatchStats
 
@@ -52,6 +53,7 @@ export function useMediaDetail(
   const [watchStatus, setWatchStatus] = useState<WatchStatus | null>(null)
   const [userRating, setUserRating] = useState<number | null>(null)
   const [ratingLoading, setRatingLoading] = useState(false)
+  const { setRating: setSharedRating } = useUserRatings()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [watchStats, setWatchStats] = useState<WatchStats | null>(null)
@@ -268,43 +270,30 @@ export function useMediaDetail(
     setWatchStatus({ isWatched: true, playCount: 1, lastWatched: new Date().toISOString() })
   }, [])
 
+  // Rating goes through the shared provider rather than posting here.
+  //
+  // This page used to call /api/ratings itself, which made it the second
+  // implementation of one action — and the difference was invisible until
+  // something was attached to rating: the "when did you watch this?" prompt
+  // fired from cards and carousels and did nothing on the detail page, which
+  // is where people actually rate. It also left the provider's ratings map
+  // stale, so a card elsewhere kept showing the old stars until a reload.
   const updateRating = useCallback(
     async (rating: number | null) => {
       if (!id) return
 
       setRatingLoading(true)
       try {
-        const endpoint =
-          mediaType === 'movie' ? `/api/ratings/movie/${id}` : `/api/ratings/series/${id}`
-
-        if (rating === null || rating === 0) {
-          // Delete rating
-          const response = await fetch(endpoint, {
-            method: 'DELETE',
-            credentials: 'include',
-          })
-          if (response.ok) {
-            setUserRating(null)
-          }
-        } else {
-          // Set rating
-          const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ rating }),
-          })
-          if (response.ok) {
-            setUserRating(rating)
-          }
-        }
+        const next = rating === null || rating === 0 ? null : rating
+        await setSharedRating(mediaType, id, next)
+        setUserRating(next)
       } catch (err) {
         console.error('Failed to update rating:', err)
       } finally {
         setRatingLoading(false)
       }
     },
-    [mediaType, id]
+    [mediaType, id, setSharedRating]
   )
 
   return {

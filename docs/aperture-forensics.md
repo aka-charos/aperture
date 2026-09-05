@@ -1585,6 +1585,15 @@ It is not a *when*, and mixing it into a list of times turns a half-second choic
 
 `series` has **no** `premiere_date` column (only `movies` and `episodes` do), which does not bite today because there is no mark-as-watched for series at all — neither provider defines `markEpisodePlayed`, only the unplayed direction. If it ever extends to TV the floor is `MIN(premiere_date)` across the show's episodes, as `strm/series/writer.ts` already computes.
 
+### The prompt did not fire where people actually rate
+
+Reported immediately after deploy: rating a film added the rating and asked nothing. The cause was not the feature — it was that **rating had two implementations**. `UserRatingsProvider.setRating` was one; `useMediaDetail.updateRating` posted to `/api/ratings` itself and read nothing but `response.ok`. Hooking the provider therefore covered cards, carousels, browse and the dashboard, and missed the detail page, which is the screen someone is looking at when they decide how they felt about a film.
+
+The comment written **in the provider** at the time said it: *"one host means the follow-up question cannot be wired to some of them and forgotten on the rest."* The reasoning was right and unverified — nobody grepped for a second caller.
+
+Writing the guard then found two more, both older than this feature: the disliked-items list in `AlgorithmSettingsSection` had its own POST and DELETE, which had been leaving the shared ratings map stale since long before any prompt existed — raise a disliked film from 2 to 8 there and every card elsewhere kept showing 2 until a reload.
+
+All four now converge on the provider, and `ratingCallSites.test.ts` scans the source, per this repo’s standing conclusion that a convention nobody can check is not a rule. Two details make it work rather than merely exist. **A URL cannot distinguish a read from a write** — `useMediaDetail` GETs `/api/ratings/movie/${id}`, the exact string it used to POST to — so the scan reads forward 240 characters for a `method:` and flags only writes; the first version flagged three GETs and would have been muted within a week. And the self-check asserts **both** directions, catching a POST and ignoring a GET, because a scan that flags everything is as useless as one that flags nothing and both look green in a summary line.
 ### Left undone deliberately
 
 The year picker inside *Longer ago* (buys nothing for the recommender; would make `historySpan` truer) and the batch prompt. The band arithmetic is a pure module with a test precisely so the batch screen is later a second caller rather than a second implementation.
