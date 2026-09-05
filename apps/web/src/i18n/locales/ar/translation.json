@@ -631,7 +631,6 @@
     "movieNotFound": "الفيلم غير موجود",
     "seriesNotFound": "المسلسل غير موجود",
     "hero": {
-      "available": "متاح",
       "watched": "شاهد",
       "watchedCount": "شاهدت {{count}}x",
       "removeFromWatchingList": "إزالة من قائمة المشاهدة",

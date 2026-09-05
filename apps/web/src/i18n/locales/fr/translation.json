@@ -631,7 +631,6 @@
     "movieNotFound": "Film introuvable",
     "seriesNotFound": "Série introuvable",
     "hero": {
-      "available": "Disponible",
       "watched": "Regardé",
       "watchedCount": "Regardé {{count}}x",
       "removeFromWatchingList": "Supprimer de la liste de surveillance",

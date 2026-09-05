@@ -769,7 +769,6 @@
       "scoreTooltipImdbVotes": "IMDb: {{score}}/10 from {{votes}} votes"
     },
     "hero": {
-      "available": "Доступный",
       "watched": "Смотрел",
       "watchedCount": "Просмотрено {{count}}x",
       "removeFromWatchingList": "Удалить из списка просмотра",

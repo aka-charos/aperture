@@ -769,7 +769,6 @@
       "scoreTooltipImdbVotes": "IMDb: {{score}}/10 from {{votes}} votes"
     },
     "hero": {
-      "available": "Beschikbaar",
       "watched": "Bekeken",
       "watchedCount": "{{count}}x bekeken",
       "removeFromWatchingList": "Verwijderen uit kijklijst",
