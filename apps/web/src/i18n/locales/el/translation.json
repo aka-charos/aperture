@@ -3378,7 +3378,9 @@
     "activitySubtitle": "Τελευταίοι 12 μήνες · διαλέξτε μήνα για να δείτε τι είδατε",
     "heatmapSubtitleAllTime": "Από την αρχή, ανά ημέρα και ώρα",
     "coverageSpan": "Από την πρώτη σας καταγεγραμμένη προβολή το {{from}} μέχρι σήμερα — εκτός από το γράφημα δραστηριότητας, που καλύπτει τους τελευταίους 12 μήνες",
-    "coverageAllTime": "Από την αρχή μέχρι σήμερα — εκτός από το γράφημα δραστηριότητας, που καλύπτει τους τελευταίους 12 μήνες"
+    "coverageAllTime": "Από την αρχή μέχρι σήμερα — εκτός από το γράφημα δραστηριότητας, που καλύπτει τους τελευταίους 12 μήνες",
+    "coverageApproximate_one": "· {{count}} watch you dated roughly is counted in the totals but not shown on the charts",
+    "coverageApproximate_other": "· {{count}} watches you dated roughly are counted in the totals but not shown on the charts"
   },
   "similarityGraph": {
     "loadingFallback": "Φόρτωση…",

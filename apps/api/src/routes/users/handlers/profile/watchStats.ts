@@ -73,6 +73,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
                AND wh.movie_id IS NOT NULL
                AND ${WATCHED}
                AND wh.last_played_at >= NOW() - INTERVAL '12 months'
+               AND wh.approximate_played_at IS NULL
                AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)
              GROUP BY date_trunc('month', wh.last_played_at)
            ),
@@ -83,6 +84,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
                AND wh.episode_id IS NOT NULL
                AND ${WATCHED}
                AND wh.last_played_at >= NOW() - INTERVAL '12 months'
+               AND wh.approximate_played_at IS NULL
              GROUP BY date_trunc('month', wh.last_played_at)
            )
            SELECT 
@@ -511,12 +513,28 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
         // needs to be able to state its own coverage rather than leave the
         // reader guessing whether an empty decade means "never watched" or
         // "before we were looking".
+        // Approximate dates are excluded here too, and this is the one that
+        // reads worst: the caption names a month ("from your first tracked
+        // play in Oct 2022"), so a backfilled title dated before a viewer's
+        // real history would hand them an origin story that never happened.
         const spanRow = await queryOne<{ first_at: Date | null; last_at: Date | null }>(
           `SELECT MIN(wh.last_played_at) as first_at, MAX(wh.last_played_at) as last_at
            FROM watch_history wh
-           WHERE wh.user_id = $1 AND wh.last_played_at IS NOT NULL`,
+           WHERE wh.user_id = $1 AND wh.last_played_at IS NOT NULL
+             AND wh.approximate_played_at IS NULL`,
           [id]
         )
+        // How many watches are counted in the totals but absent from every
+        // chart with a time axis. Dropping rows from a chart without saying so
+        // is how a page starts quietly disagreeing with itself — the tile says
+        // 243 films, the timeline plots fewer, and nothing explains the gap.
+        const approximateRow = await queryOne<{ count: string }>(
+          `SELECT COUNT(*) as count FROM watch_history wh
+            WHERE wh.user_id = $1 AND wh.approximate_played_at IS NOT NULL`,
+          [id]
+        )
+        const approximateWatches = parseInt(approximateRow?.count || '0', 10)
+
         const historySpan = {
           firstWatchedAt: spanRow?.first_at ? new Date(spanRow.first_at).toISOString() : null,
           lastWatchedAt: spanRow?.last_at ? new Date(spanRow.last_at).toISOString() : null,
@@ -602,6 +620,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
           guiltyPleasureGenres,
           busiestDay,
           historySpan,
+          approximateWatches,
           totalRewatched,
           mostRewatched
         })
