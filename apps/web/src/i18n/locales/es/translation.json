@@ -631,7 +631,6 @@
     "movieNotFound": "Película no encontrada",
     "seriesNotFound": "Serie no encontrada",
     "hero": {
-      "available": "Disponible",
       "watched": "Observó",
       "watchedCount": "Visto {{count}}x",
       "removeFromWatchingList": "Eliminar de la lista de seguimiento",

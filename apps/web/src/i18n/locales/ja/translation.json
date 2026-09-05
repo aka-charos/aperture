@@ -1072,7 +1072,6 @@
     "movieNotFound": "映画が見つかりません",
     "seriesNotFound": "シリーズが見つかりません",
     "hero": {
-      "available": "利用可能",
       "watched": "見た",
       "watchedCount": "{{count}}x 回視聴しました",
       "removeFromWatchingList": "視聴リストから削除する",

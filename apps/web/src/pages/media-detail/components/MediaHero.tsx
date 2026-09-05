@@ -326,6 +326,14 @@ export function MediaHero({
     hasCriticRatings(media) ||
     (isSeries(media) && media.critic_rating != null)
 
+  // The badge row is not always occupied. A movie used to carry a permanent
+  // "Available" chip, so the row was never empty and nothing had to ask; with
+  // that gone an unwatched film would leave 16px of margin above the title
+  // holding nothing.
+  const hasStatusBadges = isSeries(media)
+    ? Boolean(media.status) || Boolean(media.content_rating)
+    : Boolean(watchStatus?.isWatched)
+
   // Shared styling so every action reads as one consistent button group:
   // fixed height, no per-button text wrapping, no shrinking (they wrap the row instead).
   const actionBtnSx = {
@@ -431,7 +439,12 @@ export function MediaHero({
 
         {/* Info */}
         <Box sx={{ flex: 1 }}>
-          {/* Status badges */}
+          {/* Status badges. A movie carried an "Available" chip here, which
+              said nothing: the detail page is reached from the library, so
+              every film on it is available by construction. The equivalent
+              chip for a series is its production status (Continuing, Ended),
+              which is a real fact about the show, so that one stays. */}
+          {hasStatusBadges && (
           <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
             {/* Series status */}
             {isSeries(media) && media.status && (
@@ -450,14 +463,6 @@ export function MediaHero({
                 sx={{ fontWeight: 600 }}
               />
             )}
-            {/* Movie availability */}
-            {isMovie(media) && (
-              <Chip
-                label={t('mediaDetail.hero.available')}
-                size="small"
-                sx={{ bgcolor: 'success.main', color: 'white', fontWeight: 600 }}
-              />
-            )}
             {/* Movie watch status */}
             {isMovie(media) && watchStatus?.isWatched && (
               <Chip
@@ -472,6 +477,7 @@ export function MediaHero({
               />
             )}
           </Box>
+          )}
 
           {/* Title, with the viewer's own rating (indigo star, distinct from
               the red favorite heart) beside it.

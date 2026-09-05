@@ -631,7 +631,6 @@
     "movieNotFound": "फ़िल्म नहीं मिली",
     "seriesNotFound": "सीरीज़ नहीं मिली",
     "hero": {
-      "available": "उपलब्ध",
       "watched": "देखे",
       "watchedCount": "{{गिनती}}x देखा गया",
       "removeFromWatchingList": "देखने की सूची से हटाएँ",

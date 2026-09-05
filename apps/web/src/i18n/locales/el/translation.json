@@ -3050,7 +3050,6 @@
       "scoreTooltipImdbVotes": "IMDb: {{score}}/10 από {{votes}} ψήφους"
     },
     "hero": {
-      "available": "Διαθέσιμο",
       "watched": "Το είδατε",
       "watchedCount": "Το είδατε {{count}} φορές",
       "removeFromWatchingList": "Αφαίρεση από όσα παρακολουθείτε",

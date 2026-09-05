@@ -631,7 +631,6 @@
     "movieNotFound": "הסרט לא נמצא",
     "seriesNotFound": "הסדרה לא נמצאה",
     "hero": {
-      "available": "זָמִין",
       "watched": "צפו",
       "watchedCount": "צפו ב-{{count}}x",
       "removeFromWatchingList": "הסר מרשימת הצפייה",

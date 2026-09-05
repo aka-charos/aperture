@@ -1072,7 +1072,6 @@
     "movieNotFound": "未找到电影",
     "seriesNotFound": "未找到剧集",
     "hero": {
-      "available": "可用的",
       "watched": "看过",
       "watchedCount": "观看了 {{count}}x",
       "removeFromWatchingList": "从观看列表中删除",
