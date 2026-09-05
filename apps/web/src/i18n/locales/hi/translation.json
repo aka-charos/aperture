@@ -1175,7 +1175,6 @@
     "tabSeries": "टीवी श्रृंखला",
     "jobBanner": "नई खोज के सुझाव उत्पन्न हो रहे हैं...",
     "lastUpdated": "अंतिम अद्यतन: {{कब}}",
-    "runMeta": "{{प्राप्त}} उम्मीदवारों के सुझाव {{संग्रहीत}}",
     "alertRequestEnabled": "TMDb पर देखने के लिए किसी भी शीर्षक पर क्लिक करें। Seerr के माध्यम से सामग्री का अनुरोध करने के लिए होवर करें।",
     "alertRequestDisabled": "आपके खाते के लिए सामग्री अनुरोध सक्षम नहीं हैं. आप सुझाव ब्राउज़ कर सकते हैं लेकिन उनका अनुरोध नहीं कर सकते.",
     "emptyMovie": "अभी तक कोई मूवी सुझाव नहीं. अपने देखने के इतिहास के आधार पर वैयक्तिकृत अनुशंसाएँ उत्पन्न करने के लिए \"ताज़ा करें\" पर क्लिक करें।",
@@ -1232,12 +1231,14 @@
       "castUnavailable": "कास्ट की जानकारी उपलब्ध नहीं है",
       "loadingTmdb": "पूरी जानकारी लोड हो रही है...",
       "tasteRank": "Taste match",
-      "tasteRankValue": "#{{rank}} of {{total}}"
+      "tasteRankValue": "#{{rank}} of {{total}}",
+      "request": "Request"
     },
-    "tabBrowsePopular": "टीएमडीबी कुल मिलाकर लोकप्रिय है",
     "tabBrowseGenre": "शैली के अनुसार लोकप्रिय",
     "tabStreaming": "स्ट्रीमिंग",
-    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}"
+    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}",
+    "tabBrowsePicked": "Picked for you",
+    "runMetaShowing": "Showing {{shown}} of {{stored}} suggestions, scored from {{fetched}} candidates"
   },
   "mediaPoster": {
     "matchPercent": "{{पीसीटी}}% मिलान",

@@ -394,7 +394,15 @@ export function DiscoveryPage() {
           onChange={handleBrowseSubChange}
           sx={{ borderBottom: 1, borderColor: 'divider', mb: 2, minHeight: 40 }}
         >
-          <Tab value="popular" label={t('discovery.tabBrowsePopular')} sx={{ textTransform: 'none' }} />
+          {/*
+            "Picked for you", not the old "TMDb popular overall". This tab
+            renders the taste-scored list -- the label named the POOL's largest
+            source while the reader takes it as naming what is on screen. It is
+            not even accurate about the pool: measured on one live run, 228 of
+            344 candidates came from personalized sources (tmdb_similar and
+            tmdb_recommendations) against 116 from the shared global pool.
+          */}
+          <Tab value="popular" label={t('discovery.tabBrowsePicked')} sx={{ textTransform: 'none' }} />
           <Tab value="genre" label={t('discovery.tabBrowseGenre')} sx={{ textTransform: 'none' }} />
         </Tabs>
       )}
@@ -448,12 +456,21 @@ export function DiscoveryPage() {
       {run && run.createdAt && (
         <Typography variant="caption" color="text.secondary" display="block" mb={2}>
           {t('discovery.lastUpdated', { when: new Date(run.createdAt).toLocaleString() })}
+          {/*
+            Say what is on the SCREEN first. The old line reported the run --
+            "332 suggestions from 666 candidates" -- beside a grid holding 50,
+            so both figures were true and neither described what the reader was
+            looking at. The page asks the API for TARGET_DISPLAY_COUNT, and
+            `candidates` is what came back, so it is the only one of the three
+            numbers the reader can count.
+          */}
           {run.candidatesStored != null && run.candidatesFetched != null && (
             <>
               {' '}
               •{' '}
-              {t('discovery.runMeta', {
-                stored: run.candidatesStored,
+              {t('discovery.runMetaShowing', {
+                shown: candidates.length.toLocaleString(),
+                stored: run.candidatesStored.toLocaleString(),
                 fetched: run.candidatesFetched.toLocaleString(),
               })}
             </>

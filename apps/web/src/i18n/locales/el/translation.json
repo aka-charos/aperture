@@ -551,12 +551,10 @@
     "snackbarRequestFailed": "Το αίτημα δεν υποβλήθηκε",
     "tabMovies": "Ταινίες",
     "tabSeries": "Σειρές",
-    "tabBrowsePopular": "Δημοφιλή στο TMDb",
     "tabBrowseGenre": "Δημοφιλή ανά είδος",
     "tabStreaming": "Streaming",
     "jobBanner": "Ετοιμάζονται νέες προτάσεις…",
     "lastUpdated": "Τελευταία ενημέρωση: {{when}}",
-    "runMeta": "{{stored}} προτάσεις από {{fetched}} υποψήφιους τίτλους",
     "alertRequestEnabled": "Πατήστε έναν τίτλο για να τον δείτε στο TMDb. Περάστε τον κέρσορα από πάνω για να τον ζητήσετε μέσω Seerr.",
     "alertRequestDisabled": "Τα αιτήματα δεν είναι ενεργά για τον λογαριασμό σας. Μπορείτε να δείτε τις προτάσεις αλλά όχι να τις ζητήσετε.",
     "emptyMovie": "Δεν υπάρχουν προτάσεις ταινιών ακόμη. Πατήστε «Ανανέωση» για να ετοιμαστούν προτάσεις με βάση όσα έχετε δει.",
@@ -613,8 +611,11 @@
       "castUnavailable": "Δεν υπάρχουν στοιχεία ηθοποιών",
       "loadingTmdb": "Φορτώνονται όλες οι λεπτομέρειες…",
       "tasteRank": "Ταίριασμα με το γούστο σας",
-      "tasteRankValue": "#{{rank}} από {{total}}"
-    }
+      "tasteRankValue": "#{{rank}} από {{total}}",
+      "request": "Request"
+    },
+    "tabBrowsePicked": "Picked for you",
+    "runMetaShowing": "Showing {{shown}} of {{stored}} suggestions, scored from {{fetched}} candidates"
   },
   "settingsDiscoveryGenreStrips": {
     "title": "Ανακάλυψη — λωρίδες ειδών (TMDb)",

@@ -148,6 +148,17 @@ export function DiscoveryCard({
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
         resolveGenreName={resolveGenreName}
+        canRequest={canRequest && !inLibrary}
+        isRequesting={isRequesting}
+        isRequested={cachedStatus?.requested ?? false}
+        // Closed first, because what follows is another dialog -- the options
+        // sheet, and then the season picker for a series. Stacking them over
+        // the detail view leaves the reader three deep with no sense of where
+        // "back" goes.
+        onRequest={() => {
+          setDetailOpen(false)
+          handleRequest()
+        }}
       />
 
       {/* Season Selection Modal (for series) */}

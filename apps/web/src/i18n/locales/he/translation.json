@@ -1175,7 +1175,6 @@
     "tabSeries": "סדרת טלוויזיה",
     "jobBanner": "מייצר הצעות גילוי חדשות...",
     "lastUpdated": "עודכן לאחרונה: {{כאשר}}",
-    "runMeta": "{{stored}} הצעות מ-{{fetched}} מועמדים",
     "alertRequestEnabled": "לחץ על כל כותרת לצפייה ב-TMDb. העבר את העכבר כדי לבקש תוכן דרך Seerr.",
     "alertRequestDisabled": "בקשות תוכן אינן מופעלות עבור החשבון שלך. אתה יכול לעיין בהצעות אבל לא יכול לבקש אותן.",
     "emptyMovie": "אין עדיין הצעות לסרטים. לחץ על \"רענן\" כדי ליצור המלצות מותאמות אישית על סמך היסטוריית הצפייה שלך.",
@@ -1232,12 +1231,14 @@
       "castUnavailable": "מידע השחקנים אינו זמין",
       "loadingTmdb": "טוען פרטים מלאים...",
       "tasteRank": "Taste match",
-      "tasteRankValue": "#{{rank}} of {{total}}"
+      "tasteRankValue": "#{{rank}} of {{total}}",
+      "request": "Request"
     },
-    "tabBrowsePopular": "TMDb פופולרי בסך הכל",
     "tabBrowseGenre": "פופולרי לפי ז'אנר",
     "tabStreaming": "נְהִירָה",
-    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}"
+    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}",
+    "tabBrowsePicked": "Picked for you",
+    "runMetaShowing": "Showing {{shown}} of {{stored}} suggestions, scored from {{fetched}} candidates"
   },
   "mediaPoster": {
     "matchPercent": "{{pct}}% התאמה",
