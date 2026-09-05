@@ -11,7 +11,7 @@
     "lint": "eslint src",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "i18n:sync": "node scripts/i18n/sync-missing-from-en.mjs",
-    "i18n:delta": "node scripts/i18n/export-missing-delta-from-git.mjs && node scripts/i18n/split-delta-chunks.mjs",
+    "i18n:delta": "node scripts/i18n/export-missing-delta-from-git.mjs && node --import tsx scripts/i18n/split-delta-chunks.mjs",
     "i18n:translate": "node scripts/i18n/translate-locales-from-en.mjs"
   },
   "dependencies": {

@@ -590,7 +590,11 @@
         "cancel": "Cancel",
         "importing": "Importing…",
         "confirm": "Import"
-      }
+      },
+      "audienceLabel": "Audience",
+      "audienceAll": "All strings",
+      "audienceUser": "User-facing",
+      "audienceAdmin": "Admin console"
     }
   },
   "login": {
