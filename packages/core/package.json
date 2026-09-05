@@ -74,6 +74,7 @@
     "test:quota": "node --import tsx --test src/lib/webSearchQuota.test.ts",
     "test:ai-errors": "node --import tsx --test src/lib/aiErrors.test.ts",
     "test:pacing": "node --import tsx --test src/lib/callPacing.test.ts",
+    "test:watch-date": "node --import tsx --test src/lib/watchDateBands.test.ts",
     "test:ratings": "node --import tsx --test src/ratings/imdbDataset.test.ts",
     "lint": "eslint src",
     "clean": "rm -rf dist",

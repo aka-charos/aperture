@@ -1,10 +1,18 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react'
 import { UserRatingsContext, type UserRating } from './user-ratings-context'
+import {
+  WatchDatePrompt,
+  type WatchDatePromptRequest,
+} from '@/components/WatchDatePrompt'
 
 export function UserRatingsProvider({ children }: { children: ReactNode }) {
   const [ratings, setRatings] = useState<Map<string, number>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Lives here rather than on a page because rating happens in a dozen places —
+  // cards, carousels, the detail hero, the chat. One host means the follow-up
+  // question cannot be wired to some of them and forgotten on the rest.
+  const [watchPrompt, setWatchPrompt] = useState<WatchDatePromptRequest | null>(null)
 
   // Fetch all user ratings on mount
   useEffect(() => {
@@ -81,6 +89,21 @@ export function UserRatingsProvider({ children }: { children: ReactNode }) {
             next.set(key, rating)
             return next
           })
+
+          // The server decides whether to ask when they watched it — it is the
+          // only side that knows the play state, the release date and which
+          // bands survive it. Absent means don't ask, which is also what an
+          // older server sends.
+          const saved = (await response.json().catch(() => null)) as {
+            watchPrompt?: { title: string; bands: WatchDatePromptRequest['bands'] } | null
+          } | null
+          if (type === 'movie' && saved?.watchPrompt) {
+            setWatchPrompt({
+              movieId: id,
+              title: saved.watchPrompt.title,
+              bands: saved.watchPrompt.bands,
+            })
+          }
         }
       } catch (err) {
         console.error('Failed to update rating:', err)
@@ -93,6 +116,7 @@ export function UserRatingsProvider({ children }: { children: ReactNode }) {
   return (
     <UserRatingsContext.Provider value={{ ratings, getRating, setRating, loading, error }}>
       {children}
+      <WatchDatePrompt request={watchPrompt} onClose={() => setWatchPrompt(null)} />
     </UserRatingsContext.Provider>
   )
 }

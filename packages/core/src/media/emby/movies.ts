@@ -380,19 +380,44 @@ export async function getWatchHistoryFromActivityLog(
 }
 
 /**
+ * Emby's `DatePlayed` wire format: `yyyyMMddHHmmss`, per its own API
+ * reference. Note what is missing — there is **no timezone**, and the docs do
+ * not say whether a bare stamp is read as UTC or as server-local. That
+ * ambiguity is why approximate dates are written at midday: a ±12h
+ * misinterpretation still lands on the intended day.
+ *
+ * Emby does not reject a value it cannot parse; it stamps its own now instead.
+ * So a formatting mistake here does not throw, it silently backdates nothing.
+ */
+function formatDatePlayed(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return (
+    `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}` +
+    `${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
+  )
+}
+
+/**
  * Mark a movie as played/watched in Emby
  * This calls POST /Users/{UserId}/PlayedItems/{ItemId}
+ *
+ * `playedAt` backdates the play via the optional `DatePlayed` parameter.
+ * Omitted, Emby stamps now — the long-standing behaviour of the Mark Watched
+ * button, which is left exactly as it was.
  */
 export async function markMoviePlayed(
   provider: EmbyProviderBase,
   apiKey: string,
   userId: string,
-  movieProviderId: string
+  movieProviderId: string,
+  playedAt?: Date
 ): Promise<void> {
-  logger.info({ userId, movieProviderId }, 'Marking movie as played in Emby')
+  logger.info({ userId, movieProviderId, playedAt }, 'Marking movie as played in Emby')
+
+  const datePlayed = playedAt ? `?DatePlayed=${formatDatePlayed(playedAt)}` : ''
 
   await provider.fetch(
-    `/Users/${userId}/PlayedItems/${movieProviderId}`,
+    `/Users/${userId}/PlayedItems/${movieProviderId}${datePlayed}`,
     apiKey,
     { method: 'POST' }
   )

@@ -163,6 +163,20 @@ export const rateMovieSchema = {
   },
 }
 
+export const notWatchedSchema = {
+  tags: ['ratings'],
+  summary: 'Declare a rated movie unwatched',
+  description:
+    'Record that the viewer has not seen a movie they rated, so the watch-date prompt stops asking about it. Requires an existing rating.',
+  params: {
+    type: 'object',
+    required: ['id'],
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+    },
+  },
+}
+
 export const rateSeriesSchema = {
   tags: ['ratings'],
   summary: 'Rate a series',

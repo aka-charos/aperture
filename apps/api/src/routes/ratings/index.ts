@@ -1,7 +1,14 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { query, queryOne } from '../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../plugins/auth.js'
-import { pushRatingToTrakt, removeRatingFromTrakt, getUserTraktStatus } from '@aperture/core'
+import {
+  pushRatingToTrakt,
+  removeRatingFromTrakt,
+  getUserTraktStatus,
+  availableWatchDateBands,
+  type WatchDateBand,
+} from '@aperture/core'
+
 import {
   ratingsSchemas,
   getRatingsSchema,
@@ -11,9 +18,72 @@ import {
   rateMovieSchema,
   rateSeriesSchema,
   deleteMovieRatingSchema,
+  notWatchedSchema,
   deleteSeriesRatingSchema,
   bulkRatingsSchema,
 } from './schemas.js'
+
+/**
+ * Whether to ask a viewer when they watched a title they have just rated.
+ *
+ * The prompt exists because a rating on something the media server says was
+ * never played is ambiguous — most often they did watch it, elsewhere or long
+ * ago, and nothing recorded it. It is offered only when there is something to
+ * record and a way to record it, and the bands are decided here rather than in
+ * the bundle because the web never imports core.
+ */
+interface WatchDatePrompt {
+  title: string
+  /** Newest first. One entry means the question degenerates to a yes/no. */
+  bands: WatchDateBand[]
+}
+
+async function buildWatchDatePrompt(
+  user: SessionUser,
+  movieId: string
+): Promise<WatchDatePrompt | null> {
+  // Marking played writes to the media server, so someone who may not do that
+  // is never offered it; the write would 403 anyway.
+  if (!user.isAdmin && !user.canManageWatchHistory) return null
+
+  const row = await queryOne<{
+    title: string
+    premiere_date: Date | null
+    already_watched: boolean
+    declared_not_watched: boolean
+  }>(
+    `SELECT
+       m.title,
+       m.premiere_date,
+       EXISTS (
+         SELECT 1 FROM watch_history wh
+         WHERE wh.user_id = $1 AND wh.movie_id = m.id
+           AND (wh.played = true OR wh.play_count > 0
+                OR COALESCE(wh.playback_position_ticks, 0) > 0)
+       ) AS already_watched,
+       EXISTS (
+         SELECT 1 FROM user_ratings ur
+         WHERE ur.user_id = $1 AND ur.movie_id = m.id
+           AND ur.not_watched_declared_at IS NOT NULL
+       ) AS declared_not_watched
+     FROM movies m
+     WHERE m.id = $2`,
+    [user.id, movieId]
+  )
+
+  if (!row) return null
+  // Already played, or they have said outright they have not seen it. The
+  // second is the whole reason that column exists: without it the batch
+  // prompt would ask the same person about the same film forever.
+  if (row.already_watched || row.declared_not_watched) return null
+
+  const bands = availableWatchDateBands(new Date(), row.premiere_date ?? null)
+  // A title whose release date is still ahead of us has no band anyone could
+  // truthfully pick, so there is no question to ask.
+  if (bands.length === 0) return null
+
+  return { title: row.title, bands }
+}
 
 interface UserRating {
   id: string
@@ -272,7 +342,17 @@ const ratingsRoutes: FastifyPluginAsync = async (fastify) => {
         }
       })
 
-      return reply.send({ success: true, rating })
+      // Never at the cost of the rating: the rating is what the viewer asked
+      // for and it is already saved, so a failure here loses a follow-up
+      // question rather than their input.
+      let watchPrompt: WatchDatePrompt | null = null
+      try {
+        watchPrompt = await buildWatchDatePrompt(user, id)
+      } catch (error) {
+        fastify.log.error({ error, userId: user.id, movieId: id }, 'Failed to build watch date prompt')
+      }
+
+      return reply.send({ success: true, rating, watchPrompt })
     }
   )
 
@@ -321,6 +401,43 @@ const ratingsRoutes: FastifyPluginAsync = async (fastify) => {
     }
   )
 
+  /**
+   * POST /api/ratings/movie/:id/not-watched
+   * Record that the viewer has not seen a title they rated.
+   *
+   * This is the named dismissal on the watch-date prompt, and it is a real
+   * answer rather than an ignore. Dismissing is ambiguous between "not now"
+   * and "no", and we cannot act on an ambiguous signal: treat it as "no" and
+   * someone who was merely busy is never asked again, treat it as "not now"
+   * and a genuinely unwatched title is raised forever.
+   *
+   * It deliberately writes no watch history — there is no watch — and it does
+   * not touch the rating itself. An unwatched rating is close to inert
+   * already: it never reaches the taste vector, because every user_ratings
+   * join in the profile builder is a LEFT JOIN from watch history.
+   */
+  fastify.post<{ Params: { id: string } }>(
+    '/api/ratings/movie/:id/not-watched',
+    { preHandler: requireAuth, schema: notWatchedSchema },
+    async (request, reply) => {
+      const user = request.user as SessionUser
+      const { id } = request.params
+
+      // Scoped to an existing rating: the declaration qualifies a rating, so
+      // with no rating there is nothing to qualify and nowhere to put it.
+      const result = await query(
+        `UPDATE user_ratings
+            SET not_watched_declared_at = NOW(), updated_at = NOW()
+          WHERE user_id = $1 AND movie_id = $2`,
+        [user.id, id]
+      )
+      if (!result.rowCount) {
+        return reply.status(404).send({ error: 'No rating to mark' })
+      }
+
+      return reply.send({ success: true })
+    }
+  )
   /**
    * DELETE /api/ratings/movie/:id
    * Remove rating for a movie

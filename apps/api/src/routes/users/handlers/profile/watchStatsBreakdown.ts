@@ -103,9 +103,14 @@ function resolve(dimension: string, value: string, value2: string): Resolved | n
         params: [value],
       }
     }
+    // The two dimensions whose summary excludes approximate dates must exclude
+    // them here too. The chip and the list it opens have to be filtering on the
+    // same population — a "7 films" badge that opens five is a bug report — and
+    // these are the charts a band-dated watch is deliberately absent from.
     case 'day': {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
-      const clause = "to_char(wh.last_played_at, 'YYYY-MM-DD') = $2"
+      const clause =
+        "to_char(wh.last_played_at, 'YYYY-MM-DD') = $2 AND wh.approximate_played_at IS NULL"
       return { movieWhere: clause, seriesWhere: clause, params: [value] }
     }
     case 'timeOfDay': {
@@ -113,7 +118,9 @@ function resolve(dimension: string, value: string, value2: string): Resolved | n
       const hour = Number.parseInt(value2, 10)
       if (!Number.isFinite(dow) || !Number.isFinite(hour)) return null
       const clause =
-        'EXTRACT(DOW FROM wh.last_played_at)::int = $2::int AND EXTRACT(HOUR FROM wh.last_played_at)::int = $3::int'
+        'EXTRACT(DOW FROM wh.last_played_at)::int = $2::int' +
+        ' AND EXTRACT(HOUR FROM wh.last_played_at)::int = $3::int' +
+        ' AND wh.approximate_played_at IS NULL'
       return { movieWhere: clause, seriesWhere: clause, params: [dow, hour] }
     }
     case 'movies':

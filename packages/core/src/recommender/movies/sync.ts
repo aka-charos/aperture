@@ -882,6 +882,32 @@ export async function syncWatchHistoryForUser(
     synced = result.rowCount || toSync.length
   }
 
+  // An approximate date stops being approximate once the title is really
+  // watched. `approximate_played_at` holds the estimate we sent the media
+  // server, so the server disagreeing with it is proof a genuine play has
+  // happened since — at which point `last_played_at` above is already the real
+  // one and only the marker is stale. Without this, a title backfilled once
+  // stays out of the activity charts forever, including long after it was
+  // properly watched.
+  //
+  // The comparison carries a day of slack rather than being exact. Emby's
+  // `DatePlayed` is `yyyyMMddHHmmss` with no timezone, so a value can come back
+  // shifted by the server's offset from what we wrote; treating that as a new
+  // play would clear every marker on the very first sync. A real play landing
+  // inside a day of the estimate is possible in principle, and clearing the
+  // marker then is harmless — the two dates agree to within a day anyway.
+  await query(
+    `UPDATE watch_history
+        SET approximate_played_at = NULL
+      WHERE user_id = $1
+        AND approximate_played_at IS NOT NULL
+        AND (
+          last_played_at IS NULL
+          OR abs(extract(epoch FROM last_played_at - approximate_played_at)) > 86400
+        )`,
+    [userId]
+  )
+
   // Remove watch history entries no longer present in Emby (played, resume, or favorites)
   // Only do this on full sync (delta sync only adds/updates)
   let removed = 0

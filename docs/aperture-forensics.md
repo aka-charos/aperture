@@ -1526,3 +1526,61 @@ An issue is filed against **Seerr's internal media row id**, not a TMDb id, and 
 ### Left for 3b
 
 Resolve/reopen (`POST /issue/:id/:status`, MANAGE_ISSUES only) and an admin triage view. The panel already takes `scope`, and the admin switch on My Requests already drives it, so 3b is the route plus a button rather than a second page.
+
+## F-108
+
+**Approximate watch dates: backfilling a play the media server never saw, without lying about when.** Built 2026-09-05. Emby API read at `dev.emby.media` (PlaystateService); coverage figures measured on the live instance (12,608 movies).
+
+### What was actually broken
+
+Rating a movie wrote `user_ratings` and pushed to Trakt. That was all — no `markMoviePlayed`, no `watch_history` row. So a viewer could rate a film 9/10 while the server held it as never played, and the two facts sat there contradicting each other. The rating is close to inert in that state: every `user_ratings` join in `taste-profile/builder.ts` is a `LEFT JOIN` **from** watch history, so a rating on a title with no history contributes nothing to the taste vector. It reaches exactly one thing, `getDislikedMovieIds` at <= 3, and trips the activity gate's `MAX(updated_at) FROM user_ratings`.
+
+### The date is choosable, and that is the whole feature
+
+`POST /Users/{UserId}/PlayedItems/{Id}` takes an optional **`DatePlayed`**, documented format `yyyyMMddHHmmss`. Aperture was already calling that exact endpoint and simply omitting the parameter. **Jellyfin's equivalent is ISO 8601**, not Emby's format — same path, same optional parameter, different encoding — so each provider formats its own and there is deliberately no shared helper. Neither server rejects an unparseable value; it stamps its own now instead, so a formatting mistake does not throw, it silently backdates nothing.
+
+A second, richer option was found and **not** taken: `POST /Users/{UserId}/Items/{ItemId}/UserData` accepts a `UserItemDataDto` with `Played`, `LastPlayedDate`, `PlayCount`, `PlaybackPositionTicks`, `IsFavorite` **and `Rating`**. It is the endpoint to reach for if Aperture's stars are ever mirrored to Emby's own per-user rating, which is arguably a truer translation of a rating than inventing a watch.
+
+### The measurement that shaped the ladder
+
+`calculateEngagementWeight`'s recency term is `max(0.25, 0.5 ** (days / 180))` — a 180-day half-life **floored at 0.25, reached at exactly 360 days**. Past a year every date produces an identical weight: the algorithm cannot distinguish 2019 from 2003. That is why the oldest band is a single bucket and needs no precision, and why a year picker was judged to buy nothing for the recommender.
+
+Ranked by what a fabricated date actually damages:
+
+1. **`getWatchHistory` ordering** — `is_favorite DESC, play_count DESC, last_played_at DESC` limited to ~50. A backfilled title has `play_count = 1`, so it lands in the mass where recency is the tiebreak, and stamping it *now* **evicts a genuinely recent watch** from the set that builds the taste vector. This is why the ladder never defaults to today.
+2. **Hour-of-day heatmap and busiest-day chart.** The hour is pure invention — the one field no user could ever supply.
+3. The 12-month timeline, the 30-day dashboard tile, `historySpan`.
+
+### The rules
+
+**The release date clamps the ladder from below only.** The first sketch of this had old films getting a coarser list (`this year, last year, long ago`) and that is backwards — a 1998 film is exactly what someone watches *this month*. Each band is an interval, its start is clamped to `premiere_date`, and an empty interval drops the band. One rule, no per-case logic. A Feb-2026 film keeps three rungs; a 1998 film keeps five; a film released three days ago collapses to one, and **a single surviving band becomes a yes/no rather than a silent write** — marking someone's media server off the back of a rating is not what they asked for. A title whose release is still ahead offers nothing and is not prompted at all.
+
+**Midpoint, not either edge**, so the error is symmetric and bounded by half the band. **At 12:00**, for two independent reasons: Emby's `DatePlayed` carries **no timezone** and the docs do not say whether a bare stamp reads as UTC or server-local, so midday survives a +/-12h misreading on the correct day where midnight would shift it; and it keeps fabricated watches out of the small hours of the heatmap.
+
+**`longerAgo` writes a placeholder, not a midpoint.** Caught by the test: interpolating between release and the band's top edge answered **2011** for a 1998 film — a considered-looking estimate of something nobody stated. It writes 1 January of two years ago, always >= 366 days back and therefore past the floor where all older dates are equal.
+
+**Whole days, not halved milliseconds.** Both ends are local midnights, so a span crossing a DST change is not a whole number of 24h periods; halving the millisecond difference lands at 23:30 on the previous day in half the world's timezones, making the function's answer depend on where the server is.
+
+**A midpoint is never allowed into the future.** On the 1st of a month "this month" is a single day and midday on it is ahead of someone rating at 09:00. A future `last_played_at` sorts to the top of the taste history permanently and falls outside every "last N days" window.
+
+### Recording that a date is approximate
+
+Emby stores one `LastPlayedDate` and the sync overwrites ours from it (`last_played_at = EXCLUDED.last_played_at`), so "roughly" cannot be expressed there. `watch_history.approximate_played_at` (`0163`) holds **the estimate we sent**, not a boolean — which is what lets the marker clear itself: the server's date no longer matching what we wrote proves a real play has happened since. A boolean would leave every backfilled title flagged forever, including long after it was properly watched. The comparison carries **a day of slack**, because the timezone ambiguity above means a value can come back shifted by the server's offset and treating that as a new play would clear every marker on the first sync.
+
+Approximate rows count as watches everywhere that asks *how many* or *what kind*, and are excluded **only** from the hour-of-day heatmap and the busiest-day chart, whose entire claim is about the fields we invented. `watchStatsBreakdown`'s `day` and `timeOfDay` cases carry the same exclusion, per [F-102](docs/aperture-forensics.md#f-102)'s rule that a chip and the list it opens must filter identically.
+
+### Why "I haven't seen it" is not a sixth rung
+
+It is not a *when*, and mixing it into a list of times turns a half-second choice into something people stop and read — friction on every use, landing on rating, the thing you most want people doing. It sits below as the named dismissal: same click cost as closing the dialog, but a durable answer where a dismissal is ambiguous between "not now" and "no".
+
+`user_ratings.not_watched_declared_at` exists in v1 although only the inline prompt reads it, because the **batch** prompt ("9 films you rated aren't marked watched") would otherwise resurface a genuinely unwatched title every time forever with no way to stop it — and retrofitting the flag after people have rated their way through a back catalogue is too late to help them. It lives on the rating because it qualifies the rating; deleting the rating takes it with it, which correctly reopens the question.
+
+### Coverage
+
+`movies.premiere_date` is a real `DATE`, written from Emby's `PremiereDate` on every library sync (`MOVIE_LIST_FIELDS` requests it), so it does **not** depend on TMDB/OMDb enrichment. Measured: **12,604 of 12,608** movies have one, all 12,608 have a year, none has neither. Checked for placeholder contamination — Emby reports `YYYY-01-01` when it knows only a year — and found none: 8 titles on 1 January against 11 on 2 January, both *below* the ~35 a uniform distribution predicts, and 369 on any first-of-month against ~414 expected. Real release scheduling showing through, not synthetic dates.
+
+`series` has **no** `premiere_date` column (only `movies` and `episodes` do), which does not bite today because there is no mark-as-watched for series at all — neither provider defines `markEpisodePlayed`, only the unplayed direction. If it ever extends to TV the floor is `MIN(premiere_date)` across the show's episodes, as `strm/series/writer.ts` already computes.
+
+### Left undone deliberately
+
+The year picker inside *Longer ago* (buys nothing for the recommender; would make `historySpan` truer) and the batch prompt. The band arithmetic is a pure module with a test precisely so the batch screen is later a second caller rather than a second implementation.
