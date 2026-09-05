@@ -9,7 +9,9 @@
 ## Key naming
 
 - Use nested objects in `locales/*/translation.json` (e.g. `admin.dashboard.systemStatus`).
-- Prefix admin-only copy with `admin.` or `settingsSection.` for settings panels.
+- **Who sees a string is declared, not read off its prefix.** [`audience.ts`](./audience.ts) lists the namespaces that no non-admin surface reads; everything else is viewer-reachable. No prefix selects them — the thirty-odd `settings<Thing>` namespaces are admin-only, so are `jobsUi`, `runningJobs`, `explorationConfig`, `topPicksAdmin`, `inferenceDashboard` and `setup`, while the admin console reuses viewer namespaces (`watching`, `dashboard`, `playlists`) for its own section titles.
+- `audience.test.ts` re-derives that list from the source tree, so a new namespace nobody classified, or an admin key pasted into a page every viewer can open, fails `pnpm --filter @aperture/web test` instead of drifting. When a genuinely admin-only module lives outside `pages/admin|settings|jobs|setup`, add it to `ADMIN_SURFACE_PATHS` — that list carries the judgement calls, including the two widgets `Layout.tsx` mounts for everyone that return null unless `user.isAdmin`.
+- The audience is what the Translations editor's **Audience** filter selects on (and what its CSV export writes), and what `i18n:delta` orders chunks by.
 - Keep keys stable once shipped; rename only with a migration pass across all locale files.
 
 ## Locales
@@ -22,7 +24,7 @@
 From `apps/web`:
 
 1. **`pnpm i18n:sync`** — Deep-merges English into each non-English locale. **Existing translations are never overwritten.** New keys get English text until a translator replaces them.
-2. **`pnpm i18n:delta`** (requires git) — Writes `scripts/i18n/delta/missing-from-en.json` (subtree that was absent in the **last committed** non-English locale vs current English; same shape for every locale) and splits it into `delta/chunk-NN.json` (~20KB each) for batched translation.
+2. **`pnpm i18n:delta`** (requires git; runs under `tsx` so the splitter can read the audience list) — Writes `scripts/i18n/delta/missing-from-en.json` (subtree that was absent in the **last committed** non-English locale vs current English; same shape for every locale) and splits it into `delta/chunk-NN.json` (~20KB each) for batched translation, **viewer-facing namespaces first** — about half the catalogue is admin console copy, so a batch that runs out of budget should run out of it there.
 3. After a model or translator produces `chunk-01-de.json` (same shape as `chunk-01.json`), apply it:
 
    `node scripts/i18n/apply-translated-chunk.mjs de scripts/i18n/delta/chunk-01-de.json`
