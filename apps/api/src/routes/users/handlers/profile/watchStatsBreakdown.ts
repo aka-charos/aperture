@@ -97,13 +97,11 @@ function resolve(dimension: string, value: string, value2: string): Resolved | n
       // The chart labels months "Mon YYYY" for the reader; the drill-in takes
       // the unambiguous form so it never has to parse a localized month name.
       if (!/^\d{4}-\d{2}$/.test(value)) return null
-      return {
-        movieWhere: "to_char(wh.last_played_at, 'YYYY-MM') = $2",
-        seriesWhere: "to_char(wh.last_played_at, 'YYYY-MM') = $2",
-        params: [value],
-      }
+      const clause =
+        "to_char(wh.last_played_at, 'YYYY-MM') = $2 AND wh.approximate_played_at IS NULL"
+      return { movieWhere: clause, seriesWhere: clause, params: [value] }
     }
-    // The two dimensions whose summary excludes approximate dates must exclude
+    // The dimensions whose summary excludes approximate dates must exclude
     // them here too. The chip and the list it opens have to be filtering on the
     // same population — a "7 films" badge that opens five is a bug report — and
     // these are the charts a band-dated watch is deliberately absent from.

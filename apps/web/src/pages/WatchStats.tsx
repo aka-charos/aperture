@@ -93,6 +93,12 @@ interface WatchStats {
   busiestDay: { date: string; count: number } | null
   /** Absent on an instance running an older API — the caption then omits the span. */
   historySpan?: { firstWatchedAt: string | null; lastWatchedAt: string | null }
+  /**
+   * Watches dated by band rather than exactly. Counted in every total on this
+   * page, plotted on none of the charts — absent on an older server, which had
+   * no such rows.
+   */
+  approximateWatches?: number
   totalRewatched: number
   mostRewatched: { movieId: string; title: string; poster: string | null; playCount: number }[]
 }
@@ -301,6 +307,12 @@ function WatchStatsContent() {
       })
     : t('watchStats.coverageAllTime')
 
+  // A watch someone dated as "last year" has no hour, no weekday and no
+  // certain month, so it is counted everywhere and plotted nowhere. Say that
+  // outright: a total that exceeds what the charts add up to reads as a bug
+  // when it is unexplained, and as a caveat when it is not.
+  const approximate = stats.approximateWatches ?? 0
+
   return (
     <Box>
       {heading}
@@ -313,6 +325,7 @@ function WatchStatsContent() {
         <>
           <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
             {coverageLabel}
+            {approximate > 0 && ` ${t('watchStats.coverageApproximate', { count: approximate })}`}
           </Typography>
 
           {/* Every scalar the page knows, in one band. Tiles that stand for a

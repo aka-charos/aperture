@@ -4201,7 +4201,9 @@
     "activitySubtitle": "Last 12 months · pick a month to see what you watched",
     "heatmapSubtitleAllTime": "All time, by day and hour",
     "coverageSpan": "All-time, from your first tracked play in {{from}} — except the activity chart, which covers the last 12 months",
-    "coverageAllTime": "All-time — except the activity chart, which covers the last 12 months"
+    "coverageAllTime": "All-time — except the activity chart, which covers the last 12 months",
+    "coverageApproximate_one": "· {{count}} watch you dated roughly is counted in the totals but not shown on the charts",
+    "coverageApproximate_other": "· {{count}} watches you dated roughly are counted in the totals but not shown on the charts"
   },
   "jobsUi": {
     "logsEmpty": "Nessuna voce di registro ancora.",
