@@ -68,7 +68,7 @@
     "test:explanations": "node --import tsx --test src/recommender/shared/explanationParsing.test.ts src/recommender/shared/explanationPrompt.test.ts src/recommender/shared/slotPrompt.test.ts src/recommender/evidenceStrength.test.ts",
     "test:migrations": "node --import tsx --test src/migrations.test.ts",
     "test:schedule": "node --import tsx --test src/jobs/schedule.test.ts src/jobs/logWindow.test.ts",
-    "test:discovery": "node --import tsx --test src/discover/scorer.test.ts src/discover/reconcile.test.ts src/discover/embeddings.test.ts src/discover/config.test.ts src/discover/merge.test.ts src/discover/blendDiagnostics.test.ts",
+    "test:discovery": "node --import tsx --test src/discover/scorer.test.ts src/discover/reconcile.test.ts src/discover/embeddings.test.ts src/discover/config.test.ts src/discover/merge.test.ts src/discover/blendDiagnostics.test.ts src/discover/genreStripOrder.test.ts",
     "test:enrichment": "node --import tsx --test src/enrichment/needsEnrichment.test.ts src/omdb/failures.test.ts src/omdb/ratings.test.ts",
     "test:analysis": "node --import tsx --test src/analysis/sourceFloor.test.ts src/analysis/pending.test.ts src/analysis/budget.test.ts src/analysis/response.test.ts src/lib/crw.test.ts src/lib/crwEngines.test.ts",
     "test:quota": "node --import tsx --test src/lib/webSearchQuota.test.ts",

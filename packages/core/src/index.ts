@@ -1118,6 +1118,9 @@ export {
   popularityScoresBySource,
   tasteSimilarityRanks,
   SOURCE_TERM_WEIGHT,
+  // Genre strip ordering
+  orderGenreStripRowsByTaste,
+  genreStripRowAffinity,
   // Blend diagnostics
   getDiscoveryBlendDiagnostics,
   configuredBlendShares,
