@@ -1175,7 +1175,6 @@
     "tabSeries": "مسلسل تلفزيوني",
     "jobBanner": "جارٍ إنشاء اقتراحات اكتشاف جديدة...",
     "lastUpdated": "آخر تحديث: {{متى}}",
-    "runMeta": "{{مخزنة}} اقتراحات من {{تم جلبها}} من المرشحين",
     "alertRequestEnabled": "انقر على أي عنوان لعرضه على TMDb. قم بالتمرير لطلب المحتوى عبر Seerr.",
     "alertRequestDisabled": "لم يتم تمكين طلبات المحتوى لحسابك. يمكنك تصفح الاقتراحات ولكن لا يمكنك طلبها.",
     "emptyMovie": "لا توجد اقتراحات للأفلام حتى الآن. انقر فوق \"تحديث\" لإنشاء توصيات مخصصة بناءً على سجل المشاهدة الخاص بك.",
@@ -1232,12 +1231,14 @@
       "castUnavailable": "معلومات الإرسال غير متوفرة",
       "loadingTmdb": "جارٍ تحميل التفاصيل الكاملة…",
       "tasteRank": "Taste match",
-      "tasteRankValue": "#{{rank}} of {{total}}"
+      "tasteRankValue": "#{{rank}} of {{total}}",
+      "request": "Request"
     },
-    "tabBrowsePopular": "TMDb شائع بشكل عام",
     "tabBrowseGenre": "شعبية حسب النوع",
     "tabStreaming": "جاري",
-    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}"
+    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}",
+    "tabBrowsePicked": "Picked for you",
+    "runMetaShowing": "Showing {{shown}} of {{stored}} suggestions, scored from {{fetched}} candidates"
   },
   "mediaPoster": {
     "matchPercent": "تطابق بنسبة {{pct}}%",

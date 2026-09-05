@@ -1175,7 +1175,6 @@
     "tabSeries": "TV 시리즈",
     "jobBanner": "새로운 검색 제안을 생성하는 중…",
     "lastUpdated": "마지막 업데이트: {{언제}}",
-    "runMeta": "{{가져온}} 후보자의 제안이 {{저장됨}}개 있습니다.",
     "alertRequestEnabled": "TMDb에서 보려면 제목을 클릭하세요. Seerr를 통해 콘텐츠를 요청하려면 마우스를 올리세요.",
     "alertRequestDisabled": "귀하의 계정에는 콘텐츠 요청이 활성화되어 있지 않습니다. 제안 사항을 찾아볼 수는 있지만 요청할 수는 없습니다.",
     "emptyMovie": "아직 영화 추천이 없습니다. 시청 기록을 기반으로 맞춤 추천을 생성하려면 '새로고침'을 클릭하세요.",
@@ -1232,12 +1231,14 @@
       "castUnavailable": "캐스트 정보를 사용할 수 없습니다.",
       "loadingTmdb": "전체 세부정보 로드 중…",
       "tasteRank": "Taste match",
-      "tasteRankValue": "#{{rank}} of {{total}}"
+      "tasteRankValue": "#{{rank}} of {{total}}",
+      "request": "Request"
     },
-    "tabBrowsePopular": "TMDb 전반적으로 인기",
     "tabBrowseGenre": "장르별 인기",
     "tabStreaming": "스트리밍",
-    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}"
+    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}",
+    "tabBrowsePicked": "Picked for you",
+    "runMetaShowing": "Showing {{shown}} of {{stored}} suggestions, scored from {{fetched}} candidates"
   },
   "mediaPoster": {
     "matchPercent": "{{pct}}% 일치",

@@ -1175,7 +1175,6 @@
     "tabSeries": "Séries",
     "jobBanner": "Génération de nouvelles suggestions de découverte…",
     "lastUpdated": "Dernière mise à jour : {{when}}",
-    "runMeta": "{{stored}} suggestions sur {{fetched}} candidats",
     "alertRequestEnabled": "Cliquez sur un titre pour l'ouvrir sur TMDb. Survolez pour demander du contenu via Seerr.",
     "alertRequestDisabled": "Les demandes de contenu ne sont pas activées pour votre compte. Vous pouvez parcourir les suggestions mais pas les demander.",
     "emptyMovie": "Pas encore de suggestions de films. Cliquez sur « Actualiser » pour générer des recommandations personnalisées selon votre historique.",
@@ -1232,12 +1231,14 @@
       "castUnavailable": "Informations de distribution indisponibles",
       "loadingTmdb": "Chargement de tous les détails…",
       "tasteRank": "Taste match",
-      "tasteRankValue": "#{{rank}} of {{total}}"
+      "tasteRankValue": "#{{rank}} of {{total}}",
+      "request": "Request"
     },
-    "tabBrowsePopular": "TMDb populaire dans l'ensemble",
     "tabBrowseGenre": "Populaire par genre",
     "tabStreaming": "Streaming",
-    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}"
+    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}",
+    "tabBrowsePicked": "Picked for you",
+    "runMetaShowing": "Showing {{shown}} of {{stored}} suggestions, scored from {{fetched}} candidates"
   },
   "mediaPoster": {
     "matchPercent": "{{pct}}% correspondance",

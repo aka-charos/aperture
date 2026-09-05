@@ -2506,7 +2506,6 @@
     "tabSeries": "TV-serie",
     "jobBanner": "Nieuwe ontdekkingssuggesties genereren…",
     "lastUpdated": "Laatst bijgewerkt: {{wanneer}}",
-    "runMeta": "{{stored}} suggesties van {{fetched}} kandidaten",
     "alertRequestEnabled": "Klik op een titel om deze op TMDb te bekijken. Beweeg de muis om inhoud aan te vragen via Seerr.",
     "alertRequestDisabled": "Inhoudsverzoeken zijn niet ingeschakeld voor uw account. U kunt door suggesties bladeren, maar deze niet opvragen.",
     "emptyMovie": "Nog geen filmsuggesties. Klik op 'Vernieuwen' om gepersonaliseerde aanbevelingen te genereren op basis van uw kijkgeschiedenis.",
@@ -2563,12 +2562,14 @@
       "castUnavailable": "Castinformatie niet beschikbaar",
       "loadingTmdb": "Volledige details laden…",
       "tasteRank": "Taste match",
-      "tasteRankValue": "#{{rank}} of {{total}}"
+      "tasteRankValue": "#{{rank}} of {{total}}",
+      "request": "Request"
     },
-    "tabBrowsePopular": "TMDb is over het algemeen populair",
     "tabBrowseGenre": "Populair per genre",
     "tabStreaming": "Streamen",
-    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}"
+    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}",
+    "tabBrowsePicked": "Picked for you",
+    "runMetaShowing": "Showing {{shown}} of {{stored}} suggestions, scored from {{fetched}} candidates"
   },
   "mediaPoster": {
     "matchPercent": "{{pct}}% overeenkomst",

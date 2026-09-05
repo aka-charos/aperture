@@ -785,7 +785,6 @@
     "tabSeries": "电视剧",
     "jobBanner": "生成新的发现建议...",
     "lastUpdated": "最后更新时间：{{when}}",
-    "runMeta": "来自 {{fetched}} 个候选人的 {{stored}} 个建议",
     "alertRequestEnabled": "单击任何标题即可在 TMDb 上查看。 将鼠标悬停可通过 Seerr 请求内容。",
     "alertRequestDisabled": "您的帐户未启用内容请求。 您可以浏览建议，但无法请求建议。",
     "emptyMovie": "还没有电影建议。 单击“刷新”可根据您的观看历史记录生成个性化推荐。",
@@ -842,12 +841,14 @@
       "castUnavailable": "演员信息不可用",
       "loadingTmdb": "正在加载完整详细信息...",
       "tasteRank": "Taste match",
-      "tasteRankValue": "#{{rank}} of {{total}}"
+      "tasteRankValue": "#{{rank}} of {{total}}",
+      "request": "Request"
     },
-    "tabBrowsePopular": "TMDb 整体受欢迎",
     "tabBrowseGenre": "按类型受欢迎",
     "tabStreaming": "流媒体",
-    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}"
+    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}",
+    "tabBrowsePicked": "Picked for you",
+    "runMetaShowing": "Showing {{shown}} of {{stored}} suggestions, scored from {{fetched}} candidates"
   },
   "mediaPoster": {
     "matchPercent": "{{pct}}% 匹配",

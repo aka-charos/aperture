@@ -81,6 +81,19 @@ interface DiscoveryDetailPopperProps {
   open: boolean
   onClose: () => void
   resolveGenreName: ResolveDiscoveryGenreName
+  /**
+   * Request this title. Optional, because the streaming rows render this same
+   * dialog without a request flow behind them — absent means the action area
+   * is not drawn at all, rather than drawn dead.
+   *
+   * The caller owns the flow (options dialog, then seasons for a series), which
+   * is why this is a bare trigger: both call sites already had the whole
+   * sequence and only the dialog could not reach it.
+   */
+  onRequest?: () => void
+  canRequest?: boolean
+  isRequesting?: boolean
+  isRequested?: boolean
 }
 
 export function DiscoveryDetailPopper({
@@ -88,6 +101,10 @@ export function DiscoveryDetailPopper({
   open,
   onClose,
   resolveGenreName,
+  onRequest,
+  canRequest = false,
+  isRequesting = false,
+  isRequested = false,
 }: DiscoveryDetailPopperProps) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
@@ -515,6 +532,45 @@ export function DiscoveryDetailPopper({
                         )
                       )}
                     </Grid>
+                  </Box>
+                )}
+
+                {/*
+                  The action, which this dialog did not have.
+                  It showed the match score, the cast, the trailer and the
+                  synopsis -- everything needed to decide -- and then offered no
+                  way to act on the decision. Closing it and hunting for the
+                  card's own button again is not a workflow.
+
+                  Drawn only when a caller supplied the flow, so the streaming
+                  rows that render this same dialog without one get no button
+                  rather than a dead one.
+                */}
+                {onRequest && (
+                  <Box
+                    sx={{
+                      mt: hideAiMatchSection ? 'auto' : 2,
+                      pt: 2,
+                      // Exactly one rule above the footer: the score block draws
+                      // its own, so this only adds one when that block is absent.
+                      ...(hideAiMatchSection
+                        ? { borderTop: 1, borderColor: alpha('#fff', 0.1) }
+                        : {}),
+                    }}
+                  >
+                    <Button
+                      variant={isRequested ? 'outlined' : 'contained'}
+                      fullWidth
+                      disabled={isRequested || !canRequest || isRequesting}
+                      onClick={onRequest}
+                      startIcon={
+                        isRequesting ? <CircularProgress size={16} color="inherit" /> : undefined
+                      }
+                    >
+                      {isRequested
+                        ? t('discovery.requestStatusRequested')
+                        : t('discovery.detail.request')}
+                    </Button>
                   </Box>
                 )}
               </Box>

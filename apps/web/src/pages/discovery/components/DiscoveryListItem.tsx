@@ -585,6 +585,17 @@ export function DiscoveryListItem({
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
         resolveGenreName={resolveGenreName}
+        canRequest={canRequest}
+        isRequesting={isRequesting}
+        isRequested={isRequested}
+        // Closed first: the options sheet and the season picker are dialogs of
+        // their own, and stacking them over this one loses the way back.
+        // `handleRequest` wants a mouse event only to stop the row's own click
+        // from firing underneath it, and there is no row underneath here.
+        onRequest={() => {
+          setDetailOpen(false)
+          if (!isRequesting && !isRequested && canRequest) setOptionsDialogOpen(true)
+        }}
       />
 
       {/* Season Selection Modal (for series) */}

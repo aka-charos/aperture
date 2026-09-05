@@ -2506,7 +2506,6 @@
     "tabSeries": "Сериал",
     "jobBanner": "Генерация новых предложений по открытию…",
     "lastUpdated": "Последнее обновление: {{когда}}",
-    "runMeta": "{{stored}} предложений от {{fetched}} кандидатов",
     "alertRequestEnabled": "Нажмите на любой заголовок, чтобы просмотреть его на TMDb. Наведите курсор, чтобы запросить контент через Seerr.",
     "alertRequestDisabled": "Запросы контента не включены для вашей учетной записи. Вы можете просматривать предложения, но не можете запрашивать их.",
     "emptyMovie": "Предложений фильмов пока нет. Нажмите «Обновить», чтобы создать персональные рекомендации на основе вашей истории просмотра.",
@@ -2563,12 +2562,14 @@
       "castUnavailable": "Информация об актерах недоступна",
       "loadingTmdb": "Загрузка полной информации…",
       "tasteRank": "Taste match",
-      "tasteRankValue": "#{{rank}} of {{total}}"
+      "tasteRankValue": "#{{rank}} of {{total}}",
+      "request": "Request"
     },
-    "tabBrowsePopular": "TMDb в целом популярен",
     "tabBrowseGenre": "Популярный по жанру",
     "tabStreaming": "Потоковое вещание",
-    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}"
+    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}",
+    "tabBrowsePicked": "Picked for you",
+    "runMetaShowing": "Showing {{shown}} of {{stored}} suggestions, scored from {{fetched}} candidates"
   },
   "mediaPoster": {
     "matchPercent": "{{pct}} % совпадения",

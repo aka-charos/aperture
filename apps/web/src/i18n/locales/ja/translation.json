@@ -785,7 +785,6 @@
     "tabSeries": "連続テレビ番組",
     "jobBanner": "新しい発見の提案を生成しています…",
     "lastUpdated": "最終更新日: {{いつ}}",
-    "runMeta": "{{fetched}} 人の候補者からの {{stored}} 件の提案",
     "alertRequestEnabled": "タイトルをクリックするとTMDbでご覧いただけます。 カーソルを合わせると、Seerr 経由でコンテンツをリクエストできます。",
     "alertRequestDisabled": "あなたのアカウントではコンテンツリクエストが有効になっていません。 提案を参照することはできますが、リクエストすることはできません。",
     "emptyMovie": "映画の提案はまだありません。 「更新」をクリックすると、視聴履歴に基づいてパーソナライズされたおすすめが生成されます。",
@@ -842,12 +841,14 @@
       "castUnavailable": "キャスト情報はありません",
       "loadingTmdb": "詳細を読み込み中…",
       "tasteRank": "Taste match",
-      "tasteRankValue": "#{{rank}} of {{total}}"
+      "tasteRankValue": "#{{rank}} of {{total}}",
+      "request": "Request"
     },
-    "tabBrowsePopular": "TMDb 全体的に人気",
     "tabBrowseGenre": "ジャンル別の人気",
     "tabStreaming": "ストリーミング",
-    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}"
+    "subtitleNamed": "AI-powered suggestions for content not available in {{serverName}}",
+    "tabBrowsePicked": "Picked for you",
+    "runMetaShowing": "Showing {{shown}} of {{stored}} suggestions, scored from {{fetched}} candidates"
   },
   "mediaPoster": {
     "matchPercent": "{{pct}}% 一致",
