@@ -14,6 +14,10 @@ import {
   GENRE_STRIP_MAX_ROW_LIMIT,
   sanitizeGenreStripOriginCountry,
   sanitizeGenreStripYear,
+  orderGenreStripRowsByTaste,
+  getUserGenreWeights,
+  getMovieGenresList,
+  getTVGenresList,
   type MediaType,
   type RawCandidate,
 } from '@aperture/core'
@@ -126,7 +130,51 @@ export function registerTmdbGenreRowsRoutes(fastify: FastifyInstance) {
       getGenreStripMovieRows(),
       getGenreStripSeriesRows(),
     ])
-    return reply.send({ movieGenreRows, seriesGenreRows })
+
+    // The strips are the same rows for everyone -- an admin's browse surface,
+    // straight from TMDb Discover -- and that stays true. What changes is the
+    // ORDER: the viewer's own genre weights decide which row they land on
+    // first, so the surface keeps its job while the scrolling gets shorter.
+    // Ordering rows is not scoring titles; see genreStripOrder.ts for why the
+    // titles are deliberately left alone.
+    //
+    // Wrapped because it reaches TMDb for the id -> name mapping the weights
+    // are keyed by. Failing here must cost the personalization and not the
+    // page, so anything thrown returns the configured order -- which is exactly
+    // what every viewer saw before this existed.
+    try {
+      const [weights, movieGenres, seriesGenres] = await Promise.all([
+        getUserGenreWeights(currentUser.id),
+        // No language argument on purpose. `user_genre_weights.genre` holds the
+        // names the library recorded, so the lookup has to happen in ONE stable
+        // language -- asking TMDb in the viewer's locale would silently stop
+        // matching for everyone not reading English. A miss degrades to
+        // neutral, so the worst case is no personalization rather than wrong
+        // personalization.
+        getMovieGenresList(),
+        getTVGenresList(),
+      ])
+
+      const weightByGenreName = new Map(
+        weights.map((w) => [w.genre.trim().toLowerCase(), w.weight])
+      )
+
+      return reply.send({
+        movieGenreRows: orderGenreStripRowsByTaste(
+          movieGenreRows,
+          new Map(movieGenres.map((g) => [g.id, g.name])),
+          weightByGenreName
+        ),
+        seriesGenreRows: orderGenreStripRowsByTaste(
+          seriesGenreRows,
+          new Map(seriesGenres.map((g) => [g.id, g.name])),
+          weightByGenreName
+        ),
+      })
+    } catch (err) {
+      request.log.warn({ err, userId: currentUser.id }, 'Could not order genre strips by taste')
+      return reply.send({ movieGenreRows, seriesGenreRows })
+    }
   })
 
   fastify.get<{

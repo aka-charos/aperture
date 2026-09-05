@@ -69,6 +69,12 @@ export {
   SOURCE_TERM_WEIGHT,
 } from './scorer.js'
 
+// Genre strip ordering (rows by taste; titles deliberately untouched)
+export {
+  orderGenreStripRowsByTaste,
+  genreStripRowAffinity,
+} from './genreStripOrder.js'
+
 // Blend diagnostics (what the weights claim vs what they do)
 export {
   getDiscoveryBlendDiagnostics,
