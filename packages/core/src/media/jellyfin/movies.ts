@@ -245,17 +245,29 @@ function watchedItemFromJellyfinMovie(item: JellyfinItem): WatchedItem {
 /**
  * Mark a movie as played/watched in Jellyfin
  * This calls POST /Users/{UserId}/PlayedItems/{ItemId}
+ *
+ * `playedAt` backdates the play. **Jellyfin's `datePlayed` is ISO 8601, not
+ * Emby's `yyyyMMddHHmmss`** — the two servers share this endpoint's path and
+ * disagree on the format of its one optional parameter, so each provider
+ * formats its own and there is deliberately no shared helper.
+ *
+ * Passing it is also the only way to move `LastPlayedDate` on an item that
+ * already has playback progress: Jellyfin leaves the stored date alone when
+ * marking such an item played without one (jellyfin#8492).
  */
 export async function markMoviePlayed(
   provider: JellyfinProviderBase,
   apiKey: string,
   userId: string,
-  movieProviderId: string
+  movieProviderId: string,
+  playedAt?: Date
 ): Promise<void> {
-  logger.info({ userId, movieProviderId }, 'Marking movie as played in Jellyfin')
+  logger.info({ userId, movieProviderId, playedAt }, 'Marking movie as played in Jellyfin')
+
+  const datePlayed = playedAt ? `?datePlayed=${encodeURIComponent(playedAt.toISOString())}` : ''
 
   await provider.fetch(
-    `/Users/${userId}/PlayedItems/${movieProviderId}`,
+    `/Users/${userId}/PlayedItems/${movieProviderId}${datePlayed}`,
     apiKey,
     { method: 'POST' }
   )

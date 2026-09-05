@@ -392,9 +392,18 @@ export interface MediaServerProvider {
   // =========================================================================
 
   /**
-   * Mark a movie as watched/played
+   * Mark a movie as watched/played.
+   *
+   * `playedAt` backdates the play. Omit it and the server stamps its own now,
+   * which is the existing behaviour of the Mark Watched button.
+   *
+   * The wire format differs between the two servers and each implementation
+   * formats its own — Emby wants `yyyyMMddHHmmss`, Jellyfin wants ISO 8601.
+   * A shared formatter returning one string would be silently wrong for one of
+   * them, and neither server rejects a date it cannot parse: it just stamps
+   * now instead, so the failure looks like the feature working.
    */
-  markMoviePlayed(apiKey: string, userId: string, movieId: string): Promise<void>
+  markMoviePlayed(apiKey: string, userId: string, movieId: string, playedAt?: Date): Promise<void>
 
   /**
    * Mark a movie as unwatched/unplayed

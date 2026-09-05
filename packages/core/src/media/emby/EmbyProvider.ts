@@ -311,8 +311,13 @@ export class EmbyProvider extends EmbyProviderBase implements MediaServerProvide
   }
 
   // Watch History Management
-  async markMoviePlayed(apiKey: string, userId: string, movieId: string): Promise<void> {
-    return markMoviePlayed(this, apiKey, userId, movieId)
+  async markMoviePlayed(
+    apiKey: string,
+    userId: string,
+    movieId: string,
+    playedAt?: Date
+  ): Promise<void> {
+    return markMoviePlayed(this, apiKey, userId, movieId, playedAt)
   }
 
   async markMovieUnplayed(apiKey: string, userId: string, movieId: string): Promise<void> {

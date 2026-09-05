@@ -425,6 +425,14 @@ export {
 // AI error descriptions -- compact enough to log, unlike the raw APICallError
 export { describeAiError, type AiErrorDescription } from './lib/aiErrors.js'
 
+export {
+  WATCH_DATE_BANDS,
+  availableWatchDateBands,
+  resolveWatchDate,
+  isWatchDateBand,
+  type WatchDateBand,
+} from './lib/watchDateBands.js'
+
 // Taste Synopsis
 export {
   streamTasteSynopsis,

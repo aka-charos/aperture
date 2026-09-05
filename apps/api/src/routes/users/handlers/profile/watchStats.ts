@@ -441,6 +441,12 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
 
         // Activity heatmap: day-of-week (0=Sun..6=Sat) x hour-of-day, across
         // both movies and episodes.
+        //
+        // Approximate rows are excluded here and nowhere else. A watch dated
+        // by band ("last month") carries a timestamp this app chose, so its
+        // hour and weekday are inventions — and this chart's entire claim is
+        // about hour and weekday. It still counts as a watch everywhere that
+        // asks how many or what kind.
         const heatmapResult = await query<{ dow: string; hour: string; count: string }>(
           `SELECT
              EXTRACT(DOW FROM wh.last_played_at)::int as dow,
@@ -448,6 +454,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
              COUNT(*) as count
            FROM watch_history wh
            WHERE wh.user_id = $1 AND wh.last_played_at IS NOT NULL
+             AND wh.approximate_played_at IS NULL
            GROUP BY 1, 2`,
           [id]
         )
@@ -516,11 +523,15 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
         }
 
         // Busiest single day (movies + episodes combined)
+        // Excludes approximate dates for the heatmap's reason: a band midpoint
+        // is a specific day nobody named, and enough of them share one would
+        // manufacture a "busiest day" out of the estimate itself.
         const busiestDayRow = await queryOne<{ date: string; count: string }>(
           `SELECT to_char(date_trunc('day', wh.last_played_at), 'YYYY-MM-DD') as date,
                   COUNT(*) as count
            FROM watch_history wh
            WHERE wh.user_id = $1 AND wh.last_played_at IS NOT NULL
+             AND wh.approximate_played_at IS NULL
            GROUP BY date_trunc('day', wh.last_played_at)
            ORDER BY count DESC
            LIMIT 1`,

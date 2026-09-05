@@ -5151,5 +5151,21 @@
     "replyPosted": "Reply posted.",
     "errorLoad": "Could not load issues",
     "errorReply": "Could not post the reply"
+  },
+  "watchDate": {
+    "title": "When did you watch {{title}}?",
+    "confirmTitle": "Mark {{title}} as watched?",
+    "description": "Your server has no record of you playing this, so we can add one.",
+    "descriptionNamed": "{{serverName}} has no record of you playing this, so we can add one.",
+    "bands": {
+      "thisMonth": "This month",
+      "lastMonth": "Last month",
+      "earlierThisYear": "Earlier this year",
+      "lastYear": "Last year",
+      "longerAgo": "Longer ago than that"
+    },
+    "confirmAction": "Mark watched",
+    "notNow": "Not now",
+    "notSeen": "I haven't seen it"
   }
 }
