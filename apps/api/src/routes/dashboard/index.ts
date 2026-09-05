@@ -2,8 +2,23 @@ import type { FastifyPluginAsync } from 'fastify'
 import { query, queryOne } from '../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../plugins/auth.js'
 import { dashboardSchemas, getDashboardSchema } from './schemas.js'
+// Shared with the Watch Stats page. The bar links there, so a viewer will
+// compare the two: they have to be counting the same population.
+import {
+  WATCHED_SQL,
+  LIBRARY_ENABLED_SQL,
+} from '../users/handlers/profile/watchStatsFilters.js'
+
+/**
+ * The rolling window the quick-stats bar reports on. The bar names it, and
+ * the API ships it as windowDays so the label cannot drift from the number
+ * underneath it.
+ */
+const STATS_WINDOW_DAYS = 30
 
 interface DashboardStats {
+  /** The window these four figures cover, in days. */
+  windowDays: number
   moviesWatched: number
   seriesWatched: number
   ratingsCount: number
@@ -96,7 +111,14 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
         recentSeriesWatchesResult,
         recentRatingsResult,
       ] = await Promise.all([
-        // Stats query
+        // Stats query — a rolling window, not all time. The all-time figures
+        // only ever grew, so a row of four tiles said the same thing every
+        // day; the window is what makes them worth looking at. Note that
+        // `watch_history` is one row per title with `last_played_at` holding
+        // the *most recent* play, so this is "titles last watched in the
+        // window" — a rewatch moves a title into it. The Watch Stats page
+        // (linked from the bar) reads the same predicates, so the two agree
+        // apart from the window.
         queryOne<{
           movies_watched: string
           series_watched: string
@@ -104,29 +126,60 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
           watch_time_minutes: string
         }>(
           `
-          SELECT 
+          SELECT
             COALESCE((
-              SELECT COUNT(DISTINCT movie_id) 
-              FROM watch_history 
-              WHERE user_id = $1 AND movie_id IS NOT NULL
+              SELECT COUNT(DISTINCT wh.movie_id)
+              FROM watch_history wh
+              JOIN movies m ON m.id = wh.movie_id
+              LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
+              WHERE wh.user_id = $1 AND wh.movie_id IS NOT NULL
+                AND wh.last_played_at >= NOW() - make_interval(days => $2)
+                AND ${WATCHED_SQL} AND ${LIBRARY_ENABLED_SQL}
             ), 0) as movies_watched,
             COALESCE((
-              SELECT COUNT(DISTINCT e.series_id) 
+              SELECT COUNT(DISTINCT e.series_id)
               FROM watch_history wh
               JOIN episodes e ON e.id = wh.episode_id
               WHERE wh.user_id = $1 AND wh.episode_id IS NOT NULL
+                AND wh.last_played_at >= NOW() - make_interval(days => $2)
+                AND ${WATCHED_SQL}
             ), 0) as series_watched,
             COALESCE((
-              SELECT COUNT(*) FROM user_ratings WHERE user_id = $1
+              SELECT COUNT(*) FROM user_ratings
+              WHERE user_id = $1
+                AND updated_at >= NOW() - make_interval(days => $2)
             ), 0) as ratings_count,
-            COALESCE((
-              SELECT COALESCE(SUM(m.runtime_minutes), 0)
-              FROM watch_history wh
-              JOIN movies m ON m.id = wh.movie_id
-              WHERE wh.user_id = $1 AND wh.movie_id IS NOT NULL
-            ), 0) as watch_time_minutes
+            (
+              COALESCE((
+                SELECT SUM(m.runtime_minutes)
+                FROM watch_history wh
+                JOIN movies m ON m.id = wh.movie_id
+                LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
+                WHERE wh.user_id = $1 AND wh.movie_id IS NOT NULL
+                  AND wh.last_played_at >= NOW() - make_interval(days => $2)
+                  AND ${WATCHED_SQL} AND ${LIBRARY_ENABLED_SQL}
+              ), 0)
+              -- Episode runtime, falling back to the series' average episode
+              -- runtime when an episode has none. Mirrors the Watch Stats
+              -- page: without it a month spent on television reads as no
+              -- watch time at all, beside a series count that says otherwise.
+              + COALESCE((
+                SELECT ROUND(SUM(COALESCE(e.runtime_minutes, sa.avg_rt)))
+                FROM watch_history wh
+                JOIN episodes e ON e.id = wh.episode_id
+                LEFT JOIN (
+                  SELECT series_id, AVG(runtime_minutes) AS avg_rt
+                  FROM episodes
+                  WHERE runtime_minutes IS NOT NULL
+                  GROUP BY series_id
+                ) sa ON sa.series_id = e.series_id
+                WHERE wh.user_id = $1 AND wh.episode_id IS NOT NULL
+                  AND wh.last_played_at >= NOW() - make_interval(days => $2)
+                  AND ${WATCHED_SQL}
+              ), 0)
+            ) as watch_time_minutes
         `,
-          [user.id]
+          [user.id, STATS_WINDOW_DAYS]
         ),
 
         // Movie recommendations — the latest completed run only. Reading
@@ -338,6 +391,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Build stats
       const stats: DashboardStats = {
+        windowDays: STATS_WINDOW_DAYS,
         moviesWatched: parseInt(statsResult?.movies_watched || '0', 10),
         seriesWatched: parseInt(statsResult?.series_watched || '0', 10),
         ratingsCount: parseInt(statsResult?.ratings_count || '0', 10),

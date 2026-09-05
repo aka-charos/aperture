@@ -2987,7 +2987,9 @@
     "noRatingsHint": "Notez les films et séries pour les voir ici",
     "ratedOn": "Évalué le {{date}}",
     "typeMovie": "Film",
-    "typeSeries": "Série"
+    "typeSeries": "Série",
+    "statsWindow": "Last {{count}} days",
+    "statsMoreDetails": "More details"
   },
   "playlists": {
     "pageTitle": "Listes de lecture",

@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 
 interface DashboardStats {
+  /**
+   * The rolling window the four figures cover, decided by the API. Absent on
+   * an older server, which is the all-time behaviour, so the bar leaves off
+   * the window caption rather than claiming a window it did not apply.
+   */
+  windowDays?: number
   moviesWatched: number
   seriesWatched: number
   ratingsCount: number

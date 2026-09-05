@@ -2987,7 +2987,9 @@
     "noRatingsHint": "قيم الأفلام والمسلسلات لمشاهدتها هنا",
     "ratedOn": "تم التقييم بتاريخ {{date}}",
     "typeMovie": "فيلم",
-    "typeSeries": "مسلسل"
+    "typeSeries": "مسلسل",
+    "statsWindow": "Last {{count}} days",
+    "statsMoreDetails": "More details"
   },
   "playlists": {
     "pageTitle": "قوائم التشغيل",

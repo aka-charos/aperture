@@ -2987,7 +2987,9 @@
     "noRatingsHint": "דרג סרטים וסדרות כדי לראות אותם כאן",
     "ratedOn": "דורג בתאריך {{date}}",
     "typeMovie": "סֶרֶט",
-    "typeSeries": "סִדרָה"
+    "typeSeries": "סִדרָה",
+    "statsWindow": "Last {{count}} days",
+    "statsMoreDetails": "More details"
   },
   "playlists": {
     "pageTitle": "רשימות השמעה",

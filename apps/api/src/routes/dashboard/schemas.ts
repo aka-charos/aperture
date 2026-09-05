@@ -7,10 +7,24 @@ export const dashboardSchemas = {
   DashboardStats: {
     type: 'object',
     properties: {
-      moviesWatched: { type: 'integer', description: 'Number of unique movies watched' },
-      seriesWatched: { type: 'integer', description: 'Number of unique series watched' },
-      ratingsCount: { type: 'integer', description: 'Total number of ratings given' },
-      watchTimeMinutes: { type: 'integer', description: 'Total watch time in minutes' },
+      windowDays: {
+        type: 'integer',
+        description:
+          'Rolling window these figures cover, in days. The client labels the bar with it rather than hardcoding a number.',
+      },
+      moviesWatched: {
+        type: 'integer',
+        description: 'Unique movies last watched inside the window',
+      },
+      seriesWatched: {
+        type: 'integer',
+        description: 'Unique series with an episode last watched inside the window',
+      },
+      ratingsCount: { type: 'integer', description: 'Ratings given or changed inside the window' },
+      watchTimeMinutes: {
+        type: 'integer',
+        description: 'Movie plus episode runtime watched inside the window, in minutes',
+      },
     },
   },
 

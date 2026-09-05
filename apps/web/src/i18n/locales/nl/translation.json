@@ -2971,7 +2971,9 @@
     "noRatingsHint": "Beoordeel films en series om ze hier te bekijken",
     "ratedOn": "Beoordeeld op {{date}}",
     "typeMovie": "Film",
-    "typeSeries": "Serie"
+    "typeSeries": "Serie",
+    "statsWindow": "Last {{count}} days",
+    "statsMoreDetails": "More details"
   },
   "playlists": {
     "pageTitle": "Afspeellijsten",

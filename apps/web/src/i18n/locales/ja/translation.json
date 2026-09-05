@@ -2987,7 +2987,9 @@
     "noRatingsHint": "映画やシリーズを評価してここで見ることができます",
     "ratedOn": "{{日付}}に評価されました",
     "typeMovie": "映画",
-    "typeSeries": "シリーズ"
+    "typeSeries": "シリーズ",
+    "statsWindow": "Last {{count}} days",
+    "statsMoreDetails": "More details"
   },
   "playlists": {
     "pageTitle": "プレイリスト",
