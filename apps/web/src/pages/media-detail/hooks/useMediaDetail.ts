@@ -13,6 +13,7 @@ import type {
 } from '../types'
 import { DEFAULT_SIMILAR_MEDIA_LIMIT } from '../constants'
 import { useUserRatings } from '@/hooks/useUserRatings'
+import { onMovieWatched } from '@/lib/watchStatusEvents'
 
 export type WatchStats = MovieWatchStats | SeriesWatchStats
 
@@ -33,7 +34,12 @@ export interface UseMediaDetailReturn {
   seasonAvailability: SeasonAvailability[]
   // Movie-specific
   clearWatchStatus: () => void
-  setWatchStatusWatched: () => void
+  /**
+   * `watchedAt` is the date actually recorded. The Mark Watched button omits
+   * it and means now; a backfill from the watch-date prompt passes the
+   * resolved estimate, which can be a year away.
+   */
+  setWatchStatusWatched: (watchedAt?: string | null) => void
   isFavorite: boolean | null
   favoriteLoading: boolean
   toggleFavorite: () => Promise<boolean>
@@ -266,9 +272,24 @@ export function useMediaDetail(
     setWatchStatus({ isWatched: false, playCount: 0, lastWatched: null })
   }, [])
 
-  const setWatchStatusWatched = useCallback(() => {
-    setWatchStatus({ isWatched: true, playCount: 1, lastWatched: new Date().toISOString() })
+  const setWatchStatusWatched = useCallback((watchedAt?: string | null) => {
+    setWatchStatus({
+      isWatched: true,
+      playCount: 1,
+      lastWatched: watchedAt ?? new Date().toISOString(),
+    })
   }, [])
+
+  // The watch-date prompt writes the play from up near the root of the tree,
+  // where rating lives, and cannot reach this page by a prop. Without this the
+  // button goes on offering to mark watched a film it has just marked watched
+  // — the write succeeded, only the screen disagreed.
+  useEffect(() => {
+    if (mediaType !== 'movie' || !id) return
+    return onMovieWatched((event) => {
+      if (event.movieId === id) setWatchStatusWatched(event.watchedAt)
+    })
+  }, [mediaType, id, setWatchStatusWatched])
 
   // Rating goes through the shared provider rather than posting here.
   //

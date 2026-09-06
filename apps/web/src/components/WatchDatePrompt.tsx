@@ -14,6 +14,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/hooks/useAuth'
 import { useServerDisplayName } from '@/hooks/useServerDisplayName'
+import { emitMovieWatched } from '@/lib/watchStatusEvents'
 
 /**
  * The bands the API offers, newest first.
@@ -83,12 +84,22 @@ export function WatchDatePrompt({ request, onClose }: WatchDatePromptProps) {
   const choose = (band: WatchDateBand) =>
     finish(async () => {
       if (!request || !user) return
-      await fetch(`/api/users/${user.id}/watch-history/movies/${request.movieId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ band }),
-      })
+      const response = await fetch(
+        `/api/users/${user.id}/watch-history/movies/${request.movieId}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ band }),
+        }
+      )
+      if (!response.ok) throw new Error('Failed to record the watch')
+
+      // Anything on screen showing this film's watch state is elsewhere in the
+      // tree and cannot be reached by a prop — without this the detail page
+      // goes on offering to mark watched a film it has just marked watched.
+      const body = (await response.json().catch(() => null)) as { watchedAt?: string } | null
+      emitMovieWatched({ movieId: request.movieId, watchedAt: body?.watchedAt ?? null })
     })
 
   const declineSeen = () =>
