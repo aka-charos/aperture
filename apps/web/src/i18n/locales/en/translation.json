@@ -1665,7 +1665,6 @@
   "userSettings": {
     "pageTitle": "Settings",
     "pageSubtitle": "Manage your profile and preferences",
-    "tabProfile": "Profile",
     "tabWatcherIdentity": "Watcher Identity",
     "tabAlgorithm": "AI Algorithm",
     "tabPreferences": "Preferences",
@@ -1678,12 +1677,6 @@
       "stateHidden": "hidden",
       "resetToDefault": "Reset to server default ({{state}})"
     },
-    "roleAdmin": "Administrator",
-    "roleUser": "User",
-    "mediaServer": "Media Server",
-    "displayName": "Display Name",
-    "roleField": "Role",
-    "profileSyncedCaption": "Profile information above is synced from your media server.",
     "emailSectionTitle": "Email & Notifications",
     "emailAddress": "Email Address",
     "emailPlaceholder": "Enter your email for notifications",

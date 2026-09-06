@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Box, Grid, Paper, Tab, Tabs } from '@mui/material'
 import SettingsIcon from '@mui/icons-material/Settings'
-import PersonIcon from '@mui/icons-material/Person'
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary'
 import FingerprintIcon from '@mui/icons-material/Fingerprint'
 import MovieIcon from '@mui/icons-material/Movie'
@@ -16,7 +15,7 @@ import { WatcherIdentitySection } from './UserSettings/WatcherIdentitySection'
 import { GenreWeightingCard, type GenreWeightingUpdate } from './UserSettings/GenreWeightingCard'
 import { AlgorithmSettingsSection } from './UserSettings/AlgorithmSettingsSection'
 import { UserLanguagePreferencesCard } from './UserSettings/UserLanguagePreferencesCard'
-import { UserProfileTab } from './UserSettings/UserProfileTab'
+import { EmailNotificationsCard } from './UserSettings/EmailNotificationsCard'
 import { AiLibraryNamesCard } from './UserSettings/AiLibraryNamesCard'
 import { AiExplanationPreferenceCard } from './UserSettings/AiExplanationPreferenceCard'
 import { SimilarityGraphPrefsCard } from './UserSettings/SimilarityGraphPrefsCard'
@@ -194,7 +193,6 @@ export function UserSettingsPage() {
             },
           }}
         >
-          <Tab icon={<PersonIcon />} iconPosition="start" label={t('userSettings.tabProfile')} />
           <Tab icon={<FingerprintIcon />} iconPosition="start" label={t('userSettings.tabWatcherIdentity')} />
           <Tab icon={<TuneIcon />} iconPosition="start" label={t('userSettings.tabAlgorithm')} />
           <Tab icon={<VideoLibraryIcon />} iconPosition="start" label={t('userSettings.tabPreferences')} />
@@ -202,29 +200,6 @@ export function UserSettingsPage() {
 
         <Box sx={{ p: 3 }}>
           <TabPanel value={tabValue} index={0}>
-            <UserProfileTab
-              user={user}
-              email={email}
-              originalEmail={originalEmail}
-              emailLocked={emailLocked}
-              emailNotificationsEnabled={emailNotificationsEnabled}
-              emailNotificationsAllowed={emailNotificationsAllowed}
-              loadingEmail={loadingEmail}
-              savingEmail={savingEmail}
-              emailSuccess={emailSuccess}
-              emailError={emailError}
-              onEmailChange={setEmail}
-              onEmailBlur={() => void saveEmailSettings(email)}
-              onNotificationsChange={(enabled) => {
-                setEmailNotificationsEnabled(enabled)
-                void saveEmailSettings(undefined, enabled)
-              }}
-              onDismissSuccess={() => setEmailSuccess(null)}
-              onDismissEmailError={() => setEmailError(null)}
-            />
-          </TabPanel>
-
-          <TabPanel value={tabValue} index={1}>
             <Tabs
               value={identityMediaType}
               onChange={(_, value: 'movie' | 'series') => setIdentityMediaType(value)}
@@ -256,11 +231,11 @@ export function UserSettingsPage() {
             </Box>
           </TabPanel>
 
-          <TabPanel value={tabValue} index={2}>
+          <TabPanel value={tabValue} index={1}>
             {user && <AlgorithmSettingsSection userId={user.id} />}
           </TabPanel>
 
-          <TabPanel value={tabValue} index={3}>
+          <TabPanel value={tabValue} index={2}>
             <Grid container spacing={3}>
               <Grid item xs={12} lg={6}>
                 <UserLanguagePreferencesCard />
@@ -289,6 +264,30 @@ export function UserSettingsPage() {
                   onSync={() => void syncTraktRatings()}
                 />
               </Grid>
+              {/* Gated on the admin grant, and the Grid item goes with it: a
+                  card returning null still occupies its column, so an
+                  ungranted viewer would get a hole rather than a shorter grid. */}
+              {emailNotificationsAllowed && (
+                <Grid item xs={12} lg={6}>
+                  <EmailNotificationsCard
+                    email={email}
+                    emailLocked={emailLocked}
+                    emailNotificationsEnabled={emailNotificationsEnabled}
+                    loadingEmail={loadingEmail}
+                    savingEmail={savingEmail}
+                    emailSuccess={emailSuccess}
+                    emailError={emailError}
+                    onEmailChange={setEmail}
+                    onEmailBlur={() => void saveEmailSettings(email)}
+                    onNotificationsChange={(enabled) => {
+                      setEmailNotificationsEnabled(enabled)
+                      void saveEmailSettings(undefined, enabled)
+                    }}
+                    onDismissSuccess={() => setEmailSuccess(null)}
+                    onDismissEmailError={() => setEmailError(null)}
+                  />
+                </Grid>
+              )}
             </Grid>
           </TabPanel>
         </Box>
