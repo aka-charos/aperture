@@ -5,9 +5,12 @@ import {
   getMigrationStatus,
   detectInterruptedEnrichmentRuns,
   checkEvidenceThresholdProvenance,
+  getAllJobConfigs,
 } from '@aperture/core'
 import { closePool } from './lib/db.js'
 import { initializeScheduler, stopScheduler } from './lib/scheduler.js'
+import { reportJobConfigDrift } from './routes/jobs/configDrift.js'
+import { jobDefinitions } from './routes/jobs/definitions.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
@@ -129,6 +132,15 @@ async function main() {
       host: process.env.HOST?.trim() || '0.0.0.0',
     })
     console.log(`🚀 Aperture API server running at ${address}`)
+
+    // Immediately before the scheduler reads job_config, say whether that table
+    // still agrees with the catalogue. Placed here so the warning sits directly
+    // above the "📅 Job scheduled" lines it is about, rather than scrolled off
+    // by everything migrations and enrichment print.
+    await reportJobConfigDrift(
+      getAllJobConfigs,
+      jobDefinitions.map((j) => j.name)
+    )
 
     // Initialize job scheduler after server is running
     try {

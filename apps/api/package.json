@@ -11,7 +11,7 @@
     "test:security": "node --import tsx --test src/config/security.test.ts",
     "test:auth": "node --import tsx --test src/lib/impersonation.test.ts",
     "test:schemas": "node --import tsx --test src/routes/aiFunctionSchemas.test.ts",
-    "test:jobs": "node --import tsx --test src/routes/jobs/jobDefaults.test.ts src/routes/jobs/state.test.ts",
+    "test:jobs": "node --import tsx --test src/routes/jobs/jobDefaults.test.ts src/routes/jobs/state.test.ts src/routes/jobs/configDrift.test.ts",
     "lint": "eslint src",
     "clean": "rm -rf dist",
     "test:assistant": "node --import tsx --test src/routes/assistant/discovery/enrichReasons.test.ts src/routes/assistant/tools/tasteBlend.test.ts src/routes/assistant/tools/episodes.test.ts src/routes/assistant/helpers/routeIntent.test.ts src/routes/assistant/helpers/titleMatch.test.ts src/routes/assistant/helpers/countryMatch.test.ts",
