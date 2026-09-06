@@ -2212,7 +2212,6 @@
   "userSettings": {
     "pageTitle": "Ρυθμίσεις",
     "pageSubtitle": "Το προφίλ και οι προτιμήσεις σας",
-    "tabProfile": "Προφίλ",
     "tabWatcherIdentity": "Ταυτότητα θεατή",
     "tabAlgorithm": "Αλγόριθμος",
     "tabPreferences": "Προτιμήσεις",
@@ -2225,12 +2224,6 @@
       "stateHidden": "δεν εμφανίζεται",
       "resetToDefault": "Επαναφορά στην προεπιλογή του διακομιστή ({{state}})"
     },
-    "roleAdmin": "Διαχειριστής",
-    "roleUser": "Χρήστης",
-    "mediaServer": "Media server",
-    "displayName": "Όνομα εμφάνισης",
-    "roleField": "Ρόλος",
-    "profileSyncedCaption": "Τα παραπάνω στοιχεία έρχονται από τον media server σας.",
     "emailSectionTitle": "Email και ειδοποιήσεις",
     "emailAddress": "Διεύθυνση email",
     "emailPlaceholder": "Το email σας για τις ειδοποιήσεις",

@@ -1787,3 +1787,22 @@ Cancellation is checked once, on entry. This is one short call per user per medi
 ### Left in place
 
 The button on Watch Stats. It is now an override rather than the only path, and it has one genuine use: *that doesn't sound like me, try again*.
+
+---
+
+## F-112
+
+**The Profile tab was one useful card and five read-only echoes.** Deleted 2026-09-07.
+
+`/settings?tab=profile` held an avatar, username, display name, media server and role — every field `disabled`, under a caption reading *"Profile information above is synced from your media server."* All of it is already in the account menu header two clicks away, and none of it could be changed here or anywhere else in the app.
+
+The exception, and the reason deleting the tab was not a one-line change: below a divider sat the **email address and the notification opt-in**, the only surface where a viewer sets their own address. It moved to Preferences as `EmailNotificationsCard`.
+
+Four things decided in the move:
+
+- **The alias points at Preferences, not at the default.** `userSettingsTabIndexFromParam` falls back to index 0 for anything unknown, which is now Watcher Identity — so without an explicit `LEGACY_TAB_ALIASES` entry an old bookmark to `?tab=profile` would land on a page sharing nothing with what it asked for. It resolves to `preferences`, where the one thing that tab could actually change now lives.
+- **The index is a position in a JSX list.** Removing a tab renumbers every `TabPanel` after it, and a key that does not round-trip sends one tab's address to another tab's panel — silently, since both render fine. `tabHelpers.test.ts` pins the round-trip for every key, the alias, the absent/unknown fallbacks, and the out-of-range index (reachable when a stale index sits in component state, where `undefined` would put `tab=undefined` in the address bar).
+- **The card's state stays in the parent**, unlike its self-contained Preferences siblings. The whole thing is gated on `emailNotificationsAllowed`, an admin-granted per-user flag that arrives on the same GET as the values, so the parent has to know it either way; making the card self-contained would mean fetching that endpoint twice. **The Grid item is gated with the card**, not just the card — a card returning null still occupies its column, so an ungranted viewer would see a hole in the grid rather than a shorter one.
+- **The account menu row went with it.** `userSettingsMenuItems.tab` is typed against `USER_SETTINGS_TAB_KEYS`, so a stale entry is a compile error rather than a menu row leading to a redirect.
+
+Seven `userSettings.*` strings were orphaned and pruned from all 15 locales — 105 entries. That prune is scriptable only because the locale files **round-trip byte-identically** through `JSON.stringify(obj, null, 2)` plus a trailing newline, checked before writing; without that the diff would be a whole-file reformat with seven deletions hidden inside it.

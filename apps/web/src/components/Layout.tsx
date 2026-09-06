@@ -28,7 +28,6 @@ import HistoryIcon from '@mui/icons-material/History'
 import PlaylistPlayIcon from '@mui/icons-material/PlaylistPlay'
 import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark'
 import LogoutIcon from '@mui/icons-material/Logout'
-import PersonIcon from '@mui/icons-material/Person'
 import FingerprintIcon from '@mui/icons-material/Fingerprint'
 import TuneIcon from '@mui/icons-material/Tune'
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
@@ -102,7 +101,6 @@ const userSettingsMenuItems: {
   icon: React.ReactElement
   tab: (typeof USER_SETTINGS_TAB_KEYS)[number]
 }[] = [
-  { textKey: 'userSettings.tabProfile', icon: <PersonIcon fontSize="small" />, tab: 'profile' },
   { textKey: 'userSettings.tabWatcherIdentity', icon: <FingerprintIcon fontSize="small" />, tab: 'watcher' },
   { textKey: 'userSettings.tabAlgorithm', icon: <TuneIcon fontSize="small" />, tab: 'algorithm' },
   { textKey: 'userSettings.tabPreferences', icon: <VideoLibraryIcon fontSize="small" />, tab: 'preferences' },
