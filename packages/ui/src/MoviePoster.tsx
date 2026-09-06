@@ -8,6 +8,7 @@ import HubOutlined from '@mui/icons-material/HubOutlined'
 import { StarRating } from './StarRating.js'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL } from './imageUtils.js'
 import { usePosterDisplaySettings } from './posterDisplaySettings.js'
+import { WatchedBadge } from './poster-overlays/WatchedBadge.js'
 
 const StarIcon = Star as unknown as React.ComponentType<{ fontSize?: string }>
 const AddToQueueIcon = AddToQueue as unknown as React.ComponentType<{ fontSize?: 'small' | 'medium' | 'large' }>
@@ -35,6 +36,16 @@ export interface MoviePosterProps {
   hideRating?: boolean
   /** Hide the user rating button (e.g., on detail pages where it's shown elsewhere) */
   hideUserRating?: boolean
+  /**
+   * Whether the viewer has finished this title — a played movie, or a series
+   * whose every library episode is played. Draws the Emby-style tick.
+   *
+   * Absent reads as "not watched" rather than "unknown", which is sound only
+   * because the one supplier (`useWatchStatus`) answers for the whole library
+   * at once. A caller that can only answer for some of its cards should pass
+   * nothing at all rather than false for the rest.
+   */
+  watched?: boolean
   /** Whether this series is in user's watching list */
   isWatching?: boolean
   /** Callback when user toggles watching status */
@@ -91,6 +102,7 @@ export function MoviePoster({
   showScore = false,
   hideRating = false,
   hideUserRating = false,
+  watched = false,
   isWatching = false,
   onWatchingToggle,
   hideWatchingToggle = false,
@@ -122,14 +134,23 @@ export function MoviePoster({
   // Proxy the image URL through our API to avoid mixed content issues
   const proxiedPosterUrl = getProxiedImageUrl(posterUrl)
 
-  // Both of these render at top/right 8 with height 24, so a top-right watching
-  // toggle has to start below them. They are mutually exclusive in practice, but
-  // either one is enough to push the toggle down.
+  // The top-right corner is a stack, not a slot: rating-or-score chip, then the
+  // watched tick, then the watching toggle when it is asked to sit up here. Each
+  // one pushes whatever follows it down by its own height plus the 8px gutter,
+  // so the offsets below are the running total rather than magic numbers. The
+  // chip renders at top 8 with height 24; the tick is 22.
+  //
+  // Top-LEFT is deliberately not used for the tick even though Emby has room
+  // there: RankBadge draws a 36–90px square flush into that corner on Top Picks
+  // and My Recommendations, and those are precisely the grids where a viewer
+  // most often meets something they have already seen.
   const ratingBadgeVisible = !hideRating && !hideLibraryRatingBadge && rating != null
   const scoreBadgeVisible = showScore && score !== undefined && score !== null
+  const chipOffset = ratingBadgeVisible || scoreBadgeVisible ? 32 : 0
+  const watchedBadgeAnchor = { top: 8 + chipOffset }
   const watchingToggleAnchor =
     watchingTogglePosition === 'topRight'
-      ? { top: ratingBadgeVisible || scoreBadgeVisible ? 40 : 8, right: 8 }
+      ? { top: 8 + chipOffset + (watched ? 30 : 0), right: 8 }
       : { bottom: 8, left: 8 }
 
   if (loading) {
@@ -251,6 +272,10 @@ export function MoviePoster({
             }}
           />
         )}
+
+        {/* Watched tick — sits above the hover overlay so it stays legible while
+            the card is being read. */}
+        {watched && <WatchedBadge sx={watchedBadgeAnchor} />}
 
         {/* Watching toggle button - bottom left, or top right when asked */}
         {!hideWatchingToggle && onWatchingToggle && (

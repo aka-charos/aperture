@@ -1246,7 +1246,8 @@
     "tba": "TBA",
     "unknownYear": "שנה לא ידועה",
     "viewDetails": "הצג פרטים",
-    "viewOnTmdb": "צפה ב-TMDb"
+    "viewOnTmdb": "צפה ב-TMDb",
+    "watched": "Watched"
   },
   "seerrRequest": {
     "title": "בקש אפשרויות",

@@ -9,6 +9,7 @@ import { WatchingProvider } from './hooks/useWatching'
 import { SetupProvider } from './hooks/SetupProvider'
 import { useSetupStatus } from './hooks/useSetupStatus'
 import { UserRatingsProvider } from './hooks/UserRatingsProvider'
+import { WatchStatusProvider } from './hooks/WatchStatusProvider'
 import { ViewModeProvider } from './hooks/ViewModeProvider'
 import { PosterPrefsProvider } from './hooks/PosterPrefsProvider'
 import { AssistantDockProvider } from './hooks/AssistantDockProvider'
@@ -94,12 +95,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     <ViewModeProvider>
       <PosterPrefsProvider>
         <UserRatingsProvider>
-          <WatchingProvider>
-            <AssistantDockProvider>
-              {children}
-              <AssistantModal />
-            </AssistantDockProvider>
-          </WatchingProvider>
+          <WatchStatusProvider>
+            <WatchingProvider>
+              <AssistantDockProvider>
+                {children}
+                <AssistantModal />
+              </AssistantDockProvider>
+            </WatchingProvider>
+          </WatchStatusProvider>
         </UserRatingsProvider>
       </PosterPrefsProvider>
     </ViewModeProvider>

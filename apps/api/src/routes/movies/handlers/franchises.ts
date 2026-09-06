@@ -34,7 +34,10 @@ export function registerFranchisesHandler(fastify: FastifyInstance) {
             COUNT(DISTINCT m.id) as total_movies,
             COUNT(DISTINCT wh.movie_id) as watched_movies
           FROM movies m
-          LEFT JOIN watch_history wh ON wh.movie_id = m.id AND wh.user_id = $1
+          -- played, not merely "has a row": a watch_history row is also written
+          -- for a favorited-but-unplayed title and for one abandoned six minutes
+          -- in, and this column is labelled "watched" on the page.
+          LEFT JOIN watch_history wh ON wh.movie_id = m.id AND wh.user_id = $1 AND wh.played = true
           WHERE m.collection_name IS NOT NULL
           GROUP BY m.collection_name
         )
@@ -118,7 +121,7 @@ export function registerFranchisesHandler(fastify: FastifyInstance) {
            m.rt_critic_score,
            CASE WHEN wh.id IS NOT NULL THEN true ELSE false END as watched
          FROM movies m
-         LEFT JOIN watch_history wh ON wh.movie_id = m.id AND wh.user_id = $1
+         LEFT JOIN watch_history wh ON wh.movie_id = m.id AND wh.user_id = $1 AND wh.played = true
          WHERE m.collection_name = ANY($2)
          ORDER BY m.year NULLS LAST`,
         [userId, franchiseNames]

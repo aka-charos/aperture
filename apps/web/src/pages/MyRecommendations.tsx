@@ -48,6 +48,7 @@ import {
 } from '@aperture/ui'
 import { useAuth } from '@/hooks/useAuth'
 import { useUserRatings } from '@/hooks/useUserRatings'
+import { useWatchStatus } from '@/hooks/useWatchStatus'
 import { useWatching } from '@/hooks/useWatching'
 import { useViewMode } from '@/hooks/useViewMode'
 import { PageHeading } from '@/components/PageHeading'
@@ -138,6 +139,7 @@ export function MyRecommendationsPage() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
   const { user } = useAuth()
   const { getRating, setRating } = useUserRatings()
+  const { isWatched } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
   
   // Tab state
@@ -533,6 +535,7 @@ export function MyRecommendationsPage() {
                     showScore
                     hideRating
                     userRating={getRating(type, id)}
+                    watched={isWatched(type, id)}
                     onRate={(rating) => handleRate(type, id, rating)}
                     isWatching={type === 'series' ? isWatching(id) : undefined}
                     onWatchingToggle={type === 'series' ? () => toggleWatching(id) : undefined}

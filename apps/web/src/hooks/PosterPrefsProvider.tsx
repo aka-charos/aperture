@@ -12,6 +12,7 @@
  */
 
 import { useState, useCallback, useEffect, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { PosterDisplaySettingsContext } from '@aperture/ui'
 import { PosterPrefsContext } from './poster-prefs-context'
 import { POSTER_PREFS_CACHE_KEY } from '@/lib/clientCaches'
@@ -58,6 +59,7 @@ function resolveEffective(prefs: CachedPrefs): boolean {
 }
 
 export function PosterPrefsProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation()
   const [prefs, setPrefs] = useState<CachedPrefs>(readCache)
   const [loading, setLoading] = useState(true)
 
@@ -119,7 +121,12 @@ export function PosterPrefsProvider({ children }: { children: ReactNode }) {
         loading,
       }}
     >
-      <PosterDisplaySettingsContext.Provider value={{ hideLibraryRatingBadge: effectiveHide }}>
+      {/* The watched tick's label rides along here for the same reason the
+          rating preference does: @aperture/ui has no i18n, and one home beats
+          the same t() call threaded through twenty poster call sites. */}
+      <PosterDisplaySettingsContext.Provider
+        value={{ hideLibraryRatingBadge: effectiveHide, watchedLabel: t('mediaPoster.watched') }}
+      >
         {children}
       </PosterDisplaySettingsContext.Provider>
     </PosterPrefsContext.Provider>

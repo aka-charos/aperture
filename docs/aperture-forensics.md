@@ -1606,3 +1606,53 @@ The event carries the **resolved** date rather than letting the page assume now,
 ### Left undone deliberately
 
 The year picker inside *Longer ago* (buys nothing for the recommender; would make `historySpan` truer) and the batch prompt. The band arithmetic is a pure module with a test precisely so the batch screen is later a second caller rather than a second implementation.
+
+## F-109
+
+**A watched tick on every poster.** Built 2026-09-06. Asked for by comparison with Emby, which draws a green check in the top-right corner of any poster the viewer has played.
+
+### The predicate is the decision, and there were already three of them
+
+`recommender/watchedExclusion.ts` holds three readings of watch history and none of them answers the badge's question:
+
+| reading | SQL | question |
+|---|---|---|
+| `WATCH_HISTORY_TASTE_SQL` | `played OR is_favorite` | what shaped your taste |
+| `WATCH_HISTORY_EXCLUDABLE_SQL` | `played OR ≥5% progress` | have you seen it |
+| `getExpandedFavorited*Ids` | `is_favorite` (+ tmdb/imdb twins) | have you already found it |
+| **this** | `played = true` | **have you finished it** |
+
+F-033 already records why the first three differ. The fourth is stricter than all of them because a badge is a claim made to the viewer's face: the sync writes a `watch_history` row for played ∪ in-progress ∪ favorited-unplayed (F-040), so the excludable reading would tick a film someone bailed on six minutes in, and the taste reading would tick a bookmark. Both would be a small lie on every poster, in the direction the viewer is least able to check.
+
+A **series** is ticked when every episode the library holds is played — Emby's rule. The population is the library's, not TMDb's, following `completionMultiplier`'s reasoning in F-039: someone who owns one season of five and watched it has finished everything there is to finish here. A part-watched show gets nothing. That is not a lesser tick withheld; "you are 60% through" is a different fact, and Emby answers it with an unwatched-episode count, which is a second feature and is not built.
+
+The two queries are one core function rather than SQL in the route, because a fourth predicate written in a route is the fifth one waiting to happen. The series half carries an `IN (…)` that looks redundant against its own `HAVING`: without it the aggregate walks every episode row in the library (16,591 on the reference instance) to answer a question about the handful of shows the viewer has touched.
+
+### One set, not ten flags
+
+Twenty-one `MoviePoster` call sites are fed by ten different list endpoints — `/api/movies`, `/api/series`, browse, search, person, studio, similar, top picks, recommendations, dashboard. Adding `watched` to each response is the obvious shape and the wrong one: it is ten copies of the predicate above, and the failure mode is a card claiming one thing on the library page and another on the person page, with nothing in a build able to see it.
+
+So `GET /api/watch-status` answers for the whole library at once and `WatchStatusProvider` holds it, exactly as `UserRatingsProvider` already holds every rating the viewer has given. The payload is a few thousand ids for a heavy viewer — smaller than what the media detail page was already fetching per visit, which pulls `watch-history?pageSize=1000` and scans it to decide one film's status.
+
+Two consequences follow from "one supplier answers for everything":
+
+- **Absent reads as not-watched, not unknown.** Legitimate here, illegitimate the moment a second supplier exists that can only answer for part of a page — hence the prop's docstring saying a partial answerer must pass nothing rather than `false`.
+- **No localStorage cache.** A stale tick is a wrong claim about the viewer on first paint, which is worse than the flash of a missing one, and the key would need a place in `clientCaches.ts` for the assumed-session edges (F-103). It is instead kept current in the session: `onMovieWatched` covers the watch-date prompt's path (F-108), and `MediaHero` calls `setWatched` on both Mark Watched and Mark Unwatched, since the grid the viewer came from is still mounted behind the page and reads the same set.
+
+### The corner was already taken
+
+Emby's tick is top-right. So is Aperture's community-rating chip, and the match-score chip on recommendation cards, and — on two dashboard carousels — the watching toggle. The top-right is now an explicit stack: chip (top 8, height 24), tick (top 8 or 40, height 22), toggle (offset by the running total of whatever is above it). The previous code already had half of this as a bare `? 40 : 8`.
+
+**Top-left is not the escape hatch it looks like.** `RankBadge` draws a 36–90px square flush into that corner on Top Picks and My Recommendations, and Top Picks is *community* picks — precisely the grid where a viewer most often meets something they have already seen. The assistant's `ContentCard` had exactly this collision already: its own hand-rolled tick at `top: 4, insetInlineStart: 4` under a comment claiming it sat in the "opposite corner from the rank badge", which in LTR it did not. It survived because recommendations exclude watched titles, so the two rarely fired together. It now shares `WatchedBadge` in the top-right, and the badge is one component precisely because four hand-rolled circles is how three of them end up a different green.
+
+### Franchises, and the word "watched"
+
+The franchises page already drew its own check — the only surface that did — as a sibling of `MoviePoster` at `top: 8, right: 8`, i.e. on top of the rating chip. It now passes the prop, and keeps reading `movie.watched` from its own endpoint rather than the provider: that is the same figure its progress bar counts, so the ticks and the "3 of 5 watched" line cannot disagree.
+
+That endpoint was counting `wh.id IS NOT NULL` — any row — which is the excludable-vs-played confusion above, one table over: a favorited-but-unplayed film counted toward a bar labelled *watched*. Both of its queries moved to `played = true` in the same change, which is what lets the two definitions coexist on one card.
+
+### Left unticked deliberately
+
+My Watch History and the watch-stats drill-in (every row is watched by construction; a tick on all of them is decoration), Home's two rails (recommendations are unwatched by construction, history watched), another user's profile page (the provider holds the *viewer's* set, so a tick there would be an assertion about the wrong person), and gap analysis (TMDb rows with no library id, so the question cannot be asked).
+
+No setting was added. Emby has no toggle for this and the request was for parity; `PosterDisplaySettings` is where one would go if it is ever wanted, beside `hideLibraryRatingBadge`, which exists for a reason that does not apply here (some servers burn a rating into the artwork; none burns in a watched tick).

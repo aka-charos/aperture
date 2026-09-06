@@ -6,6 +6,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import { useNavigate } from 'react-router-dom'
 import { MoviePoster, BaseCarousel, CarouselItem } from '@aperture/ui'
 import { useUserRatings } from '../../../hooks/useUserRatings'
+import { useWatchStatus } from '../../../hooks/useWatchStatus'
 import { useWatching } from '../../../hooks/useWatching'
 
 interface UpcomingEpisode {
@@ -63,6 +64,7 @@ export function WatchingCarousel({
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
+  const { isWatched } = useWatchStatus()
   const { toggleWatching } = useWatching()
 
   const handleRate = useCallback(
@@ -102,6 +104,7 @@ export function WatchingCarousel({
             genres={item.genres}
             overview={item.overview}
             userRating={getRating('series', item.seriesId)}
+            watched={isWatched('series', item.seriesId)}
             onRate={(rating) => handleRate(item.seriesId, rating)}
             isWatching={true}
             onWatchingToggle={() => toggleWatching(item.seriesId)}

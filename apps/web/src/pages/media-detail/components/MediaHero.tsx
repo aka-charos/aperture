@@ -46,6 +46,7 @@ import type {
 } from '../types'
 import { isMovie, isSeries } from '../types'
 import { useServerDisplayName } from '../../../hooks/useServerDisplayName'
+import { useWatchStatus } from '../../../hooks/useWatchStatus'
 import { formatRuntime } from '../hooks'
 import { hasCriticRatings, personPath } from '../helpers'
 import { RatingBadges } from './RatingBadges'
@@ -122,6 +123,9 @@ export function MediaHero({
   onFavoriteToggle,
 }: MediaHeroProps) {
   const { t } = useTranslation()
+  // The grid this page was opened from is still mounted behind it and reads the
+  // same set, so telling it here is what stops a film coming back unticked.
+  const { setWatched } = useWatchStatus()
   const theme = useTheme()
   const serverName = useServerDisplayName()
   const [showFullPlot, setShowFullPlot] = useState(false)
@@ -205,6 +209,7 @@ export function MediaHero({
 
       if (response.ok) {
         setSnackbar({ open: true, message: t('mediaDetail.hero.snackbarMarked'), severity: 'success' })
+        setWatched('movie', media.id, false)
         onMarkedUnwatched?.()
       } else {
         const error = await response.json()
@@ -238,6 +243,7 @@ export function MediaHero({
           message: t('mediaDetail.hero.snackbarMarkedWatched'),
           severity: 'success',
         })
+        setWatched('movie', media.id, true)
         onMarkedWatched?.()
       } else {
         const error = await response.json()

@@ -21,7 +21,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Tooltip,
   Skeleton,
 } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
@@ -394,32 +393,20 @@ export function FranchisesPage() {
                   <Grid container spacing={2} mt={1}>
                     {franchise.movies.map((movie) => (
                       <Grid item xs={4} sm={3} md={2} lg={1.5} key={movie.id}>
-                        <Box position="relative">
-                          <MoviePoster
-                            title={movie.title}
-                            year={movie.year}
-                            posterUrl={movie.posterUrl}
-                            rating={movie.rating}
-                            userRating={getRating('movie', movie.id)}
-                            onRate={(rating) => handleRate(movie.id, rating)}
-                            responsive
-                            onClick={() => navigate(`/movies/${movie.id}`)}
-                          />
-                          {movie.watched && (
-                            <Tooltip title={t('browse.franchises.watched')}>
-                              <CheckCircleIcon
-                                sx={{
-                                  position: 'absolute',
-                                  top: 8,
-                                  right: 8,
-                                  color: 'success.main',
-                                  bgcolor: 'background.paper',
-                                  borderRadius: '50%',
-                                }}
-                              />
-                            </Tooltip>
-                          )}
-                        </Box>
+                        {/* movie.watched rather than useWatchStatus: it is the same
+                            figure the progress bar on this card counts, so the ticks
+                            and the "3 of 5 watched" line can never disagree. */}
+                        <MoviePoster
+                          title={movie.title}
+                          year={movie.year}
+                          posterUrl={movie.posterUrl}
+                          rating={movie.rating}
+                          userRating={getRating('movie', movie.id)}
+                          watched={movie.watched}
+                          onRate={(rating) => handleRate(movie.id, rating)}
+                          responsive
+                          onClick={() => navigate(`/movies/${movie.id}`)}
+                        />
                       </Grid>
                     ))}
                   </Grid>

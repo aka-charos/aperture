@@ -19,6 +19,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search'
 import { MoviePoster } from '@aperture/ui'
 import { useUserRatings } from '../../hooks/useUserRatings'
+import { useWatchStatus } from '../../hooks/useWatchStatus'
 import type { ViewMode } from '../../hooks/view-mode-context'
 import {
   BrowseMovieListItem,
@@ -74,6 +75,7 @@ export function BrowseMoviesTab({ viewMode, movies, presets }: BrowseMoviesTabPr
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
+  const { isWatched } = useWatchStatus()
 
   const handleRateMovie = useCallback(
     async (movieId: string, rating: number | null) => {
@@ -257,6 +259,7 @@ export function BrowseMoviesTab({ viewMode, movies, presets }: BrowseMoviesTabPr
                     genres={movie.genres}
                     overview={movie.overview}
                     userRating={getRating('movie', movie.id)}
+                    watched={isWatched('movie', movie.id)}
                     onRate={(rating) => void handleRateMovie(movie.id, rating)}
                     responsive
                     onClick={() => navigate(`/movies/${movie.id}`)}
@@ -271,6 +274,7 @@ export function BrowseMoviesTab({ viewMode, movies, presets }: BrowseMoviesTabPr
                   key={movie.id}
                   movie={movie}
                   userRating={getRating('movie', movie.id)}
+                  watched={isWatched('movie', movie.id)}
                   onRate={(rating) => void handleRateMovie(movie.id, rating)}
                   onClick={() => navigate(`/movies/${movie.id}`)}
                 />

@@ -21,7 +21,7 @@ import PeopleIcon from '@mui/icons-material/People'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import TvIcon from '@mui/icons-material/Tv'
-import { RankBadge, StarRating, getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
+import { RankBadge, StarRating, WatchedBadge, getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
 
 interface PopularSeries {
   seriesId: string
@@ -41,6 +41,8 @@ interface PopularSeries {
 interface TopPicksSeriesListItemProps {
   series: PopularSeries
   userRating: number | null
+  /** Viewer has finished this title — draws the same tick the poster grid does. */
+  watched?: boolean
   onRate: (rating: number | null) => void
   isWatching?: boolean
   onWatchingToggle?: () => void
@@ -49,6 +51,7 @@ interface TopPicksSeriesListItemProps {
 export function TopPicksSeriesListItem({ 
   series, 
   userRating, 
+  watched,
   onRate,
 }: TopPicksSeriesListItemProps) {
   const { t } = useTranslation()
@@ -115,6 +118,7 @@ export function TopPicksSeriesListItem({
               }}
             />
             <RankBadge rank={series.rank} size={isMobile ? 'medium' : 'large'} />
+            {watched && <WatchedBadge size={18} sx={{ top: 6, insetInlineEnd: 6 }} />}
             
             {/* Network badge - desktop only */}
             {series.network && !isMobile && (

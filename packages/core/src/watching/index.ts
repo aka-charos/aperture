@@ -20,3 +20,8 @@ export {
   processWatchingFavoritesForAllUsers,
   type ReconcileWatchingFavoritesResult,
 } from './favoriteSync.js'
+
+export {
+  getWatchedItemIdsForUser,
+  type WatchedItemIds,
+} from './watchedItems.js'

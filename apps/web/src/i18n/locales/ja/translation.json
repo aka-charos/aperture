@@ -857,7 +857,8 @@
     "tba": "未定",
     "unknownYear": "不明な年",
     "viewDetails": "詳細を見る",
-    "viewOnTmdb": "TMDb で見る"
+    "viewOnTmdb": "TMDb で見る",
+    "watched": "Watched"
   },
   "seerrRequest": {
     "title": "リクエストオプション",

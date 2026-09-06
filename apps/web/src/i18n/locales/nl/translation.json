@@ -2579,7 +2579,8 @@
     "tba": "TBA",
     "unknownYear": "Onbekend jaar",
     "viewDetails": "Bekijk details",
-    "viewOnTmdb": "Bekijk op TMDb"
+    "viewOnTmdb": "Bekijk op TMDb",
+    "watched": "Watched"
   },
   "seerrRequest": {
     "title": "Opties aanvragen",

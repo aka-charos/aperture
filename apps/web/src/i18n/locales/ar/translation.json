@@ -1246,7 +1246,8 @@
     "tba": "سيتم تحديده لاحقًا",
     "unknownYear": "سنة غير معروفة",
     "viewDetails": "عرض التفاصيل",
-    "viewOnTmdb": "عرض على TMDb"
+    "viewOnTmdb": "عرض على TMDb",
+    "watched": "Watched"
   },
   "seerrRequest": {
     "title": "خيارات الطلب",
