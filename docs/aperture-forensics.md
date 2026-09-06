@@ -1736,3 +1736,54 @@ Both generators now refuse it. Two details are load-bearing:
 
 - **It throws rather than returning quietly.** The throw reaches `streamSseGenerator`, which writes an SSE `error` part; the client shows the failure and — because `displaySynopsis` falls back to the already-fetched `profileOutput.synopsis` once `isStreaming` clears — keeps rendering the stored profile. Returning silently would leave a blank card that refills on the next reload, which reads as the same intermittent disappearance.
 - **The catch path is untouched.** A provider that actually fails still yields the fallback blurb and stores it. That overwrites a good synopsis with a generic one, which is a smaller loss than a blank card and, unlike the empty case, is a result the user can see they got. Worth revisiting if a transient 429 is ever observed flattening a real identity.
+
+---
+
+## F-111
+
+**The Watcher Identity was manual, and five features read it.** Built 2026-09-07, from the question "in what scenario would a user go to their profile, discover the option, and run Generate Identity by hand?" The answer is that they wouldn't, which is the defect — the synopsis is not a display card.
+
+### Who reads `taste_synopsis`
+
+| consumer | behaviour when the column is null |
+|---|---|
+| `recommender/movies/explanations.ts` + the series mirror | the `Taste Profile:` line is **unshifted to the top** of the prompt context, so with none the explanation for every pick is written knowing nothing about the viewer |
+| `assistant/prompts/context/user.ts` | the system prompt substitutes the literal string *"No movie taste profile available yet."* |
+| `assistant/discovery/tasteBrief.ts` | the brief drops to signature titles alone; with none it returns null and the turn is not personalised at all (F-008) |
+| `channels/ai.ts` | AI channel/playlist generation loses its taste block |
+| `assistant/jobs/refreshSuggestions.ts` | suggestion chips lose it |
+
+Every one of those has a null branch, i.e. the column was expected to normally be populated. None of them says anything when it is not.
+
+### Three independent signals that automatic was the intent
+
+1. **A docstring promising a job that was never written.** `getTasteSynopsis` read *"Background job handles periodic refresh based on user's refresh_interval_days setting"*. Nothing calls `streamTasteSynopsis` except the SSE route behind the button. Corrected in F-110, which is how this was found.
+2. **The cost estimator bills it as recurring.** `CostEstimatorSection` computes `tasteCalls = enabledUsers * runsPerWeek` for both media types — one synopsis per user per recommendation run. The projected AI spend an admin reads has a line item for work that never happened.
+3. **`refresh_interval_days` exists and governs the profile**, not the prose. Something was supposed to ride on it.
+
+### The trigger is the profile moving, not a clock
+
+The synopsis is prose *describing* a centroid, so the question "should this be rewritten" is exactly "has that centroid changed". `user_taste_profiles.auto_updated_at` answers it, and `isProfileStale` (refresh_interval_days, 30 by default) already paces the rebuild — so the synopsis inherits that pacing for free and a run whose profile was reused pays nothing.
+
+That is strictly cheaper than the model the cost estimator already shows: a monthly rebuild rather than one per run.
+
+`synopsisNeedsRefresh` is pure, exported and pinned, because both of its failure directions are silent and neither shows up in a log. Four rules:
+
+- **Empty counts as missing**, agreeing with `getTasteSynopsis`, whose `if (existing?.taste_synopsis)` is falsy for `''`. Disagreeing would leave the card offering Generate for something this function calls current.
+- **A null `auto_updated_at` is not staleness.** It means the profile was never auto-built (locked, or only ever set by hand); there is nothing the stored text can be out of date with respect to, and treating it as stale makes a paid call on every run forever.
+- **Text with no stamp of its own is rewritten** — it cannot be shown to be current, and one call is the cheaper side of that asymmetry.
+- **Strictly newer, never `>=`.** The synopsis is written *after* the rebuild that prompted it, so equal stamps mean it already describes that profile. The test suite was verified against an injected `>=`: exactly the tie case fails.
+
+### Placement, and what it must not break
+
+Called at step 2b of both pipelines: after the taste profile is resolved and after the early returns that finalize a run as `failed`, before scoring. Two reasons for exactly there — `getUserTasteContext` reads `taste_synopsis` and the explanation prompt is built later in the same run, so a synopsis written here is used by *this* run's explanations; and a run about to fail for want of a profile does not pay for a paragraph describing one.
+
+It **fails open in every direction** — unconfigured model, cancelled job, provider outage, empty generation — returning an outcome rather than throwing. A run that produced good picks must never be failed by the prose about them, the rule `generateChannelPickReasons` already follows.
+
+The unconfigured check is made **before** calling the generator rather than left to it. Both generators answer an unconfigured model by storing the deterministic fallback blurb, which is right for someone who pressed a button and is watching the card, and wrong here: storing it stamps the row current, so the real synopsis would never be written once a model was finally configured.
+
+Cancellation is checked once, on entry. This is one short call per user per media type, so the caller's own per-user loop is the seam Stop needs — there is no inner loop to poll, which is what F-080's "check between calls" asks for.
+
+### Left in place
+
+The button on Watch Stats. It is now an override rather than the only path, and it has one genuine use: *that doesn't sound like me, try again*.

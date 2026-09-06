@@ -447,6 +447,15 @@ export {
   type SeriesTasteSynopsis,
 } from './lib/tasteSeriesSynopsis.js'
 
+// Automatic Watcher Identity refresh (both pipelines call this per run)
+export {
+  refreshTasteSynopsis,
+  synopsisNeedsRefresh,
+  type SynopsisMediaType,
+  type SynopsisRefreshOutcome,
+  type SynopsisFreshnessInput,
+} from './lib/tasteSynopsisRefresh.js'
+
 // Locales (UI + AI)
 export {
   DEFAULT_LOCALE,
