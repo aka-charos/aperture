@@ -38,7 +38,6 @@ import AddIcon from '@mui/icons-material/Add'
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh'
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import { WatcherIdentityCard } from '@/components/WatcherIdentityCard'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslation } from 'react-i18next'
 import { useTheme } from '@mui/material/styles'
@@ -1107,10 +1106,6 @@ export function WatcherIdentitySection({ mediaType, onGenresDetected }: WatcherI
         </Grid>
         </CardContent>
       </Card>
-
-      {/* Section 4: Identity Output — shared with the Watch Stats page, which
-          shows the same account of your taste beside the charts that count it. */}
-      <WatcherIdentityCard mediaType={mediaType} />
     </Box>
   )
 }
