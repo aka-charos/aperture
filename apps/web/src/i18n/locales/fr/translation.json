@@ -1246,7 +1246,8 @@
     "tba": "À déterminer",
     "unknownYear": "Année inconnue",
     "viewDetails": "Voir les détails",
-    "viewOnTmdb": "Voir sur TMDb"
+    "viewOnTmdb": "Voir sur TMDb",
+    "watched": "Watched"
   },
   "seerrRequest": {
     "title": "Options de demande",

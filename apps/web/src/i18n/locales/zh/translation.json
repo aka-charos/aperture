@@ -857,7 +857,8 @@
     "tba": "待定",
     "unknownYear": "年份不明",
     "viewDetails": "查看详情",
-    "viewOnTmdb": "在 TMDb 上查看"
+    "viewOnTmdb": "在 TMDb 上查看",
+    "watched": "Watched"
   },
   "seerrRequest": {
     "title": "请求选项",

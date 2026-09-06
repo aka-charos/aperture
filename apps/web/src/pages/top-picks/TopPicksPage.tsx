@@ -22,6 +22,7 @@ import ViewListIcon from '@mui/icons-material/ViewList'
 import PeopleIcon from '@mui/icons-material/People'
 import { MoviePoster, RankBadge } from '@aperture/ui'
 import { useUserRatings } from '../../hooks/useUserRatings'
+import { useWatchStatus } from '../../hooks/useWatchStatus'
 import { useWatching } from '../../hooks/useWatching'
 import { useViewMode } from '../../hooks/useViewMode'
 import { TopPicksMovieListItem, TopPicksSeriesListItem } from './components'
@@ -75,6 +76,7 @@ export function TopPicksPage() {
   const theme = useTheme()
   const [searchParams, setSearchParams] = useSearchParams()
   const { getRating, setRating } = useUserRatings()
+  const { isWatched } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
   
   const initialTab = searchParams.get('tab') === 'series' ? 1 : 0
@@ -184,6 +186,7 @@ export function TopPicksPage() {
               rating={movie.communityRating}
               overview={movie.overview}
               userRating={getRating('movie', movie.movieId)}
+              watched={isWatched('movie', movie.movieId)}
               onRate={(rating) => handleRateMovie(movie.movieId, rating)}
               responsive
               onClick={() => navigate(`/movies/${movie.movieId}`)}
@@ -217,6 +220,7 @@ export function TopPicksPage() {
           key={movie.movieId}
           movie={movie}
           userRating={getRating('movie', movie.movieId)}
+          watched={isWatched('movie', movie.movieId)}
           onRate={(rating) => handleRateMovie(movie.movieId, rating)}
         />
       ))}
@@ -236,6 +240,7 @@ export function TopPicksPage() {
               rating={show.communityRating}
               overview={show.overview}
               userRating={getRating('series', show.seriesId)}
+              watched={isWatched('series', show.seriesId)}
               onRate={(rating) => handleRateSeries(show.seriesId, rating)}
               responsive
               isWatching={isWatching(show.seriesId)}
@@ -292,6 +297,7 @@ export function TopPicksPage() {
           key={show.seriesId}
           series={show}
           userRating={getRating('series', show.seriesId)}
+          watched={isWatched('series', show.seriesId)}
           onRate={(rating) => handleRateSeries(show.seriesId, rating)}
         />
       ))}

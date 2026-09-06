@@ -22,6 +22,7 @@ import PeopleIcon from '@mui/icons-material/People'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import { MoviePoster, RankBadge } from '@aperture/ui'
 import { useUserRatings } from '../../hooks/useUserRatings'
+import { useWatchStatus } from '../../hooks/useWatchStatus'
 import { useWatching } from '../../hooks/useWatching'
 import { PageHeading } from '@/components/PageHeading'
 
@@ -87,6 +88,7 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
   const navigate = useNavigate()
   const theme = useTheme()
   const { getRating, setRating } = useUserRatings()
+  const { isWatched } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
   const [items, setItems] = useState<TopPickItem[]>([])
   const [config, setConfig] = useState<TopPicksConfig | null>(null)
@@ -222,6 +224,7 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
                   rating={item.communityRating}
                   overview={item.overview}
                   userRating={getRating(item.mediaType, item.id)}
+                  watched={isWatched(item.mediaType, item.id)}
                   onRate={(rating) => handleRate(item.id, rating)}
                   responsive
                   isWatching={item.mediaType === 'series' ? isWatching(item.id) : undefined}

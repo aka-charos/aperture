@@ -15,6 +15,7 @@ import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
 import { MoviePoster, BaseCarousel, CarouselItem, getProxiedImageUrl } from '@aperture/ui'
 import { useUserRatings } from '../hooks/useUserRatings'
+import { useWatchStatus } from '../hooks/useWatchStatus'
 import { useWatching } from '../hooks/useWatching'
 import { RotatingBackdrop } from '../components/RotatingBackdrop'
 
@@ -44,6 +45,7 @@ export function StudioDetailPage() {
   const { name } = useParams<{ name: string }>()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
+  const { isWatched } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
   const [data, setData] = useState<StudioData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -216,6 +218,7 @@ export function StudioDetailPage() {
                     rating={movie.communityRating}
                     genres={movie.genres}
                     userRating={getRating('movie', movie.id)}
+                    watched={isWatched('movie', movie.id)}
                     onRate={(rating) => setRating('movie', movie.id, rating)}
                     onClick={() => navigate(`/movies/${movie.id}`)}
                     size="medium"
@@ -243,6 +246,7 @@ export function StudioDetailPage() {
                     rating={series.communityRating}
                     genres={series.genres}
                     userRating={getRating('series', series.id)}
+                    watched={isWatched('series', series.id)}
                     onRate={(rating) => setRating('series', series.id, rating)}
                     isWatching={isWatching(series.id)}
                     onWatchingToggle={() => toggleWatching(series.id)}

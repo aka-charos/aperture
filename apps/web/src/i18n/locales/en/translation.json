@@ -3098,7 +3098,8 @@
     "tba": "TBA",
     "unknownYear": "Unknown year",
     "viewDetails": "View details",
-    "viewOnTmdb": "View on TMDb"
+    "viewOnTmdb": "View on TMDb",
+    "watched": "Watched"
   },
   "seerrRequest": {
     "title": "Request options",

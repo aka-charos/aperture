@@ -1695,7 +1695,8 @@
     "tba": "Προσεχώς",
     "unknownYear": "Άγνωστο έτος",
     "viewDetails": "Λεπτομέρειες",
-    "viewOnTmdb": "Προβολή στο TMDb"
+    "viewOnTmdb": "Προβολή στο TMDb",
+    "watched": "Watched"
   },
   "browse": {
     "title": "Περιήγηση",

@@ -28,6 +28,7 @@ import {
   getProxiedImageUrl,
 } from '@aperture/ui'
 import { useUserRatings } from '../hooks/useUserRatings'
+import { useWatchStatus } from '../hooks/useWatchStatus'
 import { useWatching } from '../hooks/useWatching'
 import { usePersonPortrait } from '../hooks/usePersonPortrait'
 import { RotatingBackdrop } from '../components/RotatingBackdrop'
@@ -142,6 +143,7 @@ export function PersonDetailPage() {
   const { name } = useParams<{ name: string }>()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
+  const { isWatched } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
   const [data, setData] = useState<PersonData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -658,6 +660,7 @@ export function PersonDetailPage() {
                     rating={movie.communityRating}
                     genres={movie.genres}
                     userRating={getRating('movie', movie.id)}
+                    watched={isWatched('movie', movie.id)}
                     onRate={(rating) => setRating('movie', movie.id, rating)}
                     onClick={() => navigate(`/movies/${movie.id}`)}
                     size="medium"
@@ -685,6 +688,7 @@ export function PersonDetailPage() {
                     rating={series.communityRating}
                     genres={series.genres}
                     userRating={getRating('series', series.id)}
+                    watched={isWatched('series', series.id)}
                     onRate={(rating) => setRating('series', series.id, rating)}
                     isWatching={isWatching(series.id)}
                     onWatchingToggle={() => toggleWatching(series.id)}

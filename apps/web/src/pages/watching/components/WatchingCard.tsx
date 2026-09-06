@@ -15,6 +15,7 @@ import StarIcon from '@mui/icons-material/Star'
 import BookmarkRemoveIcon from '@mui/icons-material/BookmarkRemove'
 import { MoviePoster, usePosterDisplaySettings } from '@aperture/ui'
 import { useUserRatings } from '@/hooks/useUserRatings'
+import { useWatchStatus } from '@/hooks/useWatchStatus'
 import { EpisodeAvailabilityBar } from './EpisodeAvailabilityBar'
 import type { WatchingSeries, UpcomingEpisode } from '../hooks/useWatchingData'
 
@@ -48,6 +49,7 @@ export function WatchingCard({ series, onRemove }: WatchingCardProps) {
   const navigate = useNavigate()
   const theme = useTheme()
   const { getRating, setRating } = useUserRatings()
+  const { isWatched } = useWatchStatus()
   const { hideLibraryRatingBadge } = usePosterDisplaySettings()
 
   const handleClick = () => {
@@ -83,6 +85,7 @@ export function WatchingCard({ series, onRemove }: WatchingCardProps) {
         genres={series.genres}
         overview={series.overview}
         userRating={getRating('series', series.seriesId)}
+        watched={isWatched('series', series.seriesId)}
         onRate={handleRate}
         // Rating and the remove action are rendered together in a top-right cluster
         // below, so they never overlap; the built-in overlays are suppressed here.

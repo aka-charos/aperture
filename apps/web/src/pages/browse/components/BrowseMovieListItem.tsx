@@ -16,7 +16,7 @@ import {
 import StarIcon from '@mui/icons-material/Star'
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
-import { getProxiedImageUrl, FALLBACK_POSTER_URL, StarRating } from '@aperture/ui'
+import { getProxiedImageUrl, FALLBACK_POSTER_URL, StarRating, WatchedBadge } from '@aperture/ui'
 
 interface Movie {
   id: string
@@ -31,6 +31,8 @@ interface Movie {
 interface BrowseMovieListItemProps {
   movie: Movie
   userRating: number | null
+  /** Viewer has finished this title — draws the same tick the poster grid does. */
+  watched?: boolean
   onRate: (rating: number | null) => void
   onClick: () => void
 }
@@ -38,6 +40,7 @@ interface BrowseMovieListItemProps {
 export function BrowseMovieListItem({
   movie,
   userRating,
+  watched,
   onRate,
   onClick,
 }: BrowseMovieListItemProps) {
@@ -108,6 +111,7 @@ export function BrowseMovieListItem({
               objectFit: 'cover',
             }}
           />
+          {watched && <WatchedBadge size={18} sx={{ top: 6, insetInlineEnd: 6 }} />}
         </Box>
 
         {/* Content Section */}

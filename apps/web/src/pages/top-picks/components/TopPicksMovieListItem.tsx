@@ -20,7 +20,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import PeopleIcon from '@mui/icons-material/People'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
-import { RankBadge, StarRating, getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
+import { RankBadge, StarRating, WatchedBadge, getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
 
 interface PopularMovie {
   movieId: string
@@ -38,10 +38,17 @@ interface PopularMovie {
 interface TopPicksMovieListItemProps {
   movie: PopularMovie
   userRating: number | null
+  /** Viewer has finished this title — draws the same tick the poster grid does. */
+  watched?: boolean
   onRate: (rating: number | null) => void
 }
 
-export function TopPicksMovieListItem({ movie, userRating, onRate }: TopPicksMovieListItemProps) {
+export function TopPicksMovieListItem({
+  movie,
+  userRating,
+  watched,
+  onRate,
+}: TopPicksMovieListItemProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const theme = useTheme()
@@ -107,6 +114,7 @@ export function TopPicksMovieListItem({ movie, userRating, onRate }: TopPicksMov
               }}
             />
             <RankBadge rank={movie.rank} size={isMobile ? 'medium' : 'large'} />
+            {watched && <WatchedBadge size={18} sx={{ top: 6, insetInlineEnd: 6 }} />}
           </Box>
 
           {/* Content Section */}

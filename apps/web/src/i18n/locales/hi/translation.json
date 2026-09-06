@@ -1246,7 +1246,8 @@
     "tba": "टीबीए",
     "unknownYear": "अज्ञात वर्ष",
     "viewDetails": "विवरण देखें",
-    "viewOnTmdb": "टीएमडीबी पर देखें"
+    "viewOnTmdb": "टीएमडीबी पर देखें",
+    "watched": "Watched"
   },
   "seerrRequest": {
     "title": "विकल्प का अनुरोध करें",

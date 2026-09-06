@@ -24,6 +24,7 @@ import HomeIcon from '@mui/icons-material/Home'
 import NavigateNextIcon from '@mui/icons-material/NavigateNext'
 import FullscreenOutlinedIcon from '@mui/icons-material/FullscreenOutlined'
 import { useUserRatings } from '../../../hooks/useUserRatings'
+import { useWatchStatus } from '../../../hooks/useWatchStatus'
 import { useWatching } from '../../../hooks/useWatching'
 import {
   SimilarityGraph,
@@ -100,6 +101,7 @@ export function SimilarMedia({
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
+  const { isWatched } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
   const [viewMode, setViewMode] = useState<'list' | 'graph'>('list')
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -251,6 +253,7 @@ export function SimilarMedia({
                 posterUrl={item.poster_url}
                 genres={item.genres}
                 userRating={getRating(mediaType === 'movie' ? 'movie' : 'series', item.id)}
+                watched={isWatched(mediaType === 'movie' ? 'movie' : 'series', item.id)}
                 onRate={(rating) => handleRate(item.id, rating)}
                 isWatching={mediaType === 'series' ? isWatching(item.id) : undefined}
                 onWatchingToggle={

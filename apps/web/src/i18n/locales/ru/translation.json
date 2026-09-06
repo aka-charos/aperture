@@ -2579,7 +2579,8 @@
     "tba": "будет объявлено позже",
     "unknownYear": "Неизвестный год",
     "viewDetails": "Посмотреть детали",
-    "viewOnTmdb": "Посмотреть на TMDb"
+    "viewOnTmdb": "Посмотреть на TMDb",
+    "watched": "Watched"
   },
   "seerrRequest": {
     "title": "Варианты запроса",

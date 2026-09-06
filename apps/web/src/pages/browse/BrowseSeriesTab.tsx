@@ -19,6 +19,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search'
 import { MoviePoster } from '@aperture/ui'
 import { useUserRatings } from '../../hooks/useUserRatings'
+import { useWatchStatus } from '../../hooks/useWatchStatus'
 import { useWatching } from '../../hooks/useWatching'
 import type { ViewMode } from '../../hooks/view-mode-context'
 import {
@@ -75,6 +76,7 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
+  const { isWatched } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
 
   const handleRateSeries = useCallback(
@@ -246,6 +248,7 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
                     genres={show.genres}
                     overview={show.overview}
                     userRating={getRating('series', show.id)}
+                    watched={isWatched('series', show.id)}
                     onRate={(rating) => void handleRateSeries(show.id, rating)}
                     isWatching={isWatching(show.id)}
                     onWatchingToggle={() => toggleWatching(show.id)}
@@ -262,6 +265,7 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
                   key={show.id}
                   series={show}
                   userRating={getRating('series', show.id)}
+                  watched={isWatched('series', show.id)}
                   onRate={(rating) => void handleRateSeries(show.id, rating)}
                   isWatching={isWatching(show.id)}
                   onWatchingToggle={() => toggleWatching(show.id)}

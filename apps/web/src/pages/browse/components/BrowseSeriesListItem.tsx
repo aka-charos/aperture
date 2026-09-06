@@ -18,7 +18,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import AddToQueueIcon from '@mui/icons-material/AddToQueue'
 import CheckIcon from '@mui/icons-material/Check'
-import { getProxiedImageUrl, FALLBACK_POSTER_URL, StarRating } from '@aperture/ui'
+import { getProxiedImageUrl, FALLBACK_POSTER_URL, StarRating, WatchedBadge } from '@aperture/ui'
 
 interface Series {
   id: string
@@ -36,6 +36,8 @@ interface Series {
 interface BrowseSeriesListItemProps {
   series: Series
   userRating: number | null
+  /** Viewer has finished this title — draws the same tick the poster grid does. */
+  watched?: boolean
   onRate: (rating: number | null) => void
   isWatching: boolean
   onWatchingToggle: () => void
@@ -45,6 +47,7 @@ interface BrowseSeriesListItemProps {
 export function BrowseSeriesListItem({
   series,
   userRating,
+  watched,
   onRate,
   isWatching,
   onWatchingToggle,
@@ -129,6 +132,9 @@ export function BrowseSeriesListItem({
               objectFit: 'cover',
             }}
           />
+          {/* Bottom corner here: the top-right one already holds the network chip
+              on desktop, and the status chip owns the top-left. */}
+          {watched && <WatchedBadge size={18} sx={{ top: 'auto', bottom: 6, insetInlineEnd: 6 }} />}
           {/* Status badge - smaller on mobile */}
           <Chip
             label={statusChipLabel}

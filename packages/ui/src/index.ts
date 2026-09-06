@@ -28,6 +28,8 @@ export {
 export {
   RankBadge,
   type RankBadgeProps,
+  WatchedBadge,
+  type WatchedBadgeProps,
   RANK_STYLES,
   getRankStyle,
   getRankTextColor,

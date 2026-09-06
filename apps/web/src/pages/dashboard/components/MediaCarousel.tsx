@@ -4,6 +4,7 @@ import { Box } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
 import { MoviePoster, RankBadge, BaseCarousel, CarouselItem } from '@aperture/ui'
 import { useUserRatings } from '../../../hooks/useUserRatings'
+import { useWatchStatus } from '../../../hooks/useWatchStatus'
 import { useWatching } from '../../../hooks/useWatching'
 
 interface MediaItem {
@@ -42,6 +43,7 @@ export function MediaCarousel({
   const emptyMessage = emptyMessageProp ?? t('dashboard.carouselEmpty')
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
+  const { isWatched } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
 
   const handleRate = useCallback(
@@ -68,6 +70,7 @@ export function MediaCarousel({
       score={showScore ? (item.matchScore ? item.matchScore / 100 : null) : undefined}
       showScore={showScore && item.matchScore != null}
       userRating={getRating(item.type, item.id)}
+      watched={isWatched(item.type, item.id)}
       onRate={(rating) => handleRate(item.type, item.id, rating)}
       isWatching={item.type === 'series' ? isWatching(item.id) : undefined}
       onWatchingToggle={item.type === 'series' ? () => toggleWatching(item.id) : undefined}
