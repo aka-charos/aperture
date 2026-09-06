@@ -31,27 +31,81 @@
  * 0.75 and above, both complaints sit at 0.69 and below, and rank 10 of the
  * whole library lands at 0.68-0.72.
  *
- * The threshold below is therefore MEASURED, but from a small sample, and this
- * repo has twice been burned thresholding a compressed cosine band blind (twin
- * centroids spanning 0.898-0.993; `avgNovelty` pinned inside [0.8, 1.0]). Two
- * things make shipping a provisional number defensible anyway.
+ * That first derivation produced 0.72 and was correct FOR THE MODEL IT WAS
+ * MEASURED ON. It has since been re-derived once, and the reason it had to be
+ * is the durable lesson here: these numbers are not on an absolute scale, so
+ * changing the embedding model moves every score underneath this constant
+ * without changing a line of code that reads it. Nothing failed. Nothing
+ * logged. The threshold simply stopped meaning what it was measured to mean.
+ * That is what `EVIDENCE_THRESHOLD_EMBEDDING_SET` below exists to catch.
  *
- * (1) THE FAILURE IS ASYMMETRIC AND THE SAFE SIDE IS UP. Set too high, the
- *     panel shows the same three titles under "Closest in your library" and
- *     merely declines to call them the reason -- nothing is hidden and nothing
- *     is false. Set too low, it asserts a cause that isn't there, which is the
- *     bug. Err high.
- * (2) It governs one heading. No score, no ranking and no recommendation
- *     depends on it, so a wrong value cannot cost anyone a pick.
+ * SECOND DERIVATION -- openrouter:google/gemini-embedding-2 @3072, raw cosine,
+ * measured 2026-09-07 over 581 picks on the newest completed run per viewer.
+ * Method is the same one: look at real pairs either side of the line and ask
+ * where a person stops recognising the connection.
  *
- * Note this is a RAW cosine, and raw cosines here are badly compressed -- the
- * gap between an excellent match and a poor one is about 0.13. Mean-centring
- * the library roughly doubles that spread (Poor Things -> Kinds of Kindness
- * goes 0.814 vs 0.682 at rank 10 raw, and 0.563 vs 0.264 centred), so if
- * centred vectors ever back this lookup, this constant is measured against the
- * wrong distribution and MUST be re-derived rather than carried over.
+ * At 0.72 the bar had drifted UP relative to the new model's distribution, and
+ * was rejecting matches nobody would call weak:
+ *
+ *   Furiosa             -> Mad Max                  0.717   same franchise
+ *   Top Gun: Maverick   -> M:I Dead Reckoning       0.713
+ *   Thunderbolts        -> Guardians of the Galaxy  0.712
+ *   Mulholland Drive    -> Blue Velvet              0.711   same director
+ *   Blade Runner 2049   -> Dune: Part Two           0.711   same director
+ *   Nobody              -> John Wick                0.709
+ *   The Irishman        -> Gangs of New York        0.707   same director
+ *
+ * while admitting looser ones above it (Children of Men -> Inception 0.737,
+ * Whiplash -> Flight 0.735). Two contradictions showed the line was cutting
+ * through a cluster rather than sitting in a gap: The Martian -> Prometheus
+ * passed at 0.722 while Gravity -> Prometheus failed at 0.715, and one film
+ * was causal evidence in one direction and not the other 0.018 apart.
+ *
+ * Quality falls off below 0.703, not below 0.72. The band underneath is where
+ * "both are films released recently" starts winning -- The Batman -> M:I 0.690,
+ * One Battle After Another -> A Working Man 0.689, Coco -> Finding Dory 0.690 --
+ * and by 0.67 it is Thirteen Lives -> Death on the Nile. So the bar moves to
+ * 0.70, which sits in the empty gap between 0.691 and 0.703.
+ *
+ * WHAT NO THRESHOLD FIXES, and the reason not to keep tuning this: strong pairs
+ * appear at every level. Die Hard -> Live Free or Die Hard sits at 0.680,
+ * Decalogue I -> The Double Life of Veronique (both Kieslowski) at 0.672,
+ * Paris, Texas -> Perfect Days (both Wenders) at 0.658. Any bar that rejects
+ * Marriage Story -> Poor Things at 0.673 also rejects two of those. A single
+ * cosine cannot sort these cleanly; 0.70 moves the line to where the MAJORITY
+ * flips, which is all it claims to do.
+ *
+ * On erring high, which the first derivation argued for: it is still the safer
+ * side, but it is not free, and that was overstated. The claim was that a
+ * too-high bar costs nothing because the same three titles still appear under
+ * "Closest in your library". True of the panel, false of the prose -- the same
+ * boolean picks the heading in the EXPLANATION PROMPT (`evidenceHeading`), so
+ * at 0.72 the model was being told the Furiosa/Mad Max connection is NOT why
+ * the film was picked, and wrote around the obvious answer.
+ *
+ * Note this is a RAW cosine (`storeEvidence` reads `embeddings_*.embedding`,
+ * not `embedding_centered`). Mean-centring roughly doubles the spread, so if
+ * centred vectors ever back this lookup the constant is again measured against
+ * the wrong distribution and MUST be re-derived rather than carried over.
  */
-export const EVIDENCE_CAUSAL_MIN_COSINE = 0.72
+export const EVIDENCE_CAUSAL_MIN_COSINE = 0.7
+
+/**
+ * The embedding set `EVIDENCE_CAUSAL_MIN_COSINE` was last derived against.
+ *
+ * The threshold is a raw cosine, and a raw cosine only means something relative
+ * to the model that produced it. Swapping models is a config change with no
+ * code change, so without this the constant silently describes a distribution
+ * that no longer exists -- which is exactly what happened between the first and
+ * second derivations above, and took three ad-hoc queries to notice.
+ *
+ * Format matches `embeddingSetId()` so the two are directly comparable.
+ * `checkEvidenceThresholdProvenance` warns at boot when they diverge; it does
+ * NOT change behaviour, because the second derivation showed a model swap can
+ * leave the threshold serviceable, and forcing every pick in the library to the
+ * hedged heading on suspicion alone would have been the wrong call that day.
+ */
+export const EVIDENCE_THRESHOLD_EMBEDDING_SET = 'openrouter:google/gemini-embedding-2'
 
 /**
  * True when the closest stored evidence is near enough that calling it the

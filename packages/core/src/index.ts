@@ -1396,8 +1396,17 @@ export {
 // belongs beside the query that produced it, not in the web bundle.
 export {
   EVIDENCE_CAUSAL_MIN_COSINE,
+  EVIDENCE_THRESHOLD_EMBEDDING_SET,
   hasCausalEvidence,
 } from './recommender/evidenceStrength.js'
+
+// And because that cosine only means something relative to the model that
+// produced it, the boot check that notices the two have parted company.
+export {
+  checkEvidenceThresholdProvenance,
+  compareEvidenceThresholdSet,
+  type EvidenceThresholdProvenance,
+} from './recommender/evidenceThresholdProvenance.js'
 
 // Mean-centred embeddings. The job needs the refresh; nothing outside core
 // needs to reason about spaces, which is the point of storing the centred
