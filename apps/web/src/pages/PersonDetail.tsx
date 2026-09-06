@@ -143,7 +143,7 @@ export function PersonDetailPage() {
   const { name } = useParams<{ name: string }>()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
-  const { isWatched } = useWatchStatus()
+  const { isWatched, getEpisodeProgress } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
   const [data, setData] = useState<PersonData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -689,6 +689,7 @@ export function PersonDetailPage() {
                     genres={series.genres}
                     userRating={getRating('series', series.id)}
                     watched={isWatched('series', series.id)}
+                    episodeProgress={getEpisodeProgress('series', series.id)}
                     onRate={(rating) => setRating('series', series.id, rating)}
                     isWatching={isWatching(series.id)}
                     onWatchingToggle={() => toggleWatching(series.id)}

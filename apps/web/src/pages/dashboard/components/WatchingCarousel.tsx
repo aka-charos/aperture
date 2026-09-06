@@ -64,7 +64,7 @@ export function WatchingCarousel({
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
-  const { isWatched } = useWatchStatus()
+  const { isWatched, getEpisodeProgress } = useWatchStatus()
   const { toggleWatching } = useWatching()
 
   const handleRate = useCallback(
@@ -105,6 +105,7 @@ export function WatchingCarousel({
             overview={item.overview}
             userRating={getRating('series', item.seriesId)}
             watched={isWatched('series', item.seriesId)}
+            episodeProgress={getEpisodeProgress('series', item.seriesId)}
             onRate={(rating) => handleRate(item.seriesId, rating)}
             isWatching={true}
             onWatchingToggle={() => toggleWatching(item.seriesId)}

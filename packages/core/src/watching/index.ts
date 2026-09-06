@@ -22,6 +22,7 @@ export {
 } from './favoriteSync.js'
 
 export {
-  getWatchedItemIdsForUser,
-  type WatchedItemIds,
+  getWatchStatusForUser,
+  type WatchStatusForUser,
+  type SeriesWatchProgress,
 } from './watchedItems.js'

@@ -60,7 +60,7 @@ export function SearchPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { getRating, setRating } = useUserRatings()
-  const { isWatched } = useWatchStatus()
+  const { isWatched, getEpisodeProgress } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
 
   // Search state
@@ -485,6 +485,7 @@ export function SearchPage() {
                   overview={result.overview}
                   userRating={getRating(result.type, result.id)}
                   watched={isWatched(result.type, result.id)}
+                  episodeProgress={getEpisodeProgress(result.type, result.id)}
                   onRate={(rating) => handleRate(result.id, result.type, rating)}
                   isWatching={result.type === 'series' ? isWatching(result.id) : undefined}
                   onWatchingToggle={result.type === 'series' ? () => toggleWatching(result.id) : undefined}

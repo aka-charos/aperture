@@ -101,7 +101,7 @@ export function SimilarMedia({
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
-  const { isWatched } = useWatchStatus()
+  const { isWatched, getEpisodeProgress } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
   const [viewMode, setViewMode] = useState<'list' | 'graph'>('list')
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -254,6 +254,7 @@ export function SimilarMedia({
                 genres={item.genres}
                 userRating={getRating(mediaType === 'movie' ? 'movie' : 'series', item.id)}
                 watched={isWatched(mediaType === 'movie' ? 'movie' : 'series', item.id)}
+                episodeProgress={getEpisodeProgress(mediaType === 'movie' ? 'movie' : 'series', item.id)}
                 onRate={(rating) => handleRate(item.id, rating)}
                 isWatching={mediaType === 'series' ? isWatching(item.id) : undefined}
                 onWatchingToggle={

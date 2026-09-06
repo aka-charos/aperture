@@ -76,7 +76,7 @@ export function TopPicksPage() {
   const theme = useTheme()
   const [searchParams, setSearchParams] = useSearchParams()
   const { getRating, setRating } = useUserRatings()
-  const { isWatched } = useWatchStatus()
+  const { isWatched, getEpisodeProgress } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
   
   const initialTab = searchParams.get('tab') === 'series' ? 1 : 0
@@ -241,6 +241,7 @@ export function TopPicksPage() {
               overview={show.overview}
               userRating={getRating('series', show.seriesId)}
               watched={isWatched('series', show.seriesId)}
+              episodeProgress={getEpisodeProgress('series', show.seriesId)}
               onRate={(rating) => handleRateSeries(show.seriesId, rating)}
               responsive
               isWatching={isWatching(show.seriesId)}
@@ -298,6 +299,7 @@ export function TopPicksPage() {
           series={show}
           userRating={getRating('series', show.seriesId)}
           watched={isWatched('series', show.seriesId)}
+          episodeProgress={getEpisodeProgress('series', show.seriesId)}
           onRate={(rating) => handleRateSeries(show.seriesId, rating)}
         />
       ))}

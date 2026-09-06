@@ -2580,7 +2580,8 @@
     "unknownYear": "Неизвестный год",
     "viewDetails": "Посмотреть детали",
     "viewOnTmdb": "Посмотреть на TMDb",
-    "watched": "Watched"
+    "watched": "Watched",
+    "episodeProgress": "{{watched}} of {{total}} episodes watched"
   },
   "seerrRequest": {
     "title": "Варианты запроса",

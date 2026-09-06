@@ -49,7 +49,7 @@ export function WatchingCard({ series, onRemove }: WatchingCardProps) {
   const navigate = useNavigate()
   const theme = useTheme()
   const { getRating, setRating } = useUserRatings()
-  const { isWatched } = useWatchStatus()
+  const { isWatched, getEpisodeProgress } = useWatchStatus()
   const { hideLibraryRatingBadge } = usePosterDisplaySettings()
 
   const handleClick = () => {
@@ -86,6 +86,7 @@ export function WatchingCard({ series, onRemove }: WatchingCardProps) {
         overview={series.overview}
         userRating={getRating('series', series.seriesId)}
         watched={isWatched('series', series.seriesId)}
+        episodeProgress={getEpisodeProgress('series', series.seriesId)}
         onRate={handleRate}
         // Rating and the remove action are rendered together in a top-right cluster
         // below, so they never overlap; the built-in overlays are suppressed here.

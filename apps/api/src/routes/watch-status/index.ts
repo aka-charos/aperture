@@ -12,14 +12,14 @@
  */
 import type { FastifyPluginAsync } from 'fastify'
 import { requireAuth, type SessionUser } from '../../plugins/auth.js'
-import { getWatchedItemIdsForUser } from '@aperture/core'
+import { getWatchStatusForUser } from '@aperture/core'
 
 const watchStatusRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * GET /api/watch-status
-   * Ids of every movie the current user has played, and of every series whose
-   * episodes they have all played. Absent from either list means "not
-   * finished", never "unknown" — the answer covers the whole library.
+   * Ids of every movie the current user has played, plus episode counts for
+   * every series they have started (specials excluded). Absent means "not
+   * started", never "unknown" — the answer covers the whole library.
    */
   fastify.get(
     '/api/watch-status',
@@ -28,13 +28,23 @@ const watchStatusRoutes: FastifyPluginAsync = async (fastify) => {
       schema: {
         tags: ['watching'],
         description:
-          'Watched movie ids and fully-watched series ids for the current user.',
+          'Watched movie ids, and watched/total episode counts per started series, for the current user.',
         response: {
           200: {
             type: 'object',
             properties: {
               movieIds: { type: 'array', items: { type: 'string' } },
-              seriesIds: { type: 'array', items: { type: 'string' } },
+              series: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    watched: { type: 'integer' },
+                    total: { type: 'integer' },
+                  },
+                },
+              },
             },
           },
           500: {
@@ -48,8 +58,8 @@ const watchStatusRoutes: FastifyPluginAsync = async (fastify) => {
       const currentUser = request.user as SessionUser
 
       try {
-        const ids = await getWatchedItemIdsForUser(currentUser.id)
-        return reply.send(ids)
+        const status = await getWatchStatusForUser(currentUser.id)
+        return reply.send(status)
       } catch (err) {
         request.log.error({ err, userId: currentUser.id }, 'Failed to fetch watch status')
         return reply.status(500).send({ error: 'Failed to fetch watch status' })

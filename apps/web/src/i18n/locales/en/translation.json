@@ -3099,7 +3099,8 @@
     "unknownYear": "Unknown year",
     "viewDetails": "View details",
     "viewOnTmdb": "View on TMDb",
-    "watched": "Watched"
+    "watched": "Watched",
+    "episodeProgress": "{{watched}} of {{total}} episodes watched"
   },
   "seerrRequest": {
     "title": "Request options",

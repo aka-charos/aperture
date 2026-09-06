@@ -1696,7 +1696,8 @@
     "unknownYear": "Άγνωστο έτος",
     "viewDetails": "Λεπτομέρειες",
     "viewOnTmdb": "Προβολή στο TMDb",
-    "watched": "Watched"
+    "watched": "Watched",
+    "episodeProgress": "{{watched}} of {{total}} episodes watched"
   },
   "browse": {
     "title": "Περιήγηση",

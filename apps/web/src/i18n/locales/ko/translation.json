@@ -1247,7 +1247,8 @@
     "unknownYear": "연도를 알 수 없음",
     "viewDetails": "세부정보 보기",
     "viewOnTmdb": "TMDb에서 보기",
-    "watched": "Watched"
+    "watched": "Watched",
+    "episodeProgress": "{{watched}} of {{total}} episodes watched"
   },
   "seerrRequest": {
     "title": "요청 옵션",

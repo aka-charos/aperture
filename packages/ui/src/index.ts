@@ -30,6 +30,8 @@ export {
   type RankBadgeProps,
   WatchedBadge,
   type WatchedBadgeProps,
+  EpisodeProgressBadge,
+  type EpisodeProgressBadgeProps,
   RANK_STYLES,
   getRankStyle,
   getRankTextColor,

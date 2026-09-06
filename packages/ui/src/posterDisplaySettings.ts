@@ -15,11 +15,18 @@ export interface PosterDisplaySettings {
    * would ship untranslated. English default so a bare provider still reads.
    */
   watchedLabel: string
+  /**
+   * Tooltip for the episode-progress pill. A formatter rather than a string
+   * because the counts are interpolated, and a raw template here would put
+   * i18n placeholder syntax in a package that has no i18n.
+   */
+  episodeProgressLabel: (watched: number, total: number) => string
 }
 
 export const defaultPosterDisplaySettings: PosterDisplaySettings = {
   hideLibraryRatingBadge: false,
   watchedLabel: 'Watched',
+  episodeProgressLabel: (watched, total) => `${watched} of ${total} episodes watched`,
 }
 
 export const PosterDisplaySettingsContext = createContext<PosterDisplaySettings>(

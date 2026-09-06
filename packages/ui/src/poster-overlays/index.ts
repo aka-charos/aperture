@@ -1,6 +1,10 @@
 // Components
 export { RankBadge, type RankBadgeProps } from './RankBadge.js'
 export { WatchedBadge, type WatchedBadgeProps } from './WatchedBadge.js'
+export {
+  EpisodeProgressBadge,
+  type EpisodeProgressBadgeProps,
+} from './EpisodeProgressBadge.js'
 
 // Constants and types
 export {

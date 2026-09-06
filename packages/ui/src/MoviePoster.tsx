@@ -9,6 +9,7 @@ import { StarRating } from './StarRating.js'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL } from './imageUtils.js'
 import { usePosterDisplaySettings } from './posterDisplaySettings.js'
 import { WatchedBadge } from './poster-overlays/WatchedBadge.js'
+import { EpisodeProgressBadge } from './poster-overlays/EpisodeProgressBadge.js'
 
 const StarIcon = Star as unknown as React.ComponentType<{ fontSize?: string }>
 const AddToQueueIcon = AddToQueue as unknown as React.ComponentType<{ fontSize?: 'small' | 'medium' | 'large' }>
@@ -46,6 +47,16 @@ export interface MoviePosterProps {
    * nothing at all rather than false for the rest.
    */
   watched?: boolean
+  /**
+   * For a series the viewer has started: episodes played out of episodes the
+   * library holds, specials excluded. Renders `8/24` in the same slot the tick
+   * would take, and is ignored once `watched` is true — a finished show gets
+   * the tick, never 24/24.
+   *
+   * Absent means "not started" for a series and "not applicable" for a film,
+   * which the badge cannot distinguish and does not need to: both draw nothing.
+   */
+  episodeProgress?: { watched: number; total: number } | null
   /** Whether this series is in user's watching list */
   isWatching?: boolean
   /** Callback when user toggles watching status */
@@ -103,6 +114,7 @@ export function MoviePoster({
   hideRating = false,
   hideUserRating = false,
   watched = false,
+  episodeProgress,
   isWatching = false,
   onWatchingToggle,
   hideWatchingToggle = false,
@@ -148,9 +160,12 @@ export function MoviePoster({
   const scoreBadgeVisible = showScore && score !== undefined && score !== null
   const chipOffset = ratingBadgeVisible || scoreBadgeVisible ? 32 : 0
   const watchedBadgeAnchor = { top: 8 + chipOffset }
+  // Tick and pill are one slot, never both: a finished show is a tick, not 24/24.
+  const progressVisible = !watched && episodeProgress != null && episodeProgress.total > 0
+  const watchStateVisible = watched || progressVisible
   const watchingToggleAnchor =
     watchingTogglePosition === 'topRight'
-      ? { top: 8 + chipOffset + (watched ? 30 : 0), right: 8 }
+      ? { top: 8 + chipOffset + (watchStateVisible ? 30 : 0), right: 8 }
       : { bottom: 8, left: 8 }
 
   if (loading) {
@@ -273,9 +288,16 @@ export function MoviePoster({
           />
         )}
 
-        {/* Watched tick — sits above the hover overlay so it stays legible while
-            the card is being read. */}
+        {/* Watch state — tick when finished, position when partway through. Above
+            the hover overlay so it stays legible while the card is being read. */}
         {watched && <WatchedBadge sx={watchedBadgeAnchor} />}
+        {progressVisible && (
+          <EpisodeProgressBadge
+            watched={episodeProgress.watched}
+            total={episodeProgress.total}
+            sx={watchedBadgeAnchor}
+          />
+        )}
 
         {/* Watching toggle button - bottom left, or top right when asked */}
         {!hideWatchingToggle && onWatchingToggle && (
