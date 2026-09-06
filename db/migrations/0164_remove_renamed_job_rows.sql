@@ -1,0 +1,69 @@
+-- Delete two job_config rows naming jobs that no longer exist.
+--
+-- Both were real job names once, and both were split by media type without
+-- anyone deleting the row the old name left behind:
+--
+--   generate-recommendations  ->  generate-movie-recommendations
+--                             +   generate-series-recommendations
+--   sync-watch-history        ->  sync-movie-watch-history
+--                             +   sync-series-watch-history
+--
+-- The code side finished in January (`b3f0952b` removed the last watch-history
+-- reference, `f475db41` the last recommendations one) and neither string
+-- survives anywhere in the tree today. The rows did, and the scheduler builds
+-- its task list from `getAllJobConfigs()` -- DB rows merged with
+-- JOB_SCHEDULE_DEFAULTS -- so it dutifully scheduled both and the executor
+-- threw `Unknown job` on every firing. Measured on the live instance: two
+-- failures a night, 00:00 and 01:00 UTC, for months.
+--
+-- Harmless (they throw before doing any work) but they are noise in exactly
+-- the place an operator looks when something real breaks, and they make
+-- `job_config` disagree with the job catalogue about what this app can do.
+--
+-- WHY NOTHING CAUGHT IT. `jobDefaults.test.ts` exists for this class of drift
+-- and cannot see this instance of it: it compares `jobDefinitions` against
+-- `JOB_SCHEDULE_DEFAULTS`, code against code, and neither list contains either
+-- name. `job_config` is a third list, it is the one the scheduler actually
+-- reads, and no test can reach it. Re-run the audit below after any rename.
+--
+-- DELETE rather than the rename `0051` used for sync-strm, because both old
+-- names map to TWO successors and all four successor rows already exist -- a
+-- rename would collide. `job_runs` history is deliberately left alone: those
+-- rows record work that genuinely ran under the old name, and the nightly
+-- failures never wrote any (the executor throws before `createJobProgress`).
+--
+-- THE AUDIT, for the next time this drifts. Compare job_config against the
+-- catalogue in apps/api/src/routes/jobs/definitions.ts; anything the left side
+-- holds and the right side does not is a row the scheduler will try to run:
+--
+--   SELECT job_name, is_enabled, schedule_type
+--     FROM job_config
+--    WHERE job_name NOT IN (
+--            'auto-request-top-picks','backup-database','cleanup-auth-state',
+--            'enrich-mdblist','enrich-metadata','enrich-studio-logos',
+--            'evaluate-recommender','full-reset-movie-recommendations',
+--            'full-reset-series-recommendations','generate-discovery-suggestions',
+--            'generate-movie-embeddings','generate-movie-recommendations',
+--            'generate-series-embeddings','generate-series-recommendations',
+--            'generate-title-analysis','rebuild-taste-profiles',
+--            'reconcile-discovery-requests','refresh-ai-pricing',
+--            'refresh-assistant-suggestions','refresh-embedding-centering',
+--            'refresh-library-gaps','refresh-ratings',
+--            'refresh-recommendation-explanations','refresh-top-picks',
+--            'sync-lldap-emails','sync-movie-libraries','sync-movie-watch-history',
+--            'sync-movies','sync-series','sync-series-libraries',
+--            'sync-series-watch-history','sync-trakt-ratings','sync-users',
+--            'sync-watching-favorites')
+--    ORDER BY job_name;
+--
+-- Note this takes effect on the next boot without any further action, and that
+-- ordering is the reason a migration is the right instrument rather than an
+-- UPDATE run by hand: migrations complete BEFORE `initializeScheduler()` reads
+-- the table, so the rows are gone before the scheduler can see them. A manual
+-- UPDATE to `is_enabled` does the opposite -- the scheduler caches its cron
+-- tasks in memory at boot and only `refreshJobSchedule` (called solely by
+-- PATCH /api/jobs/:name/config) re-reads, so the database would say disabled
+-- while the running process kept firing.
+
+DELETE FROM job_config
+ WHERE job_name IN ('generate-recommendations', 'sync-watch-history');
