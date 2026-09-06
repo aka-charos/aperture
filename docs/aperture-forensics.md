@@ -1676,3 +1676,61 @@ That endpoint was counting `wh.id IS NOT NULL` — any row — which is the excl
 My Watch History and the watch-stats drill-in (every row is watched by construction; a tick on all of them is decoration), Home's two rails (recommendations are unwatched by construction, history watched), another user's profile page (the provider holds the *viewer's* set, so a tick there would be an assertion about the wrong person), and gap analysis (TMDb rows with no library id, so the question cannot be asked). The assistant's chat cards stay tick-only: `ContentItem.watched` is a boolean stamped by `annotateWatchedItems` and carries no episode counts.
 
 No setting was added. Emby has no toggle for this and the request was for parity; `PosterDisplaySettings` is where one would go if it is ever wanted, beside `hideLibraryRatingBadge`, which exists for a reason that does not apply here (some servers burn a rating into the artwork; none burns in a watched tick).
+
+---
+
+## F-110
+
+**Regenerating recommendations deleted the user's identity, and everything else on that row.** Found 2026-09-07 from the report that "Movie and TV Series identities keep getting lost and I have to regenerate after a few days".
+
+### The symptom does not name the cause
+
+The Watcher Identity is `user_preferences.taste_synopsis` (movies) and `user_preferences.series_taste_synopsis` (series). Nothing expires it: `getTasteSynopsis` reads the stored text and returns it unchanged, and the docstring's claim that a "background job handles periodic refresh based on the user's `refresh_interval_days` setting" is false — **no job calls `streamTasteSynopsis` at all**. The only writer is the SSE route behind the Generate Identity button.
+
+So the text cannot decay, cannot go stale, and cannot be overwritten by anything on a timer. It can only be **deleted**. Three paths did that, all of them through one line:
+
+```sql
+DELETE FROM user_preferences WHERE user_id = $1   -- storage.ts, "Clear taste profile"
+```
+
+reached from `clearUserRecommendations` ← `regenerateUserRecommendations` ← `POST /api/recommendations/:userId/regenerate` ← **the Regenerate button on My Recommendations**, and from `clearAllRecommendations` ← the `full-reset-movie-recommendations` job, which did it for every user at once. The "few days" was not a TTL. It was the interval between presses.
+
+### The blast radius is the whole row, and it is not a recommendation row
+
+`user_preferences` is one row per user and holds, besides the two identities: `settings` JSONB — which is where **excluded libraries** (`libraryExclusions.ts`) and **per-user algorithm settings** (`userAlgorithmSettings.ts`) live — plus `include_watched`, `dislike_behavior`, `preferred_genres`, `excluded_genres`, `novelty_weight`, `rating_weight`, `similarity_full_franchise` and `similarity_hide_watched`. A press of Regenerate reset all of it to column defaults, silently, with nothing in the log but a successful run.
+
+That is worth stating as the general rule: **a table named for one feature accretes columns from others, and a `DELETE` by user id is a claim about every one of them.** The row's name said "preferences"; by the time it held two AI-written profiles and a library-exclusion list, deleting it was a much larger act than the call site's one-line comment admitted.
+
+### What the delete was for had stopped existing
+
+The comment read `// Clear taste profile`. It has not cleared a taste profile for a long time:
+
+- The taste profile is `user_taste_profiles`, rebuilt by `getUserTasteProfile` against `isProfileStale` (F-042). This delete does not touch it.
+- `user_preferences.taste_embedding` and `series_taste_embedding` are **write-only**. Both pipelines still write them; the last reader was the Discover fallback that F-106 deleted, for carrying neither a model nor a space.
+
+So the statement cleared nothing a regenerate needed cleared. Its entire remaining effect was collateral — which is exactly the shape that survives review, because the line looks like it belongs to the function it sits in.
+
+### The mirror was already correct
+
+`clearUserSeriesRecommendations` is one statement, scoped both ways:
+
+```sql
+DELETE FROM recommendation_runs WHERE user_id = $1 AND media_type = 'series'
+```
+
+no preferences, and candidates and evidence go with it by `ON DELETE CASCADE` (0013). The movie side was the drifted half of the pair (the mirroring invariant), and drifted in a second way nobody had reported: its run delete carried **no `media_type` filter**, so asking for new *films* also emptied the series tab, and `clearAllRecommendations` under a job named `full-reset-movie-recommendations` deleted every series run in the database as well.
+
+Both movie functions are now the series ones with `'movie'` substituted. The explicit evidence/candidate deletes went with them — the cascade the series path has always relied on does the same work, and two spellings of one delete is how the two came to disagree in the first place.
+
+### What cannot be recovered
+
+Nothing. The synopses were AI-written, stored once, and never backed up; the excluded-library and algorithm settings are gone to defaults. Every affected user has to press Generate Identity again and re-set their exclusions, once. There is no backfill, for the same reason `0141`'s columns had none: the values are not derivable from anything that survived.
+
+### The same loss, reached from the other side
+
+`streamTasteSynopsis` stored `fullText` unconditionally, and the stream can finish cleanly having emitted no `text-delta` at all: a reasoning model bills its scratchpad from the same output allowance as the prose (F-030), so it can spend the whole 4,000-token cap thinking and stop. That is not an `error` part, so the catch that emits the deterministic fallback never runs, and `''` went to the store — where it is indistinguishable from never having generated one, because `getTasteSynopsis`'s `if (existing?.taste_synopsis)` is falsy for the empty string. A good identity replaced by a card reading *Generate Identity*: F-110's loss, one press instead of one DELETE.
+
+Both generators now refuse it. Two details are load-bearing:
+
+- **It throws rather than returning quietly.** The throw reaches `streamSseGenerator`, which writes an SSE `error` part; the client shows the failure and — because `displaySynopsis` falls back to the already-fetched `profileOutput.synopsis` once `isStreaming` clears — keeps rendering the stored profile. Returning silently would leave a blank card that refills on the next reload, which reads as the same intermittent disappearance.
+- **The catch path is untouched.** A provider that actually fails still yields the fallback blurb and stores it. That overwrites a good synopsis with a generic one, which is a smaller loss than a blank card and, unlike the empty case, is a result the user can see they got. Worth revisiting if a transient 429 is ever observed flattening a real identity.

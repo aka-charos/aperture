@@ -1,4 +1,4 @@
-import { query, queryOne, transaction } from '../lib/db.js'
+import { query, queryOne } from '../lib/db.js'
 import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../lib/ai-provider.js'
 import type { Candidate, WatchedMovie } from './types.js'
 import type { BlendWeights } from './shared/scoring.js'
@@ -414,41 +414,47 @@ export async function createRecommendationRun(userId: string): Promise<string> {
   return run.id
 }
 
+/**
+ * Clear one user's MOVIE recommendation data, and nothing else.
+ *
+ * Scoped two ways, both of which used to be wrong. It must not touch series
+ * runs: the movie Regenerate button calls this, and an unfiltered delete
+ * emptied the series tab as a side effect of asking for new films. And it must
+ * not touch `user_preferences`, which is not a recommendation table at all --
+ * that one row holds both Watcher Identities (`taste_synopsis` and
+ * `series_taste_synopsis`), the user's excluded libraries and per-user
+ * algorithm settings in `settings`, `include_watched`, `dislike_behavior`,
+ * their preferred/excluded genres and their similarity-graph preferences. So a
+ * single press of Regenerate silently reset all of it, and the identities read
+ * as "never generated" days later with nothing in the logs.
+ *
+ * The comment it deleted under -- "clear taste profile" -- has not been true
+ * for a long time: the taste profile lives in `user_taste_profiles` and is
+ * rebuilt by `getUserTasteProfile`, while `taste_embedding` and
+ * `series_taste_embedding` on this row are write-only leftovers with no reader
+ * left (F-106 deleted the last one). The delete cleared nothing a regenerate
+ * needed cleared; its entire effect was collateral.
+ *
+ * Candidates and evidence go with the runs by `ON DELETE CASCADE` (0013), the
+ * same way `clearUserSeriesRecommendations` relies on it.
+ */
 export async function clearUserRecommendations(userId: string): Promise<void> {
-  await transaction(async (client) => {
-    // Delete evidence first (FK constraint)
-    await client.query(
-      `DELETE FROM recommendation_evidence 
-       WHERE candidate_id IN (
-         SELECT rc.id FROM recommendation_candidates rc
-         JOIN recommendation_runs rr ON rc.run_id = rr.id
-         WHERE rr.user_id = $1
-       )`,
-      [userId]
-    )
-
-    // Delete candidates
-    await client.query(
-      `DELETE FROM recommendation_candidates 
-       WHERE run_id IN (SELECT id FROM recommendation_runs WHERE user_id = $1)`,
-      [userId]
-    )
-
-    // Delete runs
-    await client.query(`DELETE FROM recommendation_runs WHERE user_id = $1`, [userId])
-
-    // Clear taste profile
-    await client.query(`DELETE FROM user_preferences WHERE user_id = $1`, [userId])
-  })
+  await query(`DELETE FROM recommendation_runs WHERE user_id = $1 AND media_type = 'movie'`, [
+    userId,
+  ])
 }
 
+/**
+ * Clear every user's movie recommendation data (the full-reset job).
+ *
+ * Movie-scoped and preferences-preserving for the same reasons as
+ * `clearUserRecommendations`, and mirroring `clearAllSeriesRecommendations`:
+ * the series full reset has always cleared series runs alone, so the movie one
+ * blanking series runs and every user's identity and settings besides was the
+ * asymmetric half.
+ */
 export async function clearAllRecommendations(): Promise<void> {
-  await transaction(async (client) => {
-    await client.query('DELETE FROM recommendation_evidence')
-    await client.query('DELETE FROM recommendation_candidates')
-    await client.query('DELETE FROM recommendation_runs')
-    await client.query('DELETE FROM user_preferences')
-  })
+  await query(`DELETE FROM recommendation_runs WHERE media_type = 'movie'`)
 }
 
 export async function getMovieOverviews(movieIds: string[]): Promise<Map<string, string>> {

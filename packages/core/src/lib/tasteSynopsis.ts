@@ -183,6 +183,26 @@ Rules:
     fullText = fallback
   }
 
+  // An empty generation is not a result, and must never reach the store.
+  //
+  // The stream can finish cleanly having emitted no text-delta at all: a
+  // reasoning model bills its scratchpad from the same output allowance as the
+  // prose (F-030), so it can spend the whole cap thinking and stop. That is not
+  // an "error" part, so the catch above never runs and `fullText` is ''. Stored,
+  // that is indistinguishable downstream from never having generated one --
+  // getTasteSynopsis's `if (existing?.taste_synopsis)` is falsy for the empty
+  // string -- so a good synopsis would be replaced by a card reading "Generate
+  // Identity", which is the same loss F-110 was about, reached the other way.
+  //
+  // Throwing rather than returning quietly is deliberate: it reaches the client
+  // as an SSE `error` part, which surfaces the failure AND leaves the card
+  // rendering the previously stored synopsis it already fetched. Silence would
+  // show a blank profile that reappears on the next reload.
+  if (!fullText.trim()) {
+    logger.warn({ userId }, 'Synopsis generation produced no text; keeping the stored synopsis')
+    throw new Error('The model returned an empty taste profile; nothing was changed')
+  }
+
   // Store the complete synopsis
   await query(
     `INSERT INTO user_preferences (user_id, taste_synopsis, taste_synopsis_updated_at)
@@ -203,9 +223,14 @@ Rules:
 }
 
 /**
- * Get existing synopsis - never auto-regenerates on page load.
- * Background job handles periodic refresh based on user's refresh_interval_days setting.
- * User can manually regenerate via streamTasteSynopsis().
+ * Get the stored synopsis. Never regenerates on page load.
+ *
+ * There is no background refresh, despite what this said for a long time: no
+ * job calls streamTasteSynopsis, and `refresh_interval_days` governs the taste
+ * *profile* (getUserTasteProfile), not this text. So a synopsis cannot expire
+ * or go stale -- it is written by the Generate Identity button and otherwise
+ * only ever deleted. That distinction mattered: it made an identity that had
+ * been DELETEd look like one that had decayed (F-110).
  */
 export async function getTasteSynopsis(userId: string): Promise<TasteSynopsis> {
   // Check for existing synopsis
