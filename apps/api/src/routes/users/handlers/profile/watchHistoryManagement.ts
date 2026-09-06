@@ -126,7 +126,14 @@ export function registerWatchHistoryManagementHandlers(fastify: FastifyInstance)
         )
 
         fastify.log.info({ userId: id, movieId, band, playedAt }, 'Movie marked as watched')
-        return reply.send({ success: true, message: 'Movie marked as watched' })
+        // The resolved date goes back so the client can show the right one:
+        // a band write can land a year from now, and a page that assumed
+        // "just now" would contradict the row it just created.
+        return reply.send({
+          success: true,
+          message: 'Movie marked as watched',
+          watchedAt: playedAt ? playedAt.toISOString() : null,
+        })
       } catch (error) {
         fastify.log.error({ error, userId: id, movieId }, 'Failed to mark movie as watched')
         return reply.status(500).send({ error: 'Failed to mark movie as watched' })
