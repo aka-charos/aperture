@@ -644,12 +644,9 @@ function AppShell() {
                   </MenuItem>
                 ))}
                 <Divider />
-                <MenuItem onClick={() => { handleUserMenuClose(); navigate('/history'); }}>
-                  <ListItemIcon>
-                    <HistoryIcon fontSize="small" />
-                  </ListItemIcon>
-                  {t('nav.myWatchHistory')}
-                </MenuItem>
+                {/* No My Watch History here: it is a sidebar destination
+                    (nav.watchHistory, /history), and this menu is for the
+                    things that have no other entry point. */}
                 <MenuItem onClick={() => { handleUserMenuClose(); showWelcome(); }}>
                   <ListItemIcon>
                     <HelpOutlineIcon fontSize="small" />

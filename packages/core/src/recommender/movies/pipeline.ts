@@ -25,6 +25,7 @@ import { randomUUID } from 'crypto'
 // Import from modular files
 import { loadConfigForUser } from '../config.js'
 import { getRecommendationConfig } from '../../lib/recommendationConfig.js'
+import { refreshTasteSynopsis } from '../../lib/tasteSynopsisRefresh.js'
 import { getWatchHistory, buildTasteProfile as buildLegacyTasteProfile, storeTasteProfile as storeLegacyTasteProfile, getUserMovieRatings, getDislikedMovieIds } from './taste.js'
 import { getCandidates, getMultiClusterCandidates, getInterestMatchIndex } from './candidates.js'
 import { scoreCandidates } from './scoring.js'
@@ -310,6 +311,20 @@ export async function generateRecommendationsForUser(
     // Also store in legacy location for backwards compatibility
     await storeLegacyTasteProfile(user.id, tasteProfile)
     logger.info({ userId: user.id }, '💾 Stored taste profile (legacy)')
+
+    // 2b. Rewrite the Watcher Identity if the profile above moved under it.
+    //
+    // Here rather than beside the explanation pass, because getUserTasteContext
+    // reads taste_synopsis and unshifts it to the top of the explanation prompt:
+    // written now, this run's explanations use the fresh one. It is also after
+    // the early returns above, so a run about to fail for want of a profile does
+    // not pay for a paragraph describing it.
+    const synopsisOutcome = await refreshTasteSynopsis(user.id, 'movie', {
+      shouldCancel: options.shouldCancel,
+    })
+    if (synopsisOutcome !== 'current') {
+      logger.info({ userId: user.id, outcome: synopsisOutcome }, '🪞 Watcher Identity checked')
+    }
 
     // 3. Get candidate movies (optionally including watched based on user preference)
     logger.info(

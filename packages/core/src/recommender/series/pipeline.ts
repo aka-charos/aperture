@@ -55,6 +55,7 @@ import {
 } from '../shared/index.js'
 import { getDonorWatchedIds, getTwinPairs } from '../twinAffinity.js'
 import { getRecommendationConfig } from '../../lib/recommendationConfig.js'
+import { refreshTasteSynopsis } from '../../lib/tasteSynopsisRefresh.js'
 import { storeSeriesEvidence, getSeriesOverviews } from './storage.js'
 import { getSeriesEmbeddings } from './embeddings.js'
 import {
@@ -1054,6 +1055,16 @@ export async function generateSeriesRecommendationsForUser(
     // Also store in legacy location for backwards compatibility
     await storeSeriesTasteProfile(user.id, tasteProfile)
     logger.info({ userId: user.id }, '💾 Stored series taste profile (legacy)')
+
+    // 2b. Rewrite the Watcher Identity if the profile above moved under it.
+    // Mirrors the movie pipeline; see the note there for why it sits at this
+    // point rather than beside the explanation pass.
+    const synopsisOutcome = await refreshTasteSynopsis(user.id, 'series', {
+      shouldCancel: options.shouldCancel,
+    })
+    if (synopsisOutcome !== 'current') {
+      logger.info({ userId: user.id, outcome: synopsisOutcome }, '🪞 Watcher Identity checked')
+    }
 
     // 3. Get user's preferences for including watched content and handling disliked content
     const userPrefs = await queryOne<{ include_watched: boolean; settings: { dislikeBehavior?: string } | null }>(
