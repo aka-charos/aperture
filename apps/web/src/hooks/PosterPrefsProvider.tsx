@@ -125,7 +125,12 @@ export function PosterPrefsProvider({ children }: { children: ReactNode }) {
           rating preference does: @aperture/ui has no i18n, and one home beats
           the same t() call threaded through twenty poster call sites. */}
       <PosterDisplaySettingsContext.Provider
-        value={{ hideLibraryRatingBadge: effectiveHide, watchedLabel: t('mediaPoster.watched') }}
+        value={{
+          hideLibraryRatingBadge: effectiveHide,
+          watchedLabel: t('mediaPoster.watched'),
+          episodeProgressLabel: (watched, total) =>
+            t('mediaPoster.episodeProgress', { watched, total }),
+        }}
       >
         {children}
       </PosterDisplaySettingsContext.Provider>

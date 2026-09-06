@@ -670,8 +670,9 @@ export {
   unfavoriteWatchingSeriesOnMediaServer,
   processWatchingFavoritesForAllUsers,
   type ReconcileWatchingFavoritesResult,
-  getWatchedItemIdsForUser,
-  type WatchedItemIds,
+  getWatchStatusForUser,
+  type WatchStatusForUser,
+  type SeriesWatchProgress,
 } from './watching/index.js'
 
 // Trakt Integration

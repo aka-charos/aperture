@@ -18,7 +18,13 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import AddToQueueIcon from '@mui/icons-material/AddToQueue'
 import CheckIcon from '@mui/icons-material/Check'
-import { getProxiedImageUrl, FALLBACK_POSTER_URL, StarRating, WatchedBadge } from '@aperture/ui'
+import {
+  getProxiedImageUrl,
+  FALLBACK_POSTER_URL,
+  StarRating,
+  WatchedBadge,
+  EpisodeProgressBadge,
+} from '@aperture/ui'
 
 interface Series {
   id: string
@@ -38,6 +44,8 @@ interface BrowseSeriesListItemProps {
   userRating: number | null
   /** Viewer has finished this title — draws the same tick the poster grid does. */
   watched?: boolean
+  /** Episodes played of episodes held, for a show still in progress. */
+  episodeProgress?: { watched: number; total: number } | null
   onRate: (rating: number | null) => void
   isWatching: boolean
   onWatchingToggle: () => void
@@ -48,6 +56,7 @@ export function BrowseSeriesListItem({
   series,
   userRating,
   watched,
+  episodeProgress,
   onRate,
   isWatching,
   onWatchingToggle,
@@ -135,6 +144,13 @@ export function BrowseSeriesListItem({
           {/* Bottom corner here: the top-right one already holds the network chip
               on desktop, and the status chip owns the top-left. */}
           {watched && <WatchedBadge size={18} sx={{ top: 'auto', bottom: 6, insetInlineEnd: 6 }} />}
+          {!watched && episodeProgress != null && episodeProgress.total > 0 && (
+            <EpisodeProgressBadge
+              watched={episodeProgress.watched}
+              total={episodeProgress.total}
+              sx={{ top: 'auto', bottom: 6, insetInlineEnd: 6, height: 18, fontSize: '0.65rem' }}
+            />
+          )}
           {/* Status badge - smaller on mobile */}
           <Chip
             label={statusChipLabel}

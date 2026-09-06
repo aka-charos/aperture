@@ -2580,7 +2580,8 @@
     "unknownYear": "Onbekend jaar",
     "viewDetails": "Bekijk details",
     "viewOnTmdb": "Bekijk op TMDb",
-    "watched": "Watched"
+    "watched": "Watched",
+    "episodeProgress": "{{watched}} of {{total}} episodes watched"
   },
   "seerrRequest": {
     "title": "Opties aanvragen",

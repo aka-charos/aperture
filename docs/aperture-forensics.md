@@ -1624,9 +1624,29 @@ The year picker inside *Longer ago* (buys nothing for the recommender; would mak
 
 F-033 already records why the first three differ. The fourth is stricter than all of them because a badge is a claim made to the viewer's face: the sync writes a `watch_history` row for played ∪ in-progress ∪ favorited-unplayed (F-040), so the excludable reading would tick a film someone bailed on six minutes in, and the taste reading would tick a bookmark. Both would be a small lie on every poster, in the direction the viewer is least able to check.
 
-A **series** is ticked when every episode the library holds is played — Emby's rule. The population is the library's, not TMDb's, following `completionMultiplier`'s reasoning in F-039: someone who owns one season of five and watched it has finished everything there is to finish here. A part-watched show gets nothing. That is not a lesser tick withheld; "you are 60% through" is a different fact, and Emby answers it with an unwatched-episode count, which is a second feature and is not built.
+A **series** is ticked when every episode the library holds is played — Emby's rule. The population is the library's, not TMDb's, following `completionMultiplier`'s reasoning in F-039: someone who owns one season of five and watched it has finished everything there is to finish here. A part-watched show gets a fraction instead, two sections down.
 
-The two queries are one core function rather than SQL in the route, because a fourth predicate written in a route is the fifth one waiting to happen. The series half carries an `IN (…)` that looks redundant against its own `HAVING`: without it the aggregate walks every episode row in the library (16,591 on the reference instance) to answer a question about the handful of shows the viewer has touched.
+The two queries are one core function rather than SQL in the route, because a fourth predicate written in a route is the fifth one waiting to happen. The series half carries an `IN (…)` that looks redundant against its own aggregate: without it the query walks every episode row in the library (16,591 on the reference instance) to answer a question about the handful of shows the viewer has touched.
+
+### 8 means nothing on its own
+
+Raised in review before the counter was built: Emby badges a part-watched series with the number of episodes *remaining*, and that number cannot distinguish a mini-series nobody has started from season 3 of something with 200 episodes. Both read `8`.
+
+So the badge is a **fraction** — `8/24`, watched in green against a muted total — which states a position rather than a quantity, and degrades correctly (`0/24` would still say "24-episode show, untouched", where Emby's `24` cannot). Watched-of-total rather than remaining-of-total, because that is the number a viewer tracks about themselves.
+
+Three things fall out of it:
+
+- **Tick and pill are one slot.** A finished show draws the tick, never `24/24`; `MoviePoster` picks, so no call site can render both. The pill is ~45px wide against the tick's 22px dot, which on the narrowest series poster in the app (~120px, in a carousel) is about a third of the card width. That cost is the point of the feature: the compact version was the uninformative one.
+- **Untouched shows are not badged.** Emby's badge is on every unwatched series, which in a 987-show library is a number on every poster. Bounding the query to shows with at least one played episode makes a badge mean "you are partway into this one", and is the same clause that keeps the aggregate off the whole episodes table.
+- **The denominator must be the library's episodes**, matching the tick. Counting TMDb's total would leave a show sitting at `8/24` and then ticking at `8/8`, contradicting itself on one card.
+
+### Specials were quietly suppressing ticks
+
+`episodes` holds season 0. `recommender/series/syncLibrary.ts` skips only episodes with a null season or episode number (extras, bonus content) plus one Aperture-generated placeholder, so Christmas specials, OVAs and recap episodes are real rows with real numbers.
+
+That made the first version of the tick wrong in a way nobody would diagnose from the screen: finish all five seasons of something, never watch its three specials, and the poster stays bare forever. The fraction would have made it *visible* — `60/63`, permanently — without making it explicable.
+
+Both halves now filter `season_number > 0`. A show is its seasons. The asymmetry is what makes that safe as a default: excluding specials can only ever move a show **toward** complete, so the failure mode is a tick arriving slightly early for someone who counts the specials as part of the show — not a viewer being told they have not finished something they have.
 
 ### One set, not ten flags
 
@@ -1653,6 +1673,6 @@ That endpoint was counting `wh.id IS NOT NULL` — any row — which is the excl
 
 ### Left unticked deliberately
 
-My Watch History and the watch-stats drill-in (every row is watched by construction; a tick on all of them is decoration), Home's two rails (recommendations are unwatched by construction, history watched), another user's profile page (the provider holds the *viewer's* set, so a tick there would be an assertion about the wrong person), and gap analysis (TMDb rows with no library id, so the question cannot be asked).
+My Watch History and the watch-stats drill-in (every row is watched by construction; a tick on all of them is decoration), Home's two rails (recommendations are unwatched by construction, history watched), another user's profile page (the provider holds the *viewer's* set, so a tick there would be an assertion about the wrong person), and gap analysis (TMDb rows with no library id, so the question cannot be asked). The assistant's chat cards stay tick-only: `ContentItem.watched` is a boolean stamped by `annotateWatchedItems` and carries no episode counts.
 
 No setting was added. Emby has no toggle for this and the request was for parity; `PosterDisplaySettings` is where one would go if it is ever wanted, beside `hideLibraryRatingBadge`, which exists for a reason that does not apply here (some servers burn a rating into the artwork; none burns in a watched tick).

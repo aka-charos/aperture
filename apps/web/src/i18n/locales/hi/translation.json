@@ -1247,7 +1247,8 @@
     "unknownYear": "अज्ञात वर्ष",
     "viewDetails": "विवरण देखें",
     "viewOnTmdb": "टीएमडीबी पर देखें",
-    "watched": "Watched"
+    "watched": "Watched",
+    "episodeProgress": "{{watched}} of {{total}} episodes watched"
   },
   "seerrRequest": {
     "title": "विकल्प का अनुरोध करें",

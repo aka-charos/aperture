@@ -43,7 +43,7 @@ export function MediaCarousel({
   const emptyMessage = emptyMessageProp ?? t('dashboard.carouselEmpty')
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
-  const { isWatched } = useWatchStatus()
+  const { isWatched, getEpisodeProgress } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
 
   const handleRate = useCallback(
@@ -71,6 +71,7 @@ export function MediaCarousel({
       showScore={showScore && item.matchScore != null}
       userRating={getRating(item.type, item.id)}
       watched={isWatched(item.type, item.id)}
+      episodeProgress={getEpisodeProgress(item.type, item.id)}
       onRate={(rating) => handleRate(item.type, item.id, rating)}
       isWatching={item.type === 'series' ? isWatching(item.id) : undefined}
       onWatchingToggle={item.type === 'series' ? () => toggleWatching(item.id) : undefined}

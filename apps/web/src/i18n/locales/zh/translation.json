@@ -858,7 +858,8 @@
     "unknownYear": "年份不明",
     "viewDetails": "查看详情",
     "viewOnTmdb": "在 TMDb 上查看",
-    "watched": "Watched"
+    "watched": "Watched",
+    "episodeProgress": "{{watched}} of {{total}} episodes watched"
   },
   "seerrRequest": {
     "title": "请求选项",

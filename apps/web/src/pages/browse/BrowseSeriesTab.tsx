@@ -76,7 +76,7 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
-  const { isWatched } = useWatchStatus()
+  const { isWatched, getEpisodeProgress } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
 
   const handleRateSeries = useCallback(
@@ -249,6 +249,7 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
                     overview={show.overview}
                     userRating={getRating('series', show.id)}
                     watched={isWatched('series', show.id)}
+                    episodeProgress={getEpisodeProgress('series', show.id)}
                     onRate={(rating) => void handleRateSeries(show.id, rating)}
                     isWatching={isWatching(show.id)}
                     onWatchingToggle={() => toggleWatching(show.id)}
@@ -266,6 +267,7 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
                   series={show}
                   userRating={getRating('series', show.id)}
                   watched={isWatched('series', show.id)}
+                  episodeProgress={getEpisodeProgress('series', show.id)}
                   onRate={(rating) => void handleRateSeries(show.id, rating)}
                   isWatching={isWatching(show.id)}
                   onWatchingToggle={() => toggleWatching(show.id)}

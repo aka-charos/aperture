@@ -858,7 +858,8 @@
     "unknownYear": "不明な年",
     "viewDetails": "詳細を見る",
     "viewOnTmdb": "TMDb で見る",
-    "watched": "Watched"
+    "watched": "Watched",
+    "episodeProgress": "{{watched}} of {{total}} episodes watched"
   },
   "seerrRequest": {
     "title": "リクエストオプション",

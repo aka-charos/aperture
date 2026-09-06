@@ -88,7 +88,7 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
   const navigate = useNavigate()
   const theme = useTheme()
   const { getRating, setRating } = useUserRatings()
-  const { isWatched } = useWatchStatus()
+  const { isWatched, getEpisodeProgress } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
   const [items, setItems] = useState<TopPickItem[]>([])
   const [config, setConfig] = useState<TopPicksConfig | null>(null)
@@ -225,6 +225,7 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
                   overview={item.overview}
                   userRating={getRating(item.mediaType, item.id)}
                   watched={isWatched(item.mediaType, item.id)}
+                  episodeProgress={getEpisodeProgress(item.mediaType, item.id)}
                   onRate={(rating) => handleRate(item.id, rating)}
                   responsive
                   isWatching={item.mediaType === 'series' ? isWatching(item.id) : undefined}

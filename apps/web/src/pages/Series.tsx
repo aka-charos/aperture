@@ -40,7 +40,7 @@ export function SeriesPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
-  const { isWatched } = useWatchStatus()
+  const { isWatched, getEpisodeProgress } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
   const [series, setSeries] = useState<Series[]>([])
   const [genres, setGenres] = useState<string[]>([])
@@ -269,6 +269,7 @@ export function SeriesPage() {
                   overview={show.overview}
                   userRating={getRating('series', show.id)}
                   watched={isWatched('series', show.id)}
+                  episodeProgress={getEpisodeProgress('series', show.id)}
                   onRate={(rating) => handleRate(show.id, rating)}
                   isWatching={isWatching(show.id)}
                   onWatchingToggle={() => toggleWatching(show.id)}

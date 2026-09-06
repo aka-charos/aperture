@@ -139,7 +139,7 @@ export function MyRecommendationsPage() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
   const { user } = useAuth()
   const { getRating, setRating } = useUserRatings()
-  const { isWatched } = useWatchStatus()
+  const { isWatched, getEpisodeProgress } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
   
   // Tab state
@@ -536,6 +536,7 @@ export function MyRecommendationsPage() {
                     hideRating
                     userRating={getRating(type, id)}
                     watched={isWatched(type, id)}
+                    episodeProgress={getEpisodeProgress(type, id)}
                     onRate={(rating) => handleRate(type, id, rating)}
                     isWatching={type === 'series' ? isWatching(id) : undefined}
                     onWatchingToggle={type === 'series' ? () => toggleWatching(id) : undefined}
