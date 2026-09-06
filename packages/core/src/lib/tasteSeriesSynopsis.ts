@@ -288,6 +288,17 @@ Rules:
     fullText = fallback
   }
 
+  // An empty generation is not a result, and must never reach the store. See
+  // the movie generator for why the stream can finish clean with no text, and
+  // why this throws instead of returning quietly.
+  if (!fullText.trim()) {
+    logger.warn(
+      { userId },
+      'Series synopsis generation produced no text; keeping the stored synopsis'
+    )
+    throw new Error('The model returned an empty taste profile; nothing was changed')
+  }
+
   // Store the complete synopsis
   await query(
     `
@@ -312,9 +323,10 @@ Rules:
 }
 
 /**
- * Get existing series synopsis - never auto-regenerates on page load.
- * Background job handles periodic refresh based on user's refresh_interval_days setting.
- * User can manually regenerate via streamSeriesTasteSynopsis().
+ * Get the stored series synopsis. Never regenerates on page load.
+ *
+ * As on the movie side: no background job refreshes this, so it is written by
+ * the Generate Identity button and otherwise only ever deleted. See F-110.
  */
 export async function getSeriesTasteSynopsis(userId: string): Promise<SeriesTasteSynopsis> {
   // Check for existing synopsis
