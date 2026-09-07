@@ -8,6 +8,7 @@ import { query } from '../../../lib/db.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext } from '../types.js'
+import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 
 export function createHistoryTools(ctx: ToolContext) {
   return {
@@ -40,7 +41,8 @@ export function createHistoryTools(ctx: ToolContext) {
              m.provider_item_id, m.directors, wh.last_played_at, wh.play_count
              FROM watch_history wh JOIN movies m ON m.id = wh.movie_id
              WHERE wh.user_id = $1 AND wh.movie_id IS NOT NULL
-             ORDER BY wh.last_played_at DESC LIMIT $2`,
+               AND ${WATCH_HISTORY_PLAYED_SQL}
+             ORDER BY wh.last_played_at DESC NULLS LAST LIMIT $2`,
             [ctx.userId, limit]
           )
 
@@ -92,6 +94,7 @@ export function createHistoryTools(ctx: ToolContext) {
              FROM watch_history wh JOIN episodes e ON e.id = wh.episode_id
              JOIN series s ON s.id = e.series_id
              WHERE wh.user_id = $1 AND wh.episode_id IS NOT NULL
+               AND ${WATCH_HISTORY_PLAYED_SQL}
              GROUP BY s.id, s.title, s.year, s.poster_url, s.genres, s.community_rating, s.provider_item_id, s.directors
              ORDER BY last_watched DESC LIMIT $2`,
             [ctx.userId, limit]

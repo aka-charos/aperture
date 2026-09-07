@@ -6,6 +6,7 @@
  */
 
 import type { FastifyPluginAsync } from 'fastify'
+import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 import { query, queryOne } from '../../lib/db.js'
 import { requireAuth } from '../../plugins/auth.js'
 import {
@@ -115,6 +116,9 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
     const userId = request.user!.id
 
     const result = await query<WatchingSeriesRow>(
+      // Played only — a favorited episode writes a watch_history row, and
+      // without this it both inflated episodes_watched and put a show the
+      // viewer has never started into their "in history" union.
       `WITH hist AS (
          SELECT e.series_id,
                 COUNT(DISTINCT e.id) AS episodes_watched,
@@ -122,6 +126,7 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
          FROM watch_history wh
          JOIN episodes e ON e.id = wh.episode_id
          WHERE wh.user_id = $1 AND wh.episode_id IS NOT NULL
+           AND ${WATCH_HISTORY_PLAYED_SQL}
          GROUP BY e.series_id
        )
        SELECT s.id AS series_id, uws.id AS watching_id, uws.added_at,

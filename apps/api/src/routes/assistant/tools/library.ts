@@ -8,6 +8,7 @@ import { query, queryOne } from '../../../lib/db.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import type { ContentCarouselI18nKey } from '../schemas/contentCarousel.js'
 import type { ToolContext } from '../types.js'
+import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 
 function rankingTitleKey(
   rankBy:
@@ -345,11 +346,11 @@ export function createLibraryTools(ctx: ToolContext) {
           series_started: string
           total_plays: string
         }>(
-          `SELECT 
+          `SELECT
            COUNT(DISTINCT movie_id) FILTER (WHERE movie_id IS NOT NULL) as movies_watched,
            COUNT(DISTINCT (SELECT e2.series_id FROM episodes e2 WHERE e2.id = wh.episode_id)) FILTER (WHERE episode_id IS NOT NULL) as series_started,
-           SUM(play_count) as total_plays 
-           FROM watch_history wh WHERE user_id = $1`,
+           SUM(play_count) as total_plays
+           FROM watch_history wh WHERE user_id = $1 AND ${WATCH_HISTORY_PLAYED_SQL}`,
           [ctx.userId]
         )
 

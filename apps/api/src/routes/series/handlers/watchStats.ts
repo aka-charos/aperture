@@ -4,6 +4,7 @@
  * GET /api/series/:id/watch-stats - Get comprehensive watch statistics for a series
  */
 import type { FastifyInstance } from 'fastify'
+import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import {
@@ -45,13 +46,19 @@ export function registerWatchStatsHandler(fastify: FastifyInstance) {
         first_watched: Date | null
         last_watched: Date | null
       }>(
-        `SELECT 
+        // Watched counts are played-only — favoriting an unwatched episode
+        // writes a row, and it must not read as an episode seen. FILTER rather
+        // than WHERE so favorites_count still counts every favorite: the two
+        // are separate questions, and the row is kept so the favorite survives
+        // even for someone who never started the show.
+        `SELECT
           wh.user_id,
-          COUNT(DISTINCT wh.episode_id) as episodes_watched,
-          SUM(wh.play_count) as total_plays,
+          COUNT(DISTINCT wh.episode_id) FILTER (WHERE ${WATCH_HISTORY_PLAYED_SQL})
+            AS episodes_watched,
+          COALESCE(SUM(wh.play_count) FILTER (WHERE ${WATCH_HISTORY_PLAYED_SQL}), 0) AS total_plays,
           COUNT(DISTINCT CASE WHEN wh.is_favorite THEN wh.episode_id END) as favorites_count,
-          MIN(wh.last_played_at) as first_watched,
-          MAX(wh.last_played_at) as last_watched
+          MIN(wh.last_played_at) FILTER (WHERE ${WATCH_HISTORY_PLAYED_SQL}) as first_watched,
+          MAX(wh.last_played_at) FILTER (WHERE ${WATCH_HISTORY_PLAYED_SQL}) as last_watched
          FROM watch_history wh
          JOIN episodes e ON e.id = wh.episode_id
          WHERE e.series_id = $1 AND wh.episode_id IS NOT NULL
@@ -59,9 +66,15 @@ export function registerWatchStatsHandler(fastify: FastifyInstance) {
         [id]
       )
 
+      // A viewer is someone who played an episode. Every count below is taken
+      // over these rows rather than over the query's, which also holds people
+      // who only favorited something here — they would otherwise be counted as
+      // viewers and then divided into the average progress at zero.
+      const viewerRows = watchStats.rows.filter((s) => parseInt(s.episodes_watched, 10) > 0)
+
       // Calculate completed viewers (watched all episodes)
       const completedViewers = totalEpisodes > 0
-        ? watchStats.rows.filter(s => parseInt(s.episodes_watched, 10) >= totalEpisodes).length
+        ? viewerRows.filter(s => parseInt(s.episodes_watched, 10) >= totalEpisodes).length
         : 0
 
       // Get user ratings for this series
@@ -78,10 +91,10 @@ export function registerWatchStatsHandler(fastify: FastifyInstance) {
       )
 
       // Calculate average progress (what % of the show users have watched on average)
-      const avgProgress = totalEpisodes > 0 && watchStats.rows.length > 0
+      const avgProgress = totalEpisodes > 0 && viewerRows.length > 0
         ? Math.round(
-            watchStats.rows.reduce((sum, s) => sum + parseInt(s.episodes_watched, 10), 0) /
-            watchStats.rows.length /
+            viewerRows.reduce((sum, s) => sum + parseInt(s.episodes_watched, 10), 0) /
+            viewerRows.length /
             totalEpisodes *
             100
           )
@@ -105,23 +118,23 @@ export function registerWatchStatsHandler(fastify: FastifyInstance) {
       return reply.send({
         currentlyWatching: parseInt(watchingCount?.count || '0', 10),
         ...(watcherList ? { watchers: watcherList } : {}),
-        totalViewers: watchStats.rows.length,
+        totalViewers: viewerRows.length,
         completedViewers,
         totalEpisodes,
-        totalEpisodePlays: watchStats.rows.reduce((sum, s) => sum + parseInt(s.total_plays, 10), 0),
+        totalEpisodePlays: viewerRows.reduce((sum, s) => sum + parseInt(s.total_plays, 10), 0),
         favoritedEpisodes: totalFavorites,
-        firstWatched: watchStats.rows.length > 0 
-          ? new Date(Math.min(...watchStats.rows.filter(s => s.first_watched).map(s => new Date(s.first_watched!).getTime())))
+        firstWatched: viewerRows.length > 0 
+          ? new Date(Math.min(...viewerRows.filter(s => s.first_watched).map(s => new Date(s.first_watched!).getTime())))
           : null,
-        lastWatched: watchStats.rows.length > 0
-          ? new Date(Math.max(...watchStats.rows.filter(s => s.last_watched).map(s => new Date(s.last_watched!).getTime())))
+        lastWatched: viewerRows.length > 0
+          ? new Date(Math.max(...viewerRows.filter(s => s.last_watched).map(s => new Date(s.last_watched!).getTime())))
           : null,
         // User ratings
         averageUserRating: ratingStats?.avg_rating ? parseFloat(ratingStats.avg_rating) : null,
         totalRatings: parseInt(ratingStats?.rating_count || '0', 10),
         // Progress metrics
         averageProgress: avgProgress,
-        watchPercentage: totalUsers > 0 ? Math.round((watchStats.rows.length / totalUsers) * 100) : 0,
+        watchPercentage: totalUsers > 0 ? Math.round((viewerRows.length / totalUsers) * 100) : 0,
         totalUsers,
       })
     }

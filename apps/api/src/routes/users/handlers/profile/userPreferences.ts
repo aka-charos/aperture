@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 import { queryOne } from '../../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../../plugins/auth.js'
 import { requireSelfOrAdmin } from './shared.js'
@@ -40,12 +41,19 @@ export function registerUserPreferencesHandlers(fastify: FastifyInstance) {
       if (!requireSelfOrAdmin(id, currentUser, reply)) return
 
       // Get watched count (from enabled libraries only)
+      //
+      // Played, not "has a row". This tile sits directly beside the favorites
+      // tile below it, and a favorited-but-unwatched film writes a
+      // watch_history row — so without the predicate every bookmark was
+      // counted once in each, and Home told people they had watched films they
+      // had only saved for later.
       const watchedResult = await queryOne<{ count: string }>(
-        `SELECT COUNT(*) as count 
+        `SELECT COUNT(*) as count
          FROM watch_history wh
          JOIN movies m ON m.id = wh.movie_id
          JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
-         WHERE wh.user_id = $1 AND lc.is_enabled = true`,
+         WHERE wh.user_id = $1 AND lc.is_enabled = true
+           AND ${WATCH_HISTORY_PLAYED_SQL}`,
         [id]
       )
 

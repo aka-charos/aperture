@@ -10,6 +10,7 @@ import { query } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { getTopPicksConfig, type TopPicksConfig, type PopularitySource, type HybridExternalSource } from './config.js'
 import { getListItems, isMDBListConfigured, type MDBListItem } from '../mdblist/index.js'
+import { WATCH_HISTORY_PLAYED_SQL } from '../recommender/watchedExclusion.js'
 import {
   getPopularMoviesBatch,
   getTrendingMoviesBatch,
@@ -160,6 +161,7 @@ async function getTopMoviesLocalPublic(
       FROM watch_history wh
       WHERE wh.movie_id IS NOT NULL
         AND wh.last_played_at >= NOW() - INTERVAL '${timeWindowDays} days'
+        AND ${WATCH_HISTORY_PLAYED_SQL}
       GROUP BY wh.movie_id
       HAVING COUNT(DISTINCT wh.user_id) >= $1
     )
@@ -323,11 +325,12 @@ async function getTopSeriesLocalPublic(
         SELECT COUNT(DISTINCT wh2.episode_id) as episodes_watched
         FROM watch_history wh2
         JOIN episodes e2 ON e2.id = wh2.episode_id
-        WHERE wh2.user_id = wh.user_id AND e2.series_id = e.series_id
+        WHERE wh2.user_id = wh.user_id AND e2.series_id = e.series_id AND wh2.played = true
       ) user_watched ON true
       WHERE wh.episode_id IS NOT NULL
         AND wh.media_type = 'episode'
         AND wh.last_played_at >= NOW() - INTERVAL '${timeWindowDays} days'
+        AND ${WATCH_HISTORY_PLAYED_SQL}
       GROUP BY e.series_id
       HAVING COUNT(DISTINCT wh.user_id) >= $1
     )
@@ -560,8 +563,9 @@ async function matchMDBListMoviesToLibrary(
       movie_id,
       COUNT(DISTINCT user_id) as unique_viewers,
       COUNT(*) as play_count
-    FROM watch_history
-    WHERE movie_id = ANY($1)
+    FROM watch_history wh
+    WHERE wh.movie_id = ANY($1)
+      AND ${WATCH_HISTORY_PLAYED_SQL}
     GROUP BY movie_id
   `,
     [movieIds]
@@ -690,6 +694,7 @@ async function matchMDBListSeriesToLibrary(
     FROM watch_history wh
     JOIN episodes e ON e.id = wh.episode_id
     WHERE e.series_id = ANY($1)
+      AND ${WATCH_HISTORY_PLAYED_SQL}
     GROUP BY e.series_id
   `,
     [seriesIds]
@@ -958,8 +963,9 @@ async function matchTMDBMoviesToLibrary(
       movie_id,
       COUNT(DISTINCT user_id) as unique_viewers,
       COUNT(*) as play_count
-    FROM watch_history
-    WHERE movie_id = ANY($1)
+    FROM watch_history wh
+    WHERE wh.movie_id = ANY($1)
+      AND ${WATCH_HISTORY_PLAYED_SQL}
     GROUP BY movie_id
   `,
     [movieIds]
@@ -1064,6 +1070,7 @@ async function matchTMDBSeriesToLibrary(
     FROM watch_history wh
     JOIN episodes e ON e.id = wh.episode_id
     WHERE e.series_id = ANY($1)
+      AND ${WATCH_HISTORY_PLAYED_SQL}
     GROUP BY e.series_id
   `,
     [seriesIds]
@@ -1413,6 +1420,7 @@ async function getTopMoviesLocal(
       FROM watch_history wh
       WHERE wh.movie_id IS NOT NULL
         AND wh.last_played_at >= NOW() - INTERVAL '${timeWindowDays} days'
+        AND ${WATCH_HISTORY_PLAYED_SQL}
       GROUP BY wh.movie_id
       HAVING COUNT(DISTINCT wh.user_id) >= $1
     )
@@ -1516,11 +1524,12 @@ async function getTopSeriesLocal(
         SELECT COUNT(DISTINCT wh2.episode_id) as episodes_watched
         FROM watch_history wh2
         JOIN episodes e2 ON e2.id = wh2.episode_id
-        WHERE wh2.user_id = wh.user_id AND e2.series_id = e.series_id
+        WHERE wh2.user_id = wh.user_id AND e2.series_id = e.series_id AND wh2.played = true
       ) user_watched ON true
       WHERE wh.episode_id IS NOT NULL
         AND wh.media_type = 'episode'
         AND wh.last_played_at >= NOW() - INTERVAL '${timeWindowDays} days'
+        AND ${WATCH_HISTORY_PLAYED_SQL}
       GROUP BY e.series_id
       HAVING COUNT(DISTINCT wh.user_id) >= $1
     )
@@ -1605,10 +1614,11 @@ export async function getTopPicksPreviewCounts(
     `
     SELECT COUNT(*) as count FROM (
       SELECT movie_id
-      FROM watch_history
-      WHERE movie_id IS NOT NULL
-        AND media_type = 'movie'
-        AND last_played_at >= NOW() - INTERVAL '${moviesTimeWindowDays} days'
+      FROM watch_history wh
+      WHERE wh.movie_id IS NOT NULL
+        AND wh.media_type = 'movie'
+        AND wh.last_played_at >= NOW() - INTERVAL '${moviesTimeWindowDays} days'
+        AND ${WATCH_HISTORY_PLAYED_SQL}
       GROUP BY movie_id
       HAVING COUNT(DISTINCT user_id) >= $1
     ) sub
@@ -1626,6 +1636,7 @@ export async function getTopPicksPreviewCounts(
       WHERE wh.episode_id IS NOT NULL
         AND wh.media_type = 'episode'
         AND wh.last_played_at >= NOW() - INTERVAL '${seriesTimeWindowDays} days'
+        AND ${WATCH_HISTORY_PLAYED_SQL}
       GROUP BY e.series_id
       HAVING COUNT(DISTINCT wh.user_id) >= $1
     ) sub
@@ -1675,10 +1686,11 @@ async function findRecommendedMinViewers(
         `
         SELECT COUNT(*) as count FROM (
           SELECT movie_id
-          FROM watch_history
-          WHERE movie_id IS NOT NULL
-            AND media_type = 'movie'
-            AND last_played_at >= NOW() - INTERVAL '${timeWindowDays} days'
+          FROM watch_history wh
+          WHERE wh.movie_id IS NOT NULL
+            AND wh.media_type = 'movie'
+            AND wh.last_played_at >= NOW() - INTERVAL '${timeWindowDays} days'
+            AND ${WATCH_HISTORY_PLAYED_SQL}
           GROUP BY movie_id
           HAVING COUNT(DISTINCT user_id) >= $1
         ) sub
@@ -1696,6 +1708,7 @@ async function findRecommendedMinViewers(
           WHERE wh.episode_id IS NOT NULL
             AND wh.media_type = 'episode'
             AND wh.last_played_at >= NOW() - INTERVAL '${timeWindowDays} days'
+            AND ${WATCH_HISTORY_PLAYED_SQL}
           GROUP BY e.series_id
           HAVING COUNT(DISTINCT wh.user_id) >= $1
         ) sub

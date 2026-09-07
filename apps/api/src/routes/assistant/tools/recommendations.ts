@@ -12,6 +12,7 @@ import { enrichCardReasons } from '../discovery/enrichReasons.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext, MovieResult, SeriesResult } from '../types.js'
+import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 
 /**
  * How many nearest neighbours to pull before blending in taste.
@@ -479,7 +480,8 @@ export function createRecommendationTools(ctx: ToolContext) {
 
         if (type === 'movies' || type === 'both') {
           let whereClause = `WHERE m.id NOT IN (
-            SELECT movie_id FROM watch_history WHERE user_id = $1 AND movie_id IS NOT NULL)`
+            SELECT wh.movie_id FROM watch_history wh
+            WHERE wh.user_id = $1 AND wh.movie_id IS NOT NULL AND ${WATCH_HISTORY_PLAYED_SQL})`
           const params: unknown[] = [ctx.userId]
           let paramIndex = 2
 
@@ -512,7 +514,7 @@ export function createRecommendationTools(ctx: ToolContext) {
           let whereClause = `WHERE s.id NOT IN (
             SELECT DISTINCT ep.series_id FROM watch_history wh
             JOIN episodes ep ON ep.id = wh.episode_id
-            WHERE wh.user_id = $1)`
+            WHERE wh.user_id = $1 AND ${WATCH_HISTORY_PLAYED_SQL})`
           const params: unknown[] = [ctx.userId]
           let paramIndex = 2
 

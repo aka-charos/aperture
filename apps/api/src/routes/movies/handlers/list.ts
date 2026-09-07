@@ -4,6 +4,7 @@
  * GET /api/movies - List all movies with pagination, filtering, and sorting
  */
 import type { FastifyInstance } from 'fastify'
+import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { listMoviesSchema } from '../schemas.js'
@@ -167,11 +168,16 @@ export function registerListHandler(fastify: FastifyInstance) {
         params.push(countries)
       }
 
+      // Watched means played. A favorited-but-unwatched film has a
+      // watch_history row, so the bare EXISTS filed every bookmark under
+      // "Watched" and, worse, hid it from "Unwatched" — which is the filter
+      // someone uses to find the thing they saved to watch.
       if (watchStatus === 'watched') {
         whereClause += whereClause ? ' AND ' : ' WHERE '
         whereClause += `EXISTS (
           SELECT 1 FROM watch_history wh
           WHERE wh.user_id = $${paramIndex++} AND wh.movie_id = movies.id AND wh.media_type = 'movie'
+            AND ${WATCH_HISTORY_PLAYED_SQL}
         )`
         params.push(userId)
       } else if (watchStatus === 'unwatched') {
@@ -179,15 +185,19 @@ export function registerListHandler(fastify: FastifyInstance) {
         whereClause += `NOT EXISTS (
           SELECT 1 FROM watch_history wh
           WHERE wh.user_id = $${paramIndex++} AND wh.movie_id = movies.id AND wh.media_type = 'movie'
+            AND ${WATCH_HISTORY_PLAYED_SQL}
         )`
         params.push(userId)
       }
 
+      // "Distinct users on this server" is what the helper text promises, and a
+      // watcher is someone who played it.
       if (minWatchers) {
         const n = parseInt(minWatchers, 10)
         if (!isNaN(n) && n > 0) {
           whereClause += whereClause ? ' AND ' : ' WHERE '
-          whereClause += `(SELECT COUNT(DISTINCT user_id)::int FROM watch_history WHERE movie_id = movies.id) >= $${paramIndex++}`
+          whereClause += `(SELECT COUNT(DISTINCT wh.user_id)::int FROM watch_history wh
+            WHERE wh.movie_id = movies.id AND ${WATCH_HISTORY_PLAYED_SQL}) >= $${paramIndex++}`
           params.push(n)
         }
       }
@@ -195,7 +205,8 @@ export function registerListHandler(fastify: FastifyInstance) {
         const n = parseInt(maxWatchers, 10)
         if (!isNaN(n) && n >= 0) {
           whereClause += whereClause ? ' AND ' : ' WHERE '
-          whereClause += `(SELECT COUNT(DISTINCT user_id)::int FROM watch_history WHERE movie_id = movies.id) <= $${paramIndex++}`
+          whereClause += `(SELECT COUNT(DISTINCT wh.user_id)::int FROM watch_history wh
+            WHERE wh.movie_id = movies.id AND ${WATCH_HISTORY_PLAYED_SQL}) <= $${paramIndex++}`
           params.push(n)
         }
       }

@@ -140,3 +140,11 @@ test('the predicate reads episode_id and excludes movie rows', () => {
   const sql = episodeWatchCondition('watched', 1)
   assert.match(sql, /episode_id IS NOT NULL/)
 })
+
+test('an episode counts as watched only when it was played', () => {
+  // Favoriting a single episode writes a watch_history row with played = false,
+  // so a bare "is there a row" test answered "watched" for an episode nobody
+  // has seen — and, through NOT IN, hid it from an unwatched search.
+  const sql = episodeWatchCondition('watched', 1)
+  assert.match(sql, /played = true/)
+})

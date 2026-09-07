@@ -22,7 +22,16 @@
  * plugin makes `request.user` the target and puts the real admin on
  * `request.impersonation`, so viewing as a non-admin shows the anonymous
  * version, which is what that mode is for.
+ *
+ * A WATCHER IS SOMEONE WHO PLAYED IT. Favoriting an unwatched title writes a
+ * watch_history row, so the unfiltered version of these queries named people as
+ * having watched films they had only bookmarked — a claim made about one person
+ * to another, which is the worst place in the app for this particular mistake.
+ * The favorite counts beside them are deliberately NOT filtered: they answer a
+ * different question, and a viewer who bookmarked an episode should have it
+ * counted whether or not they got to it.
  */
+import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 import { query } from './db.js'
 import type { SessionUser } from '../plugins/auth.js'
 
@@ -94,7 +103,8 @@ export async function fetchMovieWatchers(
             wh.is_favorite
      FROM watch_history wh
      JOIN users u ON u.id = wh.user_id
-     WHERE wh.movie_id = $1 AND wh.media_type = 'movie'${clause}
+     WHERE wh.movie_id = $1 AND wh.media_type = 'movie'
+       AND ${WATCH_HISTORY_PLAYED_SQL}${clause}
      ORDER BY wh.last_played_at DESC NULLS LAST, name ASC`,
     params
   )
@@ -129,18 +139,27 @@ export async function fetchSeriesWatchers(
     last_played_at: Date | null
     favorites: string
   }>(
+    // The played filter is a FILTER clause rather than a WHERE, so a viewer's
+    // favorited episodes are still counted in full for them. Moving it up into
+    // the WHERE would silently redefine `favorites` as "favorited episodes they
+    // also played". The HAVING is what keeps this a list of watchers: someone
+    // who only bookmarked an episode has no played rows and does not appear.
     `SELECT wh.user_id,
             COALESCE(${NAME_SQL}) AS name,
-            COUNT(DISTINCT wh.episode_id) AS episodes_watched,
-            COALESCE(SUM(wh.play_count), 0) AS total_plays,
-            MAX(wh.last_played_at) AS last_played_at,
+            COUNT(DISTINCT wh.episode_id) FILTER (WHERE ${WATCH_HISTORY_PLAYED_SQL})
+              AS episodes_watched,
+            COALESCE(SUM(wh.play_count) FILTER (WHERE ${WATCH_HISTORY_PLAYED_SQL}), 0)
+              AS total_plays,
+            MAX(wh.last_played_at) FILTER (WHERE ${WATCH_HISTORY_PLAYED_SQL}) AS last_played_at,
             COUNT(DISTINCT CASE WHEN wh.is_favorite THEN wh.episode_id END) AS favorites
      FROM watch_history wh
      JOIN episodes e ON e.id = wh.episode_id
      JOIN users u ON u.id = wh.user_id
      WHERE e.series_id = $1 AND wh.episode_id IS NOT NULL${clause}
      GROUP BY wh.user_id, u.display_name, u.username
-     ORDER BY MAX(wh.last_played_at) DESC NULLS LAST, name ASC`,
+     HAVING COUNT(*) FILTER (WHERE ${WATCH_HISTORY_PLAYED_SQL}) > 0
+     ORDER BY MAX(wh.last_played_at) FILTER (WHERE ${WATCH_HISTORY_PLAYED_SQL})
+              DESC NULLS LAST, name ASC`,
     params
   )
 

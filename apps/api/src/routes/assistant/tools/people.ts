@@ -6,6 +6,7 @@ import { nullSafe } from './utils.js'
 import { z } from 'zod'
 import { query } from '../../../lib/db.js'
 import type { ToolContext } from '../types.js'
+import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 
 export function createPeopleTools(ctx: ToolContext) {
   return {
@@ -258,6 +259,7 @@ export function createPeopleTools(ctx: ToolContext) {
              JOIN watch_history wh ON wh.movie_id = m.id,
              LATERAL jsonb_array_elements(m.studios) as studio_obj
              WHERE wh.user_id = $1 AND studio_obj->>'name' IS NOT NULL
+               AND ${WATCH_HISTORY_PLAYED_SQL}
              GROUP BY studio_obj->>'name' ORDER BY count DESC LIMIT $2`,
             [ctx.userId, limit]
           )
@@ -270,9 +272,10 @@ export function createPeopleTools(ctx: ToolContext) {
 
           for (const row of studioData.rows) {
             const topMovies = await query<{ id: string; title: string }>(
-              `SELECT m.id, m.title FROM movies m 
+              `SELECT m.id, m.title FROM movies m
                JOIN watch_history wh ON wh.movie_id = m.id
-               WHERE wh.user_id = $1 
+               WHERE wh.user_id = $1
+                 AND ${WATCH_HISTORY_PLAYED_SQL}
                  AND EXISTS (
                    SELECT 1 FROM jsonb_array_elements(m.studios) s 
                    WHERE s->>'name' = $2
@@ -299,6 +302,7 @@ export function createPeopleTools(ctx: ToolContext) {
              FROM series s JOIN episodes e ON e.series_id = s.id
              JOIN watch_history wh ON wh.episode_id = e.id
              WHERE wh.user_id = $1 AND s.network IS NOT NULL
+               AND ${WATCH_HISTORY_PLAYED_SQL}
              GROUP BY s.network ORDER BY count DESC LIMIT $2`,
             [ctx.userId, limit]
           )
@@ -315,6 +319,7 @@ export function createPeopleTools(ctx: ToolContext) {
                JOIN episodes e ON e.series_id = s.id
                JOIN watch_history wh ON wh.episode_id = e.id
                WHERE wh.user_id = $1 AND s.network = $2
+                 AND ${WATCH_HISTORY_PLAYED_SQL}
                ORDER BY s.community_rating DESC NULLS LAST LIMIT 3`,
               [ctx.userId, row.network]
             )

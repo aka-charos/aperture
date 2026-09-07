@@ -4,6 +4,7 @@
  * GET /api/movies/:id/watch-stats - Get comprehensive watch statistics for a movie
  */
 import type { FastifyInstance } from 'fastify'
+import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 import { queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import {
@@ -31,14 +32,19 @@ export function registerWatchStatsHandler(fastify: FastifyInstance) {
         first_watched: Date | null
         last_watched: Date | null
       }>(
-        `SELECT 
-          COUNT(DISTINCT user_id) as total_watchers,
-          COALESCE(SUM(play_count), 0) as total_plays,
-          COUNT(DISTINCT CASE WHEN is_favorite THEN user_id END) as favorites_count,
-          MIN(last_played_at) as first_watched,
-          MAX(last_played_at) as last_watched
-         FROM watch_history 
-         WHERE movie_id = $1`,
+        // "Watched" is played, not "has a row": favoriting an unwatched film
+        // writes one, so the counter used to include people who had only
+        // bookmarked it — and the named list beside it then said their name.
+        // favorites_count keeps counting every favorite, which is its own
+        // question; it is a FILTER rather than a WHERE for exactly that reason.
+        `SELECT
+          COUNT(DISTINCT wh.user_id) FILTER (WHERE ${WATCH_HISTORY_PLAYED_SQL}) as total_watchers,
+          COALESCE(SUM(wh.play_count) FILTER (WHERE ${WATCH_HISTORY_PLAYED_SQL}), 0) as total_plays,
+          COUNT(DISTINCT CASE WHEN wh.is_favorite THEN wh.user_id END) as favorites_count,
+          MIN(wh.last_played_at) FILTER (WHERE ${WATCH_HISTORY_PLAYED_SQL}) as first_watched,
+          MAX(wh.last_played_at) FILTER (WHERE ${WATCH_HISTORY_PLAYED_SQL}) as last_watched
+         FROM watch_history wh
+         WHERE wh.movie_id = $1`,
         [id]
       )
 

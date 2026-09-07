@@ -23,6 +23,7 @@ import {
 } from './genrePreference.js'
 import type { MediaType } from './types.js'
 import { USER_RATING_SCALE_MAX } from '../recommender/ratingBands.js'
+import { WATCH_HISTORY_TASTE_SQL } from '../recommender/watchedExclusion.js'
 
 const logger = createChildLogger('franchise-detector')
 
@@ -498,6 +499,7 @@ async function detectMovieFranchises(userId: string): Promise<FranchiseStats[]> 
      JOIN movies m ON m.id = wh.movie_id
      LEFT JOIN user_ratings ur ON ur.movie_id = m.id AND ur.user_id = wh.user_id
      WHERE wh.user_id = $1 AND wh.media_type = 'movie'
+       AND ${WATCH_HISTORY_TASTE_SQL}
      ${libraryExclusionClause}`,
     [userId, ...excludedLibraryIds]
   )
@@ -585,6 +587,7 @@ async function detectSeriesFranchises(userId: string): Promise<FranchiseStats[]>
      JOIN series s ON s.id = e.series_id
      LEFT JOIN user_ratings ur ON ur.series_id = s.id AND ur.user_id = wh.user_id
      WHERE wh.user_id = $1 AND wh.media_type = 'episode'
+       AND ${WATCH_HISTORY_TASTE_SQL}
      GROUP BY s.id, s.title
      ${libraryExclusionClause}`,
     [userId, ...excludedLibraryIds]
@@ -922,6 +925,7 @@ async function detectMovieGenres(userId: string): Promise<GenreDetection> {
      JOIN movies m ON m.id = wh.movie_id
      LEFT JOIN user_ratings ur ON ur.movie_id = m.id AND ur.user_id = wh.user_id
      WHERE wh.user_id = $1 AND wh.media_type = 'movie'
+       AND ${WATCH_HISTORY_TASTE_SQL}
      ${libraryExclusionClause}`,
     [userId, ...excludedLibraryIds]
   )
@@ -957,6 +961,7 @@ async function detectSeriesGenres(userId: string): Promise<GenreDetection> {
      JOIN series s ON s.id = e.series_id
      LEFT JOIN user_ratings ur ON ur.series_id = s.id AND ur.user_id = wh.user_id
      WHERE wh.user_id = $1 AND wh.media_type = 'episode'
+       AND ${WATCH_HISTORY_TASTE_SQL}
      GROUP BY s.id, s.genres
      ${libraryExclusionClause}`,
     [userId, ...excludedLibraryIds]

@@ -10,6 +10,7 @@ import { createChildLogger } from './logger.js'
 import { getTextGenerationModelInstance, isAIFunctionConfigured } from './ai-provider.js'
 import { streamText } from 'ai'
 import { getUserExcludedLibraries } from './libraryExclusions.js'
+import { WATCH_HISTORY_TASTE_SQL } from '../recommender/watchedExclusion.js'
 import { analyzeMovieTaste, formatTasteProfileForAI } from './tasteAnalyzer.js'
 import { buildAiLanguageInstruction } from './locales.js'
 import { resolveEffectiveAiLanguage } from './userSettings.js'
@@ -60,6 +61,7 @@ export async function* streamTasteSynopsis(
     FROM watch_history wh
     JOIN movies m ON m.id = wh.movie_id
     WHERE wh.user_id = $1
+      AND ${WATCH_HISTORY_TASTE_SQL}
       AND (CARDINALITY($2::text[]) = 0 OR m.provider_library_id::text != ALL($2::text[]))
   `,
     [userId, excludedLibraryIds]
@@ -286,7 +288,7 @@ async function getQuickStats(userId: string): Promise<TasteSynopsis['stats']> {
              wh.is_favorite, wh.last_played_at
       FROM watch_history wh
       JOIN movies m ON m.id = wh.movie_id
-      WHERE wh.user_id = $1
+      WHERE wh.user_id = $1 AND ${WATCH_HISTORY_TASTE_SQL}
     ),
     stats AS (
       SELECT 

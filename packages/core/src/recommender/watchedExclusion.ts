@@ -28,6 +28,42 @@ export const WATCH_HISTORY_EXCLUDABLE_SQL = `(
 export const WATCH_HISTORY_TASTE_SQL = `(wh.played = true OR wh.is_favorite = true)`
 
 /**
+ * "Did this viewer actually play it" — the media server's own flag, and the
+ * predicate every COUNT, every watched/unwatched filter and every claim made to
+ * a person's face must use.
+ *
+ * It exists because the alternative was not a looser predicate but NO
+ * predicate. Favoriting an unwatched title WRITES a watch_history row: both
+ * providers' getWatchHistory have an explicit favorites pass, and the sync
+ * stores the row with `played = false`, `play_count = 0`, `last_played_at`
+ * NULL. That row is how a favorite reaches the taste vector, so it is correct
+ * and must stay. What was wrong was ~15 reads that asked "is there a row"
+ * instead of asking this — so a bookmark counted toward Home's "Movies
+ * Watched", filed a film under Browse's Watched filter, named a viewer in
+ * another user's "who watched this" list, ticked an assistant card that the
+ * poster grid beside it showed as unwatched, and hid the title from Explore,
+ * channels and Top Picks as already seen.
+ *
+ * The four predicates in this file each answer a different question and none
+ * substitutes for another:
+ *
+ *   WATCH_HISTORY_TASTE_SQL       what shaped your taste   (played OR favorite)
+ *   WATCH_HISTORY_EXCLUDABLE_SQL  have you seen it         (played OR >=5%)
+ *   getExpandedFavorited*Ids      have you already found it
+ *   WATCH_HISTORY_PLAYED_SQL      did you play it
+ *
+ * A fifth reading — `played OR play_count > 0 OR position > 0`, "watched,
+ * resumed, or replayed" — lives in the API's watchStatsFilters.ts, where the
+ * count and its drill-in have to agree with each other rather than with this.
+ *
+ * `watchHistoryCallSites.test.ts` scans the source and fails on any query that
+ * reads watch_history without naming one of them. That scan is the real fix
+ * here: the count of sites that had drifted is the argument for it, since every
+ * one of them was written by someone who knew the rule.
+ */
+export const WATCH_HISTORY_PLAYED_SQL = `(wh.played = true)`
+
+/**
  * Favoriting is not watching, and the two predicates above keep it that way on
  * purpose: a favorite counts as taste evidence but never as "seen", so it is
  * still eligible for a Seerr request or a watched-only filter.

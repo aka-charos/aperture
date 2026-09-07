@@ -457,6 +457,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
            FROM watch_history wh
            WHERE wh.user_id = $1 AND wh.last_played_at IS NOT NULL
              AND wh.approximate_played_at IS NULL
+             AND ${WATCHED}
            GROUP BY 1, 2`,
           [id]
         )
@@ -521,7 +522,8 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
           `SELECT MIN(wh.last_played_at) as first_at, MAX(wh.last_played_at) as last_at
            FROM watch_history wh
            WHERE wh.user_id = $1 AND wh.last_played_at IS NOT NULL
-             AND wh.approximate_played_at IS NULL`,
+             AND wh.approximate_played_at IS NULL
+             AND ${WATCHED}`,
           [id]
         )
         // How many watches are counted in the totals but absent from every
@@ -530,7 +532,8 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
         // 243 films, the timeline plots fewer, and nothing explains the gap.
         const approximateRow = await queryOne<{ count: string }>(
           `SELECT COUNT(*) as count FROM watch_history wh
-            WHERE wh.user_id = $1 AND wh.approximate_played_at IS NOT NULL`,
+            WHERE wh.user_id = $1 AND wh.approximate_played_at IS NOT NULL
+              AND ${WATCHED}`,
           [id]
         )
         const approximateWatches = parseInt(approximateRow?.count || '0', 10)
@@ -550,6 +553,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
            FROM watch_history wh
            WHERE wh.user_id = $1 AND wh.last_played_at IS NOT NULL
              AND wh.approximate_played_at IS NULL
+             AND ${WATCHED}
            GROUP BY date_trunc('day', wh.last_played_at)
            ORDER BY count DESC
            LIMIT 1`,

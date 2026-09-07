@@ -1898,3 +1898,49 @@ Three more that the friends design will have to answer, recorded here so they ar
 A tooltip alone was not enough: this page renders on phones and inside `MediaDetailModal`, where there is no hover. The tooltip is the desktop shortcut and `WatcherListDialog` is the answer everywhere, which also gives the per-person detail (plays, episodes, last watched, favourite) no tooltip should carry.
 
 Noticed while reading the handler and deliberately not fixed: `watchPercentage` divides by `COUNT(*) FROM users`, which counts disabled and provider-disabled accounts, so Household Reach reads low on any instance that has ever dropped a user.
+
+## F-114
+
+**Favoriting an unwatched title made it count as watched, in about fifteen places at once.** Fixed 2026-09-07.
+
+**The mechanism is one row.** Both media-server providers' `getWatchHistory` have an explicit third pass — *"Step 3: Fetch all FAVORITES (including unwatched ones)"* (`media/emby/movies.ts`, `media/jellyfin/movies.ts`) — and the sync stores what it returns with `played = false`, `play_count = 0`, `last_played_at` NULL. That row is correct and load-bearing: it is how a favorite reaches the taste vector through `WATCH_HISTORY_TASTE_SQL`. What was wrong was every read that asked whether a row exists rather than what it says.
+
+**Why nothing caught it.** `EXISTS (SELECT 1 FROM watch_history WHERE user_id = $1 AND movie_id = m.id)` compiles, returns rows, and the rows are real. There is no type to violate, no error to log, and the number it produces is merely larger than the truth. Three of the four sanctioned predicates already lived in `recommender/watchedExclusion.ts` and every one of these sites was written by someone who knew favorites are not watches — which is the argument for a scan rather than a convention.
+
+**Where it surfaced**, in the order it costs a user something:
+
+- **Home's "Movies Watched" tile** (`users/handlers/profile/userPreferences.ts`) counted every row, directly beside a Favorites tile counting the same rows. Bookmark twenty films, gain twenty watches.
+- **Browse's Watched/Unwatched filter**, both media types (`movies/handlers/list.ts`, `series/handlers/list.ts`), filed a favorite under Watched and — worse — hid it from Unwatched, which is the filter someone uses to find the thing they saved.
+- **The community strip and its named-watcher list** (`movies|series/handlers/watchStats.ts`, `lib/watcherVisibility.ts`, both shipped days earlier as F-110) told one person that another had watched a film they had only bookmarked, with `playCount: 0` beside the name.
+- **`ContentItem.watched`** (`assistant/helpers/unwatched.ts`) put a tick on assistant cards — in the same corner, on the same films, as the poster grid behind the chat window, which reads `played = true` per F-109. Two ticks, one film, one screen, opposite answers. The same function backs `x-exclude-watched`, so favorites were silently dropped from results.
+- **Explore's hide-watched** (`similarity/index.ts`) held *two* readings in one file: `play_count > 0` in `getUserWatchedMovieIds` and bare `EXISTS` in `semanticSearch`, so the same switch hid different sets depending on how you reached the graph.
+- **Both channel builders** (`channels/recommendations.ts`, `channels/webExpand.ts`) excluded favorites as watched — the opposite of what a channel is for.
+- **Four Top Picks popularity aggregates** counted bookmarks as viewers and plays, server-wide.
+- Plus the Watching page's episode count, `searchEpisodes`' watch filter, and seven assistant tools.
+
+**Two smaller faults fell out of the same read.** `discover/sources.ts` seeds TMDb recommendations from `ORDER BY MAX(wh.last_played_at) DESC` — and Postgres sorts NULLs **first** under DESC, so a favorited-unwatched title, which has no play date, sorted **above** everything the viewer had actually seen. The ten personalized seeds were being drawn from their bookmarks. `assistant/tools/history.ts` had the identical shape. Both now carry `NULLS LAST` alongside the predicate; the ordering bug would have survived the predicate fix on the taste path, where favorites legitimately stay.
+
+**The fix is a fourth predicate and a scan.** `WATCH_HISTORY_PLAYED_SQL` is `(wh.played = true)`, exported from the core barrel because the question is asked far more often in the HTTP layer than in core. The four now read:
+
+| predicate | question |
+|---|---|
+| `WATCH_HISTORY_TASTE_SQL` | what shaped your taste (played OR favorite) |
+| `WATCH_HISTORY_EXCLUDABLE_SQL` | have you seen it (played OR ≥5%) |
+| `getExpandedFavorited*Ids` | have you already found it |
+| `WATCH_HISTORY_PLAYED_SQL` | did you play it |
+
+A fifth, `WATCHED_SQL` (played OR play_count > 0 OR position > 0), stays in the API's `watchStatsFilters.ts`, where a count and its drill-in must agree with each other rather than with core.
+
+**`recommender/watchHistoryCallSites.test.ts` is the part that lasts.** It scans core and the API and fails on any SQL literal reading `watch_history` that names none of them. Five things it had to get right, three of which it got wrong first:
+
+1. **A regex cannot find the literals.** An apostrophe in a prose comment (*"don't"*) opens a string span that swallows the next template literal, so the queries after it stop being scanned and the test goes green. It is a character-level scanner that skips comments.
+2. **An SQL `--` comment is not a predicate.** Top Picks' `movie_stats` block carried `-- For movies, consider played = completed` directly above a WHERE clause that filtered on nothing, and the first version of the scan passed it. That comment is how someone explains the filter they then did not write. Comments are stripped before the check.
+3. **A predicate assembled above the query still counts.** Several handlers build theirs in a variable because it branches on a filter argument (`statusClause`, `watchedExpr`, `havingClause` — which references `watchedExpr`, two levels deep). A scan whose unit is the literal alone reports those and pushes people to inline SQL to satisfy it, so interpolated identifiers are resolved against their assignments in the same file.
+4. **`play_count` as a projection is not an answer, as a comparison it is.** `SUM(wh.play_count)` beside an unfiltered `COUNT(DISTINCT user_id)` is the exact shape being rejected — it was in both community-strip handlers. `play_count > 1` is the rewatch filter and cannot be true of a row nobody played.
+5. **A query with genuinely no opinion goes in `ALLOWED_UNFILTERED` with a reason** — deletion, sync bookkeeping, `activityGate` (a new favorite *is* real activity), the evaluation population, and `watchStatsBreakdown`'s favorites/rewatched drill-ins, which skip the watched predicate deliberately because the tiles they open from are counted without it.
+
+**Where a favorite must keep counting, and how the queries say so.** The two community-strip handlers and `fetchSeriesWatchers` filter with `FILTER (WHERE ...)` rather than a `WHERE`, so `favorites_count` still counts every favorite while the watch counts do not. Moving the predicate up into the WHERE would have silently redefined that column as *"favorited episodes they also played"* — the same class of quiet redefinition as the bug being fixed. The series watcher list then needs `HAVING COUNT(*) FILTER (WHERE played) > 0` to stay a list of watchers, and `series/handlers/watchStats.ts` derives its viewer counts from rows with a non-zero played count rather than from every row the query returns.
+
+**One taste-side drift was fixed in passing.** `lib/tasteAnalyzer.ts`, `lib/tasteSeriesSynopsis.ts`, `lib/tasteSynopsis.ts` and `taste-profile/franchise.ts` gated on *nothing at all*, so they counted both favorites and six-minute abandonments — F-040 fixed exactly this in `taste-profile/builder.ts` and these four were missed. They now use `WATCH_HISTORY_TASTE_SQL`, which is also what the recommendation insights panel's genre affinity uses: a favorite is deliberate taste evidence there, and the right predicate is not always the strictest one.
+
+**Not measured.** Docker is absent from the machine this was written on, so the number of favorite-only rows on the live instance is unknown, and with it the size of every count that will drop. Direction is certain; magnitude is not.

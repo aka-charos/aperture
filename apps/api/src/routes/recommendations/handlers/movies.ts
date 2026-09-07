@@ -18,6 +18,7 @@ import {
 import { recommendationSchemas } from '../schemas.js'
 import { resolveTwinShared } from '../../../lib/twinShared.js'
 import type { MovieRecommendationCandidate, RecommendationRun } from '../types.js'
+import { WATCH_HISTORY_TASTE_SQL } from '@aperture/core'
 
 export async function registerMovieHandlers(fastify: FastifyInstance) {
   /**
@@ -302,10 +303,13 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
         genre: string
         watch_count: number
       }>(
+        // Taste predicate, not played: this is the viewer's genre affinity,
+        // and a favorite is deliberate taste evidence — the same reading
+        // taste-profile/builder.ts uses to build the vector this panel explains.
         `SELECT unnest(m.genres) as genre, COUNT(*) as watch_count
          FROM watch_history wh
          JOIN movies m ON m.id = wh.movie_id
-         WHERE wh.user_id = $1
+         WHERE wh.user_id = $1 AND ${WATCH_HISTORY_TASTE_SQL}
          GROUP BY unnest(m.genres)
          ORDER BY watch_count DESC
          LIMIT 10`,

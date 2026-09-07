@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { query } from '../../../lib/db.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import type { ToolContext } from '../types.js'
+import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 
 export function createDiscoveryTools(ctx: ToolContext) {
   return {
@@ -139,6 +140,7 @@ export function createDiscoveryTools(ctx: ToolContext) {
              ARRAY_AGG(m.year ORDER BY m.year) as years
            FROM movies m
            LEFT JOIN watch_history wh ON wh.movie_id = m.id AND wh.user_id = $1
+             AND ${WATCH_HISTORY_PLAYED_SQL}
            WHERE m.collection_name IS NOT NULL${searchCondition}
            GROUP BY m.collection_name
            ORDER BY COUNT(m.id) DESC
@@ -433,6 +435,7 @@ export function createDiscoveryTools(ctx: ToolContext) {
              CASE WHEN wh.id IS NOT NULL THEN true ELSE false END as watched
            FROM movies m
            LEFT JOIN watch_history wh ON wh.movie_id = m.id AND wh.user_id = $1
+             AND ${WATCH_HISTORY_PLAYED_SQL}
            WHERE m.collection_name ILIKE $2
            ORDER BY m.year NULLS LAST`,
           [ctx.userId, `%${franchiseName}%`]

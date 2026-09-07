@@ -9,6 +9,7 @@ import type { ToolContext } from '../types.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import { anyTitleMatchesSql, titleMatchRankSql } from '../helpers/titleMatch.js'
 import type { ContentDetail } from '../schemas/index.js'
+import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 
 export function createContentTools(ctx: ToolContext) {
   return {
@@ -55,7 +56,8 @@ export function createContentTools(ctx: ToolContext) {
             )
 
             const watchStatus = await queryOne<{ play_count: number; last_played_at: Date }>(
-              `SELECT play_count, last_played_at FROM watch_history WHERE user_id = $1 AND movie_id = $2`,
+              `SELECT wh.play_count, wh.last_played_at FROM watch_history wh
+               WHERE wh.user_id = $1 AND wh.movie_id = $2 AND ${WATCH_HISTORY_PLAYED_SQL}`,
               [ctx.userId, movie.id]
             )
 
@@ -146,7 +148,7 @@ export function createContentTools(ctx: ToolContext) {
             const watchStatus = await queryOne<{ episodes_watched: string }>(
               `SELECT COUNT(DISTINCT wh.episode_id) as episodes_watched
              FROM watch_history wh JOIN episodes e ON e.id = wh.episode_id
-             WHERE wh.user_id = $1 AND e.series_id = $2`,
+             WHERE wh.user_id = $1 AND e.series_id = $2 AND ${WATCH_HISTORY_PLAYED_SQL}`,
               [ctx.userId, series.id]
             )
 

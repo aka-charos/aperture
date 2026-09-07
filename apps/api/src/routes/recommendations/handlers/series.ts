@@ -16,6 +16,7 @@ import {
 import { recommendationSchemas } from '../schemas.js'
 import { resolveTwinShared } from '../../../lib/twinShared.js'
 import type { SeriesRecommendationCandidate, RecommendationRun } from '../types.js'
+import { WATCH_HISTORY_TASTE_SQL } from '@aperture/core'
 
 export async function registerSeriesHandlers(fastify: FastifyInstance) {
   /**
@@ -250,11 +251,14 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
         genre: string
         watch_count: number
       }>(
+        // Taste predicate, mirroring the movie handler: a favorite is taste
+        // evidence, which is what this panel's genre affinity is measuring.
         `SELECT unnest(s.genres) as genre, COUNT(DISTINCT s.id) as watch_count
          FROM watch_history wh
          JOIN episodes e ON e.id = wh.episode_id
          JOIN series s ON s.id = e.series_id
          WHERE wh.user_id = $1 AND wh.media_type = 'episode'
+           AND ${WATCH_HISTORY_TASTE_SQL}
          GROUP BY unnest(s.genres)
          ORDER BY watch_count DESC
          LIMIT 10`,

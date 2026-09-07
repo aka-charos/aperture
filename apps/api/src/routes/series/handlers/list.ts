@@ -4,6 +4,7 @@
  * GET /api/series - List all series with pagination, filtering, and sorting
  */
 import type { FastifyInstance } from 'fastify'
+import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { listSeriesSchema } from '../schemas.js'
@@ -175,12 +176,16 @@ export function registerListHandler(fastify: FastifyInstance) {
         params.push(countries)
       }
 
+      // Mirror of the movie filter: watched means at least one PLAYED episode.
+      // Favoriting an episode writes a row, so the bare EXISTS moved a show
+      // nobody had started into "Watched".
       if (watchStatus === 'watched') {
         whereClause += whereClause ? ' AND ' : ' WHERE '
         whereClause += `EXISTS (
           SELECT 1 FROM watch_history wh
           INNER JOIN episodes e ON e.id = wh.episode_id
           WHERE wh.user_id = $${paramIndex++} AND e.series_id = series.id AND wh.media_type = 'episode'
+            AND ${WATCH_HISTORY_PLAYED_SQL}
         )`
         params.push(userId)
       } else if (watchStatus === 'unwatched') {
@@ -189,6 +194,7 @@ export function registerListHandler(fastify: FastifyInstance) {
           SELECT 1 FROM watch_history wh
           INNER JOIN episodes e ON e.id = wh.episode_id
           WHERE wh.user_id = $${paramIndex++} AND e.series_id = series.id AND wh.media_type = 'episode'
+            AND ${WATCH_HISTORY_PLAYED_SQL}
         )`
         params.push(userId)
       }
@@ -198,7 +204,8 @@ export function registerListHandler(fastify: FastifyInstance) {
         if (!isNaN(n) && n > 0) {
           whereClause += whereClause ? ' AND ' : ' WHERE '
           whereClause += `(SELECT COUNT(DISTINCT wh.user_id)::int FROM watch_history wh
-            INNER JOIN episodes e ON e.id = wh.episode_id WHERE e.series_id = series.id) >= $${paramIndex++}`
+            INNER JOIN episodes e ON e.id = wh.episode_id
+            WHERE e.series_id = series.id AND ${WATCH_HISTORY_PLAYED_SQL}) >= $${paramIndex++}`
           params.push(n)
         }
       }
@@ -207,7 +214,8 @@ export function registerListHandler(fastify: FastifyInstance) {
         if (!isNaN(n) && n >= 0) {
           whereClause += whereClause ? ' AND ' : ' WHERE '
           whereClause += `(SELECT COUNT(DISTINCT wh.user_id)::int FROM watch_history wh
-            INNER JOIN episodes e ON e.id = wh.episode_id WHERE e.series_id = series.id) <= $${paramIndex++}`
+            INNER JOIN episodes e ON e.id = wh.episode_id
+            WHERE e.series_id = series.id AND ${WATCH_HISTORY_PLAYED_SQL}) <= $${paramIndex++}`
           params.push(n)
         }
       }
