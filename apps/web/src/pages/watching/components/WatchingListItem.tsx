@@ -26,7 +26,13 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline'
 import ScheduleIcon from '@mui/icons-material/Schedule'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
-import { getProxiedImageUrl, FALLBACK_POSTER_URL, StarRating } from '@aperture/ui'
+import {
+  getProxiedImageUrl,
+  FALLBACK_POSTER_URL,
+  StarRating,
+  WatchedBadge,
+  EpisodeProgressBadge,
+} from '@aperture/ui'
 import { EpisodeAvailabilityBar } from './EpisodeAvailabilityBar'
 import type { WatchingSeries, UpcomingEpisode } from '../hooks/useWatchingData'
 import { palette } from '@/theme'
@@ -34,6 +40,10 @@ import { palette } from '@/theme'
 interface WatchingListItemProps {
   series: WatchingSeries
   userRating: number | null
+  /** Viewer has finished the show — same tick the grid view draws. */
+  watched?: boolean
+  /** Episodes played of episodes held, for a show still in progress. */
+  episodeProgress?: { watched: number; total: number } | null
   onRate: (rating: number | null) => void
   onRemove: (seriesId: string) => Promise<void>
 }
@@ -72,7 +82,14 @@ function getCountdownColor(days: number): string {
   return '#6b7280' // Later - gray
 }
 
-export function WatchingListItem({ series, userRating, onRate, onRemove }: WatchingListItemProps) {
+export function WatchingListItem({
+  series,
+  userRating,
+  watched,
+  episodeProgress,
+  onRate,
+  onRemove,
+}: WatchingListItemProps) {
   const { t, i18n } = useTranslation()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
@@ -166,6 +183,14 @@ export function WatchingListItem({ series, userRating, onRate, onRemove }: Watch
             objectFit: 'cover',
           }}
         />
+        {watched && <WatchedBadge size={18} sx={{ top: 6, insetInlineEnd: 6 }} />}
+        {!watched && episodeProgress != null && episodeProgress.total > 0 && (
+          <EpisodeProgressBadge
+            watched={episodeProgress.watched}
+            total={episodeProgress.total}
+            sx={{ top: 6, insetInlineEnd: 6, height: 18, fontSize: '0.65rem' }}
+          />
+        )}
         {/* Status badge overlay */}
         <Box
           sx={{

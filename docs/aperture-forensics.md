@@ -1677,6 +1677,16 @@ The franchises page already drew its own check — the only surface that did —
 
 That endpoint was counting `wh.id IS NOT NULL` — any row — which is the excludable-vs-played confusion above, one table over: a favorited-but-unplayed film counted toward a bar labelled *watched*. Both of its queries moved to `played = true` in the same change, which is what lets the two definitions coexist on one card.
 
+### The one page someone opens to ask the question
+
+Reported after deploy with a counterexample: Emby showed *Videodrome* watched, Aperture's page for it did not. The data was right — `played = true`, the id present in `/api/watch-status` — and the tick rendered correctly on the search grid for the same film. The gap was that **`MediaHero` draws its own poster rather than using `MoviePoster`**, so the badge added to the shared component reached every grid in the app and not the detail page, which is the page a viewer actually opens to ask whether they have seen something.
+
+Verification had been done on grids alone, which is how it passed. The lesson is the narrower one: a badge added to a shared component is not a badge added everywhere, because the surfaces that matter most are often the ones that hand-rolled their own markup — `grep` for the poster helper, not for the component.
+
+The hero reads its own `watchStatus` for a movie rather than the shared set, because that component owns the Mark Watched and Mark Unwatched buttons and the tick has to change under the button that was just pressed rather than at the next page load. A series has no such button (neither provider defines `markEpisodePlayed`), so it reads the set and gets the fraction like everywhere else.
+
+The same sweep found the Watching page's list view unbadged while its grid view had the tick — the third instance of that grid/list split, after browse and top picks.
+
 ### Left unticked deliberately
 
 My Watch History and the watch-stats drill-in (every row is watched by construction; a tick on all of them is decoration), Home's two rails (recommendations are unwatched by construction, history watched), another user's profile page (the provider holds the *viewer's* set, so a tick there would be an assertion about the wrong person), and gap analysis (TMDb rows with no library id, so the question cannot be asked). The assistant's chat cards stay tick-only: `ContentItem.watched` is a boolean stamped by `annotateWatchedItems` and carries no episode counts.
