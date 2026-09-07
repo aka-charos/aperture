@@ -21,6 +21,60 @@ async function canManageWatchHistory(userId: string, currentUser: SessionUser): 
 
 export function registerWatchHistoryManagementHandlers(fastify: FastifyInstance) {
   /**
+   * GET /api/users/:id/watch-history/movies/:movieId
+   * Watch state for ONE movie.
+   *
+   * The detail page used to answer this by fetching the whole history with
+   * `pageSize=1000&sortBy=title` and scanning it — but the list route caps
+   * pageSize at 100, so it received the first hundred titles alphabetically and
+   * concluded "not watched" for everything after them. On a 244-film history
+   * that is most of it: the page offered to Mark Watched a film the viewer had
+   * finished, and the watched chip never appeared. Asking about the film the
+   * page is showing cannot go wrong that way, and it costs one indexed lookup
+   * instead of a hundred-row join.
+   *
+   * Answers for a title with no row too — `watched: false` — so the caller
+   * never has to distinguish "no row" from "no answer".
+   */
+  fastify.get<{
+    Params: { id: string; movieId: string }
+  }>(
+    '/api/users/:id/watch-history/movies/:movieId',
+    { preHandler: requireAuth, schema: { tags: ['users'] } },
+    async (request, reply) => {
+      const { id, movieId } = request.params
+      const currentUser = request.user as SessionUser
+
+      if (!requireSelfOrAdmin(id, currentUser, reply)) return
+
+      try {
+        const row = await queryOne<{
+          played: boolean
+          play_count: number
+          last_played_at: Date | null
+          approximate_played_at: Date | null
+        }>(
+          `SELECT played, play_count, last_played_at, approximate_played_at
+           FROM watch_history
+           WHERE user_id = $1 AND movie_id = $2 AND media_type = 'movie'`,
+          [id, movieId]
+        )
+
+        return reply.send({
+          // Same predicate the poster badge uses: finished, not merely started.
+          watched: row?.played === true,
+          playCount: row?.play_count ?? 0,
+          lastWatched: row?.last_played_at ?? null,
+          approximate: row?.approximate_played_at != null,
+        })
+      } catch (err) {
+        request.log.error({ err, userId: id, movieId }, 'Failed to fetch movie watch state')
+        return reply.status(500).send({ error: 'Failed to fetch watch state' })
+      }
+    }
+  )
+
+  /**
    * POST /api/users/:id/watch-history/movies/:movieId
    * Mark a movie as watched (marks played in Emby and records in Aperture)
    *

@@ -178,10 +178,17 @@ export function useMediaDetail(
               fetch(insightsUrl, { credentials: 'include' })
             )
 
-            // Movie-specific: watch history
+            // Movie-specific: watch state for THIS film.
+            //
+            // This used to fetch the whole history with pageSize=1000 and scan
+            // it for the movie, but the list route caps pageSize at 100 — so it
+            // saw the first hundred titles alphabetically and answered "not
+            // watched" for everything past them. On a 244-film history that is
+            // most of it, and the page offered to Mark Watched films the viewer
+            // had finished while the poster grids ticked them correctly.
             if (mediaType === 'movie') {
               userFetchPromises.push(
-                fetch(`/api/users/${userId}/watch-history?pageSize=1000&sortBy=title`, {
+                fetch(`/api/users/${userId}/watch-history/movies/${id}`, {
                   credentials: 'include',
                 })
               )
@@ -206,19 +213,16 @@ export function useMediaDetail(
               }
 
               if (watchHistoryResponse.ok) {
-                const watchData = await watchHistoryResponse.json()
-                const watchedMovie = watchData.history?.find(
-                  (h: { movie_id: string }) => h.movie_id === id
-                )
-                if (watchedMovie) {
-                  setWatchStatus({
-                    isWatched: true,
-                    playCount: watchedMovie.play_count || 1,
-                    lastWatched: watchedMovie.last_played_at,
-                  })
-                } else {
-                  setWatchStatus({ isWatched: false, playCount: 0, lastWatched: null })
+                const watchData = (await watchHistoryResponse.json()) as {
+                  watched?: boolean
+                  playCount?: number
+                  lastWatched?: string | null
                 }
+                setWatchStatus({
+                  isWatched: watchData.watched === true,
+                  playCount: watchData.playCount ?? 0,
+                  lastWatched: watchData.lastWatched ?? null,
+                })
               }
 
               if (ratingResponse.ok) {
