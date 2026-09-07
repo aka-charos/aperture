@@ -1,0 +1,35 @@
+-- The other two orphaned job_config rows, found by the check `0164` prompted.
+--
+--   generate-embeddings       ->  generate-movie-embeddings
+--                             +   generate-series-embeddings
+--   rebuild-recommendations   ->  full-reset-movie-recommendations
+--                             +   full-reset-series-recommendations
+--
+-- Same January media-type split as `0164`'s pair, same missing half: the code
+-- side finished (`1946261f` renamed the rebuild job) and the row stayed. Four
+-- rows, four renames, none of which deleted anything.
+--
+-- WHY THESE TWO WERE INVISIBLE, which is the part worth keeping. `0164`'s pair
+-- were found by reading `Unknown job` failures in a container log. These two
+-- produce no failures at all -- both are disabled or manual-only, so the
+-- scheduler never builds a cron task for them and the executor is never
+-- reached. Reading logs can only ever find orphans that FIRE, so it found
+-- exactly half of them and gave no hint the other half existed. The boot check
+-- added alongside `0164` (`configDrift.ts`) reads the table instead and
+-- reported all four on its first run, which is why it separates an orphan that
+-- fires from one that merely sits there: both are drift, only one is an
+-- incident, and a check that reported only incidents would have stopped here.
+--
+-- Harmless in the same way and worth removing for the same reason: they are
+-- rows on the Schedule tab describing work this build cannot do.
+--
+-- DELETE rather than rename, as in `0164` -- both old names map to TWO
+-- successors and all four successor rows already exist. `job_runs` history is
+-- left alone; those rows record work that genuinely ran under the old names,
+-- back when the names were real.
+--
+-- The audit query lives in `0164`'s header. After this, it should return zero
+-- rows, and the boot check should print nothing.
+
+DELETE FROM job_config
+ WHERE job_name IN ('generate-embeddings', 'rebuild-recommendations');
