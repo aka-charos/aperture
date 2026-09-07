@@ -15,6 +15,7 @@ import { z } from 'zod'
 import { createChildLogger } from '../lib/logger.js'
 import { query, queryOne } from '../lib/db.js'
 import { withWebSearchModel, getWebSearchProviderTools } from '../lib/ai-provider.js'
+import { WATCH_HISTORY_PLAYED_SQL } from '../recommender/watchedExclusion.js'
 import { parseChannelMediaTypes } from './recommendations.js'
 import type { ChannelMediaType, ChannelRecommendation } from './types.js'
 
@@ -345,9 +346,12 @@ export async function gatherWebExpansion(
     series: new Set<string>(),
   }
 
+  // Played, not "has a row" — a favorited-but-unwatched title has one, and
+  // excluding it here is the opposite of what a channel is for.
   if (mediaTypes.includes('movie')) {
     const watched = await query<{ movie_id: string }>(
-      'SELECT movie_id FROM watch_history WHERE user_id = $1',
+      `SELECT wh.movie_id FROM watch_history wh
+       WHERE wh.user_id = $1 AND ${WATCH_HISTORY_PLAYED_SQL}`,
       [channel.owner_id]
     )
     watchedIdsByType.movie = new Set(watched.rows.map((r) => r.movie_id))
@@ -358,7 +362,8 @@ export async function gatherWebExpansion(
       `SELECT DISTINCT e.series_id
        FROM watch_history wh
        JOIN episodes e ON e.id = wh.episode_id
-       WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND e.series_id IS NOT NULL`,
+       WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND e.series_id IS NOT NULL
+         AND ${WATCH_HISTORY_PLAYED_SQL}`,
       [channel.owner_id]
     )
     watchedIdsByType.series = new Set(watched.rows.map((r) => r.series_id))

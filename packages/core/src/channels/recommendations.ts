@@ -4,6 +4,7 @@ import { getMovieEmbedding, embedText } from '../recommender/movies/embeddings.j
 import { getSeriesEmbedding } from '../recommender/series/embeddings.js'
 import { averageEmbeddings } from '../recommender/shared/embeddings.js'
 import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../lib/ai-provider.js'
+import { WATCH_HISTORY_PLAYED_SQL } from '../recommender/watchedExclusion.js'
 import type { ChannelMediaType, ChannelRecommendation } from './types.js'
 import { weightedRandomSample } from './utils.js'
 
@@ -28,10 +29,17 @@ export function parseChannelMediaTypes(raw: string[] | null | undefined): Channe
   return types.length > 0 ? types : ['movie']
 }
 
-/** Movies the user has played. */
+/**
+ * Movies the user has played.
+ *
+ * Played, not "has a row": favoriting an unwatched film writes one, so the
+ * bare version quietly made every bookmarked title ineligible for the channel
+ * it was most likely to belong in.
+ */
 async function getWatchedMovieIds(userId: string): Promise<Set<string>> {
   const watched = await query<{ movie_id: string }>(
-    'SELECT movie_id FROM watch_history WHERE user_id = $1',
+    `SELECT wh.movie_id FROM watch_history wh
+     WHERE wh.user_id = $1 AND ${WATCH_HISTORY_PLAYED_SQL}`,
     [userId]
   )
   return new Set(watched.rows.map((r) => r.movie_id))
@@ -46,7 +54,8 @@ async function getWatchedSeriesIds(userId: string): Promise<Set<string>> {
     `SELECT DISTINCT e.series_id
      FROM watch_history wh
      JOIN episodes e ON e.id = wh.episode_id
-     WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND e.series_id IS NOT NULL`,
+     WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND e.series_id IS NOT NULL
+       AND ${WATCH_HISTORY_PLAYED_SQL}`,
     [userId]
   )
   return new Set(watched.rows.map((r) => r.series_id))

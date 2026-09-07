@@ -21,6 +21,7 @@ import {
   getTVExternalIds,
   getTVCredits,
 } from '../tmdb/index.js'
+import { WATCH_HISTORY_TASTE_SQL } from '../recommender/watchedExclusion.js'
 import {
   getTrendingMovies,
   getPopularMovies,
@@ -228,36 +229,44 @@ async function fetchTmdbRecommendations(
   config: DiscoveryConfig
 ): Promise<RawCandidate[]> {
   const candidates: RawCandidate[] = []
-  
+
   // Get user's top-rated or most recently watched content
   // Movies are joined directly, series need to go through episodes
+  //
+  // Gated on the taste predicate, so a favorite seeds the lookup — it is a
+  // deliberate signal, which is exactly what a seed wants. But NULLS LAST is
+  // load-bearing beside it: a favorited-unwatched title has no last_played_at,
+  // and Postgres sorts NULLs FIRST under DESC, so the ten seeds were being
+  // taken from the viewer's bookmarks before their actual viewing.
   let watchedResult: { rows: { tmdb_id: string | null }[] }
-  
+
   if (mediaType === 'movie') {
     watchedResult = await query<{ tmdb_id: string | null }>(
-      `SELECT m.tmdb_id 
+      `SELECT m.tmdb_id
        FROM watch_history wh
        JOIN movies m ON m.id = wh.movie_id
-       WHERE wh.user_id = $1 
+       WHERE wh.user_id = $1
          AND wh.media_type = 'movie'
          AND m.tmdb_id IS NOT NULL
+         AND ${WATCH_HISTORY_TASTE_SQL}
        GROUP BY m.tmdb_id
-       ORDER BY MAX(wh.last_played_at) DESC
+       ORDER BY MAX(wh.last_played_at) DESC NULLS LAST
        LIMIT 10`,
       [userId]
     )
   } else {
     // For series, we need to join through episodes to get the series
     watchedResult = await query<{ tmdb_id: string | null }>(
-      `SELECT s.tmdb_id 
+      `SELECT s.tmdb_id
        FROM watch_history wh
        JOIN episodes e ON e.id = wh.episode_id
        JOIN series s ON s.id = e.series_id
-       WHERE wh.user_id = $1 
+       WHERE wh.user_id = $1
          AND wh.media_type = 'episode'
          AND s.tmdb_id IS NOT NULL
+         AND ${WATCH_HISTORY_TASTE_SQL}
        GROUP BY s.tmdb_id
-       ORDER BY MAX(wh.last_played_at) DESC
+       ORDER BY MAX(wh.last_played_at) DESC NULLS LAST
        LIMIT 10`,
       [userId]
     )

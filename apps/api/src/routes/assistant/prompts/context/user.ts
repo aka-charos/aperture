@@ -7,6 +7,7 @@
  * - Role information
  */
 import { query, queryOne } from '../../../../lib/db.js'
+import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 
 interface TasteProfile {
   taste_synopsis: string | null
@@ -36,7 +37,7 @@ export async function buildUserContext(userId: string, isAdmin: boolean): Promis
      LEFT JOIN movies m ON m.id = wh.movie_id
      LEFT JOIN episodes e ON e.id = wh.episode_id
      LEFT JOIN series s ON s.id = e.series_id
-     WHERE wh.user_id = $1
+     WHERE wh.user_id = $1 AND ${WATCH_HISTORY_PLAYED_SQL}
      ORDER BY wh.last_played_at DESC NULLS LAST
      LIMIT 10`,
     [userId]

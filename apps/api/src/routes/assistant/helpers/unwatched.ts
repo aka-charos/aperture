@@ -15,8 +15,18 @@ import type { ToolSet } from 'ai'
 import { query } from '../../../lib/db.js'
 import type { ContentItem } from '../schemas/index.js'
 import { mapToolResult } from './toolStream.js'
+import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 
-/** Ids the user has already watched, out of the ones asked about. */
+/**
+ * Ids the user has already watched, out of the ones asked about.
+ *
+ * Played, and it has to be the same reading the poster badge uses
+ * (`watching/watchedItems.ts`): this set becomes `ContentItem.watched`, which
+ * `ContentCard` draws as a tick in the same corner, on the same films, as the
+ * grid behind the chat window. Asking "is there a row" instead put a tick on
+ * every favorited-but-unwatched title — so the two surfaces disagreed about
+ * the same film, on the same screen.
+ */
 async function watchedIds(
   userId: string,
   movieIds: string[],
@@ -26,8 +36,8 @@ async function watchedIds(
 
   if (movieIds.length > 0) {
     const res = await query<{ movie_id: string }>(
-      `SELECT DISTINCT movie_id FROM watch_history
-       WHERE user_id = $1 AND movie_id = ANY($2)`,
+      `SELECT DISTINCT wh.movie_id FROM watch_history wh
+       WHERE wh.user_id = $1 AND wh.movie_id = ANY($2) AND ${WATCH_HISTORY_PLAYED_SQL}`,
       [userId, movieIds]
     )
     for (const row of res.rows) watched.add(row.movie_id)
@@ -37,7 +47,7 @@ async function watchedIds(
     const res = await query<{ series_id: string }>(
       `SELECT DISTINCT ep.series_id FROM watch_history wh
        JOIN episodes ep ON ep.id = wh.episode_id
-       WHERE wh.user_id = $1 AND ep.series_id = ANY($2)`,
+       WHERE wh.user_id = $1 AND ep.series_id = ANY($2) AND ${WATCH_HISTORY_PLAYED_SQL}`,
       [userId, seriesIds]
     )
     for (const row of res.rows) watched.add(row.series_id)

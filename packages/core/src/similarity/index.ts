@@ -5,6 +5,7 @@ import {
   getActiveEmbeddingModelId,
   getActiveEmbeddingTableName,
 } from '../lib/ai-provider.js'
+import { WATCH_HISTORY_PLAYED_SQL } from '../recommender/watchedExclusion.js'
 import { computeConnectionReasons, type ConnectionReason } from './reasons.js'
 import { selectWithCrossMediaSlots } from './crossMedia.js'
 
@@ -98,12 +99,17 @@ async function getUserSimilarityPreferences(userId: string): Promise<SimilarityP
 }
 
 /**
- * Get set of watched movie IDs for a user
+ * Get set of watched movie IDs for a user.
+ *
+ * This file used to hold two different answers: `play_count > 0` here and a
+ * bare `EXISTS (... FROM watch_history)` in semanticSearch's hideWatched
+ * clause, so the same switch hid different sets of titles depending on which
+ * way you arrived at the graph. Both are now the one predicate.
  */
 async function getUserWatchedMovieIds(userId: string): Promise<Set<string>> {
   const result = await query<{ movie_id: string }>(
-    `SELECT DISTINCT movie_id FROM watch_history 
-     WHERE user_id = $1 AND movie_id IS NOT NULL AND play_count > 0`,
+    `SELECT DISTINCT wh.movie_id FROM watch_history wh
+     WHERE wh.user_id = $1 AND wh.movie_id IS NOT NULL AND ${WATCH_HISTORY_PLAYED_SQL}`,
     [userId]
   )
   return new Set(result.rows.map((r) => r.movie_id))
@@ -114,10 +120,10 @@ async function getUserWatchedMovieIds(userId: string): Promise<Set<string>> {
  */
 async function getUserWatchedSeriesIds(userId: string): Promise<Set<string>> {
   const result = await query<{ series_id: string }>(
-    `SELECT DISTINCT e.series_id 
+    `SELECT DISTINCT e.series_id
      FROM watch_history wh
      JOIN episodes e ON e.id = wh.episode_id
-     WHERE wh.user_id = $1 AND wh.episode_id IS NOT NULL AND wh.play_count > 0`,
+     WHERE wh.user_id = $1 AND wh.episode_id IS NOT NULL AND ${WATCH_HISTORY_PLAYED_SQL}`,
     [userId]
   )
   return new Set(result.rows.map((r) => r.series_id))
@@ -1065,10 +1071,11 @@ export async function semanticSearch(
     const watchedFilter =
       hideWatched && userId
         ? `AND NOT EXISTS (
-           SELECT 1 FROM watch_history wh 
-           WHERE wh.movie_id = m.id 
-             AND wh.user_id = $4 
+           SELECT 1 FROM watch_history wh
+           WHERE wh.movie_id = m.id
+             AND wh.user_id = $4
              AND wh.media_type = 'movie'
+             AND ${WATCH_HISTORY_PLAYED_SQL}
          )`
         : ''
     const movieParams =
@@ -1131,11 +1138,12 @@ export async function semanticSearch(
     const seriesWatchedFilter =
       hideWatched && userId
         ? `AND NOT EXISTS (
-           SELECT 1 FROM watch_history wh 
+           SELECT 1 FROM watch_history wh
            JOIN episodes ep ON ep.id = wh.episode_id
-           WHERE ep.series_id = s.id 
-             AND wh.user_id = $4 
+           WHERE ep.series_id = s.id
+             AND wh.user_id = $4
              AND wh.media_type = 'episode'
+             AND ${WATCH_HISTORY_PLAYED_SQL}
          )`
         : ''
     const seriesParams =

@@ -1366,6 +1366,18 @@ export {
   type RegenerationDecision,
 } from './recommender/activityGate.js'
 
+// The watch-history predicates. Exported because the question "what counts as
+// watched" is asked far more often in the HTTP layer than in core -- every
+// count, filter and badge the API serves asks it -- and answering it inline
+// there is what let a favorited-but-unplayed title read as watched in about
+// fifteen places. Pinned by recommender/watchHistoryCallSites.test.ts, which
+// scans apps/api as well as core.
+export {
+  WATCH_HISTORY_PLAYED_SQL,
+  WATCH_HISTORY_TASTE_SQL,
+  WATCH_HISTORY_EXCLUDABLE_SQL,
+} from './recommender/watchedExclusion.js'
+
 // Taste cluster type only -- the clustering algorithm itself (chooseK,
 // clusterTasteEmbeddings) is an internal primitive consumed solely within
 // packages/core (by builder.ts), matching the existing precedent of

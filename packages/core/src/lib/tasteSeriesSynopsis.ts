@@ -10,6 +10,7 @@ import { createChildLogger } from './logger.js'
 import { getTextGenerationModelInstance, isAIFunctionConfigured } from './ai-provider.js'
 import { streamText } from 'ai'
 import { getUserExcludedLibraries } from './libraryExclusions.js'
+import { WATCH_HISTORY_TASTE_SQL } from '../recommender/watchedExclusion.js'
 import { analyzeSeriesTaste, formatTasteProfileForAI } from './tasteAnalyzer.js'
 import { buildAiLanguageInstruction } from './locales.js'
 import { resolveEffectiveAiLanguage } from './userSettings.js'
@@ -91,6 +92,7 @@ export async function* streamSeriesTasteSynopsis(
     JOIN episodes e ON e.id = wh.episode_id
     JOIN series s ON s.id = e.series_id
     WHERE wh.user_id = $1 AND wh.media_type = 'episode'
+      AND ${WATCH_HISTORY_TASTE_SQL}
       AND (CARDINALITY($2::text[]) = 0 OR s.provider_library_id::text != ALL($2::text[]))
   `,
     [userId, excludedLibraryIds]
@@ -117,6 +119,7 @@ export async function* streamSeriesTasteSynopsis(
     JOIN episodes e ON e.id = wh.episode_id
     JOIN series s ON s.id = e.series_id
     WHERE wh.user_id = $1 AND wh.media_type = 'episode'
+      AND ${WATCH_HISTORY_TASTE_SQL}
       AND (CARDINALITY($2::text[]) = 0 OR s.provider_library_id::text != ALL($2::text[]))
     GROUP BY unnest(s.genres)
     ORDER BY count DESC
@@ -134,6 +137,7 @@ export async function* streamSeriesTasteSynopsis(
     JOIN episodes e ON e.id = wh.episode_id
     JOIN series s ON s.id = e.series_id
     WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND s.network IS NOT NULL
+      AND ${WATCH_HISTORY_TASTE_SQL}
       AND (CARDINALITY($2::text[]) = 0 OR s.provider_library_id::text != ALL($2::text[]))
     GROUP BY s.network
     ORDER BY count DESC
@@ -153,6 +157,7 @@ export async function* streamSeriesTasteSynopsis(
     JOIN episodes e ON e.id = wh.episode_id
     JOIN series s ON s.id = e.series_id
     WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND s.year IS NOT NULL
+      AND ${WATCH_HISTORY_TASTE_SQL}
       AND (CARDINALITY($2::text[]) = 0 OR s.provider_library_id::text != ALL($2::text[]))
     GROUP BY FLOOR(s.year / 10)
     ORDER BY count DESC
@@ -177,6 +182,7 @@ export async function* streamSeriesTasteSynopsis(
     JOIN episodes e ON e.id = wh.episode_id
     JOIN series s ON s.id = e.series_id
     WHERE wh.user_id = $1 AND wh.media_type = 'episode'
+      AND ${WATCH_HISTORY_TASTE_SQL}
       AND (CARDINALITY($2::text[]) = 0 OR s.provider_library_id::text != ALL($2::text[]))
     GROUP BY s.id, s.title, s.year, s.genres, s.community_rating, s.network, s.total_episodes
     ORDER BY episodes_watched DESC
@@ -387,11 +393,13 @@ async function getSeriesQuickStats(userId: string): Promise<SeriesTasteSynopsis[
       JOIN episodes e ON e.id = wh.episode_id
       JOIN series s ON s.id = e.series_id
       WHERE wh.user_id = $1 AND wh.media_type = 'episode'
+        AND ${WATCH_HISTORY_TASTE_SQL}
     ),
     episode_counts AS (
       SELECT COUNT(DISTINCT wh.episode_id) as episode_count
       FROM watch_history wh
       WHERE wh.user_id = $1 AND wh.media_type = 'episode'
+        AND ${WATCH_HISTORY_TASTE_SQL}
     ),
     stats AS (
       SELECT 

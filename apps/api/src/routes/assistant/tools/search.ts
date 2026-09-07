@@ -14,6 +14,7 @@ import { briefResult, FORMAT_PARAM_DESCRIPTION } from './utils.js'
 import type { ContentCarouselI18nKey } from '../schemas/contentCarousel.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext, MovieResult, SeriesResult } from '../types.js'
+import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 
 function searchContentTitleKey(
   searchQuery: string | undefined,
@@ -110,7 +111,12 @@ const HNSW_EF_SEARCH_FILTERED = 500
  *
  * `column` is the id column of the row being filtered ('id' when the table is
  * unaliased, 'm.id'/'s.id' when it is). A watched SERIES means at least one of
- * its episodes was played, matching every other watched check in the codebase.
+ * its episodes was played.
+ *
+ * Played is the operative word, and this docstring used to claim the bare
+ * version matched "every other watched check in the codebase" — it matched
+ * none of them. Favoriting writes a watch_history row, so asking whether one
+ * exists answered "watched" for anything the viewer had merely saved.
  */
 function watchStatusCondition(
   status: Exclude<WatchStatus, 'all'>,
@@ -119,10 +125,12 @@ function watchStatusCondition(
   paramIdx: number
 ): string {
   const subquery = isMovie
-    ? `SELECT movie_id FROM watch_history WHERE user_id = $${paramIdx} AND movie_id IS NOT NULL`
+    ? `SELECT wh.movie_id FROM watch_history wh
+       WHERE wh.user_id = $${paramIdx} AND wh.movie_id IS NOT NULL
+         AND ${WATCH_HISTORY_PLAYED_SQL}`
     : `SELECT DISTINCT ep.series_id FROM watch_history wh
        JOIN episodes ep ON ep.id = wh.episode_id
-       WHERE wh.user_id = $${paramIdx}`
+       WHERE wh.user_id = $${paramIdx} AND ${WATCH_HISTORY_PLAYED_SQL}`
   return `${column} ${status === 'watched' ? 'IN' : 'NOT IN'} (${subquery})`
 }
 
@@ -239,7 +247,8 @@ export async function findSimilarItems(
     const embeddingStr = embeddingResult.embedding
 
     const watchedFilter = excludeWatched
-      ? `AND m.id NOT IN (SELECT movie_id FROM watch_history WHERE user_id = $4 AND movie_id IS NOT NULL)`
+      ? `AND m.id NOT IN (SELECT wh.movie_id FROM watch_history wh
+          WHERE wh.user_id = $4 AND wh.movie_id IS NOT NULL AND ${WATCH_HISTORY_PLAYED_SQL})`
       : ''
     const params = excludeWatched
       ? [movie.id, modelId, embeddingStr, ctx.userId, limit]
@@ -275,7 +284,7 @@ export async function findSimilarItems(
       ? `AND s.id NOT IN (
           SELECT DISTINCT ep.series_id FROM watch_history wh
           JOIN episodes ep ON ep.id = wh.episode_id
-          WHERE wh.user_id = $4
+          WHERE wh.user_id = $4 AND ${WATCH_HISTORY_PLAYED_SQL}
         )`
       : ''
     const params = excludeWatched

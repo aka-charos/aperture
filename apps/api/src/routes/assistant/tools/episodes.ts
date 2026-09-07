@@ -25,6 +25,7 @@ import { briefResult, FORMAT_PARAM_DESCRIPTION, nullSafe } from './utils.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext } from '../types.js'
 import type { WatchStatus } from './search.js'
+import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 
 /**
  * See the note on HNSW_EF_SEARCH_FILTERED in search.ts — same reason, same
@@ -131,8 +132,9 @@ export function episodeWatchCondition(
   paramIdx: number
 ): string {
   return `ep.id ${status === 'watched' ? 'IN' : 'NOT IN'} (
-    SELECT episode_id FROM watch_history
-    WHERE user_id = $${paramIdx} AND episode_id IS NOT NULL
+    SELECT wh.episode_id FROM watch_history wh
+    WHERE wh.user_id = $${paramIdx} AND wh.episode_id IS NOT NULL
+      AND ${WATCH_HISTORY_PLAYED_SQL}
   )`
 }
 
@@ -149,8 +151,9 @@ async function annotateWatchedEpisodes(userId: string, items: ContentItem[]): Pr
   if (items.length === 0) return
   try {
     const result = await query<{ episode_id: string }>(
-      `SELECT DISTINCT episode_id FROM watch_history
-       WHERE user_id = $1 AND episode_id = ANY($2::uuid[])`,
+      `SELECT DISTINCT wh.episode_id FROM watch_history wh
+       WHERE wh.user_id = $1 AND wh.episode_id = ANY($2::uuid[])
+         AND ${WATCH_HISTORY_PLAYED_SQL}`,
       [userId, items.map((i) => i.id)]
     )
     const watched = new Set(result.rows.map((r) => r.episode_id))

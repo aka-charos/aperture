@@ -285,9 +285,10 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
             wh.play_count
           FROM watch_history wh
           JOIN movies m ON m.id = wh.movie_id
-          WHERE wh.user_id = $1 
+          WHERE wh.user_id = $1
             AND wh.movie_id IS NOT NULL
             AND wh.last_played_at IS NOT NULL
+            AND ${WATCHED_SQL}
           ORDER BY wh.last_played_at DESC NULLS LAST
           LIMIT 3
         `,
@@ -320,9 +321,10 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
             FROM watch_history wh
             JOIN episodes e ON e.id = wh.episode_id
             JOIN series s ON s.id = e.series_id
-            WHERE wh.user_id = $1 
+            WHERE wh.user_id = $1
               AND wh.episode_id IS NOT NULL
               AND wh.last_played_at IS NOT NULL
+              AND ${WATCHED_SQL}
           )
           SELECT 
             series_id,

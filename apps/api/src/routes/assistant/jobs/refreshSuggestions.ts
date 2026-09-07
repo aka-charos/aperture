@@ -4,6 +4,7 @@
 import { query, queryOne } from '../../../lib/db.js'
 import { createChildLogger } from '@aperture/core'
 import { createJobProgress, setJobStep, updateJobProgress, completeJob, failJob } from '@aperture/core'
+import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 
 const logger = createChildLogger('assistant-suggestions-job')
 
@@ -37,6 +38,7 @@ async function generateSuggestionsForUser(userId: string): Promise<string[]> {
       `SELECT m.title, 'movie' as type FROM watch_history wh
        JOIN movies m ON m.id = wh.movie_id
        WHERE wh.user_id = $1 AND wh.media_type = 'movie'
+         AND ${WATCH_HISTORY_PLAYED_SQL}
        ORDER BY wh.last_played_at DESC NULLS LAST
        LIMIT 5`,
       [userId]
@@ -49,6 +51,7 @@ async function generateSuggestionsForUser(userId: string): Promise<string[]> {
        JOIN episodes e ON e.id = wh.episode_id
        JOIN series s ON s.id = e.series_id
        WHERE wh.user_id = $1 AND wh.media_type = 'episode'
+         AND ${WATCH_HISTORY_PLAYED_SQL}
        ORDER BY s.id, wh.last_played_at DESC NULLS LAST
        LIMIT 3`,
       [userId]
