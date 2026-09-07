@@ -9,13 +9,15 @@
  * someone to file a complaint about the thing they came to watch.
  *
  * Renders nothing at all unless the backing service holds a record of this
- * title, which the status endpoint answers as a decided `canReportIssue`.
- * That is an instance-level fact (is the integration configured, has it
- * scanned this library); whether *this* viewer's account is linked is checked
- * at submit instead, because that one is per-user and fixable, and a control
- * that silently vanishes teaches nobody what to do.
+ * title. That arrives as `canReport`, decided by the status endpoint, which
+ * the page asks once and hands to everything needing it — each control asking
+ * for itself meant the same call twice for a series with gaps in it. It is an
+ * instance-level fact (is the integration configured, has it scanned this
+ * library); whether *this* viewer's account is linked is checked at submit
+ * instead, because that one is per-user and fixable, and a control that
+ * silently vanishes teaches nobody what to do.
  */
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Alert, Button, Snackbar, Tooltip } from '@mui/material'
 import type { SxProps, Theme } from '@mui/material'
@@ -27,6 +29,8 @@ interface ReportIssueButtonProps {
   tmdbId: number
   mediaType: 'movie' | 'series'
   seasons?: number[]
+  /** Whether the backend can accept a report against this title at all. */
+  canReport: boolean
   /**
    * The action row's shared button styling (height, radius, no shrinking).
    * Passed in rather than restated here, so tuning the row moves this button
@@ -40,31 +44,12 @@ export function ReportIssueButton({
   tmdbId,
   mediaType,
   seasons = [],
+  canReport,
   sx,
 }: ReportIssueButtonProps) {
   const { t } = useTranslation()
-  const [canReport, setCanReport] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [reported, setReported] = useState(false)
-
-  useEffect(() => {
-    if (!tmdbId) return
-    let cancelled = false
-    const path = mediaType === 'movie' ? 'movie' : 'tv'
-    void fetch(`/api/seerr/status/${path}/${tmdbId}`, { credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { canReportIssue?: boolean } | null) => {
-        // Absent reads as false: an older server that does not send the field
-        // cannot accept the report either.
-        if (!cancelled) setCanReport(data?.canReportIssue === true)
-      })
-      .catch(() => {
-        if (!cancelled) setCanReport(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [tmdbId, mediaType])
 
   if (!canReport) return null
 

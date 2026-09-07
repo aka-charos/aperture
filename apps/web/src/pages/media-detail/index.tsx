@@ -55,6 +55,7 @@ export function MediaDetailPage({
     mediaServer,
     watchStatus,
     watchStats,
+    seerrTitleStatus,
     userRating,
     ratingLoading,
     loading,
@@ -115,6 +116,9 @@ export function MediaDetailPage({
         seasonNumbers={Object.keys(seasons)
           .map(Number)
           .filter((n) => Number.isFinite(n) && n > 0)}
+        // One status call answers for the whole page; the button decides
+        // nothing for itself.
+        canReportIssue={seerrTitleStatus.canReportIssue}
         // Series-specific
         isWatching={isSeries(media) && id ? isWatching(id) : false}
         onWatchingToggle={isSeries(media) && id ? () => toggleWatching(id) : undefined}
@@ -166,7 +170,11 @@ export function MediaDetailPage({
               <MediaInfoCard media={media} />
               {/* Aired episodes missing from the server + Seerr requests (series only) */}
               {isSeries(media) && (
-                <MissingSeasonsCard series={media} seasonAvailability={seasonAvailability} />
+                <MissingSeasonsCard
+                  series={media}
+                  seasonAvailability={seasonAvailability}
+                  canRequest={seerrTitleStatus.canRequest}
+                />
               )}
               {/* Episodes List (Series only) */}
               {isSeries(media) && Object.keys(seasons).length > 0 && (

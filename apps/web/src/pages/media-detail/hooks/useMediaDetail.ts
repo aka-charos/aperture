@@ -17,6 +17,31 @@ import { onMovieWatched } from '@/lib/watchStatusEvents'
 
 export type WatchStats = MovieWatchStats | SeriesWatchStats
 
+/**
+ * What the request backend permits for this title, as decided values.
+ *
+ * One answer for the whole page. Two controls need it — the missing-seasons
+ * request button and the report-a-problem button — and each used to ask the
+ * same endpoint for the same title itself, so a series with gaps made the call
+ * twice and the two copies could disagree about which one had landed.
+ *
+ * Both fields default to false and stay false while the call is in flight or
+ * if it fails, which is the safe direction: a control appears once it is known
+ * to work, rather than flashing onto the page and then vanishing.
+ */
+export interface SeerrTitleStatus {
+  /** This viewer may request content that is missing. */
+  canRequest: boolean
+  /**
+   * The backend holds a media row for this title, so an issue can be filed
+   * against it. Instance-level only — whether *this* viewer's account is
+   * linked is checked when the report is submitted.
+   */
+  canReportIssue: boolean
+}
+
+const NO_SEERR_STATUS: SeerrTitleStatus = { canRequest: false, canReportIssue: false }
+
 export interface UseMediaDetailReturn {
   media: Media | null
   mediaType: MediaType
@@ -25,6 +50,8 @@ export interface UseMediaDetailReturn {
   mediaServer: MediaServerInfo | null
   watchStatus: WatchStatus | null
   watchStats: WatchStats | null
+  /** One answer per title, shared by every control that needs it. */
+  seerrTitleStatus: SeerrTitleStatus
   userRating: number | null
   ratingLoading: boolean
   loading: boolean
@@ -63,6 +90,7 @@ export function useMediaDetail(
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [watchStats, setWatchStats] = useState<WatchStats | null>(null)
+  const [seerrTitleStatus, setSeerrTitleStatus] = useState<SeerrTitleStatus>(NO_SEERR_STATUS)
   // null until the media-server favorite status has loaded
   const [isFavorite, setIsFavorite] = useState<boolean | null>(null)
   const [favoriteLoading, setFavoriteLoading] = useState(false)
@@ -246,6 +274,41 @@ export function useMediaDetail(
     }
   }, [mediaType, id, userId])
 
+  // What the request backend permits for this title. Keyed on the TMDb id
+  // rather than the library id because that is what the endpoint takes, and it
+  // only exists once the media itself has landed.
+  const tmdbId = media?.tmdb_id ?? null
+  useEffect(() => {
+    // Reset first: the detail page is rendered inside a modal that swaps
+    // titles in place, so last title's answer must not outlive it.
+    setSeerrTitleStatus(NO_SEERR_STATUS)
+    const numericTmdbId = tmdbId != null ? Number(tmdbId) : NaN
+    if (!Number.isFinite(numericTmdbId) || numericTmdbId <= 0) return
+
+    let cancelled = false
+    // Seerr's own vocabulary for a show is 'tv', not 'series'.
+    const path = mediaType === 'movie' ? 'movie' : 'tv'
+    fetch(`/api/seerr/status/${path}/${numericTmdbId}`, { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { canRequest?: boolean; canReportIssue?: boolean } | null) => {
+        // Absent reads as false in both directions — an older server that does
+        // not send a field cannot honour the action behind it either.
+        if (!cancelled) {
+          setSeerrTitleStatus({
+            canRequest: data?.canRequest === true,
+            canReportIssue: data?.canReportIssue === true,
+          })
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setSeerrTitleStatus(NO_SEERR_STATUS)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [mediaType, tmdbId])
+
   const toggleFavorite = useCallback(async (): Promise<boolean> => {
     if (!id || mediaType !== 'movie') return false
 
@@ -325,6 +388,7 @@ export function useMediaDetail(
     mediaServer,
     watchStatus,
     watchStats,
+    seerrTitleStatus,
     userRating,
     ratingLoading,
     loading,

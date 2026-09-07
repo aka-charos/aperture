@@ -97,6 +97,11 @@ interface MediaHeroProps {
    * specials, which nobody reports against).
    */
   seasonNumbers?: number[]
+  /**
+   * Whether the request backend can accept a problem report against this
+   * title. Decided by the page's one status call, not asked for here.
+   */
+  canReportIssue?: boolean
   // Series-specific
   isWatching?: boolean
   onWatchingToggle?: () => void
@@ -120,6 +125,7 @@ export function MediaHero({
   genreAnalysis,
   watchStats,
   seasonNumbers,
+  canReportIssue = false,
   isWatching,
   onWatchingToggle,
   watchStatus,
@@ -857,6 +863,7 @@ export function MediaHero({
                 tmdbId={Number(media.tmdb_id)}
                 mediaType={isSeries(media) ? 'series' : 'movie'}
                 seasons={seasonNumbers}
+                canReport={canReportIssue}
                 sx={actionBtnSx}
               />
             )}
