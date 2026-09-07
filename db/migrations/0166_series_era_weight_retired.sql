@@ -1,0 +1,51 @@
+-- Retire the decade preference for series. Movies keep it.
+--
+-- `0155` added the dimension for both media types on the assumption that a
+-- decade means the same thing for a show as for a film. Measured on the live
+-- instance, it does not, and the reason is the LIBRARY rather than the model:
+--
+--   series by first-air decade:  1960s 2 | 1970s 2 | 1980s 8 | 1990s 15
+--                                2000s 52 | 2010s 475 | 2020s 426
+--
+-- Ninety-two per cent of the shelf sits in two decades. The smoothing in
+-- eraAffinity.ts correctly reads a decade the library barely holds as neutral
+-- however little of it a viewer watched -- so thin decades can register
+-- SEEKING and can never register AVOIDANCE, and the only axis with signal in
+-- both directions is 2010s against 2020s. That is a recency knob with two
+-- positions, which is precisely the two-parameter model the per-decade design
+-- was built to replace. The movie library spans thirteen decades with four
+-- holding a thousand titles or more.
+--
+-- Compounding it: a series is an interval and `series.year` is the first air
+-- year. That was known and defended as "what a viewer means by a 90s show",
+-- which is fair, and both halves of the lift ratio used it consistently. What
+-- the measurement added is that 172 of 982 shows -- 17.5% -- run across a
+-- decade boundary, and on this distribution nearly all of them cross the
+-- 2010/2020 one. The single axis that works is the one where a sixth of the
+-- catalogue sits on a line its own episodes straddle.
+--
+-- Fixing it is two-sided. `episodes.year` exists, so the watched side could use
+-- real air years; the library side counts series, and a show spanning two
+-- decades has to be split across them or counted per episode -- and per episode
+-- lets a 400-episode show swamp a miniseries, which is what the DISTINCT on the
+-- watched side existed to prevent. Fix one side only and the two halves stop
+-- measuring the same thing. Real design work, for a signal with one usable
+-- axis, so it is not being done.
+--
+-- WHAT THIS MIGRATION DOES NOT DO: drop the column. An image rolled back to a
+-- build before this one still SELECTs it, and losing it would break that image
+-- at startup rather than at the feature. Same reasoning that kept
+-- `schedule_day_of_week` alive beside `schedule_days_of_week` in 0149. The
+-- column is inert instead: `loadEraAffinities` no longer accepts a media type
+-- so series cannot ask for an index, the series pipeline passes era weight 0,
+-- and `loadConfigForSeries` returns a literal 0 rather than reading this
+-- column -- so a stray UPDATE reaches nothing. The settings card hides the
+-- slider for series for the same reason.
+--
+-- Movies are unaffected, and `movie_era_weight` remains admin-editable.
+-- Evidence for the movie side is F-113; this half is recorded there too.
+
+UPDATE recommendation_config SET series_era_weight = 0.00 WHERE series_era_weight <> 0.00;
+
+COMMENT ON COLUMN recommendation_config.series_era_weight IS
+  'RETIRED (0166), read by nothing. The decade preference is movies-only: a series library concentrates ~92% of its titles in two decades, leaving one axis with two-way signal, and series.year is a first-air year that 17.5% of shows outlive. Kept as a column only so a rolled-back image still finds it.';

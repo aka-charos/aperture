@@ -59,7 +59,12 @@ export async function loadSeriesConfig(): Promise<PipelineConfig> {
       acclaimedMinRating: dbConfig.series.acclaimedMinRating,
       acclaimedMinVotes: dbConfig.series.acclaimedMinVotes,
       preferenceStrength: dbConfig.series.preferenceStrength,
-      eraWeight: dbConfig.series.eraWeight,
+      // Deliberately NOT dbConfig.series.eraWeight. The era dimension is
+      // movies-only (see loadEraAffinities and F-113), and the column survives
+      // only so a rolled-back image still finds it. Reading it here would let a
+      // stray UPDATE reach a pipeline that no longer has the dimension wired,
+      // which is the kind of half-connected state this file exists to avoid.
+      eraWeight: 0,
     }
   } catch (err) {
     logger.warn({ err }, 'Failed to load series recommendation config from DB, using fallback')

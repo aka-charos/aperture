@@ -12,8 +12,8 @@
  *
  * This is the replacement, and it is deliberately NOT semantic: it never
  * touches an embedding, a canonical text, or a stored vector. It reads
- * `movies.year` / `series.year`, compares what a viewer watched against what
- * the library offered them, and hands the result to applyPreferenceAdjustment
+ * `movies.year`, compares what a viewer watched against what the library
+ * offered them, and hands the result to applyPreferenceAdjustment
  * as a fourth preference dimension beside franchise, genre and stated
  * interests. Adding it costs no re-embed for exactly that reason.
  *
@@ -73,7 +73,6 @@ import { query } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { decadeOf } from './eraDiagnostics.js'
 import { WATCH_HISTORY_TASTE_SQL } from './watchedExclusion.js'
-import type { MediaType } from '../taste-profile/types.js'
 
 const logger = createChildLogger('recommender-era-affinity')
 
@@ -247,52 +246,35 @@ interface YearCountRow {
  * after two minutes does not -- the same rule the taste vector and the
  * engagement ladder use.
  *
- * Series are counted DISTINCT: a watch_history row is an *episode*, so a
- * 62-episode show would otherwise outweigh sixty films.
+ * MOVIES ONLY, and the missing media-type argument is the guard -- see the
+ * note above `loadEraAffinities`.
  */
-export async function getWatchedDecadeCounts(
-  userId: string,
-  mediaType: MediaType
-): Promise<DecadeCounts> {
-  const result =
-    mediaType === 'movie'
-      ? await query<YearCountRow>(
-          `SELECT m.year AS year, COUNT(*) AS n
-             FROM watch_history wh
-             JOIN movies m ON m.id = wh.movie_id
-            WHERE wh.user_id = $1
-              AND wh.media_type = 'movie'
-              AND ${WATCH_HISTORY_TASTE_SQL}
-            GROUP BY m.year`,
-          [userId]
-        )
-      : await query<YearCountRow>(
-          `SELECT s.year AS year, COUNT(DISTINCT s.id) AS n
-             FROM watch_history wh
-             JOIN episodes e ON e.id = wh.episode_id
-             JOIN series s ON s.id = e.series_id
-            WHERE wh.user_id = $1
-              AND wh.media_type = 'episode'
-              AND ${WATCH_HISTORY_TASTE_SQL}
-            GROUP BY s.year`,
-          [userId]
-        )
+export async function getWatchedDecadeCounts(userId: string): Promise<DecadeCounts> {
+  const result = await query<YearCountRow>(
+    `SELECT m.year AS year, COUNT(*) AS n
+       FROM watch_history wh
+       JOIN movies m ON m.id = wh.movie_id
+      WHERE wh.user_id = $1
+        AND wh.media_type = 'movie'
+        AND ${WATCH_HISTORY_TASTE_SQL}
+      GROUP BY m.year`,
+    [userId]
+  )
 
   return foldYearsToDecades(result.rows.map((row) => ({ year: row.year, n: Number(row.n) })))
 }
 
 /**
- * Decades of everything in the library.
+ * Decades of every film in the library.
  *
  * The whole catalogue, not the candidate pool: the question is what the viewer
  * had the opportunity to watch, and retrieval has already been shaped by their
  * taste. Using the pool would compare their history against a set selected to
  * resemble it, which reads every viewer as era-neutral.
  */
-export async function getLibraryDecadeCounts(mediaType: MediaType): Promise<DecadeCounts> {
-  const table = mediaType === 'movie' ? 'movies' : 'series'
+export async function getLibraryDecadeCounts(): Promise<DecadeCounts> {
   const result = await query<YearCountRow>(
-    `SELECT year AS year, COUNT(*) AS n FROM ${table} GROUP BY year`
+    `SELECT year AS year, COUNT(*) AS n FROM movies GROUP BY year`
   )
   return foldYearsToDecades(result.rows.map((row) => ({ year: row.year, n: Number(row.n) })))
 }
@@ -303,19 +285,51 @@ export async function getLibraryDecadeCounts(mediaType: MediaType): Promise<Deca
  * Never throws. An era preference is a refinement on top of a score that is
  * already correct without it, so a failure here must cost the nudge and
  * nothing else -- an empty index reads as neutral everywhere.
+ *
+ * MOVIES ONLY, and there is deliberately no media-type argument to ask with.
+ *
+ * The reason is the LIBRARY, not the labelling (F-113). Measured on the
+ * instance this was designed against, series by first-air decade: 1960s 2,
+ * 1970s 2, 1980s 8, 1990s 15, 2000s 52, 2010s 475, 2020s 426. Ninety-two per
+ * cent of the shelf sits in two decades, and the smoothing above -- correctly
+ * -- reads a decade the library barely holds as neutral however little of it a
+ * viewer watched. So thin decades can register SEEKING and can never register
+ * AVOIDANCE, which leaves exactly one axis with signal in both directions:
+ * 2010s against 2020s. That is a recency knob with two positions, i.e. the
+ * two-parameter model this whole file exists to replace. The movie library
+ * spans thirteen decades with four holding a thousand titles or more; the two
+ * are not the same problem.
+ *
+ * A second thing compounds it, and half of it was already known: a series is
+ * an interval and `series.year` is the first air year. The note this replaces
+ * argued that is what a viewer means by "a 90s show", which is fair -- and
+ * both sides of the lift ratio used it consistently, so the ratio was never
+ * incoherent. What the measurement added is that 172 of 982 shows (17.5%) run
+ * across a decade boundary, and on this distribution nearly all of them cross
+ * the 2010/2020 one. The single axis that works is the one where a sixth of
+ * the catalogue sits on a line its own episodes straddle.
+ *
+ * Fixing that is two-sided and neither side is cheap. `episodes.year` exists,
+ * so the WATCHED side could use real air years; the LIBRARY side counts
+ * series, and a show spanning two decades has to be split across them or
+ * counted per episode -- and per episode lets a 400-episode show swamp a
+ * miniseries, which is what the DISTINCT on the watched side existed to
+ * prevent. Fix one side only and the two halves stop measuring the same
+ * thing. Real design work, for a signal with one usable axis.
+ *
+ * So the boundary is the signature rather than a comment: series cannot ask
+ * for this. `series_era_weight` survives as a column (0166) only so a
+ * rolled-back image still finds it, and nothing reads it.
  */
-export async function loadEraAffinities(
-  userId: string,
-  mediaType: MediaType
-): Promise<EraAffinityIndex> {
+export async function loadEraAffinities(userId: string): Promise<EraAffinityIndex> {
   try {
     const [watched, library] = await Promise.all([
-      getWatchedDecadeCounts(userId, mediaType),
-      getLibraryDecadeCounts(mediaType),
+      getWatchedDecadeCounts(userId),
+      getLibraryDecadeCounts(),
     ])
     return buildEraAffinities(watched, library)
   } catch (err) {
-    logger.warn({ err, userId, mediaType }, 'Failed to build era affinities, using neutral')
+    logger.warn({ err, userId }, 'Failed to build era affinities, using neutral')
     return new Map()
   }
 }
