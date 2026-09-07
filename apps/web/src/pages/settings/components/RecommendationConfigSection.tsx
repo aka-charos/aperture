@@ -109,6 +109,17 @@ interface MediaTypeCardProps {
    * to the stored value keeps the slider usable instead of collapsing it.
    */
   libraryCount: number
+  /**
+   * Whether this media type has a decade-preference dimension at all.
+   *
+   * Movies only. A series library concentrates ~92% of its titles in two
+   * decades, which leaves era one axis with signal in both directions —
+   * effectively the recency knob the per-decade model was built to replace. The
+   * series pipeline no longer wires it and `loadEraAffinities` no longer takes
+   * a media type; this hides the control so the setting cannot be offered where
+   * nothing reads it. See F-113.
+   */
+  supportsEra: boolean
   isDirty: boolean
   isSaving: boolean
   isLoading: boolean
@@ -123,6 +134,7 @@ function MediaTypeCard({
   icon,
   config,
   libraryCount,
+  supportsEra,
   isDirty,
   isSaving,
   isLoading,
@@ -522,7 +534,12 @@ function MediaTypeCard({
         {/* Sits directly under preference strength because it is a dimension
             INSIDE that nudge, not a fourth scoring term. At 0 -- the default --
             the other three dimensions keep their exact original shares, so this
-            is a real off switch rather than an attenuator. */}
+            is a real off switch rather than an attenuator.
+
+            Absent entirely for series: nothing reads the value there, and a
+            slider that moves a number no pipeline consumes is worse than no
+            slider. See supportsEra. */}
+        {supportsEra && (
         <FormControl fullWidth sx={{ mb: 3 }} size="small">
           <Box display="flex" alignItems="center" justifyContent="space-between">
             <Box display="flex" alignItems="center">
@@ -552,6 +569,7 @@ function MediaTypeCard({
             {t('settingsRecAlgo.eraWeightHint')}
           </Typography>
         </FormControl>
+        )}
         {/* The gate. Only shown once the feature is on: two thresholds for a
             disabled feature is noise. */}
         {config.acclaimedMaxSlots > 0 && (
@@ -739,6 +757,7 @@ export function RecommendationConfigSection({
               icon={<MovieIcon color="primary" />}
               config={recConfig.movie}
               libraryCount={libraryCounts?.movies ?? 0}
+              supportsEra
               isDirty={movieConfigDirty}
               isSaving={savingRecConfig}
               isLoading={loadingRecConfig}
@@ -754,6 +773,7 @@ export function RecommendationConfigSection({
               icon={<TvIcon color="secondary" />}
               config={recConfig.series}
               libraryCount={libraryCounts?.series ?? 0}
+              supportsEra={false}
               isDirty={seriesConfigDirty}
               isSaving={savingRecConfig}
               isLoading={loadingRecConfig}

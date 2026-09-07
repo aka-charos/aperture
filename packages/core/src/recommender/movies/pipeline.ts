@@ -581,7 +581,7 @@ export async function generateRecommendationsForUser(
         ),
         getFranchiseAffinityMap(user.id, 'movie'),
         getUserGenreWeights(user.id),
-        loadEraAffinities(user.id, 'movie'),
+        loadEraAffinities(user.id),
       ])
     const genreWeightMap = buildGenreWeightMap(genreWeights)
     const preferenceWeights: PreferenceDimensionWeights = {
