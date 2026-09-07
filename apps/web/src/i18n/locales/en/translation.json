@@ -960,7 +960,15 @@
       "studios": "Studios",
       "languages": "Languages",
       "countries": "Countries",
-      "awards": "Awards"
+      "awards": "Awards",
+      "watchedByTitle": "Watched by",
+      "favoritedByTitle": "Favorited by",
+      "watchersMore": " and {{count}} more",
+      "watchersOpenHint": "Click to see everyone",
+      "watchersAdminOnly": "Only admins can see these names.",
+      "watcherPlays": "{{count}} plays",
+      "watcherEpisodes": "{{count}} episodes",
+      "watcherLastWatched": "Last watched {{date}}"
     },
     "hero": {
       "showFullPlot": "Read full synopsis",

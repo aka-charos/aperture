@@ -3076,7 +3076,15 @@
       "scoreTooltipTmdb": "TMDB: {{score}}/10",
       "scoreTooltipTmdbVotes": "TMDB: {{score}}/10 από {{votes}} ψήφους",
       "scoreTooltipImdb": "IMDb: {{score}}/10",
-      "scoreTooltipImdbVotes": "IMDb: {{score}}/10 από {{votes}} ψήφους"
+      "scoreTooltipImdbVotes": "IMDb: {{score}}/10 από {{votes}} ψήφους",
+      "watchedByTitle": "Watched by",
+      "favoritedByTitle": "Favorited by",
+      "watchersMore": " and {{count}} more",
+      "watchersOpenHint": "Click to see everyone",
+      "watchersAdminOnly": "Only admins can see these names.",
+      "watcherPlays": "{{count}} plays",
+      "watcherEpisodes": "{{count}} episodes",
+      "watcherLastWatched": "Last watched {{date}}"
     },
     "hero": {
       "watched": "Το είδατε",
