@@ -23,6 +23,7 @@ import { Alert, Button, Snackbar, Tooltip } from '@mui/material'
 import type { SxProps, Theme } from '@mui/material'
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined'
 import { ReportIssueDialog } from '../../../components/ReportIssueDialog'
+import { useServerDisplayName } from '../../../hooks/useServerDisplayName'
 
 interface ReportIssueButtonProps {
   title: string
@@ -48,6 +49,7 @@ export function ReportIssueButton({
   sx,
 }: ReportIssueButtonProps) {
   const { t } = useTranslation()
+  const serverName = useServerDisplayName()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [reported, setReported] = useState(false)
 
@@ -55,7 +57,16 @@ export function ReportIssueButton({
 
   return (
     <>
-      <Tooltip title={t('reportIssue.heroTooltip')}>
+      {/* Name the media server. A report goes to whoever runs the library, not
+          to whoever runs this web app, and someone who does not know that
+          reports the wrong thing to the wrong people. */}
+      <Tooltip
+        title={
+          serverName
+            ? t('reportIssue.heroTooltipNamed', { serverName })
+            : t('reportIssue.heroTooltip')
+        }
+      >
         <Button
           variant="text"
           color="inherit"
