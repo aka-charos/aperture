@@ -1,5 +1,4 @@
-import { Box, Grid, Alert, Button } from '@mui/material'
-import RefreshIcon from '@mui/icons-material/Refresh'
+import { Box, Grid, Alert } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { useAuth } from '@/hooks/useAuth'
@@ -17,7 +16,7 @@ import { PageHeading } from '@/components/PageHeading'
 export function DashboardPage() {
   const { t } = useTranslation()
   const { user } = useAuth()
-  const { data, loading, error, refetch } = useDashboardData()
+  const { data, loading, error } = useDashboardData()
   const { series: watchingSeries, loading: watchingLoading } = useWatchingData()
 
   // Filter watching series to only those with upcoming episodes, sorted by air date
@@ -33,31 +32,11 @@ export function DashboardPage() {
 
   return (
     <Box>
-      {/* Header */}
-      <Box sx={{ 
-        display: 'flex', 
-        flexDirection: { xs: 'column', sm: 'row' },
-        alignItems: { xs: 'stretch', sm: 'center' }, 
-        justifyContent: 'space-between', 
-        gap: { xs: 2, sm: 0 },
-        mb: 3 
-      }}>
-        <PageHeading
-          title={`${greeting}, ${user?.displayName || user?.username || ''}`}
-          description={t('dashboard.subtitle')}
-          sx={{ mb: 0 }}
-        />
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<RefreshIcon />}
-          onClick={refetch}
-          disabled={loading}
-          sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}
-        >
-          {t('dashboard.refresh')}
-        </Button>
-      </Box>
+      <PageHeading
+        title={`${greeting}, ${user?.displayName || user?.username || ''}`}
+        description={t('dashboard.subtitle')}
+        sx={{ mb: 3 }}
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
