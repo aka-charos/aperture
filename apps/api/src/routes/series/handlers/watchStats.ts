@@ -5,7 +5,11 @@
  */
 import type { FastifyInstance } from 'fastify'
 import { query, queryOne } from '../../../lib/db.js'
-import { requireAuth } from '../../../plugins/auth.js'
+import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
+import {
+  resolveWatcherAudience,
+  fetchSeriesWatchers,
+} from '../../../lib/watcherVisibility.js'
 import { watchStatsSchema } from '../schemas.js'
 
 export function registerWatchStatsHandler(fastify: FastifyInstance) {
@@ -17,6 +21,7 @@ export function registerWatchStatsHandler(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       const { id } = request.params
+      const currentUser = request.user as SessionUser
 
       // Get total episodes for calculating completion percentage
       const seriesInfo = await queryOne<{ total_episodes: number }>(
@@ -93,8 +98,13 @@ export function registerWatchStatsHandler(fastify: FastifyInstance) {
         (sum, s) => sum + parseInt(s.favorites_count, 10), 0
       )
 
+      // Names ride the same response as the counts, decided server-side: a
+      // viewer with no visibility never receives them. Mirrors the movie handler.
+      const watcherList = await fetchSeriesWatchers(id, resolveWatcherAudience(currentUser))
+
       return reply.send({
         currentlyWatching: parseInt(watchingCount?.count || '0', 10),
+        ...(watcherList ? { watchers: watcherList } : {}),
         totalViewers: watchStats.rows.length,
         completedViewers,
         totalEpisodes,

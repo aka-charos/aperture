@@ -294,6 +294,21 @@ export interface MediaServerInfo {
 }
 
 // Watch statistics
+/**
+ * One named watcher. Present only when the server decided this viewer may see
+ * names — today that means an admin — and ABSENT otherwise, never an empty
+ * array, so the payload is the privacy boundary rather than a UI condition.
+ */
+export interface Watcher {
+  userId: string
+  name: string
+  playCount: number
+  /** Episodes of this series played. Absent for a movie. */
+  episodesWatched?: number
+  lastWatched: string | null
+  favorite: boolean
+}
+
 export interface MovieWatchStats {
   totalWatchers: number
   totalPlays: number
@@ -304,6 +319,7 @@ export interface MovieWatchStats {
   totalRatings: number
   watchPercentage: number
   totalUsers: number
+  watchers?: Watcher[]
 }
 
 export interface SeriesWatchStats {
@@ -320,5 +336,6 @@ export interface SeriesWatchStats {
   averageProgress: number
   watchPercentage: number
   totalUsers: number
+  watchers?: Watcher[]
 }
 

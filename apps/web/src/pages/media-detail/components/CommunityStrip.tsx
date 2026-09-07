@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Box, Typography, Tooltip, LinearProgress } from '@mui/material'
 import VisibilityIcon from '@mui/icons-material/Visibility'
@@ -7,8 +7,9 @@ import FavoriteIcon from '@mui/icons-material/Favorite'
 import StarIcon from '@mui/icons-material/Star'
 import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
-import type { Media, MovieWatchStats, SeriesWatchStats } from '../types'
+import type { Media, MovieWatchStats, SeriesWatchStats, Watcher } from '../types'
 import { isMovie } from '../types'
+import { WatcherListDialog } from './WatcherListDialog'
 
 type WatchStats = MovieWatchStats | SeriesWatchStats
 
@@ -23,7 +24,18 @@ interface Stat {
   value: string
   label: string
   tooltip?: string
+  /**
+   * Named people behind this number. Present only when the server sent names,
+   * which is the whole gate — the strip has no idea who is allowed to see them
+   * and must not: it renders what arrived.
+   */
+  watchers?: Watcher[]
+  /** Heading for the drill-in dialog. Required alongside `watchers`. */
+  watchersTitle?: string
 }
+
+/** Names for the hover summary; the dialog carries the full list. */
+const TOOLTIP_NAMES = 8
 
 interface Meter {
   id: string
@@ -53,6 +65,9 @@ const ICON_SX = { fontSize: 18 } as const
  */
 export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
   const { t } = useTranslation()
+  // Above the early returns: this component bails in three places and a hook
+  // after any of them is a hooks-order violation.
+  const [openStat, setOpenStat] = useState<Stat | null>(null)
 
   if (!watchStats) return null
 
@@ -72,6 +87,8 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
         pct: s.watchPercentage,
         total: s.totalUsers,
       }),
+      watchers: s.watchers,
+      watchersTitle: t('mediaDetail.infoCard.watchedByTitle'),
     })
     if (s.totalPlays > 0) {
       stats.push({
@@ -87,6 +104,8 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
         icon: <FavoriteIcon sx={{ ...ICON_SX, color: 'error.main' }} />,
         value: String(s.favoritesCount),
         label: t('mediaDetail.infoCard.favorited'),
+        watchers: s.watchers?.filter((w) => w.favorite),
+        watchersTitle: t('mediaDetail.infoCard.favoritedByTitle'),
       })
     }
     if (s.averageUserRating != null) {
@@ -123,6 +142,8 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
         icon: <VisibilityIcon sx={{ ...ICON_SX, color: 'info.main' }} />,
         value: String(s.totalViewers),
         label: t('mediaDetail.infoCard.viewers'),
+        watchers: s.watchers,
+        watchersTitle: t('mediaDetail.infoCard.watchedByTitle'),
       })
     }
     if (s.completedViewers > 0) {
@@ -170,6 +191,7 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
   if (stats.length === 0 && meters.length === 0) return null
 
   return (
+    <>
     <Box
       sx={{
         display: 'flex',
@@ -187,9 +209,39 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
         mb: 2.5,
       }}
     >
-      {stats.map(({ id, icon, value, label, tooltip }) => {
+      {stats.map((stat) => {
+        const { id, icon, value, label, tooltip, watchers } = stat
+        // Names only where the server sent some. An empty list means the
+        // counter has no one behind it this viewer may see, which is not a
+        // reason to offer an empty dialog.
+        const named = watchers && watchers.length > 0 ? watchers : undefined
+
         const item = (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.75,
+              ...(named && {
+                cursor: 'pointer',
+                borderRadius: 1,
+                px: 0.5,
+                mx: -0.5,
+                '&:hover': { bgcolor: 'action.hover' },
+              }),
+            }}
+            {...(named && {
+              role: 'button',
+              tabIndex: 0,
+              onClick: () => setOpenStat(stat),
+              onKeyDown: (e: React.KeyboardEvent) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setOpenStat(stat)
+                }
+              },
+            })}
+          >
             {icon}
             <Typography variant="body2" fontWeight={700} lineHeight={1.2}>
               {value}
@@ -199,8 +251,29 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
             </Typography>
           </Box>
         )
-        return tooltip ? (
-          <Tooltip key={id} title={tooltip}>
+
+        // The hover summary names the first few and says how to see the rest;
+        // the dialog is the answer on touch, where there is no hover at all.
+        const title = named ? (
+          <>
+            <Box component="span" sx={{ display: 'block' }}>
+              {named
+                .slice(0, TOOLTIP_NAMES)
+                .map((w) => w.name)
+                .join(', ')}
+              {named.length > TOOLTIP_NAMES &&
+                t('mediaDetail.infoCard.watchersMore', { count: named.length - TOOLTIP_NAMES })}
+            </Box>
+            <Box component="span" sx={{ display: 'block', opacity: 0.7, mt: 0.5 }}>
+              {t('mediaDetail.infoCard.watchersOpenHint')}
+            </Box>
+          </>
+        ) : (
+          tooltip
+        )
+
+        return title ? (
+          <Tooltip key={id} title={title}>
             {item}
           </Tooltip>
         ) : (
@@ -245,5 +318,15 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
         </Box>
       ))}
     </Box>
+
+      {openStat?.watchers && (
+        <WatcherListDialog
+          open
+          title={openStat.watchersTitle ?? openStat.label}
+          watchers={openStat.watchers}
+          onClose={() => setOpenStat(null)}
+        />
+      )}
+    </>
   )
 }

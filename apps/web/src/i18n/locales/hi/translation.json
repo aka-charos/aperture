@@ -788,7 +788,15 @@
       "scoreTooltipTmdb": "TMDB: {{score}}/10",
       "scoreTooltipTmdbVotes": "TMDB: {{score}}/10 from {{votes}} votes",
       "scoreTooltipImdb": "IMDb: {{score}}/10",
-      "scoreTooltipImdbVotes": "IMDb: {{score}}/10 from {{votes}} votes"
+      "scoreTooltipImdbVotes": "IMDb: {{score}}/10 from {{votes}} votes",
+      "watchedByTitle": "Watched by",
+      "favoritedByTitle": "Favorited by",
+      "watchersMore": " and {{count}} more",
+      "watchersOpenHint": "Click to see everyone",
+      "watchersAdminOnly": "Only admins can see these names.",
+      "watcherPlays": "{{count}} plays",
+      "watcherEpisodes": "{{count}} episodes",
+      "watcherLastWatched": "Last watched {{date}}"
     },
     "similar": {
       "titleMovies": "संबंधित फ़िल्में",

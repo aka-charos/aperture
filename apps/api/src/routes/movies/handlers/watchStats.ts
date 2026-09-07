@@ -5,7 +5,11 @@
  */
 import type { FastifyInstance } from 'fastify'
 import { queryOne } from '../../../lib/db.js'
-import { requireAuth } from '../../../plugins/auth.js'
+import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
+import {
+  resolveWatcherAudience,
+  fetchMovieWatchers,
+} from '../../../lib/watcherVisibility.js'
 import { watchStatsSchema } from '../schemas.js'
 
 export function registerWatchStatsHandler(fastify: FastifyInstance) {
@@ -17,6 +21,7 @@ export function registerWatchStatsHandler(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       const { id } = request.params
+      const currentUser = request.user as SessionUser
 
       // Get watch history stats
       const watchStats = await queryOne<{
@@ -63,8 +68,13 @@ export function registerWatchStatsHandler(fastify: FastifyInstance) {
       const totalUsers = parseInt(userCount?.count || '1', 10)
       const watchers = parseInt(watchStats?.total_watchers || '0', 10)
 
+      // Names ride the same response as the counts, decided here rather than
+      // filtered in the client: a viewer with no visibility never receives them.
+      const watcherList = await fetchMovieWatchers(id, resolveWatcherAudience(currentUser))
+
       return reply.send({
         totalWatchers: watchers,
+        ...(watcherList ? { watchers: watcherList } : {}),
         totalPlays: parseInt(watchStats?.total_plays || '0', 10),
         favoritesCount: parseInt(watchStats?.favorites_count || '0', 10),
         firstWatched: watchStats?.first_watched || null,
