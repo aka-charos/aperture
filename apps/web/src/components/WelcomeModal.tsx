@@ -71,150 +71,152 @@ export function WelcomeModal({ open, onClose }: WelcomeModalProps) {
   const steps = useMemo(
     () => [
       {
-        label: t('welcomeModal.stepWelcome'),
-        icon: <AutoAwesomeIcon />,
+        label: t('welcomeModal.stepLearns'),
+        icon: <HistoryIcon />,
         content: (
           <Box>
-            <Typography paragraph>
-              <Trans i18nKey="welcomeModal.stepWelcomeP1" components={{ 0: <strong /> }} />
-            </Typography>
+            <Typography paragraph>{t('welcomeModal.learnsP1')}</Typography>
             <Typography paragraph color="text.secondary">
-              {t('welcomeModal.stepWelcomeP2')}
+              {t('welcomeModal.learnsP2')}
             </Typography>
           </Box>
         ),
       },
       {
-        label: t('welcomeModal.stepHowAi'),
+        label: t('welcomeModal.stepReads'),
         icon: <PsychologyIcon />,
         content: (
           <Box>
             <Typography paragraph>
-              <Trans i18nKey="welcomeModal.stepHowAiP1" components={{ 0: <strong /> }} />
+              <Trans i18nKey="welcomeModal.readsP1" components={{ 0: <strong /> }} />
             </Typography>
             <Box component="ul" sx={{ pl: 2, '& li': { mb: 1 } }}>
               <li>
                 <Typography variant="body2">
-                  <Trans i18nKey="welcomeModal.stepHowAiLi1" components={{ 0: <strong /> }} />
+                  <Trans i18nKey="welcomeModal.readsLi1" components={{ 0: <strong /> }} />
                 </Typography>
               </li>
               <li>
                 <Typography variant="body2">
-                  <Trans i18nKey="welcomeModal.stepHowAiLi2" components={{ 0: <strong /> }} />
+                  <Trans i18nKey="welcomeModal.readsLi2" components={{ 0: <strong /> }} />
                 </Typography>
               </li>
               <li>
                 <Typography variant="body2">
-                  <Trans i18nKey="welcomeModal.stepHowAiLi3" components={{ 0: <strong /> }} />
+                  <Trans i18nKey="welcomeModal.readsLi3" components={{ 0: <strong /> }} />
                 </Typography>
               </li>
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              {t('welcomeModal.stepHowAiP2')}
+              {t('welcomeModal.readsP2')}
             </Typography>
           </Box>
         ),
       },
       {
-        label: t('welcomeModal.stepScoring'),
+        label: t('welcomeModal.stepScore'),
         icon: <TuneIcon />,
         content: (
           <Box>
-            <Typography paragraph>{t('welcomeModal.stepScoringP1')}</Typography>
+            <Typography paragraph>{t('welcomeModal.scoreP1')}</Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
               <Paper sx={{ p: 1.5, bgcolor: alpha(theme.palette.primary.main, 0.1) }}>
                 <Typography variant="subtitle2" color="primary">
-                  {t('welcomeModal.stepScoringTaste')}
+                  {t('welcomeModal.scoreTaste')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {t('welcomeModal.stepScoringTasteD')}
+                  {t('welcomeModal.scoreTasteD')}
                 </Typography>
               </Paper>
               <Paper sx={{ p: 1.5, bgcolor: alpha(theme.palette.secondary.main, 0.1) }}>
                 <Typography variant="subtitle2" color="secondary">
-                  {t('welcomeModal.stepScoringGenre')}
+                  {t('welcomeModal.scoreDiscovery')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {t('welcomeModal.stepScoringGenreD')}
+                  {t('welcomeModal.scoreDiscoveryD')}
                 </Typography>
               </Paper>
               <Paper sx={{ p: 1.5, bgcolor: alpha(theme.palette.success.main, 0.1) }}>
                 <Typography variant="subtitle2" color="success.main">
-                  {t('welcomeModal.stepScoringCommunity')}
+                  {t('welcomeModal.scoreQuality')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {t('welcomeModal.stepScoringCommunityD')}
+                  {t('welcomeModal.scoreQualityD')}
                 </Typography>
               </Paper>
+              {/* Deliberately last and visually set apart: diversity is not a
+                  term in the blend above it. Listing it as a fourth percentage
+                  is the same error the insights panel shipped with before
+                  migration 0141 moved Variety to its own heading. */}
               <Paper sx={{ p: 1.5, bgcolor: alpha(theme.palette.warning.main, 0.1) }}>
                 <Typography variant="subtitle2" color="warning.main">
-                  {t('welcomeModal.stepScoringDiversity')}
+                  {t('welcomeModal.scoreVariety')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {t('welcomeModal.stepScoringDiversityD')}
+                  {t('welcomeModal.scoreVarietyD')}
                 </Typography>
               </Paper>
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              {t('welcomeModal.stepScoringP2')}
+              {t('welcomeModal.scoreP2')}
             </Typography>
           </Box>
         ),
       },
       {
-        label: t('welcomeModal.stepSimilar'),
-        icon: <MovieFilterIcon />,
+        label: t('welcomeModal.stepSlots'),
+        icon: <AutoAwesomeIcon />,
         content: (
           <Box>
             <Typography paragraph>
-              <Trans i18nKey="welcomeModal.stepSimilarP1" components={{ 0: <strong /> }} />
+              <Trans i18nKey="welcomeModal.slotsP1" components={{ 0: <strong /> }} />
             </Typography>
-            <Typography paragraph>{t('welcomeModal.stepSimilarP2')}</Typography>
+            <Typography paragraph>{t('welcomeModal.slotsP2')}</Typography>
             <Box component="ul" sx={{ pl: 2, '& li': { mb: 0.5 } }}>
               <li>
-                <Typography variant="body2">{t('welcomeModal.stepSimilarLi1')}</Typography>
+                <Typography variant="body2">{t('welcomeModal.slotsLi1')}</Typography>
               </li>
               <li>
-                <Typography variant="body2">{t('welcomeModal.stepSimilarLi2')}</Typography>
+                <Typography variant="body2">{t('welcomeModal.slotsLi2')}</Typography>
               </li>
               <li>
-                <Typography variant="body2">{t('welcomeModal.stepSimilarLi3')}</Typography>
+                <Typography variant="body2">{t('welcomeModal.slotsLi3')}</Typography>
               </li>
               <li>
-                <Typography variant="body2">{t('welcomeModal.stepSimilarLi4')}</Typography>
+                <Typography variant="body2">{t('welcomeModal.slotsLi4')}</Typography>
               </li>
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              {t('welcomeModal.stepSimilarP3')}
+              {t('welcomeModal.slotsP3')}
             </Typography>
           </Box>
         ),
       },
       {
-        label: t('welcomeModal.stepData'),
-        icon: <HistoryIcon />,
+        label: t('welcomeModal.stepPanel'),
+        icon: <MovieFilterIcon />,
         content: (
           <Box>
-            <Typography paragraph>{t('welcomeModal.stepDataP1')}</Typography>
+            <Typography paragraph>{t('welcomeModal.panelP1')}</Typography>
             <Box component="ul" sx={{ pl: 2, '& li': { mb: 1 } }}>
               <li>
                 <Typography variant="body2">
-                  <Trans i18nKey="welcomeModal.stepDataLi1" components={{ 0: <strong /> }} />
+                  <Trans i18nKey="welcomeModal.panelLi1" components={{ 0: <strong /> }} />
                 </Typography>
               </li>
               <li>
                 <Typography variant="body2">
-                  <Trans i18nKey="welcomeModal.stepDataLi2" components={{ 0: <strong /> }} />
+                  <Trans i18nKey="welcomeModal.panelLi2" components={{ 0: <strong /> }} />
                 </Typography>
               </li>
               <li>
                 <Typography variant="body2">
-                  <Trans i18nKey="welcomeModal.stepDataLi3" components={{ 0: <strong /> }} />
+                  <Trans i18nKey="welcomeModal.panelLi3" components={{ 0: <strong /> }} />
                 </Typography>
               </li>
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              {t('welcomeModal.stepDataP2')}
+              {t('welcomeModal.panelP2')}
             </Typography>
           </Box>
         ),
