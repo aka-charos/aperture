@@ -7,7 +7,7 @@
  * server there is nothing to request, so the card stays hidden.
  */
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Box,
@@ -33,13 +33,22 @@ import type { Series, SeasonAvailability } from '../types'
 interface MissingSeasonsCardProps {
   series: Series
   seasonAvailability: SeasonAvailability[]
+  /**
+   * Whether this viewer may request missing content. Decided by the status
+   * endpoint, which the page asks once for the whole title rather than each
+   * control asking for itself.
+   */
+  canRequest: boolean
 }
 
-export function MissingSeasonsCard({ series, seasonAvailability }: MissingSeasonsCardProps) {
+export function MissingSeasonsCard({
+  series,
+  seasonAvailability,
+  canRequest,
+}: MissingSeasonsCardProps) {
   const { t } = useTranslation()
   const { fetchTVDetails, submitRequest } = useSeerrRequest()
   const serverName = useServerDisplayName()
-  const [canRequest, setCanRequest] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [modalSeasons, setModalSeasons] = useState<SeasonInfo[]>([])
   const [loadingSeasons, setLoadingSeasons] = useState(false)
@@ -56,22 +65,6 @@ export function MissingSeasonsCard({ series, seasonAvailability }: MissingSeason
   const gaps = seasonAvailability.filter((s) => s.missing_episodes > 0)
   const totalMissing = gaps.reduce((sum, s) => sum + s.missing_episodes, 0)
   const hasGaps = gaps.length > 0
-
-  // Seerr request availability (endpoint reports canRequest=false when Seerr
-  // is not configured or requests are disabled for this user)
-  useEffect(() => {
-    if (!tmdbId || !hasGaps) return
-    let cancelled = false
-    fetch(`/api/seerr/status/tv/${tmdbId}`, { credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { canRequest?: boolean } | null) => {
-        if (!cancelled && data) setCanRequest(data.canRequest === true)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [tmdbId, hasGaps])
 
   // Every aired episode is already on the server — nothing to report and
   // nothing to request, so stay out of the way.
