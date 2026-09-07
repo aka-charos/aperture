@@ -57,6 +57,8 @@ import {
   getProxiedImageUrl,
   FALLBACK_POSTER_URL,
   TrailerModal,
+  WatchedBadge,
+  EpisodeProgressBadge,
 } from '@aperture/ui'
 
 // The "open in <server>" CTA is branded like the app it opens, not the instance's own
@@ -140,7 +142,20 @@ export function MediaHero({
   const { t } = useTranslation()
   // The grid this page was opened from is still mounted behind it and reads the
   // same set, so telling it here is what stops a film coming back unticked.
-  const { setMovieWatched } = useWatchStatus()
+  const { setMovieWatched, isWatched, getEpisodeProgress } = useWatchStatus()
+
+  // The hero draws its own poster rather than using MoviePoster, so the tick the
+  // grids get has to be repeated here — and this is the page someone opens to
+  // ask "have I seen this?", so it is the last place that should be missing it.
+  //
+  // A movie reads the page's OWN watchStatus, not the shared set: this component
+  // marks watched and unwatched, and that state has to change under the button
+  // that was just pressed rather than on the next page load. A series has no
+  // such button (neither provider defines markEpisodePlayed) so it reads the set.
+  const heroWatched = isMovie(media)
+    ? watchStatus?.isWatched === true
+    : isWatched('series', media.id)
+  const heroProgress = isMovie(media) ? undefined : getEpisodeProgress('series', media.id)
   const theme = useTheme()
   const serverName = useServerDisplayName()
   const [showFullPlot, setShowFullPlot] = useState(false)
@@ -455,6 +470,15 @@ export function MediaHero({
                 <TvIcon sx={{ fontSize: 64, color: 'grey.600' }} />
               )}
             </Box>
+          )}
+
+          {heroWatched && <WatchedBadge size={28} sx={{ top: 12, insetInlineEnd: 12 }} />}
+          {!heroWatched && heroProgress != null && heroProgress.total > 0 && (
+            <EpisodeProgressBadge
+              watched={heroProgress.watched}
+              total={heroProgress.total}
+              sx={{ top: 12, insetInlineEnd: 12, height: 26, fontSize: '0.8rem' }}
+            />
           )}
         </Paper>
 

@@ -37,6 +37,7 @@ import BookmarkIcon from '@mui/icons-material/Bookmark'
 import HistoryIcon from '@mui/icons-material/History'
 import { useWatchingData } from './hooks'
 import { useUserRatings } from '../../hooks/useUserRatings'
+import { useWatchStatus } from '../../hooks/useWatchStatus'
 import { useViewMode } from '../../hooks/useViewMode'
 import { WatchingCard, WatchingListItem, AddSeriesDialog } from './components'
 import { PageHeading } from '@/components/PageHeading'
@@ -49,6 +50,7 @@ export function WatchingPage() {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
   const { series, loading, error, refreshing, removeSeries, refreshLibrary, refetch } = useWatchingData()
   const { getRating, setRating } = useUserRatings()
+  const { isWatched, getEpisodeProgress } = useWatchStatus()
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [confirmRemove, setConfirmRemove] = useState<{ seriesId: string; title: string } | null>(null)
   const [snackbar, setSnackbar] = useState<{
@@ -361,6 +363,8 @@ export function WatchingPage() {
               key={item.id}
               series={item}
               userRating={getRating('series', item.seriesId)}
+              watched={isWatched('series', item.seriesId)}
+              episodeProgress={getEpisodeProgress('series', item.seriesId)}
               onRate={(rating) => setRating('series', item.seriesId, rating)}
               onRemove={handleRemove}
             />
