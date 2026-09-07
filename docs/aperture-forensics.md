@@ -1687,6 +1687,24 @@ The hero reads its own `watchStatus` for a movie rather than the shared set, bec
 
 The same sweep found the Watching page's list view unbadged while its grid view had the tick — the third instance of that grid/list split, after browse and top picks.
 
+### The button that offered to mark a watched film watched
+
+Second report, and the more interesting one: *War Machine* ticked correctly in the browse grid and its detail page showed **Mark Watched**, with no tick on the hero. Two surfaces on one instance, disagreeing about one film — which is the exact failure the whole-library set exists to prevent, arriving from the one direction it did not cover.
+
+The detail page was not reading that set. It answered "have I watched this?" by fetching `/api/users/:id/watch-history?pageSize=1000&sortBy=title` and scanning the result for the movie's id. But the list route caps pageSize:
+
+```ts
+const pageSize = Math.min(parseInt(request.query.pageSize || '50', 10), 100)
+```
+
+So the page received **the first hundred titles alphabetically** and concluded "not watched" for everything after them. On a 244-film history that is well over half the library, and it is why both reported counterexamples begin with V and W. Silent, because a truncated page is a valid response — nothing errors, the array simply does not contain the film.
+
+The bug predates the badge by a long way: the Mark Watched button has been offering to mark films the viewer had already finished, and the "Watched N times" chip has been missing, for anyone past a hundred watched titles. It surfaced now only because the badge put a second opinion on the same screen. **A feature that duplicates an existing answer is a free consistency check on it** — and this one failed immediately.
+
+Fixed at the source rather than by switching the page to the shared set: `GET /api/users/:id/watch-history/movies/:movieId` answers for one film, which is what the page was always asking. It cannot be truncated, it costs one indexed lookup instead of a hundred-row join, and it repairs `playCount` and `lastWatched` at the same time. The hero still reads its own `watchStatus` rather than the provider set, for the reason above — it owns the buttons, and the tick has to move under the press.
+
+A sweep for the same pattern (`pageSize=1000` and friends) found no other caller.
+
 ### Left unticked deliberately
 
 My Watch History and the watch-stats drill-in (every row is watched by construction; a tick on all of them is decoration), Home's two rails (recommendations are unwatched by construction, history watched), another user's profile page (the provider holds the *viewer's* set, so a tick there would be an assertion about the wrong person), and gap analysis (TMDb rows with no library id, so the question cannot be asked). The assistant's chat cards stay tick-only: `ContentItem.watched` is a boolean stamped by `annotateWatchedItems` and carries no episode counts.
