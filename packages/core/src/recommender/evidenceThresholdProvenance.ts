@@ -65,11 +65,30 @@ export async function checkEvidenceThresholdProvenance(): Promise<EvidenceThresh
   try {
     activeSetId = await getActiveEmbeddingModelId()
   } catch (err) {
-    logger.debug({ err }, 'Could not resolve the active embedding set')
+    logger.info({ err }, 'Could not resolve the active embedding set; threshold unverified')
     return { state: 'unknown' }
   }
 
   const result = compareEvidenceThresholdSet(activeSetId)
+
+  // Say so on the way through, not only on divergence. A check that is silent
+  // when it passes is indistinguishable from one that did not run -- and the
+  // two silent outcomes here mean opposite things ("verified" and "could not
+  // look"). Printing the active set id also means the FIRST boot after a model
+  // swap names the new id, which is the value the re-derivation needs anyway.
+  if (result.state === 'match') {
+    logger.info(
+      { threshold: EVIDENCE_CAUSAL_MIN_COSINE, embeddingSet: result.activeSet },
+      `Evidence threshold ${EVIDENCE_CAUSAL_MIN_COSINE} verified against ${result.activeSet}`
+    )
+  }
+
+  if (result.state === 'unknown') {
+    logger.info(
+      { threshold: EVIDENCE_CAUSAL_MIN_COSINE },
+      'No embeddings role is configured, so the evidence threshold cannot be verified yet'
+    )
+  }
 
   if (result.state === 'diverged') {
     logger.warn(

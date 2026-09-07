@@ -102,12 +102,24 @@ export async function reportJobConfigDrift(
   try {
     configs = await loadConfigs()
   } catch (err) {
-    logger.debug({ err }, 'Could not read job_config to check it against the catalogue')
+    logger.info({ err }, 'Could not read job_config to check it against the catalogue')
     return null
   }
 
   const drift = findJobConfigDrift(configs, registeredNames)
-  if (drift.orphans.length === 0) return drift
+
+  // Say so when it passes, not only when it fails. A check that is silent on
+  // success reads exactly like one that never ran, and the two silences here
+  // mean opposite things -- which is not hypothetical: the first run of this
+  // check found two orphans nobody knew about, and once a migration clears
+  // them the only evidence it is still watching is this line.
+  if (drift.orphans.length === 0) {
+    logger.info(
+      { rows: configs.length },
+      `job_config agrees with the catalogue (${configs.length} rows)`
+    )
+    return drift
+  }
 
   logger.warn(
     {
