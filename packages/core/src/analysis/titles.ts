@@ -28,6 +28,7 @@ function numOrNull(value: string | number | null): number | null {
 interface TitleRow {
   id: string
   title: string
+  original_title: string | null
   year: number | null
   directors: string[] | null
   metacritic_score: number | null
@@ -46,6 +47,7 @@ interface TitleRow {
 const SUBJECT_COLUMNS = [
   'id',
   'title',
+  'original_title',
   'year',
   'directors',
   'metacritic_score',
@@ -61,6 +63,7 @@ const subjectColumns = (alias?: string) =>
 function toSubject(row: TitleRow, mediaType: 'movie' | 'series'): AnalysisSubject {
   return {
     title: row.title,
+    originalTitle: row.original_title,
     year: row.year,
     mediaType,
     directors: row.directors,

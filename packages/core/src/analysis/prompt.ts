@@ -64,10 +64,48 @@ export interface ReceptionContext {
 
 export interface AnalysisSubject {
   title: string
+  /**
+   * The name on the film's own poster, when it differs from the localized one.
+   *
+   * 30% of a real library carries one (see 0134). It matters here because the
+   * localized title is often a common English phrase — "Sentimental Value",
+   * "The Teachers' Lounge" — that a search engine answers with a different
+   * work entirely, while the original is a rare string that can only mean this
+   * film. Optional and nullable: absent means the row has none, which is the
+   * majority case.
+   */
+  originalTitle?: string | null
   year: number | null
   mediaType: 'movie' | 'series'
   directors?: string[] | null
   reception: ReceptionContext
+}
+
+/**
+ * The original title when it is a genuinely different name, else null.
+ *
+ * ONE DECISION, TWO USERS, and they have to agree: the query below adds it so
+ * retrieval can find the film, and the prompt header states it so the model
+ * recognizes the film it is reading about. Retrieving Norwegian pages about
+ * "Affeksjonsverdi" under a header saying only "Sentimental Value" invites the
+ * model to conclude the sources are about something else.
+ *
+ * "Genuinely different" is decided by ICU under base sensitivity rather than by
+ * folding the strings by hand: it already treats case and accents as
+ * insignificant, so "Amelie"/"Amélie" and "The Matrix"/"THE MATRIX" are one
+ * name and add nothing to a query. Deliberately NOT the assistant's
+ * `titlesOverlap` — that answers "do these refer to the same work" across a
+ * package boundary core cannot import, and a subtitle variant it would fold
+ * away ("Le Samouraï" / "Le Samourai: The Godson") is worth having in a search.
+ */
+export function distinctOriginalTitle(subject: AnalysisSubject): string | null {
+  const original = subject.originalTitle?.trim()
+  if (!original) return null
+  const title = subject.title.trim()
+  if (!title) return original
+  return original.localeCompare(title, undefined, { sensitivity: 'base' }) === 0
+    ? null
+    : original
 }
 
 /**
@@ -318,8 +356,15 @@ export function buildAnalysisPrompt(
   const grounded = options.mode === 'grounding'
   const sources = options.sources ?? []
 
+  const originalTitle = distinctOriginalTitle(subject)
+
   const header = [
     `${kind === 'series' ? 'Series' : 'Film'}: ${subject.title}${subject.year ? ` (${subject.year})` : ''}`,
+    // Named because the documents below were retrieved partly by this name and
+    // will often use it throughout - see distinctOriginalTitle. Without it a
+    // model handed a Norwegian page about "Affeksjonsverdi" has to guess
+    // whether it is reading about the film in the heading.
+    originalTitle ? `Original title: ${originalTitle}` : null,
     subject.directors?.length ? `Directed by: ${subject.directors.slice(0, 3).join(', ')}` : null,
     receptionLine(subject.reception)
       ? `Reception, for calibration only - do not quote these numbers back: ${receptionLine(subject.reception)}`
@@ -425,6 +470,25 @@ function afterBeginMarker(body: string): { text: string; hadBeginMarker: boolean
  * pages. The year disambiguates remakes, which is the single commonest way to
  * retrieve confident writing about the wrong film.
  *
+ * THE ORIGINAL TITLE IS THE OTHER DISAMBIGUATOR, and the stronger one. A year
+ * separates two films sharing a name; it does nothing when the localized title
+ * is an ordinary English phrase that a search engine can answer with an
+ * unrelated work of roughly the right vintage, which is how an international
+ * film ends up analysed as something else. The original is a rare string, so it
+ * pulls the ranking onto the right film even when the engine ignores the year.
+ * It goes immediately after the localized title, the way a human writes both
+ * names, rather than at the end where it would read as one more topic word.
+ *
+ * BOTH NAMES, BARE. Not the original alone - most criticism of a film released
+ * in English is written under its English title, so replacing one with the
+ * other trades one half of the coverage for the other. And not quoted or
+ * OR-joined either: quoting both makes them a hard AND and drops every page
+ * that uses only one name, which is most pages, while an OR operator is
+ * honoured differently by each of the three engines and ignored outright by
+ * some. Two bare names weight the ranking without excluding anything - a page
+ * carrying either ranks, a page carrying both ranks highest, which is exactly
+ * the ordering wanted.
+ *
  * "production history" earns its place by pulling the encyclopaedia entries and
  * making-of write-ups the circumstances question needs; "review" was dropped
  * for it, since that word is what surfaces aggregator and listicle pages -
@@ -432,6 +496,8 @@ function afterBeginMarker(body: string): { text: string; hadBeginMarker: boolean
  */
 export function buildAnalysisQuery(subject: AnalysisSubject): string {
   const kind = subject.mediaType === 'series' ? 'TV series' : 'film'
+  const original = distinctOriginalTitle(subject)
+  const alsoKnownAs = original ? ` ${original}` : ''
   const year = subject.year ? ` ${subject.year}` : ''
-  return `${subject.title}${year} ${kind} analysis criticism production history themes style`
+  return `${subject.title}${alsoKnownAs}${year} ${kind} analysis criticism production history themes style`
 }
