@@ -51,6 +51,7 @@ import { formatRuntime } from '../hooks'
 import { hasCriticRatings, personPath } from '../helpers'
 import { RatingBadges } from './RatingBadges'
 import { CommunityStrip } from './CommunityStrip'
+import { ReportIssueButton } from './ReportIssueButton'
 import {
   StarRating,
   getProxiedImageUrl,
@@ -89,6 +90,13 @@ interface MediaHeroProps {
    * down the page.
    */
   watchStats?: MovieWatchStats | SeriesWatchStats | null
+  /**
+   * Season numbers this title has, so a report about a series can name the
+   * season it is about. The page holds seasons as a record keyed by number;
+   * only the numbers reach here, and only season 1 upwards (season 0 is
+   * specials, which nobody reports against).
+   */
+  seasonNumbers?: number[]
   // Series-specific
   isWatching?: boolean
   onWatchingToggle?: () => void
@@ -111,6 +119,7 @@ export function MediaHero({
   onRatingChange,
   genreAnalysis,
   watchStats,
+  seasonNumbers,
   isWatching,
   onWatchingToggle,
   watchStatus,
@@ -837,6 +846,19 @@ export function MediaHero({
                   {t('mediaDetail.hero.markUnwatched')}
                 </Button>
               </Tooltip>
+            )}
+            {/* Last, and deliberately the quietest thing in the row: reporting
+                a problem is what you do when everything above has failed you.
+                Self-hiding when the request backend has no record of this
+                title, so it costs nothing on an instance without one. */}
+            {media.tmdb_id && (
+              <ReportIssueButton
+                title={media.title}
+                tmdbId={Number(media.tmdb_id)}
+                mediaType={isSeries(media) ? 'series' : 'movie'}
+                seasons={seasonNumbers}
+                sx={actionBtnSx}
+              />
             )}
           </Box>
 

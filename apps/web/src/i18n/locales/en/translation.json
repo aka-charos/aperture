@@ -3834,9 +3834,8 @@
   "reportIssue": {
     "title": "Report a problem",
     "subtitle": "Tell the team what is wrong with “{{title}}”. Be specific — where it happens matters more than how bad it is.",
-    "cardTitle": "Something wrong with this?",
-    "cardBody": "Report a playback problem so it can be looked at.",
-    "cardAction": "Report",
+    "heroAction": "Report a problem",
+    "heroTooltip": "Something wrong with this title? Tell the team what you are seeing.",
     "kind": "What is wrong",
     "kinds": {
       "video": "Video",

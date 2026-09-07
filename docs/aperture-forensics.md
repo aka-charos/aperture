@@ -1517,7 +1517,9 @@ An issue is filed against **Seerr's internal media row id**, not a TMDb id, and 
 
 **Only the instance-level half is decided there.** Whether *this viewer* is linked to a Seerr account is deliberately not folded in, for two reasons. It is per-user and fixable, and a control that silently vanishes teaches nobody what to do — whereas the create route refuses with a sentence naming the fix. And resolving a link **writes** (`ensureSeerrUserIdForRequest` caches the id), which on a GET would be [F-103](docs/aperture-forensics.md#f-103)'s trap: a getter that writes defeats the account-assumption guard silently, and this one would write to the *target's* row.
 
-`ReportIssueCard` self-hides on `canReportIssue !== true`, so **absent reads as false** — an older server that does not send the field cannot accept the report either.
+`ReportIssueButton` self-hides on `canReportIssue !== true`, so **absent reads as false** — an older server that does not send the field cannot accept the report either.
+
+It shipped as a bordered card at the foot of the left column and nobody scrolled that far — past the analysis, the info card and every season of a show. It is now the **last control in the hero action row**, beside Open in Emby and Trailer, because everything else you can do to a title is up there and this is a decision people make while looking at the title. It is the only borderless button in that row, deliberately: the row is otherwise primary actions, and a page should not press someone to file a complaint about the thing they came to watch. The row style (`actionBtnSx`) is **passed in rather than restated**, so tuning the row moves this button with it.
 
 ### Two extractions this forced, both of them the repo's own rule
 

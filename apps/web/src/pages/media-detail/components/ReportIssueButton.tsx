@@ -1,5 +1,12 @@
 /**
- * "Something wrong with this?" — the entry point for reporting a problem.
+ * "Report a problem" — the entry point for reporting a problem with a title.
+ *
+ * It sits last in the hero's action row rather than in a card at the foot of
+ * the page: reporting a problem is something you decide to do while looking at
+ * the title, and everything else you can do to a title is up there. It is also
+ * the lowest-weight control in that row on purpose — borderless beside the
+ * outlined pills — because it is infrequent, and a page should not press
+ * someone to file a complaint about the thing they came to watch.
  *
  * Renders nothing at all unless the backing service holds a record of this
  * title, which the status endpoint answers as a decided `canReportIssue`.
@@ -8,20 +15,33 @@
  * at submit instead, because that one is per-user and fixable, and a control
  * that silently vanishes teaches nobody what to do.
  */
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Alert, Box, Button, Paper, Snackbar, Typography } from '@mui/material'
+import { Alert, Button, Snackbar, Tooltip } from '@mui/material'
+import type { SxProps, Theme } from '@mui/material'
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined'
 import { ReportIssueDialog } from '../../../components/ReportIssueDialog'
 
-interface ReportIssueCardProps {
+interface ReportIssueButtonProps {
   title: string
   tmdbId: number
   mediaType: 'movie' | 'series'
   seasons?: number[]
+  /**
+   * The action row's shared button styling (height, radius, no shrinking).
+   * Passed in rather than restated here, so tuning the row moves this button
+   * with the rest of it.
+   */
+  sx?: SxProps<Theme>
 }
 
-export function ReportIssueCard({ title, tmdbId, mediaType, seasons = [] }: ReportIssueCardProps) {
+export function ReportIssueButton({
+  title,
+  tmdbId,
+  mediaType,
+  seasons = [],
+  sx,
+}: ReportIssueButtonProps) {
   const { t } = useTranslation()
   const [canReport, setCanReport] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -50,20 +70,25 @@ export function ReportIssueCard({ title, tmdbId, mediaType, seasons = [] }: Repo
 
   return (
     <>
-      <Paper variant="outlined" sx={{ borderRadius: 2, p: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <ReportProblemOutlinedIcon fontSize="small" color="action" />
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="subtitle2">{t('reportIssue.cardTitle')}</Typography>
-            <Typography variant="caption" color="text.secondary">
-              {t('reportIssue.cardBody')}
-            </Typography>
-          </Box>
-          <Button size="small" variant="outlined" onClick={() => setDialogOpen(true)}>
-            {t('reportIssue.cardAction')}
-          </Button>
-        </Box>
-      </Paper>
+      <Tooltip title={t('reportIssue.heroTooltip')}>
+        <Button
+          variant="text"
+          color="inherit"
+          startIcon={<ReportProblemOutlinedIcon />}
+          onClick={() => setDialogOpen(true)}
+          sx={[
+            {
+              color: 'text.secondary',
+              '&:hover': { color: 'text.primary', backgroundColor: 'action.hover' },
+            },
+            // MUI's own merge pattern — sx can be an array or a function, so it
+            // cannot simply be spread into an object literal.
+            ...(Array.isArray(sx) ? sx : [sx]),
+          ]}
+        >
+          {t('reportIssue.heroAction')}
+        </Button>
+      </Tooltip>
 
       <ReportIssueDialog
         open={dialogOpen}
