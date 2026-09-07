@@ -5138,9 +5138,8 @@
   "reportIssue": {
     "title": "Αναφορά προβλήματος",
     "subtitle": "Πείτε μας τι δεν πάει καλά με το «{{title}}». Πείτε μας συγκεκριμένα πού συμβαίνει — αυτό μετράει περισσότερο από το πόσο σοβαρό είναι.",
-    "cardTitle": "Κάτι δεν πάει καλά εδώ;",
-    "cardBody": "Αναφέρετε ένα πρόβλημα αναπαραγωγής για να το κοιτάξουμε.",
-    "cardAction": "Αναφορά",
+    "heroAction": "Αναφορά προβλήματος",
+    "heroTooltip": "Something wrong with this title? Tell the team what you are seeing.",
     "kind": "Τι δεν πάει καλά",
     "kinds": {
       "video": "Εικόνα",
