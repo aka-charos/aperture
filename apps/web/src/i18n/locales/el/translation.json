@@ -5138,8 +5138,10 @@
   "reportIssue": {
     "title": "Αναφορά προβλήματος",
     "subtitle": "Πείτε μας τι δεν πάει καλά με το «{{title}}». Πείτε μας συγκεκριμένα πού συμβαίνει — αυτό μετράει περισσότερο από το πόσο σοβαρό είναι.",
+    "subtitleNamed": "Tell the team what is wrong with “{{title}}” in {{serverName}}. Be specific — where it happens matters more than how bad it is.",
     "heroAction": "Αναφορά προβλήματος",
-    "heroTooltip": "Something wrong with this title? Tell the team what you are seeing.",
+    "heroTooltip": "Something wrong with this title on your media server? Explain the issue so we can fix it.",
+    "heroTooltipNamed": "Something wrong with this title in {{serverName}}? Explain the issue so we can fix it.",
     "kind": "Τι δεν πάει καλά",
     "kinds": {
       "video": "Εικόνα",
@@ -5153,7 +5155,12 @@
     "episode": "Επεισόδιο",
     "episodeHelp": "Προαιρετικό",
     "message": "Τι συμβαίνει",
-    "messagePlaceholder": "π.χ. ο ήχος ξεσυγχρονίζεται γύρω στο σαραντάλεπτο",
+    "messagePlaceholders": {
+      "video": "e.g. the video will not load — it just spins and then stops",
+      "audio": "e.g. the audio drifts about five seconds out of sync partway through",
+      "subtitles": "e.g. the English subtitles do not load, and the ones that do are out of sync",
+      "other": "e.g. this is the wrong cut of the film"
+    },
     "submit": "Αποστολή",
     "submitting": "Αποστέλλεται…",
     "reported": "Ευχαριστούμε — η αναφορά σας στάλθηκε.",

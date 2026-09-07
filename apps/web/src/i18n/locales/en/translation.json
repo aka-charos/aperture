@@ -3833,9 +3833,11 @@
   },
   "reportIssue": {
     "title": "Report a problem",
-    "subtitle": "Tell the team what is wrong with “{{title}}”. Be specific — where it happens matters more than how bad it is.",
+    "subtitle": "Tell the team what is wrong with “{{title}}” on your media server. Be specific — where it happens matters more than how bad it is.",
+    "subtitleNamed": "Tell the team what is wrong with “{{title}}” in {{serverName}}. Be specific — where it happens matters more than how bad it is.",
     "heroAction": "Report a problem",
-    "heroTooltip": "Something wrong with this title? Tell the team what you are seeing.",
+    "heroTooltip": "Something wrong with this title on your media server? Explain the issue so we can fix it.",
+    "heroTooltipNamed": "Something wrong with this title in {{serverName}}? Explain the issue so we can fix it.",
     "kind": "What is wrong",
     "kinds": {
       "video": "Video",
@@ -3849,7 +3851,12 @@
     "episode": "Episode",
     "episodeHelp": "Optional",
     "message": "What happens",
-    "messagePlaceholder": "e.g. the audio drifts out of sync about forty minutes in",
+    "messagePlaceholders": {
+      "video": "e.g. the video will not load — it just spins and then stops",
+      "audio": "e.g. the audio drifts about five seconds out of sync partway through",
+      "subtitles": "e.g. the English subtitles do not load, and the ones that do are out of sync",
+      "other": "e.g. this is the wrong cut of the film"
+    },
     "submit": "Send report",
     "submitting": "Sending…",
     "reported": "Thanks — your report has been sent.",

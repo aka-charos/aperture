@@ -5,6 +5,13 @@
  * as names rather than its integers — the bundle never learns another
  * system's enums. Season and episode are optional and mean "the whole title"
  * when left alone, which is what Seerr's 0 encodes.
+ *
+ * Two things the copy has to get right. It names the **media server**: a
+ * report is about the file being served, not about this web app, and someone
+ * who does not know that describes the wrong thing to the wrong people. And
+ * the example in the message box **follows the selected kind** — a video
+ * report prompted with an audio example teaches the reader that the example
+ * is decoration, which is exactly when they stop reading it.
  */
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -23,6 +30,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
+import { useServerDisplayName } from '../hooks/useServerDisplayName'
 
 export type IssueKind = 'video' | 'audio' | 'subtitles' | 'other'
 
@@ -49,6 +57,7 @@ export function ReportIssueDialog({
   onReported,
 }: ReportIssueDialogProps) {
   const { t } = useTranslation()
+  const serverName = useServerDisplayName()
   const [kind, setKind] = useState<IssueKind>('video')
   const [message, setMessage] = useState('')
   const [season, setSeason] = useState<number | ''>('')
@@ -111,7 +120,9 @@ export function ReportIssueDialog({
       <DialogTitle>{t('reportIssue.title')}</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          {t('reportIssue.subtitle', { title })}
+          {serverName
+            ? t('reportIssue.subtitleNamed', { title, serverName })
+            : t('reportIssue.subtitle', { title })}
         </Typography>
 
         {error && (
@@ -174,7 +185,7 @@ export function ReportIssueDialog({
             multiline
             minRows={3}
             fullWidth
-            placeholder={t('reportIssue.messagePlaceholder')}
+            placeholder={t(`reportIssue.messagePlaceholders.${kind}`)}
           />
         </Stack>
       </DialogContent>
