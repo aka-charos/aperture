@@ -4,6 +4,7 @@ import { test } from 'node:test'
 import { ANALYSIS_BEGIN_MARKER, parseAnalysisResponse } from './prompt.js'
 import {
   describeResponseProblem,
+  describeResponseShape,
   findResponseProblem,
   stripReasoningBlocks,
 } from './response.js'
@@ -171,4 +172,48 @@ test('the other problems keep the change-your-model advice', () => {
     const message = describeResponseProblem({ kind }, { title: 'Stalker', modelId: 'local/model' })
     assert.match(message, /Title Analysis role/, `${kind} lost its advice`)
   }
+})
+
+// The live case this was written for. OpenRouter recorded status 200,
+// finish_reason "stop", cancelled false -- a wholly successful generation --
+// while Aperture rejected it three times and stored nothing. Both were right.
+// The number that explained it was in the provider's dashboard and nowhere in
+// ours: native_tokens_reasoning 10010, i.e. the answer went to the reasoning
+// channel and the content channel came back empty.
+test('a reasoning-channel answer is measurable, not just absent', () => {
+  const shape = describeResponseShape({
+    text: '',
+    reasoningText: 'Let me work through the sources one at a time. Source [1] is the Wikipedia entry',
+  })
+
+  assert.equal(shape.textChars, 0)
+  assert.ok(shape.reasoningChars > 0)
+  assert.match(shape.reasoningHead ?? '', /work through the sources/)
+  // And it is still a rejection - the shape explains it, it does not excuse it.
+  assert.deepEqual(
+    findResponseProblem({ text: '', grade: null, hadBeginMarker: false }),
+    { kind: 'reasoning_only' }
+  )
+})
+
+// "This model does not separate its thinking" and "it thought about nothing"
+// are different facts, and only one is worth a log field.
+test('no reasoning channel omits the field rather than reporting zero', () => {
+  const shape = describeResponseShape({ text: 'Some prose.' })
+  assert.equal(shape.reasoningChars, 0)
+  assert.equal('reasoningHead' in shape, false)
+})
+
+// A head is for recognising what the model was doing, not for reading its
+// output back - and never for finding a marker in it and splicing an answer
+// together, which is the salvage-regex mistake this module records.
+test('heads are clipped so a log line cannot carry the whole response', () => {
+  const shape = describeResponseShape({
+    text: 'x'.repeat(9000),
+    reasoningText: 'y'.repeat(9000),
+  })
+
+  assert.equal(shape.textChars, 9000)
+  assert.equal(shape.textHead.length, 240)
+  assert.equal(shape.reasoningHead?.length, 240)
 })

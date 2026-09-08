@@ -68,6 +68,7 @@ import {
 } from './prompt.js'
 import {
   describeResponseProblem,
+  describeResponseShape,
   findResponseProblem,
   stripReasoningBlocks,
   type ResponseProblem,
@@ -506,6 +507,7 @@ async function runWriteAttempt(
   }
   let finishReason: string | undefined
   let usage: AnalysisUsage = {}
+  let generationId: string | undefined
   let attemptsMade = 0
 
   for (let i = 1; i <= MAX_WRITE_ATTEMPTS; i++) {
@@ -567,15 +569,61 @@ async function runWriteAttempt(
     }
     finishReason = response.finishReason
     usage = readUsage(response.usage)
+    // The provider's own id for this generation. On OpenRouter it is the
+    // `gen-…` that addresses its dashboard directly, which is the difference
+    // between comparing two records and hunting through both by timestamp --
+    // and this path had no shared key with the provider at all. Kept for the
+    // final line too, so a title that succeeded is equally traceable.
+    generationId = response.response?.id
     reading = readAnalysis(response.text ?? '', response.finishReason)
 
     if (!reading.problem) break
+
+    // WHAT THE MODEL ACTUALLY SENT, logged only when it was rejected. A
+    // healthy title has no use for it and would otherwise put a few hundred
+    // characters of prose in the log per call; a rejected one is unreadable
+    // without it, which is the whole complaint. `reasoningChars` is the field
+    // that names the failure this was written for -- a model whose answer went
+    // to the reasoning channel returns an empty content channel and looks
+    // exactly like one that said nothing.
+    const shape = describeResponseShape({
+      text: response.text ?? '',
+      reasoningText: response.reasoningText,
+    })
+
     if (i < MAX_WRITE_ATTEMPTS) {
       logger.warn(
-        { attempt: i, modelId, problem: reading.problem.kind, finishReason, ...usage, maxOutputTokens },
+        {
+          title: options.title,
+          attempt: i,
+          modelId,
+          generationId,
+          problem: reading.problem.kind,
+          finishReason,
+          ...shape,
+          ...usage,
+          maxOutputTokens,
+        },
         'Analysis response was not usable; retrying'
       )
       await sleep(RETRY_DELAY_MS)
+    } else {
+      // The last attempt has no retry line, so without this the final rejection
+      // would carry the verdict and none of the evidence for it.
+      logger.warn(
+        {
+          title: options.title,
+          attempt: i,
+          modelId,
+          generationId,
+          problem: reading.problem.kind,
+          finishReason,
+          ...shape,
+          ...usage,
+          maxOutputTokens,
+        },
+        'Analysis response was not usable and no attempts remain'
+      )
     }
   }
 
@@ -596,6 +644,7 @@ async function runWriteAttempt(
       title: options.title,
       modelId,
       provider: attempt.provider,
+      generationId,
       fallback: attempt.isFallback || undefined,
       textChars: reading.text.length,
       hasMap: reading.mapText != null,
@@ -815,12 +864,15 @@ async function writeWithGrounding(
 
       logger.info(
         {
+          title: options.title,
           attempt,
           keySlot: keyAttempt.slot,
           modelId: result.modelId,
+          generationId: response.response?.id,
           webSearchQueries: grounding?.webSearchQueries?.length ?? 0,
           groundingChunks: result.groundingChunks,
           textChars: result.text.length,
+          hasMap: result.mapText != null,
           problem: result.problem?.kind,
           finishReason: response.finishReason,
           maxOutputTokens: maxOutputTokens || 'unlimited',
@@ -831,8 +883,28 @@ async function writeWithGrounding(
 
       if (!result.problem) break
 
+      // Same evidence as the CRW path, and needed here for the same reason: a
+      // verdict with nothing behind it cannot be acted on.
+      logger.warn(
+        {
+          title: options.title,
+          attempt,
+          modelId: result.modelId,
+          generationId: response.response?.id,
+          problem: result.problem.kind,
+          finishReason: response.finishReason,
+          ...describeResponseShape({
+            text: response.text ?? '',
+            reasoningText: response.reasoningText,
+          }),
+          ...result.usage,
+        },
+        attempt < MAX_WRITE_ATTEMPTS
+          ? 'Grounded analysis unusable; retrying'
+          : 'Grounded analysis unusable and no attempts remain'
+      )
+
       if (attempt < MAX_WRITE_ATTEMPTS) {
-        logger.warn({ attempt, problem: result.problem.kind }, 'Grounded analysis unusable; retrying')
         // Metered by hand: withGroundingModel records once per KEY attempt and
         // this loop sits inside one of them, so a request Google counts would
         // otherwise be invisible.

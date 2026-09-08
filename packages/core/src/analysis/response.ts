@@ -69,6 +69,59 @@ export function stripReasoningBlocks(raw: string): string {
     .trim()
 }
 
+/** How much came back on each channel, and the opening of each. */
+export interface ResponseShape {
+  textChars: number
+  reasoningChars: number
+  /** The first characters of the content channel. Empty when there were none. */
+  textHead: string
+  /** The first characters of the reasoning channel, when the provider split it out. */
+  reasoningHead?: string
+}
+
+/** Enough of a channel to recognise what the model was doing, and no more. */
+const HEAD_CHARS = 240
+
+/**
+ * Describe what a model actually returned, for a log line about a rejection.
+ *
+ * THE REASON THIS EXISTS. A live failure looked like this: OpenRouter recorded
+ * the call as `status: 200`, `finish_reason: "stop"`, `cancelled: false` -- a
+ * completely successful generation -- while Aperture rejected it three times
+ * and stored nothing. Both were correct, and the log could not show why,
+ * because it recorded that a response was unusable without recording one
+ * character of the response. The decisive number was in the provider's own
+ * dashboard and nowhere in ours: `native_tokens_reasoning: 10010`.
+ *
+ * That is the case `reasoningChars` names. The AI SDK surfaces a provider's
+ * separated scratchpad as `reasoningText`, distinct from `text`; a model that
+ * puts its whole answer there returns an EMPTY content channel, which is
+ * indistinguishable from a model that said nothing at all unless both channels
+ * are measured. `stripReasoningBlocks` cannot help — it only knows the inline
+ * `<think>` form, and this scratchpad never enters the content stream.
+ *
+ * DIAGNOSTIC ONLY. Nothing here feeds `findResponseProblem`, and the heads are
+ * deliberately not searched for a marker or spliced into an answer: recovering
+ * prose from a scratchpad by inspection is the salvage-regex mistake this
+ * module was written to record. The heads are for a human reading a log, who
+ * can then decide whether the model or the setting is at fault.
+ */
+export function describeResponseShape(input: {
+  text: string
+  reasoningText?: string
+}): ResponseShape {
+  const reasoning = input.reasoningText ?? ''
+  return {
+    textChars: input.text.length,
+    reasoningChars: reasoning.length,
+    textHead: input.text.slice(0, HEAD_CHARS),
+    // Omitted rather than empty when the provider sent no reasoning channel:
+    // "this model does not separate its thinking" and "it thought about
+    // nothing" are different facts, and only one of them is worth a log field.
+    ...(reasoning ? { reasoningHead: reasoning.slice(0, HEAD_CHARS) } : {}),
+  }
+}
+
 export interface ResponseCheckInput {
   /** The prose, after the opening marker, reasoning tags and SOURCES line. */
   text: string
