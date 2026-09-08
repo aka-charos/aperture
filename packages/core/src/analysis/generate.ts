@@ -47,6 +47,7 @@ import {
 import { orderByHealth, recordEngineOutcome } from '../lib/crwEngines.js'
 import { query, queryOne } from '../lib/db.js'
 import { describeAiError } from '../lib/aiErrors.js'
+import { streamLmStudioChat } from '../lib/lmstudioChat.js'
 import { waitForCallSlot } from '../lib/callPacing.js'
 import { createChildLogger } from '../lib/logger.js'
 import { recordWebSearchCall } from '../lib/webSearchUsage.js'
@@ -446,16 +447,32 @@ const WRITE_HEARTBEAT_MS = 30_000
  * loop alive, so a timer left running by a throw on some path nobody thought
  * about would stop the process exiting. Cleared in a `finally` regardless.
  */
-function startWriteHeartbeat(context: Record<string, unknown>): { stop: () => void } {
+function startWriteHeartbeat(
+  context: Record<string, unknown>
+): { stop: () => void; note: (phase: string) => void } {
   const startedAt = Date.now()
+  // The last phase the model reported, when it reports any. LM Studio's native
+  // endpoint does; nothing else can, so this stays absent rather than guessing.
+  // Stored rather than logged per event: a delta arrives per token, and the
+  // heartbeat is the thing with a sane interval.
+  let phase: string | undefined
   const timer = setInterval(() => {
     logger.info(
-      { ...context, elapsedSeconds: Math.round((Date.now() - startedAt) / 1000) },
+      {
+        ...context,
+        ...(phase != null && { phase }),
+        elapsedSeconds: Math.round((Date.now() - startedAt) / 1000),
+      },
       'Still waiting for the analysis model'
     )
   }, WRITE_HEARTBEAT_MS)
   timer.unref()
-  return { stop: () => clearInterval(timer) }
+  return {
+    stop: () => clearInterval(timer),
+    note: (next: string) => {
+      phase = next
+    },
+  }
 }
 
 /** Run one model until it answers, gives up, or proves it cannot follow the format. */
@@ -552,6 +569,73 @@ async function runWriteAttempt(
     // here and rethrown in its place.
     let streamError: unknown
     try {
+      // LM STUDIO GOES THROUGH ITS OWN ENDPOINT, and only for this role.
+      //
+      // The assistant cannot: `/api/v1/chat` is marked ❌ for custom tools and
+      // ❌ for assistant messages in the request, and the assistant is twelve
+      // local tools over several steps. Title analysis is retrieval, then one
+      // prompt, then one answer — it needs neither, so it is the only role that
+      // can pay this endpoint's price, and the one that gains most from it.
+      //
+      // What it gains is diagnosis. On the OpenAI-compatible path a reasoning
+      // model that never finished thinking returns an empty `content` and looks
+      // exactly like one that said nothing; here reasoning and message are
+      // separate event streams, a cold load reports progress instead of
+      // sitting silent, and the close carries `reasoning_output_tokens`,
+      // `tokens_per_second` and `time_to_first_token_seconds` — the three
+      // numbers that say whether a slow title was the prompt, the thinking or
+      // the hardware.
+      if (attempt.provider === 'lmstudio') {
+        const native = await streamLmStudioChat({
+          model: modelId,
+          input: prompt,
+          baseUrl: attempt.baseUrl,
+          apiKey: attempt.apiKey,
+          progress: {
+            onModelLoad: (p) => heartbeat.note(`loading model ${Math.round(p * 100)}%`),
+            onPromptProgress: (p) => heartbeat.note(`reading prompt ${Math.round(p * 100)}%`),
+            // Deliberately counted rather than accumulated: the point is to say
+            // WHICH of the two the model is doing, since that is the whole
+            // difference between "still thinking" and "writing the answer".
+            onReasoningDelta: () => heartbeat.note('thinking'),
+            onMessageDelta: () => heartbeat.note('writing'),
+          },
+        })
+
+        logger.info(
+          {
+            title: options.title,
+            modelId,
+            attempt: i,
+            instance: native.modelInstanceId,
+            responseId: native.responseId,
+            textChars: native.text.length,
+            reasoningChars: native.reasoningText.length,
+            ...native.stats,
+          },
+          'LM Studio finished the analysis call'
+        )
+
+        response = {
+          text: native.text,
+          reasoningText: native.reasoningText,
+          // This endpoint reports no finish reason of its own on every shape.
+          // Absent must NOT read as 'length': that is the truncation verdict,
+          // and asserting it without evidence would blame a ceiling for a model
+          // that simply stopped.
+          finishReason: native.finishReason ?? 'stop',
+          usage: {
+            inputTokens: native.stats?.inputTokens,
+            outputTokens: native.stats?.totalOutputTokens,
+            totalTokens:
+              native.stats?.inputTokens != null && native.stats?.totalOutputTokens != null
+                ? native.stats.inputTokens + native.stats.totalOutputTokens
+                : undefined,
+            reasoningTokens: native.stats?.reasoningOutputTokens,
+          },
+          response: { id: native.responseId },
+        }
+      } else {
       const stream = streamText({
         model,
         prompt,
@@ -575,6 +659,7 @@ async function runWriteAttempt(
         stream.response,
       ])
       response = { text, reasoningText, finishReason: streamFinishReason, usage: streamUsage, response: meta }
+      }
     } catch (err) {
       // Logged here because this is the only frame that knows which model and
       // which attempt. RETURNED rather than thrown so the caller can move to a
