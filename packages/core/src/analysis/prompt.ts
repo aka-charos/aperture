@@ -50,8 +50,10 @@
  * 5: the questions are reordered so the reading opens on the work and closes
  *    on its background, and they stop being a form filled in one paragraph
  *    each.
+ * 6: the answer carries a paragraph map, so which paragraph answers which
+ *    question is recorded by the model rather than inferred from position.
  */
-export const ANALYSIS_PROMPT_VERSION = 5
+export const ANALYSIS_PROMPT_VERSION = 6
 
 /** Reception figures, passed as calibration only. All optional. */
 export interface ReceptionContext {
@@ -156,6 +158,36 @@ function receptionLine(r: ReceptionContext): string | null {
 }
 
 /**
+ * What a paragraph of the finished analysis answers.
+ *
+ * These ids are BOTH the labels shown beside each question in the prompt and
+ * the vocabulary of the paragraph map the model writes back, from one array,
+ * because a hand-kept second list of them is precisely the drift this repo
+ * keeps paying for — the AI role enums copied across ten route schemas, the job
+ * catalogue kept in two packages. The failure here would be quieter than
+ * either: an id the prompt never showed the model can never appear in a map, so
+ * that question would simply always read as unanswered.
+ *
+ * `structure` is SERIES-ONLY, and it is the reason the map is keyed by NAME
+ * rather than by question number. The series list carries one extra question in
+ * second position, so question 2 is `tradition` for a film and `structure` for
+ * a show — a numeric map would mean two different things while looking
+ * identical, and nothing downstream could tell which it was holding.
+ */
+export type AnalysisQuestionId =
+  | 'work'
+  | 'structure'
+  | 'tradition'
+  | 'dispute'
+  | 'intent'
+  | 'circumstances'
+
+interface AnalysisQuestion {
+  id: AnalysisQuestionId
+  text: string
+}
+
+/**
  * Circumstances of making and first release.
  *
  * Added after the first real pass, because the analyses read as though every
@@ -183,8 +215,10 @@ function receptionLine(r: ReceptionContext): string | null {
  * the test, and the negative list is there because a budget figure reads like
  * an answer to it while being nothing of the kind.
  */
-const CIRCUMSTANCES_QUESTION =
-  'What circumstances of its making or first release left a mark on the work - how it was produced, the form it was originally shown in, constraints or controversies that changed what it became? Facts that did not change the work - budgets, shooting schedules, crew and extras counts, release dates - are not answers.'
+const CIRCUMSTANCES_QUESTION: AnalysisQuestion = {
+  id: 'circumstances',
+  text: 'What circumstances of its making or first release left a mark on the work - how it was produced, the form it was originally shown in, constraints or controversies that changed what it became? Facts that did not change the work - budgets, shooting schedules, crew and extras counts, release dates - are not answers.',
+}
 
 /**
  * ORDER IS READING ORDER, and it is not the order these were first written in.
@@ -205,11 +239,17 @@ const CIRCUMSTANCES_QUESTION =
  * because that is a literal answer to it; asking what the work is doing and how
  * its choices serve that makes technique the evidence instead of the subject.
  */
-const MOVIE_QUESTIONS = [
-  'What is this film doing, and how do its choices serve that? Name a choice, then say what it achieves - a list of equipment or techniques with no effect attached is not an answer.',
-  'What tradition does it sit in - what was it responding to, what did it influence?',
-  'What do critics genuinely disagree about?',
-  'What did the people who made it say they were trying to do?',
+const MOVIE_QUESTIONS: AnalysisQuestion[] = [
+  {
+    id: 'work',
+    text: 'What is this film doing, and how do its choices serve that? Name a choice, then say what it achieves - a list of equipment or techniques with no effect attached is not an answer.',
+  },
+  {
+    id: 'tradition',
+    text: 'What tradition does it sit in - what was it responding to, what did it influence?',
+  },
+  { id: 'dispute', text: 'What do critics genuinely disagree about?' },
+  { id: 'intent', text: 'What did the people who made it say they were trying to do?' },
   CIRCUMSTANCES_QUESTION,
 ]
 
@@ -219,14 +259,35 @@ const MOVIE_QUESTIONS = [
  * seasons), which has no film equivalent and is exactly the kind of thing a
  * viewer choosing what to start wants to know.
  */
-const SERIES_QUESTIONS = [
-  'What is this series doing, and how do its choices serve that? Name a choice, then say what it achieves - a list of equipment or techniques with no effect attached is not an answer.',
-  'How is it structured across its run - serialised or episodic, and did it change?',
-  'What tradition does it sit in - what was it responding to, what did it influence?',
-  'What do critics genuinely disagree about?',
-  'What did the people who made it say they were trying to do?',
+const SERIES_QUESTIONS: AnalysisQuestion[] = [
+  {
+    id: 'work',
+    text: 'What is this series doing, and how do its choices serve that? Name a choice, then say what it achieves - a list of equipment or techniques with no effect attached is not an answer.',
+  },
+  {
+    id: 'structure',
+    text: 'How is it structured across its run - serialised or episodic, and did it change?',
+  },
+  {
+    id: 'tradition',
+    text: 'What tradition does it sit in - what was it responding to, what did it influence?',
+  },
+  { id: 'dispute', text: 'What do critics genuinely disagree about?' },
+  { id: 'intent', text: 'What did the people who made it say they were trying to do?' },
   CIRCUMSTANCES_QUESTION,
 ]
+
+/**
+ * The map vocabulary for a media type — the ids of the questions it is asked.
+ *
+ * The one reader outside this file is `./paragraphMap.ts`, which uses it to
+ * decide whether a label the model wrote is one we asked for. Deriving it here
+ * rather than restating it there is what keeps a movie from being able to claim
+ * a `structure` paragraph it was never asked to write.
+ */
+export function questionIdsFor(mediaType: 'movie' | 'series'): AnalysisQuestionId[] {
+  return (mediaType === 'series' ? SERIES_QUESTIONS : MOVIE_QUESTIONS).map((q) => q.id)
+}
 
 /**
  * The first rule is the whole epistemic difference between the two retrieval
@@ -249,7 +310,7 @@ const RULES = [
   'Describe how it works, never what happens in it. No third-act or ending discussion. Someone who has not seen it must be able to read this safely.',
   'Match your register to the work. A stunt-driven action picture has real craft in its staging and choreography, and that is a legitimate subject - write about it as what it is. Do not apply art-cinema vocabulary to a genre entertainment.',
   'The questions are what to cover and in what order, not a form to fill in. Do not write one paragraph per question. Merge the ones that belong together and let the whole read as continuous prose with a single line of thought.',
-  'Write in short paragraphs of three or four sentences, separated by a blank line. Keep each sentence to one idea and do not chain clauses with semicolons - if a sentence carries two ideas, make it two sentences. Plain prose only: no headings, bullet points, numbered lists or bold text.',
+  'Write in short paragraphs of three or four sentences, separated by a blank line. Keep each sentence to one idea and do not chain clauses with semicolons - if a sentence carries two ideas, make it two sentences. Plain prose only in the analysis itself: no headings, bullet points, numbered lists or bold text.',
   'Be specific. Name the people the sources name - the director, the writer, the cinematographer, whoever is credited with the choice you are describing - rather than writing "those behind the project" or "the creative team". Cut any sentence whose only content is that the work sits in a tradition, extends one, or hopes to influence something: say what and how, or say nothing.',
   'Answer only what the sources genuinely support. It is normal for two or three of these questions to have no answer, and dropping them is the correct outcome rather than a gap to fill. If none of them do, say so in two sentences and stop.',
   'Do not cite, number or link the sources in your prose, and do not quote the reception figures back.',
@@ -290,12 +351,48 @@ const RULES = [
  */
 export const ANALYSIS_BEGIN_MARKER = '===ANALYSIS==='
 
-const SOURCE_GRADE_LINE =
+/**
+ * The paragraph map's delimiter, and why the map sits AFTER the prose.
+ *
+ * WHICH PARAGRAPH ANSWERS WHICH QUESTION WAS ONLY EVER INFERABLE FROM POSITION,
+ * and position is exactly what the rules above make unreliable: rule 3 tells the
+ * model to merge questions that belong together, rule 6 tells it to drop the
+ * ones the sources cannot support. Both are load-bearing — they are what
+ * produced ~250 words for Love Actually and ~900 for Dancer in the Dark from
+ * one prompt — and both mean "the third paragraph" names nothing stable.
+ * Measured on a live analysis of The Voice Of Hind Rajab, the second paragraph
+ * held tradition AND critical dispute together, so anything reading two
+ * paragraphs off the top would have embedded argumentation as style.
+ *
+ * SO THE MODEL LABELS ITS OWN PARAGRAPHS RATHER THAN WRITING TO A FORM. The
+ * obvious alternative — a marker per section inside the prose — was rejected
+ * twice over. It makes merging structurally impossible, since text cannot sit
+ * under two markers at once, and a named empty section is a far stronger
+ * invitation to pad than an omitted paragraph is; both are the exact behaviours
+ * versions 4 and 5 were written to remove.
+ *
+ * A TRAILING MAP CANNOT DO THAT, and the reason is ordering rather than
+ * obedience: the article is complete before the first character of the map
+ * exists, so no instruction about the map can reach back and shape the prose.
+ * The one thing it can get wrong is counting, which ./paragraphMap.ts checks.
+ *
+ * IT IS ALSO TOLERANT BY DESIGN, like the SOURCES grade and unlike the opening
+ * marker. Missing, garbled or miscounted costs the signal and keeps the
+ * analysis — see `findResponseProblem`, which is deliberately NOT extended to
+ * know about this. Making it strict would mean a formatting slip costs a title,
+ * and the map is an index, not the article.
+ */
+export const ANALYSIS_MAP_MARKER = '===MAP==='
+
+const OUTPUT_CONTRACT =
   `Output format. Write this and nothing else:\n` +
   `${ANALYSIS_BEGIN_MARKER}\n` +
   `<your analysis, in paragraphs separated by a blank line>\n` +
+  `${ANALYSIS_MAP_MARKER}\n` +
+  `<one line per paragraph, written as "<paragraph number>: <question labels>">\n` +
   `SOURCES: substantial | reviews-only | almost-nothing\n\n` +
-  `The first line of your output must be ${ANALYSIS_BEGIN_MARKER} exactly. If you need to think first, do it above that line - everything above it is discarded. The SOURCES line is the last line and nothing follows it.`
+  `The first line of your output must be ${ANALYSIS_BEGIN_MARKER} exactly. If you need to think first, do it above that line - everything above it is discarded. The SOURCES line is the last line and nothing follows it.\n\n` +
+  `About the map. Finish the analysis first, then read back what you wrote and label it. Number your paragraphs from 1 in the order you wrote them, counting each blank-line-separated block as one paragraph. Against each number put the bracketed label of the question that paragraph answers, and if it answers two, list both separated by a comma. Leave out any paragraph that answers none of the questions, and any question you did not answer - a missing line is the correct way to say "not covered", and there is no label for it. The map describes prose you have already written. It is not a plan, and nothing in it may change a word of what is above it.`
 
 /**
  * The untrusted-content fence.
@@ -385,12 +482,15 @@ export function buildAnalysisPrompt(
     grounded
       ? `Answer only the questions that have real answers for this ${kind}:`
       : `Answer only the questions the sources actually support:`,
-    ...questions.map((q, i) => `${i + 1}. ${q}`),
+    // The bracketed label is the map's vocabulary, stated where the question
+    // is asked rather than in a list of its own. One place to read, and a
+    // label the model is shown beside the thing it names.
+    ...questions.map((q, i) => `${i + 1}. [${q.id}] ${q.text}`),
     '',
     'RULES',
     ...[grounded ? GROUNDED_RULE : SOURCED_RULE, ...RULES].map((r) => `- ${r}`),
     '',
-    SOURCE_GRADE_LINE,
+    OUTPUT_CONTRACT,
   ].join('\n')
 }
 
@@ -406,8 +506,24 @@ export interface ParsedAnalysis {
    * this contract exists to close.
    */
   hadBeginMarker: boolean
-  /** Prose with the SOURCES line removed. Empty when the model wrote none. */
+  /**
+   * The analysis alone, with the SOURCES line and the paragraph map removed.
+   * Empty when the model wrote none.
+   *
+   * This is what gets stored and rendered, so neither marker may survive into
+   * it — a map line reaching the panel would read as the model talking to
+   * itself in the middle of the article.
+   */
   text: string
+  /**
+   * The raw map block, exactly as written and NOT yet validated. Null when the
+   * model omitted it, which is an ordinary outcome rather than a fault.
+   *
+   * Unvalidated here on purpose: judging it needs the paragraph count and the
+   * media type's question list, and this function has neither. `./paragraphMap.ts`
+   * does that, at the point where the prose is final.
+   */
+  mapText: string | null
   /** null when the model omitted the line or wrote something unrecognised. */
   grade: SourceGrade | null
 }
@@ -434,10 +550,46 @@ export function parseAnalysisResponse(raw: string): ParsedAnalysis {
     const value = match[1].toLowerCase().replace(/[\s_]+/g, '-').replace(/[.*`]/g, '')
     const grade = GRADES.find((g) => value.includes(g)) ?? null
     const body = [...lines.slice(0, i), ...lines.slice(i + 1)].join('\n')
-    return { ...afterBeginMarker(body), grade }
+    return { ...readBody(body), grade }
   }
 
-  return { ...afterBeginMarker(raw), grade: null }
+  return { ...readBody(raw), grade: null }
+}
+
+/**
+ * Unwrap one answer: discard the preamble, then split the map off the prose.
+ *
+ * ORDER MATTERS. The opening marker is found first, so a model that echoed the
+ * whole output contract while reasoning has that scratchpad — map template
+ * included — discarded before anything looks for a map. Searching for the map
+ * first would find the one in the echoed template.
+ */
+function readBody(body: string): Omit<ParsedAnalysis, 'grade'> {
+  const { text, hadBeginMarker } = afterBeginMarker(body)
+  return { ...splitAtMapMarker(text), hadBeginMarker }
+}
+
+/**
+ * Cut the paragraph map off the end of the prose.
+ *
+ * LAST occurrence, for the same reason `afterBeginMarker` takes the last one:
+ * if the token appears twice, the later one is the real block and the earlier
+ * is the model quoting the instruction. A marker with nothing under it yields
+ * null rather than an empty string, so "wrote the header and stopped" and
+ * "never wrote one" reach ./paragraphMap.ts as the same thing — they mean the
+ * same thing, which is that there is no map.
+ */
+function splitAtMapMarker(text: string): { text: string; mapText: string | null } {
+  const lines = text.split('\n')
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i].includes(ANALYSIS_MAP_MARKER)) {
+      return {
+        text: lines.slice(0, i).join('\n').trim(),
+        mapText: lines.slice(i + 1).join('\n').trim() || null,
+      }
+    }
+  }
+  return { text: text.trim(), mapText: null }
 }
 
 /**

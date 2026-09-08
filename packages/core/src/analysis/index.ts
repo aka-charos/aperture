@@ -16,16 +16,29 @@
  * library possible at all.
  */
 export {
+  ANALYSIS_BEGIN_MARKER,
+  ANALYSIS_MAP_MARKER,
   ANALYSIS_PROMPT_VERSION,
   buildAnalysisPrompt,
   buildAnalysisQuery,
   parseAnalysisResponse,
+  questionIdsFor,
+  type AnalysisQuestionId,
   type AnalysisSource,
   type AnalysisSubject,
   type ReceptionContext,
   type SourceGrade,
   type ParsedAnalysis,
 } from './prompt.js'
+
+export {
+  parseParagraphMap,
+  selectMappedParagraphs,
+  splitAnalysisParagraphs,
+  type ParagraphMap,
+  type ParagraphMapContext,
+  type ParagraphMapEntry,
+} from './paragraphMap.js'
 
 export {
   decideAnalysisFloor,
