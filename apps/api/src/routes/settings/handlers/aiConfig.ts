@@ -55,6 +55,8 @@ import {
   isCustomModelProvider,
   discoverLocalModels,
   isDiscoverableProvider,
+  probeLmStudioServer,
+  loadLmStudioModel,
   getSystemSetting,
   setSystemSetting,
   getEpisodeEmbeddingsEnabled,
@@ -90,6 +92,8 @@ import {
   aiProvidersSchema,
   aiModelsSchema,
   discoverAiModelsSchema,
+  lmStudioStatusSchema,
+  lmStudioLoadSchema,
   testAiProviderSchema,
   addCustomModelSchema,
   deleteCustomModelSchema,
@@ -411,6 +415,70 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       } catch (err) {
         fastify.log.error({ err }, 'Failed to discover local AI models')
         return reply.status(500).send({ error: 'Failed to discover models' })
+      }
+    }
+  )
+
+  /**
+   * POST /api/settings/ai/lmstudio/status
+   *
+   * The connectivity half of testing a local server, with no model involved.
+   * A single pass/fail that needs a model selected cannot tell "LM Studio is
+   * unreachable" from "this model failed", and those have different fixes —
+   * especially from a container, where the usual faults are an unresolvable
+   * host or a closed port rather than anything about a model.
+   */
+  fastify.post<{ Body: { baseUrl?: string; apiKey?: string } }>(
+    '/api/settings/ai/lmstudio/status',
+    { preHandler: requireAdmin, schema: lmStudioStatusSchema },
+    async (request, reply) => {
+      try {
+        const { baseUrl, apiKey } = request.body ?? {}
+        let url = baseUrl
+        let key = apiKey
+        if (!url || !key) {
+          const saved = await getFunctionConfig('textGeneration')
+          if (saved?.provider === 'lmstudio') {
+            url = url || saved.baseUrl
+            key = key || saved.apiKey
+          }
+        }
+        return reply.send(await probeLmStudioServer(url, key))
+      } catch (err) {
+        fastify.log.error({ err }, 'Failed to probe LM Studio')
+        return reply.status(500).send({ error: 'Failed to reach LM Studio' })
+      }
+    }
+  )
+
+  /**
+   * POST /api/settings/ai/lmstudio/load
+   *
+   * Explicitly load a model, with the configuration it should run under.
+   * Deliberately has no unload twin — see loadLmStudioModel.
+   */
+  fastify.post<{
+    Body: {
+      model: string
+      baseUrl?: string
+      apiKey?: string
+      contextLength?: number
+      flashAttention?: boolean
+      evalBatchSize?: number
+      numExperts?: number
+      offloadKvCacheToGpu?: boolean
+    }
+  }>(
+    '/api/settings/ai/lmstudio/load',
+    { preHandler: requireAdmin, schema: lmStudioLoadSchema },
+    async (request, reply) => {
+      try {
+        const { model, baseUrl, apiKey, ...options } = request.body
+        if (!model) return reply.status(400).send({ error: 'model is required' })
+        return reply.send(await loadLmStudioModel(model, baseUrl, apiKey, options))
+      } catch (err) {
+        fastify.log.error({ err }, 'Failed to load an LM Studio model')
+        return reply.status(500).send({ error: 'Failed to load the model' })
       }
     }
   )

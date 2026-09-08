@@ -1227,6 +1227,8 @@
     "discoverNoneForRole": "The server answered, but none of its installed models can fill this role. Download a suitable one in LM Studio and refresh.",
     "discoverSkipped_one": "{{count}} other installed model isn't suitable for this role.",
     "discoverSkipped_other": "{{count}} other installed models aren't suitable for this role.",
+    "serverSummary": "LM Studio answered on its {{api}} API: {{total}} models installed ({{language}} language, {{embedding}} embedding).",
+    "serverLoaded": "Currently loaded: {{models}}.",
     "discoverManualHint": "Or type a model ID by hand, exactly as the server reports it.",
     "detectedDimensions": "Detected {{dim}} dimensions, and selected it below.",
     "detectedDimensionsUnsupported": "This model returns {{dim}}-dimension vectors, which Aperture has no table for. Pick a model with one of the supported sizes.",

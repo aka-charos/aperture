@@ -708,6 +708,55 @@ export const discoverAiModelsSchema = {
   },
 }
 
+/**
+ * Reaching the local server itself, with no model involved.
+ *
+ * Separate from the model test on purpose: "LM Studio is unreachable" and "this
+ * model failed" are different problems with different fixes, and one pass/fail
+ * that needs a model selected can only ever report the second.
+ */
+export const lmStudioStatusSchema = {
+  tags: ['settings'],
+  summary: 'Check an LM Studio server and report what it holds',
+  description:
+    "Reach a local LM Studio server, report which REST API answered, how many models it has by type, and which are loaded (admin only).",
+  body: {
+    type: 'object' as const,
+    additionalProperties: true,
+    properties: {
+      baseUrl: { type: 'string' as const, description: 'Base URL as typed, before saving' },
+      apiKey: { type: 'string' as const, description: 'API key as typed, before saving' },
+    },
+  },
+}
+
+/**
+ * Loading is an explicit, operator-initiated action. See loadLmStudioModel for
+ * why it is not something that happens on every call — and why there is no
+ * matching unload route.
+ */
+export const lmStudioLoadSchema = {
+  tags: ['settings'],
+  summary: 'Load a model into LM Studio',
+  description:
+    'Ask LM Studio to load a model into memory, optionally with a context length and performance options (admin only).',
+  body: {
+    type: 'object' as const,
+    additionalProperties: true,
+    properties: {
+      model: { type: 'string' as const },
+      baseUrl: { type: 'string' as const },
+      apiKey: { type: 'string' as const },
+      contextLength: { type: 'integer' as const, minimum: 1 },
+      flashAttention: { type: 'boolean' as const },
+      evalBatchSize: { type: 'integer' as const, minimum: 1 },
+      numExperts: { type: 'integer' as const, minimum: 1 },
+      offloadKvCacheToGpu: { type: 'boolean' as const },
+    },
+    required: ['model'] as string[],
+  },
+}
+
 export const testAiProviderSchema = {
   tags: ['settings'],
   summary: 'Test AI provider connection',

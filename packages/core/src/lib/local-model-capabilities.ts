@@ -22,6 +22,8 @@ const logger = createChildLogger('local-model-capabilities')
 
 const PROBE_TIMEOUT_MS = 3000
 const CACHE_TTL_MS = 2 * 60 * 1000
+/** Loading a large model off a cold disk is minutes, not seconds. */
+const LOAD_TIMEOUT_MS = 10 * 60 * 1000
 
 const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434'
 const DEFAULT_LMSTUDIO_BASE_URL = 'http://localhost:1234/v1'
@@ -422,5 +424,244 @@ export function lmStudioCapabilities(entry: LmStudioModel): ModelCapabilities | 
     supportsToolStreaming: supportsTools,
     supportsObjectGeneration: true,
     supportsEmbeddings: false,
+  }
+}
+
+// ============================================================================
+// LM Studio: server status and model loading
+// ============================================================================
+
+/**
+ * Why a request to the server did not arrive.
+ *
+ * A connection failure carries its reason in `error.cause.code`, and for this
+ * integration that code IS the diagnosis: `ENOTFOUND host.docker.internal` says
+ * the container cannot resolve the host, `ECONNREFUSED` says nothing is
+ * listening on that port, `ETIMEDOUT` says a firewall ate it. Collapsing all
+ * three into "could not connect" throws away the only sentence that tells an
+ * operator what to change — which matters most here, because Aperture in Docker
+ * reaching LM Studio on the host is the normal deployment and every one of
+ * those failures has a different fix.
+ */
+function describeFetchFailure(err: unknown): string {
+  const cause = (err as { cause?: { code?: string } })?.cause
+  const code = cause?.code
+  const message = err instanceof Error ? err.message : String(err)
+
+  switch (code) {
+    case 'ENOTFOUND':
+    case 'EAI_AGAIN':
+      return `Host not found (${code}). From a container, the host machine is usually host.docker.internal.`
+    case 'ECONNREFUSED':
+      return `Connection refused (${code}). Nothing is listening there — check LM Studio's server is started and on this port.`
+    case 'ETIMEDOUT':
+    case 'UND_ERR_CONNECT_TIMEOUT':
+      return `Timed out reaching the server (${code}). A firewall between the container and the host does this.`
+    case 'ECONNRESET':
+      return `Connection reset (${code}).`
+    default:
+      return code ? `${message} (${code})` : message
+  }
+}
+
+/** What one loaded instance of a model is running with. */
+export interface LmStudioLoadedInstance {
+  modelId: string
+  contextLength?: number
+}
+
+/**
+ * The state of an LM Studio server, as a *test* rather than a ping.
+ *
+ * Reachability alone answers almost nothing. The failures this integration
+ * actually produces are a wrong port, a container that cannot resolve the host,
+ * a server with nothing installed, and a role pointed at a server holding no
+ * model of the right type. Every one of those is invisible to a yes/no
+ * connection check and obvious from the catalog.
+ */
+export interface LmStudioServerStatus {
+  reachable: boolean
+  /** Which generation of the REST API answered, so an old server is visible. */
+  api?: 'v1' | 'v0'
+  /** Everything installed, whatever its type. */
+  totalModels: number
+  languageModels: number
+  embeddingModels: number
+  /** Models in memory now. Empty is normal — LM Studio loads on demand. */
+  loaded: LmStudioLoadedInstance[]
+  /** Why it could not be reached, in the operator's terms. */
+  error?: string
+}
+
+async function probeApi(
+  base: string,
+  path: string,
+  apiKey: string | undefined
+): Promise<{ ok: true; json: unknown } | { ok: false; error: string }> {
+  try {
+    const response = await fetch(`${base}${path}`, {
+      headers: authHeaders(apiKey),
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    })
+    if (!response.ok) {
+      // A token problem reads nothing like a 404, which means this server does
+      // not serve LM Studio's API at all.
+      const detail =
+        response.status === 401 || response.status === 403
+          ? 'the server requires an API token — enter it above'
+          : `HTTP ${response.status}`
+      return { ok: false, error: `${path} answered ${detail}` }
+    }
+    return { ok: true, json: await response.json() }
+  } catch (err) {
+    return { ok: false, error: describeFetchFailure(err) }
+  }
+}
+
+/**
+ * Test a server the way somebody debugging it would: reach it, say which API
+ * answered, and report what it actually holds.
+ *
+ * Tries v1 then v0, so a success names the generation rather than merely
+ * succeeding. When neither answers, the v1 failure is the one reported — it is
+ * the recommended API, so its error describes the server as it ought to be.
+ */
+export async function probeLmStudioServer(
+  baseUrl?: string,
+  apiKey?: string
+): Promise<LmStudioServerStatus> {
+  const base = stripSuffix(baseUrl ?? DEFAULT_LMSTUDIO_BASE_URL, '/v1')
+
+  const v1 = await probeApi(base, '/api/v1/models', apiKey)
+  if (v1.ok) {
+    const raw = (v1.json as { models?: LmStudioV1Model[] })?.models
+    const entries = (Array.isArray(raw) ? raw : []).filter((m) => typeof m?.key === 'string')
+    const normalized = entries.map(normalizeLmStudioV1Model)
+    return {
+      reachable: true,
+      api: 'v1',
+      totalModels: normalized.length,
+      languageModels: normalized.filter((m) => m.type !== 'embeddings').length,
+      embeddingModels: normalized.filter((m) => m.type === 'embeddings').length,
+      loaded: entries
+        .filter((m) => (m.loaded_instances?.length ?? 0) > 0)
+        .map((m) => {
+          const context = m.loaded_instances?.[0]?.config?.context_length
+          return {
+            modelId: m.key,
+            ...(context != null && { contextLength: context }),
+          }
+        }),
+    }
+  }
+
+  const v0 = await probeApi(base, '/api/v0/models', apiKey)
+  if (v0.ok) {
+    const raw = (v0.json as { data?: LmStudioModel[] })?.data
+    const models = (Array.isArray(raw) ? raw : []).filter((m) => typeof m?.id === 'string')
+    return {
+      reachable: true,
+      api: 'v0',
+      totalModels: models.length,
+      languageModels: models.filter((m) => m.type !== 'embeddings').length,
+      embeddingModels: models.filter((m) => m.type === 'embeddings').length,
+      loaded: models
+        .filter((m) => m.state === 'loaded')
+        .map((m) => ({
+          modelId: m.id,
+          ...(m.max_context_length != null && { contextLength: m.max_context_length }),
+        })),
+    }
+  }
+
+  return {
+    reachable: false,
+    totalModels: 0,
+    languageModels: 0,
+    embeddingModels: 0,
+    loaded: [],
+    error: v1.error,
+  }
+}
+
+/**
+ * Options `POST /api/v1/models/load` accepts.
+ *
+ * `contextLength` is the one that changes outcomes rather than speed: a model
+ * loaded at LM Studio's default context truncates a long prompt, and this app
+ * sends some long ones — a title analysis runs to ~69,000 characters of
+ * retrieved sources. The rest are performance knobs, passed only when set, so
+ * an unspecified field leaves LM Studio's own default alone.
+ */
+export interface LmStudioLoadOptions {
+  contextLength?: number
+  flashAttention?: boolean
+  evalBatchSize?: number
+  numExperts?: number
+  offloadKvCacheToGpu?: boolean
+}
+
+export interface LmStudioLoadResult {
+  ok: boolean
+  /** What LM Studio says it loaded with, when it echoes the config back. */
+  loadConfig?: Record<string, unknown>
+  error?: string
+}
+
+/**
+ * Load a model into memory, with the configuration it should run under.
+ *
+ * Deliberately an explicit action rather than something that happens on every
+ * call. LM Studio loads on demand already, and a model loaded THIS way is not a
+ * JIT model — it is exempt from Auto-Evict and outlives the idle TTL, which is
+ * what somebody wants from a button labelled Load and is not what they want as
+ * a side effect of a batch job. Unloading is deliberately not offered for the
+ * matching reason: it must never take away a model somebody else is using, and
+ * nothing here can tell whose it is.
+ *
+ * Loading is slow — a large model off a cold disk is minutes — so it gets its
+ * own generous timeout rather than the catalog probe's three seconds.
+ */
+export async function loadLmStudioModel(
+  modelId: string,
+  baseUrl?: string,
+  apiKey?: string,
+  options: LmStudioLoadOptions = {}
+): Promise<LmStudioLoadResult> {
+  const base = stripSuffix(baseUrl ?? DEFAULT_LMSTUDIO_BASE_URL, '/v1')
+
+  try {
+    const response = await fetch(`${base}/api/v1/models/load`, {
+      method: 'POST',
+      headers: { ...authHeaders(apiKey), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: modelId,
+        ...(options.contextLength != null && { context_length: options.contextLength }),
+        ...(options.flashAttention != null && { flash_attention: options.flashAttention }),
+        ...(options.evalBatchSize != null && { eval_batch_size: options.evalBatchSize }),
+        ...(options.numExperts != null && { num_experts: options.numExperts }),
+        ...(options.offloadKvCacheToGpu != null && {
+          offload_kv_cache_to_gpu: options.offloadKvCacheToGpu,
+        }),
+        // Ask for the resolved configuration back, so the UI reports what the
+        // model is ACTUALLY running with rather than what was requested.
+        echo_load_config: true,
+      }),
+      signal: AbortSignal.timeout(LOAD_TIMEOUT_MS),
+    })
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '')
+      return {
+        ok: false,
+        error: `HTTP ${response.status}${body ? ` — ${body.slice(0, 300)}` : ''}`,
+      }
+    }
+
+    const json = (await response.json()) as { load_config?: Record<string, unknown> }
+    return { ok: true, ...(json.load_config != null && { loadConfig: json.load_config }) }
+  } catch (err) {
+    logger.debug({ err, base, model: modelId }, 'LM Studio load failed')
+    return { ok: false, error: describeFetchFailure(err) }
   }
 }

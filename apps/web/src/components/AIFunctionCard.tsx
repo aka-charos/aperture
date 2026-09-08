@@ -137,6 +137,22 @@ export interface DiscoveredModel {
   }
 }
 
+/**
+ * What an LM Studio server says about itself. A test rather than a ping: the
+ * counts are what tell an operator the role they are configuring has nothing
+ * suitable installed, which reachability alone cannot.
+ */
+export interface LmStudioStatus {
+  reachable: boolean
+  /** Which REST API generation answered, so an old server is visible. */
+  api?: 'v1' | 'v0'
+  totalModels: number
+  languageModels: number
+  embeddingModels: number
+  loaded: { modelId: string; contextLength?: number }[]
+  error?: string
+}
+
 interface DiscoveryResponse {
   /**
    * False when the catalog could not be read at all. Kept separate from an
@@ -304,6 +320,7 @@ export function AIFunctionCard({
    */
   const [discovery, setDiscovery] = useState<DiscoveryResponse | null>(null)
   const [discovering, setDiscovering] = useState(false)
+  const [serverStatus, setServerStatus] = useState<LmStudioStatus | null>(null)
   
   // Valid embedding dimensions. Hand-mirrored from core's
   // VALID_EMBEDDING_DIMENSIONS (the web bundle never imports core); each one
@@ -560,10 +577,54 @@ export function AIFunctionCard({
   // Title Analysis card pointed at LM Studio should not be asked.
   const offersFreeTierToggle = supportsFallbackKey && provider === 'google'
 
+  /**
+   * Ask the local server about itself, with no model involved.
+   *
+   * Runs before the model test rather than instead of it: "LM Studio is
+   * unreachable" and "this model failed" are different problems with different
+   * fixes, and a single pass/fail that needs a model selected can only ever
+   * report the second. From a container — the normal deployment — the usual
+   * faults are an unresolvable host or a closed port, neither of which has
+   * anything to do with a model.
+   */
+  const runServerCheck = useCallback(async (): Promise<LmStudioStatus | null> => {
+    try {
+      const res = await fetch(`${apiBase}/lmstudio/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ baseUrl: baseUrl || undefined, apiKey: apiKey || undefined }),
+      })
+      if (!res.ok) return null
+      return (await res.json()) as LmStudioStatus
+    } catch {
+      return null
+    }
+  }, [apiBase, baseUrl, apiKey])
+
   const handleTest = async () => {
     setTesting(true)
     setTestResult(null)
+    setServerStatus(null)
     try {
+      // Stage one, for a server we can interrogate. A failure here is final —
+      // testing a model against a server that is not there produces a second,
+      // less informative error about the same fault.
+      if (supportsDiscovery) {
+        const status = await runServerCheck()
+        setServerStatus(status)
+        if (status && !status.reachable) {
+          setTestResult({ success: false, error: status.error })
+          return
+        }
+        // No model chosen is a perfectly good place to stop: the question was
+        // whether the server is there, and now it is answered.
+        if (!model) {
+          setTestResult({ success: true })
+          return
+        }
+      }
+
       const runTest = async (key: string | undefined) => {
         const res = await fetch(`${apiBase}/test`, {
           method: 'POST',
@@ -925,6 +986,31 @@ export function AIFunctionCard({
             {testResult.success
               ? t('aiFunctionCard.connectionSuccess')
               : t('aiFunctionCard.connectionFailedWithError', { error: testResult.error ?? '' })}
+            {/*
+              What the server actually holds, not just that it answered. The
+              counts are the part that diagnoses a role pointed at a server with
+              nothing suitable installed — reachability alone never could.
+            */}
+            {serverStatus?.reachable && (
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                {t('aiFunctionCard.serverSummary', {
+                  api: serverStatus.api ?? '?',
+                  total: serverStatus.totalModels,
+                  language: serverStatus.languageModels,
+                  embedding: serverStatus.embeddingModels,
+                })}
+                {serverStatus.loaded.length > 0 && (
+                  <>
+                    {' '}
+                    {t('aiFunctionCard.serverLoaded', {
+                      models: serverStatus.loaded
+                        .map((l) => (l.contextLength ? `${l.modelId} (${l.contextLength})` : l.modelId))
+                        .join(', '),
+                    })}
+                  </>
+                )}
+              </Typography>
+            )}
           </Alert>
         )}
 
@@ -1657,7 +1743,10 @@ export function AIFunctionCard({
             variant="outlined"
             size="small"
             onClick={handleTest}
-            disabled={testing || !model}
+            // A local server can be tested on its own — that is the whole point
+            // of separating the two stages, and the button being dead until a
+            // model is chosen is what made connectivity unanswerable.
+            disabled={testing || (!model && !supportsDiscovery)}
           >
             {testing ? <CircularProgress size={16} /> : t('aiFunctionCard.test')}
           </Button>

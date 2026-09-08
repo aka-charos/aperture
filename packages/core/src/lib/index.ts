@@ -158,6 +158,15 @@ export {
 // Reading a local inference server's own catalog, so the operator picks an
 // installed model from a list instead of retyping its id from LM Studio.
 export {
+  probeLmStudioServer,
+  loadLmStudioModel,
+  type LmStudioServerStatus,
+  type LmStudioLoadedInstance,
+  type LmStudioLoadOptions,
+  type LmStudioLoadResult,
+} from './local-model-capabilities.js'
+
+export {
   discoverLocalModels,
   lmStudioModelsForRole,
   isDiscoverableProvider,
