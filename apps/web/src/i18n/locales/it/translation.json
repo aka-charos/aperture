@@ -1547,7 +1547,9 @@
     "discoverManualHint": "Or type a model ID by hand, exactly as the server reports it.",
     "detectedDimensions": "Detected {{dim}} dimensions, and selected it below.",
     "detectedDimensionsUnsupported": "This model returns {{dim}}-dimension vectors, which Aperture has no table for. Pick a model with one of the supported sizes.",
-    "lmStudioAutoEvictNote": "LM Studio loads models on demand and unloads them after an idle timeout, so nothing stays in memory unused. Note that Auto-Evict is on by default and keeps only one on-demand model loaded: if you point more than one role here, LM Studio reloads a model from disk every time Aperture switches between them. Turn Auto-Evict off if you have memory for both."
+    "lmStudioAutoEvictNote": "LM Studio loads models on demand and unloads them after an idle timeout, so nothing stays in memory unused. Note that Auto-Evict is on by default and keeps only one on-demand model loaded: if you point more than one role here, LM Studio reloads a model from disk every time Aperture switches between them. Turn Auto-Evict off if you have memory for both.",
+    "serverSummary": "LM Studio answered on its {{api}} API: {{total}} models installed ({{language}} language, {{embedding}} embedding).",
+    "serverLoaded": "Currently loaded: {{models}}."
   },
   "topPicksOutputConfig": {
     "accordionTitle": "Qual è la differenza tra Libreria, Raccolta e Playlist?",

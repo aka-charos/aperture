@@ -90,6 +90,12 @@ export {
   type CustomModelProvider,
   type LocalModelProvider,
   // Reading a local server's installed models, so nobody retypes a model id
+  probeLmStudioServer,
+  loadLmStudioModel,
+  type LmStudioServerStatus,
+  type LmStudioLoadedInstance,
+  type LmStudioLoadOptions,
+  type LmStudioLoadResult,
   discoverLocalModels,
   lmStudioModelsForRole,
   isDiscoverableProvider,
