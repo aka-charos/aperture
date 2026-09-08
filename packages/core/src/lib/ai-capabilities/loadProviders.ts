@@ -4,6 +4,7 @@ import deepseek from './data/deepseek.json' with { type: 'json' }
 import google from './data/google.json' with { type: 'json' }
 import groq from './data/groq.json' with { type: 'json' }
 import huggingface from './data/huggingface.json' with { type: 'json' }
+import lmstudio from './data/lmstudio.json' with { type: 'json' }
 import ollama from './data/ollama.json' with { type: 'json' }
 import openai from './data/openai.json' with { type: 'json' }
 import openaiCompatible from './data/openai-compatible.json' with { type: 'json' }
@@ -13,6 +14,7 @@ const RAW_PROVIDERS = [
   openai,
   anthropic,
   ollama,
+  lmstudio,
   openaiCompatible,
   groq,
   google,

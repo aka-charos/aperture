@@ -51,6 +51,10 @@ import {
   getPricingCacheStatus,
   addCustomModel,
   deleteCustomModel,
+  CUSTOM_MODEL_PROVIDERS,
+  isCustomModelProvider,
+  discoverLocalModels,
+  isDiscoverableProvider,
   getSystemSetting,
   setSystemSetting,
   getEpisodeEmbeddingsEnabled,
@@ -85,6 +89,7 @@ import {
   updateAiCredentialSchema,
   aiProvidersSchema,
   aiModelsSchema,
+  discoverAiModelsSchema,
   testAiProviderSchema,
   addCustomModelSchema,
   deleteCustomModelSchema,
@@ -353,6 +358,64 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
   })
 
   /**
+   * POST /api/settings/ai/models/discover
+   *
+   * Ask a local inference server which models it has. LM Studio's own catalog
+   * carries a type and, since 0.3.16, per-model tool support, so the answer can
+   * be narrowed to the models that can actually hold the role being configured
+   * — instead of making someone copy an id like
+   * `text-embedding-nomic-embed-text-v1.5` by hand and find out it was wrong
+   * only when the model tests as unreachable.
+   *
+   * `reachable: false` is a distinct answer from an empty list. "Nothing
+   * installed" and "wrong address" look identical in a dropdown and mean
+   * opposite things, so the two are never collapsed.
+   */
+  fastify.post<{
+    Body: { provider: string; function: string; baseUrl?: string; apiKey?: string }
+  }>(
+    '/api/settings/ai/models/discover',
+    { preHandler: requireAdmin, schema: discoverAiModelsSchema },
+    async (request, reply) => {
+      try {
+        const { provider, function: fn, baseUrl, apiKey } = request.body
+
+        if (!provider || !fn) {
+          return reply.status(400).send({ error: 'provider and function are required' })
+        }
+        if (!isAIFunction(fn)) {
+          return reply.status(400).send({ error: `Invalid function. Must be one of: ${AI_FUNCTIONS.join(', ')}` })
+        }
+        if (!isDiscoverableProvider(provider)) {
+          return reply.status(400).send({ error: `${provider} does not publish an installed-model list` })
+        }
+
+        // Fall back to what is saved, so the button also works on a card the
+        // operator has not touched this visit.
+        let url = baseUrl
+        let key = apiKey
+        if (!url || !key) {
+          const saved = await getFunctionConfig(fn)
+          if (saved && saved.provider === provider) {
+            url = url || saved.baseUrl
+            key = key || saved.apiKey
+          }
+        }
+
+        const result = await discoverLocalModels(provider, fn, url, key)
+        if (!result) {
+          return reply.send({ reachable: false, models: [], skipped: [] })
+        }
+
+        return reply.send({ reachable: true, ...result })
+      } catch (err) {
+        fastify.log.error({ err }, 'Failed to discover local AI models')
+        return reply.status(500).send({ error: 'Failed to discover models' })
+      }
+    }
+  )
+
+  /**
    * POST /api/settings/ai/custom-models
    */
   fastify.post<{
@@ -365,8 +428,8 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'provider, function, and modelId are required' })
       }
 
-      if (provider !== 'ollama' && provider !== 'openai-compatible' && provider !== 'openrouter' && provider !== 'huggingface') {
-        return reply.status(400).send({ error: 'Custom models are only supported for ollama, openai-compatible, openrouter, and huggingface providers' })
+      if (!isCustomModelProvider(provider)) {
+        return reply.status(400).send({ error: `Custom models are only supported for these providers: ${CUSTOM_MODEL_PROVIDERS.join(', ')}` })
       }
 
       if (fn === 'embeddings') {
@@ -381,7 +444,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       }
 
       const customModel = await addCustomModel(
-        provider as 'ollama' | 'openai-compatible' | 'openrouter' | 'huggingface',
+        provider,
         fn as AIFunction,
         modelId,
         fn === 'embeddings' ? embeddingDimensions : undefined
@@ -407,12 +470,12 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'provider, function, and modelId are required' })
       }
 
-      if (provider !== 'ollama' && provider !== 'openai-compatible' && provider !== 'openrouter' && provider !== 'huggingface') {
-        return reply.status(400).send({ error: 'Custom models are only supported for ollama, openai-compatible, openrouter, and huggingface providers' })
+      if (!isCustomModelProvider(provider)) {
+        return reply.status(400).send({ error: `Custom models are only supported for these providers: ${CUSTOM_MODEL_PROVIDERS.join(', ')}` })
       }
 
       const deleted = await deleteCustomModel(
-        provider as 'ollama' | 'openai-compatible' | 'openrouter' | 'huggingface',
+        provider,
         fn as AIFunction,
         modelId
       )

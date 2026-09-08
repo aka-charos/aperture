@@ -470,6 +470,32 @@ const getAIModels = {
   },
 }
 
+/**
+ * The setup-wizard twin of the settings route. It has to exist here too: the
+ * AI cards are one component rendered against two API bases, and first-run
+ * setup is precisely when nobody knows their model ids yet.
+ *
+ * A POST for a read, because an API key must not travel in a URL and because
+ * the credentials arrive as typed, before anything has been saved.
+ */
+const discoverAIModels = {
+  tags: ['setup'],
+  summary: 'Discover models installed on a local AI server',
+  description:
+    'Read the installed models from a local inference server (LM Studio) and keep the ones that can hold the given role.',
+  body: {
+    type: 'object' as const,
+    additionalProperties: true,
+    required: ['provider', 'function'] as string[],
+    properties: {
+      provider: { type: 'string' as const, description: 'Provider ID', example: 'lmstudio' },
+      function: { type: 'string' as const, enum: aiFunctionEnum },
+      baseUrl: { type: 'string' as const, description: 'Base URL as typed, before saving' },
+      apiKey: { type: 'string' as const, description: 'API key as typed, before saving' },
+    },
+  },
+}
+
 const addCustomModel = {
   tags: ['setup'],
   summary: 'Add custom AI model',
@@ -643,6 +669,7 @@ export const setupSchemas = {
   // AI Providers
   getAIProviders,
   getAIModels,
+  discoverAIModels,
   addCustomModel,
   deleteCustomModel,
   getAICredentials,

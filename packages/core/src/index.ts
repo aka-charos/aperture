@@ -78,10 +78,25 @@ export {
   PROVIDERS,
   AI_FUNCTIONS,
   isAIFunction,
-  // Custom models (Ollama & OpenAI-compatible)
+  // Custom models (the local servers, OpenRouter and Hugging Face)
   getCustomModels,
   addCustomModel,
   deleteCustomModel,
+  type ProviderConnectionTest,
+  CUSTOM_MODEL_PROVIDERS,
+  isCustomModelProvider,
+  LOCAL_MODEL_PROVIDERS,
+  isLocalModelProvider,
+  type CustomModelProvider,
+  type LocalModelProvider,
+  // Reading a local server's installed models, so nobody retypes a model id
+  discoverLocalModels,
+  lmStudioModelsForRole,
+  isDiscoverableProvider,
+  type DiscoveredModel,
+  type SkippedModel,
+  type DiscoveryResult,
+  type DiscoverableProvider,
   // Pricing cache
   getPricingData,
   findModelPricing,
