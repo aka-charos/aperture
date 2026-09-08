@@ -90,6 +90,10 @@ export {
   type CustomModelProvider,
   type LocalModelProvider,
   // Reading a local server's installed models, so nobody retypes a model id
+  streamLmStudioChat,
+  LmStudioChatError,
+  type LmStudioChatResult,
+  type LmStudioChatStats,
   probeLmStudioServer,
   loadLmStudioModel,
   type LmStudioServerStatus,

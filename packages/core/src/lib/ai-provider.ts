@@ -1462,6 +1462,16 @@ export interface ModelAttempt {
   spacingMs: number
   /** False for the primary. Only useful for saying so in a log line. */
   isFallback: boolean
+  /**
+   * Where this attempt resolved to, carried so a caller can reach the same
+   * server WITHOUT the AI SDK. Only LM Studio needs that — its native chat
+   * endpoint reports reasoning, load progress and timing that the
+   * OpenAI-compatible surface does not — and resolving credentials a second
+   * time elsewhere is how the two copies come to disagree about which server
+   * this attempt actually means.
+   */
+  baseUrl?: string
+  apiKey?: string
 }
 
 /**
@@ -1496,6 +1506,8 @@ export async function getTitleAnalysisModelAttempts(): Promise<ModelAttempt[]> {
       provider: providerConfig.provider,
       spacingMs,
       isFallback,
+      ...(providerConfig.baseUrl != null && { baseUrl: providerConfig.baseUrl }),
+      ...(providerConfig.apiKey != null && { apiKey: providerConfig.apiKey }),
     }
   }
 

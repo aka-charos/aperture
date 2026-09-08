@@ -158,6 +158,15 @@ export {
 // Reading a local inference server's own catalog, so the operator picks an
 // installed model from a list instead of retyping its id from LM Studio.
 export {
+  streamLmStudioChat,
+  LmStudioChatError,
+  type LmStudioChatResult,
+  type LmStudioChatStats,
+  type LmStudioChatProgress,
+  type LmStudioChatOptions,
+} from './lmstudioChat.js'
+
+export {
   probeLmStudioServer,
   loadLmStudioModel,
   type LmStudioServerStatus,
