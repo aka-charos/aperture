@@ -514,22 +514,12 @@ function createProviderInstance(providerConfig: ProviderConfig, role?: AIFunctio
       })
       break
 
-    case 'ollama': {
-      // Extended timeout for slow local inference (5 minutes)
-      // Ollama on CPU or with large models can take several minutes to respond
-      const ollamaFetch: typeof fetch = (url, options) => {
-        return fetch(url, {
-          ...options,
-          signal: AbortSignal.timeout(300000), // 5 minute timeout
-        })
-      }
-
+    case 'ollama':
       instance = createOllama({
         baseURL: providerConfig.baseUrl ?? 'http://localhost:11434',
-        fetch: ollamaFetch,
+        fetch: localInferenceFetch,
       })
       break
-    }
 
     // Inference goes over LM Studio's OPENAI-COMPATIBLE endpoints, not its
     // native `/api/v1/chat`, and that is a capability decision rather than a
