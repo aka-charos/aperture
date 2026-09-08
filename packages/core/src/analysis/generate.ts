@@ -410,6 +410,51 @@ export interface WriteOptions {
   shouldCancel?: () => Promise<boolean> | boolean
   /** Told when a pacing cool-off begins, so a job console can say why it is idle. */
   onWait?: (seconds: number) => void
+  /**
+   * The title being written, for the log lines on this path and nothing else.
+   *
+   * It was missing, and the cost was real: `Writing analysis` named the model,
+   * the prompt size and the ceiling but not the FILM, so with a batch job
+   * running beside an on-demand request there was no way to tell which line
+   * belonged to which title except by guessing from timestamps.
+   */
+  title?: string
+}
+
+/**
+ * How long a model may work before the log says it is still alive.
+ *
+ * The whole reason this exists: between `Writing analysis` and `Analysis
+ * written` there was NOTHING, and a local or free-tier model with a large
+ * output ceiling can sit in that gap for ten minutes or more. Silence there is
+ * ambiguous in the worst way -- a healthy slow call, a provider that accepted
+ * the connection and will never answer, and a container that was restarted
+ * mid-write all look identical, which is to say they all look like nothing.
+ *
+ * Thirty seconds because the point is to distinguish working from wedged, and a
+ * minute of nothing is already long enough to start guessing. A healthy fast
+ * call finishes inside the first interval and logs none of these, so the cost
+ * is paid only by the calls that are actually worth watching.
+ */
+const WRITE_HEARTBEAT_MS = 30_000
+
+/**
+ * Say, periodically, that a model call is still running.
+ *
+ * `unref()` is load-bearing: a pending interval otherwise keeps the Node event
+ * loop alive, so a timer left running by a throw on some path nobody thought
+ * about would stop the process exiting. Cleared in a `finally` regardless.
+ */
+function startWriteHeartbeat(context: Record<string, unknown>): { stop: () => void } {
+  const startedAt = Date.now()
+  const timer = setInterval(() => {
+    logger.info(
+      { ...context, elapsedSeconds: Math.round((Date.now() - startedAt) / 1000) },
+      'Still waiting for the analysis model'
+    )
+  }, WRITE_HEARTBEAT_MS)
+  timer.unref()
+  return { stop: () => clearInterval(timer) }
 }
 
 /** Run one model until it answers, gives up, or proves it cannot follow the format. */
@@ -442,6 +487,7 @@ async function runWriteAttempt(
   // pause in a run now has a log line saying which of the two services owns it.
   logger.info(
     {
+      title: options.title,
       modelId,
       provider: attempt.provider,
       fallback: attempt.isFallback || undefined,
@@ -473,6 +519,15 @@ async function runWriteAttempt(
     if (paced.cancelled) return { kind: 'cancelled' }
 
     let response
+    // The one genuinely unobservable stretch in this file, and the reason the
+    // heartbeat exists. Everything either side of it logs; this await could sit
+    // for ten minutes saying nothing.
+    const heartbeat = startWriteHeartbeat({
+      title: options.title,
+      modelId,
+      provider: attempt.provider,
+      attempt: i,
+    })
     try {
       response = await generateText({
         model,
@@ -496,10 +551,19 @@ async function runWriteAttempt(
       // in declaration order -- so logging `{ err }` put ~16 KB of scraped
       // article text ahead of the one field that says what went wrong.
       logger.error(
-        { ...describeAiError(err), modelId, attempt: i, promptChars: prompt.length },
+        {
+          ...describeAiError(err),
+          title: options.title,
+          modelId,
+          attempt: i,
+          promptChars: prompt.length,
+          elapsedSeconds: Math.round((Date.now() - startedAt) / 1000),
+        },
         'Title analysis model call failed'
       )
       return { kind: 'error', error: err }
+    } finally {
+      heartbeat.stop()
     }
     finishReason = response.finishReason
     usage = readUsage(response.usage)
@@ -529,10 +593,12 @@ async function runWriteAttempt(
   // failure and logged none of it, which is why the cause had to be guessed at.
   logger.info(
     {
+      title: options.title,
       modelId,
       provider: attempt.provider,
       fallback: attempt.isFallback || undefined,
       textChars: reading.text.length,
+      hasMap: reading.mapText != null,
       grade: reading.grade,
       problem: reading.problem?.kind,
       finishReason,
@@ -706,14 +772,28 @@ async function writeWithGrounding(
         reasoningEffort
       )
 
-      const response = await generateText({
-        model,
-        tools,
-        prompt,
-        maxRetries: MODEL_MAX_RETRIES,
-        ...(reasoning ? { providerOptions: reasoning } : {}),
-        ...(maxOutputTokens > 0 ? { maxOutputTokens } : {}),
+      // Same silent stretch as the CRW path, and grounded calls are slower
+      // still because the model searches before it writes.
+      const heartbeat = startWriteHeartbeat({
+        title: options.title,
+        modelId: keyAttempt.modelId,
+        provider: keyAttempt.provider,
+        keySlot: keyAttempt.slot,
+        attempt,
       })
+      let response
+      try {
+        response = await generateText({
+          model,
+          tools,
+          prompt,
+          maxRetries: MODEL_MAX_RETRIES,
+          ...(reasoning ? { providerOptions: reasoning } : {}),
+          ...(maxOutputTokens > 0 ? { maxOutputTokens } : {}),
+        })
+      } finally {
+        heartbeat.stop()
+      }
       usage = response.usage
 
       const grounding = (
@@ -870,7 +950,7 @@ export async function analyseTitle(
     const result = await writeWithGrounding(
       buildAnalysisPrompt(subject, { mode }),
       crwConfig.analysisMaxOutputTokens,
-      { shouldCancel: options.shouldCancel, onWait: options.onWait }
+      { shouldCancel: options.shouldCancel, onWait: options.onWait, title: subject.title }
     )
 
     // A grounded call that retrieved NOTHING did not answer the question — it
@@ -916,7 +996,7 @@ export async function analyseTitle(
     const result = await writeFromSources(
       buildAnalysisPrompt(subject, { mode, sources: retrieval.sources }),
       crwConfig.analysisMaxOutputTokens,
-      { shouldCancel: options.shouldCancel, onWait: options.onWait }
+      { shouldCancel: options.shouldCancel, onWait: options.onWait, title: subject.title }
     )
     text = result.text
     mapText = result.mapText
@@ -1067,6 +1147,34 @@ export async function analyseTitle(
       paragraphMap ? JSON.stringify(paragraphMap) : null,
       ANALYSIS_PROMPT_VERSION,
     ]
+  )
+
+  // THE LINE THAT SAYS A ROW NOW EXISTS, and its absence is what made a live
+  // failure unreadable. Every other line on this path reports on WORK -- what
+  // was retrieved, what the model said, whether the answer was usable -- and
+  // the last of them, `Analysis written`, is about a response in memory. So a
+  // run that wrote a fine analysis and then failed to store it looked exactly
+  // like a run that stored one, and the only way to tell them apart was to go
+  // and query the table. Now the log distinguishes them.
+  //
+  // `mapped` rides here rather than anywhere else because this is the first
+  // point at which it is a fact about the DATABASE instead of about a response.
+  logger.info(
+    {
+      mediaType,
+      mediaId,
+      title: subject.title,
+      mode,
+      modelId,
+      stored: decision.store ? 'analysis' : 'decline',
+      declineReason,
+      chars: analysis?.length ?? 0,
+      mapped: paragraphMap?.length ?? null,
+      grade,
+      sourceCount,
+      promptVersion: ANALYSIS_PROMPT_VERSION,
+    },
+    'Title analysis stored'
   )
 
   return {
