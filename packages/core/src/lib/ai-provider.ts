@@ -53,7 +53,9 @@ import { withInferenceContext } from './inferenceContext.js'
 import {
   getOllamaModelCapabilities,
   getLmStudioModelCapabilities,
+  lmStudioInferenceBaseUrl,
 } from './local-model-capabilities.js'
+import { describeAiError } from './aiErrors.js'
 import {
   isCustomModelProvider,
   isLocalModelProvider,
@@ -544,7 +546,9 @@ function createProviderInstance(providerConfig: ProviderConfig, role?: AIFunctio
     case 'lmstudio':
       instance = createOpenAICompatible({
         name: 'lmstudio',
-        baseURL: providerConfig.baseUrl ?? 'http://localhost:1234/v1',
+        // Normalised, because discovery tolerates a missing /v1 and inference
+        // cannot — see lmStudioInferenceBaseUrl.
+        baseURL: lmStudioInferenceBaseUrl(providerConfig.baseUrl),
         // Optional in LM Studio and off by default, but it can be told to
         // require one. Sending a key it did not ask for is harmless.
         apiKey: providerConfig.apiKey,
@@ -1951,9 +1955,30 @@ async function runProviderConnectionTest(
 
     return { success: true }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    logger.error({ error, provider: providerConfig.provider }, 'Provider connection test failed')
-    return { success: false, error: message }
+    // `error.message` alone is close to useless here. The AI SDK's JSON handler
+    // throws the single string "Invalid JSON response" for two unrelated
+    // faults — a body that is not JSON at all (wrong path, a proxy's 404 page)
+    // and a body that is JSON but does not match the provider's schema — and
+    // the one field separating them, the response body, is sitting on the
+    // APICallError being discarded. This is a test button: the whole reason
+    // someone pressed it is to find out what is wrong.
+    const described = describeAiError(error)
+    logger.error(
+      { ...described, provider: providerConfig.provider, model: providerConfig.model },
+      'Provider connection test failed'
+    )
+
+    const detail = [
+      described.status != null ? `HTTP ${described.status}` : null,
+      described.providerMessage || null,
+    ]
+      .filter(Boolean)
+      .join(' — ')
+
+    return {
+      success: false,
+      error: detail ? `${described.message} (${detail})` : described.message,
+    }
   }
 }
 

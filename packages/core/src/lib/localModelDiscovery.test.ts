@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { lmStudioModelsForRole, isDiscoverableProvider } from './localModelDiscovery.js'
 import {
   enrichFromV0,
+  lmStudioInferenceBaseUrl,
   normalizeLmStudioV1Model,
   type LmStudioModel,
 } from './local-model-capabilities.js'
@@ -290,4 +291,37 @@ test('a loaded v1 model keeps its own context length, which describes the runnin
   const fromV1 = [normalizeLmStudioV1Model(V1_LLM)] // loaded, 2048
   const fromV0: LmStudioModel[] = [{ id: 'microsoft/phi-2', max_context_length: 131072 }]
   assert.equal(enrichFromV0(fromV1, fromV0)[0].max_context_length, 2048)
+})
+
+// ===========================================================================
+// The two base URLs. LM Studio serves its native API under /api and its
+// OpenAI-compatible one under /v1, off the same host — and only the second is
+// appended to verbatim, so only the second has a required shape.
+// ===========================================================================
+
+test('the inference base URL gains /v1 when the operator left it off', () => {
+  // The exact case that lists models perfectly and then fails every test:
+  // discovery strips /v1 so it never noticed, inference needs it.
+  assert.equal(lmStudioInferenceBaseUrl('http://localhost:1234'), 'http://localhost:1234/v1')
+  assert.equal(lmStudioInferenceBaseUrl('http://localhost:1234/'), 'http://localhost:1234/v1')
+})
+
+test('a base URL that already works is returned unchanged', () => {
+  assert.equal(lmStudioInferenceBaseUrl('http://localhost:1234/v1'), 'http://localhost:1234/v1')
+  // Trailing slashes are the same URL, not a different one.
+  assert.equal(lmStudioInferenceBaseUrl('http://localhost:1234/v1/'), 'http://localhost:1234/v1')
+  // Never doubled.
+  assert.equal(
+    lmStudioInferenceBaseUrl(lmStudioInferenceBaseUrl('http://localhost:1234')),
+    'http://localhost:1234/v1'
+  )
+})
+
+test('a remote LM Studio behind a path prefix keeps its prefix', () => {
+  assert.equal(lmStudioInferenceBaseUrl('http://nas.local:1234/lmstudio'), 'http://nas.local:1234/lmstudio/v1')
+})
+
+test('nothing configured falls back to the documented default', () => {
+  assert.equal(lmStudioInferenceBaseUrl(undefined), 'http://localhost:1234/v1')
+  assert.equal(lmStudioInferenceBaseUrl(''), 'http://localhost:1234/v1')
 })

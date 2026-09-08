@@ -195,6 +195,31 @@ export function normalizeLmStudioV1Model(entry: LmStudioV1Model): LmStudioModel 
 }
 
 /**
+ * The base URL to send OpenAI-shaped inference to, from whatever the operator
+ * typed.
+ *
+ * LM Studio serves its native API under `/api/…` and its OpenAI-compatible one
+ * under `/v1/…`, off the same host and port. Discovery reaches the first by
+ * stripping any `/v1` suffix, so it works whether or not the operator included
+ * one — but inference appends `/chat/completions` to this value verbatim, so it
+ * *requires* the suffix. That asymmetry meant a base URL of
+ * `http://localhost:1234` listed every installed model perfectly and then
+ * failed every test against `/chat/completions`, which LM Studio does not
+ * serve. A dialog that discovers correctly and tests incorrectly points the
+ * blame at the model.
+ *
+ * Only ever appends, and only when absent, so a URL that already works is
+ * returned unchanged. Applied to `lmstudio` alone: a generic OpenAI-compatible
+ * server may legitimately live at any path, and rewriting it would break
+ * setups that work today.
+ */
+export function lmStudioInferenceBaseUrl(baseUrl?: string): string {
+  const trimmed = (baseUrl ?? DEFAULT_LMSTUDIO_BASE_URL).replace(/\/+$/, '')
+  if (trimmed.length === 0) return DEFAULT_LMSTUDIO_BASE_URL
+  return trimmed.toLowerCase().endsWith('/v1') ? trimmed : `${trimmed}/v1`
+}
+
+/**
  * LM Studio can be configured to require a bearer token. Sending one it did not
  * ask for is harmless, so the key rides along whenever the operator has entered
  * it — the alternative is a probe that fails with 401 on a locked-down server
