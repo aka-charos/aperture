@@ -9,6 +9,7 @@
 
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
 import { createChildLogger } from './logger.js'
+import { isLocalModelProvider } from './ai-capabilities/customModels.js'
 
 const logger = createChildLogger('pricing-cache')
 
@@ -209,8 +210,10 @@ export async function findModelPricing(
   provider: string,
   modelId: string
 ): Promise<{ inputCostPerMillion: number; outputCostPerMillion: number } | null> {
-  // Self-hosted providers have no API costs
-  if (provider === 'ollama' || provider === 'openai-compatible') {
+  // Self-hosted providers have no API costs. These really are free, unlike an
+  // unpriced cloud model — which is why the zeros are safe here and are a lie
+  // anywhere else (see FunctionPricing.pricingKnown).
+  if (isLocalModelProvider(provider)) {
     return { inputCostPerMillion: 0, outputCostPerMillion: 0 }
   }
 

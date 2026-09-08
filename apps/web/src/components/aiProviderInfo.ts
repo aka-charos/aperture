@@ -2,6 +2,7 @@ export type ProviderType =
   | 'openai'
   | 'anthropic'
   | 'ollama'
+  | 'lmstudio'
   | 'groq'
   | 'google'
   | 'openai-compatible'
@@ -279,6 +280,17 @@ export const PROVIDER_INFO: Record<ProviderType, ProviderInfo> = {
     defaultBaseUrl: 'http://localhost:11434',
     website: 'https://ollama.ai',
     logoPath: '/ollama.svg',
+  },
+  lmstudio: {
+    id: 'lmstudio',
+    // No logoPath: the card falls back to a computer icon for a self-hosted
+    // provider, which is honest. An invented logo would be worse than none.
+    name: 'LM Studio',
+    type: 'self-hosted',
+    requiresApiKey: false,
+    requiresBaseUrl: true,
+    defaultBaseUrl: 'http://localhost:1234/v1',
+    website: 'https://lmstudio.ai',
   },
   'openai-compatible': {
     id: 'openai-compatible',

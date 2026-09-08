@@ -1527,7 +1527,27 @@
       "none": "None",
       "xhigh": "Very high",
       "max": "Maximum"
-    }
+    },
+    "lmStudioSetupTitle": "Connect LM Studio",
+    "lmStudioStepDownload": "In LM Studio, download the models you want on the Discover tab.",
+    "lmStudioStepServer": "Open the Developer tab and start the local server (it listens on port 1234 by default).",
+    "lmStudioStepDetect": "Come back here and use Add custom model — Aperture reads the list straight off the server, so there is nothing to type.",
+    "lmStudioEmbeddingNote": "Embedding models are a separate download in LM Studio: search Discover for \"embedding\" (nomic-embed-text is a good default).",
+    "baseUrlHelperLmStudio": "LM Studio's local server address. Start it on the Developer tab; the default port is 1234.",
+    "addCustomDialog_lmstudio": "Pick from the models LM Studio has installed. Anything downloaded in LM Studio shows up here once its local server is running.",
+    "discoverTitle": "Installed models",
+    "discoverRefresh": "Refresh",
+    "discoverLoading": "Reading the model list from your server…",
+    "discoverPick": "Choose an installed model",
+    "discoverLoaded": "loaded",
+    "discoverUnreachable": "Couldn't read a model list from {{url}}. Check that LM Studio's local server is running on the Developer tab, and that this address is right.",
+    "discoverNoneForRole": "The server answered, but none of its installed models can fill this role. Download a suitable one in LM Studio and refresh.",
+    "discoverSkipped_one": "{{count}} other installed model isn't suitable for this role.",
+    "discoverSkipped_other": "{{count}} other installed models aren't suitable for this role.",
+    "discoverManualHint": "Or type a model ID by hand, exactly as the server reports it.",
+    "detectedDimensions": "Detected {{dim}} dimensions, and selected it below.",
+    "detectedDimensionsUnsupported": "This model returns {{dim}}-dimension vectors, which Aperture has no table for. Pick a model with one of the supported sizes.",
+    "lmStudioAutoEvictNote": "LM Studio loads models on demand and unloads them after an idle timeout, so nothing stays in memory unused. Note that Auto-Evict is on by default and keeps only one on-demand model loaded: if you point more than one role here, LM Studio reloads a model from disk every time Aperture switches between them. Turn Auto-Evict off if you have memory for both."
   },
   "topPicksOutputConfig": {
     "accordionTitle": "Qual é a diferença entre Biblioteca, Coleção e Playlist?",

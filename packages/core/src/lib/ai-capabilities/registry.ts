@@ -7,10 +7,19 @@ export const PROVIDERS: ProviderMetadata[] = loadProviders()
  * Providers that ship no built-in models and rely on user-added custom models.
  * Their custom chat models are assumed tool-capable, so they qualify for the
  * Chat Assistant even without a built-in tool-calling model — the same way they
- * already qualify for Text Generation. Mirrors the custom-model support in the
- * settings UI (Ollama, OpenAI-Compatible, OpenRouter).
+ * already qualify for Text Generation.
+ *
+ * Deliberately NOT `customModels.ts`'s `CUSTOM_MODEL_PROVIDERS`, which is the
+ * list of providers a model may be STORED for. That one includes `huggingface`
+ * and this one does not, so sharing the array would newly admit Hugging Face to
+ * the Chat role — a behaviour change wearing a refactor's clothes.
  */
-const CUSTOM_MODEL_PROVIDERS = new Set(['ollama', 'openai-compatible', 'openrouter'])
+const CHAT_WITHOUT_BUILTIN_TOOL_MODELS = new Set([
+  'ollama',
+  'lmstudio',
+  'openai-compatible',
+  'openrouter',
+])
 
 export function getProvider(providerId: string): ProviderMetadata | undefined {
   return PROVIDERS.find((p) => p.id === providerId)
@@ -52,7 +61,7 @@ export function getProvidersForFunction(fn: AIFunction): ProviderMetadata[] {
       return (
         p.supportsChat &&
         (p.chatModels.some((m) => m.capabilities.supportsToolCalling) ||
-          CUSTOM_MODEL_PROVIDERS.has(p.id))
+          CHAT_WITHOUT_BUILTIN_TOOL_MODELS.has(p.id))
       )
     // Title Analysis is a plain writing role: retrieval happens before the model
     // is called (fastCRW returns the source text), so it needs no grounding

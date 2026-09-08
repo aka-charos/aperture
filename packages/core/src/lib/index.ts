@@ -149,10 +149,32 @@ export {
   type ValidEmbeddingDimension,
   type LegacyEmbeddingsInfo,
   type CustomModel,
+  type ProviderConnectionTest,
   type WebSearchAttempt,
   type WebSearchCallOutcome,
   type WebSearchUsageTokens,
 } from './ai-provider.js'
+
+// Reading a local inference server's own catalog, so the operator picks an
+// installed model from a list instead of retyping its id from LM Studio.
+export {
+  discoverLocalModels,
+  lmStudioModelsForRole,
+  isDiscoverableProvider,
+  type DiscoveredModel,
+  type SkippedModel,
+  type DiscoveryResult,
+  type DiscoverableProvider,
+} from './localModelDiscovery.js'
+
+export {
+  CUSTOM_MODEL_PROVIDERS,
+  isCustomModelProvider,
+  LOCAL_MODEL_PROVIDERS,
+  isLocalModelProvider,
+  type CustomModelProvider,
+  type LocalModelProvider,
+} from './ai-capabilities/customModels.js'
 
 // Free-tier quota for the grounding role. Limits Google has ENFORCED always
 // win; the shipped free-tier table only fills gaps, and only when the operator

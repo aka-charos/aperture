@@ -679,6 +679,35 @@ export const aiModelsSchema = {
   },
 }
 
+/**
+ * Reading a local inference server's own catalog.
+ *
+ * A POST for what is really a read, and for the same reason `/ai/test` is one:
+ * the credentials arrive from the form as typed, before anything is saved —
+ * detecting models is the step that comes BEFORE saving a provider, so
+ * requiring them to be stored first would put the button behind the problem it
+ * exists to solve — and an API key must not travel in a URL, where it would be
+ * written to every access log on the way. Saved values fill in when the form
+ * has none.
+ */
+export const discoverAiModelsSchema = {
+  tags: ['settings'],
+  summary: 'Discover models installed on a local AI server',
+  description:
+    'Read the installed models from a local inference server (LM Studio) and keep the ones that can hold the given role (admin only).',
+  body: {
+    type: 'object' as const,
+    additionalProperties: true,
+    properties: {
+      provider: { type: 'string' as const },
+      function: { type: 'string' as const, enum: aiFunctionEnum },
+      baseUrl: { type: 'string' as const, description: 'Base URL as typed, before saving' },
+      apiKey: { type: 'string' as const, description: 'API key as typed, before saving' },
+    },
+    required: ['provider', 'function'] as string[],
+  },
+}
+
 export const testAiProviderSchema = {
   tags: ['settings'],
   summary: 'Test AI provider connection',

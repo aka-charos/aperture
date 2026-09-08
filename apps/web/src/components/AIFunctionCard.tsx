@@ -41,6 +41,7 @@ import {
   Warning as WarningIcon,
   Delete as DeleteIcon,
   Add as AddIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material'
 import {
   PROVIDER_INFO,
@@ -103,6 +104,49 @@ export interface ModelInfo {
     supportsEmbeddings: boolean
   }
   isCustom?: boolean
+}
+
+/**
+ * The answer to a connection test.
+ *
+ * `embeddingDimensions` is MEASURED — the width of the vector the model
+ * actually returned — because a local server publishes that number nowhere and
+ * it decides which `embeddings_<n>` table every read goes to. Guessing it
+ * points the library at an empty table and nothing errors.
+ */
+interface TestResult {
+  success: boolean
+  error?: string
+  embeddingDimensions?: number
+  /** Whether that width has a table to live in. Decided server-side. */
+  embeddingDimensionsSupported?: boolean
+}
+
+/** One model a local server reports having installed. */
+export interface DiscoveredModel {
+  id: string
+  name: string
+  description?: string
+  contextWindow?: string
+  /** LM Studio loads on demand, so not-loaded is still usable — this only says
+   *  which one answers instantly. Absent when the server did not say. */
+  loaded?: boolean
+  capabilities: {
+    supportsToolCalling: boolean
+    supportsEmbeddings: boolean
+  }
+}
+
+interface DiscoveryResponse {
+  /**
+   * False when the catalog could not be read at all. Kept separate from an
+   * empty `models` because "nothing installed" and "wrong address" are opposite
+   * problems with opposite fixes.
+   */
+  reachable: boolean
+  models: DiscoveredModel[]
+  /** Installed models this role cannot use, with a reason key to translate. */
+  skipped: { id: string; reason: 'wrongType' | 'noToolCalling' }[]
 }
 
 /**
@@ -248,7 +292,18 @@ export function AIFunctionCard({
   const [addingModel, setAddingModel] = useState(false)
   const [deletingModel, setDeletingModel] = useState<string | null>(null)
   const [dialogTesting, setDialogTesting] = useState(false)
-  const [dialogTestResult, setDialogTestResult] = useState<{ success: boolean; error?: string } | null>(null)
+  const [dialogTestResult, setDialogTestResult] = useState<TestResult | null>(null)
+
+  /**
+   * What a local server says it has installed.
+   *
+   * `null` means nobody has asked yet, which is not the same as an empty list —
+   * and neither is the same as `reachable: false`. "Nothing installed" and
+   * "wrong address" look identical in a dropdown and mean opposite things, so
+   * the three states stay distinct all the way to the screen.
+   */
+  const [discovery, setDiscovery] = useState<DiscoveryResponse | null>(null)
+  const [discovering, setDiscovering] = useState(false)
   
   // Valid embedding dimensions. Hand-mirrored from core's
   // VALID_EMBEDDING_DIMENSIONS (the web bundle never imports core); each one
@@ -266,7 +321,23 @@ export function AIFunctionCard({
   const providerInfo = PROVIDER_INFO[provider]
   const selectedModel = models.find(m => m.id === model)
   const selectedModelPrice = selectedModel ? formatModelPrice(selectedModel) : null
-  const supportsCustomModels = provider === 'ollama' || provider === 'openai-compatible' || provider === 'openrouter' || provider === 'huggingface'
+  // Hand-mirrored from core's CUSTOM_MODEL_PROVIDERS (the web bundle never
+  // imports core). A provider missing here has no "add a custom model" option
+  // at all, which for a local server means no way to use it.
+  const supportsCustomModels =
+    provider === 'ollama' ||
+    provider === 'lmstudio' ||
+    provider === 'openai-compatible' ||
+    provider === 'openrouter' ||
+    provider === 'huggingface'
+
+  /**
+   * Whether this server can be asked what it has installed. Mirrors core's
+   * `isDiscoverableProvider`: LM Studio publishes a catalog, and
+   * `openai-compatible` might BE LM Studio, since it has shipped LM Studio's
+   * port as its default base URL since before the named provider existed.
+   */
+  const supportsDiscovery = provider === 'lmstudio' || provider === 'openai-compatible'
 
   // Sync form state when config prop changes (e.g., loaded from DB)
   useEffect(() => {
@@ -615,10 +686,54 @@ export function AIFunctionCard({
     }
   }, [apiBase, provider, functionType])
 
+  /**
+   * Ask the local server what it has installed.
+   *
+   * Sends the base URL and key as typed rather than as saved, because detecting
+   * models is the step BEFORE saving a provider — requiring a save first would
+   * put the button behind the problem it exists to solve.
+   */
+  const handleDiscoverModels = useCallback(async () => {
+    setDiscovering(true)
+    setDiscovery(null)
+    try {
+      const res = await fetch(`${apiBase}/models/discover`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          provider,
+          function: functionType,
+          baseUrl: baseUrl || undefined,
+          apiKey: apiKey || undefined,
+        }),
+      })
+      const data = await res.json()
+      setDiscovery(
+        res.ok && typeof data?.reachable === 'boolean'
+          ? { reachable: data.reachable, models: data.models ?? [], skipped: data.skipped ?? [] }
+          : { reachable: false, models: [], skipped: [] }
+      )
+    } catch {
+      setDiscovery({ reachable: false, models: [], skipped: [] })
+    } finally {
+      setDiscovering(false)
+    }
+  }, [apiBase, provider, functionType, baseUrl, apiKey])
+
+  // Opening the dialog for a local server is the moment the question "which
+  // models do I have?" is being asked, so answer it without a second click.
+  // The probe is a metadata request to a machine on the operator's own network.
+  useEffect(() => {
+    if (addModelDialogOpen && supportsDiscovery && !discovery && !discovering) {
+      void handleDiscoverModels()
+    }
+  }, [addModelDialogOpen, supportsDiscovery, discovery, discovering, handleDiscoverModels])
+
   // Test custom model in dialog
   const handleTestCustomModel = async () => {
     if (!newModelName.trim()) return
-    
+
     setDialogTesting(true)
     setDialogTestResult(null)
     try {
@@ -634,8 +749,22 @@ export function AIFunctionCard({
           baseUrl: baseUrl || undefined,
         }),
       })
-      const data = await res.json()
+      const data: TestResult = await res.json()
       setDialogTestResult(data)
+
+      // The test embedded a string, so the vector's width is now known. Fill it
+      // in rather than leaving the operator to guess the one number that
+      // decides which table their library lives in — but only when it has a
+      // table to live in, since offering an unsupported width would just move
+      // the failure to the save.
+      if (
+        functionType === 'embeddings' &&
+        data.success &&
+        data.embeddingDimensions != null &&
+        data.embeddingDimensionsSupported === true
+      ) {
+        setNewModelEmbeddingDimensions(data.embeddingDimensions)
+      }
     } catch {
       setDialogTestResult({ success: false, error: t('aiFunctionCard.connectionFailed') })
     } finally {
@@ -693,6 +822,7 @@ export function AIFunctionCard({
     setNewModelName('')
     setNewModelEmbeddingDimensions('')
     setDialogTestResult(null)
+    setDiscovery(null)
   }
 
   // Delete custom model
@@ -1450,6 +1580,55 @@ export function AIFunctionCard({
           </Box>
         )}
 
+        {/*
+          LM Studio's equivalent is not a list of commands to run — models are
+          downloaded in its own UI — so the help it needs is the two settings
+          that decide whether anything here can reach it at all: the local
+          server has to be started, and for the Embeddings role it will not
+          answer without an embedding model loaded.
+        */}
+        {provider === 'lmstudio' && (
+          <Box sx={{
+            mb: 2,
+            p: 2,
+            borderRadius: 2,
+            bgcolor: (theme) => alpha(theme.palette.info.main, 0.08),
+            border: 1,
+            borderColor: (theme) => alpha(theme.palette.info.main, 0.2),
+          }}>
+            <Typography variant="subtitle2" sx={{ mb: 1.5, color: 'info.main', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <ComputerIcon fontSize="small" />
+              {t('aiFunctionCard.lmStudioSetupTitle')}
+            </Typography>
+            <Box component="ol" sx={{ pl: 2.5, m: 0, '& li': { mb: 0.5 } }}>
+              <Typography component="li" variant="body2">
+                {t('aiFunctionCard.lmStudioStepDownload')}
+              </Typography>
+              <Typography component="li" variant="body2">
+                {t('aiFunctionCard.lmStudioStepServer')}
+              </Typography>
+              <Typography component="li" variant="body2">
+                {t('aiFunctionCard.lmStudioStepDetect')}
+              </Typography>
+            </Box>
+            {functionType === 'embeddings' && (
+              <Typography variant="body2" sx={{ mt: 1.5, fontStyle: 'italic' }}>
+                {t('aiFunctionCard.lmStudioEmbeddingNote')}
+              </Typography>
+            )}
+            {/*
+              Shown on every role, not only when a second one is already on LM
+              Studio: this card knows its own config and nothing else, and the
+              cost being warned about is a performance cliff that appears long
+              after the setting that caused it. A sentence read once and not
+              needed beats a swap loop nobody can explain.
+            */}
+            <Typography variant="body2" sx={{ mt: 1.5, fontStyle: 'italic' }}>
+              {t('aiFunctionCard.lmStudioAutoEvictNote')}
+            </Typography>
+          </Box>
+        )}
+
         {/* Base URL */}
         {providerInfo?.requiresBaseUrl && (
           <TextField
@@ -1463,7 +1642,9 @@ export function AIFunctionCard({
             helperText={
               provider === 'ollama'
                 ? t('aiFunctionCard.baseUrlHelperOllama')
-                : t('aiFunctionCard.baseUrlHelperCompatible')
+                : provider === 'lmstudio'
+                  ? t('aiFunctionCard.baseUrlHelperLmStudio')
+                  : t('aiFunctionCard.baseUrlHelperCompatible')
             }
           />
         )}
@@ -1504,11 +1685,93 @@ export function AIFunctionCard({
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             {provider === 'ollama' && t('aiFunctionCard.addCustomDialog_ollama')}
+            {provider === 'lmstudio' && t('aiFunctionCard.addCustomDialog_lmstudio')}
             {provider === 'openrouter' && t('aiFunctionCard.addCustomDialog_openrouter')}
             {provider === 'huggingface' && t('aiFunctionCard.addCustomDialog_huggingface')}
-            {provider !== 'ollama' && provider !== 'openrouter' && provider !== 'huggingface' &&
+            {provider !== 'ollama' && provider !== 'lmstudio' && provider !== 'openrouter' &&
+              provider !== 'huggingface' &&
               t('aiFunctionCard.addCustomDialog_compatible')}
           </Typography>
+          {/*
+            What the server says it has. Shown above the free-text field so the
+            list is the obvious path and typing an id is the fallback, not the
+            other way round — copying `text-embedding-nomic-embed-text-v1.5` by
+            hand is exactly the step this removes.
+          */}
+          {supportsDiscovery && (
+            <Box sx={{ mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                <Typography variant="subtitle2">{t('aiFunctionCard.discoverTitle')}</Typography>
+                <Button
+                  size="small"
+                  startIcon={discovering ? <CircularProgress size={14} /> : <RefreshIcon />}
+                  onClick={handleDiscoverModels}
+                  disabled={discovering || dialogTesting}
+                >
+                  {t('aiFunctionCard.discoverRefresh')}
+                </Button>
+              </Box>
+
+              {discovering && (
+                <Typography variant="body2" color="text.secondary">
+                  {t('aiFunctionCard.discoverLoading')}
+                </Typography>
+              )}
+
+              {!discovering && discovery && !discovery.reachable && (
+                <Alert severity="info">
+                  {t('aiFunctionCard.discoverUnreachable', {
+                    url: baseUrl || providerInfo?.defaultBaseUrl || '',
+                  })}
+                </Alert>
+              )}
+
+              {!discovering && discovery?.reachable && discovery.models.length === 0 && (
+                <Alert severity="info">{t('aiFunctionCard.discoverNoneForRole')}</Alert>
+              )}
+
+              {!discovering && discovery?.reachable && discovery.models.length > 0 && (
+                <FormControl fullWidth size="small">
+                  <InputLabel>{t('aiFunctionCard.discoverPick')}</InputLabel>
+                  <Select
+                    value={discovery.models.some((m) => m.id === newModelName) ? newModelName : ''}
+                    label={t('aiFunctionCard.discoverPick')}
+                    onChange={(e) => {
+                      setNewModelName(e.target.value as string)
+                      setDialogTestResult(null)
+                    }}
+                    disabled={dialogTesting}
+                  >
+                    {discovery.models.map((m) => (
+                      <MenuItem key={m.id} value={m.id}>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="body2" noWrap>
+                              {m.name}
+                            </Typography>
+                            {m.loaded && (
+                              <Chip size="small" label={t('aiFunctionCard.discoverLoaded')} color="success" variant="outlined" />
+                            )}
+                          </Box>
+                          {(m.description || m.contextWindow) && (
+                            <Typography variant="caption" color="text.secondary">
+                              {[m.description, m.contextWindow].filter(Boolean).join(' · ')}
+                            </Typography>
+                          )}
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  {discovery.skipped.length > 0 && (
+                    <FormHelperText>
+                      {t('aiFunctionCard.discoverSkipped', { count: discovery.skipped.length })}
+                    </FormHelperText>
+                  )}
+                </FormControl>
+              )}
+            </Box>
+          )}
+
           <TextField
             autoFocus
             label={t('aiFunctionCard.modelName')}
@@ -1529,10 +1792,11 @@ export function AIFunctionCard({
                     ? t('aiFunctionCard.placeholderHuggingface')
                     : t('aiFunctionCard.placeholderDefault')
             }
+            helperText={supportsDiscovery ? t('aiFunctionCard.discoverManualHint') : undefined}
             disabled={dialogTesting}
             sx={{ mb: 2 }}
           />
-          
+
           {/* Embedding Dimensions Dropdown - only for embeddings function */}
           {functionType === 'embeddings' && (
             <>
@@ -1587,6 +1851,23 @@ export function AIFunctionCard({
               {dialogTestResult.success
                 ? t('aiFunctionCard.modelValidatedSuccess')
                 : t('aiFunctionCard.validationFailedWithError', { error: dialogTestResult.error ?? '' })}
+              {/*
+                The test embedded a string, so the vector's width is a measured
+                fact now rather than something to look up. Say so — and say it
+                plainly when there is no table for it, because the model works
+                and is still unusable here.
+              */}
+              {dialogTestResult.success && dialogTestResult.embeddingDimensions != null && (
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  {dialogTestResult.embeddingDimensionsSupported === false
+                    ? t('aiFunctionCard.detectedDimensionsUnsupported', {
+                        dim: dialogTestResult.embeddingDimensions,
+                      })
+                    : t('aiFunctionCard.detectedDimensions', {
+                        dim: dialogTestResult.embeddingDimensions,
+                      })}
+                </Typography>
+              )}
             </Alert>
           )}
           

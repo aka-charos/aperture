@@ -55,6 +55,12 @@ import {
   getLmStudioModelCapabilities,
 } from './local-model-capabilities.js'
 import {
+  isCustomModelProvider,
+  isLocalModelProvider,
+  type CustomModelProvider,
+} from './ai-capabilities/customModels.js'
+import { formatContextWindow } from './ai-capabilities/contextWindow.js'
+import {
   classifyQuotaError,
   clearSlotCooldown,
   isSlotCoolingDown,
@@ -74,6 +80,7 @@ export type ProviderType =
   | 'openai'
   | 'anthropic'
   | 'ollama'
+  | 'lmstudio'
   | 'openai-compatible'
   | 'groq'
   | 'google'
@@ -455,6 +462,29 @@ function getCacheKey(providerConfig: ProviderConfig, role?: AIFunction): string 
   return `${providerConfig.provider}:${providerConfig.apiKey ?? ''}:${providerConfig.baseUrl ?? ''}:${role ?? ''}`
 }
 
+/** A local model can take minutes to answer on CPU or at a large size. */
+const LOCAL_INFERENCE_TIMEOUT_MS = 300000
+
+/**
+ * A fetch with the patience local inference needs.
+ *
+ * The caller's own signal is kept alongside the timeout rather than replaced by
+ * it: the SDK passes an abort signal for a cancelled generation, and overwriting
+ * it means a user who closes the chat leaves the model grinding away with
+ * nothing left to read the answer.
+ */
+const localInferenceFetch: typeof fetch = (url, options) => {
+  const timeout = AbortSignal.timeout(LOCAL_INFERENCE_TIMEOUT_MS)
+  const caller = options?.signal
+  return fetch(url, {
+    ...options,
+    signal:
+      caller && typeof AbortSignal.any === 'function'
+        ? AbortSignal.any([caller, timeout])
+        : timeout,
+  })
+}
+
 /**
  * Create a provider instance based on configuration.
  *
@@ -500,6 +530,37 @@ function createProviderInstance(providerConfig: ProviderConfig, role?: AIFunctio
       })
       break
     }
+
+    // Inference goes over LM Studio's OPENAI-COMPATIBLE endpoints, not its
+    // native `/api/v1/chat`, and that is a capability decision rather than a
+    // convenience one. LM Studio's own endpoint comparison marks `/api/v1/chat`
+    // ❌ for **custom tools** (its tools are MCP servers) and ❌ for
+    // **including assistant messages in the request**. This app's assistant is
+    // twelve local function tools driven over multiple steps that resend the
+    // accumulated tool results each time (see the step-budget rule), so the
+    // native endpoint cannot run it — and there is no native embeddings
+    // endpoint under /api/v1 at all.
+    //
+    // The catalog is a different question and is read from the native API,
+    // which is the only place tool support and model type are published. See
+    // local-model-capabilities.ts.
+    //
+    // It is a provider of its own rather than a preset of the one below because
+    // the difference is knowing WHICH server is at the other end: only a named
+    // LM Studio can offer to read its catalog, report per-model tool support, or
+    // explain itself in the setup wizard. "OpenAI-Compatible" has to assume the
+    // operator already knows all of that. There is no @ai-sdk/lmstudio package;
+    // openai-compatible is what LM Studio's own docs point at.
+    case 'lmstudio':
+      instance = createOpenAICompatible({
+        name: 'lmstudio',
+        baseURL: providerConfig.baseUrl ?? 'http://localhost:1234/v1',
+        // Optional in LM Studio and off by default, but it can be told to
+        // require one. Sending a key it did not ask for is harmless.
+        apiKey: providerConfig.apiKey,
+        fetch: localInferenceFetch,
+      })
+      break
 
     case 'openai-compatible':
       instance = createOpenAICompatible({
@@ -861,7 +922,11 @@ export async function getEmbeddingInvocation(): Promise<EmbeddingInvocation> {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return (provider as any).embedding(modelId)
 
+      // LM Studio is served by the same openai-compatible provider, so it
+      // exposes the same method. Omitting it here would not degrade embeddings,
+      // it would throw on the first batch — the switch has no working default.
       case 'google':
+      case 'lmstudio':
       case 'openai-compatible':
       case 'huggingface':
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1467,17 +1532,6 @@ export async function getExplorationModelInstance(): Promise<LanguageModel> {
 // ============================================================================
 
 /**
- * Providers whose models are user-entered rather than registry-defined.
- * Mirrors the providers accepted by addCustomModel.
- */
-const CUSTOM_MODEL_PROVIDERS = new Set<string>([
-  'ollama',
-  'openai-compatible',
-  'openrouter',
-  'huggingface',
-])
-
-/**
  * Capabilities assumed for a user-added custom model when nothing better is
  * known: the model was added for a specific function, so assume it can do
  * what that function needs (a chat model is assumed to tool-call, etc.).
@@ -1495,15 +1549,18 @@ export function assumedCustomModelCapabilities(fn: AIFunction): ModelCapabilitie
  * Live per-model capability sources, by provider:
  * - OpenRouter: public model catalog (supported parameters per model)
  * - Ollama: the show endpoint's capabilities list
- * - openai-compatible: might be LM Studio, whose native REST API reports
- *   per-model capabilities; other servers just fail the probe harmlessly
+ * - LM Studio: its native REST API reports a type and, since 0.3.16, tool
+ *   support per model
+ * - openai-compatible: might be LM Studio, so it takes the same probe; other
+ *   servers just fail it harmlessly
  * Returns null when the source is unavailable or doesn't know the model.
  */
 async function liveModelCapabilities(
   providerId: string,
   modelId: string,
   fn: AIFunction,
-  baseUrl?: string
+  baseUrl?: string,
+  apiKey?: string
 ): Promise<ModelCapabilities | null> {
   // The OpenRouter catalog only describes language models, so never let it
   // answer for embeddings — the custom-model assumption handles those
@@ -1513,8 +1570,12 @@ async function liveModelCapabilities(
   if (providerId === 'ollama') {
     return getOllamaModelCapabilities(modelId, baseUrl)
   }
-  if (providerId === 'openai-compatible') {
-    return getLmStudioModelCapabilities(modelId, baseUrl)
+  // `openai-compatible` might BE LM Studio — it has shipped LM Studio's port as
+  // its default base URL since before the named provider existed — so it keeps
+  // the probe for anyone who wired it up that way. It fails harmlessly against
+  // any other server.
+  if (providerId === 'lmstudio' || providerId === 'openai-compatible') {
+    return getLmStudioModelCapabilities(modelId, baseUrl, apiKey)
   }
   return null
 }
@@ -1531,15 +1592,16 @@ export async function resolveModelCapabilities(
   providerId: string,
   modelId: string,
   fn: AIFunction,
-  baseUrl?: string
+  baseUrl?: string,
+  apiKey?: string
 ): Promise<ModelCapabilities | null> {
   const builtIn = getModel(providerId, modelId, fn)
   if (builtIn) return builtIn.capabilities
 
-  const live = await liveModelCapabilities(providerId, modelId, fn, baseUrl)
+  const live = await liveModelCapabilities(providerId, modelId, fn, baseUrl, apiKey)
   if (live) return live
 
-  if (CUSTOM_MODEL_PROVIDERS.has(providerId)) {
+  if (isCustomModelProvider(providerId)) {
     return assumedCustomModelCapabilities(fn)
   }
 
@@ -1567,7 +1629,7 @@ export async function getAICapabilitiesStatus(): Promise<AICapabilitiesStatus> {
     // credential store rather than on this function's config
     const baseUrl =
       fnConfig.baseUrl ??
-      (fnConfig.provider === 'ollama' || fnConfig.provider === 'openai-compatible'
+      (isLocalModelProvider(fnConfig.provider)
         ? await resolveBaseUrlForProvider(fnConfig.provider)
         : undefined)
 
@@ -1575,7 +1637,13 @@ export async function getAICapabilitiesStatus(): Promise<AICapabilitiesStatus> {
       configured: true,
       provider: fnConfig.provider,
       model: fnConfig.model,
-      capabilities: await resolveModelCapabilities(fnConfig.provider, fnConfig.model, fn, baseUrl),
+      capabilities: await resolveModelCapabilities(
+        fnConfig.provider,
+        fnConfig.model,
+        fn,
+        baseUrl,
+        fnConfig.apiKey
+      ),
     }
   }
 
@@ -1806,10 +1874,33 @@ export async function dropLegacyEmbeddingTables(): Promise<void> {
 /**
  * Test connection to a provider
  */
+export interface ProviderConnectionTest {
+  success: boolean
+  error?: string
+  /**
+   * The width of the vector an embedding model actually returned.
+   *
+   * Measured rather than asked for, because a local server publishes no
+   * dimension anywhere — LM Studio's catalog does not carry one — and the
+   * operator is otherwise made to guess a number that decides which
+   * `embeddings_<n>` table every read goes to. Getting it wrong points the
+   * library at an empty table and nothing errors.
+   *
+   * Absent for a language role, and absent when the test failed.
+   */
+  embeddingDimensions?: number
+  /**
+   * Whether that width has an `embeddings_<n>` table to live in. A model can
+   * connect perfectly and still be unusable here, and that is worth saying at
+   * the test rather than as a 400 two clicks later.
+   */
+  embeddingDimensionsSupported?: boolean
+}
+
 export async function testProviderConnection(
   providerConfig: ProviderConfig,
   fn: AIFunction
-): Promise<{ success: boolean; error?: string }> {
+): Promise<ProviderConnectionTest> {
   // A test is a real billable request, so it lands in the ledger like any other.
   // Labelling it keeps a burst of "Test" clicks from looking like mystery spend.
   return withInferenceContext({ feature: 'settings.testConnection' }, () =>
@@ -1820,7 +1911,7 @@ export async function testProviderConnection(
 async function runProviderConnectionTest(
   providerConfig: ProviderConfig,
   fn: AIFunction
-): Promise<{ success: boolean; error?: string }> {
+): Promise<ProviderConnectionTest> {
   try {
     const provider = createProviderInstance(providerConfig, fn)
 
@@ -1837,10 +1928,23 @@ async function runProviderConnectionTest(
 
       // Import embed from ai package
       const { embed } = await import('ai')
-      await embed({
+      const { embedding } = await embed({
         model,
         value: 'test',
       })
+
+      // The answer already carries the one number nobody can look up, so read
+      // it rather than throwing it away and asking the operator to guess.
+      const dimensions = Array.isArray(embedding) ? embedding.length : undefined
+      return {
+        success: true,
+        ...(dimensions != null && {
+          embeddingDimensions: dimensions,
+          embeddingDimensionsSupported: VALID_EMBEDDING_DIMENSIONS.includes(
+            dimensions as ValidEmbeddingDimension
+          ),
+        }),
+      }
     } else {
       // Test chat/text generation
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1891,7 +1995,7 @@ export async function getOpenAIApiKeyLegacy(): Promise<string | null> {
  */
 export interface CustomModel {
   id: number
-  provider: 'ollama' | 'openai-compatible' | 'openrouter' | 'huggingface'
+  provider: CustomModelProvider
   functionType: AIFunction
   modelId: string
   embeddingDimensions?: number  // Only for embeddings function
@@ -1905,8 +2009,10 @@ export async function getCustomModels(
   providerId: string,
   fn: AIFunction
 ): Promise<CustomModel[]> {
-  // Only Ollama, OpenAI-compatible, and OpenRouter support custom models
-  if (providerId !== 'ollama' && providerId !== 'openai-compatible' && providerId !== 'openrouter') {
+  // The same list `addCustomModel` accepts. It used to be a hand-written copy
+  // that had drifted a provider short of it, so a Hugging Face model could be
+  // stored and then never appeared in the picker it was stored for.
+  if (!isCustomModelProvider(providerId)) {
     return []
   }
 
@@ -1914,7 +2020,7 @@ export async function getCustomModels(
   
   const result = await query<{
     id: number
-    provider: 'ollama' | 'openai-compatible' | 'openrouter' | 'huggingface'
+    provider: CustomModelProvider
     function_type: string
     model_id: string
     embedding_dimensions: number | null
@@ -1941,7 +2047,7 @@ export async function getCustomModels(
  * Add a custom model for Ollama, OpenAI-compatible, OpenRouter, or HuggingFace provider
  */
 export async function addCustomModel(
-  providerId: 'ollama' | 'openai-compatible' | 'openrouter' | 'huggingface',
+  providerId: CustomModelProvider,
   fn: AIFunction,
   modelId: string,
   embeddingDimensions?: number
@@ -1960,7 +2066,7 @@ export async function addCustomModel(
 
   const result = await queryOne<{
     id: number
-    provider: 'ollama' | 'openai-compatible' | 'openrouter' | 'huggingface'
+    provider: CustomModelProvider
     function_type: string
     model_id: string
     embedding_dimensions: number | null
@@ -1995,7 +2101,7 @@ export async function addCustomModel(
  * Delete a custom model
  */
 export async function deleteCustomModel(
-  providerId: 'ollama' | 'openai-compatible' | 'openrouter' | 'huggingface',
+  providerId: CustomModelProvider,
   fn: AIFunction,
   modelId: string
 ): Promise<boolean> {
@@ -2012,16 +2118,6 @@ export async function deleteCustomModel(
     logger.info({ provider: providerId, function: fn, model: modelId }, 'Deleted custom AI model')
   }
   return deleted
-}
-
-/** Format a token count the way built-in model metadata does: "1M", "128K" */
-function formatContextWindow(tokens: number): string {
-  if (tokens >= 1_000_000) {
-    const millions = tokens / 1_000_000
-    return `${Number.isInteger(millions) ? millions : Math.round(millions * 10) / 10}M`
-  }
-  if (tokens >= 1_000) return `${Math.round(tokens / 1_000)}K`
-  return String(tokens)
 }
 
 /**
@@ -2086,13 +2182,13 @@ export async function getModelsForFunctionWithCustom(
         )
       : builtInModels
 
-  // Get custom models from database (only for ollama and openai-compatible)
+  // Get custom models from the database (only for the providers that store them)
   const customModels = await getCustomModels(providerId, fn)
 
   // Local-server probes need the provider's base URL, which lives in the
   // shared credential store or on whichever function uses the provider
   const probeBaseUrl =
-    customModels.length > 0 && (providerId === 'ollama' || providerId === 'openai-compatible')
+    customModels.length > 0 && isLocalModelProvider(providerId)
       ? await resolveBaseUrlForProvider(providerId as ProviderType)
       : undefined
 
