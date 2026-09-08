@@ -464,8 +464,43 @@ function getCacheKey(providerConfig: ProviderConfig, role?: AIFunction): string 
   return `${providerConfig.provider}:${providerConfig.apiKey ?? ''}:${providerConfig.baseUrl ?? ''}:${role ?? ''}`
 }
 
-/** A local model can take minutes to answer on CPU or at a large size. */
-const LOCAL_INFERENCE_TIMEOUT_MS = 300000
+/**
+ * How long a local model may take before the connection is treated as wedged.
+ *
+ * **This was five minutes and that number broke real work.** Measured on a
+ * 26B model at ~12 tokens/sec: a title analysis with a 69,000-character prompt
+ * spent 36 seconds on prompt processing and then generated 3,136 tokens before
+ * the fetch aborted at exactly 300s, mid-sentence. The role's configured
+ * ceiling was 32,000 tokens, which at that rate needs about 45 minutes — the
+ * request could not have succeeded at any prompt size. LM Studio logged it as
+ * "Client disconnected", which reads as the server's fault rather than ours.
+ *
+ * Five minutes is a plausible ceiling for a cloud API and a wrong one for a
+ * large model on someone's own GPU, which is the entire point of these two
+ * providers. The value now has to clear the slowest legitimate generation
+ * rather than the fastest.
+ *
+ * It stays a backstop, not a budget: nothing waits this long on a healthy
+ * call, and its only job is to stop a genuinely dead connection from holding a
+ * job forever. A wall-clock cap cannot tell "slow" from "hung" — only a
+ * streaming response can, because a stalled stream is visible between chunks —
+ * so the number is deliberately far above any real generation instead of
+ * tuned close to one.
+ *
+ * **RAISING THIS IS NOT SUFFICIENT ON ITS OWN, AND THAT IS MEASURED.** Node's
+ * fetch enforces its own `headersTimeout`, default 300s, which no AbortSignal
+ * can extend. Probed on Node v24.18.0 against a server that withholds its
+ * response: both a delayed-headers and a delayed-body case failed at 306.5s
+ * with `UND_ERR_HEADERS_TIMEOUT`, with no signal passed at all. A
+ * **non-streaming** call — `generateText`, which is what `analysis/generate.ts`
+ * uses — gets no response headers until the model has finished, so any local
+ * generation over five minutes still dies there regardless of this constant.
+ *
+ * The real fix for those paths is to stream: an SSE response sends headers at
+ * once and chunks continuously, so neither of Node's timeouts is ever reached.
+ * Until that lands, this raise only helps calls whose headers arrive promptly.
+ */
+const LOCAL_INFERENCE_TIMEOUT_MS = 60 * 60 * 1000
 
 /**
  * A fetch with the patience local inference needs.
