@@ -793,17 +793,31 @@ export const addCustomModelSchema = {
   },
 }
 
+/**
+ * BODY, not params. This declared `params` with `provider` and `modelId`
+ * required, while the route is `/api/settings/ai/custom-models` and carries no
+ * path parameters at all — so Fastify validated an empty object against a
+ * schema demanding two properties and answered 400 to every request. Deleting a
+ * custom model had never worked from the settings page.
+ *
+ * Nothing typed could catch it: a schema is data, `params` is a valid key, and
+ * the handler reads `request.body` regardless. The setup route's copy was
+ * correct the whole time, which is how the two drifted without anyone noticing
+ * — the same list, in two places, disagreeing.
+ */
 export const deleteCustomModelSchema = {
   tags: ['settings'],
   summary: 'Delete custom AI model',
   description: 'Delete a custom AI model definition (admin only).',
-  params: {
+  body: {
     type: 'object' as const,
+    additionalProperties: true,
     properties: {
       provider: { type: 'string' as const },
+      function: { type: 'string' as const, enum: aiFunctionEnum },
       modelId: { type: 'string' as const },
     },
-    required: ['provider', 'modelId'] as string[],
+    required: ['provider', 'function', 'modelId'] as string[],
   },
 }
 

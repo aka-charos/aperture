@@ -31,6 +31,7 @@ import {
   ListItemSecondaryAction,
   Checkbox,
   FormControlLabel,
+  Tooltip,
 } from '@mui/material'
 import {
   Visibility as VisibilityIcon,
@@ -42,6 +43,7 @@ import {
   Delete as DeleteIcon,
   Add as AddIcon,
   Refresh as RefreshIcon,
+  InfoOutlined as InfoOutlinedIcon,
 } from '@mui/icons-material'
 import {
   PROVIDER_INFO,
@@ -151,6 +153,34 @@ export interface LmStudioStatus {
   embeddingModels: number
   loaded: { modelId: string; contextLength?: number }[]
   error?: string
+}
+
+/**
+ * An explanation that is worth having and not worth reading twice.
+ *
+ * Several controls here need a paragraph of reasoning behind a one-line label —
+ * why pacing exists, what LM Studio's Auto-Evict does to a second role. Printed
+ * inline, those paragraphs are longer than the settings they describe and the
+ * card becomes something to scroll past rather than read. Behind an icon they
+ * are still one gesture away.
+ *
+ * A Tooltip rather than a Popover because it needs no dismissal, and on an
+ * `IconButton` rather than a bare icon so it is reachable by keyboard focus and
+ * by long-press on a touch screen, where there is no hover at all.
+ */
+function InfoHint({ title }: { title: React.ReactNode }) {
+  return (
+    <Tooltip
+      title={<Box sx={{ p: 0.5, whiteSpace: 'pre-line' }}>{title}</Box>}
+      enterTouchDelay={0}
+      leaveTouchDelay={8000}
+      slotProps={{ tooltip: { sx: { maxWidth: 360 } } }}
+    >
+      <IconButton size="small" sx={{ p: 0.25, color: 'text.secondary' }}>
+        <InfoOutlinedIcon sx={{ fontSize: 16 }} />
+      </IconButton>
+    </Tooltip>
+  )
 }
 
 interface DiscoveryResponse {
@@ -1424,7 +1454,14 @@ export function AIFunctionCard({
                   onChange={(e) => setPacingSeconds(e.target.checked ? pacingDraft : 0)}
                 />
               }
-              label={t('aiFunctionCard.pacingLabel')}
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+                  {t('aiFunctionCard.pacingLabel')}
+                  {/* The reasoning is four sentences and the setting is one
+                      checkbox. It belongs a gesture away, not under every card. */}
+                  <InfoHint title={t('aiFunctionCard.pacingHelp')} />
+                </Box>
+              }
             />
             {pacingSeconds > 0 && (
               <TextField
@@ -1441,9 +1478,6 @@ export function AIFunctionCard({
                 sx={{ mt: 1, maxWidth: 220 }}
               />
             )}
-            <FormHelperText sx={{ mt: pacingSeconds > 0 ? 1 : 0 }}>
-              {t('aiFunctionCard.pacingHelp')}
-            </FormHelperText>
           </Box>
         )}
 
@@ -1673,45 +1707,25 @@ export function AIFunctionCard({
           server has to be started, and for the Embeddings role it will not
           answer without an embedding model loaded.
         */}
+        {/*
+          One line and an icon, where this used to be a boxed panel of three
+          numbered steps and two paragraphs. All of it is still true and almost
+          none of it is needed twice: an operator reads the setup once and then
+          scrolls past it on every visit afterwards, on every role's card.
+        */}
         {provider === 'lmstudio' && (
-          <Box sx={{
-            mb: 2,
-            p: 2,
-            borderRadius: 2,
-            bgcolor: (theme) => alpha(theme.palette.info.main, 0.08),
-            border: 1,
-            borderColor: (theme) => alpha(theme.palette.info.main, 0.2),
-          }}>
-            <Typography variant="subtitle2" sx={{ mb: 1.5, color: 'info.main', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <ComputerIcon fontSize="small" />
-              {t('aiFunctionCard.lmStudioSetupTitle')}
-            </Typography>
-            <Box component="ol" sx={{ pl: 2.5, m: 0, '& li': { mb: 0.5 } }}>
-              <Typography component="li" variant="body2">
-                {t('aiFunctionCard.lmStudioStepDownload')}
-              </Typography>
-              <Typography component="li" variant="body2">
-                {t('aiFunctionCard.lmStudioStepServer')}
-              </Typography>
-              <Typography component="li" variant="body2">
-                {t('aiFunctionCard.lmStudioStepDetect')}
-              </Typography>
-            </Box>
-            {functionType === 'embeddings' && (
-              <Typography variant="body2" sx={{ mt: 1.5, fontStyle: 'italic' }}>
-                {t('aiFunctionCard.lmStudioEmbeddingNote')}
-              </Typography>
-            )}
-            {/*
-              Shown on every role, not only when a second one is already on LM
-              Studio: this card knows its own config and nothing else, and the
-              cost being warned about is a performance cliff that appears long
-              after the setting that caused it. A sentence read once and not
-              needed beats a swap loop nobody can explain.
-            */}
-            <Typography variant="body2" sx={{ mt: 1.5, fontStyle: 'italic' }}>
-              {t('aiFunctionCard.lmStudioAutoEvictNote')}
-            </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 2, color: 'text.secondary' }}>
+            <ComputerIcon sx={{ fontSize: 16 }} />
+            <Typography variant="caption">{t('aiFunctionCard.lmStudioSetupTitle')}</Typography>
+            <InfoHint
+              title={[
+                t('aiFunctionCard.lmStudioStepDownload'),
+                t('aiFunctionCard.lmStudioStepServer'),
+                t('aiFunctionCard.lmStudioStepDetect'),
+                ...(functionType === 'embeddings' ? [t('aiFunctionCard.lmStudioEmbeddingNote')] : []),
+                t('aiFunctionCard.lmStudioAutoEvictNote'),
+              ].join('\n\n')}
+            />
           </Box>
         )}
 

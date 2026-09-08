@@ -2556,7 +2556,7 @@
     "cardWebSearchTitle": "Google Gemini Web Search",
     "cardWebSearchDesc": "Optional. Gemini's native search grounding finds current titles from the web for discovery requests, then matches them against your library. Google is the only provider that offers this. Leave unset to disable web discovery.",
     "cardTitleAnalysisTitle": "Title Analysis",
-    "cardTitleAnalysisDesc": "Optional. Writes a critic-informed analysis of a film or show — how it was made, what its makers were attempting, where it sits, what critics argue about. Cached per title and shared by everyone. Any provider works: with self-hosted retrieval the model only writes from pages already fetched for it, so a local LM Studio model or a cheap OpenRouter one is plenty. Choose Google to let it search for itself instead — better sources, but a hard daily cap.",
+    "cardTitleAnalysisDesc": "Optional. A critic-informed account of how a title was made and what critics argue about, cached and shared by everyone. Any provider works; Google can search for itself, at a daily cap.",
     "episodeEmbeddingsTitle": "Episode Embeddings",
     "episodeEmbeddingsBody": "Vectorizing individual episodes lets the assistant answer questions about what happens inside one — \"the episode where they get stuck in the desert\". Nothing else can: the series vector describes the show, not its episodes. It is also the largest embedding table by far, one row per episode instead of one per show, and every new episode costs an embedding call.",
     "episodeEmbeddingsToggle": "Generate embeddings for episodes",
