@@ -185,6 +185,31 @@ const analysisRoutes: FastifyPluginAsync = async (fastify) => {
         if (!subject) return reply.status(404).send({ error: 'Title not found' })
 
         owned = true
+
+        // A DISCONNECTED REQUESTER USED TO BE COMPLETELY INVISIBLE, and it is
+        // the shape of failure this route produces most often. Writing an
+        // analysis takes minutes -- a large prompt against a local or free-tier
+        // model -- while a browser fetch or a reverse proxy gives up in tens of
+        // seconds. Fastify does not abort the handler when that happens, so the
+        // work carries on and eventually stores a perfectly good row, but the
+        // page has already shown its generic failure message and the server log
+        // says NOTHING about the disconnect. Measured live: the panel read
+        // "Could not write an analysis right now", the container log ended at
+        // "Writing analysis", and there was no way to tell a hung provider from
+        // a timed-out browser from a restarted container.
+        //
+        // Logged rather than acted on, deliberately. Cancelling the work would
+        // throw away minutes of paid inference because someone closed a tab,
+        // and the row is shared by every user once written.
+        request.raw.on('close', () => {
+          if (!reply.raw.writableEnded) {
+            logger.warn(
+              { mediaType, id, title: subject.title },
+              'Requester disconnected before the analysis finished; the work continues and the row will still be written'
+            )
+          }
+        })
+
         const work = analyseTitle(mediaType, id, subject).finally(() => inFlight.delete(key))
         inFlight.set(key, work)
 
