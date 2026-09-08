@@ -24,7 +24,7 @@
  * the OMDb-401 lesson applied together: a transport failure that stamps a row
  * retires a library.
  */
-import { generateText } from 'ai'
+import { generateText, streamText } from 'ai'
 
 import {
   getFunctionConfig,
@@ -530,8 +530,29 @@ async function runWriteAttempt(
       provider: attempt.provider,
       attempt: i,
     })
+    // STREAMED, and not for progress — for survival. Node's fetch enforces its
+    // own 300s `headersTimeout` that no AbortSignal can extend (measured on
+    // v24.18.0: a withheld response fails at 306.5s with UND_ERR_HEADERS_TIMEOUT
+    // with no signal involved). A non-streaming call gets no response headers
+    // until the model has finished, so a local model slower than five minutes
+    // could never complete this call whatever the ceilings were set to.
+    // Measured: a 26B model at ~12 tokens/sec was cut off mid-sentence at
+    // exactly 300s against a 32,000-token budget needing about 45 minutes.
+    //
+    // An SSE response sends headers at once and chunks continuously, so neither
+    // of Node's timeouts is ever approached. Nothing here consumes the stream
+    // incrementally; the promises below are awaited exactly as the
+    // non-streaming result was read.
+    //
+    // `onError` is load-bearing, not logging. `streamText` does not throw the
+    // provider's error — awaiting its promises rejects with a generic
+    // `AI_NoOutputGeneratedError` whose message is "No output generated",
+    // carrying no status and none of the provider's own words. That is the one
+    // thing `describeAiError` exists to preserve, so the real error is captured
+    // here and rethrown in its place.
+    let streamError: unknown
     try {
-      response = await generateText({
+      const stream = streamText({
         model,
         prompt,
         maxRetries: MODEL_MAX_RETRIES,
@@ -541,7 +562,19 @@ async function runWriteAttempt(
         // 0 means the operator asked for no ceiling, so none is sent and the
         // provider default applies.
         ...(maxOutputTokens > 0 ? { maxOutputTokens } : {}),
+        onError: ({ error }) => {
+          streamError = error
+        },
       })
+
+      const [text, reasoningText, streamFinishReason, streamUsage, meta] = await Promise.all([
+        stream.text,
+        stream.reasoningText,
+        stream.finishReason,
+        stream.usage,
+        stream.response,
+      ])
+      response = { text, reasoningText, finishReason: streamFinishReason, usage: streamUsage, response: meta }
     } catch (err) {
       // Logged here because this is the only frame that knows which model and
       // which attempt. RETURNED rather than thrown so the caller can move to a
@@ -554,7 +587,7 @@ async function runWriteAttempt(
       // article text ahead of the one field that says what went wrong.
       logger.error(
         {
-          ...describeAiError(err),
+          ...describeAiError(streamError ?? err),
           title: options.title,
           modelId,
           attempt: i,
@@ -563,7 +596,7 @@ async function runWriteAttempt(
         },
         'Title analysis model call failed'
       )
-      return { kind: 'error', error: err }
+      return { kind: 'error', error: streamError ?? err }
     } finally {
       heartbeat.stop()
     }
