@@ -1,0 +1,56 @@
+-- Record which paragraph of an analysis answers which question.
+--
+-- The analysis is one block of prose and always has been, so the only way to
+-- find the part of it that carries STYLE -- what the work is doing, what
+-- tradition it sits in -- was to count paragraphs off the top. The prompt makes
+-- that unsafe on purpose. Its rules tell the model to merge questions that
+-- belong together and to drop the ones the sources cannot support, which is
+-- what produces ~250 words for a slight film and ~900 for a dense one from one
+-- prompt; both mean "the second paragraph" names nothing stable. Measured on a
+-- live analysis of The Voice Of Hind Rajab, the second paragraph carried
+-- tradition AND critical dispute together, so anything reading two paragraphs
+-- off the top would have embedded argumentation as though it were style.
+--
+-- So the model labels its own paragraphs, and prompt version 6 asks for it.
+--
+-- WHY NOT A MARKER PER SECTION INSIDE THE PROSE. Two reasons, and both are the
+-- behaviour versions 4 and 5 were written to remove. Text cannot sit under two
+-- markers at once, so section markers make merging structurally impossible; and
+-- a named empty section is a much stronger invitation to pad than an omitted
+-- paragraph is. A map written AFTER the article cannot do either, and the
+-- reason is ordering rather than obedience -- the prose is complete before the
+-- first character of the map exists, so nothing in the map can reach back and
+-- shape it.
+--
+-- NULLABLE, AND NULL IS ORDINARY. The map is tolerant like `source_grade` and
+-- unlike the opening marker: missing, garbled or miscounted costs the signal
+-- and keeps the analysis. Making it strict would mean a formatting slip costs a
+-- title, and this is an index, not the article. Three things read as NULL here:
+-- a row written under prompt version 5 or earlier, a model that omitted the
+-- block, and a map whose numbering did not survive validation.
+--
+-- NOT BACKFILLED, and it cannot be. The map is something the model wrote, so
+-- there is nothing in an existing row to derive it from. That is exactly what
+-- `prompt_version` is for: bumping it to 6 drops every stored row below
+-- `needsAnalysisSql`, and the job re-analyses them. No migration required for
+-- that half, which is the whole point of 0143 carrying the version.
+--
+-- Shape: [{"paragraph": 1, "questions": ["work"]},
+--         {"paragraph": 2, "questions": ["work", "tradition"]}]
+--
+-- `paragraph` is 1-based into the blank-line-separated blocks of `analysis` --
+-- the same split the detail panel renders with, which is load-bearing: if the
+-- two ever disagree about what a paragraph is, every index is off and the map
+-- points confidently at the wrong prose. `questions` are the ids from
+-- MOVIE_QUESTIONS / SERIES_QUESTIONS in prompt.ts. Note `structure` is
+-- SERIES-ONLY, which is why these are names rather than question numbers: a
+-- series is asked one extra question in second position, so number 2 means
+-- `tradition` for a film and `structure` for a show.
+--
+-- No index. Nothing queries by map content -- it is read alongside the row it
+-- belongs to, by primary key.
+
+ALTER TABLE title_analysis ADD COLUMN IF NOT EXISTS paragraph_map JSONB;
+
+COMMENT ON COLUMN title_analysis.paragraph_map IS
+  'Which paragraph of `analysis` answers which question, written by the model and validated in paragraphMap.ts. [{paragraph, questions[]}], 1-based into the blank-line split. NULL is ordinary: prompt_version < 6, or the model omitted or miscounted it. Question ids come from prompt.ts; `structure` is series-only.';

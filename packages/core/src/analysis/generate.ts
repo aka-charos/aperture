@@ -53,6 +53,11 @@ import { recordWebSearchCall } from '../lib/webSearchUsage.js'
 import { budgetSources } from './budget.js'
 import { checkModeReadiness, type RetrievalMode } from './mode.js'
 import {
+  parseParagraphMap,
+  splitAnalysisParagraphs,
+  type ParagraphMap,
+} from './paragraphMap.js'
+import {
   ANALYSIS_PROMPT_VERSION,
   buildAnalysisPrompt,
   buildAnalysisQuery,
@@ -115,6 +120,15 @@ export interface StoredAnalysis {
   model: string | null
   /** Which approach produced this row — the whole point of storing it. */
   retrievalMode: RetrievalMode | null
+  /**
+   * Which paragraph of `analysis` answers which question, per the model.
+   *
+   * Null is ordinary rather than a fault: a row written under prompt version 5
+   * or earlier has none, and so does one whose map failed validation. Anything
+   * reading it must treat absence as "the analysis is undivided", never as an
+   * error — see ./paragraphMap.ts.
+   */
+  paragraphMap: ParagraphMap | null
   promptVersion: number
   analyzedAt: string
 }
@@ -133,11 +147,13 @@ export async function getStoredAnalysis(
     retrieved_chars: number | null
     model: string | null
     retrieval_mode: RetrievalMode | null
+    paragraph_map: ParagraphMap | null
     prompt_version: number
     analyzed_at: Date
   }>(
     `SELECT analysis, decline_reason, sources, source_grade, source_count,
-            retrieved_chars, model, retrieval_mode, prompt_version, analyzed_at
+            retrieved_chars, model, retrieval_mode, paragraph_map,
+            prompt_version, analyzed_at
        FROM title_analysis
       WHERE media_type = $1 AND media_id = $2`,
     [mediaType, mediaId]
@@ -155,6 +171,7 @@ export async function getStoredAnalysis(
     retrievedChars: row.retrieved_chars,
     model: row.model,
     retrievalMode: row.retrieval_mode,
+    paragraphMap: row.paragraph_map,
     promptVersion: row.prompt_version,
     analyzedAt: row.analyzed_at.toISOString(),
   }
@@ -332,6 +349,8 @@ function readUsage(usage: unknown): AnalysisUsage {
 interface WriteResult {
   /** The prose, already unwrapped from the contract. */
   text: string
+  /** The raw paragraph map, still unvalidated. Null when the model wrote none. */
+  mapText: string | null
   /** The closing grade, or null when the model omitted it. */
   grade: SourceGrade | null
   /** Why the response is unusable, or null when it reads as an answer. */
@@ -359,6 +378,11 @@ function readAnalysis(raw: string, finishReason?: string) {
   return {
     text: parsed.text,
     grade: parsed.grade,
+    // Carried up raw and judged in `analyseTitle`, which is the only frame that
+    // knows the media type -- and therefore which question labels were even
+    // offered. Deliberately absent from findResponseProblem below: a missing or
+    // broken map costs the map, never the analysis.
+    mapText: parsed.mapText,
     problem: findResponseProblem({
       text: parsed.text,
       grade: parsed.grade,
@@ -428,7 +452,12 @@ async function runWriteAttempt(
   )
   const startedAt = Date.now()
 
-  let reading = { text: '', grade: null as SourceGrade | null, problem: null as ResponseProblem | null }
+  let reading = {
+    text: '',
+    mapText: null as string | null,
+    grade: null as SourceGrade | null,
+    problem: null as ResponseProblem | null,
+  }
   let finishReason: string | undefined
   let usage: AnalysisUsage = {}
   let attemptsMade = 0
@@ -657,6 +686,7 @@ async function writeWithGrounding(
   return withGroundingModel('titleAnalysis', async (model, keyAttempt) => {
     let result: WriteResult = {
       text: '',
+      mapText: null,
       grade: null,
       problem: null,
       modelId: keyAttempt.modelId,
@@ -821,6 +851,7 @@ export async function analyseTitle(
   const crwConfig = await getCrwConfig()
 
   let text: string
+  let mapText: string | null
   let grade: SourceGrade | null
   let problem: ResponseProblem | null
   let modelId: string
@@ -859,6 +890,7 @@ export async function analyseTitle(
     }
 
     text = result.text
+    mapText = result.mapText
     grade = result.grade
     problem = result.problem
     modelId = result.modelId
@@ -887,6 +919,7 @@ export async function analyseTitle(
       { shouldCancel: options.shouldCancel, onWait: options.onWait }
     )
     text = result.text
+    mapText = result.mapText
     grade = result.grade
     problem = result.problem
     modelId = result.modelId
@@ -942,6 +975,37 @@ export async function analyseTitle(
   const analysis = decision.store ? text : null
   const declineReason = decision.store ? null : decision.reason
 
+  // Judged here because this is the only frame holding the media type, and
+  // therefore the only one that knows which question labels the model was even
+  // offered -- `structure` is series-only. Only for a kept analysis: a decline
+  // stores no prose, so there would be nothing for the indices to point at.
+  const paragraphMap = decision.store
+    ? parseParagraphMap(mapText, {
+        paragraphCount: splitAnalysisParagraphs(text).length,
+        mediaType,
+      })
+    : null
+
+  // The map is tolerant, which is exactly why losing one has to be AUDIBLE.
+  // Both boot-time checks in this repo shipped silent on the unhappy path and
+  // were indistinguishable from never having run; a map that quietly fails for
+  // every title would look the same as a model that never writes one, and the
+  // fixes are different -- a miscount is the model, an absence is the prompt or
+  // a stale prompt_version.
+  if (mapText && !paragraphMap && decision.store) {
+    logger.warn(
+      {
+        mediaType,
+        mediaId,
+        title: subject.title,
+        modelId,
+        paragraphs: splitAnalysisParagraphs(text).length,
+        mapText,
+      },
+      'Paragraph map did not validate; storing the analysis without it'
+    )
+  }
+
   // Provenance is stored for what we KEPT only: a declined row renders as
   // "we looked and there was nothing worth writing", and listing the pages that
   // produced nothing would invite a reader to go and check them.
@@ -968,8 +1032,9 @@ export async function analyseTitle(
   await query(
     `INSERT INTO title_analysis
        (media_type, media_id, analysis, decline_reason, sources, source_grade,
-        source_count, retrieved_chars, model, retrieval_mode, prompt_version, analyzed_at)
-     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, NOW())
+        source_count, retrieved_chars, model, retrieval_mode, paragraph_map,
+        prompt_version, analyzed_at)
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11::jsonb, $12, NOW())
      ON CONFLICT (media_type, media_id) DO UPDATE SET
        analysis = EXCLUDED.analysis,
        decline_reason = EXCLUDED.decline_reason,
@@ -979,6 +1044,7 @@ export async function analyseTitle(
        retrieved_chars = EXCLUDED.retrieved_chars,
        model = EXCLUDED.model,
        retrieval_mode = EXCLUDED.retrieval_mode,
+       paragraph_map = EXCLUDED.paragraph_map,
        prompt_version = EXCLUDED.prompt_version,
        analyzed_at = NOW(),
        -- A fresh analysis invalidates tags extracted from the previous prose.
@@ -994,6 +1060,11 @@ export async function analyseTitle(
       retrievedChars,
       modelId,
       mode,
+      // NULL, not '[]'. "The model wrote no usable map" and "the map says this
+      // analysis answers nothing" are different claims, and only the first is
+      // true here -- an empty array would tell a later reader the questions
+      // were checked and found unanswered.
+      paragraphMap ? JSON.stringify(paragraphMap) : null,
       ANALYSIS_PROMPT_VERSION,
     ]
   )
@@ -1009,6 +1080,7 @@ export async function analyseTitle(
     retrievedChars,
     model: modelId,
     retrievalMode: mode,
+    paragraphMap,
     promptVersion: ANALYSIS_PROMPT_VERSION,
     analyzedAt: new Date().toISOString(),
   }
