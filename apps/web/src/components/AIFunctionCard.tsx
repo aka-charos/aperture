@@ -94,7 +94,7 @@ export interface ModelInfo {
   /** How the mode reaches the model; absent means a request parameter. */
   inputTypeMechanism?: 'parameter' | 'textPrefix'
   /** How this model takes a reasoning effort; absent means it takes none. */
-  reasoningMechanism?: 'effort' | 'thinkingLevel'
+  reasoningMechanism?: 'effort' | 'thinkingLevel' | 'reasoningEffort'
   /**
    * The effort words THIS model accepts, weakest first, resolved server-side —
    * live from OpenRouter's catalog, or the SDK's fixed enum for native Google.
@@ -376,7 +376,8 @@ export function AIFunctionCard({
     provider === 'lmstudio' ||
     provider === 'openai-compatible' ||
     provider === 'openrouter' ||
-    provider === 'huggingface'
+    provider === 'huggingface' ||
+    provider === 'zai'
 
   /**
    * Whether this server can be asked what it has installed. Mirrors core's
@@ -1716,7 +1717,9 @@ export function AIFunctionCard({
                 ? t('aiFunctionCard.baseUrlHelperOllama')
                 : provider === 'lmstudio'
                   ? t('aiFunctionCard.baseUrlHelperLmStudio')
-                  : t('aiFunctionCard.baseUrlHelperCompatible')
+                  : provider === 'zai'
+                    ? t('aiFunctionCard.baseUrlHelperZai')
+                    : t('aiFunctionCard.baseUrlHelperCompatible')
             }
           />
         )}
@@ -1807,8 +1810,9 @@ export function AIFunctionCard({
             {provider === 'lmstudio' && t('aiFunctionCard.addCustomDialog_lmstudio')}
             {provider === 'openrouter' && t('aiFunctionCard.addCustomDialog_openrouter')}
             {provider === 'huggingface' && t('aiFunctionCard.addCustomDialog_huggingface')}
+            {provider === 'zai' && t('aiFunctionCard.addCustomDialog_zai')}
             {provider !== 'ollama' && provider !== 'lmstudio' && provider !== 'openrouter' &&
-              provider !== 'huggingface' &&
+              provider !== 'huggingface' && provider !== 'zai' &&
               t('aiFunctionCard.addCustomDialog_compatible')}
           </Typography>
           {/*
@@ -1909,7 +1913,9 @@ export function AIFunctionCard({
                   ? t('aiFunctionCard.placeholderOpenrouter')
                   : provider === 'huggingface'
                     ? t('aiFunctionCard.placeholderHuggingface')
-                    : t('aiFunctionCard.placeholderDefault')
+                    : provider === 'zai'
+                      ? t('aiFunctionCard.placeholderZai')
+                      : t('aiFunctionCard.placeholderDefault')
             }
             helperText={supportsDiscovery ? t('aiFunctionCard.discoverManualHint') : undefined}
             disabled={dialogTesting}

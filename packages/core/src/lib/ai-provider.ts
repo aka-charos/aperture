@@ -89,6 +89,7 @@ export type ProviderType =
   | 'deepseek'
   | 'openrouter'
   | 'huggingface'
+  | 'zai'
 
 export interface ProviderConfig {
   provider: ProviderType
@@ -523,6 +524,18 @@ const localInferenceFetch: typeof fetch = (url, options) => {
 }
 
 /**
+ * Z.AI's international endpoint. The mainland platform is a DIFFERENT service
+ * at https://open.bigmodel.cn/api/paas/v4 — separate account, separate key,
+ * and a catalog that includes embedding models this one does not — so the base
+ * URL is offered as an editable field rather than baked in here.
+ *
+ * The trailing path matters: @ai-sdk/openai-compatible appends /chat/completions
+ * to it verbatim, so a URL ending at the host answers 404 and reads as a dead
+ * key rather than a wrong address.
+ */
+const ZAI_BASE_URL = 'https://api.z.ai/api/paas/v4'
+
+/**
  * Create a provider instance based on configuration.
  *
  * `role` is only an attribution label: OpenRouter instances get a fetch that
@@ -633,6 +646,30 @@ function createProviderInstance(providerConfig: ProviderConfig, role?: AIFunctio
           // Documented as always-on now, and accepted-and-ignored when it is.
           // Stated explicitly so the dependency is visible at the call site.
           extraBody: { usage: { include: true } },
+        })
+        break
+
+      // Z.AI speaks the OpenAI wire format at its own base URL, so there is no
+      // dedicated package to install and none is wanted: the community
+      // `zhipu-ai-provider` is pinned to @ai-sdk/provider@3 (spec v3) on its
+      // current line, which `ai@5` refuses with UnsupportedModelVersionError —
+      // the same major-skew trap F-098 records for @ai-sdk/openai-compatible
+      // itself. What it would have added over this is an embeddings model, and
+      // Z.AI does not serve one (see zai.json).
+      //
+      // `name` is load-bearing beyond the label: OpenAICompatibleChatLanguageModel
+      // derives its providerOptions namespace from it (`config.provider.split(".")[0]`),
+      // so this is what makes `providerOptions.zai` reach the request and is why
+      // MECHANISM_PROVIDER can name `zai` for the reasoning-effort mechanism.
+      //
+      // The base URL is editable rather than fixed because Z.AI is two
+      // platforms: api.z.ai (international) and open.bigmodel.cn (mainland),
+      // separate accounts with separate keys and a differing model catalog.
+      case 'zai':
+        instance = createOpenAICompatible({
+          name: 'zai',
+          baseURL: providerConfig.baseUrl ?? ZAI_BASE_URL,
+          apiKey: providerConfig.apiKey,
         })
         break
 

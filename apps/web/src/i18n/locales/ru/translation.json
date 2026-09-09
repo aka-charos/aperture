@@ -1111,7 +1111,10 @@
     "detectedDimensionsUnsupported": "This model returns {{dim}}-dimension vectors, which Aperture has no table for. Pick a model with one of the supported sizes.",
     "lmStudioAutoEvictNote": "LM Studio loads models on demand and unloads them after an idle timeout, so nothing stays in memory unused. Note that Auto-Evict is on by default and keeps only one on-demand model loaded: if you point more than one role here, LM Studio reloads a model from disk every time Aperture switches between them. Turn Auto-Evict off if you have memory for both.",
     "serverSummary": "LM Studio answered on its {{api}} API: {{total}} models installed ({{language}} language, {{embedding}} embedding).",
-    "serverLoaded": "Currently loaded: {{models}}."
+    "serverLoaded": "Currently loaded: {{models}}.",
+    "baseUrlHelperZai": "Z.AI international platform. Change this to https://open.bigmodel.cn/api/paas/v4 for a mainland China (Zhipu/BigModel) account — a different account, key and model list.",
+    "addCustomDialog_zai": "Enter the exact model code from the Z.AI docs (e.g. glm-5.3, glm-5.3-flash). Use this to reach a model newer than the built-in list.",
+    "placeholderZai": "e.g., glm-5.3"
   },
   "aiCapability": {
     "configure": "Настроить",

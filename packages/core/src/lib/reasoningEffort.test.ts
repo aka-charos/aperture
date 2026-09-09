@@ -14,6 +14,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  GLM_REASONING_EFFORTS,
   KNOWN_REASONING_EFFORTS,
   THINKING_LEVELS,
   ROLES_WITH_REASONING_EFFORT,
@@ -44,6 +45,8 @@ const orModel = (efforts: readonly string[]): ReasoningCapableModel => ({
 })
 
 const googleModel: ReasoningCapableModel = { reasoningMechanism: 'thinkingLevel' }
+
+const zaiModel: ReasoningCapableModel = { reasoningMechanism: 'reasoningEffort' }
 
 // ---------------------------------------------------------------------------
 // Absent means send nothing
@@ -212,6 +215,7 @@ test('every delivered namespace key is the provider id it was resolved for', () 
   const cases = [
     { provider: 'openrouter', model: orModel(OPENROUTER.gpt), effort: 'high' },
     { provider: 'google', model: googleModel, effort: 'low' },
+    { provider: 'zai', model: zaiModel, effort: 'max' },
   ]
   for (const c of cases) {
     const out = resolveReasoningOptions(c)
@@ -282,6 +286,56 @@ test('isThinkingLevel guards the SDK enum', () => {
   assert.ok(!isThinkingLevel('xhigh'))
   assert.ok(!isThinkingLevel('none'))
   assert.ok(!isThinkingLevel(undefined))
+})
+
+// ---------------------------------------------------------------------------
+// Z.AI / GLM
+// ---------------------------------------------------------------------------
+
+test('GLM takes exactly the three words Z.AI documents', () => {
+  // No live catalog to ask, so the vocabulary is the mechanism's own — and a
+  // supportedEfforts claim must not widen it, the same rule thinkingLevel has.
+  assert.deepEqual(reasoningEffortsFor(zaiModel), ['low', 'high', 'max'])
+  assert.deepEqual(
+    reasoningEffortsFor({ reasoningMechanism: 'reasoningEffort', supportedEfforts: ['xhigh'] }),
+    ['low', 'high', 'max']
+  )
+  assert.equal(
+    resolveReasoningOptions({ provider: 'zai', model: zaiModel, effort: 'xhigh' }).undeliverable,
+    'effort'
+  )
+})
+
+test('thinking cannot be switched off on GLM, so no word promises it', () => {
+  // GLM-5.3 errors when thinking is disabled. Offering `none` or `minimal`
+  // would be a setting that saves and then 400s on the first real call.
+  for (const off of ['none', 'minimal']) {
+    assert.ok(!(GLM_REASONING_EFFORTS as readonly string[]).includes(off))
+    assert.equal(
+      resolveReasoningOptions({ provider: 'zai', model: zaiModel, effort: off }).undeliverable,
+      'effort'
+    )
+  }
+})
+
+test('GLM delivers a flat reasoningEffort field, not a nested one', () => {
+  // @ai-sdk/openai-compatible names this field in its own provider-options
+  // schema and writes it as `reasoning_effort`. Nesting it the way OpenRouter
+  // and Google nest theirs would fall into the schema's passthrough branch and
+  // put an object on the wire where a string belongs.
+  for (const effort of GLM_REASONING_EFFORTS) {
+    const out = resolveReasoningOptions({ provider: 'zai', model: zaiModel, effort })
+    assert.deepEqual(out.providerOptions, { zai: { reasoningEffort: effort } })
+    assert.equal(out.undeliverable, null)
+  }
+})
+
+test('every GLM word already has a label', () => {
+  // KNOWN_REASONING_EFFORTS is a display order and label-key set. A GLM word
+  // missing from it would render as a raw key path in the dropdown.
+  for (const word of GLM_REASONING_EFFORTS) {
+    assert.ok((KNOWN_REASONING_EFFORTS as readonly string[]).includes(word), word)
+  }
 })
 
 // ---------------------------------------------------------------------------

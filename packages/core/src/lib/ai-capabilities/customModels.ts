@@ -29,6 +29,13 @@ export const CUSTOM_MODEL_PROVIDERS = [
   'openai-compatible',
   'openrouter',
   'huggingface',
+  // Z.AI is the one CLOUD provider here that ships a built-in catalog AND
+  // accepts custom models. Its catalog moves faster than this repo does — GLM
+  // 4.6, 4.7, 5, 5.1, 5.2 and 5.3 all shipped inside eighteen months, and the
+  // docs retire a model's guide page the moment it is superseded — so a static
+  // list is a floor, not the set. Without this, an operator whose account has
+  // a model newer than `zai.json` has no way to reach it at all.
+  'zai',
 ] as const
 
 export type CustomModelProvider = (typeof CUSTOM_MODEL_PROVIDERS)[number]

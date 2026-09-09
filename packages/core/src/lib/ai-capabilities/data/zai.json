@@ -1,0 +1,103 @@
+{
+  "id": "zai",
+  "name": "Z.AI",
+  "type": "cloud",
+  "website": "https://z.ai/manage-apikey/apikey-list",
+  "supportsEmbeddings": false,
+  "supportsChat": true,
+  "supportsTextGeneration": true,
+  "supportsExploration": true,
+  "requiresApiKey": true,
+  "requiresBaseUrl": true,
+  "defaultBaseUrl": "https://api.z.ai/api/paas/v4",
+  "embeddingModels": [],
+  "chatModels": [
+    {
+      "id": "glm-5.3",
+      "name": "GLM-5.3",
+      "description": "Flagship GLM. Deep thinking is forced on and its depth is set by the reasoning effort below, which defaults to max.",
+      "capabilities": {
+        "supportsToolCalling": true,
+        "supportsToolStreaming": true,
+        "supportsObjectGeneration": true,
+        "supportsEmbeddings": false
+      },
+      "reasoningMechanism": "reasoningEffort",
+      "quality": "premium",
+      "speed": "medium",
+      "costTier": "medium",
+      "contextWindow": "1M",
+      "inputCostPerMillion": 1.4,
+      "outputCostPerMillion": 4.4
+    },
+    {
+      "id": "glm-5.3-flash",
+      "name": "GLM-5.3 Flash",
+      "description": "Same 1M context as GLM-5.3 at a tenth of the price, and multimodal. Deep thinking is forced on here too.",
+      "capabilities": {
+        "supportsToolCalling": true,
+        "supportsToolStreaming": true,
+        "supportsObjectGeneration": true,
+        "supportsEmbeddings": false
+      },
+      "reasoningMechanism": "reasoningEffort",
+      "quality": "standard",
+      "speed": "fast",
+      "costTier": "low",
+      "contextWindow": "1M",
+      "inputCostPerMillion": 0.15,
+      "outputCostPerMillion": 0.5
+    },
+    {
+      "id": "glm-4.7",
+      "name": "GLM-4.7",
+      "description": "Previous-generation foundation model. Cheaper than GLM-5.3 and does not force thinking.",
+      "capabilities": {
+        "supportsToolCalling": true,
+        "supportsToolStreaming": true,
+        "supportsObjectGeneration": true,
+        "supportsEmbeddings": false
+      },
+      "quality": "standard",
+      "speed": "medium",
+      "costTier": "low",
+      "inputCostPerMillion": 0.6,
+      "outputCostPerMillion": 2.2
+    },
+    {
+      "id": "glm-4.7-flash",
+      "name": "GLM-4.7 Flash",
+      "description": "Free tier of GLM-4.7. A rate limit rather than a bill is what runs out here.",
+      "capabilities": {
+        "supportsToolCalling": true,
+        "supportsToolStreaming": true,
+        "supportsObjectGeneration": true,
+        "supportsEmbeddings": false
+      },
+      "quality": "budget",
+      "speed": "fast",
+      "costTier": "free",
+      "inputCostPerMillion": 0,
+      "outputCostPerMillion": 0
+    },
+    {
+      "id": "glm-4.6",
+      "name": "GLM-4.6",
+      "description": "Long-serving coding model at 200K context. Kept because it is what most existing z.ai setups point at.",
+      "capabilities": {
+        "supportsToolCalling": true,
+        "supportsToolStreaming": true,
+        "supportsObjectGeneration": true,
+        "supportsEmbeddings": false
+      },
+      "quality": "standard",
+      "speed": "medium",
+      "costTier": "low",
+      "contextWindow": "200K",
+      "inputCostPerMillion": 0.6,
+      "outputCostPerMillion": 2.2
+    }
+  ],
+  "textGenerationModels": [],
+  "explorationModels": []
+}

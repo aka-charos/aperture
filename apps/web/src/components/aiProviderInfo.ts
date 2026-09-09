@@ -9,6 +9,7 @@ export type ProviderType =
   | 'deepseek'
   | 'openrouter'
   | 'huggingface'
+  | 'zai'
 
 export interface ProviderInfo {
   id: ProviderType
@@ -308,6 +309,21 @@ export const PROVIDER_INFO: Record<ProviderType, ProviderInfo> = {
     requiresBaseUrl: false,
     website: 'https://openrouter.ai/keys',
     logoPath: '/openrouter.svg',
+  },
+  zai: {
+    id: 'zai',
+    name: 'Z.AI',
+    type: 'cloud',
+    requiresApiKey: true,
+    // A cloud provider that still shows the base-URL field, because Z.AI is two
+    // separate platforms: api.z.ai (international) and open.bigmodel.cn
+    // (mainland China), with their own accounts, keys and model catalogs. The
+    // default below is the international one; a mainland operator edits it.
+    requiresBaseUrl: true,
+    defaultBaseUrl: 'https://api.z.ai/api/paas/v4',
+    website: 'https://z.ai/manage-apikey/apikey-list',
+    // No logoPath: the card falls back to a cloud icon, which is honest. An
+    // invented logo would be worse than none.
   },
   huggingface: {
     id: 'huggingface',

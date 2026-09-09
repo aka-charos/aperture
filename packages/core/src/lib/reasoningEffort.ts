@@ -56,8 +56,18 @@
  * and 1.5 has no thinking at all. Sending `thinking_level` to either is a 400,
  * which is exactly what a provider-level guard would have shipped for three of
  * the seven models in `google.json`.
+ *
+ * `reasoningEffort` — a top-level `reasoning_effort` body field, delivered by
+ * @ai-sdk/openai-compatible's own provider-options schema (it is a named field
+ * there, not passthrough, so the SDK spells it on the wire). Z.AI's GLM-5.x
+ * models take it, and unlike the other two mechanisms this one is NOT optional
+ * thinking: GLM-5.3 forces deep thinking on — disabling it is documented to
+ * return an error — and defaults to the most expensive word it accepts. So
+ * absent here does not mean "no scratchpad", it means "the vendor's scratchpad,
+ * at max", which is the one case where leaving the setting alone is itself the
+ * costly choice.
  */
-export type ReasoningMechanism = 'effort' | 'thinkingLevel'
+export type ReasoningMechanism = 'effort' | 'thinkingLevel' | 'reasoningEffort'
 
 /**
  * The provider that owns each mechanism's `providerOptions` namespace.
@@ -70,6 +80,7 @@ export type ReasoningMechanism = 'effort' | 'thinkingLevel'
 const MECHANISM_PROVIDER: Record<ReasoningMechanism, string> = {
   effort: 'openrouter',
   thinkingLevel: 'google',
+  reasoningEffort: 'zai',
 }
 
 /**
@@ -88,6 +99,28 @@ export type ThinkingLevel = (typeof THINKING_LEVELS)[number]
 export function isThinkingLevel(value: unknown): value is ThinkingLevel {
   return typeof value === 'string' && (THINKING_LEVELS as readonly string[]).includes(value)
 }
+
+/**
+ * The vocabulary for `reasoningEffort`, fixed by Z.AI rather than by an SDK.
+ *
+ * Written here rather than in the catalog JSON for the same reason
+ * {@link THINKING_LEVELS} is: it belongs to the mechanism, not to the model, so
+ * a new GLM entry inherits it by declaring the mechanism and cannot mistype it.
+ * That is also why `supportedEfforts` stays what its own doc says it is —
+ * live OpenRouter data, never hand-written in a catalog file.
+ *
+ * Three words, from the GLM-5.3 migration guide: `low` (light thinking),
+ * `high` (enhanced), `max` (deep, and the default when nothing is sent).
+ * There is no `none` and no `minimal`: thinking cannot be switched off on
+ * these models, so a word promising that would be a setting that saves and
+ * then 400s.
+ *
+ * Unlike the OpenRouter mechanism there is no live catalog to ask, so this is
+ * a claim with a shelf life. It fails the safe way — an effort Z.AI drops is
+ * refused by the provider and the request keeps the vendor default, rather
+ * than a word Z.AI adds being silently unavailable.
+ */
+export const GLM_REASONING_EFFORTS = ['low', 'high', 'max'] as const
 
 /**
  * Every effort word seen in the live catalog, weakest first.
@@ -130,6 +163,9 @@ export function reasoningEffortsFor(
   // The SDK's enum is the authority here, not the catalog: a `thinkingLevel`
   // model's list is fixed and any wider claim would throw before the wire.
   if (mechanism === 'thinkingLevel') return THINKING_LEVELS
+  // Same reasoning, different authority: Z.AI publishes no per-model catalog to
+  // read, so the vocabulary is the mechanism's own.
+  if (mechanism === 'reasoningEffort') return GLM_REASONING_EFFORTS
   return model?.supportedEfforts ?? []
 }
 
@@ -176,6 +212,11 @@ export function resolveReasoningEffort(
 export type ReasoningProviderOptions =
   | { openrouter: { reasoning: { effort: string } } }
   | { google: { thinkingConfig: { thinkingLevel: ThinkingLevel } } }
+  // `reasoningEffort` is a named field on @ai-sdk/openai-compatible's provider
+  // options, which puts it on the wire as `reasoning_effort`. The namespace is
+  // `zai` because that is the `name` the provider instance is created with, and
+  // the SDK derives its providerOptions key from exactly that.
+  | { zai: { reasoningEffort: string } }
 
 export interface ReasoningDelivery {
   /** Spread into the call's `providerOptions`; absent means send nothing. */
@@ -232,6 +273,13 @@ export function resolveReasoningOptions(input: {
     if (!isThinkingLevel(effort)) return { undeliverable: 'effort' }
     return {
       providerOptions: { google: { thinkingConfig: { thinkingLevel: effort } } },
+      undeliverable: null,
+    }
+  }
+
+  if (mechanism === 'reasoningEffort') {
+    return {
+      providerOptions: { zai: { reasoningEffort: effort } },
       undeliverable: null,
     }
   }

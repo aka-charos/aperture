@@ -2073,3 +2073,60 @@ The first wall was `LOCAL_INFERENCE_TIMEOUT_MS`, a 5-minute `AbortSignal.timeout
 **An optional argument that changes the answer is the defect**, which is [F-038](#f-038)'s lesson about `embeddingSetId`'s optional second parameter, one module over. The same shape: a signature that compiles either way, one call site that omits it, and a failure that presents as a fact about the operator's infrastructure rather than as a bug.
 
 **Two smaller ones from the same change, both caught by the compiler rather than by review.** A barrel export anchored on the neighbouring symbol landed `resolveProviderEndpoint` in the `localModelDiscovery` block rather than the `ai-provider` one. And `isDiscoverableProvider` is a type predicate whose narrowing TypeScript carries through a `const` identifier but not through a property access, so `provider.id` had to be bound before the guard would narrow it.
+
+## F-118
+
+**A vendor speaking the OpenAI wire format still needs a name, and the package that would have supplied it is two majors ahead.** Added 2026-09-09.
+
+**The question asked.** Does the Vercel AI SDK ship a Z.AI provider, or does one have to be written from scratch? Neither, as it turns out, and the middle answer is the interesting one.
+
+**There is no first-party package.** `@ai-sdk/zhipu`, `@ai-sdk/zai`, `zai-ai-provider`, `@z-ai/ai-sdk-provider` and `zai-sdk-provider` are all absent from npm. What exists is one community package, `zhipu-ai-provider` (`Xiang-CH/zhipu-ai-provider`), listed on ai-sdk.dev as "Zhipu AI (Z.AI)". It is real, it exports a `zai` alias, it knows both regional base URLs, and it implements `textEmbeddingModel` and `imageModel`.
+
+**And its current line cannot be installed here.** Its dependency on `@ai-sdk/provider`, by published version:
+
+| version | `@ai-sdk/provider` | spec | works with |
+| --- | --- | --- | --- |
+| 0.1.0–0.1.1 | `^1.0.9` | v1 | ai@4 |
+| 0.2.0–0.2.2 | `^2.0.0` | **v2** | **ai@5 — this repo** |
+| 0.3.0–0.4.0 | `^3.0.3` | v3 | ai@6/7 |
+
+`pnpm add zhipu-ai-provider` resolves 0.4.0, and every call then dies on `UnsupportedModelVersionError` because `ai@5` accepts only `"v2"`. This is [F-098](#f-098)'s trap exactly — a provider package's major does not track the SDK's — reached from the other direction: there a range looked conservative and was not, here a package looks current and is two SDK majors ahead. The pinnable version is 0.2.2, last published 2026-01-22 and frozen.
+
+**So the choice was a frozen third-party package or a base URL, and the base URL wins on evidence.** Z.AI's own quick start documents `https://api.z.ai/api/paas/v4/` as OpenAI-compatible and points at the OpenAI SDKs for Python, Node and Java. `@ai-sdk/openai-compatible@1.0.53` is already a dependency, already pinned to spec v2 for [F-098](#f-098)'s reason, and its chat model appends `/chat/completions` to the configured base. The one thing `zhipu-ai-provider` would have added over that is an embedding model, and **Z.AI does not serve one**: measured 2026-09-09 against `docs.z.ai/llms.txt` — the full documentation index, listing chat completion, image, video, audio transcription, tokenizer, layout parsing, web search, web reader and agents, with no embeddings entry — and against the pricing page, which prices text, vision, image and video models and no embedding row. `embedding-3` is documented on `docs.bigmodel.cn`, the **mainland** platform: a different service at `open.bigmodel.cn` with its own account and key. So `zai.json` declares `supportsEmbeddings: false`, which is [F-098](#f-098)'s own remedy for Hugging Face rather than a new idea — offering a role a provider cannot fill is worse than not listing it.
+
+**Why a named provider rather than one more `openai-compatible` base URL.** It already worked as `openai-compatible`: that provider requires a base URL and takes an optional key, so an operator could have pointed it at `api.z.ai` before any of this. What that cannot do is know which vendor is at the other end — [F-115](#f-115)'s argument for LM Studio, holding here for different reasons. A named provider can ship a catalog with real prices, can be sorted into the large-context tier for `explanationBatchSettings`, and — the one that matters most — can declare that its flagship model forces a reasoning scratchpad on. None of that is expressible under `openai-compatible`, and that provider is additionally filed as a **local** one (`LOCAL_MODEL_PROVIDERS`, whose members are priced at zero and probed for an LM Studio catalog), so a cloud vendor's spend would have reported as free.
+
+**A third reasoning mechanism, and the first where absent is the expensive setting.** GLM-5.3 and GLM-5.3-Flash take a top-level `reasoning_effort` body field with three words — `low`, `high`, `max` — and Z.AI's migration guide states that deep thinking is **forced on** (`thinking.type` accepts only `enabled`; disabling it returns an error) and that `max` is the default. [F-099](#f-099)'s rule that absent means send nothing therefore carries a different consequence here than on OpenRouter or Google: sending nothing does not mean no scratchpad, it means the vendor's scratchpad at its most expensive setting. That is precisely the spend [F-030](#f-030) and [F-064](#f-064) each answered by buying more output allowance, so this setting is the cheaper half of a fix this repo has already made twice.
+
+Delivery is `providerOptions.zai.reasoningEffort`, and the namespace is not a coincidence: `OpenAICompatibleChatLanguageModel` derives `providerOptionsName` from `config.provider.split('.')[0]`, which is the `name` passed to `createOpenAICompatible`. Creating the instance with `name: 'zai'` is what makes [F-099](#f-099) rule 6 — the namespace key must be the provider id — true by construction rather than by convention.
+
+`reasoningEffort` is a **named field on the SDK's own provider-options schema**, not passthrough: `openaiCompatibleProviderOptions` declares `reasoningEffort: z.string().optional()` and the request builder writes it as `reasoning_effort`, while everything *not* in that schema goes through a separate spread. So the payload is a bare string, and nesting it the way OpenRouter (`reasoning.effort`) and Google (`thinkingConfig.thinkingLevel`) nest theirs would put an object on the wire where a string belongs. There is a test for that shape.
+
+**The vocabulary is a constant, not catalog data.** `GLM_REASONING_EFFORTS` sits beside `THINKING_LEVELS` for the same reason: it belongs to the mechanism rather than to a model, so a new GLM entry inherits it by declaring the mechanism and cannot mistype it — and `supportedEfforts` stays what its docstring says it is, live OpenRouter data never hand-written in a catalog file. There is no `none` and no `minimal`, because thinking cannot be switched off on these models and a word promising that would be a setting that saves and then 400s. Unlike OpenRouter there is no live catalog to ask, so this is a claim with a shelf life; it fails the safe way, since a word Z.AI drops is refused locally and the request keeps the vendor default.
+
+**Measured on the wire, without an account.** A fake `fetch` capturing the request body, driving the real `@ai-sdk/openai-compatible` provider created exactly as `createProviderInstance` creates it:
+
+```
+effort=low       undeliverable=null    url=…/chat/completions reasoning_effort="low"
+effort=high      undeliverable=null    url=…/chat/completions reasoning_effort="high"
+effort=max       undeliverable=null    url=…/chat/completions reasoning_effort="max"
+effort=undefined undeliverable=null    url=…/chat/completions reasoning_effort=undefined
+effort=xhigh     undeliverable=effort  url=…/chat/completions reasoning_effort=undefined
+```
+
+Three things this pins that a unit test on `resolveReasoningOptions` alone cannot: the namespace derivation really does reach the body, an unset effort produces a request byte-identical to what shipped before the field existed, and an off-vocabulary word is dropped locally rather than forwarded for the provider to reject.
+
+**The base URL is an editable field on a cloud provider**, which is unusual here and deliberate. Z.AI is two platforms — `api.z.ai` (international) and `open.bigmodel.cn` (mainland China) — with separate accounts, separate keys and differing catalogs, and the mainland one is where the embedding models live. `requiresBaseUrl: true` with the international default pre-filled is what lets a mainland operator switch without a second provider entry. The trailing `/api/paas/v4` is load-bearing: the SDK appends `/chat/completions` verbatim, so a URL ending at the host answers 404 and reads as a dead key rather than a wrong address.
+
+**Custom models are enabled, and that is what the migration is for.** Z.AI is the only **cloud** provider here that both ships a built-in catalog and accepts custom models. Its catalog moves faster than this repo does — GLM-4.5, 4.6, 4.7, 5, 5.1, 5.2 and 5.3 all inside eighteen months, with the docs retiring a model's guide page as soon as it is superseded — so the shipped list is a floor and `custom_ai_models` is how an operator reaches anything newer. `0170` extends `custom_ai_models_provider_check`, which per [F-002](#f-002) deliberately stays underived from TypeScript because it guards providers, not roles.
+
+**What is NOT verified.** No call has been made to Z.AI from this machine: there is no account and no key here, so nothing below the fake fetch has run against the real service. Consequences worth knowing before trusting the catalog:
+
+- `glm-5.3` and `glm-5.3-flash` are confirmed model codes, stated as such in the quick start, the migration guide and the GLM-5.3-Flash guide. The other three (`glm-4.7`, `glm-4.7-flash`, `glm-4.6`) are lower-cased from the **pricing table**, which lists display names. That is good evidence a model exists and excellent evidence of its price; it is not proof of the id string.
+- `contextWindow` is declared only where documented — 1M for both 5.3 models, 200K for GLM-4.6 (release note, 2025-09-30). GLM-4.7 and GLM-4.7-Flash carry none, because no figure was found and the field is display-only. An omitted context window is honest; an invented one is what an operator sizes a prompt against.
+- `reasoningMechanism` is declared on the two 5.3 models only. GLM-4.6 and 4.7 use the older `thinking: {type}` switch and are not documented to take `reasoning_effort`, so per [F-099](#f-099) rule 2 they declare nothing and are offered no control.
+- The safety net for all of this is the one [F-115](#f-115) relies on: `zai` is in `CUSTOM_MODEL_PROVIDERS`, and the add-model dialog refuses to save a model that has not tested successfully. A wrong id in the catalog costs one failed Test, not a silent misconfiguration.
+
+**Pricing resolves through the catalog, not `PROVIDER_MAP`.** `pricing-cache.ts` has no `zai` entry, so `findModelPricing` returns null and `getPricingForModelAsync` falls back to the declared numbers — the shape [F-005](#f-005) records for OpenRouter. `glm-4.7-flash` declares `0`/`0` rather than omitting them, which is the difference between "free" and "unpriceable": `pricingKnown` reads true and the UI may say $0.00 truthfully.
+
+**Where the hand-copied lists were.** Six, and every one of them fails quietly if missed: `ProviderType` in core, `ProviderType` and `PROVIDER_INFO` in the web bundle (which never imports core), `CUSTOM_MODEL_PROVIDERS`, the SQL `CHECK`, `AIFunctionCard`'s `supportsCustomModels` chain, and `AIFunctionCard`'s own copy of the `reasoningMechanism` union. Route schemas needed nothing — `provider` is `type: 'string'` on every AI route, and only *roles* are enum'd there ([F-002](#f-002)), which is the one place this change was cheaper than it looked.
