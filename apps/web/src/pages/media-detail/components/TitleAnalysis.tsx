@@ -18,16 +18,22 @@
  * ONE OF THOSE QUESTIONS TURNED OUT NOT TO BE PRE-VIEWING. Where a work sits
  * can be the thing it withholds: measured on Incendies, a model answering the
  * tradition question correctly named the earlier work the film is patterned on,
- * which tells anyone who knows that one how this one ends. So the server marks
- * those runs and this panel puts them behind a control the reader opens — see
- * `paragraphs` below and core's analysis/segments.ts.
+ * which tells anyone who knows that one how this one ends. That is answered in
+ * the prompt now — the tradition question carries its own rule about naming an
+ * antecedent whose ending would travel across to this one.
  *
- * THE CONTROL IS NEUTRAL AND APPEARS ON EVERY TITLE THAT HAS SUCH A RUN, which
- * is the whole reason it can be shown at all. A gate that fired only where the
- * model judged there was something to hide would announce, by appearing, that
- * this film has a twist — a spoiler of its own, and one no wording could take
- * back. Gating every tradition run makes its presence say nothing about the
- * work, so the label names the subject rather than warning about it.
+ * IT WAS BRIEFLY ANSWERED HERE INSTEAD, by collapsing the tradition run behind
+ * a disclosure, and that is gone. Collapsing part of a short article costs
+ * every reader a click on every title to protect a minority of them, and the
+ * paragraph index the model writes is more useful as headings than as a gate.
+ * The consequence is worth stating rather than rediscovering: the prompt rule
+ * is now the only protection, and it is an instruction, so it will eventually
+ * fail on some title.
+ *
+ * SO EACH RUN IS HEADED WITH WHAT IT ANSWERS — see `paragraphs` below and core's
+ * analysis/segments.ts. The model is still forbidden from writing headings into
+ * its own prose (a named empty section invites padding); these come from the
+ * index it writes afterwards, which is the whole reason that index exists.
  *
  * Three states, and they must stay distinguishable:
  *   - an analysis    -> render it
@@ -47,7 +53,6 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Collapse,
   Tooltip,
   Typography,
 } from '@mui/material'
@@ -85,26 +90,35 @@ interface AnalysisProvenance {
 }
 
 /**
- * A run of the analysis, and whether the reader has to ask for it.
+ * A run of the analysis and the questions it answers.
  *
- * `gated` arrives DECIDED. The bundle does not know which question this run
- * answers and must not learn: that rule lives in core, where it can be retuned
- * without redeploying the client and its 15 locales. The split is made there
- * too, because this file's own `toParagraphs` does not divide the prose the way
- * the model's paragraph map counts it.
+ * The ids arrive raw rather than as finished labels, the way `sourceGrade` and
+ * `declineReason` already do — the vocabulary is small, closed and stable, and
+ * this side is the one holding 15 locales. An id with no translation renders no
+ * heading rather than a raw key. The SPLIT is still core's, because this file's
+ * `toParagraphs` does not divide the prose the way the model's paragraph map
+ * counts it, so an index resolved here would label the wrong paragraph.
  */
+type AnalysisQuestionId =
+  | 'work'
+  | 'structure'
+  | 'tradition'
+  | 'dispute'
+  | 'intent'
+  | 'circumstances'
+
 interface AnalysisSegment {
   text: string
-  gated: boolean
+  questions: AnalysisQuestionId[]
 }
 
 interface AnalysisResponse {
   attempted: boolean
   analysis: string | null
   /**
-   * Absent from a server older than the gate, and empty for a declined row.
-   * Either way the fallback below renders `analysis` as a single open run,
-   * which is exactly what this panel did before segments existed.
+   * Absent from an older server, and empty for a declined row. Either way the
+   * fallback below renders `analysis` as one unlabelled run, which is exactly
+   * what this panel did before segments existed.
    */
   paragraphs?: AnalysisSegment[]
   declineReason?: string | null
@@ -202,8 +216,16 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
     data?.paragraphs && data.paragraphs.length > 0
       ? data.paragraphs
       : data?.analysis
-        ? [{ text: data.analysis, gated: false }]
+        ? [{ text: data.analysis, questions: [] }]
         : []
+  // WHETHER TO REBUILD THE PARAGRAPHS IS A FACT ABOUT THE WHOLE ANALYSIS, and
+  // it has to be decided here because a segment cannot answer it. `toParagraphs`
+  // reflows by sentence count when it finds no blank line, which is right for a
+  // row the model wrote as one unbroken block and catastrophic per segment: a
+  // single paragraph never contains a blank line, so every paragraph would be
+  // reflowed and cut at four sentences. That shipped, and it split a six-
+  // sentence opening into four sentences plus a stranded two-sentence stub.
+  const reflow = !/\n{2,}/.test(data?.analysis ?? '')
   const provenanceLine = data ? describeProvenance(data, t) : null
   const chip = analysisChip(data, t)
 
@@ -314,13 +336,14 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
                 }}
               >
                 <Box sx={{ flex: '1 1 26rem', maxWidth: '84ch' }}>
-                  {segments.map((segment, i) =>
-                    segment.gated ? (
-                      <GatedRun key={i} text={segment.text} />
-                    ) : (
-                      <AnalysisProse key={i} text={segment.text} />
-                    )
-                  )}
+                  {segments.map((segment, i) => (
+                    <AnalysisSection
+                      key={i}
+                      text={segment.text}
+                      questions={segment.questions}
+                      reflow={reflow}
+                    />
+                  ))}
 
                   {canRewrite && (
                     <Box sx={{ mt: 1.5 }}>
@@ -461,10 +484,10 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
  * wherever the sentence did. Letting HTML collapse whitespace is what makes
  * paragraphs read as paragraphs; `toParagraphs` decides where the breaks go.
  */
-function AnalysisProse({ text }: { text: string }) {
+function AnalysisProse({ text, reflow }: { text: string; reflow: boolean }) {
   return (
     <>
-      {toParagraphs(text).map((para, i) => (
+      {(reflow ? toParagraphs(text) : splitOnBlankLines(text)).map((para, i) => (
         <Typography key={i} variant="body2" sx={{ mb: 2, lineHeight: 1.75 }}>
           {para}
         </Typography>
@@ -474,53 +497,65 @@ function AnalysisProse({ text }: { text: string }) {
 }
 
 /**
- * A run the reader has to open.
+ * One run of the analysis, under a heading for what it answers.
  *
- * The label names the subject and does not warn about it — see the note at the
- * top of this file on why the control has to say nothing about this particular
- * work. It is a button and a Collapse rather than a nested Accordion: this
- * already sits inside one, and two chevrons in a column read as a broken panel.
+ * The heading is an `overline` rather than a real heading level: it names a part
+ * of a short article instead of opening a section of a document, and it must
+ * not out-weigh the panel's own title two rows above it.
  *
- * Closed on every mount, deliberately, with no memory across titles. A reader
- * who opened one film's tradition paragraph has not asked to have the next
- * film's opened for them, and that is the direction where being wrong costs
- * something.
+ * A run the model labelled with nothing renders with no heading at all — which
+ * is also every row written before the paragraph index existed, so that is the
+ * common case rather than an edge.
  */
-function GatedRun({ text }: { text: string }) {
+function AnalysisSection({
+  text,
+  questions,
+  reflow,
+}: {
+  text: string
+  questions: AnalysisQuestionId[]
+  reflow: boolean
+}) {
   const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
+  // Both labels survive when a paragraph answers two questions, in the order
+  // the model listed them on its own map line: rule 3 tells it to merge what
+  // belongs together, so that is a normal shape and dropping one would
+  // misdescribe the run.
+  const heading = questions
+    .map((question) => t(`mediaDetail.analysis.section.${question}`, { defaultValue: '' }))
+    .filter(Boolean)
+    .join(' · ')
 
   return (
-    <Box sx={{ mb: 2 }}>
-      <Button
-        size="small"
-        variant="text"
-        onClick={() => setOpen((wasOpen) => !wasOpen)}
-        startIcon={
-          <ExpandMoreIcon
-            fontSize="small"
-            sx={{
-              transition: 'transform 150ms',
-              transform: open ? 'rotate(180deg)' : 'none',
-            }}
-          />
-        }
-        sx={{ textTransform: 'none', px: 0.5 }}
-      >
-        {t(open ? 'mediaDetail.analysis.traditionHide' : 'mediaDetail.analysis.traditionShow')}
-      </Button>
-      {!open && (
-        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-          {t('mediaDetail.analysis.traditionNote')}
+    <Box sx={{ mb: 1 }}>
+      {heading && (
+        <Typography
+          variant="overline"
+          color="text.secondary"
+          display="block"
+          sx={{ lineHeight: 1.6, letterSpacing: '0.08em' }}
+        >
+          {heading}
         </Typography>
       )}
-      <Collapse in={open} unmountOnExit>
-        <Box sx={{ mt: 1 }}>
-          <AnalysisProse text={text} />
-        </Box>
-      </Collapse>
+      <AnalysisProse text={text} reflow={reflow} />
     </Box>
   )
+}
+
+/**
+ * The model's own paragraphs, honoured exactly.
+ *
+ * This is the ordinary path. Segments arrive already split on blank lines by
+ * core's `splitAnalysisParagraphs`, so a segment holds one or more whole
+ * paragraphs joined the way the model wrote them, and nothing here may second-
+ * guess where they end.
+ */
+function splitOnBlankLines(text: string): string[] {
+  return text
+    .split(/\n{2,}/)
+    .map((para) => para.trim())
+    .filter(Boolean)
 }
 
 /** Sentences per paragraph when the model's own breaks have to be replaced. */
@@ -547,6 +582,12 @@ const MIN_SENTENCE_CHARS = 40
  * it did not. This reflows text rather than displaying it verbatim, which is
  * worth being explicit about — but the shape it reflows to is the shape the
  * prompt asked for, and the alternative on those rows is unreadable.
+ *
+ * CALL IT WITH A WHOLE ANALYSIS, NEVER WITH ONE SEGMENT. Its first branch asks
+ * whether the text carries blank lines, and one paragraph never does — so per
+ * segment the question always answers "no" and the sentence fallback runs on
+ * prose that never needed it. The caller decides once, on `data.analysis`, and
+ * passes the answer down as `reflow`.
  */
 function toParagraphs(text: string): string[] {
   const trimmed = text.trim()

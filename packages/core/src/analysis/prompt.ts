@@ -53,9 +53,10 @@
  * 6: the answer carries a paragraph map, so which paragraph answers which
  *    question is recorded by the model rather than inferred from position.
  * 7: the tradition question stops naming an antecedent whose ending would
- *    travel across to this one, and the dispute question stops settling what
- *    it reports. Every stored row is retired because the rows themselves are
- *    what carry the leak.
+ *    travel across to this one, the dispute question stops settling what it
+ *    reports, and dispute moves to last so the reading runs work, then making,
+ *    then reception. Every stored row is retired because the rows themselves
+ *    are what carry the leak.
  */
 export const ANALYSIS_PROMPT_VERSION = 7
 
@@ -304,8 +305,29 @@ const INTENT_QUESTION: AnalysisQuestion = {
  * reach what the work is doing. Measured on three live analyses, every one of
  * them opened on cameras, lenses and cutting rhythm.
  *
- * So: what the work is doing, where it sits, what is disputed about it - then
- * the background. Anyone who stops halfway has read the half worth reading.
+ * So: the work, then its making, then its reception. Form and lineage first,
+ * because that is what the piece is for; stated intent and production context
+ * next; critical disagreement last. That is the shape criticism already uses -
+ * an article about a film closes on reception - and it reads as a closing note
+ * rather than an interruption three paragraphs in.
+ *
+ * DISPUTE MOVED FROM THIRD TO LAST once the paragraphs were labelled, and the
+ * labels are what made it cheap. Version 5's argument for the old order was
+ * that anyone who stops halfway has read the half worth reading; that is right
+ * about intent and circumstances being background and was never an argument
+ * about dispute in particular. The cost is a merge: tradition and dispute are
+ * adjacent topics and the model often ran them together - measured on The Voice
+ * Of Hind Rajab, one paragraph carried both - so separating them yields a
+ * slightly more segmented article. Acceptable now that each run is headed.
+ *
+ * IT CANNOT BE DONE AT RENDER TIME, which is why it is here rather than in the
+ * panel. The prose is continuous and refers backwards - "That visual discipline
+ * sits inside a Gothic historical horror tradition" points at the paragraph
+ * above it - so re-sorting finished paragraphs strands those references. It
+ * needed no version bump of its own either: 7 had already retired every stored
+ * row, and a row written in the old order still renders correctly, because its
+ * paragraphs carry their own labels rather than their meaning coming from
+ * position.
  *
  * The first question is also reframed rather than moved. "What is formally or
  * technically distinctive about how it was made" reliably returns hardware,
@@ -318,9 +340,9 @@ const MOVIE_QUESTIONS: AnalysisQuestion[] = [
     text: 'What is this film doing, and how do its choices serve that? Name a choice, then say what it achieves - a list of equipment or techniques with no effect attached is not an answer.',
   },
   TRADITION_QUESTION,
-  DISPUTE_QUESTION,
   INTENT_QUESTION,
   CIRCUMSTANCES_QUESTION,
+  DISPUTE_QUESTION,
 ]
 
 /**
@@ -339,9 +361,9 @@ const SERIES_QUESTIONS: AnalysisQuestion[] = [
     text: 'How is it structured across its run - serialised or episodic, and did it change?',
   },
   TRADITION_QUESTION,
-  DISPUTE_QUESTION,
   INTENT_QUESTION,
   CIRCUMSTANCES_QUESTION,
+  DISPUTE_QUESTION,
 ]
 
 /**
