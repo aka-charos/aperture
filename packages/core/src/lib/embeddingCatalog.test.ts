@@ -122,29 +122,78 @@ test('a recommended mode is one the system can actually store', () => {
   }
 })
 
-test('both Gemini models want the symmetric space, by different mechanisms', () => {
+/**
+ * NO MODEL RECOMMENDS A MODE, and this test is the guard against the argument
+ * that keeps producing one.
+ *
+ * The reasoning is genuinely appealing: this library compares items against
+ * items and a taste profile is a mean of item vectors, so the task is
+ * symmetric, so the symmetric mode should win. F-038 made exactly that argument
+ * a priori, both Gemini entries were given `recommendedInputType` on the
+ * strength of it, and the settings card told operators to Apply it.
+ *
+ * F-095 measured it on five fully-embedded sets over the same 12,589-row pool
+ * and 33 viewers, and it is wrong on both models:
+ *
+ *  - 001 pinned to google-vertex, mode honoured and stable, ranks LAST of five.
+ *    The unmoded set ranks second. The pin is not the confound -- both upstreams
+ *    agree on the unmoded vector.
+ *  - gemini-2's prefix ties on the metrics (0.02pp median) and then splits into
+ *    two opposite effects: same-country share falls to 75.0% from 83.9%, while
+ *    lexical title-matching rises to 10.0% of slots from 3.3%. Bare is better on
+ *    13 of 18 seeds. Bare also wins deep retrieval, which is what a centroid
+ *    query over thousands actually spends: ndcg@500 51.32 against 49.21.
+ *
+ * So the shipped set is bare gemini-2 with no mode, and a recommendation
+ * pointing anywhere else contradicts the vectors on disk. The mechanisms below
+ * stay asserted because they are still true and still decide how a mode WOULD
+ * be delivered if an operator chooses one deliberately.
+ */
+test('no model recommends a retrieval mode, because the measured best is none', () => {
+  for (const model of OPENROUTER_EMBEDDINGS) {
+    assert.equal(
+      model.recommendedInputType,
+      undefined,
+      `${model.id} recommends ${model.recommendedInputType}; F-095 measured the unmoded set as the one to ship, so a recommendation here would argue against the library's own vectors`
+    )
+  }
+})
+
+test('the mode DELIVERY mechanisms are still declared, since a mode may be chosen deliberately', () => {
   const byId = Object.fromEntries(OPENROUTER_EMBEDDINGS.map((m) => [m.id, m]))
 
-  // gemini-2 conditions on a TEXT PREFIX and is byte-stable over five identical
-  // requests. The prefix changes the input, so no route can collapse it into
-  // the unconditioned vector, and no pin is needed.
-  assert.equal(byId['google/gemini-embedding-2'].recommendedInputType, 'semantic_similarity')
+  // gemini-2 conditions on a TEXT PREFIX and is byte-stable over repeats. The
+  // prefix changes the input, so no route can collapse it into the
+  // unconditioned vector, and no pin is needed.
   assert.equal(byId['google/gemini-embedding-2'].inputTypeMechanism, 'textPrefix')
 
   // 001 takes the mode as a request PARAMETER, which OpenRouter's two upstreams
   // treat differently -- google-vertex honours it, google-ai-studio drops it.
   // Usable, but ONLY pinned, which `requiresProviderPin` enforces at the
   // settings route rather than leaving to whoever reads the note.
-  assert.equal(byId['google/gemini-embedding-001'].recommendedInputType, 'semantic_similarity')
   assert.equal(byId['google/gemini-embedding-001'].inputTypeMechanism, 'parameter')
   assert.ok(
     requiresProviderPin({ provider: 'openrouter', mechanism: 'parameter' }),
-    'recommending a parameter mode on openrouter must still demand a pin'
+    'a parameter mode on openrouter must still demand a pin when one is chosen'
   )
 
   // Qwen: its instruction recipe is query-side against bare documents, and this
-  // recommender's query is a centroid, not text.
-  assert.equal(byId['qwen/qwen3-embedding-8b'].recommendedInputType, undefined)
+  // recommender's query is a centroid, not text. No mechanism at all.
+  assert.equal(byId['qwen/qwen3-embedding-8b'].inputTypeMechanism, undefined)
+})
+
+/**
+ * Every model must still SAY why it has no recommendation. Absent guidance and
+ * "leave this alone, and here is the measurement" look identical on screen, and
+ * only the second survives the next person who reasons from symmetry.
+ */
+test('a model with no recommendation explains itself', () => {
+  for (const model of OPENROUTER_EMBEDDINGS) {
+    assert.ok(
+      model.inputTypeNote && model.inputTypeNote.length > 0,
+      `${model.id} offers no recommendation and no note, which reads as an oversight`
+    )
+  }
 })
 
 test('every recommended mode can actually be delivered by its model', () => {
