@@ -20,6 +20,7 @@ import {
   getStoredAnalysis,
   isAnalysisStale,
   loadAnalysisSubject,
+  buildAnalysisSegments,
   createChildLogger,
   describeAiError,
   type StoredAnalysis,
@@ -38,6 +39,19 @@ function analysisPayload(stored: StoredAnalysis, generated: boolean, admin: bool
   return {
     attempted: true,
     analysis: stored.analysis,
+    // The same prose, cut into the runs the panel renders, each carrying a
+    // DECIDED flag for whether the reader has to ask for it. The split is made
+    // here because the browser cannot make it: which questions are
+    // spoiler-prone is a core decision, and the panel's own paragraph splitting
+    // does not agree with the map's numbering on rows the model wrote without
+    // blank lines. See core's analysis/segments.ts.
+    //
+    // `analysis` stays alongside it, unchanged. A gated run is behind a
+    // disclosure, not withheld — the reader opens it — so there is nothing to
+    // keep out of the response, and a client written before this still works.
+    paragraphs: stored.analysis
+      ? buildAnalysisSegments(stored.analysis, stored.paragraphMap)
+      : [],
     declineReason: stored.declineReason,
     sources: stored.sources,
     sourceGrade: stored.sourceGrade,
