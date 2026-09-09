@@ -179,7 +179,7 @@ export async function getStoredAnalysis(
   }
 }
 
-interface Retrieval {
+export interface Retrieval {
   /** Clipped to the configured budget, ready for the prompt. */
   sources: AnalysisSource[]
   /** What the floor judges: domain and size of each budgeted document. */
@@ -206,7 +206,7 @@ interface Retrieval {
  * and do reach `decideAnalysisFloor`, because there we genuinely did retrieve
  * the web's answer and it was poor.
  */
-async function retrieveSources(subject: AnalysisSubject): Promise<Retrieval> {
+export async function retrieveSources(subject: AnalysisSubject): Promise<Retrieval> {
   const config = await getCrwConfig()
   if (!isCrwEnabled(config)) {
     throw new Error(
@@ -348,7 +348,7 @@ function readUsage(usage: unknown): AnalysisUsage {
   return out
 }
 
-interface WriteResult {
+export interface WriteResult {
   /** The prose, already unwrapped from the contract. */
   text: string
   /** The raw paragraph map, still unvalidated. Null when the model wrote none. */
@@ -402,7 +402,7 @@ function readAnalysis(raw: string, finishReason?: string) {
  * next model, and an unusable answer moves on too — except when it names a
  * SETTING, which no other model would escape either.
  */
-type AttemptOutcome =
+export type AttemptOutcome =
   | { kind: 'ok'; result: WriteResult }
   | { kind: 'unusable'; result: WriteResult }
   | { kind: 'error'; error: unknown }
@@ -475,8 +475,17 @@ function startWriteHeartbeat(
   }
 }
 
-/** Run one model until it answers, gives up, or proves it cannot follow the format. */
-async function runWriteAttempt(
+/**
+ * Run one model until it answers, gives up, or proves it cannot follow the format.
+ *
+ * Exported for the comparison bench (./compare.ts), which needs exactly this —
+ * one model, one prompt, one outcome — without the rotation, the storage or the
+ * decline that `analyseTitle` wraps around it. Keeping the bench on this
+ * function rather than on a copy is what makes a comparison a fact about the
+ * models: it runs the retries, the pacing and the contract checks the real
+ * generation path runs, so a model that reads well here reads well in the job.
+ */
+export async function runWriteAttempt(
   attempt: ModelAttempt,
   prompt: string,
   maxOutputTokens: number,

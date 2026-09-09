@@ -46,6 +46,28 @@ export {
 } from './segments.js'
 
 export {
+  startComparison,
+  getComparisonRun,
+  listComparisonRuns,
+  deleteComparisonRun,
+  cancelComparison,
+  isComparisonRunning,
+  MAX_COMPARISON_MODELS,
+  type ComparisonModelRequest,
+  type ComparisonRunSummary,
+  type ComparisonRunView,
+  type StartComparisonOptions,
+} from './compare.js'
+
+export {
+  renderComparisonReport,
+  type ComparisonEntry,
+  type ComparisonReport,
+  type ComparisonSource,
+} from './comparisonReport.js'
+
+
+export {
   decideAnalysisFloor,
   isListingDomain,
   MIN_ANALYSIS_CHARS,

@@ -38,6 +38,7 @@ import i18nRoutes from './i18n/index.js'
 import brandingRoutes from './branding/index.js'
 import inferenceRoutes from './inference/index.js'
 import analysisRoutes from './analysis/index.js'
+import analysisCompareRoutes from './analysis-compare/index.js'
 
 const routes: FastifyPluginAsync = async (fastify) => {
   // Register health check routes
@@ -156,6 +157,7 @@ const routes: FastifyPluginAsync = async (fastify) => {
   // Register title-analysis routes (grounded per-title critical analysis,
   // cached forever and shared by every user — see core/src/analysis)
   await fastify.register(analysisRoutes)
+  await fastify.register(analysisCompareRoutes)
 }
 
 export default routes

@@ -77,6 +77,7 @@ export const ADMIN_SURFACE_PATHS: readonly string[] = [
  */
 export const ADMIN_ONLY_NAMESPACES: readonly string[] = [
   'admin',
+  'adminAnalysisBench',
   'adminNav',
   'aiFunctionCard',
   'explorationConfig',

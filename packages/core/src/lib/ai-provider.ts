@@ -1545,6 +1545,52 @@ export async function getTitleAnalysisModelAttempts(): Promise<ModelAttempt[]> {
 }
 
 /**
+ * One attempt against a provider and model the CALLER chose.
+ *
+ * `getTitleAnalysisModelAttempts` answers "what will the role use", which is
+ * the right question for generation and the wrong one for a bench: comparing
+ * models means running one the role is not configured with, on a provider that
+ * may hold no role at all. Credentials come from the shared per-provider store,
+ * the same lookup a cross-provider fallback already uses.
+ *
+ * Pacing is read from the role's config when the provider matches it, because
+ * the limit belongs to the ACCOUNT rather than to the model — a bench firing
+ * six models at one OpenRouter key must respect the same spacing a library pass
+ * does, or it trips the limit the setting exists to avoid.
+ *
+ * Throws when the provider cannot be instantiated, which the caller reports
+ * against that one model rather than failing the whole run.
+ */
+export async function buildTitleAnalysisAttemptFor(
+  provider: ProviderType,
+  model: string
+): Promise<ModelAttempt> {
+  const roleConfig = await getFunctionConfig('titleAnalysis')
+  const sameProvider = roleConfig?.provider === provider
+
+  const resolved: ProviderConfig = {
+    provider,
+    model,
+    apiKey: sameProvider
+      ? (roleConfig?.apiKey ?? (await resolveApiKeyForProvider(provider)))
+      : await resolveApiKeyForProvider(provider),
+    baseUrl: sameProvider ? roleConfig?.baseUrl : await resolveBaseUrlForProvider(provider),
+  }
+
+  const instance = createProviderInstance(resolved, 'titleAnalysis')
+  return {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    model: (instance as any)(model) as LanguageModel,
+    modelId: model,
+    provider,
+    spacingMs: sameProvider ? resolveCallSpacingMs(roleConfig) : 0,
+    isFallback: false,
+    ...(resolved.baseUrl != null && { baseUrl: resolved.baseUrl }),
+    ...(resolved.apiKey != null && { apiKey: resolved.apiKey }),
+  }
+}
+
+/**
  * Get an exploration model instance for the configured provider
  * Used for semantic graph generation from conceptual inputs
  */
