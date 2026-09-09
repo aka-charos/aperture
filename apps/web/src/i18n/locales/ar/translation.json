@@ -5265,6 +5265,7 @@
     "previous": "Earlier comparisons",
     "runSummary": "{{count}} models · {{status}} · {{when}}",
     "startFailed": "Could not start the comparison.",
-    "modelsFailed": "Could not load the model list."
+    "modelsFailed": "Could not load the model list.",
+    "notConfigured": "No server address set for this provider. Add one in the AI settings."
   }
 }

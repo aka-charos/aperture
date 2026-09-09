@@ -1545,6 +1545,29 @@ export async function getTitleAnalysisModelAttempts(): Promise<ModelAttempt[]> {
 }
 
 /**
+ * Where a provider lives, for a caller that has no function config in hand.
+ *
+ * A LOCAL provider is only reachable at the address the operator configured,
+ * and that address lives in the shared credential store or on whichever role
+ * already uses it — never at a default. Probing without it hits
+ * `localhost:1234`, which inside a container is the container, so a perfectly
+ * healthy LM Studio on the host reports as unreachable. That shipped.
+ *
+ * Exported because the two resolvers below it are private and there must not be
+ * a second copy of this rule: `buildTitleAnalysisAttemptFor` needs the same
+ * answer to construct a model, and the bench's model picker needs it to probe
+ * one, and those two disagreeing is how a model that lists cannot be run.
+ */
+export async function resolveProviderEndpoint(
+  provider: ProviderType
+): Promise<{ baseUrl?: string; apiKey?: string }> {
+  return {
+    baseUrl: await resolveBaseUrlForProvider(provider),
+    apiKey: await resolveApiKeyForProvider(provider),
+  }
+}
+
+/**
  * One attempt against a provider and model the CALLER chose.
  *
  * `getTitleAnalysisModelAttempts` answers "what will the role use", which is

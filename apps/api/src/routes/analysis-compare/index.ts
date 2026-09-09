@@ -27,6 +27,7 @@ import {
   getModelsForFunctionWithCustom,
   discoverLocalModels,
   isDiscoverableProvider,
+  resolveProviderEndpoint,
   createChildLogger,
   type ComparisonModelRequest,
 } from '@aperture/core'
@@ -46,9 +47,19 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
    * The catalogue and a LIVE local probe, because those answer different
    * questions: the catalogue says what this build knows about, and only the
    * probe can say what is actually installed on the server at the other end of
-   * a base URL. `reachable: false` is passed through rather than flattened to an
-   * empty list — "nothing installed" and "wrong address" look identical in a
-   * picker and have opposite fixes.
+   * a base URL.
+   *
+   * THE PROBE MUST BE GIVEN THE OPERATOR'S ADDRESS. `discoverLocalModels` takes
+   * a base URL and a key precisely because a local server is only reachable
+   * where it was configured; called without them it falls back to
+   * `localhost:1234`, which inside the API container is the container itself.
+   * That shipped, and every local provider reported "did not answer" while LM
+   * Studio was running perfectly well on the host.
+   *
+   * Three states reach the picker, not two. "Not configured", "configured but
+   * silent" and "reachable but empty" have three different fixes, and
+   * collapsing the first two sends the operator to check an address they never
+   * set.
    */
   fastify.get(
     '/api/analysis-compare/models',
@@ -65,10 +76,28 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
             // answer — and only the first is normal. Asking which provider it
             // is separates them, so a cloud provider is never reported as
             // unreachable for lacking something it never had.
-            const discoverable = isDiscoverableProvider(provider.id)
-            const discovered = discoverable
-              ? await discoverLocalModels(provider.id, 'titleAnalysis')
-              : null
+            // Bound to a const first: isDiscoverableProvider is a type
+            // predicate, and TypeScript carries that narrowing through a const
+            // identifier but not through a property access.
+            const providerId = provider.id
+            const discoverable = isDiscoverableProvider(providerId)
+            const endpoint = discoverable
+              ? await resolveProviderEndpoint(providerId)
+              : { baseUrl: undefined, apiKey: undefined }
+            // null means two different things from discoverLocalModels — this
+            // provider has no local catalogue to read, or the server did not
+            // answer — and only the first is normal. Asking which provider it
+            // is separates them, so a cloud provider is never reported as
+            // unreachable for lacking something it never had.
+            const discovered =
+              discoverable && endpoint.baseUrl
+                ? await discoverLocalModels(
+                    provider.id,
+                    'titleAnalysis',
+                    endpoint.baseUrl,
+                    endpoint.apiKey
+                  )
+                : null
 
             // A discovered id the catalogue already lists must not appear
             // twice; the catalogue entry wins because it carries the name and
@@ -81,7 +110,10 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
             return {
               provider: provider.id,
               name: provider.name,
-              reachable: discoverable ? discovered !== null : true,
+              // Only a local provider can be unconfigured or unreachable; a
+              // cloud one is neither for having no server of its own.
+              configured: discoverable ? Boolean(endpoint.baseUrl) : true,
+              reachable: discoverable ? endpoint.baseUrl != null && discovered !== null : true,
               models: [
                 ...models.map((model) => ({ id: model.id, name: model.name })),
                 ...extra,
@@ -90,7 +122,13 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
           } catch (err) {
             // One unreachable provider must not empty the whole picker.
             logger.warn({ err, provider: provider.id }, 'Could not list models for a provider')
-            return { provider: provider.id, name: provider.name, reachable: false, models: [] }
+            return {
+              provider: provider.id,
+              name: provider.name,
+              configured: true,
+              reachable: false,
+              models: [],
+            }
           }
         })
       )
