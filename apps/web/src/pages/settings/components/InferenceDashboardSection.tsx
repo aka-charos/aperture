@@ -1,13 +1,22 @@
 /**
- * AI spend dashboard (OpenRouter).
+ * AI spend dashboard.
  *
  * The cost estimator next to this one projects what a configuration *should*
- * cost from published prices and assumed call volumes. This shows what it
- * actually cost: OpenRouter returns the credits spent on every response, so each
- * call is recorded with real money attached (see core `lib/inferenceUsage.ts`).
+ * cost from published prices and assumed call volumes. This shows what actually
+ * ran: every call through a metered provider is recorded with its token counts
+ * (see core `lib/inferenceUsage.ts`).
  *
- * Renders only when at least one AI role is pointed at OpenRouter — no other
- * provider reports per-call cost, so there would be nothing honest to show.
+ * MONEY HERE IS TWO DIFFERENT CLAIMS and the panel has to say which. OpenRouter
+ * reports the credits it charged, so its figures are billed. Z.AI reports tokens
+ * only, so its figures are computed from published per-million prices — an
+ * estimate, and one that rounds up, since it cannot see cached-input discounts
+ * or whatever plan rate an account is really on. Which providers are which
+ * arrives as `estimatedProviders` rather than being decided here: the web bundle
+ * never imports core, and a hardcoded "OpenRouter is exact" would start lying
+ * the day a second billed provider is metered.
+ *
+ * Renders only when at least one AI role points at a metered provider — nothing
+ * else writes rows, so there would be nothing to show.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -45,6 +54,8 @@ import {
 import InsightsIcon from '@mui/icons-material/Insights'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet'
+
+import { PROVIDER_INFO, type ProviderType } from '../../../components/aiProviderInfo'
 
 // ============================================================================
 // Types (mirror /api/inference/*)
@@ -90,11 +101,18 @@ interface AccountStatus {
 interface SummaryResponse {
   configured: boolean
   roles: string[]
+  /** Metered providers actually driving a role right now. */
+  configuredProviders: string[]
+  /** Providers the ledger was read for, in dashboard order. */
+  providers: string[]
+  /** Of those, the ones whose cost is computed here rather than billed. */
+  estimatedProviders: string[]
   account: AccountStatus | null
   days: number
   window: Totals
   today: Totals
   daily: DailyRow[]
+  byProvider: BreakdownRow[]
   byModel: BreakdownRow[]
   byRole: BreakdownRow[]
   byFeature: BreakdownRow[]
@@ -115,6 +133,7 @@ interface SessionRow {
 interface CallRow {
   id: string
   createdAt: string
+  provider: string
   model: string
   role: string | null
   feature: string | null
@@ -130,7 +149,7 @@ interface CallRow {
   latencyMs: number | null
 }
 
-type BreakdownDimension = 'model' | 'role' | 'feature'
+type BreakdownDimension = 'provider' | 'model' | 'role' | 'feature'
 
 const WINDOW_OPTIONS = [7, 30, 90] as const
 const POLL_INTERVAL_MS = 60_000
@@ -151,6 +170,18 @@ function formatUsd(value: number | null | undefined): string {
   if (value < 0.01) return `$${value.toFixed(5)}`
   if (value < 1) return `$${value.toFixed(4)}`
   return `$${value.toFixed(2)}`
+}
+
+/**
+ * The same amount, marked as computed rather than billed.
+ *
+ * A prefix rather than a footnote, because these sit in a column beside billed
+ * figures and the reader is scanning, not reading. "≈" costs one character and
+ * survives being screenshotted into a support thread.
+ */
+function formatEstimatedUsd(value: number | null | undefined): string {
+  if (value == null) return '—'
+  return `≈${formatUsd(value)}`
 }
 
 /** Short enough for a chart axis: 3 significant-ish digits, no trailing noise. */
@@ -174,6 +205,16 @@ function formatTime(iso: string): string {
 function formatLatency(ms: number | null): string {
   if (ms == null) return '—'
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`
+}
+
+/**
+ * Provider id → the name the settings page uses for it.
+ *
+ * Falls back to the id, which is what a provider metered before the web bundle
+ * knew about it would show — legible, and better than an empty cell.
+ */
+function providerName(id: string): string {
+  return PROVIDER_INFO[id as ProviderType]?.name ?? id
 }
 
 /** `job:generate-movie-embeddings` → `generate-movie-embeddings`. */
@@ -217,10 +258,18 @@ function BreakdownTable({
   rows,
   columnLabel,
   transform,
+  isEstimated,
 }: {
   rows: BreakdownRow[]
   columnLabel: string
   transform?: (key: string) => string
+  /**
+   * Whether this row's money is computed rather than billed. Only answerable on
+   * the provider dimension — a row pooling several providers is neither, which
+   * is why the caller passes this only for that one and the totals carry the
+   * caveat instead.
+   */
+  isEstimated?: (key: string) => boolean
 }) {
   const { t } = useTranslation()
   const maxCost = Math.max(...rows.map((r) => r.cost), 0)
@@ -264,7 +313,7 @@ function BreakdownTable({
               <TableCell align="right">{row.calls.toLocaleString()}</TableCell>
               <TableCell align="right">{formatTokens(row.totalTokens)}</TableCell>
               <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                {formatUsd(row.cost)}
+                {isEstimated?.(row.key) ? formatEstimatedUsd(row.cost) : formatUsd(row.cost)}
               </TableCell>
             </TableRow>
           ))}
@@ -317,10 +366,33 @@ export function InferenceDashboardSection() {
 
   const breakdownRows = useMemo(() => {
     if (!summary) return []
+    if (dimension === 'provider') return summary.byProvider
     if (dimension === 'model') return summary.byModel
     if (dimension === 'role') return summary.byRole
     return summary.byFeature
   }, [summary, dimension])
+
+  /**
+   * Which providers' money is computed rather than billed.
+   *
+   * A Set because it is asked once per table row; the list itself is two entries
+   * at most, so this is for legibility rather than speed.
+   */
+  const estimatedProviders = useMemo(
+    () => new Set(summary?.estimatedProviders ?? []),
+    [summary]
+  )
+
+  /**
+   * True when any of the window's own spend is an estimate — which is the
+   * question the caveat answers, and is NOT the same as "an estimated provider
+   * is configured". A role pointed at Z.AI that has not run yet contributes
+   * nothing to these totals and should not put a caveat on them.
+   */
+  const hasEstimatedSpend = useMemo(
+    () => (summary?.byProvider ?? []).some((row) => estimatedProviders.has(row.key)),
+    [summary, estimatedProviders]
+  )
 
   const chartData = useMemo(
     () =>
@@ -482,6 +554,20 @@ export function InferenceDashboardSection() {
                   {t('inferenceDashboard.unpricedCalls', { count: unpricedCalls })}
                 </Typography>
               )}
+
+              {/* The headline totals pool a billed figure with a computed one,
+                  so they cannot be marked row by row — the caveat has to sit
+                  under the number itself, naming which providers it applies to.
+                  Shown only when such a provider actually spent in this window:
+                  a configured-but-unused Z.AI must not caveat a pure
+                  OpenRouter total. */}
+              {hasEstimatedSpend && (
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1.5 }}>
+                  {t('inferenceDashboard.estimatedNote', {
+                    providers: (summary.estimatedProviders ?? []).map(providerName).join(', '),
+                  })}
+                </Typography>
+              )}
             </CardContent>
           </Card>
 
@@ -532,18 +618,36 @@ export function InferenceDashboardSection() {
                   <ToggleButton value="feature">{t('inferenceDashboard.byFeature')}</ToggleButton>
                   <ToggleButton value="model">{t('inferenceDashboard.byModel')}</ToggleButton>
                   <ToggleButton value="role">{t('inferenceDashboard.byRole')}</ToggleButton>
+                  {/* Only when there is something to split. With one provider
+                      the table is a single row restating the headline. */}
+                  {summary.byProvider.length > 1 && (
+                    <ToggleButton value="provider">
+                      {t('inferenceDashboard.byProvider')}
+                    </ToggleButton>
+                  )}
                 </ToggleButtonGroup>
               </Box>
               <BreakdownTable
                 rows={breakdownRows}
                 columnLabel={
-                  dimension === 'model'
-                    ? t('inferenceDashboard.colModel')
-                    : dimension === 'role'
-                      ? t('inferenceDashboard.colRole')
-                      : t('inferenceDashboard.colFeature')
+                  dimension === 'provider'
+                    ? t('inferenceDashboard.colProvider')
+                    : dimension === 'model'
+                      ? t('inferenceDashboard.colModel')
+                      : dimension === 'role'
+                        ? t('inferenceDashboard.colRole')
+                        : t('inferenceDashboard.colFeature')
                 }
-                transform={dimension === 'feature' ? shortFeature : undefined}
+                transform={
+                  dimension === 'feature'
+                    ? shortFeature
+                    : dimension === 'provider'
+                      ? providerName
+                      : undefined
+                }
+                isEstimated={
+                  dimension === 'provider' ? (key) => estimatedProviders.has(key) : undefined
+                }
               />
             </CardContent>
           </Card>
@@ -655,7 +759,21 @@ export function InferenceDashboardSection() {
                           <TableCell align="right">{formatTokens(call.totalTokens)}</TableCell>
                           <TableCell align="right">{formatLatency(call.latencyMs)}</TableCell>
                           <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                            {formatUsd(call.cost)}
+                            <Tooltip
+                              title={
+                                estimatedProviders.has(call.provider)
+                                  ? t('inferenceDashboard.estimatedTooltip', {
+                                      provider: providerName(call.provider),
+                                    })
+                                  : ''
+                              }
+                            >
+                              <span>
+                                {estimatedProviders.has(call.provider)
+                                  ? formatEstimatedUsd(call.cost)
+                                  : formatUsd(call.cost)}
+                              </span>
+                            </Tooltip>
                           </TableCell>
                         </TableRow>
                       ))}

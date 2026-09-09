@@ -3,8 +3,17 @@
  *
  * Reads the `llm_inference_calls` ledger (core `lib/inferenceUsage.ts`) — what
  * the app actually spent, as opposed to what Settings > AI's cost estimator
- * projects it might. Only OpenRouter reports real per-call cost, so the
- * dashboard is scoped to it; `configured` tells the UI whether to render at all.
+ * projects it might.
+ *
+ * The scope is `METERED_PROVIDERS`: every provider with an instrumented fetch,
+ * which today is OpenRouter and Z.AI. Their money is not the same KIND of
+ * number — OpenRouter reports the credits it charged, Z.AI reports tokens that
+ * are priced here from its published catalog — so the summary ships
+ * `estimatedProviders` and the panel says which rows are estimates. Pooling them
+ * into one unlabelled total would be the thing this dashboard exists not to do.
+ *
+ * `configured` tells the UI whether to render at all: no role pointed at a
+ * metered provider means there is nothing to measure, not an empty week.
  *
  * Everything here is admin-only: spend, per-user attribution and conversation
  * titles are all operator-level data.
@@ -20,13 +29,14 @@ import {
   getOpenRouterAccountStatus,
   createChildLogger,
   AI_FUNCTIONS,
+  METERED_PROVIDERS,
   type AIFunction,
 } from '@aperture/core'
 
 const logger = createChildLogger('inference-routes')
 
-/** The one provider that reports what a call actually cost. */
-const LEDGER_PROVIDER = 'openrouter'
+/** The providers whose calls reach the ledger. Ordered as the dashboard lists them. */
+const LEDGER_PROVIDERS: readonly string[] = METERED_PROVIDERS
 
 const DEFAULT_WINDOW_DAYS = 30
 
@@ -42,23 +52,49 @@ function parseLimit(raw: string | undefined, fallback: number, max: number): num
   return Math.min(max, Math.max(1, parsed))
 }
 
+interface ConfiguredProviders {
+  /** Roles pointed at any metered provider, in role order. */
+  roles: AIFunction[]
+  /** The distinct metered providers those roles use. */
+  providers: string[]
+}
+
 /**
- * Which AI roles are pointed at OpenRouter right now. Read off the shared role
- * list, not a copy: `configured` gates the whole dashboard, so a role missing
- * here hides the measured spend of the only role that was spending.
+ * Which AI roles are pointed at a metered provider right now.
+ *
+ * Read off the shared role list, not a copy: `configured` gates the whole
+ * dashboard, so a role missing here hides the measured spend of the only role
+ * that was spending.
+ *
+ * The provider set is returned alongside because the OpenRouter account lookup
+ * is a live HTTP call and must not be made for an instance that has never used
+ * OpenRouter.
  */
-async function getOpenRouterRoles(): Promise<AIFunction[]> {
+async function getMeteredRoles(): Promise<ConfiguredProviders> {
   const config = await getAIConfig()
-  return AI_FUNCTIONS.filter((role) => config[role]?.provider === LEDGER_PROVIDER)
+  const roles = AI_FUNCTIONS.filter((role) => {
+    const provider = config[role]?.provider
+    return provider != null && LEDGER_PROVIDERS.includes(provider)
+  })
+  const providers = [
+    ...new Set(
+      roles.flatMap((role) => {
+        const provider = config[role]?.provider
+        return provider ? [String(provider)] : []
+      })
+    ),
+  ]
+  return { roles, providers }
 }
 
 const inferenceRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * GET /api/inference/summary?days=30
    *
-   * Totals, daily series and breakdowns, plus OpenRouter's own view of the key.
-   * Never 500s on an un-migrated database — the summary degrades to zeroes so
-   * the settings page still renders.
+   * Totals, daily series and breakdowns across every metered provider, plus
+   * OpenRouter's own view of the key when OpenRouter is one of them. Never 500s
+   * on an un-migrated database — the summary degrades to zeroes so the settings
+   * page still renders.
    */
   fastify.get<{ Querystring: { days?: string } }>(
     '/api/inference/summary',
@@ -66,21 +102,28 @@ const inferenceRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       try {
         const days = parseDays(request.query.days)
-        const roles = await getOpenRouterRoles()
+        const { roles, providers } = await getMeteredRoles()
 
         // The account lookup is a live call to OpenRouter; it must not be able to
-        // take the ledger down with it.
+        // take the ledger down with it, and it is skipped entirely for an
+        // instance that does not use OpenRouter rather than returning null after
+        // a pointless round trip.
         const [summary, account] = await Promise.all([
-          getInferenceSummary(LEDGER_PROVIDER, days),
-          getOpenRouterAccountStatus().catch(() => null),
+          getInferenceSummary(LEDGER_PROVIDERS, days),
+          providers.includes('openrouter')
+            ? getOpenRouterAccountStatus().catch(() => null)
+            : Promise.resolve(null),
         ])
 
         return reply.send({
-          // False means "OpenRouter isn't driving anything" — the panel hides
-          // itself rather than showing an empty dashboard for a provider the
-          // admin doesn't use.
+          // False means "no metered provider is driving anything" — the panel
+          // hides itself rather than showing an empty dashboard for providers
+          // the admin doesn't use.
           configured: roles.length > 0,
           roles,
+          // The metered providers actually in use, as distinct from the window's
+          // `providers`, which is everything the ledger was read for.
+          configuredProviders: providers,
           account,
           ...summary,
         })
@@ -100,7 +143,7 @@ const inferenceRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       try {
         const limit = parseLimit(request.query.limit, 50, 200)
-        const calls = await getRecentInferenceCalls(LEDGER_PROVIDER, limit)
+        const calls = await getRecentInferenceCalls(LEDGER_PROVIDERS, limit)
         return reply.send({ calls })
       } catch (err) {
         logger.error({ err }, 'Failed to get inference calls')
@@ -123,7 +166,7 @@ const inferenceRoutes: FastifyPluginAsync = async (fastify) => {
       try {
         const days = parseDays(request.query.days)
         const limit = parseLimit(request.query.limit, 25, 100)
-        const sessions = await getInferenceSessions(LEDGER_PROVIDER, days, limit)
+        const sessions = await getInferenceSessions(LEDGER_PROVIDERS, days, limit)
         return reply.send({ sessions })
       } catch (err) {
         logger.error({ err }, 'Failed to get inference sessions')

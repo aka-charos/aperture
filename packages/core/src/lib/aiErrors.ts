@@ -57,8 +57,65 @@ export interface AiErrorDescription {
   url?: string
   /** The provider's own words, clipped. Usually the only specific field. */
   providerMessage?: string
+  /**
+   * A specific, actionable cause this failure's shape gives away — set only
+   * where the shape is unambiguous. See {@link diagnoseFromUrl}.
+   *
+   * Separate from `providerMessage` rather than replacing it: the provider's own
+   * words are evidence and must survive. Absent means nothing was recognised,
+   * which is the common case and is not a failure of this function.
+   */
+  hint?: string
   /** The Error's message, always present so a non-API failure still says something. */
   message: string
+}
+
+/**
+ * Hosts that serve Z.AI's OpenAI-compatible API, and the path prefix a working
+ * base URL must already contain.
+ *
+ * `api.z.ai` is the international platform and `open.bigmodel.cn` the mainland
+ * one — different accounts and different keys, which is the other half of the
+ * mistake this recognises.
+ */
+const ZAI_HOSTS = ['api.z.ai', 'open.bigmodel.cn']
+const ZAI_API_PATH = '/api/paas/v4'
+
+/**
+ * Turn a status and an endpoint into a specific cause, or nothing.
+ *
+ * ONE CASE TODAY, and it is the one Z.AI's own wiring makes easy to hit: the SDK
+ * appends `/chat/completions` to whatever base URL is configured, so a base URL
+ * left at the bare host — the natural thing to paste — produces a 404. A 404
+ * reads as "your key is dead" to everyone who has ever configured an AI
+ * provider, so the operator goes and regenerates a perfectly good key.
+ *
+ * READ OFF THE URL, NOT PASSED IN. `describeAiError` is called from a dozen
+ * places and an optional `provider` argument would be supplied by some of them
+ * and forgotten by others, so the same fault would be diagnosed on one screen
+ * and not another — the defect [F-117] names. The endpoint is already on the
+ * error, is the thing actually at fault, and cannot be forgotten.
+ *
+ * SILENT WHEN THE PATH IS ALREADY RIGHT. A 404 from a correctly-formed Z.AI URL
+ * is a different fault — most likely a model id the account cannot reach — and
+ * telling someone to fix a base URL that is already correct sends them to change
+ * the one thing that works.
+ */
+export function diagnoseFromUrl(status: number | undefined, url: string | undefined): string | undefined {
+  if (status !== 404 || !url) return undefined
+
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return undefined
+  }
+
+  if (!ZAI_HOSTS.includes(parsed.hostname) || parsed.pathname.includes(ZAI_API_PATH)) {
+    return undefined
+  }
+
+  return `The Z.AI base URL looks incomplete: it must include the ${ZAI_API_PATH} path (https://api.z.ai${ZAI_API_PATH} for the international platform, https://open.bigmodel.cn${ZAI_API_PATH} for mainland China — separate accounts with separate keys).`
 }
 
 /**
@@ -145,6 +202,9 @@ export function describeAiError(err: unknown): AiErrorDescription {
     const clipped = clipMessage(body, MAX_PROVIDER_MESSAGE)
     if (clipped && clipped !== description.message) description.providerMessage = clipped
   }
+
+  const hint = diagnoseFromUrl(description.status, description.url)
+  if (hint) description.hint = hint
 
   return description
 }

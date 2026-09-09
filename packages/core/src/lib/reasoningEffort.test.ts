@@ -15,6 +15,7 @@ import assert from 'node:assert/strict'
 
 import {
   GLM_REASONING_EFFORTS,
+  isGlmReasoningModel,
   KNOWN_REASONING_EFFORTS,
   THINKING_LEVELS,
   ROLES_WITH_REASONING_EFFORT,
@@ -328,6 +329,49 @@ test('GLM delivers a flat reasoningEffort field, not a nested one', () => {
     assert.deepEqual(out.providerOptions, { zai: { reasoningEffort: effort } })
     assert.equal(out.undeliverable, null)
   }
+})
+
+test('a custom GLM-5 model is recognised across the whole line', () => {
+    // Why this is inferred at all: Z.AI is a custom-model provider, so the
+    // ordinary way to reach a model newer than zai.json is to type its id --
+    // and a custom model carries no catalog metadata, so it declared no
+    // mechanism and got no control. That is not the usual harmless "no
+    // control": GLM-5.x forces deep thinking on and defaults to max.
+  for (const id of [
+    'glm-5',
+    'glm-5.1',
+    'glm-5.2',
+    'glm-5.3',
+    'glm-5.3-flash',
+    // Z.AI's own tooling appends this to ask for the 1M context window. Same
+    // model, so the same control.
+    'glm-5.3-flash[1m]',
+    'GLM-5.3',
+    '  glm-5.3  ',
+  ]) {
+    assert.ok(isGlmReasoningModel(id), id)
+  }
+})
+
+test('GLM-4.x and near misses are left alone', () => {
+  // 4.x uses the older thinking:{type} switch and does NOT force thinking on,
+  // so it has neither the capability nor the problem. And a prefix match would
+  // sweep in a hypothetical glm-50, which is why the pattern guards the digit.
+  for (const id of ['glm-4.7', 'glm-4.7-flash', 'glm-4.6', 'glm-50', 'glm-51-x', '', 'gpt-5']) {
+    assert.ok(!isGlmReasoningModel(id), id)
+  }
+})
+
+test('an inferred GLM model gets the mechanism vocabulary, not a wider one', () => {
+  // The inference supplies a mechanism and nothing else; the words still come
+  // from GLM_REASONING_EFFORTS, so there is no second list to maintain and no
+  // way for a custom model to be offered a word the sender would refuse.
+  const inferred = { reasoningMechanism: 'reasoningEffort' } as ReasoningCapableModel
+  assert.deepEqual(reasoningEffortsFor(inferred), ['low', 'high', 'max'])
+  assert.deepEqual(
+    resolveReasoningOptions({ provider: 'zai', model: inferred, effort: 'max' }).providerOptions,
+    { zai: { reasoningEffort: 'max' } }
+  )
 })
 
 test('every GLM word already has a label', () => {

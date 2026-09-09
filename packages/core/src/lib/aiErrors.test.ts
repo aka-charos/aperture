@@ -10,7 +10,7 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { APICallError, RetryError } from 'ai'
 
-import { describeAiError } from './aiErrors.js'
+import { describeAiError, diagnoseFromUrl } from './aiErrors.js'
 
 /** The live failure this module was written for, reconstructed. */
 function openRouterFailure(overrides: Partial<ConstructorParameters<typeof APICallError>[0]> = {}) {
@@ -117,5 +117,76 @@ describe('isProviderError', () => {
     // mode, for a quota that does not exist.
     assert.equal(describeAiError(new Error('CRW search returned no results')).isProviderError, false)
     assert.equal(describeAiError('boom').isProviderError, false)
+  })
+})
+
+describe('diagnoseFromUrl', () => {
+  /** A Z.AI call made against a base URL missing its API path. */
+  function zaiFailure(url: string) {
+    return new APICallError({
+      message: 'Not Found',
+      url,
+      requestBodyValues: { model: 'glm-5.3' },
+      statusCode: 404,
+      responseBody: '<html>404</html>',
+      isRetryable: false,
+    })
+  }
+
+  test('names the missing API path on a bare Z.AI host', () => {
+    // The whole point: the SDK appends /chat/completions to whatever base URL is
+    // configured, so pasting the bare host produces a 404 -- which reads as a
+    // dead key to anyone who has configured an AI provider before, and sends
+    // them off to regenerate a perfectly good one.
+    const hint = diagnoseFromUrl(404, 'https://api.z.ai/chat/completions')
+    assert.match(hint ?? '', /\/api\/paas\/v4/)
+    // Both platforms are named, because the other half of the mistake is a
+    // mainland key against the international host.
+    assert.match(hint ?? '', /open\.bigmodel\.cn/)
+
+    assert.ok(diagnoseFromUrl(404, 'https://open.bigmodel.cn/chat/completions'))
+  })
+
+  test('says nothing when the path is already right', () => {
+    // A 404 from a correctly-formed URL is a different fault -- most likely a
+    // model id this account cannot reach -- and telling someone to fix the one
+    // setting that is correct is worse than saying nothing at all.
+    assert.equal(
+      diagnoseFromUrl(404, 'https://api.z.ai/api/paas/v4/chat/completions'),
+      undefined
+    )
+  })
+
+  test('only 404, and only Z.AI', () => {
+    // A 401 from a bare host is a key problem and must keep saying so; another
+    // vendor's 404 is not this diagnosis to make.
+    assert.equal(diagnoseFromUrl(401, 'https://api.z.ai/chat/completions'), undefined)
+    assert.equal(diagnoseFromUrl(500, 'https://api.z.ai/chat/completions'), undefined)
+    assert.equal(diagnoseFromUrl(404, 'https://openrouter.ai/api/v1/chat/completions'), undefined)
+    assert.equal(diagnoseFromUrl(404, 'http://localhost:1234/v1/chat/completions'), undefined)
+  })
+
+  test('survives a status or URL it cannot read', () => {
+    assert.equal(diagnoseFromUrl(undefined, 'https://api.z.ai/chat/completions'), undefined)
+    assert.equal(diagnoseFromUrl(404, undefined), undefined)
+    assert.equal(diagnoseFromUrl(404, 'not a url'), undefined)
+  })
+
+  test('reaches the description without being asked for', () => {
+    // Read off the error's own URL rather than passed in by the caller: an
+    // optional provider argument would be supplied by some of the dozen call
+    // sites and forgotten by others, so the same fault would be diagnosed on one
+    // screen and not another.
+    const described = describeAiError(zaiFailure('https://api.z.ai/chat/completions'))
+    assert.match(described.hint ?? '', /\/api\/paas\/v4/)
+    // The provider's own words survive alongside it -- the hint adds, never
+    // replaces.
+    assert.ok(described.providerMessage)
+    assert.equal(described.status, 404)
+  })
+
+  test('absent on an ordinary failure', () => {
+    assert.equal(describeAiError(openRouterFailure()).hint, undefined)
+    assert.equal(describeAiError(new Error('boom')).hint, undefined)
   })
 })

@@ -61,6 +61,7 @@
       "quality": "standard",
       "speed": "medium",
       "costTier": "low",
+      "contextWindow": "200K",
       "inputCostPerMillion": 0.6,
       "outputCostPerMillion": 2.2
     },
@@ -77,6 +78,7 @@
       "quality": "budget",
       "speed": "fast",
       "costTier": "free",
+      "contextWindow": "200K",
       "inputCostPerMillion": 0,
       "outputCostPerMillion": 0
     },

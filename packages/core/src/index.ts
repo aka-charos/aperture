@@ -155,7 +155,8 @@ export {
   type WebSearchUsageWindow,
   type WebSearchSlotUsage,
   type WebSearchUsageSummary,
-  // Inference ledger (real per-call usage & cost; OpenRouter reports both)
+  // Inference ledger (per-call usage & cost; OpenRouter bills, Z.AI is priced
+  // from its published catalog — see BILLED_COST_PROVIDERS)
   getOpenRouterAccountStatus,
   withInferenceContext,
   getInferenceContext,
@@ -163,6 +164,9 @@ export {
   getInferenceSummary,
   getRecentInferenceCalls,
   getInferenceSessions,
+  METERED_PROVIDERS,
+  BILLED_COST_PROVIDERS,
+  costIsEstimated,
   type OpenRouterAccountStatus,
   type InferenceContext,
   type InferenceCallStatus,

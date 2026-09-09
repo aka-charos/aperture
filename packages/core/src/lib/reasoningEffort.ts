@@ -123,6 +123,38 @@ export function isThinkingLevel(value: unknown): value is ThinkingLevel {
 export const GLM_REASONING_EFFORTS = ['low', 'high', 'max'] as const
 
 /**
+ * Does this Z.AI model id belong to the family that takes a reasoning effort?
+ *
+ * WHY A PATTERN AND NOT JUST THE CATALOG. Z.AI is a custom-model provider (its
+ * catalog moves faster than this repo does), and a custom model gets no
+ * `ModelMetadata`, so a hand-added `glm-5.3` — the ordinary way to reach a model
+ * newer than `zai.json` — declared no mechanism and was offered no control. That
+ * is not the usual "no control" outcome: GLM-5.x forces deep thinking on and
+ * defaults to `max`, so the model ran at the most expensive setting it has, on
+ * every call, with nothing on screen saying so.
+ *
+ * THE ASYMMETRY IS INVERTED HERE, which is why inferring is right when
+ * {@link ReasoningMechanism}'s docs say absent must mean "send nothing"
+ * everywhere else. Guessing that a model takes an effort costs nothing until an
+ * operator actually picks one, because an unset effort still sends no field at
+ * all; the worst case is a setting that saves and quietly does not apply.
+ * Guessing that it does not costs money on every call, forever, silently. And
+ * `reasoning_effort` is OpenAI's own field name on a provider that advertises
+ * OpenAI SDK compatibility, so an ignored field is the likely failure rather
+ * than a 400.
+ *
+ * SCOPE. The whole GLM-5 line, from the evidence that GLM-5.3 and GLM-5.3-Flash
+ * document it and share their text parameters. `(?![0-9])` so a future `glm-50`
+ * is not swept in by a prefix match, and the `[1m]` context suffix Z.AI's own
+ * tooling appends is matched because it is the same model. GLM-4.x is
+ * deliberately excluded: it uses the older `thinking: {type}` switch, does not
+ * force thinking on, and so has neither the capability nor the problem.
+ */
+export function isGlmReasoningModel(modelId: string): boolean {
+  return /^glm-5(?![0-9])/i.test(modelId.trim())
+}
+
+/**
  * Every effort word seen in the live catalog, weakest first.
  *
  * This is a DISPLAY ORDER and a label key set — never a filter. Nothing is
