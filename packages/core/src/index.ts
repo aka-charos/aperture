@@ -1526,7 +1526,6 @@ export {
   selectMappedParagraphs,
   splitAnalysisParagraphs,
   buildAnalysisSegments,
-  GATED_QUESTIONS,
   decideAnalysisFloor,
   budgetSources,
   isListingDomain,

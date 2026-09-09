@@ -42,7 +42,6 @@ export {
 
 export {
   buildAnalysisSegments,
-  GATED_QUESTIONS,
   type AnalysisSegment,
 } from './segments.js'
 

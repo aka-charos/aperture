@@ -3281,9 +3281,14 @@
           "grounding": "Τεκμηρίωση Google"
         }
       },
-      "traditionShow": "Show tradition and influences",
-      "traditionHide": "Hide tradition and influences",
-      "traditionNote": "Shown on request, because where a work sits can point at what it withholds."
+      "section": {
+        "work": "Form and Style",
+        "structure": "Narrative Structure",
+        "tradition": "Lineage and Influence",
+        "dispute": "Critical Debate",
+        "intent": "Stated Intent",
+        "circumstances": "Production Context"
+      }
     }
   },
   "settingsCostEstimator": {
