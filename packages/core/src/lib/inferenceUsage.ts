@@ -7,12 +7,17 @@
  * this records the token counts and the credits the provider actually charged,
  * per call. Where the two disagree, this one is right.
  *
- * Cost is nullable throughout. OpenRouter reports real cost on every response,
- * which is why the dashboard is scoped to it; other providers report tokens only,
- * so their rows carry counts and no money. Sums treat a missing cost as absent
- * rather than as zero, and the read side reports how much of the window it could
- * actually price — a total that silently ignores unpriced calls is worse than no
- * total at all.
+ * Cost is nullable throughout, and a row's money comes from one of two places.
+ * OpenRouter reports the credits it charged on every response, so its rows are
+ * BILLED. Z.AI reports tokens only, so its rows are PRICED from the published
+ * catalog (`lib/zai-usage.ts`) — a different kind of claim, tracked by
+ * {@link BILLED_COST_PROVIDERS} and stated on the dashboard rather than blended
+ * into one total that means neither thing. Anything else calling a model writes
+ * no row at all.
+ *
+ * Sums treat a missing cost as absent rather than as zero, and the read side
+ * reports how much of the window it could actually price — a total that silently
+ * ignores unpriced calls is worse than no total at all.
  *
  * Nothing here throws at its caller. A ledger that can break the work it is
  * recording is not worth having.
@@ -24,6 +29,47 @@ const logger = createChildLogger('inference-usage')
 
 /** How the request ended. Errors are recorded too — an error rate is signal. */
 export type InferenceCallStatus = 'ok' | 'error'
+
+/**
+ * The providers whose calls reach this ledger, and therefore the scope of the
+ * spend dashboard.
+ *
+ * A provider is here because it has an instrumented `fetch` (see
+ * `lib/usageFetch.ts`), not because it is expensive — a provider absent from
+ * this list writes no rows, so including it in a read would only widen a filter
+ * that can never match. Adding one means writing the meter first.
+ *
+ * The order is the order the dashboard lists them in.
+ */
+export const METERED_PROVIDERS = ['openrouter', 'zai'] as const
+
+/**
+ * Of those, the ones that report what a call ACTUALLY cost.
+ *
+ * Everyone else's money is computed from published per-million prices, which is
+ * an estimate and has to be labelled as one. Kept as a separate list rather than
+ * a flag on the row: it is a property of the provider's API, identical for every
+ * row it writes, and storing it per row would let two rows of one provider
+ * disagree about what kind of number they carry.
+ */
+export const BILLED_COST_PROVIDERS: readonly string[] = ['openrouter']
+
+/** True when this provider's ledger cost is computed here rather than billed. */
+export function costIsEstimated(provider: string): boolean {
+  return !BILLED_COST_PROVIDERS.includes(provider)
+}
+
+/**
+ * Normalise a provider scope to the array every query binds.
+ *
+ * One helper because the alternative is three call sites each deciding whether
+ * a bare string is a list of one, and the failure of getting that wrong is a
+ * filter that matches nothing — an empty dashboard that looks exactly like a
+ * quiet week.
+ */
+function providerList(scope: string | readonly string[]): string[] {
+  return typeof scope === 'string' ? [scope] : [...scope]
+}
 
 export interface InferenceCallRecord {
   provider: string
@@ -168,12 +214,22 @@ export interface InferenceDailyRow {
 }
 
 export interface InferenceSummary {
-  provider: string
+  /** The providers this window covers, in the order the dashboard lists them. */
+  providers: string[]
+  /**
+   * Those whose money is computed from published prices rather than billed.
+   *
+   * Decided here and shipped as a value, because the web bundle never imports
+   * core: a UI that hardcoded "OpenRouter is exact" would start lying the day a
+   * second billed provider is metered.
+   */
+  estimatedProviders: string[]
   days: number
   since: string
   window: InferenceTotals
   today: InferenceTotals
   daily: InferenceDailyRow[]
+  byProvider: InferenceBreakdownRow[]
   byModel: InferenceBreakdownRow[]
   byRole: InferenceBreakdownRow[]
   byFeature: InferenceBreakdownRow[]
@@ -235,41 +291,53 @@ const TOTALS_COLUMNS = `
 /**
  * Everything the dashboard's top half needs, in one round trip per section.
  *
- * `days` bounds the window; `provider` scopes it (the dashboard is OpenRouter's,
- * but the ledger is not). Degrades to an empty summary rather than throwing, so
- * a database that hasn't run the migration still renders the settings page.
+ * `days` bounds the window; `scope` names the provider or providers (normally
+ * {@link METERED_PROVIDERS}). Degrades to an empty summary rather than throwing,
+ * so a database that hasn't run the migration still renders the settings page.
+ *
+ * The breakdowns pool across providers on purpose — "what did title analysis
+ * cost me" is a question about the role, not about who served it — and
+ * `byProvider` is what keeps the split visible, since a pooled total mixes a
+ * billed figure with an estimated one.
  */
 export async function getInferenceSummary(
-  provider: string,
+  scope: string | readonly string[],
   days: number
 ): Promise<InferenceSummary> {
+  const providers = providerList(scope)
   const windowDays = Math.min(365, Math.max(1, Math.round(days)))
   const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString()
 
   const empty: InferenceSummary = {
-    provider,
+    providers,
+    estimatedProviders: providers.filter(costIsEstimated),
     days: windowDays,
     since,
     window: { ...EMPTY_TOTALS },
     today: { ...EMPTY_TOTALS },
     daily: [],
+    byProvider: [],
     byModel: [],
     byRole: [],
     byFeature: [],
     empty: true,
   }
 
-  try {
-    const windowFilter = `provider = $1 AND created_at >= NOW() - INTERVAL '${windowDays} days'`
+  // An empty scope would bind an empty array and match nothing, which renders
+  // identically to a quiet week. Say so instead of querying for it.
+  if (providers.length === 0) return empty
 
-    const [totals, todayTotals, daily, byModel, byRole, byFeature] = await Promise.all([
+  try {
+    const windowFilter = `provider = ANY($1) AND created_at >= NOW() - INTERVAL '${windowDays} days'`
+
+    const [totals, todayTotals, daily, byProvider, byModel, byRole, byFeature] = await Promise.all([
       query<TotalsRow>(`SELECT ${TOTALS_COLUMNS} FROM llm_inference_calls WHERE ${windowFilter}`, [
-        provider,
+        providers,
       ]),
       query<TotalsRow>(
         `SELECT ${TOTALS_COLUMNS} FROM llm_inference_calls
-         WHERE provider = $1 AND created_at >= date_trunc('day', NOW())`,
-        [provider]
+         WHERE provider = ANY($1) AND created_at >= date_trunc('day', NOW())`,
+        [providers]
       ),
       query<{ day: string; calls: number; total_tokens: string | number; cost: string | number }>(
         `SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS day,
@@ -280,11 +348,12 @@ export async function getInferenceSummary(
          WHERE ${windowFilter}
          GROUP BY 1
          ORDER BY 1`,
-        [provider]
+        [providers]
       ),
-      breakdown('model', windowFilter, provider),
-      breakdown("COALESCE(role, 'unattributed')", windowFilter, provider),
-      breakdown("COALESCE(feature, 'unattributed')", windowFilter, provider),
+      breakdown('provider', windowFilter, providers),
+      breakdown('model', windowFilter, providers),
+      breakdown("COALESCE(role, 'unattributed')", windowFilter, providers),
+      breakdown("COALESCE(feature, 'unattributed')", windowFilter, providers),
     ])
 
     const window = toTotals(totals.rows[0])
@@ -299,13 +368,14 @@ export async function getInferenceSummary(
         totalTokens: Number(r.total_tokens),
         cost: Number(r.cost),
       })),
-      byModel: byModel,
-      byRole: byRole,
-      byFeature: byFeature,
+      byProvider,
+      byModel,
+      byRole,
+      byFeature,
       empty: window.calls === 0,
     }
   } catch (err) {
-    logger.warn({ err, provider }, 'Failed to read inference summary; reporting empty')
+    logger.warn({ err, providers }, 'Failed to read inference summary; reporting empty')
     return empty
   }
 }
@@ -314,7 +384,7 @@ export async function getInferenceSummary(
 async function breakdown(
   expression: string,
   windowFilter: string,
-  provider: string
+  providers: string[]
 ): Promise<InferenceBreakdownRow[]> {
   const result = await query<{
     key: string
@@ -331,7 +401,7 @@ async function breakdown(
      GROUP BY 1
      ORDER BY cost DESC, calls DESC
      LIMIT 20`,
-    [provider]
+    [providers]
   )
 
   return result.rows.map((r) => ({
@@ -345,6 +415,8 @@ async function breakdown(
 export interface InferenceCallRow {
   id: string
   createdAt: string
+  /** Which metered provider served it — the row's cost is billed or estimated by this. */
+  provider: string
   model: string
   role: string | null
   feature: string | null
@@ -365,15 +437,18 @@ export interface InferenceCallRow {
 
 /** The most recent calls, newest first. Never throws. */
 export async function getRecentInferenceCalls(
-  provider: string,
+  scope: string | readonly string[],
   limit: number
 ): Promise<InferenceCallRow[]> {
+  const providers = providerList(scope)
   const capped = Math.min(200, Math.max(1, Math.round(limit)))
+  if (providers.length === 0) return []
 
   try {
     const result = await query<{
       id: string
       created_at: Date
+      provider: string
       model: string
       role: string | null
       feature: string | null
@@ -391,21 +466,22 @@ export async function getRecentInferenceCalls(
       cost: string | null
       latency_ms: number | null
     }>(
-      `SELECT c.id, c.created_at, c.model, c.role, c.feature, c.session_id,
+      `SELECT c.id, c.created_at, c.provider, c.model, c.role, c.feature, c.session_id,
               u.username, c.upstream_provider, c.status, c.status_code, c.streamed,
               c.prompt_tokens, c.completion_tokens, c.reasoning_tokens, c.cached_tokens,
               c.total_tokens, c.cost, c.latency_ms
        FROM llm_inference_calls c
        LEFT JOIN users u ON u.id = c.user_id
-       WHERE c.provider = $1
+       WHERE c.provider = ANY($1)
        ORDER BY c.created_at DESC
        LIMIT ${capped}`,
-      [provider]
+      [providers]
     )
 
     return result.rows.map((r) => ({
       id: String(r.id),
       createdAt: r.created_at.toISOString(),
+      provider: r.provider,
       model: r.model,
       role: r.role,
       feature: r.feature,
@@ -424,7 +500,7 @@ export async function getRecentInferenceCalls(
       latencyMs: r.latency_ms,
     }))
   } catch (err) {
-    logger.warn({ err, provider }, 'Failed to read recent inference calls')
+    logger.warn({ err, providers }, 'Failed to read recent inference calls')
     return []
   }
 }
@@ -447,12 +523,14 @@ export interface InferenceSessionRow {
  * conversation cost". Titles are joined in when the conversation still exists.
  */
 export async function getInferenceSessions(
-  provider: string,
+  scope: string | readonly string[],
   days: number,
   limit: number
 ): Promise<InferenceSessionRow[]> {
+  const providers = providerList(scope)
   const windowDays = Math.min(365, Math.max(1, Math.round(days)))
   const capped = Math.min(100, Math.max(1, Math.round(limit)))
+  if (providers.length === 0) return []
 
   try {
     const result = await query<{
@@ -476,13 +554,13 @@ export async function getInferenceSessions(
        FROM llm_inference_calls c
        LEFT JOIN assistant_conversations conv ON conv.id::text = c.session_id
        LEFT JOIN users u ON u.id = c.user_id
-       WHERE c.provider = $1
+       WHERE c.provider = ANY($1)
          AND c.session_id IS NOT NULL
          AND c.created_at >= NOW() - INTERVAL '${windowDays} days'
        GROUP BY c.session_id
        ORDER BY last_call_at DESC
        LIMIT ${capped}`,
-      [provider]
+      [providers]
     )
 
     return result.rows.map((r) => ({
@@ -496,7 +574,7 @@ export async function getInferenceSessions(
       lastCallAt: r.last_call_at.toISOString(),
     }))
   } catch (err) {
-    logger.warn({ err, provider }, 'Failed to read inference sessions')
+    logger.warn({ err, providers }, 'Failed to read inference sessions')
     return []
   }
 }

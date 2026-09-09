@@ -4660,7 +4660,11 @@
     "sessionsCaption": "One chat turn can run several models, so the conversation total is the real cost.",
     "deletedConversation": "(deleted conversation)",
     "recentTitle": "Recent calls",
-    "failed": "Failed"
+    "failed": "Failed",
+    "estimatedNote": "Costs for {{providers}} are computed from published prices rather than billed, so they are estimates and round up — a cached-input discount or a plan rate is not visible from here. Token counts are measured either way.",
+    "estimatedTooltip": "Estimated from {{provider}}’s published prices. It reports tokens, not cost.",
+    "byProvider": "Provider",
+    "colProvider": "Provider"
   },
   "settingsDeployment": {
     "title": "Deployment",

@@ -2130,3 +2130,61 @@ Three things this pins that a unit test on `resolveReasoningOptions` alone canno
 **Pricing resolves through the catalog, not `PROVIDER_MAP`.** `pricing-cache.ts` has no `zai` entry, so `findModelPricing` returns null and `getPricingForModelAsync` falls back to the declared numbers — the shape [F-005](#f-005) records for OpenRouter. `glm-4.7-flash` declares `0`/`0` rather than omitting them, which is the difference between "free" and "unpriceable": `pricingKnown` reads true and the UI may say $0.00 truthfully.
 
 **Where the hand-copied lists were.** Six, and every one of them fails quietly if missed: `ProviderType` in core, `ProviderType` and `PROVIDER_INFO` in the web bundle (which never imports core), `CUSTOM_MODEL_PROVIDERS`, the SQL `CHECK`, `AIFunctionCard`'s `supportsCustomModels` chain, and `AIFunctionCard`'s own copy of the `reasoningMechanism` union. Route schemas needed nothing — `provider` is `type: 'string'` on every AI route, and only *roles* are enum'd there ([F-002](#f-002)), which is the one place this change was cheaper than it looked.
+
+## F-119
+
+**A provider that is not metered is not cheap, it is invisible — and the money for one that reports only tokens is a different KIND of number.** Added 2026-09-10.
+
+**Four gaps, found by reading the Z.AI route back a day after shipping it.** Every one of them is silent: nothing errors, nothing logs, and each presents as an absence rather than a fault.
+
+### 1. Every GLM call ran unrecorded
+
+The inference ledger is written from exactly one place — `createOpenRouterUsageFetch`. So `llm_inference_calls` held OpenRouter and nothing else, and a library-wide title-analysis pass on GLM-5.3 produced no tokens, no cost, no latency and no error rate. The ledger's own design anticipated this ("other providers report tokens only… Cost is nullable throughout"), which is what made the gap easy to miss: the schema was already right and only the writer was missing.
+
+**The scaffolding was never OpenRouter-specific.** Reading the request to learn the model, teeing the response, scanning for a `usage` object, timing, and writing one row are the same work for anybody. `usageFetch.ts` is now that work, and a provider supplies exactly two things: how to read a chunk, and how — or whether — to price the result. OpenRouter keeps its own (generation id, upstream provider, `cost`, `cost_details.upstream_inference_cost`); Z.AI's is the standard OpenAI `usage` object and nothing more.
+
+**The two rules survive the move intact**, and they are the whole contract: metering never changes what the caller sees, and never fails the call. Both are pinned now rather than merely commented (`usageFetch.test.ts`) — including that a streamed body still arrives chunk for chunk, which is the property the tee exists for and the one whose failure would present as a broken assistant rather than a wrong dashboard. Running those tests prints a stack of "Failed to record inference call" warnings, because there is no `DATABASE_URL`; every assertion passes anyway, which is rule two demonstrated rather than described.
+
+### 2. Two kinds of money, and only one of them is measured
+
+Z.AI reports tokens and no cost, so its figures are **computed** from the per-million prices in `zai.json`. That is a genuinely different claim from OpenRouter's, and blending them into one unlabelled total would be the exact thing this dashboard exists not to do — it is the panel whose whole point is being a measurement rather than the estimator's projection.
+
+`BILLED_COST_PROVIDERS` is the split, kept as a provider list rather than a per-row flag: it is a property of the provider's API, identical for every row it writes, and storing it per row would let two rows of one provider disagree about what kind of number they carry. The summary ships `estimatedProviders` as a **decided value** (web-never-imports-core), so a UI that hardcoded "OpenRouter is exact" cannot start lying the day a second billed provider is metered.
+
+**Three ways the estimate is wrong, all in the same direction.** Cached input is cheaper (GLM-5.3: $0.26 against $1.4) and the catalog carries no cached rate, so cached prompt tokens are billed here at full rate; a promotional or plan rate is not knowable from here; a price change lands only when `zai.json` is updated. All three overstate, which is the safe direction for a spend figure — and the cached count is still recorded, so the overshoot is visible rather than hidden. What it must never do is invent one: a model with no published price records tokens and a **null** cost.
+
+**`priceZaiCall` has two failure modes that both look like $0.00 and are not.** A model the catalog does not list returns `undefined` — which is *every* custom model, because `custom_ai_models` has no price columns at all (the plan for this work assumed it did; it holds id, provider, function_type, model_id, embedding_dimensions and created_at, and nothing else). And a call with nothing measured — every failed call reaches the meter with an empty usage object — returns `undefined` rather than 0, or it would be filed as a successful free call and pad the very `pricedCalls` figure the dashboard uses to report its own coverage. A free model is the third case and is the opposite: `inputCostPerMillion: 0` is a **published** price and must survive, so the guard is `!= null` and not truthiness.
+
+**Reasoning tokens are not added.** `completion_tokens_details.reasoning_tokens` is a breakdown *of* `completion_tokens`, not an addition to it. Adding them would over-report precisely the models this metering exists to watch, and it would do so silently, since both numbers are plausible.
+
+**The read side takes a provider list.** `getInferenceSummary` / `getRecentInferenceCalls` / `getInferenceSessions` bind `provider = ANY($1)`, and an empty scope returns empty rather than querying for a filter that matches nothing — which renders identically to a quiet week. Breakdowns pool across providers on purpose ("what did title analysis cost me" is a question about the role, not about who served it) and a new `byProvider` dimension is what keeps the split visible. The OpenRouter account card stays a live-call extra, now skipped entirely when no role points at OpenRouter rather than making a pointless round trip to return null.
+
+### 3. The reasoning control has never rendered for anything but OpenRouter
+
+The stated symptom was narrower — a custom `glm-5.3` gets no `reasoningMechanism`, so no `reasoning_effort` is sent and it runs at the vendor default `max`. Chasing it found the general case.
+
+**The picker's dropdown is fed by `ModelMetadata.supportedEfforts` and nothing else**, while the save route validates against `getSupportedReasoningEfforts`. Only OpenRouter ever stamped the field. So native Google's `thinkingLevel` models declare a mechanism in `google.json`, the server knows their vocabulary is fixed by the SDK's own enum, the save route would accept a value — and there has never been a control to set one. Z.AI's `glm-5.3` inherited the same hole the day it shipped. `withReasoningEfforts` fills the list from `reasoningEffortsFor`, the same function the validator calls, whose own docstring is that the offered list, the saved value and the sent field must not be able to drift. One change, three mechanisms, and the Google fix is a side effect worth naming because nobody asked for it.
+
+**`isGlmReasoningModel` infers from the model id, and the asymmetry is inverted here.** `ReasoningMechanism`'s rule is that absent means "takes none" and nothing is guessed — right everywhere else, because guessing wrong risks a 400 on a batch job. On Z.AI it points the other way. Guessing that a model takes an effort costs nothing until an operator actually picks one, since an unset effort still sends no field at all; the worst case is a setting that saves and quietly does not apply, and `reasoning_effort` is OpenAI's own field name on a provider advertising OpenAI SDK compatibility, so an ignored field is likelier than a rejection. Guessing that it does *not* costs money on every call, forever, silently — GLM-5.x forces deep thinking on and defaults to `max`.
+
+Scope is the whole GLM-5 line from the evidence that 5.3 and 5.3-Flash document it and share their text parameters. `(?![0-9])` so a future `glm-50` is not swept in by a prefix match; the `[1m]` context suffix Z.AI's own tooling appends is matched, because it is the same model. GLM-4.x is excluded deliberately: it uses the older `thinking: {type}` switch, does not force thinking on, and has neither the capability nor the problem.
+
+`inferredReasoningFacts` is shared by `getReasoningModelFacts` (what the sender and the validator ask) and `getModelsForFunctionWithCustom` (what the picker offers), so a custom model cannot be offered a control the sender would then refuse.
+
+### 4. A 404 from Z.AI reads as a dead key
+
+The SDK appends `/chat/completions` to whatever base URL is configured, so pasting the bare host — the natural thing to do — produces a 404. To anyone who has configured an AI provider before, a 404 means the key is gone, so they go and regenerate a key that was fine.
+
+**Read off the URL, not passed in.** `describeAiError` is called from a dozen places, and an optional `provider` argument would be supplied by some and forgotten by others, so the same fault would be diagnosed on one screen and not another — [F-117](#f-117)'s defect exactly, and [F-038](#f-038)'s before it. The endpoint is already on the error, is the thing actually at fault, and cannot be forgotten.
+
+**Silent when the path is already right.** A 404 from a correctly-formed Z.AI URL is a different fault — most likely a model id the account cannot reach — and telling someone to fix the one setting that is correct is worse than saying nothing. Only 404, only the two Z.AI hosts, only when `/api/paas/v4` is absent.
+
+`hint` is its own field rather than a replacement for `providerMessage`: the provider's own words are evidence and must survive. `testProviderConnection` appends it, because that button is pressed *to find out what is wrong*.
+
+### The catalog, re-verified
+
+Checked against docs.z.ai on 2026-09-10. No drift: every price matches, no model newer than GLM-5.3 exists, and there is still no embedding model anywhere in `llms.txt` or the pricing page — so `supportsEmbeddings: false` stands.
+
+Two things improved on [F-118](#f-118)'s "not verified" list. `glm-4.7` and `glm-4.6` are now **confirmed model codes**, read from the cURL sample on each model's own guide page (`"model": "glm-4.7"`), not lower-cased from a display name. And the two missing context windows are filled: the GLM-4.7 guide carries three variant tabs each declaring **200K** context and 128K max output, which covers `glm-4.7` and `glm-4.7-flash`. `glm-4.7-flash` remains the one id never seen in a request example — it appears only as the display name "GLM-4.7-Flash" — so it is still an inference, made from the same lower-casing that `glm-5.3-flash` confirms.
+
+The GLM-4.7 guide page exists at `/guides/llm/glm-4.7` but is **absent from `llms.txt`**, which is why [F-118](#f-118) recorded its context window as undocumented. A vendor's own documentation index is not a complete list of its documentation; try the URL.

@@ -25,6 +25,7 @@ import {
   type EmbeddingInputType,
 } from './embeddingIdentity.js'
 import {
+  isGlmReasoningModel,
   orderReasoningEfforts,
   reasoningEffortsFor,
   resolveReasoningEffort,
@@ -49,6 +50,7 @@ import {
   fetchOpenRouterKeyStatus,
   type OpenRouterAccountStatus,
 } from './openrouter-usage.js'
+import { createZaiUsageFetch } from './zai-usage.js'
 import { withInferenceContext } from './inferenceContext.js'
 import {
   getOllamaModelCapabilities,
@@ -670,6 +672,10 @@ function createProviderInstance(providerConfig: ProviderConfig, role?: AIFunctio
           name: 'zai',
           baseURL: providerConfig.baseUrl ?? ZAI_BASE_URL,
           apiKey: providerConfig.apiKey,
+          // Z.AI reports token counts but not money, so this writes the counts
+          // and prices them from the published catalog. See lib/zai-usage.ts
+          // for why an estimate is worth recording and how it can be wrong.
+          fetch: createZaiUsageFetch(role),
         })
         break
 
@@ -1089,7 +1095,31 @@ export async function getReasoningModelFacts(
   }
 
   const model = getModel(provider, modelId, fn)
-  return model?.reasoningMechanism ? model : null
+  if (model?.reasoningMechanism) return model
+
+  return inferredReasoningFacts(provider, modelId)
+}
+
+/**
+ * Reasoning facts for a model the catalog does not list.
+ *
+ * Only Z.AI has any, and only because it is the one provider where a missing
+ * mechanism costs money rather than merely a missing control — see
+ * `isGlmReasoningModel` for the full argument. Every other provider returns null
+ * here, which is `ReasoningMechanism`'s rule that absent is a positive fact.
+ *
+ * Shared by `getReasoningModelFacts` (what the request builder and the save
+ * validator ask) and `getModelsForFunctionWithCustom` (what the picker offers),
+ * so a custom model cannot be offered a control the sender would then refuse.
+ */
+function inferredReasoningFacts(
+  provider: string,
+  modelId: string
+): ReasoningCapableModel | null {
+  if (provider === 'zai' && isGlmReasoningModel(modelId)) {
+    return { reasoningMechanism: 'reasoningEffort' }
+  }
+  return null
 }
 
 /**
@@ -2128,9 +2158,15 @@ async function runProviderConnectionTest(
       .filter(Boolean)
       .join(' — ')
 
+    const base = detail ? `${described.message} (${detail})` : described.message
+
+    // The hint goes AFTER the provider's own words rather than instead of them.
+    // This is the button someone presses to find out what is wrong, and a 404
+    // from a bare Z.AI host reads as a dead key to anyone who has configured an
+    // AI provider before — so the specific cause is worth the extra sentence.
     return {
       success: false,
-      error: detail ? `${described.message} (${detail})` : described.message,
+      error: described.hint ? `${base} — ${described.hint}` : base,
     }
   }
 }
@@ -2311,6 +2347,31 @@ function reasoningFromCatalog(
   }
 }
 
+/**
+ * Fill in the effort words for a model that declares a mechanism but no list.
+ *
+ * The picker's dropdown is fed by `ModelMetadata.supportedEfforts` and nothing
+ * else, while the save route validates against `getSupportedReasoningEfforts`.
+ * Only OpenRouter ever stamped the field, so the two disagreed for every other
+ * mechanism: native Google's models declare `thinkingLevel` in `google.json` and
+ * Z.AI's declare `reasoningEffort` in `zai.json`, both of them draw their
+ * vocabulary from a constant the server already knows, and neither has ever
+ * rendered a control. The save route would have accepted a value there was no
+ * way to set.
+ *
+ * So the list comes from `reasoningEffortsFor` — the same function
+ * `getSupportedReasoningEfforts` calls, whose own docstring is that the offered
+ * list, the saved value and the sent field must not be able to drift. A model
+ * that already carries a list (OpenRouter's, which is live and per model) keeps
+ * it untouched.
+ */
+function withReasoningEfforts(model: ModelMetadata): ModelMetadata {
+  if (!model.reasoningMechanism || model.supportedEfforts?.length) return model
+  const efforts = reasoningEffortsFor(model)
+  if (efforts.length === 0) return model
+  return { ...model, supportedEfforts: orderReasoningEfforts(efforts) }
+}
+
 export async function getModelsForFunctionWithCustom(
   providerId: string,
   fn: AIFunction
@@ -2390,6 +2451,11 @@ export async function getModelsForFunctionWithCustom(
           contextWindow: formatContextWindow(catalogInfo.contextLength),
         }),
         ...reasoningFromCatalog(catalogInfo),
+        // A custom model has no catalog entry to declare a mechanism, so this
+        // is the only place one can be inferred — and for Z.AI's GLM-5.x that
+        // matters, because the alternative is a model that forces thinking on,
+        // defaults to its most expensive level, and offers no way to say so.
+        ...(inferredReasoningFacts(providerId, cm.modelId) ?? {}),
         // Mark as custom for UI
         isCustom: true,
       }
@@ -2409,10 +2475,13 @@ export async function getModelsForFunctionWithCustom(
   // a dimension the resolver would not use.
   const builtInIds = new Set(enrichedBuiltIns.map((m) => m.id))
 
+  // Applied last, over both lists, so a mechanism from any of the three sources
+  // — the catalog file, OpenRouter's live data, or the Z.AI inference above —
+  // reaches the picker with the words it accepts.
   return [
     ...enrichedBuiltIns,
     ...customModelMetadata.filter((m) => !builtInIds.has(m.id)),
-  ]
+  ].map(withReasoningEfforts)
 }
 
 // ============================================================================
