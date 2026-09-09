@@ -1007,42 +1007,6 @@ export function AIFunctionCard({
             {success}
           </Alert>
         )}
-        {testResult && (
-          <Alert 
-            severity={testResult.success ? 'success' : 'error'} 
-            sx={{ mb: 2 }}
-            onClose={() => setTestResult(null)}
-          >
-            {testResult.success
-              ? t('aiFunctionCard.connectionSuccess')
-              : t('aiFunctionCard.connectionFailedWithError', { error: testResult.error ?? '' })}
-            {/*
-              What the server actually holds, not just that it answered. The
-              counts are the part that diagnoses a role pointed at a server with
-              nothing suitable installed — reachability alone never could.
-            */}
-            {serverStatus?.reachable && (
-              <Typography variant="body2" sx={{ mt: 1 }}>
-                {t('aiFunctionCard.serverSummary', {
-                  api: serverStatus.api ?? '?',
-                  total: serverStatus.totalModels,
-                  language: serverStatus.languageModels,
-                  embedding: serverStatus.embeddingModels,
-                })}
-                {serverStatus.loaded.length > 0 && (
-                  <>
-                    {' '}
-                    {t('aiFunctionCard.serverLoaded', {
-                      models: serverStatus.loaded
-                        .map((l) => (l.contextLength ? `${l.modelId} (${l.contextLength})` : l.modelId))
-                        .join(', '),
-                    })}
-                  </>
-                )}
-              </Typography>
-            )}
-          </Alert>
-        )}
 
         {/* Provider & Model Selection */}
         <Box display="flex" flexDirection="column" gap={2} mb={2}>
@@ -1407,7 +1371,9 @@ export function AIFunctionCard({
             >
               {t('aiFunctionCard.addFallbackKey')}
             </Button>
-            <FormHelperText>{t('aiFunctionCard.fallbackApiKeyHelp')}</FormHelperText>
+            {/* Three lines explaining why a spare from the same Google project
+                buys nothing — true, and read once. */}
+            <InfoHint title={t('aiFunctionCard.fallbackApiKeyHelp')} />
           </Box>
         )}
 
@@ -1428,9 +1394,15 @@ export function AIFunctionCard({
                   onChange={(e) => setFreeTier(e.target.checked)}
                 />
               }
-              label={t('aiFunctionCard.freeTierLabel')}
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+                  {t('aiFunctionCard.freeTierLabel')}
+                  {/* Same treatment as the pacing checkbox beside it: the
+                      reasoning is a paragraph and the control is one tick. */}
+                  <InfoHint title={t('aiFunctionCard.freeTierHelp')} />
+                </Box>
+              }
             />
-            <FormHelperText sx={{ mt: 0 }}>{t('aiFunctionCard.freeTierHelp')}</FormHelperText>
           </Box>
         )}
 
@@ -1775,6 +1747,50 @@ export function AIFunctionCard({
             {saving ? <CircularProgress size={16} /> : t('common.save')}
           </Button>
         </Box>
+
+        {/*
+          BELOW the buttons, not above them. A result that appears at the top of
+          a tall card is off-screen from where the press happened — on the Title
+          Analysis card the button sits past the fallback-model list, so the
+          answer to "did that work" landed several hundred pixels behind the
+          reader. It belongs where the action is.
+        */}
+        {testResult && (
+          <Alert 
+            severity={testResult.success ? 'success' : 'error'} 
+            sx={{ mt: 2 }}
+            onClose={() => setTestResult(null)}
+          >
+            {testResult.success
+              ? t('aiFunctionCard.connectionSuccess')
+              : t('aiFunctionCard.connectionFailedWithError', { error: testResult.error ?? '' })}
+            {/*
+              What the server actually holds, not just that it answered. The
+              counts are the part that diagnoses a role pointed at a server with
+              nothing suitable installed — reachability alone never could.
+            */}
+            {serverStatus?.reachable && (
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                {t('aiFunctionCard.serverSummary', {
+                  api: serverStatus.api ?? '?',
+                  total: serverStatus.totalModels,
+                  language: serverStatus.languageModels,
+                  embedding: serverStatus.embeddingModels,
+                })}
+                {serverStatus.loaded.length > 0 && (
+                  <>
+                    {' '}
+                    {t('aiFunctionCard.serverLoaded', {
+                      models: serverStatus.loaded
+                        .map((l) => (l.contextLength ? `${l.modelId} (${l.contextLength})` : l.modelId))
+                        .join(', '),
+                    })}
+                  </>
+                )}
+              </Typography>
+            )}
+          </Alert>
+        )}
       </CardContent>
 
       {/* Add Custom Model Dialog */}
