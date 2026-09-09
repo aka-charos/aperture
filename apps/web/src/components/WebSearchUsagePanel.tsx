@@ -83,10 +83,6 @@ function formatTime(iso: string | null): string {
     : date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 }
 
-function formatCompact(n: number): string {
-  return n.toLocaleString(undefined, { notation: 'compact', maximumFractionDigits: 1 })
-}
-
 /**
  * Slot names are `primary`, `fallback`, `fallback2`, `fallback3`… The first two
  * keep dedicated strings because they read better than "Spare key 1"; beyond
@@ -110,14 +106,27 @@ function barColor(used: number, limit: number): 'primary' | 'warning' | 'error' 
   return 'primary'
 }
 
-function UsageBar({ label, used, limit }: { label: string; used: number; limit: number | null }) {
+function UsageBar({
+  label,
+  used,
+  limit,
+  adornment,
+}: {
+  label: string
+  used: number
+  limit: number | null
+  /** Sits beside the label, for a chip that belongs to this row. */
+  adornment?: React.ReactNode
+}) {
   const value = limit ? Math.min(100, (used / limit) * 100) : 0
   return (
     <Box sx={{ mb: 1 }}>
       <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 0.25 }}>
-        <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+        <Typography variant="caption" color="text.secondary" fontWeight={600}>
           {label}
         </Typography>
+        {adornment}
+        <Box sx={{ flex: 1 }} />
         <Typography variant="caption" sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
           {limit
             ? `${used.toLocaleString()} / ${limit.toLocaleString()}`
@@ -167,6 +176,17 @@ export function WebSearchUsagePanel({ role = 'webSearch' }: { role?: string } = 
   // Nothing to meter until the role is configured — the card already says so.
   if (!usage?.configured) return null
 
+  // FREE TIER ONLY. This panel's denominators come from the shipped free-tier
+  // table, and its heading says so, so it has nothing to draw against on a paid
+  // project — the bars would read as full while the real budget had barely been
+  // touched, which is the exact misreading the checkbox exists to prevent.
+  //
+  // The cost is real and deliberate: limits Google has ENFORCED against this key
+  // apply whatever the checkbox says, and those counts are hidden here too. They
+  // are still recorded, and the moment the operator says the key is free-tier
+  // they appear.
+  if (!usage.freeTier) return null
+
   // The server already returns exactly the configured keys, deduped — a role
   // with no spares gets one row, and the primary's numbers are the whole story.
   const slots = usage.slots
@@ -201,7 +221,7 @@ export function WebSearchUsagePanel({ role = 'webSearch' }: { role?: string } = 
         {t('webSearchUsage.resets', { time: formatTime(usage.dayResetsAt) })}
       </Typography>
 
-      {!limits?.rpd && !limits?.rpm && (
+      {!limits?.rpd && (
         <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
           {/* Two different reasons for a bare count, and the operator can only
               act on one of them: they turned the free-tier ceilings off. */}
@@ -234,13 +254,24 @@ export function WebSearchUsagePanel({ role = 'webSearch' }: { role?: string } = 
         )
       )}
 
+      {/*
+        ONE LINE PER KEY, and per-day only.
+        The per-minute bars were unreadable by construction: a minute is gone
+        before anyone navigates to this page, so they read 0/10 on every visit
+        except the one made mid-run — a meter whose honest answer is almost
+        always "nothing happening". The daily figure is the one that is still
+        true when somebody comes to look, and it is the budget that actually
+        runs out. The key's name is the bar's label rather than a heading above
+        it, which is what collapses three rows per key into one.
+      */}
       {slots.map((slot) => (
-        <Box key={slot.slot} sx={{ mb: 1.5, '&:last-of-type': { mb: 0 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-            <Typography variant="caption" fontWeight={600}>
-              {slotLabel(slot.slot, t)}
-            </Typography>
-            {slot.rateLimitedToday > 0 && (
+        <UsageBar
+          key={slot.slot}
+          label={slotLabel(slot.slot, t)}
+          used={slot.day.requests}
+          limit={limits?.rpd ?? null}
+          adornment={
+            slot.rateLimitedToday > 0 ? (
               <Chip
                 size="small"
                 color="warning"
@@ -249,28 +280,9 @@ export function WebSearchUsagePanel({ role = 'webSearch' }: { role?: string } = 
                 label={t('webSearchUsage.rateLimitedToday', { count: slot.rateLimitedToday })}
                 sx={{ height: 18, fontSize: '0.65rem', '& .MuiChip-label': { px: 0.75 } }}
               />
-            )}
-          </Box>
-
-          <UsageBar
-            label={t('webSearchUsage.requestsToday')}
-            used={slot.day.requests}
-            limit={limits?.rpd ?? null}
-          />
-          <UsageBar
-            label={t('webSearchUsage.requestsThisMinute')}
-            used={slot.minute.requests}
-            limit={limits?.rpm ?? null}
-          />
-          <Typography variant="caption" color="text.secondary" display="block">
-            {limits?.tpm
-              ? t('webSearchUsage.tokensThisMinuteWithLimit', {
-                  used: formatCompact(slot.minute.tokens),
-                  limit: formatCompact(limits.tpm),
-                })
-              : t('webSearchUsage.tokensThisMinute', { used: formatCompact(slot.minute.tokens) })}
-          </Typography>
-        </Box>
+            ) : undefined
+          }
+        />
       ))}
 
       {paused.map((slot) => (
