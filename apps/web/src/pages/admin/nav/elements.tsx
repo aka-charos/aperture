@@ -6,6 +6,7 @@ import BackupIcon from '@mui/icons-material/Backup'
 import BadgeIcon from '@mui/icons-material/Badge'
 import CalculateIcon from '@mui/icons-material/Calculate'
 import CategoryIcon from '@mui/icons-material/Category'
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows'
 import ContactMailIcon from '@mui/icons-material/ContactMail'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import DnsIcon from '@mui/icons-material/Dns'
@@ -209,6 +210,10 @@ export const ADMIN_ELEMENTS: Record<string, AdminElement> = {
   algorithm: {
     icon: <TuneIcon />,
     Component: lazy(() => import('@/pages/admin/routes/AlgorithmRoute')),
+  },
+  'analysis-bench': {
+    icon: <CompareArrowsIcon />,
+    Component: lazy(() => import('@/pages/admin/routes/AnalysisBenchRoute')),
   },
   evaluation: {
     icon: <ScienceIcon />,

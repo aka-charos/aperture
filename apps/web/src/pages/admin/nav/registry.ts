@@ -375,6 +375,27 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     ],
   },
   {
+    // The bench sits with the AI settings rather than with the recommender's
+    // evaluation: it answers "which model should hold this role", which is a
+    // question about the AI configuration a few rows above it.
+    id: 'analysis-bench',
+    group: 'ai',
+    segment: 'analysis-bench',
+    titleKey: 'adminNav.analysisBench.title',
+    blurbKey: 'adminNav.analysisBench.blurb',
+    aliases: [
+      'compare',
+      'comparison',
+      'bench',
+      'benchmark',
+      'model comparison',
+      'title analysis',
+      'lm studio',
+      'side by side',
+      'prompt',
+    ],
+  },
+  {
     id: 'evaluation',
     group: 'recommendations',
     segment: 'evaluation',

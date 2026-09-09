@@ -5054,6 +5054,10 @@
     "discoveryTuning": {
       "title": "Discovery tuning",
       "blurb": "How much Discover fetches, how hard it filters, and what it ranks by"
+    },
+    "analysisBench": {
+      "title": "Analysis bench",
+      "blurb": "Run one film through several models on identical sources and read them side by side."
     }
   },
   "settingsEvaluation": {
@@ -5241,5 +5245,26 @@
     "confirmAction": "Mark watched",
     "notNow": "Not now",
     "notSeen": "I haven't seen it"
+  },
+  "adminAnalysisBench": {
+    "premise": "Sources are retrieved once and every model answers the identical prompt, so a difference between two answers is a difference between the two models.",
+    "stepTitle": "1. Pick a title",
+    "searchPlaceholder": "Search your library…",
+    "stepModels": "2. Pick the models",
+    "modelsHint": "Up to {{count}} models per run. They answer in the order you tick them.",
+    "unreachable": "That server did not answer. Check its address in the AI settings.",
+    "noModels": "No models available for this provider.",
+    "run_one": "Run {{count}} model",
+    "run_other": "Run {{count}} models",
+    "stop": "Stop",
+    "progress": "{{done}} of {{total}} models done",
+    "control": "Every model below answered one prompt built from {{count}} source document(s), {{chars}} characters retrieved · prompt version {{version}}",
+    "copy": "Copy the whole report",
+    "copied": "Copied",
+    "download": "Download as a text file",
+    "previous": "Earlier comparisons",
+    "runSummary": "{{count}} models · {{status}} · {{when}}",
+    "startFailed": "Could not start the comparison.",
+    "modelsFailed": "Could not load the model list."
   }
 }
