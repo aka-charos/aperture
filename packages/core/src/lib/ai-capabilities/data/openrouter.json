@@ -24,13 +24,12 @@
       "embeddingDimensions": 3072,
       "quality": "standard",
       "costTier": "low",
-      "inputTypeNote": "Ignores input_type: its semantic_similarity output is byte-identical to sending nothing. The mode is delivered as a TEXT PREFIX on the document instead (task: sentence similarity | query: ...), which moves the vector to cosine 0.811 from bare text -- a far larger change than any parameter produces. Verified byte-identical between OpenRouter and Google native on both bare and prefixed input, and byte-identical across repeats despite four listed upstreams (all Google), which is why its routing needs no pin. Measured separately: unlike 001, this model RENORMALISES its own Matryoshka truncations -- 768 dimensions come back unit-length. That removes the renormalisation objection for this model specifically, though `dimensions` stays unplumbed because it does not hold for 001 or pplx-embed.",
+      "inputTypeNote": "No mode is recommended, and that is a measurement rather than an omission. MEASURED across five fully-embedded sets on one library (12,589 rows, all centred, 33 viewers): bare and prefixed tie on the metrics to 0.02pp median percentile, but the prefix does two things at once and they pull opposite ways -- it lowers same-country share in the top ten (75.0% against 83.9% bare) and RAISES lexical title-matching (10.0% of slots against 3.3%), with bare higher on 13 of 18 seeds and tied on 4. On The Conversation both Conversation Pieces took ranks 1 and 2 ahead of the entire 70s surveillance cluster. Bare also wins deep retrieval, which is what the recommender spends: ndcg@500 51.32 against 49.21. So bare shipped. Do not re-derive a recommendation from the symmetry of the task -- item-to-item comparison and a centroid of item vectors really are symmetric, and that argument was measured against the same model and pool and predicted the wrong answer. MECHANICS, still true and worth keeping: this model ignores input_type (its semantic_similarity output is byte-identical to sending nothing) and takes its mode as a TEXT PREFIX on the document instead (task: sentence similarity | query: ...), which moves the vector to cosine 0.811 from bare text. Verified byte-identical between OpenRouter and Google native on both bare and prefixed input, and across repeats despite four listed upstreams (all Google), which is why its routing needs no pin. Unlike 001 it RENORMALISES its own Matryoshka truncations -- 768 dimensions come back unit-length -- though `dimensions` stays unplumbed because that does not hold for 001 or pplx-embed.",
       "inputTypeMechanism": "textPrefix",
       "inputTypePrefixes": {
         "semantic_similarity": "task: sentence similarity | query: ",
         "clustering": "task: clustering | query: "
-      },
-      "recommendedInputType": "semantic_similarity"
+      }
     },
     {
       "id": "google/gemini-embedding-001",
@@ -45,9 +44,8 @@
       "embeddingDimensions": 3072,
       "quality": "standard",
       "costTier": "low",
-      "inputTypeNote": "Its Matryoshka truncations are NOT unit-length -- measured L2 norm 0.598 at 768 dimensions, confirming Google's own instruction to normalise non-3072 output manually, and unlike gemini-2 which renormalises its own. Setting a mode here REQUIRES pinning an upstream. OpenRouter serves this model from two that disagree: pinned to google-vertex, input_type: semantic_similarity is honoured and stable (cosine 0.841 from unmoded); pinned to google-ai-studio it is dropped and the unmoded vector comes back. Unpinned, each request is a coin flip and the library becomes a mixture of two spaces -- so the settings page refuses that combination. Both upstreams do agree on the unmoded vector, which is why the library embedded without a mode is unaffected however it routed.",
+      "inputTypeNote": "Its Matryoshka truncations are NOT unit-length -- measured L2 norm 0.598 at 768 dimensions, confirming Google's own instruction to normalise non-3072 output manually, and unlike gemini-2 which renormalises its own. Setting a mode here REQUIRES pinning an upstream. OpenRouter serves this model from two that disagree: pinned to google-vertex, input_type: semantic_similarity is honoured and stable (cosine 0.841 from unmoded); pinned to google-ai-studio it is dropped and the unmoded vector comes back. Unpinned, each request is a coin flip and the library becomes a mixture of two spaces -- so the settings page refuses that combination. Both upstreams do agree on the unmoded vector, which is why the library embedded without a mode is unaffected however it routed. No mode is recommended: pinned and honoured, semantic_similarity measured as a LOSS on the one library this has been evaluated against -- last of five sets, against second place for the same model with no mode at all. The pin is not the cause, since both upstreams agree on the unmoded vector.",
       "inputTypeMechanism": "parameter",
-      "recommendedInputType": "semantic_similarity",
       "inputTypeValues": {
         "semantic_similarity": "SEMANTIC_SIMILARITY",
         "search_query": "RETRIEVAL_QUERY",
