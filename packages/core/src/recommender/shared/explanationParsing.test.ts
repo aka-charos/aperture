@@ -11,7 +11,7 @@ import {
 // ============================================================================
 
 test('large-context providers get room for a model that reasons first', () => {
-  for (const provider of ['openai', 'anthropic', 'google', 'deepseek', 'openrouter']) {
+  for (const provider of ['openai', 'anthropic', 'google', 'deepseek', 'openrouter', 'zai']) {
     const settings = explanationBatchSettings(provider)
     assert.equal(settings.batchSize, 10, `${provider} batch size`)
 

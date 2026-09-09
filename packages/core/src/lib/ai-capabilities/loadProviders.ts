@@ -9,6 +9,7 @@ import ollama from './data/ollama.json' with { type: 'json' }
 import openai from './data/openai.json' with { type: 'json' }
 import openaiCompatible from './data/openai-compatible.json' with { type: 'json' }
 import openrouter from './data/openrouter.json' with { type: 'json' }
+import zai from './data/zai.json' with { type: 'json' }
 
 const RAW_PROVIDERS = [
   openai,
@@ -21,6 +22,7 @@ const RAW_PROVIDERS = [
   deepseek,
   openrouter,
   huggingface,
+  zai,
 ] as const
 
 function isModelMetadata(value: unknown): value is ModelMetadata {

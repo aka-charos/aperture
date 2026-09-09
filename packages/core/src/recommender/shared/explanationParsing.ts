@@ -74,8 +74,11 @@ export function explanationBatchSettings(
   }
 
   // Large context: OpenAI (128K), Anthropic (200K), Google (1M+), DeepSeek
-  // (64K), OpenRouter (a router in front of those same large-context models).
-  const largeContextProviders = ['openai', 'anthropic', 'google', 'deepseek', 'openrouter']
+  // (64K), OpenRouter (a router in front of those same large-context models),
+  // Z.AI (GLM-5.3 and 5.3-Flash at 1M, GLM-4.6 at 200K — and its GLM-5.x models
+  // force a scratchpad on, which is precisely the spend this ceiling exists to
+  // survive).
+  const largeContextProviders = ['openai', 'anthropic', 'google', 'deepseek', 'openrouter', 'zai']
   if (largeContextProviders.includes(provider)) {
     return { batchSize: 10, maxTokens: 16000 }
   }
