@@ -5209,7 +5209,7 @@
     "searchPlaceholder": "Search your library…",
     "stepModels": "2. Pick the models",
     "modelsHint": "Up to {{count}} models per run. They answer in the order you tick them.",
-    "unreachable": "That server did not answer. Check its address in the AI settings.",
+    "unreachable": "That server did not answer at its configured address. Check it in the AI settings.",
     "noModels": "No models available for this provider.",
     "run_one": "Run {{count}} model",
     "run_other": "Run {{count}} models",
@@ -5222,6 +5222,7 @@
     "previous": "Earlier comparisons",
     "runSummary": "{{count}} models · {{status}} · {{when}}",
     "startFailed": "Could not start the comparison.",
-    "modelsFailed": "Could not load the model list."
+    "modelsFailed": "Could not load the model list.",
+    "notConfigured": "No server address set for this provider. Add one in the AI settings."
   }
 }

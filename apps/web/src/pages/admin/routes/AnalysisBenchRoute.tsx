@@ -61,7 +61,9 @@ interface SearchHit {
 interface ProviderGroup {
   provider: string
   name: string
-  /** False only for a LOCAL provider whose server did not answer. */
+  /** False only for a LOCAL provider with no address configured anywhere. */
+  configured: boolean
+  /** False only for a LOCAL provider whose configured server did not answer. */
   reachable: boolean
   models: { id: string; name: string }[]
 }
@@ -328,10 +330,15 @@ export default function AnalysisBenchRoute() {
             <Typography variant="body2" fontWeight={600}>
               {group.name}
             </Typography>
-            {/* "Nothing installed" and "wrong address" have opposite fixes, so
-                an unreachable local server says so instead of rendering as an
-                empty provider. */}
-            {!group.reachable ? (
+            {/* Three states, three fixes: no address set, an address that
+                does not answer, and a server that answered with nothing.
+                Collapsing the first two sends the operator to check an address
+                they never set. */}
+            {!group.configured ? (
+              <Typography variant="caption" color="text.secondary">
+                {t('adminAnalysisBench.notConfigured')}
+              </Typography>
+            ) : !group.reachable ? (
               <Typography variant="caption" color="warning.main">
                 {t('adminAnalysisBench.unreachable')}
               </Typography>

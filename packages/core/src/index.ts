@@ -73,6 +73,7 @@ export {
   getProvidersForFunction,
   getModelsForFunction,
   getModelsForFunctionWithCustom,
+  resolveProviderEndpoint,
   getPricingForModel,
   getPricingForModelAsync,
   PROVIDERS,
