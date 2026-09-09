@@ -37,9 +37,14 @@ export type ParagraphMap = ParagraphMapEntry[]
 /**
  * Split an analysis into the paragraphs the map's numbers refer to.
  *
- * MUST AGREE WITH THE PANEL, which splits on `/\n{2,}/` to render. If the two
- * disagree about what a paragraph is then every index is off by however many
- * they differ by, and the map would confidently point at the wrong prose.
+ * THE PANEL DOES NOT SPLIT THIS WAY, and that is why nothing on the client may
+ * use these indices. Its `toParagraphs` honours blank lines when the model wrote
+ * any and otherwise reflows the prose by sentence count, because some rows
+ * arrive as one unbroken block with no newline in them anywhere — so on exactly
+ * those rows an index resolved in the browser points at prose the model did not
+ * label. Anything needing to act on a labelled paragraph resolves it here and
+ * ships the resolved text: ./segments.ts is the only such caller, and a second
+ * one belongs beside it rather than in the bundle.
  */
 export function splitAnalysisParagraphs(text: string): string[] {
   return text

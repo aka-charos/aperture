@@ -52,8 +52,12 @@
  *    each.
  * 6: the answer carries a paragraph map, so which paragraph answers which
  *    question is recorded by the model rather than inferred from position.
+ * 7: the tradition question stops naming an antecedent whose ending would
+ *    travel across to this one, and the dispute question stops settling what
+ *    it reports. Every stored row is retired because the rows themselves are
+ *    what carry the leak.
  */
-export const ANALYSIS_PROMPT_VERSION = 6
+export const ANALYSIS_PROMPT_VERSION = 7
 
 /** Reception figures, passed as calibration only. All optional. */
 export interface ReceptionContext {
@@ -221,6 +225,75 @@ const CIRCUMSTANCES_QUESTION: AnalysisQuestion = {
 }
 
 /**
+ * Where it sits, and the one thing it may not name.
+ *
+ * THE SPOILER DEFENCE HAS A HOLE AND THIS QUESTION IS IT. The header above
+ * argues that spoilers are handled structurally, because craft, intent,
+ * tradition and reception are pre-viewing questions by construction. That is
+ * true of four of them. For a work whose revelation IS its antecedent, the
+ * honest answer to this one is the ending. Measured on a live analysis of
+ * Incendies: a model that had followed every other rule well named Oedipus Rex
+ * as the film's model and explained the transposition, which tells a reader who
+ * has not seen it exactly what the film is holding back. Nothing was
+ * disobeyed — question 2 was answered correctly, and question 2 was unsafe.
+ *
+ * THE TEST IS MECHANICAL ON PURPOSE. "Do not name an antecedent that is the
+ * revelation" asks the model for the judgement it has just been shown not to
+ * make. Asking instead whether knowing how the antecedent ends tells you how
+ * this one ends is checkable without insight, and leaves the ordinary case —
+ * a movement, a national cinema, a body of work — untouched.
+ *
+ * IT IS STILL AN INSTRUCTION, and this file's own position is that a
+ * don't-spoil rule only has to fail once. It sits in the question rather than
+ * in RULES for proximity: the rule it duplicates is eight bullets and several
+ * thousand characters further down, past the source documents, while this is
+ * read at the moment the breach is invited. The load-bearing half is
+ * ./segments.ts, which gates a paragraph the model labelled `tradition` behind
+ * a disclosure the reader opens. This paragraph is what covers the rows that
+ * gate cannot reach — the paragraph map is tolerant by design, so a row
+ * carrying no usable map has no gate and nothing else standing in the way.
+ */
+const TRADITION_QUESTION: AnalysisQuestion = {
+  id: 'tradition',
+  text: 'What tradition does it sit in - what was it responding to, what did it influence? Name traditions and movements freely. Naming one specific prior work as the model for this one is only safe when the comparison does not carry the ending of that work across: if a reader who knows how that one ends would then know how this one ends, name the tradition and stop there.',
+}
+
+/**
+ * What is argued about, left argued about.
+ *
+ * The closing half was added because a live analysis reported a genuine
+ * two-sided critical disagreement and then, two paragraphs later, decided it —
+ * closing on one side's reading as the article's own verdict. The TASK line
+ * already says "not a review", which is evidently not proximate enough to reach
+ * a question that invites a survey of opinions.
+ *
+ * ATTRIBUTION IS DELIBERATELY NOT REQUIRED. Demanding a named critic or outlet
+ * for each position sounds like the specificity rule below and behaves nothing
+ * like it: retrieved reviews and aggregator pages routinely describe a
+ * disagreement without saying who holds which end of it, and a model required
+ * to attribute one will either invent a critic — a fabricated position stored
+ * indefinitely, the worst failure available here — or drop the paragraph under
+ * the answer-only-what-is-supported rule, which on the analysis that prompted
+ * this was the best paragraph in it and named nobody. The specificity rule
+ * already asks for the names the sources give, which takes the upside without
+ * the pressure.
+ */
+const DISPUTE_QUESTION: AnalysisQuestion = {
+  id: 'dispute',
+  text: 'What do critics genuinely disagree about? Report the disagreement and leave it open - if you find yourself concluding which side is right, you have stopped answering this question.',
+}
+
+/**
+ * Stated once and shared, like the two above: it is identical for both media
+ * types, and a question duplicated across the two arrays is a question that
+ * drifts the first time one copy is edited.
+ */
+const INTENT_QUESTION: AnalysisQuestion = {
+  id: 'intent',
+  text: 'What did the people who made it say they were trying to do?',
+}
+
+/**
  * ORDER IS READING ORDER, and it is not the order these were first written in.
  *
  * The questions arrive in the output as paragraphs in sequence - one each, in
@@ -244,12 +317,9 @@ const MOVIE_QUESTIONS: AnalysisQuestion[] = [
     id: 'work',
     text: 'What is this film doing, and how do its choices serve that? Name a choice, then say what it achieves - a list of equipment or techniques with no effect attached is not an answer.',
   },
-  {
-    id: 'tradition',
-    text: 'What tradition does it sit in - what was it responding to, what did it influence?',
-  },
-  { id: 'dispute', text: 'What do critics genuinely disagree about?' },
-  { id: 'intent', text: 'What did the people who made it say they were trying to do?' },
+  TRADITION_QUESTION,
+  DISPUTE_QUESTION,
+  INTENT_QUESTION,
   CIRCUMSTANCES_QUESTION,
 ]
 
@@ -268,12 +338,9 @@ const SERIES_QUESTIONS: AnalysisQuestion[] = [
     id: 'structure',
     text: 'How is it structured across its run - serialised or episodic, and did it change?',
   },
-  {
-    id: 'tradition',
-    text: 'What tradition does it sit in - what was it responding to, what did it influence?',
-  },
-  { id: 'dispute', text: 'What do critics genuinely disagree about?' },
-  { id: 'intent', text: 'What did the people who made it say they were trying to do?' },
+  TRADITION_QUESTION,
+  DISPUTE_QUESTION,
+  INTENT_QUESTION,
   CIRCUMSTANCES_QUESTION,
 ]
 

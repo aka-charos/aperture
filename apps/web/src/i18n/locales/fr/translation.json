@@ -852,7 +852,10 @@
           "crw": "Self-hosted search",
           "grounding": "Google grounding"
         }
-      }
+      },
+      "traditionShow": "Show tradition and influences",
+      "traditionHide": "Hide tradition and influences",
+      "traditionNote": "Shown on request, because where a work sits can point at what it withholds."
     }
   },
   "browse": {

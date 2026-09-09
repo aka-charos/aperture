@@ -15,6 +15,20 @@
  * text: a notice hedging about spoilers on every title, forever, is a worse
  * trade than the closed question set it would be apologising for.
  *
+ * ONE OF THOSE QUESTIONS TURNED OUT NOT TO BE PRE-VIEWING. Where a work sits
+ * can be the thing it withholds: measured on Incendies, a model answering the
+ * tradition question correctly named the earlier work the film is patterned on,
+ * which tells anyone who knows that one how this one ends. So the server marks
+ * those runs and this panel puts them behind a control the reader opens — see
+ * `paragraphs` below and core's analysis/segments.ts.
+ *
+ * THE CONTROL IS NEUTRAL AND APPEARS ON EVERY TITLE THAT HAS SUCH A RUN, which
+ * is the whole reason it can be shown at all. A gate that fired only where the
+ * model judged there was something to hide would announce, by appearing, that
+ * this film has a twist — a spoiler of its own, and one no wording could take
+ * back. Gating every tradition run makes its presence say nothing about the
+ * work, so the label names the subject rather than warning about it.
+ *
  * Three states, and they must stay distinguishable:
  *   - an analysis    -> render it
  *   - asked, declined -> say so plainly; there is nothing more to get
@@ -33,6 +47,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Collapse,
   Tooltip,
   Typography,
 } from '@mui/material'
@@ -69,9 +84,29 @@ interface AnalysisProvenance {
   promptVersion: number
 }
 
+/**
+ * A run of the analysis, and whether the reader has to ask for it.
+ *
+ * `gated` arrives DECIDED. The bundle does not know which question this run
+ * answers and must not learn: that rule lives in core, where it can be retuned
+ * without redeploying the client and its 15 locales. The split is made there
+ * too, because this file's own `toParagraphs` does not divide the prose the way
+ * the model's paragraph map counts it.
+ */
+interface AnalysisSegment {
+  text: string
+  gated: boolean
+}
+
 interface AnalysisResponse {
   attempted: boolean
   analysis: string | null
+  /**
+   * Absent from a server older than the gate, and empty for a declined row.
+   * Either way the fallback below renders `analysis` as a single open run,
+   * which is exactly what this panel did before segments existed.
+   */
+  paragraphs?: AnalysisSegment[]
   declineReason?: string | null
   sources?: AnalysisSource[]
   sourceGrade?: string | null
@@ -160,6 +195,15 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
   // row is current — which is what bounds the spend without an admin gate:
   // one rewrite per title per prompt version, not a button anyone can lean on.
   const canRewrite = hasAnalysis && Boolean(data?.stale)
+  // One open run holding everything is the fallback, not a special case: it is
+  // what an ungated analysis produces anyway, so an older server and a row with
+  // no usable paragraph map both land on the path that was here before.
+  const segments: AnalysisSegment[] =
+    data?.paragraphs && data.paragraphs.length > 0
+      ? data.paragraphs
+      : data?.analysis
+        ? [{ text: data.analysis, gated: false }]
+        : []
   const provenanceLine = data ? describeProvenance(data, t) : null
   const chip = analysisChip(data, t)
 
@@ -270,22 +314,13 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
                 }}
               >
                 <Box sx={{ flex: '1 1 26rem', maxWidth: '84ch' }}>
-                  {toParagraphs(data?.analysis ?? '').map((para, i) => (
-                    <Typography
-                      key={i}
-                      variant="body2"
-                      // No pre-wrap. The model separates its sentences with
-                      // single newlines as well as its paragraphs with blank
-                      // ones, and preserving the former broke every sentence
-                      // onto its own line — an article rendered as a list, each
-                      // line ending wherever the sentence did. Letting HTML
-                      // collapse whitespace is what makes paragraphs read as
-                      // paragraphs; `toParagraphs` decides where the breaks go.
-                      sx={{ mb: 2, lineHeight: 1.75 }}
-                    >
-                      {para}
-                    </Typography>
-                  ))}
+                  {segments.map((segment, i) =>
+                    segment.gated ? (
+                      <GatedRun key={i} text={segment.text} />
+                    ) : (
+                      <AnalysisProse key={i} text={segment.text} />
+                    )
+                  )}
 
                   {canRewrite && (
                     <Box sx={{ mt: 1.5 }}>
@@ -413,6 +448,77 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
           )}
         </AccordionDetails>
       </Accordion>
+    </Box>
+  )
+}
+
+/**
+ * A run of the analysis, rendered as paragraphs.
+ *
+ * No pre-wrap. The model separates its sentences with single newlines as well
+ * as its paragraphs with blank ones, and preserving the former broke every
+ * sentence onto its own line — an article rendered as a list, each line ending
+ * wherever the sentence did. Letting HTML collapse whitespace is what makes
+ * paragraphs read as paragraphs; `toParagraphs` decides where the breaks go.
+ */
+function AnalysisProse({ text }: { text: string }) {
+  return (
+    <>
+      {toParagraphs(text).map((para, i) => (
+        <Typography key={i} variant="body2" sx={{ mb: 2, lineHeight: 1.75 }}>
+          {para}
+        </Typography>
+      ))}
+    </>
+  )
+}
+
+/**
+ * A run the reader has to open.
+ *
+ * The label names the subject and does not warn about it — see the note at the
+ * top of this file on why the control has to say nothing about this particular
+ * work. It is a button and a Collapse rather than a nested Accordion: this
+ * already sits inside one, and two chevrons in a column read as a broken panel.
+ *
+ * Closed on every mount, deliberately, with no memory across titles. A reader
+ * who opened one film's tradition paragraph has not asked to have the next
+ * film's opened for them, and that is the direction where being wrong costs
+ * something.
+ */
+function GatedRun({ text }: { text: string }) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+
+  return (
+    <Box sx={{ mb: 2 }}>
+      <Button
+        size="small"
+        variant="text"
+        onClick={() => setOpen((wasOpen) => !wasOpen)}
+        startIcon={
+          <ExpandMoreIcon
+            fontSize="small"
+            sx={{
+              transition: 'transform 150ms',
+              transform: open ? 'rotate(180deg)' : 'none',
+            }}
+          />
+        }
+        sx={{ textTransform: 'none', px: 0.5 }}
+      >
+        {t(open ? 'mediaDetail.analysis.traditionHide' : 'mediaDetail.analysis.traditionShow')}
+      </Button>
+      {!open && (
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+          {t('mediaDetail.analysis.traditionNote')}
+        </Typography>
+      )}
+      <Collapse in={open} unmountOnExit>
+        <Box sx={{ mt: 1 }}>
+          <AnalysisProse text={text} />
+        </Box>
+      </Collapse>
     </Box>
   )
 }

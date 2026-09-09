@@ -41,6 +41,12 @@ export {
 } from './paragraphMap.js'
 
 export {
+  buildAnalysisSegments,
+  GATED_QUESTIONS,
+  type AnalysisSegment,
+} from './segments.js'
+
+export {
   decideAnalysisFloor,
   isListingDomain,
   MIN_ANALYSIS_CHARS,
