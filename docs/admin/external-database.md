@@ -136,7 +136,7 @@ Use `docker-compose.external-db.yml` instead of the standard compose file:
 
 ```bash
 # Download the external database compose file
-curl -O https://raw.githubusercontent.com/dgruhin-hrizn/aperture/main/docker-compose.external-db.yml
+curl -O https://raw.githubusercontent.com/aka-charos/aperture/main/docker-compose.external-db.yml
 
 # Or if you have the repo, it's already there
 ```

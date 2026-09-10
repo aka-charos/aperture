@@ -208,4 +208,4 @@ If you don't see the sparkle button, ask your admin about AI access.
 
 ---
 
-**Next:** [Profile Settings](user-settings/profile.md)
+**Next:** [Preferences](user-settings/preferences.md)

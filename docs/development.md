@@ -36,7 +36,7 @@ This guide covers local development setup, available scripts, and contribution g
 ### 1. Clone and Install
 
 ```bash
-git clone https://github.com/dgruhin-hrizn/aperture.git
+git clone https://github.com/aka-charos/aperture.git
 cd aperture
 pnpm install
 ```
