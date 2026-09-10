@@ -2,10 +2,13 @@
  * Content list for Tool UI.
  *
  * Renders either:
- * - a horizontal scrollable carousel (default) — semantic "Also worth checking"
- *   and every library/search result; or
- * - a vertical stack of rich cards (when `data.layout === 'list'`) — the
- *   web-search "Recommendations", where each card carries a synopsis + reason.
+ * - a horizontal scrollable carousel (default) — the secondary "Also worth
+ *   checking" strip and plain library/search results; or
+ * - a vertical stack of rich cards (when `data.layout === 'list'`) — every list
+ *   whose cards carry a synopsis and a written "why it fits": the web-search
+ *   "Recommendations" and the two "Your AI Recommendations" lists. A reason is
+ *   what earns the vertical form; without one a card is a poster and belongs in
+ *   the scroller.
  */
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -64,7 +67,8 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const { resolvedTitle, resolvedDescription } = useCarouselHeaderText(data)
 
-  // 'list' = vertical rich cards (web-search recs). Anything else = carousel.
+  // 'list' = vertical rich cards (anything with per-card reasons). Anything
+  // else = carousel.
   const isList = data.layout === 'list'
 
   const [favorited, setFavorited] = useState<Set<string>>(new Set())
@@ -278,7 +282,7 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
       {renderHeader()}
 
       {isList ? (
-        /* Vertical stacked list of rich cards (web-search recommendations) */
+        /* Vertical stacked list of rich cards (recommendations with reasons) */
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, [COMPACT_THREAD]: { gap: 1 } }}>
           {data.items.map((item) => (
             <ContentCard

@@ -82,7 +82,7 @@ export const ContentCarouselSchema = z.object({
   layout: z
     .enum(['list', 'carousel'])
     .optional()
-    .describe("'list' = vertical rich cards (web-search recs); otherwise a horizontal carousel"),
+    .describe("'list' = vertical rich cards (anything with per-card reasons); otherwise a horizontal carousel"),
   // Stamped centrally by withRequestContext, not by the tools. UI-only: it lets
   // "Create playlist from these" name the list after what was actually asked for.
   request: z

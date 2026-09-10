@@ -232,6 +232,10 @@ export function createRecommendationTools(ctx: ToolContext) {
           titleKey: 'carouselRecommendationsTitle',
           descriptionKey: 'carouselRecommendationsDesc',
           descriptionParams: { count: items.length },
+          // Every pick carries a synopsis and a written "why it fits", so these
+          // read the way the web-grounded recommendations do: one card under the
+          // next, nothing hidden off the side of a scroller.
+          layout: 'list' as const,
           items,
         }
       },
@@ -389,6 +393,9 @@ export function createRecommendationTools(ctx: ToolContext) {
           titleKey: 'carouselRecommendationsTitle',
           descriptionKey: 'carouselRecommendationsDesc',
           descriptionParams: { count: explained.length },
+          // Same reasoning as getMyRecommendations: enrichCardReasons has just
+          // given every card its own "why", which is what the vertical list is for.
+          layout: 'list' as const,
           items: explained,
         }
       },
