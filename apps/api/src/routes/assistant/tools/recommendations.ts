@@ -74,7 +74,15 @@ function formatContentItem(
   playLink: string | null,
   rank?: number,
   source?: 'ranked' | 'twin' | 'interest' | 'acclaimed',
-  sharedTitles?: string[]
+  sharedTitles?: string[],
+  /**
+   * The run's stored `ai_explanation`, when the caller selected it.
+   *
+   * NULL is the normal state for a run made while AI explanations were off —
+   * that is never backfilled, so the card simply has no note and the list
+   * renders without one.
+   */
+  reason?: string | null
 ): ContentItem {
   const genres = item.genres?.slice(0, 2).join(', ') || ''
   const subtitle = [item.year, genres].filter(Boolean).join(' · ')
@@ -90,6 +98,7 @@ function formatContentItem(
     overview: item.overview ?? null,
     rating: item.community_rating,
     rank,
+    ...(reason ? { reason } : {}),
     ...(source ? { source } : {}),
     ...(sharedTitles?.length ? { sharedTitles } : {}),
     actions: [
@@ -136,9 +145,11 @@ export function createRecommendationTools(ctx: ToolContext) {
             provider_item_id: string | null
             directors: string[] | null
             score_breakdown: Record<string, unknown> | null
+            ai_explanation: string | null
           }>(
             `SELECT m.id, m.title, m.year, rc.selected_rank as rank, m.genres, m.overview, m.poster_url,
-             m.community_rating, m.provider_item_id, m.directors, rc.score_breakdown
+             m.community_rating, m.provider_item_id, m.directors, rc.score_breakdown,
+             rc.ai_explanation
              FROM recommendation_candidates rc
              JOIN recommendation_runs rr ON rr.id = rc.run_id
              JOIN movies m ON m.id = rc.movie_id
@@ -166,7 +177,8 @@ export function createRecommendationTools(ctx: ToolContext) {
                 pickSource(r.score_breakdown),
                 readTwinSharedIds(r.score_breakdown)
                   .map((id) => sharedTitles.get(id))
-                  .filter((title): title is string => Boolean(title))
+                  .filter((title): title is string => Boolean(title)),
+                r.ai_explanation
               )
             )
           }
@@ -185,9 +197,11 @@ export function createRecommendationTools(ctx: ToolContext) {
             provider_item_id: string | null
             directors: string[] | null
             score_breakdown: Record<string, unknown> | null
+            ai_explanation: string | null
           }>(
             `SELECT s.id, s.title, s.year, rc.selected_rank as rank, s.genres, s.overview, s.poster_url,
-             s.community_rating, s.provider_item_id, s.directors, rc.score_breakdown
+             s.community_rating, s.provider_item_id, s.directors, rc.score_breakdown,
+             rc.ai_explanation
              FROM recommendation_candidates rc
              JOIN recommendation_runs rr ON rr.id = rc.run_id
              JOIN series s ON s.id = rc.series_id
@@ -213,7 +227,8 @@ export function createRecommendationTools(ctx: ToolContext) {
                 pickSource(r.score_breakdown),
                 readTwinSharedIds(r.score_breakdown)
                   .map((id) => sharedTitles.get(id))
-                  .filter((title): title is string => Boolean(title))
+                  .filter((title): title is string => Boolean(title)),
+                r.ai_explanation
               )
             )
           }
@@ -232,9 +247,9 @@ export function createRecommendationTools(ctx: ToolContext) {
           titleKey: 'carouselRecommendationsTitle',
           descriptionKey: 'carouselRecommendationsDesc',
           descriptionParams: { count: items.length },
-          // Every pick carries a synopsis and a written "why it fits", so these
-          // read the way the web-grounded recommendations do: one card under the
-          // next, nothing hidden off the side of a scroller.
+          // Every pick carries a synopsis and, when the run wrote one, its stored
+          // explanation — so these read the way the web-grounded recommendations
+          // do: one card under the next, nothing hidden off the side of a scroller.
           layout: 'list' as const,
           items,
         }
