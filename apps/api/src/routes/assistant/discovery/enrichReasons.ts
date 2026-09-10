@@ -25,9 +25,46 @@ import {
   getTextGenerationModelInstance,
   getChatModelInstance,
   createChildLogger,
+  loadAnalysisGrounding,
+  type AnalysisGroundingPart,
 } from '@aperture/core'
 import { recordLlmError } from '../helpers/errors.js'
 import type { ContentItem } from '../schemas/index.js'
+
+/** Grounding for the cards in one call, keyed by library id. */
+type GroundingMap = Map<string, AnalysisGroundingPart[]>
+
+/** How the inline prompt lines name each grounded segment. */
+const GROUNDING_LABELS: Record<string, string> = {
+  work: "what it's doing",
+  tradition: 'where it sits',
+}
+
+/**
+ * Load the stored analysis for these cards, split by media type.
+ *
+ * The SELECTION is shared with the recommender (core's `selectAnalysisGrounding`
+ * decides which segments and how much of each); only the rendering differs,
+ * because that prompt builds indented blocks and this one builds inline
+ * `— key: value` clauses. Sharing the selection is what matters — it is where
+ * the spoiler and length rules live.
+ *
+ * Never throws: the loader swallows its own failures, and a card with no
+ * grounding is prompted exactly as it was before this existed.
+ */
+async function loadGroundingForItems(items: ContentItem[]): Promise<GroundingMap> {
+  const movieIds = items.filter((i) => i.type === 'movie').map((i) => i.id)
+  const seriesIds = items.filter((i) => i.type === 'series').map((i) => i.id)
+
+  const [movies, series] = await Promise.all([
+    loadAnalysisGrounding('movie', movieIds),
+    loadAnalysisGrounding('series', seriesIds),
+  ])
+
+  // Ids are library uuids and cannot collide across the two tables, so one map
+  // keyed by id alone is unambiguous.
+  return new Map([...movies, ...series])
+}
 
 const logger = createChildLogger('discovery-reasons')
 
@@ -86,12 +123,18 @@ function truncate(text: string, max: number): string {
   return clean.length > max ? `${clean.slice(0, max)}…` : clean
 }
 
-function buildPrompt(queryText: string, items: ContentItem[]): string {
+function buildPrompt(queryText: string, items: ContentItem[], grounding: GroundingMap): string {
   const lines = items.map((item, i) => {
     const parts = [`${i + 1}. ${item.name}`]
     if (item.subtitle) parts.push(`(${item.subtitle})`)
     if (item.reason) parts.push(`— research note: ${truncate(item.reason, 240)}`)
     if (item.overview) parts.push(`— synopsis: ${truncate(item.overview, MAX_SYNOPSIS_CHARS)}`)
+    // Deliberately NOT re-truncated to MAX_SYNOPSIS_CHARS. Core already clipped
+    // each segment, and this is the best material on the line — a synopsis is
+    // marketing copy, this is criticism — so it keeps the room core gave it.
+    for (const part of grounding.get(item.id) ?? []) {
+      parts.push(`— ${GROUNDING_LABELS[part.question] ?? part.question}: ${part.text}`)
+    }
     return parts.join(' ')
   })
 
@@ -103,6 +146,13 @@ function buildPrompt(queryText: string, items: ContentItem[]): string {
     '- Write in your own voice, with confidence. NEVER hedge or attribute: no "is often described as", "critics have noted", "is considered", "is listed as", "fans might enjoy".\n' +
     '- Do NOT summarize the plot — the card already shows the synopsis next to your note.\n' +
     '- Never invent facts. If you know nothing beyond the research note, just sharpen that note into direct, specific language.\n' +
+    // Substance matches buildAnalysisRules in core, which the recommender's
+    // explanation prompts use. Written out rather than shared because that
+    // builder speaks of one media type ("this movie" / "this show") and this
+    // list is mixed, and because that prompt is indented blocks where this is
+    // inline clauses. The RULES must not drift; the wording is allowed to.
+    '- The "what it\'s doing" and "where it sits" clauses are critical writing about the title. Use them to name ONE specific quality and tie it to the request. Do NOT summarize or quote them, and never let one become the whole note.\n' +
+    '- From "where it sits", name the tradition, movement or style. NEVER name one specific earlier film or show as this one\'s model: knowing how that one ends can give away how this one ends.\n' +
     '- Around 25-35 words each. No title, no markdown, no bullet points.\n\n' +
     'Reply with exactly one line per title in the form `<number> | <your sentences>` and nothing else.\n\n' +
     lines.join('\n')
@@ -198,7 +248,8 @@ interface RewrittenReason {
 async function rewriteChunk(
   model: LanguageModel,
   queryText: string,
-  chunk: IndexedItem[]
+  chunk: IndexedItem[],
+  grounding: GroundingMap
 ): Promise<Array<{ index: number; reason: string }>> {
   const { text } = await generateText({
     model,
@@ -206,7 +257,8 @@ async function rewriteChunk(
     maxOutputTokens: Math.max(chunk.length * TOKENS_PER_REASON + 200, MIN_OUTPUT_TOKENS),
     prompt: buildPrompt(
       queryText,
-      chunk.map((entry) => entry.item)
+      chunk.map((entry) => entry.item),
+      grounding
     ),
   })
 
@@ -255,6 +307,11 @@ export async function* enrichCardReasonsProgressive(
     return
   }
 
+  // Loaded once for the whole call, before any chunk goes out: both passes and
+  // every concurrent chunk read the same map, and it is one query per media
+  // type rather than one per chunk.
+  const grounding = await loadGroundingForItems(items)
+
   const rewritten = new Map<number, string>()
   const applied = () =>
     items.map((item, i) => {
@@ -275,7 +332,7 @@ export async function* enrichCardReasonsProgressive(
     chunkBy(remaining, BATCH_SIZE).forEach((chunk, id) => {
       inFlight.set(
         id,
-        rewriteChunk(model, queryText, chunk)
+        rewriteChunk(model, queryText, chunk, grounding)
           .catch((err) => {
             firstError ??= err
             return [] as RewrittenReason[]
