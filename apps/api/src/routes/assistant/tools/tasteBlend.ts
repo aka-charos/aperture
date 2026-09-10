@@ -16,6 +16,26 @@
 /** How much of the ranking the request itself commands. */
 export const QUERY_WEIGHT = 0.6
 
+/**
+ * The same weight, mirrored — for a section that answers the user's TASTE with
+ * the request as the tiebreak, rather than the request with taste as the
+ * tiebreak.
+ *
+ * Defined as the mirror rather than as its own number because the two are one
+ * editorial decision seen from both ends: how hard a section leans. Retuning
+ * `QUERY_WEIGHT` should move both, or the two sections stop being complements
+ * and start being two arbitrary points on the same axis.
+ *
+ * Going lower was considered and rejected. It is tempting because the pool is
+ * already the 400 nearest neighbours of the concept, so topical relevance has a
+ * floor no weight can breach — but at the bottom of the range the ordering
+ * collapses to `final_score` alone, which is the user's generic recommendation
+ * list re-filtered, and the section stops answering *this* request from a taste
+ * angle and starts ignoring it. The invariant that matters is only that taste
+ * leads (< 0.5); `tasteBlend.test.ts` pins that rather than the exact value.
+ */
+export const TASTE_SECTION_QUERY_WEIGHT = 1 - QUERY_WEIGHT
+
 export interface BlendableRow {
   /** Cosine between the request embedding and the item, 0-1. */
   queryScore: number

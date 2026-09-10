@@ -10,7 +10,7 @@
 
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { blendQueryAndTaste, QUERY_WEIGHT } from './tasteBlend.js'
+import { blendQueryAndTaste, QUERY_WEIGHT, TASTE_SECTION_QUERY_WEIGHT } from './tasteBlend.js'
 
 const row = (id: string, queryScore: number, tasteScore: number) => ({ id, queryScore, tasteScore })
 
@@ -41,6 +41,36 @@ describe('blendQueryAndTaste', () => {
     const ranked = blendQueryAndTaste([row('worse', 0.8, 0.1), row('better', 0.8, 0.9)])
 
     assert.equal(ranked[0]!.id, 'better')
+  })
+
+  test('the taste section leans the other way, and its heading depends on it', () => {
+    // The discovery taste section is captioned "From your taste profile". That
+    // caption is only true while taste actually leads — the exact value is a
+    // judgement, this inequality is not.
+    assert.equal(TASTE_SECTION_QUERY_WEIGHT < 0.5, true)
+
+    const ranked = blendQueryAndTaste(
+      [row('onTopic', 1, 0), row('onTaste', 0, 1)],
+      TASTE_SECTION_QUERY_WEIGHT
+    )
+    assert.equal(ranked[0]!.id, 'onTaste')
+  })
+
+  test('the two sections lean equally hard in opposite directions', () => {
+    // Complements, not two arbitrary points on one axis: retuning QUERY_WEIGHT
+    // has to move both or the pairing stops meaning anything.
+    assert.equal(QUERY_WEIGHT + TASTE_SECTION_QUERY_WEIGHT, 1)
+  })
+
+  test('the request still discriminates inside the taste section', () => {
+    // The floor under relevance is the ANN pool, not the weight — but the
+    // weight must not be so low that the ordering collapses to final_score
+    // alone, which would just be the user's generic list re-filtered.
+    const ranked = blendQueryAndTaste(
+      [row('offTopic', 0, 0.9), row('onTopic', 1, 0.9)],
+      TASTE_SECTION_QUERY_WEIGHT
+    )
+    assert.equal(ranked[0]!.id, 'onTopic')
   })
 
   test('a term with no spread contributes nothing instead of NaN', () => {
