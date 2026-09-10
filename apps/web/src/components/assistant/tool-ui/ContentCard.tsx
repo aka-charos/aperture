@@ -12,9 +12,17 @@
  *
  * Two variants, same geometry:
  * - 'compact' (default): fixed-width card used in horizontal carousels
- *   (semantic "Also worth checking", library search/top-rated, etc.).
+ *   ("Also worth checking", "From your taste profile", library search, etc.).
+ *   The carousel makes every card in a row the same height, so this one grows
+ *   to whatever its text needs and the row follows the tallest.
  * - 'list': full-width card used in the vertical recommendation lists (web
  *   search, and the user's own AI recommendations).
+ *
+ * The SYNOPSIS is the only clamped text, in both variants — it exists in full on
+ * the detail page, so a disclosure costs the reader nothing. The "why it fits"
+ * is never clamped anywhere: it is the only text on the card with no second
+ * home, and hiding it behind a control means reading a row of six picks one
+ * expansion at a time.
  */
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -80,9 +88,15 @@ const LIST_OVERVIEW_CHARS = 320
 const CAPTION_CHAR_PX = chatText(6.5)
 const LIST_OVERVIEW_MIN_LINES = 4
 const LIST_OVERVIEW_MAX_LINES = 8
-/** Carousel cards are a fixed width everywhere, so their clamps can be fixed too. */
+/**
+ * Carousel cards are a fixed width everywhere, so their clamp can be fixed too.
+ *
+ * The SYNOPSIS is the only thing clamped on a card, in either variant. It is
+ * available in full on the detail page and on the poster grids, so cutting it
+ * costs a reader nothing they cannot get elsewhere — which is exactly what is
+ * not true of the reason (see where it is rendered).
+ */
 const COMPACT_OVERVIEW_LINES = 3
-const COMPACT_REASON_LINES = 3
 
 // Truncate multi-line text with an ellipsis after `lines` rows.
 const clampLines = (lines: number) => ({
@@ -130,12 +144,11 @@ export function ContentCard({
 
   const { year, rest: genreLine } = splitMeta(item.subtitle)
 
-  // One expand control per card, covering whatever is clamped: both texts on a
-  // carousel card, the synopsis alone in the list. Two separate toggles on a
-  // carousel-sized card is more chrome than text.
+  // One expand control per card, and it now covers the synopsis alone in both
+  // variants — the reason is never clamped, so there is nothing else for it to
+  // reveal.
   const bodyRef = useRef<HTMLDivElement>(null)
   const overviewRef = useRef<HTMLSpanElement>(null)
-  const reasonRef = useRef<HTMLSpanElement>(null)
   const [expanded, setExpanded] = useState(false)
   const [overflowing, setOverflowing] = useState(false)
   const [listOverviewLines, setListOverviewLines] = useState(LIST_OVERVIEW_MIN_LINES)
@@ -148,10 +161,8 @@ export function ContentCard({
   // the "show less" control on screen.
   useEffect(() => {
     if (expanded) return
-    const elements = [overviewRef.current, reasonRef.current].filter(
-      (element): element is HTMLSpanElement => element !== null
-    )
-    if (elements.length === 0) return
+    const overview = overviewRef.current
+    if (!overview) return
     const measure = () => {
       const width = bodyRef.current?.clientWidth ?? 0
       if (isList && width > 0) {
@@ -166,18 +177,18 @@ export function ContentCard({
       // change is still the previous one. Settling it takes a second pass:
       // a new line count changes the block's own height, so the observer
       // below fires again and this runs once more with the final clamp.
-      setOverflowing(elements.some((element) => element.scrollHeight > element.clientHeight + 1))
+      setOverflowing(overview.scrollHeight > overview.clientHeight + 1)
     }
     measure()
     // The column is observed alongside the text: a clamped block that gains a
-    // line of hidden content keeps the same box height, so watching the texts
+    // line of hidden content keeps the same box height, so watching the text
     // alone would miss overflow that only appears once the panel narrows.
     const observer = new ResizeObserver(measure)
-    for (const element of [...elements, bodyRef.current]) {
+    for (const element of [overview, bodyRef.current]) {
       if (element) observer.observe(element)
     }
     return () => observer.disconnect()
-  }, [expanded, isList, item.overview, item.reason])
+  }, [expanded, isList, item.overview])
 
   // Chat surfaces that own the whole viewport open the item here instead of
   // routing, so the conversation and its scroll position survive a look at a
@@ -431,16 +442,24 @@ export function ContentCard({
           >
             <LightbulbOutlinedIcon sx={{ fontSize: 15, color: theme.palette.primary.light, flexShrink: 0, mt: '1px' }} />
             <Typography
-              ref={reasonRef}
               variant="caption"
               sx={{
                 color: '#c7c7d1',
                 lineHeight: 1.45,
-                // Never clamped in the list. It runs one or two model-written
-                // sentences, it is the only text on the card that exists
-                // nowhere else in the app, and three lines cut most of them at
-                // any dock width short of ~640px.
-                ...(expanded || isList ? {} : clampLines(COMPACT_REASON_LINES)),
+                // NEVER clamped, in either variant. It runs one or two
+                // model-written sentences, it is the only text on the card that
+                // exists nowhere else in the app — no detail page, no grid, no
+                // second chance — and it is the whole reason the card is in
+                // front of this reader rather than some other card.
+                //
+                // It was clamped to three lines on carousel cards, which cut
+                // most of them, so reading why a row of six films was picked
+                // meant expanding six cards one at a time. A disclosure is
+                // right for a synopsis you can go and read elsewhere; for the
+                // only copy of something it is just a lock on the answer.
+                //
+                // The card grows instead. `MAX_REASON_CHARS` (320, server side)
+                // is what bounds that, so the worst case is a known one.
               }}
             >
               {item.reason}

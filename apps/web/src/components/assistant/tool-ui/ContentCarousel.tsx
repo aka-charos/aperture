@@ -364,7 +364,20 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
             }}
           >
             {data.items.map((item) => (
-              <Box key={item.id} sx={{ scrollSnapAlign: 'start', flexShrink: 0 }}>
+              // `display: flex` is what makes every card in the row the same
+              // height. The wrapper is already stretched to the tallest card by
+              // the scroller's default `align-items: stretch`; making it a flex
+              // container passes that height down to the Paper, which otherwise
+              // sizes to its own content. Deliberately not `height: '100%'` —
+              // that resolves against a parent whose height came from stretch
+              // rather than from a declared value, which is the percentage-
+              // height trap the admin nav rail already fell into.
+              //
+              // It matters more now that the reason is never clamped: card
+              // height follows a model-written sentence, so without this a row
+              // reads as a ragged staircase and the Details/Play buttons sit at
+              // a different height on every card.
+              <Box key={item.id} sx={{ scrollSnapAlign: 'start', flexShrink: 0, display: 'flex' }}>
                 <ContentCard
                   item={item}
                   onPlay={onPlay}
