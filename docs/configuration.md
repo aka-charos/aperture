@@ -24,11 +24,11 @@ We provide pre-configured docker-compose files for common platforms:
 
 | Platform | File | Notes |
 |----------|------|-------|
-| **Unraid** | [`docker-compose.unraid.yml`](https://github.com/dgruhin-hrizn/aperture/blob/main/docker-compose.unraid.yml) | `/mnt/user/` paths |
-| **QNAP** | [`docker-compose.qnap.yml`](https://github.com/dgruhin-hrizn/aperture/blob/main/docker-compose.qnap.yml) | qnet driver with static IPs |
-| **Synology** | [`docker-compose.synology.yml`](https://github.com/dgruhin-hrizn/aperture/blob/main/docker-compose.synology.yml) | `/volume1/` paths, optional macvlan |
-| **Windows** | [`docker-compose.windows.yml`](https://github.com/dgruhin-hrizn/aperture/blob/main/docker-compose.windows.yml) | Docker Desktop + native Emby, STRM mode |
-| **Linux/Other** | [`docker-compose.prod.yml`](https://github.com/dgruhin-hrizn/aperture/blob/main/docker-compose.prod.yml) | Generic production setup |
+| **Unraid** | [`docker-compose.unraid.yml`](https://github.com/aka-charos/aperture/blob/main/docker-compose.unraid.yml) | `/mnt/user/` paths |
+| **QNAP** | [`docker-compose.qnap.yml`](https://github.com/aka-charos/aperture/blob/main/docker-compose.qnap.yml) | qnet driver with static IPs |
+| **Synology** | [`docker-compose.synology.yml`](https://github.com/aka-charos/aperture/blob/main/docker-compose.synology.yml) | `/volume1/` paths, optional macvlan |
+| **Windows** | [`docker-compose.windows.yml`](https://github.com/aka-charos/aperture/blob/main/docker-compose.windows.yml) | Docker Desktop + native Emby, STRM mode |
+| **Linux/Other** | [`docker-compose.prod.yml`](https://github.com/aka-charos/aperture/blob/main/docker-compose.prod.yml) | Generic production setup |
 
 Download the file for your platform and edit the required values (IP address, session secret, paths).
 
@@ -81,7 +81,7 @@ What Emby Sees (automatically):
 ```yaml
 services:
   app:
-    image: ghcr.io/dgruhin-hrizn/aperture:latest
+    image: ghcr.io/aka-charos/aperture:latest
     container_name: aperture
     user: root
     environment:
