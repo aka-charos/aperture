@@ -242,11 +242,13 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
             // title gave us embeddings-similar picks — promote them to the PRIMARY
             // section so "movies like X" still returns a coherent answer instead of
             // an orphaned "Also worth checking". These cards get their "why" from the
-            // enrichment pass above (the embeddings search itself provides none).
+            // enrichment pass above (the embeddings search itself provides none),
+            // so they take the vertical list the same way the web picks would
+            // have: they are the whole answer here, not a strip beside one.
             carousels.push(
               createCarouselResult(`discovery-similar-${stamp}`, alsoCards, {
                 title: seedTitle?.trim() ? `Similar to ${seedTitle.trim()}` : 'Recommendations',
-                layout: 'carousel',
+                layout: 'list',
               })
             )
           }
