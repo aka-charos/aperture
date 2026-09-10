@@ -1491,7 +1491,14 @@
     "carouselSimilarDescSeries": "Found {{count}} series similar to this series",
     "carouselSimilarDescMovieUnwatched": "Found {{count}} movies similar to this movie that you haven't watched",
     "carouselSimilarDescSeriesUnwatched": "Found {{count}} series similar to this series that you haven't watched",
-    "carouselSimilarError": "Failed to find similar content: {{message}}"
+    "carouselSimilarError": "Failed to find similar content: {{message}}",
+    "analysisHeading": "Analysis",
+    "analysisSources": "{{count}} source",
+    "analysisSources_other": "{{count}} sources",
+    "analysisSpoilerReveal": "This part places the film in its tradition and may reveal how it ends — tap to read",
+    "analysisNotYet": "No analysis has been written for this title yet. Open its page to generate one.",
+    "analysisDeclined": "An analysis was attempted, but there was not enough published writing about this title to work from.",
+    "analysisNotInLibrary": "“{{title}}” is not in the library, so there is no stored analysis for it."
   },
   "similarityGraph": {
     "loadingFallback": "Loading…",
@@ -3346,7 +3353,8 @@
       "discoveryMatching": "Matching against your library…",
       "discoveryRelated": "Finding related titles…",
       "discoveryReasons": "Writing up why each fits…",
-      "discoveryAssembling": "Putting your list together…"
+      "discoveryAssembling": "Putting your list together…",
+      "analysis": "Reading the analysis"
     },
     "welcomeTitle": "Hi! I'm Encore",
     "welcomeBody": "Your AI movie and TV recommendation assistant. Ask me to find something to watch, discover similar titles, or explore your personalized picks!",

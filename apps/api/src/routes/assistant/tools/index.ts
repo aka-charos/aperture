@@ -7,6 +7,7 @@ import type { ToolContext } from '../types.js'
 import { createLibraryTools } from './library.js'
 import { createSearchTools } from './search.js'
 import { createContentTools } from './content.js'
+import { createAnalysisTools } from './analysis.js'
 import { createHistoryTools } from './history.js'
 import { createRecommendationTools } from './recommendations.js'
 import { createPeopleTools } from './people.js'
@@ -28,6 +29,7 @@ export function createTools(ctx: ToolContext) {
     ...createLibraryTools(ctx),
     ...createSearchTools(ctx),
     ...createContentTools(ctx),
+    ...createAnalysisTools(ctx),
     ...createHistoryTools(ctx),
     ...createRecommendationTools(ctx),
     ...createPeopleTools(ctx),

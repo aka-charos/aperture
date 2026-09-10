@@ -44,6 +44,7 @@ export type StatusPhase =
   | 'history'
   | 'ratings'
   | 'details'
+  | 'analysis'
   | 'people'
   | 'studios'
   | 'stats'
@@ -98,6 +99,7 @@ const TOOL_PHASES: Record<string, StatusPhase> = {
   getWatchHistory: 'history',
   getUserRatings: 'ratings',
   getContentDetails: 'details',
+  getTitleAnalysis: 'analysis',
   searchPeople: 'people',
   getTopStudios: 'studios',
   getLibraryStats: 'stats',

@@ -1715,7 +1715,14 @@
     "carouselEpisodesTitle": "Episodes closest to \"{{concept}}\"",
     "carouselEpisodesDesc": "The {{count}} nearest episodes in your library",
     "carouselEpisodesEmpty": "No episodes found matching \"{{concept}}\". Try describing what happens in it.",
-    "carouselEpisodesError": "Episode search failed: {{message}}"
+    "carouselEpisodesError": "Episode search failed: {{message}}",
+    "analysisHeading": "Analysis",
+    "analysisSources": "{{count}} source",
+    "analysisSources_other": "{{count}} sources",
+    "analysisSpoilerReveal": "This part places the film in its tradition and may reveal how it ends — tap to read",
+    "analysisNotYet": "No analysis has been written for this title yet. Open its page to generate one.",
+    "analysisDeclined": "An analysis was attempted, but there was not enough published writing about this title to work from.",
+    "analysisNotInLibrary": "“{{title}}” is not in the library, so there is no stored analysis for it."
   },
   "similarityGraph": {
     "loadingFallback": "लोड हो रहा है...",
@@ -2853,7 +2860,8 @@
       "discoveryRelated": "Finding related titles…",
       "discoveryReasons": "Writing up why each fits…",
       "discoveryAssembling": "Putting your list together…",
-      "episodes": "Looking through episodes…"
+      "episodes": "Looking through episodes…",
+      "analysis": "Reading the analysis"
     },
     "tooltipOpenFullPage": "Open full page",
     "scrollToAnswer": "Back to the answer",

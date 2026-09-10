@@ -19,8 +19,11 @@ export function getToolSkeleton(toolName: string): ReactNode {
     case 'getContentRankings':
       return <ContentCarouselSkeleton />
 
-    // Content detail tool
+    // Single-title views. The analysis card shares the detail skeleton rather
+    // than the carousel one the default would give it — a row of poster
+    // placeholders promises a list and then resolves into one article.
     case 'getContentDetails':
+    case 'getTitleAnalysis':
       return <ContentDetailSkeleton />
 
     // Person search
