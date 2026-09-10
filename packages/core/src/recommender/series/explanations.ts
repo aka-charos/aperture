@@ -39,8 +39,14 @@ import {
   EVIDENCE_PLOT_CHARS,
   KEYWORD_LIMIT,
   PICK_PLOT_CHARS,
+  buildAnalysisRules,
   clip,
 } from '../shared/explanationPrompt.js'
+import {
+  formatAnalysisGrounding,
+  loadAnalysisGrounding,
+  type AnalysisGroundingPart,
+} from '../../analysis/grounding.js'
 
 const logger = createChildLogger('series-explanations')
 
@@ -106,6 +112,8 @@ export interface EvidenceSeries {
 /** Mirrors the movie generator's TitleContext; series carry no director column. */
 interface SeriesTitleContext {
   keywords: string[]
+  /** Two clipped runs of the stored analysis. Absent leaves the prompt as it was. */
+  analysis?: AnalysisGroundingPart[]
 }
 
 export interface SeriesWithEvidence extends SeriesForExplanation {
@@ -307,12 +315,21 @@ export async function generateSeriesExplanations(
 
   // Fetch the actual embedding-based evidence
   const seriesIds = recommendations.map((r) => r.seriesId)
-  const [evidenceMap, titleContext, tasteContext, twinSharedTitles] = await Promise.all([
-    fetchSeriesEvidenceForRecommendations(runId, seriesIds),
-    fetchSeriesTitleContext(seriesIds),
-    getUserSeriesTasteContext(userId),
-    fetchTwinSharedTitles(recommendations),
-  ])
+  const [evidenceMap, titleContext, tasteContext, twinSharedTitles, analysisGrounding] =
+    await Promise.all([
+      fetchSeriesEvidenceForRecommendations(runId, seriesIds),
+      fetchSeriesTitleContext(seriesIds),
+      getUserSeriesTasteContext(userId),
+      fetchTwinSharedTitles(recommendations),
+      // One query for the run; see the movie generator.
+      loadAnalysisGrounding('series', seriesIds),
+    ])
+
+  for (const [id, parts] of analysisGrounding) {
+    const existing = titleContext.get(id)
+    if (existing) existing.analysis = parts
+    else titleContext.set(id, { keywords: [], analysis: parts })
+  }
 
   // Attach evidence to each recommendation
   const seriesWithEvidence: SeriesWithEvidence[] = recommendations.map((r) => ({
@@ -402,15 +419,18 @@ async function generateBatchSeriesExplanations(
       // Shared with the movie generator; see explanationPrompt.ts.
       const slotLines = buildSlotLines(s, SERIES_NOUNS)
 
-      const keywords = titleContext.get(s.seriesId)?.keywords
+      const context = titleContext.get(s.seriesId)
+      const keywords = context?.keywords
       const themes = keywords?.length
         ? `\n   Themes: ${keywords.slice(0, KEYWORD_LIMIT).join(', ')}`
         : ''
+      // Mirrors the movie generator exactly: under the plot, above the evidence.
+      const analysisLines = formatAnalysisGrounding(context?.analysis ?? []) ?? ''
 
       return `${i + 1}. "${s.title}" (${s.year || 'N/A'})
    Genres: ${s.genres.join(', ')}${s.network ? `\n   Network: ${s.network}` : ''}${s.status ? `\n   Status: ${s.status}` : ''}${themes}
    Novelty: ${s.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${s.ratingScore > 0.7 ? 'critically acclaimed' : s.ratingScore > 0.5 ? 'well received' : 'mixed'}${slotLines}
-   Plot: ${clip(s.overview, PICK_PLOT_CHARS) ?? 'No overview available'}
+   Plot: ${clip(s.overview, PICK_PLOT_CHARS) ?? 'No overview available'}${analysisLines}
 ${evidenceHeading(s, SERIES_NOUNS, hasCausalEvidence(s.evidence.map((e) => e.similarity)))}
 ${evidenceStr}`
     })
@@ -436,6 +456,7 @@ Write compelling 3-4 sentence explanations for each recommendation. Your explana
 - Be specific rather than superlative. Naming what two shows share is more persuasive than praising either one, and never spoil an ending
 - Mention if it's from a network/streaming service they seem to enjoy
 ${buildEvidenceRules(SERIES_NOUNS)}
+${buildAnalysisRules(SERIES_NOUNS)}
 
 ${buildSlotRules(SERIES_NOUNS)}
 

@@ -34,8 +34,14 @@ import {
   EVIDENCE_PLOT_CHARS,
   KEYWORD_LIMIT,
   PICK_PLOT_CHARS,
+  buildAnalysisRules,
   clip,
 } from '../shared/explanationPrompt.js'
+import {
+  formatAnalysisGrounding,
+  loadAnalysisGrounding,
+  type AnalysisGroundingPart,
+} from '../../analysis/grounding.js'
 
 const logger = createChildLogger('explanations')
 
@@ -116,6 +122,11 @@ export interface EvidenceMovie {
 interface TitleContext {
   keywords: string[]
   directors: string[]
+  /**
+   * Two clipped runs of the stored analysis, when one exists. Absent is the
+   * ordinary case and leaves the prompt byte-identical to what it was.
+   */
+  analysis?: AnalysisGroundingPart[]
 }
 
 export interface MovieWithEvidence extends MovieForExplanation {
@@ -326,12 +337,24 @@ export async function generateExplanations(
 
   // Fetch the actual embedding-based evidence
   const movieIds = recommendations.map((r) => r.movieId)
-  const [evidenceMap, titleContext, tasteContext, twinSharedTitles] = await Promise.all([
-    fetchEvidenceForRecommendations(runId, movieIds),
-    fetchTitleContext(movieIds),
-    getUserTasteContext(userId),
-    fetchTwinSharedTitles(recommendations),
-  ])
+  const [evidenceMap, titleContext, tasteContext, twinSharedTitles, analysisGrounding] =
+    await Promise.all([
+      fetchEvidenceForRecommendations(runId, movieIds),
+      fetchTitleContext(movieIds),
+      getUserTasteContext(userId),
+      fetchTwinSharedTitles(recommendations),
+      // One query for the whole run, beside the others rather than inside the
+      // batch loop: ten picks a batch would otherwise be ten round trips each.
+      loadAnalysisGrounding('movie', movieIds),
+    ])
+
+  // Folded into the context map the batch builder already receives, so a batch
+  // cannot be handed the keywords without the analysis or the other way round.
+  for (const [id, parts] of analysisGrounding) {
+    const existing = titleContext.get(id)
+    if (existing) existing.analysis = parts
+    else titleContext.set(id, { keywords: [], directors: [], analysis: parts })
+  }
 
   // Attach evidence to each recommendation
   const moviesWithEvidence: MovieWithEvidence[] = recommendations.map((r) => ({
@@ -429,11 +452,17 @@ async function generateBatchExplanations(
       const keywords = context?.keywords?.length
         ? `\n   Themes: ${context.keywords.slice(0, KEYWORD_LIMIT).join(', ')}`
         : ''
+      // Sits directly under the plot, which is the other material about the
+      // film itself. The evidence below is about the VIEWER, and keeping the
+      // two visually apart is part of what stops the reason drifting into a
+      // description of the film. Empty string when there is no analysis, so
+      // the block is byte-identical to what it was.
+      const analysisLines = formatAnalysisGrounding(context?.analysis ?? []) ?? ''
 
       return `${i + 1}. "${m.title}" (${m.year || 'N/A'})
    Genres: ${m.genres.join(', ')}${directors}${keywords}
    Novelty: ${m.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${m.ratingScore > 0.7 ? 'highly acclaimed' : m.ratingScore > 0.5 ? 'well received' : 'mixed'}${slotLines}
-   Plot: ${clip(m.overview, PICK_PLOT_CHARS) ?? 'No overview available'}
+   Plot: ${clip(m.overview, PICK_PLOT_CHARS) ?? 'No overview available'}${analysisLines}
 ${evidenceHeading(m, MOVIE_NOUNS, hasCausalEvidence(m.evidence.map((e) => e.similarity)))}
 ${evidenceStr}`
     })
@@ -458,6 +487,7 @@ Write compelling 3-4 sentence explanations for each recommendation. Your explana
 - Be warm and conversational, like a knowledgeable friend
 - Be specific rather than superlative. Naming what two films share is more persuasive than praising either one, and never spoil an ending
 ${buildEvidenceRules(MOVIE_NOUNS)}
+${buildAnalysisRules(MOVIE_NOUNS)}
 
 ${buildSlotRules(MOVIE_NOUNS)}
 

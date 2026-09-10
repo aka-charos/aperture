@@ -222,6 +222,31 @@ export function buildSlotLines(slot: SlotMarkers, nouns: ExplanationNouns): stri
  * evidence as support"). A model resolves that conflict toward the MUST, and
  * did.
  */
+/**
+ * Rules for the two analysis-derived lines, shared by both generators.
+ *
+ * Both halves are load-bearing and they pull against each other.
+ *
+ * The first stops the material becoming the subject. Handing a model critical
+ * writing about a film and asking for a reason invites it to paraphrase the
+ * criticism — an account of the work, identical for every reader, which is
+ * exactly what a recommendation explanation is not. The clip in
+ * `analysis/grounding.ts` is the structural half of that guard; this is the
+ * instructional half, and neither is sufficient alone.
+ *
+ * The second is a spoiler guard placed at the moment of writing rather than
+ * upstream. The analysis prompt already asks its own writer not to name a prior
+ * work whose ending carries across, and that rule holds well — but it is an
+ * instruction, so it will eventually fail on some title, and a reason on a card
+ * for a film the viewer has NOT seen is a worse place for that failure to land
+ * than an article they chose to open. A rule near the decision beats a rule far
+ * from it, which is why this sits here and not only in the retrieval prompt.
+ */
+export function buildAnalysisRules(nouns: ExplanationNouns): string {
+  return `- The "What it is doing" and "Where it sits" lines, when present, are critical writing about the ${nouns.singular}. Use them to name ONE specific quality and connect that quality to what this person watches. Do NOT summarize them, do NOT quote them, and never let them become the explanation — a reason that describes the ${nouns.singular} without reference to this viewer has failed
+- From "Where it sits", name the tradition, movement or style. NEVER name one specific earlier ${nouns.singular} as this one's model: knowing how that one ends can give away how this one ends`
+}
+
 export function buildEvidenceRules(nouns: ExplanationNouns): string {
   return `- For a recommendation showing "${EVIDENCE_HEADING_RANKED}": reference those specific ${nouns.plural} and explain what qualities they share with the recommendation, drawing on the synopses, themes and crew you have been given
 - For a recommendation showing "${EVIDENCE_HEADING_RESERVED}": that list is context, not cause. It tells you what the viewer already has; it is NOT a reason and must never be presented as one. Lead with the marked reason instead, and mention those titles only if they genuinely illuminate the pick`

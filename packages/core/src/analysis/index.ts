@@ -94,6 +94,15 @@ export {
 export { budgetSources, type BudgetOptions } from './budget.js'
 
 export {
+  GROUNDING_QUESTIONS,
+  GROUNDING_SEGMENT_CHARS,
+  formatAnalysisGrounding,
+  loadAnalysisGrounding,
+  selectAnalysisGrounding,
+  type AnalysisGroundingPart,
+} from './grounding.js'
+
+export {
   analysisJoinSql,
   analysisPriorityOrderSql,
   isAnalysisStale,
