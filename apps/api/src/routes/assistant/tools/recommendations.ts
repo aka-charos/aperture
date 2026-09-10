@@ -4,7 +4,7 @@
 import { tool } from 'ai'
 import { nullSafe } from './utils.js'
 import { z } from 'zod'
-import { getActiveEmbeddingTableName } from '@aperture/core'
+import { getActiveEmbeddingTableName, createChildLogger } from '@aperture/core'
 import { query, transaction } from '../../../lib/db.js'
 import { readTwinSharedIds, resolveTwinSharedTitles } from '../../../lib/twinShared.js'
 import { blendQueryAndTaste } from './tasteBlend.js'
@@ -13,6 +13,8 @@ import { buildPlayLink } from '../helpers/mediaServer.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext, MovieResult, SeriesResult } from '../types.js'
 import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
+
+const logger = createChildLogger('recommendation-tools')
 
 /**
  * How many nearest neighbours to pull before blending in taste.
@@ -360,6 +362,25 @@ export function createRecommendationTools(ctx: ToolContext) {
               tasteScore: r.final_score != null ? Number(r.final_score) : 0,
             }))
           ).slice(0, safeLimit)
+
+          // The one record of what was actually searched for. The concept is
+          // written by the MODEL, not by the user — it paraphrases the request
+          // into a phrase before anything is embedded — so when a result is off,
+          // this is the difference between a bad paraphrase and a thin library,
+          // which are indistinguishable from the cards alone. Per media type,
+          // because the two have separate runs: 'both' with 200 movies matched
+          // and 0 series is a completed movie run beside a missing series one,
+          // and one summed line would hide it.
+          logger.info(
+            {
+              concept,
+              media,
+              annPool: ANN_POOL_SIZE,
+              matched: rows.rows.length,
+              returned: ranked.length,
+            },
+            'Personalized library search'
+          )
 
           const sharedTitles = await resolveTwinSharedTitles(
             ranked.map((r) => r.row.score_breakdown),
