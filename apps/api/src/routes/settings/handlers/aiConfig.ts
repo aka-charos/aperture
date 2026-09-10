@@ -83,6 +83,7 @@ import {
 } from '@aperture/core'
 import { query } from '../../../lib/db.js'
 import { requireAdmin, requireAuth } from '../../../plugins/auth.js'
+import { isGroundingRole, sharedCredentialUpdate } from '../../../lib/providerCredentials.js'
 import {
   aiConfigSchema,
   aiCapabilitiesSchema,
@@ -948,17 +949,19 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       // built-in search (see core `analysis/mode.ts`). It costs nothing when it
       // is pointed at a local model — there is no key to protect — and the
       // alternative is a setting whose safety depends on another setting.
-      const isGroundingRole = fn === 'webSearch' || fn === 'titleAnalysis'
+      const grounding = isGroundingRole(fn)
 
-      if ((apiKey || baseUrl) && !isGroundingRole) {
+      // What may be published to the shared per-provider store is one rule, and
+      // it lives in `lib/providerCredentials.ts` — the key is withheld from a
+      // grounding role, the base URL never is. See that module for why the two
+      // are different questions, and what withholding the address cost.
+      const shared = sharedCredentialUpdate(fn, { apiKey, baseUrl })
+
+      if (shared) {
         const credentialsJson = await getSystemSetting('ai_provider_credentials')
         const credentials = credentialsJson ? JSON.parse(credentialsJson) : {}
 
-        credentials[provider] = {
-          ...(credentials[provider] || {}),
-          ...(apiKey && { apiKey }),
-          ...(baseUrl && { baseUrl }),
-        }
+        credentials[provider] = { ...(credentials[provider] || {}), ...shared }
 
         await setSystemSetting('ai_provider_credentials', JSON.stringify(credentials), 'Stored credentials for AI providers')
       }
@@ -969,7 +972,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       // withResolvedCredentials finds it again in the shared store. A grounding
       // role's does not go there at all, so an omitted key has to be carried
       // over here or saving a model change would wipe the credential.
-      const nextApiKey = apiKey ?? (isGroundingRole ? existing?.apiKey : undefined)
+      const nextApiKey = apiKey ?? (grounding ? existing?.apiKey : undefined)
 
       // Fallback keys live only here, so an omitted field means "leave alone"
       // and only an explicit empty array clears them.
