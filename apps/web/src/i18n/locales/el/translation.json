@@ -1502,7 +1502,8 @@
       "discoveryRelated": "Βρίσκω συναφείς τίτλους…",
       "discoveryReasons": "Γράφω γιατί ταιριάζει ο καθένας…",
       "discoveryAssembling": "Συνθέτω τη λίστα σας…",
-      "episodes": "Κοιτάζω τα επεισόδια…"
+      "episodes": "Κοιτάζω τα επεισόδια…",
+      "analysis": "Reading the analysis"
     },
     "tooltipOpenFullPage": "Άνοιγμα σε πλήρη σελίδα",
     "scrollToAnswer": "Πίσω στην απάντηση",
@@ -3723,7 +3724,14 @@
     "carouselEpisodesTitle": "Επεισόδια πιο κοντά στο «{{concept}}»",
     "carouselEpisodesDesc": "Τα {{count}} πιο κοντινά επεισόδια στη βιβλιοθήκη σας",
     "carouselEpisodesEmpty": "Δεν βρέθηκαν επεισόδια κοντά στο «{{concept}}». Δοκιμάστε να περιγράψετε τι συμβαίνει σε αυτό.",
-    "carouselEpisodesError": "Η αναζήτηση επεισοδίων απέτυχε: {{message}}"
+    "carouselEpisodesError": "Η αναζήτηση επεισοδίων απέτυχε: {{message}}",
+    "analysisHeading": "Analysis",
+    "analysisSources": "{{count}} source",
+    "analysisSources_other": "{{count}} sources",
+    "analysisSpoilerReveal": "This part places the film in its tradition and may reveal how it ends — tap to read",
+    "analysisNotYet": "No analysis has been written for this title yet. Open its page to generate one.",
+    "analysisDeclined": "An analysis was attempted, but there was not enough published writing about this title to work from.",
+    "analysisNotInLibrary": "“{{title}}” is not in the library, so there is no stored analysis for it."
   },
   "dashboard": {
     "greetingMorning": "Καλημέρα",

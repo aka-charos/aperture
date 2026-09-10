@@ -27,12 +27,14 @@ import {
 import type { TextMessagePartProps, ToolCallMessagePartProps } from '@assistant-ui/react'
 import {
   ContentCarousel,
+  AnalysisCard,
   ContentDetail,
   PersonResult,
   StatsDisplay,
   StudiosDisplay,
   getToolSkeleton,
   type ContentCarouselData,
+  type AnalysisData,
   type ContentDetailData,
   type PersonResultData,
   type StatsData,
@@ -156,6 +158,13 @@ function renderToolResult(toolName: string, result: unknown): React.ReactNode {
   // Content carousel tools (search, similar, recommendations, history, ratings, unwatched, top rated)
   if ('items' in data && Array.isArray(data.items)) {
     return <ContentCarousel data={data as unknown as ContentCarouselData} />
+  }
+
+  // Title analysis. Checked before the content-detail shape because both are
+  // single-title views; this one carries no `actions`, so the two cannot
+  // collide, but the order documents which is the more specific match.
+  if ('analysis' in data && typeof data.analysis === 'object' && data.analysis !== null) {
+    return <AnalysisCard data={data as unknown as AnalysisData} />
   }
 
   // Content detail tool

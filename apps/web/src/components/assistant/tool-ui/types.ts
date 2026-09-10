@@ -208,3 +208,48 @@ export interface ContentDetailData {
 }
 
 
+
+/**
+ * A title's stored analysis, as `getTitleAnalysis` returns it.
+ *
+ * Mirrors the tool's own shape by hand — nothing calls a schema's `parse()` on
+ * a tool result, so this file is the only thing keeping the two in step and has
+ * to be edited alongside `tools/analysis.ts`.
+ */
+export type AnalysisQuestionId =
+  | 'work'
+  | 'structure'
+  | 'tradition'
+  | 'intent'
+  | 'circumstances'
+  | 'dispute'
+
+export interface AnalysisSegmentData {
+  text: string
+  /** Rendered through `mediaDetail.analysis.section.*`, shared with the panel. */
+  questions: AnalysisQuestionId[]
+  /**
+   * Decided server-side. The bundle must not carry its own copy of which
+   * question ids are spoiler-shaped — that is a fact about the analysis prompt,
+   * and a duplicate would drift the first time the question set changes.
+   */
+  spoilerRisk: boolean
+}
+
+export interface AnalysisData {
+  id: string
+  analysis: {
+    query: string
+    status: 'available' | 'declined' | 'notAnalyzed' | 'notInLibrary'
+    contentId: string | null
+    type: 'movie' | 'series' | null
+    title: string | null
+    year: number | null
+    poster: string | null
+    segments: AnalysisSegmentData[]
+    declineReason: string | null
+    sourceCount: number | null
+    sourceGrade: string | null
+    analyzedAt: string | null
+  }
+}
