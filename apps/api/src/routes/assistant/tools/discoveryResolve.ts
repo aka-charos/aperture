@@ -8,10 +8,18 @@
  * while the card skeletons show, instead of the whole reply flushing at once
  * after a long silent wait.
  *
- * When the request references a specific title (seedTitle), it ALSO adds an
- * "Also worth checking" carousel of embeddings-similar library items (deduped
- * against the web picks), so the user gets both sources in one deterministic
- * result — web first.
+ * Three sections come back from the one call, all deduped against each other:
+ * - "Recommendations" — the web-sourced picks, matched to the library.
+ * - "Also worth checking" — embeddings neighbours of `seedTitle`, when the
+ *   request named a title.
+ * - "From your taste profile" — the user's own scored pool, ranked taste-first.
+ *   Unconditional, and started concurrently with the web gather so it costs no
+ *   wall clock; it is what makes a turn with thin or failed web results still
+ *   answer with something personal, without the model having to notice and
+ *   decide to go looking.
+ *
+ * They draw on one library from three directions, so overlap is the normal case
+ * and the dedupe is load-bearing rather than defensive.
  *
  * Same render path as every other content tool (everything shown is a library
  * item). Only added to the toolset on discovery-routed turns.
@@ -28,6 +36,8 @@ import { enrichCardReasonsProgressive } from '../discovery/enrichReasons.js'
 import { filterUnwatchedItems } from '../helpers/unwatched.js'
 import { normalizeTitle } from '../helpers/titleMatch.js'
 import { findSimilarItems } from './search.js'
+import { searchScoredPool } from './scoredPool.js'
+import { TASTE_SECTION_QUERY_WEIGHT } from './tasteBlend.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext } from '../types.js'
 
@@ -45,6 +55,21 @@ const SUPPLEMENT_POOL = 12
  * start burying — and each one costs a note the writing model has to pay for.
  */
 const SUPPLEMENT_MAX = 6
+
+/**
+ * How many taste-section rows to fetch before deduping against the other two
+ * sections. Headroom, not a display count — the scored pool overlaps the web
+ * matches and the seed's neighbours by construction, so fetching the display
+ * count would routinely render fewer.
+ */
+const TASTE_POOL = 24
+/**
+ * How many survive to the screen. Six for the same reason SUPPLEMENT_MAX is
+ * six: it is a second opinion under the answer, not a second answer. It also
+ * keeps the section inside ONE `enrichCardReasons` batch (BATCH_SIZE is 8), so
+ * the marginal cost of the whole feature is one model call per turn.
+ */
+const TASTE_MAX = 6
 
 /**
  * Loose title key for comparing a candidate against the referenced seed title.
@@ -76,21 +101,21 @@ export const DISCOVERY_PROMPT =
   'unavailable), treat those as your recommendations: write the same opener and closing about ' +
   'them as the closest matches in the library — seamlessly, without mentioning that web search ' +
   'was unavailable.\n' +
-  'If findCandidatesInLibrary comes back with FEWER THAN 8 cards, you MUST then call ' +
-  'searchMyRecommendations, passing the theme of the request as `concept`. A thin result there ' +
-  'means the web named titles this library does not hold — NOT that the library has nothing: ' +
-  'that tool searches the library itself, so it finds what the web happened not to mention. Do ' +
-  'the same for an open genre/theme/"best of" browse. If findCandidatesInLibrary returns no ' +
-  'matches at all, fall back to searchMyRecommendations, then getTopRated or ' +
-  'getMyRecommendations, so the user still gets picks. The web "Recommendations" cards are the ' +
-  'primary picks; "Also worth checking" and any in-library list are secondary. Only present ' +
+  'findCandidatesInLibrary returns up to THREE sections in the one call, and they never share ' +
+  'a title: "Recommendations" (web-sourced, the primary picks), "Also worth checking" (library ' +
+  'titles close to seedTitle), and "From your taste profile" (drawn from this user\'s own ' +
+  'recommendation scores rather than from the web). Lead on the web picks; the other two are ' +
+  'worth a mention, not the headline. Do NOT call searchMyRecommendations afterwards — the ' +
+  'taste section already IS that search, run in parallel, and calling it again just repeats ' +
+  'the same list under a second heading. If findCandidatesInLibrary returns no cards at all, ' +
+  'fall back to getTopRated or getMyRecommendations so the user still gets picks. Only present ' +
   'titles these tools return — never invent titles.'
 
 export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) {
   return {
     findCandidatesInLibrary: tool({
       description:
-        "Gather web-sourced recommendation candidates for this request and match them to the user's library, returning them as the primary 'Recommendations'. When a specific title is referenced via seedTitle, also add embeddings-similar library picks as 'Also worth checking'. Call this exactly ONCE, first. Everything returned is IN the library — titles the library does not have are dropped and must never be mentioned. Each pick includes a short 'reason' that is already shown on its card — synthesize a short closing note rather than repeating them per title. Only present what this tool returns — never invent titles.",
+        "Gather web-sourced recommendation candidates for this request and match them to the user's library, returning them as the primary 'Recommendations'. When a specific title is referenced via seedTitle, also add embeddings-similar library picks as 'Also worth checking'. Always also returns 'From your taste profile' — the same personalized in-library search searchMyRecommendations performs, run in parallel here, so that tool does not need calling afterwards. The three sections never share a title. Call this exactly ONCE, first. Everything returned is IN the library — titles the library does not have are dropped and must never be mentioned. Each pick includes a short 'reason' that is already shown on its card — synthesize a short closing note rather than repeating them per title. Only present what this tool returns — never invent titles.",
       inputSchema: nullSafe(z.object({
         seedTitle: z
           .string()
@@ -116,6 +141,31 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
         // than in webCandidates so the network work stays in the tool boundary;
         // fails soft to null, which restores un-personalized behaviour.
         const tasteBrief = await buildTasteBrief(ctx.userId)
+
+        // The taste section, started here and awaited far below.
+        //
+        // It shares nothing with the web pipeline — a different index, a
+        // different ranking, no network call to a search provider — so running
+        // it concurrently hides its embed + ANN + join entirely underneath the
+        // web gather, which is the slowest stage of the turn by a wide margin.
+        //
+        // It searches `queryText`, the user's OWN words, where the tool version
+        // searches a `concept` the model paraphrased first. There is no
+        // paraphrase step here to go wrong, which is the one respect in which
+        // this section is more faithful to the request than the tool is.
+        //
+        // Fails open to nothing: a turn that produced good web picks must not
+        // fail over its secondary strip.
+        const tastePromise = searchScoredPool(ctx, {
+          concept: queryText,
+          limit: TASTE_POOL,
+          queryWeight: TASTE_SECTION_QUERY_WEIGHT,
+          caller: 'discovery',
+        }).catch((err) => {
+          logger.warn({ err }, 'Taste section failed; continuing without it')
+          return [] as ContentItem[]
+        })
+
         // Gathered here (not before the stream) so the assistant's opening line
         // streams first and this slow web work runs behind the card skeletons.
         const gathered = await gatherWebCandidates(queryText, onStatus, tasteBrief)
@@ -189,7 +239,40 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
           }
         }
 
-        const combined = [...webItems, ...alsoItems]
+        // Third section: the user's own scored pool, ranked taste-first.
+        //
+        // Deduped against BOTH sections above, and against the seed itself. The
+        // three draw on one library from three directions, so overlap is the
+        // normal case, not the edge case — the same film under two headings
+        // with two different notes reads as a bug.
+        //
+        // Watched titles are dropped BEFORE the slice, not after. The pool
+        // excludes what was watched as of the last recommendation run, which
+        // may be days old, and the outer `withUnwatchedFilter` only strips the
+        // finished result — so filtering late would silently return two cards
+        // where six were asked for, and pay for notes on the four that vanish.
+        const shownIds = new Set([...webItems, ...alsoItems].map((i) => i.id))
+        const tastePool = await tastePromise
+        const tasteCandidates = ctx.excludeWatched
+          ? await filterUnwatchedItems(ctx.userId, tastePool)
+          : tastePool
+        const tasteItems = tasteCandidates
+          .filter((i) => !shownIds.has(i.id))
+          .filter((i) => !seedKey || normalizeTitleKey(i.name) !== seedKey)
+          .slice(0, TASTE_MAX)
+
+        logger.info(
+          {
+            fetched: tastePool.length,
+            afterWatched: tasteCandidates.length,
+            shown: tasteItems.length,
+            dedupedAgainst: shownIds.size,
+            queryWeight: TASTE_SECTION_QUERY_WEIGHT,
+          },
+          'Discovery taste section resolved'
+        )
+
+        const combined = [...webItems, ...alsoItems, ...tasteItems]
         // One stamp for the whole turn. These ids are React keys on the client,
         // so a fresh Date.now() per emission would remount the entire list on
         // every progress update instead of rewriting the notes in place.
@@ -197,19 +280,24 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
 
         /** The tool's output for a given state of the cards. */
         const build = (cards: ContentItem[]) => {
-          const webCards = cards.slice(0, webItems.length)
-          const alsoCards = cards.slice(webItems.length)
+          // `combined` is three concatenated sections and the enrichment pass
+          // preserves order and length, so the offsets split them back out.
+          const alsoStart = webItems.length
+          const tasteStart = alsoStart + alsoItems.length
+          const webCards = cards.slice(0, alsoStart)
+          const alsoCards = cards.slice(alsoStart, tasteStart)
+          const tasteCards = cards.slice(tasteStart)
 
           // Per-pick rationale: grounding for the model's closing synthesis. Keyed
           // off the CARDS, so whatever the pipeline dropped — not in the library,
           // already watched — can never reach the model as something to talk about.
           const enrichedByTitle = new Map(
-            [...webCards, ...alsoCards]
+            [...webCards, ...alsoCards, ...tasteCards]
               .filter((i) => i.reason)
               .map((i) => [normalizeTitleKey(i.name), i.reason as string])
           )
           const shownTitleKeys = new Set(
-            [...webCards, ...alsoCards].map((i) => normalizeTitleKey(i.name))
+            [...webCards, ...alsoCards, ...tasteCards].map((i) => normalizeTitleKey(i.name))
           )
           const picks = candidates
             .filter((c) => shownTitleKeys.has(normalizeTitleKey(c.title)))
@@ -249,6 +337,20 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
               createCarouselResult(`discovery-similar-${stamp}`, alsoCards, {
                 title: seedTitle?.trim() ? `Similar to ${seedTitle.trim()}` : 'Recommendations',
                 layout: 'list',
+              })
+            )
+          }
+
+          if (tasteCards.length > 0) {
+            // Secondary by default — a strip you glance at under the answer you
+            // read, which is what a horizontal carousel is actually for. It
+            // becomes the vertical list only when it is the ONLY section, where
+            // it stops being a sidebar and starts being the answer.
+            const isOnlySection = carousels.length === 0
+            carousels.push(
+              createCarouselResult(`discovery-taste-${stamp}`, tasteCards, {
+                title: 'From your taste profile',
+                layout: isOnlySection ? 'list' : 'carousel',
               })
             )
           }
