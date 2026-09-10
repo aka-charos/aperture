@@ -1,188 +1,74 @@
-# Similarity Graphs
+# Related-Content Graphs
 
-Similarity graphs appear on movie and series detail pages, showing related content in an interactive visualization.
+Every movie and series detail page shows **Related Movies / Related Series** — the same relationships drawn two ways: a **List** of posters and an interactive **Graph**.
 
 ![Movie Detail Page](../images/features/movie-detail.png)
 
-## Accessing Similarity Graphs
-
-1. Navigate to any movie or series detail page
-2. Scroll to the "Similar Movies" or "Similar Series" section
-3. Click the **Graph** tab (vs **List**)
-
----
-
-## Graph vs List View
-
-### Similar Items Section
-
-This section shows two views:
+## List and Graph
 
 | Tab | Display |
 |-----|---------|
-| **List** | Traditional grid/list of similar items |
-| **Graph** | Interactive node-based visualization |
+| **List** | Poster cards with watch badges, your ratings, and **connection-reason chips** naming why each one relates |
+| **Graph** | The same items as a poster network you can drag, zoom, and refocus |
 
-Toggle between them to suit your preference.
-
----
-
-## Graph Features
-
-### Nodes
-
-Each node represents a movie or series:
-
-| Element | Description |
-|---------|-------------|
-| **Image** | Poster thumbnail |
-| **Border** | Color indicates connection type |
-| **Size** | Larger = higher similarity |
-| **Glow** | Current selection highlighted |
-
-### Edges
-
-Lines connecting nodes show relationships:
-
-| Line Style | Meaning |
-|------------|---------|
-| **Solid thick** | Strong connection |
-| **Solid thin** | Moderate connection |
-| **Dashed** | Weak but present connection |
-
-### Colors
-
-Connection type indicated by color:
-
-| Color | Relationship |
-|-------|--------------|
-| **Blue** | Shared cast members |
-| **Green** | Shared director/creator |
-| **Orange** | Genre similarity |
-| **Purple** | Thematic similarity |
-| **Gray** | Embedding similarity |
+The section shows a fixed set of the strongest connections (10 docked; the fullscreen graph reaches 12).
 
 ---
 
-## Interaction
+## The Graph
 
-### Hover
+### Nodes and edges
 
-Hover over a node to see:
+- Nodes are posters; the item you're viewing and its primary relations render larger — size reflects role, not similarity
+- Edge **width** scales with similarity; hover an edge for the exact percentage ("71% similar")
+- Hover a node for title, year, type, and **"Connected via:"** reason chips
+- **Click a node** to refocus the graph on it (breadcrumbs appear; **Start over** resets); **double-click or ⓘ** opens the detail page
+- **Fullscreen** expands the graph to more items ("Expanded view • N items") — with its own create-playlist button
 
-- Title and year
-- Similarity percentage
-- Connection reason
-- Your rating (if rated)
+### Connection colors
 
-### Click
+One edge, one color — the strongest reason wins:
 
-Click a node to:
-
-- Navigate to that item's detail page
-- Or view in sidebar panel (depending on settings)
-
-### Drag
-
-Drag nodes to rearrange the visualization:
-
-- Organize the layout
-- Separate clusters
-- Better understand relationships
-
-### Zoom
-
-- **Scroll** — Zoom in/out
-- **Pinch** (touch) — Zoom in/out
-- **Double-click** — Reset zoom
-
----
-
-## Understanding Connections
-
-### Why Items Connect
-
-The graph shows various relationship types:
-
-#### Cast Connections
-> "Both feature Tom Hanks in a leading role"
-
-#### Director Connections
-> "Both directed by Steven Spielberg"
-
-#### Genre Connections
-> "Both are psychological thrillers"
-
-#### Thematic Connections
-> "Both explore themes of isolation and survival"
-
-#### Embedding Similarity
-> "AI detected similar narrative patterns and tone"
-
-### Connection Strength
-
-Stronger connections have:
-
-- Thicker lines
-- Closer proximity
-- Multiple edge types (multi-colored)
-
----
-
-## Using Similarity Graphs
-
-### Quick Discovery
-
-See at a glance what's related to something you like.
-
-### Understanding "Why"
-
-Hover over edges to see exactly why items are connected.
-
-### Finding Patterns
-
-Notice clusters of similar content and understand the threads.
-
-### Rating from Graph
-
-Click a node, then rate it in the detail panel without leaving the page.
+| Color | Connection |
+|-------|-----------|
+| **Blue** | Same director |
+| **Teal** | Shared actor |
+| **Gold** | Same collection |
+| **Purple** | Genre match |
+| **Pink** | Theme match |
+| **Orange** | Same studio |
+| **Green** | Same network |
+| **Gray** | AI similar (embedding similarity) |
+| **Emerald** | AI discovery |
 
 ---
 
 ## Settings
 
-Similarity graph behavior can be customized in [Preferences](user-settings/preferences.md):
+Two preferences live under [Preferences](user-settings/preferences.md) → Similarity Graph:
 
 | Setting | Effect |
 |---------|--------|
-| **Auto-expand** | Graph starts expanded or collapsed |
-| **Hide watched** | Exclude items you've seen |
-| **Connection types** | Which relationships to show |
+| **Hide Watched Content** | Related items you've seen don't appear |
+| **Full Franchise Mode** | Keeps whole collections together instead of trimming to a representative few |
+
+The section always opens on the List tab; your graph position resets per visit.
 
 ---
 
-## Performance
+## From the Graph to a Playlist
 
-For items with many connections:
-
-- Graph limits displayed nodes
-- Strongest connections shown first
-- "Load more" option for additional nodes
-- Performance scales with your device
+In the fullscreen view, **Create playlist** opens the playlist dialog with the graph's items pre-filled — a quick way to turn "everything connected to this" into something your media server can play. See [Playlists](playlists.md).
 
 ---
 
-## Comparison: Graph vs Explore
+## Related Graphs vs Media Graph
 
-| Feature | Similarity Graph | Explore |
-|---------|------------------|---------|
-| **Scope** | Single item's connections | Entire library |
-| **Location** | Detail page section | Dedicated page |
-| **Depth** | One level | Unlimited drilling |
-| **Purpose** | Quick similar items | Extended discovery |
-
-Use similarity graphs for quick "what's similar" answers.
-Use Explore for extended discovery sessions.
+| | Related-content graph | [Media Graph](explore.md) |
+|---|---|---|
+| **Scope** | One title's connections | Your whole library, seeded by a description or list |
+| **Depth** | One hop (refocus to hop again) | Unlimited wandering |
+| **Best for** | "What's like this?" | Discovery sessions |
 
 ---
 

@@ -1,6 +1,6 @@
 # Playlists
 
-Playlists allow you to create custom collections of movies and series for organization and tracking.
+Playlists are **AI-generated recommendation lists** — you describe the vibe, Aperture picks the titles, and the finished playlist lands in your Emby/Jellyfin server, visible **only to you**. For a list everyone sees, build a [Collection](collections.md) instead.
 
 ![Playlists Page](../images/features/playlists.png)
 
@@ -10,194 +10,63 @@ Navigate to **Playlists** in the sidebar (playlist icon).
 
 ---
 
-## Playlist Types
+## Two Kinds of Playlist
 
-### Manual Playlists
-
-Collections you create manually:
-
-- Add specific movies/series
-- Order them as you like
-- Perfect for themed collections
-
-**Examples:**
-- "Date Night Movies"
-- "Halloween Watchlist"
-- "Shows to Watch with Mom"
-
-### Graph Playlists
-
-AI-generated playlists based on exploration:
-
-- Created from Explore graph navigation
-- Automatically themed
-- AI-generated names and descriptions
-
-**Examples:**
-- "Mind-Bending Sci-Fi Journey"
-- "Christopher Nolan's Best"
-- "90s Nostalgia Trip"
+| | **AI playlists** | **Similarity playlists** |
+|---|---|---|
+| Created by | You, with the recommender picking items | The [Media Graph](explore.md) or the [AI assistant](ai-assistant.md) |
+| Card badge | Genre chips + seed count + "Updated …" | **Similarity** badge |
+| Editable | Regenerate via preview; add/remove items by hand | View and delete only |
 
 ---
 
-## Playlist Cards
+## Creating an AI Playlist
 
-### Visual Design
+1. Click **New Playlist** and describe it:
+   - **Genres** to match
+   - **Media** — Movies, TV shows, or Both
+   - **Seed titles** — "movies that define this playlist's vibe"; they steer generation, and an *Include the seed titles* toggle decides whether they're also *in* it
+   - **Preferences** — free text ("Dark atmosphere, morally complex characters, twist endings…")
+2. The sparkle buttons generate the preferences, name, or description for you — and when there's already text in the box, they offer **"Build on what I wrote"** instead of overwriting it
+3. Save — the playlist exists, empty, until you generate
 
-Each playlist card shows:
+## Generating: Preview, Then Approve
 
-| Element | Description |
-|---------|-------------|
-| **Poster Collage** | Preview of up to 4 items in the playlist |
-| **Title** | Playlist name |
-| **Count** | Number of items |
-| **Type Badge** | Manual or Graph |
-| **Description** | First line of description |
+Click a card's generate/refresh button and nothing is written yet — a **preview** opens first:
 
-### Hover Actions
+- Every proposed title carries an **AI-written one-line reason** for why it fits
+- Remove anything you don't want
+- Confirm with **"Add N titles"** — exactly the approved set is pushed to your media server
 
-Hover over a card to see:
+Refreshing re-runs the same preview, so the server copy never changes without your approval.
 
-- **View** — Open the playlist
-- **Edit** — Modify the playlist
-- **Delete** — Remove the playlist
+## Managing an AI Playlist
 
----
-
-## Creating Playlists
-
-### Manual Creation
-
-1. Click **New Playlist** button
-2. Enter a name
-3. Optionally add a description
-4. Click **Create**
-5. Add items from browse/search
-
-### From Explore
-
-1. Navigate in the Explore graph
-2. Click **Create Playlist** when you find interesting items
-3. Selected nodes become playlist items
-4. AI generates name and description
-
-### AI-Assisted Creation
-
-When creating a playlist:
-
-1. Add items
-2. Click **Generate Name** — AI suggests a title
-3. Click **Generate Description** — AI writes a summary
+- **View** — the full list, with reasons
+- **Add manually** — a search box in the view dialog ("Add Movie to Playlist")
+- **Remove** — per item from the view dialog
+- **Edit settings** — genres, seeds, preferences
+- **Delete** — removes the playlist from Aperture *and* from your media server
 
 ---
 
-## Managing Playlists
+## Similarity Playlists
 
-### Adding Items
+Created from elsewhere and view-only:
 
-Multiple ways to add content:
+- **From the Media Graph** — explore, then **Create playlist** to bundle the current items ("Create Playlist from Graph")
+- **From chat** — assistant answer carousels offer **Create Playlist from Suggestions**, pre-selecting the titles it recommended
 
-| Method | Steps |
-|--------|-------|
-| **From playlist** | Edit → Search → Add |
-| **From browse** | Click "Add to playlist" on any poster |
-| **From detail page** | Click "Add to playlist" button |
-| **From search** | Add from search results |
-
-### Reordering Items
-
-In edit mode:
-
-- Drag and drop items
-- Items maintain their order
-
-### Removing Items
-
-- Click the **X** on any item to remove
-- Or select multiple and bulk remove
-
-### Editing Details
-
-- **Rename** — Click the title to edit
-- **Description** — Click to edit the description
-- **Cover** — Changes based on items (auto-generated)
-
----
-
-## Viewing Playlists
-
-### Grid View
-
-Click a playlist to see all items in a grid:
-
-- Full posters
-- Titles and years
-- Your ratings
-- Watch status
-
----
-
-## Graph Playlists
-
-### How They're Created
-
-1. Navigate in Explore
-2. System tracks your path
-3. Click "Save as Playlist"
-4. AI analyzes the connections
-5. Generates themed name/description
-
-### AI-Generated Content
-
-The AI considers:
-
-- Genres of selected items
-- Shared actors/directors
-- Themes and connections
-- Your navigation pattern
-
-**Example output:**
-
-> **"Neo-Noir Mind Games"**
-> *A curated journey through psychological thrillers that blur the line between reality and perception, featuring complex protagonists and twist endings.*
-
-### Editing Graph Playlists
-
-Graph playlists can be edited like manual ones:
-
-- Add or remove items
-- Reorder content
-- Edit name/description
-
----
-
-## Playlist Ideas
-
-| Theme | Contents |
-|-------|----------|
-| **Award Season** | Oscar nominees/winners |
-| **Comfort Rewatches** | Your 10/10 rated items |
-| **Director Focus** | All films by one director |
-| **Franchise Marathon** | Complete series in order |
-| **Decade Collection** | Best of the 90s |
-| **Guest Picks** | Crowd-pleasers for visitors |
+Either way the dialog lists the items (adjustable at creation), and can generate a name and description with AI. The playlist is created on your media server too.
 
 ---
 
 ## Tips
 
-### Organization
-
-- Use descriptive names
-- Add descriptions for future reference
-- Group related content together
-
-### Maintenance
-
-- Review playlists periodically
-- Remove watched items if desired
-- Update seasonal playlists
+- **Seeds beat genres** — three seed films describe a mood better than any keyword
+- **Build on what you wrote** — a bad first generated description is worth one more try with your own additions
+- **The reasons matter** — read the preview reasons before approving; they're the model telling you what it thinks you asked for
 
 ---
 
-**Next:** [Virtual Libraries](virtual-libraries.md)
+**Next:** [Collections](collections.md)

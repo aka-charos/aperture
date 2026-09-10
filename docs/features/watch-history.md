@@ -1,148 +1,71 @@
 # Watch History
 
-The Watch History page shows everything you've watched, with filtering and management options.
+The Watch History page is your complete viewing log — everything your media server says you've played, with search, filters, and the tools to correct it.
 
 ![Watch History Page](../images/features/watch-history.png)
 
 ## Accessing Watch History
 
-Navigate to **Watch History** in the sidebar (clock icon).
+Navigate to **Watch History** in the sidebar (clock icon). The page has two tabs, **Movies** and **Series**, each with its own view mode ([grid or list](grid-list-views.md)).
 
-## Page Layout
-
-### Tabs
-
-Switch between content types:
-
-- **Movies** — Your watched movies
-- **Series** — Your watched TV series
-
-### View Modes
-
-Toggle between display modes:
-
-| Mode | Description |
-|------|-------------|
-| **Grid View** | Poster grid with watch info overlay |
-| **List View** | Detailed rows with metadata and watch stats |
-
-Your preferred view is saved and remembered.
+Your history comes from your media server, synced automatically — movies roughly every 2 hours, series hourly, and always right before a recommendation run. Roughly-dated watches (from the rating prompt) appear here too, marked as approximate.
 
 ---
 
-## Watch Information
+## Finding Things
 
-### For Movies
+- **Search** — the box searches your **entire history** on the server (title and genre), not just the loaded page
+- **Status filter** — All / **In Progress** (started, not finished) / **Completed**
+- **Pagination** — 50 per page; the counter tells you where you are
 
-Each movie shows:
+## Sorting
 
-| Info | Description |
-|------|-------------|
-| **Last Watched** | When you last watched |
-| **Play Count** | Total times watched |
-| **Your Rating** | Your heart rating (if rated) |
-
-### For Series
-
-Each series shows:
-
-| Info | Description |
-|------|-------------|
-| **Last Episode** | Most recent episode watched (e.g., S2E5) |
-| **Progress** | Episodes watched vs total |
-| **Your Rating** | Your heart rating (if rated) |
+| Sort | Order |
+|------|-------|
+| **Recent** | Most recently played first (default) |
+| **Plays** | Most-played first |
+| **A-Z** | Alphabetical |
 
 ---
 
-## Time Display
+## What Each Entry Shows
 
-Watch history uses smart time formatting:
+### Movies
 
-| Example | Meaning |
-|---------|---------|
-| **"2d ago"** | Watched 2 days ago |
-| **"2d ago · 3x"** | Watched 2 days ago, 3 total plays |
-| **"2d ago · Rewatched"** | Recently rewatched |
-| **"2mo 15d ago"** | Watched 2 months, 15 days ago |
-| **"1y 3mo ago"** | Watched over a year ago |
+- Poster with a **watched tick** and, where applicable, a **plays chip** — "3 plays", capped at 5, then "Rewatched"
+- **Favorite badge** — the heart, if you've favorited it on the media server
+- **Resume bar** — if you stopped partway, the poster shows how far, with a "% watched" tooltip on hover
+- Title, year, and the last-watched date
 
----
+### Series
 
-## Sorting Options
+- Poster with watched tick and progress, plus the watched/total episode count and completion percentage
+- A **Complete** chip when you've watched everything on the server
+- The last-watched date
+- A **hover toggle** to add the series to (or remove it from) [Shows You Watch](shows-you-watch.md) — the same list the sidebar page manages
 
-Sort your watch history by:
-
-| Option | Description |
-|--------|-------------|
-| **Recent** | Most recently watched first |
-| **Most Played** | Highest play count first |
-| **Title** | Alphabetical order |
-| **Rating** | Highest rated first |
+Both tabs rate inline (hover the stars), same as everywhere else.
 
 ---
 
-## Rating from History
+## Correcting Your History
 
-Rate items directly from the watch history:
+Where you have permission (admins, or users granted **manage watch history**), hovering an entry reveals a **Mark Unwatched** button:
 
-- **Grid View** — Hover to reveal heart rating
-- **List View** — Heart rating shown inline
+- **Movies** — removes the play from your media server and from Aperture's history
+- **Series** — "Mark all episodes as unwatched" clears the whole series
 
-Click to set or change your rating.
+Both ask for confirmation — **"Mark as Unwatched? This action cannot be undone"** — and update what the recommender sees immediately.
 
----
-
-## Managing Watch History
-
-If your admin has enabled watch history management:
-
-### Mark Unwatched
-
-Remove items from your watch history:
-
-#### For Movies
-- Click the movie
-- Select **Mark Unwatched**
-- Removes from both Aperture and media server
-
-#### For Series
-| Action | Effect |
-|--------|--------|
-| Mark Episode Unwatched | Removes single episode |
-| Mark Season Unwatched | Removes entire season |
-| Mark Series Unwatched | Removes all episodes |
-
-### Why Mark Unwatched?
-
-- Started a movie but didn't finish
-- Want to "rewatch" with fresh recommendations
-- Accidentally marked as watched
-- Clean up old watch data
+Episode- and season-level correction is API-only today; the page manages whole movies and whole series.
 
 ---
 
-## How Watch History Affects Recommendations
+## Tips
 
-Your watch history directly influences AI recommendations:
-
-- **Recently watched** content is excluded from recommendations
-- **Genres you watch** are weighted in your taste profile
-- **Directors/actors** you watch frequently are considered
-- **Franchises** you've engaged with are tracked
-
----
-
-## Syncing
-
-Watch history syncs from your media server:
-
-- **Automatic** — Runs on a schedule (typically every 1-2 hours)
-- **Full sync** — Catches all historical watches
-- **Pre-recommendation** — Syncs before generating new recommendations
-
-If you just watched something and don't see it:
-- Wait for the next sync
-- Ask your admin to run a manual sync
+- **Fix mistakes promptly** — everything here feeds your taste profile; a misattributed play skews recommendations until removed
+- **Use In Progress** — the fastest list of things you started and abandoned
+- **Favorite things here too** — favorites are a taste signal; the badge shows you what's already counted
 
 ---
 

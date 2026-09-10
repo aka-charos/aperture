@@ -1,221 +1,83 @@
-# Explore
+# Media Graph
 
-Explore is an AI-powered semantic graph that lets you discover content through visual connections and relationships.
+Media Graph (sidebar: **Media Graph**, hub icon) is a semantic exploration tool: describe what you're in the mood for, or pick one of your lists, and your library is drawn as a poster graph you can wander through.
 
 ![Explore Page](../images/features/explore.png)
 
-## Accessing Explore
+## Accessing Media Graph
 
-Navigate to **Explore** in the sidebar (hub icon).
-
-**Note:** Explore requires AI embeddings to be generated. Your admin must have completed the AI setup.
+Navigate to **Media Graph** in the sidebar. It requires AI embeddings to be generated — your admin must have completed the AI setup.
 
 ---
 
-## The Graph Interface
+## Starting a Graph
 
-### Visual Layout
+Two ways in:
 
-- **Nodes** — Movie/series posters arranged in a network
-- **Edges** — Lines connecting related content
-- **Center** — Your current focus item
-- **Surrounding** — Related items arranged by similarity
+### Search by description
 
-### Color-Coded Connections
+Type what you're after — *"psychological thrillers"*, *"feel-good comedies"*, *"mind-bending sci-fi"* (the Try: chips are examples). Search by mood, theme, or description, not by title. Your recent searches are kept for one-click reuse.
 
-| Color | Connection Type |
-|-------|-----------------|
-| **Blue** | Actor/cast shared |
-| **Green** | Director/creator shared |
-| **Orange** | Genre similarity |
-| **Purple** | Thematic similarity |
-| **Gray** | General embedding similarity |
+### Browse one of your lists
+
+**Browse by** seeds the graph from a list you already have: **My AI movie picks**, **My AI series picks**, **Shows you watch**, **Top picks movies**, **Top picks series**. The #1 item of a list is marked on its node.
+
+While the graph builds, the page narrates what it's doing — searching your library, discovering themes, clustering, arranging.
 
 ---
 
-## Navigation
+## Reading the Graph
 
-### Starting Point
+- **Nodes** are posters; the center/primary items render larger. Node size does *not* encode similarity
+- **Edges** connect related items; hover an edge for the **similarity percentage**
+- **Hover a node** for title, year, type, and **"Connected via:"** reason chips
+- **Click a poster** to make it the new center (with breadcrumbs tracking your path); **click ⓘ** (or double-click) to open its detail page
+- **Drag** to reposition, **scroll** to zoom
 
-1. **Search** — Type a title to seed the graph
-2. **Click any node** — Make it the new center
-3. **From elsewhere** — Click "Explore Similar" on any detail page
+### Connection Colors
 
-### Drilling Down
+| Color | Connection |
+|-------|-----------|
+| **Blue** | Same director |
+| **Teal** | Shared actor |
+| **Gold** | Same collection |
+| **Purple** | Genre match |
+| **Pink** | Theme match (keywords) |
+| **Orange** | Same studio |
+| **Green** | Same network |
+| **Gray** | AI similar (embedding similarity) |
+| **Emerald** | AI discovery (deliberately diverse picks) |
 
-1. Click a poster node
-2. That item becomes the new center
-3. New related items appear around it
-4. Previous path shown in breadcrumbs
-
-### Breadcrumb Trail
-
-Shows your navigation path:
-
-> Home → The Matrix → Inception → Interstellar
-
-Click any breadcrumb to jump back to that point.
-
-### Going Back
-
-- Click breadcrumbs to revisit
-- Use browser back button
-- Click "Start Over" to reset
+The sidebar legend shows the same list live.
 
 ---
 
 ## Controls
 
-### Hide Watched
-
-Toggle to hide content you've already watched:
-
-- **On** — Only shows unwatched content
-- **Off** — Shows all related content
-
-Useful for finding new things vs understanding connections.
-
-### Primary Node Highlighting
-
-The current center node is highlighted with:
-
-- Larger size
-- Glowing border
-- Clear visual distinction
-
-### Zoom & Pan
-
-- **Scroll** — Zoom in/out
-- **Drag** — Pan the canvas
-- **Double-click** — Reset view
+| Control | What it does |
+|---------|-------------|
+| **Movies / Series / Both** | Filter the graph by media type |
+| **Hide watched** | Drop titles you've already seen |
+| **Show cross-media connections** | Let a film link to a resembling series and vice versa (browse views only; one slot per item is reserved for the other media type) |
+| **Start over** | Reset to the initial graph |
+| **Refresh** | Rebuild with current settings |
 
 ---
 
-## Node Information
+## Create Playlist
 
-### Hover
-
-Hover over any node to see:
-
-- Title and year
-- Rating
-- Brief description
-- Connection reason
-
-### Click
-
-Click a node to:
-
-- Make it the new center
-- Expand its connections
-- See full details in sidebar
-
-### Detail Panel
-
-When a node is selected, a panel shows:
-
-- Full poster
-- Complete metadata
-- Genres
-- Your rating (with ability to rate)
-- "View Details" link to full page
+The header's **Create playlist** button takes the graph's current items and opens the playlist dialog with them pre-filled ("N items will be added") — name it, optionally generate a description, and it's created on your media server. See [Playlists](playlists.md).
 
 ---
 
-## Building Playlists
+## Media Graph vs Related-Content Graphs
 
-Create playlists from your exploration:
-
-### From Exploration
-
-1. Click **Start Playlist** button
-2. Click nodes to add them
-3. Items appear in playlist builder
-4. Name and save your playlist
-
-### Automatic Suggestions
-
-The graph can suggest playlist themes:
-
-- "Christopher Nolan Journey"
-- "Mind-Bending Sci-Fi"
-- "90s Action Classics"
-
-Based on your selected nodes and their connections.
+| | Media Graph | [Related-content graphs](similarity-graphs.md) |
+|---|---|---|
+| **Where** | Its own page | Each detail page's Graph tab |
+| **Seed** | A description or one of your lists | The title you're viewing |
+| **Best for** | Open-ended discovery sessions | "What's connected to this one?" |
 
 ---
 
-## Connection Types
-
-### Shared Cast
-
-Blue edges indicate shared actors:
-
-> The Matrix ↔ John Wick (Keanu Reeves)
-
-Click the edge to see who's shared.
-
-### Shared Creator
-
-Green edges indicate shared directors/creators:
-
-> Inception ↔ Interstellar (Christopher Nolan)
-
-### Genre Overlap
-
-Orange edges indicate genre similarity:
-
-> Both are sci-fi thrillers with similar themes
-
-### Semantic Similarity
-
-Purple edges indicate deeper thematic connections:
-
-> Both explore themes of memory and identity
-
-These use AI embeddings to find non-obvious connections.
-
----
-
-## Using Explore Effectively
-
-### Discovery Mode
-
-1. Start with something you love
-2. Navigate through connections
-3. Find hidden gems related to your favorites
-
-### Understanding Your Taste
-
-1. See why items are connected
-2. Notice patterns in what you like
-3. Understand the common threads
-
-### Building Collections
-
-1. Explore a genre or theme
-2. Add interesting finds to a playlist
-3. Create curated viewing journeys
-
-### Finding Specific Content
-
-1. Search for a known title
-2. Explore what's similar
-3. Find the perfect movie for tonight
-
----
-
-## Graph vs List Views
-
-| Aspect | Graph (Explore) | List (Similarity) |
-|--------|-----------------|-------------------|
-| **Best For** | Discovery, exploration | Quick comparison |
-| **Shows** | Network of connections | Ranked list |
-| **Navigation** | Click to drill down | Scroll through |
-| **Visual** | Spatial relationships | Linear ranking |
-
-Use both as needed. Graph for discovery, list for picking from options.
-
----
-
-**Next:** [Similarity Graphs](similarity-graphs.md)
+**Next:** [Related-Content Graphs](similarity-graphs.md)

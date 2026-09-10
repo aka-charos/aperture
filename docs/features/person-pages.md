@@ -1,17 +1,14 @@
 # Person Pages
 
-Person pages show filmographies for actors, directors, writers, and other crew members.
+Person pages cover anyone in your library's credits — actors, directors, writers, creators — with their work from your library, plus everything else they've done that you can request.
 
 ![Movie Detail with Cast](../images/features/movie-detail.png)
 
 ## Accessing Person Pages
 
-Multiple ways to reach a person page:
-
-1. **Click a name** — From any movie or series detail page
-2. **Search** — Type the person's name in global search
-3. **Watch Stats** — Click from Top Actors or Top Directors
-4. **Direct URL** — `/person/Person%20Name`
+1. **Click a name** — anywhere on a movie or series detail page: cast lists, director, writers, creator, cinematography, music, editing
+2. **Watch Stats** — the Most Watched Actors / Directors breakdowns have a **Full filmography** link per person
+3. **Direct URL** — `/person/Person%20Name`
 
 ---
 
@@ -19,108 +16,44 @@ Multiple ways to reach a person page:
 
 ### Header
 
-- **Profile photo** — The person's image
-- **Name** — Full name
-- **Known for** — Primary profession (Actor, Director, etc.)
-- **Birth/Death** — Dates if available
+- **Profile photo** over a **rotating fanart backdrop**
+- Name, plus **Born** (with current age) and, where applicable, **Died** (with age at death)
+- A **Biography**, clamped with **More / Less** when it runs long
 
-### Biography
+Header chips summarize the person's footprint in your library: **"12 as Actor"**, **"3 as Director"**, **"20 Movies"**, **"4 Series"**.
 
-If available, a brief biography of the person.
+### Filmography From Your Library
 
----
+Two poster carousels — **Movies** and **TV Series** — covering everything of theirs your library holds. Cards carry the standard overlays:
 
-## Filmography
+- Watched tick, or an **episode-progress badge** (8/24) for series
+- Your **star rating**, hover-rateable
+- The **Shows You Watch** toggle on series entries
+- Community rating where known
 
-### Movies
-
-All movies in your library featuring this person:
-
-| Column | Description |
-|--------|-------------|
-| **Poster** | Movie thumbnail |
-| **Title** | Click to view details |
-| **Year** | Release year |
-| **Role** | Their role (if actor) or job (director, writer) |
-| **Your Rating** | Heart rating if rated |
-| **Watch Status** | Whether you've seen it |
-
-### TV Series
-
-All series in your library featuring this person:
-
-| Column | Description |
-|--------|-------------|
-| **Poster** | Series thumbnail |
-| **Title** | Click to view details |
-| **Years** | Run period |
-| **Role** | Character name or job |
-| **Episodes** | Number of episodes (for actors) |
-| **Watch Status** | Your progress |
+Click any poster for its detail page.
 
 ---
 
-## Sorting & Filtering
+## Not in Your Library
 
-### Sort Options
+The second half answers the question the library can't: **the person's other credits, pulled from TMDb** — up to 80 titles you don't have.
 
-| Option | Description |
-|--------|-------------|
-| **Year** | By release/premiere date |
-| **Rating** | By community rating |
-| **Your Rating** | By your personal ratings |
-| **Title** | Alphabetical |
+- Titles are **grouped by media type and role** — acting, directing, producing, writing, creating, other crew
+- **Media** (All / Movies / TV) and **Role** filter dropdowns narrow the grid
+- Each missing title can be **requested via Seerr** right there — the same request pipeline as [Discover](discovery.md)
+- For series, a **season selector** picks specific seasons rather than the whole show
+- Titles already requested show their **request status** chip
 
-### Filter Options
-
-- **Watched only** — Show only what you've seen
-- **Unwatched only** — Show what you haven't seen
-- **Movies / Series** — Filter by content type
+This is how a person page becomes a watchlist: find the film you've never heard of, ask for it, and track it under [My Requests](my-requests.md).
 
 ---
 
-## Person Stats
+## Tips
 
-Quick stats about this person in your library:
-
-| Stat | Description |
-|------|-------------|
-| **Total Items** | Movies + series in your library |
-| **Watched** | How many you've seen |
-| **Avg Rating** | Your average rating of their work |
-| **Your Favorite** | Highest-rated by you |
-
----
-
-## Using Person Pages
-
-### Discover New Content
-
-- Found an actor you like? See what else they're in
-- Enjoyed a director's film? Explore their catalog
-- Writers often have consistent styles worth following
-
-### Complete Filmographies
-
-- See gaps in your viewing of a favorite actor
-- Track how many of a director's films you've seen
-- Discover hidden gems you didn't know they made
-
-### Rate & Compare
-
-- Rate items directly from the filmography
-- Compare your ratings to community ratings
-- Identify patterns in what you like from them
-
----
-
-## Related People
-
-At the bottom, you may see:
-
-- **Frequent collaborators** — People they often work with
-- **Similar actors** — Actors with overlapping filmographies
-- **Same genre specialists** — Others known for similar content
+- **Follow a director** — their page doubles as a completeness checklist for your library, with the gaps flagged for requesting
+- **The role filters matter for hyphenates** — an actor who also directs keeps both bodies of work separate
+- **Rate from the carousels** — ratings here feed the same taste profile as everywhere else
 
 ---
 
