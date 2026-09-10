@@ -1,6 +1,6 @@
 # Browse Movies & Series
 
-The Browse page is your library explorer with powerful filtering, sorting, and organization tools.
+The Browse page is your library explorer: every title you have, with deep filtering, sorting, presets, and a People tab.
 
 ![Browse Movies Grid View](../images/features/browse-movies-grid.png)
 
@@ -8,187 +8,103 @@ The Browse page is your library explorer with powerful filtering, sorting, and o
 
 ### Tabs
 
-Switch between content types using the tabs at the top:
+- **Movies** — your movie library
+- **Series** — your TV series library
+- **People** — every actor, director, and creator in your library, searchable, with Name / Credits sorting and its own grid/list mode (People defaults to **list**)
 
-- **Movies** — Browse your movie library
-- **Series** — Browse your TV series library
+Each tab keeps its own filters, sort preference, and view mode (see [Grid & List Views](grid-list-views.md)).
 
-Each tab maintains its own filters, sort preferences, and view mode.
+### The Filter Bar
 
-### View Modes
+A sticky bar above the grid holds, left to right: a **search box**, **Genre**, **Franchise** (movies) or **Network** (series), **Country**, **Filters**, **Sort**, and **Presets**. Active selections appear as removable chips under the bar.
 
-Toggle between two display modes using the buttons in the header:
-
-| Mode | Description |
-|------|-------------|
-| **Grid View** | Poster grid with quick info on hover |
-| **List View** | Detailed rows with metadata, ratings, and synopsis |
-
-Your preferred view mode is **saved per page** and remembered when you return.
+The **search box** filters the current tab by title as you type.
 
 ---
 
-## Filtering Content
+## The Filters Popper
 
-### Quick Filters
+The **Filters** button (it shows a count when anything is active) opens the full panel, grouped into sections. Most filters are **dual-handle range sliders** — set both a floor and a ceiling:
 
-The filter bar contains quick-access filters:
+| Section | Filters |
+|---------|---------|
+| **Scores** | Community rating, Rotten Tomatoes critic score, Metacritic |
+| **Year** | Release-year range |
+| **Library & Audience** | **Watch status** (Any / Watched / Unwatched — unwatched means never played or under 5% progress), **min/max watchers** (how many distinct users on your server have watched it) |
+| **Runtime** | Length range (movies) |
+| **Video quality** | Resolution / formats present in your files |
+| **Seasons** | Season-count range (series) |
+| **Status** | **Airing / Ended** (series) |
+| **Content rating** | Age ratings |
 
-| Filter | Movies | Series |
-|--------|--------|--------|
-| **Search** | Search by title | Search by title |
-| **Genre** | Filter by genre | Filter by genre |
-| **Franchise** | Filter by collection | — |
-| **Network** | — | Filter by TV network |
+The popper header has a **reset icon** that clears everything at once; chips let you remove individual filters.
 
-### Advanced Filters
+### Country
 
-Click the **Filters** button to open the advanced filter panel:
+The **Country** button opens its own popper for **production country**:
 
-![Filters Panel](../images/features/browse-filters-open.png)
+- A **Match All / Any** switch — "France AND Japan" versus "France OR Japan"
+- It matches stored country names; nationalities work too ("French", "German"…)
 
-#### For Movies
+Production country is almost completely populated (unlike language metadata), so it's the reliable way to browse national cinema.
 
-| Filter | Description |
-|--------|-------------|
-| **Year Range** | Slider for release year (e.g., 1990-2020) |
-| **Runtime** | Slider for duration in minutes |
-| **Community Rating** | Minimum rating threshold |
-| **Rotten Tomatoes** | Minimum RT critic score |
-| **Metacritic** | Minimum Metacritic score |
-| **Content Rating** | Select ratings (G, PG, PG-13, R, etc.) |
-| **Resolution** | Select quality (4K, 1080p, 720p, SD) |
+### Franchise / Network
 
-#### For Series
-
-| Filter | Description |
-|--------|-------------|
-| **Year Range** | Slider for premiere year |
-| **Seasons** | Slider for number of seasons |
-| **Community Rating** | Minimum rating threshold |
-| **Rotten Tomatoes** | Minimum RT critic score |
-| **Metacritic** | Minimum Metacritic score |
-| **Content Rating** | Select ratings |
-| **Status** | Filter by Continuing, Ended, etc. |
-
-### Active Filters
-
-When filters are active:
-
-- A badge shows the count of active filters
-- Filter chips appear below the filter bar
-- Click the **X** on any chip to remove that filter
-- Click **Clear All** to reset all filters
+Movies can be narrowed to one **collection** (franchise); series to one **network**. For the collection overview across your whole library, see the [Franchise Tracker](franchises.md).
 
 ---
 
 ## Sorting
 
-Click the **Sort** button to change the sort order:
+The **Sort** menu covers:
 
-![Sort Options](../images/features/browse-sort-open.png)
+| Movies | Series |
+|--------|--------|
+| Title | Title |
+| Year | Year |
+| Release Date | Release Date |
+| Rating | Rating |
+| RT Score | RT Score |
+| Metacritic | Metacritic |
+| Runtime | Seasons |
+| **Recently Added** | **Recently Added** |
 
-### Sort Options
-
-| Option | Description |
-|--------|-------------|
-| **Title** | Alphabetical A-Z or Z-A |
-| **Year** | By release/premiere year |
-| **Release Date** | By exact release date (movies) |
-| **Rating** | By community rating |
-| **RT Score** | By Rotten Tomatoes score |
-| **Metacritic** | By Metacritic score |
-| **Runtime** | By duration (movies) |
-| **Seasons** | By number of seasons (series) |
-| **Date Added** | By when added to library |
-
-### Sort Order
-
-Click the same sort option again to toggle between:
-
-- **Ascending** (↑) — A-Z, lowest first, oldest first
-- **Descending** (↓) — Z-A, highest first, newest first
-
-### Sort Persistence
-
-Your sort preference is **automatically saved** per media type:
-
-- Movies and Series have independent sort settings
-- Settings sync to your account (work across devices)
-- Persists between sessions
+Each tab remembers its own sort, synced to your account.
 
 ---
 
 ## Filter Presets
 
-Save your favorite filter combinations for quick access.
+Any combination of filters can be saved as a **preset** from the Presets menu:
 
-### Saving a Preset
-
-1. Set up your desired filters
-2. Click the **Presets** button
-3. Click **Save Current Filters**
-4. Enter a name (e.g., "High Rated Action", "90s Comedies")
-5. Click **Save**
-
-### Loading a Preset
-
-1. Click the **Presets** button
-2. Click on any saved preset
-3. All filters from that preset are applied
-
-### Managing Presets
-
-- **Rename** — Click the menu icon on a preset, select Rename
-- **Delete** — Click the menu icon, select Delete
-- **Manage All** — Click "Manage Presets" to see all presets
-
-### Preset Scope
-
-- Presets are saved separately for Movies vs Series
-- Each preset stores: genre, franchise/network, and all advanced filters
-- Presets sync to your account
+- **Save Current Filters** — name the combination and it joins the menu
+- **Manage Presets** — rename and delete
+- Applying a preset replaces the active filters; the chips show exactly what it contains
+- Presets are per-account and work on both tabs
 
 ---
 
-## Sticky Filter Bar
+## Reading the Results
 
-When you scroll down, the filter bar **sticks to the top** of the page:
+**Grid view** — posters with overlays: watched tick, your star rating on hover, episode-progress badge for series, community rating badge.
 
-- Filters remain accessible while browsing
-- Active filter chips stay visible
-- Easy to adjust filters without scrolling back up
+**List view** — poster beside the details:
 
----
+- Title, year, **community rating**
+- **Genre chips** (up to four)
+- A two-line **overview** (with "View on TMDb" alongside)
+- Your rating, inline; series add their **status** (Airing/Ended) and **season count**, plus an **Add to Watching** toggle
 
-## Infinite Scroll
-
-Content loads automatically as you scroll:
-
-- Initial load shows first batch of results
-- Scroll to bottom to load more
-- Total count shown in header
-- Loading indicator appears while fetching
-
----
-
-## Rating from Browse
-
-In both Grid and List views:
-
-- **Grid View** — Hover to reveal the heart rating overlay
-- **List View** — Heart rating appears inline with each item
-
-Click the heart to rate any item without leaving the page.
+Results load infinitely as you scroll, with an end message at the bottom of the match set.
 
 ---
 
 ## Tips
 
-- Use **filter presets** to quickly switch between browsing modes
-- **List view** shows more metadata for informed decisions
-- Combine **multiple filters** to narrow down large libraries
-- **Sort by Date Added** to find your newest content
+- **Watch status is a filter** — "Unwatched + RT 80%+" is the fastest shortlist in the app
+- **Save your default browse** (e.g. unwatched, sorted by Recently Added) as a preset and apply it in one click
+- **Country, not language** — use production country for national-cinema browsing
+- **Min/max watchers** finds hidden gems (low) or household hits (high)
 
 ---
 

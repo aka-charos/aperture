@@ -1,132 +1,36 @@
 # Studio Pages
 
-Studio pages show catalogs for production studios and TV networks.
+Studio pages collect what your library holds from a **production studio** (movies) or **TV network** (series).
 
 ![Series Detail with Network](../images/features/series-detail.png)
 
 ## Accessing Studio Pages
 
-Multiple ways to reach a studio page:
-
-1. **Click a studio name** — From movie detail pages
-2. **Click a network name** — From series detail pages
-3. **Watch Stats** — Click from Top Studios or Top Networks
-4. **Direct URL** — `/studio/Studio%20Name`
+1. **Click a studio name** — from a movie detail page's info card
+2. **Watch Stats** — the Top Studios / Top Networks breakdowns include an **All titles** link to the studio's page
+3. **Direct URL** — `/studio/Studio%20Name`
 
 ---
 
 ## Page Layout
 
-### Header
+The page is deliberately simple:
 
-- **Studio/Network logo** — If available
-- **Name** — Studio or network name
-- **Item count** — Content in your library
-- **Type** — Movie studio or TV network
+- The **studio logo** and name (an empty state appears if your library holds nothing from them)
+- Two count chips: **"N Movies"** and **"N Series"**
+- Two poster carousels — **Movies** and **TV Series** — everything from this studio in your library
 
----
+Carousel cards carry the standard overlays: community rating, watched tick, **episode-progress badge** for series, your **star rating** (hover-rateable), and the **Shows You Watch** toggle on series entries. Click any poster for its detail page.
 
-## Catalog
-
-### For Movie Studios
-
-All movies from this studio in your library:
-
-| Column | Description |
-|--------|-------------|
-| **Poster** | Movie thumbnail |
-| **Title** | Click to view details |
-| **Year** | Release year |
-| **Rating** | Community rating |
-| **Your Rating** | Heart rating if rated |
-| **Watch Status** | Whether you've seen it |
-
-### For TV Networks
-
-All series from this network in your library:
-
-| Column | Description |
-|--------|-------------|
-| **Poster** | Series thumbnail |
-| **Title** | Click to view details |
-| **Years** | Run period |
-| **Seasons** | Total seasons |
-| **Your Rating** | Heart rating if rated |
-| **Watch Status** | Your progress |
+There are no extra filters or sorting here — for that, use [Browse](browse.md) with its filters, or the [Watch Stats](watch-stats.md) drill-downs, which treat studios and networks as first-class dimensions you can click through.
 
 ---
 
-## Sorting & Filtering
+## Tips
 
-### Sort Options
-
-| Option | Description |
-|--------|-------------|
-| **Year** | By release date |
-| **Rating** | By community rating |
-| **Your Rating** | By your ratings |
-| **Title** | Alphabetical |
-| **Popularity** | By watch count |
-
-### Filter Options
-
-- **Watched only** — What you've seen
-- **Unwatched only** — What you haven't seen
-- **Genre** — Filter by genre within the studio
-
----
-
-## Studio Stats
-
-Quick stats about this studio/network:
-
-| Stat | Description |
-|------|-------------|
-| **Total Items** | Content in your library |
-| **Watched** | How many you've seen |
-| **Avg Rating** | Community average |
-| **Your Avg** | Your average rating |
-| **Top Rated** | Highest-rated title |
-
----
-
-## Using Studio Pages
-
-### Discover Studio Style
-
-Studios often have recognizable styles:
-
-| Studio | Known For |
-|--------|-----------|
-| **A24** | Artistic indie films |
-| **Marvel Studios** | Superhero blockbusters |
-| **Pixar** | Animated family films |
-| **HBO** | Prestige TV dramas |
-| **Netflix** | Diverse streaming originals |
-
-### Find Quality Content
-
-- See top-rated items from studios you trust
-- Discover hidden gems in their catalog
-- Compare your taste to their typical output
-
-### Track Studio Preferences
-
-Your viewing patterns show:
-
-- Which studios align with your taste
-- Studios to explore more
-- Studios to potentially avoid
-
----
-
-## Related Studios
-
-At the bottom, you may see:
-
-- **Similar studios** — Studios with similar content styles
-- **Parent/Subsidiary** — Related companies
-- **Frequent partners** — Studios that often co-produce
+- **Studios have styles** — the catalog makes a studio's house style visible at a glance
+- **Networks are counted per series** — the TV Series carousel shows whether a network's whole run is on your server
+- **Follow the logos from Watch Stats** — your most-watched studios are one click away, drill-down included
 
 ---
 

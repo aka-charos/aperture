@@ -1,210 +1,99 @@
-# Encore Chatbot
+# AI Assistant (Encore)
 
-Encore is Aperture's AI assistant that helps you find content through natural conversation.
+**Encore** is Aperture's built-in AI assistant. Ask in plain language and it searches your library, your history, your stats, and — for discovery requests — the web, answering with poster cards you can act on.
 
 ![Dashboard showing AI features](../images/features/dashboard.png)
 
-## Accessing Encore
+## Opening the Assistant
 
-Click the **sparkle button** (✨) in the bottom-right corner of any page.
+- The **sparkle button** (bottom-right, on every page) opens the assistant as a **side panel** you can drag to resize (400–720px wide)
+- It's also a full **page** in the sidebar (**Assistant**), where your conversations live
+- Conversations are **saved server-side** — close the panel or reload the page and they're still there, fully rendered; old conversations can be deleted from the sidebar page
 
 ---
 
-## What Encore Can Do
+## What It Can Do
 
-### Find Movies
-
-Ask natural language questions:
+### Find things in your library
 
 > "What should I watch tonight?"
 
-> "Find me a funny movie from the 90s"
-
 > "I want something like Inception but less confusing"
 
-### Find Series
+> "A slow, wintry film — nothing longer than two hours"
 
-> "What TV shows should I start?"
+Concept queries are answered with **semantic search** over your library's embeddings, not just title matching. Answers arrive as **poster card carousels**, each with a reason attached. Cards carry **Play on Emby/Jellyfin** and favorite actions, so you can go from answer to playback without leaving the chat.
 
-> "I need a new binge-worthy series"
-
-> "Something like Breaking Bad but lighter"
-
-### Get Recommendations
-
-> "What do you think I'd like based on my history?"
-
-> "Recommend something I haven't seen by Christopher Nolan"
-
-> "My partner likes romcoms, what should we watch together?"
-
-### Answer Questions
-
-> "What's the highest rated movie in my library?"
+### Answer questions about *you*
 
 > "How many Marvel movies have I watched?"
 
-> "Who directed The Matrix?"
+> "What did I rate highest last year?"
+
+> "The French noir I watched this spring?"
+
+It can read your history (including by genre, country, or rating), your ratings, your stats, and your taste profile. Turn on **"Only suggest what I haven't watched"** — a persistent checkbox — and every suggestion filters out everything you've seen.
+
+### Find people and episodes
+
+> "What else has Denis Villeneuve directed?"
+
+> "Which episode of The X-Files is the one with the carnival?"
+
+Person lookups return **person cards**; where episode embeddings are enabled, episode-level search finds individual episodes and links to their series.
+
+### Discover what you *don't* have
+
+For "find me something new" requests, the assistant searches **web sources** (Google grounding, Tavily) alongside your library and combines the results. A discovery answer comes in up to three sections:
+
+1. **Recommendations** — the web picks, each with a grounded reason
+2. **Also worth checking** — neighbours of a seed title from your own library
+3. **From your taste profile** — scored library matches for your exact words
+
+Missing titles can be **requested** straight from the cards (via Seerr). While it works, a **status line** narrates the phase — "Searching your library…", "Scouting for candidates…", "Writing up why each fits…" — so you're never staring at a spinner.
+
+### Build playlists from answers
+
+A suggestion carousel has a **create-playlist** action: the titles it recommended become a playlist, with the chat's request and reasons feeding the playlist's own generation. See [Playlists](playlists.md).
 
 ---
 
-## Conversation Examples
-
-### Finding Tonight's Movie
+## A Worked Example
 
 **You:** "I'm in the mood for something scary but not too gory"
 
-**Encore:** "Based on your taste, I'd suggest these atmospheric horror films:
-1. **The Others** (2001) - Psychological haunted house
-2. **A Quiet Place** (2018) - Tense creature feature
-3. **Get Out** (2017) - Social thriller horror
+> *Status: Searching your library…*
 
-Would you like more details on any of these?"
+**Encore:** carousel of atmospheric horror from your library — each card with a one-line reason ("slow-burn haunted-house dread, minimal gore"), a **Play on Emby** button, and the watched titles omitted because "Only suggest what I haven't watched" is on.
 
-### Exploring Genres
+**You:** "okay but something newer, this century only"
 
-**You:** "I've never watched anime, where should I start?"
+**Encore:** a refreshed carousel (it remembers the thread), plus — because this is now a *discovery* request for titles you may not have — a second section, **"Also worth checking"**, with library neighbours of the strongest pick.
 
-**Encore:** "Great! For anime beginners, I'd recommend:
-1. **Spirited Away** - Beautiful Studio Ghibli film
-2. **Death Note** - Gripping supernatural thriller series
-3. **Your Name** - Romantic fantasy
+**You:** "is there anything like this streaming that we don't have?"
 
-These are accessible entry points that showcase the medium well."
+> *Status: Scouting for candidates…*
 
-### Personal Questions
-
-**You:** "What genres do I watch most?"
-
-**Encore:** "Looking at your watch history:
-1. **Sci-Fi** - 34% of your viewing
-2. **Action** - 28%
-3. **Drama** - 22%
-4. **Comedy** - 16%
-
-You seem to prefer thought-provoking science fiction!"
+**Encore:** a **Recommendations** section of web-sourced titles with grounded reasons, each card carrying a **Request** button. Anything requested shows up later under [My Requests](my-requests.md).
 
 ---
 
-## How Encore Works
+## Good to Know
 
-### Your Data
-
-Encore has access to:
-
-- Your watch history
-- Your ratings
-- Your library content
-- General movie/TV knowledge
-
-### Personalization
-
-Responses are tailored to you:
-
-- Recommends from your library
-- Considers what you've seen
-- Accounts for your ratings
-- Remembers conversation context
-
-### Privacy
-
-Encore processes data locally (through your admin's configured AI):
-
-- No data sent to external services (if using local AI)
-- Conversations aren't stored long-term
-- Your watch history stays private
+- **It can't rate for you** — ratings stay a manual action (deliberately: a rating is your judgement)
+- **It can't play directly** — play buttons open the title in your media server
+- **Discovery turns use the internet** — when the answer needs web sources, the request involves external services; library-only questions stay local
+- **It doesn't guess watched state** — with "only unwatched" on, the filter is real: played titles and 5%+ progress are excluded
+- **Welcome-screen suggestion chips** refresh with your latest recommendation run — a one-click way in
 
 ---
 
-## Tips for Better Results
+## Tips
 
-### Be Specific
-
-| Less Effective | More Effective |
-|----------------|----------------|
-| "Find me a movie" | "Find me a thriller from the 2010s" |
-| "What's good?" | "What's good that I haven't seen?" |
-| "Comedy" | "Light comedy for family movie night" |
-
-### Add Context
-
-Tell Encore about your situation:
-
-> "I have 90 minutes before dinner"
-
-> "Watching with my kids ages 8 and 12"
-
-> "I want something to fall asleep to"
-
-### Ask Follow-ups
-
-Continue the conversation:
-
-> "Tell me more about option 2"
-
-> "Any other suggestions like those?"
-
-> "What about something newer?"
-
----
-
-## Quick Actions
-
-Encore can help you take action:
-
-### Rating Content
-
-> "I just watched Inception, rate it 9 hearts"
-
-### Adding to Playlists
-
-> "Add The Matrix to my sci-fi playlist"
-
-### Finding Similar
-
-> "Show me movies similar to Interstellar"
-
----
-
-## Limitations
-
-### What Encore Can't Do
-
-- Play movies directly
-- Modify your media server settings
-- Access content not in your library
-- Remember conversations after you close it
-
-### When to Use Other Features
-
-| Need | Better Option |
-|------|---------------|
-| Detailed filtering | Browse page filters |
-| Visual exploration | Explore graph |
-| Request new content | Discovery page |
-| Manage playlists | Playlists page |
-
----
-
-## Configuration
-
-### Admin Settings
-
-Your admin configures:
-
-- Which AI model powers Encore
-- Response length limits
-- Enabled capabilities
-
-### Availability
-
-Encore requires:
-
-- AI provider configured
-- Your account enabled for AI features
-- API key with sufficient quota
-
-If you don't see the sparkle button, ask your admin about AI access.
+- **Say what you're in the mood for, not a title** — "something slow and wintry" works better than genre names
+- **Chain turns** — "more like the second one", "anything with the same director?", "now something lighter"
+- **Ask it to justify** — "why this one?" gets you the reasoning behind a card
+- **Use it for intersection questions** — the things Browse filters can't express ("the 90s comedies I rated 8+")
 
 ---
 

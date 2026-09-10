@@ -1,104 +1,62 @@
 # Top Picks
 
-Top Picks shows trending content across all users on your server or from external ranking sources.
+Top Picks ranks the most popular titles across all users of your server, over a recent window — what the household has been watching, not what fits you personally.
 
 ![Top Picks Page](../images/features/top-picks.png)
 
 ## Accessing Top Picks
 
-Navigate to **Top Picks** in the sidebar (flame icon).
+Navigate to **Top Picks** in the sidebar (flame icon). The page has two tabs: **Movies** and **Series** ("Top Pick Movies" / "Top Pick Series").
+
+---
+
+## The Ranking
+
+The header states exactly what's being ranked: **"Ranked by popularity based on watch activity from all users over the last N days"** — the window is admin-configured (default 30 days). A **Last refreshed** caption shows when the ranking was last computed.
+
+This is deliberately **not personalized**: it's the same list for everyone. For picks that fit you specifically, see [My Recommendations](recommendations.md).
 
 ---
 
 ## Page Layout
 
-### Tabs
-
-Switch between content types:
-
-- **Movies** — Trending movies
-- **Series** — Trending TV series
-
 ### View Modes
-
-Toggle between display modes:
 
 | Mode | Description |
 |------|-------------|
-| **Grid View** | Poster grid with rank badges |
+| **Grid View** | Poster grid with rank badges and viewer chips |
 | **List View** | Detailed rows with viewer stats |
-
----
-
-## Ranking Display
 
 ### Rank Badges
 
-Top content shows medal badges:
+Each title carries a numbered rank badge (#1, #2, …) — the same badge that's burned into the poster overlays when Top Picks are written into your media server.
 
-| Badge | Meaning |
-|-------|---------|
-| 🥇 Gold | #1 most popular |
-| 🥈 Silver | #2 most popular |
-| 🥉 Bronze | #3 most popular |
-| 4+ | Numbered badge |
+---
 
-### Viewer Stats
+## Understanding the Numbers
 
-In list view, each item shows:
+In list view, each title shows:
 
 | Stat | Description |
 |------|-------------|
-| **Unique Viewers** | Number of users who watched |
-| **Play Count** | Total plays across all users |
-| **Community Rating** | Average rating |
+| **Unique Viewers** | How many different users watched it — broadly popular |
+| **Play Count** | Total plays ("10+ plays" caps the chip) — high plays with few viewers means a few people rewatch it |
+| **Community Rating** | Average rating from your media server |
+
+Series add their own stats: **episodes watched**, **% avg completion** (how much of each episode the household actually watches), and a **network** chip.
+
+Every title also shows whether *you've* watched it (✓ on the poster), and you can rate directly — hover a poster in grid view, or use the inline control in list view. Your ratings still feed your own recommendations.
 
 ---
 
 ## Popularity Sources
 
-Your admin configures where Top Picks rankings come from:
+Your admin configures where the ranking comes from; the header tells you which is active:
 
-### Server Watch History
-
-Rankings based on your server's actual watch activity:
-
-- Who watched what
-- How many times
-- Recent vs all-time
-
-**Pros:** Reflects your community's actual taste
-
-### MDBList
-
-Rankings from external curated lists:
-
-- Popular and trending lists
-- Genre-specific lists
-- Custom admin-selected lists
-
-**Pros:** Professional curation, broader perspective
-
-### Combined
-
-Mix of both sources:
-
-- Server data for local popularity
-- MDBList for broader trends
-
----
-
-## Time Windows
-
-Depending on admin configuration:
-
-| Window | Description |
-|--------|-------------|
-| **Weekly** | Most popular this week |
-| **Monthly** | Most popular this month |
-| **All Time** | Most popular ever |
-
-The current time window is shown in the page header.
+- **Server watch history** — your community's actual viewing, the default
+- **TMDb** — popular, trending (daily/weekly), or top-rated charts
+- **MDBList** — curated external lists
+- **Hybrid** — local activity blended with one external source
 
 ---
 
@@ -106,61 +64,24 @@ The current time window is shown in the page header.
 
 | Aspect | Top Picks | Recommendations |
 |--------|-----------|-----------------|
-| **Based On** | All users' activity | Your personal taste |
-| **Personalized** | No | Yes |
-| **Good For** | Discovering popular content | Finding matches for you |
-| **Updates** | Based on server activity | When job runs |
+| **Based on** | All users' activity | Your personal taste |
+| **Personalized** | No — same list for everyone | Yes |
+| **Good for** | What the household is into right now | Matches for you specifically |
+| **Window** | Last N days | Since the last run |
 
-Use both:
-- **Top Picks** to see what's trending
-- **Recommendations** for personalized suggestions
-
----
-
-## Rating from Top Picks
-
-Rate items directly:
-
-- **Grid View** — Hover for heart overlay
-- **List View** — Heart rating inline
-
-Your ratings still affect your personal recommendations.
+Use both: Top Picks to see what everyone's talking about, Recommendations for what fits you.
 
 ---
 
 ## Top Picks in Your Media Server
 
-If configured by your admin, Top Picks also appear as libraries in Emby/Jellyfin:
+If your admin configured it, Top Picks are also written into Emby/Jellyfin:
 
-- "Top Movies This Week" (or similar)
-- "Top Series This Week"
-- Updates automatically based on activity
-- See [Virtual Libraries](virtual-libraries.md)
+- As libraries named **"Top Picks - Movies"** and **"Top Picks - Series"**, or as a **Box Set collection** or **playlist** — depending on the output your admin chose
+- Rank badges burned into the poster overlays
+- Refreshed automatically on the admin's schedule
 
----
-
-## Understanding the Numbers
-
-### Unique Viewers
-
-The number of different users who watched:
-
-- Higher = more broadly popular
-- Lower with high play count = some users watching repeatedly
-
-### Play Count
-
-Total number of plays:
-
-- Includes rewatches
-- Higher than viewers = rewatchable content
-
-### Your Watch Status
-
-Each item shows if you've watched it:
-
-- ✓ = You've seen it
-- Empty = Haven't watched yet
+See [Virtual Libraries](virtual-libraries.md).
 
 ---
 

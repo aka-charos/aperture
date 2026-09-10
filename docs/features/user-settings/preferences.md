@@ -1,235 +1,59 @@
 # Preferences
 
-Preferences control how Aperture displays content and behaves for your account.
+The **Preferences** tab collects the settings that shape your day-to-day view of Aperture — and your account's connection to the outside world.
 
 ![User Settings - Preferences](../../images/user-settings/user-settings-preferences.png)
 
 ## Accessing Preferences
 
-1. Click your avatar in the top navigation bar
-2. Select **Settings**
-3. Click the **Preferences** tab
+Click your **avatar** in the top bar and pick **Preferences** (the menu links all three settings tabs directly).
 
 ---
 
-## Library Names
+## Language
 
-Customize the names of your virtual libraries in Emby/Jellyfin.
+- **UI language** — pick Aperture's interface language
+- **AI Summaries language** — the language AI-written text (explanations, identity prose) is written in, independent of the UI — useful when the household browses in one language but prefers its summaries in another
+- When unset, the server default applies; your admin may restrict the offered languages
 
-### Available Libraries
+## AI Library Names
 
-| Library | Default Name | Your Custom Name |
-|---------|--------------|------------------|
-| AI Movie Picks | "AI Picks - [Username] - Movies" | Your choice |
-| AI Series Picks | "AI Picks - [Username] - Series" | Your choice |
-| Shows You Watch | "Shows You Watch - [Username]" | Your choice |
+The names of your two AI Picks libraries in Emby/Jellyfin — "*YourName*'s AI Picks - Movies" and "- TV Series" by default. Changes are used at the next library update. Keep names short (they show in TV menus) and avoid characters your media server dislikes in folder names. See [Virtual Libraries](../virtual-libraries.md).
 
-### Setting Custom Names
+## AI Explanation Preference
 
-1. Enter your preferred name in each field
-2. Click **Save**
-3. Library updates on next sync
+Whether each recommendation carries a **"Why *Aperture* picked this for you"** note — in the detail page's insights panel and on your media server. Your account may have this locked by an admin, in which case the card shows the effective setting with a **Reset to Default** option instead of the toggle. Changes apply when recommendations are next regenerated — turning it on doesn't backfill old runs.
 
-### Tips
+## Similarity Graph
 
-- Keep names short for mobile display
-- Use consistent naming patterns
-- Avoid special characters that may cause issues
+Two switches for the related-content graphs on detail pages (see [Related-Content Graphs](../similarity-graphs.md)):
 
----
+| Setting | Effect | Use it when |
+|---------|--------|-------------|
+| **Hide Watched Content** | Related titles you've seen don't appear | You browse related items to find something *new* |
+| **Full Franchise Mode** | Keeps whole collections together rather than trimming to a representative few | You'd rather see every entry of a franchise than its best-known face |
 
-## Dislike Behavior
+## Poster Display
 
-Control how low ratings affect your recommendations.
+**Show rating badge on library posters** — turn it off if your artwork already carries a rating (many custom covers do); Aperture-sourced covers from Discover/TMDb always show their corner badge regardless. A **Reset to server default** option appears once you've chosen.
 
-### Options
+## Trakt Integration
 
-| Option | Effect |
-|--------|--------|
-| **Exclude** | Items similar to 1-3 star ratings are completely excluded |
-| **Penalize** | Items similar to dislikes are ranked lower but may appear |
+Connect, sync, or disconnect your Trakt account. This card only appears when your admin has configured Trakt on the server — see [Trakt Integration](../trakt-integration.md) for the full flow.
 
-### When to Use Each
+## Email & Notifications
 
-**Exclude (Default):**
-- Strong preferences about what you don't like
-- Want cleaner recommendations
-- Genres you never want to see
+A toggle for receiving email notifications about your recommendations, and your email address. This card appears only when your **admin grants email notifications** for your account.
 
-**Penalize:**
-- Open to being surprised
-- Want more diverse recommendations
-- Mild dislikes, not hard nos
-
-### How It Works
-
-1. You rate a movie 2 hearts
-2. AI identifies similar content
-3. **Exclude:** Similar content removed from candidates
-4. **Penalize:** Similar content gets lower scores
+The email address starts synced from your media server account; setting a custom one **locks it** against future overwrites from Emby/Jellyfin (the helper text tells you which state you're in). Changes save as you leave the field.
 
 ---
 
-## AI Explanations
+## Not Here Anymore
 
-Control whether you see natural language explanations with recommendations.
-
-### Toggle Options
-
-| Setting | Effect |
-|---------|--------|
-| **Enabled** | Each recommendation includes "Why this pick?" explanation |
-| **Disabled** | Only show match scores, no text explanation |
-
-### Example Explanation
-
-When enabled, recommendations show:
-
-> "This psychological thriller shares the mind-bending narrative style you enjoyed in Inception and Memento, with strong performances and a satisfying twist ending."
-
-### Considerations
-
-- Explanations require AI processing
-- May slightly slow recommendation generation
-- Provides insight into "why" not just "what"
+- **Dislike behavior** lives in the [AI Algorithm](ai-algorithm.md) tab
+- **Browse view modes, sort orders, and filter presets** are managed on the [Browse](../browse.md) page itself — they persist per account automatically
 
 ---
 
-## Similarity Graph Settings
-
-Configure the behavior of similarity graphs throughout Aperture.
-
-### Auto-Expand
-
-| Setting | Effect |
-|---------|--------|
-| **On** | Similarity graphs start expanded |
-| **Off** | Graphs start collapsed, click to expand |
-
-### Hide Watched in Graphs
-
-| Setting | Effect |
-|---------|--------|
-| **On** | Watched content hidden by default |
-| **Off** | All similar content shown |
-
-### Connection Types
-
-Choose which relationship types to display:
-
-| Type | Example |
-|------|---------|
-| **Cast** | Shared actors |
-| **Crew** | Shared directors/writers |
-| **Genre** | Genre similarity |
-| **Theme** | Thematic similarity |
-| **Embedding** | AI-detected similarity |
-
-Toggle each type on/off to customize your graph view.
-
----
-
-## Browse Sort Preferences
-
-Your default sort order for the Browse page.
-
-### Current Settings
-
-Shows your saved sort preferences:
-
-| Library | Sort By | Order |
-|---------|---------|-------|
-| Movies | [Your choice] | Asc/Desc |
-| Series | [Your choice] | Asc/Desc |
-
-### How It's Set
-
-Sort preferences are set automatically:
-
-1. Change sort on the Browse page
-2. Preference is saved immediately
-3. Applied next time you visit
-
-You can also reset to defaults here.
-
----
-
-## View Mode Preferences
-
-Your preferred view mode (grid/list) for each page.
-
-### Pages with View Modes
-
-| Page | Options |
-|------|---------|
-| Browse | Grid / List |
-| Recommendations | Grid / List |
-| Top Picks | Grid / List |
-| Discovery | Grid / List |
-| Watch History | Grid / List |
-| Shows You Watch | Grid / List |
-
-### How It Works
-
-1. Toggle view mode on any page
-2. Preference saved automatically
-3. Page remembers your choice
-
-### Resetting
-
-Click **Reset View Preferences** to return all pages to default (grid) view.
-
----
-
-## Filter Presets
-
-Manage your saved filter combinations for the Browse page.
-
-### Viewing Presets
-
-Lists all your saved filter presets:
-
-| Preset | Type | Filters |
-|--------|------|---------|
-| "90s Action" | Movies | Year: 1990-1999, Genre: Action |
-| "Short Docs" | Movies | Runtime: < 90min, Genre: Documentary |
-
-### Managing Presets
-
-| Action | How |
-|--------|-----|
-| **Rename** | Click the edit icon |
-| **Delete** | Click the trash icon |
-| **Load** | Go to Browse page, click preset |
-
-### Creating Presets
-
-Presets are created from the Browse page:
-
-1. Set up your filters
-2. Click **Presets** → **Save Current**
-3. Name your preset
-4. Click **Save**
-
----
-
-## Reset Options
-
-### Reset All Preferences
-
-Restores all preferences to defaults:
-
-- Library names reset
-- Dislike behavior → Exclude
-- View modes → Grid
-- Filter presets → Cleared
-
-**Warning:** This cannot be undone.
-
-### Reset Individual Settings
-
-Most sections have individual reset options for fine-grained control.
-
----
-
-**Next:** [AI Algorithm Weights](ai-algorithm.md)
+**Next:** [AI Algorithm](ai-algorithm.md)

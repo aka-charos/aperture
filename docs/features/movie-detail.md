@@ -1,140 +1,115 @@
 # Movie Details
 
-The Movie Detail page shows comprehensive information about a specific movie.
+The Movie Detail page shows everything about a specific movie — its ratings, its people, how it fits your taste, and what you can do with it. Series share the same page layout; the series-specific parts are described in [Series Details](series-detail.md).
 
 ![Movie Detail Page](../images/features/movie-detail.png)
 
 ## Page Sections
 
-### Header
+### Hero
 
-- **Backdrop** — Full-width fanart image
-- **Poster** — Movie poster with heart rating overlay
-- **Title & Year** — Movie name and release year
-- **Metadata** — Runtime, rating, genres
-- **Play Button** — Opens in your media server
+The top of the page: full-width fanart backdrop, poster, title, year, and the key facts in one line.
 
-### Overview
+- **Ratings** — the community rating from your media server ("7.6 / 10"), followed by external score badges where available: Rotten Tomatoes (Tomatometer and Audience), Metacritic, IMDb, TMDB, and Letterboxd. For movies with a critic consensus, the quote appears under the badges, and an awards line where one exists.
+- **Genre chips** — clickable, and annotated by the recommender where it has something to say: "a genre you already watch a lot of" versus "new to you".
+- **Synopsis** — with a **Read full synopsis** expander for the longer plot text.
 
-The movie's plot synopsis and description.
+### Actions
 
-### Ratings
+The hero's action row:
 
-| Rating | Source |
-|--------|--------|
-| **Community Rating** | From your media server |
-| **Rotten Tomatoes** | Critic score (if available) |
-| **Metacritic** | Metascore (if available) |
-| **Your Rating** | Your personal heart rating |
-
-### Cast & Crew
-
-- **Director** — Click to view their filmography
-- **Writers** — Screenplay and story credits
-- **Cast** — Top actors with photos, click to view their page
-
-### Technical Info
-
-| Field | Description |
-|-------|-------------|
-| **Resolution** | Video quality (4K, 1080p, etc.) |
-| **Audio** | Audio format and channels |
-| **Studio** | Production studio (clickable) |
-| **Release Date** | Full release date |
-
-### Collections
-
-If the movie belongs to a franchise:
-
-- Shows the collection name
-- Link to view all movies in the franchise
-- Your position in the collection
-
----
-
-## Similar Movies
-
-Below the main info, you'll find AI-powered similar movie suggestions:
-
-### List View
-
-A grid of similar movies with:
-
-- Poster thumbnails
-- Title and year
-- Match percentage
-- Heart rating
-
-### Graph View
-
-Click the **Graph** tab to see an interactive visualization:
-
-- Movies shown as poster nodes
-- Color-coded connection lines
-- Hover to see why items are connected
-- Click to explore deeper
-
-See [Similarity Graphs](similarity-graphs.md) for details.
-
----
-
-## Movie Insights
-
-If this movie was recommended to you, click **Why This Pick?** to see:
-
-### Match Score Breakdown
-
-| Factor | Description |
-|--------|-------------|
-| **Taste Match** | How well it matches your preferences |
-| **Discovery** | How much it expands your horizons |
-| **Quality** | Community and critic ratings |
-| **Variety** | How it diversifies your recommendations |
-
-### Evidence Trail
-
-Movies from your watch history that influenced this recommendation:
-
-- "Because you watched X, Y, and Z..."
-- Shows the connection strength
-- Links to those movies
-
-### AI Explanation
-
-If enabled, a natural language explanation of why this was picked for you.
-
----
-
-## Actions
+| Action | What it does |
+|--------|--------------|
+| **Open in Jellyfin / Open in Emby** | Opens the movie in your media server's app or web client |
+| **Favorite / Favorited** | Sets or clears the favorite flag **on your media server**. Favorites matter: they feed your taste profile and what the recommender excludes |
+| **Mark Watched / Mark Unwatched** | Marks the movie watched (or clears it) in your media server and Aperture's history. Unwatching asks for confirmation — it cannot be undone. Availability depends on a per-user permission |
+| **Trailer** | Opens the YouTube trailer in a modal |
+| **Report a problem** | Report video, audio, subtitle, or other playback issues — see below |
 
 ### Rating
 
-Click the heart to rate the movie (1-10 hearts):
+The star rating control (1–10) sits on the poster and in the hero. Rating affects your recommendations and syncs to Trakt if connected.
 
-- Rating affects future recommendations
-- Syncs with Trakt if connected
-- Shows on your dashboard
+If your server has no record of you playing the movie, rating it also asks **"When did you watch *title*?"** with time bands — *This month*, *Last month*, *Earlier this year*, *Last year*, *Longer ago than that* — plus **Not now** and **I haven't seen it**. Choosing a band records the watch (dated to the band) on your media server, so your history reflects reality without a real play event. See [The Rating System](ratings.md).
 
-### Play
+---
 
-Click **Play** to open the movie in your media server app.
+## Community Activity
 
-### Mark Unwatched
+Directly under the actions, a **Community Activity** strip shows how the household has engaged with this title:
 
-If your admin has enabled this:
+- **Watched / Plays / Favorited** counts, and for series, **Completed** and episode plays
+- **Average Viewer Progress** — how far into it viewers typically get
+- **User Reach** — what percentage of the server's users have touched it
 
-- Click **Mark Unwatched** to remove from watch history
-- Useful for movies you started but didn't finish
-- Updates both Aperture and your media server
+Where your admin allows it, these counts expand into a list of **who** watched and favorited it; otherwise they stay anonymous.
+
+---
+
+## Recommended For You
+
+If the recommender scored this title for you, the page shows a personal insights panel — headed **Recommended For You** (it made your list) or **How This Fits Your Taste** (it was scored but not picked):
+
+- **How We Calculated Your Match** — the three factors with their weight shares: **Taste Match** (similarity to your history), **Discovery** (how different it is from what you usually watch), and **Quality** (community and critic ratings), blended, then adjusted by your franchise and genre preferences.
+- **Evidence** — "Based on your history with similar movies:" the specific titles from your history that pulled it in, linked.
+- **Variety In Your List** — how much this pick differs from the others chosen with it; this shapes the *order* of your list, not the match.
+- **Taste twin** — sometimes the reason is a person here whose taste closely overlaps yours; the panel says so and shows the rare titles you've both watched, but never names them.
+- **AI explanation** — "Why *Aperture* picked this for you", a natural-language paragraph, if your admin enabled it.
+
+---
+
+## Film Analysis
+
+Many titles also carry a **Film Analysis** — a grounded critical essay about the work itself, written from published sources rather than from your data. See [Title Analysis](title-analysis.md).
+
+---
+
+## Related Movies
+
+The right column lists similar titles from your library as **Related Movies**, with two tabs:
+
+- **List** — poster cards with watch-state badges, your ratings, and chips naming the connection (shared cast, genre, theme...)
+- **Graph** — the same relationships drawn as an explorable graph; open it fullscreen to go deeper
+
+See [Related-Content Graphs](similarity-graphs.md).
+
+---
+
+## The Info Card
+
+The lower-left card collects the rest, most of it clickable:
+
+| Field | Notes |
+|-------|-------|
+| **Cast / Director / Writers** | Names link to their [person pages](person-pages.md) |
+| **Created By** | For series |
+| **Studios** | Links to the [studio page](studio-pages.md) |
+| **Available On** | Streaming providers, where known |
+| **Keywords, Languages, Countries** | Production metadata |
+| **Cinematography / Music / Editing** | Key crew |
+| **Awards** | Notable wins and nominations |
+| **External Links** | IMDb, TMDb, TVDb |
+| **Part of Collection** | The franchise this belongs to (see the [Franchise Tracker](franchises.md)) |
+
+---
+
+## Report a Problem
+
+If something's wrong with the file — video, audio, subtitles, or something else — use **Report a problem**:
+
+1. Pick what's wrong (Video / Audio / Subtitles / Something else)
+2. For series, optionally scope it to a season and episode
+3. Describe what happens and send
+
+The report goes to your server's Seerr, where your admin triages it; your reports are listed under [My Requests](my-requests.md) → **Issues**. The button only appears when Seerr has a record of the title.
 
 ---
 
 ## Navigation
 
-- Click **Back** or use browser back to return
-- Click any person's name to view their page
-- Click the studio to see other movies from them
-- Click the collection to see the full franchise
+- Click any person's name for their filmography
+- Click the studio for its catalog
+- Every poster on the page navigates the same way
 
 ---
 

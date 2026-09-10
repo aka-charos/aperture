@@ -1,14 +1,14 @@
-# Discovery
+# Discover
 
-Discovery helps you find movies and TV series that aren't in your library yet, with AI-powered suggestions and optional Seerr integration for requesting content.
+Discover surfaces movies and TV series that **aren't in your library yet** — AI-scored suggestions you can request into your library in one click when your admin has configured Seerr.
 
 ![Discovery Page](../images/features/discovery.png)
 
-## Accessing Discovery
+## Accessing Discover
 
 Navigate to **Discover** in the sidebar (compass icon).
 
-**Note:** Your admin must enable Discovery for your account.
+**Note:** Your admin must enable Discover for your account; otherwise the page tells you it's not enabled.
 
 ---
 
@@ -16,171 +16,112 @@ Navigate to **Discover** in the sidebar (compass icon).
 
 ### Tabs
 
-Switch between content types:
+- **Movies** — movie suggestions
+- **TV Series** — series suggestions
+- **Streaming** — popular titles and streaming momentum from JustWatch charts (if your admin enabled it)
 
-- **Movies** — Movie suggestions
-- **Series** — TV series suggestions
+On the Movies and TV Series tabs, a second switch chooses between:
+
+| Sub-tab | Description |
+|---------|-------------|
+| **Picked for you** | The scored suggestion pool, ranked by match to your taste |
+| **Popular by genre** | TMDb Discover strips per genre — several genres together means titles matching all of them |
+
+A line under the tabs reports the state of the current run: **"Last updated: … • Showing X of Y suggestions, scored from Z candidates."**
+
+### Filters
+
+The **Filters** button opens the user filters: **Language**, **Genre**, **Year range**, and a minimum **taste match** slider. Your filters persist between visits. Changing them doesn't re-run anything — the page *finds more* content matching your filters from what's already been scored.
 
 ### View Modes
 
-Toggle between display modes:
-
 | Mode | Description |
 |------|-------------|
-| **Grid View** | Poster cards with source badges |
+| **Grid View** | Poster cards with badges |
 | **List View** | Detailed rows with metadata and scores |
 
 ---
 
-## Discovery Cards
-
-Each suggestion shows:
-
-### Poster Card
+## Suggestion Cards
 
 | Element | Description |
 |---------|-------------|
-| **Poster** | Movie/series artwork |
-| **Rank Badge** | Top-left: 🥇🥈🥉 for top 3 |
-| **Source Badge** | Top-right: Where suggestion came from |
-| **Match %** | Bottom-right: AI confidence |
-| **Request Status** | Bottom-left: Seerr status (if applicable) |
+| **Rank badge** | Position in the current list (numbered, like all rank badges in Aperture) |
+| **Source badge** | Where the suggestion came from (Trending, Popular, …) |
+| **Match %** | How well it scored against your taste |
+| **Requested chip** | Your request status, once requested |
 
-### List View
-
-Additional details shown:
-
-- Full metadata (year, runtime, genres)
-- Synopsis/overview
-- Cast highlights
-- Score breakdown
+Click a card to open the TMDb detail modal; hover to request it.
 
 ---
 
-## Suggestion Sources
+## Where Suggestions Come From
 
-Discovery pulls candidates from multiple sources:
-
-### TMDb (The Movie Database)
+Your admin configures which sources feed the pool; each suggestion carries a badge naming its source:
 
 | Source | Description |
 |--------|-------------|
-| **Recommendations** | Based on content you've watched |
-| **Similar** | Based on content you've rated highly |
-| **Discover** | Popular/trending meeting quality thresholds |
-
-### Trakt (if connected)
-
-| Source | Description |
-|--------|-------------|
-| **Trending** | Currently hot content |
-| **Popular** | All-time popular |
-| **Personal** | Personalized Trakt recommendations |
-
-Source badges show where each suggestion originated.
+| **TMDb Recommended** | Based on content you've watched |
+| **Similar Titles** | Based on titles related to what you watch |
+| **TMDb Popular** | Popular/trending meeting quality thresholds |
+| **Trending / Popular / Trakt Pick** | Trakt charts and personalized picks, if Trakt is connected |
+| **MDBList** | Curated external lists |
+| **Streaming charts** | JustWatch streaming charts (the Streaming tab) |
 
 ---
 
 ## AI Scoring
 
-Each candidate is scored with weighted factors:
+Each candidate is scored against **your taste profile** — the clusters built from your watch history and ratings. The blend weighs similarity to your taste heaviest, with popularity, recency, and the strength of the source signal making up the rest; your admin can tune the balance. The **Match %** on each card is that blend.
 
-| Factor | Weight | Description |
-|--------|--------|-------------|
-| **Similarity** | 50% | Match to your taste profile |
-| **Popularity** | 30% | General audience appeal |
-| **Recency** | 20% | Bonus for newer releases |
-
-The final match percentage reflects the combined score.
+The detail modal shows the components: the overall **AI match score**, the raw **Similarity**, and where the title ranks for you ("Taste match: #14 of 520").
 
 ---
 
 ## Detail View
 
-Click the **info icon** on any card to see:
+Click any card for the full TMDb picture:
 
-### Full Metadata
-
-- Title (and original title if different)
-- Year, runtime, rating
-- Genres
-- Vote count
-
-### Backdrop
-
-Full-width fanart image.
-
-### Cast & Crew
-
-- Top 8 cast members with photos
-- Director/creator information
-- Click names to learn more
-
-### Score Breakdown
-
-- AI match percentage
-- Similarity score details
+- Backdrop, year, runtime, genres, vote count
+- **Top 8 cast** with photos and character names; director/creator
+- An embedded **trailer** player
+- Person names link to their Aperture pages; a **Request** button is right there
 
 ---
 
 ## Requesting Content
 
-If your admin has configured Seerr:
+If your admin has configured Seerr and enabled requests for your account:
 
-### Making a Request
+1. **Hover** a card and click **Request** (or use the Request button in the detail modal)
+2. A confirmation appears, and the card's chip shows the request status
 
-1. Hover over a Discovery card
-2. Click **Request**
-3. Confirm the request
-4. Status badge appears on the card
+| Status | Meaning |
+|--------|---------|
+| **Requested** | Submitted, awaiting approval |
+| **Approved** | Approved and on its way |
+| **Declined** | Declined |
 
-### Request Statuses
-
-| Status | Badge | Meaning |
-|--------|-------|---------|
-| **Pending** | Yellow | Awaiting admin approval |
-| **Approved** | Green | Request approved |
-| **Declined** | Red | Request denied |
-| **Available** | Blue | Downloaded and ready |
-
-### Permissions
-
-Your admin controls:
-
-- Whether you can see Discovery suggestions
-- Whether you can submit requests
-
-If you don't see the Request button, you may not have request permissions.
+Later stages — **Processing**, **Partially available**, **Available** — show on the [My Requests](my-requests.md) page, which tracks everything you've asked for. If you don't see the Request button, requests aren't enabled for your account.
 
 ---
 
 ## Refreshing Suggestions
 
-### Automatic
-
-Discovery runs on a schedule (typically daily) to generate fresh suggestions.
-
-### Manual Refresh
-
-Click the **Refresh** button to regenerate suggestions:
-
-- Fetches new candidates from sources
-- Re-scores based on your latest activity
-- Updates the display
-
-**Note:** Manual refresh may take a moment while candidates are fetched and scored.
+- **Scheduled** — the discovery job runs on a schedule (typically daily); a banner shows when it's currently **generating new suggestions**, and Refresh is disabled while it runs.
+- **Manual** — **Refresh** re-runs discovery for your account: new candidates are fetched from the sources and scored against your latest activity.
+- **Expanding** — with filters applied, the page can fetch *more* candidates matching them ("Finding more content matching your filters…").
 
 ---
 
-## Filtering
+## What Gets Excluded
 
-Discovery results are already filtered to exclude:
+The pool already excludes:
 
 - Content already in your library
-- Content you've watched (even if not in library)
-- Previously declined requests
+- Content you've watched
 
-This ensures you only see truly new suggestions.
+One honest caveat: **declined and failed requests are not excluded** — a declined title can resurface in a later run.
 
 ---
 
@@ -188,16 +129,16 @@ This ensures you only see truly new suggestions.
 
 ### Improving Discovery
 
-- Rate more content (affects similarity scoring)
-- Connect Trakt for personalized Trakt recommendations
-- Watch diverse content for broader suggestions
+- Rate more content — the taste match is only as good as your profile
+- Connect [Trakt](trakt-integration.md) for its personalized sources
+- Watch and rate broadly so the similarity signal has something to work with
 
-### Using Effectively
+### Using It Well
 
-- Check regularly for new suggestions
-- Use requests strategically for most-wanted content
-- Combine with Explore for deeper discovery
+- Set a **min taste match** filter to see only strong matches
+- Check the **Streaming** tab for what's charting right now
+- Track everything you've asked for under [My Requests](my-requests.md)
 
 ---
 
-**Next:** [Explore](explore.md)
+**Next:** [My Requests](my-requests.md)

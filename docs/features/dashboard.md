@@ -1,77 +1,50 @@
 # Dashboard
 
-The Dashboard is your personalized home screen showing AI recommendations, trending content, and recent activity.
+The Dashboard is your home screen: a time-boxed snapshot of your viewing, your AI picks, what's airing next, and what's popular on the server.
 
 ![Dashboard](../images/features/dashboard.png)
 
-## Quick Stats Bar
+## Greeting & Quick Stats
 
-At the top, you'll see your viewing statistics:
+A time-of-day greeting heads the page, above a stats bar covering the **last 30 days** (it says so, and links **More details** to [Watch Stats](watch-stats.md) for the all-time view):
 
 | Stat | Description |
 |------|-------------|
-| **Movies Watched** | Total movies in your watch history |
-| **Series Watched** | Total series you've started |
-| **Ratings Given** | Number of items you've rated |
-| **Total Watch Time** | Cumulative viewing time |
+| **Movies Watched** | Movies you've played this month |
+| **Series Watched** | Series you've played this month |
+| **Ratings** | Titles you've rated |
+| **Watch Time** | Cumulative viewing time |
 
-## Your Movie Picks
+---
 
-A two-row carousel of AI-recommended movies based on your taste:
+## Your AI Picks
 
-- **Rank Badges** — Gold (#1), Silver (#2), Bronze (#3) for top recommendations
-- **Heart Rating** — Click the heart to rate directly from the poster
-- **Click any poster** — View detailed insights about why it was recommended
+Two carousels — **Your AI Movie Recommendations** and **Your AI Series Recommendations** ("Personalized picks based on your taste"):
 
-## Your Series Picks
+- **Rank badges** — numbered, matching your [AI Picks libraries](recommendations.md)
+- **Rate from the poster** — hover and pick stars (1–10)
+- **Click any poster** for the detail page and its insights panel
 
-A two-row carousel of AI-recommended TV series with the same features:
+Empty until your first recommendation run; the empty state says so.
 
-- Rank badges for top picks
-- Quick rating from posters
-- Click through for recommendation insights
+## Upcoming Episodes
 
-## Trending Movies
+**Upcoming Episodes** — "From shows you watch" — pulls from your [Shows You Watch](shows-you-watch.md) list: poster, **Airing** chip, and countdowns (**Today**, **Tomorrow**, **In N days**) for what's next.
 
-A carousel showing popular movies across all users on your server, ranked by community activity.
+---
 
-## Trending Series
+## Top Picks
 
-A carousel showing popular TV series across all users.
+**Top Pick Movies** and **Top Pick Series** ("Popular movies/TV series across all users") — the same ranking as the [Top Picks](top-picks.md) page, in carousel form.
 
-## Recently Watched
+---
 
-Your recently watched content displayed in two columns:
+## Recently Watched & Recent Ratings
 
-| Column | Content |
-|--------|---------|
-| **Movies** (left) | Recently watched movies with play count |
-| **Series** (right) | Recently watched series with last episode (e.g., S2E5) |
+The bottom row pairs two cards:
 
-### Time Display
-
-- **"2d ago"** — Watched 2 days ago (first watch)
-- **"2d ago · 3x"** — Watched 2 days ago, 3 total plays
-- **"2d ago · Rewatched"** — Recently rewatched
-- **"2mo 15d ago"** — For older items (months)
-- **"1y 3mo ago"** — For items watched over a year ago
-
-## Recent Ratings
-
-Shows your most recent ratings with:
-
-- Heart fill indicator showing your rating
-- "Rated on Jan 11, 2026" format
-- Click to view the item's detail page
-
-## Navigation
-
-From the Dashboard, you can:
-
-- Click any poster to view details
-- Use the sidebar to navigate to other sections
-- Click the sparkle button (✨) to open the AI assistant
-- Use the search icon to find specific content
+- **Recently Watched** — movies and series columns with relative times ("2d ago", "1y 3mo ago"), play counts ("3x", or "Rewatched" past five plays), and the last episode you landed on ("· S2E5")
+- **Recent Ratings** — your latest star ratings with the date ("Rated on Jan 11, 2026"), rateable right there
 
 ---
 
