@@ -13,7 +13,8 @@
  * Two variants, same geometry:
  * - 'compact' (default): fixed-width card used in horizontal carousels
  *   (semantic "Also worth checking", library search/top-rated, etc.).
- * - 'list': full-width card used in the vertical web-search recommendations list.
+ * - 'list': full-width card used in the vertical recommendation lists (web
+ *   search, and the user's own AI recommendations).
  */
 import { useEffect, useRef, useState } from 'react'
 import {
