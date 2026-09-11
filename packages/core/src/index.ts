@@ -25,6 +25,9 @@ export {
   getReasoningEffortFor,
   getReasoningProviderOptions,
   getReasoningProviderOptionsFor,
+  getSupportedGenerationParams,
+  getGenerationParamsForRole,
+  getGenerationParamsFor,
   getReasoningModelFacts,
   getSupportedReasoningEfforts,
   getChatModelInstance,
@@ -240,6 +243,18 @@ export {
   resolveReasoningOptions,
   type ReasoningMechanism,
   type ReasoningCapableModel,
+  // Sampling — temperature and top_p, offered only where the MODEL declares
+  // them. See lib/generationParams.ts for why that gate is load-bearing.
+  GENERATION_PARAMETERS,
+  GENERATION_PARAM_RANGES,
+  SUGGESTED_GENERATION_PARAMS,
+  ROLES_WITH_GENERATION_PARAMS,
+  roleReadsGenerationParams,
+  generationParamsFor,
+  resolveGenerationParams,
+  resolveGenerationDelivery,
+  type GenerationParameter,
+  type SamplingCapableModel,
 } from './lib/index.js'
 
 // Migrations

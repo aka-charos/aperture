@@ -140,6 +140,13 @@ export interface ModelMetadata {
    * seven words, no model offering all seven. See {@link ReasoningMechanism}.
    */
   supportedEfforts?: readonly string[]
+  /**
+   * Wire-name parameters this model accepts (`temperature`, `top_p`, …),
+   * live from OpenRouter's catalogue. Absent means no sampling control is
+   * offered — see `../generationParams.ts`, where absent is a positive fact
+   * rather than an unknown.
+   */
+  supportedParameters?: readonly string[]
 
   description?: string
   quality?: 'budget' | 'standard' | 'premium'

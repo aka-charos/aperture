@@ -28,6 +28,7 @@ Each card holds: **provider → model → API key** (per-role keys; a provider's
 - **Spare/fallback API keys** — extra keys per provider that rotate in when the primary hits a quota or auth error (web-search grounding depends on this: Gemini's free tier is what usually breaks)
 - **Custom models** — "Add Custom Model…" registers a model keyed to *(provider, role)*, so custom entries don't leak across roles
 - **Reasoning effort** (where the model supports it) and **retrieval mode** (input type) on the embeddings card
+- **Temperature** and **Top P** on the Title analysis card, and only when the chosen model's catalogue entry declares them — 87 of OpenRouter's 439 models do not accept temperature at all, so the fields appear per model rather than per provider. Empty means the provider default, which is what every role used before these existed. The number in a grey field is a suggestion, not a stored value; move one of the two at a time, or a change cannot be attributed.
 - **Test** — sends a real (billable) request tagged as a settings test; for embeddings it reports the **measured vector width** and whether a matching storage table exists
 
 Model catalogs ship with the app — OpenAI, Anthropic, Google, Groq, Deepseek, OpenRouter, Z.AI, HuggingFace, Ollama, LM Studio (auto-discovers installed models), and generic OpenAI-compatible endpoints.

@@ -75,6 +75,9 @@ import {
   requiresProviderPin,
   getSupportedReasoningEfforts,
   roleReadsReasoningEffort,
+  getSupportedGenerationParams,
+  roleReadsGenerationParams,
+  GENERATION_PARAM_RANGES,
   getModel,
   EMBEDDING_INPUT_TYPES,
   type AIFunction,
@@ -917,6 +920,8 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       embeddingInputType?: string | null
       embeddingProviderOnly?: string | null
       reasoningEffort?: string | null
+      temperature?: number | null
+      topP?: number | null
     }
   }>('/api/settings/ai/:function', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
     try {
@@ -933,6 +938,8 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         embeddingInputType,
         embeddingProviderOnly,
         reasoningEffort,
+        temperature,
+        topP,
       } = request.body
 
       if (!isAIFunction(fn)) {
@@ -1110,6 +1117,53 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         nextReasoningEffort = reasoningEffort
       }
 
+      // Sampling. Same three rules as the effort above, and the same reason for
+      // each: omitted means leave alone, `null` clears, and a role that does not
+      // READ these may not store them — a number stored where nothing sends it
+      // leaves the card describing a configuration no request carries.
+      //
+      // Validated against THIS MODEL'S OWN declaration rather than a fixed list,
+      // because "every chat model takes temperature" is measurably false: 87 of
+      // 439 live OpenRouter models refuse it, Claude Sonnet 5 and the whole
+      // GPT-5.6 family among them. The same call backs the card's fields, so
+      // what is offered and what is accepted are one answer by construction.
+      const sampling: { temperature?: number; topP?: number } = {
+        temperature: existing?.temperature,
+        topP: existing?.topP,
+      }
+      const declaredParams =
+        temperature !== undefined || topP !== undefined
+          ? await getSupportedGenerationParams(provider, model, fn)
+          : []
+
+      for (const [field, raw, wire] of [
+        ['temperature', temperature, 'temperature'],
+        ['topP', topP, 'top_p'],
+      ] as const) {
+        if (raw === undefined) continue
+        if (raw === null) {
+          sampling[field] = undefined
+          continue
+        }
+        if (!roleReadsGenerationParams(fn)) {
+          return reply.status(400).send({
+            error: `The ${fn} role does not apply sampling settings. Nothing on that path reads them, so a value stored here would change no request.`,
+          })
+        }
+        if (!declaredParams.includes(wire)) {
+          return reply.status(400).send({
+            error: `${model} does not accept ${wire}. Leave it unset, or choose a model whose catalogue entry declares it.`,
+          })
+        }
+        const { min, max } = GENERATION_PARAM_RANGES[wire]
+        if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < min || raw > max) {
+          return reply.status(400).send({
+            error: `${wire} must be a number between ${min} and ${max}.`,
+          })
+        }
+        sampling[field] = raw
+      }
+
       // A role that changed model since the effort was stored keeps the value
       // but stops sending it — the request builder re-checks per call and warns.
       // Clearing it here would silently discard a choice on a save that never
@@ -1156,6 +1210,8 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         embeddingInputType: nextInputType,
         embeddingProviderOnly: nextProviderOnly,
         reasoningEffort: nextReasoningEffort,
+        temperature: sampling.temperature,
+        topP: sampling.topP,
       })
 
       const config = await getFunctionConfig(fn)

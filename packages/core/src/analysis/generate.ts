@@ -35,6 +35,8 @@ import {
   type ModelAttempt,
   getReasoningEffortFor,
   getReasoningProviderOptionsFor,
+  getGenerationParamsForRole,
+  getGenerationParamsFor,
 } from '../lib/ai-provider.js'
 import {
   crwSearch,
@@ -506,6 +508,20 @@ export async function runWriteAttempt(
     await getReasoningEffortFor('titleAnalysis')
   )
 
+  // Resolved per attempt for the same reason, and it is not the same reason as
+  // reasoning's: sampling values carry no provider namespace, so a fallback on
+  // another provider would accept them silently rather than ignore them. What
+  // is per-attempt here is whether the MODEL declares them at all — measured,
+  // 87 of 439 OpenRouter models refuse `temperature` — and a local fallback
+  // declares nothing, so the resolver returns an empty object and the request
+  // is byte-identical to what it was before this existed.
+  const sampling = await getGenerationParamsFor(
+    attempt.provider,
+    modelId,
+    'titleAnalysis',
+    await getGenerationParamsForRole('titleAnalysis')
+  )
+
   // The other silent half. A local model chewing through ~18k tokens of article
   // text is minutes of wall clock with nothing to show for it, and on a
   // self-hosted setup this is the step most likely to be the slow one - so the
@@ -625,6 +641,11 @@ export async function runWriteAttempt(
           'LM Studio finished the analysis call'
         )
 
+        // No sampling values reach this branch, and that is the resolver's
+        // answer rather than a gap: `getGenerationParamsFor` returns an empty
+        // object for LM Studio, because nothing has verified what its
+        // OpenAI-compatible endpoint accepts and the native chat API is a
+        // different surface again. See ../lib/generationParams.ts.
         response = {
           text: native.text,
           reasoningText: native.reasoningText,
@@ -652,6 +673,9 @@ export async function runWriteAttempt(
         // Omitted entirely when unset, so a role that has never chosen an
         // effort sends the request it sent before this existed.
         ...(reasoning ? { providerOptions: reasoning } : {}),
+        // Spread rather than assigned, because `temperature: undefined` is not
+        // the same request as omitting the field on every provider.
+        ...sampling,
         // 0 means the operator asked for no ceiling, so none is sent and the
         // provider default applies.
         ...(maxOutputTokens > 0 ? { maxOutputTokens } : {}),
@@ -924,6 +948,7 @@ async function writeWithGrounding(
   // role, not of the attempt, so re-reading it inside the key loop would be a
   // database round trip per retry.
   const reasoningEffort = await getReasoningEffortFor('titleAnalysis')
+  const samplingParams = await getGenerationParamsForRole('titleAnalysis')
 
   return withGroundingModel('titleAnalysis', async (model, keyAttempt) => {
     let result: WriteResult = {
@@ -948,6 +973,18 @@ async function writeWithGrounding(
         reasoningEffort
       )
 
+      // Grounding is Google-only and native Google declares no sampling
+      // parameters, so in practice this resolves to nothing and the grounded
+      // request is unchanged. It is wired anyway because the alternative is one
+      // of the role's two paths quietly ignoring a setting the card shows — the
+      // partial-coverage fault ROLES_WITH_GENERATION_PARAMS exists to avoid.
+      const sampling = await getGenerationParamsFor(
+        keyAttempt.provider,
+        keyAttempt.modelId,
+        'titleAnalysis',
+        samplingParams
+      )
+
       // Same silent stretch as the CRW path, and grounded calls are slower
       // still because the model searches before it writes.
       const heartbeat = startWriteHeartbeat({
@@ -965,6 +1002,7 @@ async function writeWithGrounding(
           prompt,
           maxRetries: MODEL_MAX_RETRIES,
           ...(reasoning ? { providerOptions: reasoning } : {}),
+          ...sampling,
           ...(maxOutputTokens > 0 ? { maxOutputTokens } : {}),
         })
       } finally {
