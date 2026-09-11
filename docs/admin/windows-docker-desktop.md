@@ -171,7 +171,7 @@ services:
     restart: unless-stopped
 
   app:
-    image: ghcr.io/aka-charos/aperture:latest
+    image: ghcr.io/aka-charos/aperture:dev
     container_name: aperture
     user: root
     environment:
@@ -471,7 +471,7 @@ services:
     restart: unless-stopped
 
   app:
-    image: ghcr.io/aka-charos/aperture:latest
+    image: ghcr.io/aka-charos/aperture:dev
     container_name: aperture
     user: root
     environment:

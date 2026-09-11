@@ -53,15 +53,17 @@ This repository ([aka-charos/aperture](https://github.com/aka-charos/aperture)) 
 
 > ¹ Docker Desktop with Emby/Jellyfin running natively on Windows needs extra path mapping — see the [Windows guide](docs/admin/windows-docker-desktop.md).
 
-### 2. Point it at this fork's image
+### 2. Check the image line
 
-The compose files still carry upstream's image line. Change it:
+The compose files already point at this fork's image — no edit needed:
 
 ```yaml
 services:
   app:
-    image: ghcr.io/aka-charos/aperture:dev # was ghcr.io/dgruhin-hrizn/aperture:latest
+    image: ghcr.io/aka-charos/aperture:dev
 ```
+
+**Use `:dev`, not `:latest`.** This fork publishes `:dev` on every push to the `dev` branch, which is where all work happens. `:latest` is only built from `main`, a stale upstream mirror — it is months behind.
 
 ### 3. Configure
 
