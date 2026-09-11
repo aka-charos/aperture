@@ -2303,3 +2303,44 @@ Bumping `ANALYSIS_PROMPT_VERSION` 7 → 8 retires every stored row, which is the
 **Pinned by `prompt.test.ts`** — five new tests asserting each clause is present, plus that the deleted "one paragraph per question" sentence stays deleted, because re-adding it is as much a regression as dropping the replacement.
 
 **Unverified against a model.** The prompt renders and reads correctly and the suite passes, but no analysis has been generated on version 8: this machine has no database and no provider. The first bench run should be read for three things — no "the sources" phrasing anywhere in the prose, a production-context run about production rather than reception, and length back inside the 200–900 band.
+
+
+## F-123
+
+**Nothing in this app could change how a model samples, and the obvious premise for fixing that was false.** Added 2026-09-11.
+
+**The gap.** Every generation this app has ever made ran at whatever temperature the provider defaults to — 1.0 on most of them, a value chosen for open-ended conversation. That included `titleAnalysis`, whose whole job is to write one structured document from source text it was handed, against a prompt with eight rules and an output contract. [F-122](#f-122) corrected four of those rules; whether sampling has anything to do with adherence at all was a question this repo had no way to ask, because there was no way to vary it and read the result.
+
+**The premise that did not survive contact with the catalogue.** The plan for this said "temperature and top_p only — every chat model accepts both", and the interesting-parameters case was argued the other way (penalties are the wrong instrument, `logit_bias` is tokenizer-specific). Measured against OpenRouter's live `/api/v1/models`, 439 entries on 2026-09-11:
+
+| parameter | declared by |
+|---|---|
+| `temperature` | 352 |
+| `top_p` | 334 |
+| `seed` | 331 |
+| `frequency_penalty` | 241 |
+| `top_k` | 217 |
+| `reasoning_effort` | 169 |
+| `min_p` | 116 |
+
+**87 models refuse `temperature` outright** and 105 refuse `top_p`, and they are not the obscure ones: `anthropic/claude-sonnet-5`, `anthropic/claude-opus-5:batch`, `anthropic/claude-fable-5.1`, `openai/gpt-6-astra`, the entire `openai/gpt-5.6-*` family, every `google/gemini-3.x-flash:batch` variant, `openrouter/fusion` and the sakana models. So a control offered because "they all take it" is a control that does nothing on a fifth of the catalogue — which is precisely the fault [F-099](#f-099) was rebuilt around and [F-097](#f-097) had to retrofit a rule for.
+
+**So the model declares it, and the declaration was already cached.** `supported_parameters` is what `getOpenRouterModelCapabilities` has been reading since CACHE_VERSION 3 to answer "does this model support tools". Publishing it on `OpenRouterModelInfo` cost one field and no fetch. That is worth noting as a pattern: the second time a per-model capability was needed here, the data was already on disk and the work was deciding what to do with it.
+
+**Why this is OpenRouter-only on purpose.** `temperature` is a plain top-level field on every OpenAI-compatible endpoint, and it would very likely work against LM Studio, Z.AI and native Google. "Very likely" is exactly the reasoning that produced [F-097](#f-097)'s failure — a mode that was sent, ignored, and still written into a stored set identity, buying a paid re-embed that produced byte-identical vectors under a second name. `getSamplingModelFacts` returns null for every other provider, so the analysis writer's LM Studio branch receives nothing by construction rather than by a comment. A provider joins when something has verified what it accepts, the way each `ReasoningMechanism` did.
+
+**Three rules about the value itself, all of them about silent failure.**
+
+1. **An undeclared parameter is dropped AND reported.** OpenRouter drops a parameter an upstream does not support rather than erroring, so sending one hopefully yields a setting an operator can see, save, and never observe — indistinguishable from sampling having no effect on that model's writing. The warn is the only place the difference surfaces.
+2. **Out of range reads as unset, never clamped.** `resolveReasoningOptions`' argument one module over: a value silently moved makes the settings page and the wire disagree about what was asked for, and the resulting request is one nobody chose. Refusing leaves the provider default, which is a state an operator can reason about.
+3. **`temperature: 0` is a value and `top_p: 0` is not.** Zero temperature is greedy decoding and must survive a truthiness test (the NUMERIC-arrives-as-text trap in another costume); zero top_p is a request for an empty nucleus that endpoints treat inconsistently, and is refused.
+
+**ONE ROLE, and the reason is coverage rather than caution.** This is the decision most likely to be argued with later. A sampling value is a top-level option on the generation call, so it reaches a model only at the call sites that pass it. `titleAnalysis` has exactly two — the CRW `streamText` and the grounded `generateText` — and both already resolve reasoning per attempt, so there is a seam and it can be covered completely. `textGeneration` has **eight**: `channels/reasons.ts`, `channels/ai.ts`, `ai-playlist-generation.ts`, `tasteSynopsis.ts`, `tasteSeriesSynopsis.ts`, both explanation generators and the discovery structuring pass — and three of those choose between `getTextGenerationModelInstance()` and `getChatModelInstance()` at runtime, so the role whose value ought to apply is not known to the caller that would have to pass it. Wiring the two easy ones would ship a knob that works on recommendation explanations and silently does nothing on playlists and taste synopses. A partial control is worse than an absent one, so `ROLES_WITH_GENERATION_PARAMS` is `['titleAnalysis']` and the others join by wiring their call sites, one change each.
+
+**The suggested values are ours, because the vendor's are empty.** OpenRouter publishes a `default_parameters` object per model and 271 of 439 entries carry one — several of them all-null — but for `deepseek/deepseek-v4.1-flash`, the model this was built to tune, it is `{}`. Reading it and finding nothing would be worse than not reading it, so it is not read and the card labels its placeholders as suggestions. They are placeholders and never pre-filled values, because "unset" and "set to the number we suggest" are different states and only the first sends nothing.
+
+**What was excluded, with reasons.** `max_tokens`: it truncates rather than shortens, `findResponseProblem` rejects `finishReason: 'length'` and throws rather than storing ([F-064](#f-064)), and the role already exposes it honestly once as `analysisMaxOutputTokens` — a second home for one number is how they drift. The penalties: they punish every repeated token, including the crew names [F-122](#f-122)'s specificity rule demands. `seed`: genuinely useful, but it buys a repeatable comparison at the cost of a library pass's variety, so it belongs to the bench axis rather than to a role.
+
+**Found while measuring, and it retires a planned phase.** `deepseek/deepseek-v4.1-flash` publishes `reasoning: { mandatory: false, default_enabled: true, supported_efforts: ["max","high","low"], default_effort: "high" }`. So through OpenRouter this model already has a working reasoning control — the live-catalogue path [F-099](#f-099) built — and it is **reasoning by default, at `high`**, which is spend nobody chose. The planned work to declare a `reasoningMechanism` on the NATIVE `deepseek` provider buys nothing for anyone reaching the model this way, and should not be done before someone actually needs the native endpoint.
+
+**Unverified against a model.** The resolver, the ranges, the role gate and the suggestions are pinned by `generationParams.test.ts` (21 tests) against a `supportedParameters` array copied from the real catalogue read. No analysis has been generated with a temperature set: this machine has no database and no provider. The first bench run should confirm three things — that a value set on the card appears in the report's stat line, that a model declaring neither parameter shows no fields rather than inert ones, and that the same title at two temperatures actually differs.

@@ -1286,6 +1286,9 @@
       "xhigh": "Very high",
       "max": "Maximum"
     },
+    "temperatureLabel": "Temperature",
+    "topPLabel": "Top P",
+    "samplingHelp": "Leave both empty to use the provider default. Temperature and Top P are two ways to narrow the same choice, so move one at a time or you will not know which did it. Lower makes the model more literal — worth trying, but it will not make it follow an instruction it has misread.",
     "fallbackModelsTitle": "Fallback models",
     "fallbackModelsHelp": "Tried in order when the model above cannot be reached — rate-limited, unavailable, or withdrawn by its provider. Free models often have a single upstream endpoint, so losing it is not unusual. Pick a different provider to survive an outage rather than just a dead model.",
     "fallbackModelLabel": "Fallback {{number}}",

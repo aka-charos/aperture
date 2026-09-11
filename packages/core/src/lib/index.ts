@@ -73,6 +73,9 @@ export {
   getReasoningEffortFor,
   getReasoningProviderOptions,
   getReasoningProviderOptionsFor,
+  getSupportedGenerationParams,
+  getGenerationParamsForRole,
+  getGenerationParamsFor,
   getReasoningModelFacts,
   getSupportedReasoningEfforts,
   type EmbeddingInvocation,
@@ -301,4 +304,21 @@ export {
   type ReasoningDelivery,
   type ReasoningProviderOptions,
 } from './reasoningEffort.js'
+
+// Sampling — how a role's model draws its next token, for the roles that read
+// it. Which of the two knobs exists is a per-MODEL catalogue fact, not a
+// property of this app: 87 of 439 OpenRouter models refuse `temperature`.
+export {
+  GENERATION_PARAMETERS,
+  GENERATION_PARAM_RANGES,
+  SUGGESTED_GENERATION_PARAMS,
+  ROLES_WITH_GENERATION_PARAMS,
+  roleReadsGenerationParams,
+  generationParamsFor,
+  resolveGenerationParams,
+  resolveGenerationDelivery,
+  type GenerationParameter,
+  type SamplingCapableModel,
+  type GenerationParamsDelivery,
+} from './generationParams.js'
 

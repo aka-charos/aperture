@@ -32,6 +32,12 @@ import {
   resolveReasoningOptions,
   type ReasoningCapableModel,
 } from './reasoningEffort.js'
+import {
+  generationParamsFor,
+  resolveGenerationDelivery,
+  resolveGenerationParams,
+} from './generationParams.js'
+import type { GenerationParameter } from './generationParams.js'
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
 import { createChildLogger } from './logger.js'
 import {
@@ -231,6 +237,24 @@ export interface ProviderConfig {
    * a word that would be dropped at the request builder.
    */
   reasoningEffort?: string
+  /**
+   * How the model samples, for the roles that read it. Absent = send nothing,
+   * which is the provider's default and what every role built before these
+   * fields existed was already getting.
+   *
+   * Two numbers rather than one blob because they are two independent knobs an
+   * operator sets separately, and storing them as an object would make "cleared"
+   * and "never set" the same shape. Whether the chosen MODEL accepts either is a
+   * live catalogue question answered per call — see ./generationParams.ts, where
+   * 87 of 439 OpenRouter models turn out to refuse `temperature` outright.
+   *
+   * Deliberately NOT a ceiling on output length: `max_tokens` truncates rather
+   * than shortens, and `findResponseProblem` rejects a truncated analysis and
+   * throws rather than storing it, so that knob already exists in one honest
+   * place (`analysisMaxOutputTokens`) and must not grow a second.
+   */
+  temperature?: number
+  topP?: number
 }
 
 /**
@@ -1210,6 +1234,102 @@ export async function getReasoningProviderOptions(
     fn,
     resolveReasoningEffort(config)
   )
+}
+
+/**
+ * The parameters this role's chosen model accepts, for the picker and the save
+ * route. Empty means offer no sampling control.
+ *
+ * Shared by both so the fields an operator is shown and the values they are
+ * allowed to save cannot drift — `getSupportedReasoningEfforts`' rule, one
+ * capability over.
+ */
+export async function getSupportedGenerationParams(
+  provider: string,
+  modelId: string,
+  fn: AIFunction
+): Promise<readonly GenerationParameter[]> {
+  return generationParamsFor(await getSamplingModelFacts(provider, modelId, fn))
+}
+
+/**
+ * What a model declares about sampling.
+ *
+ * OpenRouter only, and that is the whole design rather than a gap: its
+ * catalogue is the one source that says per model whether `temperature` is
+ * accepted, and every other provider returns null here, which reads as "no
+ * control". See ./generationParams.ts for why an unverified provider is not
+ * given one on the strength of the field usually working.
+ *
+ * The custom path matters most: OpenRouter's chat models are all user-entered,
+ * so this lookup is how a hand-typed `deepseek/deepseek-v4.1-flash` gets a
+ * control at all.
+ */
+async function getSamplingModelFacts(
+  provider: string,
+  modelId: string,
+  fn: AIFunction
+): Promise<{ supportedParameters?: readonly string[] } | null> {
+  if (provider === 'openrouter') {
+    const info = await getOpenRouterModelInfo(modelId)
+    if (!info?.supportedParameters?.length) return null
+    return { supportedParameters: info.supportedParameters }
+  }
+  return getModel(provider, modelId, fn) ?? null
+}
+
+/**
+ * The sampling values configured for a role, or an empty object.
+ *
+ * Separate from {@link getGenerationParamsFor} for the reason the reasoning
+ * pair is split: the title-analysis writer walks a list of model ATTEMPTS that
+ * each carry their own provider and model id, so it reads the role's values
+ * once and resolves deliverability per attempt rather than per database read.
+ */
+export async function getGenerationParamsForRole(
+  fn: AIFunction
+): Promise<{ temperature?: number; topP?: number }> {
+  return resolveGenerationParams(await getFunctionConfig(fn))
+}
+
+/**
+ * The sampling options to spread into a call, for one specific provider+model.
+ *
+ * An empty object means send nothing, and the call must then omit both keys
+ * rather than passing undefined through — `streamText({ temperature: undefined })`
+ * is not the same request as omitting it on every provider.
+ *
+ * The warn is the only place an operator learns a saved value is not reaching
+ * the model, and OpenRouter makes that necessary rather than merely tidy: it
+ * DROPS a parameter an upstream does not support instead of erroring, so
+ * without this the setting is visible, saved, and observably inert — which
+ * looks exactly like sampling having no effect on that model's writing.
+ */
+export async function getGenerationParamsFor(
+  provider: string,
+  modelId: string,
+  fn: AIFunction,
+  params: { temperature?: number; topP?: number }
+): Promise<{ temperature?: number; topP?: number }> {
+  if (params.temperature == null && params.topP == null) return {}
+
+  const model = await getSamplingModelFacts(provider, modelId, fn)
+  const delivery = resolveGenerationDelivery({ model, params })
+
+  if (delivery.undeliverable.length > 0) {
+    logger.warn(
+      {
+        role: fn,
+        provider,
+        model: modelId,
+        undeliverable: delivery.undeliverable,
+        supported: generationParamsFor(model),
+      },
+      'Sampling settings ignored: this model does not accept them'
+    )
+  }
+
+  return delivery.params
 }
 
 /**
@@ -2337,6 +2457,21 @@ export async function deleteCustomModel(
  * contributes NOTHING, leaving `reasoningMechanism` absent so every reader
  * treats it as "takes none" rather than as an empty list to fall through.
  */
+/**
+ * The sampling declaration from a catalogue entry, or nothing.
+ *
+ * A sibling of {@link reasoningFromCatalog} rather than part of it: the two
+ * answer different questions about the same entry, and folding them together
+ * would mean a model that reasons without an effort list also loses its
+ * temperature control.
+ */
+function samplingFromCatalog(
+  info: { supportedParameters: string[] | null } | null
+): Pick<ModelMetadata, 'supportedParameters'> {
+  if (!info?.supportedParameters?.length) return {}
+  return { supportedParameters: info.supportedParameters }
+}
+
 function reasoningFromCatalog(
   info: { supportedEfforts: string[] | null } | null
 ): Pick<ModelMetadata, 'reasoningMechanism' | 'supportedEfforts'> {
@@ -2406,6 +2541,7 @@ export async function getModelsForFunctionWithCustom(
                 contextWindow: formatContextWindow(catalogInfo.contextLength),
               }),
               ...reasoningFromCatalog(catalogInfo),
+              ...samplingFromCatalog(catalogInfo),
             }
           })
         )
@@ -2451,6 +2587,10 @@ export async function getModelsForFunctionWithCustom(
           contextWindow: formatContextWindow(catalogInfo.contextLength),
         }),
         ...reasoningFromCatalog(catalogInfo),
+        // Same live source, and this is the branch that matters for sampling:
+        // OpenRouter's chat models are all user-entered, so a hand-typed id is
+        // the ordinary way a model reaches this app at all.
+        ...samplingFromCatalog(catalogInfo),
         // A custom model has no catalog entry to declare a mechanism, so this
         // is the only place one can be inferred — and for Z.AI's GLM-5.x that
         // matters, because the alternative is a model that forces thinking on,

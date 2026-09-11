@@ -50,6 +50,9 @@ import {
   embeddingInputTypeOptions,
   PROVIDERS_WITH_INPUT_TYPE,
   ROLES_WITH_REASONING_EFFORT,
+  ROLES_WITH_GENERATION_PARAMS,
+  SUGGESTED_GENERATION_PARAMS,
+  GENERATION_PARAM_RANGES,
   reasoningEffortOptions,
   reasoningEffortLabelKey,
   OPENROUTER_UPSTREAMS,
@@ -101,6 +104,12 @@ export interface ModelInfo {
    * Absent means offer no control.
    */
   supportedEfforts?: readonly string[]
+  /**
+   * Wire-name parameters THIS model accepts, live from the provider's
+   * catalogue. Absent means offer no sampling control — 87 of 439 OpenRouter
+   * models refuse `temperature` outright, so this is a real capability read.
+   */
+  supportedParameters?: readonly string[]
   capabilities: {
     supportsToolCalling: boolean
     supportsEmbeddings: boolean
@@ -330,6 +339,15 @@ export function AIFunctionCard({
   /** Pinned OpenRouter upstream; '' means let OpenRouter choose. */
   const [providerOnly, setProviderOnly] = useState('')
   const [reasoningEffort, setReasoningEffort] = useState('')
+  /**
+   * Sampling, held as STRINGS because '' is the state that sends nothing.
+   *
+   * A numeric state would make an emptied field 0 — a real temperature, and the
+   * one furthest from the provider default the operator was trying to get back
+   * to. The conversion happens once, at save.
+   */
+  const [temperature, setTemperature] = useState('')
+  const [topP, setTopP] = useState('')
 
   // Custom model dialog state
   const [addModelDialogOpen, setAddModelDialogOpen] = useState(false)
@@ -486,6 +504,30 @@ export function AIFunctionCard({
   const offersReasoningEffort =
     ROLES_WITH_REASONING_EFFORT.includes(functionType) &&
     ((modelEfforts?.length ?? 0) > 0 || storedReasoningEffort !== '')
+
+  // Same shape as the effort above, and keyed on the SELECTED MODEL for the
+  // same measured reason: a provider-level gate would offer temperature for
+  // Claude Sonnet 5 and the whole GPT-5.6 family, which refuse it. A stored
+  // value keeps its field visible even when the current model declares nothing,
+  // so it can be cleared rather than stranded.
+  const storedTemperature = config?.temperature
+  const storedTopP = config?.topP
+  useEffect(() => {
+    setTemperature(storedTemperature != null ? String(storedTemperature) : '')
+  }, [storedTemperature])
+  useEffect(() => {
+    setTopP(storedTopP != null ? String(storedTopP) : '')
+  }, [storedTopP])
+
+  const modelParams = selectedModel?.supportedParameters
+  const offersTemperature =
+    ROLES_WITH_GENERATION_PARAMS.includes(functionType) &&
+    (modelParams?.includes('temperature') === true || storedTemperature != null)
+  const offersTopP =
+    ROLES_WITH_GENERATION_PARAMS.includes(functionType) &&
+    (modelParams?.includes('top_p') === true || storedTopP != null)
+  const offersGenerationParams = offersTemperature || offersTopP
+  const suggested = SUGGESTED_GENERATION_PARAMS[functionType]
 
   const storedProviderOnly = config?.embeddingProviderOnly ?? ''
   useEffect(() => {
@@ -740,6 +782,14 @@ export function AIFunctionCard({
       ...(offersReasoningEffort
         ? { reasoningEffort: (reasoningEffort || null) as FunctionConfig['reasoningEffort'] }
         : {}),
+      // Explicit null when cleared, and sent only by a card showing the field —
+      // the same rule as the two above. An empty string becomes null rather
+      // than 0: emptying the box means "go back to the provider default", and 0
+      // is a real temperature at the far end of the range from that.
+      ...(offersTemperature
+        ? { temperature: temperature === '' ? null : Number(temperature) }
+        : {}),
+      ...(offersTopP ? { topP: topP === '' ? null : Number(topP) } : {}),
       ...(offersInputType && provider === 'openrouter'
         ? { embeddingProviderOnly: providerOnly || null }
         : {}),
@@ -1485,6 +1535,49 @@ export function AIFunctionCard({
               </Select>
             </FormControl>
             <FormHelperText>{t('aiFunctionCard.reasoningHelp')}</FormHelperText>
+          </Box>
+        )}
+
+        {/* Sampling. Shown only where the MODEL's catalogue entry declares the
+            parameter: OpenRouter drops one an upstream does not support rather
+            than erroring, so an ungated field would be a control an operator
+            can set, save, and never observe. Empty means the provider default,
+            which is what every role had before this existed — and the
+            placeholder is a suggestion, never a value. */}
+        {offersGenerationParams && (
+          <Box sx={{ mb: 2 }}>
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              {offersTemperature && (
+                <TextField
+                  label={t('aiFunctionCard.temperatureLabel')}
+                  type="number"
+                  size="small"
+                  value={temperature}
+                  onChange={(e) => setTemperature(e.target.value)}
+                  placeholder={suggested ? String(suggested.temperature) : undefined}
+                  inputProps={GENERATION_PARAM_RANGES.temperature}
+                  sx={{ maxWidth: 200 }}
+                />
+              )}
+              {offersTopP && (
+                <TextField
+                  label={t('aiFunctionCard.topPLabel')}
+                  type="number"
+                  size="small"
+                  value={topP}
+                  onChange={(e) => setTopP(e.target.value)}
+                  placeholder={suggested ? String(suggested.topP) : undefined}
+                  inputProps={GENERATION_PARAM_RANGES.top_p}
+                  sx={{ maxWidth: 200 }}
+                />
+              )}
+            </Box>
+            {/* Two things worth saying and neither is obvious from the fields:
+                these are two ways to narrow one distribution, so moving both at
+                once makes a result hard to attribute — and lowering them makes
+                a model more literal, which is not the same as making it follow
+                instructions it has misread. */}
+            <FormHelperText>{t('aiFunctionCard.samplingHelp')}</FormHelperText>
           </Box>
         )}
 

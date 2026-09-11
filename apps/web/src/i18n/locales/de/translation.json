@@ -1560,7 +1560,10 @@
     "serverLoaded": "Currently loaded: {{models}}.",
     "baseUrlHelperZai": "Z.AI international platform. Change this to https://open.bigmodel.cn/api/paas/v4 for a mainland China (Zhipu/BigModel) account — a different account, key and model list.",
     "addCustomDialog_zai": "Enter the exact model code from the Z.AI docs (e.g. glm-5.3, glm-5.3-flash). Use this to reach a model newer than the built-in list.",
-    "placeholderZai": "e.g., glm-5.3"
+    "placeholderZai": "e.g., glm-5.3",
+    "temperatureLabel": "Temperature",
+    "topPLabel": "Top P",
+    "samplingHelp": "Leave both empty to use the provider default. Temperature and Top P are two ways to narrow the same choice, so move one at a time or you will not know which did it. Lower makes the model more literal — worth trying, but it will not make it follow an instruction it has misread."
   },
   "topPicksOutputConfig": {
     "accordionTitle": "Was ist der Unterschied zwischen Bibliothek, Sammlung und Wiedergabeliste?",

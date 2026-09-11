@@ -96,6 +96,17 @@ export interface FunctionConfig {
    * same list, so a value that saves is a value that reaches the wire.
    */
   reasoningEffort?: string | null
+  /**
+   * How the model samples. Absent/null = the provider default, which is what
+   * every role got before these existed.
+   *
+   * Whether the chosen model accepts either is a live catalogue fact that rides
+   * in the models response as `supportedParameters`; the server validates
+   * against the same declaration, so a value that saves is a value that reaches
+   * the wire.
+   */
+  temperature?: number | null
+  topP?: number | null
 }
 
 /**
@@ -123,6 +134,42 @@ export const KNOWN_REASONING_EFFORTS: readonly string[] = [
  * Mirrors core's `ROLES_WITH_REASONING_EFFORT`.
  */
 export const ROLES_WITH_REASONING_EFFORT: readonly string[] = ['textGeneration', 'titleAnalysis']
+
+/**
+ * The roles that read sampling settings. Mirrors core's
+ * `ROLES_WITH_GENERATION_PARAMS`.
+ *
+ * One role, and deliberately: a sampling value only reaches a model at the call
+ * sites that pass it, and `textGeneration` has eight — three of which pick
+ * between `textGeneration` and `chat` at runtime. Showing the fields on a card
+ * whose role only half-applies them is a control that appears to work.
+ */
+export const ROLES_WITH_GENERATION_PARAMS: readonly string[] = ['titleAnalysis']
+
+/**
+ * The suggestion shown in an empty sampling field, per role. Mirrors core's
+ * `SUGGESTED_GENERATION_PARAMS`.
+ *
+ * A PLACEHOLDER and never a value: pre-filling would make "unset" and "set to
+ * the number we suggest" the same state, and unset is the one that sends
+ * nothing. There is no vendor recommendation to use instead — OpenRouter
+ * publishes `default_parameters` per model and for DeepSeek V4.1 Flash it is
+ * empty.
+ */
+export const SUGGESTED_GENERATION_PARAMS: Record<
+  string,
+  { temperature: number; topP: number } | undefined
+> = {
+  titleAnalysis: { temperature: 0.3, topP: 0.9 },
+  textGeneration: { temperature: 0.7, topP: 0.95 },
+  chat: { temperature: 1, topP: 1 },
+}
+
+/** Bounds for the sampling fields. Mirrors core's `GENERATION_PARAM_RANGES`. */
+export const GENERATION_PARAM_RANGES = {
+  temperature: { min: 0, max: 2, step: 0.05 },
+  top_p: { min: 0.01, max: 1, step: 0.01 },
+} as const
 
 /**
  * What to put in the effort dropdown: what THIS model accepts, plus whatever

@@ -230,6 +230,19 @@ export interface OpenRouterModelInfo {
    * See {@link CatalogModel.supportedEfforts} — this is data, not a type.
    */
   supportedEfforts: string[] | null
+  /**
+   * Every parameter this model accepts, as the catalogue's own wire names.
+   *
+   * Read by `generationParams.ts` to decide whether a sampling control exists
+   * at all: measured on 439 live entries, 87 refuse `temperature` and 105
+   * refuse `top_p`, so this is a real capability rather than a formality. Null
+   * means the catalogue said nothing, which is offered as "no control" and
+   * never as "anything goes".
+   *
+   * Already cached since CACHE_VERSION 3 — it is what answers "does this model
+   * support tools" — so exposing it needs no fetch and no cache bump.
+   */
+  supportedParameters: string[] | null
 }
 
 /**
@@ -250,5 +263,6 @@ export async function getOpenRouterModelInfo(modelId: string): Promise<OpenRoute
     outputCostPerMillion: entry.outputCostPerMillion,
     contextLength: entry.contextLength,
     supportedEfforts: entry.supportedEfforts,
+    supportedParameters: entry.supportedParameters,
   }
 }
