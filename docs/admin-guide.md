@@ -74,7 +74,7 @@ Start here if you're new to Aperture:
 
 | Topic | Description |
 |-------|-------------|
-| [AI Explanations](admin/ai-explanations.md) | Generated "Why This Pick?" text |
+| [AI Explanations](admin/ai-explanations.md) | Generated "Why *Aperture* picked this for you" text |
 | [Algorithm Tuning](admin/algorithm-tuning.md) | Weights and parameters |
 
 ---
@@ -88,21 +88,21 @@ Start here if you're new to Aperture:
 
 ### Language defaults (admin)
 
-Under **Admin → Settings → System**, **Language defaults** sets the instance-wide default **UI language** and default **AI output language** (taste synopses, recommendation explanations, assistant replies, etc.). Users can override both under **Settings → Preferences → Language** (`uiLanguage` / `aiLanguage` in stored preferences; `null` means “use server default”). Supported locale codes match `APP_LOCALE_OPTIONS` in core: `en`, `es`, `de`, `fr`, `it`, `pt`, `nl`, `ru`, `ja`, `zh`, `ko`, `hi`, `ar`, `he`, `el`.
+Under **Admin console → Appearance → Language defaults**, the instance-wide default **UI language** and default **AI output language** (taste synopses, recommendation explanations, assistant replies, etc.) are set. Users can override both under **User Settings → Preferences → Language** (`uiLanguage` / `aiLanguage` in stored preferences; `null` means "use server default"). Supported locale codes match `APP_LOCALE_OPTIONS` in core: `en`, `es`, `de`, `fr`, `it`, `pt`, `nl`, `ru`, `ja`, `zh`, `ko`, `hi`, `ar`, `he`, `el`.
 
 ### Gap Analysis (admin)
 
-**Gap Analysis** (`/admin/gaps`) compares TMDB movie collection membership to your synced `movies` table so you can see which franchise entries are missing. It is **not** the same as user [Discovery](features/discovery.md) (per-user suggestions).
+**Gap Analysis** (**Admin console → Library → Gap analysis**, `/admin/library/gaps`) compares TMDB movie collection membership to your synced `movies` table so you can see which franchise entries are missing. It is **not** the same as user [Discovery](features/discovery.md) (per-user suggestions).
 
 **Prerequisites**
 
-- **TMDb API key** — Admin → Settings.
+- **TMDb API key** — Admin console → Integrations → TMDB.
 - **Collection metadata** — Run the **Enrich metadata** job so movies get `collection_id` from TMDb.
 - **Seerr** (optional) — Only needed if you want to request missing titles; requests are always explicit (bulk or single).
 
 **Operations**
 
-- Use **Run analysis** on the page (or schedule the **`refresh-library-gaps`** job under Admin → Jobs). The job only calls TMDb and your database — it **never** requests content from Seerr automatically.
+- Use **Run analysis** on the page (or run the **`refresh-library-gaps`** job under Operations → Jobs). The job only calls TMDb and your database — it **never** requests content from Seerr automatically.
 - Gap-initiated requests are stored with `source: gap_analysis` and appear on **My Requests** with a **Gap Analysis** badge; they can be filtered with the Source dropdown.
 - Re-run analysis after large library syncs so counts stay accurate.
 
@@ -159,29 +159,35 @@ Under **Admin → Settings → System**, **Language defaults** sets the instance
 
 ## Quick Reference
 
-### Default Job Schedule
+### Admin Console Map
 
-| Time | Jobs |
-|------|------|
-| 1:00 AM | Database backup |
-| 2:00 AM | Library scan (sync-movies, sync-series) |
-| Every 2h | Watch history sync |
-| 3:00 AM | Embedding generation |
-| Sunday 4:00 AM | AI recommendations |
-| Sunday 5:00 AM | Library sync (STRM/symlinks) |
-| 5:00 AM | Top Picks refresh |
-| Every 6h | Metadata enrichment |
-| Every 30m | User sync |
+Groups in the admin nav (one page per route): **Overview**, **Library** (Media server, Libraries, File locations, Gap analysis), **Integrations** (11 pages), **AI models** (Providers & roles, Embeddings, AI Spend, Cost estimate, Analysis bench), **Recommendations** (Algorithm, Evaluation, Explanations, Output format, Library naming, Top Picks, Shows You Watch, Discovery tuning, Genre strips, Channels web expand), **Appearance** (Branding, Theme colours, Poster display, Language defaults, Translations), **Access** (Users, API keys), **Operations** (Jobs, Backup & restore, Database, Poster repair).
+
+### Default Job Schedule (seeds)
+
+| Schedule | Jobs |
+|----------|------|
+| Every 30 min | `sync-users` |
+| Hourly | `sync-series-watch-history` (movies every 2 h) |
+| Every 3 h | `sync-movies` / `sync-series`, staggered library builds |
+| Every 6 h | `enrich-metadata`, movie/series embeddings (staggered) |
+| Daily 02:00–03:30 | `backup-database` 02:00, `refresh-ratings` 02:30, `reconcile-discovery-requests` 04:30, `sync-lldap-emails` 03:15, `cleanup-auth-state` 03:30 |
+| Daily 02:00–03:30 | `backup-database` 02:00, `refresh-ratings` 02:30, `sync-lldap-emails` 03:15, `cleanup-auth-state` 03:30, `reconcile-discovery-requests` 04:30 |
+| Daily 05:00–07:00 | `refresh-top-picks` 05:00, `enrich-studio-logos` 05:30, `generate-discovery-suggestions` 06:00, `enrich-mdblist` 07:00 |
+| Weekly (Sunday) | `generate-movie/series-recommendations` 04:00, `auto-request-top-picks` 00:00, `refresh-assistant-suggestions` 00:00, `refresh-ai-pricing` 00:00 |
+
+All 34 jobs, seeded — edit per job in **Operations → Jobs** (see [Job scheduling](admin/job-scheduling.md)). The scheduler reads the `job_config` table seeded from these defaults (the definitions file's cron fields are not what it reads). Times follow `TZ` (default `America/New_York`). Missed runs do not catch up.
 
 ### Algorithm Defaults
 
 | Weight | Movies | Series |
 |--------|--------|--------|
-| Similarity | 0.5 | 0.5 |
-| Popularity | 0.2 | 0.2 |
-| Recency | 0.1 | 0.1 |
-| Rating | 0.1 | 0.1 |
-| Diversity | 0.1 | 0.1 |
+| Similarity | 0.4 | 0.4 |
+| Novelty (Genre Discovery) | 0.2 | 0.2 |
+| Rating | 0.2 | 0.2 |
+| Diversity | 0.2 | 0.2 |
+
+Per-user picks default to **20** from a candidate pool of up to 50,000; reserved slots cover interest, taste-twin, and acclaimed picks. See [Algorithm tuning](admin/algorithm-tuning.md).
 
 ### Embedding Models
 
@@ -215,27 +221,49 @@ All admin documentation files:
 
 ### Integrations
 - [admin/integrations-overview.md](admin/integrations-overview.md)
-- [admin/trakt.md](admin/trakt.md)
 - [admin/tmdb.md](admin/tmdb.md)
 - [admin/omdb.md](admin/omdb.md)
 - [admin/mdblist.md](admin/mdblist.md)
+- [admin/trakt.md](admin/trakt.md)
 - [admin/seerr.md](admin/seerr.md)
+- [admin/lldap.md](admin/lldap.md)
+- [admin/n8n.md](admin/n8n.md)
+- [admin/tavily.md](admin/tavily.md)
+- [admin/crw.md](admin/crw.md)
+- [admin/streaming.md](admin/streaming.md)
+- [admin/ratings-refresh.md](admin/ratings-refresh.md)
 
 ### AI Configuration
 - [admin/ai-providers.md](admin/ai-providers.md)
 - [admin/embedding-models.md](admin/embedding-models.md)
 - [admin/text-models.md](admin/text-models.md)
 - [admin/chat-models.md](admin/chat-models.md)
+- [admin/ai-spend.md](admin/ai-spend.md)
+- [admin/cost-estimate.md](admin/cost-estimate.md)
+- [admin/analysis-bench.md](admin/analysis-bench.md)
+
+### Appearance
+- [admin/branding.md](admin/branding.md)
+- [admin/theme-colors.md](admin/theme-colors.md)
+- [admin/poster-display.md](admin/poster-display.md)
+- [admin/language-defaults.md](admin/language-defaults.md)
+- [admin/translations.md](admin/translations.md)
 
 ### AI Recommendations
+- [admin/algorithm-tuning.md](admin/algorithm-tuning.md)
+- [admin/ai-explanations.md](admin/ai-explanations.md)
 - [admin/output-format.md](admin/output-format.md)
 - [admin/library-titles.md](admin/library-titles.md)
-- [admin/ai-explanations.md](admin/ai-explanations.md)
-- [admin/algorithm-tuning.md](admin/algorithm-tuning.md)
+- [admin/evaluation.md](admin/evaluation.md)
+- [admin/discovery-tuning.md](admin/discovery-tuning.md)
+- [admin/genre-strips.md](admin/genre-strips.md)
+- [admin/channels-web-expand.md](admin/channels-web-expand.md)
 
-### Features
+### Features & Library
 - [admin/top-picks.md](admin/top-picks.md)
 - [admin/shows-you-watch.md](admin/shows-you-watch.md)
+- [admin/gap-analysis.md](admin/gap-analysis.md)
+- [admin/overview.md](admin/overview.md)
 
 ### Jobs
 - [admin/jobs-overview.md](admin/jobs-overview.md)
@@ -244,14 +272,23 @@ All admin documentation files:
 - [admin/series-jobs.md](admin/series-jobs.md)
 - [admin/global-jobs.md](admin/global-jobs.md)
 
-### Users
+### Users & Access
 - [admin/user-management.md](admin/user-management.md)
 - [admin/user-permissions.md](admin/user-permissions.md)
+- [admin/api-keys.md](admin/api-keys.md)
+- [admin/deployment.md](admin/deployment.md)
 
-### System
+### Operations
+- [admin/jobs-overview.md](admin/jobs-overview.md)
+- [admin/job-scheduling.md](admin/job-scheduling.md)
+- [admin/movie-jobs.md](admin/movie-jobs.md)
+- [admin/series-jobs.md](admin/series-jobs.md)
+- [admin/global-jobs.md](admin/global-jobs.md)
 - [admin/maintenance.md](admin/maintenance.md)
 - [admin/backup-restore.md](admin/backup-restore.md)
 - [admin/database-management.md](admin/database-management.md)
-- [admin/external-database.md](admin/external-database.md)
+- [admin/logs.md](admin/logs.md)
 - [admin/api-errors.md](admin/api-errors.md)
 - [admin/recommended-workflow.md](admin/recommended-workflow.md)
+- [admin/external-database.md](admin/external-database.md)
+- [admin/windows-docker-desktop.md](admin/windows-docker-desktop.md)

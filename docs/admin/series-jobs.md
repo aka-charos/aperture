@@ -1,298 +1,54 @@
 # Series Jobs
 
-Background jobs for syncing, processing, and building TV series libraries.
+The TV Series tab (`/admin/ops/jobs`) — the series-side pipeline, including episodes.
 
 ![Admin Jobs](../images/admin/admin-jobs.png)
 
-## Job List
+## The Pipeline
 
-| Job | Purpose |
-|-----|---------|
-| **sync-series** | Import series from media server |
-| **sync-series-watch-history** | Import what users have watched |
-| **generate-series-embeddings** | Create AI vectors |
-| **generate-series-recommendations** | Create personalized picks |
-| **full-reset-series-recommendations** | Delete all + rebuild (manual only) |
-| **sync-series-libraries** | Build virtual libraries |
+| Job | Default schedule | What it does |
+|-----|------------------|--------------|
+| `sync-series` | every 3 h at :10 | Pull the series library and episodes from the media server |
+| `sync-series-watch-history` | **every hour** | Episode-level play states and progress for all users — hourly because episode data changes faster than movies |
+| `generate-series-embeddings` | every 6 h at :20 | Embeds **series and episodes** — episode vectors power the assistant's episode search |
+| `generate-series-recommendations` | **weekly, Sunday 04:00** | Score and select per-user series picks (activity gate applies to scheduled runs) |
+| `sync-series-libraries` | every 3 h at :30 | Rebuild the "AI Picks - TV Series" libraries from the newest completed run |
+| `enrich-metadata` | every 6 h | TMDb+OMDb enrichment (Global tab — shared with movies) |
 
----
+Jobs are **not chained** — the staggering is for load-spreading, not sequencing. The one ordering rule that matters: **watch history before recommendations** (runs exclude watched episodes; the job syncs history itself as a safety net, but after a big import, run history manually first).
 
-## sync-series
+## Scheduled vs Manual Runs
 
-Import TV series from your media server.
+- **Scheduled runs** skip users with no new activity since their last run
+- **Manual runs** (the Run button, or per-user from [user management](user-management.md)) always execute
+- Every schedule is editable per job (see [Job scheduling](job-scheduling.md))
 
-### What It Does
+## Full Reset
 
-1. Connects to Emby/Jellyfin
-2. Fetches all series from enabled libraries
-3. Imports series metadata
-4. Imports all seasons and episodes
-5. Downloads poster URLs
-6. Updates existing records
+`full-reset-series-recommendations` deletes **all** series recommendations and rebuilds from scratch — **manual-only**, with a warning dialog before it runs. It re-scores everything (minutes of model calls); reserve it for embedding-model or algorithm changes, and prefer per-user regeneration otherwise.
 
-### Output
+## Episode Embeddings
 
-- New series added
-- New episodes added
-- Existing entries updated
-- Removed series/episodes marked
+The largest embedding tables in a real library are the **episode** tables — a long-running show contributes thousands of vectors:
 
-### When to Run
+- Episode vectors are gated by the **episode embeddings** toggle on the [Embeddings](embedding-models.md) page — with it off, this job embeds series only
+- The assistant's episode search exists **only** when episode embeddings are enabled and populated
+- Watch storage: the [Embeddings](embedding-models.md) page shows per-set sizes, and episodes dominate them
 
-- **Scheduled:** Daily
-- **Manual:** After adding new series
-- **Prerequisites:** None
+## Season 00 (Specials) Handling
 
-### Typical Duration
+The library writer keeps specials from jumping the queue on Emby shelves:
 
-| Library Size | Duration |
-|--------------|----------|
-| Small (<200 series) | 2-5 min |
-| Medium | 5-15 min |
-| Large (500+ series) | 15-45 min |
+- Season 00 is written as a **hidden placeholder** entry with a future `dateadded`, so it sorts last rather than first
+- Its NFO plot carries an explanatory note, so it's identifiable if it's ever seen
+- Nothing is skipped — specials remain playable and progress-tracked
 
-Series sync is slower than movies due to episode count.
+## Reading the Results
+
+- `selected_rank` from the newest completed run drives the AI Picks library ordering and burned-in poster badges
+- A failed run leaves the previous picks in place — check the run history and logs before assuming "no recommendations"
+- Series watched-state exclusions treat **5%+ episode progress** as "watched" for recommendation purposes
 
 ---
 
-## sync-series-watch-history
-
-Import what episodes users have watched.
-
-### What It Does
-
-1. Queries media server for each enabled user
-2. Fetches watch status for all episodes
-3. Records watched episodes with timestamps
-4. Tracks partial plays (playback position and runtime from the media server)
-5. Stores `played`, `playback_position_ticks`, and `runtime_ticks` on each `watch_history` row
-
-### Episode-Level Tracking
-
-| Data | Description |
-|------|-------------|
-| **Played** | Fully watched (`UserData.Played`) |
-| **Playback position** | Resume position in ticks (`playback_position_ticks`) |
-| **Runtime** | Episode runtime in ticks at sync time (`runtime_ticks`) |
-| **Progress** | `playback_position_ticks / runtime_ticks` when both are set |
-| **Play Count** | Number of times watched |
-| **Last Watched** | Most recent play date |
-
-When **New Content Only** is enabled (`include_watched = false`), titles with any episode at **5% or more** progress (or fully played) are excluded from AI recommendations. Partial-only rows are not used for taste-profile building.
-
-### When to Run
-
-- **Scheduled:** Every 2 hours
-- **Manual:** If history seems out of sync
-- **Prerequisites:** sync-series
-
----
-
-## generate-series-embeddings
-
-Create AI vectors for similarity matching.
-
-### What It Does
-
-1. Identifies series without embeddings
-2. Constructs text from series metadata
-3. Sends to AI provider for embedding
-4. Stores vectors in database
-
-### What Gets Embedded
-
-Series-level data:
-- Title and year
-- Overview/description
-- Genres
-- Keywords (if available)
-- Network
-
-Note: Episodes are not individually embedded.
-
-### When to Run
-
-- **Scheduled:** Daily at 3 AM
-- **Manual:** After adding many new series
-- **Prerequisites:** sync-series, AI provider configured
-
-### Typical Duration
-
-| Library Size | Duration (OpenAI) | Duration (Ollama) |
-|--------------|-------------------|-------------------|
-| 200 series | 3-8 min | 10-20 min |
-| 500 series | 8-20 min | 30-60 min |
-| 1000+ series | 20-45 min | 1-2 hours |
-
----
-
-## generate-series-recommendations
-
-Create personalized picks for each user.
-
-### What It Does
-
-1. For each enabled user:
-2. Analyzes episode watch history
-3. Builds series taste profile
-4. Excludes series already being watched
-5. Scores all unwatched series
-6. Ranks by score
-7. Generates explanations (if enabled)
-8. Stores recommendations
-
-### Series-Specific Logic
-
-| Factor | Handling |
-|--------|----------|
-| **Partially watched** | Excluded from recommendations at ≥5% episode progress |
-| **Completed series** | Excluded (unless ended) |
-| **Currently watching** | Excluded |
-| **Ended series** | Included in pool |
-
-### When to Run
-
-- **Scheduled:** Weekly
-- **Manual:** After algorithm changes
-- **Prerequisites:** embeddings, watch history
-
----
-
-## full-reset-series-recommendations
-
-**⚠️ Manual Only** - This job cannot be scheduled and must be run manually.
-
-Complete recommendation reset: **deletes ALL existing series recommendations** for all users, then rebuilds from scratch.
-
-### Difference from Regular
-
-| Generate (Regular) | Full Reset |
-|---------|---------|
-| Updates existing | **Deletes all first** |
-| Incremental | Full regeneration |
-| Faster | Slower |
-| Can be scheduled | **Manual only** |
-
-### When to Use
-
-- After major algorithm changes
-- After changing embedding model
-- If recommendations seem corrupted
-- After significant library changes
-
-### Warning
-
-⚠️ **Destructive operation**: Removes ALL existing series recommendations before rebuilding. Users will have no recommendations until the job completes.
-
----
-
-## sync-series-libraries
-
-Build virtual libraries in media server.
-
-### What It Does
-
-1. For each enabled user:
-2. Creates output directory structure
-3. Generates series folders
-4. Creates Season 00 placeholder (for Emby sorting)
-5. Generates STRM or symlink files for each season/episode
-6. Creates NFO metadata files
-7. Triggers media server scan
-
-### Output Structure
-
-```
-/aperture-libraries/users/john/ai-series/
-├── Breaking Bad (2008)/
-│   ├── Season 00/
-│   │   └── breaking-bad-placeholder.strm  (sorting workaround)
-│   ├── Season 1/
-│   │   ├── Breaking Bad - S01E01.strm
-│   │   └── ...
-│   └── tvshow.nfo
-├── The Wire (2002)/
-│   └── ...
-```
-
-### Emby Home Row Fix
-
-The Season 00 placeholder ensures series appear in correct rank order on Emby home rows. See [technical details](#emby-home-row-sorting).
-
-### When to Run
-
-- **Scheduled:** After recommendations job
-- **Manual:** After recommendation generation
-- **Prerequisites:** generate-series-recommendations
-
----
-
-## Emby Home Row Sorting
-
-### The Problem
-
-Emby sorts series on home rows by the most recent episode's `dateadded`. This causes recommendations to appear in random order.
-
-### The Solution
-
-Aperture creates a hidden Season 00 with a placeholder episode. This placeholder has a future `dateadded` based on rank:
-- Rank 1: 2125-01-01
-- Rank 2: 2124-12-31
-- etc.
-
-### Technical Details
-
-- Season 00 folder contains minimal STRM and NFO
-- Placeholder is auto-marked as watched
-- Hidden from Continue Watching
-- NFO explains its purpose
-
-### Jellyfin
-
-Jellyfin handles sorting differently and doesn't need this workaround, but the placeholder doesn't cause issues.
-
----
-
-## Job Order
-
-For initial setup or full refresh:
-
-```
-1. sync-series
-2. generate-series-embeddings
-3. sync-series-watch-history
-4. generate-series-recommendations
-5. sync-series-libraries
-```
-
----
-
-## Troubleshooting
-
-### Sync Series Taking Too Long
-
-- Large libraries with many episodes take time
-- Consider running overnight
-- Check for stuck episodes
-
-### Missing Episodes
-
-- Verify episode exists in media server
-- Check if episode is in enabled library
-- Re-run sync job
-
-### Recommendations Include Currently Watching
-
-- Ensure watch history is synced
-- Check episode tracking is working
-- Verify series status in database
-
-### Season 00 Visible to Users
-
-- This is expected for Emby sorting
-- Placeholder should be auto-watched
-- Users won't see in Continue Watching
-
----
-
-**Previous:** [Movie Jobs](movie-jobs.md) | **Next:** [Global Jobs](global-jobs.md)
+**Related:** [Jobs overview](jobs-overview.md) · [Movie jobs](movie-jobs.md) · [Embedding models](embedding-models.md)

@@ -1,213 +1,29 @@
 # Maintenance
 
-Tools for maintaining Aperture's data and fixing common issues.
+The old "Maintenance" settings tab is gone — its two real features moved to dedicated pages:
 
 ![Admin Settings - Maintenance](../images/admin/admin-settings-maintenance.png)
 
-## Accessing Settings
-
-Navigate to **Admin → Settings → Maintenance**
-
----
-
 ## Poster Repair
 
-Fix missing or broken poster images.
+**Operations → Poster repair** (`/admin/ops/poster-repair`).
 
-### When to Use
+Fixes artwork by pushing **from TMDb to your media server** (not the other way):
 
-- Posters show as placeholder images
-- Media server changed poster locations
-- After migrating media server
-- Poster URLs expired
-
-### How It Works
-
-1. Click **Repair Posters**
-2. Aperture scans all movies/series
-3. Identifies items with missing/invalid poster URLs
-4. Fetches fresh URLs from media server
-5. Updates database
-
-### Progress
-
-Shows:
-- Items scanned
-- Posters updated
-- Errors encountered
-
-### Schedule
-
-Poster repair is manual-only. Run when needed.
-
----
+1. **Scan** — Aperture asks the media server for items with missing or failed posters
+2. **Review** — a table of what was found
+3. **Repair selected** — TMDb artwork is fetched and pushed to the media server; the repair runs as a job with progress, and you can cancel it
 
 ## Legacy Embeddings
 
-Manage old embedding data from previous model configurations.
+**AI models → Embeddings** (`/admin/ai/embeddings`) — the bottom section appears only when pre-multi-dimension legacy tables exist, with a single **"Drop Legacy Tables"** action to reclaim their space. See [Embedding models](embedding-models.md).
 
-### What Are Legacy Embeddings?
+## What No Longer Has a Page
 
-When you change embedding models, old embeddings become obsolete:
-- Different dimensions
-- Incompatible vectors
-- Take up storage space
-
-### Viewing Legacy Data
-
-Shows:
-- Embedding tables by dimension
-- Count of embeddings per table
-- Storage used
-
-### Cleanup Options
-
-| Action | Effect |
-|--------|--------|
-| **Delete Legacy** | Remove old dimension tables |
-| **Keep Current** | Only keep active model's embeddings |
-
-### When to Clean Up
-
-Clean legacy embeddings when:
-- You've settled on a model
-- Storage is limited
-- Old data is confirmed unnecessary
-
-### Warning
-
-Deleted embeddings cannot be recovered. Ensure current model is working before deleting legacy data.
+- **Cache management** — caches are database tables with TTLs; there is no flush button
+- **Metadata refresh** — that's the [enrichment jobs](global-jobs.md)
+- **Health checks** — the Overview page plus job history cover it
 
 ---
 
-## Metadata Refresh
-
-Force refresh of metadata from media server.
-
-### When to Use
-
-- Metadata changed in media server
-- Posters updated
-- Genres/cast modified
-- Ratings changed
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| **Full Refresh** | Re-sync all metadata |
-| **Changed Only** | Only items modified since last sync |
-
-### Process
-
-Run the relevant sync jobs:
-- `sync-movies` for movie metadata
-- `sync-series` for series metadata
-
----
-
-## Cache Management
-
-Clear cached data that may be stale.
-
-### API Response Cache
-
-Aperture caches some API responses:
-- TMDb lookups
-- OMDb scores
-- MDBList data
-
-### Clearing Cache
-
-Cache automatically expires, but to force clear:
-1. Restart Aperture container
-2. Or wait for cache TTL
-
-### Frontend Cache
-
-Users can clear their browser cache for:
-- Stale UI elements
-- Old images
-- Cached preferences
-
----
-
-## Health Checks
-
-### Database Health
-
-Check database status:
-- Connection status
-- Table integrity
-- Index status
-
-### API Connections
-
-Verify integrations:
-- Media server connection
-- OpenAI/AI provider
-- Trakt, TMDb, etc.
-
-### Job Status
-
-Review job health:
-- Failed jobs
-- Long-running jobs
-- Stuck jobs
-
----
-
-## Common Maintenance Tasks
-
-### Weekly
-
-- Review job logs for errors
-- Check for failed jobs
-- Monitor storage usage
-
-### Monthly
-
-- Review embedding storage
-- Clean legacy embeddings if needed
-- Check poster health
-
-### After Updates
-
-- Run enrichment jobs
-- Verify integrations still work
-- Test recommendation generation
-
-### After Migration
-
-- Repair posters
-- Verify path mappings
-- Re-sync libraries
-- Regenerate embeddings if needed
-
----
-
-## Troubleshooting
-
-### Slow Performance
-
-1. Check database storage
-2. Clean legacy embeddings
-3. Review job schedules for overlap
-4. Monitor during peak times
-
-### Missing Data
-
-1. Re-run sync jobs
-2. Check library configuration
-3. Verify media server connection
-4. Review enrichment job status
-
-### Image Issues
-
-1. Run poster repair
-2. Check media server poster availability
-3. Verify URL accessibility
-
----
-
-**Previous:** [Shows You Watch Configuration](shows-you-watch.md) | **Next:** [Backup & Restore](backup-restore.md)
+**Related:** [Jobs overview](jobs-overview.md) · [Embedding models](embedding-models.md) · [Database](database-management.md)

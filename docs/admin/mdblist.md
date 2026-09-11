@@ -1,211 +1,48 @@
 # MDBList Integration
 
-Connect to MDBList for curated movie/TV lists and as a Top Picks popularity source.
+Connect to MDBList for curated scores (Letterboxd, MDBList ratings), streaming providers, keywords, and as a [Top Picks](top-picks.md) popularity source.
 
 ![Admin Settings - Integrations](../images/admin/admin-settings-setup-integrations.png)
 
 ## Accessing Settings
 
-Navigate to **Admin → Settings → Setup → Integrations**
-
----
-
-## What MDBList Provides
-
-| Feature | Description |
-|---------|-------------|
-| **Curated Lists** | Community-created movie/TV lists |
-| **Top Picks Source** | Use MDBList rankings for Top Picks |
-| **Multiple Scores** | Aggregated ratings from multiple sources |
-| **Genre Lists** | Pre-built genre-specific collections |
-
----
-
-## Use Cases
-
-### Top Picks
-
-Use MDBList as the popularity source for Top Picks:
-- "Most Popular Movies" list
-- "Trending This Week" list
-- Custom curated list
-
-### Discovery
-
-MDBList can provide additional Discovery suggestions.
-
-### Enrichment
-
-The `enrich-mdblist` job adds MDBList scores to your content.
-
----
+Admin console → **Integrations** → **MDBList** (`/admin/integrations/mdblist`).
 
 ## Getting an API Key
 
-1. Create account at [mdblist.com](https://mdblist.com/)
-2. Go to your profile/settings
-3. Find or generate your API key
-4. Copy the key
-
-### Account Tiers
-
-| Tier | Features |
-|------|----------|
-| **Free** | Limited API calls, public lists |
-| **Supporter** | More calls, private lists |
-| **Pro** | Unlimited, priority support |
-
----
+MDBList issues API keys to registered accounts — free accounts work, and a **supporter subscription** raises your rate limits (tell Aperture about it with the toggle below).
 
 ## Configuration
 
-1. Navigate to Admin → Settings → Setup → Integrations
-2. Find MDBList section
-3. Enter your **API Key**
-4. Click **Test Connection**
-5. Click **Save**
+| Setting | Description |
+|---------|-------------|
+| **API Key** | Masked once saved |
+| **Enable MDBList integration** | Master switch |
+| **Supporter tier** | On if you subscribe — faster rate limits |
 
----
+**Test Connection** reports the connected **user**, **account status**, and **how many API requests the test used** — so you can see the shape of your quota from one click.
+
+## The List Selector
+
+For Top Picks use, the built-in list selector searches your MDBList lists or accepts a **pasted list URL or ID**, showing item counts before you commit. A **Library Match Preview** shows how much of a candidate list your library already holds — the difference between "a list" and "a list worth using for Top Picks".
+
+## The `enrich-mdblist` Job
+
+A separate scheduled job — **daily at 07:00**, deliberately its own job rather than part of `enrich-metadata`. Adds **Letterboxd scores, MDBList scores, streaming providers, and keywords** to your titles. MDBList titles are also a [Discovery](../features/discovery.md) candidate source.
 
 ## Using MDBList for Top Picks
 
-See [Top Picks Configuration](top-picks.md) for full details.
+In [Top Picks](top-picks.md) settings:
 
-### Quick Setup
-
-1. Go to Admin → Settings → Top Picks
-2. Set **Popularity Source** to "MDBList"
-3. Click **Select List**
-4. Browse or search for a list
-5. Select your preferred list
-6. Configure sort order
-7. Save and run Top Picks job
-
-### Popular Lists
-
-| List Type | Good For |
-|-----------|----------|
-| "Most Popular Movies" | General trending |
-| "Best of 2024" | Recent quality |
-| "IMDb Top 250" | All-time classics |
-| Genre-specific | Targeted collections |
-
----
-
-## List Selection
-
-### Browsing Lists
-
-The MDBList selector shows:
-- Popular public lists
-- Your own lists (if logged in)
-- Search functionality
-
-### List Information
-
-Each list displays:
-- List name and description
-- Item count
-- Last updated date
-- Author
-
-### Library Match Preview
-
-After selecting a list:
-- Shows how many items match your library
-- Lists missing items
-- Helps choose appropriate lists
-
----
-
-## Sort Options
-
-When using MDBList for Top Picks:
-
-| Sort Option | Description |
-|-------------|-------------|
-| **MDBList Score** | Combined score from all sources |
-| **Average Score** | Simple average |
-| **IMDb Rating** | IMDb user rating |
-| **IMDb Votes** | Number of votes |
-| **IMDb Popularity** | IMDb popularity rank |
-| **TMDb Popularity** | TMDb popularity score |
-| **Rotten Tomatoes** | RT critic score |
-| **Metacritic** | Metacritic score |
-
----
-
-## Enrichment Job
-
-The `enrich-mdblist` job fetches additional data:
-
-### What It Adds
-
-- MDBList combined score
-- Streaming availability
-- Additional ratings
-
-### Running
-
-- **Automatic:** Part of enrichment cycle
-- **Manual:** Admin → Jobs → enrich-mdblist → Run
-
----
-
-## Hybrid Mode
-
-Combine MDBList with local watch data:
-
-### Configuration
-
-1. Set Top Picks source to "Hybrid"
-2. Configure MDBList list as above
-3. Set weights:
-   - **Local Weight:** How much server data matters
-   - **MDBList Weight:** How much list ranking matters
-
-### How It Works
-
-Final score = (Local popularity × Local weight) + (MDBList position × MDBList weight)
-
----
+- Choose **MDBList** as the popularity source and pick a list (selector above)
+- Or choose **Hybrid** and blend local watch data against an external source with the single **local↔external slider** (default 50/50) — the external half can be MDBList **or** a TMDb chart
 
 ## Troubleshooting
 
-### "Invalid API key"
-
-- Verify key is correct
-- Check account is active
-- Ensure no extra spaces in key
-
-### List Not Loading
-
-- Check API key has access to that list
-- Verify list still exists
-- Try searching by list ID directly
-
-### Low Match Rate
-
-If few list items match your library:
-- List may contain content you don't have
-- Consider different list
-- Use Hybrid mode to supplement
+- **Test fails with auth error** — key wrong or revoked; fix and re-test (a successful test clears the alert; quota errors never auto-clear)
+- **Enrichment slow / stalled** — free-tier rate limits; the supporter toggle and off-peak scheduling both help
+- **Scores missing on some titles** — MDBList only knows TMDb/IMDb-id titles it has data for; coverage gaps are normal, not failures
 
 ---
 
-## Privacy
-
-### What's Shared
-
-- API key for authentication
-- List queries
-
-### What's Not Shared
-
-- Your library contents
-- Your user data
-- Watch history
-
----
-
-**Previous:** [OMDb Integration](omdb.md) | **Next:** [Seerr Integration](seerr.md)
+**Related:** [Top Picks](top-picks.md) · [TMDb](tmdb.md) · [Jobs overview](jobs-overview.md)

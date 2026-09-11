@@ -1,279 +1,47 @@
 # AI Providers
 
-Configure your AI/LLM provider for embeddings, recommendations, and the Encore chatbot.
+Configure every AI capability in one place. AI is organized by **role** — each role has its own provider, model, and keys, on one page of cards.
 
 ![Admin Settings - AI/LLM](../images/admin/admin-settings-ai-llm.png)
 
-## Accessing Settings
+## Where It Lives
 
-Navigate to **Admin → Settings → AI / LLM**
+Admin console → **AI models** → **Providers & roles** (`/admin/ai/roles`).
 
----
+## The Six Roles
 
-## Supported Providers
+| Role | What it does |
+|------|--------------|
+| **Embeddings** | Vector generation for similarity, recommendations, search |
+| **Chat Assistant** | The AI assistant — needs a model with reliable **tool calling** |
+| **Text Generation** | Recommendation explanations, taste profiles, playlist text |
+| **Exploration** | The semantic graph (Media Graph) |
+| **Google Gemini Web Search** | Web grounding for the assistant's discovery turns — **Google only** (a second Gemini key is recommended; see quota below) |
+| **Title Analysis** | The grounded critical essays on detail pages — the only role with **fallback models** and request pacing |
 
-| Provider | Type | Best For |
-|----------|------|----------|
-| **OpenAI** | Cloud | Most users, best quality |
-| **Ollama** | Local | Privacy, no API costs |
-| **Groq** | Cloud | Fast inference |
-| **Anthropic** | Cloud | Claude models |
-| **Google AI** | Cloud | Gemini models |
-| **DeepSeek** | Cloud | Cost-effective |
-| **OpenAI-Compatible** | Various | Custom endpoints |
+The setup wizard requires the first four to be configured before it will finish; the other two are optional features that unlock when configured.
 
----
+## Per-Role Cards
 
-## OpenAI
+Each card holds: **provider → model → API key** (per-role keys; a provider's key isn't shared between roles), plus:
 
-The default and most well-tested provider.
+- **Spare/fallback API keys** — extra keys per provider that rotate in when the primary hits a quota or auth error (web-search grounding depends on this: Gemini's free tier is what usually breaks)
+- **Custom models** — "Add Custom Model…" registers a model keyed to *(provider, role)*, so custom entries don't leak across roles
+- **Reasoning effort** (where the model supports it) and **retrieval mode** (input type) on the embeddings card
+- **Test** — sends a real (billable) request tagged as a settings test; for embeddings it reports the **measured vector width** and whether a matching storage table exists
 
-### Setup
+Model catalogs ship with the app — OpenAI, Anthropic, Google, Groq, Deepseek, OpenRouter, Z.AI, HuggingFace, Ollama, LM Studio (auto-discovers installed models), and generic OpenAI-compatible endpoints.
 
-1. Get API key from [platform.openai.com](https://platform.openai.com)
-2. Enter key in Aperture
-3. Test connection
-4. Save
+## Quotas and Free Tiers
 
-### Models Available
+- The web-search role shows a **free-tier usage panel** with a quota that resets at **midnight US/Pacific**; limits and per-key cooldowns are handled automatically
+- A **free-tier toggle** on cards enables per-call pacing for rate-limited free plans
 
-| Purpose | Recommended Model |
-|---------|-------------------|
-| Embeddings | text-embedding-3-small |
-| Text Generation | gpt-4o-mini |
-| Chat | gpt-4o-mini |
+## Where the Money Goes
 
-### Costs
-
-Pay-per-use based on tokens:
-- Embeddings: ~$0.02 per million tokens
-- Text: ~$0.15-$3.00 per million tokens
-- Chat: ~$0.15-$15.00 per million tokens
-
-### Pros/Cons
-
-| Pros | Cons |
-|------|------|
-| Best quality | Costs money |
-| Most reliable | Data sent to cloud |
-| Largest context windows | Rate limits |
+- **AI Spend** (`/admin/ai/spend`) — measured usage, with per-call cost metering for **OpenRouter** (billed) and **Z.AI** (estimated)
+- **Cost estimate** (`/admin/ai/estimate`) — a projection from current configuration; unpriceable models are shown as unknown, never as $0
 
 ---
 
-## Ollama
-
-Run AI models locally on your own hardware.
-
-### Prerequisites
-
-- Ollama installed ([ollama.ai](https://ollama.ai))
-- Sufficient RAM (8GB+ recommended)
-- GPU recommended for speed
-
-### Setup
-
-1. Install Ollama
-2. Pull required models:
-   ```bash
-   ollama pull nomic-embed-text
-   ollama pull llama3.2
-   ```
-3. In Aperture, select "Ollama" provider
-4. Enter URL: `http://host.docker.internal:11434` (Docker) or `http://localhost:11434`
-5. Test and save
-
-### Models
-
-| Purpose | Recommended Model |
-|---------|-------------------|
-| Embeddings | nomic-embed-text |
-| Text | llama3.2, mistral |
-| Chat | llama3.2, mistral |
-
-### Context Window
-
-Ollama default is 4096 tokens. Aperture automatically adjusts batch sizes to fit.
-
-### Pros/Cons
-
-| Pros | Cons |
-|------|------|
-| Free after setup | Slower than cloud |
-| Data stays local | Requires hardware |
-| No rate limits | Smaller context windows |
-
----
-
-## Groq
-
-High-speed cloud inference.
-
-### Setup
-
-1. Get API key from [console.groq.com](https://console.groq.com)
-2. Select "Groq" provider in Aperture
-3. Enter API key
-4. Test and save
-
-### Models
-
-| Purpose | Recommended Model |
-|---------|-------------------|
-| Text | llama3-8b-8192 |
-| Chat | llama3-70b-8192 |
-
-### Note
-
-Groq doesn't provide embeddings. Use with OpenAI for embeddings + Groq for text generation.
-
-### Pros/Cons
-
-| Pros | Cons |
-|------|------|
-| Very fast | No embedding models |
-| Free tier available | Rate limits |
-
----
-
-## Anthropic
-
-Claude models from Anthropic.
-
-### Setup
-
-1. Get API key from [console.anthropic.com](https://console.anthropic.com)
-2. Select "Anthropic" provider
-3. Enter API key
-4. Test and save
-
-### Models
-
-| Purpose | Recommended Model |
-|---------|-------------------|
-| Text | claude-3-haiku |
-| Chat | claude-3-sonnet |
-
-### Note
-
-Anthropic doesn't provide embeddings. Use with OpenAI for embeddings.
-
----
-
-## Google AI
-
-Google's Gemini models.
-
-### Setup
-
-1. Get API key from Google AI Studio
-2. Select "Google AI" provider
-3. Enter API key
-4. Test and save
-
-### Models
-
-| Purpose | Recommended Model |
-|---------|-------------------|
-| Embeddings | gemini-embedding-001 |
-| Text | gemini-1.5-flash |
-| Chat | gemini-1.5-pro |
-
----
-
-## DeepSeek
-
-Cost-effective Chinese AI provider.
-
-### Setup
-
-1. Get API key from DeepSeek
-2. Select "DeepSeek" provider
-3. Enter API key
-4. Test and save
-
-### Models
-
-| Purpose | Recommended Model |
-|---------|-------------------|
-| Text | deepseek-chat |
-| Chat | deepseek-chat |
-
----
-
-## OpenAI-Compatible
-
-For custom endpoints that implement OpenAI's API format.
-
-### Setup
-
-1. Select "OpenAI Compatible" provider
-2. Enter your custom base URL
-3. Enter API key (if required)
-4. Specify model names manually
-5. Test and save
-
-### Use Cases
-
-- Self-hosted LLMs with OpenAI-compatible API
-- Corporate AI endpoints
-- Other providers with compatible APIs
-
----
-
-## Multi-Provider Setup
-
-You can use different providers for different purposes:
-
-| Purpose | Provider Selection |
-|---------|-------------------|
-| **Embeddings** | OpenAI (best quality) or Google AI |
-| **Text Generation** | Any provider |
-| **Chat** | Any provider |
-| **Exploration** | Any provider |
-
-Configure each in the respective sections.
-
----
-
-## Testing Connection
-
-After configuring:
-
-1. Click **Test Connection**
-2. Aperture attempts to:
-   - Validate API key
-   - Check model availability
-   - Verify endpoint is reachable
-3. Green = success, Red = failure with error details
-
----
-
-## Troubleshooting
-
-### "Invalid API key"
-
-- Check key is correct
-- Verify account is active
-- Ensure key has required permissions
-
-### "Model not found"
-
-- Model name may be wrong
-- Model may not be available on your plan
-- For Ollama, ensure model is pulled
-
-### "Rate limited"
-
-- Reduce job batch sizes
-- Upgrade API tier
-- Add delay between requests
-
-### "Timeout"
-
-- Ollama may need more time
-- Check network connectivity
-- Increase timeout settings if available
-
----
-
-**Previous:** [Seerr Integration](seerr.md) | **Next:** [Embedding Models](embedding-models.md)
+**Related:** [Chat models](chat-models.md) · [Embedding models](embedding-models.md) · [API errors](api-errors.md)

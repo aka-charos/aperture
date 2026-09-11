@@ -6,7 +6,7 @@ Configure path mappings between Aperture and your media server for symlinks and 
 
 ## Accessing Settings
 
-Navigate to **Admin → Settings → Setup → Media Server** (File Locations section)
+Admin console → **Library** → **File locations** (`/admin/library/paths`).
 
 ---
 
