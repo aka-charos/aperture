@@ -2237,3 +2237,69 @@ Six rules.
 6. **The SELECTION is shared and the RENDERING is not.** `selectAnalysisGrounding` is one pure function pinned by `grounding.test.ts`; the recommender renders indented blocks and `enrichCardReasons` renders inline `— key: value` clauses, because those are two prompt shapes. Sharing selection is what matters — it is where the spoiler and length rules live. The rule *text* is deliberately written twice for the same reason (`buildAnalysisRules` speaks of one media type; the chat list is mixed), with a comment at each site saying the substance may not drift.
 
 One query per batch, not per title, in both pipelines — the explanation generators already work in batches of up to ten and a per-pick lookup would put ten round trips inside each.
+
+
+## F-122
+
+**A rule the model can satisfy while producing the behaviour the rule exists to prevent is not a rule yet.** Added 2026-09-11.
+
+**Where this came from.** The analysis bench ([F-117](#f-117)) was used for the thing it was built for: one film, one prompt, several models. DeepSeek V4.1 Flash came back with output that is, on content, the best this prompt has produced — it names Joshua Raymond Lee, Arseni Khachaturan and Daniel Pemberton rather than "the creative team", it drops a question the sources cannot answer instead of padding it, and it gives away no endings. It also diverged from the prompt in three visible ways, and reading those against `prompt.ts` showed **two of them were gaps in the prompt rather than disobedience**, and the third was a rule the product had grown out of.
+
+**That distinction is the whole entry.** "The model ignored rule N" and "rule N does not say what we think it says" have opposite fixes, and only one of them is worth a version bump. Three of the four corrections below name the failing phrasing verbatim — which reads as over-specification and is not, because in each case the abstract rule was already there and had already failed.
+
+### 1. "the sources" is not a citation
+
+Roughly ten instances across two analyses: *"the sources describe it as"*, *"the works the sources put behind it"*, *"The sources do not agree on what this amounts to"*, *"the sources tie the imagery directly to the bhavacakra"*.
+
+`RULES[6]` read *"Do not cite, number or link the sources in your prose"*. Every one of those phrasings satisfies it — no number, no link, nothing resembling a citation. The rule forbade the **form** of a citation and the behaviour is the **act** of pointing at the retrieval, which is a different thing and is worse for a reader: an article that keeps naming its own research apparatus reads as a summary of what was found rather than as an account of the film.
+
+So the rule now names them: *no "the sources say", "the sources describe", "reportedly", "according to reports"*. The alternative it offers is not new — `RULES[4]` already asks for the names the sources give — it is stated here because a prohibition with no stated alternative is answered by dropping the sentence.
+
+### 2. The circumstances question was attracting reception
+
+One analysis's production-context run covered a marketing-versus-film mismatch, months of online speculation, and objections from people affected by real events. The model **said so in the paragraph itself**: *"These are reception conditions rather than matters of craft, but they changed the frame the film arrived in."*
+
+Nothing was disobeyed. `CIRCUMSTANCES_QUESTION` asks about *"constraints or controversies that changed what it became"*, which genuinely invites a controversy, and its negative list ([F-064](#f-064)'s second guard) names only production trivia — budgets, schedules, crew counts, release dates. Reception was the one large category the question neither asked for nor excluded, and it is precisely the category an encyclopaedic source block is full of.
+
+The cost is a **duplicate**: whatever lands here is answered again, better, by `DISPUTE_QUESTION` two runs down, so the article spends two of its five sections on the same material.
+
+The third guard follows `TRADITION_QUESTION`'s pattern rather than `CIRCUMSTANCES_QUESTION`'s own: a **mechanical test** — *would the finished work be different if this had not happened* — instead of another list of excluded nouns. A list can always be walked around; the test separates a production constraint from a reaction to the finished thing without asking for the judgement the model has just been shown not to make.
+
+### 3. Rule 3 changed direction, and only one sentence of it was false
+
+The output arrived cleanly sectioned, one question per run, which `RULES[2]` explicitly forbade: *"Do not write one paragraph per question."*
+
+Version 5 wrote that sentence to stop the questions being a form filled in one paragraph each, and **that reasoning still holds** — it is not what DeepSeek produced either, which gave `work` four paragraphs and `tradition` one, varying with the material. But the rule also forbids the shape the product has since grown into, and three consumers now prefer it:
+
+- `TitleAnalysis.tsx` renders a heading per labelled run ([F-116](#f-116)), so a merged run gets a heading naming two things.
+- `selectAnalysisGrounding` ([F-121](#f-121)) picks `work` and `tradition` by label, and emits the same text twice when one run carries both.
+- The assistant's `getTitleAnalysis` ([F-064](#f-064)) widens its `spoilerRisk` block to the whole merged run, hiding more than the spoiler-shaped half.
+
+So the false sentence is gone, merging stays permitted, and the new constraint is **adjacency**: a question may take as many paragraphs as it has material for, but not paragraphs scattered apart from one another. That is the property all three consumers actually need — a question's answer must be findable as one run — and scattering is exactly what a model does when told to write continuous prose across a question list.
+
+**Why touch it at all, when the model that exposed it ignores it harmlessly.** The rule's cost is paid by *other* models. One told to merge into continuous prose can return a single unlabelled block, which turns grounding off entirely (no map, `selectAnalysisGrounding` returns `[]`) and gives the panel one unheaded slab. The bench exists to find out which models those are.
+
+### 4. Length was following the source block, which is a licence
+
+`RULES[7]` read *"Length follows the work and the sources."* With `analysisMaxSourceChars` at 64,000 — about 16,000 tokens of material — the second half reads as permission to write at the size of the block, and the analyses ran past 1,100 words. It now says the work only, keeps the existing 200/900 anchors, and states outright what a long block mostly is: plot summary, cast lists, and the same facts repeated across pages.
+
+**`max_tokens` is not the lever and never was.** A token ceiling does not shorten an answer, it truncates one — and `findResponseProblem` rejects `finishReason: 'length'` as `truncated` and **throws rather than storing** ([F-064](#f-064)), so lowering `analysisMaxOutputTokens` to shape length buys failed titles, not brief ones. Length is shaped in the prompt or not at all.
+
+### What was NOT wrong, and was checked before changing anything
+
+- **The section headings are ours.** "Form and Style", "Lineage and Influence", "Stated Intent", "Production Context", "Critical Debate" are `mediaDetail.analysis.section.*` rendered by `AnalysisSection`. `RULES[3]`'s "no headings" is not being broken — reading a rendered panel as model output is the easy mistake here, and it would have produced a correction to a rule that was already being followed.
+- **A missing section is correct.** One analysis has no Stated Intent run, which is `RULES[5]` working.
+- **Question order was right** — both samples ran work, tradition, intent, circumstances, dispute, the version 7 order.
+
+### Things considered and rejected
+
+- **Sampling penalties for the "the sources" tic.** `frequency_penalty` and `repetition_penalty` punish every repeated token, including the crew names `RULES[4]` demands. `logit_bias` is surgical and tokenizer-specific, and this role is a free choice among ~40 models.
+- **Multi-round.** DeepSeek's own guide is "append the prior messages and resend" — there is no server-side memory — so five questions in five rounds means resending the source block five times, roughly 5× the input tokens per title across a whole library, and it would destroy the single line of thought `RULES[2]` exists to protect.
+
+### Cost and status
+
+Bumping `ANALYSIS_PROMPT_VERSION` 7 → 8 retires every stored row, which is the second full re-analysis inside a week. It is the right call for the same reason version 7's was: the faults are **in the prose**, so a corrected prompt with a stale version number applies to nothing already written, and `isAnalysisStale` is what surfaces the rewrite affordance at all.
+
+**Pinned by `prompt.test.ts`** — five new tests asserting each clause is present, plus that the deleted "one paragraph per question" sentence stays deleted, because re-adding it is as much a regression as dropping the replacement.
+
+**Unverified against a model.** The prompt renders and reads correctly and the suite passes, but no analysis has been generated on version 8: this machine has no database and no provider. The first bench run should be read for three things — no "the sources" phrasing anywhere in the prose, a production-context run about production rather than reception, and length back inside the 200–900 band.

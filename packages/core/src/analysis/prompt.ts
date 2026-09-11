@@ -57,8 +57,14 @@
  *    reports, and dispute moves to last so the reading runs work, then making,
  *    then reception. Every stored row is retired because the rows themselves
  *    are what carry the leak.
+ * 8: the prose stops pointing at its own retrieval ("the sources describe it
+ *    as"), the circumstances question stops attracting reception, one question
+ *    may take as many paragraphs as it has material but must keep them
+ *    together, and length follows the work rather than the size of the source
+ *    block. Every stored row is retired for the same reason as 7 - the tic is
+ *    in the prose, so only a rewrite removes it.
  */
-export const ANALYSIS_PROMPT_VERSION = 7
+export const ANALYSIS_PROMPT_VERSION = 8
 
 /** Reception figures, passed as calibration only. All optional. */
 export interface ReceptionContext {
@@ -219,10 +225,24 @@ interface AnalysisQuestion {
  * attract it when the sources are encyclopaedic. "Left a mark on the work" is
  * the test, and the negative list is there because a budget figure reads like
  * an answer to it while being nothing of the kind.
+ *
+ * THE THIRD GUARD FENCES OUT RECEPTION, added in version 8. Measured on a live
+ * DeepSeek analysis, this question was answered with a marketing-versus-film
+ * mismatch, months of online speculation and who objected to the film after
+ * release - and the model said so in the paragraph itself: "These are reception
+ * conditions rather than matters of craft." Nothing was disobeyed. "Constraints
+ * or controversies that changed what it became" genuinely invites a
+ * controversy, and the negative list named only production trivia, so reception
+ * was the one large category the question neither asked for nor excluded. The
+ * cost is a duplicate: whatever lands here is then answered again, better, by
+ * the dispute question two paragraphs down. The closing sentence is a
+ * MECHANICAL test in the shape TRADITION_QUESTION already uses - would the
+ * finished work be different - which separates a production constraint from a
+ * reaction to the finished thing without asking for a judgement.
  */
 const CIRCUMSTANCES_QUESTION: AnalysisQuestion = {
   id: 'circumstances',
-  text: 'What circumstances of its making or first release left a mark on the work - how it was produced, the form it was originally shown in, constraints or controversies that changed what it became? Facts that did not change the work - budgets, shooting schedules, crew and extras counts, release dates - are not answers.',
+  text: 'What circumstances of its making or first release left a mark on the work - how it was produced, the form it was originally shown in, constraints or controversies that changed what it became? Facts that did not change the work - budgets, shooting schedules, crew and extras counts, release dates - are not answers. Neither is how it was received: marketing, online discussion and who objected to it after release belong to the disagreement question, not this one. Ask whether the finished work would be different if this had not happened.',
 }
 
 /**
@@ -395,15 +415,35 @@ const SOURCED_RULE =
 const GROUNDED_RULE =
   'Ground every claim in something you actually retrieved. Prefer critics, filmmaker interviews and film scholarship over aggregators, listicles and marketing copy. Invent nothing: no production history, festival history or reception you cannot source.'
 
+/**
+ * THREE OF THESE NAME THE FAILING PHRASING VERBATIM, which reads as
+ * over-specification and is not. Each one replaced an abstract rule that was
+ * already there and had already failed: "do not cite the sources" did not stop
+ * "the sources describe it as", because that is not a citation; "length follows
+ * the work and the sources" was read as permission to write at the length of
+ * the source block. A rule the model can satisfy while producing the behaviour
+ * the rule exists to prevent is not a rule yet.
+ *
+ * RULE 3 IS THE ONE THAT CHANGED DIRECTION. Version 5 wrote "do not write one
+ * paragraph per question" to stop the questions being a form filled in one
+ * paragraph each, and that reasoning still holds - but it also forbade the
+ * shape the product has since grown into. The panel heads each labelled run
+ * (./segments.ts), ./grounding.ts selects by label, and the assistant widens a
+ * spoiler gate around a merged run: all three read better when a question's
+ * answer is a findable block. So the false sentence is gone and merging stays
+ * permitted, with ADJACENCY as the new constraint - scattering one question
+ * across non-consecutive paragraphs is what those three consumers cannot
+ * handle, and it is a thing a model does when told to write continuous prose.
+ */
 const RULES = [
   'Describe how it works, never what happens in it. No third-act or ending discussion. Someone who has not seen it must be able to read this safely.',
   'Match your register to the work. A stunt-driven action picture has real craft in its staging and choreography, and that is a legitimate subject - write about it as what it is. Do not apply art-cinema vocabulary to a genre entertainment.',
-  'The questions are what to cover and in what order, not a form to fill in. Do not write one paragraph per question. Merge the ones that belong together and let the whole read as continuous prose with a single line of thought.',
+  'The questions are what to cover and in what order, not a form to fill in. Give a question as many paragraphs as the sources support, and none to a question they do not. Two questions may share a paragraph when they genuinely belong together, but do not scatter one question across paragraphs that are not next to each other. Let the whole read as continuous prose with a single line of thought.',
   'Write in short paragraphs of three or four sentences, separated by a blank line. Keep each sentence to one idea and do not chain clauses with semicolons - if a sentence carries two ideas, make it two sentences. Plain prose only in the analysis itself: no headings, bullet points, numbered lists or bold text.',
   'Be specific. Name the people the sources name - the director, the writer, the cinematographer, whoever is credited with the choice you are describing - rather than writing "those behind the project" or "the creative team". Cut any sentence whose only content is that the work sits in a tradition, extends one, or hopes to influence something: say what and how, or say nothing.',
   'Answer only what the sources genuinely support. It is normal for two or three of these questions to have no answer, and dropping them is the correct outcome rather than a gap to fill. If none of them do, say so in two sentences and stop.',
-  'Do not cite, number or link the sources in your prose, and do not quote the reception figures back.',
-  'Length follows the work and the sources. Some support 900 words. Many support 200.',
+  'Do not cite, number or link the sources in your prose, and do not quote the reception figures back. Never refer to the source documents as a thing - no "the sources say", "the sources describe", "reportedly", "according to reports". Write the claim as a fact about the work, or name the critic or publication that made it.',
+  'Length follows the work, not the amount of source text. Many titles support 200 words, and 900 is the most any of them support. A long source block is not a reason to write more - most of it is plot summary, cast lists and the same facts repeated across pages.',
 ]
 
 /**

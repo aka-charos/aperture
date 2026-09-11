@@ -9,7 +9,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { buildAnalysisQuery, buildAnalysisPrompt, distinctOriginalTitle } from './prompt.js'
+import {
+  ANALYSIS_PROMPT_VERSION,
+  buildAnalysisQuery,
+  buildAnalysisPrompt,
+  distinctOriginalTitle,
+} from './prompt.js'
 import type { AnalysisSubject } from './prompt.js'
 
 const subject = (over: Partial<AnalysisSubject> = {}): AnalysisSubject => ({
@@ -86,6 +91,57 @@ test('a non-Latin original title is kept', () => {
     distinctOriginalTitle(subject({ title: 'Drive My Car', originalTitle: 'ドライブ・マイ・カー' })),
     'ドライブ・マイ・カー'
   )
+})
+
+/**
+ * The four version-8 corrections, pinned because nothing else can see them.
+ *
+ * Each one exists because an abstract rule was already present and did not
+ * catch the behaviour - so these are not paraphrases of a rule above them, they
+ * are the specific sentence that does the work, and an edit that tidies one
+ * away restores a fault this file has already paid for. The assertions are
+ * fragments rather than whole strings on purpose: the surrounding rule is free
+ * to be rewritten, the clause is not free to disappear.
+ */
+test('version 8 forbids pointing at the retrieval, not merely citing it', () => {
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  assert.ok(p.includes('Never refer to the source documents as a thing'), p)
+  assert.ok(p.includes('"the sources describe"'), p)
+})
+
+test('version 8 fences reception out of the circumstances question', () => {
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  assert.ok(p.includes('Neither is how it was received'), p)
+  assert.ok(
+    p.includes('Ask whether the finished work would be different if this had not happened.'),
+    p
+  )
+})
+
+// The half of rule 3 that had to go, and the half that replaced it. Both are
+// asserted, because re-adding the old sentence is as much a regression as
+// dropping the new one - see the comment above RULES.
+test('version 8 lets a question take several paragraphs, but keeps them together', () => {
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  assert.ok(!p.includes('Do not write one paragraph per question'), p)
+  assert.ok(p.includes('Give a question as many paragraphs as the sources support'), p)
+  assert.ok(
+    p.includes('do not scatter one question across paragraphs that are not next to each other'),
+    p
+  )
+})
+
+test('version 8 stops the size of the source block licensing length', () => {
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  assert.ok(p.includes('Length follows the work, not the amount of source text'), p)
+  assert.ok(p.includes('A long source block is not a reason to write more'), p)
+})
+
+// The bump is what retires every stored row, so it is the half of the change
+// that actually reaches readers - a corrected prompt with a stale version
+// number silently applies to nothing already written.
+test('the prompt version carries the version-8 corrections', () => {
+  assert.ok(ANALYSIS_PROMPT_VERSION >= 8, String(ANALYSIS_PROMPT_VERSION))
 })
 
 test('the prompt names the original title, and only when there is one', () => {
