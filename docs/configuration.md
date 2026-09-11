@@ -81,7 +81,7 @@ What Emby Sees (automatically):
 ```yaml
 services:
   app:
-    image: ghcr.io/aka-charos/aperture:latest
+    image: ghcr.io/aka-charos/aperture:dev
     container_name: aperture
     user: root
     environment:

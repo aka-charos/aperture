@@ -53,7 +53,7 @@ services:
     #     ipv4_address: 192.168.1.201
 
   app:
-    image: ghcr.io/dgruhin-hrizn/aperture:latest
+    image: ghcr.io/aka-charos/aperture:dev
     container_name: aperture
     # Run as root to avoid permission issues with Synology's ACLs
     user: root
