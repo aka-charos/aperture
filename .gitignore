@@ -59,3 +59,6 @@ test-results/
 
 # User uploads
 apps/api/uploads/
+
+# ZCode session scratch
+.zcode/
