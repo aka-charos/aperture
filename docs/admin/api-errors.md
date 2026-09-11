@@ -1,249 +1,41 @@
 # API Errors
 
-Understanding and resolving integration error alerts.
+How integration failures surface to admins, and how to clear them.
 
 ![Admin Settings - Integrations](../images/admin/admin-settings-setup-integrations.png)
 
-## Accessing Errors
+## Where It Appears
 
-Error alerts appear:
-- In Admin → Settings → Integrations
-- At the top of relevant settings pages
-- In job logs
+An **error alert** mounts inside the admin shell and shows only on **Integrations** pages, listing the most recent failures (up to 5) with a detected-at timestamp and an indicator chip elsewhere in the shell. It's UI-only — no email or webhook notification.
 
----
+## Covered Providers
+
+Every integration client reports structured failures to one sink:
+
+**OpenAI, Google (Gemini), Tavily, fastCRW, TMDb, Trakt, MDBList, OMDb, LLDAP**
+
+Each provider's client classifies failures — so a message is specific (e.g. OMDb answers some errors as HTTP 200 with an error body; fastCRW reports errors in the message before the status). Seerr failures are not part of this sink; they surface in Seerr's own dashboard.
 
 ## Error Types
 
-### Authentication Errors
+| Type | Presentation |
+|------|--------------|
+| **Auth** (red) | Invalid or revoked key |
+| **Rate limit / quota limit** (amber) | Throttling or exhausted quota — shows a **reset countdown** where the provider reports one |
+| **Outage** (blue) | Provider unreachable / server errors |
 
-| Indicator | Meaning |
-|-----------|---------|
-| **Severity:** Error | Critical, needs action |
-| **Icon:** 🔴 | Red alert |
-| **Cause:** Invalid API key | Expired credentials |
+Dismissal-aware: alerts can be dismissed per provider, and a **successful connection test** auto-clears auth/outage alerts for that provider. Quota errors are **never auto-cleared** — a test passing doesn't mean the quota reset.
 
-**Actions Required:**
-1. Check API key is correct
-2. Verify account is active
-3. Generate new key if needed
-4. Update in Aperture settings
+## Retention
 
-### Rate Limit Errors
+- Alerts stop displaying after **7 days** and are purged after **30** (a manual cleanup action exists on the errors API)
+- Dismissed rows are deleted after 7 days
+- Errors are informational — jobs keep their own retry/lockout behavior regardless
 
-| Indicator | Meaning |
-|-----------|---------|
-| **Severity:** Warning | Temporary limitation |
-| **Icon:** 🟡 | Yellow alert |
-| **Cause:** Too many requests | Quota exceeded |
+## What To Do
 
-**Actions:**
-1. Wait for rate limit reset
-2. Reduce request frequency
-3. Upgrade API tier if persistent
-
-### Service Outage Errors
-
-| Indicator | Meaning |
-|-----------|---------|
-| **Severity:** Info | External issue |
-| **Icon:** 🔵 | Blue alert |
-| **Cause:** Service unavailable | Server errors (500, 502, etc.) |
-
-**Actions:**
-1. Wait for service recovery
-2. Check service status page
-3. Alert auto-dismisses on recovery
+Each alert carries an action button where one applies (Check Settings / Learn More / Upgrade), deep-linking to the right integration page. Fix, **Test** on the integration card, and the alert clears; if the failure was quota, wait for the reset.
 
 ---
 
-## Error Alert Display
-
-### What's Shown
-
-- Service name (TMDb, OMDb, etc.)
-- Error type
-- Error message
-- Timestamp
-- Recommended action
-
-### Alert Components
-
-```
-┌─────────────────────────────────────────┐
-│ 🔴 TMDb Authentication Error            │
-│                                         │
-│ Invalid API key. Please check your      │
-│ configuration.                          │
-│                                         │
-│ 2025-01-15 14:30:22           [Dismiss] │
-└─────────────────────────────────────────┘
-```
-
----
-
-## Auto-Dismiss Behavior
-
-### Service Outage Recovery
-
-When a service recovers:
-1. Aperture tests connection
-2. If successful, alert auto-clears
-3. No manual dismissal needed
-
-### When Auto-Dismiss Occurs
-
-- **Test Connection** clicked and succeeds
-- Job completes successfully
-- Background health check passes
-
----
-
-## Manual Dismissal
-
-### Dismissing Alerts
-
-Click **Dismiss** or **X** on the alert.
-
-### When to Dismiss
-
-- Error was investigated
-- Issue was resolved
-- False positive
-- Intentionally disabled integration
-
-### Retention
-
-Dismissed alerts are:
-- Removed from UI immediately
-- Cleaned from database after 7 days
-- Not counted in error totals
-
----
-
-## Per-Service Errors
-
-### TMDb Errors
-
-| Error | Cause | Fix |
-|-------|-------|-----|
-| 401 Unauthorized | Invalid API key | Update key |
-| 429 Rate Limited | Too many requests | Wait, space out jobs |
-| 503 Service Unavailable | TMDb down | Wait for recovery |
-
-### OMDb Errors
-
-| Error | Cause | Fix |
-|-------|-------|-----|
-| Invalid API key | Key not activated | Verify email |
-| Request limit reached | Daily limit hit | Wait until midnight UTC |
-| Movie not found | No match in OMDb | Normal for some content |
-
-### Trakt Errors
-
-| Error | Cause | Fix |
-|-------|-------|-----|
-| Invalid credentials | Client ID/Secret wrong | Reconfigure in Aperture |
-| Token expired | User auth expired | User re-authenticates |
-| Rate limited | Too many requests | Wait 5 minutes |
-
-### MDBList Errors
-
-| Error | Cause | Fix |
-|-------|-------|-----|
-| 401 Unauthorized | Invalid API key | Update key |
-| List not found | List deleted or private | Select different list |
-
-### Seerr Errors
-
-| Error | Cause | Fix |
-|-------|-------|-----|
-| Connection refused | Wrong URL | Check URL and port |
-| Unauthorized | Invalid API key | Update key |
-| User not found | User mapping issue | Check user configuration |
-
----
-
-## Error Logging
-
-### Where Errors Are Logged
-
-- Job logs (Admin → Jobs → History)
-- System logs (Docker container)
-- Database error records
-
-### Log Information
-
-Each error record includes:
-- Timestamp
-- Service name
-- Error code
-- Error message
-- Request details (sanitized)
-
----
-
-## Monitoring
-
-### Error Patterns
-
-Watch for:
-- Repeated authentication errors
-- Frequent rate limits
-- Persistent outages
-
-### Alerting
-
-Currently, alerts are:
-- Displayed in UI
-- Not sent via email/webhook
-
-Future: Email notifications (TBD feature)
-
----
-
-## Troubleshooting
-
-### Many Errors Suddenly
-
-1. Check service status (may be down)
-2. Verify nothing changed (API keys, etc.)
-3. Review recent configuration changes
-
-### Errors During Jobs
-
-1. Job may still complete partially
-2. Check job logs for specifics
-3. Retry affected items
-
-### Persistent Authentication Errors
-
-1. Delete and re-enter API key
-2. Verify account status
-3. Generate fresh API key
-4. Test connection after saving
-
----
-
-## Error Prevention
-
-### Best Practices
-
-| Practice | Why |
-|----------|-----|
-| Use dedicated API keys | Track Aperture usage |
-| Monitor quotas | Avoid hitting limits |
-| Space out jobs | Reduce request bursts |
-| Keep keys secure | Prevent revocation |
-
-### Quota Management
-
-| Service | How to Monitor |
-|---------|---------------|
-| TMDb | Dashboard at themoviedb.org |
-| OMDb | Usage shown on omdbapi.com |
-| OpenAI | Dashboard at platform.openai.com |
-
----
-
-**Previous:** [User Permissions](user-permissions.md) | **Next:** [Recommended Workflow](recommended-workflow.md)
+**Related:** [Integrations overview](integrations-overview.md) · [OMDb](omdb.md) · [AI providers](ai-providers.md)

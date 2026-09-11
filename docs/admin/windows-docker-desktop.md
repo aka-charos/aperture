@@ -402,11 +402,13 @@ docker-compose up -d
 3. Run: `docker logs aperture` for error details
 4. Verify all paths exist and are accessible
 
-### "SESSION_SECRET must contain at least 32 characters" error
+### SESSION_SECRET problems
 
-This is usually caused by special characters in your session secret, not the length!
+Two failure modes, both worth knowing:
 
-**The Problem:** YAML interprets `#` as the start of a comment. If your generated key contains `#`, everything after it is ignored.
+**1. Missing or short secret.** The app doesn't refuse to start — it falls back to a built-in default (`CHANGE-ME-IN-PRODUCTION-32-CHARS`) and logs a **startup warning**. Sessions then survive only until restart and are insecure; replace the default before real use.
+
+**2. Special characters truncating the value.** YAML interprets `#` as the start of a comment. If your generated key contains `#`, everything after it is ignored.
 
 For example, this key:
 ```yaml
@@ -419,7 +421,7 @@ YAML sees only `abc123xyz` (9 characters) because `#789qwerty...` is treated as 
 SESSION_SECRET: 'your-secret-key-here-with-any#special$chars!'
 ```
 
-Single quotes (`'`) or double quotes (`"`) both work.
+Single quotes (`'`) or double quotes (`"`) both work. (A quoted but genuinely too-short explicit value is still rejected.)
 
 ### STRM files not working
 

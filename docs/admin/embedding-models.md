@@ -1,214 +1,40 @@
 # Embedding Models
 
-Configure which AI model generates embeddings for similarity matching and recommendations.
+Configure which AI model generates the vectors behind similarity, recommendations, search, and the Media Graph — and manage the vector storage that results.
 
 ![Admin Settings - AI/LLM](../images/admin/admin-settings-ai-llm.png)
 
-## Accessing Settings
+## Where It Lives
 
-Navigate to **Admin → Settings → AI / LLM → Embedding Model**
+- The **Embeddings** role card: Admin console → **AI models** → **Providers & roles** (`/admin/ai/roles`)
+- Storage management: **AI models** → **Embeddings** (`/admin/ai/embeddings`)
 
----
+## Changing Models Is Additive, Not Destructive
 
-## What Are Embeddings?
+Point the Embeddings role at a different model and Aperture **starts a new vector set alongside the old ones** — nothing is deleted, and switching back to a previous model reuses its stored vectors. Each set shows coverage stats; old sets can be deleted individually to reclaim space.
 
-Embeddings are numerical representations of content:
+Supported vector widths: **256, 384, 512, 768, 1024, 1536, 2560, 3072, 4096** — each with movie, series, and episode tables. Custom embedding models are supported with a manual dimension entry; the **Test** button measures the real vector width and tells you whether a matching table exists.
 
-- Each movie/series is converted to a vector of numbers
-- Similar content has similar vectors
-- Enables "find similar" and recommendation features
+## The Post-Change Sequence
 
----
+After switching models, run (in order, via [Jobs](jobs-overview.md)):
 
-## Available Models
+1. `generate-movie-embeddings`
+2. `generate-series-embeddings` (embeds **series and episodes**)
+3. `refresh-embedding-centering`
+4. `rebuild-taste-profiles` — profiles are points in the *old* vector space until rebuilt
+5. `generate-movie-recommendations` / `generate-series-recommendations`
 
-### OpenAI Models
+The Embeddings page states the same sequence.
 
-| Model | Dimensions | Quality | Cost |
-|-------|------------|---------|------|
-| **text-embedding-3-small** | 1536 | Good | $0.02/1M tokens |
-| **text-embedding-3-large** | 3072 | Best | $0.13/1M tokens |
-| text-embedding-ada-002 | 1536 | Legacy | $0.10/1M tokens |
+## Episode Embeddings
 
-**Recommended:** `text-embedding-3-small` for most users.
+A toggle on the Embeddings page controls **episode-level vectors** (used by the assistant's episode search). Episodes are the largest embedding tables on a real library; the page shows storage stats, and disabling and deleting are separate actions.
 
-### Ollama Models
+## Legacy Tables
 
-| Model | Dimensions | Quality |
-|-------|------------|---------|
-| **nomic-embed-text** | 768 | Good |
-| mxbai-embed-large | 1024 | Better |
-
-**Recommended:** `nomic-embed-text` for local setups.
-
-### Google AI Models
-
-| Model | Dimensions | Quality |
-|-------|------------|---------|
-| **gemini-embedding-001** | 3072 | Good (default API output; flexible 128–3072) |
+A **Legacy embeddings** section appears only when pre-multi-dimension tables exist, offering a single **"Drop Legacy Tables"** action to reclaim their space.
 
 ---
 
-## Selecting a Model
-
-### Considerations
-
-| Factor | Small Model | Large Model |
-|--------|-------------|-------------|
-| Quality | Good enough | Best |
-| Cost | Lower | Higher |
-| Speed | Faster | Slower |
-| Storage | Less | More |
-
-### For Most Users
-
-Use `text-embedding-3-small`:
-- Best balance of quality and cost
-- Well-tested
-- Sufficient for library sizes up to 10,000+
-
-### For Quality Focus
-
-Use `text-embedding-3-large`:
-- Better similarity matching
-- More nuanced recommendations
-- Worth the extra cost for large libraries
-
-### For Local/Privacy
-
-Use `nomic-embed-text` with Ollama:
-- No API costs
-- Data stays local
-- Good quality for most use cases
-
----
-
-## Changing Models
-
-**Warning:** Changing embedding models requires regenerating ALL embeddings.
-
-### Process
-
-1. Select new model
-2. Click Save
-3. Run `generate-movie-embeddings` job
-4. Run `generate-series-embeddings` job
-5. Wait for completion (can take hours for large libraries)
-
-### Why Regeneration?
-
-Different models produce incompatible vectors:
-- Old embeddings can't be compared with new ones
-- All must use the same model
-- Partial regeneration causes matching failures
-
----
-
-## Dimensions
-
-Embedding dimension affects:
-
-| Aspect | Lower Dimensions | Higher Dimensions |
-|--------|------------------|-------------------|
-| Quality | Less nuanced | More detailed |
-| Storage | Smaller database | Larger database |
-| Search speed | Faster | Slightly slower |
-
-Aperture automatically handles dimension-specific storage.
-
----
-
-## Multi-Dimension Support
-
-Aperture supports multiple embedding dimensions:
-
-- Embeddings stored in dimension-specific tables
-- `embeddings_768`, `embeddings_1536`, `embeddings_3072`
-- Automatic table selection based on model
-
-This allows testing different models without data loss.
-
----
-
-## Embedding Content
-
-### What Gets Embedded
-
-For each movie/series:
-- Title
-- Overview/description
-- Genres
-- Keywords (if available)
-- Cast/crew highlights
-
-### Embedding Quality
-
-Better embeddings come from:
-- Complete metadata
-- Detailed descriptions
-- Accurate keywords
-
-Run enrichment jobs to improve metadata before embedding.
-
----
-
-## Monitoring
-
-### Generation Progress
-
-During embedding jobs:
-- Progress bar shows completion
-- Count of items embedded
-- Estimated time remaining
-
-### Storage Usage
-
-Check embedding storage:
-- Admin → Settings → System → Database
-- Shows embedding count and table sizes
-
----
-
-## Troubleshooting
-
-### "Model not available"
-
-- Verify API key is valid
-- Check model name is correct
-- Ensure provider supports embeddings
-
-### Generation Taking Too Long
-
-- Large libraries take time
-- Consider running overnight
-- Check for rate limiting
-
-### Poor Similarity Results
-
-- Verify same model used for all content
-- Check metadata quality
-- Consider higher-dimension model
-
----
-
-## Cost Estimation
-
-### OpenAI Embedding Costs
-
-| Library Size | text-embedding-3-small | text-embedding-3-large |
-|--------------|------------------------|------------------------|
-| 500 items | ~$0.10 | ~$0.65 |
-| 2,000 items | ~$0.40 | ~$2.60 |
-| 10,000 items | ~$2.00 | ~$13.00 |
-
-*Approximate, depends on description length.*
-
-### Local (Ollama)
-
-- No API costs
-- Hardware costs (electricity, GPU)
-- Time investment
-
----
-
-**Previous:** [AI Providers](ai-providers.md) | **Next:** [Text Generation Models](text-models.md)
+**Related:** [AI providers](ai-providers.md) · [Movie jobs](movie-jobs.md) · [Series jobs](series-jobs.md)

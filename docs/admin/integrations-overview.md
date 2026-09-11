@@ -1,214 +1,45 @@
 # Integrations Overview
 
-Aperture integrates with several external services to enhance metadata, enable rating sync, and power discovery features.
+Aperture connects to external services for metadata, ratings, requests, and AI grounding. Each integration is its own page in the admin console.
 
 ![Admin Settings - Integrations](../images/admin/admin-settings-setup-integrations.png)
 
-## Accessing Settings
+## Where Integrations Live
 
-Navigate to **Admin → Settings → Setup → Integrations**
+Admin console → **Integrations** — one page per service:
 
----
+| Integration | Page | What it provides |
+|-------------|------|------------------|
+| **TMDB** | `/admin/integrations/tmdb` | Metadata enrichment, posters, genre strips, gap analysis — the backbone |
+| **OMDb** | `/admin/integrations/omdb` | RT/Metacritic/IMDb scores, awards, plot |
+| **MDBList** | `/admin/integrations/mdblist` | Curated scores, streaming providers, a Top Picks source |
+| **Trakt** | `/admin/integrations/trakt` | Per-user rating sync + Discovery chart sources |
+| **Seerr** | `/admin/integrations/seerr` | Requests, issue reporting, Top Picks auto-request |
+| **LLDAP** | `/admin/integrations/lldap` | Email address import for users |
+| **n8n** | `/admin/integrations/n8n` | Webhook automation |
+| **Tavily** | `/admin/integrations/tavily` | Web search for the assistant's discovery turns |
+| **fastCRW** | `/admin/integrations/crw` | Self-hosted search/scrape for Title Analysis |
+| **Streaming (JustWatch)** | `/admin/integrations/streaming` | Streaming-chart discovery tab |
+| **Ratings Refresh** | `/admin/integrations/ratings-refresh` | Ongoing IMDb rating freshness |
 
-## Available Integrations
-
-| Integration | Purpose | Required |
-|-------------|---------|----------|
-| [Trakt](trakt.md) | Rating sync, watchlist sync | Optional |
-| [TMDb](tmdb.md) | Metadata enrichment | Recommended |
-| [OMDb](omdb.md) | Rotten Tomatoes, Metacritic scores | Optional |
-| [MDBList](mdblist.md) | Curated lists, Top Picks source | Optional |
-| [Seerr](seerr.md) | Discovery requests | Optional |
-
----
-
-## Integration Priority
-
-### Essential
-
-| Integration | Why |
-|-------------|-----|
-| **AI Provider** | Powers all AI features (configured in AI/LLM tab) |
-
-### Highly Recommended
-
-| Integration | Why |
-|-------------|-----|
-| **TMDb** | Best metadata source, keywords, collections |
-
-### Recommended
-
-| Integration | Why |
-|-------------|-----|
-| **OMDb** | RT and Metacritic scores for better filtering |
-| **Trakt** | Rating sync if users use Trakt |
-
-### Optional
-
-| Integration | Why |
-|-------------|-----|
-| **MDBList** | Only needed for MDBList-based Top Picks |
-| **Seerr** | Only needed for Discovery request feature |
-
----
-
-## Configuration Status
-
-Each integration shows status indicators:
-
-| Status | Meaning |
-|--------|---------|
-| ✓ Connected | Integration working |
-| ⚠ Warning | Configuration issue |
-| ✗ Not configured | API key missing |
-| 🔄 Testing | Connection test in progress |
-
----
-
-## API Error Alerts
-
-Integration errors are displayed prominently:
-
-### Error Types
-
-| Type | Severity | Action Needed |
-|------|----------|---------------|
-| **Authentication** | Error | Check/update API key |
-| **Rate Limit** | Warning | Wait for reset |
-| **Service Outage** | Info | Automatic recovery |
-
-### Auto-Dismiss
-
-Service outage alerts automatically clear when:
-- Connection test succeeds
-- Service recovers
-
-See [API Errors](api-errors.md) for details.
-
----
-
-## Integration Data Flow
-
-```
-Media Server → Aperture → TMDb (metadata)
-                       → OMDb (scores)
-                       → Trakt (ratings)
-                       → MDBList (rankings)
-                       → Seerr (requests)
-```
-
-### What Each Integration Provides
-
-**TMDb:**
-- Keywords and themes
-- Collections/franchises
-- Cast and crew details
-- Backdrop images
-
-**OMDb:**
-- Rotten Tomatoes critic score
-- Metacritic score
-- Awards information
-
-**Trakt:**
-- User ratings (bidirectional)
-- Watchlist sync
-- Discovery suggestions
-
-**MDBList:**
-- Curated movie/TV lists
-- Popularity rankings
-- Genre-specific lists
-
-**Seerr:**
-- Request management
-- Availability status
-- User request permissions
-
----
+Each card shows a green **Configured** chip once saved; most have an **enable switch**, so an integration is turned off by toggling — the key stays saved.
 
 ## Setup Order
 
-Recommended setup order for new installations:
+1. **Media server** first (Library group) — everything reads from it
+2. **TMDB** — gates genre strips, discovery tuning, and gap analysis
+3. **OMDb** — scores for filtering and taste-vs-crowd
+4. **AI models** (its own group) — required before embeddings and recommendations
+5. Everything else as needed
 
-1. **AI Provider** (required for core features)
-2. **TMDb** (enhances metadata immediately)
-3. **OMDb** (adds critic scores)
-4. **Trakt** (if users use Trakt)
-5. **MDBList** (if using for Top Picks)
-6. **Seerr** (if using Discovery)
+## Storage Note
 
----
+API keys are stored in the `system_settings` table **in plain text** (database file access should be trusted accordingly); they are redacted from logs and from the API responses that fill the admin forms.
 
-## API Key Management
+## When an Integration Breaks
 
-### Security
-
-- API keys are stored encrypted in the database
-- Never exposed in logs or UI after saving
-- Use service-specific keys (not personal)
-
-### Key Rotation
-
-To rotate an API key:
-1. Generate new key in the service
-2. Update in Aperture settings
-3. Test connection
-4. Revoke old key in the service
-
-### Rate Limits
-
-| Service | Typical Limits |
-|---------|----------------|
-| TMDb | 40 requests/10 seconds |
-| OMDb | 1,000/day (free), unlimited (paid) |
-| Trakt | 1,000/5 minutes |
-| MDBList | Varies by tier |
-
-Aperture respects rate limits and queues requests appropriately.
+Failures surface in the **[API errors](api-errors.md)** panel inside the admin shell — with an alert that lingers until dismissed or cleared by a successful connection test.
 
 ---
 
-## Troubleshooting
-
-### Integration Not Working
-
-1. Check API key is entered correctly
-2. Click **Test Connection**
-3. Review error message
-4. Check service status (may be down)
-
-### Rate Limited
-
-- Wait for rate limit reset
-- Check if job is making excessive requests
-- Consider upgrading API tier
-
-### Data Not Updating
-
-- Run enrichment job manually
-- Check job logs for errors
-- Verify integration is connected
-
----
-
-## Disabling Integrations
-
-To disable an integration:
-1. Clear the API key field
-2. Click Save
-3. Features depending on that integration become unavailable
-
-### Impact of Disabling
-
-| Integration | Impact When Disabled |
-|-------------|---------------------|
-| TMDb | No keyword/collection enrichment |
-| OMDb | No RT/Metacritic scores |
-| Trakt | No rating sync |
-| MDBList | Can't use MDBList for Top Picks |
-| Seerr | No request functionality |
-
----
-
-**Previous:** [File Locations](file-locations.md) | **Next:** [Trakt Integration](trakt.md)
+**Related:** [Media server](media-server.md) · [AI providers](ai-providers.md) · [API errors](api-errors.md)

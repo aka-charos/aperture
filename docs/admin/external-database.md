@@ -239,6 +239,8 @@ If you prefer to run migrations manually:
 
 ```bash
 DATABASE_URL="postgres://..." node scripts/migrate.mjs
+
+> **Note:** outside Docker, core rewrites a `@db:` host to `@localhost:` in `DATABASE_URL` (a convenience for the default compose setup). Set `DOCKER_ENV` in the container environment so your external host passes through untouched.
 ```
 
 ## Backups

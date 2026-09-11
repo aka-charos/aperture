@@ -1,397 +1,66 @@
 # Setup Wizard
 
-The Setup Wizard guides you through initial Aperture configuration in 11 steps. It appears automatically on first access or can be re-run from Admin Settings.
+The Setup Wizard guides initial Aperture configuration in 11 steps. It appears automatically on first access (from local-network addresses only) and can be re-run at any time via the **Re-run Setup Wizard** button pinned to the bottom of the admin nav column.
 
 ![Admin Overview](../images/admin/admin-overview.png)
 
-## Accessing the Wizard
+## Before You Start
 
-- **First time:** Automatically shown when accessing Aperture
-- **Re-run:** Admin → Settings → Setup → "Re-run Setup Wizard" button
+Have ready: your media server's URL and **API key** (Emby: Dashboard → Advanced → API Keys; Jellyfin: Dashboard → API Keys), a place on disk Aperture can write to that your media server can also read, and an **AI provider API key** (the wizard requires one — OpenAI is the default suggestion, but every provider catalog is offered).
 
----
+First-run access is **restricted to local-network addresses** until setup completes, so connecting from the server's own machine or LAN is expected. Admins re-running the wizard get an **exit button** so they can back out without changes; nothing is overwritten until you pass through a step, and returning to a re-run shows your current settings pre-filled.
 
-## Step 1: Restore (Optional)
+## The 11 Steps
 
-Restore from an existing backup if migrating or recovering.
+### 1. Restore
 
-### Options
+Optionally restore a [backup](backup-restore.md) from a previous instance instead of starting fresh — the fastest migration path. Skip to configure from scratch.
 
-| Option | Description |
-|--------|-------------|
-| **Upload backup** | Select a backup file from your computer |
-| **Select existing** | Choose from backups in the `/backups` volume |
-| **Skip** | Start fresh with no data |
+### 2. Connect
 
-### When to Use
+Media server **type** (Emby/Jellyfin), **URL**, and **API key**, plus:
 
-- Migrating Aperture to a new server
-- Recovering from data loss
-- Restoring a known-good state
+- **Discover Servers on Network** — UDP auto-discovery of Emby/Jellyfin instances on the LAN
+- **Allow passwordless login** — only for media servers that permit passwordless accounts; carries an exposure warning (see [Media server](media-server.md))
 
-### What Gets Restored
+**Test** verifies the credentials and shows the resolved server name.
 
-- All user data and preferences
-- Watch history
-- Ratings
-- Recommendations
-- Job schedules
-- Settings
+### 3. Libraries
 
-**Skip this step** if starting fresh.
+Per-library **enable switches** fetched from your server, grouped **Movies / TV**. Bulk controls — **Refresh**, **Enable All**, **Disable All** — live right here in the wizard. Everything disabled is invisible to Aperture (see [Libraries](libraries.md)).
 
----
+### 4. Paths
 
-## Step 2: Media Server Connection
+Where Aperture writes its output (`/aperture-libraries` inside the container) and the path **your media server** uses for the same folder. **Auto-Detect Paths** compares a sample file's path on both sides and computes the mapping — see [File locations](file-locations.md) for the manual version.
 
-Connect Aperture to your Emby or Jellyfin server.
+### 5. AI Recommendations
 
-### Configuration
+Output format per media type — **symlink vs STRM** switches (symlinks recommended; see [Output format](output-format.md)) — and the **library cover image** upload. Library *names* are not set here; they're templates under **Recommendations → Library naming**.
 
-| Field | Description |
-|-------|-------------|
-| **Server Type** | Emby or Jellyfin |
-| **Server URL** | Full URL including port (e.g., `http://192.168.1.100:8096`) |
-| **API Key** | Admin API key from your media server |
+### 6. Validate
 
-### Getting Your API Key
+Automatic checks, all required before Continue unlocks: **write access** (can Aperture create files?), **media access** (can the media server path see them?), **symlink support** (when symlinks are enabled), and **media-server reachability**. A failure here states which check and why — fix it before proceeding, or switch to STRM in step 5.
 
-**Emby:**
-1. Open Emby Dashboard
-2. Navigate to **Advanced → API Keys**
-3. Click **New API Key**
-4. Name it "Aperture"
-5. Copy the generated key
+### 7. Users
 
-**Jellyfin:**
-1. Open Jellyfin Dashboard
-2. Navigate to **Dashboard → API Keys**
-3. Click **Add**
-4. Name it "Aperture"
-5. Copy the generated key
+Import and enable users, toggling **Movies / Series** per user. The wizard **refuses to disable the last enabled admin**. Users can also be managed later (see [User management](user-management.md)).
 
-### Testing Connection
+### 8. Top Picks
 
-1. Enter your details
-2. Click **Test Connection**
-3. Green checkmark = success
-4. Red X = check URL and API key
+Enable [Top Picks](top-picks.md) and choose the per-media-type output — **library / collection / playlist** — with symlink toggles. Sources, windows, and auto-request are configured on the Top Picks admin page afterwards.
 
-### Troubleshooting
+### 9. AI / LLM
 
-| Issue | Solution |
-|-------|----------|
-| Connection refused | Check URL and port |
-| Unauthorized | Verify API key is correct |
-| Timeout | Check network/firewall |
-| SSL error | Use http:// or configure certificates |
+**Mandatory** — the wizard will not finish without it. Four roles must each have a provider, model, and key configured: **Embeddings**, **Chat**, **Text Generation**, and **Exploration**. The step renders as per-role cards (the same ones as [Providers & roles](ai-providers.md)); Continue stays disabled until all four are valid.
+
+### 10. Initial Jobs
+
+The wizard queues the kickoff pipeline — **11 jobs**: library syncs (movies, series), **watch-history syncs** (deliberately before embeddings), movie/series **embeddings**, movie/series **recommendations**, movie/series **library builds**, and optionally Top Picks. This means **recommendations already exist when the wizard finishes** — there is no separate "generate recommendations" step afterwards. Watch the jobs console if you want to see it work ([Jobs overview](jobs-overview.md)).
+
+### 11. Done
+
+A completion summary: created libraries, per-user recommendation counts, **skipped users ("no watch history")**, the schedules that were set, and which features just unlocked. From here, the [Post-setup checklist](post-setup-checklist.md) takes over.
 
 ---
 
-## Step 3: Source Libraries
-
-Select which libraries Aperture should analyze for recommendations.
-
-### Configuration
-
-Toggle ON/OFF for each library:
-
-| Library Type | What Happens When Enabled |
-|--------------|---------------------------|
-| **Movies** | Movies synced, embeddings generated, recommendations created |
-| **TV Shows** | Series synced, embeddings generated, recommendations created |
-
-### Best Practices
-
-- **Enable:** Main movie and TV libraries
-- **Disable:** Kids libraries (unless you want those recommendations)
-- **Disable:** Music videos, home videos, etc.
-
-### Multiple Libraries
-
-If you have multiple movie libraries (e.g., "Movies", "4K Movies"):
-- Enable all you want in recommendations
-- Aperture deduplicates automatically
-
----
-
-## Step 4: File Locations
-
-Configure path mappings for symlinks to work correctly.
-
-### The Challenge
-
-Aperture and your media server may see files at different paths:
-- Media server: `/mnt/Movies/Film.mkv`
-- Aperture container: `/media/Movies/Film.mkv`
-
-### Configuration
-
-| Setting | Description | Default |
-|---------|-------------|---------|
-| **Aperture Libraries Path** | Where media server sees Aperture's output | `/mnt/ApertureLibraries/` |
-| **Media Server Path Prefix** | Base path for media in media server | `/mnt/` |
-
-### Auto-Detection
-
-Click **Auto-Detect Paths** to automatically configure:
-1. Fetches sample file from media server
-2. Compares to Aperture's view
-3. Calculates correct prefix
-
-### Common Configurations
-
-**Unraid:**
-```
-Aperture Libraries Path: /mnt/ApertureLibraries/
-Media Server Path Prefix: /mnt/
-```
-
-**Synology:**
-```
-Aperture Libraries Path: /volume1/docker/aperture/libraries/
-Media Server Path Prefix: /volume1/
-```
-
-**Standard Docker:**
-```
-Aperture Libraries Path: /data/ApertureLibraries/
-Media Server Path Prefix: /data/
-```
-
-### Skip Option
-
-If using STRM files (not symlinks), path mapping is less critical. You can skip and adjust later.
-
----
-
-## Step 5: AI Recommendations
-
-Configure library naming and cover images.
-
-### Library Names
-
-Set default templates for AI recommendation libraries:
-
-| Template | Example Output |
-|----------|----------------|
-| `{{username}}'s AI Picks - {{type}}` | "John's AI Picks - Movies" |
-| `AI Recommendations for {{username}}` | "AI Recommendations for John" |
-
-### Available Merge Tags
-
-| Tag | Value |
-|-----|-------|
-| `{{username}}` | User's display name |
-| `{{type}}` | "Movies" or "TV Series" |
-| `{{count}}` | Number of recommendations |
-| `{{date}}` | Date of last generation |
-
-### Library Images
-
-Upload custom banner images (optional):
-
-| Library | Recommended Size |
-|---------|------------------|
-| AI Movies | 1920×1080 (16:9) |
-| AI Series | 1920×1080 (16:9) |
-
-Leave blank to use defaults.
-
----
-
-## Step 6: Validate
-
-Review and verify your output configuration.
-
-### Output Format Selection
-
-| Format | Description | Best For |
-|--------|-------------|----------|
-| **STRM** | Text files with streaming URLs | Universal compatibility |
-| **Symlinks** | Filesystem links to originals | Same filesystem setups |
-
-### Validation Checks
-
-The wizard verifies:
-- Path mappings are valid
-- Output directory is writable
-- Media server can access the output path
-
-### Fix Issues
-
-If validation fails:
-- Go back and adjust paths
-- Check Docker volume mounts
-- Verify permissions
-
----
-
-## Step 7: Users
-
-Select which users receive AI recommendations.
-
-### User List
-
-All users from your media server appear. For each user:
-
-| Toggle | Effect |
-|--------|--------|
-| **Movies** | Enable movie recommendations |
-| **Series** | Enable series recommendations |
-
-### Considerations
-
-- Users need **watch history** for recommendations to work
-- New users can be enabled later
-- Admin users can also receive recommendations
-
-### Bulk Actions
-
-- **Enable All:** Quick enable for all users
-- **Disable All:** Start with none enabled
-
----
-
-## Step 8: Top Picks (Optional)
-
-Configure global trending content libraries.
-
-### Enable/Disable
-
-Toggle Top Picks on or off. Can be configured in detail later.
-
-### Quick Configuration
-
-| Setting | Options |
-|---------|---------|
-| **Source** | Local watch data, MDBList, or Hybrid |
-| **Output** | Library, Collection, Playlist |
-| **Count** | Number of items (default: 50) |
-
-### Skip
-
-Top Picks is optional. Skip to configure later or leave disabled.
-
-See [Top Picks Configuration](top-picks.md) for full details.
-
----
-
-## Step 9: AI / LLM Setup
-
-Configure your AI provider and API key.
-
-### Provider Selection
-
-| Provider | Setup |
-|----------|-------|
-| **OpenAI** | API key from platform.openai.com |
-| **Ollama** | Local URL (http://host:11434) |
-| **Groq** | API key from groq.com |
-| **Others** | OpenAI-compatible endpoints |
-
-### OpenAI Setup
-
-1. Get API key from [platform.openai.com](https://platform.openai.com)
-2. Enter key in the field
-3. Click **Test Key**
-4. Green checkmark = success
-
-### Skip Option
-
-You can skip AI setup and configure later, but:
-- Embeddings won't generate
-- Recommendations won't work
-- AI features disabled
-
-### What AI Powers
-
-| Feature | Requires AI |
-|---------|-------------|
-| Embeddings | Yes |
-| Recommendations | Yes |
-| Explanations | Yes |
-| Encore chatbot | Yes |
-| Top Picks | No (uses watch data) |
-
----
-
-## Step 10: Initial Jobs
-
-Run first-time sync jobs with real-time progress.
-
-### Automatic Jobs
-
-The wizard runs these jobs in sequence:
-
-1. **Sync Movies** — Import movies from libraries
-2. **Sync Series** — Import TV series and episodes
-3. **Generate Movie Embeddings** — Create AI vectors
-4. **Generate Series Embeddings** — Create AI vectors
-5. **Sync Watch History** — Import viewing data
-
-### Progress Display
-
-Each job shows:
-- Real-time progress bar
-- Current status message
-- Time elapsed
-- Errors (if any)
-
-### Re-running Jobs
-
-If a job fails:
-- Click **Retry** on that job
-- Or skip and run manually later from Admin → Jobs
-
-### Duration
-
-First-time sync depends on library size:
-
-| Library Size | Approximate Time |
-|--------------|------------------|
-| Small (<500) | 5-15 minutes |
-| Medium (500-2000) | 15-45 minutes |
-| Large (2000+) | 45+ minutes |
-
-Embeddings are the slowest part.
-
----
-
-## Step 11: Complete
-
-Setup is finished! Review what was created.
-
-### Summary
-
-The wizard shows:
-- Libraries created
-- Users configured
-- Jobs scheduled
-- Next steps
-
-### What's Ready
-
-After completing setup:
-- Movies and series are synced
-- Embeddings are generated
-- Watch history is imported
-- Default job schedules are set
-
-### Next Steps
-
-1. **Generate Recommendations** — Run from Admin → Jobs
-2. **Build Libraries** — Creates virtual libraries in media server
-3. **Configure Schedules** — Adjust job timing as needed
-4. **Fine-tune Settings** — Explore Admin → Settings
-
-### Re-running the Wizard
-
-You can re-run the wizard anytime from Admin → Settings to:
-- Reconfigure media server
-- Change path mappings
-- Reset settings
-
----
-
-**Next:** [Post-Setup Checklist](post-setup-checklist.md)
+**Related:** [Media server](media-server.md) · [AI providers](ai-providers.md) · [Post-setup checklist](post-setup-checklist.md)

@@ -1,194 +1,49 @@
 # OMDb Integration
 
-Connect to the Open Movie Database (OMDb) for Rotten Tomatoes and Metacritic scores.
+Connect to the Open Movie Database (OMDb) for Rotten Tomatoes (Tomatometer, audience score, consensus), Metacritic, IMDb ratings/votes, awards, languages/countries, and longer plot text.
 
 ![Admin Settings - Integrations](../images/admin/admin-settings-setup-integrations.png)
 
 ## Accessing Settings
 
-Navigate to **Admin → Settings → Setup → Integrations**
-
----
-
-## What OMDb Provides
-
-| Data | Description |
-|------|-------------|
-| **Rotten Tomatoes Score** | Critic aggregate percentage |
-| **Metacritic Score** | Weighted critic average |
-| **Awards** | Oscar/Emmy information |
-| **Box Office** | Revenue data |
-
----
-
-## Why OMDb?
-
-Rotten Tomatoes and Metacritic don't offer public APIs. OMDb aggregates this data legally and provides it via API.
-
-### Score Types
-
-| Score | Scale | Meaning |
-|-------|-------|---------|
-| **Rotten Tomatoes** | 0-100% | Percentage of positive reviews |
-| **Metacritic** | 0-100 | Weighted average of reviews |
-
----
+Admin console → **Integrations** → **OMDb** (`/admin/integrations/omdb`).
 
 ## Getting an API Key
 
-### Free Tier
+Request a key at [omdbapi.com/apikey.aspx](https://www.omdbapi.com/apikey.aspx):
 
-1. Go to [omdbapi.com/apikey.aspx](https://www.omdbapi.com/apikey.aspx)
-2. Select **FREE! (1,000 daily limit)**
-3. Enter your email
-4. Verify email and get key
-
-### Paid Tiers
-
-| Tier | Daily Limit | Price |
-|------|-------------|-------|
-| Free | 1,000 | $0 |
-| Patreon Basic | 100,000 | $1/month |
-| Patreon Premium | Unlimited | $5/month |
-
-For larger libraries, consider a paid tier.
-
----
+| Tier | Cost | Quota | Aperture rate |
+|------|------|-------|---------------|
+| **Free** | $0 | **1,000 requests/day** | ~1 request/sec |
+| **Patron** | $1+/mo | **100,000/day** | **40 requests/sec** |
 
 ## Configuration
 
-1. Navigate to Admin → Settings → Setup → Integrations
-2. Find OMDb section
-3. Enter your **API Key**
-4. Click **Test Connection**
-5. Click **Save**
+| Setting | Description |
+|---------|-------------|
+| **API Key** | Masked once saved |
+| **Enable OMDb enrichment** | Master switch |
+| **Paid subscription** | **Toggle this if your key is paid** — raises the request rate to 40/sec. This is the single biggest backfill speed lever: at free-tier rate a 12,500-title library takes ~3.5 hours of pure OMDb time; at paid rate, minutes |
+
+**Test** verifies the key.
+
+## How It's Used
+
+- OMDb is fetched **inside the `enrich-metadata` job** (every 6 h by default) for every title that has an **`imdb_id`** — one request per title, then never again (an OMDb "not found" is recorded as attempted; an outage is retried later)
+- Adds: RT Tomatometer + audience + **consensus quote**, Metacritic, IMDb rating/votes, awards line, languages/countries, cinematography/music/editing credits, longer plot
+- Powers: Browse score filters, Watch Stats "Your Taste vs. the Crowd" (including **guilty pleasures**), detail-page rating badges
+
+## Failure Behavior (Worth Knowing)
+
+- OMDb answers **HTTP 401 for both an invalid key and an exhausted quota** — Aperture tells them apart from the response body and treats them differently
+- A **bad key latches for ten minutes** rather than burning one doomed request per library item; keys are trimmed on save and read
+- OMDb also reports some errors as **HTTP 200 with an error body** — those are parsed, not trusted
+- Failures surface in the [API errors](api-errors.md) panel under the OMDb provider; a successful **Test** clears auth/outage alerts (quota errors are never auto-cleared)
+
+## Rating Freshness
+
+OMDb is fetched **once per title**. Ongoing freshness (a rating that moves as votes accrue) is the separate **[Ratings Refresh](ratings-refresh.md)** integration.
 
 ---
 
-## Enrichment
-
-OMDb data is fetched during the `enrich-metadata` job:
-
-### What Happens
-
-1. Movies without RT/Metacritic scores identified
-2. OMDb queried for each
-3. Scores stored in database
-
-### Running Enrichment
-
-- **Automatic:** Every 6 hours (default)
-- **Manual:** Admin → Jobs → enrich-metadata → Run
-
----
-
-## Using Scores
-
-### Browse Filtering
-
-On the Browse page, users can filter by:
-- Minimum Rotten Tomatoes score
-- Minimum Metacritic score
-
-### Display
-
-Scores appear:
-- On movie/series detail pages
-- In list view mode
-- In Discovery cards
-
-### Recommendations
-
-Scores can influence recommendations:
-- Higher-rated content may rank higher
-- Depends on algorithm weight for "Rating"
-
----
-
-## Coverage
-
-### Movies
-
-OMDb has good coverage for:
-- Hollywood releases
-- International theatrical releases
-- Popular indie films
-
-Limited coverage for:
-- Direct-to-video releases
-- Very old films
-- Obscure titles
-
-### TV Series
-
-OMDb covers:
-- Major network shows
-- Popular streaming originals
-- Some cable series
-
-Limited for:
-- Web series
-- Foreign TV
-- Reality shows
-
----
-
-## Rate Limits
-
-### Free Tier
-
-- 1,000 requests per day
-- Resets at midnight UTC
-
-### Handling Limits
-
-If rate limited:
-- Job pauses until reset
-- Enrichment continues next day
-- No data loss
-
-### Monitoring Usage
-
-Check job logs for rate limit messages.
-
----
-
-## Troubleshooting
-
-### "Invalid API key"
-
-- Verify key is correct
-- Check if key was activated (email verification)
-- Ensure you're using the correct key format
-
-### Scores Not Appearing
-
-1. Run enrichment job
-2. Check job completed without errors
-3. Verify OMDb has data for that title
-
-### Rate Limited Frequently
-
-- Upgrade to paid tier
-- Reduce enrichment frequency
-- Prioritize which content gets enriched
-
----
-
-## Data Accuracy
-
-### Freshness
-
-OMDb updates scores periodically:
-- New releases update frequently
-- Older titles update less often
-
-### Discrepancies
-
-Slight differences from RT/Metacritic websites possible:
-- Timing differences
-- Rounding variations
-
----
-
-**Previous:** [TMDb Integration](tmdb.md) | **Next:** [MDBList Integration](mdblist.md)
+**Related:** [TMDb](tmdb.md) · [Ratings refresh](ratings-refresh.md) · [API errors](api-errors.md)

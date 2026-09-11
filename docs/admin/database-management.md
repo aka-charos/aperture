@@ -1,223 +1,47 @@
 # Database Management
 
-View database statistics and perform data management operations.
+View database statistics and purge stored data — the destructive controls.
 
 ![Admin Settings - System](../images/admin/admin-settings-system.png)
 
-## Accessing Settings
+## Where It Lives
 
-Navigate to **Admin → Settings → System** (Database section)
+Admin console → **Operations** → **Database** (`/admin/ops/database`).
 
----
+## Statistics
 
-## Database Statistics
+Live counts, grouped:
 
-### Overview Stats
+| Group | What's counted |
+|-------|----------------|
+| **Content Library** | Movies, series, episodes, total titles |
+| **AI Embeddings** | Movie / series / episode vectors |
+| **User Data** | Watch history, ratings, recommendations, taste profiles |
+| **AI Assistant** | Conversations and messages |
 
-| Stat | Description |
-|------|-------------|
-| **Movies** | Total movies in database |
-| **Series** | Total TV series |
-| **Episodes** | Total episodes |
-| **Users** | Registered users |
-| **Embeddings** | AI vectors generated |
-| **Ratings** | User ratings count |
-| **Watch History** | Watch records |
+## Purge Content Database
 
-### Storage Stats
+The one destructive action on the page: **"Purge Content Database"** deletes everything **except user accounts and library config**:
 
-| Stat | Description |
-|------|-------------|
-| **Database Size** | Total PostgreSQL size |
-| **Embeddings Size** | Vector storage |
-| **Index Size** | Database indexes |
+- All content: movies, series, episodes
+- All embedding tables (every vector set)
+- Watch history, user ratings, preferences
+- Recommendations, candidates, evidence
+- AI assistant conversations, messages, and suggestions
 
----
+To run it you must type **`yes I am sure`** (case-insensitive) — the button stays disabled until the phrase matches.
 
-## Viewing Statistics
+## After a Purge
 
-1. Navigate to Admin → Settings → System
-2. Database section shows current counts
-3. Click **Refresh** to update
+Users, permissions, library configuration, and integrations survive. To rebuild:
 
-### Understanding Counts
+1. `sync-movies` / `sync-series`
+2. `sync-movie-watch-history` / `sync-series-watch-history`
+3. `generate-movie-embeddings` / `generate-series-embeddings`
+4. `generate-movie-recommendations` / `generate-series-recommendations`
 
-| Discrepancy | Possible Cause |
-|-------------|----------------|
-| Movies < Library | Sync not complete |
-| Embeddings < Movies | Embedding job pending |
-| Users < Media Server | User sync needed |
+For a full reset *including* users, drop the database and let migrations recreate it (see [External database](external-database.md)) — or restore a [backup](backup-restore.md).
 
 ---
 
-## Data Purge
-
-### Warning
-
-**Purging deletes data permanently.** This cannot be undone.
-
-### When to Purge
-
-- Switching media servers
-- Starting fresh
-- Removing test data
-- Major reconfiguration
-
-### Purge Options
-
-| Option | What's Deleted |
-|--------|----------------|
-| **Movies** | All movie data, embeddings, recommendations |
-| **Series** | All series data, embeddings, recommendations |
-| **All Content** | Movies + Series |
-| **Watch History** | All watch records |
-| **Ratings** | All user ratings |
-| **Everything** | Complete database reset |
-
-### Purge Process
-
-1. Select what to purge
-2. Review warning showing counts
-3. Type confirmation text: "yes I am sure"
-4. Click **Purge**
-5. Wait for completion
-
-### After Purging
-
-Depending on what was purged:
-1. Re-run sync jobs
-2. Re-run embedding jobs
-3. Regenerate recommendations
-4. Users may need to re-rate content
-
----
-
-## Confirmation Modal
-
-Purge requires explicit confirmation:
-
-### What's Shown
-
-- Exact counts of data to be deleted
-- Affected tables
-- Warning about irreversibility
-
-### Confirmation
-
-Must type exactly: `yes I am sure`
-
-Button remains disabled until confirmation matches.
-
----
-
-## Database Health
-
-### Checking Health
-
-Look for:
-- Connection status (green = healthy)
-- Query performance
-- Storage growth trends
-
-### Signs of Issues
-
-| Symptom | Possible Cause |
-|---------|----------------|
-| Slow queries | Missing indexes |
-| Growing size | Orphaned data |
-| Connection errors | Resource limits |
-
----
-
-## Maintenance Operations
-
-### Vacuum (Automatic)
-
-PostgreSQL automatically manages:
-- Dead tuple cleanup
-- Space reclamation
-- Statistics updates
-
-### Manual Optimization
-
-Rarely needed, but if performance degrades:
-1. Stop Aperture
-2. Connect to PostgreSQL directly
-3. Run `VACUUM ANALYZE`
-4. Restart Aperture
-
----
-
-## Data Integrity
-
-### Consistency Checks
-
-Aperture maintains referential integrity:
-- Foreign key constraints
-- Cascade deletes
-- Orphan cleanup
-
-### Orphaned Data
-
-Occasionally, orphaned records may exist:
-- From interrupted operations
-- Migration edge cases
-
-These are typically harmless and cleaned automatically.
-
----
-
-## Troubleshooting
-
-### Database Connection Issues
-
-1. Check PostgreSQL is running
-2. Verify connection string
-3. Check credentials
-4. Review Docker networking
-
-### Slow Performance
-
-1. Check database size
-2. Review query logs
-3. Consider index optimization
-4. Upgrade hardware if needed
-
-### Data Inconsistencies
-
-1. Re-run sync jobs
-2. Check for interrupted operations
-3. Review job logs
-4. Contact support if persistent
-
----
-
-## PostgreSQL Access
-
-### Direct Access
-
-For advanced troubleshooting:
-
-```bash
-# Connect to PostgreSQL
-docker exec -it aperture-db psql -U aperture -d aperture
-
-# View tables
-\dt
-
-# Check counts
-SELECT COUNT(*) FROM movies;
-SELECT COUNT(*) FROM series;
-SELECT COUNT(*) FROM embeddings_1536;
-```
-
-### Security Note
-
-Direct database access should be:
-- Limited to administrators
-- Used carefully
-- Documented when making changes
-
----
-
-**Previous:** [Backup & Restore](backup-restore.md) | **Next:** [Jobs Overview](jobs-overview.md)
+**Related:** [Backup & restore](backup-restore.md) · [Jobs overview](jobs-overview.md) · [External database](external-database.md)
