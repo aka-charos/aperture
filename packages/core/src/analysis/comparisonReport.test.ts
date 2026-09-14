@@ -10,6 +10,7 @@ import {
 const entry = (over: Partial<ComparisonEntry> = {}): ComparisonEntry => ({
   provider: 'lmstudio',
   model: 'ornith-1.5-9b',
+  promptVersion: 7,
   status: 'ok',
   analysis: 'The film is built around a black-and-white image.',
   grade: 'substantial',
@@ -147,7 +148,7 @@ test('every answer carries its habit counts, and the table lists every entry', (
   assert.match(text, /SIGNALS/)
   assert.match(text, /"rather than" 1/)
   // A failed entry still gets its row, with a dash instead of numbers.
-  assert.match(text, /\[2\] lmstudio \/ broken-model\s+—/)
+  assert.match(text, /\[2\] lmstudio \/ broken-model · v7\s+—/)
   assert.ok(text.indexOf('SIGNALS') < text.indexOf('It is inherited'), 'table above the prose')
 })
 
@@ -160,14 +161,18 @@ test('a replay prints the baseline after its own answers and pairs the table row
   const text = renderComparisonReport(
     report({
       promptVersion: 9,
-      entries: [entry({ model: 'deepseek', analysis: 'Version nine prose.' })],
+      entries: [entry({ model: 'deepseek', promptVersion: 9, analysis: 'Version nine prose.' })],
       replayOf: {
         runId: 'run-8',
         promptVersion: 8,
         startedAt: '2026-09-10T10:00:00Z',
         entries: [
-          entry({ model: 'dropped-model', analysis: 'Only in the old run.' }),
-          entry({ model: 'deepseek', analysis: 'Version eight prose, rather than nine.' }),
+          entry({ model: 'dropped-model', promptVersion: 8, analysis: 'Only in the old run.' }),
+          entry({
+            model: 'deepseek',
+            promptVersion: 8,
+            analysis: 'Version eight prose, rather than nine.',
+          }),
         ],
       },
     })
@@ -179,14 +184,49 @@ test('a replay prints the baseline after its own answers and pairs the table row
 
   const table = text.slice(text.indexOf('SIGNALS'), text.indexOf('Version nine prose.'))
   const lines = table.split('\n')
-  const v9 = lines.findIndex((line) => line.startsWith('v9 [1] lmstudio / deepseek'))
+  const v9 = lines.findIndex((line) => line.startsWith('[1] lmstudio / deepseek · v9'))
   assert.ok(v9 > -1, table)
-  assert.ok(lines[v9 + 1].startsWith('v8 [b2] lmstudio / deepseek'), table)
-  assert.ok(lines[v9 + 2].startsWith('v8 [b1] lmstudio / dropped-model'), table)
+  assert.ok(lines[v9 + 1].startsWith('[b2] lmstudio / deepseek · v8'), table)
+  assert.ok(lines[v9 + 2].startsWith('[b1] lmstudio / dropped-model · v8'), table)
 
   assert.ok(text.indexOf('Version nine prose.') < text.indexOf('BASELINE — run run-8'))
   assert.ok(text.indexOf('BASELINE — run run-8') < text.indexOf('Version eight prose'))
   assert.ok(text.indexOf('Only in the old run.') < text.indexOf('THE PROMPT BODY'))
+})
+
+/**
+ * Several prompt versions in one run: the point is reading one model's answers
+ * to each version side by side, so they must be adjacent, and the prompt section
+ * must show what differs without printing the same 60k of documents twice.
+ */
+test('several prompt versions: answers named by version, documents printed once', () => {
+  const shared = 'Film: X\n\nSOURCE DOCUMENTS\n[1] Doc — d.com\nBody.\n\nTASK\n'
+  const text = renderComparisonReport(
+    report({
+      promptVersion: 9,
+      entries: [
+        entry({ model: 'a', promptVersion: 8, analysis: 'A under eight.' }),
+        entry({ model: 'a', promptVersion: 9, analysis: 'A under nine.' }),
+        entry({ model: 'b', promptVersion: 8, analysis: 'B under eight.' }),
+        entry({ model: 'b', promptVersion: 9, analysis: 'B under nine.' }),
+      ],
+      prompt: `${shared}NINE QUESTIONS`,
+      prompts: [
+        { version: 8, text: `${shared}EIGHT QUESTIONS` },
+        { version: 9, text: `${shared}NINE QUESTIONS` },
+      ],
+    })
+  )
+
+  assert.match(text, /Prompt versions: 8, 9/)
+  assert.match(text, /differ only in their questions and rules/)
+  assert.ok(text.indexOf('[1] lmstudio / a · v8') < text.indexOf('[2] lmstudio / a · v9'))
+  assert.ok(text.indexOf('[2] lmstudio / a · v9') < text.indexOf('[3] lmstudio / b · v8'))
+
+  assert.equal(text.split('SOURCE DOCUMENTS').length - 1, 1, 'documents once')
+  assert.ok(text.includes('EIGHT QUESTIONS') && text.includes('NINE QUESTIONS'))
+  assert.ok(text.indexOf('PROMPT VERSION 9, in full') < text.indexOf('PROMPT VERSION 8, from TASK on'))
+  assert.doesNotMatch(text, /THE PROMPT EVERY MODEL RECEIVED/)
 })
 
 test('an ordinary run says nothing about replaying', () => {

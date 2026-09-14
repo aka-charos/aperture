@@ -16,7 +16,10 @@ import {
   distinctOriginalTitle,
   extractPromptSources,
   questionIdsFor,
+  BENCH_PROMPT_VERSIONS,
+  resolveBenchPromptVersions,
 } from './prompt.js'
+import { ARCHIVED_PROMPT_EDITIONS } from './promptEditions.js'
 import type { AnalysisSubject } from './prompt.js'
 
 const subject = (over: Partial<AnalysisSubject> = {}): AnalysisSubject => ({
@@ -250,4 +253,84 @@ test('the prompt names the original title, and only when there is one', () => {
 
   const without = buildAnalysisPrompt(subject(), { mode: 'grounding' })
   assert.ok(!without.includes('Original title:'), without.slice(0, 200))
+})
+
+/**
+ * Archived editions, which the bench runs beside the current prompt.
+ *
+ * The claim that makes a multi-version bench sound is that two versions built
+ * from one retrieval differ below the TASK line and nowhere else. That is
+ * pinned here against the real archived editions, not asserted in a comment.
+ */
+const benchSources = [{ title: 'Doc', domain: 'd.com', text: 'Body.' }]
+const aboveTask = (p: string) => p.slice(0, p.lastIndexOf('\nTASK\n'))
+const contract = (p: string) => p.slice(p.indexOf('Output format.'))
+
+test('the bench carries the archived versions and the current one, current newest', () => {
+  assert.ok(BENCH_PROMPT_VERSIONS.includes(7) && BENCH_PROMPT_VERSIONS.includes(8))
+  assert.equal(BENCH_PROMPT_VERSIONS[BENCH_PROMPT_VERSIONS.length - 1], ANALYSIS_PROMPT_VERSION)
+  // An archived copy carrying the current number would silently stand in for it.
+  for (const edition of ARCHIVED_PROMPT_EDITIONS) {
+    assert.ok(edition.version < ANALYSIS_PROMPT_VERSION, `archived ${edition.version}`)
+  }
+})
+
+test('every edition shares the documents, header and output contract exactly', () => {
+  const now = buildAnalysisPrompt(subject({ originalTitle: 'Affeksjonsverdi' }), {
+    mode: 'crw',
+    sources: benchSources,
+  })
+  for (const version of BENCH_PROMPT_VERSIONS) {
+    for (const mediaType of ['movie', 'series'] as const) {
+      const p = buildAnalysisPrompt(subject({ originalTitle: 'Affeksjonsverdi', mediaType }), {
+        mode: 'crw',
+        sources: benchSources,
+        version,
+      })
+      const current = buildAnalysisPrompt(subject({ originalTitle: 'Affeksjonsverdi', mediaType }), {
+        mode: 'crw',
+        sources: benchSources,
+      })
+      assert.equal(aboveTask(p), aboveTask(current), `v${version} ${mediaType} above TASK`)
+      assert.equal(contract(p), contract(now), `v${version} ${mediaType} contract`)
+    }
+  }
+})
+
+test('an archived edition asks its own questions', () => {
+  const v8 = buildAnalysisPrompt(subject(), { mode: 'crw', sources: benchSources, version: 8 })
+  assert.deepEqual(questionOrder(v8), ['work', 'tradition', 'intent', 'circumstances', 'dispute'])
+  assert.ok(v8.includes('Never refer to the source documents as a thing'), v8)
+  assert.ok(!v8.includes('[reception]'), v8)
+
+  const v7 = buildAnalysisPrompt(subject(), { mode: 'crw', sources: benchSources, version: 7 })
+  assert.deepEqual(questionOrder(v7), questionOrder(v8))
+  assert.ok(!v7.includes('Never refer to the source documents as a thing'), 'v8 added that clause')
+  assert.notEqual(v7, v8)
+})
+
+test('no version means the current edition, byte for byte', () => {
+  assert.equal(
+    buildAnalysisPrompt(subject(), { mode: 'crw', sources: benchSources }),
+    buildAnalysisPrompt(subject(), { mode: 'crw', sources: benchSources, version: ANALYSIS_PROMPT_VERSION })
+  )
+})
+
+test('the map vocabulary follows the version it is asked about', () => {
+  assert.ok(questionIdsFor('movie', 8).includes('dispute'))
+  assert.ok(questionIdsFor('series', 8).includes('structure'))
+  assert.ok(!questionIdsFor('movie').includes('dispute'))
+})
+
+test('bench versions: current by default, deduplicated oldest first, unknown refused', () => {
+  assert.deepEqual(resolveBenchPromptVersions(), [ANALYSIS_PROMPT_VERSION])
+  assert.deepEqual(resolveBenchPromptVersions([]), [ANALYSIS_PROMPT_VERSION])
+  assert.deepEqual(resolveBenchPromptVersions([ANALYSIS_PROMPT_VERSION, 8, ANALYSIS_PROMPT_VERSION, 7]), [
+    7,
+    8,
+    ANALYSIS_PROMPT_VERSION,
+  ])
+  assert.throws(() => resolveBenchPromptVersions([3]), /not available/)
+  assert.throws(() => resolveBenchPromptVersions([8.5]), /not a prompt version/)
+  assert.throws(() => buildAnalysisPrompt(subject(), { mode: 'crw', version: 3 }), /not available/)
 })

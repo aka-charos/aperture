@@ -35,6 +35,8 @@
  * here is to not ask about the plot at all.
  */
 
+import { ARCHIVED_PROMPT_EDITIONS } from './promptEditions.js'
+
 /**
  * Bump when the prompt changes in a way that should invalidate stored analysis.
  * Every row below this becomes pending again — see 0143. That makes a prompt
@@ -423,9 +425,21 @@ const SERIES_QUESTIONS: AnalysisQuestion[] = [
  * decide whether a label the model wrote is one we asked for. Deriving it here
  * rather than restating it there is what keeps a movie from being able to claim
  * a `structure` paragraph it was never asked to write.
+ *
+ * `version` exists for the bench, which runs archived editions beside the
+ * current one: an answer written under version 8 legitimately labels paragraphs
+ * `intent` and `dispute`, and judging its map against version 9's vocabulary
+ * would discard those labels as unrecognised. Everything else - the library
+ * job, the analysis route - leaves it at the current version.
  */
-export function questionIdsFor(mediaType: 'movie' | 'series'): AnalysisQuestionId[] {
-  return (mediaType === 'series' ? SERIES_QUESTIONS : MOVIE_QUESTIONS).map((q) => q.id)
+export function questionIdsFor(
+  mediaType: 'movie' | 'series',
+  version: number = ANALYSIS_PROMPT_VERSION
+): AnalysisQuestionId[] {
+  const edition = editionFor(version)
+  return (mediaType === 'series' ? edition.seriesQuestions : edition.movieQuestions).map(
+    (q) => q.id
+  )
 }
 
 /**
@@ -491,6 +505,74 @@ const RULES = [
   'Do not cite, number or link the documents, and do not mention them at all - the reader never sees them, so "the sources say" or "the sources carry" points at nothing. Do not quote the reception figures back. State facts plainly. A view - an interpretation or a judgement - belongs to whoever holds it: name the critic or publication when the sources do, and say "critics" when they do not. Never turn a view into a fact, and never hide whose view it is behind "is described as", "has been called", "according to one reading" or "reportedly". Name a critic where their view is the point, not in every sentence. Judgements of quality belong in the reception answer only.',
   'Length follows the work, not the amount of source text. Many titles support 200 words, and 900 words - about ten short paragraphs - is the most any of them support. A long source block is not a reason to write more - most of it is plot summary, cast lists and the same facts repeated across pages.',
 ]
+
+/**
+ * One version of the prompt: its questions and its rules, and nothing else.
+ *
+ * AN EDITION IS ONLY THESE, BECAUSE THAT IS ALL THAT HAS EVER CHANGED between
+ * the versions the bench can run. The header, the source block, the TASK lines,
+ * the retrieval-mode rule and the output contract were compared line by line
+ * across versions 7, 8 and 9 when the archived editions were extracted, and are
+ * identical. That is what makes a multi-version bench sound: the prompts it
+ * builds from one retrieval differ below the TASK line and nowhere else.
+ */
+export interface PromptEdition {
+  version: number
+  movieQuestions: readonly { id: AnalysisQuestionId; text: string }[]
+  seriesQuestions: readonly { id: AnalysisQuestionId; text: string }[]
+  /** The rules after the retrieval-mode rule, which every edition shares. */
+  rules: readonly string[]
+}
+
+const CURRENT_EDITION: PromptEdition = {
+  version: ANALYSIS_PROMPT_VERSION,
+  movieQuestions: MOVIE_QUESTIONS,
+  seriesQuestions: SERIES_QUESTIONS,
+  rules: RULES,
+}
+
+// The current edition goes in last, so it can never be shadowed by an archived
+// copy carrying the same number. prompt.test.ts pins that none does.
+const EDITIONS: ReadonlyMap<number, PromptEdition> = new Map(
+  [...ARCHIVED_PROMPT_EDITIONS, CURRENT_EDITION].map((edition) => [edition.version, edition])
+)
+
+/** Every prompt version the bench can run, oldest first. */
+export const BENCH_PROMPT_VERSIONS: readonly number[] = [...EDITIONS.keys()].sort((a, b) => a - b)
+
+/**
+ * The edition for a version, or the current one.
+ *
+ * Throws on a version this build does not carry, with a sentence the bench route
+ * passes straight to the operator: silently substituting the current edition
+ * would label an answer with a version it was not written under.
+ */
+export function editionFor(version: number = ANALYSIS_PROMPT_VERSION): PromptEdition {
+  const edition = EDITIONS.get(version)
+  if (!edition) {
+    throw new Error(
+      `Prompt version ${version} is not available. This build carries ${BENCH_PROMPT_VERSIONS.join(', ')}.`
+    )
+  }
+  return edition
+}
+
+/**
+ * The versions a bench run should use: deduplicated, oldest first, and the
+ * current version alone when nothing was asked for.
+ *
+ * Oldest first because the report reads each model's answers in version order,
+ * which is the order the prompt changed in.
+ */
+export function resolveBenchPromptVersions(requested?: readonly number[] | null): number[] {
+  if (!requested || requested.length === 0) return [ANALYSIS_PROMPT_VERSION]
+  const unique = [...new Set(requested)]
+  for (const version of unique) {
+    if (!Number.isInteger(version)) throw new Error(`"${String(version)}" is not a prompt version.`)
+    editionFor(version)
+  }
+  return unique.sort((a, b) => a - b)
+}
 
 /**
  * The closing line is the depth signal. It is asked for in the model's own
@@ -667,6 +749,12 @@ export interface PromptOptions {
   mode: 'crw' | 'grounding'
   /** Retrieved documents, already budgeted. Ignored in 'grounding' mode. */
   sources?: AnalysisSource[]
+  /**
+   * Which edition's questions and rules to use. Absent means the current one,
+   * which is the only edition the library job ever writes with; the bench
+   * passes older ones. See ./promptEditions.ts.
+   */
+  version?: number
 }
 
 /**
@@ -682,7 +770,9 @@ export function buildAnalysisPrompt(
   subject: AnalysisSubject,
   options: PromptOptions
 ): string {
-  const questions = subject.mediaType === 'series' ? SERIES_QUESTIONS : MOVIE_QUESTIONS
+  const edition = editionFor(options.version)
+  const questions =
+    subject.mediaType === 'series' ? edition.seriesQuestions : edition.movieQuestions
   const kind = subject.mediaType === 'series' ? 'series' : 'film'
   const grounded = options.mode === 'grounding'
   const sources = options.sources ?? []
@@ -722,7 +812,7 @@ export function buildAnalysisPrompt(
     ...questions.map((q, i) => `${i + 1}. [${q.id}] ${q.text}`),
     '',
     'RULES',
-    ...[grounded ? GROUNDED_RULE : SOURCED_RULE, ...RULES].map((r) => `- ${r}`),
+    ...[grounded ? GROUNDED_RULE : SOURCED_RULE, ...edition.rules].map((r) => `- ${r}`),
     '',
     OUTPUT_CONTRACT,
   ].join('\n')

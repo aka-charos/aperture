@@ -67,6 +67,12 @@ export interface ParagraphMapContext {
   paragraphCount: number
   /** Decides the vocabulary: only a series is asked about `structure`. */
   mediaType: 'movie' | 'series'
+  /**
+   * The prompt version the answer was written under, which also decides the
+   * vocabulary: version 8 asked `intent` and `dispute`, version 9 does not.
+   * Absent means the current version. Only the bench passes an older one.
+   */
+  promptVersion?: number
 }
 
 /**
@@ -84,7 +90,7 @@ export function parseParagraphMap(
 ): ParagraphMap | null {
   if (!mapText || context.paragraphCount < 1) return null
 
-  const vocabulary = new Set<string>(questionIdsFor(context.mediaType))
+  const vocabulary = new Set<string>(questionIdsFor(context.mediaType, context.promptVersion))
   const claimed = new Set<number>()
   const map: ParagraphMap = []
 

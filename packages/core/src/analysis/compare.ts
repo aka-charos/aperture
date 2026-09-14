@@ -47,7 +47,7 @@ import { retrieveSources, runWriteAttempt } from './generate.js'
 import {
   buildAnalysisPrompt,
   extractPromptSources,
-  ANALYSIS_PROMPT_VERSION,
+  resolveBenchPromptVersions,
   type AnalysisSource,
 } from './prompt.js'
 import { parseParagraphMap, splitAnalysisParagraphs } from './paragraphMap.js'
@@ -70,6 +70,18 @@ export interface StartComparisonOptions {
   mediaType: 'movie' | 'series'
   mediaId: string
   models: ComparisonModelRequest[]
+  /**
+   * Prompt versions to put beside each other. Every model answers every
+   * version, all built from the one retrieval. Absent means the current
+   * version only, which is what the bench did before versions were selectable.
+   */
+  promptVersions?: number[]
+}
+
+/** One answer the run will produce: a model, under one prompt version. */
+interface PlannedEntry extends ComparisonModelRequest {
+  position: number
+  promptVersion: number
 }
 
 /**
@@ -119,21 +131,30 @@ export async function startComparison(options: StartComparisonOptions): Promise<
 
   const models = options.models.slice(0, MAX_COMPARISON_MODELS)
   if (models.length === 0) throw new Error('Pick at least one model.')
+  // Resolved before any row exists, so an unknown version is refused rather
+  // than leaving a run behind that can never finish.
+  const versions = resolveBenchPromptVersions(options.promptVersions)
 
   const run = await queryOne<{ id: string }>(
     `INSERT INTO analysis_comparison_runs (media_type, media_id, title, year, prompt_version)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING id`,
-    [options.mediaType, options.mediaId, subject.title, subject.year, ANALYSIS_PROMPT_VERSION]
+    [options.mediaType, options.mediaId, subject.title, subject.year, versions[versions.length - 1]]
   )
   if (!run) throw new Error('Could not start the comparison.')
 
-  await launch(run.id, options.mediaType, options.mediaId, models, null)
+  await launch(run.id, options.mediaType, options.mediaId, models, versions, null)
   return run.id
 }
 
 /**
- * Replay a stored run's sources under the prompt this build carries.
+ * Replay a stored run's sources under any prompt versions this build carries.
+ *
+ * A new bench no longer needs this to compare versions - `startComparison`
+ * takes `promptVersions` and builds every version from its one retrieval. What
+ * replay still answers is the run you already have: the same documents under a
+ * version that did not exist when it ran, or the same version again for the
+ * noise floor.
  *
  * WHY. The bench compares MODELS by retrieving once. Comparing PROMPT VERSIONS
  * needs the same control across two runs days apart, and retrieving again would
@@ -158,8 +179,10 @@ export async function startComparison(options: StartComparisonOptions): Promise<
  */
 export async function replayComparison(
   runId: string,
-  requested?: ComparisonModelRequest[]
+  options: { models?: ComparisonModelRequest[]; promptVersions?: number[] } = {}
 ): Promise<string> {
+  const requested = options.models
+  const versions = resolveBenchPromptVersions(options.promptVersions)
   const original = await queryOne<RunRow>(`SELECT * FROM analysis_comparison_runs WHERE id = $1`, [
     runId,
   ])
@@ -178,13 +201,17 @@ export async function replayComparison(
   if (!subject) throw new Error('That title is no longer in the library.')
 
   // Default: the baseline's models, in the baseline's order, so every answer in
-  // the report has a partner to be read against.
+  // the report has a partner to be read against. DISTINCT because a baseline
+  // that ran several prompt versions lists each model once per version.
   const models = (
     requested?.length
       ? requested
       : (
           await query<ComparisonModelRequest>(
-            `SELECT provider, model FROM analysis_comparison_results WHERE run_id = $1 ORDER BY position ASC`,
+            `SELECT provider, model FROM analysis_comparison_results
+              WHERE run_id = $1
+              GROUP BY provider, model
+              ORDER BY MIN(position) ASC`,
             [runId]
           )
         ).rows
@@ -201,7 +228,7 @@ export async function replayComparison(
       original.media_id,
       subject.title,
       subject.year,
-      ANALYSIS_PROMPT_VERSION,
+      versions[versions.length - 1],
       original.id,
       original.source_count,
       original.retrieved_chars,
@@ -211,8 +238,27 @@ export async function replayComparison(
   )
   if (!run) throw new Error('Could not start the replay.')
 
-  await launch(run.id, original.media_type, original.media_id, models, sources)
+  await launch(run.id, original.media_type, original.media_id, models, versions, sources)
   return run.id
+}
+
+/**
+ * Every answer a run will produce, in report order: grouped by MODEL, each
+ * model's prompt versions oldest first.
+ *
+ * Grouped by model rather than by version so a model's answers sit next to each
+ * other in the report, which is the comparison a version change asks for - the
+ * same model, the same documents, different questions and rules.
+ */
+function planEntries(models: ComparisonModelRequest[], versions: number[]): PlannedEntry[] {
+  return models.flatMap((model, m) =>
+    versions.map((promptVersion, v) => ({
+      provider: model.provider,
+      model: model.model,
+      promptVersion,
+      position: m * versions.length + v,
+    }))
+  )
 }
 
 /**
@@ -227,19 +273,21 @@ async function launch(
   mediaType: 'movie' | 'series',
   mediaId: string,
   models: ComparisonModelRequest[],
+  versions: number[],
   replaySources: AnalysisSource[] | null
 ): Promise<void> {
-  for (const [position, entry] of models.entries()) {
+  const entries = planEntries(models, versions)
+  for (const entry of entries) {
     await query(
-      `INSERT INTO analysis_comparison_results (run_id, position, provider, model)
-       VALUES ($1, $2, $3, $4)`,
-      [runId, position, entry.provider, entry.model]
+      `INSERT INTO analysis_comparison_results (run_id, position, provider, model, prompt_version)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [runId, entry.position, entry.provider, entry.model, entry.promptVersion]
     )
   }
 
   running.add(runId)
   // Deliberately not awaited: the caller answers 202 and the page polls.
-  void driveComparison(runId, mediaType, mediaId, models, replaySources).catch((err) => {
+  void driveComparison(runId, mediaType, mediaId, entries, versions, replaySources).catch((err) => {
     logger.error({ err, runId }, 'Comparison run threw outside its own handler')
   })
 }
@@ -248,7 +296,8 @@ async function driveComparison(
   runId: string,
   mediaType: 'movie' | 'series',
   mediaId: string,
-  models: ComparisonModelRequest[],
+  entries: PlannedEntry[],
+  versions: number[],
   replaySources: AnalysisSource[] | null
 ): Promise<void> {
   try {
@@ -257,24 +306,23 @@ async function driveComparison(
 
     const crwConfig = await getCrwConfig()
 
-    let prompt: string
+    // ONCE, whatever the number of versions. Every prompt below is built from
+    // this one list, so two versions' prompts differ below the TASK line and
+    // nowhere else - see PromptEdition.
+    let sources: AnalysisSource[]
     if (replaySources) {
       // A replay's documents came from the run it replays, and the counts and
       // summaries were copied from that run when the row was created.
-      prompt = buildAnalysisPrompt(subject, { mode: 'crw', sources: replaySources })
-      await query(`UPDATE analysis_comparison_runs SET prompt = $2 WHERE id = $1`, [runId, prompt])
+      sources = replaySources
     } else {
-      // ONCE. Everything below answers what this returns.
       const retrieval = await retrieveSources(subject)
-      prompt = buildAnalysisPrompt(subject, { mode: 'crw', sources: retrieval.sources })
-
+      sources = retrieval.sources
       await query(
         `UPDATE analysis_comparison_runs
-            SET prompt = $2, source_count = $3, retrieved_chars = $4, sources = $5
+            SET source_count = $2, retrieved_chars = $3, sources = $4
           WHERE id = $1`,
         [
           runId,
-          prompt,
           retrieval.sources.length,
           retrieval.retrievedChars,
           JSON.stringify(
@@ -289,14 +337,43 @@ async function driveComparison(
       )
     }
 
+    const prompts = new Map(
+      versions.map((version) => [
+        version,
+        buildAnalysisPrompt(subject, { mode: 'crw', sources, version }),
+      ])
+    )
+    // `prompt` keeps the newest version's text, because replay reads the
+    // documents back out of it (0171); `prompts` holds every version (0172).
+    const newest = prompts.get(versions[versions.length - 1])!
+    await query(`UPDATE analysis_comparison_runs SET prompt = $2, prompts = $3 WHERE id = $1`, [
+      runId,
+      newest,
+      JSON.stringify(Object.fromEntries(prompts)),
+    ])
+
     logger.info(
-      { runId, title: subject.title, models: models.length, promptChars: prompt.length },
-      'Comparison prompt built — running models'
+      {
+        runId,
+        title: subject.title,
+        answers: entries.length,
+        promptVersions: versions,
+        promptChars: newest.length,
+      },
+      'Comparison prompts built — running models'
     )
 
-    for (const [position, entry] of models.entries()) {
+    for (const entry of entries) {
       if (cancelled.has(runId)) break
-      await runOneEntry(runId, position, entry, prompt, crwConfig.analysisMaxOutputTokens, mediaType)
+      await runOneEntry(
+        runId,
+        entry.position,
+        entry,
+        prompts.get(entry.promptVersion)!,
+        crwConfig.analysisMaxOutputTokens,
+        mediaType,
+        entry.promptVersion
+      )
     }
 
     await finishRun(runId, cancelled.has(runId) ? 'cancelled' : 'completed', null)
@@ -325,7 +402,8 @@ async function runOneEntry(
   entry: ComparisonModelRequest,
   prompt: string,
   maxOutputTokens: number,
-  mediaType: 'movie' | 'series'
+  mediaType: 'movie' | 'series',
+  promptVersion: number
 ): Promise<void> {
   const startedAt = Date.now()
   try {
@@ -366,6 +444,9 @@ async function runOneEntry(
       ? parseParagraphMap(result.mapText, {
           paragraphCount: splitAnalysisParagraphs(result.text).length,
           mediaType,
+          // The vocabulary of the version it answered, or a version-8 answer's
+          // `intent` and `dispute` labels read as unrecognised and drop.
+          promptVersion,
         })
       : null
 
@@ -426,12 +507,16 @@ interface RunRow {
   retrieved_chars: number | null
   sources: { title: string; domain: string; url: string | null; chars: number }[] | null
   replay_of: string | null
+  /** One prompt per version (0172); null on runs made before versions were selectable. */
+  prompts: Record<string, string> | null
   started_at: string
   finished_at: string | null
 }
 
 interface ResultRow {
   position: number
+  /** Null on rows made before 0172, which answered their run's prompt_version. */
+  prompt_version: number | null
   provider: string
   model: string
   status: string
@@ -485,7 +570,7 @@ export async function getComparisonRun(runId: string): Promise<ComparisonRunView
         runId: base.id,
         promptVersion: base.prompt_version,
         startedAt: new Date(base.started_at).toISOString(),
-        entries: baseResults.rows.map(toEntry),
+        entries: baseResults.rows.map((row) => toEntry(row, base.prompt_version)),
       }
     }
   }
@@ -502,12 +587,17 @@ export async function getComparisonRun(runId: string): Promise<ComparisonRunView
     })),
     retrievedChars: run.retrieved_chars ?? 0,
     prompt: run.prompt,
+    prompts: run.prompts
+      ? Object.entries(run.prompts)
+          .map(([version, text]) => ({ version: Number(version), text }))
+          .sort((a, b) => a.version - b.version)
+      : null,
     // pg hands a TIMESTAMPTZ back as a Date, so interpolating it into the
     // report would print a locale-shaped string that differs between the
     // server rendering it and a client re-rendering it. Normalised once here.
     startedAt: new Date(run.started_at).toISOString(),
     finishedAt: run.finished_at ? new Date(run.finished_at).toISOString() : null,
-    entries: results.rows.map(toEntry),
+    entries: results.rows.map((row) => toEntry(row, run.prompt_version)),
     replayOf,
   }
 
@@ -520,10 +610,12 @@ export async function getComparisonRun(runId: string): Promise<ComparisonRunView
   }
 }
 
-function toEntry(row: ResultRow): ComparisonEntry {
+function toEntry(row: ResultRow, runVersion: number): ComparisonEntry {
   return {
     provider: row.provider,
     model: row.model,
+    // Absent on a pre-0172 row, which answered the one prompt its run held.
+    promptVersion: row.prompt_version ?? runVersion,
     status: row.status,
     analysis: row.analysis,
     grade: row.grade,
@@ -565,8 +657,10 @@ export interface ComparisonRunSummary {
   year: number | null
   status: string
   modelCount: number
-  /** Which prompt the run answered — what a replay is chosen by. */
+  /** The newest prompt version the run answered. */
   promptVersion: number
+  /** Every prompt version the run answered, oldest first. */
+  promptVersions: number[]
   /** The run this one replayed, or null for a run that retrieved its own. */
   replayOf: string | null
   startedAt: string
@@ -583,12 +677,19 @@ export async function listComparisonRuns(limit = 25): Promise<ComparisonRunSumma
     status: string
     model_count: string
     prompt_version: number
+    prompt_versions: number[] | null
     replay_of: string | null
     started_at: string
     finished_at: string | null
   }>(
     `SELECT r.id, r.media_type, r.media_id, r.title, r.year, r.status,
             r.prompt_version, r.replay_of, r.started_at, r.finished_at,
+            ARRAY(
+              SELECT DISTINCT COALESCE(v.prompt_version, r.prompt_version)
+                FROM analysis_comparison_results v
+               WHERE v.run_id = r.id
+               ORDER BY 1
+            ) AS prompt_versions,
             COUNT(x.id) AS model_count
        FROM analysis_comparison_runs r
        LEFT JOIN analysis_comparison_results x ON x.run_id = r.id
@@ -608,6 +709,7 @@ export async function listComparisonRuns(limit = 25): Promise<ComparisonRunSumma
     // COUNT comes back as text from pg, so it is parsed rather than trusted.
     modelCount: Number.parseInt(row.model_count, 10) || 0,
     promptVersion: row.prompt_version,
+    promptVersions: row.prompt_versions?.length ? row.prompt_versions : [row.prompt_version],
     replayOf: row.replay_of,
     startedAt: row.started_at,
     finishedAt: row.finished_at,
