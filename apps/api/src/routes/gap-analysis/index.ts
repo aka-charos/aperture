@@ -80,9 +80,23 @@ const gapAnalysisRoutes: FastifyPluginAsync = async (fastify) => {
       const activeRun = await getActiveRunningGapRun()
       const latest = await getLatestCompletedGapRun()
 
-      let collectionSummaries: Awaited<ReturnType<typeof getGapCollectionSummaries>> = []
-      if (!activeRun && latest) {
-        collectionSummaries = await getGapCollectionSummaries(latest.id)
+      // Summaries for whichever run the page is showing. A run streams every
+      // released part of a collection in one insert batch, so a running run's
+      // counts are already whole per collection; withholding them left the
+      // live listing with gaps and no totals to set them against.
+      const displayRun = activeRun ?? latest
+      const collectionSummaries = displayRun ? await getGapCollectionSummaries(displayRun.id) : []
+
+      // A snapshot goes stale when the library moves under it, not after a
+      // fixed number of days — so say how far it has moved. Null while a scan
+      // is running or before one has finished, which is "not applicable", not 0.
+      let moviesAddedSinceRun: number | null = null
+      if (!activeRun && latest?.completedAt) {
+        const added = await queryOne<{ c: string }>(
+          `SELECT COUNT(*)::text AS c FROM movies WHERE created_at > $1`,
+          [latest.completedAt]
+        )
+        moviesAddedSinceRun = parseInt(added?.c ?? '0', 10)
       }
 
       return reply.send({
@@ -93,6 +107,7 @@ const gapAnalysisRoutes: FastifyPluginAsync = async (fastify) => {
         run: latest,
         activeRun,
         collectionSummaries,
+        moviesAddedSinceRun,
       })
     }
   )
