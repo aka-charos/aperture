@@ -71,7 +71,7 @@ export const GLOBAL_JOB_CATEGORIES: JobCategory[] = [
     titleKey: 'admin.jobsPage.categories.globalCurated.title',
     descriptionKey: 'admin.jobsPage.categories.globalCurated.description',
     color: '#f59e0b',
-    jobs: ['refresh-top-picks', 'auto-request-top-picks', 'sync-watching-favorites'],
+    jobs: ['refresh-top-picks', 'auto-request-top-picks', 'sync-home-sections', 'sync-watching-favorites'],
   },
   {
     titleKey: 'admin.jobsPage.categories.globalDiscovery.title',

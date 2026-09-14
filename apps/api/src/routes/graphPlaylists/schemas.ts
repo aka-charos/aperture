@@ -18,6 +18,8 @@ export const graphPlaylistsSchemas = {
       itemCount: { type: 'integer', description: 'Number of items in playlist' },
       sourceItemId: { type: 'string', format: 'uuid', nullable: true, description: 'The item used as source for the graph' },
       sourceItemType: { type: 'string', enum: ['movie', 'series'], nullable: true, description: 'Type of source item' },
+      origin: { type: 'string', enum: ['graph', 'chat'], description: 'graph = built on the Explore graph; chat = created from assistant suggestions' },
+      onHomeScreen: { type: 'boolean', description: "Whether the owner put it on their Emby home screen (chat playlists only)" },
       createdAt: { type: 'string', format: 'date-time' },
       updatedAt: { type: 'string', format: 'date-time' },
     },
@@ -49,6 +51,8 @@ export const graphPlaylistsSchemas = {
       seriesIds: { type: 'array', items: { type: 'string', format: 'uuid' }, description: 'Series IDs to include' },
       sourceItemId: { type: 'string', format: 'uuid', description: 'Source item from graph' },
       sourceItemType: { type: 'string', enum: ['movie', 'series'], description: 'Type of source item' },
+      origin: { type: 'string', enum: ['graph', 'chat'], description: "Sent as 'chat' by the assistant's dialog only; defaults to graph" },
+      showOnHomeScreen: { type: 'boolean', description: "Put it on the owner's Emby home screen (chat playlists only)" },
     },
     example: {
       name: 'Mind-Bending Sci-Fi',

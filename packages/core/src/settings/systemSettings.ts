@@ -406,17 +406,10 @@ export async function testMediaServerConnection(config: {
     const { createMediaServerProvider } = await import('../media/index.js')
     const provider = createMediaServerProvider(config.type, baseUrl)
 
-    // Try to get server info as a connection test
-    if ('getServerInfo' in provider) {
-      const info = await (
-        provider as { getServerInfo: (key: string) => Promise<{ id: string; name: string }> }
-      ).getServerInfo(config.apiKey)
-      return { success: true, serverName: info.name }
-    }
-
-    // Fallback: try to get movie libraries
-    const libraries = await provider.getMovieLibraries(config.apiKey)
-    return { success: true, serverName: `${config.type} server (${libraries.length} libraries)` }
+    // Server info is the connection test. Both providers implement it and it is
+    // on MediaServerProvider, so the old library-count fallback could never run.
+    const info = await provider.getServerInfo(config.apiKey)
+    return { success: true, serverName: info.name }
   } catch (err) {
     const error = err instanceof Error ? err.message : 'Unknown error'
     logger.warn(

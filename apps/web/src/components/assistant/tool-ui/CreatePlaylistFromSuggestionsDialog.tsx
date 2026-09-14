@@ -18,6 +18,7 @@ import {
   Tooltip,
   Alert,
   Checkbox,
+  FormControlLabel,
   Menu,
   MenuItem,
 } from '@mui/material'
@@ -53,6 +54,9 @@ export function CreatePlaylistFromSuggestionsDialog({
   const [error, setError] = useState<string | null>(null)
   const [nameMenuAnchor, setNameMenuAnchor] = useState<HTMLElement | null>(null)
   const [descriptionMenuAnchor, setDescriptionMenuAnchor] = useState<HTMLElement | null>(null)
+  // Offered only when the API says this viewer can have home rows; false until it answers.
+  const [homeAvailable, setHomeAvailable] = useState(false)
+  const [showOnHome, setShowOnHome] = useState(false)
 
   // Pre-select every suggestion whenever the dialog opens ("add all" by default).
   useEffect(() => {
@@ -63,8 +67,25 @@ export function CreatePlaylistFromSuggestionsDialog({
       setError(null)
       setNameMenuAnchor(null)
       setDescriptionMenuAnchor(null)
+      setShowOnHome(false)
     }
   }, [open, items])
+
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    fetch('/api/home-sections/availability', { credentials: 'include' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!cancelled) setHomeAvailable(data?.playlists === true)
+      })
+      .catch(() => {
+        if (!cancelled) setHomeAvailable(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open])
 
   const selectedItems = items.filter((i) => selectedIds.has(i.id))
   const movieIds = selectedItems.filter((i) => i.type === 'movie').map((i) => i.id)
@@ -177,6 +198,9 @@ export function CreatePlaylistFromSuggestionsDialog({
           description: description.trim() || undefined,
           movieIds,
           seriesIds,
+          // Marks it as a chat playlist, the only kind a home row may be made from.
+          origin: 'chat',
+          showOnHomeScreen: homeAvailable && showOnHome,
         }),
       })
       if (!response.ok) {
@@ -427,6 +451,29 @@ export function CreatePlaylistFromSuggestionsDialog({
             )
           })}
         </Box>
+
+        {homeAvailable && (
+          <FormControlLabel
+            sx={{ mt: 2, alignItems: 'flex-start' }}
+            control={
+              <Checkbox
+                checked={showOnHome}
+                onChange={(e) => setShowOnHome(e.target.checked)}
+                disabled={creating}
+                size="small"
+                sx={{ pt: 0.25 }}
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body2">{t('playlists.showOnHomeScreen')}</Typography>
+                <Typography variant="caption" color="text.secondary" component="div">
+                  {t('playlists.showOnHomeScreenHint')}
+                </Typography>
+              </Box>
+            }
+          />
+        )}
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2 }}>

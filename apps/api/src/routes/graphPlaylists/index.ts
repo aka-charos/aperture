@@ -8,6 +8,7 @@ import {
   getGraphPlaylist,
   deleteGraphPlaylist,
   getGraphPlaylistItems,
+  setChatPlaylistOnHomeScreen,
   type PlaylistChatContext,
 } from '@aperture/core'
 import { graphPlaylistsSchemas } from './schemas.js'
@@ -128,13 +129,17 @@ const graphPlaylistRoutes: FastifyPluginAsync = async (fastify) => {
       seriesIds: string[]
       sourceItemId?: string
       sourceItemType?: 'movie' | 'series'
+      /** Sent as 'chat' by the assistant's dialog only. */
+      origin?: 'graph' | 'chat'
+      showOnHomeScreen?: boolean
     }
   }>(
     '/api/graph-playlists',
     { preHandler: requireAuth, schema: { tags: ["playlists"] } },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
-      const { name, description, movieIds, seriesIds, sourceItemId, sourceItemType } = request.body
+      const { name, description, movieIds, seriesIds, sourceItemId, sourceItemType, origin, showOnHomeScreen } =
+        request.body
 
       if (!name) {
         return reply.status(400).send({ error: 'Playlist name is required' })
@@ -161,6 +166,8 @@ const graphPlaylistRoutes: FastifyPluginAsync = async (fastify) => {
           seriesIds: seriesIds || [],
           sourceItemId,
           sourceItemType,
+          origin: origin === 'chat' ? 'chat' : 'graph',
+          showOnHomeScreen: showOnHomeScreen === true,
         })
 
         return reply.status(201).send(playlist)
@@ -249,6 +256,56 @@ const graphPlaylistRoutes: FastifyPluginAsync = async (fastify) => {
         request.log.error({ err, playlistId: id }, 'Failed to get graph playlist items')
         const message = err instanceof Error ? err.message : 'Failed to get playlist items'
         return reply.status(500).send({ error: message })
+      }
+    }
+  )
+
+  /**
+   * PUT /api/graph-playlists/:id/home-screen
+   * Put a playlist made from assistant suggestions on its owner's Emby home
+   * screen, or take it off. Owner only. A playlist built on the Explore graph is
+   * not offered this and answers 409 — the two share this table and route, so
+   * the refusal has to live here and not only in the card that hides the button.
+   */
+  fastify.put<{
+    Params: { id: string }
+    Body: { enabled?: unknown }
+  }>(
+    '/api/graph-playlists/:id/home-screen',
+    {
+      preHandler: requireAuth,
+      schema: {
+        tags: ['playlists'],
+        body: { type: 'object', required: ['enabled'], properties: { enabled: { type: 'boolean' } } },
+      },
+    },
+    async (request, reply) => {
+      const currentUser = request.user as SessionUser
+      const { id } = request.params
+      const enabled = request.body?.enabled
+      if (typeof enabled !== 'boolean') {
+        return reply.status(400).send({ error: 'enabled must be a boolean' })
+      }
+
+      try {
+        const playlist = await getGraphPlaylist(id)
+        if (!playlist) {
+          return reply.status(404).send({ error: 'Playlist not found' })
+        }
+        if (playlist.ownerId !== currentUser.id) {
+          return reply.status(403).send({ error: 'Only the owner can put this on their home screen' })
+        }
+        if (playlist.origin !== 'chat') {
+          return reply
+            .status(409)
+            .send({ error: 'Only playlists created from assistant suggestions can go on the home screen' })
+        }
+
+        const onHomeScreen = await setChatPlaylistOnHomeScreen(id, enabled)
+        return reply.send({ onHomeScreen: onHomeScreen === true })
+      } catch (err) {
+        request.log.error({ err, playlistId: id }, 'Failed to change playlist home screen setting')
+        return reply.status(500).send({ error: 'Failed to change the home screen setting' })
       }
     }
   )

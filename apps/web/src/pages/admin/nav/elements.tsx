@@ -16,6 +16,7 @@ import FolderOpenIcon from '@mui/icons-material/FolderOpen'
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted'
 import GTranslateIcon from '@mui/icons-material/GTranslate'
 import HealingIcon from '@mui/icons-material/Healing'
+import HomeIcon from '@mui/icons-material/Home'
 import ImageIcon from '@mui/icons-material/Image'
 import LiveTvIcon from '@mui/icons-material/LiveTv'
 import LocalMoviesIcon from '@mui/icons-material/LocalMovies'
@@ -243,6 +244,13 @@ export const ADMIN_ELEMENTS: Record<string, AdminElement> = {
   'top-picks': {
     icon: <WhatshotIcon />,
     Component: section(() => import('@/pages/settings/topPicks/TopPicksSection'), 'TopPicksSection'),
+  },
+  'home-sections': {
+    icon: <HomeIcon />,
+    Component: section(
+      () => import('@/pages/settings/homeSections/HomeSectionsSection'),
+      'HomeSectionsSection'
+    ),
   },
   watching: {
     icon: <AddToQueueIcon />,

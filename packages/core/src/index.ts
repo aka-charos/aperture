@@ -1635,3 +1635,34 @@ export {
   normalizeCountries,
   canonicalCountryNames,
 } from './countries/canonical.js'
+
+// Managed rows on Emby home screens (./homeSections) — API-only, backed by
+// `aperture:` tags on the original library items. The mappers drop those tags on
+// the way back in (./media/managedTags), or they would be embedded as themes.
+export {
+  MIN_EMBY_VERSION,
+  isEmbyVersionSupported,
+  parseServerVersion,
+  HOME_SECTION_SORTS,
+  MAX_SECTION_POSITION,
+  MAX_ROW_NAME_LENGTH,
+  MIN_RECOMMENDATIONS_LIMIT,
+  MAX_RECOMMENDATIONS_LIMIT,
+  DEFAULT_HOME_SECTIONS_CONFIG,
+  isHomeSectionSort,
+  sanitizeHomeSectionsUpdate,
+  getHomeSectionsConfig,
+  updateHomeSectionsConfig,
+  getHomeSectionsServerStatus,
+  syncHomeSections,
+  isPlaylistHomeSectionAvailable,
+  setChannelOnHomeScreen,
+  setChatPlaylistOnHomeScreen,
+  type HomeSectionSort,
+  type HomeSectionsConfig,
+  type HomeSectionsConfigUpdate,
+  type HomeSectionsServerStatus,
+  type HomeSectionsSupportReason,
+  type HomeSectionsSyncResult,
+} from './homeSections/index.js'
+export { MANAGED_TAG_PREFIX, isManagedTag, withoutManagedTags } from './media/managedTags.js'

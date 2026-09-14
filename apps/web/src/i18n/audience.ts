@@ -99,6 +99,7 @@ export const ADMIN_ONLY_NAMESPACES: readonly string[] = [
   'settingsDiscoveryGenreStrips',
   'settingsEvaluation',
   'settingsFileLocations',
+  'settingsHomeSections',
   'settingsLegacyEmbeddings',
   'settingsLibraryConfig',
   'settingsLibraryMatchPreview',

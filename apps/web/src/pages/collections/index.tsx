@@ -71,6 +71,8 @@ export function CollectionsPage() {
     handleClosePlaylistDialog,
     handleRemoveFromPlaylist,
     handleAddToPlaylist,
+    homeSectionsAvailable,
+    handleToggleChannelHomeScreen,
   } = usePlaylistsData('collection')
 
   if (loading) {
@@ -137,6 +139,8 @@ export function CollectionsPage() {
                 onGenerate={handleGeneratePlaylist}
                 onView={handleViewPlaylist}
                 i18nNamespace={NS}
+                homeSectionsAvailable={homeSectionsAvailable}
+                onToggleHomeScreen={handleToggleChannelHomeScreen}
               />
             </Grid>
           ))}

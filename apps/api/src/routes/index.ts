@@ -12,6 +12,7 @@ import channelsRoutes from './channels/index.js'
 import jobsRoutes from './jobs/index.js'
 import settingsRoutes from './settings/index.js'
 import topPicksRoutes from './top-picks/index.js'
+import homeSectionsRoutes from './home-sections/index.js'
 import traktRoutes from './trakt/index.js'
 import mdblistRoutes from './mdblist/index.js'
 import dashboardRoutes from './dashboard/index.js'
@@ -79,6 +80,7 @@ const routes: FastifyPluginAsync = async (fastify) => {
 
   // Register top picks routes
   await fastify.register(topPicksRoutes)
+  await fastify.register(homeSectionsRoutes)
 
   // Register Trakt routes
   await fastify.register(traktRoutes)

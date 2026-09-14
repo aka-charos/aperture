@@ -443,6 +443,18 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     aliases: ['top picks', 'trending', 'auto request', 'mdblist'],
   },
   {
+    id: 'home-sections',
+    group: 'recommendations',
+    segment: 'home-sections',
+    titleKey: 'adminNav.homeSections.title',
+    blurbKey: 'adminNav.homeSections.blurb',
+    aliases: ['emby', 'home screen', 'home rows', 'sections', 'tags', 'top picks row'],
+    fields: [
+      { anchor: 'home-sections-enabled', labelKey: 'settingsHomeSections.enabled' },
+      { anchor: 'home-sections-sort', labelKey: 'settingsHomeSections.sortBy', aliases: ['order', 'sort'] },
+    ],
+  },
+  {
     id: 'watching',
     group: 'recommendations',
     segment: 'watching',

@@ -264,3 +264,49 @@ export interface LibraryCreateResult {
   alreadyExists?: boolean
 }
 
+
+// ============================================================================
+// Home screen sections (Emby ContentService / TagService)
+// ============================================================================
+
+/**
+ * Emby `ItemsQuery` — the filter a dynamic-media home section runs. Only the
+ * fields Aperture writes are modelled; the index signature keeps the rest.
+ */
+export interface ContentSectionQuery {
+  TagIds?: string[]
+  GenreIds?: string[]
+  StudioIds?: string[]
+  CollectionTypes?: string[]
+  IsFavorite?: boolean
+  IsPlayed?: boolean
+  IsResumable?: boolean
+  [key: string]: unknown
+}
+
+/**
+ * Emby `ContentSection` — one row on a user's home screen. Field names are
+ * Emby's own (PascalCase) because the object round-trips: a section read from
+ * the server is written back with its Id to update it, and anything Aperture
+ * does not model (display mode, image type, a viewer's own tweaks) must survive
+ * that trip. Hence the index signature.
+ */
+export interface ContentSection {
+  Id?: string
+  Name?: string
+  CustomName?: string
+  Subtitle?: string
+  SectionType?: string
+  ItemTypes?: string[]
+  ParentId?: string
+  Query?: ContentSectionQuery
+  SortBy?: string
+  SortOrder?: string
+  [key: string]: unknown
+}
+
+/** A tag as the media server lists it. `id` is absent until the tag exists. */
+export interface MediaServerTag {
+  name: string
+  id?: string
+}

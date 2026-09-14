@@ -81,6 +81,9 @@ export function PlaylistsPage() {
     handleAddToPlaylist,
     handleViewGraphPlaylist,
     handleCloseGraphPlaylistDialog,
+    homeSectionsAvailable,
+    handleToggleChannelHomeScreen,
+    handleToggleGraphPlaylistHomeScreen,
   } = usePlaylistsData()
 
   if (loading) {
@@ -147,6 +150,8 @@ export function PlaylistsPage() {
                 onDelete={handleDelete}
                 onGenerate={handleGeneratePlaylist}
                 onView={handleViewPlaylist}
+                homeSectionsAvailable={homeSectionsAvailable}
+                onToggleHomeScreen={handleToggleChannelHomeScreen}
               />
             </Grid>
           ))}
@@ -157,6 +162,8 @@ export function PlaylistsPage() {
                 playlist={playlist}
                 onDelete={handleDeleteGraphPlaylist}
                 onView={handleViewGraphPlaylist}
+                homeSectionsAvailable={homeSectionsAvailable}
+                onToggleHomeScreen={handleToggleGraphPlaylistHomeScreen}
               />
             </Grid>
           ))}

@@ -16,13 +16,9 @@ export async function getMediaServerInfo(): Promise<MediaServerInfo | null> {
     let reportedName = ''
     try {
       const provider = createMediaServerProvider(config.type, config.baseUrl)
-      if ('getServerInfo' in provider) {
-        const info = await (
-          provider as { getServerInfo: (key: string) => Promise<{ id: string; name: string }> }
-        ).getServerInfo(config.apiKey)
-        serverId = info.id
-        reportedName = info.name
-      }
+      const info = await provider.getServerInfo(config.apiKey)
+      serverId = info.id
+      reportedName = info.name
     } catch {
       // Server ID/name are optional for link generation
     }

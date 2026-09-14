@@ -615,6 +615,27 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
         )
         break
       }
+      // === Emby Home Screen Rows ===
+      case 'sync-home-sections': {
+        const { syncHomeSections } = await import('@aperture/core')
+        const result = await syncHomeSections(jobId)
+        logger.info(
+          {
+            job: name,
+            jobId,
+            skipped: result.skipped,
+            viewersProcessed: result.viewersProcessed,
+            sectionsCreated: result.sectionsCreated,
+            sectionsUpdated: result.sectionsUpdated,
+            sectionsRemoved: result.sectionsRemoved,
+            tagsApplied: result.tagsApplied,
+            tagsRemoved: result.tagsRemoved,
+            errorCount: result.errorCount,
+          },
+          `✅ Home sections sync complete`
+        )
+        break
+      }
       // === LLDAP Email Sync Job ===
       case 'sync-lldap-emails': {
         const result = await syncLldapEmails(jobId)

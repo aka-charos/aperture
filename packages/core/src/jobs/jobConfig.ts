@@ -178,6 +178,8 @@ export const JOB_SCHEDULE_DEFAULTS: Record<
   'cleanup-auth-state': { scheduleType: 'daily', hour: 3, minute: 30 },
   'refresh-top-picks': { scheduleType: 'daily', hour: 5, minute: 0 },
   'enrich-studio-logos': { scheduleType: 'daily', hour: 5, minute: 30 },
+  // After refresh-top-picks (05:00), so the Top Picks row reads that morning's list.
+  'sync-home-sections': { scheduleType: 'daily', hour: 5, minute: 45 },
   'enrich-mdblist': { scheduleType: 'daily', hour: 7, minute: 0 },
   'generate-discovery-suggestions': { scheduleType: 'daily', hour: 6, minute: 0 },
   // Scheduled ahead of generate-discovery-suggestions (06:00) on purpose: the
