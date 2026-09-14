@@ -13,9 +13,12 @@
  * So the analysis arrives as MATERIAL, never as the subject:
  *
  * - Two segments only, `work` and `tradition` — what the film is doing and
- *   where it sits. Those are the two that connect to taste. `intent`,
- *   `circumstances` and `dispute` are about the making and the reception, which
- *   is an article's business and not a reason to watch something tonight.
+ *   where it sits. Those are the two that connect to taste. `circumstances` and
+ *   `reception` (and, on rows written before prompt version 9, `intent` and
+ *   `dispute`) are about the making and the reception, which is an article's
+ *   business and not a reason to watch something tonight. Version 9 moved
+ *   influence out of `tradition` into `reception`, which leaves this segment
+ *   closer to what a reason needs.
  * - Each clipped hard, so a long analysis cannot crowd out the evidence titles
  *   that make the reason personal. That clip is the structural half of "not the
  *   subject"; the prompt rule is the other half.
@@ -38,7 +41,9 @@ import type { ParagraphMap } from './paragraphMap.js'
 import type { AnalysisQuestionId } from './prompt.js'
 
 /**
- * The two questions worth grounding a recommendation in, in prompt order.
+ * The two questions worth grounding a recommendation in, in the order the
+ * explanation prompts show them (what it is doing leads, where it sits
+ * follows), which is no longer the analysis prompt's order since version 9.
  *
  * Deliberately not all six. A reason is an argument about whether this viewer
  * will like this film; production circumstances and critical disputes are

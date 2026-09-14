@@ -44,9 +44,19 @@ import { getCrwConfig } from '../lib/crw.js'
 import { getRetrievalMode } from './mode.js'
 import { loadAnalysisSubject } from './titles.js'
 import { retrieveSources, runWriteAttempt } from './generate.js'
-import { buildAnalysisPrompt, ANALYSIS_PROMPT_VERSION } from './prompt.js'
+import {
+  buildAnalysisPrompt,
+  extractPromptSources,
+  ANALYSIS_PROMPT_VERSION,
+  type AnalysisSource,
+} from './prompt.js'
 import { parseParagraphMap, splitAnalysisParagraphs } from './paragraphMap.js'
-import { renderComparisonReport, type ComparisonReport } from './comparisonReport.js'
+import {
+  renderComparisonReport,
+  type ComparisonBaseline,
+  type ComparisonEntry,
+  type ComparisonReport,
+} from './comparisonReport.js'
 
 const logger = createChildLogger('analysis-compare')
 
@@ -118,28 +128,128 @@ export async function startComparison(options: StartComparisonOptions): Promise<
   )
   if (!run) throw new Error('Could not start the comparison.')
 
+  await launch(run.id, options.mediaType, options.mediaId, models, null)
+  return run.id
+}
+
+/**
+ * Replay a stored run's sources under the prompt this build carries.
+ *
+ * WHY. The bench compares MODELS by retrieving once. Comparing PROMPT VERSIONS
+ * needs the same control across two runs days apart, and retrieving again would
+ * give the newer prompt different pages - so a difference in the answers could
+ * be the pages rather than the prompt. A replay retrieves nothing: it reads the
+ * documents back out of the stored prompt (`extractPromptSources`), builds the
+ * current prompt from them, and records the run it came from so the report
+ * prints both runs' answers together.
+ *
+ * REPLAYING UNDER THE SAME VERSION IS ALLOWED ON PURPOSE. Same sources, same
+ * prompt, same models is the noise floor: how much a model's answer moves
+ * between two identical calls. Without it a difference between versions has
+ * nothing to be measured against.
+ *
+ * The retrieval mode is not checked, unlike `startComparison`: grounding is
+ * refused there because each model would search for itself, and here nothing
+ * searches.
+ *
+ * The subject header (directors, reception figures) is rebuilt from the library
+ * as it is now, so a rating refreshed since the baseline shows up in that one
+ * line of the prompt. The documents are what must not move, and do not.
+ */
+export async function replayComparison(
+  runId: string,
+  requested?: ComparisonModelRequest[]
+): Promise<string> {
+  const original = await queryOne<RunRow>(`SELECT * FROM analysis_comparison_runs WHERE id = $1`, [
+    runId,
+  ])
+  if (!original) throw new Error('No such comparison.')
+  if (running.has(runId)) throw new Error('That run is still going. Replay it once it has finished.')
+  if (!original.prompt) {
+    throw new Error('That run never got as far as building its prompt, so it has no sources to replay.')
+  }
+
+  const sources = extractPromptSources(original.prompt, original.sources ?? [])
+  if (!sources) {
+    throw new Error("Could not read that run's source documents back out of its stored prompt.")
+  }
+
+  const subject = await loadAnalysisSubject(original.media_type, original.media_id)
+  if (!subject) throw new Error('That title is no longer in the library.')
+
+  // Default: the baseline's models, in the baseline's order, so every answer in
+  // the report has a partner to be read against.
+  const models = (
+    requested?.length
+      ? requested
+      : (
+          await query<ComparisonModelRequest>(
+            `SELECT provider, model FROM analysis_comparison_results WHERE run_id = $1 ORDER BY position ASC`,
+            [runId]
+          )
+        ).rows
+  ).slice(0, MAX_COMPARISON_MODELS)
+  if (models.length === 0) throw new Error('That run has no models to replay.')
+
+  const run = await queryOne<{ id: string }>(
+    `INSERT INTO analysis_comparison_runs
+       (media_type, media_id, title, year, prompt_version, replay_of, source_count, retrieved_chars, sources)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     RETURNING id`,
+    [
+      original.media_type,
+      original.media_id,
+      subject.title,
+      subject.year,
+      ANALYSIS_PROMPT_VERSION,
+      original.id,
+      original.source_count,
+      original.retrieved_chars,
+      // pg hands JSONB back parsed, so it goes back in as text.
+      JSON.stringify(original.sources ?? []),
+    ]
+  )
+  if (!run) throw new Error('Could not start the replay.')
+
+  await launch(run.id, original.media_type, original.media_id, models, sources)
+  return run.id
+}
+
+/**
+ * Write the pending rows, then drive the run in the background.
+ *
+ * The pending rows are written UP FRONT so the page can show what is queued
+ * from the first poll. An empty list while three models are waiting reads as a
+ * broken run.
+ */
+async function launch(
+  runId: string,
+  mediaType: 'movie' | 'series',
+  mediaId: string,
+  models: ComparisonModelRequest[],
+  replaySources: AnalysisSource[] | null
+): Promise<void> {
   for (const [position, entry] of models.entries()) {
     await query(
       `INSERT INTO analysis_comparison_results (run_id, position, provider, model)
        VALUES ($1, $2, $3, $4)`,
-      [run.id, position, entry.provider, entry.model]
+      [runId, position, entry.provider, entry.model]
     )
   }
 
-  running.add(run.id)
+  running.add(runId)
   // Deliberately not awaited: the caller answers 202 and the page polls.
-  void driveComparison(run.id, options.mediaType, options.mediaId, models).catch((err) => {
-    logger.error({ err, runId: run.id }, 'Comparison run threw outside its own handler')
+  void driveComparison(runId, mediaType, mediaId, models, replaySources).catch((err) => {
+    logger.error({ err, runId }, 'Comparison run threw outside its own handler')
   })
-
-  return run.id
 }
 
 async function driveComparison(
   runId: string,
   mediaType: 'movie' | 'series',
   mediaId: string,
-  models: ComparisonModelRequest[]
+  models: ComparisonModelRequest[],
+  replaySources: AnalysisSource[] | null
 ): Promise<void> {
   try {
     const subject = await loadAnalysisSubject(mediaType, mediaId)
@@ -147,29 +257,37 @@ async function driveComparison(
 
     const crwConfig = await getCrwConfig()
 
-    // ONCE. Everything below answers what this returns.
-    const retrieval = await retrieveSources(subject)
-    const prompt = buildAnalysisPrompt(subject, { mode: 'crw', sources: retrieval.sources })
+    let prompt: string
+    if (replaySources) {
+      // A replay's documents came from the run it replays, and the counts and
+      // summaries were copied from that run when the row was created.
+      prompt = buildAnalysisPrompt(subject, { mode: 'crw', sources: replaySources })
+      await query(`UPDATE analysis_comparison_runs SET prompt = $2 WHERE id = $1`, [runId, prompt])
+    } else {
+      // ONCE. Everything below answers what this returns.
+      const retrieval = await retrieveSources(subject)
+      prompt = buildAnalysisPrompt(subject, { mode: 'crw', sources: retrieval.sources })
 
-    await query(
-      `UPDATE analysis_comparison_runs
-          SET prompt = $2, source_count = $3, retrieved_chars = $4, sources = $5
-        WHERE id = $1`,
-      [
-        runId,
-        prompt,
-        retrieval.sources.length,
-        retrieval.retrievedChars,
-        JSON.stringify(
-          retrieval.sources.map((source) => ({
-            title: source.title,
-            domain: source.domain,
-            url: source.url ?? null,
-            chars: source.text.length,
-          }))
-        ),
-      ]
-    )
+      await query(
+        `UPDATE analysis_comparison_runs
+            SET prompt = $2, source_count = $3, retrieved_chars = $4, sources = $5
+          WHERE id = $1`,
+        [
+          runId,
+          prompt,
+          retrieval.sources.length,
+          retrieval.retrievedChars,
+          JSON.stringify(
+            retrieval.sources.map((source) => ({
+              title: source.title,
+              domain: source.domain,
+              url: source.url ?? null,
+              chars: source.text.length,
+            }))
+          ),
+        ]
+      )
+    }
 
     logger.info(
       { runId, title: subject.title, models: models.length, promptChars: prompt.length },
@@ -307,6 +425,7 @@ interface RunRow {
   source_count: number | null
   retrieved_chars: number | null
   sources: { title: string; domain: string; url: string | null; chars: number }[] | null
+  replay_of: string | null
   started_at: string
   finished_at: string | null
 }
@@ -349,6 +468,28 @@ export async function getComparisonRun(runId: string): Promise<ComparisonRunView
     [runId]
   )
 
+  // A replay carries its baseline's answers, so the one document holds both
+  // prompt versions. A baseline deleted since leaves replay_of NULL (0171), and
+  // the run then reads as an ordinary one.
+  let replayOf: ComparisonBaseline | null = null
+  if (run.replay_of) {
+    const base = await queryOne<RunRow>(`SELECT * FROM analysis_comparison_runs WHERE id = $1`, [
+      run.replay_of,
+    ])
+    if (base) {
+      const baseResults = await query<ResultRow>(
+        `SELECT * FROM analysis_comparison_results WHERE run_id = $1 ORDER BY position ASC`,
+        [base.id]
+      )
+      replayOf = {
+        runId: base.id,
+        promptVersion: base.prompt_version,
+        startedAt: new Date(base.started_at).toISOString(),
+        entries: baseResults.rows.map(toEntry),
+      }
+    }
+  }
+
   const report: ComparisonReport = {
     title: run.title,
     year: run.year,
@@ -366,23 +507,8 @@ export async function getComparisonRun(runId: string): Promise<ComparisonRunView
     // server rendering it and a client re-rendering it. Normalised once here.
     startedAt: new Date(run.started_at).toISOString(),
     finishedAt: run.finished_at ? new Date(run.finished_at).toISOString() : null,
-    entries: results.rows.map((row) => ({
-      provider: row.provider,
-      model: row.model,
-      status: row.status,
-      analysis: row.analysis,
-      grade: row.grade,
-      problem: row.problem,
-      finishReason: row.finish_reason,
-      inputTokens: row.input_tokens,
-      outputTokens: row.output_tokens,
-      reasoningTokens: row.reasoning_tokens,
-      durationMs: row.duration_ms,
-      error: row.error,
-      // Rebuilt into per-paragraph order so the report can print the shape of
-      // the answer. An absent map is an empty list, never a guess at position.
-      sections: sectionsFromMap(row.analysis, row.paragraph_map),
-    })),
+    entries: results.rows.map(toEntry),
+    replayOf,
   }
 
   return {
@@ -391,6 +517,26 @@ export async function getComparisonRun(runId: string): Promise<ComparisonRunView
     status: run.status,
     error: run.error,
     text: renderComparisonReport(report),
+  }
+}
+
+function toEntry(row: ResultRow): ComparisonEntry {
+  return {
+    provider: row.provider,
+    model: row.model,
+    status: row.status,
+    analysis: row.analysis,
+    grade: row.grade,
+    problem: row.problem,
+    finishReason: row.finish_reason,
+    inputTokens: row.input_tokens,
+    outputTokens: row.output_tokens,
+    reasoningTokens: row.reasoning_tokens,
+    durationMs: row.duration_ms,
+    error: row.error,
+    // Rebuilt into per-paragraph order so the report can print the shape of
+    // the answer. An absent map is an empty list, never a guess at position.
+    sections: sectionsFromMap(row.analysis, row.paragraph_map),
   }
 }
 
@@ -419,6 +565,10 @@ export interface ComparisonRunSummary {
   year: number | null
   status: string
   modelCount: number
+  /** Which prompt the run answered — what a replay is chosen by. */
+  promptVersion: number
+  /** The run this one replayed, or null for a run that retrieved its own. */
+  replayOf: string | null
   startedAt: string
   finishedAt: string | null
 }
@@ -432,11 +582,13 @@ export async function listComparisonRuns(limit = 25): Promise<ComparisonRunSumma
     year: number | null
     status: string
     model_count: string
+    prompt_version: number
+    replay_of: string | null
     started_at: string
     finished_at: string | null
   }>(
     `SELECT r.id, r.media_type, r.media_id, r.title, r.year, r.status,
-            r.started_at, r.finished_at,
+            r.prompt_version, r.replay_of, r.started_at, r.finished_at,
             COUNT(x.id) AS model_count
        FROM analysis_comparison_runs r
        LEFT JOIN analysis_comparison_results x ON x.run_id = r.id
@@ -455,6 +607,8 @@ export async function listComparisonRuns(limit = 25): Promise<ComparisonRunSumma
     status: row.status,
     // COUNT comes back as text from pg, so it is parsed rather than trusted.
     modelCount: Number.parseInt(row.model_count, 10) || 0,
+    promptVersion: row.prompt_version,
+    replayOf: row.replay_of,
     startedAt: row.started_at,
     finishedAt: row.finished_at,
   }))

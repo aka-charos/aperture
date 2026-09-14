@@ -223,6 +223,7 @@ export type AnalysisQuestionId =
   | 'intent'
   | 'circumstances'
   | 'dispute'
+  | 'reception'
 
 export interface AnalysisSegmentData {
   text: string

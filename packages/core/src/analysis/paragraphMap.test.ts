@@ -13,14 +13,14 @@ const movie = { paragraphCount: 4, mediaType: 'movie' as const }
 
 test('reads a well-formed map, including a paragraph answering two questions', () => {
   const map = parseParagraphMap(
-    ['1: work', '2: work, tradition', '3: dispute', '4: circumstances'].join('\n'),
+    ['1: work', '2: work, tradition', '3: reception', '4: circumstances'].join('\n'),
     movie
   )
 
   assert.deepEqual(map, [
     { paragraph: 1, questions: ['work'] },
     { paragraph: 2, questions: ['work', 'tradition'] },
-    { paragraph: 3, questions: ['dispute'] },
+    { paragraph: 3, questions: ['reception'] },
     { paragraph: 4, questions: ['circumstances'] },
   ])
 })
@@ -38,7 +38,7 @@ test('a question the model did not answer is simply absent', () => {
 // The one thing the model can get wrong is counting, and a map that points at
 // the wrong prose is worse than no map — so the whole block goes, not the line.
 test('an index past the end of the analysis discards the entire map', () => {
-  assert.equal(parseParagraphMap(['1: work', '9: dispute'].join('\n'), movie), null)
+  assert.equal(parseParagraphMap(['1: work', '9: reception'].join('\n'), movie), null)
 })
 
 test('a repeated paragraph number discards the entire map', () => {
@@ -67,13 +67,13 @@ test('structure is valid for a series and unknown for a movie', () => {
 
 test('tolerates the separators and formatting a model actually reaches for', () => {
   const map = parseParagraphMap(
-    ['**1.** work', '2) work and tradition', '3 - dispute (the middle section)'].join('\n'),
+    ['**1.** work', '2) work and tradition', '3 - reception (the middle section)'].join('\n'),
     movie
   )
   assert.deepEqual(map, [
     { paragraph: 1, questions: ['work'] },
     { paragraph: 2, questions: ['work', 'tradition'] },
-    { paragraph: 3, questions: ['dispute'] },
+    { paragraph: 3, questions: ['reception'] },
   ])
 })
 
@@ -101,7 +101,7 @@ test('splitAnalysisParagraphs counts blank-line blocks, as the panel does', () =
 
 test('selectMappedParagraphs returns the wanted paragraphs in written order', () => {
   const map = parseParagraphMap(
-    ['3: dispute', '1: work', '2: tradition'].join('\n'),
+    ['3: reception', '1: work', '2: tradition'].join('\n'),
     movie
   )
   assert.deepEqual(selectMappedParagraphs(FOUR_PARAGRAPHS, map, ['work', 'tradition']), [

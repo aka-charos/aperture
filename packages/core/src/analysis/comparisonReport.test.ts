@@ -135,6 +135,66 @@ test('reports the shape of the answer from the labels the model wrote', () => {
   assert.match(text, /sections: 1\. work {3}2\. tradition\+dispute {3}3\. —/)
 })
 
+test('every answer carries its habit counts, and the table lists every entry', () => {
+  const text = renderComparisonReport(
+    report({
+      entries: [
+        entry({ analysis: 'It is inherited rather than borrowed.' }),
+        entry({ model: 'broken-model', status: 'error', analysis: null, error: 'Refused' }),
+      ],
+    })
+  )
+  assert.match(text, /SIGNALS/)
+  assert.match(text, /"rather than" 1/)
+  // A failed entry still gets its row, with a dash instead of numbers.
+  assert.match(text, /\[2\] lmstudio \/ broken-model\s+—/)
+  assert.ok(text.indexOf('SIGNALS') < text.indexOf('It is inherited'), 'table above the prose')
+})
+
+/**
+ * A replay is two runs in one document. The baseline's answers must follow this
+ * run's, the pair must sit on adjacent rows of the table, and a baseline model
+ * this run did not repeat must still be printed.
+ */
+test('a replay prints the baseline after its own answers and pairs the table rows', () => {
+  const text = renderComparisonReport(
+    report({
+      promptVersion: 9,
+      entries: [entry({ model: 'deepseek', analysis: 'Version nine prose.' })],
+      replayOf: {
+        runId: 'run-8',
+        promptVersion: 8,
+        startedAt: '2026-09-10T10:00:00Z',
+        entries: [
+          entry({ model: 'dropped-model', analysis: 'Only in the old run.' }),
+          entry({ model: 'deepseek', analysis: 'Version eight prose, rather than nine.' }),
+        ],
+      },
+    })
+  )
+
+  assert.match(text, /PROMPT REPLAY/)
+  assert.match(text, /Replaying run run-8 \(prompt version 8/)
+  assert.match(text, /reused unchanged/)
+
+  const table = text.slice(text.indexOf('SIGNALS'), text.indexOf('Version nine prose.'))
+  const lines = table.split('\n')
+  const v9 = lines.findIndex((line) => line.startsWith('v9 [1] lmstudio / deepseek'))
+  assert.ok(v9 > -1, table)
+  assert.ok(lines[v9 + 1].startsWith('v8 [b2] lmstudio / deepseek'), table)
+  assert.ok(lines[v9 + 2].startsWith('v8 [b1] lmstudio / dropped-model'), table)
+
+  assert.ok(text.indexOf('Version nine prose.') < text.indexOf('BASELINE — run run-8'))
+  assert.ok(text.indexOf('BASELINE — run run-8') < text.indexOf('Version eight prose'))
+  assert.ok(text.indexOf('Only in the old run.') < text.indexOf('THE PROMPT BODY'))
+})
+
+test('an ordinary run says nothing about replaying', () => {
+  const text = renderComparisonReport(report())
+  assert.match(text, /MODEL COMPARISON/)
+  assert.doesNotMatch(text, /BASELINE|Replaying|reused unchanged/)
+})
+
 test('an unmapped analysis prints no sections line rather than an empty one', () => {
   const text = renderComparisonReport({ ...report(), entries: [entry({ sections: [] })] })
   assert.doesNotMatch(text, /sections:/)

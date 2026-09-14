@@ -1552,6 +1552,7 @@ export {
   loadAnalysisGrounding,
   selectAnalysisGrounding,
   startComparison,
+  replayComparison,
   getComparisonRun,
   listComparisonRuns,
   deleteComparisonRun,

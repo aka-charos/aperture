@@ -63,8 +63,18 @@
  *    together, and length follows the work rather than the size of the source
  *    block. Every stored row is retired for the same reason as 7 - the tic is
  *    in the prose, so only a rewrite removes it.
+ * 9: the reading runs before, during, after - where the work comes from, what
+ *    it is doing, how it was made, how it was received. Lineage leads and hands
+ *    its influence half to reception; stated intent folds into the making
+ *    question; the dispute question becomes a reception question, because four
+ *    of five measured analyses invented a disagreement to have something to
+ *    answer. The attribution rule states a principle - facts plainly, views
+ *    with a holder - after version 8's list of banned phrasings was met with
+ *    synonyms. Four measured habits are named: sections opening by restating
+ *    their question, one fact told under two questions, credit lists, and a
+ *    closing sentence announcing that a question stays open.
  */
-export const ANALYSIS_PROMPT_VERSION = 8
+export const ANALYSIS_PROMPT_VERSION = 9
 
 /** Reception figures, passed as calibration only. All optional. */
 export interface ReceptionContext {
@@ -184,6 +194,13 @@ function receptionLine(r: ReceptionContext): string | null {
  * second position, so question 2 is `tradition` for a film and `structure` for
  * a show — a numeric map would mean two different things while looking
  * identical, and nothing downstream could tell which it was holding.
+ *
+ * `intent` AND `dispute` ARE RETIRED, NOT DELETED. Version 9 stopped asking
+ * either - intent folded into `circumstances`, dispute became `reception` - but
+ * every row written before it carries them in its stored map, and the panel
+ * still heads those runs until the row is rewritten. They stay in the union so
+ * those rows type-check; `questionIdsFor` no longer returns them, so a new map
+ * cannot claim one.
  */
 export type AnalysisQuestionId =
   | 'work'
@@ -192,6 +209,7 @@ export type AnalysisQuestionId =
   | 'dispute'
   | 'intent'
   | 'circumstances'
+  | 'reception'
 
 interface AnalysisQuestion {
   id: AnalysisQuestionId
@@ -239,10 +257,22 @@ interface AnalysisQuestion {
  * MECHANICAL test in the shape TRADITION_QUESTION already uses - would the
  * finished work be different - which separates a production constraint from a
  * reaction to the finished thing without asking for a judgement.
+ *
+ * STATED INTENT FOLDED IN AT VERSION 9. As two questions they competed for the
+ * same few facts: on Possession, why Berlin was chosen appeared under intent
+ * ("the divided city") and again under circumstances ("the closest point to
+ * Poland"); on Fantozzi, the episodic source material was the whole of one and
+ * most of the other; on Tuner the model could not keep them apart and headed
+ * one paragraph with both. Intent stays a real answer - Possession's was the
+ * best section in it - so the question keeps its test for it: only what
+ * someone SAID, never an intention read off the finished film, which is what a
+ * thin intent section otherwise pads itself with. Measured too: filming
+ * locations listed for their own sake and a detail the answer itself called
+ * "coincidental" both passed the would-it-be-different test, so both are named.
  */
 const CIRCUMSTANCES_QUESTION: AnalysisQuestion = {
   id: 'circumstances',
-  text: 'What circumstances of its making or first release left a mark on the work - how it was produced, the form it was originally shown in, constraints or controversies that changed what it became? Facts that did not change the work - budgets, shooting schedules, crew and extras counts, release dates - are not answers. Neither is how it was received: marketing, online discussion and who objected to it after release belong to the disagreement question, not this one. Ask whether the finished work would be different if this had not happened.',
+  text: 'How was it made, and what did that leave on the work? Two things belong here. First, what the people who made it said they were trying to do - only what someone actually said, attributed to them, never an intention read back off the finished work. Second, the circumstances of its making or first release that changed what it became - how it was produced, the form it was first shown in, the constraints it was made under. Ask whether the finished work would be different if this had not happened. Facts that did not change the work are not answers - budgets, shooting schedules, crew and extras counts, filming locations listed for their own sake, release dates, coincidences. Neither is how it was received: that belongs to the reception question.',
 }
 
 /**
@@ -268,101 +298,102 @@ const CIRCUMSTANCES_QUESTION: AnalysisQuestion = {
  * don't-spoil rule only has to fail once. It sits in the question rather than
  * in RULES for proximity: the rule it duplicates is eight bullets and several
  * thousand characters further down, past the source documents, while this is
- * read at the moment the breach is invited. The load-bearing half is
- * ./segments.ts, which gates a paragraph the model labelled `tradition` behind
- * a disclosure the reader opens. This paragraph is what covers the rows that
- * gate cannot reach — the paragraph map is tolerant by design, so a row
- * carrying no usable map has no gate and nothing else standing in the way.
+ * read at the moment the breach is invited. It is also the ONLY protection:
+ * ./segments.ts once gated this paragraph behind a disclosure and no longer
+ * does (see that module), and the assistant's `spoilerRisk` flag reaches chat
+ * alone.
+ *
+ * VERSION 9 MOVED IT FIRST AND CUT IT IN HALF. It asked two things - what the
+ * work was responding to, and what it went on to influence - and only the first
+ * is an opening. Every measured lineage section oriented a reader well, which
+ * is why it now leads; "launched nine sequels" and "its influence has been
+ * traced to Lynch" are legacy, and they belong beside the reception that made
+ * them. The trade is knowing: the one spoiler-shaped question is now the first
+ * thing read, so the mechanical test above matters more than it did.
  */
 const TRADITION_QUESTION: AnalysisQuestion = {
   id: 'tradition',
-  text: 'What tradition does it sit in - what was it responding to, what did it influence? Name traditions and movements freely. Naming one specific prior work as the model for this one is only safe when the comparison does not carry the ending of that work across: if a reader who knows how that one ends would then know how this one ends, name the tradition and stop there.',
+  text: 'Where does it come from - what kind of work is it, what source does it adapt, what tradition, movement or body of work does it belong to, what was it responding to? Name traditions and movements freely. Naming one specific prior work as the model for this one is only safe when the comparison does not carry the ending of that work across: if a reader who knows how that one ends would then know how this one ends, name the tradition and stop there. What it went on to influence belongs to the reception question.',
 }
 
 /**
- * What is argued about, left argued about.
+ * How it was received, and what it went on to influence.
  *
- * The closing half was added because a live analysis reported a genuine
- * two-sided critical disagreement and then, two paragraphs later, decided it —
- * closing on one side's reading as the article's own verdict. The TASK line
- * already says "not a review", which is evidently not proximate enough to reach
- * a question that invites a survey of opinions.
+ * IT REPLACED A DISAGREEMENT QUESTION THAT HAD NOTHING TO ANSWER. Version 7
+ * asked "what do critics genuinely disagree about", and a model asked for a
+ * disagreement produces one: measured across five version-8 analyses, four
+ * invented the split. Fantozzi's set "one line of reading" against "another"
+ * and named neither; Possession's was a category argument about which genre it
+ * is; Affeksjonsverdi's said so itself - "These readings do not cancel each
+ * other out". A reader deciding what to watch wants what critics valued and
+ * faulted, which is a question every reviewed title has an answer to.
  *
- * ATTRIBUTION IS DELIBERATELY NOT REQUIRED. Demanding a named critic or outlet
- * for each position sounds like the specificity rule below and behaves nothing
- * like it: retrieved reviews and aggregator pages routinely describe a
- * disagreement without saying who holds which end of it, and a model required
- * to attribute one will either invent a critic — a fabricated position stored
- * indefinitely, the worst failure available here — or drop the paragraph under
- * the answer-only-what-is-supported rule, which on the analysis that prompted
- * this was the best paragraph in it and named nobody. The specificity rule
- * already asks for the names the sources give, which takes the upside without
- * the pressure.
+ * "LEAVE IT OPEN" WAS PERFORMED AS A SENTENCE. That clause existed because a
+ * version-6 analysis reported a real split and then settled it. Four of the
+ * five later answers carried it out by announcing it - "These disagreements
+ * remain unresolved", "left open by the people reviewing it" - so the guard is
+ * now against the verdict (no verdict of your own) and against the announcement
+ * (no sentence remarking the question stays open), separately.
+ *
+ * ATTRIBUTION IS STILL NOT REQUIRED, for the reason it was not required of the
+ * dispute question: retrieved pages routinely describe a view without saying
+ * who holds it, and a model required to name someone invents a critic or drops
+ * the paragraph. Rule 6 lets "critics" hold a view when the sources give no
+ * name; what it forbids is a view with no holder at all.
+ *
+ * ESTABLISHED PUBLICATIONS LEAD because the retrieval does not weigh them.
+ * Tuner leaned on a small blog as heavily as on The Guardian and Variety, and a
+ * section that exists to report reception is where that imbalance shows most.
+ * This is the prompt's half; most of it is decided at retrieval.
  */
-const DISPUTE_QUESTION: AnalysisQuestion = {
-  id: 'dispute',
-  text: 'What do critics genuinely disagree about? Report the disagreement and leave it open - if you find yourself concluding which side is right, you have stopped answering this question.',
-}
-
-/**
- * Stated once and shared, like the two above: it is identical for both media
- * types, and a question duplicated across the two arrays is a question that
- * drifts the first time one copy is edited.
- */
-const INTENT_QUESTION: AnalysisQuestion = {
-  id: 'intent',
-  text: 'What did the people who made it say they were trying to do?',
+const RECEPTION_QUESTION: AnalysisQuestion = {
+  id: 'reception',
+  text: 'How was it received, and what did it go on to influence? Say what critics valued in it and what they faulted, and name the critic or publication - where the sources include established publications, lead with them. If critics largely agree, say what they agree on. If they genuinely split, say where, give each side once and move on, with no sentence remarking that the question stays open. Critics reading the same work in different ways is not a disagreement about it. A criticism of one part may name that part - the final act, a subplot - but not say what happens in it. No scores, no list of awards, and no verdict of your own.',
 }
 
 /**
  * ORDER IS READING ORDER, and it is not the order these were first written in.
  *
- * The questions arrive in the output as paragraphs in sequence - one each, in
- * order, however often the rules say otherwise - so the list is the article's
- * structure whether or not it is meant to be. Version 4 opened on technique and
- * put the circumstances of production third, which meant a reader met an
- * equipment list first and had to cross a paragraph of production logistics to
- * reach what the work is doing. Measured on three live analyses, every one of
- * them opened on cameras, lenses and cutting rhythm.
+ * The questions arrive in the output as paragraphs in sequence, so the list is
+ * the article's structure whether or not it is meant to be. Version 4 opened on
+ * technique and put production third, so a reader met an equipment list first;
+ * version 5 moved the work to the front and version 7 put dispute last.
  *
- * So: the work, then its making, then its reception. Form and lineage first,
- * because that is what the piece is for; stated intent and production context
- * next; critical disagreement last. That is the shape criticism already uses -
- * an article about a film closes on reception - and it reads as a closing note
- * rather than an interruption three paragraphs in.
- *
- * DISPUTE MOVED FROM THIRD TO LAST once the paragraphs were labelled, and the
- * labels are what made it cheap. Version 5's argument for the old order was
- * that anyone who stops halfway has read the half worth reading; that is right
- * about intent and circumstances being background and was never an argument
- * about dispute in particular. The cost is a merge: tradition and dispute are
- * adjacent topics and the model often ran them together - measured on The Voice
- * Of Hind Rajab, one paragraph carried both - so separating them yields a
- * slightly more segmented article. Acceptable now that each run is headed.
+ * VERSION 9: BEFORE, DURING, AFTER. Where it comes from, what it is doing, how
+ * it was made, how it was received. Read across five version-8 analyses, the
+ * lineage paragraph was the one that oriented a reader every time - "sits in
+ * the anti-war tradition of Remarque's 1929 novel, as the third screen
+ * adaptation" is the sentence someone new to a title needs first - and the
+ * operator reads it as the overview. The influence half moved out to reception
+ * (see TRADITION_QUESTION), which is what makes the order chronological rather
+ * than merely reshuffled.
  *
  * IT CANNOT BE DONE AT RENDER TIME, which is why it is here rather than in the
- * panel. The prose is continuous and refers backwards - "That visual discipline
- * sits inside a Gothic historical horror tradition" points at the paragraph
- * above it - so re-sorting finished paragraphs strands those references. It
- * needed no version bump of its own either: 7 had already retired every stored
- * row, and a row written in the old order still renders correctly, because its
- * paragraphs carry their own labels rather than their meaning coming from
- * position.
+ * panel. The prose refers backwards - "That visual discipline sits inside a
+ * Gothic historical horror tradition" points at the paragraph above it - so
+ * re-sorting finished paragraphs strands those references. A row written in an
+ * older order still renders correctly, because its paragraphs carry their own
+ * labels rather than their meaning coming from position.
  *
- * The first question is also reframed rather than moved. "What is formally or
- * technically distinctive about how it was made" reliably returns hardware,
- * because that is a literal answer to it; asking what the work is doing and how
- * its choices serve that makes technique the evidence instead of the subject.
+ * The work question is framed as what the work is doing rather than what is
+ * distinctive about how it was made, which reliably returned hardware. Version
+ * 9 closes the gap that framing left: a model attaches a token sentence of
+ * effect to a credits roll or a lens list and satisfies it (Tuner's four-name
+ * orchestration credit, Affeksjonsverdi's Arricam LT and Cooke lenses), and
+ * interpreting a device invites saying what it turns out to be (Possession's
+ * doubles and creature, both late reveals, in its first section).
  */
+const WORK_GUARD =
+  'Name a choice, then say what it achieves. Only the choices that matter to what it is doing: a run of camera models, lens makes or music credits is not an answer, even with a sentence about its effect attached. Describe what an image, device or figure does to the viewer, never what it turns out to be.'
+
 const MOVIE_QUESTIONS: AnalysisQuestion[] = [
+  TRADITION_QUESTION,
   {
     id: 'work',
-    text: 'What is this film doing, and how do its choices serve that? Name a choice, then say what it achieves - a list of equipment or techniques with no effect attached is not an answer.',
+    text: `What is this film doing, and how do its choices serve that? ${WORK_GUARD}`,
   },
-  TRADITION_QUESTION,
-  INTENT_QUESTION,
   CIRCUMSTANCES_QUESTION,
-  DISPUTE_QUESTION,
+  RECEPTION_QUESTION,
 ]
 
 /**
@@ -372,18 +403,17 @@ const MOVIE_QUESTIONS: AnalysisQuestion[] = [
  * viewer choosing what to start wants to know.
  */
 const SERIES_QUESTIONS: AnalysisQuestion[] = [
+  TRADITION_QUESTION,
   {
     id: 'work',
-    text: 'What is this series doing, and how do its choices serve that? Name a choice, then say what it achieves - a list of equipment or techniques with no effect attached is not an answer.',
+    text: `What is this series doing, and how do its choices serve that? ${WORK_GUARD}`,
   },
   {
     id: 'structure',
     text: 'How is it structured across its run - serialised or episodic, and did it change?',
   },
-  TRADITION_QUESTION,
-  INTENT_QUESTION,
   CIRCUMSTANCES_QUESTION,
-  DISPUTE_QUESTION,
+  RECEPTION_QUESTION,
 ]
 
 /**
@@ -416,13 +446,29 @@ const GROUNDED_RULE =
   'Ground every claim in something you actually retrieved. Prefer critics, filmmaker interviews and film scholarship over aggregators, listicles and marketing copy. Invent nothing: no production history, festival history or reception you cannot source.'
 
 /**
- * THREE OF THESE NAME THE FAILING PHRASING VERBATIM, which reads as
+ * SEVERAL OF THESE NAME THE FAILING PHRASING VERBATIM, which reads as
  * over-specification and is not. Each one replaced an abstract rule that was
  * already there and had already failed: "do not cite the sources" did not stop
  * "the sources describe it as", because that is not a citation; "length follows
  * the work and the sources" was read as permission to write at the length of
  * the source block. A rule the model can satisfy while producing the behaviour
  * the rule exists to prevent is not a rule yet.
+ *
+ * BUT A LIST ALONE IS MET WITH SYNONYMS, which is what version 9 learned from
+ * version 8. Rule 7 banned "the sources say", "the sources describe",
+ * "reportedly", "according to reports" - and Possession wrote "according to one
+ * critical read", "is described as" and "has been called" instead, while
+ * Affeksjonsverdi wrote "the sources carry". So the named phrasings are now
+ * EXAMPLES under a stated principle: facts plainly, views with a holder. The
+ * same version-8 rule also turned an interpretation into a fact - it offered
+ * "write the claim as a fact" as one of two exits, and Im Westen took it for a
+ * scholar's thesis about Netflix and German memory culture - which is why the
+ * principle separates the two kinds of claim rather than the two exits.
+ *
+ * RULE 4'S OPENER CLAUSE IS ABOUT THE PANEL. Five of five analyses opened a
+ * section by restating its question ("The film sits in", "Critics disagree
+ * about"), which is the questionnaire showing through a heading that already
+ * names it. The model cannot see the heading, so the rule tells it one exists.
  *
  * RULE 3 IS THE ONE THAT CHANGED DIRECTION. Version 5 wrote "do not write one
  * paragraph per question" to stop the questions being a form filled in one
@@ -436,14 +482,14 @@ const GROUNDED_RULE =
  * handle, and it is a thing a model does when told to write continuous prose.
  */
 const RULES = [
-  'Describe how it works, never what happens in it. No third-act or ending discussion. Someone who has not seen it must be able to read this safely.',
+  'Describe how it works, never what happens in it. No third-act or ending discussion, and no reveals - not what a character, creature or image turns out to be. Someone who has not seen it must be able to read this safely.',
   'Match your register to the work. A stunt-driven action picture has real craft in its staging and choreography, and that is a legitimate subject - write about it as what it is. Do not apply art-cinema vocabulary to a genre entertainment.',
-  'The questions are what to cover and in what order, not a form to fill in. Give a question as many paragraphs as the sources support, and none to a question they do not. Two questions may share a paragraph when they genuinely belong together, but do not scatter one question across paragraphs that are not next to each other. Let the whole read as continuous prose with a single line of thought.',
-  'Write in short paragraphs of three or four sentences, separated by a blank line. Keep each sentence to one idea and do not chain clauses with semicolons - if a sentence carries two ideas, make it two sentences. Plain prose only in the analysis itself: no headings, bullet points, numbered lists or bold text.',
-  'Be specific. Name the people the sources name - the director, the writer, the cinematographer, whoever is credited with the choice you are describing - rather than writing "those behind the project" or "the creative team". Cut any sentence whose only content is that the work sits in a tradition, extends one, or hopes to influence something: say what and how, or say nothing.',
-  'Answer only what the sources genuinely support. It is normal for two or three of these questions to have no answer, and dropping them is the correct outcome rather than a gap to fill. If none of them do, say so in two sentences and stop.',
-  'Do not cite, number or link the sources in your prose, and do not quote the reception figures back. Never refer to the source documents as a thing - no "the sources say", "the sources describe", "reportedly", "according to reports". Write the claim as a fact about the work, or name the critic or publication that made it.',
-  'Length follows the work, not the amount of source text. Many titles support 200 words, and 900 is the most any of them support. A long source block is not a reason to write more - most of it is plot summary, cast lists and the same facts repeated across pages.',
+  'The questions are what to cover and in what order, not a form to fill in. Give a question as many paragraphs as the sources support, and none to a question they do not. Two questions may share a paragraph when they genuinely belong together, but do not scatter one question across paragraphs that are not next to each other. Say each fact once, under the question it belongs to - once it has been said, do not say it again under another.',
+  'Write in short paragraphs of three or four sentences, never more, separated by a blank line. Keep each sentence to one idea and do not chain clauses with semicolons - if a sentence carries two ideas, make it two sentences. Each answer is shown to the reader under a heading that names its question, so open on the substance - never with a restatement of the question such as "The film sits in", "The circumstances of its making" or "Critics disagree about". Say what a choice does, not what it avoids: a sentence built on "rather than" or "not X but Y" usually says one thing twice. Plain prose only in the analysis itself: no headings, bullet points, numbered lists or bold text.',
+  'Be specific. Name the person responsible for the choice you are describing - the director, the writer, the cinematographer - instead of "those behind the project" or "the creative team". Name people for what they chose, never to list credits: a sentence that only records who did what is not analysis. Cut any sentence whose only content is that the work sits in a tradition, extends one, or hopes to influence something: say what and how, or say nothing.',
+  'Answer only what the sources genuinely support. It is normal for one or two of these questions to have no answer, and dropping them is the correct outcome rather than a gap to fill. A single thin fact is not a paragraph - fold it into the answer it belongs to, or leave it out. If no question has an answer, say so in two sentences and stop.',
+  'Do not cite, number or link the documents, and do not mention them at all - the reader never sees them, so "the sources say" or "the sources carry" points at nothing. Do not quote the reception figures back. State facts plainly. A view - an interpretation or a judgement - belongs to whoever holds it: name the critic or publication when the sources do, and say "critics" when they do not. Never turn a view into a fact, and never hide whose view it is behind "is described as", "has been called", "according to one reading" or "reportedly". Name a critic where their view is the point, not in every sentence. Judgements of quality belong in the reception answer only.',
+  'Length follows the work, not the amount of source text. Many titles support 200 words, and 900 words - about ten short paragraphs - is the most any of them support. A long source block is not a reason to write more - most of it is plot summary, cast lists and the same facts repeated across pages.',
 ]
 
 /**
@@ -545,13 +591,72 @@ const SOURCE_BLOCK_HEADER = [
 function buildSourceBlock(sources: AnalysisSource[]): string {
   const documents = sources
     .filter((s) => s.text.trim().length > 0)
-    .map((source, i) => {
-      const label = [source.title, source.domain].filter(Boolean).join(' — ')
-      return `[${i + 1}] ${label}\n${source.text.trim()}`
-    })
+    .map((source, i) => `[${i + 1}] ${documentLabel(source)}\n${source.text.trim()}`)
     .join('\n\n')
 
   return `${SOURCE_BLOCK_HEADER}\n\n${documents}`
+}
+
+/** How a document is labelled in the block above. One copy, read both ways. */
+function documentLabel(source: { title: string; domain: string }): string {
+  return [source.title, source.domain].filter(Boolean).join(' — ')
+}
+
+/**
+ * Recover the documents a stored prompt was built from.
+ *
+ * WHY THIS EXISTS. A bench run stores its whole prompt and a summary of each
+ * source (title, domain, url, length) but not the source text as its own field,
+ * and replaying a run under a newer prompt needs exactly that text - retrieving
+ * again would hand the new prompt different pages and put the confound the
+ * bench exists to remove straight back. The text is all inside the stored
+ * prompt, so it is read back out of it.
+ *
+ * SPLIT ON THE KNOWN LABELS, NEVER ON THE NUMBERING ALONE. A document is
+ * introduced by `[n] title — domain` on its own line, and scraped pages are
+ * full of footnote markers like `[2]` at the start of a line - so a split on
+ * "a line starting with the next number" would cut a Wikipedia page at its
+ * reference list. The label carries the title and domain the run recorded, and
+ * that string does not occur by accident.
+ *
+ * A DOCUMENT CAN BE MISSING FROM THE BLOCK ON PURPOSE: `buildSourceBlock` skips
+ * one whose text is empty and does not give it a number, while the run's
+ * summary still lists it. So each summary entry is looked for under the NEXT
+ * unused number, and one that is not found is taken as skipped rather than as
+ * a failure.
+ *
+ * Returns null when nothing can be recovered, which the caller reports rather
+ * than replaying an empty prompt. Pinned by a round trip in ./prompt.test.ts:
+ * the text recovered must rebuild a byte-identical block.
+ */
+export function extractPromptSources(
+  prompt: string,
+  documents: readonly { title: string; domain: string; url?: string | null }[]
+): AnalysisSource[] | null {
+  // The last TASK heading, because a scraped page may contain the word on a
+  // line of its own and the real one follows every document.
+  const end = prompt.lastIndexOf('\n\nTASK\n')
+  if (end < 0) return null
+
+  const found: { at: number; textStart: number; doc: (typeof documents)[number] }[] = []
+  let cursor = 0
+  let next = 1
+  for (const doc of documents) {
+    const marker = `\n\n[${next}] ${documentLabel(doc)}\n`
+    const at = prompt.indexOf(marker, cursor)
+    if (at < 0 || at >= end) continue
+    found.push({ at, textStart: at + marker.length, doc })
+    cursor = at + marker.length
+    next += 1
+  }
+  if (found.length === 0) return null
+
+  return found.map((entry, i) => ({
+    title: entry.doc.title,
+    domain: entry.doc.domain,
+    text: prompt.slice(entry.textStart, i + 1 < found.length ? found[i + 1].at : end),
+    ...(entry.doc.url ? { url: entry.doc.url } : {}),
+  }))
 }
 
 export interface PromptOptions {

@@ -132,10 +132,10 @@ export function createAnalysisTools(_ctx: ToolContext) {
   return {
     getTitleAnalysis: tool({
       description:
-        "Read the stored critical analysis of one title in the user's library: what the work " +
-        'is doing and how its choices serve that, what tradition it sits in, what its makers ' +
-        'said they were attempting, the circumstances it was made under, and what critics ' +
-        'still argue about. Written from retrieved published sources and cached, so it is ' +
+        "Read the stored critical analysis of one title in the user's library: where it comes " +
+        'from and what tradition it sits in, what the work is doing and how its choices serve ' +
+        'that, how it was made and what its makers said they were attempting, and how critics ' +
+        'received it. Written from retrieved published sources and cached, so it is ' +
         'about the WORK and is the same for every user — it is not a recommendation and says ' +
         'nothing about why this person might like it. Use it for "tell me about X", "what is ' +
         'X doing", "why does X matter", "what do critics say about X". Returns one title per ' +
