@@ -5403,6 +5403,7 @@
     "openJob": "Follow it in Jobs",
     "syncFailed": "Could not start the sync",
     "playlistsEnabled": "Playlists viewers choose to show",
-    "playlistsHelp": "A viewer can put a playlist or collection they generated, or one made from assistant suggestions, on their own home screen. Rows follow the playlist's current contents, not its order. Playlists built on the Explore graph are not offered this."
+    "playlistsHelp": "A viewer can put a playlist or collection they generated, or one made from assistant suggestions, on their own home screen. Rows follow the playlist's current contents, not its order. Playlists built on the Explore graph are not offered this.",
+    "syncWhenOff": "Sync is available while home screen rows are on. With them off, the nightly sync — or running it from the Jobs page — removes any rows and tags already written."
   }
 }

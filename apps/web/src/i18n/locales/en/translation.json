@@ -2430,6 +2430,7 @@
     "tagsNote": "Each row is backed by a tag beginning with “aperture:” on the original titles. The tags are visible in Emby, and {{appName}} ignores them when it syncs your library.",
     "save": "Save",
     "syncNow": "Sync now",
+    "syncWhenOff": "Sync is available while home screen rows are on. With them off, the nightly sync — or running it from the Jobs page — removes any rows and tags already written.",
     "syncStarted": "Sync started.",
     "openJob": "Follow it in Jobs",
     "syncFailed": "Could not start the sync"

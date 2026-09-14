@@ -186,6 +186,15 @@ export function HomeSectionsSection() {
   // Switching ON needs a supported server; switching OFF never does, because
   // that is how every managed row gets removed.
   const enableBlocked = !status.supported && !form.enabled
+  // Nothing below the master switch has any effect while it is off: the sync
+  // gates every row on it and a run can only remove. Showing those controls as
+  // live — a Top Picks switch reading "on" under a feature that is off — says
+  // otherwise, so they are disabled. Their values are kept for when it comes back
+  // on, and the form value (not the saved one) decides, so flipping the switch
+  // on unlocks them before saving.
+  const inactive = !form.enabled
+  const captionColor = inactive ? 'text.disabled' : 'text.secondary'
+  const headingColor = inactive ? 'text.disabled' : 'text.primary'
 
   const unsupportedMessage = (() => {
     switch (status.reason) {
@@ -285,7 +294,7 @@ export function HomeSectionsSection() {
 
         <Divider sx={{ my: 2 }} />
 
-        <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+        <Typography variant="subtitle2" fontWeight={600} gutterBottom color={headingColor}>
           {t('settingsHomeSections.rowsHeading')}
         </Typography>
         <Stack spacing={1}>
@@ -294,12 +303,13 @@ export function HomeSectionsSection() {
               control={
                 <Switch
                   checked={form.recommendationsEnabled}
+                  disabled={inactive}
                   onChange={(e) => update({ recommendationsEnabled: e.target.checked })}
                 />
               }
               label={t('settingsHomeSections.recommendationsEnabled')}
             />
-            <Typography variant="caption" color="text.secondary" component="p">
+            <Typography variant="caption" color={captionColor} component="p">
               {t('settingsHomeSections.recommendationsHelp')}
             </Typography>
           </Box>
@@ -308,12 +318,13 @@ export function HomeSectionsSection() {
               control={
                 <Switch
                   checked={form.topPicksEnabled}
+                  disabled={inactive}
                   onChange={(e) => update({ topPicksEnabled: e.target.checked })}
                 />
               }
               label={t('settingsHomeSections.topPicksEnabled')}
             />
-            <Typography variant="caption" color="text.secondary" component="p">
+            <Typography variant="caption" color={captionColor} component="p">
               {t('settingsHomeSections.topPicksHelp')}
             </Typography>
           </Box>
@@ -322,12 +333,13 @@ export function HomeSectionsSection() {
               control={
                 <Switch
                   checked={form.playlistsEnabled}
+                  disabled={inactive}
                   onChange={(e) => update({ playlistsEnabled: e.target.checked })}
                 />
               }
               label={t('settingsHomeSections.playlistsEnabled')}
             />
-            <Typography variant="caption" color="text.secondary" component="p">
+            <Typography variant="caption" color={captionColor} component="p">
               {t('settingsHomeSections.playlistsHelp')}
             </Typography>
           </Box>
@@ -335,7 +347,7 @@ export function HomeSectionsSection() {
 
         <Divider sx={{ my: 2 }} />
 
-        <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+        <Typography variant="subtitle2" fontWeight={600} gutterBottom color={headingColor}>
           {t('settingsHomeSections.namesHeading')}
         </Typography>
         <Box
@@ -350,6 +362,7 @@ export function HomeSectionsSection() {
             value={form.recommendationsName}
             onChange={(e) => update({ recommendationsName: e.target.value })}
             size="small"
+            disabled={inactive}
             slotProps={{ htmlInput: { maxLength: limits.maxNameLength } }}
           />
           <TextField
@@ -357,6 +370,7 @@ export function HomeSectionsSection() {
             value={form.topPicksMoviesName}
             onChange={(e) => update({ topPicksMoviesName: e.target.value })}
             size="small"
+            disabled={inactive}
             slotProps={{ htmlInput: { maxLength: limits.maxNameLength } }}
           />
           <TextField
@@ -364,13 +378,14 @@ export function HomeSectionsSection() {
             value={form.topPicksSeriesName}
             onChange={(e) => update({ topPicksSeriesName: e.target.value })}
             size="small"
+            disabled={inactive}
             slotProps={{ htmlInput: { maxLength: limits.maxNameLength } }}
           />
         </Box>
 
         <Divider sx={{ my: 2 }} />
 
-        <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+        <Typography variant="subtitle2" fontWeight={600} gutterBottom color={headingColor}>
           {t('settingsHomeSections.layoutHeading')}
         </Typography>
         <Box
@@ -391,6 +406,7 @@ export function HomeSectionsSection() {
               if (Number.isFinite(value)) update({ sectionPosition: value })
             }}
             size="small"
+            disabled={inactive}
             slotProps={{ htmlInput: { min: 0, max: limits.maxSectionPosition } }}
           />
           <TextField
@@ -402,6 +418,7 @@ export function HomeSectionsSection() {
               if (Number.isFinite(value)) update({ recommendationsLimit: value })
             }}
             size="small"
+            disabled={inactive}
             slotProps={{
               htmlInput: { min: limits.minRecommendationsLimit, max: limits.maxRecommendationsLimit },
             }}
@@ -414,6 +431,7 @@ export function HomeSectionsSection() {
               helperText={t('settingsHomeSections.sortHelp')}
               value={form.sortBy}
               onChange={(e) => update({ sortBy: e.target.value })}
+              disabled={inactive}
               size="small"
             >
               {limits.sorts.map((sort) => (
@@ -425,7 +443,7 @@ export function HomeSectionsSection() {
           </Box>
         </Box>
 
-        <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 2 }}>
+        <Typography variant="caption" color={captionColor} component="p" sx={{ mt: 2 }}>
           {t('settingsHomeSections.tagsNote')}
         </Typography>
 
@@ -437,11 +455,16 @@ export function HomeSectionsSection() {
             variant="outlined"
             startIcon={<SyncIcon />}
             onClick={() => void handleSyncNow()}
-            disabled={!status.supported || syncing || hasChanges}
+            disabled={inactive || !status.supported || syncing || hasChanges}
           >
             {t('settingsHomeSections.syncNow')}
           </Button>
         </Box>
+        {inactive && (
+          <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1 }}>
+            {t('settingsHomeSections.syncWhenOff')}
+          </Typography>
+        )}
       </CardContent>
     </Card>
   )
