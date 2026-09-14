@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import type {
   Channel,
   MediaSummary,
@@ -27,8 +28,12 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
   // User-facing noun for the (non-i18n) snackbar/error strings below. The components are
   // i18n-namespaced separately; these transient toasts just swap the word.
   const noun = outputType === 'collection' ? 'Collection' : 'Playlist'
+  const { t } = useTranslation()
+  const ns = outputType === 'collection' ? 'collections' : 'playlists'
   const [channels, setChannels] = useState<Channel[]>([])
   const [graphPlaylists, setGraphPlaylists] = useState<GraphPlaylist[]>([])
+  // Decided by the API; false until it answers, so the control never flashes on and off.
+  const [homeSectionsAvailable, setHomeSectionsAvailable] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -117,14 +122,25 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
     }
   }
 
+  const fetchHomeAvailability = useCallback(async () => {
+    try {
+      const response = await fetch('/api/home-sections/availability', { credentials: 'include' })
+      const data = response.ok ? await response.json() : null
+      setHomeSectionsAvailable(data?.playlists === true)
+    } catch {
+      setHomeSectionsAvailable(false)
+    }
+  }, [])
+
   useEffect(() => {
     fetchChannels()
     fetchGenres()
+    void fetchHomeAvailability()
     // Graph playlists are a playlist-only concept; the Collections page doesn't show them.
     if (outputType === 'playlist') {
       fetchGraphPlaylists()
     }
-  }, [fetchChannels, fetchGraphPlaylists, outputType])
+  }, [fetchChannels, fetchGraphPlaylists, fetchHomeAvailability, outputType])
 
   // Seed details are fetched one id at a time because /api/movies and /api/series only expose
   // single-item detail routes; the lists are short (a handful of seeds per channel).
@@ -501,10 +517,43 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
     setGraphPlaylistItems([])
   }
 
+  /**
+   * Put a playlist on the owner's Emby home screen or take it off. The row itself
+   * changes on the next home-section sync, so the toast says so rather than
+   * implying the home screen already changed.
+   */
+  const toggleHomeScreen = async (url: string, enabled: boolean, refresh: () => Promise<void>) => {
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ enabled }),
+      })
+      if (!response.ok) throw new Error()
+      const data = await response.json()
+      await refresh()
+      setSnackbar({
+        open: true,
+        message: t(`${ns}.${data.onHomeScreen ? 'snackbarAddedToHome' : 'snackbarRemovedFromHome'}`),
+        severity: 'success',
+      })
+    } catch {
+      setSnackbar({ open: true, message: t(`${ns}.snackbarHomeFailed`), severity: 'error' })
+    }
+  }
+
+  const handleToggleChannelHomeScreen = (channel: Channel) =>
+    toggleHomeScreen(`/api/channels/${channel.id}/home-screen`, !channel.home_section_tag, fetchChannels)
+
+  const handleToggleGraphPlaylistHomeScreen = (playlist: GraphPlaylist) =>
+    toggleHomeScreen(`/api/graph-playlists/${playlist.id}/home-screen`, playlist.onHomeScreen !== true, fetchGraphPlaylists)
+
   return {
     // Data
     channels,
     graphPlaylists,
+    homeSectionsAvailable,
     loading,
     error,
     availableGenres,
@@ -560,5 +609,7 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
     handleAddToPlaylist,
     handleViewGraphPlaylist,
     handleCloseGraphPlaylistDialog,
+    handleToggleChannelHomeScreen,
+    handleToggleGraphPlaylistHomeScreen,
   }
 }

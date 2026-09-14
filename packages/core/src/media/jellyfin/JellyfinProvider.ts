@@ -22,6 +22,8 @@ import type {
   CollectionCreateResult,
   LibraryCreateResult,
   PlaylistItem,
+  ContentSection,
+  MediaServerTag,
 } from '../types.js'
 
 import { JellyfinProviderBase } from './base.js'
@@ -76,6 +78,16 @@ import {
   addCollectionItems,
   removeCollectionItems,
 } from './collections.js'
+import {
+  getHomeSections,
+  saveHomeSection,
+  deleteHomeSections,
+  moveHomeSections,
+  getTagsByPrefix,
+  getItemIdsWithTag,
+  addItemTag,
+  removeItemTag,
+} from './homeSections.js'
 
 export class JellyfinProvider extends JellyfinProviderBase implements MediaServerProvider {
   // Authentication
@@ -308,6 +320,44 @@ export class JellyfinProvider extends JellyfinProviderBase implements MediaServe
 
   async removeCollectionItems(apiKey: string, collectionId: string, itemIds: string[]): Promise<void> {
     return removeCollectionItems(this, apiKey, collectionId, itemIds)
+  }
+
+  // Home screen sections and item tags (unsupported — see ./homeSections.ts)
+  async getHomeSections(apiKey: string, userId: string): Promise<ContentSection[]> {
+    return getHomeSections(this, apiKey, userId)
+  }
+
+  async saveHomeSection(apiKey: string, userId: string, section: ContentSection): Promise<void> {
+    return saveHomeSection(this, apiKey, userId, section)
+  }
+
+  async deleteHomeSections(apiKey: string, userId: string, sectionIds: string[]): Promise<void> {
+    return deleteHomeSections(this, apiKey, userId, sectionIds)
+  }
+
+  async moveHomeSections(
+    apiKey: string,
+    userId: string,
+    sectionIds: string[],
+    newIndex: number
+  ): Promise<void> {
+    return moveHomeSections(this, apiKey, userId, sectionIds, newIndex)
+  }
+
+  async getTagsByPrefix(apiKey: string, prefix: string): Promise<MediaServerTag[]> {
+    return getTagsByPrefix(this, apiKey, prefix)
+  }
+
+  async getItemIdsWithTag(apiKey: string, tagName: string): Promise<string[]> {
+    return getItemIdsWithTag(this, apiKey, tagName)
+  }
+
+  async addItemTag(apiKey: string, itemId: string, tag: MediaServerTag): Promise<void> {
+    return addItemTag(this, apiKey, itemId, tag)
+  }
+
+  async removeItemTag(apiKey: string, itemId: string, tag: MediaServerTag): Promise<void> {
+    return removeItemTag(this, apiKey, itemId, tag)
   }
 
   // Watch History Management

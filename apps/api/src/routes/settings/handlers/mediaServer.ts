@@ -51,13 +51,9 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
     if (baseUrl && apiKey && config.type) {
       try {
         const provider = createMediaServerProvider(config.type, baseUrl)
-        if ('getServerInfo' in provider) {
-          const info = await (
-            provider as { getServerInfo: (key: string) => Promise<{ id: string; name: string }> }
-          ).getServerInfo(apiKey)
-          serverId = info.id
-          serverName = info.name
-        }
+        const info = await provider.getServerInfo(apiKey)
+        serverId = info.id
+        serverName = info.name
       } catch (err) {
         fastify.log.warn({ err }, 'Could not fetch media server info')
       }
@@ -92,12 +88,8 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
         if (config.baseUrl && config.apiKey && config.type) {
           try {
             const provider = createMediaServerProvider(config.type, config.baseUrl)
-            if ('getServerInfo' in provider) {
-              const info = await (
-                provider as { getServerInfo: (key: string) => Promise<{ id: string; name: string }> }
-              ).getServerInfo(config.apiKey)
-              reportedName = info.name
-            }
+            const info = await provider.getServerInfo(config.apiKey)
+            reportedName = info.name
           } catch (err) {
             fastify.log.warn({ err }, 'Could not fetch media server info for settings')
           }

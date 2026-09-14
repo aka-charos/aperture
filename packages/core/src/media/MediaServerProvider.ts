@@ -14,6 +14,8 @@ import type {
   CollectionCreateResult,
   LibraryCreateResult,
   PlaylistItem,
+  ContentSection,
+  MediaServerTag,
 } from './types.js'
 
 /**
@@ -39,6 +41,13 @@ export interface MediaServerProvider {
    * Returns user info and access token for making API calls on their behalf
    */
   authenticateByName(username: string, password: string): Promise<AuthResult>
+
+  /**
+   * Server identity and version. Both providers have always implemented this;
+   * it was missing from the interface, so callers duck-typed it and dropped
+   * `version` — which the home-section version gate needs.
+   */
+  getServerInfo(apiKey: string): Promise<{ id: string; name: string; version: string }>
 
   // =========================================================================
   // Users
@@ -347,6 +356,34 @@ export interface MediaServerProvider {
    * Returns unique genre names sorted alphabetically
    */
   getGenres(apiKey: string): Promise<string[]>
+
+  // =========================================================================
+  // Home screen sections and item tags (Emby only — Jellyfin stubs throw)
+  // =========================================================================
+
+  /** A user's configured home-screen rows. */
+  getHomeSections(apiKey: string, userId: string): Promise<ContentSection[]>
+
+  /**
+   * Create a section (no `Id`) or update one (with `Id`). Emby answers with an
+   * empty body, so a created section's id is learnt by reading the list back.
+   */
+  saveHomeSection(apiKey: string, userId: string, section: ContentSection): Promise<void>
+
+  deleteHomeSections(apiKey: string, userId: string, sectionIds: string[]): Promise<void>
+
+  moveHomeSections(apiKey: string, userId: string, sectionIds: string[], newIndex: number): Promise<void>
+
+  /** Every tag whose name starts with `prefix`, with its id. */
+  getTagsByPrefix(apiKey: string, prefix: string): Promise<MediaServerTag[]>
+
+  /** Ids of every movie and series carrying the tag. */
+  getItemIdsWithTag(apiKey: string, tagName: string): Promise<string[]>
+
+  /** Tag one item. Writes only the item's tag list, on the original item. */
+  addItemTag(apiKey: string, itemId: string, tag: MediaServerTag): Promise<void>
+
+  removeItemTag(apiKey: string, itemId: string, tag: MediaServerTag): Promise<void>
 
   // =========================================================================
   // Utilities

@@ -15,6 +15,8 @@ export interface Channel {
   playlist_id: string | null
   output_type?: 'playlist' | 'collection'
   collection_id?: string | null
+  /** Present (a tag) when the owner put it on their Emby home screen; null or absent otherwise. */
+  home_section_tag?: string | null
   last_generated_at: string | null
 }
 
@@ -87,6 +89,9 @@ export interface GraphPlaylist {
   sourceItemId: string | null
   sourceItemType: string | null
   itemCount: number
+  /** Absent on older API responses; only 'chat' playlists may go on a home screen. */
+  origin?: 'graph' | 'chat'
+  onHomeScreen?: boolean
   createdAt: string
   updatedAt: string
 }

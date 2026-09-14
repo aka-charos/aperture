@@ -5,6 +5,7 @@
  */
 
 import { normalizeCountries } from '../../countries/canonical.js'
+import { withoutManagedTags } from '../managedTags.js'
 import type { Movie, Series, Episode } from '../types.js'
 import type { JellyfinItem, JellyfinEpisode } from './types.js'
 
@@ -57,7 +58,7 @@ export function mapJellyfinItemToMovie(item: JellyfinItem, baseUrl: string): Mov
     actors,
     imdbId: item.ProviderIds?.Imdb,
     tmdbId: item.ProviderIds?.Tmdb,
-    tags: item.Tags || [],
+    tags: withoutManagedTags(item.Tags),
     // ProductionLocations is whatever the server's scraper wrote into the
     // NFO — localised ("Ελλάδα"), coded ("GR"), or a whole comma-joined list
     // in one string. Canonicalised here so the sync cannot re-dirty a column
@@ -125,7 +126,7 @@ export function mapJellyfinItemToSeries(item: JellyfinItem, baseUrl: string): Se
     imdbId: item.ProviderIds?.Imdb,
     tmdbId: item.ProviderIds?.Tmdb,
     tvdbId: item.ProviderIds?.Tvdb,
-    tags: item.Tags || [],
+    tags: withoutManagedTags(item.Tags),
     // ProductionLocations is whatever the server's scraper wrote into the
     // NFO — localised ("Ελλάδα"), coded ("GR"), or a whole comma-joined list
     // in one string. Canonicalised here so the sync cannot re-dirty a column

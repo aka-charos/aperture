@@ -16,6 +16,8 @@ import {
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import RefreshIcon from '@mui/icons-material/Refresh'
+import HomeIcon from '@mui/icons-material/Home'
+import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import PlaylistPlayIcon from '@mui/icons-material/PlaylistPlay'
 import MovieIcon from '@mui/icons-material/Movie'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
@@ -31,6 +33,9 @@ interface PlaylistCardProps {
   onGenerate: (channelId: string) => void
   onView: (channel: Channel) => void
   i18nNamespace?: string
+  /** Decided by the API. The home screen control renders only when true. */
+  homeSectionsAvailable?: boolean
+  onToggleHomeScreen?: (channel: Channel) => void
 }
 
 export function PlaylistCard({
@@ -41,6 +46,8 @@ export function PlaylistCard({
   onGenerate,
   onView,
   i18nNamespace = 'playlists',
+  homeSectionsAvailable = false,
+  onToggleHomeScreen,
 }: PlaylistCardProps) {
   const { t, i18n } = useTranslation()
   const pt = (key: string, options?: Record<string, unknown>) => t(`${i18nNamespace}.${key}`, options)
@@ -55,6 +62,12 @@ export function PlaylistCard({
   const [descriptionOverflowing, setDescriptionOverflowing] = useState(false)
 
   const isGenerating = generatingChannelId === channel.id
+  const onHomeScreen = !!channel.home_section_tag
+
+  const handleHomeScreenClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onToggleHomeScreen?.(channel)
+  }
   // The output lives in playlist_id or collection_id depending on the channel's target.
   const outputId = channel.output_type === 'collection' ? channel.collection_id : channel.playlist_id
   const hasPlaylist = !!outputId
@@ -419,6 +432,18 @@ export function PlaylistCard({
         </Box>
 
         <Box display="flex" gap={0.5}>
+          {homeSectionsAvailable && onToggleHomeScreen && (
+            <Tooltip title={onHomeScreen ? pt('tooltipRemoveFromHome') : pt('tooltipAddToHome')}>
+              <IconButton
+                size="small"
+                onClick={handleHomeScreenClick}
+                color={onHomeScreen ? 'primary' : 'default'}
+                aria-pressed={onHomeScreen}
+              >
+                {onHomeScreen ? <HomeIcon fontSize="small" /> : <HomeOutlinedIcon fontSize="small" />}
+              </IconButton>
+            </Tooltip>
+          )}
           <Tooltip title={hasPlaylist ? pt('tooltipRefreshPlaylist') : pt('tooltipGeneratePlaylist')}>
             <IconButton
               size="small"

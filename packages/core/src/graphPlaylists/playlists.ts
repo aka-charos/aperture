@@ -6,6 +6,7 @@ import { createChildLogger } from '../lib/logger.js'
 import { query, queryOne } from '../lib/db.js'
 import { getMediaServerProvider } from '../media/index.js'
 import { getMediaServerApiKey } from '../settings/systemSettings.js'
+import { newPlaylistTagName } from '../homeSections/playlists.js'
 
 const logger = createChildLogger('graphPlaylists')
 
@@ -18,6 +19,10 @@ export interface GraphPlaylist {
   sourceItemId: string | null
   sourceItemType: string | null
   itemCount: number
+  /** 'chat' when made from assistant suggestions; 'graph' when built on the Explore graph. */
+  origin: 'graph' | 'chat'
+  /** Whether the owner put it on their Emby home screen (chat playlists only). */
+  onHomeScreen: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -29,6 +34,10 @@ export interface CreateGraphPlaylistInput {
   seriesIds: string[]
   sourceItemId?: string
   sourceItemType?: 'movie' | 'series'
+  /** Defaults to 'graph'. Only the assistant's dialog sends 'chat'. */
+  origin?: 'graph' | 'chat'
+  /** Honoured for chat playlists only. */
+  showOnHomeScreen?: boolean
 }
 
 /**
@@ -112,12 +121,15 @@ export async function createGraphPlaylist(
 
   logger.info({ result }, 'Media server playlist created')
 
+  // An Explore-graph playlist is never offered a home row, whatever the body says.
+  const origin = input.origin === 'chat' ? 'chat' : 'graph'
+
   // Store in database
   const dbResult = await queryOne<GraphPlaylist>(
     `INSERT INTO graph_playlists (
       name, description, media_server_playlist_id, owner_id,
-      source_item_id, source_item_type, item_count
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+      source_item_id, source_item_type, item_count, origin, home_section_tag
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING
       id, name, description,
       media_server_playlist_id as "mediaServerPlaylistId",
@@ -125,6 +137,8 @@ export async function createGraphPlaylist(
       source_item_id as "sourceItemId",
       source_item_type as "sourceItemType",
       item_count as "itemCount",
+      origin,
+      home_section_tag IS NOT NULL as "onHomeScreen",
       created_at as "createdAt",
       updated_at as "updatedAt"`,
     [
@@ -135,6 +149,8 @@ export async function createGraphPlaylist(
       input.sourceItemId || null,
       input.sourceItemType || null,
       mediaServerItemIds.length,
+      origin,
+      origin === 'chat' && input.showOnHomeScreen === true ? newPlaylistTagName() : null,
     ]
   )
 
@@ -162,6 +178,8 @@ export async function getGraphPlaylists(userId: string): Promise<GraphPlaylist[]
       source_item_id as "sourceItemId",
       source_item_type as "sourceItemType",
       item_count as "itemCount",
+      origin,
+      home_section_tag IS NOT NULL as "onHomeScreen",
       created_at as "createdAt",
       updated_at as "updatedAt"
     FROM graph_playlists
@@ -185,6 +203,8 @@ export async function getGraphPlaylist(playlistId: string): Promise<GraphPlaylis
       source_item_id as "sourceItemId",
       source_item_type as "sourceItemType",
       item_count as "itemCount",
+      origin,
+      home_section_tag IS NOT NULL as "onHomeScreen",
       created_at as "createdAt",
       updated_at as "updatedAt"
     FROM graph_playlists

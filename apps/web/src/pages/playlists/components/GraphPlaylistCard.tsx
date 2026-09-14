@@ -16,6 +16,8 @@ import HubIcon from '@mui/icons-material/Hub'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
 import VisibilityIcon from '@mui/icons-material/Visibility'
+import HomeIcon from '@mui/icons-material/Home'
+import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import { getProxiedImageUrl } from '@aperture/ui'
 import type { GraphPlaylist } from '../types'
 
@@ -31,9 +33,18 @@ interface GraphPlaylistCardProps {
   playlist: GraphPlaylist
   onDelete: (playlistId: string, playlistName: string) => void
   onView?: (playlist: GraphPlaylist) => void
+  /** Decided by the API. Offered for playlists made from assistant suggestions only. */
+  homeSectionsAvailable?: boolean
+  onToggleHomeScreen?: (playlist: GraphPlaylist) => void
 }
 
-export function GraphPlaylistCard({ playlist, onDelete, onView }: GraphPlaylistCardProps) {
+export function GraphPlaylistCard({
+  playlist,
+  onDelete,
+  onView,
+  homeSectionsAvailable = false,
+  onToggleHomeScreen,
+}: GraphPlaylistCardProps) {
   const { t, i18n } = useTranslation()
   const [previewItems, setPreviewItems] = useState<GraphPlaylistItem[]>([])
   const [loadingPreview, setLoadingPreview] = useState(false)
@@ -70,6 +81,14 @@ export function GraphPlaylistCard({ playlist, onDelete, onView }: GraphPlaylistC
   }
 
   const isClickable = !!onView
+  // Playlists built on the Explore graph are deliberately not offered a home row.
+  const canShowOnHome = homeSectionsAvailable && !!onToggleHomeScreen && playlist.origin === 'chat'
+  const onHomeScreen = playlist.onHomeScreen === true
+
+  const handleHomeScreenClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onToggleHomeScreen?.(playlist)
+  }
 
   return (
     <Card
@@ -298,6 +317,18 @@ export function GraphPlaylistCard({ playlist, onDelete, onView }: GraphPlaylistC
         </Typography>
 
         <Box display="flex" gap={0.5}>
+          {canShowOnHome && (
+            <Tooltip title={onHomeScreen ? t('playlists.tooltipRemoveFromHome') : t('playlists.tooltipAddToHome')}>
+              <IconButton
+                size="small"
+                onClick={handleHomeScreenClick}
+                color={onHomeScreen ? 'primary' : 'default'}
+                aria-pressed={onHomeScreen}
+              >
+                {onHomeScreen ? <HomeIcon fontSize="small" /> : <HomeOutlinedIcon fontSize="small" />}
+              </IconButton>
+            </Tooltip>
+          )}
           {isClickable && (
             <Tooltip title={t('playlists.tooltipViewPlaylist')}>
               <IconButton size="small" onClick={handleCardClick} color="primary">

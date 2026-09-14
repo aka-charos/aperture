@@ -3212,7 +3212,14 @@
     "tooltipGenerateDescriptionChoose": "Generate a description with AI — keep what you wrote or start over",
     "tooltipGenerateNameChoose": "Generate a name with AI — keep what you wrote or start over",
     "aiBuildOnNotes": "Build on what I wrote",
-    "aiStartFresh": "Start fresh"
+    "aiStartFresh": "Start fresh",
+    "tooltipAddToHome": "Show on my Emby home screen",
+    "tooltipRemoveFromHome": "Remove from my Emby home screen",
+    "snackbarAddedToHome": "Added — it appears on your Emby home screen after the next sync",
+    "snackbarRemovedFromHome": "Removed — it leaves your Emby home screen after the next sync",
+    "snackbarHomeFailed": "Could not change the home screen setting",
+    "showOnHomeScreen": "Also show it on my Emby home screen",
+    "showOnHomeScreenHint": "It appears as a row after the next home screen sync. The row is not kept in playlist order."
   },
   "myRecommendations": {
     "pageTitle": "मेरी सिफ़ारिशें",
@@ -4543,7 +4550,14 @@
     "tooltipGenerateNameChoose": "Generate a name with AI — keep what you wrote or start over",
     "tooltipGenerateDescriptionChoose": "Generate a description with AI — keep what you wrote or start over",
     "aiBuildOnNotes": "Build on what I wrote",
-    "aiStartFresh": "Start fresh"
+    "aiStartFresh": "Start fresh",
+    "tooltipAddToHome": "Show on my Emby home screen",
+    "tooltipRemoveFromHome": "Remove from my Emby home screen",
+    "snackbarAddedToHome": "Added — it appears on your Emby home screen after the next sync",
+    "snackbarRemovedFromHome": "Removed — it leaves your Emby home screen after the next sync",
+    "snackbarHomeFailed": "Could not change the home screen setting",
+    "showOnHomeScreen": "Also show it on my Emby home screen",
+    "showOnHomeScreenHint": "It appears as a row after the next home screen sync. The row is not kept in playlist order."
   },
   "countryFilter": {
     "label": "Country",
@@ -5098,6 +5112,10 @@
     "analysisBench": {
       "title": "Analysis bench",
       "blurb": "Run one film through several models on identical sources and read them side by side."
+    },
+    "homeSections": {
+      "title": "Emby Home Rows",
+      "blurb": "Top Picks and each viewer's recommendations on their Emby home screen"
     }
   },
   "settingsEvaluation": {
@@ -5322,5 +5340,54 @@
     "runAnswers_other": "Run {{count}} answers",
     "controlVersions": "Every answer below was written from {{count}} source document(s), {{chars}} characters retrieved once · prompt versions {{versions}}",
     "promptVersionsShort": "prompts {{versions}}"
+  },
+  "settingsHomeSections": {
+    "title": "Emby Home Screen Rows",
+    "description": "Put a Top Picks row and each viewer's own recommendations on their Emby home screen. Rows are backed by tags on the titles already in your library — nothing is copied, no files are written, and watching from a row updates the real item.",
+    "loadError": "Failed to load home screen row settings",
+    "saveError": "Failed to save home screen row settings",
+    "saved": "Home screen row settings saved",
+    "status": {
+      "supported": "Emby {{version}} — supported",
+      "notConfigured": "No media server is configured yet.",
+      "unsupportedProvider": "Home screen rows are only available on Emby. This server is {{provider}}.",
+      "unsupportedServer": "Emby {{minVersion}} or newer is required. This server runs {{version}}.",
+      "unreachable": "The media server did not answer, so its version could not be checked.",
+      "unknownVersion": "an unknown version"
+    },
+    "enabled": "Manage home screen rows",
+    "enabledHelp": "Rows go to viewers enabled in {{appName}}. Switching this off removes every managed row and tag on the next sync.",
+    "enableBlocked": "Needs Emby {{minVersion}} or newer",
+    "rowsHeading": "Rows",
+    "topPicksEnabled": "Top Picks — one row for movies, one for series",
+    "topPicksHelp": "Reads the Top Picks list, so Top Picks itself must be switched on.",
+    "recommendationsEnabled": "Each viewer's own recommendations",
+    "recommendationsHelp": "The picks from their most recent recommendation run, movies and series together.",
+    "namesHeading": "Row names",
+    "topPicksMoviesName": "Top Picks movies row",
+    "topPicksSeriesName": "Top Picks series row",
+    "recommendationsName": "Recommendations row",
+    "layoutHeading": "Layout",
+    "position": "Position on the home screen",
+    "positionHelp": "0 is the top. Rows move here when they are first created or when this changes; otherwise a viewer's own arrangement is left alone.",
+    "limit": "Recommendations per media type",
+    "sortBy": "Order within each row",
+    "sortHelp": "Emby cannot show a row in recommendation rank, so each row sorts by a field on the server.",
+    "sort": {
+      "Random": "Random",
+      "SortName": "Title (A–Z)",
+      "DateCreated": "Recently added",
+      "ProductionYear": "Newest release year",
+      "PremiereDate": "Newest release date",
+      "CommunityRating": "Highest rated"
+    },
+    "tagsNote": "Each row is backed by a tag beginning with “aperture:” on the original titles. The tags are visible in Emby, and {{appName}} ignores them when it syncs your library.",
+    "save": "Save",
+    "syncNow": "Sync now",
+    "syncStarted": "Sync started.",
+    "openJob": "Follow it in Jobs",
+    "syncFailed": "Could not start the sync",
+    "playlistsEnabled": "Playlists viewers choose to show",
+    "playlistsHelp": "A viewer can put a playlist or collection they generated, or one made from assistant suggestions, on their own home screen. Rows follow the playlist's current contents, not its order. Playlists built on the Explore graph are not offered this."
   }
 }

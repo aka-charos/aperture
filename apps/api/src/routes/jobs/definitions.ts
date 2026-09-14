@@ -127,6 +127,12 @@ export const jobDefinitions: JobDefinition[] = [
     description: 'Automatically request missing Top Picks content via Seerr',
     cron: '0 0 * * 0', // Weekly on Sunday at midnight (configurable via settings)
   },
+  // === Emby Home Screen Rows ===
+  {
+    name: 'sync-home-sections',
+    description: 'Sync Top Picks and per-viewer recommendation rows onto Emby home screens',
+    cron: '45 5 * * *', // Daily at 5:45 AM, after refresh-top-picks
+  },
   // === Trakt Sync Job ===
   {
     name: 'sync-trakt-ratings',

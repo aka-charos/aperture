@@ -4,6 +4,7 @@ import {
   registerAiHandlers,
   registerPlaylistHandlers,
   registerSharesHandlers,
+  registerHomeScreenHandlers,
 } from './handlers/index.js'
 
 const channelsRoutes: FastifyPluginAsync = async (fastify) => {
@@ -12,6 +13,7 @@ const channelsRoutes: FastifyPluginAsync = async (fastify) => {
   registerAiHandlers(fastify)
   registerPlaylistHandlers(fastify)
   registerSharesHandlers(fastify)
+  registerHomeScreenHandlers(fastify)
 }
 
 export default channelsRoutes

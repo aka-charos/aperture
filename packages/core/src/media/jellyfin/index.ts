@@ -18,6 +18,7 @@ export * from './movies.js'
 export * from './series.js'
 export * from './favorites.js'
 export * from './playlists.js'
+export * from './homeSections.js'
 
 
 

@@ -22,6 +22,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import TheatersIcon from '@mui/icons-material/Theaters'
 import StarHalfIcon from '@mui/icons-material/StarHalf'
 import BiotechIcon from '@mui/icons-material/Biotech'
+import HomeIcon from '@mui/icons-material/Home'
 import { JOB_DISPLAY_NAME_KEYS, titleCaseJobName } from './registry'
 import { getAppName } from '@/lib/branding'
 
@@ -61,6 +62,7 @@ export const JOB_ICONS: Record<string, React.ReactNode> = {
   'refresh-recommendation-explanations': <AutoAwesomeIcon />,
   'generate-title-analysis': <TheatersIcon />,
   'refresh-ratings': <StarHalfIcon />,
+  'sync-home-sections': <HomeIcon />,
 }
 
 export const JOB_COLORS: Record<string, string> = {
@@ -93,6 +95,7 @@ export const JOB_COLORS: Record<string, string> = {
   'refresh-recommendation-explanations': '#06b6d4',
   'generate-title-analysis': '#e91e63',
   'refresh-ratings': '#f97316',
+  'sync-home-sections': '#eab308',
 }
 
 
