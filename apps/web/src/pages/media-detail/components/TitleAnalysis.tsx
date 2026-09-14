@@ -106,6 +106,7 @@ type AnalysisQuestionId =
   | 'dispute'
   | 'intent'
   | 'circumstances'
+  | 'reception'
 
 interface AnalysisSegment {
   text: string

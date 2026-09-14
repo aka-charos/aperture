@@ -47,6 +47,7 @@ export {
 
 export {
   startComparison,
+  replayComparison,
   getComparisonRun,
   listComparisonRuns,
   deleteComparisonRun,

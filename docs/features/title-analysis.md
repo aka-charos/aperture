@@ -20,7 +20,7 @@ The feature must be configured by an administrator (a dedicated AI model role an
 
 The section is **collapsed by default** — expand it when you want to read. Inside:
 
-- **Section headings** such as *Form and Style*, *Narrative Structure*, *Lineage and Influence*, *Critical Debate*, *Stated Intent*, and *Production Context*. The essay's paragraphs are indexed as they are written, so a heading only appears when there is substance under it.
+- **Section headings**, in reading order: *Context* (where the work comes from and the tradition it belongs to), *Form and Style*, *Narrative Structure* (series only), *Making* (how it was made and what its makers said they intended), and *Critical Reception* (what critics valued and faulted, and what it went on to influence). Analyses written before prompt version 9 may still show the older *Lineage and Influence*, *Stated Intent*, *Production Context* and *Critical Debate* labels until they are rewritten. The essay's paragraphs are indexed as they are written, so a heading only appears when there is substance under it.
 - A **Sources** chip showing how much published writing the analysis is grounded in, with a grade: **Well documented**, **Reviews only**, or **Sparse sources**.
 
 ### Spoiler stance

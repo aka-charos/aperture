@@ -859,7 +859,8 @@
         "tradition": "Lineage and Influence",
         "dispute": "Critical Debate",
         "intent": "Stated Intent",
-        "circumstances": "Production Context"
+        "circumstances": "Production Context",
+        "reception": "Critical Reception"
       }
     }
   },
@@ -5284,6 +5285,12 @@
     "runSummary": "{{count}} models · {{status}} · {{when}}",
     "startFailed": "Could not start the comparison.",
     "modelsFailed": "Could not load the model list.",
-    "notConfigured": "No server address set for this provider. Add one in the AI settings."
+    "notConfigured": "No server address set for this provider. Add one in the AI settings.",
+    "replay": "Replay under prompt v{{version}}",
+    "replayHint": "Runs the same models on this run's source documents with the current prompt. Nothing is retrieved again, so a difference in the answers comes from the prompt. Replaying under the same version shows how much answers move between identical calls.",
+    "replayControl": "Replay: these documents were retrieved for an earlier run under prompt version {{version}}. Its answers follow this run's in the report.",
+    "replayFailed": "Could not start the replay.",
+    "promptVersionShort": "prompt v{{version}}",
+    "replayTag": "replay"
   }
 }

@@ -2344,3 +2344,50 @@ Bumping `ANALYSIS_PROMPT_VERSION` 7 → 8 retires every stored row, which is the
 **Found while measuring, and it retires a planned phase.** `deepseek/deepseek-v4.1-flash` publishes `reasoning: { mandatory: false, default_enabled: true, supported_efforts: ["max","high","low"], default_effort: "high" }`. So through OpenRouter this model already has a working reasoning control — the live-catalogue path [F-099](#f-099) built — and it is **reasoning by default, at `high`**, which is spend nobody chose. The planned work to declare a `reasoningMechanism` on the NATIVE `deepseek` provider buys nothing for anyone reaching the model this way, and should not be done before someone actually needs the native endpoint.
 
 **Unverified against a model.** The resolver, the ranges, the role gate and the suggestions are pinned by `generationParams.test.ts` (21 tests) against a `supportedParameters` array copied from the real catalogue read. No analysis has been generated with a temperature set: this machine has no database and no provider. The first bench run should confirm three things — that a value set on the card appears in the report's stat line, that a model declaring neither parameter shows no fields rather than inert ones, and that the same title at two temperatures actually differs.
+
+
+## F-124
+
+**Prompt version 9, and a bench that can compare prompt versions on the same documents.** Added 2026-09-14.
+
+**What was read.** Five analyses written under prompt version 8, all supplied by the operator: *Im Westen Nichts Neues* (2022), *Fantozzi* (1975), *Possession* (1981), *Tuner* (2025) and *Affeksjonsverdi* (2025). The operator raised two faults: lineage should come first, as the overview, and the dispute section is critics being critics and helps nobody. The rest were found by reading the five against the prompt.
+
+**What the five showed, counted by hand.**
+
+| habit | analyses | example |
+|---|---|---|
+| dispute question answered with an invented split | 4 of 5 | Affeksjonsverdi: "These readings do not cancel each other out." Possession's "split" was which genre it is. |
+| the dispute closed by announcing it is open | 4 of 5 | "These disagreements remain unresolved." / "left open by the people reviewing it" |
+| a section opening by restating its question | 5 of 5 | "The film sits in…" opened lineage in four; "Critics disagree/genuinely divide" opened every dispute |
+| reception inside another section | 3 of 3 checked | Possession's lineage (feminist readings, "genre remains contested"); Tuner's form (critics calling performances likeable) |
+| one fact told under two questions | 5 of 5 | Possession's Berlin choice under intent and under production; Fantozzi's episodic source under form and production |
+| stated intent guessed rather than reported | 3 of 5 | Fantozzi: "The intent was to carry the novels' tone"; Tuner's intent section held no statement at all |
+| the v8 phrase ban met with a synonym | 2 of 5 | Possession: "according to one critical read", "is described as", "has been called"; Affeksjonsverdi: "the sources carry" |
+| length over the 900-word anchor | 2 of 5 | Tuner ~1,000 words, Affeksjonsverdi ~1,150 |
+
+Also seen once each, and each is now named in the prompt: a credits roll given a token sentence of effect (Tuner's orchestration credits, Affeksjonsverdi's Arricam LT and Cooke lenses); late reveals in the first section (Possession's doubles and creature); locations listed for their own sake and a detail the answer itself called coincidental, both passing the would-it-be-different test (Affeksjonsverdi); and the version-8 rule's "write the claim as a fact" exit taken for a scholar's thesis (Im Westen's paragraph on Netflix and German memory culture).
+
+**Two of version 8's four fixes held and two did not, and the split is the lesson.** The circumstances fence (reception stays out of production) held in four of five, and the adjacency rule held in five of five. The phrase ban and the length anchor failed. The two that held changed what a QUESTION asks; the two that failed were rules the model has to keep in mind while writing. Version 9 therefore does most of its work in the questions.
+
+**What version 9 changed.**
+
+1. **Order: before, during, after.** `tradition` first (heading *Context*), then `work`, then `structure` for a series, then `circumstances` (*Making*), then `reception` (*Critical Reception*). The lineage paragraph oriented a reader in every one of the five. Its influence half ("launched nine sequels", "influence traced to Lynch") moved to reception, which is what makes the order chronological. The known cost: the one spoiler-shaped question is now read first.
+2. **`intent` folded into `circumstances`.** As two questions they competed for the same few facts. The merged question keeps a test for intent — only what someone said, attributed, never an intention read off the finished work — because Possession showed intent can be the best section in an analysis.
+3. **`dispute` became `reception`.** What critics valued and faulted, named; consensus reported as consensus; a real split given each side once, with no sentence announcing openness; different readings are not a disagreement; a criticism may name a part (the final act) without saying what happens in it; no verdict of its own. Established publications lead, because Tuner leaned on a small blog as hard as on The Guardian and Variety. Most of that problem is decided at retrieval, not here.
+4. **Attribution is a principle.** Facts plainly; every view has a holder; "critics" is an acceptable holder when the sources name none ([F-116](#f-116)'s argument against required names still holds — the alternative is an invented critic); never passive voice that hides whose view it is; quality judgements in reception only. The measured synonyms are named as examples beneath it.
+5. **Four smaller rules**, each from the table above: open on substance, not on the question; say each fact once; name people for their choices, not to list credits; a thin single fact is folded in or dropped rather than given a paragraph.
+
+`intent` and `dispute` remain in `AnalysisQuestionId` and the two web mirrors, because every stored map written before version 9 carries them. `questionIdsFor` no longer returns them, so a map written now cannot claim either. The 14 other locales keep their older translations of the `tradition` and `circumstances` headings, since `i18n:sync` never overwrites, and show *Critical Reception* in English until translated.
+
+**Length is still an instruction, and it is the rule most likely to fail again.** A paragraph ceiling the model checks against its own map was considered and rejected: the map is written after the prose has streamed, so nothing the model does at that point can shorten it. `max_tokens` is not the lever either — a truncated analysis is rejected and the title fails. The expectation is that the content rules remove most of the excess, since in both long analyses the extra words sat in credit lists, location lists, a padded intent section and an invented second dispute paragraph.
+
+**The bench could not compare prompts.** [F-117](#f-117)'s bench retrieves once per RUN, which controls for models. A version-8 run and a version-9 run each retrieve their own pages, so a difference between them can be the pages. Two designs were weighed:
+
+- **A bench-only draft prompt** beside the live one, both built from one retrieval per run. Sound, and it keeps production untouched until the draft is promoted, at the cost of a second copy of the questions and rules in the code and doubled calls.
+- **Replay**, chosen by the operator: deploy the new prompt, then rerun a stored run's documents under it. Simpler; the price is that the new prompt is already live, which the operator accepted because the version-8 library pass had only reached a few dozen titles.
+
+**How replay recovers the documents.** A run stores its whole prompt and, per source, only title, domain, url and length; the text is inside the prompt. `extractPromptSources` splits on each recorded `[n] title — domain` label in order, and takes a summary entry whose label is not found under the next number as a document `buildSourceBlock` skipped for having empty text. It deliberately does not split on "a line starting with the next number": Wikipedia scrapes carry `[2]` footnote markers at line starts. The last document ends at the LAST `\n\nTASK\n`, since a page may contain that word on its own line. A round-trip test builds a prompt from documents carrying all three hazards, extracts, rebuilds, and requires a byte-identical prompt.
+
+**The counts are an instrument.** `proseSignals.ts` counts the measured habits and the report prints them in a table above the answers and in a line under each; a replay's two answers per model sit on adjacent rows. Every pattern matches some innocent prose — "rather than" is sometimes exactly right — so nothing gates on them. They answer "did this habit go down across models", which reading five answers cannot.
+
+**Unverified.** Nothing here has run against a model: this machine has no database and no provider. The first real test is to bench the five titles above under version 8 before pulling the image (or reuse their runs, if they were bench runs), then replay them after. What to read for: the signals columns falling, reception sections that report consensus where it exists, no section opening on its question, and length.

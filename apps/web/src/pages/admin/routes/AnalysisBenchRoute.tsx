@@ -48,6 +48,7 @@ import {
   Delete as DeleteIcon,
   Download as DownloadIcon,
   PlayArrow as RunIcon,
+  Replay as ReplayIcon,
   Stop as StopIcon,
 } from '@mui/icons-material'
 
@@ -89,6 +90,8 @@ interface RunView {
   sources: { title: string; domain: string; chars: number }[]
   retrievedChars: number
   entries: RunEntry[]
+  /** The run whose documents this one replayed; its answers are in `text`. */
+  replayOf?: { runId: string; promptVersion: number } | null
   /** The whole comparison as one document — rendered by core, shown verbatim. */
   text: string
 }
@@ -99,6 +102,8 @@ interface RunSummary {
   year: number | null
   status: string
   modelCount: number
+  promptVersion: number
+  replayOf: string | null
   startedAt: string
 }
 
@@ -114,6 +119,9 @@ export default function AnalysisBenchRoute() {
 
   const [providers, setProviders] = useState<ProviderGroup[]>([])
   const [maxModels, setMaxModels] = useState(8)
+  // Decided by the server, never hardcoded: the version a replay will run is
+  // whatever core carries now.
+  const [promptVersion, setPromptVersion] = useState<number | null>(null)
   // An ORDERED list, not a Set: the report prints entries in the order they
   // were chosen, and a Set would silently reorder the document between runs.
   const [selected, setSelected] = useState<{ provider: string; model: string }[]>([])
@@ -132,11 +140,14 @@ export default function AnalysisBenchRoute() {
   useEffect(() => {
     fetch('/api/analysis-compare/models', { credentials: 'include' })
       .then((res) => (res.ok ? res.json() : null))
-      .then((json: { providers: ProviderGroup[]; maxModels: number } | null) => {
-        if (!json) return
-        setProviders(json.providers)
-        setMaxModels(json.maxModels)
-      })
+      .then(
+        (json: { providers: ProviderGroup[]; maxModels: number; promptVersion?: number } | null) => {
+          if (!json) return
+          setProviders(json.providers)
+          setMaxModels(json.maxModels)
+          setPromptVersion(json.promptVersion ?? null)
+        }
+      )
       .catch(() => setError(t('adminAnalysisBench.modelsFailed')))
     void loadRuns()
   }, [loadRuns, t])
@@ -230,6 +241,32 @@ export default function AnalysisBenchRoute() {
   const openRun = async (id: string) => {
     const res = await fetch(`/api/analysis-compare/${id}`, { credentials: 'include' })
     if (res.ok) setRun((await res.json()) as RunView)
+  }
+
+  // Same models, same documents, current prompt. Nothing is retrieved, which
+  // is the whole point: see replayComparison in core.
+  const replay = async () => {
+    if (!run) return
+    setStarting(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/analysis-compare/${run.id}/replay`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setError(json?.error ?? t('adminAnalysisBench.replayFailed'))
+        return
+      }
+      await openRun(json.runId as string)
+    } catch {
+      setError(t('adminAnalysisBench.replayFailed'))
+    } finally {
+      setStarting(false)
+    }
   }
 
   const stop = async () => {
@@ -399,6 +436,22 @@ export default function AnalysisBenchRoute() {
               {run.title}
               {run.year ? ` (${run.year})` : ''}
             </Typography>
+            {promptVersion != null && (
+              <Tooltip title={t('adminAnalysisBench.replayHint')}>
+                {/* A span so the tooltip still explains a disabled button. */}
+                <span>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<ReplayIcon />}
+                    disabled={live || starting || run.sources.length === 0}
+                    onClick={replay}
+                  >
+                    {t('adminAnalysisBench.replay', { version: promptVersion })}
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
             <Tooltip title={copied ? t('adminAnalysisBench.copied') : t('adminAnalysisBench.copy')}>
               <IconButton size="small" onClick={copy}>
                 <CopyIcon fontSize="small" />
@@ -426,6 +479,11 @@ export default function AnalysisBenchRoute() {
               version: run.promptVersion,
             })}
           </Typography>
+          {run.replayOf && (
+            <Typography variant="caption" color="text.secondary" display="block">
+              {t('adminAnalysisBench.replayControl', { version: run.replayOf.promptVersion })}
+            </Typography>
+          )}
 
           <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ my: 1.5 }}>
             {run.entries.map((entry) => (
@@ -493,11 +551,17 @@ export default function AnalysisBenchRoute() {
               <ListItemButton key={summary.id} onClick={() => openRun(summary.id)}>
                 <ListItemText
                   primary={`${summary.title}${summary.year ? ` (${summary.year})` : ''}`}
-                  secondary={t('adminAnalysisBench.runSummary', {
-                    count: summary.modelCount,
-                    status: summary.status,
-                    when: new Date(summary.startedAt).toLocaleString(),
-                  })}
+                  secondary={[
+                    t('adminAnalysisBench.runSummary', {
+                      count: summary.modelCount,
+                      status: summary.status,
+                      when: new Date(summary.startedAt).toLocaleString(),
+                    }),
+                    t('adminAnalysisBench.promptVersionShort', { version: summary.promptVersion }),
+                    summary.replayOf ? t('adminAnalysisBench.replayTag') : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
                 />
                 <IconButton
                   size="small"

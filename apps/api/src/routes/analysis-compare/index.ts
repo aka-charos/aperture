@@ -18,6 +18,8 @@ import type { FastifyPluginAsync } from 'fastify'
 import { requireAdmin } from '../../plugins/auth.js'
 import {
   startComparison,
+  replayComparison,
+  ANALYSIS_PROMPT_VERSION,
   getComparisonRun,
   listComparisonRuns,
   deleteComparisonRun,
@@ -133,7 +135,14 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
         })
       )
 
-      return reply.send({ providers: groups, maxModels: MAX_COMPARISON_MODELS })
+      // The current prompt version rides along as a decided value, so the
+      // replay button can name the version it will run without the bundle
+      // holding a copy of a number core bumps.
+      return reply.send({
+        providers: groups,
+        maxModels: MAX_COMPARISON_MODELS,
+        promptVersion: ANALYSIS_PROMPT_VERSION,
+      })
     }
   )
 
@@ -195,6 +204,37 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
       const run = await getComparisonRun(request.params.runId)
       if (!run) return reply.status(404).send({ error: 'No such comparison.' })
       return reply.send(run)
+    }
+  )
+
+  /**
+   * Replay a stored run's documents under the current prompt.
+   *
+   * Retrieves nothing — see `replayComparison`. The models default to the
+   * baseline's, in its order; a body naming models overrides that. 202 for the
+   * same reason a fresh bench answers 202.
+   */
+  fastify.post<{ Params: { runId: string }; Body: { models?: ComparisonModelRequest[] } }>(
+    '/api/analysis-compare/:runId/replay',
+    { preHandler: requireAdmin, schema: { tags: ['analysis'] } },
+    async (request, reply) => {
+      const models = request.body?.models
+      if (models !== undefined) {
+        if (!Array.isArray(models) || models.some((entry) => !entry?.provider || !entry?.model)) {
+          return reply.status(400).send({ error: 'Every model needs a provider and a model id.' })
+        }
+      }
+
+      try {
+        const runId = await replayComparison(request.params.runId, models)
+        return reply.status(202).send({ runId })
+      } catch (err) {
+        // Operator-facing refusals with real sentences, like the start route.
+        logger.error({ err }, 'Could not replay a comparison')
+        return reply
+          .status(400)
+          .send({ error: err instanceof Error ? err.message : 'Could not start the replay.' })
+      }
     }
   )
 

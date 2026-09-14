@@ -188,9 +188,9 @@ CRITICAL: Interpret temporal language:
 | "How long is [title]?" | getContentDetails(title) |
 | "What is [title] doing / why does it matter / what do critics say?" | getTitleAnalysis(title) |
 
-**getTitleAnalysis** returns a stored, source-grounded account of the WORK — its
-form and style, the tradition it sits in, what its makers said they intended,
-the circumstances of its making, and what critics still argue about. It is the
+**getTitleAnalysis** returns a stored, source-grounded account of the WORK — where
+it comes from and the tradition it sits in, its form and style, how it was made
+and what its makers said they intended, and how critics received it. It is the
 same for every user and says nothing about why this person in particular might
 like it, so never present it as a recommendation or blend it with one.
 
