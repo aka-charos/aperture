@@ -1,43 +1,39 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
+import { Link as RouterLink } from 'react-router-dom'
 import {
   Alert,
+  AppBar,
   Box,
   Button,
   Checkbox,
+  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Grid,
-  LinearProgress,
-  Typography,
-  Paper,
-  TextField,
-  Stack,
-  AppBar,
-  Toolbar,
-  Link as MuiLink,
   FormControl,
+  InputAdornment,
   InputLabel,
-  Select,
+  LinearProgress,
   MenuItem,
-  Chip,
-  IconButton,
-  Slider,
+  Paper,
+  Select,
+  Skeleton,
+  Stack,
+  TextField,
+  Toolbar,
+  Typography,
 } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
-import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import FactCheckIcon from '@mui/icons-material/FactCheck'
-import SortIcon from '@mui/icons-material/Sort'
+import SearchIcon from '@mui/icons-material/Search'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty'
-import { StatusCard } from '@aperture/ui'
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 import { MoviePoster } from '@aperture/ui'
-import type { SeerrStatus } from '../../components/MediaPosterCard'
 import { RequestSeerrOptionsDialog } from '../../components/RequestSeerrOptionsDialog'
 import {
   TmdbExternalDetailModal,
@@ -45,9 +41,42 @@ import {
 } from '../../components/TmdbExternalDetailModal'
 import type { SeerrRequestOptions } from '../../types/seerrRequest'
 import { PageHeading } from '@/components/PageHeading'
+import { adminPathFor } from './nav/registry'
+import { jobConsoleLink } from '../jobs/registry'
+import { GapCollectionRow } from './gapAnalysis/GapCollectionRow'
+import {
+  buildGapListings,
+  compareByRelease,
+  listingMatchesSearch,
+  matchesMissingFilter,
+  relativeTimeParts,
+  sortGapListings,
+  type GapCollectionListing,
+  type GapCollectionSummary,
+  type GapMissingFilter,
+  type GapMissingTitle,
+  type GapSort,
+} from './gapAnalysis/listing'
 
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w500'
 const BULK_CONFIRM_THRESHOLD = 5
+/** The request route refuses more than this per call, so a larger selection is sent in batches. */
+const REQUEST_BATCH_SIZE = 200
+/** Collections rendered per step; a snapshot routinely has hundreds. */
+const PAGE_SIZE = 50
+const RESULTS_PAGE_SIZE = 500
+const MAX_RESULT_PAGES = 40
+const PROGRESS_POLL_MS = 600
+/** How often a running scan refetches the listing — progress polls far faster than that is worth. */
+const LIVE_LIST_REFRESH_MS = 3000
+const POLL_TIMEOUT_MS = 15 * 60 * 1000
+
+/** Sized off the container: this page renders beside the admin nav, where `lg` is rarely reached. */
+const PARTS_GRID = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+  gap: 2,
+} as const
 
 type GapRequestItem = { tmdbId: number; mediaType: 'movie'; title: string }
 
@@ -62,14 +91,12 @@ interface GapRun {
   startedAt: string
 }
 
-interface CollectionSummary {
-  collectionId: number
-  collectionName: string
-  collectionPosterPath: string | null
-  totalReleased: number
-  ownedCount: number
-  seerrCount: number
-  missingCount: number
+interface LatestResponse {
+  prerequisites: { tmdbConfigured: boolean; moviesWithCollectionCount: number }
+  run: GapRun | null
+  activeRun: GapRun | null
+  collectionSummaries?: GapCollectionSummary[]
+  moviesAddedSinceRun?: number | null
 }
 
 type PartSeerrStatus = 'none' | 'requested' | 'processing' | 'available'
@@ -91,19 +118,9 @@ interface GapCollectionPartsPayload {
   parts: GapCollectionPart[]
 }
 
-interface GapRow {
+interface GapRow extends GapMissingTitle {
   id: string
-  collectionId: number
   collectionName: string
-  collectionPosterPath: string | null
-  tmdbId: number
-  title: string
-  releaseYear: number | null
-  releaseDate?: string | null
-  posterPath: string | null
-  inLibrary: boolean
-  seerrStatus: PartSeerrStatus
-  requestStatus: string | null
 }
 
 interface JobProgressState {
@@ -114,10 +131,17 @@ interface JobProgressState {
   currentItem?: string
 }
 
+/**
+ * How a part reads in the expanded grid. `requested` is a part the scan saw as
+ * a gap that is no longer open — requested since, from here or elsewhere — so
+ * it must not offer a Request button the row's own count has stopped counting.
+ */
+type PartVariant = 'owned' | 'seerr' | 'requested' | 'missing'
+
+type DisplayPart = GapCollectionPart & { variant: PartVariant }
+
 function seerrChipLabel(status: PartSeerrStatus, t: TFunction): string {
   switch (status) {
-    case 'requested':
-      return t('admin.gaps.seerrRequested')
     case 'processing':
       return t('admin.gaps.seerrProcessing')
     case 'available':
@@ -127,21 +151,75 @@ function seerrChipLabel(status: PartSeerrStatus, t: TFunction): string {
   }
 }
 
+function PartStatusChip({ icon, label, color }: { icon: ReactElement; label: string; color: string }) {
+  return (
+    <Chip
+      icon={icon}
+      label={label}
+      size="small"
+      sx={{
+        position: 'absolute',
+        bottom: 8,
+        left: 8,
+        zIndex: 3,
+        fontWeight: 600,
+        fontSize: '0.7rem',
+        height: 24,
+        bgcolor: alpha(color, 0.9),
+        color: 'common.white',
+        '& .MuiChip-icon': { color: 'common.white' },
+      }}
+    />
+  )
+}
+
+function SnapshotStat({ value, label, detail }: { value: string; label: string; detail?: string }) {
+  return (
+    <Box sx={{ px: 1.5, py: 1.25, borderRadius: 1.5, bgcolor: 'action.hover', minWidth: 0 }}>
+      <Typography variant="h5" fontWeight={700} lineHeight={1.2}>
+        {value}
+      </Typography>
+      <Typography variant="body2">{label}</Typography>
+      {detail && (
+        <Typography variant="caption" color="text.secondary" display="block" noWrap>
+          {detail}
+        </Typography>
+      )}
+    </Box>
+  )
+}
+
+function ListSkeleton() {
+  return (
+    <Stack spacing={1}>
+      {Array.from({ length: 6 }, (_, i) => (
+        <Skeleton key={i} variant="rounded" height={72} />
+      ))}
+    </Stack>
+  )
+}
+
 export function GapAnalysisPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const theme = useTheme()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [run, setRun] = useState<GapRun | null>(null)
   const [activeRun, setActiveRun] = useState<GapRun | null>(null)
   const [jobProgress, setJobProgress] = useState<JobProgressState | null>(null)
-  const [summaries, setSummaries] = useState<CollectionSummary[]>([])
-  const [prereq, setPrereq] = useState<{ tmdbConfigured: boolean; moviesWithCollectionCount: number } | null>(null)
+  const [summaries, setSummaries] = useState<GapCollectionSummary[]>([])
+  const [prereq, setPrereq] = useState<LatestResponse['prerequisites'] | null>(null)
+  const [moviesAddedSinceRun, setMoviesAddedSinceRun] = useState<number | null>(null)
   const [rows, setRows] = useState<GapRow[]>([])
+  /** The run whose gaps `rows` holds — until it matches the displayed run, the list is still loading. */
+  const [resultsRunId, setResultsRunId] = useState<string | null>(null)
   const [seerrOk, setSeerrOk] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [search, setSearch] = useState('')
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [sortBy, setSortBy] = useState<GapSort>('closest')
+  const [missingFilter, setMissingFilter] = useState<GapMissingFilter>('any')
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const [selected, setSelected] = useState<Set<number>>(new Set())
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [requesting, setRequesting] = useState(false)
   const [locallyRequested, setLocallyRequested] = useState<Set<number>>(new Set())
@@ -153,60 +231,21 @@ export function GapAnalysisPage() {
     seerrOptions: SeerrRequestOptions
   } | null>(null)
   const [collectionPartsById, setCollectionPartsById] = useState<Record<number, GapCollectionPartsPayload | undefined>>({})
-  const [sortBy, setSortBy] = useState<'most_missing' | 'most_complete' | 'name'>('most_missing')
-  const [minMissing, setMinMissing] = useState(0)
   const [expandedCollections, setExpandedCollections] = useState<Set<number>>(new Set())
   const [partsLoading, setPartsLoading] = useState<Set<number>>(new Set())
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
   const [detailData, setDetailData] = useState<TmdbExternalDetailPayload | null>(null)
-  const [detailPart, setDetailPart] = useState<GapCollectionPart | null>(null)
+  const [detailPart, setDetailPart] = useState<Pick<GapCollectionPart, 'tmdbId' | 'title' | 'inLibrary' | 'seerrStatus'> | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const toSeerrStatus = useCallback(
-    (row: GapRow): SeerrStatus | undefined => {
-      const serverBlocking = ['pending', 'submitted', 'approved'].includes(row.requestStatus ?? '')
-      const optimistic = locallyRequested.has(row.tmdbId)
-      if (!serverBlocking && !optimistic) return undefined
-      if (optimistic && !serverBlocking) {
-        return { requested: true, requestStatus: 'pending' }
-      }
-      const rs = row.requestStatus
-      let requestStatus: SeerrStatus['requestStatus'] = 'unknown'
-      if (rs === 'pending') requestStatus = 'pending'
-      else if (rs === 'approved' || rs === 'submitted') requestStatus = 'approved'
-      else if (rs === 'declined') requestStatus = 'declined'
-      return { requested: true, requestStatus }
-    },
-    [locallyRequested]
-  )
+  const formatNumber = useCallback((n: number) => n.toLocaleString(i18n.language), [i18n.language])
 
-  const isDimmed = useCallback(
-    (row: GapRow): boolean => {
-      return (
-        row.inLibrary ||
-        ['pending', 'submitted', 'approved'].includes(row.requestStatus ?? '') ||
-        locallyRequested.has(row.tmdbId)
-      )
-    },
-    [locallyRequested]
-  )
-
-  useEffect(() => {
-    setLocallyRequested((prev) => {
-      if (prev.size === 0) return prev
-      const next = new Set(prev)
-      for (const r of rows) {
-        if (['pending', 'submitted', 'approved'].includes(r.requestStatus ?? '')) {
-          next.delete(r.tmdbId)
-        }
-      }
-      return next
-    })
-  }, [rows])
-
-  const loadLatest = useCallback(async (): Promise<GapRun | null> => {
-    setError(null)
+  /** Returns the id of the run the page should show — the running one if any. */
+  const loadLatest = useCallback(async (): Promise<string | null> => {
+    // Deliberately does not clear `error`: this reload follows a request, and
+    // clearing here wiped the request's own failure message before it rendered.
     try {
       const [latestRes, seerrRes] = await Promise.all([
         fetch('/api/admin/gap-analysis/latest', { credentials: 'include' }),
@@ -216,12 +255,12 @@ export function GapAnalysisPage() {
         const d = await latestRes.json().catch(() => ({}))
         throw new Error(d.error || t('admin.gaps.errorLoadGapAnalysis'))
       }
-      const data = await latestRes.json()
+      const data = (await latestRes.json()) as LatestResponse
       setPrereq(data.prerequisites)
-      const nextRun = data.run as GapRun | null
-      setRun(nextRun)
-      setActiveRun((data.activeRun as GapRun | null) ?? null)
-      setSummaries(data.collectionSummaries || [])
+      setRun(data.run ?? null)
+      setActiveRun(data.activeRun ?? null)
+      setSummaries(data.collectionSummaries ?? [])
+      setMoviesAddedSinceRun(data.moviesAddedSinceRun ?? null)
 
       if (seerrRes.ok) {
         const sc = await seerrRes.json()
@@ -229,7 +268,7 @@ export function GapAnalysisPage() {
       } else {
         setSeerrOk(false)
       }
-      return nextRun
+      return data.activeRun?.id ?? data.run?.id ?? null
     } catch (e) {
       setError(e instanceof Error ? e.message : t('admin.gaps.errorFailedToLoad'))
       return null
@@ -238,42 +277,53 @@ export function GapAnalysisPage() {
     }
   }, [t])
 
-  const loadResults = useCallback(async (runId: string) => {
-    try {
-      const all: GapRow[] = []
-      let page = 1
-      let total = 0
-      do {
-        const u = new URL('/api/admin/gap-analysis/results', window.location.origin)
-        u.searchParams.set('runId', runId)
-        u.searchParams.set('page', String(page))
-        u.searchParams.set('pageSize', '500')
-        if (search.trim()) u.searchParams.set('search', search.trim())
-        const res = await fetch(u.toString(), { credentials: 'include' })
-        if (!res.ok) break
-        const data = await res.json()
-        total = data.total ?? 0
-        const chunk = (data.rows || []) as GapRow[]
-        all.push(...chunk)
-        page++
-      } while (all.length < total && page < 40)
-      setRows(all)
-    } catch {
-      /* keep prior rows on fetch error */
-    }
-  }, [search])
+  /**
+   * Every open gap for a run, loaded once; search and filters work on this
+   * copy. It used to refetch all pages on each keystroke.
+   */
+  const loadResults = useCallback(
+    async (runId: string) => {
+      try {
+        const all: GapRow[] = []
+        let page = 1
+        let total = 0
+        do {
+          const u = new URL('/api/admin/gap-analysis/results', window.location.origin)
+          u.searchParams.set('runId', runId)
+          u.searchParams.set('page', String(page))
+          u.searchParams.set('pageSize', String(RESULTS_PAGE_SIZE))
+          const res = await fetch(u.toString(), { credentials: 'include' })
+          if (!res.ok) throw new Error(t('admin.gaps.errorLoadGapAnalysis'))
+          const data = await res.json()
+          total = data.total ?? 0
+          const chunk = (data.rows || []) as GapRow[]
+          all.push(...chunk)
+          if (chunk.length === 0) break
+          page++
+        } while (all.length < total && page <= MAX_RESULT_PAGES)
+        setRows(all)
+      } catch (e) {
+        // Keep whatever was already listed rather than blanking it.
+        setError(e instanceof Error ? e.message : t('admin.gaps.errorLoadGapAnalysis'))
+      } finally {
+        setResultsRunId(runId)
+      }
+    },
+    [t]
+  )
 
   useEffect(() => {
     void loadLatest()
   }, [loadLatest])
 
-  const displayRunId = activeRun?.id ?? run?.id
+  const displayRunId = activeRun?.id ?? run?.id ?? null
 
   useEffect(() => {
     if (displayRunId) {
       void loadResults(displayRunId)
     } else {
       setRows([])
+      setResultsRunId(null)
     }
   }, [displayRunId, loadResults])
 
@@ -282,92 +332,68 @@ export function GapAnalysisPage() {
     setExpandedCollections(new Set())
   }, [displayRunId])
 
-  const filteredRows = useMemo(() => {
-    if (!search.trim()) return rows
-    const q = search.trim().toLowerCase()
-    return rows.filter(
-      (r) => r.title.toLowerCase().includes(q) || r.collectionName.toLowerCase().includes(q)
-    )
-  }, [rows, search])
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) clearInterval(pollRef.current)
+    pollRef.current = null
+  }, [])
 
-  const sortedMissingRows = filteredRows
+  useEffect(() => stopPolling, [stopPolling])
 
-  const grouped = useMemo(() => {
-    const m = new Map<number, GapRow[]>()
-    for (const r of sortedMissingRows) {
-      const list = m.get(r.collectionId) || []
-      list.push(r)
-      m.set(r.collectionId, list)
-    }
-    return m
-  }, [sortedMissingRows])
+  const listReady = displayRunId != null && resultsRunId === displayRunId
 
-  const collectionOrder = useMemo(() => {
-    const seen = new Set<number>()
-    const order: number[] = []
-    for (const r of sortedMissingRows) {
-      if (!seen.has(r.collectionId)) {
-        seen.add(r.collectionId)
-        order.push(r.collectionId)
+  const listings = useMemo(() => buildGapListings(summaries, rows), [summaries, rows])
+
+  const filtered = useMemo(
+    () =>
+      sortGapListings(
+        listings.filter(
+          (l) => listingMatchesSearch(l, search) && matchesMissingFilter(l.missing.length, missingFilter)
+        ),
+        sortBy
+      ),
+    [listings, search, missingFilter, sortBy]
+  )
+
+  const shown = filtered.slice(0, visibleCount)
+
+  /** A film can sit in two TMDb collections; it is still one film to request. */
+  const openGapIds = useMemo(() => new Set(rows.map((r) => r.tmdbId)), [rows])
+
+  const filteredMissingCount = useMemo(() => {
+    const ids = new Set<number>()
+    for (const l of filtered) for (const m of l.missing) ids.add(m.tmdbId)
+    return ids.size
+  }, [filtered])
+
+  const requestableIds = useCallback(
+    (listing: GapCollectionListing<GapRow>) =>
+      listing.missing.filter((m) => !locallyRequested.has(m.tmdbId)).map((m) => m.tmdbId),
+    [locallyRequested]
+  )
+
+  const setSelection = (ids: number[], on: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      for (const id of ids) {
+        if (on) next.add(id)
+        else next.delete(id)
       }
-    }
-    return order
-  }, [sortedMissingRows])
+      return next
+    })
+  }
 
-  const displaySummariesOrdered = useMemo(() => {
-    const byId = new Map(summaries.map((s) => [s.collectionId, s]))
-    const built = collectionOrder
-      .map((cid) => {
-        const gapRows = grouped.get(cid)
-        if (!gapRows?.length) return null
-        const server = byId.get(cid)
-        const first = gapRows[0]
-        const posterFromRows = first.collectionPosterPath ?? first.posterPath ?? null
-        if (server) {
-          return { ...server, collectionPosterPath: server.collectionPosterPath ?? posterFromRows }
-        }
-        return {
-          collectionId: cid,
-          collectionName: first.collectionName,
-          collectionPosterPath: posterFromRows,
-          totalReleased: gapRows.length,
-          ownedCount: 0,
-          seerrCount: 0,
-          missingCount: gapRows.length,
-        }
-      })
-      .filter((s): s is CollectionSummary => s != null)
-      .filter((s) => s.missingCount >= minMissing)
+  const toggleIds = (ids: number[]) => {
+    if (ids.length === 0) return
+    setSelection(ids, !ids.every((id) => selected.has(id)))
+  }
 
-    if (sortBy === 'most_missing') {
-      built.sort((a, b) => b.missingCount - a.missingCount || a.collectionName.localeCompare(b.collectionName))
-    } else if (sortBy === 'most_complete') {
-      built.sort((a, b) => {
-        const ratioA = a.totalReleased > 0 ? a.ownedCount / a.totalReleased : 0
-        const ratioB = b.totalReleased > 0 ? b.ownedCount / b.totalReleased : 0
-        return ratioB - ratioA || a.collectionName.localeCompare(b.collectionName)
-      })
-    } else {
-      built.sort((a, b) => a.collectionName.localeCompare(b.collectionName))
-    }
+  const shownRequestableIds = shown.flatMap(requestableIds)
+  const shownSelected = shownRequestableIds.filter((id) => selected.has(id)).length
 
-    return built
-  }, [summaries, collectionOrder, grouped, sortBy, minMissing])
-
-  const maxMissing = useMemo(() => {
-    let max = 0
-    for (const s of summaries) {
-      if (s.missingCount > max) max = s.missingCount
-    }
-    return max
-  }, [summaries])
+  const clearSel = () => setSelected(new Set())
 
   const loadCollectionParts = useCallback(async (cid: number) => {
-    setPartsLoading((prev) => {
-      const n = new Set(prev)
-      n.add(cid)
-      return n
-    })
+    setPartsLoading((prev) => new Set(prev).add(cid))
     try {
       const u = new URL('/api/admin/gap-analysis/collection-parts', window.location.origin)
       u.searchParams.set('ids', String(cid))
@@ -380,7 +406,7 @@ export function GapAnalysisPage() {
         }
       }
     } catch {
-      /* grid falls back to missing rows only */
+      /* the panel falls back to the missing films alone */
     } finally {
       setPartsLoading((prev) => {
         const n = new Set(prev)
@@ -389,26 +415,6 @@ export function GapAnalysisPage() {
       })
     }
   }, [])
-
-  const toggleSelect = (key: string, dimmed: boolean) => {
-    if (dimmed) return
-    setSelected((prev) => {
-      const n = new Set(prev)
-      if (n.has(key)) n.delete(key)
-      else n.add(key)
-      return n
-    })
-  }
-
-  const selectAllVisible = () => {
-    const n = new Set<string>()
-    for (const r of filteredRows) {
-      if (!isDimmed(r)) n.add(`${r.tmdbId}`)
-    }
-    setSelected(n)
-  }
-
-  const clearSel = () => setSelected(new Set())
 
   const toggleExpand = (cid: number) => {
     const willExpand = !expandedCollections.has(cid)
@@ -423,26 +429,29 @@ export function GapAnalysisPage() {
     }
   }
 
-  const openDetailModal = useCallback((part: GapCollectionPart) => {
-    setDetailPart(part)
-    setDetailOpen(true)
-    setDetailLoading(true)
-    setDetailError(null)
-    setDetailData(null)
-    void fetch(`/api/discover/tmdb/movie/${part.tmdbId}`, { credentials: 'include' })
-      .then(async (r) => {
-        if (!r.ok) {
-          const j = (await r.json().catch(() => ({}))) as { error?: string }
-          throw new Error(j.error || t('admin.gaps.errorLoadDetails'))
-        }
-        return r.json() as Promise<TmdbExternalDetailPayload>
-      })
-      .then((payload) => setDetailData(payload))
-      .catch((e: unknown) =>
-        setDetailError(e instanceof Error ? e.message : t('admin.gaps.errorLoadDetails'))
-      )
-      .finally(() => setDetailLoading(false))
-  }, [t])
+  const openDetailModal = useCallback(
+    (part: Pick<GapCollectionPart, 'tmdbId' | 'title' | 'inLibrary' | 'seerrStatus'>) => {
+      setDetailPart(part)
+      setDetailOpen(true)
+      setDetailLoading(true)
+      setDetailError(null)
+      setDetailData(null)
+      void fetch(`/api/discover/tmdb/movie/${part.tmdbId}`, { credentials: 'include' })
+        .then(async (r) => {
+          if (!r.ok) {
+            const j = (await r.json().catch(() => ({}))) as { error?: string }
+            throw new Error(j.error || t('admin.gaps.errorLoadDetails'))
+          }
+          return r.json() as Promise<TmdbExternalDetailPayload>
+        })
+        .then((payload) => setDetailData(payload))
+        .catch((e: unknown) =>
+          setDetailError(e instanceof Error ? e.message : t('admin.gaps.errorLoadDetails'))
+        )
+        .finally(() => setDetailLoading(false))
+    },
+    [t]
+  )
 
   const closeDetailModal = useCallback(() => {
     setDetailOpen(false)
@@ -466,47 +475,51 @@ export function GapAnalysisPage() {
   const executeGapRequest = useCallback(
     async (items: GapRequestItem[], seerrOptions: SeerrRequestOptions) => {
       setRequesting(true)
+      const failures: { tmdbId: number; title: string; message: string }[] = []
       try {
-        const res = await fetch('/api/admin/gap-analysis/request', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            items,
-            ...(Object.keys(seerrOptions).length > 0 ? { seerrOptions } : {}),
-          }),
-        })
-        const data = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(data.error || data.message || t('admin.gaps.errorRequestFailed'))
-        const errs = (data.errors || []) as { tmdbId: number; title: string; message: string }[]
-        if (errs.length > 0) {
-          setError(
-            errs
-              .slice(0, 3)
-              .map((e) => `${e.title || e.tmdbId}: ${e.message}`)
-              .join(' · ')
-          )
-        } else {
-          setError(null)
+        for (let i = 0; i < items.length; i += REQUEST_BATCH_SIZE) {
+          const batch = items.slice(i, i + REQUEST_BATCH_SIZE)
+          const res = await fetch('/api/admin/gap-analysis/request', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              items: batch,
+              ...(Object.keys(seerrOptions).length > 0 ? { seerrOptions } : {}),
+            }),
+          })
+          const data = await res.json().catch(() => ({}))
+          // `message` first: for an unlinked Seerr account it is the sentence
+          // that says what to do, where `error` is only the label.
+          if (!res.ok) throw new Error(data.message || data.error || t('admin.gaps.errorRequestFailed'))
+          const errs = (data.errors || []) as { tmdbId: number; title: string; message: string }[]
+          failures.push(...errs)
+          const errored = new Set(errs.map((e) => e.tmdbId))
+          setLocallyRequested((prev) => {
+            const next = new Set(prev)
+            for (const it of batch) {
+              if (!errored.has(it.tmdbId)) next.add(it.tmdbId)
+            }
+            return next
+          })
         }
-        const errored = new Set(errs.map((e) => e.tmdbId))
-        setLocallyRequested((prev) => {
-          const next = new Set(prev)
-          for (const it of items) {
-            if (!errored.has(it.tmdbId)) next.add(it.tmdbId)
-          }
-          return next
-        })
-        const nextRun = await loadLatest()
-        if (nextRun?.id) await loadResults(nextRun.id)
-        clearSel()
-        setConfirmOpen(false)
+        setError(
+          failures.length > 0
+            ? failures
+                .slice(0, 3)
+                .map((e) => `${e.title || e.tmdbId}: ${e.message}`)
+                .join(' · ')
+            : null
+        )
+        setSelected(new Set())
       } catch (e) {
         setError(e instanceof Error ? e.message : t('admin.gaps.errorRequestFailed'))
-        setConfirmOpen(false)
       } finally {
+        setConfirmOpen(false)
         setRequesting(false)
         setPendingBulkAfterOptions(null)
+        const displayed = await loadLatest()
+        if (displayed) await loadResults(displayed)
       }
     },
     [loadLatest, loadResults, t]
@@ -536,7 +549,6 @@ export function GapAnalysisPage() {
     setRefreshing(true)
     setError(null)
     setJobProgress(null)
-    let poll: ReturnType<typeof setInterval> | null = null
     try {
       const res = await fetch('/api/admin/gap-analysis/refresh', {
         method: 'POST',
@@ -545,15 +557,20 @@ export function GapAnalysisPage() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || t('admin.gaps.errorRefreshFailed'))
       const jobId = data.jobId as string
-      poll = setInterval(async () => {
-        let terminal = false
+      const startedAt = Date.now()
+      let lastListRefresh = 0
+      let busy = false
+      stopPolling()
+      pollRef.current = setInterval(async () => {
+        // A slow tick must not overlap the next one.
+        if (busy) return
+        busy = true
         try {
-          const [jr, latestRes] = await Promise.all([
-            fetch(`/api/jobs/progress/${jobId}`, { credentials: 'include' }),
-            fetch('/api/admin/gap-analysis/latest', { credentials: 'include' }),
-          ])
+          let status: string | undefined
+          const jr = await fetch(`/api/jobs/progress/${jobId}`, { credentials: 'include' })
           if (jr.ok) {
             const j = await jr.json()
+            status = j.status
             setJobProgress({
               overallProgress: typeof j.overallProgress === 'number' ? j.overallProgress : 0,
               currentStep: j.currentStep ?? '',
@@ -561,50 +578,47 @@ export function GapAnalysisPage() {
               itemsTotal: typeof j.itemsTotal === 'number' ? j.itemsTotal : 0,
               currentItem: j.currentItem,
             })
-            if (j.status === 'completed' || j.status === 'failed' || j.status === 'cancelled') {
-              terminal = true
-            }
           }
-          if (latestRes.ok) {
-            const d = await latestRes.json()
-            setActiveRun((d.activeRun as GapRun | null) ?? null)
-            setRun((d.run as GapRun | null) ?? null)
-            setSummaries(d.collectionSummaries || [])
-            const ar = d.activeRun as GapRun | null
-            if (ar?.id) {
-              await loadResults(ar.id)
-            }
-          }
-          if (terminal) {
-            if (poll) clearInterval(poll)
+          const terminal = status === 'completed' || status === 'failed' || status === 'cancelled'
+          if (terminal || Date.now() - startedAt > POLL_TIMEOUT_MS) {
+            stopPolling()
             setRefreshing(false)
             setJobProgress(null)
-            setActiveRun(null)
-            await loadLatest()
+            if (status === 'failed') setError(t('admin.gaps.errorRefreshFailed'))
+            const displayed = await loadLatest()
+            if (displayed) await loadResults(displayed)
+            return
+          }
+          if (Date.now() - lastListRefresh >= LIVE_LIST_REFRESH_MS) {
+            lastListRefresh = Date.now()
+            const displayed = await loadLatest()
+            if (displayed) await loadResults(displayed)
           }
         } catch {
-          if (poll) clearInterval(poll)
+          stopPolling()
           setRefreshing(false)
           setJobProgress(null)
+        } finally {
+          busy = false
         }
-      }, 600)
-      setTimeout(() => {
-        if (poll) clearInterval(poll)
-        setRefreshing(false)
-        setJobProgress(null)
-      }, 15 * 60 * 1000)
+      }, PROGRESS_POLL_MS)
     } catch (e) {
-      if (poll) clearInterval(poll)
+      stopPolling()
       setError(e instanceof Error ? e.message : t('admin.gaps.errorRefreshFailed'))
       setRefreshing(false)
       setJobProgress(null)
     }
   }
 
-  const buildItemsFromSelection = () =>
-    filteredRows
-      .filter((r) => selected.has(`${r.tmdbId}`))
-      .map((r) => ({ tmdbId: r.tmdbId, mediaType: 'movie' as const, title: r.title }))
+  const buildItemsFromSelection = (): GapRequestItem[] => {
+    const byId = new Map<number, GapRequestItem>()
+    for (const r of rows) {
+      if (selected.has(r.tmdbId) && !byId.has(r.tmdbId)) {
+        byId.set(r.tmdbId, { tmdbId: r.tmdbId, mediaType: 'movie', title: r.title })
+      }
+    }
+    return [...byId.values()]
+  }
 
   const onToolbarRequest = () => {
     const items = buildItemsFromSelection()
@@ -623,62 +637,173 @@ export function GapAnalysisPage() {
   }
 
   const snapshotRun = activeRun ?? run
-  const completionPct =
+  const coveragePct =
     snapshotRun && snapshotRun.totalParts > 0
-      ? Math.round((snapshotRun.ownedParts / snapshotRun.totalParts) * 1000) / 10
+      ? Math.round((snapshotRun.ownedParts / snapshotRun.totalParts) * 100)
       : 0
-
-  const LoadingSkeleton = () => (
-    <Grid container spacing={2}>
-      {[...Array(12)].map((_, i) => (
-        <Grid item xs={6} sm={4} md={3} lg={2} key={i}>
-          <MoviePoster title="" loading responsive hideRating hideUserRating hideWatchingToggle hideExploreButton />
-        </Grid>
-      ))}
-    </Grid>
-  )
 
   const bulkPreConfirmCount = pendingBulkAfterOptions?.items.length ?? 0
 
-  /** Build unified chronological parts list for a collection. */
-  const getChronologicalParts = (
-    collectionId: number,
-    missingRows: GapRow[]
-  ): { part: GapCollectionPart; gapRow?: GapRow; variant: 'owned' | 'seerr' | 'missing' }[] => {
-    const partDetail = collectionPartsById[collectionId]
-    if (!partDetail) {
-      return missingRows.map((r) => ({
-        part: {
-          tmdbId: r.tmdbId,
-          title: r.title,
-          releaseYear: r.releaseYear,
-          releaseDate: r.releaseDate ?? null,
-          posterPath: r.posterPath,
-          inLibrary: false,
-          seerrStatus: 'none' as PartSeerrStatus,
-        },
-        gapRow: r,
-        variant: 'missing' as const,
-      }))
-    }
-
-    const missingByTmdb = new Map(missingRows.map((r) => [r.tmdbId, r]))
-
-    return partDetail.parts
-      .slice()
-      .sort((a, b) => {
-        const da = (a.releaseDate ?? '').slice(0, 10)
-        const db = (b.releaseDate ?? '').slice(0, 10)
-        if (da !== db) return da.localeCompare(db)
-        return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })
-      })
-      .map((p) => {
-        if (p.inLibrary) return { part: p, variant: 'owned' as const }
-        if (p.seerrStatus !== 'none') return { part: p, variant: 'seerr' as const }
-        const gapRow = missingByTmdb.get(p.tmdbId)
-        return { part: p, gapRow, variant: 'missing' as const }
-      })
+  const describeRun = (r: GapRun): string => {
+    const when = new Date(r.completedAt || r.startedAt)
+    const { value, unit } = relativeTimeParts(when, new Date())
+    return t('admin.gaps.scannedAt', {
+      when: when.toLocaleString(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }),
+      relative: new Intl.RelativeTimeFormat(i18n.language, { numeric: 'auto' }).format(value, unit),
+    })
   }
+
+  const partsFor = (listing: GapCollectionListing<GapRow>): DisplayPart[] | null => {
+    const detail = collectionPartsById[listing.collectionId]
+    if (!detail) return null
+    return [...detail.parts].sort(compareByRelease).map((p) => {
+      let variant: PartVariant
+      if (p.inLibrary) variant = 'owned'
+      else if (p.seerrStatus !== 'none') variant = 'seerr'
+      else if (openGapIds.has(p.tmdbId) && !locallyRequested.has(p.tmdbId)) variant = 'missing'
+      else variant = 'requested'
+      return { ...p, variant }
+    })
+  }
+
+  const renderPart = (part: DisplayPart) => {
+    const { variant } = part
+    return (
+      <Box key={part.tmdbId} sx={{ opacity: variant === 'missing' ? 1 : 0.55, transition: 'opacity 0.2s', '&:hover': { opacity: 1 } }}>
+        <MoviePoster
+          title={part.title}
+          year={part.releaseYear}
+          posterUrl={part.posterPath ? `${TMDB_IMG}${part.posterPath}` : null}
+          responsive
+          titleLines={2}
+          hideRating
+          hideUserRating
+          hideWatchingToggle
+          hideExploreButton
+          onClick={() => openDetailModal(part)}
+        >
+          {variant === 'owned' && (
+            <PartStatusChip icon={<CheckCircleIcon />} label={t('admin.gaps.inLibrary')} color={theme.palette.success.main} />
+          )}
+          {variant === 'seerr' && (
+            <PartStatusChip
+              icon={<HourglassEmptyIcon />}
+              label={seerrChipLabel(part.seerrStatus, t)}
+              color={theme.palette.info.main}
+            />
+          )}
+          {variant === 'requested' && (
+            <PartStatusChip icon={<HourglassEmptyIcon />} label={t('admin.gaps.requested')} color={theme.palette.secondary.main} />
+          )}
+          {variant === 'missing' && (
+            <>
+              <Checkbox
+                size="small"
+                checked={selected.has(part.tmdbId)}
+                onClick={(e) => e.stopPropagation()}
+                onChange={() => toggleIds([part.tmdbId])}
+                inputProps={{ 'aria-label': t('admin.gaps.selectAria', { title: part.title }) }}
+                sx={{
+                  position: 'absolute',
+                  top: 4,
+                  left: 4,
+                  zIndex: 5,
+                  bgcolor: alpha(theme.palette.common.black, 0.5),
+                  borderRadius: 1,
+                  p: 0.25,
+                  color: 'common.white',
+                  '&.Mui-checked': { color: 'primary.main' },
+                  '&:hover': { bgcolor: alpha(theme.palette.common.black, 0.7) },
+                }}
+              />
+              {seerrOk && (
+                <Button
+                  size="small"
+                  variant="contained"
+                  sx={{
+                    position: 'absolute',
+                    bottom: 8,
+                    right: 8,
+                    zIndex: 5,
+                    minWidth: 0,
+                    py: 0.25,
+                    px: 1,
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    openSeerrOptionsStep([{ tmdbId: part.tmdbId, mediaType: 'movie', title: part.title }])
+                  }}
+                >
+                  {t('admin.gaps.request')}
+                </Button>
+              )}
+            </>
+          )}
+        </MoviePoster>
+      </Box>
+    )
+  }
+
+  const renderExpanded = (listing: GapCollectionListing<GapRow>) => {
+    const parts = partsFor(listing)
+    const stillLoading = parts == null && partsLoading.has(listing.collectionId)
+    // Without the full part list (it failed, or a scan is still running) the
+    // missing films alone are still worth showing.
+    const display: DisplayPart[] =
+      parts ??
+      listing.missing.map((m) => ({
+        tmdbId: m.tmdbId,
+        title: m.title,
+        releaseYear: m.releaseYear,
+        releaseDate: m.releaseDate ?? null,
+        posterPath: m.posterPath,
+        inLibrary: false,
+        seerrStatus: 'none',
+        variant: locallyRequested.has(m.tmdbId) ? 'requested' : 'missing',
+      }))
+
+    return (
+      <Box sx={{ px: 2, pb: 2, borderTop: 1, borderColor: 'divider' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 1,
+            py: 1.25,
+          }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            {stillLoading ? '' : parts ? t('admin.gaps.releaseOrder') : t('admin.gaps.missingOnly')}
+          </Typography>
+          <Button
+            size="small"
+            component={RouterLink}
+            to={`/franchises/${listing.collectionId}`}
+            endIcon={<ArrowForwardIcon />}
+          >
+            {t('admin.gaps.openFranchise')}
+          </Button>
+        </Box>
+        {stillLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+            <CircularProgress size={28} />
+          </Box>
+        ) : (
+          <Box sx={PARTS_GRID}>{display.map(renderPart)}</Box>
+        )}
+      </Box>
+    )
+  }
+
+  const tmdbMissing = prereq != null && !prereq.tmdbConfigured
+  const collectionsMissing = prereq != null && prereq.moviesWithCollectionCount === 0
+  const allReady = prereq != null && !tmdbMissing && !collectionsMissing && seerrOk
+  const uniqueMissingFilms = openGapIds.size
 
   return (
     <Box sx={{ maxWidth: 1400, mx: 'auto', p: { xs: 2, md: 3 }, pb: 10 }}>
@@ -696,165 +821,202 @@ export function GapAnalysisPage() {
       )}
 
       {loading ? (
-        <LoadingSkeleton />
+        <>
+          <Skeleton variant="rounded" height={170} sx={{ mb: 3 }} />
+          <ListSkeleton />
+        </>
       ) : (
         <>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} md={4}>
-              <StatusCard
-                title={t('admin.gaps.statusTmdb')}
-                status={prereq?.tmdbConfigured ? 'ok' : 'error'}
-                message={prereq?.tmdbConfigured ? t('admin.gaps.statusTmdbOk') : t('admin.gaps.statusTmdbBad')}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <StatusCard
-                title={t('admin.gaps.statusCollections')}
-                status={(prereq?.moviesWithCollectionCount ?? 0) > 0 ? 'ok' : 'error'}
-                message={
-                  (prereq?.moviesWithCollectionCount ?? 0) > 0
-                    ? t('admin.gaps.statusCollectionsOk', { count: prereq?.moviesWithCollectionCount ?? 0 })
-                    : t('admin.gaps.statusCollectionsBad')
-                }
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <StatusCard
-                title={t('admin.gaps.statusSeerr')}
-                status={seerrOk ? 'ok' : 'error'}
-                message={seerrOk ? t('admin.gaps.statusSeerrOk') : t('admin.gaps.statusSeerrBad')}
-              />
-            </Grid>
-          </Grid>
-
-          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 3 }}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center" justifyContent="space-between">
-              <Box>
-                <Typography fontWeight={600}>{t('admin.gaps.analysisSnapshot')}</Typography>
-                {activeRun ? (
-                  <Typography variant="body2" color="text.secondary">
-                    {t('admin.gaps.inProgressScan', {
-                      scanned: activeRun.collectionsScanned,
-                      missing: activeRun.missingCount,
-                      pct: completionPct,
-                    })}
-                  </Typography>
-                ) : run ? (
-                  <Typography variant="body2" color="text.secondary">
-                    {t('admin.gaps.lastRun', {
-                      when: new Date(run.completedAt || run.startedAt).toLocaleString(),
-                      scanned: run.collectionsScanned,
-                      missing: run.missingCount,
-                      pct: completionPct,
-                    })}
-                  </Typography>
-                ) : (
-                  <Typography variant="body2" color="text.secondary">
-                    {t('admin.gaps.noRunYet')}
-                  </Typography>
-                )}
-              </Box>
-              <Button variant="contained" onClick={() => void runRefresh()} disabled={refreshing || !prereq?.tmdbConfigured}>
-                {refreshing ? <CircularProgress size={22} color="inherit" /> : t('admin.gaps.runAnalysis')}
-              </Button>
-            </Stack>
-          </Paper>
-
-          {refreshing && (
-            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 3 }}>
-              <Typography fontWeight={600} gutterBottom>
-                {jobProgress?.currentStep || t('admin.gaps.startingGapAnalysis')}
-              </Typography>
-              <LinearProgress
-                variant={jobProgress && jobProgress.overallProgress > 0 ? 'determinate' : 'indeterminate'}
-                value={jobProgress ? Math.min(100, jobProgress.overallProgress) : 0}
-                sx={{ mb: 1 }}
-              />
-              <Typography variant="body2" color="text.secondary">
-                {jobProgress && jobProgress.itemsTotal > 0
-                  ? t('admin.gaps.progressCollections', {
-                      processed: jobProgress.itemsProcessed,
-                      total: jobProgress.itemsTotal,
-                    })
-                  : jobProgress?.currentItem || t('admin.gaps.scanningCollections')}
-              </Typography>
-              {activeRun != null && (
-                <Typography variant="body2" color="primary" sx={{ mt: 1 }}>
-                  {t('admin.gaps.missingSoFar', { count: activeRun.missingCount })}
-                </Typography>
-              )}
-            </Paper>
+          {/* Only what is wrong gets a banner; when everything is set up, one caption says so. */}
+          {tmdbMissing && (
+            <Alert
+              severity="error"
+              sx={{ mb: 2 }}
+              action={
+                <Button color="inherit" size="small" component={RouterLink} to={adminPathFor('tmdb')}>
+                  {t('admin.gaps.openTmdbSettings')}
+                </Button>
+              }
+            >
+              {t('admin.gaps.tmdbMissing')}
+            </Alert>
           )}
-
-          {!prereq?.tmdbConfigured && (
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              {t('admin.gaps.tmdbRequired')}{' '}
-              <MuiLink href="/admin/settings">{t('admin.gaps.tmdbRequiredLink')}</MuiLink>{' '}
-              {t('admin.gaps.tmdbRequiredSuffix')}
+          {collectionsMissing && (
+            <Alert
+              severity="warning"
+              sx={{ mb: 2 }}
+              action={
+                <Button color="inherit" size="small" component={RouterLink} to={jobConsoleLink('enrich-metadata')}>
+                  {t('admin.gaps.openEnrichJob')}
+                </Button>
+              }
+            >
+              {t('admin.gaps.collectionsMissing')}
+            </Alert>
+          )}
+          {!seerrOk && (
+            <Alert
+              severity="info"
+              sx={{ mb: 2 }}
+              action={
+                <Button color="inherit" size="small" component={RouterLink} to={adminPathFor('seerr')}>
+                  {t('admin.gaps.openSeerrSettings')}
+                </Button>
+              }
+            >
+              {t('admin.gaps.seerrMissing')}
             </Alert>
           )}
 
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 3 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 2,
+              }}
+            >
+              <Box sx={{ minWidth: 0 }}>
+                <Typography fontWeight={600}>{t('admin.gaps.analysisSnapshot')}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {activeRun ? t('admin.gaps.scanInProgress') : run ? describeRun(run) : t('admin.gaps.noRunYet')}
+                </Typography>
+              </Box>
+              <Button
+                variant="contained"
+                onClick={() => void runRefresh()}
+                disabled={refreshing || activeRun != null || tmdbMissing}
+                startIcon={refreshing ? <CircularProgress size={16} color="inherit" /> : undefined}
+              >
+                {t('admin.gaps.runAnalysis')}
+              </Button>
+            </Box>
+
+            {moviesAddedSinceRun != null && moviesAddedSinceRun > 0 && !activeRun && (
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                {t('admin.gaps.staleMovies', { count: moviesAddedSinceRun, movies: formatNumber(moviesAddedSinceRun) })}
+              </Alert>
+            )}
+
+            {snapshotRun && (
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(11rem, 1fr))',
+                  gap: 1.5,
+                  mt: 2,
+                }}
+              >
+                <SnapshotStat
+                  value={listReady ? formatNumber(listings.length) : '–'}
+                  label={t('admin.gaps.statCollections')}
+                  detail={t('admin.gaps.statCollectionsDetail', { scanned: formatNumber(snapshotRun.collectionsScanned) })}
+                />
+                <SnapshotStat
+                  value={listReady ? formatNumber(uniqueMissingFilms) : '–'}
+                  label={t('admin.gaps.statMissing')}
+                  detail={t('admin.gaps.statMissingDetail')}
+                />
+                <SnapshotStat
+                  value={`${coveragePct}%`}
+                  label={t('admin.gaps.statCoverage')}
+                  detail={t('admin.gaps.statCoverageDetail', {
+                    owned: formatNumber(snapshotRun.ownedParts),
+                    total: formatNumber(snapshotRun.totalParts),
+                  })}
+                />
+              </Box>
+            )}
+
+            {refreshing && (
+              <Box sx={{ mt: 2 }}>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 1, mb: 0.75 }}>
+                  <Typography variant="body2" fontWeight={600}>
+                    {jobProgress?.currentStep || t('admin.gaps.startingGapAnalysis')}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {jobProgress && jobProgress.itemsTotal > 0
+                      ? t('admin.gaps.progressCollections', {
+                          processed: jobProgress.itemsProcessed,
+                          total: jobProgress.itemsTotal,
+                        })
+                      : jobProgress?.currentItem || t('admin.gaps.scanningCollections')}
+                  </Typography>
+                </Box>
+                <LinearProgress
+                  variant={jobProgress && jobProgress.overallProgress > 0 ? 'determinate' : 'indeterminate'}
+                  value={jobProgress ? Math.min(100, jobProgress.overallProgress) : 0}
+                />
+              </Box>
+            )}
+
+            {allReady && (
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1.5 }}>
+                {t('admin.gaps.readyLine', {
+                  count: prereq.moviesWithCollectionCount,
+                  movies: formatNumber(prereq.moviesWithCollectionCount),
+                })}
+              </Typography>
+            )}
+          </Paper>
+
           {displayRunId && (
             <>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }} alignItems={{ sm: 'center' }} flexWrap="wrap">
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center', mb: 2 }}>
                 <TextField
                   size="small"
-                  label={t('admin.gaps.searchLabel')}
+                  placeholder={t('admin.gaps.searchLabel')}
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  sx={{ minWidth: 260 }}
+                  onChange={(e) => {
+                    setSearch(e.target.value)
+                    setVisibleCount(PAGE_SIZE)
+                  }}
+                  sx={{ flex: '1 1 16rem', maxWidth: { sm: 360 } }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  }}
+                  inputProps={{ 'aria-label': t('admin.gaps.searchLabel') }}
                 />
-                <FormControl size="small" sx={{ minWidth: 180 }}>
+                <FormControl size="small" sx={{ minWidth: 190 }}>
                   <InputLabel id="gap-sort-by">{t('admin.gaps.sortBy')}</InputLabel>
                   <Select
                     labelId="gap-sort-by"
                     label={t('admin.gaps.sortBy')}
                     value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as 'most_missing' | 'most_complete' | 'name')}
-                    renderValue={(sel) => {
-                      const labels: Record<string, string> = {
-                        most_missing: t('admin.gaps.sortMostMissing'),
-                        most_complete: t('admin.gaps.sortMostComplete'),
-                        name: t('admin.gaps.sortName'),
-                      }
-                      return (
-                        <Stack direction="row" alignItems="center" gap={0.75} component="span">
-                          <SortIcon fontSize="small" sx={{ opacity: 0.8 }} />
-                          <Typography component="span" variant="body2">{labels[sel] ?? sel}</Typography>
-                        </Stack>
-                      )
+                    onChange={(e) => {
+                      setSortBy(e.target.value as GapSort)
+                      setVisibleCount(PAGE_SIZE)
                     }}
                   >
-                    <MenuItem value="most_missing">{t('admin.gaps.sortMostMissing')}</MenuItem>
-                    <MenuItem value="most_complete">{t('admin.gaps.sortMostComplete')}</MenuItem>
+                    <MenuItem value="closest">{t('admin.gaps.sortClosest')}</MenuItem>
+                    <MenuItem value="mostMissing">{t('admin.gaps.sortMostMissing')}</MenuItem>
                     <MenuItem value="name">{t('admin.gaps.sortName')}</MenuItem>
                   </Select>
                 </FormControl>
-                {maxMissing > 1 && (
-                  <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 200, maxWidth: 320, flex: 1 }}>
-                    <Typography variant="body2" color="text.secondary" noWrap>
-                      {t('admin.gaps.minMissing')}
-                    </Typography>
-                    <Slider
-                      size="small"
-                      value={minMissing}
-                      min={0}
-                      max={maxMissing}
-                      onChange={(_, v) => setMinMissing(v as number)}
-                      valueLabelDisplay="auto"
-                    />
-                    <Typography variant="body2" fontWeight={600} sx={{ minWidth: 24, textAlign: 'right' }}>
-                      {minMissing}
-                    </Typography>
-                  </Stack>
-                )}
-                <Button size="small" onClick={selectAllVisible}>
-                  {t('admin.gaps.selectAllVisible')}
-                </Button>
-                <Button size="small" onClick={clearSel}>
-                  {t('admin.gaps.clearSelection')}
-                </Button>
-              </Stack>
+                <FormControl size="small" sx={{ minWidth: 150 }}>
+                  <InputLabel id="gap-missing-filter">{t('admin.gaps.missingFilter')}</InputLabel>
+                  <Select
+                    labelId="gap-missing-filter"
+                    label={t('admin.gaps.missingFilter')}
+                    value={missingFilter}
+                    onChange={(e) => {
+                      setMissingFilter(e.target.value as GapMissingFilter)
+                      setVisibleCount(PAGE_SIZE)
+                    }}
+                  >
+                    <MenuItem value="any">{t('admin.gaps.missingAny')}</MenuItem>
+                    <MenuItem value="one">{t('admin.gaps.missingOne')}</MenuItem>
+                    <MenuItem value="few">{t('admin.gaps.missingFew')}</MenuItem>
+                    <MenuItem value="many">{t('admin.gaps.missingMany')}</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
 
               <RequestSeerrOptionsDialog
                 open={requestOptionsOpen}
@@ -864,275 +1026,79 @@ export function GapAnalysisPage() {
                 onConfirm={handleSeerrOptionsConfirm}
               />
 
-              {displaySummariesOrdered.length === 0 && filteredRows.length === 0 ? (
-                <Alert severity="info">{t('admin.gaps.noMissingInSnapshot')}</Alert>
+              {!listReady ? (
+                <ListSkeleton />
+              ) : listings.length === 0 ? (
+                <Alert severity="success">{t('admin.gaps.noGaps')}</Alert>
+              ) : filtered.length === 0 ? (
+                <Alert severity="info">{t('admin.gaps.noMatches')}</Alert>
               ) : (
-                <Stack spacing={3}>
-                  {displaySummariesOrdered.map((s) => {
-                    const missingRows = grouped.get(s.collectionId) || []
-                    if (missingRows.length === 0) return null
+                <>
+                  {/* Same horizontal inset as a row, so this checkbox sits over theirs. */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1.5, mb: 1 }}>
+                    <Checkbox
+                      size="small"
+                      checked={shownRequestableIds.length > 0 && shownSelected === shownRequestableIds.length}
+                      indeterminate={shownSelected > 0 && shownSelected < shownRequestableIds.length}
+                      disabled={shownRequestableIds.length === 0}
+                      onChange={() => toggleIds(shownRequestableIds)}
+                      inputProps={{ 'aria-label': t('admin.gaps.selectShownAria') }}
+                      sx={{ p: 0.5 }}
+                    />
+                    <Typography variant="body2" color="text.secondary">
+                      {t('admin.gaps.showingCollections', {
+                        count: filtered.length,
+                        shown: formatNumber(shown.length),
+                        total: formatNumber(filtered.length),
+                      })}
+                      {' · '}
+                      {t('admin.gaps.missingInView', {
+                        count: filteredMissingCount,
+                        films: formatNumber(filteredMissingCount),
+                      })}
+                    </Typography>
+                  </Box>
 
-                    const coveredCount = s.ownedCount + s.seerrCount
-                    const ratio = s.totalReleased > 0 ? coveredCount / s.totalReleased : 0
-                    const expanded = expandedCollections.has(s.collectionId)
-                    const partsPending = partsLoading.has(s.collectionId) && !collectionPartsById[s.collectionId]
-                    const allParts = expanded && !partsPending ? getChronologicalParts(s.collectionId, missingRows) : []
-
-                    return (
-                      <Paper key={s.collectionId} variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
-                        {/* Collection header */}
-                        <Box
-                          onClick={() => toggleExpand(s.collectionId)}
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 2,
-                            p: 2,
-                            cursor: 'pointer',
-                            '&:hover': { bgcolor: 'action.hover' },
-                            transition: 'background-color 0.15s',
-                          }}
+                  <Stack spacing={1}>
+                    {shown.map((listing) => {
+                      const ids = requestableIds(listing)
+                      const expanded = expandedCollections.has(listing.collectionId)
+                      return (
+                        <GapCollectionRow
+                          key={listing.collectionId}
+                          listing={listing}
+                          expanded={expanded}
+                          onToggleExpand={() => toggleExpand(listing.collectionId)}
+                          requestableCount={ids.length}
+                          selectedCount={ids.filter((id) => selected.has(id)).length}
+                          onToggleSelect={() => toggleIds(ids)}
+                          canRequest={seerrOk}
+                          onRequestAll={() =>
+                            openSeerrOptionsStep(
+                              listing.missing
+                                .filter((m) => !locallyRequested.has(m.tmdbId))
+                                .map((m) => ({ tmdbId: m.tmdbId, mediaType: 'movie' as const, title: m.title })),
+                              t('admin.gaps.requestAllMissing', { name: listing.name })
+                            )
+                          }
+                          onOpenTitle={(m) =>
+                            openDetailModal({ tmdbId: m.tmdbId, title: m.title, inLibrary: false, seerrStatus: 'none' })
+                          }
                         >
-                          <Box sx={{ flexShrink: 0, width: { xs: 60, sm: 80 } }}>
-                            <MoviePoster
-                              title={s.collectionName}
-                              posterUrl={s.collectionPosterPath ? `${TMDB_IMG}${s.collectionPosterPath}` : null}
-                              responsive
-                              hideYear
-                              hideUserRating
-                              hideWatchingToggle
-                              hideExploreButton
-                              hideRating
-                            />
-                          </Box>
-                          <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography variant="h6" fontWeight={700} noWrap>{s.collectionName}</Typography>
-                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mt: 0.5 }}>
-                              {s.ownedCount > 0 && (
-                                <Chip
-                                  icon={<CheckCircleIcon />}
-                                  label={t('admin.gaps.owned', { count: s.ownedCount })}
-                                  size="small"
-                                  color="success"
-                                  variant="outlined"
-                                />
-                              )}
-                              {s.seerrCount > 0 && (
-                                <Chip
-                                  icon={<HourglassEmptyIcon />}
-                                  label={t('admin.gaps.inSeerr', { count: s.seerrCount })}
-                                  size="small"
-                                  color="info"
-                                  variant="outlined"
-                                />
-                              )}
-                              <Typography variant="caption" color="text.secondary">
-                                {t('admin.gaps.coveredFraction', {
-                                  covered: coveredCount,
-                                  total: s.totalReleased,
-                                  missing: missingRows.length,
-                                })}
-                              </Typography>
-                            </Stack>
-                            <LinearProgress
-                              variant="determinate"
-                              value={Math.min(100, ratio * 100)}
-                              sx={{ mt: 1, maxWidth: 300, borderRadius: 1 }}
-                            />
-                          </Box>
-                          <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
-                            <Button
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                const n = new Set(selected)
-                                for (const r of missingRows) {
-                                  if (!isDimmed(r)) n.add(`${r.tmdbId}`)
-                                }
-                                setSelected(n)
-                              }}
-                            >
-                              {t('admin.gaps.selectAll')}
-                            </Button>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              disabled={!seerrOk || missingRows.filter((r) => !isDimmed(r)).length === 0}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                const requestable = missingRows
-                                  .filter((r) => !isDimmed(r))
-                                  .map((r) => ({ tmdbId: r.tmdbId, mediaType: 'movie' as const, title: r.title }))
-                                openSeerrOptionsStep(
-                                  requestable,
-                                  t('admin.gaps.requestAllMissing', { name: s.collectionName })
-                                )
-                              }}
-                            >
-                              {t('admin.gaps.requestAll')}
-                            </Button>
-                            <IconButton size="small">
-                              {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                            </IconButton>
-                          </Stack>
-                        </Box>
+                          {expanded ? renderExpanded(listing) : null}
+                        </GapCollectionRow>
+                      )
+                    })}
+                  </Stack>
 
-                        {/* Poster grid — parts are fetched lazily on first expand */}
-                        {expanded && partsPending && (
-                          <Box sx={{ display: 'flex', justifyContent: 'center', px: 2, pb: 3, pt: 1 }}>
-                            <CircularProgress size={28} />
-                          </Box>
-                        )}
-                        {expanded && !partsPending && (
-                          <Box sx={{ px: 2, pb: 2 }}>
-                            <Grid container spacing={2}>
-                              {allParts.map(({ part: p, gapRow, variant }) => {
-                                const isOwned = variant === 'owned'
-                                const isSeerr = variant === 'seerr'
-                                const isMissing = variant === 'missing'
-                                const dim = isMissing && gapRow ? isDimmed(gapRow) : false
-                                const isChecked = isMissing && selected.has(`${p.tmdbId}`)
-                                const seerr = isMissing && gapRow ? toSeerrStatus(gapRow) : undefined
-                                const apertureRequested = !!(seerr?.requested)
-                                const posterOpacity = isOwned ? 0.45 : isSeerr ? 0.55 : dim ? 0.55 : 1
-
-                                return (
-                                  <Grid item xs={6} sm={4} md={3} lg={2} key={`${variant}-${p.tmdbId}`}>
-                                    <Box sx={{ position: 'relative' }}>
-                                      <Box sx={{ opacity: posterOpacity, transition: 'opacity 0.2s' }}>
-                                        <MoviePoster
-                                          title={p.title}
-                                          year={p.releaseYear}
-                                          posterUrl={p.posterPath ? `${TMDB_IMG}${p.posterPath}` : null}
-                                          responsive
-                                          hideRating
-                                          hideUserRating
-                                          hideWatchingToggle
-                                          hideExploreButton
-                                          onClick={() => openDetailModal(p)}
-                                        >
-                                          {/* Status badge overlay */}
-                                          {isOwned && (
-                                            <Chip
-                                              icon={<CheckCircleIcon />}
-                                              label={t('admin.gaps.inLibrary')}
-                                              size="small"
-                                              sx={{
-                                                position: 'absolute',
-                                                bottom: 8,
-                                                left: 8,
-                                                zIndex: 3,
-                                                fontWeight: 600,
-                                                fontSize: '0.7rem',
-                                                height: 24,
-                                                bgcolor: 'rgba(34, 197, 94, 0.9)',
-                                                color: 'white',
-                                                '& .MuiChip-icon': { color: 'white' },
-                                              }}
-                                            />
-                                          )}
-                                          {isSeerr && (
-                                            <Chip
-                                              icon={<HourglassEmptyIcon />}
-                                              label={seerrChipLabel(p.seerrStatus, t)}
-                                              size="small"
-                                              sx={{
-                                                position: 'absolute',
-                                                bottom: 8,
-                                                left: 8,
-                                                zIndex: 3,
-                                                fontWeight: 600,
-                                                fontSize: '0.7rem',
-                                                height: 24,
-                                                bgcolor: 'rgba(59, 130, 246, 0.9)',
-                                                color: 'white',
-                                                '& .MuiChip-icon': { color: 'white' },
-                                              }}
-                                            />
-                                          )}
-                                          {isMissing && apertureRequested && (
-                                            <Chip
-                                              icon={<HourglassEmptyIcon />}
-                                              label={
-                                                seerr?.requestStatus === 'pending'
-                                                  ? t('admin.gaps.pending')
-                                                  : t('admin.gaps.requested')
-                                              }
-                                              size="small"
-                                              sx={{
-                                                position: 'absolute',
-                                                bottom: 8,
-                                                left: 8,
-                                                zIndex: 3,
-                                                fontWeight: 600,
-                                                fontSize: '0.7rem',
-                                                height: 24,
-                                                bgcolor: alpha(theme.palette.secondary.main, 0.9),
-                                                color: 'white',
-                                                '& .MuiChip-icon': { color: 'white' },
-                                              }}
-                                            />
-                                          )}
-                                          {isMissing && !apertureRequested && (
-                                            <Checkbox
-                                              size="small"
-                                              checked={isChecked}
-                                              disabled={dim}
-                                              onChange={(e) => { e.stopPropagation(); toggleSelect(`${p.tmdbId}`, dim) }}
-                                              inputProps={{ 'aria-label': t('admin.gaps.selectAria', { title: p.title }) }}
-                                              sx={{
-                                                position: 'absolute',
-                                                top: 4,
-                                                left: 4,
-                                                zIndex: 5,
-                                                bgcolor: 'rgba(0,0,0,0.5)',
-                                                borderRadius: 1,
-                                                p: 0.25,
-                                                color: 'white',
-                                                '&.Mui-checked': { color: 'primary.main' },
-                                                '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
-                                              }}
-                                            />
-                                          )}
-                                          {isMissing && !apertureRequested && !dim && seerrOk && (
-                                            <Button
-                                              size="small"
-                                              variant="contained"
-                                              sx={{
-                                                position: 'absolute',
-                                                bottom: 8,
-                                                right: 8,
-                                                zIndex: 5,
-                                                minWidth: 0,
-                                                py: 0.25,
-                                                px: 1,
-                                                fontSize: '0.7rem',
-                                                fontWeight: 600,
-                                                textTransform: 'none',
-                                                bgcolor: alpha(theme.palette.primary.main, 0.9),
-                                                '&:hover': { bgcolor: theme.palette.primary.main },
-                                              }}
-                                              onClick={(e) => {
-                                                e.stopPropagation()
-                                                openSeerrOptionsStep([{ tmdbId: p.tmdbId, mediaType: 'movie', title: p.title }])
-                                              }}
-                                            >
-                                              {t('admin.gaps.request')}
-                                            </Button>
-                                          )}
-                                        </MoviePoster>
-                                      </Box>
-                                    </Box>
-                                  </Grid>
-                                )
-                              })}
-                            </Grid>
-                          </Box>
-                        )}
-                      </Paper>
-                    )
-                  })}
-                </Stack>
+                  {shown.length < filtered.length && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                      <Button variant="outlined" onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}>
+                        {t('admin.gaps.showMore', { count: Math.min(PAGE_SIZE, filtered.length - shown.length) })}
+                      </Button>
+                    </Box>
+                  )}
+                </>
               )}
             </>
           )}
@@ -1147,17 +1113,15 @@ export function GapAnalysisPage() {
         data={detailData}
         sourceLabel={t('admin.gaps.sourceLabel')}
         canRequest={
-          seerrOk &&
-          !!detailPart &&
-          !detailPart.inLibrary &&
-          detailPart.seerrStatus === 'none' &&
-          !locallyRequested.has(detailPart.tmdbId)
+          seerrOk && !!detailPart && openGapIds.has(detailPart.tmdbId) && !locallyRequested.has(detailPart.tmdbId)
         }
         seerrAvailable={detailPart?.inLibrary || detailPart?.seerrStatus === 'available'}
         seerrPending={
-          detailPart?.seerrStatus === 'requested' ||
-          detailPart?.seerrStatus === 'processing' ||
-          (!!detailPart && locallyRequested.has(detailPart.tmdbId))
+          !!detailPart &&
+          (detailPart.seerrStatus === 'requested' ||
+            detailPart.seerrStatus === 'processing' ||
+            locallyRequested.has(detailPart.tmdbId) ||
+            (!detailPart.inLibrary && detailPart.seerrStatus === 'none' && !openGapIds.has(detailPart.tmdbId)))
         }
         onRequest={
           detailPart
@@ -1179,7 +1143,7 @@ export function GapAnalysisPage() {
             <Typography variant="body2">{t('admin.gaps.selectedCount', { count: selected.size })}</Typography>
             <Stack direction="row" spacing={1}>
               <Button onClick={clearSel}>{t('common.clear')}</Button>
-              <Button variant="contained" disabled={!seerrOk} onClick={onToolbarRequest}>
+              <Button variant="contained" disabled={!seerrOk || requesting} onClick={onToolbarRequest}>
                 {t('admin.gaps.requestSelectedSeerr')}
               </Button>
             </Stack>
