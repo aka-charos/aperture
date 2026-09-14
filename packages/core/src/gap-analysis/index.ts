@@ -12,6 +12,15 @@ import { fetchCollectionDataAndCache } from '../tmdb/collection-cache.js'
 import type { CollectionData } from '../tmdb/types.js'
 import { setJobStep, addLog, updateJobProgress } from '../jobs/progress.js'
 import { batchGetMediaStatus, isSeerrConfigured } from '../seerr/provider.js'
+import {
+  deriveSeerrStatus,
+  isReleasedReleaseDate,
+  type SeerrStatus,
+} from '../tmdb/collectionParts.js'
+
+// Shared with the franchise page, so both read "released" and a Seerr status
+// the same way. Re-exported here to keep the barrel's names unchanged.
+export { isReleasedReleaseDate, type SeerrStatus } from '../tmdb/collectionParts.js'
 
 const logger = createChildLogger('gap-analysis')
 
@@ -21,22 +30,6 @@ const CHUNK_DELAY_MS = 200
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-export function isReleasedReleaseDate(releaseDate: string | null | undefined): boolean {
-  if (releaseDate == null || typeof releaseDate !== 'string') return false
-  const s = releaseDate.trim()
-  if (s.length < 10) return false
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s)
-  if (!m) return false
-  const y = Number(m[1])
-  const mo = Number(m[2])
-  const d = Number(m[3])
-  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return false
-  const releaseUtc = Date.UTC(y, mo - 1, d)
-  const now = new Date()
-  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
-  return releaseUtc <= todayUtc
-}
 
 function parseYear(releaseDate: string | null): number | null {
   if (!releaseDate || releaseDate.length < 4) return null
@@ -52,7 +45,6 @@ function sleep(ms: number): Promise<void> {
 // Types
 // ---------------------------------------------------------------------------
 
-export type SeerrStatus = 'none' | 'requested' | 'processing' | 'available'
 export type GapAnalysisRunStatus = 'running' | 'completed' | 'failed'
 
 export interface GapAnalysisRun {
@@ -244,16 +236,6 @@ export async function getMovieTmdbIdsWithActiveDiscoveryRequest(): Promise<Set<n
 // ---------------------------------------------------------------------------
 // Scan job: runLibraryGapAnalysis
 // ---------------------------------------------------------------------------
-
-function deriveSeerrStatus(
-  st: { exists: boolean; status: string; requested: boolean } | undefined
-): SeerrStatus {
-  if (!st) return 'none'
-  if (st.exists) return 'available'
-  if (st.status === 'processing') return 'processing'
-  if (st.requested) return 'requested'
-  return 'none'
-}
 
 export async function runLibraryGapAnalysis(options: { jobId?: string } = {}): Promise<{
   runId: string

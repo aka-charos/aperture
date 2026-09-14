@@ -2391,3 +2391,30 @@ Also seen once each, and each is now named in the prompt: a credits roll given a
 **The counts are an instrument.** `proseSignals.ts` counts the measured habits and the report prints them in a table above the answers and in a line under each; a replay's two answers per model sit on adjacent rows. Every pattern matches some innocent prose — "rather than" is sometimes exactly right — so nothing gates on them. They answer "did this habit go down across models", which reading five answers cannot.
 
 **Unverified.** Nothing here has run against a model: this machine has no database and no provider. The first real test is to bench the five titles above under version 8 before pulling the image (or reuse their runs, if they were bench runs), then replay them after. What to read for: the signals columns falling, reception sections that report consensus where it exists, no section opening on its question, and length.
+
+
+## F-125
+
+**The collection name on a detail page opens the franchise, with what is missing and a way to request it.** Added 2026-09-14.
+
+**The complaint.** "Part of Collection — Fantozzi Collection" rendered as plain text on the movie detail page. The operator expected it to open the collection's films, both the ones on the server and the ones missing, so a viewer could request the gaps.
+
+**What already existed and was not connected.** `movies.collection_id` (the TMDb id) was stored and already returned by `GET /api/movies/:id`. `tmdb_collection_cache` stored full part lists, but only the admin gap-analysis job wrote it. Enrichment called `getCollectionData` for every collection it met and wrote only the name and poster to `collections`, **discarding the parts it had just paid a TMDb call for**. The person page already had the "not in your library → request" flow (`MediaPosterCard`, `RequestSeerrOptionsDialog`, `TmdbExternalDetailModal`), so the new page reuses it rather than building a second one.
+
+**Decisions, and who made them.**
+
+- **A page, not a dialog** (operator). A dialog over the detail page could not be linked to, could not be reached from the Franchises list, and would stack on top of the assistant's own media dialog.
+- **Per-title requests only** (operator). A "request all missing" button was offered and declined: Seerr applies quota per acting user, and an eight-film collection spends a quota in one press.
+- **Unreleased parts are listed and not requestable** (operator). Seerr would accept them, since Radarr monitors an announced film until release, so this is a product choice rather than a limitation, and the rule says so where it is written.
+- **No new request `source`.** A request from this page is someone going looking for a title, which is `direct`'s definition ([F-105](#f-105)). A `collection` value would have needed `resolveRequestSource`, a comment migration and a test, to separate two things nobody has asked to separate.
+- **No `library_config` filter.** Neither `/api/movies/franchises` nor the movie detail route filters by it. Filtering only here would make "6 of 10" on the list read "5 of 10" on the page.
+
+**The rule that had to move.** Gap analysis already held `isReleasedReleaseDate` and a private `deriveSeerrStatus`, in a module importing the DB pool. The page needed both. A copy is exactly the drift the pure-module invariant exists for, so both moved to `tmdb/collectionParts.ts`, which has no runtime imports. Gap analysis re-exports the names it exported before, so the barrel is unchanged. `isReleasedReleaseDate` gained an optional `now` argument for the test, and its behaviour is otherwise identical.
+
+**A pre-existing modal gap closed in the same change.** `MediaDetailModalProvider` never closed on navigation, so the cast and studio links in `MediaInfoCard` already routed the page underneath an open media dialog. A franchise link would have been a third such link. The provider now clears its target on a pathname change.
+
+**Unverified.** Nothing here has run against a database, a TMDb key or Seerr: this machine has none, and the local dev server does not start. The pure rules are pinned by `collectionParts.test.ts`. What to check on the deployed instance:
+- The Fantozzi link opens a page whose owned count matches the Franchises list.
+- A non-admin's request skips the options dialog, and the card turns pending.
+- An announced part shows its date and no button.
+- The collection link inside the assistant's media dialog closes that dialog.

@@ -816,6 +816,12 @@ export {
   upsertCollectionCache,
   getCachedCollectionDataBatch,
   fetchCollectionDataAndCache,
+  getCollectionDataCached,
+  COLLECTION_CACHE_MAX_AGE_MS,
+  classifyCollectionPart,
+  type CollectionPartStatus,
+  type ClassifiedCollectionPart,
+  type SeerrMediaStatusLike,
   // Constants
   TMDB_IMAGE_BASE_URL,
   TMDB_API_BASE_URL,

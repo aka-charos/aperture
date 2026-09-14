@@ -196,6 +196,20 @@ export const franchisesSchema = {
   },
 }
 
+export const franchiseDetailSchema = {
+  tags: ['movies'],
+  summary: 'Get one franchise',
+  description:
+    'One TMDb collection: every part, whether it is in the library and watched by the current user, missing, upcoming or already in Seerr, and whether it may be requested. Status and requestability are decided server-side.',
+  params: {
+    type: 'object' as const,
+    required: ['id'],
+    properties: {
+      id: { type: 'string' as const, pattern: '^[0-9]+$', description: 'TMDb collection id', example: '10' },
+    },
+  },
+}
+
 // =============================================================================
 // Similar Movies Schema
 // =============================================================================

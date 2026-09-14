@@ -3,7 +3,8 @@
  * Gap analysis run populates this; admin gap UI reads summaries from cache only (no N API calls).
  */
 
-import { query } from '../lib/db.js'
+import { query, queryOne } from '../lib/db.js'
+import { createChildLogger } from '../lib/logger.js'
 import { getImageUrl, type ApiLogCallback } from './client.js'
 import { getCollectionData } from './collections.js'
 import type { CollectionData } from './types.js'
@@ -101,6 +102,57 @@ export async function getCachedCollectionDataBatch(
     out.set(row.collection_id, rowToCollectionData(row))
   }
   return out
+}
+
+const logger = createChildLogger('tmdb:collection-cache')
+
+/**
+ * How long a cached part list is trusted before TMDb is asked again.
+ *
+ * A collection changes when a sequel is announced, which is rare; a week keeps
+ * a page view from spending a TMDb call while still picking one up. Gap
+ * analysis and enrichment both refresh the cache on their own schedule too.
+ */
+export const COLLECTION_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+
+/**
+ * One collection for display: the cache when fresh, TMDb when not, and the
+ * stale row when TMDb cannot answer.
+ *
+ * A stale list beats no list — an unconfigured key or an outage should cost the
+ * newest sequel, not the whole page. Null only when there is neither.
+ */
+export async function getCollectionDataCached(
+  collectionId: number,
+  options: { maxAgeMs?: number } = {}
+): Promise<CollectionData | null> {
+  const maxAgeMs = options.maxAgeMs ?? COLLECTION_CACHE_MAX_AGE_MS
+  const row = await queryOne<{
+    collection_id: number
+    name: string
+    overview: string | null
+    poster_path: string | null
+    backdrop_path: string | null
+    parts_json: unknown
+    updated_at: Date
+  }>(
+    `SELECT collection_id, name, overview, poster_path, backdrop_path, parts_json, updated_at
+     FROM tmdb_collection_cache
+     WHERE collection_id = $1`,
+    [collectionId]
+  )
+
+  if (row && Date.now() - new Date(row.updated_at).getTime() < maxAgeMs) {
+    return rowToCollectionData(row)
+  }
+
+  try {
+    const fresh = await fetchCollectionDataAndCache(collectionId)
+    if (fresh) return fresh
+  } catch (err) {
+    logger.warn({ err, collectionId }, 'TMDb collection refresh failed; using cached copy if any')
+  }
+  return row ? rowToCollectionData(row) : null
 }
 
 /**

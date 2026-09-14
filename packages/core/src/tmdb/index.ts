@@ -81,7 +81,17 @@ export {
   upsertCollectionCache,
   getCachedCollectionDataBatch,
   fetchCollectionDataAndCache,
+  getCollectionDataCached,
+  COLLECTION_CACHE_MAX_AGE_MS,
 } from './collection-cache.js'
+
+// Collection part status (pure; shared by gap analysis and the franchise page)
+export {
+  classifyCollectionPart,
+  type CollectionPartStatus,
+  type ClassifiedCollectionPart,
+  type SeerrMediaStatusLike,
+} from './collectionParts.js'
 
 // Discovery functions (recommendations, similar, discover)
 export {
