@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import {
   Box,
   Typography,
@@ -45,6 +45,8 @@ interface FranchiseMovie {
 
 interface Franchise {
   name: string
+  /** TMDb collection id, which addresses the franchise page. */
+  collectionId: string | null
   movies: FranchiseMovie[]
   totalMovies: number
   watchedMovies: number
@@ -342,9 +344,31 @@ export function FranchisesPage() {
 
                   <Box flex={1} minWidth={0}>
                     <Box display="flex" alignItems="center" gap={1} mb={0.5}>
-                      <Typography variant="h6" fontWeight={600} noWrap>
-                        {franchise.name}
-                      </Typography>
+                      {franchise.collectionId ? (
+                        // The name opens the full franchise, missing films
+                        // included; the rest of the row still expands the
+                        // preview. stopPropagation keeps a click on the name
+                        // from doing both.
+                        <Typography
+                          variant="h6"
+                          fontWeight={600}
+                          noWrap
+                          component={RouterLink}
+                          to={`/franchises/${encodeURIComponent(franchise.collectionId)}`}
+                          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                          sx={{
+                            color: 'inherit',
+                            textDecoration: 'none',
+                            '&:hover': { color: 'primary.main', textDecoration: 'underline' },
+                          }}
+                        >
+                          {franchise.name}
+                        </Typography>
+                      ) : (
+                        <Typography variant="h6" fontWeight={600} noWrap>
+                          {franchise.name}
+                        </Typography>
+                      )}
                       {franchise.progress === 100 && (
                         <Chip
                           icon={<CheckCircleIcon />}

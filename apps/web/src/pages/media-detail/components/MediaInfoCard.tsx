@@ -28,7 +28,15 @@ import { useTranslation } from 'react-i18next'
 import { getProxiedImageUrl } from '@aperture/ui'
 import type { Media, Actor, StudioItem } from '../types'
 import { isMovie } from '../types'
-import { badgeLinksTo, imdbUrl, personPath, studioPath, tmdbUrl, tvdbUrl } from '../helpers'
+import {
+  badgeLinksTo,
+  franchisePath,
+  imdbUrl,
+  personPath,
+  studioPath,
+  tmdbUrl,
+  tvdbUrl,
+} from '../helpers'
 
 interface MediaInfoCardProps {
   media: Media
@@ -290,9 +298,25 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
       <CardContent>
         {isMovie(media) && media.collection_name && (
           <FactRow icon={<CollectionsIcon />} label={t('mediaDetail.infoCard.partOfCollection')}>
-            <Typography variant="body2" fontWeight={500}>
-              {media.collection_name}
-            </Typography>
+            {/* The page lists every part: what is on the server and what is
+                missing, with requests. Addressed by the TMDb id, so a title
+                enriched before collection ids were stored stays plain text. */}
+            {media.collection_id ? (
+              <Typography
+                variant="body2"
+                fontWeight={500}
+                color="primary"
+                component={RouterLink}
+                to={franchisePath(media.collection_id)}
+                sx={{ textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+              >
+                {media.collection_name}
+              </Typography>
+            ) : (
+              <Typography variant="body2" fontWeight={500}>
+                {media.collection_name}
+              </Typography>
+            )}
           </FactRow>
         )}
 

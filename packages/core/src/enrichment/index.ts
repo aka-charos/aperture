@@ -38,6 +38,7 @@ import { getTMDbConfig, getOMDbConfig } from '../settings/systemSettings.js'
 import {
   getMovieEnrichmentData,
   getCollectionData,
+  upsertCollectionCache,
   type CollectionData,
   type ApiLogCallback,
 } from '../tmdb/index.js'
@@ -1074,6 +1075,12 @@ export async function enrichMetadata(jobId: string): Promise<EnrichmentProgress>
         } catch (err) {
           logger.error({ err, tmdbId }, 'Failed to create collection')
         }
+        // The part list came with the same TMDb response and used to be
+        // dropped here, leaving the franchise page to fetch it again on first
+        // view. Its own catch: a cache miss must not read as a failed collection.
+        await upsertCollectionCache(data).catch((err) =>
+          logger.warn({ err, tmdbId }, 'Failed to cache collection parts')
+        )
       }
 
       // Update movie counts

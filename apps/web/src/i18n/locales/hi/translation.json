@@ -1001,7 +1001,28 @@
     "rangeSlider": {
       "valueRange": "{{अंत शुरू}}"
     },
-    "subtitleLineNamed": "Browse {{serverName}} media library • {{count}} {{kind}}"
+    "subtitleLineNamed": "Browse {{serverName}} media library • {{count}} {{kind}}",
+    "franchiseDetail": {
+      "back": "Back",
+      "summary": "{{total}} films · {{owned}} in your library · {{watched}} watched",
+      "inLibrary": "In your library ({{count}})",
+      "notInLibrary": "Not in your library ({{count}})",
+      "upcoming": "Upcoming ({{count}})",
+      "missingChip": "{{count}} missing",
+      "upcomingChip": "{{count}} upcoming",
+      "releases": "Releases {{date}}",
+      "dateTba": "Release date not announced",
+      "availableSoon": "Already on the server; appears after the next library sync",
+      "seerrNotConfigured": "Requests aren't available because Seerr isn't configured.",
+      "requestsDisabled": "Requests aren't enabled for your account.",
+      "tmdbUnavailable": "TMDb couldn't be reached, so only the films already in your library are listed.",
+      "requestSuccess": "Requested {{title}}",
+      "requestFailed": "Could not request {{title}}",
+      "detailFailed": "Failed to load details",
+      "sourceLabel": "Franchise",
+      "errorLoad": "Failed to load this franchise",
+      "notFound": "Franchise not found"
+    }
   },
   "login": {
     "title": "वापसी पर स्वागत है",

@@ -32,6 +32,7 @@ import { BrowsePage } from './pages/Browse'
 import { WatchStatsPage } from './pages/WatchStats'
 import { SearchPage } from './pages/Search'
 import { FranchisesPage } from './pages/Franchises'
+import { FranchiseDetailPage } from './pages/FranchiseDetail'
 import { WatchingPage } from './pages/watching'
 import { PersonDetailPage } from './pages/PersonDetail'
 import { StudioDetailPage } from './pages/StudioDetail'
@@ -180,6 +181,8 @@ function AppRoutes() {
         <Route path="stats" element={<WatchStatsPage />} />
         <Route path="search" element={<SearchPage />} />
         <Route path="franchises" element={<FranchisesPage />} />
+        {/* `:id`, not `:collectionId` — Breadcrumbs skips a segment matching params.id. */}
+        <Route path="franchises/:id" element={<FranchiseDetailPage />} />
         <Route path="person/:name" element={<PersonDetailPage />} />
         <Route path="studio/:name" element={<StudioDetailPage />} />
         <Route path="settings" element={<UserSettingsPage />} />

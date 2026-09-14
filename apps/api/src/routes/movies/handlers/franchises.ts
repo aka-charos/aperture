@@ -31,6 +31,9 @@ export function registerFranchisesHandler(fastify: FastifyInstance) {
         WITH franchise_stats AS (
           SELECT 
             m.collection_name,
+            -- The TMDb id the franchise page is addressed by. Grouping stays
+            -- on the name, which is what this list has always counted by.
+            MIN(m.collection_id) as collection_id,
             COUNT(DISTINCT m.id) as total_movies,
             COUNT(DISTINCT wh.movie_id) as watched_movies
           FROM movies m
@@ -41,8 +44,9 @@ export function registerFranchisesHandler(fastify: FastifyInstance) {
           WHERE m.collection_name IS NOT NULL
           GROUP BY m.collection_name
         )
-        SELECT 
+        SELECT
           collection_name,
+          collection_id,
           total_movies::int,
           watched_movies::int,
           CASE 
@@ -69,6 +73,7 @@ export function registerFranchisesHandler(fastify: FastifyInstance) {
 
       const allFranchiseStats = await query<{
         collection_name: string
+        collection_id: string | null
         total_movies: number
         watched_movies: number
         progress: number
@@ -156,6 +161,7 @@ export function registerFranchisesHandler(fastify: FastifyInstance) {
       // Build final franchise objects in the same order as paginatedStats
       const franchises = paginatedStats.map(stat => ({
         name: stat.collection_name,
+        collectionId: stat.collection_id,
         movies: moviesByCollection.get(stat.collection_name) || [],
         totalMovies: stat.total_movies,
         watchedMovies: stat.watched_movies,

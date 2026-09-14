@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
 import { MediaDetailModal, type MediaDetailTarget } from '../components/MediaDetailModal'
 import { MediaDetailModalContext, type OpenMediaDetail } from './media-detail-modal-context'
 
@@ -37,6 +38,14 @@ export function MediaDetailModalProvider({
   useEffect(() => {
     if (!enabled) setTarget(null)
   }, [enabled])
+
+  // Links inside the dialog — a cast name, a studio, the franchise — route the
+  // page underneath it. Left open, the dialog would cover the very page the
+  // reader just asked for.
+  const { pathname } = useLocation()
+  useEffect(() => {
+    setTarget(null)
+  }, [pathname])
 
   return (
     <MediaDetailModalContext.Provider value={value}>

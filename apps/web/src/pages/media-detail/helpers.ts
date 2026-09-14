@@ -43,6 +43,11 @@ export function studioPath(name: string): string {
   return `/studio/${encodeURIComponent(name)}`
 }
 
+/** A TMDb collection's page. "Franchise", because `/collections` is channels. */
+export function franchisePath(collectionId: string): string {
+  return `/franchises/${encodeURIComponent(collectionId)}`
+}
+
 /**
  * The external page for a title on each service we hold an identifier for, or
  * null where we hold none.
