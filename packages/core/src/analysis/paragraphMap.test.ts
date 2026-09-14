@@ -178,3 +178,15 @@ test('a response with no map at all still parses as an answer', () => {
   assert.equal(parsed.mapText, null)
   assert.equal(parsed.grade, 'substantial')
 })
+
+// A bench answer written under an archived prompt labels paragraphs with that
+// prompt's questions. Judged against the current vocabulary those labels drop
+// and the map empties, which would misreport the old version's structure.
+test('an answer is judged by the vocabulary of the version it answered', () => {
+  const map = '1: intent\n2: dispute'
+  assert.deepEqual(parseParagraphMap(map, { ...movie, promptVersion: 8 }), [
+    { paragraph: 1, questions: ['intent'] },
+    { paragraph: 2, questions: ['dispute'] },
+  ])
+  assert.equal(parseParagraphMap(map, movie), null)
+})

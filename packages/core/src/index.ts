@@ -1545,6 +1545,7 @@ export {
 // see ./analysis; retrieval is the self-hosted fastCRW client in ./lib/crw.ts)
 export {
   ANALYSIS_PROMPT_VERSION,
+  BENCH_PROMPT_VERSIONS,
   buildAnalysisPrompt,
   buildAnalysisQuery,
   parseAnalysisResponse,

@@ -37,6 +37,8 @@ import { measureProse, type ProseSignals } from './proseSignals.js'
 export interface ComparisonEntry {
   provider: string
   model: string
+  /** The prompt version this answer was written under (0172). */
+  promptVersion: number
   /** pending | ok | unusable | error — see the 0169 comment. */
   status: string
   analysis: string | null
@@ -78,10 +80,16 @@ export interface ComparisonReport {
   title: string
   year: number | null
   mediaType: 'movie' | 'series'
+  /** The newest version the run answered; see `prompts` for all of them. */
   promptVersion: number
   sources: ComparisonSource[]
   retrievedChars: number
   prompt: string | null
+  /**
+   * One prompt per version, oldest first, when the run answered more than the
+   * single `prompt` (0172). Absent or null on older runs.
+   */
+  prompts?: { version: number; text: string }[] | null
   entries: ComparisonEntry[]
   startedAt: string
   finishedAt: string | null
@@ -185,41 +193,50 @@ interface SignalRow {
 }
 
 /**
- * One row per answer, a replay's pair on adjacent rows.
+ * One row per answer, every answer a model gave on adjacent rows.
  *
- * Paired by provider AND model, since two providers can serve one id. A
- * baseline answer with no partner in this run is still printed, after the
- * pairs, for the same reason a failed entry is: omitting it misreports the run.
+ * Grouped by provider AND model (two providers can serve one id), in the order
+ * each model first appears, and stable inside a group - so a model's prompt
+ * versions read oldest to newest, and a replay's baseline answers follow this
+ * run's. A baseline model this run did not repeat still gets its rows, for the
+ * same reason a failed entry does: omitting it misreports the run.
  */
 function signalRows(report: ComparisonReport): SignalRow[] {
-  const baseline = report.replayOf
-  const current = report.entries.map((entry, i) => ({
-    entry,
-    label: `${baseline ? `v${report.promptVersion} ` : ''}[${i + 1}] ${entry.provider} / ${entry.model}`,
-  }))
-  if (!baseline) return current.map(({ entry, label }) => ({ label, signals: signalsOf(entry) }))
+  const labelled = [
+    ...report.entries.map((entry, i) => ({ entry, label: `[${i + 1}] ${entryName(entry)}` })),
+    ...(report.replayOf?.entries ?? []).map((entry, i) => ({
+      entry,
+      label: `[b${i + 1}] ${entryName(entry)}`,
+    })),
+  ]
 
-  const baseRows = baseline.entries.map((entry, i) => ({
-    entry,
-    label: `v${baseline.promptVersion} [b${i + 1}] ${entry.provider} / ${entry.model}`,
-    used: false,
-  }))
+  const groupOf = new Map<string, number>()
+  for (const { entry } of labelled) {
+    const key = `${entry.provider}::${entry.model}`
+    if (!groupOf.has(key)) groupOf.set(key, groupOf.size)
+  }
 
-  const rows: SignalRow[] = []
-  for (const { entry, label } of current) {
-    rows.push({ label, signals: signalsOf(entry) })
-    const partner = baseRows.find(
-      (row) => !row.used && row.entry.provider === entry.provider && row.entry.model === entry.model
-    )
-    if (partner) {
-      partner.used = true
-      rows.push({ label: partner.label, signals: signalsOf(partner.entry) })
-    }
-  }
-  for (const row of baseRows) {
-    if (!row.used) rows.push({ label: row.label, signals: signalsOf(row.entry) })
-  }
-  return rows
+  return labelled
+    .map((row, index) => ({ row, index, group: groupOf.get(`${row.entry.provider}::${row.entry.model}`)! }))
+    .sort((a, b) => a.group - b.group || a.index - b.index)
+    .map(({ row }) => ({ label: row.label, signals: signalsOf(row.entry) }))
+}
+
+/** How an answer is named everywhere in the report: model, then prompt version. */
+function entryName(entry: ComparisonEntry): string {
+  return `${entry.provider} / ${entry.model} · v${entry.promptVersion}`
+}
+
+/** The distinct prompt versions this run answered, oldest first. */
+function versionsOf(report: ComparisonReport): number[] {
+  const versions = [...new Set(report.entries.map((entry) => entry.promptVersion))]
+  return versions.length > 0 ? versions.sort((a, b) => a - b) : [report.promptVersion]
+}
+
+/** A prompt from its TASK line on — the part that differs between versions. */
+function fromTask(prompt: string): string {
+  const at = prompt.lastIndexOf('\nTASK\n')
+  return at >= 0 ? prompt.slice(at + 1) : prompt
 }
 
 function signalsTable(rows: SignalRow[]): string[] {
@@ -241,7 +258,7 @@ function signalsTable(rows: SignalRow[]): string[] {
 function pushEntry(out: string[], label: string, entry: ComparisonEntry): void {
   const signals = signalsOf(entry)
   out.push(THIN)
-  out.push(`${label} ${entry.provider} / ${entry.model}`)
+  out.push(`${label} ${entryName(entry)}`)
   out.push(statLine(entry, signals))
   if (signals) out.push(signalsLine(signals))
   const sections = sectionLine(entry)
@@ -266,7 +283,12 @@ export function renderComparisonReport(report: ComparisonReport): string {
   // The control, stated before any answer. Every entry below answered one
   // prompt built from these documents, which is the only reason the answers can
   // be read against each other at all.
-  out.push(`Prompt version: ${report.promptVersion}`)
+  const versions = versionsOf(report)
+  out.push(
+    versions.length > 1
+      ? `Prompt versions: ${versions.join(', ')}`
+      : `Prompt version: ${versions[0]}`
+  )
   if (baseline) {
     out.push(
       `Replaying run ${baseline.runId} (prompt version ${baseline.promptVersion}, started ${baseline.startedAt})`
@@ -282,7 +304,11 @@ export function renderComparisonReport(report: ComparisonReport): string {
     out.push(`  - ${source.domain} — ${source.title} (${source.chars.toLocaleString('en-US')} chars)`)
   }
   out.push('')
-  out.push('Every model below answered the SAME prompt built from those documents.')
+  out.push(
+    versions.length > 1
+      ? 'Every answer below was written from those same documents, retrieved once. The prompt versions differ only in their questions and rules - everything above the TASK line is identical.'
+      : 'Every model below answered the SAME prompt built from those documents.'
+  )
   if (baseline) {
     out.push(
       `The BASELINE section after them holds that run's answers to prompt version ${baseline.promptVersion}, built from the same documents.`
@@ -311,7 +337,32 @@ export function renderComparisonReport(report: ComparisonReport): string {
     }
   }
 
-  if (report.prompt) {
+  // Several versions: the newest in full, then each older one from its TASK
+  // line only. Everything above TASK is the same documents, and printing the
+  // source block once per version would bury the part that actually differs.
+  const prompts =
+    report.prompts && report.prompts.length > 1
+      ? [...report.prompts].sort((a, b) => b.version - a.version)
+      : null
+  if (prompts) {
+    const [newest, ...older] = prompts
+    out.push(RULE)
+    out.push('THE PROMPTS')
+    out.push(RULE)
+    out.push('')
+    out.push(`--- PROMPT VERSION ${newest.version}, in full ---`)
+    out.push('')
+    out.push(newest.text)
+    out.push('')
+    for (const prompt of older) {
+      out.push(
+        `--- PROMPT VERSION ${prompt.version}, from TASK on (everything above it is identical to version ${newest.version}) ---`
+      )
+      out.push('')
+      out.push(fromTask(prompt.text))
+      out.push('')
+    }
+  } else if (report.prompt) {
     out.push(RULE)
     out.push('THE PROMPT EVERY MODEL RECEIVED')
     out.push(RULE)

@@ -5312,6 +5312,15 @@
     "replayControl": "Replay: these documents were retrieved for an earlier run under prompt version {{version}}. Its answers follow this run's in the report.",
     "replayFailed": "Could not start the replay.",
     "promptVersionShort": "prompt v{{version}}",
-    "replayTag": "replay"
+    "replayTag": "replay",
+    "replayVersions": "Replay under prompts {{versions}}",
+    "stepPrompts": "Prompt versions",
+    "promptsHint": "Every ticked model answers every ticked version. The documents are retrieved once, so the prompts differ only in their questions and rules.",
+    "versionLabel": "v{{version}}",
+    "versionCurrent": "v{{version}} (current)",
+    "runAnswers_one": "Run {{count}} answer",
+    "runAnswers_other": "Run {{count}} answers",
+    "controlVersions": "Every answer below was written from {{count}} source document(s), {{chars}} characters retrieved once · prompt versions {{versions}}",
+    "promptVersionsShort": "prompts {{versions}}"
   }
 }

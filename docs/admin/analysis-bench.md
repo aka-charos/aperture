@@ -27,16 +27,19 @@ The bench runs the **real generation path** (retries, pacing, contract checks) b
 - **Earlier comparisons** are listed (stored in their own tables) with the prompt version each answered, and are deletable
 - A **signals table** above the answers, and a signals line under each one, count habits the prompt asks the model to avoid: paragraphs and the longest paragraph in sentences, pointing at "the sources", views with no holder ("is described as"), "rather than", announcing a question stays open, and paragraphs that open by restating their question. They are counts to compare, not a pass mark — each pattern also matches innocent prose
 
-## Replaying Under a Newer Prompt
+## Comparing Prompt Versions
 
-The bench compares **models** within one run. To compare **prompt versions**, open an earlier run and press **Replay under prompt vN**:
+Under the model list, **Prompt versions** lists every version this build carries (currently v7, v8 and v9), with the current one ticked. Tick more than one and every ticked model answers every ticked version:
 
-- The **same models** answer the **same source documents**, read back out of that run's stored prompt, under the prompt this build carries. **Nothing is retrieved again**, so a difference in the answers comes from the prompt, not from different pages
-- The report prints this run's answers, then the earlier run's in a **BASELINE** section, and the signals table puts each model's two answers on adjacent rows
-- Replaying under the **same** version is allowed and useful: it shows how much a model's answer moves between identical calls, which is what any version difference has to be larger than
-- The title header (directors, ratings) is rebuilt from the library as it is now; the documents are what stay fixed
+- The sources are **retrieved once** and every version's prompt is built from them, so the prompts are identical down to the TASK line and differ only in their questions and rules. A difference between two answers from one model is therefore the prompt
+- The report groups each model's answers together, labels each one with its version (`deepseek-v4.1-flash · v8`, `· v9`), and puts them on adjacent rows of the signals table
+- The prompt section prints the newest version in full and each older version from its TASK line, so the documents are not repeated
+- The Run button counts answers: two models under two versions is four model calls
+- Nothing about the library changes — analyses are always written with the current version
 
-A replay needs a deployed build carrying the newer prompt. Deploying that build also retires every stored analysis written under the older version, so run the baseline benches **before** pulling the new image.
+## Replaying an Earlier Run
+
+For a run you already have, open it and press **Replay** — it reruns that run's models on its stored source documents under the prompt versions ticked above. **Nothing is retrieved again**. The report prints the new answers, then the earlier run's in a **BASELINE** section, paired by model in the signals table. Replaying under the **same** version shows how much a model's answer moves between identical calls, which is what any version difference has to be larger than. The title header (directors, ratings) is rebuilt from the library as it is now; the documents stay fixed.
 
 ## When to Use It
 

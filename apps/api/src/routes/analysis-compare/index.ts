@@ -20,6 +20,7 @@ import {
   startComparison,
   replayComparison,
   ANALYSIS_PROMPT_VERSION,
+  BENCH_PROMPT_VERSIONS,
   getComparisonRun,
   listComparisonRuns,
   deleteComparisonRun,
@@ -40,6 +41,17 @@ interface StartBody {
   mediaType?: 'movie' | 'series'
   mediaId?: string
   models?: ComparisonModelRequest[]
+  /** Prompt versions to run beside each other; absent means the current one. */
+  promptVersions?: number[]
+}
+
+/**
+ * A versions field is either absent or an array; what the numbers mean is
+ * core's to decide (`resolveBenchPromptVersions` refuses an unknown one with a
+ * sentence), so only the shape is checked here.
+ */
+function badVersions(value: unknown): boolean {
+  return value !== undefined && !Array.isArray(value)
 }
 
 const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
@@ -142,6 +154,7 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
         providers: groups,
         maxModels: MAX_COMPARISON_MODELS,
         promptVersion: ANALYSIS_PROMPT_VERSION,
+        promptVersions: BENCH_PROMPT_VERSIONS,
       })
     }
   )
@@ -166,7 +179,7 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/analysis-compare',
     { preHandler: requireAdmin, schema: { tags: ['analysis'] } },
     async (request, reply) => {
-      const { mediaType, mediaId, models } = request.body ?? {}
+      const { mediaType, mediaId, models, promptVersions } = request.body ?? {}
 
       if (mediaType !== 'movie' && mediaType !== 'series') {
         return reply.status(400).send({ error: 'mediaType must be "movie" or "series".' })
@@ -180,9 +193,12 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
       if (models.some((entry) => !entry?.provider || !entry?.model)) {
         return reply.status(400).send({ error: 'Every model needs a provider and a model id.' })
       }
+      if (badVersions(promptVersions)) {
+        return reply.status(400).send({ error: 'promptVersions must be a list of version numbers.' })
+      }
 
       try {
-        const runId = await startComparison({ mediaType, mediaId, models })
+        const runId = await startComparison({ mediaType, mediaId, models, promptVersions })
         return reply.status(202).send({ runId })
       } catch (err) {
         // These are all operator-facing refusals with real sentences — the
@@ -211,22 +227,30 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
    * Replay a stored run's documents under the current prompt.
    *
    * Retrieves nothing — see `replayComparison`. The models default to the
-   * baseline's, in its order; a body naming models overrides that. 202 for the
-   * same reason a fresh bench answers 202.
+   * baseline's, in its order, and the versions to the current one; a body
+   * naming either overrides it. 202 for the same reason a fresh bench answers
+   * 202.
    */
-  fastify.post<{ Params: { runId: string }; Body: { models?: ComparisonModelRequest[] } }>(
+  fastify.post<{
+    Params: { runId: string }
+    Body: { models?: ComparisonModelRequest[]; promptVersions?: number[] }
+  }>(
     '/api/analysis-compare/:runId/replay',
     { preHandler: requireAdmin, schema: { tags: ['analysis'] } },
     async (request, reply) => {
       const models = request.body?.models
+      const promptVersions = request.body?.promptVersions
       if (models !== undefined) {
         if (!Array.isArray(models) || models.some((entry) => !entry?.provider || !entry?.model)) {
           return reply.status(400).send({ error: 'Every model needs a provider and a model id.' })
         }
       }
+      if (badVersions(promptVersions)) {
+        return reply.status(400).send({ error: 'promptVersions must be a list of version numbers.' })
+      }
 
       try {
-        const runId = await replayComparison(request.params.runId, models)
+        const runId = await replayComparison(request.params.runId, { models, promptVersions })
         return reply.status(202).send({ runId })
       } catch (err) {
         // Operator-facing refusals with real sentences, like the start route.

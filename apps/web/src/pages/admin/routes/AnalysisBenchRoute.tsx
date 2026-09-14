@@ -72,6 +72,8 @@ interface ProviderGroup {
 interface RunEntry {
   provider: string
   model: string
+  /** Absent from an older server, which ran one prompt version per run. */
+  promptVersion?: number
   status: string
   analysis: string | null
   grade: string | null
@@ -103,9 +105,13 @@ interface RunSummary {
   status: string
   modelCount: number
   promptVersion: number
+  promptVersions?: number[]
   replayOf: string | null
   startedAt: string
 }
+
+/** "v8, v9" — how a list of versions is written in labels. */
+const versionList = (versions: number[]) => versions.map((version) => `v${version}`).join(', ')
 
 /** A model is addressed by provider AND id — two providers can serve one id. */
 const keyOf = (provider: string, model: string) => `${provider}::${model}`
@@ -119,9 +125,13 @@ export default function AnalysisBenchRoute() {
 
   const [providers, setProviders] = useState<ProviderGroup[]>([])
   const [maxModels, setMaxModels] = useState(8)
-  // Decided by the server, never hardcoded: the version a replay will run is
-  // whatever core carries now.
+  // Decided by the server, never hardcoded: which versions exist and which one
+  // is current are facts about core, and a copy here would drift on the next
+  // prompt change.
   const [promptVersion, setPromptVersion] = useState<number | null>(null)
+  const [availableVersions, setAvailableVersions] = useState<number[]>([])
+  // Kept sorted, so the request and the labels read oldest first.
+  const [selectedVersions, setSelectedVersions] = useState<number[]>([])
   // An ORDERED list, not a Set: the report prints entries in the order they
   // were chosen, and a Set would silently reorder the document between runs.
   const [selected, setSelected] = useState<{ provider: string; model: string }[]>([])
@@ -141,11 +151,23 @@ export default function AnalysisBenchRoute() {
     fetch('/api/analysis-compare/models', { credentials: 'include' })
       .then((res) => (res.ok ? res.json() : null))
       .then(
-        (json: { providers: ProviderGroup[]; maxModels: number; promptVersion?: number } | null) => {
+        (
+          json: {
+            providers: ProviderGroup[]
+            maxModels: number
+            promptVersion?: number
+            promptVersions?: number[]
+          } | null
+        ) => {
           if (!json) return
           setProviders(json.providers)
           setMaxModels(json.maxModels)
           setPromptVersion(json.promptVersion ?? null)
+          const current = json.promptVersion
+          setAvailableVersions(json.promptVersions ?? (current != null ? [current] : []))
+          // The current prompt alone by default: a run nobody asked to widen
+          // costs what it always cost.
+          setSelectedVersions(current != null ? [current] : [])
         }
       )
       .catch(() => setError(t('adminAnalysisBench.modelsFailed')))
@@ -210,6 +232,20 @@ export default function AnalysisBenchRoute() {
     })
   }
 
+  // The last ticked version cannot be unticked: a run with no prompt is not a
+  // run, and a checkbox that silently does nothing is worse than a disabled one.
+  const toggleVersion = (version: number) => {
+    setSelectedVersions((prev) => {
+      if (prev.includes(version)) {
+        return prev.length > 1 ? prev.filter((v) => v !== version) : prev
+      }
+      return [...prev, version].sort((a, b) => a - b)
+    })
+  }
+
+  // Every ticked model answers every ticked version.
+  const answerCount = selected.length * Math.max(selectedVersions.length, 1)
+
   const start = async () => {
     if (!picked || selected.length === 0) return
     setStarting(true)
@@ -223,6 +259,7 @@ export default function AnalysisBenchRoute() {
           mediaType: picked.type,
           mediaId: picked.id,
           models: selected,
+          promptVersions: selectedVersions,
         }),
       })
       const json = await res.json()
@@ -254,7 +291,7 @@ export default function AnalysisBenchRoute() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ promptVersions: selectedVersions }),
       })
       const json = await res.json()
       if (!res.ok) {
@@ -303,6 +340,20 @@ export default function AnalysisBenchRoute() {
 
   const done = useMemo(
     () => run?.entries.filter((entry) => entry.status !== 'pending').length ?? 0,
+    [run]
+  )
+
+  // The versions the open run actually answered, read off its entries rather
+  // than off the checkboxes, which describe the NEXT run.
+  const runVersions = useMemo(
+    () =>
+      [
+        ...new Set(
+          (run?.entries ?? [])
+            .map((entry) => entry.promptVersion)
+            .filter((version): version is number => version != null)
+        ),
+      ].sort((a, b) => a - b),
     [run]
   )
 
@@ -410,15 +461,58 @@ export default function AnalysisBenchRoute() {
           </Box>
         ))}
 
+        {/* The prompt axis. Only shown when the build carries more than one
+            version, since a single checkbox that cannot be unticked is noise. */}
+        {availableVersions.length > 1 && (
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" fontWeight={600}>
+              {t('adminAnalysisBench.stepPrompts')}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+              {t('adminAnalysisBench.promptsHint')}
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+              {availableVersions.map((version) => {
+                const on = selectedVersions.includes(version)
+                return (
+                  <FormControlLabel
+                    key={version}
+                    sx={{ mr: 2 }}
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={on}
+                        disabled={on && selectedVersions.length === 1}
+                        onChange={() => toggleVersion(version)}
+                      />
+                    }
+                    label={
+                      <Typography variant="body2">
+                        {version === promptVersion
+                          ? t('adminAnalysisBench.versionCurrent', { version })
+                          : t('adminAnalysisBench.versionLabel', { version })}
+                      </Typography>
+                    }
+                  />
+                )
+              })}
+            </Box>
+          </Box>
+        )}
+
         <Divider sx={{ my: 1.5 }} />
         <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
           <Button
             variant="contained"
             startIcon={starting ? <CircularProgress size={16} /> : <RunIcon />}
-            disabled={!picked || selected.length === 0 || starting || live}
+            disabled={
+              !picked || selected.length === 0 || selectedVersions.length === 0 || starting || live
+            }
             onClick={start}
           >
-            {t('adminAnalysisBench.run', { count: selected.length })}
+            {selectedVersions.length > 1
+              ? t('adminAnalysisBench.runAnswers', { count: answerCount })
+              : t('adminAnalysisBench.run', { count: selected.length })}
           </Button>
           {live && (
             <Button variant="outlined" color="warning" startIcon={<StopIcon />} onClick={stop}>
@@ -436,7 +530,7 @@ export default function AnalysisBenchRoute() {
               {run.title}
               {run.year ? ` (${run.year})` : ''}
             </Typography>
-            {promptVersion != null && (
+            {selectedVersions.length > 0 && (
               <Tooltip title={t('adminAnalysisBench.replayHint')}>
                 {/* A span so the tooltip still explains a disabled button. */}
                 <span>
@@ -447,7 +541,11 @@ export default function AnalysisBenchRoute() {
                     disabled={live || starting || run.sources.length === 0}
                     onClick={replay}
                   >
-                    {t('adminAnalysisBench.replay', { version: promptVersion })}
+                    {selectedVersions.length > 1
+                      ? t('adminAnalysisBench.replayVersions', {
+                          versions: versionList(selectedVersions),
+                        })
+                      : t('adminAnalysisBench.replay', { version: selectedVersions[0] })}
                   </Button>
                 </span>
               </Tooltip>
@@ -473,11 +571,17 @@ export default function AnalysisBenchRoute() {
           {/* The control, said out loud: this is what makes the answers below
               comparable at all. */}
           <Typography variant="caption" color="text.secondary" display="block">
-            {t('adminAnalysisBench.control', {
-              count: run.sources.length,
-              chars: run.retrievedChars.toLocaleString(),
-              version: run.promptVersion,
-            })}
+            {runVersions.length > 1
+              ? t('adminAnalysisBench.controlVersions', {
+                  count: run.sources.length,
+                  chars: run.retrievedChars.toLocaleString(),
+                  versions: versionList(runVersions),
+                })
+              : t('adminAnalysisBench.control', {
+                  count: run.sources.length,
+                  chars: run.retrievedChars.toLocaleString(),
+                  version: run.promptVersion,
+                })}
           </Typography>
           {run.replayOf && (
             <Typography variant="caption" color="text.secondary" display="block">
@@ -488,7 +592,7 @@ export default function AnalysisBenchRoute() {
           <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ my: 1.5 }}>
             {run.entries.map((entry) => (
               <Chip
-                key={keyOf(entry.provider, entry.model)}
+                key={`${keyOf(entry.provider, entry.model)}::${entry.promptVersion ?? ''}`}
                 size="small"
                 variant={entry.status === 'pending' ? 'outlined' : 'filled'}
                 color={
@@ -500,7 +604,11 @@ export default function AnalysisBenchRoute() {
                         ? 'warning'
                         : 'default'
                 }
-                label={entry.model}
+                label={
+                  runVersions.length > 1 && entry.promptVersion != null
+                    ? `${entry.model} · v${entry.promptVersion}`
+                    : entry.model
+                }
               />
             ))}
           </Stack>
@@ -557,7 +665,11 @@ export default function AnalysisBenchRoute() {
                       status: summary.status,
                       when: new Date(summary.startedAt).toLocaleString(),
                     }),
-                    t('adminAnalysisBench.promptVersionShort', { version: summary.promptVersion }),
+                    summary.promptVersions && summary.promptVersions.length > 1
+                      ? t('adminAnalysisBench.promptVersionsShort', {
+                          versions: versionList(summary.promptVersions),
+                        })
+                      : t('adminAnalysisBench.promptVersionShort', { version: summary.promptVersion }),
                     summary.replayOf ? t('adminAnalysisBench.replayTag') : null,
                   ]
                     .filter(Boolean)
