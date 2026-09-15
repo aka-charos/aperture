@@ -97,10 +97,15 @@ interface TagPlan {
   ids: string[] | null
 }
 
-function recordError(result: HomeSectionsSyncResult, scope: string, err: unknown): void {
+function recordError(jobId: string, result: HomeSectionsSyncResult, scope: string, err: unknown): void {
   result.errorCount++
   const message = err instanceof Error ? err.message : String(err)
-  if (result.errors.length < MAX_RECORDED_ERRORS) result.errors.push({ scope, message })
+  if (result.errors.length < MAX_RECORDED_ERRORS) {
+    result.errors.push({ scope, message })
+    // The summary line only counts failures. Without this the job console says
+    // "4 step(s) failed" and the only record of which four is the container log.
+    addLog(jobId, 'warn', `⚠️ ${scope}: ${message}`)
+  }
   logger.warn({ scope, err }, 'Home sections sync step failed')
 }
 
@@ -118,6 +123,7 @@ function summarize(result: HomeSectionsSyncResult): Record<string, unknown> {
     tagsApplied: result.tagsApplied,
     tagsRemoved: result.tagsRemoved,
     errorCount: result.errorCount,
+    errors: result.errors,
   }
 }
 
@@ -356,7 +362,7 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
         addLog(jobId, 'info', `🔥 ${kind}: ${ids.length} titles`)
       } catch (err) {
         planTag(TOP_PICKS_TAGS[kind], null)
-        recordError(result, kind, err)
+        recordError(jobId, result,kind, err)
         addLog(jobId, 'warn', `⚠️ ${kind}: could not load the list, leaving the row as it is`)
       }
     }
@@ -378,7 +384,7 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
       } catch (err) {
         const tag = viewerTags.get(viewer.id)
         if (tag) planTag(tag, null)
-        recordError(result, `recommendations:${viewer.username}`, err)
+        recordError(jobId, result,`recommendations:${viewer.username}`, err)
       }
     }
     // Generated playlists go only to their owner, and only while playlists are on.
@@ -393,7 +399,7 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
         planTag(playlist.tagName, await playlistProviderIds(provider, apiKey, playlist))
       } catch (err) {
         planTag(playlist.tagName, null)
-        recordError(result, `playlist:${playlist.name}`, err)
+        recordError(jobId, result,`playlist:${playlist.name}`, err)
       }
     }
 
@@ -425,7 +431,7 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
             await provider.addItemTag(apiKey, itemId, tag)
             result.tagsApplied++
           } catch (err) {
-            recordError(result, `tag ${plan.name} +${itemId}`, err)
+            recordError(jobId, result,`tag ${plan.name} +${itemId}`, err)
           }
         }
         for (const itemId of remove) {
@@ -433,13 +439,13 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
             await provider.removeItemTag(apiKey, itemId, tag)
             result.tagsRemoved++
           } catch (err) {
-            recordError(result, `tag ${plan.name} -${itemId}`, err)
+            recordError(jobId, result,`tag ${plan.name} -${itemId}`, err)
           }
         }
       } catch (err) {
         // Membership unknown: treat like a failed source and leave its rows be.
         plan.ids = null
-        recordError(result, `tag ${plan.name}`, err)
+        recordError(jobId, result,`tag ${plan.name}`, err)
       }
     }
     addLog(jobId, 'info', `🏷️ Tags: ${result.tagsApplied} applied, ${result.tagsRemoved} removed`)
@@ -536,7 +542,7 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
         result.viewersProcessed++
       } catch (err) {
         completedAllViewers = false
-        recordError(result, `home screen:${viewer.username}`, err)
+        recordError(jobId, result,`home screen:${viewer.username}`, err)
       }
     }
     updateJobProgress(jobId, viewers.length, viewers.length)
@@ -553,7 +559,10 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
         (result.viewersMissing > 0
           ? `; ${result.viewersMissing} account(s) no longer on the media server skipped`
           : '') +
-        (result.errorCount > 0 ? ` — ${result.errorCount} step(s) failed` : '')
+        (result.errorCount > 0 ? ` — ${result.errorCount} step(s) failed (listed above)` : '') +
+        (result.errorCount > result.errors.length
+          ? `; only the first ${result.errors.length} are listed, the rest are in the container log`
+          : '')
     )
     return finish()
   } catch (err) {
