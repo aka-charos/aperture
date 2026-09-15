@@ -255,10 +255,14 @@ export function UsersPage() {
       })
 
       if (response.ok) {
+        // The server decides whether the account is enabled — from all four switches,
+        // keeping an enabled admin enabled — so take its answer. Guessing it here from
+        // two switches is how this page and the database came to disagree.
+        const saved = (await response.json()) as { is_enabled?: boolean }
         setProviderUsers((prev) =>
           prev.map((u) =>
             u.providerUserId === user.providerUserId
-              ? { ...u, moviesEnabled: newValue, isEnabled: newValue || u.seriesEnabled }
+              ? { ...u, moviesEnabled: newValue, isEnabled: saved.is_enabled ?? u.isEnabled }
               : u
           )
         )
@@ -282,10 +286,11 @@ export function UsersPage() {
       })
 
       if (response.ok) {
+        const saved = (await response.json()) as { is_enabled?: boolean }
         setProviderUsers((prev) =>
           prev.map((u) =>
             u.providerUserId === user.providerUserId
-              ? { ...u, seriesEnabled: newValue, isEnabled: u.moviesEnabled || newValue }
+              ? { ...u, seriesEnabled: newValue, isEnabled: saved.is_enabled ?? u.isEnabled }
               : u
           )
         )
@@ -345,6 +350,7 @@ export function UsersPage() {
           ...(newValue === false && { discoverRequestEnabled: false }),
         }),
       })
+      const saved: { is_enabled?: boolean } = response.ok ? await response.json() : {}
 
       if (response.ok) {
         setProviderUsers((prev) =>
@@ -355,6 +361,7 @@ export function UsersPage() {
                   discoverEnabled: newValue,
                   // If disabling discovery, also disable request permission
                   discoverRequestEnabled: newValue ? u.discoverRequestEnabled : false,
+                  isEnabled: saved.is_enabled ?? u.isEnabled,
                 }
               : u
           )
@@ -420,10 +427,11 @@ export function UsersPage() {
       })
 
       if (response.ok) {
+        const saved = (await response.json()) as { is_enabled?: boolean }
         setProviderUsers((prev) =>
           prev.map((u) =>
             u.providerUserId === user.providerUserId
-              ? { ...u, collectionsEnabled: newValue }
+              ? { ...u, collectionsEnabled: newValue, isEnabled: saved.is_enabled ?? u.isEnabled }
               : u
           )
         )
@@ -653,6 +661,32 @@ export function UsersPage() {
   const isJobRunning = (userId: string) => runningJobs.has(userId)
   const providerLabel = provider.charAt(0).toUpperCase() + provider.slice(1)
 
+  // Whether the account can sign in to this app: users.is_enabled, which the API
+  // derives from the switches on this page. It used to show only as a faint green
+  // row tint, beside a "Status: Active" chip that describes the media-server
+  // account instead — so the one label on the row described the half this page
+  // cannot change. A server-disabled account cannot sign in whatever the flag says.
+  const renderAccessChip = (user: ProviderUser, compact = false) => {
+    const canSignIn = user.isEnabled && !user.isDisabled
+    const tooltip = canSignIn
+      ? t('admin.usersPage.accessCanSignInTooltip', { provider: providerLabel })
+      : user.isDisabled
+        ? t('admin.usersPage.accessNoneServerTooltip', { provider: providerLabel })
+        : t('admin.usersPage.accessNoneTooltip')
+    return (
+      <Tooltip title={tooltip}>
+        <Chip
+          icon={canSignIn ? <LoginIcon sx={compact ? { fontSize: 14 } : undefined} /> : undefined}
+          label={canSignIn ? t('admin.usersPage.accessCanSignIn') : t('admin.usersPage.accessNone')}
+          size="small"
+          color={canSignIn ? 'primary' : 'default'}
+          variant="outlined"
+          sx={compact ? { height: 20, fontSize: '0.7rem' } : undefined}
+        />
+      </Tooltip>
+    )
+  }
+
   const sortControl = (
     <Stack direction="row" alignItems="center" spacing={0.5} flexWrap="wrap">
       <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
@@ -719,7 +753,7 @@ export function UsersPage() {
               <Card
                 key={user.providerUserId}
                 sx={{
-                  backgroundColor: user.isEnabled ? 'rgba(82, 181, 75, 0.05)' : 'background.paper',
+                  backgroundColor: 'background.paper',
                   borderRadius: 2,
                   opacity: user.isDisabled ? 0.5 : 1,
                 }}
@@ -747,26 +781,29 @@ export function UsersPage() {
                             <Chip label={t('admin.usersPage.adminChip')} size="small" color="primary" sx={{ height: 20 }} />
                           )}
                         </Stack>
-                        <Typography variant="caption" color="text.secondary" component="div">
-                          {user.isDisabled ? (
-                            <Chip 
-                              icon={<BlockIcon sx={{ fontSize: 14 }} />}
-                              label={t('admin.usersPage.providerDisabled', { provider: providerLabel })}
-                              size="small" 
-                              color="error" 
-                              variant="outlined"
-                              sx={{ height: 20, mt: 0.5, fontSize: '0.7rem' }}
-                            />
-                          ) : (
-                            <Chip 
-                              label={t('admin.usersPage.providerActive', { provider: providerLabel })}
-                              size="small" 
-                              color="success" 
-                              variant="outlined"
-                              sx={{ height: 20, mt: 0.5, fontSize: '0.7rem' }}
-                            />
-                          )}
-                        </Typography>
+                        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                          <Tooltip title={t('admin.usersPage.serverAccountColTooltip', { provider: providerLabel })}>
+                            {user.isDisabled ? (
+                              <Chip
+                                icon={<BlockIcon sx={{ fontSize: 14 }} />}
+                                label={t('admin.usersPage.providerDisabled', { provider: providerLabel })}
+                                size="small"
+                                color="error"
+                                variant="outlined"
+                                sx={{ height: 20, fontSize: '0.7rem' }}
+                              />
+                            ) : (
+                              <Chip
+                                label={t('admin.usersPage.providerActive', { provider: providerLabel })}
+                                size="small"
+                                color="success"
+                                variant="outlined"
+                                sx={{ height: 20, fontSize: '0.7rem' }}
+                              />
+                            )}
+                          </Tooltip>
+                          {renderAccessChip(user, true)}
+                        </Stack>
                       </Box>
                     </Stack>
                     {user.isImported && (user.moviesEnabled || user.seriesEnabled) ? (
@@ -1076,7 +1113,16 @@ export function UsersPage() {
           <TableHead>
             <TableRow>
               <TableCell>{t('admin.usersPage.colUser')}</TableCell>
-              <TableCell>{t('admin.usersPage.colStatus')}</TableCell>
+              <TableCell>
+                <Tooltip title={t('admin.usersPage.serverAccountColTooltip', { provider: providerLabel })}>
+                  <span>{t('admin.usersPage.colServerAccount', { provider: providerLabel })}</span>
+                </Tooltip>
+              </TableCell>
+              <TableCell>
+                <Tooltip title={t('admin.usersPage.accessColTooltip')}>
+                  <span>{t('admin.usersPage.colAccess')}</span>
+                </Tooltip>
+              </TableCell>
               <TableCell align="center">{t('admin.usersPage.colImported')}</TableCell>
               <TableCell align="center">
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
@@ -1138,7 +1184,7 @@ export function UsersPage() {
           <TableBody>
             {sortedUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={globalAiConfig?.userOverrideAllowed ? 11 : 10} align="center">
+                <TableCell colSpan={globalAiConfig?.userOverrideAllowed ? 12 : 11} align="center">
                   <Typography variant="body2" color="text.secondary" py={4}>
                     {t('admin.usersPage.noUsers', { provider: providerLabel })}
                   </Typography>
@@ -1151,7 +1197,6 @@ export function UsersPage() {
                   hover
                   sx={{ 
                     opacity: user.isDisabled ? 0.5 : 1,
-                    backgroundColor: user.isEnabled ? 'rgba(82, 181, 75, 0.05)' : 'inherit'
                   }}
                 >
                   <TableCell>
@@ -1193,23 +1238,26 @@ export function UsersPage() {
                     </Stack>
                   </TableCell>
                   <TableCell>
-                    {user.isDisabled ? (
-                      <Chip 
-                        icon={<BlockIcon />}
-                        label={t('admin.usersPage.disabledOnServer')} 
-                        size="small" 
-                        color="error" 
-                        variant="outlined"
-                      />
-                    ) : (
-                      <Chip 
-                        label={t('admin.usersPage.activeStatus')} 
-                        size="small" 
-                        color="success" 
-                        variant="outlined"
-                      />
-                    )}
+                    <Tooltip title={t('admin.usersPage.serverAccountColTooltip', { provider: providerLabel })}>
+                      {user.isDisabled ? (
+                        <Chip
+                          icon={<BlockIcon />}
+                          label={t('admin.usersPage.serverAccountDisabled', { provider: providerLabel })}
+                          size="small"
+                          color="error"
+                          variant="outlined"
+                        />
+                      ) : (
+                        <Chip
+                          label={t('admin.usersPage.serverAccountActive')}
+                          size="small"
+                          color="success"
+                          variant="outlined"
+                        />
+                      )}
+                    </Tooltip>
                   </TableCell>
+                  <TableCell>{renderAccessChip(user)}</TableCell>
                   <TableCell align="center">
                     {user.isImported ? (
                       <Tooltip title={t('admin.usersPage.importedTooltip')}>

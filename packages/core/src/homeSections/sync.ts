@@ -6,7 +6,9 @@
  * 1. Work out what every managed tag should hold: the Top Picks lists, and each
  *    enabled viewer's newest completed picks, and every generated playlist an
  *    owner put on their home screen. A tag this run cannot account for —
- *    a deleted viewer's, a switched-off row's — should hold nothing.
+ *    a deleted viewer's, a switched-off row's — should hold nothing. Top Picks
+ *    goes to every account the server has not disabled; the personal rows only
+ *    to viewers enabled in Aperture (plan.ts).
  * 2. Tag and untag the ORIGINAL library items to match. A section filters by tag
  *    id and a tag has an id only once an item carries it, so ids are read after.
  * 3. Read each viewer's sections back and reconcile them (plan.ts): create,
@@ -36,6 +38,7 @@ import { getMediaServerProvider } from '../media/index.js'
 import { isEmbyNotFoundError } from '../media/emby/fetchHelpers.js'
 import { MANAGED_TAG_PREFIX } from '../media/managedTags.js'
 import type { MediaServerProvider } from '../media/MediaServerProvider.js'
+import type { ContentSection } from '../media/types.js'
 import { getMediaServerApiKey } from '../settings/systemSettings.js'
 import { getTopPicksConfig } from '../topPicks/config.js'
 import { getTopMovies, getTopSeries } from '../topPicks/popularity.js'
@@ -44,6 +47,7 @@ import {
   TOP_PICKS_TAGS,
   diffMembership,
   isHomeSectionTarget,
+  isTopPicksTarget,
   orderRows,
   planMoves,
   planViewerSections,
@@ -65,6 +69,8 @@ export interface HomeSectionsSyncResult {
   cancelled?: boolean
   serverVersion?: string | null
   viewersProcessed: number
+  /** Accounts in the users table the media server no longer has. */
+  viewersMissing: number
   sectionsCreated: number
   sectionsUpdated: number
   sectionsRemoved: number
@@ -104,6 +110,7 @@ function summarize(result: HomeSectionsSyncResult): Record<string, unknown> {
     cancelled: result.cancelled,
     serverVersion: result.serverVersion,
     viewersProcessed: result.viewersProcessed,
+    viewersMissing: result.viewersMissing,
     sectionsCreated: result.sectionsCreated,
     sectionsUpdated: result.sectionsUpdated,
     sectionsRemoved: result.sectionsRemoved,
@@ -206,6 +213,16 @@ async function playlistProviderIds(
   }
 }
 
+/** Whether the media server has no account with this id any more — a 404 for the user itself. */
+async function accountIsGone(provider: MediaServerProvider, apiKey: string, providerUserId: string): Promise<boolean> {
+  try {
+    await provider.getUserById(apiKey, providerUserId)
+    return false
+  } catch (err) {
+    return isEmbyNotFoundError(err)
+  }
+}
+
 async function loadViewerTags(): Promise<Map<string, string>> {
   const rows = await query<{ user_id: string; tag_name: string }>(
     `SELECT user_id, tag_name FROM home_sections_viewer_tags`
@@ -230,6 +247,7 @@ function emptyResult(jobId: string): HomeSectionsSyncResult {
   return {
     jobId,
     viewersProcessed: 0,
+    viewersMissing: 0,
     sectionsCreated: 0,
     sectionsUpdated: 0,
     sectionsRemoved: 0,
@@ -313,12 +331,20 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
     const targets = viewers.filter((viewer) =>
       isHomeSectionTarget({ isEnabled: viewer.is_enabled, providerDisabled: viewer.provider_disabled })
     )
+    const topPicksViewerIds = new Set(
+      viewers
+        .filter((viewer) => isTopPicksTarget({ providerDisabled: viewer.provider_disabled }))
+        .map((viewer) => viewer.id)
+    )
 
     const tagPlans = new Map<string, TagPlan>()
     const planTag = (name: string, ids: string[] | null) => tagPlans.set(name.toLowerCase(), { name, ids })
 
     const topPicksOn =
-      config.enabled && config.topPicksEnabled && targets.length > 0 && (await getTopPicksConfig()).isEnabled
+      config.enabled &&
+      config.topPicksEnabled &&
+      topPicksViewerIds.size > 0 &&
+      (await getTopPicksConfig()).isEnabled
     for (const kind of ['top-picks-movies', 'top-picks-series'] as const) {
       if (!topPicksOn) {
         planTag(TOP_PICKS_TAGS[kind], [])
@@ -448,10 +474,12 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
         }
       }
 
-      if (isTarget) {
-        considerRow('recs', viewerTags.get(viewer.id), config.recommendationsName, ['Movie', 'Series'])
+      if (topPicksViewerIds.has(viewer.id)) {
         considerRow('top-picks-movies', TOP_PICKS_TAGS['top-picks-movies'], config.topPicksMoviesName, ['Movie'])
         considerRow('top-picks-series', TOP_PICKS_TAGS['top-picks-series'], config.topPicksSeriesName, ['Series'])
+      }
+      if (isTarget) {
+        considerRow('recs', viewerTags.get(viewer.id), config.recommendationsName, ['Movie', 'Series'])
         for (const playlist of homePlaylists) {
           if (playlist.ownerId === viewer.id) {
             considerRow('playlist', playlist.tagName, playlist.name, ['Movie', 'Series'])
@@ -460,7 +488,23 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
       }
 
       try {
-        const sections = await provider.getHomeSections(apiKey, viewer.provider_user_id)
+        let sections: ContentSection[]
+        try {
+          sections = await provider.getHomeSections(apiKey, viewer.provider_user_id)
+        } catch (err) {
+          // Nothing marks an account deleted from Emby: the user sync only imports and
+          // updates, so its row stays behind, not provider_disabled, and Top Picks is
+          // written to it every night. That is ordinary for any server that has ever
+          // removed a user, so it is not a failure — but only once the account itself
+          // is confirmed gone, or a sections endpoint answering 404 would skip every
+          // viewer and report success.
+          if (!isEmbyNotFoundError(err) || !(await accountIsGone(provider, apiKey, viewer.provider_user_id))) {
+            throw err
+          }
+          result.viewersMissing++
+          logger.debug({ user: viewer.username }, 'Viewer no longer exists on the media server')
+          continue
+        }
         const plan = planViewerSections({ existing: sections, managedTagIds, desired, preserveTagIds })
 
         if (plan.deletes.length > 0) {
@@ -491,11 +535,6 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
         }
         result.viewersProcessed++
       } catch (err) {
-        // An account Emby no longer has cannot hold rows; nothing to clean up.
-        if (!isTarget && isEmbyNotFoundError(err)) {
-          logger.debug({ user: viewer.username }, 'Viewer no longer exists on the media server')
-          continue
-        }
         completedAllViewers = false
         recordError(result, `home screen:${viewer.username}`, err)
       }
@@ -511,6 +550,9 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
       result.errorCount > 0 ? 'warn' : 'info',
       `✅ ${result.viewersProcessed} home screens: ${result.sectionsCreated} rows created, ` +
         `${result.sectionsUpdated} updated, ${result.sectionsRemoved} removed` +
+        (result.viewersMissing > 0
+          ? `; ${result.viewersMissing} account(s) no longer on the media server skipped`
+          : '') +
         (result.errorCount > 0 ? ` — ${result.errorCount} step(s) failed` : '')
     )
     return finish()

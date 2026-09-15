@@ -8,6 +8,7 @@ import {
   deleteAllUserSessions,
   type SessionUser,
 } from '../../../plugins/auth.js'
+import { accountEnabledSql, type AccountSwitchColumn } from '../../../lib/accountEnabled.js'
 import type { UserRow, UserListResponse, UserUpdateBody } from '../types.js'
 
 const listLogger = createChildLogger('users-list')
@@ -87,43 +88,26 @@ export function registerListHandlers(fastify: FastifyInstance) {
         values.push(displayName)
       }
 
-      if (isEnabled !== undefined) {
-        updates.push(`is_enabled = $${paramIndex++}`)
-        values.push(isEnabled)
+      // The switches this request writes, by column, so is_enabled is derived from
+      // their NEW values (accountEnabledSql says why the bare column would not do).
+      const writtenSwitches: Partial<Record<AccountSwitchColumn, string>> = {}
+      const setSwitch = (column: AccountSwitchColumn, value: boolean | undefined) => {
+        if (value === undefined) return
+        writtenSwitches[column] = `$${paramIndex}`
+        updates.push(`${column} = $${paramIndex++}`)
+        values.push(value)
       }
 
-      if (moviesEnabled !== undefined) {
-        updates.push(`movies_enabled = $${paramIndex++}`)
-        values.push(moviesEnabled)
-        // Also update is_enabled for backwards compatibility
-        if (moviesEnabled || seriesEnabled) {
-          updates.push(`is_enabled = true`)
-        }
-      }
-
-      if (seriesEnabled !== undefined) {
-        updates.push(`series_enabled = $${paramIndex++}`)
-        values.push(seriesEnabled)
-        // Also update is_enabled for backwards compatibility
-        if (moviesEnabled || seriesEnabled) {
-          updates.push(`is_enabled = true`)
-        }
-      }
-
-      if (discoverEnabled !== undefined) {
-        updates.push(`discover_enabled = $${paramIndex++}`)
-        values.push(discoverEnabled)
-      }
+      setSwitch('movies_enabled', moviesEnabled)
+      setSwitch('series_enabled', seriesEnabled)
+      setSwitch('discover_enabled', discoverEnabled)
 
       if (discoverRequestEnabled !== undefined) {
         updates.push(`discover_request_enabled = $${paramIndex++}`)
         values.push(discoverRequestEnabled)
       }
 
-      if (collectionsEnabled !== undefined) {
-        updates.push(`collections_enabled = $${paramIndex++}`)
-        values.push(collectionsEnabled)
-      }
+      setSwitch('collections_enabled', collectionsEnabled)
 
       if (emailNotificationsAllowed !== undefined) {
         updates.push(`email_notifications_allowed = $${paramIndex++}`)
@@ -145,9 +129,15 @@ export function registerListHandlers(fastify: FastifyInstance) {
         values.push(seerrUserId)
       }
 
-      // If both movies and series are disabled, disable overall is_enabled
-      if (moviesEnabled === false && seriesEnabled === false) {
-        updates.push(`is_enabled = false`)
+      // An explicit isEnabled is the caller's decision. Otherwise changing any switch
+      // re-derives it from the whole row, not from this request: the Users page
+      // sends one switch per request, and deciding from the request alone left
+      // accounts switched off one at a time enabled (lib/accountEnabled.ts).
+      if (isEnabled !== undefined) {
+        updates.push(`is_enabled = $${paramIndex++}`)
+        values.push(isEnabled)
+      } else if (Object.keys(writtenSwitches).length > 0) {
+        updates.push(`is_enabled = ${accountEnabledSql(writtenSwitches)}`)
       }
 
       if (updates.length === 0) {
@@ -168,7 +158,7 @@ export function registerListHandlers(fastify: FastifyInstance) {
 
       // Disabling an account must end its existing sessions, not just block the
       // next login. Keyed off the written row so it covers every path that can
-      // clear is_enabled, including the movies+series back-compat rule above.
+      // clear is_enabled, including the derived one when the last switch goes off.
       if (!user.is_enabled) {
         await deleteAllUserSessions(id).catch((err: unknown) =>
           listLogger.error({ err, userId: id }, 'Failed to revoke sessions for disabled user')
