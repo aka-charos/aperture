@@ -139,7 +139,7 @@ test('version 9 asks neither intent nor dispute, and the map vocabulary agrees',
 test('influence moved from the lineage question to reception', () => {
   const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
   assert.ok(!p.includes('what did it influence?'), p)
-  assert.ok(p.includes('What it went on to influence belongs to the reception question.'), p)
+  assert.ok(p.includes('what it went on to influence to the reception question'), p)
   assert.ok(p.includes('what did it go on to influence?'), p)
 })
 
@@ -155,7 +155,7 @@ test('reception asks for consensus where there is one and forbids announcing ope
 
 test('the making question holds intent to what someone actually said', () => {
   const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
-  assert.ok(p.includes('never an intention read back off the finished work'), p)
+  assert.ok(p.includes('neither is an intention read back off the finished work'), p)
   assert.ok(p.includes('Neither is how it was received'), p)
   assert.ok(
     p.includes('Ask whether the finished work would be different if this had not happened.'),
@@ -178,7 +178,7 @@ test('attribution is a principle: facts plainly, views with a holder', () => {
   assert.ok(p.includes('Never turn a view into a fact'), p)
   assert.ok(p.includes('"is described as"'), p)
   assert.ok(p.includes('"the sources carry"'), p)
-  assert.ok(p.includes('Judgements of quality belong in the reception answer only.'), p)
+  assert.ok(p.includes('judgements of quality belong in the reception answer only.'), p)
 })
 
 test('paragraphs open on substance and a fact is told once', () => {
@@ -208,8 +208,44 @@ test('the size of the source block does not license length', () => {
 // The bump is what retires every stored row, so it is the half of the change
 // that actually reaches readers - a corrected prompt with a stale version
 // number silently applies to nothing already written.
-test('the prompt version carries the version-9 corrections', () => {
-  assert.ok(ANALYSIS_PROMPT_VERSION >= 9, String(ANALYSIS_PROMPT_VERSION))
+test('the prompt version carries the version-11 corrections', () => {
+  assert.ok(ANALYSIS_PROMPT_VERSION >= 11, String(ANALYSIS_PROMPT_VERSION))
+})
+
+/**
+ * Version 11, from Terminator 2 benched under 9 and the version-10 draft. Each
+ * fragment is the clause answering one measured fault - see the notes on the
+ * constants in ./prompt.ts.
+ */
+test('context opens on the kind of work, and a single-work comparison carries a holder', () => {
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  assert.ok(p.includes('not on who directed, wrote or stars in it'), p)
+  assert.ok(p.includes('is a view unless a maker said it, so name who made the comparison'), p)
+  assert.ok(p.includes('How it was made and what its makers decided belong to the making question'), p)
+  // v9's invitation to production, and v10's pull toward single works, stay gone.
+  assert.ok(!p.includes('what was it responding to'), p)
+  assert.ok(!p.includes('what earlier works'), p)
+})
+
+test('a critic reading of a choice goes to reception, and naming is no longer optional', () => {
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  assert.ok(p.includes('What one critic reads into a choice belongs to the reception answer'), p)
+  assert.ok(p.includes('A view written as a plain sentence with nobody named is still a view'), p)
+  assert.ok(p.includes('name them once, at its start'), p)
+  assert.ok(!p.includes('not in every sentence'), 'the licence version 9 gave must stay gone')
+})
+
+test('reception groups critics by point and dates a re-release review', () => {
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  assert.ok(p.includes('grouped by the point made'), p)
+  assert.ok(p.includes('not one sentence per critic'), p)
+  assert.ok(p.includes('describe the split only in terms a critic used'), p)
+  assert.ok(p.includes('A review of a later re-release or restoration'), p)
+})
+
+test("a critic's guess at intent is not the maker speaking", () => {
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  assert.ok(p.includes("A critic's guess at what the maker wanted is not a statement by the maker"), p)
 })
 
 /**
@@ -341,35 +377,26 @@ test('bench versions: current by default, deduplicated oldest first, unknown ref
 })
 
 /**
- * The draft edition: benchable beside the current prompt, never used by
- * anything else. "Never the default" is the property that lets a prompt change
- * be tested without retiring the library it would rewrite.
+ * Version 9 and the version-10 draft are archived, so the bench runs already
+ * labelled with them stay rerunnable, and each still sends its own text.
  */
-const draftPrompt = () =>
-  buildAnalysisPrompt(subject(), { mode: 'crw', sources: benchSources, version: DRAFT_PROMPT_VERSION! })
+const versionPrompt = (version: number) =>
+  buildAnalysisPrompt(subject(), { mode: 'crw', sources: benchSources, version })
 
-test('the draft is benchable, differs from the current prompt, and is never the default', () => {
-  assert.ok(DRAFT_PROMPT_VERSION != null, 'expected a draft edition')
-  assert.ok(BENCH_PROMPT_VERSIONS.includes(DRAFT_PROMPT_VERSION!))
-  const now = buildAnalysisPrompt(subject(), { mode: 'crw', sources: benchSources })
-  assert.notEqual(draftPrompt(), now)
-  assert.ok(!now.includes('name them once, at its start'), 'the library prompt must not carry the draft')
+test('versions 9 and 10 stay benchable, each as it was sent', () => {
+  assert.ok(BENCH_PROMPT_VERSIONS.includes(9) && BENCH_PROMPT_VERSIONS.includes(10))
+  const [v9, v10, now] = [versionPrompt(9), versionPrompt(10), versionPrompt(ANALYSIS_PROMPT_VERSION)]
+  assert.ok(v9.includes('not in every sentence'), 'v9 carried the naming licence')
+  assert.ok(v10.includes('what earlier works, genres or movements'), 'v10 draft wording')
+  assert.ok(!v10.includes('grouped by the point made'), 'v11 reception is not in v10')
+  assert.notEqual(v9, v10)
+  assert.notEqual(v10, now)
+  // Same questions in the same order, so their maps share a vocabulary.
+  assert.deepEqual(questionOrder(v9), questionOrder(now))
+  assert.deepEqual(questionIdsFor('series', 10), questionIdsFor('series'))
 })
 
-// Same questions in the same order, so a draft answer's map is judged by the
-// same vocabulary and the panel labels it the same way.
-test('the draft asks the same questions as the current edition', () => {
-  const now = buildAnalysisPrompt(subject(), { mode: 'crw', sources: benchSources })
-  assert.deepEqual(questionOrder(draftPrompt()), questionOrder(now))
-  assert.deepEqual(questionIdsFor('series', DRAFT_PROMPT_VERSION!), questionIdsFor('series'))
-})
-
-test('the draft carries the corrections the Terminator 2 bench asked for', () => {
-  const draft = draftPrompt()
-  assert.ok(draft.includes('How it was made and what its makers decided belong to the making question'), draft)
-  assert.ok(draft.includes("A critic's guess at what the maker wanted is not a statement by the maker"), draft)
-  assert.ok(draft.includes('A view written as a plain sentence with nobody named is still a view'), draft)
-  assert.ok(draft.includes('name them once, at its start'), draft)
-  assert.ok(draft.includes('whether it is good belongs to the reception question'), draft)
-  assert.ok(!draft.includes('not in every sentence'), 'the licence version 9 gave must be gone')
+test('with no draft, the current version is the newest the bench carries', () => {
+  assert.equal(DRAFT_PROMPT_VERSION, null)
+  assert.equal(BENCH_PROMPT_VERSIONS[BENCH_PROMPT_VERSIONS.length - 1], ANALYSIS_PROMPT_VERSION)
 })
