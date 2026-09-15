@@ -21,6 +21,7 @@ import { AiExplanationPreferenceCard } from './UserSettings/AiExplanationPrefere
 import { SimilarityGraphPrefsCard } from './UserSettings/SimilarityGraphPrefsCard'
 import { PosterDisplayCard } from './UserSettings/PosterDisplayCard'
 import { TraktIntegrationCard } from './UserSettings/TraktIntegrationCard'
+import { HomeScreenRowsCard } from './UserSettings/HomeScreenRowsCard'
 import { useTraktIntegration } from './UserSettings/hooks/useTraktIntegration'
 import { TabPanel } from './UserSettings/TabPanel'
 import {
@@ -288,6 +289,8 @@ export function UserSettingsPage() {
                   />
                 </Grid>
               )}
+              {/* Renders its own Grid item, or nothing when no managed row reaches this viewer. */}
+              <HomeScreenRowsCard />
             </Grid>
           </TabPanel>
         </Box>

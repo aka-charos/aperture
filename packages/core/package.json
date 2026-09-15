@@ -87,7 +87,7 @@
     "test:local-models": "node --import tsx --test src/lib/localModelDiscovery.test.ts src/lib/lmstudioChat.test.ts",
     "test:inference": "node --import tsx --test src/lib/usageFetch.test.ts src/lib/zai-usage.test.ts",
     "test:collections": "node --import tsx --test src/tmdb/collectionParts.test.ts",
-    "test:home-sections": "node --import tsx --test src/homeSections/version.test.ts src/homeSections/settings.test.ts src/homeSections/plan.test.ts src/media/managedTags.test.ts"
+    "test:home-sections": "node --import tsx --test src/homeSections/version.test.ts src/homeSections/settings.test.ts src/homeSections/plan.test.ts src/homeSections/placement.test.ts src/media/managedTags.test.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.0",

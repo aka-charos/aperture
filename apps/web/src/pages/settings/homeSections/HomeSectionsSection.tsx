@@ -5,11 +5,16 @@
  * arrives as a decided value, together with the version it needs — the bundle
  * never holds the floor, so it cannot drift from the gate core enforces.
  *
- * "Sync now" starts the ordinary job rather than calling a bespoke endpoint: the
- * jobs route claims the name, so a press cannot run beside the nightly schedule,
+ * Saving starts the ordinary sync job, so a change reaches home screens now
+ * rather than at the nightly run. "Sync now" starts the same job without a
+ * save: the jobs route claims the name, so neither can run beside the other,
  * and the run gets a log and a Cancel button in the Jobs console.
+ *
+ * Placement is per feature. After/Before a row is chosen from rows read live
+ * from every account; how many accounts lack the chosen row is shown, and only
+ * then is a fallback offered for them.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -32,7 +37,16 @@ import {
 import HomeIcon from '@mui/icons-material/Home'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import SyncIcon from '@mui/icons-material/Sync'
+import RefreshIcon from '@mui/icons-material/Refresh'
 import { jobConsoleLink } from '@/pages/jobs/registry'
+import { PlacementFields } from '@/components/homeSections/PlacementFields'
+import {
+  isAnchorMode,
+  isPlacementComplete,
+  type FallbackMode,
+  type FeaturePlacementValue,
+  type HomeRowOption,
+} from '@/components/homeSections/placement'
 
 type SupportReason = 'ok' | 'not-configured' | 'unsupported-provider' | 'unsupported-server' | 'unreachable'
 
@@ -49,12 +63,13 @@ interface HomeSectionsForm {
   topPicksEnabled: boolean
   recommendationsEnabled: boolean
   playlistsEnabled: boolean
-  sectionPosition: number
   topPicksMoviesName: string
   topPicksSeriesName: string
-  recommendationsName: string
+  recommendationsMoviesName: string
+  recommendationsSeriesName: string
   sortBy: string
   recommendationsLimit: number
+  placements: Record<string, FeaturePlacementValue>
 }
 
 interface Limits {
@@ -63,22 +78,53 @@ interface Limits {
   minRecommendationsLimit: number
   maxRecommendationsLimit: number
   maxNameLength: number
+  features: string[]
+  modes: string[]
+  fallbackModes: string[]
 }
+
+interface SharedRows {
+  accounts: number
+  unreadable: number
+  rows: HomeRowOption[]
+}
+
+type SyncOutcome = { started: boolean; reason?: 'nothing-saved' | 'feature-off' | 'already-running' }
 
 const JOB_NAME = 'sync-home-sections'
 
+/** Which of the three switches a feature's rows depend on. */
+const SWITCH_FOR: Record<string, 'topPicksEnabled' | 'recommendationsEnabled' | 'playlistsEnabled'> = {
+  'top-picks-movies': 'topPicksEnabled',
+  'top-picks-series': 'topPicksEnabled',
+  'recs-movies': 'recommendationsEnabled',
+  'recs-series': 'recommendationsEnabled',
+  playlists: 'playlistsEnabled',
+}
+
 function toForm(config: HomeSectionsForm): HomeSectionsForm {
+  const placements: Record<string, FeaturePlacementValue> = {}
+  for (const [feature, placement] of Object.entries(config.placements ?? {})) {
+    placements[feature] = {
+      mode: placement.mode,
+      position: placement.position,
+      anchor: placement.anchor,
+      fallbackMode: placement.fallbackMode,
+      fallbackPosition: placement.fallbackPosition,
+    }
+  }
   return {
     enabled: config.enabled,
     topPicksEnabled: config.topPicksEnabled,
     recommendationsEnabled: config.recommendationsEnabled,
     playlistsEnabled: config.playlistsEnabled,
-    sectionPosition: config.sectionPosition,
     topPicksMoviesName: config.topPicksMoviesName,
     topPicksSeriesName: config.topPicksSeriesName,
-    recommendationsName: config.recommendationsName,
+    recommendationsMoviesName: config.recommendationsMoviesName,
+    recommendationsSeriesName: config.recommendationsSeriesName,
     sortBy: config.sortBy,
     recommendationsLimit: config.recommendationsLimit,
+    placements,
   }
 }
 
@@ -95,6 +141,25 @@ export function HomeSectionsSection() {
   const [syncStarted, setSyncStarted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [anchors, setAnchors] = useState<SharedRows | null>(null)
+  const [anchorsLoading, setAnchorsLoading] = useState(false)
+  const [anchorsError, setAnchorsError] = useState(false)
+  const anchorsRequested = useRef(false)
+
+  const loadAnchors = useCallback(async () => {
+    anchorsRequested.current = true
+    setAnchorsLoading(true)
+    setAnchorsError(false)
+    try {
+      const response = await fetch('/api/home-sections/anchors', { credentials: 'include' })
+      if (!response.ok) throw new Error()
+      setAnchors(await response.json())
+    } catch {
+      setAnchorsError(true)
+    } finally {
+      setAnchorsLoading(false)
+    }
+  }, [])
 
   const load = useCallback(async () => {
     try {
@@ -106,12 +171,16 @@ export function HomeSectionsSection() {
       setSaved(next)
       setStatus(data.status)
       setLimits(data.limits)
+      // Rows are read from every account, so only when a saved placement needs them.
+      if (!anchorsRequested.current && Object.values(next.placements).some((p) => isAnchorMode(p.mode))) {
+        void loadAnchors()
+      }
     } catch {
       setError(t('settingsHomeSections.loadError'))
     } finally {
       setLoading(false)
     }
-  }, [t])
+  }, [t, loadAnchors])
 
   useEffect(() => {
     void load()
@@ -122,11 +191,20 @@ export function HomeSectionsSection() {
     setSuccess(null)
   }
 
+  const updatePlacement = (feature: string, changes: Partial<FeaturePlacementValue>) => {
+    setForm((prev) =>
+      prev ? { ...prev, placements: { ...prev.placements, [feature]: { ...prev.placements[feature], ...changes } } } : prev
+    )
+    setSuccess(null)
+    if (changes.mode && isAnchorMode(changes.mode) && !anchorsRequested.current) void loadAnchors()
+  }
+
   const handleSave = async () => {
     if (!form) return
     setSaving(true)
     setError(null)
     setSuccess(null)
+    setSyncStarted(false)
     try {
       const response = await fetch('/api/home-sections/config', {
         method: 'PATCH',
@@ -140,7 +218,15 @@ export function HomeSectionsSection() {
       const next = toForm(data.config)
       setForm(next)
       setSaved(next)
-      setSuccess(t('settingsHomeSections.saved'))
+      const sync = data.sync as SyncOutcome | undefined
+      if (sync?.started) {
+        setSuccess(t('settingsHomeSections.savedApplying'))
+        setSyncStarted(true)
+      } else if (sync?.reason === 'already-running') {
+        setSuccess(t('settingsHomeSections.savedSyncRunning'))
+      } else {
+        setSuccess(t('settingsHomeSections.saved'))
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : t('settingsHomeSections.saveError'))
     } finally {
@@ -183,6 +269,7 @@ export function HomeSectionsSection() {
   }
 
   const hasChanges = JSON.stringify(form) !== JSON.stringify(saved)
+  const complete = Object.values(form.placements).every(isPlacementComplete)
   // Switching ON needs a supported server; switching OFF never does, because
   // that is how every managed row gets removed.
   const enableBlocked = !status.supported && !form.enabled
@@ -227,6 +314,120 @@ export function HomeSectionsSection() {
     />
   )
 
+  const rowSwitch = (
+    field: 'recommendationsEnabled' | 'topPicksEnabled' | 'playlistsEnabled',
+    labelKey: string,
+    helpKey: string
+  ) => (
+    <Box>
+      <FormControlLabel
+        control={
+          <Switch
+            checked={form[field]}
+            disabled={inactive}
+            onChange={(e) => update({ [field]: e.target.checked } as Partial<HomeSectionsForm>)}
+          />
+        }
+        label={t(labelKey)}
+      />
+      <Typography variant="caption" color={captionColor} component="p">
+        {t(helpKey)}
+      </Typography>
+    </Box>
+  )
+
+  const nameField = (
+    field: 'topPicksMoviesName' | 'topPicksSeriesName' | 'recommendationsMoviesName' | 'recommendationsSeriesName',
+    labelKey: string
+  ) => (
+    <TextField
+      label={t(labelKey)}
+      value={form[field]}
+      onChange={(e) => update({ [field]: e.target.value } as Partial<HomeSectionsForm>)}
+      size="small"
+      disabled={inactive}
+      slotProps={{ htmlInput: { maxLength: limits.maxNameLength } }}
+    />
+  )
+
+  /** Accounts lacking the chosen anchor, or null when that cannot be told yet. */
+  const accountsLacking = (placement: FeaturePlacementValue): number | null => {
+    if (!anchors || !placement.anchor) return null
+    const shared = anchors.rows.find((row) => row.id === placement.anchor?.id)
+    return Math.max(anchors.accounts - (shared?.accountsWithType ?? 0), 0)
+  }
+
+  const renderFallback = (feature: string, placement: FeaturePlacementValue, disabled: boolean) => {
+    if (!isAnchorMode(placement.mode) || !placement.anchor) return null
+    const name = placement.anchor.name ?? placement.anchor.id
+    const lacking = accountsLacking(placement)
+    if (lacking === null && anchorsLoading) {
+      return (
+        <Typography variant="caption" color={captionColor} component="p" sx={{ mt: 1 }}>
+          {t('settingsHomeSections.anchorsLoading')}
+        </Typography>
+      )
+    }
+    if (lacking === 0) {
+      return (
+        <Typography variant="caption" color={captionColor} component="p" sx={{ mt: 1 }}>
+          {t('settingsHomeSections.anchorEveryone', { name })}
+        </Typography>
+      )
+    }
+    return (
+      <Box sx={{ mt: 1.5 }}>
+        <Typography variant="caption" color={captionColor} component="p" sx={{ mb: 1 }}>
+          {lacking === null
+            ? t('settingsHomeSections.anchorUnknown', { name })
+            : t('settingsHomeSections.anchorMissing', { name, missing: lacking, accounts: anchors?.accounts ?? 0 })}
+        </Typography>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+          <TextField
+            select
+            size="small"
+            label={t('settingsHomeSections.fallback')}
+            value={placement.fallbackMode}
+            disabled={disabled}
+            sx={{ minWidth: 180 }}
+            onChange={(e) =>
+              updatePlacement(feature, {
+                fallbackMode: e.target.value as FallbackMode,
+                fallbackPosition: e.target.value === 'position' ? placement.fallbackPosition : 0,
+              })
+            }
+          >
+            {limits.fallbackModes.map((mode) => (
+              <MenuItem key={mode} value={mode}>
+                {t(`homeScreenPlacement.modes.${mode}`)}
+              </MenuItem>
+            ))}
+          </TextField>
+          {placement.fallbackMode === 'position' && (
+            <TextField
+              type="number"
+              size="small"
+              label={t('homeScreenPlacement.position')}
+              helperText={t('homeScreenPlacement.positionHelp')}
+              value={placement.fallbackPosition}
+              disabled={disabled}
+              sx={{ width: { xs: '100%', sm: 170 } }}
+              onChange={(e) => {
+                const parsed = Number.parseInt(e.target.value, 10)
+                if (Number.isFinite(parsed)) {
+                  updatePlacement(feature, {
+                    fallbackPosition: Math.min(Math.max(parsed, 0), limits.maxSectionPosition),
+                  })
+                }
+              }}
+              slotProps={{ htmlInput: { min: 0, max: limits.maxSectionPosition } }}
+            />
+          )}
+        </Stack>
+      </Box>
+    )
+  }
+
   return (
     <Card>
       <CardContent>
@@ -260,11 +461,25 @@ export function HomeSectionsSection() {
           </Alert>
         )}
         {success && (
-          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
+          <Alert
+            severity="success"
+            sx={{ mb: 2 }}
+            onClose={() => {
+              setSuccess(null)
+              setSyncStarted(false)
+            }}
+            action={
+              syncStarted ? (
+                <Button color="inherit" size="small" onClick={() => navigate(jobConsoleLink(JOB_NAME))}>
+                  {t('settingsHomeSections.openJob')}
+                </Button>
+              ) : undefined
+            }
+          >
             {success}
           </Alert>
         )}
-        {syncStarted && (
+        {syncStarted && !success && (
           <Alert
             severity="info"
             sx={{ mb: 2 }}
@@ -298,51 +513,13 @@ export function HomeSectionsSection() {
           {t('settingsHomeSections.rowsHeading')}
         </Typography>
         <Stack spacing={1}>
-          <Box>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={form.recommendationsEnabled}
-                  disabled={inactive}
-                  onChange={(e) => update({ recommendationsEnabled: e.target.checked })}
-                />
-              }
-              label={t('settingsHomeSections.recommendationsEnabled')}
-            />
-            <Typography variant="caption" color={captionColor} component="p">
-              {t('settingsHomeSections.recommendationsHelp')}
-            </Typography>
-          </Box>
-          <Box>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={form.topPicksEnabled}
-                  disabled={inactive}
-                  onChange={(e) => update({ topPicksEnabled: e.target.checked })}
-                />
-              }
-              label={t('settingsHomeSections.topPicksEnabled')}
-            />
-            <Typography variant="caption" color={captionColor} component="p">
-              {t('settingsHomeSections.topPicksHelp')}
-            </Typography>
-          </Box>
-          <Box>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={form.playlistsEnabled}
-                  disabled={inactive}
-                  onChange={(e) => update({ playlistsEnabled: e.target.checked })}
-                />
-              }
-              label={t('settingsHomeSections.playlistsEnabled')}
-            />
-            <Typography variant="caption" color={captionColor} component="p">
-              {t('settingsHomeSections.playlistsHelp')}
-            </Typography>
-          </Box>
+          {rowSwitch('topPicksEnabled', 'settingsHomeSections.topPicksEnabled', 'settingsHomeSections.topPicksHelp')}
+          {rowSwitch(
+            'recommendationsEnabled',
+            'settingsHomeSections.recommendationsEnabled',
+            'settingsHomeSections.recommendationsHelp'
+          )}
+          {rowSwitch('playlistsEnabled', 'settingsHomeSections.playlistsEnabled', 'settingsHomeSections.playlistsHelp')}
         </Stack>
 
         <Divider sx={{ my: 2 }} />
@@ -350,37 +527,87 @@ export function HomeSectionsSection() {
         <Typography variant="subtitle2" fontWeight={600} gutterBottom color={headingColor}>
           {t('settingsHomeSections.namesHeading')}
         </Typography>
-        <Box
-          sx={{
-            display: 'grid',
-            gap: 2,
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          }}
-        >
-          <TextField
-            label={t('settingsHomeSections.recommendationsName')}
-            value={form.recommendationsName}
-            onChange={(e) => update({ recommendationsName: e.target.value })}
-            size="small"
-            disabled={inactive}
-            slotProps={{ htmlInput: { maxLength: limits.maxNameLength } }}
-          />
-          <TextField
-            label={t('settingsHomeSections.topPicksMoviesName')}
-            value={form.topPicksMoviesName}
-            onChange={(e) => update({ topPicksMoviesName: e.target.value })}
-            size="small"
-            disabled={inactive}
-            slotProps={{ htmlInput: { maxLength: limits.maxNameLength } }}
-          />
-          <TextField
-            label={t('settingsHomeSections.topPicksSeriesName')}
-            value={form.topPicksSeriesName}
-            onChange={(e) => update({ topPicksSeriesName: e.target.value })}
-            size="small"
-            disabled={inactive}
-            slotProps={{ htmlInput: { maxLength: limits.maxNameLength } }}
-          />
+        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+          {nameField('topPicksMoviesName', 'settingsHomeSections.topPicksMoviesName')}
+          {nameField('topPicksSeriesName', 'settingsHomeSections.topPicksSeriesName')}
+          {nameField('recommendationsMoviesName', 'settingsHomeSections.recommendationsMoviesName')}
+          {nameField('recommendationsSeriesName', 'settingsHomeSections.recommendationsSeriesName')}
+        </Box>
+
+        <Divider sx={{ my: 2 }} />
+
+        <Box id="home-sections-placement">
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Typography variant="subtitle2" fontWeight={600} color={headingColor} sx={{ flex: 1 }}>
+              {t('settingsHomeSections.placementHeading')}
+            </Typography>
+            {anchorsRequested.current && (
+              <Button
+                size="small"
+                startIcon={anchorsLoading ? <CircularProgress size={14} /> : <RefreshIcon />}
+                onClick={() => void loadAnchors()}
+                disabled={inactive || anchorsLoading}
+              >
+                {t('settingsHomeSections.anchorsRefresh')}
+              </Button>
+            )}
+          </Box>
+          <Typography variant="caption" color={captionColor} component="p" sx={{ mb: 1.5 }}>
+            {t('settingsHomeSections.placementHelp')}
+          </Typography>
+          {anchorsError && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              {t('settingsHomeSections.anchorsError')}
+            </Alert>
+          )}
+          {anchors && (
+            <Typography variant="caption" color={captionColor} component="p" sx={{ mb: 1.5 }}>
+              {anchors.unreadable > 0
+                ? t('settingsHomeSections.anchorsSummaryUnreadable', {
+                    accounts: anchors.accounts,
+                    unreadable: anchors.unreadable,
+                  })
+                : t('settingsHomeSections.anchorsSummary', { accounts: anchors.accounts })}
+            </Typography>
+          )}
+
+          <Stack spacing={2.5} divider={<Divider flexItem />}>
+            {limits.features.map((feature) => {
+              const placement = form.placements[feature]
+              if (!placement) return null
+              const switchedOff = !form[SWITCH_FOR[feature]]
+              const disabled = inactive || switchedOff
+              return (
+                <Box key={feature}>
+                  <Typography
+                    variant="body2"
+                    fontWeight={500}
+                    color={disabled ? 'text.disabled' : 'text.primary'}
+                    sx={{ mb: 1 }}
+                  >
+                    {t(`homeScreenPlacement.features.${feature}`)}
+                    {switchedOff && !inactive && (
+                      <Typography component="span" variant="caption" color="text.disabled" sx={{ ml: 1 }}>
+                        {t('settingsHomeSections.featureOff')}
+                      </Typography>
+                    )}
+                  </Typography>
+                  <PlacementFields
+                    idPrefix={`home-sections-${feature}`}
+                    value={placement}
+                    onChange={(next) => updatePlacement(feature, next)}
+                    modes={limits.modes}
+                    rows={anchors?.rows ?? []}
+                    rowsLoading={anchorsLoading}
+                    maxPosition={limits.maxSectionPosition}
+                    disabled={disabled}
+                    showAccounts
+                  />
+                  {renderFallback(feature, placement, disabled)}
+                </Box>
+              )
+            })}
+          </Stack>
         </Box>
 
         <Divider sx={{ my: 2 }} />
@@ -396,19 +623,6 @@ export function HomeSectionsSection() {
             alignItems: 'start',
           }}
         >
-          <TextField
-            type="number"
-            label={t('settingsHomeSections.position')}
-            helperText={t('settingsHomeSections.positionHelp')}
-            value={form.sectionPosition}
-            onChange={(e) => {
-              const value = Number.parseInt(e.target.value, 10)
-              if (Number.isFinite(value)) update({ sectionPosition: value })
-            }}
-            size="small"
-            disabled={inactive}
-            slotProps={{ htmlInput: { min: 0, max: limits.maxSectionPosition } }}
-          />
           <TextField
             type="number"
             label={t('settingsHomeSections.limit')}
@@ -448,7 +662,11 @@ export function HomeSectionsSection() {
         </Typography>
 
         <Box sx={{ display: 'flex', gap: 1.5, mt: 3, flexWrap: 'wrap' }}>
-          <Button variant="contained" onClick={() => void handleSave()} disabled={!hasChanges || saving}>
+          <Button
+            variant="contained"
+            onClick={() => void handleSave()}
+            disabled={!hasChanges || !complete || saving}
+          >
             {saving ? <CircularProgress size={18} color="inherit" /> : t('settingsHomeSections.save')}
           </Button>
           <Button
@@ -460,6 +678,11 @@ export function HomeSectionsSection() {
             {t('settingsHomeSections.syncNow')}
           </Button>
         </Box>
+        {!complete && (
+          <Typography variant="caption" color="warning.main" component="p" sx={{ mt: 1 }}>
+            {t('settingsHomeSections.anchorRequired')}
+          </Typography>
+        )}
         {inactive && (
           <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1 }}>
             {t('settingsHomeSections.syncWhenOff')}

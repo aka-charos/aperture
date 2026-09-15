@@ -4,6 +4,17 @@
  * route and the tests read the same rules.
  */
 
+import {
+  DEFAULT_FEATURE_PLACEMENT,
+  PLACEMENT_FEATURES,
+  isPlacementFeature,
+  sanitizeFeaturePlacement,
+  type FeaturePlacement,
+  type PlacementFeature,
+} from './placement.js'
+
+export { MAX_SECTION_POSITION } from './placement.js'
+
 /**
  * Server-side sort fields offered for a tag-backed row. A tag carries no order,
  * so this is the only ordering a row can have; there is deliberately no "rank"
@@ -32,25 +43,26 @@ export function sortOrderFor(sort: HomeSectionSort): 'Ascending' | 'Descending' 
   return sort === 'Random' || sort === 'SortName' ? 'Ascending' : 'Descending'
 }
 
-export const MAX_SECTION_POSITION = 50
 export const MAX_ROW_NAME_LENGTH = 100
 export const MIN_RECOMMENDATIONS_LIMIT = 1
 export const MAX_RECOMMENDATIONS_LIMIT = 100
 
 export interface HomeSectionsConfig {
   enabled: boolean
+  /** Both Top Picks rows. */
   topPicksEnabled: boolean
+  /** Both recommendation rows (movies and series). */
   recommendationsEnabled: boolean
   /** Whether viewers may put their own generated playlists on their home screen. */
   playlistsEnabled: boolean
-  sectionPosition: number
-  /** The position the last full sync applied; null until one has. */
-  appliedSectionPosition: number | null
   topPicksMoviesName: string
   topPicksSeriesName: string
-  recommendationsName: string
+  recommendationsMoviesName: string
+  recommendationsSeriesName: string
   sortBy: HomeSectionSort
   recommendationsLimit: number
+  /** Where each feature's rows go unless a viewer chose otherwise. */
+  placements: Record<PlacementFeature, FeaturePlacement>
   updatedAt: Date | null
 }
 
@@ -59,13 +71,15 @@ export const DEFAULT_HOME_SECTIONS_CONFIG: HomeSectionsConfig = {
   topPicksEnabled: true,
   recommendationsEnabled: true,
   playlistsEnabled: true,
-  sectionPosition: 0,
-  appliedSectionPosition: null,
   topPicksMoviesName: 'Top Picks: Movies',
   topPicksSeriesName: 'Top Picks: Series',
-  recommendationsName: 'Recommended for You',
+  recommendationsMoviesName: 'Recommended Movies',
+  recommendationsSeriesName: 'Recommended Series',
   sortBy: 'Random',
   recommendationsLimit: 20,
+  placements: Object.fromEntries(
+    PLACEMENT_FEATURES.map((feature) => [feature, DEFAULT_FEATURE_PLACEMENT])
+  ) as Record<PlacementFeature, FeaturePlacement>,
   updatedAt: null,
 }
 
@@ -76,17 +90,22 @@ export type HomeSectionsConfigUpdate = Partial<
     | 'topPicksEnabled'
     | 'recommendationsEnabled'
     | 'playlistsEnabled'
-    | 'sectionPosition'
     | 'topPicksMoviesName'
     | 'topPicksSeriesName'
-    | 'recommendationsName'
+    | 'recommendationsMoviesName'
+    | 'recommendationsSeriesName'
     | 'sortBy'
     | 'recommendationsLimit'
   >
->
+> & { placements?: Partial<Record<PlacementFeature, FeaturePlacement>> }
 
 const BOOLEAN_FIELDS = ['enabled', 'topPicksEnabled', 'recommendationsEnabled', 'playlistsEnabled'] as const
-const NAME_FIELDS = ['topPicksMoviesName', 'topPicksSeriesName', 'recommendationsName'] as const
+const NAME_FIELDS = [
+  'topPicksMoviesName',
+  'topPicksSeriesName',
+  'recommendationsMoviesName',
+  'recommendationsSeriesName',
+] as const
 
 /**
  * Turn a request body into an update, collecting a reason for every value that
@@ -116,15 +135,6 @@ export function sanitizeHomeSectionsUpdate(body: unknown): {
     else errors.push(`${field} must be 1–${MAX_ROW_NAME_LENGTH} characters`)
   }
 
-  if (input.sectionPosition !== undefined) {
-    const value = input.sectionPosition
-    if (Number.isInteger(value) && (value as number) >= 0 && (value as number) <= MAX_SECTION_POSITION) {
-      update.sectionPosition = value as number
-    } else {
-      errors.push(`sectionPosition must be a whole number from 0 to ${MAX_SECTION_POSITION}`)
-    }
-  }
-
   if (input.recommendationsLimit !== undefined) {
     const value = input.recommendationsLimit
     if (
@@ -143,6 +153,24 @@ export function sanitizeHomeSectionsUpdate(body: unknown): {
   if (input.sortBy !== undefined) {
     if (isHomeSectionSort(input.sortBy)) update.sortBy = input.sortBy
     else errors.push(`sortBy must be one of ${HOME_SECTION_SORTS.join(', ')}`)
+  }
+
+  if (input.placements !== undefined) {
+    if (typeof input.placements !== 'object' || input.placements === null) {
+      errors.push('placements must be an object')
+    } else {
+      const placements: Partial<Record<PlacementFeature, FeaturePlacement>> = {}
+      for (const [feature, value] of Object.entries(input.placements as Record<string, unknown>)) {
+        if (!isPlacementFeature(feature)) {
+          errors.push(`placements.${feature} is not a feature`)
+          continue
+        }
+        const result = sanitizeFeaturePlacement(value, `placements.${feature}`)
+        if (result.placement) placements[feature] = result.placement
+        errors.push(...result.errors)
+      }
+      if (Object.keys(placements).length > 0) update.placements = placements
+    }
   }
 
   return { update, errors }

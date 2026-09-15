@@ -9,6 +9,9 @@ import {
   deleteGraphPlaylist,
   getGraphPlaylistItems,
   setChatPlaylistOnHomeScreen,
+  showPlaylistRowNow,
+  hidePlaylistRowNow,
+  type InstantOutcome,
   type PlaylistChatContext,
 } from '@aperture/core'
 import { graphPlaylistsSchemas } from './schemas.js'
@@ -170,7 +173,9 @@ const graphPlaylistRoutes: FastifyPluginAsync = async (fastify) => {
           showOnHomeScreen: showOnHomeScreen === true,
         })
 
-        return reply.status(201).send(playlist)
+        // Asked for from the chat dialog: the row appears now, not at the next sync.
+        const homeScreen = playlist.onHomeScreen ? await showPlaylistRowNow('chat', playlist.id) : null
+        return reply.status(201).send({ ...playlist, homeScreenApplied: homeScreen?.applied ?? null })
       } catch (err) {
         request.log.error({ 
           err, 
@@ -266,6 +271,7 @@ const graphPlaylistRoutes: FastifyPluginAsync = async (fastify) => {
    * screen, or take it off. Owner only. A playlist built on the Explore graph is
    * not offered this and answers 409 — the two share this table and route, so
    * the refusal has to live here and not only in the card that hides the button.
+   * Applied at once, like the channel route; `applied: false` is caught up by the next sync.
    */
   fastify.put<{
     Params: { id: string }
@@ -301,8 +307,18 @@ const graphPlaylistRoutes: FastifyPluginAsync = async (fastify) => {
             .send({ error: 'Only playlists created from assistant suggestions can go on the home screen' })
         }
 
-        const onHomeScreen = await setChatPlaylistOnHomeScreen(id, enabled)
-        return reply.send({ onHomeScreen: onHomeScreen === true })
+        const toggle = await setChatPlaylistOnHomeScreen(id, enabled)
+        if (!toggle) return reply.status(404).send({ error: 'Playlist not found' })
+
+        let outcome: InstantOutcome = { applied: true, moved: 0 }
+        if (toggle.onHomeScreen) outcome = await showPlaylistRowNow('chat', id)
+        else if (toggle.previousTag) outcome = await hidePlaylistRowNow(toggle.ownerId, toggle.previousTag)
+
+        return reply.send({
+          onHomeScreen: toggle.onHomeScreen,
+          applied: outcome.applied,
+          reason: outcome.applied ? undefined : outcome.reason,
+        })
       } catch (err) {
         request.log.error({ err, playlistId: id }, 'Failed to change playlist home screen setting')
         return reply.status(500).send({ error: 'Failed to change the home screen setting' })

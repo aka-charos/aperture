@@ -5,18 +5,30 @@ import { HOME_SECTION_SORTS, sanitizeHomeSectionsUpdate, sortOrderFor } from './
 test('a valid body becomes an update with no errors', () => {
   const { update, errors } = sanitizeHomeSectionsUpdate({
     enabled: true,
-    sectionPosition: 2,
     recommendationsLimit: 15,
     sortBy: 'DateCreated',
-    recommendationsName: '  For You  ',
+    recommendationsMoviesName: '  Films for You  ',
+    placements: {
+      'recs-movies': { mode: 'after', anchor: { id: 'smalllibrarytiles', type: 'userviews', name: 'My Media' } },
+      playlists: { mode: 'position', position: 3 },
+    },
   })
   assert.deepEqual(errors, [])
   assert.deepEqual(update, {
     enabled: true,
-    sectionPosition: 2,
     recommendationsLimit: 15,
     sortBy: 'DateCreated',
-    recommendationsName: 'For You',
+    recommendationsMoviesName: 'Films for You',
+    placements: {
+      'recs-movies': {
+        mode: 'after',
+        position: 0,
+        anchor: { id: 'smalllibrarytiles', type: 'userviews', name: 'My Media' },
+        fallbackMode: 'bottom',
+        fallbackPosition: 0,
+      },
+      playlists: { mode: 'position', position: 3, anchor: null, fallbackMode: 'bottom', fallbackPosition: 0 },
+    },
   })
 })
 
@@ -27,13 +39,13 @@ test('absent fields are left alone', () => {
 test('an invalid value is refused rather than clamped', () => {
   const { update, errors } = sanitizeHomeSectionsUpdate({
     enabled: 'yes',
-    sectionPosition: -1,
     recommendationsLimit: 1000,
     sortBy: 'Rank',
     topPicksMoviesName: '   ',
+    placements: { 'recs-movies': { mode: 'after' }, sideways: { mode: 'top' } },
   })
   assert.deepEqual(update, {})
-  assert.equal(errors.length, 5)
+  assert.equal(errors.length, 6)
 })
 
 test('a non-object body is an error', () => {

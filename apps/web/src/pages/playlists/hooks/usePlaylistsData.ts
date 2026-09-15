@@ -518,9 +518,10 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
   }
 
   /**
-   * Put a playlist on the owner's Emby home screen or take it off. The row itself
-   * changes on the next home-section sync, so the toast says so rather than
-   * implying the home screen already changed.
+   * Put a playlist on the owner's Emby home screen or take it off. The server
+   * applies it at once and says whether it could; when it could not, the setting
+   * is still saved and the next home-section sync catches up, so the toast says
+   * that rather than implying the home screen already changed.
    */
   const toggleHomeScreen = async (url: string, enabled: boolean, refresh: () => Promise<void>) => {
     try {
@@ -533,11 +534,17 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
       if (!response.ok) throw new Error()
       const data = await response.json()
       await refresh()
-      setSnackbar({
-        open: true,
-        message: t(`${ns}.${data.onHomeScreen ? 'snackbarAddedToHome' : 'snackbarRemovedFromHome'}`),
-        severity: 'success',
-      })
+      // Saved either way; `applied: false` means Emby was not updated this time,
+      // so the toast must not claim the row is already there.
+      const queued = data.applied === false
+      const key = data.onHomeScreen
+        ? queued
+          ? 'snackbarHomeQueued'
+          : 'snackbarAddedToHome'
+        : queued
+          ? 'snackbarRemoveQueued'
+          : 'snackbarRemovedFromHome'
+      setSnackbar({ open: true, message: t(`${ns}.${key}`), severity: 'success' })
     } catch {
       setSnackbar({ open: true, message: t(`${ns}.snackbarHomeFailed`), severity: 'error' })
     }
