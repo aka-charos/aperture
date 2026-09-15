@@ -7,9 +7,10 @@
  * posted through one route, so `origin` is what separates them.
  *
  * Opting in stores a random `aperture:playlist-…` tag on the row; opting out
- * clears it. The column IS the flag: the next sync reads it, tags the playlist's
- * current items, and gives the OWNER a row. A cleared column leaves a tag nobody
- * accounts for, which the sync strips along with its row.
+ * clears it. The column IS the flag. The route then applies the change at once
+ * (instant.ts) — tags the playlist's current items and gives the OWNER a row, or
+ * removes both — and every sync reconciles it again: a cleared column leaves a
+ * tag nobody accounts for, which the sync strips along with its row.
  */
 
 import { randomBytes } from 'crypto'
@@ -69,20 +70,29 @@ export async function loadHomePlaylists(): Promise<HomePlaylist[]> {
   }))
 }
 
+export interface HomeScreenToggle {
+  onHomeScreen: boolean
+  ownerId: string
+  /** The tag the playlist held before this change: what a row being taken off queried. */
+  previousTag: string | null
+}
+
 /**
- * Put a channel on its owner's home screen or take it off. Returns the resulting
- * state, or null when the channel does not exist. Switching on twice keeps the
- * tag it already has, so the row is not torn down and rebuilt.
+ * Put a channel on its owner's home screen or take it off. Null when the channel
+ * does not exist. Switching on twice keeps the tag it already has, so the row is
+ * not torn down and rebuilt.
  */
-export async function setChannelOnHomeScreen(channelId: string, enabled: boolean): Promise<boolean | null> {
-  const row = await queryOne<{ on_home: boolean }>(
-    `UPDATE channels
-     SET home_section_tag = CASE WHEN $2::boolean THEN COALESCE(home_section_tag, $3) ELSE NULL END
-     WHERE id = $1
-     RETURNING home_section_tag IS NOT NULL AS on_home`,
+export async function setChannelOnHomeScreen(channelId: string, enabled: boolean): Promise<HomeScreenToggle | null> {
+  const row = await queryOne<{ on_home: boolean; owner_id: string; previous_tag: string | null }>(
+    `WITH before AS (SELECT id, home_section_tag FROM channels WHERE id = $1)
+     UPDATE channels c
+     SET home_section_tag = CASE WHEN $2::boolean THEN COALESCE(c.home_section_tag, $3) ELSE NULL END
+     FROM before
+     WHERE c.id = before.id
+     RETURNING c.home_section_tag IS NOT NULL AS on_home, c.owner_id, before.home_section_tag AS previous_tag`,
     [channelId, enabled, newPlaylistTagName()]
   )
-  return row ? row.on_home : null
+  return row ? { onHomeScreen: row.on_home, ownerId: row.owner_id, previousTag: row.previous_tag } : null
 }
 
 /**
@@ -92,16 +102,18 @@ export async function setChannelOnHomeScreen(channelId: string, enabled: boolean
 export async function setChatPlaylistOnHomeScreen(
   playlistId: string,
   enabled: boolean
-): Promise<boolean | null> {
-  const row = await queryOne<{ on_home: boolean }>(
-    `UPDATE graph_playlists
-     SET home_section_tag = CASE WHEN $2::boolean THEN COALESCE(home_section_tag, $3) ELSE NULL END,
+): Promise<HomeScreenToggle | null> {
+  const row = await queryOne<{ on_home: boolean; owner_id: string; previous_tag: string | null }>(
+    `WITH before AS (SELECT id, home_section_tag FROM graph_playlists WHERE id = $1 AND origin = 'chat')
+     UPDATE graph_playlists g
+     SET home_section_tag = CASE WHEN $2::boolean THEN COALESCE(g.home_section_tag, $3) ELSE NULL END,
          updated_at = NOW()
-     WHERE id = $1 AND origin = 'chat'
-     RETURNING home_section_tag IS NOT NULL AS on_home`,
+     FROM before
+     WHERE g.id = before.id
+     RETURNING g.home_section_tag IS NOT NULL AS on_home, g.owner_id, before.home_section_tag AS previous_tag`,
     [playlistId, enabled, newPlaylistTagName()]
   )
-  return row ? row.on_home : null
+  return row ? { onHomeScreen: row.on_home, ownerId: row.owner_id, previousTag: row.previous_tag } : null
 }
 
 /**

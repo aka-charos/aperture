@@ -13,6 +13,7 @@
 import type { ContentSection } from '../media/types.js'
 import { MANAGED_TAG_PREFIX } from '../media/managedTags.js'
 import { sortOrderFor, type HomeSectionSort } from './settings.js'
+import type { PlacementFeature } from './placement.js'
 
 /**
  * Emby's section type for a query-backed row of media, as opposed to `boxset`
@@ -22,13 +23,12 @@ import { sortOrderFor, type HomeSectionSort } from './settings.js'
  */
 export const HOME_SECTION_TYPE = 'items'
 
-export type ManagedRowKind = 'recs' | 'top-picks-movies' | 'top-picks-series' | 'playlist'
+export type ManagedRowKind = 'top-picks-movies' | 'top-picks-series' | 'recs-movies' | 'recs-series' | 'playlist'
 
-/**
- * Top of the home screen first: the personal row leads, the shared lists follow,
- * and a viewer's own playlists come last.
- */
-export const ROW_ORDER: readonly ManagedRowKind[] = ['recs', 'top-picks-movies', 'top-picks-series', 'playlist']
+/** The placement feature a row belongs to. Every playlist row shares one. */
+export function featureOfKind(kind: ManagedRowKind): PlacementFeature {
+  return kind === 'playlist' ? 'playlists' : kind
+}
 
 export const TOP_PICKS_TAGS: Readonly<Record<'top-picks-movies' | 'top-picks-series', string>> = {
   'top-picks-movies': `${MANAGED_TAG_PREFIX}top-picks-movies`,
@@ -37,9 +37,20 @@ export const TOP_PICKS_TAGS: Readonly<Record<'top-picks-movies' | 'top-picks-ser
 
 export const RECS_TAG_PREFIX = `${MANAGED_TAG_PREFIX}recs-`
 
-/** A viewer's recommendation tag, from the random token stored for them. */
+/** The name stored for a viewer, from their random token. */
 export function recsTagName(token: string): string {
   return `${RECS_TAG_PREFIX}${token}`
+}
+
+/**
+ * The two tags a viewer's recommendation rows query, derived from the name
+ * stored for them. Movies and series are separate rows with separate placements,
+ * so each needs its own tag: a section is recognised by the one tag it queries.
+ * The stored name itself backed 0173's mixed row, holds nothing now, and is
+ * stripped as an orphan by the first sync after 0175.
+ */
+export function recsTagNames(viewerTagName: string): { movies: string; series: string } {
+  return { movies: `${viewerTagName}-movies`, series: `${viewerTagName}-series` }
 }
 
 export const PLAYLIST_TAG_PREFIX = `${MANAGED_TAG_PREFIX}playlist-`
@@ -213,28 +224,4 @@ export function planViewerSections(input: {
   }
 
   return plan
-}
-
-/**
- * A viewer's rows in display order: by kind (ROW_ORDER), then by name, so
- * several playlist rows do not reshuffle between runs.
- */
-export function orderRows(rows: readonly DesiredRow[]): DesiredRow[] {
-  const rank = (row: DesiredRow) => ROW_ORDER.indexOf(row.kind)
-  return [...rows].sort(
-    (a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name) || a.tagId.localeCompare(b.tagId)
-  )
-}
-
-/**
- * Single-section moves that leave `idsInDisplayOrder` consecutive from
- * `position`, top first. Moved one at a time in reverse, so each insert pushes
- * the previous one down — correct whether `Move` with several ids keeps their
- * array order or not, which the reference does not say.
- */
-export function planMoves(
-  idsInDisplayOrder: readonly string[],
-  position: number
-): Array<{ id: string; index: number }> {
-  return [...idsInDisplayOrder].reverse().map((id) => ({ id, index: position }))
 }

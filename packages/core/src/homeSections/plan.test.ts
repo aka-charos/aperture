@@ -9,26 +9,25 @@ import type { ContentSection } from '../media/types.js'
 import { isManagedTag } from '../media/managedTags.js'
 import {
   HOME_SECTION_TYPE,
-  ROW_ORDER,
   TOP_PICKS_TAGS,
   buildSection,
   diffMembership,
+  featureOfKind,
   isHomeSectionTarget,
   isTopPicksTarget,
-  orderRows,
-  planMoves,
   planViewerSections,
   playlistTagName,
   recsTagName,
+  recsTagNames,
   sectionDiffers,
   type DesiredRow,
 } from './plan.js'
 
 const RECS: DesiredRow = {
-  kind: 'recs',
+  kind: 'recs-movies',
   tagId: '901',
-  name: 'Recommended for You',
-  itemTypes: ['Movie', 'Series'],
+  name: 'Recommended Movies',
+  itemTypes: ['Movie'],
   sortBy: 'Random',
 }
 
@@ -50,8 +49,22 @@ describe('tag names', () => {
   test('every tag this feature mints is one the mappers will filter out', () => {
     // If this failed, the next library sync would embed our own tag as a theme.
     assert.equal(isManagedTag(recsTagName('3f9a1c0b2d')), true)
+    for (const tag of Object.values(recsTagNames(recsTagName('3f9a1c0b2d')))) assert.equal(isManagedTag(tag), true)
     for (const tag of Object.values(TOP_PICKS_TAGS)) assert.equal(isManagedTag(tag), true)
     assert.equal(isManagedTag(playlistTagName('ab12cd34ef')), true)
+  })
+
+  test("a viewer's movie and series rows get distinct tags, neither of them the stored name", () => {
+    const stored = recsTagName('3f9a1c0b2d')
+    const { movies, series } = recsTagNames(stored)
+    assert.equal(new Set([stored, movies, series]).size, 3)
+  })
+})
+
+describe('featureOfKind', () => {
+  test('every playlist row shares one placement; every other kind is its own', () => {
+    assert.equal(featureOfKind('playlist'), 'playlists')
+    assert.equal(featureOfKind('recs-series'), 'recs-series')
   })
 })
 
@@ -100,14 +113,15 @@ describe('buildSection', () => {
     const section = buildSection(RECS, existing)
     assert.equal(section.Id, 's1')
     assert.equal(section.DisplayMode, 'thumb')
-    assert.equal(section.CustomName, 'Recommended for You')
+    assert.equal(section.CustomName, 'Recommended Movies')
     assert.deepEqual(section.Query, { TagIds: ['901'], IsPlayed: false })
   })
 })
 
 describe('sectionDiffers', () => {
   test('item type order is not a difference', () => {
-    assert.equal(sectionDiffers(recsSection('s1', { ItemTypes: ['Series', 'Movie'] }), buildSection(RECS)), false)
+    const row = playlistRow('701', 'Noir')
+    assert.equal(sectionDiffers({ ...buildSection(row), Id: 's1', ItemTypes: ['Series', 'Movie'] }, buildSection(row)), false)
   })
 })
 
@@ -194,20 +208,6 @@ describe('planViewerSections', () => {
   })
 })
 
-describe('planMoves', () => {
-  test('moves one at a time in reverse so the rows land in display order', () => {
-    assert.deepEqual(planMoves(['r', 'm', 's'], 2), [
-      { id: 's', index: 2 },
-      { id: 'm', index: 2 },
-      { id: 'r', index: 2 },
-    ])
-  })
-
-  test('the personal row leads', () => {
-    assert.equal(ROW_ORDER[0], 'recs')
-  })
-})
-
 function playlistRow(tagId: string, name: string): DesiredRow {
   return { kind: 'playlist', tagId, name, itemTypes: ['Movie', 'Series'], sortBy: 'Random' }
 }
@@ -225,13 +225,5 @@ describe('playlist rows', () => {
     assert.equal(plan.existingIds.get('701'), 'sa')
     assert.equal(plan.creates.length, 1)
     assert.deepEqual(plan.creates[0].Query, { TagIds: ['702'] })
-  })
-
-  test('display order is recommendations, Top Picks, then playlists by name', () => {
-    const ordered = orderRows([playlistRow('p2', 'Zombies'), TOP_MOVIES, playlistRow('p1', 'Noir'), RECS])
-    assert.deepEqual(
-      ordered.map((row) => row.tagId),
-      ['901', '902', 'p1', 'p2']
-    )
   })
 })

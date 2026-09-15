@@ -721,6 +721,17 @@
       "stateShown": "表示",
       "stateHidden": "非表示",
       "resetToDefault": "サーバーの既定値にリセット（{{state}}）"
+    },
+    "homeScreen": {
+      "title": "Emby home screen rows",
+      "subtitle": "Choose where the rows {{appName}} adds to your Emby home screen go. A row left on its default follows what your admin sets.",
+      "useDefault": "Default: {{placement}}",
+      "chooseOwn": "My own placement",
+      "apply": "Apply",
+      "applied": "Done — your home screen has been updated.",
+      "savedLater": "Saved. It will be applied at the next sync.",
+      "saveFailed": "Could not save this placement",
+      "rowsUnavailable": "Emby did not return your home screen rows, so a row to place next to can't be chosen right now."
     }
   },
   "settingsPage": {
@@ -3238,11 +3249,13 @@
     "aiStartFresh": "Start fresh",
     "tooltipAddToHome": "Show on my Emby home screen",
     "tooltipRemoveFromHome": "Remove from my Emby home screen",
-    "snackbarAddedToHome": "Added — it appears on your Emby home screen after the next sync",
-    "snackbarRemovedFromHome": "Removed — it leaves your Emby home screen after the next sync",
+    "snackbarAddedToHome": "Added to your Emby home screen",
+    "snackbarRemovedFromHome": "Removed from your Emby home screen",
     "snackbarHomeFailed": "Could not change the home screen setting",
     "showOnHomeScreen": "Also show it on my Emby home screen",
-    "showOnHomeScreenHint": "It appears as a row after the next home screen sync. The row is not kept in playlist order."
+    "showOnHomeScreenHint": "It appears as a row after the next home screen sync. The row is not kept in playlist order.",
+    "snackbarHomeQueued": "Saved. It will appear on your home screen after the next sync.",
+    "snackbarRemoveQueued": "Saved. It will leave your home screen after the next sync."
   },
   "myRecommendations": {
     "pageTitle": "私のおすすめ",
@@ -4576,11 +4589,13 @@
     "aiStartFresh": "Start fresh",
     "tooltipAddToHome": "Show on my Emby home screen",
     "tooltipRemoveFromHome": "Remove from my Emby home screen",
-    "snackbarAddedToHome": "Added — it appears on your Emby home screen after the next sync",
-    "snackbarRemovedFromHome": "Removed — it leaves your Emby home screen after the next sync",
+    "snackbarAddedToHome": "Added to your Emby home screen",
+    "snackbarRemovedFromHome": "Removed from your Emby home screen",
     "snackbarHomeFailed": "Could not change the home screen setting",
     "showOnHomeScreen": "Also show it on my Emby home screen",
-    "showOnHomeScreenHint": "It appears as a row after the next home screen sync. The row is not kept in playlist order."
+    "showOnHomeScreenHint": "It appears as a row after the next home screen sync. The row is not kept in playlist order.",
+    "snackbarHomeQueued": "Saved. It will appear on your home screen after the next sync.",
+    "snackbarRemoveQueued": "Saved. It will leave your home screen after the next sync."
   },
   "countryFilter": {
     "label": "Country",
@@ -5384,15 +5399,12 @@
     "rowsHeading": "Rows",
     "topPicksEnabled": "Top Picks — one row for movies, one for series",
     "topPicksHelp": "Shown to every Emby user, including those not enabled in {{appName}}. Reads the Top Picks list, so Top Picks itself must be switched on.",
-    "recommendationsEnabled": "Each viewer's own recommendations",
-    "recommendationsHelp": "The picks from their most recent recommendation run, movies and series together.",
+    "recommendationsEnabled": "Each viewer's own recommendations — one row for movies, one for series",
+    "recommendationsHelp": "The picks from their most recent recommendation runs. A viewer only gets the row for a media type switched on for them.",
     "namesHeading": "Row names",
     "topPicksMoviesName": "Top Picks movies row",
     "topPicksSeriesName": "Top Picks series row",
-    "recommendationsName": "Recommendations row",
     "layoutHeading": "Layout",
-    "position": "Position on the home screen",
-    "positionHelp": "0 is the top. Rows move here when they are first created or when this changes; otherwise a viewer's own arrangement is left alone.",
     "limit": "Recommendations per media type",
     "sortBy": "Order within each row",
     "sortHelp": "Emby cannot show a row in recommendation rank, so each row sorts by a field on the server.",
@@ -5412,6 +5424,54 @@
     "syncFailed": "Could not start the sync",
     "playlistsEnabled": "Playlists viewers choose to show",
     "playlistsHelp": "A viewer can put a playlist or collection they generated, or one made from assistant suggestions, on their own home screen. Rows follow the playlist's current contents, not its order. Playlists built on the Explore graph are not offered this.",
-    "syncWhenOff": "Sync is available while home screen rows are on. With them off, the nightly sync — or running it from the Jobs page — removes any rows and tags already written."
+    "syncWhenOff": "Sync is available while home screen rows are on. With them off, the nightly sync — or running it from the Jobs page — removes any rows and tags already written.",
+    "savedApplying": "Saved. Applying it to home screens now.",
+    "savedSyncRunning": "Saved. A sync is already running and may miss this change — run Sync now when it finishes.",
+    "recommendationsMoviesName": "Movie recommendations row",
+    "recommendationsSeriesName": "Series recommendations row",
+    "placementHeading": "Placement",
+    "placementHelp": "Where each feature's rows go on home screens. Viewers can choose their own in their settings. Saving applies it straight away; after that, a row a viewer dragged stays where they put it until its placement changes.",
+    "anchorsLoading": "Reading home screen rows from every account…",
+    "anchorsError": "Could not read home screen rows from Emby, so rows to place next to cannot be listed.",
+    "anchorsRefresh": "Re-read rows",
+    "anchorsSummary": "Rows read from {{accounts}} accounts.",
+    "anchorsSummaryUnreadable": "Rows read from {{accounts}} accounts; {{unreadable}} did not answer.",
+    "anchorEveryone": "Every account has “{{name}}”.",
+    "anchorMissing": "{{missing}} of {{accounts}} accounts don't have “{{name}}”. Those accounts get:",
+    "anchorUnknown": "Accounts that don't have “{{name}}” get:",
+    "fallback": "Instead",
+    "featureOff": "switched off above",
+    "anchorRequired": "Choose a row for every placement set to After a row or Before a row."
+  },
+  "homeScreenPlacement": {
+    "mode": "Placement",
+    "modes": {
+      "top": "Top",
+      "bottom": "Bottom",
+      "position": "Position number",
+      "after": "After a row",
+      "before": "Before a row"
+    },
+    "position": "Position",
+    "positionHelp": "Rows above it (0 = top)",
+    "anchor": "Row",
+    "anchorMissing": "{{name}} (not found now)",
+    "rowWithAccounts": "{{name}} · {{accounts}} accounts",
+    "rowsLoading": "Reading rows…",
+    "noRows": "No rows to choose from",
+    "describe": {
+      "top": "Top",
+      "bottom": "Bottom",
+      "position": "Position {{position}}",
+      "after": "After {{name}}",
+      "before": "Before {{name}}"
+    },
+    "features": {
+      "top-picks-movies": "Top Picks: Movies",
+      "top-picks-series": "Top Picks: Series",
+      "recs-movies": "Movie recommendations",
+      "recs-series": "Series recommendations",
+      "playlists": "Generated playlists"
+    }
   }
 }
