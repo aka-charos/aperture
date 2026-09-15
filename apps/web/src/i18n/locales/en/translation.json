@@ -5429,6 +5429,7 @@
     "promptsHint": "Every ticked model answers every ticked version. The documents are retrieved once, so the prompts differ only in their questions and rules.",
     "versionLabel": "v{{version}}",
     "versionCurrent": "v{{version}} (current)",
+    "versionDraft": "v{{version}} (draft — bench only)",
     "runAnswers_one": "Run {{count}} answer",
     "runAnswers_other": "Run {{count}} answers",
     "controlVersions": "Every answer below was written from {{count}} source document(s), {{chars}} characters retrieved once · prompt versions {{versions}}",

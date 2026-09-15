@@ -132,6 +132,8 @@ export default function AnalysisBenchRoute() {
   const [availableVersions, setAvailableVersions] = useState<number[]>([])
   // Kept sorted, so the request and the labels read oldest first.
   const [selectedVersions, setSelectedVersions] = useState<number[]>([])
+  // The next version, benchable only — labelled so it is never read as live.
+  const [draftVersion, setDraftVersion] = useState<number | null>(null)
   // An ORDERED list, not a Set: the report prints entries in the order they
   // were chosen, and a Set would silently reorder the document between runs.
   const [selected, setSelected] = useState<{ provider: string; model: string }[]>([])
@@ -157,6 +159,7 @@ export default function AnalysisBenchRoute() {
             maxModels: number
             promptVersion?: number
             promptVersions?: number[]
+            draftPromptVersion?: number | null
           } | null
         ) => {
           if (!json) return
@@ -165,6 +168,7 @@ export default function AnalysisBenchRoute() {
           setPromptVersion(json.promptVersion ?? null)
           const current = json.promptVersion
           setAvailableVersions(json.promptVersions ?? (current != null ? [current] : []))
+          setDraftVersion(json.draftPromptVersion ?? null)
           // The current prompt alone by default: a run nobody asked to widen
           // costs what it always cost.
           setSelectedVersions(current != null ? [current] : [])
@@ -490,7 +494,9 @@ export default function AnalysisBenchRoute() {
                       <Typography variant="body2">
                         {version === promptVersion
                           ? t('adminAnalysisBench.versionCurrent', { version })
-                          : t('adminAnalysisBench.versionLabel', { version })}
+                          : version === draftVersion
+                            ? t('adminAnalysisBench.versionDraft', { version })
+                            : t('adminAnalysisBench.versionLabel', { version })}
                       </Typography>
                     }
                   />

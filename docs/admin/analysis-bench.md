@@ -25,11 +25,14 @@ The bench runs the **real generation path** (retries, pacing, contract checks) b
 - The **full prompt** is included at the end, so you can see exactly what every model answered
 - **Copy** to clipboard or **download** as `.txt`
 - **Earlier comparisons** are listed (stored in their own tables) with the prompt version each answered, and are deletable
-- A **signals table** above the answers, and a signals line under each one, count habits the prompt asks the model to avoid: paragraphs and the longest paragraph in sentences, pointing at "the sources", views with no holder ("is described as"), "rather than", announcing a question stays open, and paragraphs that open by restating their question. They are counts to compare, not a pass mark — each pattern also matches innocent prose
+- A **signals table** above the answers, and a signals line under each one, count habits the prompt asks the model to avoid: paragraphs and the longest paragraph in sentences, pointing at "the sources", views with no holder ("is described as"), "rather than", announcing a question stays open, paragraphs that open by restating their question, and **told twice** — phrases that appear under two different questions, printed so you can check them. They are counts to compare, not a pass mark — each pattern also matches innocent prose. And zero is not clean: an opinion stated as a plain fact, with no critic named and no hedge, matches nothing here and has to be read
+- Retrieval now **drops bot-check and access-wall pages** (Cloudflare challenges, "Access restricted") before they reach the prompt, so they no longer appear in the sources list or take a share of the budget
 
 ## Comparing Prompt Versions
 
-Under the model list, **Prompt versions** lists every version this build carries (currently v7, v8 and v9), with the current one ticked. Tick more than one and every ticked model answers every ticked version:
+Under the model list, **Prompt versions** lists every version this build carries (currently v7, v8, v9 and a v10 draft), with the current one ticked. Tick more than one and every ticked model answers every ticked version.
+
+A version marked **draft — bench only** is the next prompt being tested. Only the bench can run it: the library keeps writing with the current version, and no stored analysis is retired until the draft is promoted in a later release. Bench the draft against the current version on several titles and models first — that is what it is for.
 
 - The sources are **retrieved once** and every version's prompt is built from them, so the prompts are identical down to the TASK line and differ only in their questions and rules. A difference between two answers from one model is therefore the prompt
 - The report groups each model's answers together, labels each one with its version (`deepseek-v4.1-flash · v8`, `· v9`), and puts them on adjacent rows of the signals table

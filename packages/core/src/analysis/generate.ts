@@ -54,6 +54,7 @@ import { waitForCallSlot } from '../lib/callPacing.js'
 import { createChildLogger } from '../lib/logger.js'
 import { recordWebSearchCall } from '../lib/webSearchUsage.js'
 import { budgetSources } from './budget.js'
+import { isBlockedPage } from './blockedPage.js'
 import { checkModeReadiness, type RetrievalMode } from './mode.js'
 import {
   parseParagraphMap,
@@ -288,7 +289,33 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
     )
   }
 
-  const sources = budgetSources(fetched, { budget: config.sourceBudgetChars })
+  // Bot checks and access walls come back as ordinary results with a little
+  // text, and the budget below keeps a short document whole - so without this
+  // they reach the prompt as numbered documents and count as retrieval. See
+  // ./blockedPage.ts. Dropping them first also hands their share of the budget
+  // to the pages that did answer.
+  const blocked = fetched.filter((source) => isBlockedPage(source.text))
+  const readable = blocked.length
+    ? fetched.filter((source) => !isBlockedPage(source.text))
+    : fetched
+  if (blocked.length > 0) {
+    logger.warn(
+      { title: subject.title, blocked: blocked.map((source) => source.domain) },
+      'Dropped bot-check and access-wall pages from retrieval'
+    )
+  }
+  // Every page walled is the scraper being refused, not a fact about the title,
+  // so it throws like an empty scrape rather than reaching the floor and being
+  // stored as a decline.
+  if (readable.every((source) => source.text.trim().length === 0)) {
+    throw new Error(
+      `Retrieval returned ${response.results.length} result(s) but every page was a bot check or access wall (${blocked
+        .map((source) => source.domain)
+        .join(', ')}) — the scraper is being blocked.${reported}`
+    )
+  }
+
+  const sources = budgetSources(readable, { budget: config.sourceBudgetChars })
   const retrievedChars = sources.reduce((sum, s) => sum + s.text.length, 0)
 
   // INFO, not debug. This is the line that says whether retrieval is healthy —

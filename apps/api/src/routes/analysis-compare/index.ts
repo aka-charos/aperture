@@ -21,6 +21,7 @@ import {
   replayComparison,
   ANALYSIS_PROMPT_VERSION,
   BENCH_PROMPT_VERSIONS,
+  DRAFT_PROMPT_VERSION,
   getComparisonRun,
   listComparisonRuns,
   deleteComparisonRun,
@@ -155,6 +156,9 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
         maxModels: MAX_COMPARISON_MODELS,
         promptVersion: ANALYSIS_PROMPT_VERSION,
         promptVersions: BENCH_PROMPT_VERSIONS,
+        // A draft is benchable only; the picker labels it so nobody mistakes
+        // it for the version the library writes with.
+        draftPromptVersion: DRAFT_PROMPT_VERSION,
       })
     }
   )

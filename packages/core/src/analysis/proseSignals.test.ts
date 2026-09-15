@@ -13,7 +13,9 @@ import { measureProse } from './proseSignals.js'
 test('an empty or missing analysis measures as zero everywhere', () => {
   for (const text of [null, undefined, '', '   ']) {
     const s = measureProse(text)
-    assert.deepEqual(Object.values(s), [0, 0, 0, 0, 0, 0, 0, 0])
+    const { repeatedPhrases, ...counts } = s
+    assert.deepEqual(Object.values(counts), [0, 0, 0, 0, 0, 0, 0, 0, 0])
+    assert.deepEqual(repeatedPhrases, [])
   }
 })
 
@@ -69,4 +71,35 @@ test('a paragraph opening by restating its question', () => {
     ].join('\n\n')
   )
   assert.equal(s.questionEchoes, 3)
+})
+
+/**
+ * Terminator 2 under version 9, cut to the paragraphs that matter: the early
+ * screenplay's liquid-metal idea told under Context and again under Making.
+ */
+const T2 = [
+  'Cameron drew on an early version of the original screenplay that contained a liquid-metal terminator, an idea he had scrapped.',
+  'Brad Fiedel wrote a score of industrial percussion.',
+  'Robert Patrick plays the pursuer with a fixed, gliding stillness.',
+  'The liquid-metal idea came from an early version of the original screenplay and became possible after The Abyss.',
+  'Brian Eggert praised the action and faulted the script.',
+].join('\n\n')
+const T2_SECTIONS = [['tradition'], ['work'], ['work'], ['circumstances'], ['reception']]
+
+test('a fact told under two questions is found and named', () => {
+  const s = measureProse(T2, T2_SECTIONS)
+  assert.ok(s.repeatedPhrases.includes('liquid metal'), s.repeatedPhrases.join(', '))
+  assert.ok(s.repeatedPhrases.includes('original screenplay'), s.repeatedPhrases.join(', '))
+  assert.equal(s.repeatedAcrossSections, s.repeatedPhrases.length)
+})
+
+// Two runs sharing a label are one question, however they are split.
+test('a phrase repeated inside one question is not a repeat', () => {
+  const text = ['The liquid-metal pursuer glides.', 'The liquid-metal pursuer never runs.'].join('\n\n')
+  assert.deepEqual(measureProse(text, [['work'], ['work', 'tradition']]).repeatedPhrases, [])
+})
+
+test('without a paragraph map there are no questions to repeat across', () => {
+  assert.equal(measureProse(T2).repeatedAcrossSections, 0)
+  assert.equal(measureProse(T2, []).repeatedAcrossSections, 0)
 })

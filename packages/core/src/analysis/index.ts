@@ -20,6 +20,7 @@ export {
   ANALYSIS_MAP_MARKER,
   ANALYSIS_PROMPT_VERSION,
   BENCH_PROMPT_VERSIONS,
+  DRAFT_PROMPT_VERSION,
   buildAnalysisPrompt,
   buildAnalysisQuery,
   parseAnalysisResponse,
