@@ -6,6 +6,8 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  collapseExpandedRows,
+  groupsAreContiguous,
   placementChain,
   placementKey,
   planPlacement,
@@ -63,9 +65,68 @@ function liveLayout(): HomeScreenRow[] {
 
 function place(rows: HomeScreenRow[], chains: Array<[PlacementFeature, Placement[]]>) {
   const plan = planPlacement(rows, new Map(chains))
-  assert.deepEqual(replay(rows.map((row) => row.id), plan.moves), plan.order, 'the moves must produce the order')
+  const stored = collapseExpandedRows(rows).map((row) => row.id)
+  assert.deepEqual(replay(stored, plan.moves), plan.order, 'the moves must produce the order')
   return plan
 }
+
+/** One account's layout with several libraries' Latest rows, as the read returns them. */
+function withLatestMedia(): HomeScreenRow[] {
+  return [
+    own('smalllibrarytiles', 'userviews'),
+    own('resume'),
+    own('resumeaudio'),
+    own('onnow'),
+    own('latestmoviereleases'),
+    own('latestmedia_111621', 'latestmedia'),
+    own('latestmedia_7149', 'latestmedia'),
+    own('latestmedia_65792', 'latestmedia'),
+    own('latestmedia_7', 'latestmedia'),
+    ours('397a4d25', 'playlists', 'Dark realities'),
+  ]
+}
+
+const LATEST_TV_SHOWS = { id: 'latestmedia_65792', type: 'latestmedia', name: 'Latest TV Shows' }
+
+describe('Latest Media is one row', () => {
+  test("every library's Latest row collapses into one row where the group first appears", () => {
+    const collapsed = collapseExpandedRows(withLatestMedia())
+    assert.deepEqual(
+      collapsed.map((row) => row.id),
+      ['smalllibrarytiles', 'resume', 'resumeaudio', 'onnow', 'latestmoviereleases', 'latestmedia', '397a4d25']
+    )
+    assert.equal(collapsed[5].group, true)
+  })
+
+  test('an anchor on one library\'s Latest row is stored as the whole group', () => {
+    const { placement } = sanitizePlacement({ mode: 'after', anchor: LATEST_TV_SHOWS }, 'p')
+    assert.deepEqual(placement?.anchor, { id: 'latestmedia', type: 'latestmedia', name: 'Latest Media' })
+    assert.equal(placementKey([after(LATEST_TV_SHOWS)]), placementKey([after({ id: 'latestmedia', type: 'latestmedia', name: null })]))
+  })
+
+  test('nothing lands between two libraries: before and after mean the whole block', () => {
+    const rows = withLatestMedia()
+    const afterPlan = place(rows, [['playlists', [after(LATEST_TV_SHOWS)]]])
+    assert.deepEqual(afterPlan.order.slice(-2), ['latestmedia', '397a4d25'])
+    const beforePlan = place(rows, [['playlists', [before(LATEST_TV_SHOWS)]]])
+    assert.deepEqual(beforePlan.order.slice(-3), ['latestmoviereleases', '397a4d25', 'latestmedia'])
+    assert.deepEqual(beforePlan.moves, [{ id: '397a4d25', index: 5 }])
+  })
+
+  test("a position counts the block once, the way Emby's Home Screen editor numbers it", () => {
+    const plan = place(withLatestMedia(), [['playlists', [position(6)]]])
+    assert.deepEqual(plan.moves, [])
+    const earlier = place(withLatestMedia(), [['playlists', [position(5)]]])
+    assert.deepEqual(earlier.moves, [{ id: '397a4d25', index: 5 }])
+  })
+
+  test('a row sitting between two libraries is detected', () => {
+    assert.equal(groupsAreContiguous(withLatestMedia()), true)
+    const rows = withLatestMedia()
+    const split = [...rows.slice(0, 6), rows[9], ...rows.slice(6, 9)]
+    assert.equal(groupsAreContiguous(split), false)
+  })
+})
 
 describe('sanitizePlacement', () => {
   test('an anchor placement needs an anchor id', () => {

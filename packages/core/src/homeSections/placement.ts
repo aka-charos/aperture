@@ -3,13 +3,17 @@
  * database, no media server — so the arithmetic is pinned by a test.
  *
  * Emby has no "insert after" call. `POST …/HomeSections/Move` takes ids and a
- * `NewIndex`, and — measured on a live server — takes the row out and puts it
- * back so it ends up AT that index of the list `GET …/HomeSections` returns,
- * which is also the order the viewer sees. So every placement resolves to an
- * index in one viewer's own list.
+ * `NewIndex`, and a row sent to an index ends up AT that index of the list as
+ * Emby STORES it — which is not quite the list `GET …/HomeSections` returns.
+ * Some rows are stored as one section and expanded per library on the way out:
+ * "Latest Media" comes back as `latestmedia_<library id>`, one entry per
+ * library, while Emby's own Home Screen editor shows it as a single line and no
+ * row can sit between two of them. So every plan is made against the collapsed
+ * list (`collapseExpandedRows`): a group is one row to anchor to, one row in a
+ * position count, and one row to move around.
  *
- * Built-in rows share ids across accounts (`smalllibrarytiles`, `resume`,
- * `latestmedia_<library id>`), which is what lets an anchor chosen once work for
+ * Built-in rows share ids across accounts (`smalllibrarytiles`, `resume`, the
+ * Latest Media group), which is what lets an anchor chosen once work for
  * everyone; rows someone added carry a random id and exist on one account. A
  * built-in row can also appear under a sibling id (My Media as
  * `librarybuttons`), so an anchor missing by id is looked for by section type —
@@ -20,6 +24,12 @@
 export const MAX_SECTION_POSITION = 50
 const MAX_ANCHOR_ID_LENGTH = 200
 const MAX_ANCHOR_TEXT_LENGTH = 200
+
+/**
+ * Bumped when what a stored placement MEANS changes, so every viewer is placed
+ * once more under the new meaning. 2: expansion groups became one row.
+ */
+const PLACEMENT_KEY_VERSION = 2
 
 /**
  * One placement per feature. The order is also the stacking order when several
@@ -83,6 +93,28 @@ export function isTypeMatchable(type: string | null): type is string {
   return !!type && !GENERIC_SECTION_TYPES.has(type)
 }
 
+/** Names for the groups Emby expands per library; Emby's read gives none for the group itself. */
+const GROUP_NAMES: Readonly<Record<string, string>> = { latestmedia: 'Latest Media' }
+
+/**
+ * The group a section belongs to when Emby expanded it per library, recognised
+ * by its id being the section type plus a suffix (`latestmedia_7`); null for a
+ * row that is a row in its own right.
+ */
+export function expandedGroupOf(id: string, type: string | null): string | null {
+  return type && id.startsWith(`${type}_`) ? type : null
+}
+
+export function groupName(group: string): string {
+  return GROUP_NAMES[group] ?? group
+}
+
+/** An anchor on one library's expansion means the group it belongs to. */
+export function normaliseAnchor(anchor: PlacementAnchor): PlacementAnchor {
+  const group = expandedGroupOf(anchor.id, anchor.type)
+  return group ? { id: group, type: group, name: groupName(group) } : anchor
+}
+
 export function isAnchorMode(mode: PlacementMode): mode is 'after' | 'before' {
   return mode === 'after' || mode === 'before'
 }
@@ -99,7 +131,8 @@ function optionalText(value: unknown, max: number): string | null {
 
 /**
  * A placement from a request body. Whatever the chosen mode does not use is
- * normalised away — a Top placement keeps no anchor and position 0 — so two
+ * normalised away — a Top placement keeps no anchor and position 0 — and an
+ * anchor on one library's Latest row becomes the Latest Media group, so two
  * placements that behave the same are stored the same.
  */
 export function sanitizePlacement(input: unknown, label: string): { placement: Placement | null; errors: string[] } {
@@ -124,11 +157,11 @@ export function sanitizePlacement(input: unknown, label: string): { placement: P
     const raw = typeof body.anchor === 'object' && body.anchor !== null ? (body.anchor as Record<string, unknown>) : {}
     const id = optionalText(raw.id, MAX_ANCHOR_ID_LENGTH)
     if (id) {
-      anchor = {
+      anchor = normaliseAnchor({
         id,
         type: optionalText(raw.type, MAX_ANCHOR_TEXT_LENGTH),
         name: optionalText(raw.name, MAX_ANCHOR_TEXT_LENGTH),
-      }
+      })
     } else {
       errors.push(`${label}.anchor.id is required when placing ${mode} a row`)
     }
@@ -169,7 +202,7 @@ function normalise(placement: Placement): Placement {
   return {
     mode: placement.mode,
     position: placement.mode === 'position' ? placement.position : 0,
-    anchor: isAnchorMode(placement.mode) ? placement.anchor : null,
+    anchor: isAnchorMode(placement.mode) && placement.anchor ? normaliseAnchor(placement.anchor) : null,
   }
 }
 
@@ -193,12 +226,13 @@ export function placementChain(adminDefault: FeaturePlacement, override: Placeme
  * Names are left out: renaming a row somewhere else must not move anybody's.
  */
 export function placementKey(chain: readonly Placement[]): string {
-  return JSON.stringify(
+  return JSON.stringify([
+    PLACEMENT_KEY_VERSION,
     chain.map((placement) => {
       const p = normalise(placement)
       return [p.mode, p.position, p.anchor?.id ?? null, p.anchor?.type ?? null]
-    })
-  )
+    }),
+  ])
 }
 
 /** One row of a viewer's home screen, in the order Emby returns them. */
@@ -209,6 +243,46 @@ export interface HomeScreenRow {
   feature: PlacementFeature | null
   /** Orders rows within a feature (playlists by name). */
   name: string
+  /** True for a group of per-library expansions collapsed into one row. */
+  group?: boolean
+}
+
+/**
+ * A viewer's rows as Emby stores them: every expansion of a group collapsed into
+ * one row where the group first appears. Plans are made, counted and moved
+ * against this list.
+ */
+export function collapseExpandedRows(rows: readonly HomeScreenRow[]): HomeScreenRow[] {
+  const collapsed: HomeScreenRow[] = []
+  const seen = new Set<string>()
+  for (const row of rows) {
+    const group = row.feature === null ? expandedGroupOf(row.id, row.sectionType) : null
+    if (!group) {
+      collapsed.push(row)
+    } else if (!seen.has(group)) {
+      seen.add(group)
+      collapsed.push({ id: group, sectionType: group, feature: null, name: groupName(group), group: true })
+    }
+  }
+  return collapsed
+}
+
+/**
+ * Whether every group's expansions sit together. A row between two of them is
+ * something Emby's own editor cannot show — so after a move, it means the move
+ * landed somewhere the plan did not intend.
+ */
+export function groupsAreContiguous(rows: readonly HomeScreenRow[]): boolean {
+  const finished = new Set<string>()
+  let current: string | null = null
+  for (const row of rows) {
+    const group = row.feature === null ? expandedGroupOf(row.id, row.sectionType) : null
+    if (group === current) continue
+    if (current) finished.add(current)
+    if (group && finished.has(group)) return false
+    current = group
+  }
+  return true
 }
 
 function featureRank(feature: PlacementFeature): number {
@@ -217,9 +291,10 @@ function featureRank(feature: PlacementFeature): number {
 
 function findAnchor(list: readonly HomeScreenRow[], anchor: PlacementAnchor | null): number {
   if (!anchor) return -1
-  const byId = list.findIndex((row) => row.feature === null && row.id === anchor.id)
-  if (byId >= 0 || !isTypeMatchable(anchor.type)) return byId
-  return list.findIndex((row) => row.feature === null && row.sectionType === anchor.type)
+  const wanted = normaliseAnchor(anchor)
+  const byId = list.findIndex((row) => row.feature === null && row.id === wanted.id)
+  if (byId >= 0 || !isTypeMatchable(wanted.type)) return byId
+  return list.findIndex((row) => row.feature === null && row.sectionType === wanted.type)
 }
 
 /** The index just after the viewer's `count`-th own row. Aperture's rows are not counted. */
@@ -234,7 +309,10 @@ function indexAfterOwnRows(list: readonly HomeScreenRow[], count: number): numbe
   return list.length
 }
 
-/** The index a chain resolves to in `list`. Exhausting the chain means the bottom. */
+/**
+ * The index a chain resolves to in `list` — a collapsed list, so a group is one
+ * row. Exhausting the chain means the bottom.
+ */
 export function resolvePlacementIndex(list: readonly HomeScreenRow[], chain: readonly Placement[]): number {
   for (const placement of chain) {
     switch (placement.mode) {
@@ -265,9 +343,9 @@ export interface PlacementMove {
 }
 
 export interface PlacementPlan {
-  /** The viewer's row ids in their final order. */
+  /** The viewer's row ids in their final order, groups collapsed. */
   order: string[]
-  /** `Move` calls, one row each, in the order they must be sent. */
+  /** `Move` calls, one row each, in the order they must be sent; indexes count the collapsed list. */
   moves: PlacementMove[]
 }
 
@@ -278,9 +356,10 @@ export interface PlacementPlan {
  * counted by a position and features stack in PLACEMENT_FEATURES order.
  */
 export function planPlacement(
-  rows: readonly HomeScreenRow[],
+  screen: readonly HomeScreenRow[],
   chains: ReadonlyMap<PlacementFeature, readonly Placement[]>
 ): PlacementPlan {
+  const rows = collapseExpandedRows(screen)
   const moving = rows.filter((row) => row.feature !== null && chains.has(row.feature))
   const movingIds = new Set(moving.map((row) => row.id))
   const list = rows.filter((row) => !movingIds.has(row.id))

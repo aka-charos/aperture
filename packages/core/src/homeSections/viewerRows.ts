@@ -8,6 +8,8 @@ import type { MediaServerProvider } from '../media/MediaServerProvider.js'
 import type { ContentSection } from '../media/types.js'
 import { TOP_PICKS_TAGS, recsTagNames, sectionTagIds } from './plan.js'
 import {
+  collapseExpandedRows,
+  groupsAreContiguous,
   placementChain,
   placementKey,
   planPlacement,
@@ -94,8 +96,13 @@ export interface PlaceViewerRowsInput {
  * Move the rows of every feature whose placement differs from what was last
  * applied to this viewer, or that was just created. Nothing else moves, so a
  * viewer who dragged a row keeps it until the placement that applies changes.
- * The applied keys are saved only after every move succeeded; a failure throws
- * and the next run tries again.
+ *
+ * After moving, the screen is read back and compared with the plan. `Move`'s
+ * index is taken to count the list as Emby stores it (groups collapsed); if Emby
+ * put a row anywhere else — including between two libraries' Latest rows — that
+ * assumption is wrong for this server, and it throws so the job console says so
+ * rather than a row quietly landing somewhere nobody chose. The applied keys are
+ * saved only after the rows are confirmed where planned.
  */
 export async function placeViewerRows(input: PlaceViewerRowsInput): Promise<{ moved: number; placed: PlacementFeature[] }> {
   const rows = toHomeScreenRows(input.sections, input.managed)
@@ -116,6 +123,20 @@ export async function placeViewerRows(input: PlaceViewerRowsInput): Promise<{ mo
   const plan = planPlacement(rows, chains)
   for (const move of plan.moves) {
     await input.provider.moveHomeSections(input.apiKey, input.providerUserId, [move.id], move.index)
+  }
+
+  if (plan.moves.length > 0) {
+    const landed = toHomeScreenRows(
+      await input.provider.getHomeSections(input.apiKey, input.providerUserId),
+      input.managed
+    )
+    const order = collapseExpandedRows(landed).map((row) => row.id)
+    if (!groupsAreContiguous(landed) || order.join('\n') !== plan.order.join('\n')) {
+      throw new Error(
+        'Emby put the rows somewhere other than planned, so the placement was not recorded as applied ' +
+          `(planned ${plan.order.join(' > ')}; found ${landed.map((row) => row.id).join(' > ')})`
+      )
+    }
   }
   await saveAppliedPlacementKeys(input.userId, keys)
   return { moved: plan.moves.length, placed: [...chains.keys()] }
