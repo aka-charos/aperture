@@ -2442,8 +2442,12 @@
     "anchorsRefresh": "Re-read rows",
     "anchorsSummary": "Rows read from {{accounts}} accounts.",
     "anchorsSummaryUnreadable": "Rows read from {{accounts}} accounts; {{unreadable}} did not answer.",
+    "anchorsUnreadableAccounts": "Did not answer: {{names}}",
     "anchorEveryone": "Every account has “{{name}}”.",
-    "anchorMissing": "{{missing}} of {{accounts}} accounts don't have “{{name}}”. Those accounts get:",
+    "anchorMissing": "{{missing}} of {{accounts}} accounts don't have “{{name}}”.",
+    "anchorMissingAccounts": "Not on: {{names}}",
+    "anchorFallbackPrompt": "Those accounts get:",
+    "namesAndMore": "{{names}} and {{extra}} more",
     "anchorUnknown": "Accounts that don't have “{{name}}” get:",
     "fallback": "Instead",
     "featureOff": "switched off above",
@@ -2497,6 +2501,9 @@
       "recs-movies": "Movie recommendations",
       "recs-series": "Series recommendations",
       "playlists": "Generated playlists"
+    },
+    "groups": {
+      "latestmedia": "Latest Media"
     }
   },
   "settingsStreamingDiscovery": {

@@ -5,7 +5,7 @@
  */
 import { MenuItem, Stack, TextField } from '@mui/material'
 import { useTranslation } from 'react-i18next'
-import { isAnchorMode, type HomeRowOption, type PlacementMode, type PlacementValue } from './placement'
+import { isAnchorMode, rowName, type HomeRowOption, type PlacementMode, type PlacementValue } from './placement'
 
 interface PlacementFieldsProps {
   idPrefix: string
@@ -43,12 +43,13 @@ export function PlacementFields({
     : rows
 
   const rowLabel = (row: HomeRowOption) => {
+    const name = rowName(t, row)
     if (missingAnchor && row.id === missingAnchor.id) {
-      return t('homeScreenPlacement.anchorMissing', { name: row.name })
+      return t('homeScreenPlacement.anchorMissing', { name })
     }
     return showAccounts && row.accounts != null
-      ? t('homeScreenPlacement.rowWithAccounts', { name: row.name, accounts: row.accounts })
-      : row.name
+      ? t('homeScreenPlacement.rowWithAccounts', { name, accounts: row.accounts })
+      : name
   }
 
   return (

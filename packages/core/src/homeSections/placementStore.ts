@@ -12,6 +12,7 @@ import {
   PLACEMENT_MODES,
   isAnchorMode,
   isPlacementFeature,
+  normaliseAnchor,
   type FallbackMode,
   type FeaturePlacement,
   type Placement,
@@ -27,13 +28,18 @@ interface PlacementColumns {
   anchor_name: string | null
 }
 
-/** A stored row as a placement; null for one edited in SQL into something unusable. */
+/**
+ * A stored row as a placement; null for one edited in SQL into something
+ * unusable. An anchor saved on one library's Latest row reads as the Latest
+ * Media group it always belonged to.
+ */
 function toPlacement(row: PlacementColumns): Placement | null {
   if (!(PLACEMENT_MODES as readonly string[]).includes(row.mode)) return null
   const mode = row.mode as PlacementMode
   if (isAnchorMode(mode)) {
     if (!row.anchor_id) return null
-    return { mode, position: 0, anchor: { id: row.anchor_id, type: row.anchor_type, name: row.anchor_name } }
+    const anchor = normaliseAnchor({ id: row.anchor_id, type: row.anchor_type, name: row.anchor_name })
+    return { mode, position: 0, anchor }
   }
   return { mode, position: mode === 'position' ? row.position : 0, anchor: null }
 }

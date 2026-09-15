@@ -86,8 +86,12 @@ interface Limits {
 interface SharedRows {
   accounts: number
   unreadable: number
+  unreadableAccounts: string[]
   rows: HomeRowOption[]
 }
+
+/** Past this many, the list is cut short and the full set is in a tooltip. */
+const MAX_LISTED_ACCOUNTS = 10
 
 type SyncOutcome = { started: boolean; reason?: 'nothing-saved' | 'feature-off' | 'already-running' }
 
@@ -357,6 +361,27 @@ export function HomeSectionsSection() {
     return Math.max(anchors.accounts - (shared?.accountsWithType ?? 0), 0)
   }
 
+  /**
+   * Account names as a caption. A long list is cut short and the full set moves
+   * to a tooltip, so one row with forty names does not push the page apart.
+   */
+  const accountList = (key: string, names: readonly string[]) => {
+    if (names.length === 0) return null
+    const truncated = names.length > MAX_LISTED_ACCOUNTS
+    const listed = truncated
+      ? t('settingsHomeSections.namesAndMore', {
+          names: names.slice(0, MAX_LISTED_ACCOUNTS).join(', '),
+          extra: names.length - MAX_LISTED_ACCOUNTS,
+        })
+      : names.join(', ')
+    const caption = (
+      <Typography variant="caption" color={captionColor} component="p" sx={{ mb: 1 }}>
+        {t(key, { names: listed })}
+      </Typography>
+    )
+    return truncated ? <Tooltip title={names.join(', ')}>{caption}</Tooltip> : caption
+  }
+
   const renderFallback = (feature: string, placement: FeaturePlacementValue, disabled: boolean) => {
     if (!isAnchorMode(placement.mode) || !placement.anchor) return null
     const name = placement.anchor.name ?? placement.anchor.id
@@ -375,13 +400,24 @@ export function HomeSectionsSection() {
         </Typography>
       )
     }
+    const missingAccounts = anchors?.rows.find((row) => row.id === placement.anchor?.id)?.missingAccounts
     return (
       <Box sx={{ mt: 1.5 }}>
-        <Typography variant="caption" color={captionColor} component="p" sx={{ mb: 1 }}>
-          {lacking === null
-            ? t('settingsHomeSections.anchorUnknown', { name })
-            : t('settingsHomeSections.anchorMissing', { name, missing: lacking, accounts: anchors?.accounts ?? 0 })}
-        </Typography>
+        {lacking === null ? (
+          <Typography variant="caption" color={captionColor} component="p" sx={{ mb: 1 }}>
+            {t('settingsHomeSections.anchorUnknown', { name })}
+          </Typography>
+        ) : (
+          <>
+            <Typography variant="caption" color={captionColor} component="p" sx={{ mb: 0.5 }}>
+              {t('settingsHomeSections.anchorMissing', { name, missing: lacking, accounts: anchors?.accounts ?? 0 })}
+            </Typography>
+            {accountList('settingsHomeSections.anchorMissingAccounts', missingAccounts ?? [])}
+            <Typography variant="caption" color={captionColor} component="p" sx={{ mb: 1 }}>
+              {t('settingsHomeSections.anchorFallbackPrompt')}
+            </Typography>
+          </>
+        )}
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
           <TextField
             select
@@ -561,14 +597,17 @@ export function HomeSectionsSection() {
             </Alert>
           )}
           {anchors && (
-            <Typography variant="caption" color={captionColor} component="p" sx={{ mb: 1.5 }}>
-              {anchors.unreadable > 0
-                ? t('settingsHomeSections.anchorsSummaryUnreadable', {
-                    accounts: anchors.accounts,
-                    unreadable: anchors.unreadable,
-                  })
-                : t('settingsHomeSections.anchorsSummary', { accounts: anchors.accounts })}
-            </Typography>
+            <Box sx={{ mb: 1.5 }}>
+              <Typography variant="caption" color={captionColor} component="p" sx={{ mb: 0.5 }}>
+                {anchors.unreadable > 0
+                  ? t('settingsHomeSections.anchorsSummaryUnreadable', {
+                      accounts: anchors.accounts,
+                      unreadable: anchors.unreadable,
+                    })
+                  : t('settingsHomeSections.anchorsSummary', { accounts: anchors.accounts })}
+              </Typography>
+              {accountList('settingsHomeSections.anchorsUnreadableAccounts', anchors.unreadableAccounts ?? [])}
+            </Box>
           )}
 
           <Stack spacing={2.5} divider={<Divider flexItem />}>

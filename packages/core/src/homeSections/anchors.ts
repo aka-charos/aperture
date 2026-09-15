@@ -4,7 +4,9 @@
  * Nothing is cached: an anchor list that is a day old offers a row an admin has
  * since removed from everyone. Aperture's own rows are never offered — anchoring
  * one feature to another would make placement order-dependent in a way no
- * setting could explain.
+ * setting could explain. Per-library expansions (every library's Latest row) are
+ * offered as the one group Emby stores them as, because nothing can be placed
+ * between two of them.
  */
 
 import { getMediaServerProvider } from '../media/index.js'
@@ -13,7 +15,7 @@ import type { MediaServerProvider } from '../media/MediaServerProvider.js'
 import type { ContentSection } from '../media/types.js'
 import { getMediaServerApiKey } from '../settings/systemSettings.js'
 import { isTopPicksTarget, sectionTagIds } from './plan.js'
-import { isTypeMatchable } from './placement.js'
+import { collapseExpandedRows, isTypeMatchable, type HomeScreenRow } from './placement.js'
 import { loadViewers } from './sources.js'
 
 /** Emby answers quickly, but fifty accounts one after another is a long wait on a settings page. */
@@ -23,6 +25,8 @@ export interface HomeRowOption {
   id: string
   type: string | null
   name: string
+  /** True for a group of per-library rows offered as one (Latest Media). */
+  group?: boolean
 }
 
 export interface SharedHomeRow extends HomeRowOption {
@@ -30,6 +34,12 @@ export interface SharedHomeRow extends HomeRowOption {
   accounts: number
   /** Accounts where an anchor on this row resolves: by id, or by a matchable type. */
   accountsWithType: number
+  /**
+   * The accounts it would NOT resolve for — the ones a fallback applies to.
+   * Worked out from the same matching as `accountsWithType`, so the names always
+   * add up to the count shown beside them.
+   */
+  missingAccounts: string[]
 }
 
 export interface SharedHomeRows {
@@ -37,6 +47,7 @@ export interface SharedHomeRows {
   accounts: number
   /** Accounts the media server did not answer for. */
   unreadable: number
+  unreadableAccounts: string[]
   rows: SharedHomeRow[]
 }
 
@@ -50,8 +61,19 @@ async function managedTagIds(provider: MediaServerProvider, apiKey: string): Pro
   return new Set(tags.map((tag) => tag.id).filter((id): id is string => !!id))
 }
 
-function isManagedSection(section: ContentSection, managed: ReadonlySet<string>): boolean {
-  return sectionTagIds(section).some((id) => managed.has(id))
+/** A home screen's own rows, groups collapsed, Aperture's rows left out. */
+function ownRows(sections: readonly ContentSection[], managed: ReadonlySet<string>): HomeScreenRow[] {
+  const rows: HomeScreenRow[] = []
+  for (const section of sections) {
+    if (!section.Id || sectionTagIds(section).some((id) => managed.has(id))) continue
+    rows.push({
+      id: String(section.Id),
+      sectionType: typeof section.SectionType === 'string' ? section.SectionType : null,
+      feature: null,
+      name: sectionName(section),
+    })
+  }
+  return collapseExpandedRows(rows)
 }
 
 async function requireServer(): Promise<{ provider: MediaServerProvider; apiKey: string }> {
@@ -61,11 +83,14 @@ async function requireServer(): Promise<{ provider: MediaServerProvider; apiKey:
   return { provider, apiKey }
 }
 
+const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' })
+
 /**
- * Every row found on more than one account, with how many accounts have it and
- * how many an anchor on it would resolve for — the difference is what the admin
- * picks a fallback for. A row on one account is someone's own and cannot anchor
- * anyone else's, so it is left out unless there is only one account to read.
+ * Every row found on more than one account, with how many accounts have it,
+ * how many an anchor on it would resolve for, and which accounts it would not —
+ * the ones the admin picks a fallback for. A row on one account is someone's own
+ * and cannot anchor anyone else's, so it is left out unless there is only one
+ * account to read.
  */
 export async function listSharedHomeRows(): Promise<SharedHomeRows> {
   const { provider, apiKey } = await requireServer()
@@ -74,62 +99,82 @@ export async function listSharedHomeRows(): Promise<SharedHomeRows> {
   )
   const managed = await managedTagIds(provider, apiKey)
 
-  const screens: ContentSection[][] = []
-  let unreadable = 0
+  const screens: Array<{ viewerId: string; rows: HomeScreenRow[] }> = []
+  const unreadableAccounts: string[] = []
   let next = 0
   const worker = async () => {
     while (next < viewers.length) {
       const viewer = viewers[next++]
       try {
-        screens.push(await provider.getHomeSections(apiKey, viewer.provider_user_id))
+        const sections = await provider.getHomeSections(apiKey, viewer.provider_user_id)
+        screens.push({ viewerId: viewer.id, rows: ownRows(sections, managed) })
       } catch {
-        unreadable++
+        unreadableAccounts.push(viewer.username)
       }
     }
   }
   await Promise.all(Array.from({ length: Math.min(READ_CONCURRENCY, viewers.length) }, worker))
 
-  const byId = new Map<string, { type: string | null; names: Map<string, number>; accounts: number }>()
-  const accountsByType = new Map<string, number>()
-  for (const sections of screens) {
-    const seenIds = new Set<string>()
-    const seenTypes = new Set<string>()
-    for (const section of sections) {
-      if (!section.Id || isManagedSection(section, managed)) continue
-      const id = String(section.Id)
-      const type = typeof section.SectionType === 'string' ? section.SectionType : null
-      if (type) seenTypes.add(type)
-      if (seenIds.has(id)) continue
-      seenIds.add(id)
-      const entry = byId.get(id) ?? { type, names: new Map<string, number>(), accounts: 0 }
-      entry.accounts++
-      const name = sectionName(section)
-      entry.names.set(name, (entry.names.get(name) ?? 0) + 1)
-      byId.set(id, entry)
+  const usernames = new Map(viewers.map((viewer) => [viewer.id, viewer.username]))
+  const byId = new Map<
+    string,
+    { type: string | null; group: boolean; names: Map<string, number>; holders: Set<string> }
+  >()
+  const holdersByType = new Map<string, Set<string>>()
+
+  for (const { viewerId, rows } of screens) {
+    for (const row of rows) {
+      if (row.sectionType) {
+        const holders = holdersByType.get(row.sectionType) ?? new Set<string>()
+        holders.add(viewerId)
+        holdersByType.set(row.sectionType, holders)
+      }
+      const entry = byId.get(row.id) ?? {
+        type: row.sectionType,
+        group: row.group === true,
+        names: new Map<string, number>(),
+        holders: new Set<string>(),
+      }
+      // An account holding a row twice counts once, name and all.
+      if (!entry.holders.has(viewerId)) {
+        entry.names.set(row.name, (entry.names.get(row.name) ?? 0) + 1)
+        entry.holders.add(viewerId)
+      }
+      byId.set(row.id, entry)
     }
-    for (const type of seenTypes) accountsByType.set(type, (accountsByType.get(type) ?? 0) + 1)
   }
 
   const rows: SharedHomeRow[] = [...byId.entries()]
-    .filter(([, entry]) => entry.accounts >= 2 || screens.length < 2)
+    .filter(([, entry]) => entry.holders.size >= 2 || screens.length < 2)
     .map(([id, entry]) => {
-      const name = [...entry.names.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? id
+      const reached = new Set(entry.holders)
+      if (isTypeMatchable(entry.type)) {
+        for (const viewerId of holdersByType.get(entry.type) ?? []) reached.add(viewerId)
+      }
       return {
         id,
         type: entry.type,
-        name,
-        accounts: entry.accounts,
-        accountsWithType: isTypeMatchable(entry.type)
-          ? Math.max(entry.accounts, accountsByType.get(entry.type) ?? 0)
-          : entry.accounts,
+        name: [...entry.names.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? id,
+        ...(entry.group ? { group: true } : {}),
+        accounts: entry.holders.size,
+        accountsWithType: reached.size,
+        missingAccounts: screens
+          .filter((screen) => !reached.has(screen.viewerId))
+          .map((screen) => usernames.get(screen.viewerId) ?? screen.viewerId)
+          .sort(byName),
       }
     })
     .sort((a, b) => b.accounts - a.accounts || a.name.localeCompare(b.name))
 
-  return { accounts: screens.length, unreadable, rows }
+  return {
+    accounts: screens.length,
+    unreadable: unreadableAccounts.length,
+    unreadableAccounts: unreadableAccounts.sort(byName),
+    rows,
+  }
 }
 
-/** One account's own rows, in the order that account sees them. */
+/** One account's own rows, in the order that account sees them, groups collapsed. */
 export async function listOwnHomeRows(providerUserId: string): Promise<HomeRowOption[]> {
   const { provider, apiKey } = await requireServer()
   const [sections, managed] = await Promise.all([
@@ -137,13 +182,11 @@ export async function listOwnHomeRows(providerUserId: string): Promise<HomeRowOp
     managedTagIds(provider, apiKey),
   ])
   const seen = new Set<string>()
-  const rows: HomeRowOption[] = []
-  for (const section of sections) {
-    if (!section.Id || isManagedSection(section, managed)) continue
-    const id = String(section.Id)
-    if (seen.has(id)) continue
-    seen.add(id)
-    rows.push({ id, type: typeof section.SectionType === 'string' ? section.SectionType : null, name: sectionName(section) })
+  const options: HomeRowOption[] = []
+  for (const row of ownRows(sections, managed)) {
+    if (seen.has(row.id)) continue
+    seen.add(row.id)
+    options.push({ id: row.id, type: row.sectionType, name: row.name, ...(row.group ? { group: true } : {}) })
   }
-  return rows
+  return options
 }
