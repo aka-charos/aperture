@@ -78,6 +78,18 @@ const MINE_SQL: Record<TasteMediaType, string> = {
       GROUP BY e.series_id`,
 }
 
+/**
+ * What counts as ONE choice in a facet comparison. A film in a TMDb collection
+ * is its collection, so a trilogy is one choice rather than three: counted per
+ * title, three extended editions of one trilogy made both a country and a
+ * director read as preferences (F-129). `collection_id` is TEXT, and an empty
+ * string is no collection. A show has no franchise grouping and is itself.
+ */
+const UNIT_EXPRESSION: Record<TasteMediaType, string> = {
+  movie: `COALESCE(NULLIF(t.collection_id, ''), t.id::text)`,
+  series: `t.id::text`,
+}
+
 /** Each facet as a text[] over the title table aliased `t`, so every facet unnests alike. */
 const FACET_EXPRESSION: Record<TasteFacet, string> = {
   genre: `COALESCE(t.genres, '{}'::text[])`,
@@ -97,6 +109,10 @@ function toNumber(value: unknown): number | null {
 
 function toCount(value: unknown): number {
   return Math.max(0, Math.round(toNumber(value) ?? 0))
+}
+
+function toStrings(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string' && v.trim() !== '') : []
 }
 
 type ExcludedLibraries = string[]
@@ -181,11 +197,13 @@ async function countTitles(
  * Every facet label with the viewer's count and the library's, plus each facet's
  * own totals -- in one statement, so the two sides are read from one snapshot.
  *
- * The totals are the titles carrying at least one label OF THAT FACET, not every
- * title: a film with no keywords is not evidence about keywords, and counting it
- * would shrink every keyword share. Labels the viewer never watched are kept only
- * for facets that report avoidance, since "none of theirs" is the strongest form
- * of it, and dropped elsewhere (the library's keyword list is enormous).
+ * Counts are CHOICES (UNIT_EXPRESSION), not titles, on both sides, so a franchise
+ * is one decision however many of its films were watched. The totals are the
+ * choices carrying at least one label OF THAT FACET, not every title: a film with
+ * no keywords is not evidence about keywords, and counting it would shrink every
+ * keyword share. Labels the viewer never watched are kept only for facets that
+ * report avoidance, since "none of theirs" is the strongest form of it, and
+ * dropped elsewhere (the library's keyword list is enormous).
  */
 async function getFacetCounts(
   userId: string,
@@ -197,7 +215,7 @@ async function getFacetCounts(
   const unions = facets
     .map(
       (f) =>
-        `SELECT '${f}'::text AS facet, v AS label, lib.id, lib.title, lib.votes FROM lib, unnest(lib.f_${f}) AS v`
+        `SELECT '${f}'::text AS facet, v AS label, lib.id, lib.unit, lib.title, lib.votes FROM lib, unnest(lib.f_${f}) AS v`
     )
     .join('\n       UNION ALL\n       ')
   const reportsAvoidance = facets.filter((f) => FACET_RULES[f].underLimit > 0).map((f) => `'${f}'`)
@@ -214,6 +232,7 @@ async function getFacetCounts(
   }>(
     `WITH lib AS (
        SELECT t.id, t.title, t.imdb_vote_count AS votes,
+              ${UNIT_EXPRESSION[mediaType]} AS unit,
               ${columns}
        FROM ${TABLE[mediaType]} t
        WHERE ${libraryFilter('t')}
@@ -224,8 +243,8 @@ async function getFacetCounts(
      )
      SELECT f.facet,
             f.label,
-            COUNT(DISTINCT f.id)::int AS available,
-            COUNT(DISTINCT mine.id)::int AS watched,
+            COUNT(DISTINCT f.unit)::int AS available,
+            (COUNT(DISTINCT f.unit) FILTER (WHERE mine.id IS NOT NULL))::int AS watched,
             (array_agg(f.title ORDER BY mine.rating DESC NULLS LAST, f.votes DESC NULLS LAST, f.title)
                FILTER (WHERE mine.id IS NOT NULL))[1:${EXAMPLE_CANDIDATES}] AS examples,
             GROUPING(f.label)::int AS is_total
@@ -262,6 +281,11 @@ async function getFacetCounts(
   return { rows, totals }
 }
 
+/**
+ * Every title the viewer rated, with what it is: genres and keywords are what
+ * let the model say what the favourites -- and the disagreements with IMDb --
+ * have in common, instead of listing titles it may know nothing about.
+ */
 async function getRatedTitles(
   userId: string,
   mediaType: TasteMediaType,
@@ -273,9 +297,12 @@ async function getRatedTitles(
     year: number | null
     rating: number
     crowd: string | number | null
+    genres: string[] | null
+    keywords: string[] | null
   }>(
     `SELECT t.title, t.year, ur.rating,
-            NULLIF(COALESCE(t.imdb_rating, t.community_rating), 0) AS crowd
+            NULLIF(COALESCE(t.imdb_rating, t.community_rating), 0) AS crowd,
+            t.genres, t.keywords
      FROM user_ratings ur
      JOIN ${TABLE[mediaType]} t ON t.id = ur.${column}
      WHERE ur.user_id = $1 AND ${libraryFilter('t')}`,
@@ -287,6 +314,8 @@ async function getRatedTitles(
     year: toNumber(r.year),
     rating: toCount(r.rating),
     crowdRating: toNumber(r.crowd),
+    genres: toStrings(r.genres),
+    keywords: toStrings(r.keywords),
   }))
 }
 
