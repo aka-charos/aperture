@@ -147,6 +147,13 @@ function signalsLine(signals: ProseSignals): string {
     `"rather than" ${signals.ratherThan}`,
     `left open ${signals.leftOpen}`,
     `question echoes ${signals.questionEchoes}`,
+    // The phrases are printed, not just counted: this is the one signal whose
+    // matches a reader has to judge (a critic cited twice is not a repeat).
+    signals.repeatedAcrossSections > 0
+      ? `told twice ${signals.repeatedAcrossSections} (${signals.repeatedPhrases.slice(0, 4).join(', ')}${
+          signals.repeatedAcrossSections > 4 ? ', …' : ''
+        })`
+      : 'told twice 0',
   ].join('  ·  ')
 }
 
@@ -173,8 +180,10 @@ function failureLine(entry: ComparisonEntry): string {
   return '[no output]'
 }
 
+// The sections are the model's own paragraph labels, which is what lets the
+// "told twice" count tell a repeated fact from one question's long answer.
 const signalsOf = (entry: ComparisonEntry): ProseSignals | null =>
-  entry.analysis?.trim() ? measureProse(entry.analysis) : null
+  entry.analysis?.trim() ? measureProse(entry.analysis, entry.sections) : null
 
 const SIGNAL_COLUMNS: [string, (s: ProseSignals) => number][] = [
   ['words', (s) => s.words],
@@ -185,6 +194,7 @@ const SIGNAL_COLUMNS: [string, (s: ProseSignals) => number][] = [
   ['rather', (s) => s.ratherThan],
   ['open', (s) => s.leftOpen],
   ['echoes', (s) => s.questionEchoes],
+  ['twice', (s) => s.repeatedAcrossSections],
 ]
 
 interface SignalRow {

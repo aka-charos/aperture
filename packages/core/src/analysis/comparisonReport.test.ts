@@ -229,6 +229,27 @@ test('several prompt versions: answers named by version, documents printed once'
   assert.doesNotMatch(text, /THE PROMPT EVERY MODEL RECEIVED/)
 })
 
+// The one signal a reader has to judge, so its phrases are printed, and it
+// needs the model's labels, which the entry already carries.
+test('a fact told under two questions is counted and named in the report', () => {
+  const text = renderComparisonReport(
+    report({
+      entries: [
+        entry({
+          analysis: [
+            'Cameron kept a liquid-metal idea from an early draft.',
+            'The pursuer moves without effort.',
+            'The liquid-metal idea waited for better effects.',
+          ].join('\n\n'),
+          sections: [['tradition'], ['work'], ['circumstances']],
+        }),
+      ],
+    })
+  )
+  assert.match(text, /told twice \d+ \([^)]*liquid metal/)
+  assert.match(text, /\s+twice\n/)
+})
+
 test('an ordinary run says nothing about replaying', () => {
   const text = renderComparisonReport(report())
   assert.match(text, /MODEL COMPARISON/)

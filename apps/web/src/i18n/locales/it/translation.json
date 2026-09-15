@@ -5377,7 +5377,8 @@
     "runAnswers_one": "Run {{count}} answer",
     "runAnswers_other": "Run {{count}} answers",
     "controlVersions": "Every answer below was written from {{count}} source document(s), {{chars}} characters retrieved once · prompt versions {{versions}}",
-    "promptVersionsShort": "prompts {{versions}}"
+    "promptVersionsShort": "prompts {{versions}}",
+    "versionDraft": "v{{version}} (draft — bench only)"
   },
   "settingsHomeSections": {
     "title": "Emby Home Screen Rows",

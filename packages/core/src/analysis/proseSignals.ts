@@ -15,10 +15,15 @@
  * good writing. They are printed beside the prose they describe, where a reader
  * can see what matched.
  *
- * EVERY PATTERN WAS MEASURED, not imagined - each comes from a version-8
- * analysis read on 2026-09-14 (Im Westen Nichts Neues, Fantozzi, Possession,
- * Tuner, Affeksjonsverdi). A new habit gets a pattern when it has been seen, the
- * way the prompt's named phrasings do.
+ * ZERO IS NOT CLEAN. The Terminator 2 bench showed the limit: version 9 scored
+ * zero "unattributed" while stating one blog's readings as plain fact, because
+ * the column counts hedges ("is described as") and a flat assertion has none.
+ * An opinion with no holder and no hedge is invisible to any pattern here and
+ * has to be read.
+ *
+ * EVERY PATTERN WAS MEASURED, not imagined - each comes from a version-8 or
+ * version-9 analysis read on the bench. A new habit gets a pattern when it has
+ * been seen, the way the prompt's named phrasings do.
  *
  * PURE AND DB-FREE, like ./comparisonReport.ts which prints it.
  */
@@ -39,6 +44,14 @@ export interface ProseSignals {
   leftOpen: number
   /** Paragraphs that open by restating their question: "The film sits in". */
   questionEchoes: number
+  /**
+   * Phrases told under two different questions — `repeatedPhrases.length`.
+   * Zero whenever the answer carried no usable paragraph map, since without
+   * labels there are no questions to repeat across.
+   */
+  repeatedAcrossSections: number
+  /** The phrases behind that count, so a reader can check what matched. */
+  repeatedPhrases: string[]
 }
 
 const POINTS_AT_SOURCES = [/\b(?:the|these|those|its|available|retrieved) sources\b/gi, /\bsource (?:documents?|material)\b/gi]
@@ -64,6 +77,19 @@ const LEFT_OPEN = [
 const QUESTION_ECHO =
   /^(?:the (?:film|series|show) sits in\b|in tradition terms\b|(?:the )?critics (?:genuinely |also |sharply )?(?:disagree|divide|split|differ)\b|what critics (?:and viewers )?(?:genuinely )?(?:disagree|argue)\b|the circumstances of its making\b|the (?:most consequential )?circumstances? of its making\b|the people who made it\b|the making of the film left\b|the (?:film|series)'s (?:governing|organi[sz]ing|central) (?:formal )?(?:idea|choice)\b)/i
 
+/**
+ * Words too common to make a two-word phrase distinctive. Everything under four
+ * letters is already excluded by length, so this list only has to cover the
+ * longer function words and the words every analysis uses about its subject.
+ */
+const COMMON_WORDS = new Set([
+  'about', 'after', 'also', 'before', 'being', 'between', 'both', 'each', 'even', 'film', 'films',
+  'from', 'have', 'into', 'just', 'like', 'many', 'more', 'most', 'much', 'only', 'other', 'over',
+  'series', 'show', 'some', 'still', 'such', 'than', 'that', 'their', 'them', 'then', 'there',
+  'these', 'they', 'this', 'those', 'through', 'under', 'very', 'were', 'what', 'when', 'where',
+  'which', 'while', 'whose', 'with', 'work', 'would',
+])
+
 function count(text: string, patterns: RegExp[]): number {
   return patterns.reduce((sum, pattern) => sum + (text.match(pattern)?.length ?? 0), 0)
 }
@@ -77,9 +103,71 @@ function sentenceCount(paragraph: string): number {
   return paragraph.split(/(?<=[.!?])["'”’)\]]*\s+(?=["'“‘(]?[A-Z0-9À-ÖØ-Þ])/).filter((s) => s.trim()).length
 }
 
-export function measureProse(text: string | null | undefined): ProseSignals {
+/** Two adjacent distinctive words, hyphens read as spaces ("liquid-metal"). */
+function distinctivePairs(paragraph: string): Set<string> {
+  const words = paragraph
+    .toLowerCase()
+    .replace(/[-–—]/g, ' ')
+    .split(/[^\p{L}\p{N}']+/u)
+    .filter(Boolean)
+  const pairs = new Set<string>()
+  for (let i = 0; i + 1 < words.length; i++) {
+    const [a, b] = [words[i], words[i + 1]]
+    if (a.length >= 4 && b.length >= 4 && !COMMON_WORDS.has(a) && !COMMON_WORDS.has(b)) {
+      pairs.add(`${a} ${b}`)
+    }
+  }
+  return pairs
+}
+
+/**
+ * Phrases that appear under two questions that share no label.
+ *
+ * Measured on Terminator 2 under version 9: the early screenplay's liquid-metal
+ * idea was told under Context and again under Making, and "say each fact once"
+ * was in the prompt both times. Two paragraphs labelled `work` and
+ * `work+tradition` share a question, so a phrase in both is not counted — only a
+ * phrase whose occurrences include two DISJOINT label sets is.
+ *
+ * A phrase in half the paragraphs or more is the subject's own vocabulary (a
+ * character, the premise), not a fact told twice, and is left out once there
+ * are enough paragraphs for "half" to mean something.
+ */
+function repeatsAcrossSections(
+  paragraphs: string[],
+  sections: readonly (readonly string[])[] | null | undefined
+): string[] {
+  if (!sections || sections.length === 0) return []
+
+  const seen = new Map<string, { labels: string[][]; paragraphs: number }>()
+  paragraphs.forEach((paragraph, i) => {
+    const labels = sections[i]
+    if (!labels || labels.length === 0) return
+    for (const pair of distinctivePairs(paragraph)) {
+      const entry = seen.get(pair) ?? { labels: [], paragraphs: 0 }
+      entry.labels.push([...labels])
+      entry.paragraphs += 1
+      seen.set(pair, entry)
+    }
+  })
+
+  const disjoint = (a: string[], b: string[]) => !a.some((label) => b.includes(label))
+  const repeated: string[] = []
+  for (const [pair, entry] of seen) {
+    if (paragraphs.length >= 4 && entry.paragraphs * 2 >= paragraphs.length) continue
+    const crosses = entry.labels.some((a, i) => entry.labels.slice(i + 1).some((b) => disjoint(a, b)))
+    if (crosses) repeated.push(pair)
+  }
+  return repeated.sort()
+}
+
+export function measureProse(
+  text: string | null | undefined,
+  sections?: readonly (readonly string[])[] | null
+): ProseSignals {
   const trimmed = (text ?? '').trim()
   const paragraphs = trimmed ? splitAnalysisParagraphs(trimmed) : []
+  const repeatedPhrases = repeatsAcrossSections(paragraphs, sections)
   return {
     words: trimmed ? trimmed.split(/\s+/).length : 0,
     paragraphs: paragraphs.length,
@@ -89,5 +177,7 @@ export function measureProse(text: string | null | undefined): ProseSignals {
     ratherThan: count(trimmed, RATHER_THAN),
     leftOpen: count(trimmed, LEFT_OPEN),
     questionEchoes: paragraphs.filter((p) => QUESTION_ECHO.test(p)).length,
+    repeatedAcrossSections: repeatedPhrases.length,
+    repeatedPhrases,
   }
 }

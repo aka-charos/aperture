@@ -17,6 +17,7 @@ import {
   extractPromptSources,
   questionIdsFor,
   BENCH_PROMPT_VERSIONS,
+  DRAFT_PROMPT_VERSION,
   resolveBenchPromptVersions,
 } from './prompt.js'
 import { ARCHIVED_PROMPT_EDITIONS } from './promptEditions.js'
@@ -268,7 +269,11 @@ const contract = (p: string) => p.slice(p.indexOf('Output format.'))
 
 test('the bench carries the archived versions and the current one, current newest', () => {
   assert.ok(BENCH_PROMPT_VERSIONS.includes(7) && BENCH_PROMPT_VERSIONS.includes(8))
-  assert.equal(BENCH_PROMPT_VERSIONS[BENCH_PROMPT_VERSIONS.length - 1], ANALYSIS_PROMPT_VERSION)
+  const released = BENCH_PROMPT_VERSIONS.filter((version) => version !== DRAFT_PROMPT_VERSION)
+  assert.equal(released[released.length - 1], ANALYSIS_PROMPT_VERSION)
+  if (DRAFT_PROMPT_VERSION != null) {
+    assert.equal(DRAFT_PROMPT_VERSION, ANALYSIS_PROMPT_VERSION + 1)
+  }
   // An archived copy carrying the current number would silently stand in for it.
   for (const edition of ARCHIVED_PROMPT_EDITIONS) {
     assert.ok(edition.version < ANALYSIS_PROMPT_VERSION, `archived ${edition.version}`)
@@ -333,4 +338,38 @@ test('bench versions: current by default, deduplicated oldest first, unknown ref
   assert.throws(() => resolveBenchPromptVersions([3]), /not available/)
   assert.throws(() => resolveBenchPromptVersions([8.5]), /not a prompt version/)
   assert.throws(() => buildAnalysisPrompt(subject(), { mode: 'crw', version: 3 }), /not available/)
+})
+
+/**
+ * The draft edition: benchable beside the current prompt, never used by
+ * anything else. "Never the default" is the property that lets a prompt change
+ * be tested without retiring the library it would rewrite.
+ */
+const draftPrompt = () =>
+  buildAnalysisPrompt(subject(), { mode: 'crw', sources: benchSources, version: DRAFT_PROMPT_VERSION! })
+
+test('the draft is benchable, differs from the current prompt, and is never the default', () => {
+  assert.ok(DRAFT_PROMPT_VERSION != null, 'expected a draft edition')
+  assert.ok(BENCH_PROMPT_VERSIONS.includes(DRAFT_PROMPT_VERSION!))
+  const now = buildAnalysisPrompt(subject(), { mode: 'crw', sources: benchSources })
+  assert.notEqual(draftPrompt(), now)
+  assert.ok(!now.includes('name them once, at its start'), 'the library prompt must not carry the draft')
+})
+
+// Same questions in the same order, so a draft answer's map is judged by the
+// same vocabulary and the panel labels it the same way.
+test('the draft asks the same questions as the current edition', () => {
+  const now = buildAnalysisPrompt(subject(), { mode: 'crw', sources: benchSources })
+  assert.deepEqual(questionOrder(draftPrompt()), questionOrder(now))
+  assert.deepEqual(questionIdsFor('series', DRAFT_PROMPT_VERSION!), questionIdsFor('series'))
+})
+
+test('the draft carries the corrections the Terminator 2 bench asked for', () => {
+  const draft = draftPrompt()
+  assert.ok(draft.includes('How it was made and what its makers decided belong to the making question'), draft)
+  assert.ok(draft.includes("A critic's guess at what the maker wanted is not a statement by the maker"), draft)
+  assert.ok(draft.includes('A view written as a plain sentence with nobody named is still a view'), draft)
+  assert.ok(draft.includes('name them once, at its start'), draft)
+  assert.ok(draft.includes('whether it is good belongs to the reception question'), draft)
+  assert.ok(!draft.includes('not in every sentence'), 'the licence version 9 gave must be gone')
 })
