@@ -1657,7 +1657,6 @@
     "trailer": "拖车",
     "openOnTmdb": "在 TMDb 上打开",
     "imdb": "IMDb",
-    "inSeerr": "在塞尔",
     "requested": "已请求",
     "request": "要求",
     "requesting": "请求…",
@@ -1667,7 +1666,8 @@
     "castAs": "作为{{字符}}",
     "castUnavailable": "演员信息不可用",
     "runtimeHours": "{{小时}}小时{{分钟}}分钟",
-    "runtimeMins": "{{分钟}}米"
+    "runtimeMins": "{{分钟}}米",
+    "available": "Available"
   },
   "assistantToolUi": {
     "noImage": "无图像",

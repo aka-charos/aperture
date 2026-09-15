@@ -1657,7 +1657,6 @@
     "trailer": "גְרוֹר",
     "openOnTmdb": "פתח ב-TMDb",
     "imdb": "IMDb",
-    "inSeerr": "ב-Seerr",
     "requested": "התבקש",
     "request": "בַּקָשָׁה",
     "requesting": "מבקש...",
@@ -1667,7 +1666,8 @@
     "castAs": "בתור {{תו}}",
     "castUnavailable": "מידע השחקנים אינו זמין",
     "runtimeHours": "{{שעות}}שעות {{דקות}}דקות",
-    "runtimeMins": "{{דקות}}דק'"
+    "runtimeMins": "{{דקות}}דק'",
+    "available": "Available"
   },
   "assistantToolUi": {
     "noImage": "אין תמונה",

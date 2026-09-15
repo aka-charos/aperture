@@ -1657,7 +1657,6 @@
     "trailer": "トレーラー",
     "openOnTmdb": "TMDb で開く",
     "imdb": "IMDb",
-    "inSeerr": "シーアに位置",
     "requested": "リクエスト済み",
     "request": "リクエスト",
     "requesting": "リクエスト中…",
@@ -1667,7 +1666,8 @@
     "castAs": "{{文字}}として",
     "castUnavailable": "キャスト情報はありません",
     "runtimeHours": "{{時間}}時 {{分}}分",
-    "runtimeMins": "{{分}}分"
+    "runtimeMins": "{{分}}分",
+    "available": "Available"
   },
   "assistantToolUi": {
     "noImage": "画像なし",

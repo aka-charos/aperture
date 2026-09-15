@@ -98,6 +98,12 @@ export interface GapCollectionPart {
   posterPath: string | null
   inLibrary: boolean
   seerrStatus: SeerrStatus
+  /**
+   * The library movie holding this part, resolved when read rather than stored
+   * by the scan — so an owned part opens its own page, and a film removed since
+   * the scan falls back to the TMDb card instead of a dead link.
+   */
+  libraryId: string | null
 }
 
 export type GapResultsSortBy = 'title' | 'release_date' | 'collection_name'
@@ -605,13 +611,22 @@ export async function getGapCollectionParts(
     poster_path: string | null
     in_library: boolean
     seerr_status: SeerrStatus
+    library_id: string | null
   }>(
-    `SELECT collection_id, collection_name, collection_poster_path,
-            tmdb_id, title, release_year, release_date, poster_path,
-            in_library, seerr_status
-     FROM gap_analysis_results
-     WHERE run_id = $1 AND collection_id = ANY($2::int[])
-     ORDER BY collection_name ASC, release_date DESC NULLS LAST, title ASC`,
+    // One library row per part: a film held in two libraries is still one
+    // film, and either copy's page answers "show me this".
+    `SELECT r.collection_id, r.collection_name, r.collection_poster_path,
+            r.tmdb_id, r.title, r.release_year, r.release_date, r.poster_path,
+            r.in_library, r.seerr_status, lib.id AS library_id
+     FROM gap_analysis_results r
+     LEFT JOIN LATERAL (
+       SELECT m.id FROM movies m
+       WHERE m.tmdb_id = r.tmdb_id::text
+       ORDER BY m.created_at ASC
+       LIMIT 1
+     ) lib ON true
+     WHERE r.run_id = $1 AND r.collection_id = ANY($2::int[])
+     ORDER BY r.collection_name ASC, r.release_date DESC NULLS LAST, r.title ASC`,
     [runId, ids]
   )
 
@@ -634,6 +649,7 @@ export async function getGapCollectionParts(
       posterPath: row.poster_path,
       inLibrary: row.in_library,
       seerrStatus: row.seerr_status,
+      libraryId: row.library_id,
     })
   }
 

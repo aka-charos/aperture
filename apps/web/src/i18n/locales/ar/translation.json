@@ -1657,7 +1657,6 @@
     "trailer": "جَرَّار",
     "openOnTmdb": "افتح على TMDb",
     "imdb": "IMDb",
-    "inSeerr": "في سير",
     "requested": "مطلوب",
     "request": "طلب",
     "requesting": "جارٍ الطلب…",
@@ -1667,7 +1666,8 @@
     "castAs": "ك {{شخصية}}",
     "castUnavailable": "معلومات الإرسال غير متوفرة",
     "runtimeHours": "{{ساعات}}س {{دقيقة}}م",
-    "runtimeMins": "{{دقيقة}} م"
+    "runtimeMins": "{{دقيقة}} م",
+    "available": "Available"
   },
   "assistantToolUi": {
     "noImage": "لا توجد صورة",

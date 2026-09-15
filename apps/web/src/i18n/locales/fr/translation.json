@@ -1657,7 +1657,6 @@
     "trailer": "Bande-annonce",
     "openOnTmdb": "Ouvrir sur TMDb",
     "imdb": "IMDb",
-    "inSeerr": "En Seerr",
     "requested": "Demandée",
     "request": "Demande",
     "requesting": "Demander…",
@@ -1667,7 +1666,8 @@
     "castAs": "comme {{personnage}}",
     "castUnavailable": "Informations sur le casting non disponibles",
     "runtimeHours": "{{hours}}h {{mins}}m",
-    "runtimeMins": "{{minutes}} mois"
+    "runtimeMins": "{{minutes}} mois",
+    "available": "Available"
   },
   "assistantToolUi": {
     "noImage": "Aucune image",

@@ -1657,7 +1657,6 @@
     "trailer": "ट्रेलर",
     "openOnTmdb": "टीएमडीबी पर खोलें",
     "imdb": "IMDb",
-    "inSeerr": "सीरर में",
     "requested": "अनुरोध किया",
     "request": "अनुरोध",
     "requesting": "निवेदन है...",
@@ -1667,7 +1666,8 @@
     "castAs": "{{चरित्र}} के रूप में",
     "castUnavailable": "कास्ट की जानकारी उपलब्ध नहीं है",
     "runtimeHours": "{{घंटे}}घंटा {{मिनट}}मि",
-    "runtimeMins": "{{मिनट}}मि"
+    "runtimeMins": "{{मिनट}}मि",
+    "available": "Available"
   },
   "assistantToolUi": {
     "noImage": "चित्र उपलब्द नहीं है",

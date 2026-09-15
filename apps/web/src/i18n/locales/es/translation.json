@@ -1657,7 +1657,6 @@
     "trailer": "Tráiler",
     "openOnTmdb": "Abierta en TMDb",
     "imdb": "IMDb",
-    "inSeerr": "En vidente",
     "requested": "Solicitada",
     "request": "Pedido",
     "requesting": "Solicitando…",
@@ -1667,7 +1666,8 @@
     "castAs": "como {{carácter}}",
     "castUnavailable": "Información de reparto no disponible",
     "runtimeHours": "{{horas}}h {{minutos}}m",
-    "runtimeMins": "{{minutos}}m"
+    "runtimeMins": "{{minutos}}m",
+    "available": "Available"
   },
   "assistantToolUi": {
     "noImage": "Sin imagen",

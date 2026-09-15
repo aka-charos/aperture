@@ -1657,7 +1657,6 @@
     "trailer": "트레일러",
     "openOnTmdb": "TMDb에서 열기",
     "imdb": "IMDb",
-    "inSeerr": "세르에 위치",
     "requested": "요청됨",
     "request": "요구",
     "requesting": "요청 중…",
@@ -1667,7 +1666,8 @@
     "castAs": "{{문자}}로",
     "castUnavailable": "캐스트 정보를 사용할 수 없습니다.",
     "runtimeHours": "{{시간}}시간 {{분}}분",
-    "runtimeMins": "{{분}}분"
+    "runtimeMins": "{{분}}분",
+    "available": "Available"
   },
   "assistantToolUi": {
     "noImage": "이미지 없음",
