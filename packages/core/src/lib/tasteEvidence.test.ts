@@ -26,6 +26,17 @@ function row(
   return { facet, label, watched, available, examples }
 }
 
+function rated(
+  title: string,
+  year: number | null,
+  rating: number,
+  crowdRating: number | null,
+  genres: string[] = [],
+  keywords: string[] = []
+): RatedTitle {
+  return { title, year, rating, crowdRating, genres, keywords }
+}
+
 function show(
   title: string,
   watched: number,
@@ -112,6 +123,17 @@ describe('rankFacetSkews', () => {
     )
   })
 
+  it('needs more choices before calling a production country a pattern', () => {
+    // Co-producers and filming locations: measured live, a handful of productions
+    // shot in one small country read as a preference for that country.
+    const totals = { watched: 233, available: 12500 }
+    assert.deepEqual(rankFacetSkews('country', [row('country', 'X', 4, 60)], totals).over, [])
+    assert.deepEqual(
+      labels(rankFacetSkews('country', [row('country', 'X', 5, 60)], totals).over),
+      ['X']
+    )
+  })
+
   it('never reports avoiding a director, network or keyword', () => {
     const totals = { watched: 300, available: 10000 }
     for (const facet of ['director', 'network', 'keyword'] as const) {
@@ -144,24 +166,24 @@ describe('facetIsCovered', () => {
 })
 
 describe('summariseRatings', () => {
-  const rated: RatedTitle[] = [
-    { title: 'Heat', year: 1995, rating: 10, crowdRating: 8.3 },
-    { title: 'Zodiac', year: 2007, rating: 9, crowdRating: 7.7 },
-    { title: 'Obscure', year: 2012, rating: 9, crowdRating: 5.9 },
-    { title: 'Middling', year: 2000, rating: 5, crowdRating: 6.0 },
-    { title: 'Hyped', year: 2014, rating: 3, crowdRating: 8.1 },
-    { title: 'Unrated Elsewhere', year: 2010, rating: 2, crowdRating: null },
+  const ratings: RatedTitle[] = [
+    rated('Heat', 1995, 10, 8.3),
+    rated('Zodiac', 2007, 9, 7.7),
+    rated('Obscure', 2012, 9, 5.9),
+    rated('Middling', 2000, 5, 6.0),
+    rated('Hyped', 2014, 3, 8.1),
+    rated('Unrated Elsewhere', 2010, 2, null),
   ]
 
   it('lists liked and disliked titles by the shared rating bands', () => {
-    const summary = summariseRatings(rated)
+    const summary = summariseRatings(ratings)
     assert.equal(summary.count, 6)
     assert.deepEqual(titles(summary.highest), ['Heat', 'Obscure', 'Zodiac'])
     assert.deepEqual(titles(summary.lowest), ['Unrated Elsewhere', 'Hyped'])
   })
 
   it('names disagreements with IMDb and never invents one from a missing rating', () => {
-    const summary = summariseRatings(rated)
+    const summary = summariseRatings(ratings)
     assert.deepEqual(titles(summary.aboveCrowd), ['Obscure'])
     // 'Unrated Elsewhere' has no crowd rating. Read as 0 it would be rated well
     // ABOVE the crowd; it must appear in neither list.
@@ -169,14 +191,14 @@ describe('summariseRatings', () => {
   })
 
   it('averages only when there is enough to average', () => {
-    const summary = summariseRatings(rated)
+    const summary = summariseRatings(ratings)
     assert.ok(summary.mean != null && Math.abs(summary.mean - 38 / 6) < 1e-9)
     assert.ok(summary.versusCrowd)
     assert.equal(summary.versusCrowd.count, 5)
     assert.ok(Math.abs(summary.versusCrowd.theirs - 7.2) < 1e-9)
     assert.ok(Math.abs(summary.versusCrowd.crowd - 7.2) < 1e-9)
 
-    const thin = summariseRatings(rated.slice(0, 4))
+    const thin = summariseRatings(ratings.slice(0, 4))
     assert.equal(thin.mean, null)
     assert.equal(thin.versusCrowd, null)
   })
@@ -262,10 +284,11 @@ function movieEvidence(overrides: Partial<TasteEvidence> = {}): TasteEvidence {
 }
 
 describe('formatTasteEvidence', () => {
-  it('counts played titles and says so', () => {
+  it('counts played titles, franchises once, and says so', () => {
     const doc = formatTasteEvidence(movieEvidence())
     assert.ok(doc.includes('Watched: 238 of the 12,584 films'))
     assert.ok(doc.includes('only titles the media server marks as played'))
+    assert.ok(doc.includes('a franchise counts once'))
   })
 
   it('states skews against the library with titles, and leaves proportional genres out', () => {
@@ -341,19 +364,34 @@ describe('formatTasteEvidence', () => {
     assert.ok(doc.includes('no genre stands out'))
   })
 
-  it('says when there are no ratings, and lists them when there are', () => {
+  it('says when there are no ratings, and says what each rated title is when there are', () => {
     assert.ok(formatTasteEvidence(movieEvidence()).includes('Their own ratings: none recorded.'))
 
-    const doc = formatTasteEvidence(
+    const lines = formatTasteEvidence(
       movieEvidence({
         rated: [
-          { title: 'Heat', year: 1995, rating: 10, crowdRating: 8.3 },
-          { title: 'Hyped', year: 2014, rating: 3, crowdRating: 8.1 },
+          rated(
+            'Heat',
+            1995,
+            10,
+            8.3,
+            ['Crime', 'Thriller', 'Drama', 'Action'],
+            ['heist', 'los angeles', 'cat and mouse', 'bank robbery', 'police', 'obsession']
+          ),
+          rated('Hyped', 2014, 3, 8.1, ['Drama']),
         ],
       })
+    ).split('\n')
+
+    assert.ok(lines.includes('- Rated highest:'))
+    assert.ok(
+      lines.includes(
+        '  - "Heat" (1995) 10/10 — Crime, Thriller, Drama; keywords: heist, los angeles, cat and mouse, bank robbery, police'
+      )
     )
-    assert.ok(doc.includes('- Rated highest: "Heat" (1995) 10/10'))
-    assert.ok(doc.includes('- Rated well below IMDb: "Hyped" (2014) 3/10 vs IMDb 8.1'))
+    assert.ok(lines.includes('  - "Hyped" (2014) 3/10 — Drama'))
+    // A title in two lists is described once, so the evidence does not repeat itself.
+    assert.ok(lines.includes('  - "Hyped" (2014) 3/10 vs IMDb 8.1'))
   })
 
   it('keeps film-only and TV-only sections to their own media type', () => {
@@ -378,6 +416,7 @@ describe('formatTasteEvidence', () => {
       ],
     })
     assert.ok(seriesDoc.includes('a show counts once any episode has been played'))
+    assert.ok(!seriesDoc.includes('a franchise counts once'))
     assert.ok(seriesDoc.includes("Networks they return to (their shows / the library's shows):"))
     assert.ok(seriesDoc.includes('- HBO: 8 of 40'))
     assert.ok(seriesDoc.includes('- Finished every episode: 1 — e.g. "The Wire" (60 of 60)'))

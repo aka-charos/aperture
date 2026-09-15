@@ -14,16 +14,19 @@
  * viewer's "44% favourite rate" was 175 unwatched bookmarks out of 183, and
  * another held 872 unwatched favourites against 159 played films.
  *
- * Four rules, each the inverse of a defect:
+ * Five rules, each the inverse of a defect:
  *
  * 1. A title counts when the media server marks it PLAYED. The identity is a
  *    claim made to someone's face (F-114); a bookmark is not a watch.
  * 2. A preference is a SKEW against what the library offers, never a share of
  *    volume. Drama leads almost everyone's history because drama leads almost
  *    every library -- genrePreference.ts measured a 2.5-fold gap between the two.
- * 3. Titles and names travel with every pattern, so the model can be specific
+ * 3. A franchise is ONE choice. Counted per title, three extended editions of one
+ *    trilogy became both a country preference and a director preference.
+ * 4. Titles and names travel with every pattern, and rated titles carry what
+ *    they are (genres, keywords), so the model has material to explain a taste
  *    and a reader can check what it says.
- * 4. Nothing about HOW someone watches is offered unless it is measured. There
+ * 5. Nothing about HOW someone watches is offered unless it is measured. There
  *    is no session data, and `play_count > 1` is not a rewatch: live rows show
  *    more "rewatched" titles than played ones for the same viewer.
  *
@@ -81,6 +84,9 @@ const HIGHEST_RATED = 8
 const LOWEST_RATED = 6
 const CROWD_DISAGREEMENTS = 5
 const PROGRESS_EXAMPLES = 4
+/** What a rated title is, shown beside it: enough to say what the favourites share. */
+const RATED_GENRES = 3
+const RATED_KEYWORDS = 5
 
 /** Facets per media type, in the order the evidence presents them. */
 export const FACETS_FOR: Record<TasteMediaType, TasteFacet[]> = {
@@ -88,21 +94,25 @@ export const FACETS_FOR: Record<TasteMediaType, TasteFacet[]> = {
   series: ['genre', 'decade', 'country', 'network', 'keyword'],
 }
 
+/**
+ * One label's counts. Both counts are CHOICES, not titles: every title in one
+ * TMDb collection counts once, on both sides, so a trilogy is one decision.
+ */
 export interface FacetCount {
   facet: TasteFacet
   label: string
-  /** The viewer's played titles carrying this label. */
+  /** The viewer's played choices carrying this label. */
   watched: number
-  /** Titles in the viewer's libraries carrying it, theirs included. */
+  /** Choices in the viewer's libraries carrying it, theirs included. */
   available: number
   /** Candidate example titles from the viewer's history, best first. */
   examples: string[]
 }
 
 export interface FacetTotals {
-  /** The viewer's played titles carrying at least one label of this facet. */
+  /** The viewer's played choices carrying at least one label of this facet. */
   watched: number
-  /** Library titles carrying at least one label of this facet. */
+  /** Library choices carrying at least one label of this facet. */
   available: number
 }
 
@@ -113,6 +123,8 @@ export interface RatedTitle {
   rating: number
   /** IMDb (else the media server's community) rating; null when unknown, never 0. */
   crowdRating: number | null
+  genres: string[]
+  keywords: string[]
 }
 
 export interface CrowdComparison {
@@ -171,9 +183,9 @@ export interface TasteEvidence {
 // ============================================================================
 
 interface FacetRule {
-  /** Fewest of the viewer's titles that may carry an over-selection. */
+  /** Fewest of the viewer's choices that may carry an over-selection. */
   minWatched: number
-  /** Shrinkage constant: a skew backed by n titles keeps n/(n+K) of its size. */
+  /** Shrinkage constant: a skew backed by n choices keeps n/(n+K) of its size. */
   shrinkK: number
   overLimit: number
   /** 0 means avoidance is never reported (nobody "avoids" a director). */
@@ -185,12 +197,15 @@ interface FacetRule {
 /**
  * Per-facet selection. The shrinkage constants differ because the facets differ
  * in size: genre's 10 is genrePreference.ts's constant for the same problem,
- * while a director with four films on the shelf could never clear it.
+ * while a director with four films on the shelf could never clear it. Country
+ * needs five choices because production countries list co-producers and
+ * filming locations: measured live, three Hollywood productions shot in one
+ * country were enough to make that country read as a preference.
  */
 export const FACET_RULES: Record<TasteFacet, FacetRule> = {
   genre: { minWatched: 3, shrinkK: 10, overLimit: 5, underLimit: 4, minUnderShare: 0.03 },
   decade: { minWatched: 3, shrinkK: 10, overLimit: 3, underLimit: 2, minUnderShare: 0.05 },
-  country: { minWatched: 3, shrinkK: 5, overLimit: 5, underLimit: 2, minUnderShare: 0.05 },
+  country: { minWatched: 5, shrinkK: 5, overLimit: 5, underLimit: 2, minUnderShare: 0.05 },
   director: { minWatched: 3, shrinkK: 3, overLimit: 8, underLimit: 0, minUnderShare: 1 },
   network: { minWatched: 2, shrinkK: 3, overLimit: 5, underLimit: 0, minUnderShare: 1 },
   keyword: { minWatched: 4, shrinkK: 5, overLimit: 10, underLimit: 0, minUnderShare: 1 },
@@ -567,9 +582,27 @@ function crowdSection(evidence: TasteEvidence): string[] {
   return lines.length > 0 ? [`How their ${plural} compare with the library:`, ...lines, ''] : []
 }
 
-function ratedTitle(r: RatedTitle, withCrowd: boolean): string {
+/**
+ * A rated title and, the first time it appears, what it is. The genres and
+ * keywords are what let the model say what a viewer's favourites share rather
+ * than list them; a title can sit in two lists (rated highest AND well above
+ * IMDb), and describing it twice would only lengthen the prompt.
+ */
+function ratedTitle(r: RatedTitle, withCrowd: boolean, described: Set<string>): string {
   const base = `${quote(r.title)}${r.year != null ? ` (${r.year})` : ''} ${r.rating}/10`
-  return withCrowd && r.crowdRating != null ? `${base} vs IMDb ${r.crowdRating.toFixed(1)}` : base
+  const crowd = withCrowd && r.crowdRating != null ? ` vs IMDb ${r.crowdRating.toFixed(1)}` : ''
+  const key = `${r.title} ${r.year ?? ''}`
+  if (described.has(key)) return `${base}${crowd}`
+  described.add(key)
+
+  const detail = [
+    r.genres.slice(0, RATED_GENRES).join(', '),
+    r.keywords.length > 0 ? `keywords: ${r.keywords.slice(0, RATED_KEYWORDS).join(', ')}` : '',
+  ]
+    .filter((part) => part.length > 0)
+    .join('; ')
+
+  return `${base}${crowd}${detail ? ` — ${detail}` : ''}`
 }
 
 function ratingsSection(evidence: TasteEvidence): string[] {
@@ -588,10 +621,12 @@ function ratingsSection(evidence: TasteEvidence): string[] {
       `- On the ${count} of those IMDb also rates: they average ${theirs.toFixed(1)}, IMDb ${crowd.toFixed(1)}.`
     )
   }
+
+  const described = new Set<string>()
   const list = (label: string, titles: RatedTitle[], withCrowd: boolean) => {
-    if (titles.length > 0) {
-      lines.push(`- ${label}: ${titles.map((t) => ratedTitle(t, withCrowd)).join('; ')}`)
-    }
+    if (titles.length === 0) return
+    lines.push(`- ${label}:`)
+    for (const t of titles) lines.push(`  - ${ratedTitle(t, withCrowd, described)}`)
   }
   list('Rated highest', summary.highest, false)
   list('Rated lowest', summary.lowest, false)
@@ -663,6 +698,9 @@ export function formatTasteEvidence(evidence: TasteEvidence): string {
   lines.push(
     'Counted: only titles the media server marks as played. Favourites they have not watched are left out.'
   )
+  if (evidence.mediaType === 'movie') {
+    lines.push('In the comparisons below, a franchise counts once however many of its films they watched.')
+  }
   lines.push('')
 
   const usedExamples = new Set<string>()
