@@ -1206,7 +1206,6 @@
     "trailer": "Aanhangwagen",
     "openOnTmdb": "Openen op TMDb",
     "imdb": "IMDb",
-    "inSeerr": "In Zier",
     "requested": "Gevraagd",
     "request": "Verzoek",
     "requesting": "Aanvragen…",
@@ -1216,7 +1215,8 @@
     "castAs": "als {{karakter}}",
     "castUnavailable": "Castinformatie niet beschikbaar",
     "runtimeHours": "{{uren}}u {{mins}}m",
-    "runtimeMins": "{{min.}} m"
+    "runtimeMins": "{{min.}} m",
+    "available": "Available"
   },
   "assistantToolUi": {
     "noImage": "Geen afbeelding",

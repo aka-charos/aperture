@@ -1148,7 +1148,6 @@
     "trailer": "Τρέιλερ",
     "openOnTmdb": "Άνοιγμα στο TMDb",
     "imdb": "IMDb",
-    "inSeerr": "Στο Seerr",
     "requested": "Ζητήθηκε",
     "request": "Αίτημα",
     "requesting": "Υποβάλλεται…",
@@ -1158,7 +1157,8 @@
     "castAs": "ως {{character}}",
     "castUnavailable": "Δεν υπάρχουν στοιχεία ηθοποιών",
     "runtimeHours": "{{hours}} ώρ. {{mins}} λ.",
-    "runtimeMins": "{{mins}} λ."
+    "runtimeMins": "{{mins}} λ.",
+    "available": "Available"
   },
   "seasonRequest": {
     "dialogTitle": "Αίτημα για σειρά",

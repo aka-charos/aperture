@@ -446,7 +446,7 @@ export function TmdbExternalDetailModal({
                     {seerrAvailable && (
                       <Chip
                         size="small"
-                        label={t('tmdbExternalModal.inSeerr')}
+                        label={t('tmdbExternalModal.available')}
                         color="success"
                         variant="outlined"
                       />

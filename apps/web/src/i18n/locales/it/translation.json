@@ -1657,7 +1657,6 @@
     "trailer": "Rimorchio",
     "openOnTmdb": "Apri su TMDb",
     "imdb": "IMDb",
-    "inSeerr": "A Seerr",
     "requested": "Richiesto",
     "request": "Richiesta",
     "requesting": "Richiesta…",
@@ -1667,7 +1666,8 @@
     "castAs": "come {{carattere}}",
     "castUnavailable": "Informazioni sul cast non disponibili",
     "runtimeHours": "{{ore}}h {{minuti}}m",
-    "runtimeMins": "{{minuti}}m"
+    "runtimeMins": "{{minuti}}m",
+    "available": "Available"
   },
   "assistantToolUi": {
     "noImage": "Nessuna immagine",

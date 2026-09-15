@@ -1657,7 +1657,6 @@
     "trailer": "Reboque",
     "openOnTmdb": "Abra no TMDb",
     "imdb": "IMDb",
-    "inSeerr": "Em Seer",
     "requested": "Solicitada",
     "request": "Solicitar",
     "requesting": "Solicitando…",
@@ -1667,7 +1666,8 @@
     "castAs": "como {{personagem}}",
     "castUnavailable": "Informações do elenco não disponíveis",
     "runtimeHours": "{{horas}}h {{mins}}m",
-    "runtimeMins": "{{mins}}m"
+    "runtimeMins": "{{mins}}m",
+    "available": "Available"
   },
   "assistantToolUi": {
     "noImage": "Sem imagem",

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { Link as RouterLink } from 'react-router-dom'
+import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import {
   Alert,
   AppBar,
@@ -41,6 +41,8 @@ import {
 } from '../../components/TmdbExternalDetailModal'
 import type { SeerrRequestOptions } from '../../types/seerrRequest'
 import { PageHeading } from '@/components/PageHeading'
+import { MediaDetailModalProvider } from '@/hooks/MediaDetailModalProvider'
+import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
 import { adminPathFor } from './nav/registry'
 import { jobConsoleLink } from '../jobs/registry'
 import { GapCollectionRow } from './gapAnalysis/GapCollectionRow'
@@ -109,6 +111,8 @@ interface GapCollectionPart {
   posterPath: string | null
   inLibrary: boolean
   seerrStatus: PartSeerrStatus
+  /** The library movie holding this part now, if any. */
+  libraryId: string | null
 }
 
 interface GapCollectionPartsPayload {
@@ -200,8 +204,20 @@ function ListSkeleton() {
 }
 
 export function GapAnalysisPage() {
+  // An owned film opens its library page in a dialog, so the admin keeps the
+  // collection they were reading instead of being routed away from it.
+  return (
+    <MediaDetailModalProvider>
+      <GapAnalysisContent />
+    </MediaDetailModalProvider>
+  )
+}
+
+function GapAnalysisContent() {
   const { t, i18n } = useTranslation()
   const theme = useTheme()
+  const navigate = useNavigate()
+  const openMediaDetail = useMediaDetailModal()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [run, setRun] = useState<GapRun | null>(null)
@@ -460,6 +476,21 @@ export function GapAnalysisPage() {
     setDetailPart(null)
   }, [])
 
+  /**
+   * A film the library holds opens its own page — ratings, who watched it, the
+   * play button — rather than TMDb's card for a film we lack. The TMDb card is
+   * kept for everything else, including an owned film whose library row has
+   * gone since the scan.
+   */
+  const openPart = (part: DisplayPart) => {
+    if (part.libraryId) {
+      if (openMediaDetail) openMediaDetail('movie', part.libraryId)
+      else navigate(`/movies/${part.libraryId}`)
+      return
+    }
+    openDetailModal(part)
+  }
+
   const openSeerrOptionsStep = useCallback(
     (items: GapRequestItem[], titleOverride?: string) => {
       if (!seerrOk || items.length === 0) return
@@ -680,7 +711,7 @@ export function GapAnalysisPage() {
           hideUserRating
           hideWatchingToggle
           hideExploreButton
-          onClick={() => openDetailModal(part)}
+          onClick={() => openPart(part)}
         >
           {variant === 'owned' && (
             <PartStatusChip icon={<CheckCircleIcon />} label={t('admin.gaps.inLibrary')} color={theme.palette.success.main} />
@@ -762,6 +793,7 @@ export function GapAnalysisPage() {
         posterPath: m.posterPath,
         inLibrary: false,
         seerrStatus: 'none',
+        libraryId: null,
         variant: locallyRequested.has(m.tmdbId) ? 'requested' : 'missing',
       }))
 

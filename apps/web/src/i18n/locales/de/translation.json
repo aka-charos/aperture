@@ -1657,7 +1657,6 @@
     "trailer": "Trailer",
     "openOnTmdb": "Auf TMDb öffnen",
     "imdb": "IMDb",
-    "inSeerr": "In Seerr",
     "requested": "Angefragt",
     "request": "Anfragen",
     "requesting": "Anfrage läuft…",
@@ -1667,7 +1666,8 @@
     "castAs": "als {{character}}",
     "castUnavailable": "Besetzungsinformationen nicht verfügbar",
     "runtimeHours": "{{hours}}h {{mins}}m",
-    "runtimeMins": "{{mins}}m"
+    "runtimeMins": "{{mins}}m",
+    "available": "Available"
   },
   "assistantToolUi": {
     "noImage": "Kein Bild",

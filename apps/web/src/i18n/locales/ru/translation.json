@@ -1206,7 +1206,6 @@
     "trailer": "Трейлер",
     "openOnTmdb": "Открыть на TMDb",
     "imdb": "IMDb",
-    "inSeerr": "В Сирре",
     "requested": "Запрошено",
     "request": "Запрос",
     "requesting": "Запрос…",
@@ -1216,7 +1215,8 @@
     "castAs": "как {{character}}",
     "castUnavailable": "Информация об актерах недоступна",
     "runtimeHours": "{{часы}}ч {{минуты}}м",
-    "runtimeMins": "{{mins}} мин."
+    "runtimeMins": "{{mins}} мин.",
+    "available": "Available"
   },
   "assistantToolUi": {
     "noImage": "Нет изображения",
