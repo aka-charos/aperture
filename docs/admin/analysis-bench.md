@@ -30,7 +30,7 @@ The bench runs the **real generation path** (retries, pacing, contract checks) b
 
 ## Comparing Prompt Versions
 
-Under the model list, **Prompt versions** lists every version this build carries (currently v7, v8, v9 and a v10 draft), with the current one ticked. Tick more than one and every ticked model answers every ticked version.
+Under the model list, **Prompt versions** lists every version this build carries (currently v7 to v11, where v11 is current and v10 was a draft that never went live), with the current one ticked. Tick more than one and every ticked model answers every ticked version.
 
 A version marked **draft — bench only** is the next prompt being tested. Only the bench can run it: the library keeps writing with the current version, and no stored analysis is retired until the draft is promoted in a later release. Bench the draft against the current version on several titles and models first — that is what it is for.
 

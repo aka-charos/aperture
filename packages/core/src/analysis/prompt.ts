@@ -75,8 +75,19 @@ import { ARCHIVED_PROMPT_EDITIONS } from './promptEditions.js'
  *    synonyms. Four measured habits are named: sections opening by restating
  *    their question, one fact told under two questions, credit lists, and a
  *    closing sentence announcing that a question stays open.
+ * 10: a bench-only draft, never current. Archived in ./promptEditions.ts
+ *    because bench runs are labelled with it.
+ * 11: measured on Terminator 2 under 9 and 10 from one retrieval. Context
+ *    opens on what kind of work it is rather than its credits, names
+ *    traditions before single works, and a comparison with one earlier work
+ *    carries whoever made it. A critic's reading of what a choice means moves
+ *    to reception under their name, because asking for names in the work answer
+ *    twice produced unnamed readings twice. Reception groups critics by the
+ *    point they made instead of one sentence per critic, describes a split only
+ *    in a critic's own terms, and labels a re-release review as one. A critic's
+ *    guess at intent is not the maker speaking.
  */
-export const ANALYSIS_PROMPT_VERSION = 9
+export const ANALYSIS_PROMPT_VERSION = 11
 
 /** Reception figures, passed as calibration only. All optional. */
 export interface ReceptionContext {
@@ -271,10 +282,16 @@ interface AnalysisQuestion {
  * thin intent section otherwise pads itself with. Measured too: filming
  * locations listed for their own sake and a detail the answer itself called
  * "coincidental" both passed the would-it-be-different test, so both are named.
+ *
+ * VERSION 11 NAMES THE CONDITIONAL. On Terminator 2 a critic's "if Cameron
+ * hoped to instill a theme about peace" became "Cameron also said he hoped to"
+ * under version 9. "Only what someone actually said" did not catch it, because
+ * the critic did say something. The question now says a guess by a critic is
+ * not a statement by the maker, however it is phrased.
  */
 const CIRCUMSTANCES_QUESTION: AnalysisQuestion = {
   id: 'circumstances',
-  text: 'How was it made, and what did that leave on the work? Two things belong here. First, what the people who made it said they were trying to do - only what someone actually said, attributed to them, never an intention read back off the finished work. Second, the circumstances of its making or first release that changed what it became - how it was produced, the form it was first shown in, the constraints it was made under. Ask whether the finished work would be different if this had not happened. Facts that did not change the work are not answers - budgets, shooting schedules, crew and extras counts, filming locations listed for their own sake, release dates, coincidences. Neither is how it was received: that belongs to the reception question.',
+  text: 'How was it made, and what did that leave on the work? Two things belong here. First, what the people who made it said they were trying to do - only what a maker is reported as saying, attributed to them. A critic\'s guess at what the maker wanted is not a statement by the maker, even when it is phrased as "if he hoped to", and neither is an intention read back off the finished work. Second, the circumstances of its making or first release that changed what it became - how it was produced, the form it was first shown in, the constraints it was made under. Ask whether the finished work would be different if this had not happened. Facts that did not change the work are not answers - budgets, shooting schedules, crew and extras counts, filming locations listed for their own sake, release dates, coincidences. Neither is how it was received: that belongs to the reception question.',
 }
 
 /**
@@ -312,10 +329,25 @@ const CIRCUMSTANCES_QUESTION: AnalysisQuestion = {
  * traced to Lynch" are legacy, and they belong beside the reception that made
  * them. The trade is knowing: the one spoiler-shaped question is now the first
  * thing read, so the mechanical test above matters more than it did.
+ *
+ * VERSION 11, FROM TWO VERSIONS ON ONE RETRIEVAL OF TERMINATOR 2:
+ * - "What was it responding to" filed production decisions here (the early
+ *   liquid-metal idea, the softening for young viewers) and they were told again
+ *   under Making. It is gone, and production is fenced out by name.
+ * - The benched replacement, "what earlier works ... does it belong to or
+ *   answer", pulled the opposite way: single works led, and one of them was
+ *   Shane, whose ending travels to the boy and his protector. Traditions and
+ *   movements come first again; a single work is the exception.
+ * - Both versions opened on credits ("directed by James Cameron and co-written
+ *   with William Wisher"). The panel already shows them, and then Making named
+ *   the writers again.
+ * - "Borrows car-chase staging from The Road Warrior" and "models the
+ *   relationship on Shane" were a critic's "seem directly inspired by", stated as
+ *   production fact. A comparison is a view unless a maker made it.
  */
 const TRADITION_QUESTION: AnalysisQuestion = {
   id: 'tradition',
-  text: 'Where does it come from - what kind of work is it, what source does it adapt, what tradition, movement or body of work does it belong to, what was it responding to? Name traditions and movements freely. Naming one specific prior work as the model for this one is only safe when the comparison does not carry the ending of that work across: if a reader who knows how that one ends would then know how this one ends, name the tradition and stop there. What it went on to influence belongs to the reception question.',
+  text: 'Where does it come from - what kind of work is it, what source does it adapt, and what tradition, movement or body of work does it belong to? Open on that, not on who directed, wrote or stars in it - the reader can already see the credits. Name traditions and movements freely. A comparison with one specific earlier work - that this one borrows from it, is modelled on it or answers it - is a view unless a maker said it, so name who made the comparison. It is only safe when it does not carry the ending of that work across: if a reader who knows how that one ends would then know how this one ends, name the tradition and stop there. How it was made and what its makers decided belong to the making question, and what it went on to influence to the reception question.',
 }
 
 /**
@@ -347,10 +379,20 @@ const TRADITION_QUESTION: AnalysisQuestion = {
  * Tuner leaned on a small blog as heavily as on The Guardian and Variety, and a
  * section that exists to report reception is where that imbalance shows most.
  * This is the prompt's half; most of it is decided at retrieval.
+ *
+ * VERSION 11 GROUPS BY POINT, NOT BY CRITIC. Terminator 2's reception ran one
+ * sentence per critic across seven of them, so the reader got a roll call and
+ * had to work out for themselves that three of them praised the same thing.
+ * Two more measured faults are named: two of the seven reviewed the 2017 3D
+ * re-release and were presented as the film's reception, and a claim was handed
+ * to the wrong source. "Say what the split is about" was deliberately NOT asked
+ * for in the open form an outside review suggested - that is the request that
+ * made four of five version-8 analyses invent a disagreement - so a split is
+ * described only in terms a critic actually used.
  */
 const RECEPTION_QUESTION: AnalysisQuestion = {
   id: 'reception',
-  text: 'How was it received, and what did it go on to influence? Say what critics valued in it and what they faulted, and name the critic or publication - where the sources include established publications, lead with them. If critics largely agree, say what they agree on. If they genuinely split, say where, give each side once and move on, with no sentence remarking that the question stays open. Critics reading the same work in different ways is not a disagreement about it. A criticism of one part may name that part - the final act, a subplot - but not say what happens in it. No scores, no list of awards, and no verdict of your own.',
+  text: 'How was it received, and what did it go on to influence? Say what critics valued in it and what they faulted, grouped by the point made: one sentence per point, naming every critic or publication who made it ("Roger Ebert and Derek Malcolm praised the effects"), not one sentence per critic. Keep each point with the critic who made it. Where the sources include established publications, lead with them. A review of a later re-release or restoration is not how the work was first received - say so when a view dates from one. If critics largely agree, say what they agree on. If they genuinely split, describe the split only in terms a critic used, give each side once and move on, with no sentence remarking that the question stays open. Critics reading the same work in different ways is not a disagreement about it. A criticism of one part may name that part - the final act, a subplot - but not say what happens in it. No scores, no list of awards, and no verdict of your own.',
 }
 
 /**
@@ -384,9 +426,18 @@ const RECEPTION_QUESTION: AnalysisQuestion = {
  * orchestration credit, Affeksjonsverdi's Arricam LT and Cooke lenses), and
  * interpreting a device invites saying what it turns out to be (Possession's
  * doubles and creature, both late reveals, in its first section).
+ *
+ * VERSION 11 MOVES READINGS OUT, BECAUSE TWO NAMING RULES FAILED HERE. Version
+ * 9 and the version-10 draft both asked for critics to be named, and on
+ * Terminator 2 both filled Form and Style with one blog's readings of the
+ * performances, the score and the chases as plain sentences - version 10 even
+ * matching its own rule's example about a score. A critic's name is natural in
+ * a reception answer and awkward in a description of craft, so the structural
+ * answer is to keep here what the work plainly does and send what one critic
+ * thinks it means to where naming them is the point.
  */
 const WORK_GUARD =
-  'Name a choice, then say what it achieves. Only the choices that matter to what it is doing: a run of camera models, lens makes or music credits is not an answer, even with a sentence about its effect attached. Describe what an image, device or figure does to the viewer, never what it turns out to be.'
+  'Name a choice, then say what it achieves. Only the choices that matter to what it is doing: a run of camera models, lens makes or music credits is not an answer, even with a sentence about its effect attached. Describe what an image, device or figure does to the viewer, never what it turns out to be. Keep to what the work plainly does - how it is shot, scored, staged and performed. What one critic reads into a choice belongs to the reception answer, under their name. What a performance, an effect or a score does belongs here; whether it is good belongs to the reception question.'
 
 const MOVIE_QUESTIONS: AnalysisQuestion[] = [
   TRADITION_QUESTION,
@@ -496,17 +547,24 @@ const GROUNDED_RULE =
  * handle, and it is a thing a model does when told to write continuous prose.
  */
 /**
- * A named constant so the draft edition can replace exactly this rule and no
+ * VERSION 11 REMOVES A LICENCE. Version 9's "name a critic where their view is
+ * the point, not in every sentence" was written to stop Tuner naming someone in
+ * every sentence, and a model satisfies it by naming nobody - which Terminator 2
+ * did, stating one blog's readings flat. It is replaced by "name them once, at
+ * its start", and the rule says outright that a plain sentence can still be a
+ * view, the case the hedge-counting signal cannot see.
+ *
+ * A named constant so a draft edition can replace exactly this rule and no
  * other - see DRAFT_EDITION.
  */
 const ATTRIBUTION_RULE =
-  'Do not cite, number or link the documents, and do not mention them at all - the reader never sees them, so "the sources say" or "the sources carry" points at nothing. Do not quote the reception figures back. State facts plainly. A view - an interpretation or a judgement - belongs to whoever holds it: name the critic or publication when the sources do, and say "critics" when they do not. Never turn a view into a fact, and never hide whose view it is behind "is described as", "has been called", "according to one reading" or "reportedly". Name a critic where their view is the point, not in every sentence. Judgements of quality belong in the reception answer only.'
+  'Do not cite, number or link the documents, and do not mention them at all - the reader never sees them, so "the sources say" or "the sources carry" points at nothing. Do not quote the reception figures back. State facts plainly. A view - an interpretation, a judgement or a comparison with another work - belongs to whoever holds it: name the critic or publication when the sources do, and say "critics" when they do not. Never turn a view into a fact, and never hide whose view it is behind "is described as", "has been called", "according to one reading" or "reportedly". A view written as a plain sentence with nobody named is still a view: "the score makes the violence feel inevitable" is somebody\'s reading and needs their name, and so does "it borrows from" another film. When a paragraph draws on one critic\'s reading throughout, name them once, at its start. Praise or faults of a performance, an effect or a script are judgements, and judgements of quality belong in the reception answer only.'
 
 const RULES = [
   'Describe how it works, never what happens in it. No third-act or ending discussion, and no reveals - not what a character, creature or image turns out to be. Someone who has not seen it must be able to read this safely.',
   'Match your register to the work. A stunt-driven action picture has real craft in its staging and choreography, and that is a legitimate subject - write about it as what it is. Do not apply art-cinema vocabulary to a genre entertainment.',
   'The questions are what to cover and in what order, not a form to fill in. Give a question as many paragraphs as the sources support, and none to a question they do not. Two questions may share a paragraph when they genuinely belong together, but do not scatter one question across paragraphs that are not next to each other. Say each fact once, under the question it belongs to - once it has been said, do not say it again under another.',
-  'Write in short paragraphs of three or four sentences, never more, separated by a blank line. Keep each sentence to one idea and do not chain clauses with semicolons - if a sentence carries two ideas, make it two sentences. Each answer is shown to the reader under a heading that names its question, so open on the substance - never with a restatement of the question such as "The film sits in", "The circumstances of its making" or "Critics disagree about". Say what a choice does, not what it avoids: a sentence built on "rather than" or "not X but Y" usually says one thing twice. Plain prose only in the analysis itself: no headings, bullet points, numbered lists or bold text.',
+  'Write in short paragraphs of three or four sentences, never more, separated by a blank line. Keep each sentence to one idea and do not chain clauses with semicolons - if a sentence carries two ideas, make it two sentences. Connect the sentences of a paragraph into one line of thought: a run of short statements that do not lead into each other reads as notes. Each answer is shown to the reader under a heading that names its question, so open on the substance - never with a restatement of the question such as "The film sits in", "The circumstances of its making" or "Critics disagree about". Say what a choice does, not what it avoids: a sentence built on "rather than" or "not X but Y" usually says one thing twice. Plain prose only in the analysis itself: no headings, bullet points, numbered lists or bold text.',
   'Be specific. Name the person responsible for the choice you are describing - the director, the writer, the cinematographer - instead of "those behind the project" or "the creative team". Name people for what they chose, never to list credits: a sentence that only records who did what is not analysis. Cut any sentence whose only content is that the work sits in a tradition, extends one, or hopes to influence something: say what and how, or say nothing.',
   'Answer only what the sources genuinely support. It is normal for one or two of these questions to have no answer, and dropping them is the correct outcome rather than a gap to fill. A single thin fact is not a paragraph - fold it into the answer it belongs to, or leave it out. If no question has an answer, say so in two sentences and stop.',
   ATTRIBUTION_RULE,
@@ -519,7 +577,7 @@ const RULES = [
  * AN EDITION IS ONLY THESE, BECAUSE THAT IS ALL THAT HAS EVER CHANGED between
  * the versions the bench can run. The header, the source block, the TASK lines,
  * the retrieval-mode rule and the output contract were compared line by line
- * across versions 7, 8 and 9 when the archived editions were extracted, and are
+ * across versions 7 to 10 when the archived editions were extracted, and are
  * identical. That is what makes a multi-version bench sound: the prompts it
  * builds from one retrieval differ below the TASK line and nowhere else.
  */
@@ -539,82 +597,33 @@ const CURRENT_EDITION: PromptEdition = {
 }
 
 /**
- * The next version, runnable on the bench and NOWHERE else.
+ * The next version, runnable on the bench and NOWHERE else. Null when there is
+ * no draft, which is the state after a promotion.
  *
  * WHY A DRAFT. Making a new version current retires every stored analysis the
  * moment the image is pulled, so a prompt change used to be tested on the
  * library it was about to rewrite. A draft sits in the bench's version list
  * beside the current one and is built from the same retrieval, while the
  * library job, the analysis route and the paragraph map all keep using the
- * current version. It becomes current only when benching says it should.
+ * current version.
  *
- * WHAT THIS DRAFT CHANGES (version 10), all measured on one Terminator 2 bench
- * run of DeepSeek V4.1 Flash under versions 8 and 9:
- *
- * - ATTRIBUTION. Version 9 dropped every critic's name from the work answer
- *   and kept their readings as plain sentences - "The film aims to marry
- *   blockbuster spectacle with philosophical depth" is one blog's view, and a
- *   whole paragraph praised performances in words lifted from it. Version 8,
- *   on the same documents, named the critics. The likely licence is version 9's
- *   "Name a critic where their view is the point, not in every sentence", added
- *   to stop Tuner naming someone in every sentence. It is replaced by "name them
- *   once, at its start", which answers Tuner without permitting the omission,
- *   and the rule now says a view stated as a flat sentence is still a view -
- *   the hedge-counting signal cannot see that case, which is how version 9
- *   scored zero while being worse.
- * - CONTEXT ASKED FOR PRODUCTION. "What was it responding to" filed the early
- *   screenplay's liquid-metal idea and the softening for young viewers under
- *   Context, and both were told again under Making. The question now names what
- *   it wants (earlier works, genres, movements) and fences production out.
- * - INVENTED INTENT. A critic's "if Cameron hoped to instill a theme about
- *   peace" became "Cameron also said he hoped to". The making question now says
- *   a critic's guess, however phrased, is not the maker speaking.
- * - QUALITY IN THE WORK ANSWER. Praise for performances and effects sat under
- *   Form and Style, where the rules already forbid it; the work question now
- *   says what a performance does belongs there and whether it is good does not.
+ * TO DRAFT: set this to the current edition with named replacements -
+ * `version: ANALYSIS_PROMPT_VERSION + 1`, questions swapped by id, a rule
+ * swapped by identity against its named constant - so the parts that did not
+ * change cannot drift between the two.
  *
  * A DRAFT'S NUMBER IS PROVISIONAL. Bench runs record the prompt text they ran
  * in `analysis_comparison_runs.prompts`, so a draft edited before promotion
  * leaves earlier runs readable but labelled with a number whose text moved.
  * Promote with the text as benched, or bump the draft number when editing it.
  *
- * TO PROMOTE: move these texts into the constants above, add the edition being
+ * TO PROMOTE: move the texts into the constants above, add the edition being
  * replaced to ./promptEditions.ts exactly as it stands, bump
- * ANALYSIS_PROMPT_VERSION, and set DRAFT_EDITION to null.
+ * ANALYSIS_PROMPT_VERSION, and set this back to null. Version 11 skipped the
+ * draft on the operator's call: the version-10 draft was benched, and 11 is
+ * what that bench asked for.
  */
-const DRAFT_TRADITION_QUESTION: AnalysisQuestion = {
-  id: 'tradition',
-  text: 'Where does it come from - what kind of work is it, what source does it adapt, and what earlier works, genres or movements does it belong to or answer? Name traditions and movements freely. Naming one specific prior work as the model for this one is only safe when the comparison does not carry the ending of that work across: if a reader who knows how that one ends would then know how this one ends, name the tradition and stop there. How it was made and what its makers decided belong to the making question, and what it went on to influence to the reception question.',
-}
-
-const DRAFT_CIRCUMSTANCES_QUESTION: AnalysisQuestion = {
-  id: 'circumstances',
-  text: 'How was it made, and what did that leave on the work? Two things belong here. First, what the people who made it said they were trying to do - only what a maker is reported as saying, attributed to them. A critic\'s guess at what the maker wanted is not a statement by the maker, even when it is phrased as "if he hoped to", and neither is an intention read back off the finished work. Second, the circumstances of its making or first release that changed what it became - how it was produced, the form it was first shown in, the constraints it was made under. Ask whether the finished work would be different if this had not happened. Facts that did not change the work are not answers - budgets, shooting schedules, crew and extras counts, filming locations listed for their own sake, release dates, coincidences. Neither is how it was received: that belongs to the reception question.',
-}
-
-const DRAFT_WORK_GUARD = `${WORK_GUARD} What a performance, an effect or a score does belongs here; whether it is good belongs to the reception question.`
-
-const DRAFT_ATTRIBUTION_RULE =
-  'Do not cite, number or link the documents, and do not mention them at all - the reader never sees them, so "the sources say" or "the sources carry" points at nothing. Do not quote the reception figures back. State facts plainly. A view - an interpretation or a judgement - belongs to whoever holds it: name the critic or publication when the sources do, and say "critics" when they do not. Never turn a view into a fact, and never hide whose view it is behind "is described as", "has been called", "according to one reading" or "reportedly". A view written as a plain sentence with nobody named is still a view: "the score makes the violence feel inevitable" is somebody\'s reading and needs their name. When a paragraph draws on one critic\'s reading throughout, name them once, at its start. Praise or faults of a performance, an effect or a script are judgements, and judgements of quality belong in the reception answer only.'
-
-/** The current questions with the draft's replacements swapped in by id. */
-function draftQuestions(questions: readonly AnalysisQuestion[]): AnalysisQuestion[] {
-  return questions.map((question) => {
-    if (question.id === 'tradition') return DRAFT_TRADITION_QUESTION
-    if (question.id === 'circumstances') return DRAFT_CIRCUMSTANCES_QUESTION
-    if (question.id === 'work') {
-      return { id: 'work', text: question.text.replace(WORK_GUARD, DRAFT_WORK_GUARD) }
-    }
-    return question
-  })
-}
-
-const DRAFT_EDITION: PromptEdition | null = {
-  version: ANALYSIS_PROMPT_VERSION + 1,
-  movieQuestions: draftQuestions(MOVIE_QUESTIONS),
-  seriesQuestions: draftQuestions(SERIES_QUESTIONS),
-  rules: RULES.map((rule) => (rule === ATTRIBUTION_RULE ? DRAFT_ATTRIBUTION_RULE : rule)),
-}
+const DRAFT_EDITION = null as PromptEdition | null
 
 /** The draft's version number, or null when there is no draft. */
 export const DRAFT_PROMPT_VERSION: number | null = DRAFT_EDITION?.version ?? null
