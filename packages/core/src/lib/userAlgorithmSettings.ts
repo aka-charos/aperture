@@ -365,19 +365,15 @@ export async function getSmartDiversityWeight(
     }
 
     // Get the user's taste dispersion. The stored cluster dispersion is the
-    // same [0,1] score analyzeMovieTaste would report, so read it directly:
-    // going through the full analysis meant four queries per user per
-    // recommendation run (genres, decades, viewing patterns, and a 100-row
-    // embedding scan) to use exactly one field of the result.
+    // same [0,1] score calculateTasteDispersion computes, so read it directly
+    // and pay for the embedding scan only when no clusters exist yet.
     const { getTasteDispersion } = await import('../taste-profile/index.js')
     let diversityScore = await getTasteDispersion(userId, mediaType)
 
     if (diversityScore === null) {
-      // No clusters yet -- fall back to computing it the long way.
-      const { analyzeMovieTaste, analyzeSeriesTaste } = await import('./tasteAnalyzer.js')
-      const analysis =
-        mediaType === 'movie' ? await analyzeMovieTaste(userId) : await analyzeSeriesTaste(userId)
-      diversityScore = analysis.diversity.score
+      // No clusters yet -- fall back to computing it from the embeddings.
+      const { calculateTasteDispersion } = await import('./tasteAnalyzer.js')
+      diversityScore = await calculateTasteDispersion(userId, mediaType)
     }
 
     const adjusted = adjustDiversityWeightForDispersion(baseDiversityWeight, diversityScore)
