@@ -1,21 +1,14 @@
 /**
- * Series Taste Synopsis Generator
+ * The TV Watcher Identity: the stored text, and the stats its card shows.
  *
- * Generates a natural language summary of a user's TV series taste
- * based on their watch history and preferences.
+ * Writing it lives in tasteSynopsisStream.ts, shared with the film identity.
+ * This generator used to run four queries (genres, networks, decade, the fifteen
+ * most-watched shows with completion) whose results never reached the model.
  */
 
-import { query, queryOne } from './db.js'
-import { createChildLogger } from './logger.js'
-import { getTextGenerationModelInstance, isAIFunctionConfigured } from './ai-provider.js'
-import { streamText } from 'ai'
-import { getUserExcludedLibraries } from './libraryExclusions.js'
-import { WATCH_HISTORY_TASTE_SQL } from '../recommender/watchedExclusion.js'
-import { analyzeSeriesTaste, formatTasteProfileForAI } from './tasteAnalyzer.js'
-import { buildAiLanguageInstruction } from './locales.js'
-import { resolveEffectiveAiLanguage } from './userSettings.js'
-
-const logger = createChildLogger('taste-series-synopsis')
+import { queryOne } from './db.js'
+import { WATCH_HISTORY_PLAYED_SQL } from '../recommender/watchedExclusion.js'
+import { streamWatcherIdentity } from './tasteSynopsisStream.js'
 
 export interface SeriesTasteSynopsis {
   synopsis: string
@@ -31,311 +24,24 @@ export interface SeriesTasteSynopsis {
   }
 }
 
-interface SeriesWatchStats {
-  series_count: number
-  episode_count: number
-  avg_rating: number
-  favorite_count: number
-}
-
-interface GenreCount {
-  genre: string
-  count: number
-}
-
-interface NetworkCount {
-  network: string
-  count: number
-}
-
-interface DecadeCount {
-  decade: string
-  count: number
-}
-
-interface WatchedSeries {
-  title: string
-  year: number | null
-  genres: string[]
-  community_rating: number | null
-  network: string | null
-  episodes_watched: number
-  total_episodes: number | null
-  completion_rate: number | null
-}
-
 /**
- * Stream generate a series taste synopsis for a user
- * Returns an async generator that yields text chunks
+ * Write a new TV identity, streaming it to the caller as it arrives, and return
+ * the stats the card shows beside it.
  */
 export async function* streamSeriesTasteSynopsis(
   userId: string
 ): AsyncGenerator<string, SeriesTasteSynopsis['stats'], void> {
-  logger.info({ userId }, 'Streaming series taste synopsis generation')
-
-  // Get user's excluded libraries to filter watch history
-  const excludedLibraryIds = await getUserExcludedLibraries(userId)
-  logger.debug(
-    { userId, excludedLibraryIds },
-    'Filtering streaming series taste synopsis by excluded libraries'
-  )
-
-  // Get watch history stats (filtered by excluded libraries)
-  const stats = await queryOne<SeriesWatchStats>(
-    `
-    SELECT 
-      COUNT(DISTINCT e.series_id) as series_count,
-      COUNT(DISTINCT wh.episode_id) as episode_count,
-      AVG(s.community_rating) as avg_rating,
-      COUNT(CASE WHEN wh.is_favorite THEN 1 END) as favorite_count
-    FROM watch_history wh
-    JOIN episodes e ON e.id = wh.episode_id
-    JOIN series s ON s.id = e.series_id
-    WHERE wh.user_id = $1 AND wh.media_type = 'episode'
-      AND ${WATCH_HISTORY_TASTE_SQL}
-      AND (CARDINALITY($2::text[]) = 0 OR s.provider_library_id::text != ALL($2::text[]))
-  `,
-    [userId, excludedLibraryIds]
-  )
-
-  if (!stats || stats.series_count === 0) {
-    yield "We're still getting to know your TV preferences! Watch some episodes and we'll build your series taste profile."
-    return {
-      totalSeriesStarted: 0,
-      totalEpisodesWatched: 0,
-      topGenres: [],
-      avgRating: 0,
-      favoriteDecade: null,
-      favoriteNetworks: [],
-      recentFavorites: [],
-    }
-  }
-
-  // Get top genres (filtered by excluded libraries)
-  const genreResults = await query<GenreCount>(
-    `
-    SELECT unnest(s.genres) as genre, COUNT(DISTINCT e.series_id) as count
-    FROM watch_history wh
-    JOIN episodes e ON e.id = wh.episode_id
-    JOIN series s ON s.id = e.series_id
-    WHERE wh.user_id = $1 AND wh.media_type = 'episode'
-      AND ${WATCH_HISTORY_TASTE_SQL}
-      AND (CARDINALITY($2::text[]) = 0 OR s.provider_library_id::text != ALL($2::text[]))
-    GROUP BY unnest(s.genres)
-    ORDER BY count DESC
-    LIMIT 5
-  `,
-    [userId, excludedLibraryIds]
-  )
-  const topGenres = genreResults.rows.map((r) => r.genre)
-
-  // Get favorite networks (filtered by excluded libraries)
-  const networkResults = await query<NetworkCount>(
-    `
-    SELECT s.network, COUNT(DISTINCT e.series_id) as count
-    FROM watch_history wh
-    JOIN episodes e ON e.id = wh.episode_id
-    JOIN series s ON s.id = e.series_id
-    WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND s.network IS NOT NULL
-      AND ${WATCH_HISTORY_TASTE_SQL}
-      AND (CARDINALITY($2::text[]) = 0 OR s.provider_library_id::text != ALL($2::text[]))
-    GROUP BY s.network
-    ORDER BY count DESC
-    LIMIT 3
-  `,
-    [userId, excludedLibraryIds]
-  )
-  const favoriteNetworks = networkResults.rows.map((r) => r.network)
-
-  // Get favorite decade (filtered by excluded libraries)
-  const decadeResults = await query<DecadeCount>(
-    `
-    SELECT 
-      (FLOOR(s.year / 10) * 10)::TEXT || 's' as decade,
-      COUNT(DISTINCT e.series_id) as count
-    FROM watch_history wh
-    JOIN episodes e ON e.id = wh.episode_id
-    JOIN series s ON s.id = e.series_id
-    WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND s.year IS NOT NULL
-      AND ${WATCH_HISTORY_TASTE_SQL}
-      AND (CARDINALITY($2::text[]) = 0 OR s.provider_library_id::text != ALL($2::text[]))
-    GROUP BY FLOOR(s.year / 10)
-    ORDER BY count DESC
-    LIMIT 1
-  `,
-    [userId, excludedLibraryIds]
-  )
-  const favoriteDecade = decadeResults.rows[0]?.decade || null
-
-  // Get most watched series (filtered by excluded libraries)
-  const topSeries = await query<WatchedSeries>(
-    `
-    SELECT 
-      s.title, s.year, s.genres, s.community_rating, s.network,
-      COUNT(DISTINCT wh.episode_id) as episodes_watched,
-      s.total_episodes,
-      CASE WHEN s.total_episodes > 0 
-        THEN ROUND(COUNT(DISTINCT wh.episode_id)::numeric / s.total_episodes * 100)
-        ELSE NULL
-      END as completion_rate
-    FROM watch_history wh
-    JOIN episodes e ON e.id = wh.episode_id
-    JOIN series s ON s.id = e.series_id
-    WHERE wh.user_id = $1 AND wh.media_type = 'episode'
-      AND ${WATCH_HISTORY_TASTE_SQL}
-      AND (CARDINALITY($2::text[]) = 0 OR s.provider_library_id::text != ALL($2::text[]))
-    GROUP BY s.id, s.title, s.year, s.genres, s.community_rating, s.network, s.total_episodes
-    ORDER BY episodes_watched DESC
-    LIMIT 15
-  `,
-    [userId, excludedLibraryIds]
-  )
-
-  // Use embedding-powered taste analyzer for abstract profile
-  const tasteProfile = await analyzeSeriesTaste(userId)
-  const abstractPrompt = formatTasteProfileForAI(tasteProfile, 'series')
-
-  logger.debug(
-    { userId, diversity: tasteProfile.diversity },
-    'Streaming: Analyzed series taste profile'
-  )
-
-  // Check if text generation is configured
-  const isConfigured = await isAIFunctionConfigured('textGeneration')
-  if (!isConfigured) {
-    logger.warn({ userId }, 'Text generation not configured, using fallback synopsis')
-    const fallback = buildFallbackSeriesSynopsis({
-      seriesCount: Number(stats.series_count),
-      episodeCount: Number(stats.episode_count),
-      topGenres,
-      favoriteNetworks,
-      favoriteDecade,
-    })
-    yield fallback
-
-    // Store fallback
-    await query(
-      `
-      INSERT INTO user_preferences (user_id, series_taste_synopsis, series_taste_synopsis_updated_at)
-      VALUES ($1, $2, NOW())
-      ON CONFLICT (user_id) DO UPDATE SET series_taste_synopsis = $2, series_taste_synopsis_updated_at = NOW()
-    `,
-      [userId, fallback]
-    )
-
-    return {
-      totalSeriesStarted: Number(stats.series_count),
-      totalEpisodesWatched: Number(stats.episode_count),
-      topGenres,
-      avgRating: Number(stats.avg_rating || 0),
-      favoriteDecade,
-      favoriteNetworks,
-      recentFavorites: [],
-    }
-  }
-
-  // Stream with AI
-  let fullText = ''
-  try {
-    const aiLocale = await resolveEffectiveAiLanguage(userId)
-    const langBlock = `\n\n${buildAiLanguageInstruction(aiLocale)}`
-    const model = await getTextGenerationModelInstance()
-    const result = streamText({
-      model,
-      system: `Write a TV viewer personality profile using this exact structure:
-
-### What Draws You In
-[1-2 paragraphs about genres, moods, and narrative styles they prefer]
-
-### Your Viewing Style  
-[1 paragraph about viewing habits - binger, completionist, sampler, etc.]
-
-### Core Traits
-- **[Trait Name]**: [Brief description]
-- **[Trait Name]**: [Brief description]
-- **[Trait Name]**: [Brief description]
-
-Rules:
-- Discuss ONLY genres, moods, pacing, and abstract narrative qualities
-- NEVER mention any show, series, or franchise names
-- Write in second person ("You gravitate toward...")
-- Use **bold** markdown for trait names${langBlock}`,
-      prompt: abstractPrompt,
-      temperature: 0.4,
-      // The prompt asks for three sections; 400 tokens cut every profile off
-      // mid-sentence, and a reasoning model spends this same allowance on its
-      // scratchpad before writing a word. A cap is not a reservation, so the
-      // headroom costs nothing on a model that answers directly.
-      maxOutputTokens: 4000,
-    })
-
-    // Consume fullStream (not textStream): under AI SDK v5 textStream silently
-    // drops "error" chunks, so a failed provider call would yield an empty
-    // synopsis instead of triggering the fallback below. fullStream surfaces
-    // the error part, which we re-throw so the catch can emit a fallback.
-    for await (const part of result.fullStream) {
-      if (part.type === 'text-delta') {
-        fullText += part.text
-        yield part.text
-      } else if (part.type === 'error') {
-        throw part.error instanceof Error ? part.error : new Error(String(part.error))
-      }
-    }
-  } catch (error) {
-    logger.error({ error, userId }, 'Failed to stream series synopsis')
-    const fallback = buildFallbackSeriesSynopsis({
-      seriesCount: Number(stats.series_count),
-      episodeCount: Number(stats.episode_count),
-      topGenres,
-      favoriteNetworks,
-      favoriteDecade,
-    })
-    yield fallback
-    fullText = fallback
-  }
-
-  // An empty generation is not a result, and must never reach the store. See
-  // the movie generator for why the stream can finish clean with no text, and
-  // why this throws instead of returning quietly.
-  if (!fullText.trim()) {
-    logger.warn(
-      { userId },
-      'Series synopsis generation produced no text; keeping the stored synopsis'
-    )
-    throw new Error('The model returned an empty taste profile; nothing was changed')
-  }
-
-  // Store the complete synopsis
-  await query(
-    `
-    INSERT INTO user_preferences (user_id, series_taste_synopsis, series_taste_synopsis_updated_at)
-    VALUES ($1, $2, NOW())
-    ON CONFLICT (user_id) DO UPDATE SET series_taste_synopsis = $2, series_taste_synopsis_updated_at = NOW()
-  `,
-    [userId, fullText]
-  )
-
-  logger.info({ userId, synopsisLength: fullText.length }, 'Series taste synopsis streamed')
-
-  return {
-    totalSeriesStarted: Number(stats.series_count),
-    totalEpisodesWatched: Number(stats.episode_count),
-    topGenres,
-    avgRating: Number(stats.avg_rating || 0),
-    favoriteDecade,
-    favoriteNetworks,
-    recentFavorites: topSeries.rows.slice(0, 5).map((s) => s.title),
-  }
+  yield* streamWatcherIdentity(userId, 'series')
+  return getSeriesQuickStats(userId)
 }
 
 /**
- * Get the stored series synopsis. Never regenerates on page load.
- *
- * As on the movie side: no background job refreshes this, so it is written by
- * the Generate Identity button and otherwise only ever deleted. See F-110.
+ * Get the stored series synopsis. Never generates on page load: recommendation
+ * runs rewrite it when the taste profile or the prompt version moves
+ * (tasteSynopsisRefresh.ts), and the Generate Identity button rewrites it on
+ * request.
  */
 export async function getSeriesTasteSynopsis(userId: string): Promise<SeriesTasteSynopsis> {
-  // Check for existing synopsis
   const existing = await queryOne<{
     series_taste_synopsis: string | null
     series_taste_synopsis_updated_at: Date | null
@@ -351,7 +57,6 @@ export async function getSeriesTasteSynopsis(userId: string): Promise<SeriesTast
   // Get stats for display (always needed)
   const stats = await getSeriesQuickStats(userId)
 
-  // Return existing synopsis if available
   if (existing?.series_taste_synopsis) {
     return {
       synopsis: existing.series_taste_synopsis,
@@ -371,8 +76,8 @@ export async function getSeriesTasteSynopsis(userId: string): Promise<SeriesTast
 }
 
 /**
- * Get quick stats without regenerating synopsis
- * Uses a single CTE query instead of 5 sequential queries for better performance
+ * The card's stats, in a single CTE query. PLAYED episodes only, for the
+ * reason getQuickStats gives on the film side.
  */
 async function getSeriesQuickStats(userId: string): Promise<SeriesTasteSynopsis['stats']> {
   const result = await queryOne<{
@@ -393,16 +98,16 @@ async function getSeriesQuickStats(userId: string): Promise<SeriesTasteSynopsis[
       JOIN episodes e ON e.id = wh.episode_id
       JOIN series s ON s.id = e.series_id
       WHERE wh.user_id = $1 AND wh.media_type = 'episode'
-        AND ${WATCH_HISTORY_TASTE_SQL}
+        AND ${WATCH_HISTORY_PLAYED_SQL}
     ),
     episode_counts AS (
       SELECT COUNT(DISTINCT wh.episode_id) as episode_count
       FROM watch_history wh
       WHERE wh.user_id = $1 AND wh.media_type = 'episode'
-        AND ${WATCH_HISTORY_TASTE_SQL}
+        AND ${WATCH_HISTORY_PLAYED_SQL}
     ),
     stats AS (
-      SELECT 
+      SELECT
         COUNT(*) as series_count,
         AVG(community_rating) as avg_rating
       FROM watched_series
@@ -437,7 +142,7 @@ async function getSeriesQuickStats(userId: string): Promise<SeriesTasteSynopsis[
       ORDER BY title
       LIMIT 5
     )
-    SELECT 
+    SELECT
       (SELECT series_count FROM stats) as series_count,
       (SELECT episode_count FROM episode_counts) as episode_count,
       (SELECT avg_rating FROM stats) as avg_rating,
@@ -458,29 +163,4 @@ async function getSeriesQuickStats(userId: string): Promise<SeriesTasteSynopsis[
     favoriteNetworks: result?.favorite_networks || [],
     recentFavorites: result?.recent_favorites || [],
   }
-}
-
-/**
- * Build fallback synopsis if OpenAI fails
- */
-function buildFallbackSeriesSynopsis(data: {
-  seriesCount: number
-  episodeCount: number
-  topGenres: string[]
-  favoriteNetworks: string[]
-  favoriteDecade: string | null
-}): string {
-  const genreText =
-    data.topGenres.length > 0
-      ? `Your top genres are ${data.topGenres.slice(0, 3).join(', ')}`
-      : `You enjoy a diverse range of genres`
-
-  const networkText =
-    data.favoriteNetworks.length > 0 ? `, often from ${data.favoriteNetworks[0]}` : ``
-
-  const decadeText = data.favoriteDecade
-    ? `, with a particular fondness for shows from the ${data.favoriteDecade}`
-    : ``
-
-  return `Based on ${data.seriesCount} series and ${data.episodeCount} episodes in your watch history, we're getting to know your TV taste! ${genreText}${networkText}${decadeText}. Keep watching and we'll refine your profile even further.`
 }

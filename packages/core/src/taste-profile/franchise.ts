@@ -1065,7 +1065,7 @@ async function getLibraryGenreCounts(
   const exclusion =
     excludedLibraryIds.length > 0
       ? ` AND (t.provider_library_id IS NULL OR t.provider_library_id NOT IN (${excludedLibraryIds
-          .map((_, i) => `${i + 1}`)
+          .map((_, i) => `$${i + 1}`)
           .join(', ')}))`
       : ''
 

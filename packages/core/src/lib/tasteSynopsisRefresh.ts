@@ -19,17 +19,21 @@
  * i.e. one per user per recommendation run, so the projected spend has a line
  * item for work that never happened.
  *
- * The trigger here is the taste profile CHANGING, not a clock. The synopsis is
- * prose describing that centroid, so re-describing an unchanged vector is a
- * paid call that cannot say anything new; `isProfileStale` already paces the
- * rebuild (refresh_interval_days, 30 by default), and this rides on it.
+ * The trigger is the taste profile CHANGING, or the prompt that writes the text
+ * changing -- not a clock. The synopsis is prose describing that profile, so
+ * re-describing an unchanged one with an unchanged prompt is a paid call that
+ * cannot say anything new; `isProfileStale` already paces the rebuild
+ * (refresh_interval_days, 30 by default), and this rides on it. A prompt change
+ * moves no profile, which is why the version that wrote the text is stored
+ * beside it (0176): without it a rewritten prompt reached nobody for a month and
+ * never reached a locked profile.
  */
 
 import { queryOne } from './db.js'
 import { createChildLogger } from './logger.js'
 import { isAIFunctionConfigured } from './ai-provider.js'
-import { streamTasteSynopsis } from './tasteSynopsis.js'
-import { streamSeriesTasteSynopsis } from './tasteSeriesSynopsis.js'
+import { streamWatcherIdentity, type IdentityOutcome } from './tasteSynopsisStream.js'
+import { TASTE_SYNOPSIS_PROMPT_VERSION } from './tasteSynopsisPrompt.js'
 
 const logger = createChildLogger('taste-synopsis-refresh')
 
@@ -42,6 +46,10 @@ export type SynopsisRefreshOutcome =
   | 'not-configured'
   | 'cancelled'
   | 'failed'
+  /** The provider failed and the fallback blurb was stored; the next run retries. */
+  | 'fallback'
+  /** Too few played titles to describe; any stored identity was cleared. */
+  | 'too-little-history'
 
 export interface SynopsisFreshnessInput {
   /** The stored synopsis text, exactly as the column holds it. */
@@ -50,6 +58,10 @@ export interface SynopsisFreshnessInput {
   synopsisUpdatedAt: Date | null
   /** `user_taste_profiles.auto_updated_at` for this user and media type. */
   profileUpdatedAt: Date | null
+  /** The prompt version that wrote the text; null before 0176, and for a fallback blurb. */
+  synopsisVersion: number | null
+  /** TASTE_SYNOPSIS_PROMPT_VERSION, passed in so the rule stays pure. */
+  currentVersion: number
 }
 
 /**
@@ -65,12 +77,21 @@ export function synopsisNeedsRefresh({
   synopsis,
   synopsisUpdatedAt,
   profileUpdatedAt,
+  synopsisVersion,
+  currentVersion,
 }: SynopsisFreshnessInput): boolean {
   // Empty is missing. The store now refuses to write '' (F-110), but rows
   // written before that guard can hold one, and `getTasteSynopsis` already
   // reads an empty string as "never generated" -- so this must agree with it,
   // or the card offers Generate for something this function calls current.
   if (!synopsis?.trim()) return true
+
+  // Written by an older prompt, or by no prompt at all (a fallback blurb stores
+  // no version). Checked before the profile rules because the profile cannot
+  // see this: a locked profile would otherwise keep a retired prompt's text
+  // forever. Older only -- a version NEWER than this image's belongs to a newer
+  // image, and an older one rolled back over it must not rewrite its text.
+  if (synopsisVersion == null || synopsisVersion < currentVersion) return true
 
   // No profile timestamp is not evidence of staleness. It means the profile has
   // never been auto-built (a locked profile, or one only ever set by hand), and
@@ -90,10 +111,25 @@ export function synopsisNeedsRefresh({
 interface SynopsisColumns {
   synopsis: string | null
   synopsis_updated_at: Date | null
+  synopsis_version: number | null
 }
 
 /**
- * Regenerate this user's synopsis if their taste profile has moved under it.
+ * The generator yields chunks for the SSE route to forward to a browser. There
+ * is no browser here, so it is drained for its side effect -- it writes the
+ * finished text itself, which keeps one storage path for both callers -- and for
+ * the outcome it returns.
+ */
+async function drain<T>(generator: AsyncGenerator<unknown, T, void>): Promise<T> {
+  for (;;) {
+    const next = await generator.next()
+    if (next.done) return next.value
+  }
+}
+
+/**
+ * Regenerate this user's synopsis if their taste profile, or the prompt, has
+ * moved under it.
  *
  * Fails open in every direction: an unconfigured model, a cancelled job, a
  * provider outage and an empty generation all leave whatever is already stored
@@ -111,8 +147,7 @@ export async function refreshTasteSynopsis(
   // than left to the caller because every caller would have to remember.
   if (options.shouldCancel?.()) return 'cancelled'
 
-  const isSeries = mediaType === 'series'
-  const column = isSeries ? 'series_taste_synopsis' : 'taste_synopsis'
+  const column = mediaType === 'series' ? 'series_taste_synopsis' : 'taste_synopsis'
 
   // Read the profile timestamp back from the table rather than taking it as an
   // argument: the caller has usually just been through getUserTasteProfile,
@@ -124,7 +159,9 @@ export async function refreshTasteSynopsis(
   )
 
   const stored = await queryOne<SynopsisColumns>(
-    `SELECT ${column} AS synopsis, ${column}_updated_at AS synopsis_updated_at
+    `SELECT ${column} AS synopsis,
+            ${column}_updated_at AS synopsis_updated_at,
+            ${column}_version AS synopsis_version
      FROM user_preferences WHERE user_id = $1`,
     [userId]
   )
@@ -133,29 +170,24 @@ export async function refreshTasteSynopsis(
     synopsis: stored?.synopsis ?? null,
     synopsisUpdatedAt: stored?.synopsis_updated_at ?? null,
     profileUpdatedAt: profile?.auto_updated_at ?? null,
+    synopsisVersion: stored?.synopsis_version ?? null,
+    currentVersion: TASTE_SYNOPSIS_PROMPT_VERSION,
   })
 
   if (!needsRefresh) return 'current'
 
-  // Checked before calling, not left to the generator. Both generators answer an
+  // Checked before calling, not left to the generator. The generator answers an
   // unconfigured model by storing the deterministic fallback blurb, which is the
-  // right answer for someone who pressed a button and is watching -- and the
-  // wrong one here, because storing it stamps the row current, so the real
-  // synopsis would never be written once a model was finally configured.
+  // right answer for someone who pressed a button and is watching -- and a
+  // wasted write for a background run.
   if (!(await isAIFunctionConfigured('textGeneration'))) {
     logger.debug({ userId, mediaType }, 'Text generation not configured, leaving synopsis alone')
     return 'not-configured'
   }
 
+  let outcome: IdentityOutcome
   try {
-    // The generator yields chunks for the SSE route to forward to a browser.
-    // There is no browser here, so it is drained for its side effect: it writes
-    // the finished text itself, which keeps one storage path for both callers.
-    const generator = isSeries ? streamSeriesTasteSynopsis(userId) : streamTasteSynopsis(userId)
-    for (;;) {
-      const next = await generator.next()
-      if (next.done) break
-    }
+    outcome = await drain(streamWatcherIdentity(userId, mediaType))
   } catch (error) {
     // Includes the empty-generation throw (F-110). Nothing was stored, so the
     // previous identity stands and the next run tries again.
@@ -163,6 +195,6 @@ export async function refreshTasteSynopsis(
     return 'failed'
   }
 
-  logger.info({ userId, mediaType }, '📝 Taste synopsis refreshed')
-  return 'written'
+  if (outcome === 'written') logger.info({ userId, mediaType }, '📝 Taste synopsis refreshed')
+  return outcome
 }

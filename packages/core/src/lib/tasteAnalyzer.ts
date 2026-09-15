@@ -1,356 +1,479 @@
 /**
- * Embedding-Powered Taste Analyzer
+ * Reads what a Watcher Identity is written from, plus the taste dispersion
+ * getSmartDiversityWeight falls back on when no clusters exist.
  *
- * Analyzes user watch history using embeddings to extract abstract taste patterns.
- * Output is designed for AI consumption without specific movie/show titles.
+ * This file used to BE the identity's analysis: genre-tag counts, a lookup table
+ * of adjectives keyed on which genres appeared in the top ten, and threshold
+ * labels on a favourite rate and a rewatch rate, all over `played OR
+ * is_favorite`. F-129 has the measurements that retired it; tasteEvidence.ts
+ * holds the rules that replaced it and lays the result out for the model.
+ *
+ * Two rules for every identity query here. The viewer's side is PLAYED titles:
+ * the identity is a claim made to someone's face, and on a live instance
+ * favourites were mostly a watchlist (one viewer: 872 unwatched of 898). And the
+ * library side comes from the same libraries the viewer's side was drawn from --
+ * `libraryFilter` is the one spelling of that, so a hidden library cannot read
+ * as an avoided genre (F-034).
  */
 
-import { query } from './db.js'
-import { createChildLogger } from './logger.js'
+import { query, queryOne } from './db.js'
 import { getActiveEmbeddingTableName, getActiveEmbeddingModelId } from './ai-provider.js'
 import { getUserExcludedLibraries } from './libraryExclusions.js'
-import { WATCH_HISTORY_TASTE_SQL } from '../recommender/watchedExclusion.js'
-import { getTasteDispersion } from '../taste-profile/index.js'
-// clustering.ts is a pure leaf (no imports of its own), so taking the cut
-// points and the labelling from it can't introduce a cycle.
-import { describeDispersion, DISPERSION_FOCUSED_THRESHOLD } from '../taste-profile/clustering.js'
+import {
+  WATCH_HISTORY_EXCLUDABLE_SQL,
+  WATCH_HISTORY_PLAYED_SQL,
+  WATCH_HISTORY_TASTE_SQL,
+} from '../recommender/watchedExclusion.js'
+import { DISPERSION_FOCUSED_THRESHOLD } from '../taste-profile/clustering.js'
+import {
+  EXAMPLE_CANDIDATES,
+  FACET_RULES,
+  FACETS_FOR,
+  MIN_TITLES_FOR_SYNOPSIS,
+  UNFINISHED_AFTER_DAYS,
+  UNFINISHED_EXAMPLES,
+  isTasteFacet,
+  type CrowdComparison,
+  type FacetCount,
+  type FacetTotals,
+  type RatedTitle,
+  type SeriesProgress,
+  type TasteEvidence,
+  type TasteFacet,
+  type TasteMediaType,
+  type UnfinishedTitles,
+} from './tasteEvidence.js'
 
-const logger = createChildLogger('taste-analyzer')
+const TABLE: Record<TasteMediaType, 'movies' | 'series'> = { movie: 'movies', series: 'series' }
 
-export interface GenreDistribution {
-  genre: string
-  percentage: number
-  count: number
-}
-
-export interface DecadeDistribution {
-  decade: string
-  percentage: number
-  count: number
-}
-
-export interface ViewingPatterns {
-  totalWatched: number
-  avgPlayCount: number
-  rewatchRate: number // % of movies watched more than once
-  favoriteRate: number // % marked as favorite
-  completionRate?: number // for series: % of started shows finished
-}
-
-export interface TasteDiversity {
-  score: number // 0-1, how spread out their taste is
-  description: string // "focused", "balanced", "eclectic"
-}
-
-export interface ThemeAffinity {
-  theme: string
-  strength: number // 0-1
-}
-
-export interface AbstractTasteProfile {
-  genres: GenreDistribution[]
-  decades: DecadeDistribution[]
-  viewingPatterns: ViewingPatterns
-  diversity: TasteDiversity
-  themes: ThemeAffinity[]
-  emotionalPreferences: string[]
-  storytellingStyles: string[]
+/**
+ * The libraries a viewer draws from, as one spelling. `$2` is their excluded
+ * library ids in every query below, and the viewer's own titles are always
+ * reached through the same filter, so the two sides of a comparison cannot come
+ * from different libraries.
+ */
+function libraryFilter(alias: string): string {
+  return `(CARDINALITY($2::text[]) = 0 OR ${alias}.provider_library_id IS NULL OR ${alias}.provider_library_id::text != ALL($2::text[]))`
 }
 
 /**
- * Analyze a user's movie taste using embeddings
+ * The viewer's PLAYED titles, one row per title, with their own rating. A show
+ * counts once any of its episodes has been played.
  */
-export async function analyzeMovieTaste(userId: string): Promise<AbstractTasteProfile> {
-  logger.info({ userId }, 'Analyzing movie taste with embeddings')
+const MINE_SQL: Record<TasteMediaType, string> = {
+  movie: `
+      SELECT wh.movie_id AS id, MAX(ur.rating) AS rating
+      FROM watch_history wh
+      LEFT JOIN user_ratings ur ON ur.user_id = wh.user_id AND ur.movie_id = wh.movie_id
+      WHERE wh.user_id = $1 AND wh.media_type = 'movie' AND wh.movie_id IS NOT NULL
+        AND ${WATCH_HISTORY_PLAYED_SQL}
+      GROUP BY wh.movie_id`,
+  series: `
+      SELECT e.series_id AS id, MAX(ur.rating) AS rating
+      FROM watch_history wh
+      JOIN episodes e ON e.id = wh.episode_id
+      LEFT JOIN user_ratings ur ON ur.user_id = wh.user_id AND ur.series_id = e.series_id
+      WHERE wh.user_id = $1 AND wh.media_type = 'episode'
+        AND ${WATCH_HISTORY_PLAYED_SQL}
+      GROUP BY e.series_id`,
+}
 
-  const excludedLibraryIds = await getUserExcludedLibraries(userId)
+/** Each facet as a text[] over the title table aliased `t`, so every facet unnests alike. */
+const FACET_EXPRESSION: Record<TasteFacet, string> = {
+  genre: `COALESCE(t.genres, '{}'::text[])`,
+  decade: `CASE WHEN t.year IS NOT NULL THEN ARRAY[(FLOOR(t.year / 10) * 10)::int::text || 's'] ELSE '{}'::text[] END`,
+  country: `COALESCE(t.production_countries, '{}'::text[])`,
+  director: `COALESCE(t.directors, '{}'::text[])`,
+  network: `CASE WHEN btrim(COALESCE(t.network, '')) <> '' THEN ARRAY[t.network] ELSE '{}'::text[] END`,
+  keyword: `COALESCE(t.keywords, '{}'::text[])`,
+}
 
-  // Get genre distribution
-  const genres = await getGenreDistribution(userId, 'movie', excludedLibraryIds)
+/** pg returns NUMERIC and COUNT as strings, and Number(null) is 0 -- parse explicitly. */
+function toNumber(value: unknown): number | null {
+  if (value == null) return null
+  const n = typeof value === 'number' ? value : Number.parseFloat(String(value))
+  return Number.isFinite(n) ? n : null
+}
 
-  // Get decade distribution
-  const decades = await getDecadeDistribution(userId, 'movie', excludedLibraryIds)
+function toCount(value: unknown): number {
+  return Math.max(0, Math.round(toNumber(value) ?? 0))
+}
 
-  // Get viewing patterns
-  const viewingPatterns = await getMovieViewingPatterns(userId, excludedLibraryIds)
+type ExcludedLibraries = string[]
 
-  // Calculate taste diversity from embeddings
-  const diversity = await calculateTasteDiversity(userId, 'movie', excludedLibraryIds)
+// ============================================================================
+// Watcher Identity evidence
+// ============================================================================
 
-  // Infer themes from genre combinations
-  const themes = inferThemesFromGenres(genres)
+export async function gatherTasteEvidence(
+  userId: string,
+  mediaType: TasteMediaType
+): Promise<TasteEvidence> {
+  const excluded = await getUserExcludedLibraries(userId)
+  const counts = await countTitles(userId, mediaType, excluded)
 
-  // Infer emotional preferences
-  const emotionalPreferences = inferEmotionalPreferences(genres, viewingPatterns)
+  const evidence: TasteEvidence = {
+    mediaType,
+    watchedTotal: counts.watched,
+    libraryTotal: counts.library,
+    facets: [],
+    facetTotals: {},
+    rated: [],
+    crowd: null,
+    unfinished: null,
+    progress: null,
+  }
 
-  // Infer storytelling styles
-  const storytellingStyles = inferStorytellingStyles(genres, decades)
+  // Below the floor nothing is written, so the expensive reads are not worth
+  // making -- and the refresh gate asks again on every run for these viewers.
+  if (counts.watched < MIN_TITLES_FOR_SYNOPSIS[mediaType]) return evidence
+
+  const [facets, rated, crowd, unfinished, progress] = await Promise.all([
+    getFacetCounts(userId, mediaType, excluded),
+    getRatedTitles(userId, mediaType, excluded),
+    getCrowdComparison(userId, mediaType, excluded),
+    mediaType === 'movie' ? getUnfinishedMovies(userId, excluded) : Promise.resolve(null),
+    mediaType === 'series' ? getSeriesProgress(userId, excluded) : Promise.resolve(null),
+  ])
 
   return {
-    genres,
-    decades,
-    viewingPatterns,
-    diversity,
-    themes,
-    emotionalPreferences,
-    storytellingStyles,
+    ...evidence,
+    facets: facets.rows,
+    facetTotals: facets.totals,
+    rated,
+    crowd,
+    unfinished,
+    progress,
+  }
+}
+
+async function countTitles(
+  userId: string,
+  mediaType: TasteMediaType,
+  excluded: ExcludedLibraries
+): Promise<{ watched: number; library: number }> {
+  const watchedSql =
+    mediaType === 'movie'
+      ? `SELECT COUNT(DISTINCT wh.movie_id)
+           FROM watch_history wh
+           JOIN movies t ON t.id = wh.movie_id
+          WHERE wh.user_id = $1 AND wh.media_type = 'movie'
+            AND ${WATCH_HISTORY_PLAYED_SQL}
+            AND ${libraryFilter('t')}`
+      : `SELECT COUNT(DISTINCT e.series_id)
+           FROM watch_history wh
+           JOIN episodes e ON e.id = wh.episode_id
+           JOIN series t ON t.id = e.series_id
+          WHERE wh.user_id = $1 AND wh.media_type = 'episode'
+            AND ${WATCH_HISTORY_PLAYED_SQL}
+            AND ${libraryFilter('t')}`
+
+  const row = await queryOne<{ watched: string | null; library: string | null }>(
+    `SELECT (${watchedSql}) AS watched,
+            (SELECT COUNT(*) FROM ${TABLE[mediaType]} t WHERE ${libraryFilter('t')}) AS library`,
+    [userId, excluded]
+  )
+
+  return { watched: toCount(row?.watched), library: toCount(row?.library) }
+}
+
+/**
+ * Every facet label with the viewer's count and the library's, plus each facet's
+ * own totals -- in one statement, so the two sides are read from one snapshot.
+ *
+ * The totals are the titles carrying at least one label OF THAT FACET, not every
+ * title: a film with no keywords is not evidence about keywords, and counting it
+ * would shrink every keyword share. Labels the viewer never watched are kept only
+ * for facets that report avoidance, since "none of theirs" is the strongest form
+ * of it, and dropped elsewhere (the library's keyword list is enormous).
+ */
+async function getFacetCounts(
+  userId: string,
+  mediaType: TasteMediaType,
+  excluded: ExcludedLibraries
+): Promise<{ rows: FacetCount[]; totals: Partial<Record<TasteFacet, FacetTotals>> }> {
+  const facets = FACETS_FOR[mediaType]
+  const columns = facets.map((f) => `${FACET_EXPRESSION[f]} AS f_${f}`).join(',\n             ')
+  const unions = facets
+    .map(
+      (f) =>
+        `SELECT '${f}'::text AS facet, v AS label, lib.id, lib.title, lib.votes FROM lib, unnest(lib.f_${f}) AS v`
+    )
+    .join('\n       UNION ALL\n       ')
+  const reportsAvoidance = facets.filter((f) => FACET_RULES[f].underLimit > 0).map((f) => `'${f}'`)
+  const keepUnwatched =
+    reportsAvoidance.length > 0 ? `OR f.facet IN (${reportsAvoidance.join(', ')})` : ''
+
+  const result = await query<{
+    facet: string
+    label: string | null
+    available: number
+    watched: number
+    examples: string[] | null
+    is_total: number
+  }>(
+    `WITH lib AS (
+       SELECT t.id, t.title, t.imdb_vote_count AS votes,
+              ${columns}
+       FROM ${TABLE[mediaType]} t
+       WHERE ${libraryFilter('t')}
+     ),
+     mine AS (${MINE_SQL[mediaType]}),
+     facets AS (
+       ${unions}
+     )
+     SELECT f.facet,
+            f.label,
+            COUNT(DISTINCT f.id)::int AS available,
+            COUNT(DISTINCT mine.id)::int AS watched,
+            (array_agg(f.title ORDER BY mine.rating DESC NULLS LAST, f.votes DESC NULLS LAST, f.title)
+               FILTER (WHERE mine.id IS NOT NULL))[1:${EXAMPLE_CANDIDATES}] AS examples,
+            GROUPING(f.label)::int AS is_total
+     FROM facets f
+     LEFT JOIN mine ON mine.id = f.id
+     WHERE f.label IS NOT NULL AND btrim(f.label) <> ''
+     GROUP BY GROUPING SETS ((f.facet, f.label), (f.facet))
+     HAVING GROUPING(f.label) = 1 OR COUNT(DISTINCT mine.id) > 0 ${keepUnwatched}`,
+    [userId, excluded]
+  )
+
+  const rows: FacetCount[] = []
+  const totals: Partial<Record<TasteFacet, FacetTotals>> = {}
+
+  for (const row of result.rows) {
+    const facet = row.facet
+    if (!isTasteFacet(facet)) continue
+    const watched = toCount(row.watched)
+    const available = toCount(row.available)
+
+    if (toCount(row.is_total) === 1) {
+      totals[facet] = { watched, available }
+    } else if (row.label) {
+      rows.push({
+        facet,
+        label: row.label,
+        watched,
+        available,
+        examples: [...new Set(row.examples ?? [])],
+      })
+    }
+  }
+
+  return { rows, totals }
+}
+
+async function getRatedTitles(
+  userId: string,
+  mediaType: TasteMediaType,
+  excluded: ExcludedLibraries
+): Promise<RatedTitle[]> {
+  const column = mediaType === 'movie' ? 'movie_id' : 'series_id'
+  const result = await query<{
+    title: string
+    year: number | null
+    rating: number
+    crowd: string | number | null
+  }>(
+    `SELECT t.title, t.year, ur.rating,
+            NULLIF(COALESCE(t.imdb_rating, t.community_rating), 0) AS crowd
+     FROM user_ratings ur
+     JOIN ${TABLE[mediaType]} t ON t.id = ur.${column}
+     WHERE ur.user_id = $1 AND ${libraryFilter('t')}`,
+    [userId, excluded]
+  )
+
+  return result.rows.map((r) => ({
+    title: r.title,
+    year: toNumber(r.year),
+    rating: toCount(r.rating),
+    crowdRating: toNumber(r.crowd),
+  }))
+}
+
+async function getCrowdComparison(
+  userId: string,
+  mediaType: TasteMediaType,
+  excluded: ExcludedLibraries
+): Promise<CrowdComparison | null> {
+  const row = await queryOne<{
+    library_median_votes: number | null
+    watched_median_votes: number | null
+    library_mean_rating: string | null
+    watched_mean_rating: string | null
+  }>(
+    `WITH lib AS (
+       SELECT t.id, t.imdb_vote_count::float8 AS votes,
+              NULLIF(COALESCE(t.imdb_rating, t.community_rating), 0) AS crowd
+       FROM ${TABLE[mediaType]} t
+       WHERE ${libraryFilter('t')}
+     ),
+     mine AS (${MINE_SQL[mediaType]})
+     SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY lib.votes) AS library_median_votes,
+            percentile_cont(0.5) WITHIN GROUP (ORDER BY lib.votes)
+              FILTER (WHERE mine.id IS NOT NULL) AS watched_median_votes,
+            AVG(lib.crowd) AS library_mean_rating,
+            AVG(lib.crowd) FILTER (WHERE mine.id IS NOT NULL) AS watched_mean_rating
+     FROM lib
+     LEFT JOIN mine ON mine.id = lib.id`,
+    [userId, excluded]
+  )
+
+  if (!row) return null
+  return {
+    watchedMedianVotes: toNumber(row.watched_median_votes),
+    libraryMedianVotes: toNumber(row.library_median_votes),
+    watchedMeanRating: toNumber(row.watched_mean_rating),
+    libraryMeanRating: toNumber(row.library_mean_rating),
   }
 }
 
 /**
- * Analyze a user's series taste using embeddings
+ * Films partly played and then left. The excludable predicate's progress half
+ * (>= 5% in) with `played` false, untouched for long enough that it reads as
+ * left rather than paused. A film the viewer has RATED is not on this list: the
+ * rating is the stronger evidence that they saw it, and measured live a 9/10
+ * film sat here with its play never registered, which would have handed the
+ * model a contradiction.
  */
-export async function analyzeSeriesTaste(userId: string): Promise<AbstractTasteProfile> {
-  logger.info({ userId }, 'Analyzing series taste with embeddings')
+async function getUnfinishedMovies(
+  userId: string,
+  excluded: ExcludedLibraries
+): Promise<UnfinishedTitles> {
+  const row = await queryOne<{ count: number | null; examples: string[] | null }>(
+    `SELECT COUNT(*)::int AS count,
+            (array_agg(t.title ORDER BY t.imdb_vote_count DESC NULLS LAST, t.title))[1:${UNFINISHED_EXAMPLES}] AS examples
+     FROM watch_history wh
+     JOIN movies t ON t.id = wh.movie_id
+     WHERE wh.user_id = $1 AND wh.media_type = 'movie'
+       AND wh.played IS NOT TRUE
+       AND ${WATCH_HISTORY_EXCLUDABLE_SQL}
+       AND wh.last_played_at < NOW() - make_interval(days => $3::int)
+       AND NOT EXISTS (
+         SELECT 1 FROM user_ratings ur WHERE ur.user_id = wh.user_id AND ur.movie_id = wh.movie_id
+       )
+       AND ${libraryFilter('t')}`,
+    [userId, excluded, UNFINISHED_AFTER_DAYS]
+  )
 
-  const excludedLibraryIds = await getUserExcludedLibraries(userId)
-
-  // Get genre distribution
-  const genres = await getGenreDistribution(userId, 'series', excludedLibraryIds)
-
-  // Get decade distribution
-  const decades = await getDecadeDistribution(userId, 'series', excludedLibraryIds)
-
-  // Get viewing patterns
-  const viewingPatterns = await getSeriesViewingPatterns(userId, excludedLibraryIds)
-
-  // Calculate taste diversity
-  const diversity = await calculateTasteDiversity(userId, 'series', excludedLibraryIds)
-
-  // Infer themes from genre combinations
-  const themes = inferThemesFromGenres(genres)
-
-  // Infer emotional preferences
-  const emotionalPreferences = inferEmotionalPreferences(genres, viewingPatterns)
-
-  // Infer storytelling styles
-  const storytellingStyles = inferStorytellingStyles(genres, decades)
-
-  return {
-    genres,
-    decades,
-    viewingPatterns,
-    diversity,
-    themes,
-    emotionalPreferences,
-    storytellingStyles,
-  }
+  return { count: toCount(row?.count), examples: row?.examples ?? [] }
 }
 
-async function getGenreDistribution(
+/**
+ * Per started show: played episodes against the library's, specials excluded
+ * from both halves (watching/watchedItems.ts's rule -- a show is its seasons),
+ * how long since an episode was last played, how many episodes had aired by
+ * that day, and the first season begun and left incomplete among those aired.
+ *
+ * The aired count and the unfinished season are NULL when any episode has no
+ * air date: an undated episode could fall on either side of the last play, and
+ * these two decide whether a viewer "stopped" or simply caught up. Air date is
+ * not the date the library acquired a season -- nothing stores that;
+ * `episodes.created_at` is when the sync inserted the row -- which is why the
+ * season test exists at all.
+ */
+async function getSeriesProgress(
   userId: string,
-  mediaType: 'movie' | 'series',
-  excludedLibraryIds: string[]
-): Promise<GenreDistribution[]> {
-  let result: { rows: { genre: string; count: string }[] }
+  excluded: ExcludedLibraries
+): Promise<SeriesProgress[]> {
+  const result = await query<{
+    title: string
+    year: number | null
+    watched: number
+    total: number
+    aired_by_last_play: number | null
+    unfinished_season: number | null
+    days_since: number | null
+  }>(
+    `WITH started AS (
+       SELECT e.series_id AS id,
+              COUNT(DISTINCT wh.episode_id)::int AS watched,
+              MAX(wh.last_played_at) AS last_played
+       FROM watch_history wh
+       JOIN episodes e ON e.id = wh.episode_id
+       WHERE wh.user_id = $1 AND wh.media_type = 'episode'
+         AND ${WATCH_HISTORY_PLAYED_SQL}
+         AND e.season_number > 0
+       GROUP BY e.series_id
+     ),
+     seasons AS (
+       SELECT e.series_id AS id,
+              e.season_number,
+              COUNT(*) AS episodes,
+              COUNT(*) FILTER (WHERE e.premiere_date IS NULL) AS undated,
+              COUNT(*) FILTER (WHERE e.premiere_date <= st.last_played::date) AS aired,
+              COUNT(wh.episode_id) AS played,
+              COUNT(wh.episode_id) FILTER (WHERE e.premiere_date <= st.last_played::date) AS played_aired
+       FROM episodes e
+       JOIN started st ON st.id = e.series_id
+       LEFT JOIN watch_history wh
+         ON wh.episode_id = e.id AND wh.user_id = $1 AND ${WATCH_HISTORY_PLAYED_SQL}
+       WHERE e.season_number > 0
+       GROUP BY e.series_id, e.season_number
+     ),
+     totals AS (
+       SELECT id,
+              SUM(episodes)::int AS total,
+              SUM(aired)::int AS aired,
+              SUM(undated)::int AS undated,
+              MIN(season_number) FILTER (WHERE played > 0 AND played_aired < aired) AS unfinished_season
+       FROM seasons
+       GROUP BY id
+     )
+     SELECT t.title, t.year, st.watched, tot.total,
+            CASE WHEN st.last_played IS NULL OR tot.undated > 0 THEN NULL
+                 ELSE tot.aired
+            END AS aired_by_last_play,
+            CASE WHEN st.last_played IS NULL OR tot.undated > 0 THEN NULL
+                 ELSE tot.unfinished_season
+            END AS unfinished_season,
+            CASE WHEN st.last_played IS NULL THEN NULL
+                 ELSE FLOOR(EXTRACT(EPOCH FROM (NOW() - st.last_played)) / 86400)::int
+            END AS days_since
+     FROM started st
+     JOIN totals tot ON tot.id = st.id
+     JOIN series t ON t.id = st.id
+     WHERE ${libraryFilter('t')}`,
+    [userId, excluded]
+  )
 
-  if (mediaType === 'movie') {
-    result = await query<{ genre: string; count: string }>(
-      `
-      SELECT unnest(m.genres) as genre, COUNT(*) as count
-      FROM watch_history wh
-      JOIN movies m ON m.id = wh.movie_id
-      WHERE wh.user_id = $1 AND wh.media_type = 'movie'
-        AND ${WATCH_HISTORY_TASTE_SQL}
-        AND (CARDINALITY($2::text[]) = 0 OR m.provider_library_id::text != ALL($2::text[]))
-      GROUP BY unnest(m.genres)
-      ORDER BY count DESC
-    `,
-      [userId, excludedLibraryIds]
-    )
-  } else {
-    result = await query<{ genre: string; count: string }>(
-      `
-      SELECT unnest(s.genres) as genre, COUNT(DISTINCT e.series_id) as count
-      FROM watch_history wh
-      JOIN episodes e ON e.id = wh.episode_id
-      JOIN series s ON s.id = e.series_id
-      WHERE wh.user_id = $1 AND wh.media_type = 'episode'
-        AND ${WATCH_HISTORY_TASTE_SQL}
-        AND (CARDINALITY($2::text[]) = 0 OR s.provider_library_id::text != ALL($2::text[]))
-      GROUP BY unnest(s.genres)
-      ORDER BY count DESC
-    `,
-      [userId, excludedLibraryIds]
-    )
-  }
-
-  const total = result.rows.reduce((sum, r) => sum + parseInt(r.count, 10), 0)
-
-  return result.rows.slice(0, 10).map((r) => ({
-    genre: r.genre,
-    count: parseInt(r.count, 10),
-    percentage: Math.round((parseInt(r.count, 10) / total) * 100),
+  return result.rows.map((r) => ({
+    title: r.title,
+    year: toNumber(r.year),
+    watched: toCount(r.watched),
+    total: toCount(r.total),
+    daysSinceLastPlay: toNumber(r.days_since),
+    airedByLastPlay: toNumber(r.aired_by_last_play),
+    unfinishedSeason: toNumber(r.unfinished_season),
   }))
 }
 
-async function getDecadeDistribution(
+// ============================================================================
+// Taste dispersion (recommender only -- not part of the identity)
+// ============================================================================
+
+/**
+ * Average cosine distance from the viewer's taste titles to their centroid,
+ * rescaled to [0,1] with clustering.ts's cut points. Only getSmartDiversityWeight
+ * reads this, and only when no clusters have stored a dispersion yet.
+ *
+ * It is deliberately not in the identity's evidence: the rescaling maps a raw
+ * distance that measured below its 0.3 floor on every live profile, so it reads
+ * 0 ("focused") for everyone -- the old identity prompt carried it anyway.
+ * `played OR is_favorite` stays here because this is recommender input, where a
+ * favourite is deliberate evidence (F-033), not a claim made to anyone.
+ */
+export async function calculateTasteDispersion(
   userId: string,
-  mediaType: 'movie' | 'series',
-  excludedLibraryIds: string[]
-): Promise<DecadeDistribution[]> {
-  let result: { rows: { decade: string; count: string }[] }
-
-  if (mediaType === 'movie') {
-    result = await query<{ decade: string; count: string }>(
-      `
-      SELECT (FLOOR(m.year / 10) * 10)::TEXT || 's' as decade, COUNT(*) as count
-      FROM watch_history wh
-      JOIN movies m ON m.id = wh.movie_id
-      WHERE wh.user_id = $1 AND wh.media_type = 'movie' AND m.year IS NOT NULL
-        AND ${WATCH_HISTORY_TASTE_SQL}
-        AND (CARDINALITY($2::text[]) = 0 OR m.provider_library_id::text != ALL($2::text[]))
-      GROUP BY FLOOR(m.year / 10)
-      ORDER BY count DESC
-    `,
-      [userId, excludedLibraryIds]
-    )
-  } else {
-    result = await query<{ decade: string; count: string }>(
-      `
-      SELECT (FLOOR(s.year / 10) * 10)::TEXT || 's' as decade, COUNT(DISTINCT e.series_id) as count
-      FROM watch_history wh
-      JOIN episodes e ON e.id = wh.episode_id
-      JOIN series s ON s.id = e.series_id
-      WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND s.year IS NOT NULL
-        AND ${WATCH_HISTORY_TASTE_SQL}
-        AND (CARDINALITY($2::text[]) = 0 OR s.provider_library_id::text != ALL($2::text[]))
-      GROUP BY FLOOR(s.year / 10)
-      ORDER BY count DESC
-    `,
-      [userId, excludedLibraryIds]
-    )
-  }
-
-  const total = result.rows.reduce((sum, r) => sum + parseInt(r.count, 10), 0)
-
-  return result.rows.slice(0, 5).map((r) => ({
-    decade: r.decade,
-    count: parseInt(r.count, 10),
-    percentage: Math.round((parseInt(r.count, 10) / total) * 100),
-  }))
-}
-
-async function getMovieViewingPatterns(
-  userId: string,
-  excludedLibraryIds: string[]
-): Promise<ViewingPatterns> {
-  const result = await query<{
-    total_watched: string
-    avg_play_count: string
-    rewatch_count: string
-    favorite_count: string
-  }>(
-    `
-    SELECT 
-      COUNT(DISTINCT wh.movie_id) as total_watched,
-      AVG(wh.play_count)::numeric(10,2) as avg_play_count,
-      COUNT(CASE WHEN wh.play_count > 1 THEN 1 END) as rewatch_count,
-      COUNT(CASE WHEN wh.is_favorite THEN 1 END) as favorite_count
-    FROM watch_history wh
-    JOIN movies m ON m.id = wh.movie_id
-    WHERE wh.user_id = $1 AND wh.media_type = 'movie'
-      AND ${WATCH_HISTORY_TASTE_SQL}
-      AND (CARDINALITY($2::text[]) = 0 OR m.provider_library_id::text != ALL($2::text[]))
-  `,
-    [userId, excludedLibraryIds]
-  )
-
-  const row = result.rows[0]
-  const totalWatched = parseInt(row.total_watched, 10) || 0
-
-  return {
-    totalWatched,
-    avgPlayCount: parseFloat(row.avg_play_count) || 1,
-    rewatchRate:
-      totalWatched > 0 ? Math.round((parseInt(row.rewatch_count, 10) / totalWatched) * 100) : 0,
-    favoriteRate:
-      totalWatched > 0 ? Math.round((parseInt(row.favorite_count, 10) / totalWatched) * 100) : 0,
-  }
-}
-
-async function getSeriesViewingPatterns(
-  userId: string,
-  excludedLibraryIds: string[]
-): Promise<ViewingPatterns> {
-  const result = await query<{
-    total_series: string
-    total_episodes: string
-    avg_play_count: string
-    favorite_count: string
-    completed_count: string
-  }>(
-    `
-    WITH series_stats AS (
-      SELECT 
-        e.series_id,
-        COUNT(DISTINCT wh.episode_id) as episodes_watched,
-        s.total_episodes,
-        AVG(wh.play_count) as avg_play,
-        MAX(CASE WHEN wh.is_favorite THEN 1 ELSE 0 END) as has_favorite
-      FROM watch_history wh
-      JOIN episodes e ON e.id = wh.episode_id
-      JOIN series s ON s.id = e.series_id
-      WHERE wh.user_id = $1 AND wh.media_type = 'episode'
-        AND ${WATCH_HISTORY_TASTE_SQL}
-        AND (CARDINALITY($2::text[]) = 0 OR s.provider_library_id::text != ALL($2::text[]))
-      GROUP BY e.series_id, s.total_episodes
-    )
-    SELECT 
-      COUNT(*) as total_series,
-      SUM(episodes_watched) as total_episodes,
-      AVG(avg_play)::numeric(10,2) as avg_play_count,
-      SUM(has_favorite) as favorite_count,
-      COUNT(CASE WHEN total_episodes > 0 AND episodes_watched::float / total_episodes >= 0.75 THEN 1 END) as completed_count
-    FROM series_stats
-  `,
-    [userId, excludedLibraryIds]
-  )
-
-  const row = result.rows[0]
-  const totalSeries = parseInt(row.total_series, 10) || 0
-
-  return {
-    totalWatched: totalSeries,
-    avgPlayCount: parseFloat(row.avg_play_count) || 1,
-    rewatchRate: 0, // Not as relevant for series
-    favoriteRate:
-      totalSeries > 0 ? Math.round((parseInt(row.favorite_count, 10) / totalSeries) * 100) : 0,
-    completionRate:
-      totalSeries > 0 ? Math.round((parseInt(row.completed_count, 10) / totalSeries) * 100) : 0,
-  }
-}
-
-async function calculateTasteDiversity(
-  userId: string,
-  mediaType: 'movie' | 'series',
-  excludedLibraryIds: string[]
-): Promise<TasteDiversity> {
-  // Prefer the dispersion the clustering pass already computed and stored:
-  // same [0,1] scale, same normalization, same cut points, but engagement-
-  // weighted rather than a flat sample, and it costs one indexed row instead
-  // of scanning 100 embeddings and averaging distances in Postgres. It is also
-  // the number that decided how many taste clusters the user got, so the K
-  // choice and this description now cite the same evidence instead of two
-  // independent estimates that were free to disagree.
-  const storedDispersion = await getTasteDispersion(userId, mediaType)
-  if (storedDispersion !== null) {
-    return { score: storedDispersion, description: describeDispersion(storedDispersion) }
-  }
-
-  // No clusters yet (pre-rebuild, or a profile that failed to cluster) --
-  // fall back to computing it here, exactly as before.
+  mediaType: TasteMediaType
+): Promise<number> {
   const modelId = await getActiveEmbeddingModelId()
-  if (!modelId) {
-    return { score: 0.5, description: describeDispersion(0.5) }
-  }
+  if (!modelId) return 0.5
 
+  const excludedLibraryIds = await getUserExcludedLibraries(userId)
   let avgDistance: number
 
   if (mediaType === 'movie') {
     const tableName = await getActiveEmbeddingTableName('embeddings')
-
-    // Calculate average pairwise distance between watched movie embeddings
     const result = await query<{ avg_distance: string }>(
       `
       WITH user_embeddings AS (
@@ -371,11 +494,9 @@ async function calculateTasteDiversity(
     `,
       [userId, modelId, excludedLibraryIds]
     )
-
     avgDistance = parseFloat(result.rows[0]?.avg_distance || '0.5')
   } else {
     const tableName = await getActiveEmbeddingTableName('series_embeddings')
-
     const result = await query<{ avg_distance: string }>(
       `
       WITH user_embeddings AS (
@@ -397,205 +518,10 @@ async function calculateTasteDiversity(
     `,
       [userId, modelId, excludedLibraryIds]
     )
-
     avgDistance = parseFloat(result.rows[0]?.avg_distance || '0.5')
   }
 
-  // Normalize to 0-1 scale (typical distances are 0.3-0.8). Same formula
-  // clustering.ts applies to its own dispersion, so the fallback above and the
-  // stored value are on one scale.
-  const normalizedScore = Math.min(
-    1,
-    Math.max(0, (avgDistance - DISPERSION_FOCUSED_THRESHOLD) / 0.5)
-  )
-
-  return { score: normalizedScore, description: describeDispersion(normalizedScore) }
-}
-
-function inferThemesFromGenres(genres: GenreDistribution[]): ThemeAffinity[] {
-  const themes: ThemeAffinity[] = []
-  const genreSet = new Set(genres.map((g) => g.genre.toLowerCase()))
-  const genreMap = new Map(genres.map((g) => [g.genre.toLowerCase(), g.percentage]))
-
-  // Check for cerebral/thought-provoking
-  if (genreSet.has('science fiction') || genreSet.has('mystery') || genreSet.has('thriller')) {
-    const strength =
-      ((genreMap.get('science fiction') || 0) +
-        (genreMap.get('mystery') || 0) +
-        (genreMap.get('thriller') || 0)) /
-      100
-    if (strength > 0.1)
-      themes.push({ theme: 'cerebral & thought-provoking', strength: Math.min(1, strength) })
-  }
-
-  // Check for action
-  if (genreSet.has('action') || genreSet.has('adventure')) {
-    const strength = ((genreMap.get('action') || 0) + (genreMap.get('adventure') || 0)) / 100
-    if (strength > 0.1)
-      themes.push({ theme: 'high-octane action', strength: Math.min(1, strength) })
-  }
-
-  // Check for heartwarming
-  if (genreSet.has('family') || genreSet.has('drama') || genreSet.has('romance')) {
-    const strength =
-      ((genreMap.get('family') || 0) +
-        (genreMap.get('drama') || 0) +
-        (genreMap.get('romance') || 0)) /
-      150
-    if (strength > 0.1)
-      themes.push({ theme: 'heartwarming & emotional', strength: Math.min(1, strength) })
-  }
-
-  // Check for dark/gritty
-  if (genreSet.has('crime') || genreSet.has('thriller') || genreSet.has('horror')) {
-    const strength =
-      ((genreMap.get('crime') || 0) +
-        (genreMap.get('thriller') || 0) +
-        (genreMap.get('horror') || 0)) /
-      150
-    if (strength > 0.1) themes.push({ theme: 'dark & gritty', strength: Math.min(1, strength) })
-  }
-
-  // Check for whimsical/fantastical
-  if (genreSet.has('fantasy') || genreSet.has('animation')) {
-    const strength = ((genreMap.get('fantasy') || 0) + (genreMap.get('animation') || 0)) / 100
-    if (strength > 0.1)
-      themes.push({ theme: 'whimsical & fantastical', strength: Math.min(1, strength) })
-  }
-
-  // Check for comedy
-  if (genreSet.has('comedy')) {
-    const strength = (genreMap.get('comedy') || 0) / 50
-    if (strength > 0.2)
-      themes.push({ theme: 'lighthearted & fun', strength: Math.min(1, strength) })
-  }
-
-  return themes.sort((a, b) => b.strength - a.strength).slice(0, 5)
-}
-
-function inferEmotionalPreferences(
-  genres: GenreDistribution[],
-  patterns: ViewingPatterns
-): string[] {
-  const prefs: string[] = []
-  const genreSet = new Set(genres.map((g) => g.genre.toLowerCase()))
-
-  if (genreSet.has('action') || genreSet.has('thriller')) prefs.push('thrills and excitement')
-  if (genreSet.has('comedy')) prefs.push('laughter and levity')
-  if (genreSet.has('drama') || genreSet.has('romance')) prefs.push('emotional depth')
-  if (genreSet.has('horror')) prefs.push('tension and fear')
-  if (genreSet.has('science fiction') || genreSet.has('mystery'))
-    prefs.push('intellectual stimulation')
-  if (genreSet.has('family') || genreSet.has('animation')) prefs.push('comfort and nostalgia')
-  if (genreSet.has('documentary')) prefs.push('learning and discovery')
-
-  if (patterns.rewatchRate > 30) prefs.push('comfort rewatching')
-  if (patterns.favoriteRate > 20) prefs.push('strong emotional connections')
-
-  return prefs.slice(0, 4)
-}
-
-function inferStorytellingStyles(
-  genres: GenreDistribution[],
-  decades: DecadeDistribution[]
-): string[] {
-  const styles: string[] = []
-  const genreSet = new Set(genres.map((g) => g.genre.toLowerCase()))
-
-  if (genreSet.has('action') || genreSet.has('thriller')) styles.push('fast-paced')
-  if (genreSet.has('drama')) styles.push('character-driven')
-  if (genreSet.has('science fiction') || genreSet.has('fantasy')) styles.push('world-building')
-  if (genreSet.has('mystery') || genreSet.has('thriller')) styles.push('plot-twisting')
-  if (genreSet.has('documentary')) styles.push('informative')
-  if (genreSet.has('comedy')) styles.push('witty dialogue')
-
-  // Check decade preferences
-  const recentDecades = decades.filter((d) => parseInt(d.decade) >= 2010)
-  const classicDecades = decades.filter((d) => parseInt(d.decade) < 2000)
-
-  if (recentDecades.reduce((sum, d) => sum + d.percentage, 0) > 60) {
-    styles.push('modern cinematography')
-  }
-  if (classicDecades.reduce((sum, d) => sum + d.percentage, 0) > 30) {
-    styles.push('classic storytelling')
-  }
-
-  return styles.slice(0, 4)
-}
-
-/**
- * Format taste profile as a prompt for AI consumption
- */
-export function formatTasteProfileForAI(
-  profile: AbstractTasteProfile,
-  mediaType: 'movie' | 'series'
-): string {
-  const lines: string[] = []
-
-  lines.push(`=== VIEWER TASTE ANALYSIS (${mediaType.toUpperCase()}) ===`)
-  lines.push('')
-
-  // Genre breakdown
-  lines.push('GENRE PREFERENCES:')
-  for (const g of profile.genres.slice(0, 6)) {
-    lines.push(`  - ${g.genre}: ${g.percentage}%`)
-  }
-  lines.push('')
-
-  // Era preferences
-  lines.push('ERA PREFERENCES:')
-  for (const d of profile.decades.slice(0, 4)) {
-    lines.push(`  - ${d.decade}: ${d.percentage}%`)
-  }
-  lines.push('')
-
-  // Viewing behavior
-  lines.push('VIEWING BEHAVIOR:')
-  lines.push(
-    `  - Total ${mediaType === 'movie' ? 'movies' : 'series'} watched: ${profile.viewingPatterns.totalWatched}`
-  )
-  if (mediaType === 'movie') {
-    lines.push(
-      `  - Rewatch rate: ${profile.viewingPatterns.rewatchRate}% (${profile.viewingPatterns.rewatchRate > 25 ? 'comfort rewatcher' : 'variety seeker'})`
-    )
-  } else {
-    lines.push(
-      `  - Completion rate: ${profile.viewingPatterns.completionRate}% (${(profile.viewingPatterns.completionRate || 0) > 50 ? 'completionist' : 'sampler'})`
-    )
-  }
-  lines.push(
-    `  - Favorite rate: ${profile.viewingPatterns.favoriteRate}% (${profile.viewingPatterns.favoriteRate > 15 ? 'emotionally engaged' : 'casual viewer'})`
-  )
-  lines.push('')
-
-  // Taste diversity
-  lines.push('TASTE PROFILE:')
-  lines.push(
-    `  - Diversity: ${profile.diversity.description} (${Math.round(profile.diversity.score * 100)}% spread)`
-  )
-  lines.push('')
-
-  // Themes
-  if (profile.themes.length > 0) {
-    lines.push('THEMATIC AFFINITIES:')
-    for (const t of profile.themes) {
-      lines.push(`  - ${t.theme}: ${Math.round(t.strength * 100)}% affinity`)
-    }
-    lines.push('')
-  }
-
-  // Emotional preferences
-  if (profile.emotionalPreferences.length > 0) {
-    lines.push(`SEEKS: ${profile.emotionalPreferences.join(', ')}`)
-  }
-
-  // Storytelling styles
-  if (profile.storytellingStyles.length > 0) {
-    lines.push(`PREFERS: ${profile.storytellingStyles.join(', ')} storytelling`)
-  }
-
-  lines.push('')
-  lines.push('=== END ANALYSIS ===')
-
-  return lines.join('\n')
+  // Same formula clustering.ts applies to its own dispersion, so this fallback
+  // and the stored value are on one scale.
+  return Math.min(1, Math.max(0, (avgDistance - DISPERSION_FOCUSED_THRESHOLD) / 0.5))
 }
