@@ -14,6 +14,7 @@ import {
   buildSection,
   diffMembership,
   isHomeSectionTarget,
+  isTopPicksTarget,
   orderRows,
   planMoves,
   planViewerSections,
@@ -69,6 +70,13 @@ describe('isHomeSectionTarget', () => {
     assert.equal(isHomeSectionTarget({ isEnabled: true, providerDisabled: false }), true)
     assert.equal(isHomeSectionTarget({ isEnabled: true, providerDisabled: true }), false)
     assert.equal(isHomeSectionTarget({ isEnabled: false, providerDisabled: false }), false)
+  })
+})
+
+describe('isTopPicksTarget', () => {
+  test('every account the media server has not disabled, enabled in Aperture or not', () => {
+    assert.equal(isTopPicksTarget({ providerDisabled: false }), true)
+    assert.equal(isTopPicksTarget({ providerDisabled: true }), false)
   })
 })
 

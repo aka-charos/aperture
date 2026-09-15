@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAdmin } from '../../../plugins/auth.js'
 import { getMediaServerProvider, getMediaServerApiKey } from '@aperture/core'
+import { isAccountEnabled } from '../../../lib/accountEnabled.js'
 import type { UserRow } from '../types.js'
 
 export function registerProviderHandlers(fastify: FastifyInstance) {
@@ -127,7 +128,25 @@ export function registerProviderHandlers(fastify: FastifyInstance) {
           `INSERT INTO users (username, display_name, provider, provider_user_id, is_admin, is_enabled, movies_enabled, series_enabled, max_parental_rating)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            RETURNING *`,
-          [providerUser.name, providerUser.name, provider.type, providerUserId, providerUser.isAdmin, enableMovies || enableSeries, enableMovies, enableSeries, providerUser.maxParentalRating ?? null]
+          [
+            providerUser.name,
+            providerUser.name,
+            provider.type,
+            providerUserId,
+            providerUser.isAdmin,
+            // Discover and Collections are not written here and default to off (0080, 0116).
+            isAccountEnabled({
+              moviesEnabled: enableMovies,
+              seriesEnabled: enableSeries,
+              discoverEnabled: false,
+              collectionsEnabled: false,
+              isAdmin: providerUser.isAdmin,
+              wasEnabled: false,
+            }),
+            enableMovies,
+            enableSeries,
+            providerUser.maxParentalRating ?? null,
+          ]
         )
 
         fastify.log.info({ userId: newUser?.id, providerUserId, name: providerUser.name }, 'User imported from media server')

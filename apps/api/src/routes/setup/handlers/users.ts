@@ -8,6 +8,7 @@ import {
   getMediaServerProvider,
 } from '@aperture/core'
 import { query, queryOne } from '../../../lib/db.js'
+import { accountEnabledSql, isAccountEnabled } from '../../../lib/accountEnabled.js'
 import { setupSchemas } from '../schemas.js'
 import { requireSetupWritable } from './status.js'
 
@@ -142,10 +143,12 @@ export async function registerUsersHandlers(fastify: FastifyInstance) {
             series_enabled: boolean
           }>(
             `UPDATE users 
-             SET movies_enabled = $1, series_enabled = $2, is_enabled = $3, updated_at = NOW()
-             WHERE id = $4
+             SET movies_enabled = $1, series_enabled = $2,
+                 is_enabled = ${accountEnabledSql({ movies_enabled: '$1', series_enabled: '$2' })},
+                 updated_at = NOW()
+             WHERE id = $3
              RETURNING id, username, is_enabled, movies_enabled, series_enabled`,
-            [moviesEnabled, seriesEnabled, moviesEnabled || seriesEnabled, existing.id]
+            [moviesEnabled, seriesEnabled, existing.id]
           )
           return reply.send({ user: updated, alreadyImported: true })
         }
@@ -169,7 +172,15 @@ export async function registerUsersHandlers(fastify: FastifyInstance) {
             provider.type,
             providerUserId,
             providerUser.isAdmin,
-            moviesEnabled || seriesEnabled,
+            // Discover and Collections are not written here and default to off (0080, 0116).
+            isAccountEnabled({
+              moviesEnabled,
+              seriesEnabled,
+              discoverEnabled: false,
+              collectionsEnabled: false,
+              isAdmin: providerUser.isAdmin,
+              wasEnabled: false,
+            }),
             moviesEnabled,
             seriesEnabled,
             providerUser.maxParentalRating ?? null,
@@ -215,11 +226,14 @@ export async function registerUsersHandlers(fastify: FastifyInstance) {
         const values: unknown[] = []
         let paramIndex = 1
 
+        const written: { movies_enabled?: string; series_enabled?: string } = {}
         if (moviesEnabled !== undefined) {
+          written.movies_enabled = `$${paramIndex}`
           updates.push(`movies_enabled = $${paramIndex++}`)
           values.push(moviesEnabled)
         }
         if (seriesEnabled !== undefined) {
+          written.series_enabled = `$${paramIndex}`
           updates.push(`series_enabled = $${paramIndex++}`)
           values.push(seriesEnabled)
         }
@@ -230,10 +244,9 @@ export async function registerUsersHandlers(fastify: FastifyInstance) {
             .send({ error: 'At least one of moviesEnabled or seriesEnabled is required' })
         }
 
-        updates.push(
-          `is_enabled = COALESCE($${paramIndex++}, movies_enabled) OR COALESCE($${paramIndex++}, series_enabled)`
-        )
-        values.push(moviesEnabled ?? null, seriesEnabled ?? null)
+        // The switches written here are read from their new values; the rest of the
+        // row, admin clause included, as it was (lib/accountEnabled.ts).
+        updates.push(`is_enabled = ${accountEnabledSql(written)}`)
 
         updates.push('updated_at = NOW()')
         values.push(apertureUserId)

@@ -55,15 +55,27 @@ export interface HomeSectionViewer {
 }
 
 /**
- * Whose home screen Aperture may write to. `is_enabled` is the operator's
- * consent to Aperture acting for that account at all; `provider_disabled`
- * means the media server has dropped them, which every other per-user loop in
- * core also refuses (and STRM cleanup treats as grounds to delete output). A
- * viewer who fails this gets their managed rows REMOVED, not merely skipped, or
- * the rows would outlive the consent that created them.
+ * Whose home screen gets PERSONAL rows — their own recommendations and the
+ * playlists they chose. `is_enabled` is the operator's consent to Aperture acting
+ * for that account; `provider_disabled` means the media server has dropped them,
+ * which every other per-user loop in core also refuses (and STRM cleanup treats
+ * as grounds to delete output). A viewer who fails this gets those rows REMOVED,
+ * not merely skipped, or the rows would outlive the consent that created them.
  */
 export function isHomeSectionTarget(viewer: HomeSectionViewer): boolean {
   return viewer.isEnabled && !viewer.providerDisabled
+}
+
+/**
+ * Whose home screen gets the Top Picks rows: every account the media server has
+ * not disabled, enabled in Aperture or not (the operator's call). Top Picks is one
+ * list for the whole server and says nothing about the person looking at it, so it
+ * does not need the consent a viewer's own picks do. The user sync imports every
+ * account on the server, so the users table is everyone — bar accounts created
+ * since it last ran. A `provider_disabled` account still has its rows removed.
+ */
+export function isTopPicksTarget(viewer: Pick<HomeSectionViewer, 'providerDisabled'>): boolean {
+  return !viewer.providerDisabled
 }
 
 export interface MembershipDiff {
