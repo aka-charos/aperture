@@ -280,4 +280,25 @@ test('an ordinary run says nothing about replaying', () => {
 test('an unmapped analysis prints no sections line rather than an empty one', () => {
   const text = renderComparisonReport({ ...report(), entries: [entry({ sections: [] })] })
   assert.doesNotMatch(text, /sections:/)
+  assert.match(text, /map: none written/)
+})
+
+// A rejected map and a missing one have different fixes, and GLM's two
+// unmapped answers could only be told apart with a database query.
+test('a map that could not be read is printed on one line', () => {
+  const text = renderComparisonReport({
+    ...report(),
+    entries: [entry({ sections: [], mapText: '1: tradition\n2: work\n9: reception\n' })],
+  })
+  assert.match(text, /map not read: 1: tradition \| 2: work \| 9: reception\n/)
+
+  const long = renderComparisonReport({
+    ...report(),
+    entries: [entry({ sections: [], mapText: 'x'.repeat(500) })],
+  })
+  assert.match(long, /map not read: x{240}…\n/)
+
+  // A readable map prints its sections and nothing about the raw text.
+  const mapped = renderComparisonReport({ ...report(), entries: [entry({ mapText: '1: work' })] })
+  assert.doesNotMatch(mapped, /map not read|map: none/)
 })

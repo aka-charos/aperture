@@ -183,7 +183,9 @@ test('attribution is a principle: facts plainly, views with a holder', () => {
 
 test('paragraphs open on substance and a fact is told once', () => {
   const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
-  assert.ok(p.includes('never with a restatement of the question'), p)
+  assert.ok(p.includes('its first sentence says something about the film itself'), p)
+  // Version 15: GLM paraphrased this example three times.
+  assert.ok(!p.includes('"The circumstances of its making"'), p)
   assert.ok(p.includes('Say each fact once, under the question it belongs to'), p)
 })
 
@@ -208,8 +210,8 @@ test('the size of the source block does not license length', () => {
 // The bump is what retires every stored row, so it is the half of the change
 // that actually reaches readers - a corrected prompt with a stale version
 // number silently applies to nothing already written.
-test('the prompt version carries the version-14 corrections', () => {
-  assert.ok(ANALYSIS_PROMPT_VERSION >= 14, String(ANALYSIS_PROMPT_VERSION))
+test('the prompt version carries the version-15 corrections', () => {
+  assert.ok(ANALYSIS_PROMPT_VERSION >= 15, String(ANALYSIS_PROMPT_VERSION))
 })
 
 /**
@@ -220,7 +222,7 @@ test('the prompt version carries the version-14 corrections', () => {
 test('context opens on the kind of work, and a single-work comparison is a critic view', () => {
   const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
   assert.ok(p.includes('not on who directed, wrote or stars in it'), p)
-  assert.ok(p.includes('and not on a string of genre labels or tags copied from any page'), p)
+  assert.ok(p.includes('and not on the tags or mood keywords a listing site attaches'), p)
   assert.ok(p.includes("is a critic's view unless a maker said it, and a critic's view belongs to the reception answer"), p)
   // The spoiler test still applies wherever the comparison ends up.
   assert.ok(p.includes('Wherever a comparison appears, it is only safe when it does not carry the ending'), p)
@@ -237,7 +239,7 @@ test('context opens on the kind of work, and a single-work comparison is a criti
  */
 test('the work answer says what its choices achieve, and quality stays out', () => {
   const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
-  assert.ok(p.includes('say what it achieves - the effect is the answer'), p)
+  assert.ok(p.includes('if a document says it, that effect is the answer'), p)
   assert.ok(p.includes('whether it is good belongs to the reception question'), p)
   assert.ok(!p.includes('What one critic reads into a choice belongs to the reception answer'), p)
 })
@@ -311,16 +313,14 @@ test('documents are weighed by who is speaking, and a wrong fact discounts a pag
   assert.ok(p.includes('Weigh what each document says by who is saying it'), p)
   assert.ok(p.includes('a critic quoted on any other page still counts as one'), p)
   assert.ok(p.includes("an aggregator's summary of what critics think"), p)
-  assert.ok(p.includes('Never repeat a string of genre labels, tags or mood keywords, from any page'), p)
+  assert.ok(p.includes('Never repeat the genre labels, tags or mood keywords a listing, store or streaming page attaches'), p)
   assert.ok(p.includes('A document that gets a checkable fact wrong'), p)
   assert.ok(p.includes('says nothing it could not say about any film'), p)
   assert.ok(!p.includes('Weigh the documents by what they are'), 'v13 weighed the kind of page')
 })
 
-test('an effect needs a document to describe it, and a statement needs the maker', () => {
+test('a statement needs the maker', () => {
   const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
-  assert.ok(p.includes('but only an effect a document describes'), p)
-  assert.ok(p.includes('name the choice without one, or leave it out'), p)
   assert.ok(p.includes('That needs the maker as the speaker'), p)
   assert.ok(p.includes('without quoting them is giving its own description'), p)
 })
@@ -354,6 +354,25 @@ test('money is not a making answer, and a changed ending is ending discussion', 
   assert.ok(p.includes('who paid for it, rights deals and fees'), p)
   assert.ok(p.includes('a published screenplay included'), p)
   assert.ok(p.includes('That a maker changed the ending, the tone it closes on'), p)
+})
+
+/**
+ * Version 15, from The Wretches Are Still Singing replayed under 13 and 14 on
+ * the same documents: every answer carried an effect no document described.
+ */
+test('the work answer names the choice first and adds an effect only from a document', () => {
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  assert.ok(p.includes('Name the choices that matter to what it is doing. For each one, look for what a document says it does to the viewer'), p)
+  assert.ok(p.includes('if none does, name the choice and stop - never supply an effect yourself'), p)
+  assert.ok(p.includes('"so that", "which gives", "lets it" or "the result is"'), p)
+  // 14's order, demand first and condition after, is what both models followed.
+  assert.ok(!p.includes('Name a choice, then say what it achieves'), p)
+})
+
+test('the opening may describe the kind of work; only a listing site\'s tags stay out', () => {
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  assert.ok(!p.includes('a string of genre labels'), p)
+  assert.ok(p.includes('a listing, store or streaming page attaches'), p)
 })
 
 /**
@@ -491,9 +510,11 @@ test('bench versions: current by default, deduplicated oldest first, unknown ref
 const versionPrompt = (version: number) =>
   buildAnalysisPrompt(subject(), { mode: 'crw', sources: benchSources, version })
 
-test('versions 9 to 13 stay benchable, each as it was sent', () => {
-  assert.ok([9, 10, 11, 12, 13].every((version) => BENCH_PROMPT_VERSIONS.includes(version)))
-  const [v9, v10, v11, v12, v13, now] = [9, 10, 11, 12, 13, ANALYSIS_PROMPT_VERSION].map(versionPrompt)
+test('versions 9 to 14 stay benchable, each as it was sent', () => {
+  assert.ok([9, 10, 11, 12, 13, 14].every((version) => BENCH_PROMPT_VERSIONS.includes(version)))
+  const [v9, v10, v11, v12, v13, v14, now] = [9, 10, 11, 12, 13, 14, ANALYSIS_PROMPT_VERSION].map(
+    versionPrompt
+  )
   assert.ok(v9.includes('not in every sentence'), 'v9 carried the naming licence')
   assert.ok(v10.includes('what earlier works, genres or movements'), 'v10 draft wording')
   assert.ok(!v10.includes('grouped by the point made'), 'v11 reception is not in v10')
@@ -503,10 +524,13 @@ test('versions 9 to 13 stay benchable, each as it was sent', () => {
   assert.ok(!v12.includes('Weigh the documents by what they are'), 'v13 rule is not in v12')
   assert.ok(v13.includes('Weigh the documents by what they are'), 'v13 source rule')
   assert.ok(v13.includes('only when more than one document holds the view'), 'v13 plural rule')
-  // v13 added a rule, which 14 kept; the archive must still hold v12's eight.
+  assert.ok(v14.includes('but only an effect a document describes'), 'v14 effect clause')
+  assert.ok(v14.includes('a string of genre labels'), 'v14 opener wording')
+  // v13 added a rule, which 14 and 15 kept; the archive must still hold v12's eight.
   assert.equal(v12.split('\n- ').length + 1, v13.split('\n- ').length)
-  assert.equal(v13.split('\n- ').length, now.split('\n- ').length)
-  assert.equal(new Set([v9, v10, v11, v12, v13, now]).size, 6)
+  assert.equal(v13.split('\n- ').length, v14.split('\n- ').length)
+  assert.equal(v14.split('\n- ').length, now.split('\n- ').length)
+  assert.equal(new Set([v9, v10, v11, v12, v13, v14, now]).size, 7)
   // Same questions in the same order, so their maps share a vocabulary.
   assert.deepEqual(questionOrder(v9), questionOrder(now))
   assert.deepEqual(questionIdsFor('series', 10), questionIdsFor('series'))

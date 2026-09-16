@@ -96,10 +96,11 @@ const UNATTRIBUTED = [
   // Terminator 2 under version 12: "are said to have changed how blockbusters
   // were made".
   /\b(?:is|are|was|were)\s+said\s+to\b/gi,
-  // A holder that is not a person, under version 13: "a philosophical reading
-  // takes it as", "one retrospective account holds". "One critical reading" is
-  // already counted above.
-  /\b(?:one|a|another)\s+(?!critical\s)(?:[a-z]+\s+)?(?:account|reading)\s+(?:holds|takes|reads|sees|argues|suggests|finds|calls)\b/gi,
+  // A holder that is not a person: "a philosophical reading takes it as", "one
+  // retrospective account holds" under version 13, and "The retrospective
+  // account is explicit", "the retrospective press placed" under 14. "One
+  // critical reading" is already counted above.
+  /\b(?:one|a|another|the)\s+(?!critical\s)(?:[a-z]+\s+)?(?:account|reading|press)\s+(?:is|was|holds|takes|reads|sees|argues|suggests|finds|calls|notes|treats|places|placed)\b/gi,
 ]
 
 /**

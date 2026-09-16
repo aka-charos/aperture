@@ -116,8 +116,18 @@ import { ARCHIVED_PROMPT_EDITIONS } from './promptEditions.js'
  *    one reading and one comparison and drops a re-release review without
  *    announcing it. A changed ending is ending discussion, and money is not a
  *    making answer.
+ * 15: measured by replaying The Wretches Are Still Singing under 13 and 14 on
+ *    the same documents, and Withnail & I under 13 and 14. Every answer on
+ *    the Greek film carried an effect no document described, one of them
+ *    repeated almost word for word across versions, so the work question now
+ *    names the choice first and adds an effect only when a document supplies
+ *    it. The context opening may describe the kind of work plainly, since for
+ *    an obscure film an encyclopedia's genre description can be the only
+ *    answer, and it is a listing site's tags that stay out. An answer's first
+ *    sentence says something about the film, where 14's example of a banned
+ *    opener was being echoed in paraphrase.
  */
-export const ANALYSIS_PROMPT_VERSION = 14
+export const ANALYSIS_PROMPT_VERSION = 15
 
 /** Reception figures, passed as calibration only. All optional. */
 export interface ReceptionContext {
@@ -410,10 +420,17 @@ const CIRCUMSTANCES_QUESTION: AnalysisQuestion = {
  * carries the same kind of label string, and The Wretches Are Still Singing
  * opened on it recast as a tradition: "the independent, experimental,
  * surrealist and underground current of art cinema in Greece".
+ *
+ * VERSION 15 NARROWS IT BACK. Replayed on the same documents, both models
+ * opened on that label string under 14 as well, and for that film it is the
+ * honest answer: the encyclopedia's description is the only statement of what
+ * kind of work it is. The Zero Years' fault was a listing site's tags and mood
+ * keywords ("tagged for mind-bending or experimental viewing"), so those are
+ * what stays out.
  */
 const TRADITION_QUESTION: AnalysisQuestion = {
   id: 'tradition',
-  text: 'Where does it come from - what kind of work is it, what source does it adapt, and what tradition, movement or body of work does it belong to? Open on that, not on who directed, wrote or stars in it - the reader can already see the credits - and not on a string of genre labels or tags copied from any page. Name traditions and movements freely. A comparison with one specific earlier work - that this one borrows from it, is modelled on it or answers it - is a critic\'s view unless a maker said it, and a critic\'s view belongs to the reception answer. Wherever a comparison appears, it is only safe when it does not carry the ending of that work across: if a reader who knows how that one ends would then know how this one ends, name the tradition and stop there. How it was made and what its makers decided belong to the making question, and what it went on to influence to the reception question.',
+  text: 'Where does it come from - what kind of work is it, what source does it adapt, and what tradition, movement or body of work does it belong to? Open on that, not on who directed, wrote or stars in it - the reader can already see the credits - and not on the tags or mood keywords a listing site attaches. Name traditions and movements freely. A comparison with one specific earlier work - that this one borrows from it, is modelled on it or answers it - is a critic\'s view unless a maker said it, and a critic\'s view belongs to the reception answer. Wherever a comparison appears, it is only safe when it does not carry the ending of that work across: if a reader who knows how that one ends would then know how this one ends, name the tradition and stop there. How it was made and what its makers decided belong to the making question, and what it went on to influence to the reception question.',
 }
 
 /**
@@ -560,9 +577,18 @@ const RECEPTION_QUESTION: AnalysisQuestion = {
  * social values a transgressive, non-naturalistic form" (both on The Wretches Are
  * Still Singing, one per model). A choice with no described effect is named
  * without one, or left out.
+ *
+ * VERSION 15 PUTS THE CONDITION FIRST, because 14's sentence still opened on
+ * the demand ("name a choice, then say what it achieves") and qualified it
+ * afterwards, and both models followed the opening. Replayed on the same Greek
+ * documents, DeepSeek wrote its version-13 effect again ("a transgressive and
+ * non-realist surface") and GLM wrote three new ones ("the era's persistent
+ * radio, so that the characters' youth is always audible"). The clause shapes
+ * those sentences share are named, the file's usual answer to a rule that is
+ * met in paraphrase.
  */
 const WORK_GUARD =
-  'Name a choice, then say what it achieves - the effect is the answer, but only an effect a document describes: where none does, name the choice without one, or leave it out. Only the choices that matter to what it is doing: a run of camera models, lens makes or music credits is not an answer, even with a sentence about its effect attached. Describe what an image, device or figure does to the viewer, never what it turns out to be. When the sources describe it, say how a comedy is funny or how a thriller builds suspense. What a performance, an effect or a score does belongs here; whether it is good belongs to the reception question, so no "sharp", "powerful", "masterful" or "career-best". What a writer says the film means - what its characters stand for, what it is really about - is a reading, and readings belong to the reception question too.'
+  'Name the choices that matter to what it is doing. For each one, look for what a document says it does to the viewer: if a document says it, that effect is the answer, and if none does, name the choice and stop - never supply an effect yourself, however natural it seems. A clause such as "so that", "which gives", "lets it" or "the result is" states an effect and needs a document behind it. A run of camera models, lens makes or music credits is not an answer, even with a sentence about its effect attached. Describe what an image, device or figure does to the viewer, never what it turns out to be. When the sources describe it, say how a comedy is funny or how a thriller builds suspense. What a performance, an effect or a score does belongs here; whether it is good belongs to the reception question, so no "sharp", "powerful", "masterful" or "career-best". What a writer says the film means - what its characters stand for, what it is really about - is a reading, and readings belong to the reception question too.'
 
 const MOVIE_QUESTIONS: AnalysisQuestion[] = [
   TRADITION_QUESTION,
@@ -659,6 +685,10 @@ const GROUNDED_RULE =
  * section by restating its question ("The film sits in", "Critics disagree
  * about"), which is the questionnaire showing through a heading that already
  * names it. The model cannot see the heading, so the rule tells it one exists.
+ * Version 15 drops the example "The circumstances of its making": GLM opened
+ * its making answer with "The circumstances of production left ... mark" in
+ * three Withnail & I answers under 13 and 14, a paraphrase of the example it
+ * was warned against. The rule now states what the first sentence must do.
  *
  * RULE 3 IS THE ONE THAT CHANGED DIRECTION. Version 5 wrote "do not write one
  * paragraph per question" to stop the questions being a form filled in one
@@ -744,9 +774,12 @@ const ATTRIBUTION_RULE =
  *   A checkable fact gotten wrong is the one test the model can apply to that
  *   without judging prose quality, and "could be said of any film" catches the
  *   rest of what such pages carry.
+ *
+ * VERSION 15 NARROWS THE LABEL SENTENCE back to what a listing page attaches,
+ * to match the context question (see TRADITION_QUESTION).
  */
 const SOURCE_VALUE_RULE =
-  'Weigh what each document says by who is saying it. Criticism and scholarship - a review or essay that argues a view, academic writing - are the evidence, and a critic quoted on any other page still counts as one. Words that belong to the page itself are not criticism when the page is a user review or comment, a fan wiki, a study guide, an essay site, an aggregator\'s summary of what critics think, or a listing, store or streaming page: they may confirm a plain fact such as where it was made, but take no reading of the work from them and no claim about where it sits, and let them supply at most one sentence, in the reception answer, on how ordinary viewers responded. Never repeat a string of genre labels, tags or mood keywords, from any page. A document that gets a checkable fact wrong - who made the film, when or where - is evidence for nothing, and neither is one that says nothing it could not say about any film.'
+  'Weigh what each document says by who is saying it. Criticism and scholarship - a review or essay that argues a view, academic writing - are the evidence, and a critic quoted on any other page still counts as one. Words that belong to the page itself are not criticism when the page is a user review or comment, a fan wiki, a study guide, an essay site, an aggregator\'s summary of what critics think, or a listing, store or streaming page: they may confirm a plain fact such as where it was made, but take no reading of the work from them and no claim about where it sits, and let them supply at most one sentence, in the reception answer, on how ordinary viewers responded. Never repeat the genre labels, tags or mood keywords a listing, store or streaming page attaches. A document that gets a checkable fact wrong - who made the film, when or where - is evidence for nothing, and neither is one that says nothing it could not say about any film.'
 
 /**
  * VERSION 14 NAMES TWO FORMS OF ENDING DISCUSSION that passed the first rule on
@@ -759,7 +792,7 @@ const RULES = [
   'Describe how it works, never what happens in it. No third-act or ending discussion, and no reveals - not what a character, creature or image turns out to be. That a maker changed the ending, the tone it closes on, and which character gets out and which does not are all ending discussion. Someone who has not seen it must be able to read this safely.',
   'Match your register to the work. A stunt-driven action picture has real craft in its staging and choreography, and that is a legitimate subject - write about it as what it is. Do not apply art-cinema vocabulary to a genre entertainment.',
   'The questions are what to cover and in what order, not a form to fill in. Give a question as many paragraphs as the sources support, and none to a question they do not. Two questions may share a paragraph when they genuinely belong together, but do not scatter one question across paragraphs that are not next to each other. Say each fact once, under the question it belongs to - once it has been said, do not say it again under another.',
-  'Write in short paragraphs of three or four sentences, never more, separated by a blank line. Each paragraph makes one point and develops it: every sentence follows from the one before, and a sentence may join two related clauses with "and", "because" or "so". A paragraph that lists separate facts one sentence at a time - the vehicles, then the effects, then the score - is notes, not prose. Do not chain clauses with semicolons. Each answer is shown to the reader under a heading that names its question, so open on the substance - never with a restatement of the question such as "The film sits in", "The circumstances of its making" or "Critics disagree about". Say what a choice does, not what it avoids: a sentence built on "rather than" or "not X but Y" usually says one thing twice. Plain prose only in the analysis itself: no headings, bullet points, numbered lists or bold text.',
+  'Write in short paragraphs of three or four sentences, never more, separated by a blank line. Each paragraph makes one point and develops it: every sentence follows from the one before, and a sentence may join two related clauses with "and", "because" or "so". A paragraph that lists separate facts one sentence at a time - the vehicles, then the effects, then the score - is notes, not prose. Do not chain clauses with semicolons. Each answer is shown to the reader under a heading that names its question, so its first sentence says something about the film itself - never what the answer is going to cover, the way "The film sits in", "Critics disagree about" or a sentence saying that the making left its mark does. Say what a choice does, not what it avoids: a sentence built on "rather than" or "not X but Y" usually says one thing twice. Plain prose only in the analysis itself: no headings, bullet points, numbered lists or bold text.',
   'Be specific. Name the person responsible for the choice you are describing - the director, the writer, the cinematographer - instead of "those behind the project" or "the creative team". Name people for what they chose, never to list credits: a sentence that only records who did what is not analysis. Cut any sentence whose only content is that the work sits in a tradition, extends one, or hopes to influence something: say what and how, or say nothing.',
   'Answer only what the sources genuinely support. It is normal for one or two of these questions to have no answer, and dropping them is the correct outcome rather than a gap to fill. A single thin fact is not a paragraph - fold it into the answer it belongs to, or leave it out. If no question has an answer, say so in two sentences and stop.',
   SOURCE_VALUE_RULE,
@@ -773,7 +806,7 @@ const RULES = [
  * AN EDITION IS ONLY THESE, BECAUSE THAT IS ALL THAT HAS EVER CHANGED between
  * the versions the bench can run. The header, the source block, the TASK lines,
  * the retrieval-mode rule and the output contract were compared line by line
- * across versions 7 to 13 when the archived editions were extracted, and are
+ * across versions 7 to 14 when the archived editions were extracted, and are
  * identical. That is what makes a multi-version bench sound: the prompts it
  * builds from one retrieval differ below the TASK line and nowhere else.
  */
@@ -817,7 +850,7 @@ const CURRENT_EDITION: PromptEdition = {
  * replaced to ./promptEditions.ts exactly as it stands, bump
  * ANALYSIS_PROMPT_VERSION, and set this back to null. Version 11 skipped the
  * draft on the operator's call: the version-10 draft was benched, and 11 is
- * what that bench asked for. Versions 12 to 14 went live without one too.
+ * what that bench asked for. Versions 12 to 15 went live without one too.
  */
 const DRAFT_EDITION = null as PromptEdition | null
 
