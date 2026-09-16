@@ -247,7 +247,7 @@ test('a fact told under two questions is counted and named in the report', () =>
     })
   )
   assert.match(text, /told twice \d+ \([^)]*liquid metal/)
-  assert.match(text, /\s+twice\n/)
+  assert.match(text, /\s+twice\s+spill\n/)
 })
 
 test('an ordinary run says nothing about replaying', () => {

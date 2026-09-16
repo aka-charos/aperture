@@ -154,6 +154,7 @@ function signalsLine(signals: ProseSignals): string {
           signals.repeatedAcrossSections > 4 ? ', …' : ''
         })`
       : 'told twice 0',
+    `writers outside reception ${signals.spill}`,
   ].join('  ·  ')
 }
 
@@ -195,6 +196,7 @@ const SIGNAL_COLUMNS: [string, (s: ProseSignals) => number][] = [
   ['open', (s) => s.leftOpen],
   ['echoes', (s) => s.questionEchoes],
   ['twice', (s) => s.repeatedAcrossSections],
+  ['spill', (s) => s.spill],
 ]
 
 interface SignalRow {

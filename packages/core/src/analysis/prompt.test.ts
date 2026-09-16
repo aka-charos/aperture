@@ -174,11 +174,11 @@ test('the work question refuses credit lists and reveals', () => {
 // is what is pinned now, with the measured synonyms named beneath it.
 test('attribution is a principle: facts plainly, views with a holder', () => {
   const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
-  assert.ok(p.includes('State facts plainly.'), p)
-  assert.ok(p.includes('Never turn a view into a fact'), p)
+  assert.ok(p.includes('state facts, what is on screen and what it does to the viewer plainly'), p)
+  assert.ok(p.includes('Never state such a view as your own'), p)
   assert.ok(p.includes('"is described as"'), p)
+  assert.ok(p.includes('"is said to"'), p)
   assert.ok(p.includes('"the sources carry"'), p)
-  assert.ok(p.includes('judgements of quality belong in the reception answer only.'), p)
 })
 
 test('paragraphs open on substance and a fact is told once', () => {
@@ -208,8 +208,8 @@ test('the size of the source block does not license length', () => {
 // The bump is what retires every stored row, so it is the half of the change
 // that actually reaches readers - a corrected prompt with a stale version
 // number silently applies to nothing already written.
-test('the prompt version carries the version-12 corrections', () => {
-  assert.ok(ANALYSIS_PROMPT_VERSION >= 12, String(ANALYSIS_PROMPT_VERSION))
+test('the prompt version carries the version-13 corrections', () => {
+  assert.ok(ANALYSIS_PROMPT_VERSION >= 13, String(ANALYSIS_PROMPT_VERSION))
 })
 
 /**
@@ -217,10 +217,13 @@ test('the prompt version carries the version-12 corrections', () => {
  * fragment is the clause answering one measured fault - see the notes on the
  * constants in ./prompt.ts.
  */
-test('context opens on the kind of work, and a single-work comparison carries a holder', () => {
+test('context opens on the kind of work, and a single-work comparison is a critic view', () => {
   const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
   assert.ok(p.includes('not on who directed, wrote or stars in it'), p)
-  assert.ok(p.includes("is a view unless a maker said it, so present it as a critic's comparison"), p)
+  assert.ok(p.includes('and not on genre labels or tags copied from a listing site'), p)
+  assert.ok(p.includes("is a critic's view unless a maker said it, and a critic's view belongs to the reception answer"), p)
+  // The spoiler test still applies wherever the comparison ends up.
+  assert.ok(p.includes('Wherever a comparison appears, it is only safe when it does not carry the ending'), p)
   assert.ok(p.includes('How it was made and what its makers decided belong to the making question'), p)
   // v9's invitation to production, and v10's pull toward single works, stay gone.
   assert.ok(!p.includes('what was it responding to'), p)
@@ -239,18 +242,6 @@ test('the work answer says what its choices achieve, and quality stays out', () 
   assert.ok(!p.includes('What one critic reads into a choice belongs to the reception answer'), p)
 })
 
-test('a view is marked, but only a recognisable critic or publication is named', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
-  assert.ok(p.includes('"critics", "reviewers" or "one reviewer" does that'), p)
-  assert.ok(p.includes('only when a general reader would recognise it'), p)
-  assert.ok(p.includes('Never name a blog, a fan site, a wiki, a study guide, an essay site or a review aggregator'), p)
-  assert.ok(p.includes('A view written as a plain sentence is still a view'), p)
-  // v11 asked for the name itself, in two places.
-  assert.ok(!p.includes('needs their name'), p)
-  assert.ok(!p.includes('name who made the comparison'), p)
-  assert.ok(!p.includes('not in every sentence'), 'the licence version 9 gave must stay gone')
-})
-
 test('reception is the shortest answer and says each point once', () => {
   const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
   assert.ok(p.includes('This is the shortest answer: at most two short paragraphs'), p)
@@ -258,6 +249,48 @@ test('reception is the shortest answer and says each point once', () => {
   assert.ok(p.includes('not a sentence for each critic who did'), p)
   assert.ok(p.includes('leave out one that is about the re-release or its format'), p)
   assert.ok(p.includes('in terms a critic used'), p)
+})
+
+/**
+ * Version 13, from Kontroll under 11 and 12 and a version-12 library row (The
+ * Zero Years): names are gone, writers' views stay in reception, and weak
+ * pages are weighed as what they are.
+ */
+test('nobody is named, and "critics" is plural only when it is', () => {
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  assert.ok(p.includes('Never name a critic, scholar, reviewer or publication'), p)
+  assert.ok(p.includes('write "critics" only when more than one document holds the view'), p)
+  // v12 still named a critic a general reader would recognise.
+  assert.ok(!p.includes('only when a general reader would recognise it'), p)
+  assert.ok(!p.includes('needs their name'), p)
+  assert.ok(!p.includes('not in every sentence'), 'the licence version 9 gave must stay gone')
+})
+
+test("the craft answers speak in the analysis's own voice; readings and verdicts go to reception", () => {
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  assert.ok(p.includes("The context, work and making answers speak in your own voice"), p)
+  assert.ok(p.includes('it belongs in the reception answer, marked as a critic'), p)
+  assert.ok(p.includes('is a reading, and readings belong to the reception question too'), p)
+  assert.ok(p.includes('A reading of what the film means belongs here only when it shaped how the film was received'), p)
+  // v12's rule that made every effect need a holder.
+  assert.ok(!p.includes('A view written as a plain sentence is still a view'), p)
+})
+
+test('weak pages are weighed, and give reception one sentence at most', () => {
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  assert.ok(p.includes('Weigh the documents by what they are'), p)
+  assert.ok(p.includes('take no reading of the work from them and no claim about where it sits'), p)
+  assert.ok(p.includes('never repeat the genre labels, tags or mood keywords a listing page attaches'), p)
+  assert.ok(p.includes("Ordinary viewers' reactions get one sentence at most"), p)
+})
+
+test('the work, making and reception answers carry the other measured corrections', () => {
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  assert.ok(p.includes('no "sharp", "powerful", "masterful" or "career-best"'), p)
+  assert.ok(p.includes('say how a comedy is funny or how a thriller builds suspense'), p)
+  assert.ok(p.includes('A list of who held which job is not an answer either'), p)
+  assert.ok(p.includes('Neither is what its makers went on to do afterwards.'), p)
+  assert.ok(p.includes('A fault a review argues in detail is worth more than a summary'), p)
 })
 
 test('a paragraph develops one point instead of listing facts', () => {
@@ -407,15 +440,19 @@ test('bench versions: current by default, deduplicated oldest first, unknown ref
 const versionPrompt = (version: number) =>
   buildAnalysisPrompt(subject(), { mode: 'crw', sources: benchSources, version })
 
-test('versions 9, 10 and 11 stay benchable, each as it was sent', () => {
-  assert.ok([9, 10, 11].every((version) => BENCH_PROMPT_VERSIONS.includes(version)))
-  const [v9, v10, v11, now] = [9, 10, 11, ANALYSIS_PROMPT_VERSION].map(versionPrompt)
+test('versions 9 to 12 stay benchable, each as it was sent', () => {
+  assert.ok([9, 10, 11, 12].every((version) => BENCH_PROMPT_VERSIONS.includes(version)))
+  const [v9, v10, v11, v12, now] = [9, 10, 11, 12, ANALYSIS_PROMPT_VERSION].map(versionPrompt)
   assert.ok(v9.includes('not in every sentence'), 'v9 carried the naming licence')
   assert.ok(v10.includes('what earlier works, genres or movements'), 'v10 draft wording')
   assert.ok(!v10.includes('grouped by the point made'), 'v11 reception is not in v10')
   assert.ok(v11.includes('grouped by the point made'), 'v11 reception wording')
   assert.ok(v11.includes('What one critic reads into a choice belongs to the reception answer'))
-  assert.equal(new Set([v9, v10, v11, now]).size, 4)
+  assert.ok(v12.includes('only when a general reader would recognise it'), 'v12 naming rule')
+  assert.ok(!v12.includes('Weigh the documents by what they are'), 'v13 rule is not in v12')
+  // v13 added a rule; the archive must still hold v12's eight.
+  assert.equal(v12.split('\n- ').length + 1, now.split('\n- ').length)
+  assert.equal(new Set([v9, v10, v11, v12, now]).size, 5)
   // Same questions in the same order, so their maps share a vocabulary.
   assert.deepEqual(questionOrder(v9), questionOrder(now))
   assert.deepEqual(questionIdsFor('series', 10), questionIdsFor('series'))
