@@ -88,7 +88,20 @@ const COMMON_WORDS = new Set([
   'series', 'show', 'some', 'still', 'such', 'than', 'that', 'their', 'them', 'then', 'there',
   'these', 'they', 'this', 'those', 'through', 'under', 'very', 'were', 'what', 'when', 'where',
   'which', 'while', 'whose', 'with', 'work', 'would',
+  // The genre and the people writing about it are the subject's vocabulary:
+  // "science fiction" and "action cinema" matched on every Terminator 2 bench
+  // without anything being told twice.
+  'action', 'cinema', 'science', 'fiction', 'genre', 'critic', 'critics', 'reviewer', 'reviewers',
+  'review', 'reviews',
 ])
+
+/**
+ * A capitalised pair is a name - "Brian Eggert", "James Cameron", "Deep Focus"
+ * - and a name recurs whenever the person does something else. Those pairs
+ * were most of what the signal printed on the version-10 and version-11
+ * benches, burying the genuine repeats.
+ */
+const isCapitalised = (word: string) => /^\p{Lu}/u.test(word)
 
 function count(text: string, patterns: RegExp[]): number {
   return patterns.reduce((sum, pattern) => sum + (text.match(pattern)?.length ?? 0), 0)
@@ -103,16 +116,19 @@ function sentenceCount(paragraph: string): number {
   return paragraph.split(/(?<=[.!?])["'”’)\]]*\s+(?=["'“‘(]?[A-Z0-9À-ÖØ-Þ])/).filter((s) => s.trim()).length
 }
 
-/** Two adjacent distinctive words, hyphens read as spaces ("liquid-metal"). */
+/**
+ * Two adjacent distinctive words, hyphens read as spaces ("liquid-metal"),
+ * skipping names.
+ */
 function distinctivePairs(paragraph: string): Set<string> {
   const words = paragraph
-    .toLowerCase()
     .replace(/[-–—]/g, ' ')
     .split(/[^\p{L}\p{N}']+/u)
     .filter(Boolean)
   const pairs = new Set<string>()
   for (let i = 0; i + 1 < words.length; i++) {
-    const [a, b] = [words[i], words[i + 1]]
+    if (isCapitalised(words[i]) && isCapitalised(words[i + 1])) continue
+    const [a, b] = [words[i].toLowerCase(), words[i + 1].toLowerCase()]
     if (a.length >= 4 && b.length >= 4 && !COMMON_WORDS.has(a) && !COMMON_WORDS.has(b)) {
       pairs.add(`${a} ${b}`)
     }

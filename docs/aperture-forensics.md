@@ -2536,6 +2536,26 @@ The replay itself did its job, and its numbers are worth keeping as the first me
 
 **Not done.** The report still does not say how many walled pages retrieval dropped, and "told twice" still flags critic names and genre words ("brian eggert", "science fiction"). Unverified: whether a model groups reception by point without inventing agreement between critics who praised different things, and whether moving readings to reception leaves the work answer thin on titles where most of what is known about the craft comes from one critic.
 
+**Addendum, 2026-09-16: version 12, the day after 11.** Terminator 2 was benched under 10 and 11 from one retrieval (DeepSeek V4.1 Flash), and the operator read two version-11 library rows, *Lost Highway* and *Session 9*.
+
+**What 11 fixed held.** Context no longer opened on credits. "Owes a debt to *The Road Warrior*" carried a name. The *Shane* comparison was gone, and the one re-release review was labelled as one.
+
+**Two of 11's rules were ignored.** "Grouped by the point made … not one sentence per critic" produced "Roger Ebert praised … Derek Malcolm praised … Kenneth Turan called …", three sentences for one point. "Connect the sentences of a paragraph" produced a paragraph listing the vehicles, the effects, the stunts and the score one sentence each.
+
+**One of 11's changes backfired.** Moving critics' readings out of the work answer removed its analysis: in these sources what a choice achieves is almost always a critic's writing. v10 wrote that the T-1000 "makes the threat feel adaptive and impersonal"; v11 described its look and stopped. Reception absorbed the readings and grew from three paragraphs to five of thirteen, about 40% of the words against the work answer's 29%. The library rows had the same shape: *Lost Highway* gave reception six paragraphs against three sentences of Form and Style.
+
+**The operator's objection to the names was right, and the measurement agrees.** Of Terminator 2's six sources, one is a newspaper critic a reader might know. v11 printed the others as authorities: "Motionlog praises it as a flawless example", "The Astromech says it divides action cinema before and after", "GradeSaver reports widespread acclaim". *Session 9* cited UKEssays, an essay mill, as a critic. The name was only ever a way to keep an opinion from reading as fact, and "critics" or "one reviewer" does that too.
+
+**What version 12 changes.**
+
+1. **A view is marked without naming its holder.** A critic or publication is named only when a general reader would recognise it. A blog, fan site, wiki, study guide, essay site or aggregator is never named. The list goes by kind of site because the model sees each document's domain, so applying it is a lookup, not a judgement of fame. The Context question asks for a comparison to be marked as a critic's, not for the name.
+2. **Reception is the shortest answer**: at most two short paragraphs, never longer than the work answer. One paragraph covers what critics valued and faulted, with a point made by several critics stated once; the other covers influence in a sentence or two. A review about a re-release's format is dropped.
+3. **The work answer says what its choices achieve again.** v10's wording is back, with "the effect is the answer" added. Only a verdict on quality moves to reception.
+4. **The paragraph rule names the list it forbids**: "the vehicles, then the effects, then the score" is notes. "One idea per sentence, make it two sentences" is gone, since it was the instruction producing the list; a sentence may now join related clauses with "and", "because" or "so".
+5. **"Told twice" skips capitalised pairs and genre and critic words.** On the v10 and v11 benches, "brian eggert", "james cameron", "edward furlong", "deep focus" and "science fiction" were most of what it printed.
+
+**Went live without a bench, on the operator's call**, the second version in a row to do so. That is a real risk here: two of v11's four new instructions were ignored, and v12's reception cap and naming rule are the same kind of instruction. v11 is archived, so the check is one bench run of 11 against 12, and the thing to read is reception's paragraph count and whether any unrecognisable site is named.
+
 ## F-129
 
 **The Watcher Identity was written from a lookup table and a watchlist; it is now written from a viewing record compared with the library.** Added 2026-09-15.

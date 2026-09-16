@@ -208,8 +208,8 @@ test('the size of the source block does not license length', () => {
 // The bump is what retires every stored row, so it is the half of the change
 // that actually reaches readers - a corrected prompt with a stale version
 // number silently applies to nothing already written.
-test('the prompt version carries the version-11 corrections', () => {
-  assert.ok(ANALYSIS_PROMPT_VERSION >= 11, String(ANALYSIS_PROMPT_VERSION))
+test('the prompt version carries the version-12 corrections', () => {
+  assert.ok(ANALYSIS_PROMPT_VERSION >= 12, String(ANALYSIS_PROMPT_VERSION))
 })
 
 /**
@@ -220,27 +220,51 @@ test('the prompt version carries the version-11 corrections', () => {
 test('context opens on the kind of work, and a single-work comparison carries a holder', () => {
   const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
   assert.ok(p.includes('not on who directed, wrote or stars in it'), p)
-  assert.ok(p.includes('is a view unless a maker said it, so name who made the comparison'), p)
+  assert.ok(p.includes("is a view unless a maker said it, so present it as a critic's comparison"), p)
   assert.ok(p.includes('How it was made and what its makers decided belong to the making question'), p)
   // v9's invitation to production, and v10's pull toward single works, stay gone.
   assert.ok(!p.includes('what was it responding to'), p)
   assert.ok(!p.includes('what earlier works'), p)
 })
 
-test('a critic reading of a choice goes to reception, and naming is no longer optional', () => {
+/**
+ * Version 12, from Terminator 2 under 10 and 11 and two version-11 library
+ * rows: reception had become the longest section and a list of bylines nobody
+ * knows, and the work answer had lost what its choices achieve.
+ */
+test('the work answer says what its choices achieve, and quality stays out', () => {
   const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
-  assert.ok(p.includes('What one critic reads into a choice belongs to the reception answer'), p)
-  assert.ok(p.includes('A view written as a plain sentence with nobody named is still a view'), p)
-  assert.ok(p.includes('name them once, at its start'), p)
+  assert.ok(p.includes('say what it achieves - the effect is the answer'), p)
+  assert.ok(p.includes('whether it is good belongs to the reception question'), p)
+  assert.ok(!p.includes('What one critic reads into a choice belongs to the reception answer'), p)
+})
+
+test('a view is marked, but only a recognisable critic or publication is named', () => {
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  assert.ok(p.includes('"critics", "reviewers" or "one reviewer" does that'), p)
+  assert.ok(p.includes('only when a general reader would recognise it'), p)
+  assert.ok(p.includes('Never name a blog, a fan site, a wiki, a study guide, an essay site or a review aggregator'), p)
+  assert.ok(p.includes('A view written as a plain sentence is still a view'), p)
+  // v11 asked for the name itself, in two places.
+  assert.ok(!p.includes('needs their name'), p)
+  assert.ok(!p.includes('name who made the comparison'), p)
   assert.ok(!p.includes('not in every sentence'), 'the licence version 9 gave must stay gone')
 })
 
-test('reception groups critics by point and dates a re-release review', () => {
+test('reception is the shortest answer and says each point once', () => {
   const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
-  assert.ok(p.includes('grouped by the point made'), p)
-  assert.ok(p.includes('not one sentence per critic'), p)
-  assert.ok(p.includes('describe the split only in terms a critic used'), p)
-  assert.ok(p.includes('A review of a later re-release or restoration'), p)
+  assert.ok(p.includes('This is the shortest answer: at most two short paragraphs'), p)
+  assert.ok(p.includes('never longer than the answer about what the work is doing'), p)
+  assert.ok(p.includes('not a sentence for each critic who did'), p)
+  assert.ok(p.includes('leave out one that is about the re-release or its format'), p)
+  assert.ok(p.includes('in terms a critic used'), p)
+})
+
+test('a paragraph develops one point instead of listing facts', () => {
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  assert.ok(p.includes('Each paragraph makes one point and develops it'), p)
+  assert.ok(p.includes('is notes, not prose'), p)
+  assert.ok(!p.includes('if a sentence carries two ideas, make it two sentences'), p)
 })
 
 test("a critic's guess at intent is not the maker speaking", () => {
@@ -383,14 +407,15 @@ test('bench versions: current by default, deduplicated oldest first, unknown ref
 const versionPrompt = (version: number) =>
   buildAnalysisPrompt(subject(), { mode: 'crw', sources: benchSources, version })
 
-test('versions 9 and 10 stay benchable, each as it was sent', () => {
-  assert.ok(BENCH_PROMPT_VERSIONS.includes(9) && BENCH_PROMPT_VERSIONS.includes(10))
-  const [v9, v10, now] = [versionPrompt(9), versionPrompt(10), versionPrompt(ANALYSIS_PROMPT_VERSION)]
+test('versions 9, 10 and 11 stay benchable, each as it was sent', () => {
+  assert.ok([9, 10, 11].every((version) => BENCH_PROMPT_VERSIONS.includes(version)))
+  const [v9, v10, v11, now] = [9, 10, 11, ANALYSIS_PROMPT_VERSION].map(versionPrompt)
   assert.ok(v9.includes('not in every sentence'), 'v9 carried the naming licence')
   assert.ok(v10.includes('what earlier works, genres or movements'), 'v10 draft wording')
   assert.ok(!v10.includes('grouped by the point made'), 'v11 reception is not in v10')
-  assert.notEqual(v9, v10)
-  assert.notEqual(v10, now)
+  assert.ok(v11.includes('grouped by the point made'), 'v11 reception wording')
+  assert.ok(v11.includes('What one critic reads into a choice belongs to the reception answer'))
+  assert.equal(new Set([v9, v10, v11, now]).size, 4)
   // Same questions in the same order, so their maps share a vocabulary.
   assert.deepEqual(questionOrder(v9), questionOrder(now))
   assert.deepEqual(questionIdsFor('series', 10), questionIdsFor('series'))
