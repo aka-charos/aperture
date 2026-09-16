@@ -58,20 +58,48 @@ export interface ProseSignals {
    * above.
    */
   spill: number
+  /** Semicolons. The prompt asks for none. */
+  semicolons: number
+  /**
+   * Words in paragraphs labelled `work`, and in paragraphs labelled reception
+   * (or version 8's `dispute`). The prompt asks for reception never to run
+   * longer than the work answer. Zero without a map.
+   */
+  workWords: number
+  receptionWords: number
+  /**
+   * Whether the answer carried a usable paragraph map. The counts that read the
+   * model's labels are zero without one, and that zero means "not measured",
+   * not "none found" - the report prints a dash for them.
+   */
+  mapped: boolean
 }
 
-const POINTS_AT_SOURCES = [/\b(?:the|these|those|its|available|retrieved) sources\b/gi, /\bsource (?:documents?|material)\b/gi]
+const POINTS_AT_SOURCES = [
+  /\b(?:the|these|those|its|available|retrieved) sources\b/gi,
+  /\bsource (?:documents?|material)\b/gi,
+  // Withnail & I under version 13: "one fan-adjacent source credits it". A
+  // source of tension, or a source novel, is not the retrieval.
+  /\b(?:one|another|several|some)\s+(?:[a-z]+(?:-[a-z]+)?\s+)?sources?\b(?!\s+(?:of|material|novel|text|book|play|story)\b)/gi,
+]
 
 const UNATTRIBUTED = [
   // Passive voice that hides whose view it is. "has been traced to" is
   // Possession's; "is described as" is the commonest.
-  /\b(?:is|are|was|were|has been|have been|had been)\s+(?:widely\s+|often\s+|variously\s+|also\s+)?(?:described|called|characteri[sz]ed|regarded|considered|labell?ed|dubbed|hailed|traced|seen)\s+(?:as|to)\b/gi,
+  /\b(?:is|are|was|were|has been|have been|had been)\s+(?:widely\s+|often\s+|variously\s+|also\s+)?(?:described|called|characteri[sz]ed|regarded|considered|labell?ed|dubbed|hailed|traced|seen|recogni[sz]ed)\s+(?:as|to)\b/gi,
+  // The Wretches Are Still Singing under version 13: "has been credited with
+  // influencing independent film-making".
+  /\b(?:is|are|was|were|has been|have been|had been)\s+(?:widely\s+|often\s+|also\s+)?credited\s+with\b/gi,
   /\baccording to (?:one|some|a|an)\b/gi,
   /\b(?:one|a) critical (?:read|reading)\b/gi,
   /\breportedly\b/gi,
   // Terminator 2 under version 12: "are said to have changed how blockbusters
   // were made".
   /\b(?:is|are|was|were)\s+said\s+to\b/gi,
+  // A holder that is not a person, under version 13: "a philosophical reading
+  // takes it as", "one retrospective account holds". "One critical reading" is
+  // already counted above.
+  /\b(?:one|a|another)\s+(?!critical\s)(?:[a-z]+\s+)?(?:account|reading)\s+(?:holds|takes|reads|sees|argues|suggests|finds|calls)\b/gi,
 ]
 
 /**
@@ -89,6 +117,21 @@ const WRITER_MENTIONS = [
   /\bwriting (?:in|for)\b/gi,
 ]
 const WRITER_SECTIONS = new Set(['reception', 'dispute'])
+const WORK_SECTIONS = new Set(['work'])
+
+/** Words in the paragraphs whose labels include one of the wanted ones. */
+function wordsIn(
+  paragraphs: string[],
+  sections: readonly (readonly string[])[] | null | undefined,
+  wanted: ReadonlySet<string>
+): number {
+  if (!sections || sections.length === 0) return 0
+  return paragraphs.reduce(
+    (sum, paragraph, i) =>
+      sections[i]?.some((label) => wanted.has(label)) ? sum + paragraph.split(/\s+/).length : sum,
+    0
+  )
+}
 
 function writersOutsideReception(
   paragraphs: string[],
@@ -114,7 +157,7 @@ const LEFT_OPEN = [
 
 /** Matched against the start of a paragraph only. */
 const QUESTION_ECHO =
-  /^(?:the (?:film|series|show) sits in\b|in tradition terms\b|(?:the )?critics (?:genuinely |also |sharply )?(?:disagree|divide|split|differ)\b|what critics (?:and viewers )?(?:genuinely )?(?:disagree|argue)\b|the circumstances of its making\b|the (?:most consequential )?circumstances? of its making\b|the people who made it\b|the making of the film left\b|the (?:film|series)'s (?:governing|organi[sz]ing|central) (?:formal )?(?:idea|choice)\b)/i
+  /^(?:the (?:film|series|show) sits in\b|in tradition terms\b|(?:the )?critics (?:genuinely |also |sharply )?(?:disagree|divide|split|differ)\b|what critics (?:and viewers )?(?:genuinely )?(?:disagree|argue)\b|the (?:most consequential )?circumstances? of (?:its |the film's )?(?:making|production)\b|the people who made it\b|the making of the film left\b|the (?:film|series)'s (?:governing|organi[sz]ing|central) (?:formal )?(?:idea|choice)\b)/i
 
 /**
  * Words too common to make a two-word phrase distinctive. Everything under four
@@ -148,11 +191,15 @@ function count(text: string, patterns: RegExp[]): number {
 
 /**
  * Sentences in a paragraph, roughly: a full stop, question or exclamation mark
- * followed by space and a capital. Initials and "Dr." over-count slightly,
- * which is the right direction for a number printed against a ceiling.
+ * followed by space and a capital. A lone capital before the stop is an
+ * initial, not a sentence end - "Richard E. Grant" made a four-sentence
+ * paragraph read as five on Withnail & I, a rule break that did not happen.
+ * "Dr." still over-counts slightly, the right direction against a ceiling.
  */
 function sentenceCount(paragraph: string): number {
-  return paragraph.split(/(?<=[.!?])["'”’)\]]*\s+(?=["'“‘(]?[A-Z0-9À-ÖØ-Þ])/).filter((s) => s.trim()).length
+  return paragraph
+    .split(/(?<=[.!?])(?<!(?:^|[\s(])\p{Lu}\.)["'”’)\]]*\s+(?=["'“‘(]?[A-Z0-9À-ÖØ-Þ])/u)
+    .filter((s) => s.trim()).length
 }
 
 /**
@@ -235,5 +282,9 @@ export function measureProse(
     repeatedAcrossSections: repeatedPhrases.length,
     repeatedPhrases,
     spill: writersOutsideReception(paragraphs, sections),
+    semicolons: (trimmed.match(/;/g) ?? []).length,
+    workWords: wordsIn(paragraphs, sections, WORK_SECTIONS),
+    receptionWords: wordsIn(paragraphs, sections, WRITER_SECTIONS),
+    mapped: Boolean(sections?.some((labels) => labels.length > 0)),
   }
 }

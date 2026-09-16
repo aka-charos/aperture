@@ -13,9 +13,10 @@ import { measureProse } from './proseSignals.js'
 test('an empty or missing analysis measures as zero everywhere', () => {
   for (const text of [null, undefined, '', '   ']) {
     const s = measureProse(text)
-    const { repeatedPhrases, ...counts } = s
-    assert.deepEqual(Object.values(counts), [0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    const { repeatedPhrases, mapped, ...counts } = s
+    assert.deepEqual(Object.values(counts), [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     assert.deepEqual(repeatedPhrases, [])
+    assert.equal(mapped, false)
   }
 })
 
@@ -28,10 +29,23 @@ test('counts words, paragraphs and the longest paragraph in sentences', () => {
   assert.equal(s.words, 12)
 })
 
+// Withnail & I under version 13 read as a five-sentence paragraph because of
+// "Richard E. Grant".
+test('an initial is not a sentence end', () => {
+  const s = measureProse(
+    'Richard E. Grant plays Withnail with excess. Paul McGann plays against him. The pair carry it. Their bond is the core.'
+  )
+  assert.equal(s.longestParagraph, 4)
+})
+
 test('pointing at the retrieval, including the synonym version 8 missed', () => {
   assert.equal(measureProse('That line is the clearest statement of purpose the sources carry.').pointsAtSources, 1)
   assert.equal(measureProse('The source documents disagree.').pointsAtSources, 1)
   assert.equal(measureProse('Critics praised its sound design.').pointsAtSources, 0)
+  // Withnail & I under version 13, and two innocent uses of the word.
+  assert.equal(measureProse('One fan-adjacent source credits it with influence.').pointsAtSources, 1)
+  assert.equal(measureProse('One source of tension is the flat.').pointsAtSources, 0)
+  assert.equal(measureProse('Robinson drew on one source novel.').pointsAtSources, 0)
 })
 
 test('a view with no holder, and not a view with one', () => {
@@ -48,6 +62,14 @@ test('a view with no holder, and not a view with one', () => {
     measureProse('Its technical achievements are said to have changed how blockbusters were made.').unattributed,
     1
   )
+  // Withnail & I and The Wretches Are Still Singing under version 13.
+  assert.equal(
+    measureProse(
+      'The film has been credited with influencing independent film-making. A philosophical reading takes it as a romance of self-destruction. One retrospective account holds that the score made it.'
+    ).unattributed,
+    3
+  )
+  assert.equal(measureProse('A scholar reads it as a parody of Hamlet.').unattributed, 0)
 })
 
 /**
@@ -71,6 +93,25 @@ test('a writer named outside the reception answer is counted, and only there', (
   assert.equal(measureProse(text, [['dispute'], ['dispute'], [], [], []]).spill, 0, 'version-8 dispute is reception')
 })
 
+// The prompt caps reception at the length of the work answer. Words are
+// counted from the model's own labels, so an unlabelled paragraph counts for
+// neither, and without a map nothing is measured.
+test('reception and work words are counted from the labels, and semicolons always', () => {
+  const text = ['One two three four.', 'Five six.', 'Seven eight nine; ten.', 'Eleven.'].join('\n\n')
+  const s = measureProse(text, [['work'], ['work', 'reception'], ['reception'], []])
+  assert.equal(s.workWords, 6)
+  assert.equal(s.receptionWords, 6)
+  assert.equal(s.semicolons, 1)
+  assert.equal(s.mapped, true)
+  assert.equal(measureProse(text, [['dispute'], [], [], []]).receptionWords, 4, 'version-8 dispute is reception')
+
+  const unmapped = measureProse(text)
+  assert.equal(unmapped.mapped, false)
+  assert.equal(unmapped.workWords + unmapped.receptionWords, 0)
+  assert.equal(unmapped.semicolons, 1)
+  assert.equal(measureProse(text, [[], [], [], []]).mapped, false, 'a map with no labels is no map')
+})
+
 test('rather than, and instead of', () => {
   assert.equal(
     measureProse('It is inherited rather than borrowed, instead of punctuating it.').ratherThan,
@@ -83,6 +124,11 @@ test('announcing that a question stays open', () => {
   assert.equal(measureProse('These readings do not cancel each other out.').leftOpen, 1)
   assert.equal(measureProse('Whether it is a defect is left open by the people reviewing it.').leftOpen, 1)
   assert.equal(measureProse('The door is left ajar.').leftOpen, 0)
+})
+
+// Withnail & I under version 13.
+test('a paragraph opening on "the circumstances of production" restates its question', () => {
+  assert.equal(measureProse('The circumstances of production left their mark too.').questionEchoes, 1)
 })
 
 // Only a paragraph's OPENING counts, because the same words mid-paragraph are
