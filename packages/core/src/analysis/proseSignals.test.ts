@@ -93,6 +93,16 @@ test('a fact told under two questions is found and named', () => {
   assert.equal(s.repeatedAcrossSections, s.repeatedPhrases.length)
 })
 
+// The version-11 bench printed "brian eggert", "james cameron" and "edward
+// furlong" as facts told twice; a person doing two things is not a repeat.
+test('names and the genre vocabulary are not counted as facts told twice', () => {
+  const text = [
+    'Brian Eggert traces the science fiction chases to James Cameron.',
+    'Brian Eggert faults the science fiction script, and James Cameron agreed.',
+  ].join('\n\n')
+  assert.deepEqual(measureProse(text, [['tradition'], ['reception']]).repeatedPhrases, [])
+})
+
 // Two runs sharing a label are one question, however they are split.
 test('a phrase repeated inside one question is not a repeat', () => {
   const text = ['The liquid-metal pursuer glides.', 'The liquid-metal pursuer never runs.'].join('\n\n')
