@@ -247,7 +247,28 @@ test('a fact told under two questions is counted and named in the report', () =>
     })
   )
   assert.match(text, /told twice \d+ \([^)]*liquid metal/)
-  assert.match(text, /\s+twice\s+spill\n/)
+  assert.match(text, /\s+twice\s+spill\s+semi\s+rec\/work\n/)
+})
+
+/**
+ * GLM's Terminator 2 answer under version 13 carried no usable map, and the
+ * table printed 0 for "twice" and "spill" as if it had been measured clean.
+ */
+test('an answer with no map prints dashes for what the map measures', () => {
+  const text = renderComparisonReport(
+    report({
+      entries: [
+        entry({ model: 'mapped', analysis: 'The work.\n\nThe reception, longer than the work.', sections: [['work'], ['reception']] }),
+        entry({ model: 'unmapped', analysis: 'The work.\n\nThe reception; longer.', sections: [] }),
+      ],
+    })
+  )
+  const row = (name: string) => text.split('\n').find((line) => line.includes(' / ' + name + ' · v7 '))!
+  assert.match(row('mapped'), /\s0\s+0\s+0\s+6\/2!$/)
+  assert.match(row('unmapped'), /\s—\s+—\s+1\s+—$/)
+  assert.match(text, /told twice — \(no map\)/)
+  assert.match(text, /writers outside reception —/)
+  assert.match(text, /reception 6 words, work 2 \(reception longer\)/)
 })
 
 test('an ordinary run says nothing about replaying', () => {

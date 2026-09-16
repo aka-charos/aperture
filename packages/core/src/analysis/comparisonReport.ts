@@ -140,6 +140,7 @@ function statLine(entry: ComparisonEntry, signals: ProseSignals | null): string 
  * matched against the prose directly below. See ./proseSignals.ts.
  */
 function signalsLine(signals: ProseSignals): string {
+  const mapped = signals.mapped
   return [
     `${signals.paragraphs} paragraphs (longest ${signals.longestParagraph} sentences)`,
     `"the sources" ${signals.pointsAtSources}`,
@@ -149,12 +150,20 @@ function signalsLine(signals: ProseSignals): string {
     `question echoes ${signals.questionEchoes}`,
     // The phrases are printed, not just counted: this is the one signal whose
     // matches a reader has to judge (a critic cited twice is not a repeat).
-    signals.repeatedAcrossSections > 0
+    !mapped
+      ? 'told twice — (no map)'
+      : signals.repeatedAcrossSections > 0
       ? `told twice ${signals.repeatedAcrossSections} (${signals.repeatedPhrases.slice(0, 4).join(', ')}${
           signals.repeatedAcrossSections > 4 ? ', …' : ''
         })`
       : 'told twice 0',
-    `writers outside reception ${signals.spill}`,
+    `writers outside reception ${mapped ? signals.spill : '—'}`,
+    `semicolons ${signals.semicolons}`,
+    mapped
+      ? `reception ${signals.receptionWords} words, work ${signals.workWords}${
+          signals.receptionWords > signals.workWords ? ' (reception longer)' : ''
+        }`
+      : 'reception vs work —',
   ].join('  ·  ')
 }
 
@@ -186,7 +195,17 @@ function failureLine(entry: ComparisonEntry): string {
 const signalsOf = (entry: ComparisonEntry): ProseSignals | null =>
   entry.analysis?.trim() ? measureProse(entry.analysis, entry.sections) : null
 
-const SIGNAL_COLUMNS: [string, (s: ProseSignals) => number][] = [
+/**
+ * A count read from the model's paragraph labels is a dash, not a zero, when
+ * there were no labels: GLM's unmapped Terminator 2 answer read as clean on
+ * "twice" and "spill" when neither had been measured.
+ */
+const labelled = (read: (s: ProseSignals) => number | string) => (s: ProseSignals) =>
+  s.mapped ? read(s) : '—'
+
+// "rec/work" carries a "!" when reception ran longer than the work answer,
+// which the prompt forbids.
+const SIGNAL_COLUMNS: [string, (s: ProseSignals) => number | string][] = [
   ['words', (s) => s.words],
   ['paras', (s) => s.paragraphs],
   ['longest', (s) => s.longestParagraph],
@@ -195,8 +214,13 @@ const SIGNAL_COLUMNS: [string, (s: ProseSignals) => number][] = [
   ['rather', (s) => s.ratherThan],
   ['open', (s) => s.leftOpen],
   ['echoes', (s) => s.questionEchoes],
-  ['twice', (s) => s.repeatedAcrossSections],
-  ['spill', (s) => s.spill],
+  ['twice', labelled((s) => s.repeatedAcrossSections)],
+  ['spill', labelled((s) => s.spill)],
+  ['semi', (s) => s.semicolons],
+  [
+    'rec/work',
+    labelled((s) => `${s.receptionWords}/${s.workWords}${s.receptionWords > s.workWords ? '!' : ''}`),
+  ],
 ]
 
 interface SignalRow {
