@@ -102,6 +102,12 @@ export async function* streamWatcherIdentity(
 
   let fullText = ''
   let version: number | null = TASTE_SYNOPSIS_PROMPT_VERSION
+  // Why a stream ended with no text. Without these the log could only say
+  // "no text", which is what version 3 first did in production: the model
+  // thought through the whole allowance and stopped before writing a word.
+  let reasoningChars = 0
+  let finish: { finishReason: string; outputTokens?: number; reasoningTokens?: number } | null =
+    null
   try {
     const aiLocale = await resolveEffectiveAiLanguage(userId)
     const model = await getTextGenerationModelInstance()
@@ -113,11 +119,14 @@ export async function* streamWatcherIdentity(
       prompt: evidenceText,
       // A factual summary of a record, not writing that benefits from surprise.
       temperature: 0.3,
-      // The answer is under 180 words, but a reasoning model spends this same
-      // allowance on its scratchpad before writing a word (F-030). A cap is not
-      // a reservation, so the headroom costs nothing on a model that answers
-      // directly.
-      maxOutputTokens: 4000,
+      // The answer is 200-300 words, but a reasoning model spends this same
+      // allowance on its scratchpad before writing a word (F-030). 4000 held for
+      // version 2, which asked for a recital; version 3 asks for analysis, and
+      // measured live the model thought for 24 seconds, reached the cap and
+      // wrote nothing. 16000 is the explanation generators' ceiling on the same
+      // role. A cap is not a reservation, so the headroom costs nothing on a
+      // model that answers directly.
+      maxOutputTokens: 16000,
     })
 
     // fullStream, not textStream: under AI SDK v5 textStream silently drops
@@ -127,6 +136,14 @@ export async function* streamWatcherIdentity(
       if (part.type === 'text-delta') {
         fullText += part.text
         yield part.text
+      } else if (part.type === 'reasoning-delta') {
+        reasoningChars += part.text.length
+      } else if (part.type === 'finish') {
+        finish = {
+          finishReason: part.finishReason,
+          outputTokens: part.totalUsage.outputTokens,
+          reasoningTokens: part.totalUsage.reasoningTokens,
+        }
       } else if (part.type === 'error') {
         throw part.error instanceof Error ? part.error : new Error(String(part.error))
       }
@@ -149,8 +166,15 @@ export async function* streamWatcherIdentity(
   // offering Generate Identity (F-110). Throwing reaches the client as an SSE
   // error part and leaves the stored identity on screen.
   if (!fullText.trim()) {
-    logger.warn({ userId, mediaType }, 'Identity generation produced no text; keeping the stored one')
-    throw new Error('The model returned an empty taste profile; nothing was changed')
+    logger.warn(
+      { userId, mediaType, ...finish, reasoningChars },
+      'Identity generation produced no text; keeping the stored one'
+    )
+    throw new Error(
+      finish?.finishReason === 'length'
+        ? 'The model spent its whole output allowance before writing; nothing was changed'
+        : 'The model returned an empty taste profile; nothing was changed'
+    )
   }
 
   await storeIdentity(userId, column, fullText, version)

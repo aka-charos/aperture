@@ -42,7 +42,9 @@ export async function streamSseGenerator<T>(
     reply.raw.write(`data: ${JSON.stringify({ type: 'done', stats })}\n\n`)
     reply.raw.end()
   } catch (error) {
-    fastify.log.error({ error, userId }, options.errorLogMessage)
+    // `err`, not `error`: pino serializes an Error only under `err`, and under
+    // any other key it logs `{}` -- which is all a failed identity said (F-129).
+    fastify.log.error({ err: error, userId }, options.errorLogMessage)
     if (reply.raw.headersSent) {
       reply.raw.write(`data: ${JSON.stringify({ type: 'error', message: 'Failed to generate' })}\n\n`)
       reply.raw.end()
