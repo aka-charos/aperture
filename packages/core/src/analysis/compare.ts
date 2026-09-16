@@ -523,6 +523,7 @@ interface ResultRow {
   analysis: string | null
   grade: string | null
   paragraph_map: { paragraph: number; questions: string[] }[] | null
+  map_text: string | null
   problem: string | null
   finish_reason: string | null
   input_tokens: number | null
@@ -629,6 +630,7 @@ function toEntry(row: ResultRow, runVersion: number): ComparisonEntry {
     // Rebuilt into per-paragraph order so the report can print the shape of
     // the answer. An absent map is an empty list, never a guess at position.
     sections: sectionsFromMap(row.analysis, row.paragraph_map),
+    mapText: row.map_text,
   }
 }
 

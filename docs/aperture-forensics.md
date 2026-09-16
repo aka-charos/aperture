@@ -2610,6 +2610,24 @@ Smaller, and not addressed by the prompt: GLM's Terminator 2 answer carried no u
 
 **Went live without a bench, on the operator's call.** v13 is archived, so the check is replaying these three runs under 13 and 14 on their stored documents.
 
+**Addendum, 2026-09-16: version 15, after replaying The Wretches Are Still Singing under 13 and 14, and Withnail & I under 13 and 14.** The Greek replay is the first controlled test of a version: the same five documents, the same two models (GLM-5.3 Flash, DeepSeek V4.1 Flash), only the prompt changed.
+
+**What 14 fixed on the replay.** GLM's "Nikolaidis' own account is that…" is gone, and DeepSeek no longer states an encyclopedia's description as the director's views. GLM no longer turns one critic's two remarks into "another" critic, and DeepSeek attributes both to one ("One critic wrote … and objected to the treatment of a corpse"). GLM's reception, 234 words against 214 of work under 13, is 221 against 297. DeepSeek dropped "published as a book". The new `rec/work` column is what showed the version-13 overrun.
+
+**What 14 did not fix.**
+
+1. **Every answer on the title carried an effect no document described**, under both versions. DeepSeek wrote its version-13 sentence again ("a transgressive, non-naturalistic form" became "a transgressive and non-realist surface") and added "allows the film to treat personal histories as evidence of a broader generational shift". GLM wrote three new ones: "lets it measure the distance between the Greece of their youth and the alienated present", "the era's persistent radio, so that the characters' youth is always audible", "a remembered Athens that reads half as myth and half as social record". Version 14's sentence opened on the demand — "Name a choice, then say what it achieves - the effect is the answer" — and qualified it afterwards, and both models followed the opening.
+2. **Both answers opened on the encyclopedia's genre string** ("An experimental, independent and openly surrealist Greek art film from the underground tradition"). That is the rule's fault, not the models': for this film the encyclopedia's description is the only statement of what kind of work it is. The Zero Years' fault, which the rule was written for, was a listing site's tags and mood keywords.
+3. **GLM's making answer opened "The circumstances of production left … mark" in three Withnail & I answers** under 13 and 14 — a paraphrase of the example the rule named as forbidden ("The circumstances of its making").
+
+GLM, not addressed by the prompt: on the Greek documents it read a fact backwards ("the Cyprus demonstrations of 1956–57 really brought students and tear gas onto Panepistimiou", where the essay says tear gas was first used in Greece in December 1960, so the script's is an anachronism), named central plot events in reception ("the way it puts abduction, rapes and murders in motion"), still gave a wrong range for the songs (the period the music selector knew, not the essay's own 1949–1972 list), still listed the songs and the festival awards, and still used non-person holders ("The retrospective account is explicit", "the retrospective press placed"). Both GLM answers on these documents carry factual errors; neither DeepSeek answer does. On Withnail & I under 14, GLM's map was unreadable a second time (two of six GLM answers across the benches, none of seven DeepSeek answers).
+
+**What version 15 changes.** The work question names the choices first and looks for what a document says each does to the viewer; where none does, the answer names the choice and stops, and the clause shapes the invented effects shared — "so that", "which gives", "lets it", "the result is" — are named as effects that need a document. The context opening may describe the kind of work plainly; it is a listing site's tags and mood keywords that stay out, and the source rule's label sentence is narrowed to match. An answer's first sentence says something about the film itself, with the forbidden example that GLM kept echoing removed. The rule count is unchanged.
+
+**Instruments.** An answer without section labels now says why under its stat line: "map: none written", or "map not read:" followed by the block the model wrote, on one line and clipped at 240 characters — the bench stores that text and the report had never printed it, so GLM's two unmapped answers could only be told apart with a database query. "the … account", "the … press" and "the … reading" followed by a claim verb count as a holder that is not a person.
+
+**Went live without a bench, on the operator's call.** v14 is archived; the check is replaying the Greek and Withnail runs under 14 and 15.
+
 ## F-129
 
 **The Watcher Identity was written from a lookup table and a watchlist; it is now written from a viewing record compared with the library.** Added 2026-09-15.

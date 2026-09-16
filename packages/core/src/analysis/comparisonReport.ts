@@ -60,6 +60,13 @@ export interface ComparisonEntry {
    * them. Validation already happened at write time, in parseParagraphMap.
    */
   sections: string[][]
+  /**
+   * The map block exactly as the model wrote it, stored whether or not it was
+   * readable. Printed only when no labels came out of it, so a rejected map
+   * can be read in the report instead of fetched from the database. Absent on
+   * entries built without it.
+   */
+  mapText?: string | null
 }
 
 export interface ComparisonSource {
@@ -182,6 +189,23 @@ function sectionLine(entry: ComparisonEntry): string | null {
     .join('   ')
 }
 
+/** Longest rejected map printed, so a long block cannot swamp the report. */
+const MAP_TEXT_LIMIT = 240
+
+/**
+ * Why an answer carries no section labels: the model wrote no map, or wrote
+ * one that could not be read. The two have different fixes - a missing map is
+ * the prompt, a rejected one is usually a miscount - and GLM's two unmapped
+ * answers could only be told apart with a database query.
+ */
+function unmappedLine(entry: ComparisonEntry): string {
+  const text = entry.mapText?.trim()
+  if (!text) return 'map: none written'
+  const oneLine = text.split('\n').map((line) => line.trim()).filter(Boolean).join(' | ')
+  const clipped = oneLine.length > MAP_TEXT_LIMIT ? '…' : ''
+  return `map not read: ${oneLine.slice(0, MAP_TEXT_LIMIT)}${clipped}`
+}
+
 /** Why this entry has no prose, in a sentence a reader can act on. */
 function failureLine(entry: ComparisonEntry): string {
   if (entry.status === 'pending') return '[not run]'
@@ -299,6 +323,7 @@ function pushEntry(out: string[], label: string, entry: ComparisonEntry): void {
   if (signals) out.push(signalsLine(signals))
   const sections = sectionLine(entry)
   if (sections) out.push(`sections: ${sections}`)
+  else if (signals) out.push(unmappedLine(entry))
   out.push(THIN)
   out.push('')
   out.push(entry.analysis?.trim() || failureLine(entry))

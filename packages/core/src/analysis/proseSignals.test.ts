@@ -70,6 +70,14 @@ test('a view with no holder, and not a view with one', () => {
     3
   )
   assert.equal(measureProse('A scholar reads it as a parody of Hamlet.').unattributed, 0)
+  // The Wretches Are Still Singing under version 14.
+  assert.equal(
+    measureProse(
+      'The retrospective account is explicit that the sound was his. It was a reaction the retrospective press placed in a moral panic.'
+    ).unattributed,
+    2
+  )
+  assert.equal(measureProse('The press screening sold out.').unattributed, 0)
 })
 
 /**
