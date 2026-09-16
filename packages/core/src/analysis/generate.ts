@@ -55,6 +55,7 @@ import { createChildLogger } from '../lib/logger.js'
 import { recordWebSearchCall } from '../lib/webSearchUsage.js'
 import { budgetSources } from './budget.js'
 import { isBlockedPage } from './blockedPage.js'
+import { dropDuplicateTitles } from './duplicateSources.js'
 import { checkModeReadiness, type RetrievalMode } from './mode.js'
 import {
   parseParagraphMap,
@@ -315,7 +316,20 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
     )
   }
 
-  const sources = budgetSources(readable, { budget: config.sourceBudgetChars })
+  // One chapter fetched from two sites is one document. See ./duplicateSources.ts.
+  const { kept: distinct, dropped: duplicates } = dropDuplicateTitles(readable, [
+    subject.title,
+    subject.originalTitle ?? '',
+    subject.year ? String(subject.year) : '',
+  ])
+  if (duplicates.length > 0) {
+    logger.warn(
+      { title: subject.title, duplicates: duplicates.map((source) => source.domain) },
+      "Dropped pages repeating another page's title"
+    )
+  }
+
+  const sources = budgetSources(distinct, { budget: config.sourceBudgetChars })
   const retrievedChars = sources.reduce((sum, s) => sum + s.text.length, 0)
 
   // INFO, not debug. This is the line that says whether retrieval is healthy —

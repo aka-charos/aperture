@@ -14,7 +14,7 @@ test('an empty or missing analysis measures as zero everywhere', () => {
   for (const text of [null, undefined, '', '   ']) {
     const s = measureProse(text)
     const { repeatedPhrases, ...counts } = s
-    assert.deepEqual(Object.values(counts), [0, 0, 0, 0, 0, 0, 0, 0, 0])
+    assert.deepEqual(Object.values(counts), [0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     assert.deepEqual(repeatedPhrases, [])
   }
 })
@@ -43,6 +43,32 @@ test('a view with no holder, and not a view with one', () => {
     4
   )
   assert.equal(measureProse('Cath Clarke, writing in The Guardian, called it an easy pleasure.').unattributed, 0)
+  // Terminator 2 under version 12.
+  assert.equal(
+    measureProse('Its technical achievements are said to have changed how blockbusters were made.').unattributed,
+    1
+  )
+})
+
+/**
+ * Version 13 keeps writers in reception. Kontroll under version 12 opened its
+ * context with "Critics have placed it", and The Zero Years ran "one Italian
+ * critic ... another viewer" through its form answer.
+ */
+test('a writer named outside the reception answer is counted, and only there', () => {
+  const text = [
+    'Critics have placed it in post-socialist cinema.',
+    'One critic reads the colour as politics, and another viewer found it a panopticon.',
+    'The red handrails flare against the dark and put the viewer on edge.',
+    'Critics praised its look, and one scholar faulted its dialogue.',
+    'A reviewer praised the ending.',
+  ].join('\n\n')
+  const s = measureProse(text, [['tradition'], ['work'], ['work'], ['reception'], []])
+  // 1 + 2; "the viewer" is how an effect is described; reception and an
+  // unlabelled paragraph do not count.
+  assert.equal(s.spill, 3)
+  assert.equal(measureProse(text).spill, 0, 'without a map there are no sections to spill into')
+  assert.equal(measureProse(text, [['dispute'], ['dispute'], [], [], []]).spill, 0, 'version-8 dispute is reception')
 })
 
 test('rather than, and instead of', () => {

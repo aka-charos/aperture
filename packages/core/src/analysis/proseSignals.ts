@@ -52,6 +52,12 @@ export interface ProseSignals {
   repeatedAcrossSections: number
   /** The phrases behind that count, so a reader can check what matched. */
   repeatedPhrases: string[]
+  /**
+   * Mentions of a critic, scholar, reviewer or viewer in paragraphs the model
+   * did not label as reception. Zero without a paragraph map, like the count
+   * above.
+   */
+  spill: number
 }
 
 const POINTS_AT_SOURCES = [/\b(?:the|these|those|its|available|retrieved) sources\b/gi, /\bsource (?:documents?|material)\b/gi]
@@ -63,7 +69,40 @@ const UNATTRIBUTED = [
   /\baccording to (?:one|some|a|an)\b/gi,
   /\b(?:one|a) critical (?:read|reading)\b/gi,
   /\breportedly\b/gi,
+  // Terminator 2 under version 12: "are said to have changed how blockbusters
+  // were made".
+  /\b(?:is|are|was|were)\s+said\s+to\b/gi,
 ]
+
+/**
+ * A writer's view named outside the reception answer.
+ *
+ * Version 13 keeps every critic, scholar and viewer in reception, after The
+ * Zero Years' form answer ran "one Italian critic ... the same critic ...
+ * another viewer" for three paragraphs. Viewers count only with a determiner,
+ * because "the viewer" is how the prompt itself asks for an effect to be
+ * described. Reception and its version-8 predecessor are where these belong.
+ */
+const WRITER_MENTIONS = [
+  /\b(?:critics?|reviewers?|scholars?|commentators?)\b/gi,
+  /\b(?:one|a|another|some|several|other|many|most)\s+viewers?\b/gi,
+  /\bwriting (?:in|for)\b/gi,
+]
+const WRITER_SECTIONS = new Set(['reception', 'dispute'])
+
+function writersOutsideReception(
+  paragraphs: string[],
+  sections: readonly (readonly string[])[] | null | undefined
+): number {
+  if (!sections || sections.length === 0) return 0
+  return paragraphs.reduce((sum, paragraph, i) => {
+    const labels = sections[i]
+    if (!labels || labels.length === 0 || labels.some((label) => WRITER_SECTIONS.has(label))) {
+      return sum
+    }
+    return sum + count(paragraph, WRITER_MENTIONS)
+  }, 0)
+}
 
 const RATHER_THAN = [/\brather than\b/gi, /\binstead of\b/gi]
 
@@ -195,5 +234,6 @@ export function measureProse(
     questionEchoes: paragraphs.filter((p) => QUESTION_ECHO.test(p)).length,
     repeatedAcrossSections: repeatedPhrases.length,
     repeatedPhrases,
+    spill: writersOutsideReception(paragraphs, sections),
   }
 }

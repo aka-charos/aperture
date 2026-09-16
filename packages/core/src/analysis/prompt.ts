@@ -95,8 +95,18 @@ import { ARCHIVED_PROMPT_EDITIONS } from './promptEditions.js'
  *    answer says what its choices achieve again, since moving every reading
  *    out of it left a description with the analysis removed. The paragraph rule
  *    names the one-fact-per-sentence shape it now forbids.
+ * 13: measured on Kontroll under 11 and 12 and on a version-12 library row
+ *    (The Zero Years). No critic, scholar or publication is named any more,
+ *    and "critics" is plural only when more than one document holds the view.
+ *    The context, work and making answers are written in the analysis's own
+ *    voice - what is on screen and what it does is stated plainly - and a
+ *    writer's reading of what the film means, or of how good it is, goes to
+ *    reception alone: marking every effect as somebody's view is what spread
+ *    "one critic" through every section. User reviews, wikis, study guides and
+ *    listing pages are weighed as what they are. A credit list with "so"
+ *    attached is not an answer about the making.
  */
-export const ANALYSIS_PROMPT_VERSION = 12
+export const ANALYSIS_PROMPT_VERSION = 13
 
 /** Reception figures, passed as calibration only. All optional. */
 export interface ReceptionContext {
@@ -297,10 +307,17 @@ interface AnalysisQuestion {
  * under version 9. "Only what someone actually said" did not catch it, because
  * the critic did say something. The question now says a guess by a critic is
  * not a statement by the maker, however it is phrased.
+ *
+ * VERSION 13 NAMES TWO MORE NON-ANSWERS, both from a version-12 library row
+ * (The Zero Years): a credit list made to look like an answer by a "so"
+ * clause ("who also served as its production designer, set decorator and
+ * costume designer, so its decaying interior and its wardrobe came from the
+ * same collaborator"), and what the director went on to do after the film,
+ * which had been filed under reception.
  */
 const CIRCUMSTANCES_QUESTION: AnalysisQuestion = {
   id: 'circumstances',
-  text: 'How was it made, and what did that leave on the work? Two things belong here. First, what the people who made it said they were trying to do - only what a maker is reported as saying, attributed to them. A critic\'s guess at what the maker wanted is not a statement by the maker, even when it is phrased as "if he hoped to", and neither is an intention read back off the finished work. Second, the circumstances of its making or first release that changed what it became - how it was produced, the form it was first shown in, the constraints it was made under. Ask whether the finished work would be different if this had not happened. Facts that did not change the work are not answers - budgets, shooting schedules, crew and extras counts, filming locations listed for their own sake, release dates, coincidences. Neither is how it was received: that belongs to the reception question.',
+  text: 'How was it made, and what did that leave on the work? Two things belong here. First, what the people who made it said they were trying to do - only what a maker is reported as saying, attributed to them. A critic\'s guess at what the maker wanted is not a statement by the maker, even when it is phrased as "if he hoped to", and neither is an intention read back off the finished work. Second, the circumstances of its making or first release that changed what it became - how it was produced, the form it was first shown in, the constraints it was made under. Ask whether the finished work would be different if this had not happened. Facts that did not change the work are not answers - budgets, shooting schedules, crew and extras counts, filming locations listed for their own sake, release dates, coincidences. A list of who held which job is not an answer either, even with a clause about what it gave the film attached. Neither is how it was received: that belongs to the reception question. Neither is what its makers went on to do afterwards.',
 }
 
 /**
@@ -358,10 +375,16 @@ const CIRCUMSTANCES_QUESTION: AnalysisQuestion = {
  * blog's name in the first paragraph ("The Astromech places it in direct
  * conversation with ..."). Marking it as a critic's comparison is what matters,
  * and the attribution rule decides whether that critic is worth naming.
+ *
+ * VERSION 13 SENDS THE COMPARISON TO RECEPTION, where every other critic's view
+ * now lives, and keeps the spoiler test here, where the comparison is invited.
+ * It also stops the opening reciting a listing site's labels: The Zero Years
+ * opened on "classified as both drama and science fiction and tagged for
+ * mind-bending or experimental viewing".
  */
 const TRADITION_QUESTION: AnalysisQuestion = {
   id: 'tradition',
-  text: 'Where does it come from - what kind of work is it, what source does it adapt, and what tradition, movement or body of work does it belong to? Open on that, not on who directed, wrote or stars in it - the reader can already see the credits. Name traditions and movements freely. A comparison with one specific earlier work - that this one borrows from it, is modelled on it or answers it - is a view unless a maker said it, so present it as a critic\'s comparison. It is only safe when it does not carry the ending of that work across: if a reader who knows how that one ends would then know how this one ends, name the tradition and stop there. How it was made and what its makers decided belong to the making question, and what it went on to influence to the reception question.',
+  text: 'Where does it come from - what kind of work is it, what source does it adapt, and what tradition, movement or body of work does it belong to? Open on that, not on who directed, wrote or stars in it - the reader can already see the credits - and not on genre labels or tags copied from a listing site. Name traditions and movements freely. A comparison with one specific earlier work - that this one borrows from it, is modelled on it or answers it - is a critic\'s view unless a maker said it, and a critic\'s view belongs to the reception answer. Wherever a comparison appears, it is only safe when it does not carry the ending of that work across: if a reader who knows how that one ends would then know how this one ends, name the tradition and stop there. How it was made and what its makers decided belong to the making question, and what it went on to influence to the reception question.',
 }
 
 /**
@@ -415,10 +438,19 @@ const TRADITION_QUESTION: AnalysisQuestion = {
  * grouping instruction shows the failing shape. A review about a re-release's
  * format ("3D is a possible new way of getting excited") says nothing about the
  * film and is dropped.
+ *
+ * VERSION 13 MAKES THIS THE ONE PLACE A WRITER'S VIEW APPEARS, so it has to
+ * say what to do with the kinds of view it now receives. A reading of what
+ * the film means gets a sentence, and only when it shaped how the film was
+ * received - otherwise the cap fills with interpretation, as Kontroll's did.
+ * Viewers get one sentence at most. And an argued fault beats a summary:
+ * Terminator 2's only full review found the script clunky, the humour dated
+ * and the voiceover clumsy, and version 12 reported instead a fan wiki's
+ * "some critics noted that the storyline lacked the radical edge".
  */
 const RECEPTION_QUESTION: AnalysisQuestion = {
   id: 'reception',
-  text: 'How was it received, and what did it go on to influence? This is the shortest answer: at most two short paragraphs, and never longer than the answer about what the work is doing. The first says what critics valued and what they faulted, with critics who made the same point in one sentence - "critics praised the effects" once, not a sentence for each critic who did. The second, only if the sources support it, says in a sentence or two what it went on to influence. Where the sources include recognisable publications, lead with them. A review of a later re-release is not how the work was first received: leave out one that is about the re-release or its format, and say so when a view of the film itself dates from one. If critics largely agree, say what they agree on. If they genuinely split, describe the split in one sentence, in terms a critic used, with no sentence remarking that the question stays open. Critics reading the same work in different ways is not a disagreement about it. A criticism of one part may name that part - the final act, a subplot - but not say what happens in it. No scores, no list of awards, and no verdict of your own.',
+  text: 'How was it received, and what did it go on to influence? This is the shortest answer: at most two short paragraphs, and never longer than the answer about what the work is doing. The first says what critics and scholars valued and what they faulted, with everyone who made the same point in one sentence - "critics praised the effects" once, not a sentence for each critic who did. A fault a review argues in detail is worth more than a summary saying some found it lacking. A reading of what the film means belongs here only when it shaped how the film was received, and gets one sentence. Ordinary viewers\' reactions get one sentence at most. The second paragraph, only if the sources support it, says in a sentence or two what it went on to influence. Where the sources include established criticism or scholarship, lead with it. A review of a later re-release is not how the work was first received: leave out one that is about the re-release or its format, and say so when a view of the film itself dates from one. If critics largely agree, say what they agree on. If they genuinely split, describe the split in one sentence, in terms a critic used, with no sentence remarking that the question stays open. Critics reading the same work in different ways is not a disagreement about it. A criticism of one part may name that part - the final act, a subplot - but not say what happens in it. No scores, no list of awards, and no verdict of your own.',
 }
 
 /**
@@ -469,9 +501,19 @@ const RECEPTION_QUESTION: AnalysisQuestion = {
  * effect is the answer to this question, so it stays here; the attribution rule
  * keeps it marked as a reviewer's reading where it is one, and only a verdict on
  * quality moves to reception.
+ *
+ * VERSION 13 DRAWS THE LINE BETWEEN WHAT A FILM DOES AND WHAT IT MEANS. The
+ * effect stays here and is stated plainly (see ATTRIBUTION_RULE); what a writer
+ * says the film means does not. The Zero Years' form answer was three
+ * paragraphs of that - "four stances of slaves before authority", "hell can
+ * feel like home" - and said almost nothing about how the film is made. The
+ * quality words are named because version 12 stated "Robert Patrick's sharp,
+ * intentional performance" here as description. And Kontroll, a
+ * comedy-thriller, came out as an academic colour reading with no word on how
+ * it is funny or how it builds suspense.
  */
 const WORK_GUARD =
-  'Name a choice, then say what it achieves - the effect is the answer. Only the choices that matter to what it is doing: a run of camera models, lens makes or music credits is not an answer, even with a sentence about its effect attached. Describe what an image, device or figure does to the viewer, never what it turns out to be. What a performance, an effect or a score does belongs here; whether it is good belongs to the reception question.'
+  'Name a choice, then say what it achieves - the effect is the answer. Only the choices that matter to what it is doing: a run of camera models, lens makes or music credits is not an answer, even with a sentence about its effect attached. Describe what an image, device or figure does to the viewer, never what it turns out to be. When the sources describe it, say how a comedy is funny or how a thriller builds suspense. What a performance, an effect or a score does belongs here; whether it is good belongs to the reception question, so no "sharp", "powerful", "masterful" or "career-best". What a writer says the film means - what its characters stand for, what it is really about - is a reading, and readings belong to the reception question too.'
 
 const MOVIE_QUESTIONS: AnalysisQuestion[] = [
   TRADITION_QUESTION,
@@ -598,11 +640,37 @@ const GROUNDED_RULE =
  * never-name list is by kind of site because the model sees each document's
  * domain, which makes it a lookup rather than a judgement of fame.
  *
+ * VERSION 13 NAMES NOBODY, AND MOVES THE MARKERS RATHER THAN MULTIPLYING THEM.
+ * Two findings. A known name tells a reader nothing about an obscure film -
+ * the operator's call, and a scholar of Greek cinema or a Variety byline is
+ * still a stranger. And version 12's "a view written as a plain sentence is
+ * still a view", set beside the work question's "the effect is the answer",
+ * made every effect need a holder, which is how "one critic ... the same critic
+ * ... another viewer" came to run through every section. So the craft answers
+ * speak in the analysis's own voice about what is on screen and what it does,
+ * and the two things that really are somebody's - what the film means, and
+ * whether it is good - go to reception, where naming the kind of writer is
+ * natural. The known cost: a blog's description of an effect can now appear as
+ * plain prose. "Critics" is plural only when it is: without names, version 12
+ * turned one scholar into "critics have placed it" twice on Kontroll.
+ *
  * A named constant so a draft edition can replace exactly this rule and no
  * other - see DRAFT_EDITION.
  */
 const ATTRIBUTION_RULE =
-  'Do not cite, number or link the documents, and do not mention them at all - the reader never sees them, so "the sources say" or "the sources carry" points at nothing. Do not quote the reception figures back. State facts plainly. A view - an interpretation, a judgement or a comparison with another work - is somebody\'s, and the prose must say so: "critics", "reviewers" or "one reviewer" does that. Name a critic or publication only when a general reader would recognise it - a national newspaper, a major film magazine, a critic well known in their own right. Never name a blog, a fan site, a wiki, a study guide, an essay site or a review aggregator: the reader does not know them, and a name lends them an authority they do not have. Never turn a view into a fact, and never hide that it is a view behind "is described as", "has been called", "according to one reading" or "reportedly". A view written as a plain sentence is still a view: "the score makes the violence feel inevitable" is somebody\'s reading, and so is "it borrows from" another film. When a paragraph draws on one reviewer\'s reading throughout, say so once, at its start. Praise or faults of a performance, an effect or a script are judgements, and judgements of quality belong in the reception answer only.'
+  'Do not cite, number or link the documents, and do not mention them at all - the reader never sees them, so "the sources say" or "the sources carry" points at nothing. Do not quote the reception figures back. Never name a critic, scholar, reviewer or publication: call them "a critic", "a scholar" or "a reviewer", and write "critics" only when more than one document holds the view. The context, work and making answers speak in your own voice: state facts, what is on screen and what it does to the viewer plainly, with nobody attached, even when a critic\'s description is where you found it. What a writer says the film means, and whether it is good, is that writer\'s view: it belongs in the reception answer, marked as a critic\'s, a scholar\'s or a viewer\'s, and nowhere else. Never state such a view as your own, and never hide that it is one behind "is described as", "has been called", "is said to", "according to one reading" or "reportedly".'
+
+/**
+ * VERSION 13. The model can tell a viewer from a critic - The Zero Years'
+ * analysis wrote "one viewer" every time - and used the viewers anyway: for a
+ * fact about the director's body of work, for three sentences of reading, and
+ * for half of its reception. Nothing had told it what a weak document is for.
+ * The list goes by kind of page because that is what the model can see, and a
+ * weak page may still confirm a plain fact, since for an obscure film it can
+ * be the only page that states where the film was made.
+ */
+const SOURCE_VALUE_RULE =
+  'Weigh the documents by what they are. Criticism and scholarship - reviews and essays that argue a view, academic writing - are the evidence. User reviews and comments, fan wikis, study guides, essay sites, and listing, store or streaming pages are not: they may confirm a plain fact such as where it was made, but take no reading of the work from them and no claim about where it sits, never repeat the genre labels, tags or mood keywords a listing page attaches, and let them supply at most one sentence, in the reception answer, on how ordinary viewers responded.'
 
 const RULES = [
   'Describe how it works, never what happens in it. No third-act or ending discussion, and no reveals - not what a character, creature or image turns out to be. Someone who has not seen it must be able to read this safely.',
@@ -611,6 +679,7 @@ const RULES = [
   'Write in short paragraphs of three or four sentences, never more, separated by a blank line. Each paragraph makes one point and develops it: every sentence follows from the one before, and a sentence may join two related clauses with "and", "because" or "so". A paragraph that lists separate facts one sentence at a time - the vehicles, then the effects, then the score - is notes, not prose. Do not chain clauses with semicolons. Each answer is shown to the reader under a heading that names its question, so open on the substance - never with a restatement of the question such as "The film sits in", "The circumstances of its making" or "Critics disagree about". Say what a choice does, not what it avoids: a sentence built on "rather than" or "not X but Y" usually says one thing twice. Plain prose only in the analysis itself: no headings, bullet points, numbered lists or bold text.',
   'Be specific. Name the person responsible for the choice you are describing - the director, the writer, the cinematographer - instead of "those behind the project" or "the creative team". Name people for what they chose, never to list credits: a sentence that only records who did what is not analysis. Cut any sentence whose only content is that the work sits in a tradition, extends one, or hopes to influence something: say what and how, or say nothing.',
   'Answer only what the sources genuinely support. It is normal for one or two of these questions to have no answer, and dropping them is the correct outcome rather than a gap to fill. A single thin fact is not a paragraph - fold it into the answer it belongs to, or leave it out. If no question has an answer, say so in two sentences and stop.',
+  SOURCE_VALUE_RULE,
   ATTRIBUTION_RULE,
   'Length follows the work, not the amount of source text. Many titles support 200 words, and 900 words - about ten short paragraphs - is the most any of them support. A long source block is not a reason to write more - most of it is plot summary, cast lists and the same facts repeated across pages.',
 ]
@@ -621,7 +690,7 @@ const RULES = [
  * AN EDITION IS ONLY THESE, BECAUSE THAT IS ALL THAT HAS EVER CHANGED between
  * the versions the bench can run. The header, the source block, the TASK lines,
  * the retrieval-mode rule and the output contract were compared line by line
- * across versions 7 to 10 when the archived editions were extracted, and are
+ * across versions 7 to 12 when the archived editions were extracted, and are
  * identical. That is what makes a multi-version bench sound: the prompts it
  * builds from one retrieval differ below the TASK line and nowhere else.
  */
