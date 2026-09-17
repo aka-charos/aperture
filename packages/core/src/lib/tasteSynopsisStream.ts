@@ -22,6 +22,7 @@ import {
 } from './ai-provider.js'
 import { buildAiLanguageInstruction } from './locales.js'
 import { resolveEffectiveAiLanguage } from './userSettings.js'
+import { startStreamStallGuard, type StreamStallGuard } from './streamStall.js'
 import { gatherTasteEvidence } from './tasteAnalyzer.js'
 import {
   MIN_TITLES_FOR_SYNOPSIS,
@@ -36,6 +37,22 @@ import {
 } from './tasteSynopsisPrompt.js'
 
 const logger = createChildLogger('taste-synopsis')
+
+/**
+ * Silence from the model that means this call is hung rather than thinking.
+ *
+ * The same argument as the analysis writer's (see ./streamStall.ts), applied to
+ * a much shorter call: the answer is 200-300 words and a measured run thought
+ * for 24 seconds before writing. Ten minutes of a stream delivering nothing is
+ * far outside that, and the reason it matters here is WHERE this runs — step 2b
+ * of both recommendation pipelines, inside a background job whose cancellation
+ * is polled between users. A silent stream with no signal on it holds that job
+ * open indefinitely, which is exactly what happened to a title analysis run.
+ */
+const SYNOPSIS_STALL_MS = 10 * 60 * 1000
+
+/** Backstop for a stream that stays alive without finishing. */
+const SYNOPSIS_DEADLINE_MS = 30 * 60 * 1000
 
 /** What a generation did, so a background caller can log it truthfully. */
 export type IdentityOutcome = 'written' | 'fallback' | 'too-little-history'
@@ -108,12 +125,25 @@ export async function* streamWatcherIdentity(
   let reasoningChars = 0
   let finish: { finishReason: string; outputTokens?: number; reasoningTokens?: number } | null =
     null
+  // Declared out here so the finally can stop its interval whichever way the
+  // stream ends, including the empty-generation throw further down.
+  let guard: StreamStallGuard | null = null
   try {
     const aiLocale = await resolveEffectiveAiLanguage(userId)
     const model = await getTextGenerationModelInstance()
     const reasoning = await getReasoningProviderOptions('textGeneration')
+    guard = startStreamStallGuard({
+      stallMs: SYNOPSIS_STALL_MS,
+      deadlineMs: SYNOPSIS_DEADLINE_MS,
+      onAbort: (reason, elapsedMs) =>
+        logger.warn(
+          { userId, mediaType, reason, elapsedSeconds: Math.round(elapsedMs / 1000) },
+          'Watcher identity call abandoned: the model stopped producing output'
+        ),
+    })
     const result = streamText({
       model,
+      abortSignal: guard.signal,
       ...(reasoning ? { providerOptions: reasoning } : {}),
       system: `${buildTasteSynopsisSystemPrompt(mediaType)}\n\n${buildAiLanguageInstruction(aiLocale)}`,
       prompt: evidenceText,
@@ -133,6 +163,9 @@ export async function* streamWatcherIdentity(
     // "error" chunks, so a failed provider call would yield an empty identity
     // instead of reaching the fallback below.
     for await (const part of result.fullStream) {
+      // Every part counts, not just text: a reasoning model streaming its
+      // scratchpad is working, and this loop sees those parts already.
+      guard.activity()
       if (part.type === 'text-delta') {
         fullText += part.text
         yield part.text
@@ -157,6 +190,8 @@ export async function* streamWatcherIdentity(
     // one transient provider failure stand in for the identity until the
     // profile next moves.
     version = null
+  } finally {
+    guard?.stop()
   }
 
   // An empty generation is not a result, and must never reach the store. The

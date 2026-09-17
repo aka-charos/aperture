@@ -52,6 +52,7 @@ import { describeAiError } from '../lib/aiErrors.js'
 import { streamLmStudioChat } from '../lib/lmstudioChat.js'
 import { waitForCallSlot } from '../lib/callPacing.js'
 import { createChildLogger } from '../lib/logger.js'
+import { startStreamStallGuard, type StreamAbortReason } from '../lib/streamStall.js'
 import { recordWebSearchCall } from '../lib/webSearchUsage.js'
 import { budgetSources } from './budget.js'
 import { isBlockedPage } from './blockedPage.js'
@@ -484,6 +485,34 @@ export interface WriteOptions {
 const WRITE_HEARTBEAT_MS = 30_000
 
 /**
+ * Silence from the model's stream that means the call is hung, not slow.
+ *
+ * Ten minutes, and the number is chosen against what a healthy call looks like
+ * rather than against what feels patient: measured over one batch, a title took
+ * 46 to 102 seconds end to end, retrieval included. Ten minutes of a stream
+ * delivering NOTHING is therefore two orders of magnitude outside normal, which
+ * is the property that matters — the guard must never be the thing that ends a
+ * slow answer, and a reasoning model's scratchpad counts as activity only when
+ * the provider streams it, so the window has to survive a long think that
+ * surfaces nothing at all.
+ *
+ * See ../lib/streamStall.ts for why this is a stall window rather than a cap on
+ * the call.
+ */
+const WRITE_STALL_MS = 10 * 60 * 1000
+
+/**
+ * The backstop, for a stream that stays technically alive forever.
+ *
+ * One hour, matching `LOCAL_INFERENCE_TIMEOUT_MS`: far above any real
+ * generation, including a large local model working through a 64,000-character
+ * prompt. Nothing observed has come close to it; the stall window is the
+ * instrument that catches a hang, and this only catches the shape the stall
+ * window cannot see.
+ */
+const WRITE_DEADLINE_MS = 60 * 60 * 1000
+
+/**
  * Say, periodically, that a model call is still running.
  *
  * `unref()` is load-bearing: a pending interval otherwise keeps the Node event
@@ -515,6 +544,38 @@ function startWriteHeartbeat(
     note: (next: string) => {
       phase = next
     },
+  }
+}
+
+/**
+ * What an abandoned call means to the caller.
+ *
+ * A cancellation is not a failure: it ends the run rather than counting against
+ * the title, and `analyseTitle` turns it into `AnalysisCancelledError` so the
+ * job stops cleanly with the title still pending.
+ *
+ * A stall or a passed deadline IS a failure, and deliberately the rotating kind
+ * — the model stopped answering, which is a fact about that model, so the next
+ * fallback gets a turn. It carries a written-out message because the whole
+ * complaint it answers was a run that said nothing about why it was stuck:
+ * whatever reads this next (a log, the fallback line, the job console once the
+ * consecutive-failure guard fires) should be able to state the cause without
+ * anyone going to the provider's dashboard.
+ */
+function abortOutcome(
+  reason: StreamAbortReason,
+  modelId: string,
+  startedAt: number
+): AttemptOutcome {
+  if (reason === 'cancelled') return { kind: 'cancelled' }
+  const seconds = Math.round((Date.now() - startedAt) / 1000)
+  const cause =
+    reason === 'stalled'
+      ? `produced no output for ${Math.round(WRITE_STALL_MS / 60_000)} minutes`
+      : `ran past the ${Math.round(WRITE_DEADLINE_MS / 60_000)}-minute ceiling for one call`
+  return {
+    kind: 'error',
+    error: new Error(`${modelId} ${cause} (${seconds}s in); the request was abandoned`),
   }
 }
 
@@ -613,6 +674,31 @@ export async function runWriteAttempt(
       provider: attempt.provider,
       attempt: i,
     })
+    // The ceiling. Streaming means neither of Node's own timeouts can end this
+    // call (see ../lib/streamStall.ts), so without a signal a stream that goes
+    // silent holds the whole run — measured at 8h45m on one title, unstoppable,
+    // because cancellation is polled between titles and this one never got
+    // there. The guard also carries `shouldCancel`, which is what gives Stop
+    // reach into a request already in flight.
+    const guard = startStreamStallGuard({
+      stallMs: WRITE_STALL_MS,
+      deadlineMs: WRITE_DEADLINE_MS,
+      shouldCancel: options.shouldCancel,
+      onAbort: (reason, elapsedMs) =>
+        logger.warn(
+          {
+            title: options.title,
+            modelId,
+            provider: attempt.provider,
+            attempt: i,
+            reason,
+            elapsedSeconds: Math.round(elapsedMs / 1000),
+          },
+          reason === 'cancelled'
+            ? 'Cancelled mid-call; abandoning the analysis request'
+            : 'Analysis model call abandoned: it stopped producing output'
+        ),
+    })
     // STREAMED, and not for progress — for survival. Node's fetch enforces its
     // own 300s `headersTimeout` that no AbortSignal can extend (measured on
     // v24.18.0: a withheld response fails at 306.5s with UND_ERR_HEADERS_TIMEOUT
@@ -657,14 +743,33 @@ export async function runWriteAttempt(
           input: prompt,
           baseUrl: attempt.baseUrl,
           apiKey: attempt.apiKey,
+          // This client has always accepted a signal, and its docstring has
+          // always said the caller's signal is the only way to stop it.
+          // Nothing passed one.
+          signal: guard.signal,
           progress: {
-            onModelLoad: (p) => heartbeat.note(`loading model ${Math.round(p * 100)}%`),
-            onPromptProgress: (p) => heartbeat.note(`reading prompt ${Math.round(p * 100)}%`),
+            // Every event counts as activity, including the two that arrive
+            // before a single token does: a cold model load and a 64k-character
+            // prompt read are exactly when a healthy call is silent longest.
+            onModelLoad: (p) => {
+              guard.activity()
+              heartbeat.note(`loading model ${Math.round(p * 100)}%`)
+            },
+            onPromptProgress: (p) => {
+              guard.activity()
+              heartbeat.note(`reading prompt ${Math.round(p * 100)}%`)
+            },
             // Deliberately counted rather than accumulated: the point is to say
             // WHICH of the two the model is doing, since that is the whole
             // difference between "still thinking" and "writing the answer".
-            onReasoningDelta: () => heartbeat.note('thinking'),
-            onMessageDelta: () => heartbeat.note('writing'),
+            onReasoningDelta: () => {
+              guard.activity()
+              heartbeat.note('thinking')
+            },
+            onMessageDelta: () => {
+              guard.activity()
+              heartbeat.note('writing')
+            },
           },
         })
 
@@ -711,6 +816,14 @@ export async function runWriteAttempt(
         model,
         prompt,
         maxRetries: MODEL_MAX_RETRIES,
+        // Forwarded to the provider's fetch, which is what actually ends a
+        // request the model has stopped answering.
+        abortSignal: guard.signal,
+        // The activity feed. Reasoning deltas reach this callback too, so a
+        // model that thinks for nine minutes and streams its scratchpad reads
+        // as alive; one that streams nothing at all is what the stall window
+        // is sized for.
+        onChunk: () => guard.activity(),
         // Omitted entirely when unset, so a role that has never chosen an
         // effort sends the request it sent before this existed.
         ...(reasoning ? { providerOptions: reasoning } : {}),
@@ -725,16 +838,44 @@ export async function runWriteAttempt(
         },
       })
 
-      const [text, reasoningText, streamFinishReason, streamUsage, meta] = await Promise.all([
+      const reads = Promise.all([
         stream.text,
         stream.reasoningText,
         stream.finishReason,
         stream.usage,
         stream.response,
       ])
+      // A second handler, so abandoning these on the abort branch below cannot
+      // become an unhandled rejection and take the process down later.
+      reads.catch(() => {})
+
+      // RACED, NOT AWAITED, and this is the whole fix rather than a nicety.
+      // Measured on ai@5.0.118: aborting the signal closes the socket, and
+      // this promise bundle then NEVER settles — not resolved, not rejected,
+      // with `onAbort` never called. So the signal alone repairs the
+      // connection and leaves this frame hung exactly as it was before the
+      // guard existed. (`for await (stream.fullStream)` throws instead, which
+      // is why the Watcher Identity's loop needs no race.) See
+      // ../lib/streamStall.ts.
+      const settled = await Promise.race([
+        reads.then((value) => ({ read: value, aborted: null }) as const),
+        guard.aborted.then((reason) => ({ read: null, aborted: reason }) as const),
+      ])
+      if (settled.aborted) {
+        return abortOutcome(settled.aborted, modelId, startedAt)
+      }
+      const [text, reasoningText, streamFinishReason, streamUsage, meta] = settled.read
       response = { text, reasoningText, finishReason: streamFinishReason, usage: streamUsage, response: meta }
       }
     } catch (err) {
+      // An abort is this guard's doing rather than the provider's, so it must
+      // not be reported as one: describeAiError would print an AbortError with
+      // no status, which reads as a mysterious dropped connection instead of a
+      // stream that went silent or a job somebody stopped.
+      const aborted = guard.reason()
+      if (aborted) {
+        return abortOutcome(aborted, modelId, startedAt)
+      }
       // Logged here because this is the only frame that knows which model and
       // which attempt. RETURNED rather than thrown so the caller can move to a
       // fallback model; with no fallback left it rethrows and the title stays
@@ -758,6 +899,7 @@ export async function runWriteAttempt(
       return { kind: 'error', error: streamError ?? err }
     } finally {
       heartbeat.stop()
+      guard.stop()
     }
     finishReason = response.finishReason
     usage = readUsage(response.usage)

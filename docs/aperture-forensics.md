@@ -2693,3 +2693,39 @@ GLM, not addressed by the prompt: on the Greek documents it read a fact backward
 **Also fixed in the dialog.** `GlobalSearch` fetched `/api/search/suggestions` before every search and never rendered the result (the state setter's value was discarded), so each keystroke waited on two sequential round trips. It now fetches only `/api/search`. The in-flight request is aborted when the query changes, a failed request reads "Search failed", and a zero RT score no longer renders a stray `0`.
 
 **Not done.** `ts_rank` uses the English configuration with no unaccent, so the full-text half still misses accents (`amelie` gets `txt 0` on *Amélie*); the trigram half carries it. `/api/search/suggestions` still compares raw titles; it has no reader in the web app. Semantic mode still scores a missing embedding as 0, not neutral, which is the pre-existing behaviour.
+
+## F-131
+
+**A streamed model call had no ceiling, and the abort signal alone would not have given it one.** Added 2026-09-17.
+
+**How it presented.** A `generate-title-analysis` run stopped on its 18th title, *Phoenix (2014)*, and could not be stopped. Read from `GET /api/jobs/active`: the run started 11:40:22Z, the 17 titles before it stored normally (46–102s each, one declined), title 18 was announced at 12:00:27Z, and at 20:45Z the job still reported `status: "running"` with `currentItem: "Phoenix"` — **8h45m on one title**. Pressing Stop changed nothing on screen, and the job could not be started again.
+
+**Why all three of those were true at once.**
+1. `analysis/generate.ts` called `streamText` with **no `abortSignal`**, and the OpenRouter provider's fetch carries no timeout (the one `AbortSignal.timeout` in `openrouter-usage.ts` covers the credits lookup, not generation).
+2. **Streaming had removed the only ceiling that used to apply by accident.** A non-streaming call gets no response headers until the model finishes, so Node's own `headersTimeout` (300s, which no AbortSignal can extend — F-115) ended a wedged call whether anyone intended it or not. An SSE response sends headers at once, which is exactly why streaming was adopted, and exactly what left a stalled stream with nothing to end it.
+3. Cancellation is cooperative and `analysis/job.ts` polls it **between titles**, so Stop set a status the stuck title never read. `runJob`'s `finally` releases the job's slot only when the work exits (F-081), so the job could neither finish nor be re-run, and the 409 it answered was correct.
+
+**The measurement that changed the design.** A probe (a local server that sends one SSE chunk and then goes silent) was run against `ai@5.0.118` with the real `@ai-sdk/openai-compatible` provider. Aborting the signal **does** close the socket — the server logs the client abort ~10ms later — and then, on the same call:
+
+| how the stream is read | what happens on abort |
+|---|---|
+| `await stream.text` (and the `Promise.all` bundle beside it) | **never settles** — not resolved, not rejected; `onAbort` never fires either |
+| `for await (const part of stream.fullStream)` | throws `AI_APICallError` |
+| `for await (const delta of stream.textStream)` | throws `AI_APICallError` |
+| `await stream.consumeStream()` | resolves |
+
+So the obvious fix — pass a signal — repairs the connection and leaves the caller hung exactly as before, because the analysis writer reads the promise bundle (deliberately: it reads a stream the way it used to read a non-streaming result). **This was found by probing, after the signal had already been wired and the first probe of the finished code hung past a 120-second timeout with nothing printed.**
+
+**What shipped.** `lib/streamStall.ts` (`startStreamStallGuard`, pinned by `streamStall.test.ts`).
+- **A stall window, not a wall-clock cap.** A flat cap cannot tell slow from hung, which is why `LOCAL_INFERENCE_TIMEOUT_MS` is a full hour; silence is the signal that does separate them. `WRITE_STALL_MS` is 10 minutes against measured healthy calls of 46–102s, with `WRITE_DEADLINE_MS` (1 hour) only as a backstop for a stream that dribbles forever.
+- **`guard.aborted` is a promise that resolves with the reason**, and the writer **races** it against the read bundle rather than awaiting the bundle. That race is the fix; the signal by itself is not.
+- **A partial answer is never read.** Reading it would hand `findResponseProblem` a truncated document and file a stall as an unusable RESPONSE — the one outcome that deliberately does not rotate to a fallback model (F-066), so it would blame the wrong thing and keep asking the same wedged model. `abortOutcome` maps a stall or a passed deadline to `{ kind: 'error' }`, which rotates, and a cancellation to `{ kind: 'cancelled' }`, which `analyseTitle` turns into `AnalysisCancelledError`. The title writes no row either way, so it stays pending for the next run.
+- **`shouldCancel` rides on the guard**, which is what gives Stop reach into a request already in flight. A poll that throws is ignored: it says nothing about the stream.
+- **Activity is a stored timestamp read on an interval**, not a timer rescheduled per chunk — a delta arrives per token. Reasoning deltas count as activity (they reach `onChunk` in v5), so a model that streams its scratchpad for nine minutes reads as alive; one that streams nothing is what the window is sized for.
+- The LM Studio native branch already accepted a `signal` and its docstring already said the caller's signal was the only way to stop it — **nothing passed one**. It reads the body itself, so it throws on abort (probed: 1643ms, `guard.reason() === 'stalled'`) and needs no race.
+
+**End-to-end, on the writer's exact read shape:** a silent stream is abandoned after the window (1638ms at a 1.5s window), a cancellation mid-call is abandoned at 871ms, and a live-but-slow stream still reads its full text with `finishReason: 'stop'`.
+
+**The same guard went into `lib/tasteSynopsisStream.ts`**, the other streamed call that runs inside a background job (step 2b of both recommendation pipelines). It consumes `fullStream`, so the abort throws into its existing catch, which stores the fallback identity with a NULL version and therefore retries on the next run (F-111).
+
+**Not done.** The assistant chat (`apps/api/.../assistant/handlers/chat.ts`, two `streamText` calls) has the same missing ceiling, but it holds one HTTP request rather than a job slot and has its own status line, so it was left alone. The grounding write path uses non-streaming `generateText`, where Node's 300s `headersTimeout` still bounds the call, so it is capped at five minutes — but Stop cannot interrupt it either.
