@@ -39,7 +39,7 @@ The cascade self-heals: **five consecutive empty answers park an engine at the b
 
 ## How Title Analysis Uses It
 
-The manual `generate-title-analysis` job refuses to start when the mode isn't ready. Per title: engines are tried in health order, the first with results wins; the fetched text is budgeted to the configured character cap; both the retrieval mode and the sources count are recorded per analysis so results are comparable. A grounded call that returns **zero** grounding citations is thrown away — the model answered from memory, which is exactly what this feature exists to prevent.
+The `generate-title-analysis` job (manual by default, schedulable, with a configurable titles-per-run limit) refuses to start when the mode isn't ready. Per title: engines are tried in health order, the first with results wins; the fetched text is budgeted to the configured character cap; both the retrieval mode and the sources count are recorded per analysis so results are comparable. A grounded call that returns **zero** grounding citations is thrown away — the model answered from memory, which is exactly what this feature exists to prevent.
 
 Failures land in the [API errors](api-errors.md) panel under the fastCRW provider.
 

@@ -18,6 +18,18 @@ export const jobComponentSchemas = {
       description: { type: 'string' as const, description: 'What this job does' },
       category: { type: 'string' as const, enum: ['sync', 'enrich', 'embed', 'recommendations', 'discovery'], description: 'Job category' },
       manualOnly: { type: 'boolean' as const, description: 'Whether this job can only be run manually' },
+      runLimit: {
+        type: 'object' as const,
+        nullable: true,
+        description: 'Present when each run works through at most N items and N is configurable',
+        properties: {
+          default: { type: 'integer' as const, description: 'Items per run when none is configured' },
+          min: { type: 'integer' as const },
+          max: { type: 'integer' as const },
+          unit: { type: 'string' as const, description: 'What one item is, e.g. titles' },
+          value: { type: 'integer' as const, description: 'Items the next run will attempt at most' },
+        },
+      },
       status: { type: 'string' as const, enum: ['running', 'idle'], description: 'Current job status' },
       currentJobId: { type: 'string' as const, format: 'uuid', nullable: true, description: 'ID of currently running job' },
       schedule: {
@@ -37,6 +49,7 @@ export const jobComponentSchemas = {
           },
           intervalHours: { type: 'integer' as const, nullable: true, description: 'Interval in hours (when not using sub-hour interval)' },
           intervalMinutes: { type: 'integer' as const, nullable: true, description: 'Sub-hour interval: 15 or 30 minutes' },
+          maxItemsPerRun: { type: 'integer' as const, nullable: true, description: "Configured items per run; null means the job's default" },
           isEnabled: { type: 'boolean' as const, description: 'Whether schedule is enabled' },
           formatted: { type: 'string' as const, description: 'Human-readable schedule description' },
         },
@@ -272,6 +285,14 @@ const updateJobConfig = {
           { type: 'number' as const, enum: [15, 30] },
         ],
         description: 'Sub-hour interval: 15 or 30 minutes. Mutually exclusive with scheduleIntervalHours.',
+      },
+      maxItemsPerRun: {
+        anyOf: [
+          { type: 'null' as const },
+          { type: 'integer' as const, minimum: 1 },
+        ],
+        description:
+          "Most items one run may attempt, for a job that declares a run limit (see the job's runLimit). Null restores the job's default; omit to leave it unchanged. Refused for jobs without a run limit.",
       },
       isEnabled: { type: 'boolean' as const, description: 'Whether the job is enabled' },
     },

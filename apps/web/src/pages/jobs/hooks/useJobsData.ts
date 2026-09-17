@@ -9,6 +9,8 @@ export interface UpdateJobConfigParams {
   scheduleDaysOfWeek?: number[] | null
   scheduleIntervalHours?: number | null
   scheduleIntervalMinutes?: number | null
+  /** Omit to leave unchanged; null restores the job's default. */
+  maxItemsPerRun?: number | null
   isEnabled?: boolean
 }
 

@@ -36,6 +36,7 @@ import {
   isJobCancelled,
   updateJobProgress,
   generateTitleAnalyses,
+  getJobConfig,
   refreshRatings,
   RATING_SOURCE_IDS,
   syncUsersFromMediaServer,
@@ -55,6 +56,8 @@ import {
 import { syncAllTraktRatings } from '../trakt/index.js'
 import { refreshAssistantSuggestions } from '../assistant/jobs/refreshSuggestions.js'
 import { releaseJob } from './state.js'
+import { jobDefinitions } from './definitions.js'
+import { resolveRunLimit } from './runLimit.js'
 
 const logger = createChildLogger('jobs-executor')
 
@@ -315,7 +318,16 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
         createJobProgress(jobId, name, 1)
         setJobStep(jobId, 0, 'Analysing titles')
 
+        // The operator's per-run cap, from the same row as the schedule. Read
+        // per run rather than at scheduling time, so a change in the dialog
+        // applies to the next run however it is started.
+        const runLimit = jobDefinitions.find((j) => j.name === name)?.runLimit
+        const maxTitles = runLimit
+          ? resolveRunLimit(runLimit, (await getJobConfig(name)).maxItemsPerRun)
+          : undefined
+
         const result = await generateTitleAnalyses({
+          maxTitles,
           onLog: (level, message) => addLog(jobId, level, message),
           // Cancellation has to be polled BETWEEN titles: a title costs a
           // search, several page fetches and a few thousand tokens of local

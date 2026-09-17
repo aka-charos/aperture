@@ -23,6 +23,12 @@ Admin console → **Operations** → **Jobs** (`/admin/ops/jobs`):
 
 Disabled jobs can also be flipped off directly from the Schedule tab.
 
+## Items Per Run
+
+Some jobs work through a list and stop after a set number of items, then pick up where they left off on the next run. Their schedule dialog has an extra field for that cap, and the card shows it beside the schedule ("Up to 200 titles per run"). It applies to manual runs as well as scheduled ones; leave it blank for the job's default.
+
+Currently this is `generate-title-analysis` (**Titles per run**, default 200, 1–5,000). A run that is still going when its next firing is due makes that firing skip, so on a short interval pick a smaller number.
+
 ## Defaults Worth Knowing
 
 - Syncs: library syncs every 3 h (staggered), movie watch history every 2 h, **series watch history hourly**, users every 30 min

@@ -41,7 +41,9 @@ The ratings job runs deliberately ahead of the recommendation run, so a regenera
 
 | Job | Default schedule | What it does |
 |-----|------------------|--------------|
-| `generate-title-analysis` | manual | Write critic-informed analyses for titles that have none, current recommendations first (each title costs a web search, a few page fetches, one model call) |
+| `generate-title-analysis` | manual (schedulable) | Write critic-informed analyses for titles that have none, current recommendations first (each title costs a web search, a few page fetches, one model call). **Titles per run** is set in its schedule dialog — default 200, 1–5,000 — and applies to manual runs too |
+
+A title takes roughly one to three minutes, so size the per-run limit to the schedule: if a run is still going when the next one is due, that next run is skipped. Nothing is lost either way — untouched titles stay pending for the next run.
 | `evaluate-recommender` | manual | Offline holdout evaluation — reads only, changes nothing ([Evaluation](evaluation.md)) |
 | `refresh-library-gaps` | manual | Re-scan TMDb collections vs the library ([Gap analysis](gap-analysis.md)); never requests via Seerr |
 | `refresh-embedding-centering` | manual | Recompute the library mean and re-centre every vector — normally automatic; reach for it to repair a populated-but-wrong column, and run `rebuild-taste-profiles` after |

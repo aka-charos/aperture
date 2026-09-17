@@ -296,7 +296,7 @@ Everything runs as a named job with live progress, a log, cancellation and run h
 | `generate-movie-recommendations`, `generate-series-recommendations`             | 04:00   |
 | `refresh-assistant-suggestions`, `refresh-ai-pricing`, `auto-request-top-picks` | 00:00   |
 
-**Manual only**
+**Manual by default** (`generate-title-analysis` and `refresh-library-gaps` can be given a schedule; the rest are manual only)
 
 `full-reset-movie-recommendations` · `full-reset-series-recommendations` · `rebuild-taste-profiles` · `refresh-recommendation-explanations` · `refresh-embedding-centering` · `evaluate-recommender` · `generate-title-analysis` · `refresh-library-gaps`
 

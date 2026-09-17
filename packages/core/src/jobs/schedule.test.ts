@@ -37,6 +37,7 @@ function config(overrides: Partial<JobConfig> = {}): JobConfig {
     scheduleDaysOfWeek: null,
     scheduleIntervalHours: null,
     scheduleIntervalMinutes: null,
+    maxItemsPerRun: null,
     isEnabled: true,
     updatedAt: NOW,
     ...overrides,
