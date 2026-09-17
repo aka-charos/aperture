@@ -32,6 +32,10 @@ The bench runs the **real generation path** (retries, pacing, contract checks) b
 
 Under the model list, **Prompt versions** lists every version this build carries (currently v7 to v15, where v15 is current and v10 was a draft that never went live), with the current one ticked. Tick more than one and every ticked model answers every ticked version.
 
+**Variants** are listed under them. A variant is a different set of questions and rules for the **same** version — same title header, same documents, same output contract — written for a model that cannot hold that version's own rules. Tick one and it runs beside the versions, on the same retrieval, and its answers are labelled `v15 compact` so they cannot be mistaken for the version's own. A variant is **never** written to the library: it is a bench prompt only, and it is not a draft of the next version.
+
+`compact` is the one this build carries. It is about 60% of version 15's instruction length, gives each question a paragraph budget instead of asking the model to judge proportion, and is aimed at small local models — on Fear and Loathing in Las Vegas, `ornith-1.5-9b` under v15 gave the film one paragraph and its reception two, which is the proportion v15 states as a hard cap.
+
 A version marked **draft — bench only** is the next prompt being tested. Only the bench can run it: the library keeps writing with the current version, and no stored analysis is retired until the draft is promoted in a later release. Bench the draft against the current version on several titles and models first — that is what it is for.
 
 - The sources are **retrieved once** and every version's prompt is built from them, so the prompts are identical down to the TASK line and differ only in their questions and rules. A difference between two answers from one model is therefore the prompt

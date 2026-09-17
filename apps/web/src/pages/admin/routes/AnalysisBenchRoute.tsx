@@ -74,6 +74,8 @@ interface RunEntry {
   model: string
   /** Absent from an older server, which ran one prompt version per run. */
   promptVersion?: number
+  /** The variant that answered, if one did; null or absent means the version. */
+  promptVariant?: string | null
   status: string
   analysis: string | null
   grade: string | null
@@ -110,6 +112,22 @@ interface RunSummary {
   startedAt: string
 }
 
+/**
+ * An alternative prompt for one version, offered beside it. Decided by the
+ * server - the label and the note come down with it, so nothing about a variant
+ * is written twice.
+ */
+interface PromptVariantOption {
+  id: string
+  label: string
+  base: number
+  note: string
+}
+
+/** "v15", or "v15 compact" — the spelling core prints in the report. */
+const promptLabel = (version: number, variant?: string | null) =>
+  variant ? `v${version} ${variant}` : `v${version}`
+
 /** "v8, v9" — how a list of versions is written in labels. */
 const versionList = (versions: number[]) => versions.map((version) => `v${version}`).join(', ')
 
@@ -134,6 +152,9 @@ export default function AnalysisBenchRoute() {
   const [selectedVersions, setSelectedVersions] = useState<number[]>([])
   // The next version, benchable only — labelled so it is never read as live.
   const [draftVersion, setDraftVersion] = useState<number | null>(null)
+  // Alternative prompts for a version, benchable only and never promoted.
+  const [availableVariants, setAvailableVariants] = useState<PromptVariantOption[]>([])
+  const [selectedVariants, setSelectedVariants] = useState<string[]>([])
   // An ORDERED list, not a Set: the report prints entries in the order they
   // were chosen, and a Set would silently reorder the document between runs.
   const [selected, setSelected] = useState<{ provider: string; model: string }[]>([])
@@ -160,6 +181,7 @@ export default function AnalysisBenchRoute() {
             promptVersion?: number
             promptVersions?: number[]
             draftPromptVersion?: number | null
+            promptVariants?: PromptVariantOption[]
           } | null
         ) => {
           if (!json) return
@@ -169,9 +191,11 @@ export default function AnalysisBenchRoute() {
           const current = json.promptVersion
           setAvailableVersions(json.promptVersions ?? (current != null ? [current] : []))
           setDraftVersion(json.draftPromptVersion ?? null)
+          setAvailableVariants(json.promptVariants ?? [])
           // The current prompt alone by default: a run nobody asked to widen
           // costs what it always cost.
           setSelectedVersions(current != null ? [current] : [])
+          setSelectedVariants([])
         }
       )
       .catch(() => setError(t('adminAnalysisBench.modelsFailed')))
@@ -236,19 +260,36 @@ export default function AnalysisBenchRoute() {
     })
   }
 
-  // The last ticked version cannot be unticked: a run with no prompt is not a
+  // The last ticked prompt cannot be unticked: a run with no prompt is not a
   // run, and a checkbox that silently does nothing is worse than a disabled one.
+  // Versions and variants are one pool for that rule - either alone is a run.
+  const promptCount = selectedVersions.length + selectedVariants.length
   const toggleVersion = (version: number) => {
     setSelectedVersions((prev) => {
       if (prev.includes(version)) {
-        return prev.length > 1 ? prev.filter((v) => v !== version) : prev
+        return promptCount > 1 ? prev.filter((v) => v !== version) : prev
       }
       return [...prev, version].sort((a, b) => a - b)
     })
   }
+  const toggleVariant = (id: string) => {
+    setSelectedVariants((prev) => {
+      if (prev.includes(id)) return promptCount > 1 ? prev.filter((v) => v !== id) : prev
+      return [...prev, id]
+    })
+  }
 
-  // Every ticked model answers every ticked version.
-  const answerCount = selected.length * Math.max(selectedVersions.length, 1)
+  // How the next run's prompts read, versions first: "v15, v15 compact".
+  const selectedPrompts = [
+    ...selectedVersions.map((version) => promptLabel(version)),
+    ...selectedVariants.map((id) => {
+      const variant = availableVariants.find((entry) => entry.id === id)
+      return promptLabel(variant?.base ?? 0, id)
+    }),
+  ]
+
+  // Every ticked model answers every ticked prompt.
+  const answerCount = selected.length * Math.max(promptCount, 1)
 
   const start = async () => {
     if (!picked || selected.length === 0) return
@@ -264,6 +305,7 @@ export default function AnalysisBenchRoute() {
           mediaId: picked.id,
           models: selected,
           promptVersions: selectedVersions,
+          promptVariants: selectedVariants,
         }),
       })
       const json = await res.json()
@@ -295,7 +337,10 @@ export default function AnalysisBenchRoute() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ promptVersions: selectedVersions }),
+        body: JSON.stringify({
+          promptVersions: selectedVersions,
+          promptVariants: selectedVariants,
+        }),
       })
       const json = await res.json()
       if (!res.ok) {
@@ -347,19 +392,19 @@ export default function AnalysisBenchRoute() {
     [run]
   )
 
-  // The versions the open run actually answered, read off its entries rather
-  // than off the checkboxes, which describe the NEXT run.
-  const runVersions = useMemo(
-    () =>
-      [
-        ...new Set(
-          (run?.entries ?? [])
-            .map((entry) => entry.promptVersion)
-            .filter((version): version is number => version != null)
-        ),
-      ].sort((a, b) => a - b),
-    [run]
-  )
+  // The prompts the open run actually answered, read off its entries rather
+  // than off the checkboxes, which describe the NEXT run. Labels rather than
+  // numbers, because a variant answers under its base version's number and two
+  // different prompts would otherwise read as one.
+  const runPrompts = useMemo(() => {
+    const labels = new Map<string, string>()
+    for (const entry of run?.entries ?? []) {
+      if (entry.promptVersion == null) continue
+      const key = `${entry.promptVersion}:${entry.promptVariant ?? ''}`
+      if (!labels.has(key)) labels.set(key, promptLabel(entry.promptVersion, entry.promptVariant))
+    }
+    return [...labels.values()]
+  }, [run])
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -467,7 +512,7 @@ export default function AnalysisBenchRoute() {
 
         {/* The prompt axis. Only shown when the build carries more than one
             version, since a single checkbox that cannot be unticked is noise. */}
-        {availableVersions.length > 1 && (
+        {(availableVersions.length > 1 || availableVariants.length > 0) && (
           <Box sx={{ mt: 1 }}>
             <Typography variant="body2" fontWeight={600}>
               {t('adminAnalysisBench.stepPrompts')}
@@ -486,7 +531,7 @@ export default function AnalysisBenchRoute() {
                       <Checkbox
                         size="small"
                         checked={on}
-                        disabled={on && selectedVersions.length === 1}
+                        disabled={on && promptCount === 1}
                         onChange={() => toggleVersion(version)}
                       />
                     }
@@ -503,6 +548,46 @@ export default function AnalysisBenchRoute() {
                 )
               })}
             </Box>
+            {availableVariants.length > 0 && (
+              <>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  display="block"
+                  sx={{ mt: 0.5 }}
+                >
+                  {t('adminAnalysisBench.variantsHint')}
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {availableVariants.map((variant) => {
+                    const on = selectedVariants.includes(variant.id)
+                    return (
+                      <Tooltip key={variant.id} title={variant.note}>
+                        <FormControlLabel
+                          sx={{ mr: 2 }}
+                          control={
+                            <Checkbox
+                              size="small"
+                              checked={on}
+                              disabled={on && promptCount === 1}
+                              onChange={() => toggleVariant(variant.id)}
+                            />
+                          }
+                          label={
+                            <Typography variant="body2">
+                              {t('adminAnalysisBench.versionVariant', {
+                                version: variant.base,
+                                label: variant.label,
+                              })}
+                            </Typography>
+                          }
+                        />
+                      </Tooltip>
+                    )
+                  })}
+                </Box>
+              </>
+            )}
           </Box>
         )}
 
@@ -547,9 +632,9 @@ export default function AnalysisBenchRoute() {
                     disabled={live || starting || run.sources.length === 0}
                     onClick={replay}
                   >
-                    {selectedVersions.length > 1
+                    {selectedPrompts.length > 1 || selectedVariants.length > 0
                       ? t('adminAnalysisBench.replayVersions', {
-                          versions: versionList(selectedVersions),
+                          versions: selectedPrompts.join(', '),
                         })
                       : t('adminAnalysisBench.replay', { version: selectedVersions[0] })}
                   </Button>
@@ -577,11 +662,11 @@ export default function AnalysisBenchRoute() {
           {/* The control, said out loud: this is what makes the answers below
               comparable at all. */}
           <Typography variant="caption" color="text.secondary" display="block">
-            {runVersions.length > 1
+            {runPrompts.length > 1
               ? t('adminAnalysisBench.controlVersions', {
                   count: run.sources.length,
                   chars: run.retrievedChars.toLocaleString(),
-                  versions: versionList(runVersions),
+                  versions: runPrompts.join(', '),
                 })
               : t('adminAnalysisBench.control', {
                   count: run.sources.length,
@@ -598,7 +683,7 @@ export default function AnalysisBenchRoute() {
           <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ my: 1.5 }}>
             {run.entries.map((entry) => (
               <Chip
-                key={`${keyOf(entry.provider, entry.model)}::${entry.promptVersion ?? ''}`}
+                key={`${keyOf(entry.provider, entry.model)}::${entry.promptVersion ?? ''}::${entry.promptVariant ?? ''}`}
                 size="small"
                 variant={entry.status === 'pending' ? 'outlined' : 'filled'}
                 color={
@@ -611,8 +696,8 @@ export default function AnalysisBenchRoute() {
                         : 'default'
                 }
                 label={
-                  runVersions.length > 1 && entry.promptVersion != null
-                    ? `${entry.model} · v${entry.promptVersion}`
+                  runPrompts.length > 1 && entry.promptVersion != null
+                    ? `${entry.model} · ${promptLabel(entry.promptVersion, entry.promptVariant)}`
                     : entry.model
                 }
               />

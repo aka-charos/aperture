@@ -20,6 +20,7 @@ import {
   startComparison,
   replayComparison,
   ANALYSIS_PROMPT_VERSION,
+  BENCH_PROMPT_VARIANTS,
   BENCH_PROMPT_VERSIONS,
   DRAFT_PROMPT_VERSION,
   getComparisonRun,
@@ -44,12 +45,14 @@ interface StartBody {
   models?: ComparisonModelRequest[]
   /** Prompt versions to run beside each other; absent means the current one. */
   promptVersions?: number[]
+  /** Prompt variants to run beside them; absent means none. */
+  promptVariants?: string[]
 }
 
 /**
- * A versions field is either absent or an array; what the numbers mean is
- * core's to decide (`resolveBenchPromptVersions` refuses an unknown one with a
- * sentence), so only the shape is checked here.
+ * A versions or variants field is either absent or an array; what the entries
+ * mean is core's to decide (`resolveBenchPromptChoices` refuses an unknown version or
+ * variant with a sentence), so only the shape is checked here.
  */
 function badVersions(value: unknown): boolean {
   return value !== undefined && !Array.isArray(value)
@@ -159,6 +162,15 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
         // A draft is benchable only; the picker labels it so nobody mistakes
         // it for the version the library writes with.
         draftPromptVersion: DRAFT_PROMPT_VERSION,
+        // Variants are benchable only too, and are never promoted: each is an
+        // alternative prompt for one version, offered beside it. The label and
+        // the note are decided here so the bundle holds no copy of either.
+        promptVariants: BENCH_PROMPT_VARIANTS.map((variant) => ({
+          id: variant.id,
+          label: variant.label,
+          base: variant.base,
+          note: variant.note,
+        })),
       })
     }
   )
@@ -183,7 +195,7 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/analysis-compare',
     { preHandler: requireAdmin, schema: { tags: ['analysis'] } },
     async (request, reply) => {
-      const { mediaType, mediaId, models, promptVersions } = request.body ?? {}
+      const { mediaType, mediaId, models, promptVersions, promptVariants } = request.body ?? {}
 
       if (mediaType !== 'movie' && mediaType !== 'series') {
         return reply.status(400).send({ error: 'mediaType must be "movie" or "series".' })
@@ -200,9 +212,18 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
       if (badVersions(promptVersions)) {
         return reply.status(400).send({ error: 'promptVersions must be a list of version numbers.' })
       }
+      if (badVersions(promptVariants)) {
+        return reply.status(400).send({ error: 'promptVariants must be a list of variant ids.' })
+      }
 
       try {
-        const runId = await startComparison({ mediaType, mediaId, models, promptVersions })
+        const runId = await startComparison({
+          mediaType,
+          mediaId,
+          models,
+          promptVersions,
+          promptVariants,
+        })
         return reply.status(202).send({ runId })
       } catch (err) {
         // These are all operator-facing refusals with real sentences — the
@@ -237,13 +258,18 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.post<{
     Params: { runId: string }
-    Body: { models?: ComparisonModelRequest[]; promptVersions?: number[] }
+    Body: {
+      models?: ComparisonModelRequest[]
+      promptVersions?: number[]
+      promptVariants?: string[]
+    }
   }>(
     '/api/analysis-compare/:runId/replay',
     { preHandler: requireAdmin, schema: { tags: ['analysis'] } },
     async (request, reply) => {
       const models = request.body?.models
       const promptVersions = request.body?.promptVersions
+      const promptVariants = request.body?.promptVariants
       if (models !== undefined) {
         if (!Array.isArray(models) || models.some((entry) => !entry?.provider || !entry?.model)) {
           return reply.status(400).send({ error: 'Every model needs a provider and a model id.' })
@@ -252,9 +278,16 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
       if (badVersions(promptVersions)) {
         return reply.status(400).send({ error: 'promptVersions must be a list of version numbers.' })
       }
+      if (badVersions(promptVariants)) {
+        return reply.status(400).send({ error: 'promptVariants must be a list of variant ids.' })
+      }
 
       try {
-        const runId = await replayComparison(request.params.runId, { models, promptVersions })
+        const runId = await replayComparison(request.params.runId, {
+          models,
+          promptVersions,
+          promptVariants,
+        })
         return reply.status(202).send({ runId })
       } catch (err) {
         // Operator-facing refusals with real sentences, like the start route.

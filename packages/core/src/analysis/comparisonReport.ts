@@ -39,6 +39,11 @@ export interface ComparisonEntry {
   model: string
   /** The prompt version this answer was written under (0172). */
   promptVersion: number
+  /**
+   * The variant that answered, or null for the version's own questions and
+   * rules (0179). Absent on entries built before variants existed.
+   */
+  promptVariant?: string | null
   /** pending | ok | unusable | error — see the 0169 comment. */
   status: string
   analysis: string | null
@@ -96,7 +101,7 @@ export interface ComparisonReport {
    * One prompt per version, oldest first, when the run answered more than the
    * single `prompt` (0172). Absent or null on older runs.
    */
-  prompts?: { version: number; text: string }[] | null
+  prompts?: { version: number; variant?: string | null; text: string }[] | null
   entries: ComparisonEntry[]
   startedAt: string
   finishedAt: string | null
@@ -282,15 +287,41 @@ function signalRows(report: ComparisonReport): SignalRow[] {
     .map(({ row }) => ({ label: row.label, signals: signalsOf(row.entry) }))
 }
 
-/** How an answer is named everywhere in the report: model, then prompt version. */
-function entryName(entry: ComparisonEntry): string {
-  return `${entry.provider} / ${entry.model} · v${entry.promptVersion}`
+/**
+ * Which prompt an answer was written under: "15", or "15 compact".
+ *
+ * The same spelling as prompt.ts's promptChoiceLabel, which names a choice for
+ * the logs and the picker. Repeated here rather than imported to keep this
+ * module readable on its own, the way its own header asks for.
+ */
+function promptName(entry: { promptVersion: number; promptVariant?: string | null }): string {
+  return entry.promptVariant
+    ? `${entry.promptVersion} ${entry.promptVariant}`
+    : String(entry.promptVersion)
 }
 
-/** The distinct prompt versions this run answered, oldest first. */
-function versionsOf(report: ComparisonReport): number[] {
-  const versions = [...new Set(report.entries.map((entry) => entry.promptVersion))]
-  return versions.length > 0 ? versions.sort((a, b) => a - b) : [report.promptVersion]
+/** How an answer is named everywhere in the report: model, then prompt. */
+function entryName(entry: ComparisonEntry): string {
+  return `${entry.provider} / ${entry.model} · v${promptName(entry)}`
+}
+
+/**
+ * The distinct prompts this run answered, oldest first, a variant after the
+ * version it varies.
+ */
+function versionsOf(report: ComparisonReport): string[] {
+  const seen = new Map<string, { version: number; variant: string; name: string }>()
+  for (const entry of report.entries) {
+    const variant = entry.promptVariant ?? ''
+    const key = `${entry.promptVersion}:${variant}`
+    if (!seen.has(key)) {
+      seen.set(key, { version: entry.promptVersion, variant, name: promptName(entry) })
+    }
+  }
+  if (seen.size === 0) return [String(report.promptVersion)]
+  return [...seen.values()]
+    .sort((a, b) => a.version - b.version || a.variant.localeCompare(b.variant))
+    .map((prompt) => prompt.name)
 }
 
 /** A prompt from its TASK line on — the part that differs between versions. */
@@ -401,23 +432,29 @@ export function renderComparisonReport(report: ComparisonReport): string {
   // Several versions: the newest in full, then each older one from its TASK
   // line only. Everything above TASK is the same documents, and printing the
   // source block once per version would bury the part that actually differs.
+  // Newest first, and a version's own prompt ahead of its variants: the one
+  // printed in full has to be the one the others are said to match above TASK.
   const prompts =
     report.prompts && report.prompts.length > 1
-      ? [...report.prompts].sort((a, b) => b.version - a.version)
+      ? [...report.prompts].sort(
+          (a, b) => b.version - a.version || (a.variant ?? '').localeCompare(b.variant ?? '')
+        )
       : null
   if (prompts) {
     const [newest, ...older] = prompts
+    const nameOf = (prompt: { version: number; variant?: string | null }) =>
+      promptName({ promptVersion: prompt.version, promptVariant: prompt.variant })
     out.push(RULE)
     out.push('THE PROMPTS')
     out.push(RULE)
     out.push('')
-    out.push(`--- PROMPT VERSION ${newest.version}, in full ---`)
+    out.push(`--- PROMPT VERSION ${nameOf(newest)}, in full ---`)
     out.push('')
     out.push(newest.text)
     out.push('')
     for (const prompt of older) {
       out.push(
-        `--- PROMPT VERSION ${prompt.version}, from TASK on (everything above it is identical to version ${newest.version}) ---`
+        `--- PROMPT VERSION ${nameOf(prompt)}, from TASK on (everything above it is identical to version ${nameOf(newest)}) ---`
       )
       out.push('')
       out.push(fromTask(prompt.text))

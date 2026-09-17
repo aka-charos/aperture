@@ -47,8 +47,11 @@ import { retrieveSources, runWriteAttempt } from './generate.js'
 import {
   buildAnalysisPrompt,
   extractPromptSources,
-  resolveBenchPromptVersions,
+  promptChoiceKey,
+  promptChoiceLabel,
+  resolveBenchPromptChoices,
   type AnalysisSource,
+  type PromptChoice,
 } from './prompt.js'
 import { parseParagraphMap, splitAnalysisParagraphs } from './paragraphMap.js'
 import {
@@ -76,12 +79,31 @@ export interface StartComparisonOptions {
    * version only, which is what the bench did before versions were selectable.
    */
   promptVersions?: number[]
+  /**
+   * Prompt variants to put beside those versions - an alternative set of
+   * questions and rules for the same version, for a model that cannot hold
+   * that version's own. See ./promptVariants.ts. Each runs on the same
+   * retrieval as everything else, so a variant is compared against its base
+   * under the one control that means anything.
+   */
+  promptVariants?: string[]
 }
 
-/** One answer the run will produce: a model, under one prompt version. */
+/** One answer the run will produce: a model, under one prompt. */
 interface PlannedEntry extends ComparisonModelRequest {
   position: number
-  promptVersion: number
+  choice: PromptChoice
+}
+
+/**
+ * The version a run is filed under: the highest number among its choices.
+ *
+ * A variant carries its base version rather than a number of its own, so a run
+ * of v15 beside v15 compact is a v15 run - which is what keeps
+ * analysis_comparison_runs.prompt_version meaning the newest version answered.
+ */
+function headlineVersion(choices: PromptChoice[]): number {
+  return Math.max(...choices.map((choice) => choice.version))
 }
 
 /**
@@ -131,19 +153,19 @@ export async function startComparison(options: StartComparisonOptions): Promise<
 
   const models = options.models.slice(0, MAX_COMPARISON_MODELS)
   if (models.length === 0) throw new Error('Pick at least one model.')
-  // Resolved before any row exists, so an unknown version is refused rather
-  // than leaving a run behind that can never finish.
-  const versions = resolveBenchPromptVersions(options.promptVersions)
+  // Resolved before any row exists, so an unknown version or variant is
+  // refused rather than leaving a run behind that can never finish.
+  const choices = resolveBenchPromptChoices(options.promptVersions, options.promptVariants)
 
   const run = await queryOne<{ id: string }>(
     `INSERT INTO analysis_comparison_runs (media_type, media_id, title, year, prompt_version)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING id`,
-    [options.mediaType, options.mediaId, subject.title, subject.year, versions[versions.length - 1]]
+    [options.mediaType, options.mediaId, subject.title, subject.year, headlineVersion(choices)]
   )
   if (!run) throw new Error('Could not start the comparison.')
 
-  await launch(run.id, options.mediaType, options.mediaId, models, versions, null)
+  await launch(run.id, options.mediaType, options.mediaId, models, choices, null)
   return run.id
 }
 
@@ -179,10 +201,14 @@ export async function startComparison(options: StartComparisonOptions): Promise<
  */
 export async function replayComparison(
   runId: string,
-  options: { models?: ComparisonModelRequest[]; promptVersions?: number[] } = {}
+  options: {
+    models?: ComparisonModelRequest[]
+    promptVersions?: number[]
+    promptVariants?: string[]
+  } = {}
 ): Promise<string> {
   const requested = options.models
-  const versions = resolveBenchPromptVersions(options.promptVersions)
+  const choices = resolveBenchPromptChoices(options.promptVersions, options.promptVariants)
   const original = await queryOne<RunRow>(`SELECT * FROM analysis_comparison_runs WHERE id = $1`, [
     runId,
   ])
@@ -228,7 +254,7 @@ export async function replayComparison(
       original.media_id,
       subject.title,
       subject.year,
-      versions[versions.length - 1],
+      headlineVersion(choices),
       original.id,
       original.source_count,
       original.retrieved_chars,
@@ -238,25 +264,25 @@ export async function replayComparison(
   )
   if (!run) throw new Error('Could not start the replay.')
 
-  await launch(run.id, original.media_type, original.media_id, models, versions, sources)
+  await launch(run.id, original.media_type, original.media_id, models, choices, sources)
   return run.id
 }
 
 /**
  * Every answer a run will produce, in report order: grouped by MODEL, each
- * model's prompt versions oldest first.
+ * model's prompts in choice order - versions oldest first, then variants.
  *
  * Grouped by model rather than by version so a model's answers sit next to each
  * other in the report, which is the comparison a version change asks for - the
  * same model, the same documents, different questions and rules.
  */
-function planEntries(models: ComparisonModelRequest[], versions: number[]): PlannedEntry[] {
+function planEntries(models: ComparisonModelRequest[], choices: PromptChoice[]): PlannedEntry[] {
   return models.flatMap((model, m) =>
-    versions.map((promptVersion, v) => ({
+    choices.map((choice, v) => ({
       provider: model.provider,
       model: model.model,
-      promptVersion,
-      position: m * versions.length + v,
+      choice,
+      position: m * choices.length + v,
     }))
   )
 }
@@ -273,21 +299,29 @@ async function launch(
   mediaType: 'movie' | 'series',
   mediaId: string,
   models: ComparisonModelRequest[],
-  versions: number[],
+  choices: PromptChoice[],
   replaySources: AnalysisSource[] | null
 ): Promise<void> {
-  const entries = planEntries(models, versions)
+  const entries = planEntries(models, choices)
   for (const entry of entries) {
     await query(
-      `INSERT INTO analysis_comparison_results (run_id, position, provider, model, prompt_version)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [runId, entry.position, entry.provider, entry.model, entry.promptVersion]
+      `INSERT INTO analysis_comparison_results
+         (run_id, position, provider, model, prompt_version, prompt_variant)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        runId,
+        entry.position,
+        entry.provider,
+        entry.model,
+        entry.choice.version,
+        entry.choice.variant,
+      ]
     )
   }
 
   running.add(runId)
   // Deliberately not awaited: the caller answers 202 and the page polls.
-  void driveComparison(runId, mediaType, mediaId, entries, versions, replaySources).catch((err) => {
+  void driveComparison(runId, mediaType, mediaId, entries, choices, replaySources).catch((err) => {
     logger.error({ err, runId }, 'Comparison run threw outside its own handler')
   })
 }
@@ -297,7 +331,7 @@ async function driveComparison(
   mediaType: 'movie' | 'series',
   mediaId: string,
   entries: PlannedEntry[],
-  versions: number[],
+  choices: PromptChoice[],
   replaySources: AnalysisSource[] | null
 ): Promise<void> {
   try {
@@ -338,14 +372,20 @@ async function driveComparison(
     }
 
     const prompts = new Map(
-      versions.map((version) => [
-        version,
-        buildAnalysisPrompt(subject, { mode: 'crw', sources, version }),
+      choices.map((choice) => [
+        promptChoiceKey(choice),
+        buildAnalysisPrompt(subject, {
+          mode: 'crw',
+          sources,
+          version: choice.version,
+          variant: choice.variant,
+        }),
       ])
     )
-    // `prompt` keeps the newest version's text, because replay reads the
-    // documents back out of it (0171); `prompts` holds every version (0172).
-    const newest = prompts.get(versions[versions.length - 1])!
+    // `prompt` keeps the last choice's text, because replay reads the documents
+    // back out of it (0171) and every choice carries the same header and source
+    // block; `prompts` holds them all (0172), keyed by choice.
+    const newest = prompts.get(promptChoiceKey(choices[choices.length - 1]))!
     await query(`UPDATE analysis_comparison_runs SET prompt = $2, prompts = $3 WHERE id = $1`, [
       runId,
       newest,
@@ -357,7 +397,7 @@ async function driveComparison(
         runId,
         title: subject.title,
         answers: entries.length,
-        promptVersions: versions,
+        prompts: choices.map(promptChoiceLabel),
         promptChars: newest.length,
       },
       'Comparison prompts built — running models'
@@ -369,10 +409,10 @@ async function driveComparison(
         runId,
         entry.position,
         entry,
-        prompts.get(entry.promptVersion)!,
+        prompts.get(promptChoiceKey(entry.choice))!,
         crwConfig.analysisMaxOutputTokens,
         mediaType,
-        entry.promptVersion
+        entry.choice.version
       )
     }
 
@@ -507,7 +547,10 @@ interface RunRow {
   retrieved_chars: number | null
   sources: { title: string; domain: string; url: string | null; chars: number }[] | null
   replay_of: string | null
-  /** One prompt per version (0172); null on runs made before versions were selectable. */
+  /**
+   * One prompt per choice, keyed "15" or "15:compact" (0172, 0179); null on
+   * runs made before versions were selectable.
+   */
   prompts: Record<string, string> | null
   started_at: string
   finished_at: string | null
@@ -517,6 +560,8 @@ interface ResultRow {
   position: number
   /** Null on rows made before 0172, which answered their run's prompt_version. */
   prompt_version: number | null
+  /** The variant that answered, or null for the version's own prompt (0179). */
+  prompt_variant: string | null
   provider: string
   model: string
   status: string
@@ -588,10 +633,16 @@ export async function getComparisonRun(runId: string): Promise<ComparisonRunView
     })),
     retrievedChars: run.retrieved_chars ?? 0,
     prompt: run.prompt,
+    // Keyed "15" before variants existed and "15:compact" with one, so the
+    // key is split rather than cast - Number("15:compact") is NaN, which sorts
+    // nowhere and prints as a prompt for version NaN.
     prompts: run.prompts
       ? Object.entries(run.prompts)
-          .map(([version, text]) => ({ version: Number(version), text }))
-          .sort((a, b) => a.version - b.version)
+          .map(([key, text]) => {
+            const [version, variant] = key.split(':')
+            return { version: Number(version), variant: variant ?? null, text }
+          })
+          .sort((a, b) => a.version - b.version || (a.variant ?? '').localeCompare(b.variant ?? ''))
       : null,
     // pg hands a TIMESTAMPTZ back as a Date, so interpolating it into the
     // report would print a locale-shaped string that differs between the
@@ -617,6 +668,7 @@ function toEntry(row: ResultRow, runVersion: number): ComparisonEntry {
     model: row.model,
     // Absent on a pre-0172 row, which answered the one prompt its run held.
     promptVersion: row.prompt_version ?? runVersion,
+    promptVariant: row.prompt_variant,
     status: row.status,
     analysis: row.analysis,
     grade: row.grade,
