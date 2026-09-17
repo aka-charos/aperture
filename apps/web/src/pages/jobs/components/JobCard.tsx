@@ -198,6 +198,11 @@ export function JobCard({
                 <ScheduleIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
                 <Typography variant="caption" color="text.disabled">
                   {job.schedule?.formatted || t('admin.jobsPage.ui.notConfigured')}
+                  {job.runLimit &&
+                    ` · ${t('admin.jobsPage.ui.runLimitCaption', {
+                      context: job.runLimit.unit,
+                      count: job.runLimit.value,
+                    })}`}
                 </Typography>
               </Stack>
               {lastRunInfo && !isRunning && (

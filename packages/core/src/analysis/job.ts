@@ -36,10 +36,14 @@ const logger = createChildLogger('title-analysis-job')
 /**
  * Titles attempted per run, unless the caller says otherwise.
  *
+ * The operator can override it per run in the job's schedule dialog
+ * (`job_config.max_items_per_run`); this is what an unset value means.
+ *
  * 200 is roughly an overnight pass at 1-3 minutes a title. Nothing breaks if it
  * is raised — there is no quota to overrun — but a run that outlives the gap to
- * its next schedule is a job overlapping itself, which is the actual failure to
- * avoid. The real throughput limits are the operator's GPU and, more likely,
+ * its next schedule gets its next firing skipped (the scheduler will not start a
+ * job that is still in flight), so on a short cadence the cap should shrink
+ * with it. The real throughput limits are the operator's GPU and, more likely,
  * SearXNG's upstream engines throttling a fast crawl.
  */
 export const DEFAULT_MAX_TITLES_PER_RUN = 200
@@ -168,7 +172,8 @@ export async function generateTitleAnalyses(
 
   say(
     'info',
-    `📚 ${total.toLocaleString()} title(s) pending — analysing up to ${capped.toLocaleString()} this run (${readiness.mode === 'crw' ? 'self-hosted retrieval' : 'built-in search'})`
+    `📚 ${total.toLocaleString()} title(s) pending — analysing up to ${capped.toLocaleString()} this run ` +
+      `(limit ${budget.toLocaleString()} per run, ${readiness.mode === 'crw' ? 'self-hosted retrieval' : 'built-in search'})`
   )
   if (capped === 0) {
     say('info', 'Nothing pending — every title already has an analysis or a stored decline.')

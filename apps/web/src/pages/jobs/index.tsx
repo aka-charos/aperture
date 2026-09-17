@@ -490,6 +490,7 @@ export function JobsPage() {
         jobName={configDialogJob || ''}
         currentSchedule={configJob?.schedule}
         manualOnly={configJob?.manualOnly}
+        runLimit={configJob?.runLimit}
         onSave={(config) => handleUpdateConfig(configDialogJob!, config)}
       />
 

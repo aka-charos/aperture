@@ -50,6 +50,11 @@ export interface JobConfig {
   scheduleIntervalHours: number | null
   /** 15 or 30 when set; mutually exclusive with scheduleIntervalHours for interval schedules */
   scheduleIntervalMinutes: number | null
+  /**
+   * Items one run may attempt, for a job that declares a run limit. Null means
+   * the job's own default. Applies to manual runs as well as scheduled ones.
+   */
+  maxItemsPerRun: number | null
   isEnabled: boolean
   updatedAt: Date
 }
@@ -63,6 +68,7 @@ interface JobConfigRow {
   schedule_days_of_week: number[] | null
   schedule_interval_hours: number | null
   schedule_interval_minutes: number | null
+  max_items_per_run: number | null
   is_enabled: boolean
   updated_at: Date
 }
@@ -206,12 +212,15 @@ export const JOB_SCHEDULE_DEFAULTS: Record<
   'evaluate-recommender': { scheduleType: 'manual', hour: 0, minute: 0 },
   'refresh-embedding-centering': { scheduleType: 'manual', hour: 0, minute: 0 },
   'refresh-recommendation-explanations': { scheduleType: 'manual', hour: 0, minute: 0 },
+  // Schedulable, but seeded manual: every title is a search, several page
+  // fetches and a model call, so a cadence is an operator's decision about
+  // their hardware (or their bill), never a default someone inherits.
   'generate-title-analysis': { scheduleType: 'manual', hour: 0, minute: 0 },
 }
 
 const CONFIG_COLUMNS = `job_name, schedule_type, schedule_hour, schedule_minute,
             schedule_day_of_week, schedule_days_of_week, schedule_interval_hours,
-            schedule_interval_minutes, is_enabled, updated_at`
+            schedule_interval_minutes, max_items_per_run, is_enabled, updated_at`
 
 function rowToConfig(row: JobConfigRow): JobConfig {
   return {
@@ -223,6 +232,7 @@ function rowToConfig(row: JobConfigRow): JobConfig {
     scheduleDaysOfWeek: row.schedule_days_of_week,
     scheduleIntervalHours: row.schedule_interval_hours,
     scheduleIntervalMinutes: row.schedule_interval_minutes,
+    maxItemsPerRun: row.max_items_per_run,
     isEnabled: row.is_enabled,
     updatedAt: row.updated_at,
   }
@@ -261,6 +271,7 @@ export async function getJobConfig(jobName: string): Promise<JobConfig> {
     scheduleDaysOfWeek: dayOfWeek === null ? null : [dayOfWeek],
     scheduleIntervalHours: defaultConfig?.intervalHours ?? null,
     scheduleIntervalMinutes: defaultConfig?.intervalMinutes ?? null,
+    maxItemsPerRun: null,
     isEnabled: true,
     updatedAt: new Date(),
   }
@@ -303,45 +314,68 @@ export async function setJobConfig(
     scheduleDaysOfWeek?: number[] | null
     scheduleIntervalHours?: number | null
     scheduleIntervalMinutes?: number | null
+    /**
+     * Undefined leaves the stored cap alone; null clears it back to the job's
+     * default.
+     */
+    maxItemsPerRun?: number | null
     isEnabled?: boolean
   }
 ): Promise<JobConfig> {
+  // A partial update leaves what it does not name alone. The Schedule tab's
+  // switch sends `isEnabled` by itself, and this used to fill the missing
+  // schedule type with 'daily' (and every time field with null), so switching
+  // a weekly job off and on again turned it into "daily at midnight"; a PATCH
+  // naming only the per-run cap would likewise have re-enabled a disabled job.
+  // The schedule fields travel as a group, so a missing type means "keep the
+  // whole current schedule" -- read from the row, or from the seed cadence
+  // the job is already running on when it has no row yet.
+  const current =
+    config.scheduleType === undefined || config.isEnabled === undefined
+      ? await getJobConfig(jobName)
+      : null
+  const schedule = config.scheduleType !== undefined || !current ? config : current
+  const isEnabled = config.isEnabled ?? current?.isEnabled ?? true
+
   // The array is the selection; the scalar trails it at the earliest day so a
   // rollback to a build without the column still reads a sensible schedule.
   // A caller sending only the old scalar (an older client, or a settings
   // handler that has no day picker) still gets a one-day array here.
   const days = normalizeScheduleDays(
-    config.scheduleDaysOfWeek ??
-      (config.scheduleDayOfWeek == null ? null : [config.scheduleDayOfWeek]),
-    config.scheduleType
+    schedule.scheduleDaysOfWeek ??
+      (schedule.scheduleDayOfWeek == null ? null : [schedule.scheduleDayOfWeek]),
+    schedule.scheduleType
   )
 
   const result = await queryOne<JobConfigRow>(
     `INSERT INTO job_config (job_name, schedule_type, schedule_hour, schedule_minute,
                              schedule_day_of_week, schedule_days_of_week, schedule_interval_hours,
-                             schedule_interval_minutes, is_enabled)
-     VALUES ($1, $2, $3, $4, $5, $9, $6, $7, $8)
+                             schedule_interval_minutes, is_enabled, max_items_per_run)
+     VALUES ($1, $2, $3, $4, $5, $9, $6, $7, $8, $11)
      ON CONFLICT (job_name) DO UPDATE SET
-       schedule_type = COALESCE($2, job_config.schedule_type),
-       schedule_hour = CASE WHEN $2 IS NOT NULL THEN $3 ELSE job_config.schedule_hour END,
-       schedule_minute = CASE WHEN $2 IS NOT NULL THEN $4 ELSE job_config.schedule_minute END,
-       schedule_day_of_week = CASE WHEN $2 IS NOT NULL THEN $5 ELSE job_config.schedule_day_of_week END,
-       schedule_days_of_week = CASE WHEN $2 IS NOT NULL THEN $9 ELSE job_config.schedule_days_of_week END,
-       schedule_interval_hours = CASE WHEN $2 IS NOT NULL THEN $6 ELSE job_config.schedule_interval_hours END,
-       schedule_interval_minutes = CASE WHEN $2 IS NOT NULL THEN $7 ELSE job_config.schedule_interval_minutes END,
-       is_enabled = COALESCE($8, job_config.is_enabled),
+       schedule_type = $2,
+       schedule_hour = $3,
+       schedule_minute = $4,
+       schedule_day_of_week = $5,
+       schedule_days_of_week = $9,
+       schedule_interval_hours = $6,
+       schedule_interval_minutes = $7,
+       is_enabled = $8,
+       max_items_per_run = CASE WHEN $10::boolean THEN $11 ELSE job_config.max_items_per_run END,
        updated_at = NOW()
      RETURNING ${CONFIG_COLUMNS}`,
     [
       jobName,
-      config.scheduleType ?? 'daily',
-      config.scheduleHour ?? null,
-      config.scheduleMinute ?? null,
+      schedule.scheduleType ?? 'daily',
+      schedule.scheduleHour ?? null,
+      schedule.scheduleMinute ?? null,
       days === null ? null : days[0],
-      config.scheduleIntervalHours ?? null,
-      config.scheduleIntervalMinutes ?? null,
-      config.isEnabled ?? true,
+      schedule.scheduleIntervalHours ?? null,
+      schedule.scheduleIntervalMinutes ?? null,
+      isEnabled,
       days,
+      config.maxItemsPerRun !== undefined,
+      config.maxItemsPerRun ?? null,
     ]
   )
 

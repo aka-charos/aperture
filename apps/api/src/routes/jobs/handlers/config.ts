@@ -8,12 +8,14 @@ import {
   setJobConfig,
   formatSchedule,
   createChildLogger,
+  type JobConfig,
   type ScheduleType,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
 import { refreshJobSchedule } from '../../../lib/scheduler.js'
 import { jobSchemas } from '../schemas.js'
 import { jobDefinitions } from '../definitions.js'
+import { runLimitError } from '../runLimit.js'
 
 /**
  * Is this a job at all?
@@ -25,6 +27,23 @@ import { jobDefinitions } from '../definitions.js'
  */
 function isKnownJob(name: string): boolean {
   return jobDefinitions.some((j) => j.name === name)
+}
+
+/** The config as both routes return it. */
+function toResponseConfig(config: JobConfig) {
+  return {
+    jobName: config.jobName,
+    scheduleType: config.scheduleType,
+    scheduleHour: config.scheduleHour,
+    scheduleMinute: config.scheduleMinute,
+    scheduleDayOfWeek: config.scheduleDayOfWeek,
+    scheduleDaysOfWeek: config.scheduleDaysOfWeek,
+    scheduleIntervalHours: config.scheduleIntervalHours,
+    scheduleIntervalMinutes: config.scheduleIntervalMinutes,
+    maxItemsPerRun: config.maxItemsPerRun,
+    isEnabled: config.isEnabled,
+    formatted: formatSchedule(config),
+  }
 }
 
 const logger = createChildLogger('jobs-config')
@@ -46,20 +65,7 @@ export async function registerConfigHandlers(fastify: FastifyInstance) {
 
       const config = await getJobConfig(name)
 
-      return reply.send({
-        config: {
-          jobName: config.jobName,
-          scheduleType: config.scheduleType,
-          scheduleHour: config.scheduleHour,
-          scheduleMinute: config.scheduleMinute,
-          scheduleDayOfWeek: config.scheduleDayOfWeek,
-          scheduleDaysOfWeek: config.scheduleDaysOfWeek,
-          scheduleIntervalHours: config.scheduleIntervalHours,
-          scheduleIntervalMinutes: config.scheduleIntervalMinutes,
-          isEnabled: config.isEnabled,
-          formatted: formatSchedule(config),
-        },
-      })
+      return reply.send({ config: toResponseConfig(config) })
     }
   )
 
@@ -77,6 +83,7 @@ export async function registerConfigHandlers(fastify: FastifyInstance) {
       scheduleDaysOfWeek?: number[] | null
       scheduleIntervalHours?: number | null
       scheduleIntervalMinutes?: number | null
+      maxItemsPerRun?: number | null
       isEnabled?: boolean
     }
   }>(
@@ -86,7 +93,8 @@ export async function registerConfigHandlers(fastify: FastifyInstance) {
       const { name } = request.params
       const updates = request.body
 
-      if (!isKnownJob(name)) {
+      const definition = jobDefinitions.find((j) => j.name === name)
+      if (!definition) {
         return reply.status(404).send({ error: 'Job not found' })
       }
 
@@ -155,6 +163,15 @@ export async function registerConfigHandlers(fastify: FastifyInstance) {
         }
       }
 
+      // The per-run cap is only accepted for a job that declares one, and only
+      // inside its declared range -- see runLimit.ts.
+      if (updates.maxItemsPerRun !== undefined) {
+        const problem = runLimitError(definition.runLimit, updates.maxItemsPerRun)
+        if (problem) {
+          return reply.status(400).send({ error: problem })
+        }
+      }
+
       if (updates.scheduleType === 'interval') {
         const hasHours =
           updates.scheduleIntervalHours !== undefined && updates.scheduleIntervalHours !== null
@@ -184,18 +201,7 @@ export async function registerConfigHandlers(fastify: FastifyInstance) {
         }
 
         return reply.send({
-          config: {
-            jobName: config.jobName,
-            scheduleType: config.scheduleType,
-            scheduleHour: config.scheduleHour,
-            scheduleMinute: config.scheduleMinute,
-            scheduleDayOfWeek: config.scheduleDayOfWeek,
-            scheduleDaysOfWeek: config.scheduleDaysOfWeek,
-            scheduleIntervalHours: config.scheduleIntervalHours,
-            scheduleIntervalMinutes: config.scheduleIntervalMinutes,
-            isEnabled: config.isEnabled,
-            formatted: formatSchedule(config),
-          },
+          config: toResponseConfig(config),
           message: 'Job configuration updated',
         })
       } catch (err) {

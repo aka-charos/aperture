@@ -16,8 +16,24 @@ export interface JobSchedule {
   daysOfWeek: number[] | null
   intervalHours: number | null
   intervalMinutes: number | null
+  /** Configured items per run; null means the job's default. Absent on older API builds. */
+  maxItemsPerRun?: number | null
   isEnabled: boolean
   formatted: string
+}
+
+/**
+ * A job that works through at most N items per run, with N configurable.
+ * Decided server-side: the bundle never holds a copy of the default or range.
+ */
+export interface JobRunLimit {
+  default: number
+  min: number
+  max: number
+  /** What one item is (an i18n context, e.g. `titles`). */
+  unit: string
+  /** The cap the next run will use: the configured value, or the default. */
+  value: number
 }
 
 export interface JobProgress {
@@ -79,6 +95,7 @@ export interface Job {
   schedule?: JobSchedule | null
   lastRun?: JobLastRun | null
   manualOnly?: boolean
+  runLimit?: JobRunLimit | null
 }
 
 export interface JobCategory {

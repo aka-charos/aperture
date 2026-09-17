@@ -14,6 +14,7 @@ import { requireAdmin } from '../../../plugins/auth.js'
 import { jobSchemas } from '../schemas.js'
 import { jobDefinitions } from '../definitions.js'
 import { activeJobs } from '../state.js'
+import { resolveRunLimit } from '../runLimit.js'
 
 export async function registerListHandlers(fastify: FastifyInstance) {
   /**
@@ -40,6 +41,11 @@ export async function registerListHandlers(fastify: FastifyInstance) {
 
           return {
             ...def,
+            // `value` is the cap the next run will use, decided here with the
+            // executor's own resolver so the card cannot state a different one.
+            runLimit: def.runLimit
+              ? { ...def.runLimit, value: resolveRunLimit(def.runLimit, config.maxItemsPerRun) }
+              : undefined,
             status: progress?.status === 'running' ? 'running' : 'idle',
             currentJobId: activeJobId,
             progress: progress
@@ -59,6 +65,7 @@ export async function registerListHandlers(fastify: FastifyInstance) {
                   daysOfWeek: config.scheduleDaysOfWeek,
                   intervalHours: config.scheduleIntervalHours,
                   intervalMinutes: config.scheduleIntervalMinutes,
+                  maxItemsPerRun: config.maxItemsPerRun,
                   isEnabled: config.isEnabled,
                   formatted: formatSchedule(config),
                 }

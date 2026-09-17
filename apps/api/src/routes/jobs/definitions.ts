@@ -3,6 +3,7 @@
  * Central registry of all background jobs
  */
 
+import { DEFAULT_MAX_TITLES_PER_RUN } from '@aperture/core'
 import type { JobDefinition } from './types.js'
 
 export const jobDefinitions: JobDefinition[] = [
@@ -85,12 +86,23 @@ export const jobDefinitions: JobDefinition[] = [
     manualOnly: true,
   },
   // === Title analysis (per title, from retrieved sources, shared by all users) ===
+  // Schedulable, with an operator-chosen cap per run so a cadence can be sized
+  // to the hardware: a title takes one to three minutes, and a run still in
+  // flight when the next firing arrives has that firing skipped. Seeded manual
+  // in core's JOB_SCHEDULE_DEFAULTS, so nobody inherits a cadence.
   {
     name: 'generate-title-analysis',
     description:
-      'Writes a critic-informed analysis for titles that have none, current recommendations first. Each title costs a web search, a few page fetches and one model call — all self-hosted, so there is no quota, only time. Needs the retrieval service configured in Settings > Integrations and the Title Analysis role in Settings > AI.',
+      'Writes a critic-informed analysis for titles that have none, current recommendations first, up to the per-run limit set in this job\'s schedule. Each title costs a web search, a few page fetches and one model call — all self-hosted, so there is no quota, only time. Needs the retrieval service configured in Settings > Integrations and the Title Analysis role in Settings > AI.',
     cron: null,
-    manualOnly: true,
+    runLimit: {
+      default: DEFAULT_MAX_TITLES_PER_RUN,
+      min: 1,
+      // Several days of work at the slowest measured rate. Past that one run is
+      // the whole library, which a schedule reaches anyway by running again.
+      max: 5000,
+      unit: 'titles',
+    },
   },
   // === Evaluation (both media types) ===
   {

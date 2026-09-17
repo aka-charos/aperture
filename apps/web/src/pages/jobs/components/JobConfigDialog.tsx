@@ -17,13 +17,14 @@ import {
   MenuItem,
   Switch,
   Stack,
+  TextField,
   Alert,
   CircularProgress,
   ToggleButton,
   ToggleButtonGroup,
 } from '@mui/material'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
-import type { ScheduleType, JobSchedule } from '../types'
+import type { ScheduleType, JobSchedule, JobRunLimit } from '../types'
 import { formatJobName } from '../constants'
 import type { UpdateJobConfigParams } from '../hooks/useJobsData'
 
@@ -38,6 +39,8 @@ interface JobConfigDialogProps {
   jobName: string
   currentSchedule: JobSchedule | null | undefined
   manualOnly?: boolean
+  /** Present when the job's per-run item cap is configurable. */
+  runLimit?: JobRunLimit | null
   onSave: (schedule: JobConfigSaveParams) => Promise<void>
 }
 
@@ -84,6 +87,7 @@ export function JobConfigDialog({
   jobName,
   currentSchedule,
   manualOnly = false,
+  runLimit = null,
   onSave,
 }: JobConfigDialogProps) {
   const { t } = useTranslation()
@@ -96,6 +100,9 @@ export function JobConfigDialog({
   const [dayOfWeek, setDayOfWeek] = useState<number>(0)
   const [intervalMinutesTotal, setIntervalMinutesTotal] = useState<number>(360)
   const [isEnabled, setIsEnabled] = useState<boolean>(true)
+  // Text, not a number: blank is a real answer ("use the job's default") and a
+  // number input cannot hold it.
+  const [runLimitText, setRunLimitText] = useState<string>('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [initialized, setInitialized] = useState(false)
@@ -151,6 +158,9 @@ export function JobConfigDialog({
           (currentSchedule.intervalHours != null ? currentSchedule.intervalHours * 60 : 360)
       )
       setIsEnabled(currentSchedule.isEnabled)
+      setRunLimitText(
+        currentSchedule.maxItemsPerRun != null ? String(currentSchedule.maxItemsPerRun) : ''
+      )
       setInitialized(true)
     }
     if (!open) {
@@ -168,6 +178,20 @@ export function JobConfigDialog({
   const showsDaySet = scheduleType === 'weekly'
   const showsTimeOfDay = showsDayOfWeek || scheduleType === 'daily'
 
+  // The cap as it will be saved: null for blank, a number when valid, and
+  // undefined when the text is not an acceptable value (Save is then disabled).
+  // Refused rather than clamped, matching the API: a clamped number is a
+  // setting nobody typed.
+  const parsedRunLimit = useMemo((): number | null | undefined => {
+    if (!runLimit) return null
+    const text = runLimitText.trim()
+    if (text === '') return null
+    if (!/^\d+$/.test(text)) return undefined
+    const value = Number(text)
+    return value >= runLimit.min && value <= runLimit.max ? value : undefined
+  }, [runLimit, runLimitText])
+  const runLimitInvalid = runLimit != null && parsedRunLimit === undefined
+
   const handleSave = async () => {
     setSaving(true)
     setError(null)
@@ -175,6 +199,9 @@ export function JobConfigDialog({
     try {
       const subHour = scheduleType === 'interval' && intervalMinutesTotal < 60
       const payload: JobConfigSaveParams = { scheduleType, isEnabled }
+      if (runLimit && parsedRunLimit !== undefined) {
+        payload.maxItemsPerRun = parsedRunLimit
+      }
 
       if (scheduleType === 'interval' || scheduleType === 'manual') {
         payload.scheduleHour = null
@@ -406,6 +433,38 @@ export function JobConfigDialog({
             </FormControl>
           )}
 
+          {runLimit && (
+            <FormControl fullWidth>
+              <FormLabel sx={{ mb: 1, fontWeight: 500 }}>
+                {t('admin.jobsPage.ui.configRunLimit', { context: runLimit.unit })}
+              </FormLabel>
+              <TextField
+                value={runLimitText}
+                onChange={(e) => setRunLimitText(e.target.value)}
+                size="small"
+                placeholder={String(runLimit.default)}
+                error={runLimitInvalid}
+                helperText={
+                  runLimitInvalid
+                    ? t('admin.jobsPage.ui.configRunLimitInvalid', {
+                        min: runLimit.min,
+                        max: runLimit.max,
+                      })
+                    : t('admin.jobsPage.ui.configRunLimitHint', {
+                        context: runLimit.unit,
+                        default: runLimit.default,
+                      })
+                }
+                slotProps={{
+                  htmlInput: {
+                    inputMode: 'numeric',
+                    'aria-label': t('admin.jobsPage.ui.configRunLimit', { context: runLimit.unit }),
+                  },
+                }}
+              />
+            </FormControl>
+          )}
+
           <Box
             sx={{
               p: 2,
@@ -419,6 +478,14 @@ export function JobConfigDialog({
             <Typography variant="body1" fontWeight={500}>
               {getPreviewText()}
             </Typography>
+            {runLimit && parsedRunLimit !== undefined && (
+              <Typography variant="body2" color="text.secondary" mt={0.5}>
+                {t('admin.jobsPage.ui.runLimitCaption', {
+                  context: runLimit.unit,
+                  count: parsedRunLimit ?? runLimit.default,
+                })}
+              </Typography>
+            )}
           </Box>
 
           {error && (
@@ -435,7 +502,7 @@ export function JobConfigDialog({
         <Button
           variant="contained"
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || runLimitInvalid}
           startIcon={saving ? <CircularProgress size={16} /> : null}
         >
           {saving ? t('common.saving') : t('common.save')}

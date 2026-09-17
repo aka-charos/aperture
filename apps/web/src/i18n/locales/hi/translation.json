@@ -570,7 +570,16 @@
         "weekdayShortWed": "Wed",
         "weekdayShortThu": "Thu",
         "weekdayShortFri": "Fri",
-        "weekdayShortSat": "Sat"
+        "weekdayShortSat": "Sat",
+        "configRunLimit": "Items per run",
+        "configRunLimit_titles": "Titles per run",
+        "configRunLimitHint": "The most items one run will work through, scheduled or manual. Leave blank for the default ({{default}}).",
+        "configRunLimitHint_titles": "The most titles one run will attempt, scheduled or manual. Each takes about one to three minutes, and a run still going when the next one is due makes that one skip. Leave blank for the default ({{default}}).",
+        "configRunLimitInvalid": "Enter a whole number from {{min}} to {{max}}.",
+        "runLimitCaption_one": "Up to {{count}} item per run",
+        "runLimitCaption_other": "Up to {{count}} items per run",
+        "runLimitCaption_titles_one": "Up to {{count}} title per run",
+        "runLimitCaption_titles_other": "Up to {{count}} titles per run"
       }
     },
     "translations": "Translations",
