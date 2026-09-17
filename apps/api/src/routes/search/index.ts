@@ -3,6 +3,14 @@ import { query, queryOne } from '../../lib/db.js'
 import { requireAuth } from '../../plugins/auth.js'
 import { getEmbeddingInvocation, getActiveEmbeddingTableName } from '@aperture/core'
 import { searchSchemas, searchSchema, searchSuggestionsSchema, searchFiltersSchema } from './schemas.js'
+import {
+  MOVIE_SEARCH,
+  SERIES_SEARCH,
+  buildPrefixTsquery,
+  buildTableSearch,
+  type SearchFilterValues,
+  type TitleSearchTable,
+} from './searchSql.js'
 
 interface SearchResult {
   id: string
@@ -36,6 +44,33 @@ interface SearchResponse {
     network?: string
     type?: 'movie' | 'series' | 'all'
   }
+}
+
+/** A row from `buildLexicalSearchSql`, plus the re-rank columns when semantic is on. */
+interface SearchRow {
+  id: string
+  title: string
+  original_title: string | null
+  year: number | null
+  genres: string[] | null
+  overview: string | null
+  poster_url: string | null
+  community_rating: number | null
+  rt_critic_score: number | null
+  collection_name?: string | null
+  network?: string | null
+  text_rank: number
+  coverage: number
+  lexical_score: number
+  semantic_similarity?: number | null
+  combined_score?: number
+}
+
+/** An integer querystring value, or undefined for absent or unparseable input. */
+function parseIntParam(value: string | undefined): number | undefined {
+  if (value === undefined || value === '') return undefined
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) ? parsed : undefined
 }
 
 /**
@@ -73,7 +108,9 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
 
   /**
    * GET /api/search
-   * Unified search combining full-text, fuzzy, and semantic search
+   * Library search: title matching (accent- and punctuation-insensitive, see
+   * migration 0178), full-text over cast, crew, keywords and synopsis, and
+   * optionally an embedding re-rank. Ranking lives in `searchSql.ts`.
    */
   fastify.get<{
     Querystring: {
@@ -103,294 +140,122 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
       semantic: semanticStr,
     } = request.query
 
+    const emptyResponse = (): SearchResponse => ({
+      results: [],
+      total: 0,
+      query: searchQuery || '',
+      filters: { type },
+    })
+
     if (!searchQuery || searchQuery.trim().length < 2) {
-      return reply.send({
-        results: [],
-        total: 0,
-        query: searchQuery || '',
-        filters: { type: type as 'movie' | 'series' | 'all' },
-      })
+      return reply.send(emptyResponse())
     }
 
-    const limit = Math.min(parseInt(limitStr || '50', 10), 100)
-    const useSemantic = semanticStr === 'true'
-    const queryLower = searchQuery.toLowerCase().trim()
+    const limit = Math.min(Math.max(parseIntParam(limitStr) ?? 50, 1), 100)
+    const yearMinNum = parseIntParam(yearMin)
+    const yearMaxNum = parseIntParam(yearMax)
+    const rtScoreNum = parseIntParam(minRtScore)
 
-    // Build filter conditions
-    const movieFilters: string[] = []
-    const seriesFilters: string[] = []
-    const movieParams: unknown[] = []
-    const seriesParams: unknown[] = []
-
-    // tsquery for full-text search - convert query to tsquery format
-    const tsqueryStr = queryLower
-      .split(/\s+/)
-      .filter((w) => w.length > 0)
-      .map((w) => `${w}:*`)
-      .join(' & ')
-
-    // Genre filter
-    if (genre) {
-      movieFilters.push(`$${movieParams.length + 1} = ANY(genres)`)
-      movieParams.push(genre)
-      seriesFilters.push(`$${seriesParams.length + 1} = ANY(genres)`)
-      seriesParams.push(genre)
+    // The query is folded by the same SQL function the titles are indexed by, so
+    // the two sides cannot disagree about accents or punctuation.
+    const keyRow = await queryOne<{ key: string | null }>('SELECT aperture_search_key($1) AS key', [
+      searchQuery,
+    ])
+    const searchKey = keyRow?.key ?? ''
+    if (searchKey.length === 0) {
+      // Nothing but punctuation: there is no text to match a title against.
+      return reply.send(emptyResponse())
     }
+    const tsquery = buildPrefixTsquery(searchQuery)
 
-    // Year filter
-    if (yearMin) {
-      movieFilters.push(`year >= $${movieParams.length + 1}`)
-      movieParams.push(parseInt(yearMin, 10))
-      seriesFilters.push(`year >= $${seriesParams.length + 1}`)
-      seriesParams.push(parseInt(yearMin, 10))
-    }
-    if (yearMax) {
-      movieFilters.push(`year <= $${movieParams.length + 1}`)
-      movieParams.push(parseInt(yearMax, 10))
-      seriesFilters.push(`year <= $${seriesParams.length + 1}`)
-      seriesParams.push(parseInt(yearMax, 10))
-    }
-
-    // RT score filter
-    if (minRtScore) {
-      const rtScore = parseInt(minRtScore, 10)
-      if (rtScore > 0) {
-        movieFilters.push(`rt_critic_score >= $${movieParams.length + 1}`)
-        movieParams.push(rtScore)
-        seriesFilters.push(`rt_critic_score >= $${seriesParams.length + 1}`)
-        seriesParams.push(rtScore)
-      }
-    }
-
-    // Collection filter (movies only)
-    if (collection) {
-      movieFilters.push(`collection_name = $${movieParams.length + 1}`)
-      movieParams.push(collection)
-    }
-
-    // Network filter (series only)
-    if (network) {
-      seriesFilters.push(`network = $${seriesParams.length + 1}`)
-      seriesParams.push(network)
-    }
-
-    const movieWhereClause = movieFilters.length > 0 ? ' AND ' + movieFilters.join(' AND ') : ''
-    const seriesWhereClause = seriesFilters.length > 0 ? ' AND ' + seriesFilters.join(' AND ') : ''
-
-    // Get semantic embedding for query if enabled
-    let queryEmbedding: number[] | null = null
-    // The set the query vector belongs to. Load-bearing now that one dimension
-    // table can hold several sets at once: without it the ANN join reads every
-    // model's rows for a title, in spaces that were never comparable.
-    let querySetId: string | null = null
-    let movieEmbeddingTable = 'embeddings_1536' // default fallback
-    let seriesEmbeddingTable = 'series_embeddings_1536' // default fallback
-    if (useSemantic) {
+    let semantic: { vector: string; setId: string; movieTable: string; seriesTable: string } | null = null
+    if (semanticStr === 'true') {
       const q = await getQueryEmbedding(searchQuery)
-      queryEmbedding = q?.embedding ?? null
-      querySetId = q?.setId ?? null
-      // Get the correct embedding table names based on configured model
-      try {
-        movieEmbeddingTable = await getActiveEmbeddingTableName('embeddings')
-        seriesEmbeddingTable = await getActiveEmbeddingTableName('series_embeddings')
-      } catch {
-        // Fall back to defaults if no embedding model configured
+      if (q) {
+        try {
+          semantic = {
+            vector: `[${q.embedding.join(',')}]`,
+            setId: q.setId,
+            movieTable: await getActiveEmbeddingTableName('embeddings'),
+            seriesTable: await getActiveEmbeddingTableName('series_embeddings'),
+          }
+        } catch {
+          // No embedding table resolves: title and full-text search still work.
+        }
       }
     }
 
-    const allResults: SearchResult[] = []
-
-    // Search movies - gracefully handle missing search_vector or enrichment data
-    if (type === 'all' || type === 'movie') {
-      const movieQuery = queryEmbedding
-        ? `
-          WITH text_search AS (
-            SELECT id, title, original_title, year, genres, overview, poster_url,
-                   community_rating, rt_critic_score, collection_name,
-                   COALESCE(ts_rank(search_vector, to_tsquery('english', $1)), 0) as text_rank,
-                   similarity(title, $2) as fuzzy_sim
-            FROM movies
-            WHERE (title % $2 OR original_title % $2 OR (search_vector IS NOT NULL AND search_vector @@ to_tsquery('english', $1)))
-            ${movieWhereClause.replace(/\$(\d+)/g, (_, n) => `$${parseInt(n) + 2}`)}
-          ),
-          semantic_search AS (
-            SELECT e.movie_id as id,
-                   1 - (e.embedding <=> $${movieParams.length + 3}::halfvec) as semantic_sim
-            FROM ${movieEmbeddingTable} e
-            WHERE e.movie_id IN (SELECT id FROM text_search)
-              AND e.model = $${movieParams.length + 4}
-          )
-          SELECT t.*, COALESCE(s.semantic_sim, 0) as semantic_similarity
-          FROM text_search t
-          LEFT JOIN semantic_search s ON t.id = s.id
-          ORDER BY (t.text_rank * 0.3 + t.fuzzy_sim * 0.3 + COALESCE(s.semantic_sim, 0) * 0.4) DESC
-          LIMIT $${movieParams.length + 5}
-        `
-        : `
-          SELECT id, title, original_title, year, genres, overview, poster_url,
-                 community_rating, rt_critic_score, collection_name,
-                 COALESCE(ts_rank(search_vector, to_tsquery('english', $1)), 0) as text_rank,
-                 similarity(title, $2) as fuzzy_sim,
-                 0 as semantic_similarity
-          FROM movies
-          WHERE (title % $2 OR original_title % $2 OR (search_vector IS NOT NULL AND search_vector @@ to_tsquery('english', $1)))
-          ${movieWhereClause.replace(/\$(\d+)/g, (_, n) => `$${parseInt(n) + 2}`)}
-          ORDER BY (COALESCE(ts_rank(search_vector, to_tsquery('english', $1)), 0) * 0.4 + similarity(title, $2) * 0.6) DESC
-          LIMIT $${movieParams.length + 3}
-        `
-
-      const movieQueryParams = queryEmbedding
-        ? [tsqueryStr, queryLower, ...movieParams, `[${queryEmbedding.join(',')}]`, querySetId, limit]
-        : [tsqueryStr, queryLower, ...movieParams, limit]
-
-      const movieResults = await query<{
-        id: string
-        title: string
-        original_title: string | null
-        year: number | null
-        genres: string[]
-        overview: string | null
-        poster_url: string | null
-        community_rating: number | null
-        rt_critic_score: number | null
-        collection_name: string | null
-        text_rank: number
-        fuzzy_sim: number
-        semantic_similarity: number
-      }>(movieQuery, movieQueryParams)
-
-      for (const row of movieResults.rows) {
-        const textScore = row.text_rank || 0
-        const fuzzyScore = row.fuzzy_sim || 0
-        const semanticScore = row.semantic_similarity || 0
-        const combinedScore = queryEmbedding
-          ? textScore * 0.3 + fuzzyScore * 0.3 + semanticScore * 0.4
-          : textScore * 0.4 + fuzzyScore * 0.6
-
-        allResults.push({
-          id: row.id,
-          type: 'movie',
-          title: row.title,
-          original_title: row.original_title,
-          year: row.year,
-          genres: row.genres || [],
-          overview: row.overview,
-          poster_url: row.poster_url,
-          community_rating: row.community_rating,
-          rt_critic_score: row.rt_critic_score,
-          collection_name: row.collection_name,
-          network: null,
-          text_rank: textScore,
-          fuzzy_similarity: fuzzyScore,
-          semantic_similarity: semanticScore > 0 ? semanticScore : null,
-          combined_score: combinedScore,
-        })
-      }
+    const filters: SearchFilterValues = {
+      genre,
+      yearMin: yearMinNum,
+      yearMax: yearMaxNum,
+      minRtScore: rtScoreNum,
+      collection,
+      network,
     }
 
-    // Search series - gracefully handle missing search_vector or enrichment data
-    if (type === 'all' || type === 'series') {
-      const seriesQuery = queryEmbedding
-        ? `
-          WITH text_search AS (
-            SELECT id, title, original_title, year, genres, overview, poster_url,
-                   community_rating, rt_critic_score, network,
-                   COALESCE(ts_rank(search_vector, to_tsquery('english', $1)), 0) as text_rank,
-                   similarity(title, $2) as fuzzy_sim
-            FROM series
-            WHERE (title % $2 OR original_title % $2 OR (search_vector IS NOT NULL AND search_vector @@ to_tsquery('english', $1)))
-            ${seriesWhereClause.replace(/\$(\d+)/g, (_, n) => `$${parseInt(n) + 2}`)}
-          ),
-          semantic_search AS (
-            SELECT e.series_id as id,
-                   1 - (e.embedding <=> $${seriesParams.length + 3}::halfvec) as semantic_sim
-            FROM ${seriesEmbeddingTable} e
-            WHERE e.series_id IN (SELECT id FROM text_search)
-              AND e.model = $${seriesParams.length + 4}
-          )
-          SELECT t.*, COALESCE(s.semantic_sim, 0) as semantic_similarity
-          FROM text_search t
-          LEFT JOIN semantic_search s ON t.id = s.id
-          ORDER BY (t.text_rank * 0.3 + t.fuzzy_sim * 0.3 + COALESCE(s.semantic_sim, 0) * 0.4) DESC
-          LIMIT $${seriesParams.length + 5}
-        `
-        : `
-          SELECT id, title, original_title, year, genres, overview, poster_url,
-                 community_rating, rt_critic_score, network,
-                 COALESCE(ts_rank(search_vector, to_tsquery('english', $1)), 0) as text_rank,
-                 similarity(title, $2) as fuzzy_sim,
-                 0 as semantic_similarity
-          FROM series
-          WHERE (title % $2 OR original_title % $2 OR (search_vector IS NOT NULL AND search_vector @@ to_tsquery('english', $1)))
-          ${seriesWhereClause.replace(/\$(\d+)/g, (_, n) => `$${parseInt(n) + 2}`)}
-          ORDER BY (COALESCE(ts_rank(search_vector, to_tsquery('english', $1)), 0) * 0.4 + similarity(title, $2) * 0.6) DESC
-          LIMIT $${seriesParams.length + 3}
-        `
-
-      const seriesQueryParams = queryEmbedding
-        ? [tsqueryStr, queryLower, ...seriesParams, `[${queryEmbedding.join(',')}]`, querySetId, limit]
-        : [tsqueryStr, queryLower, ...seriesParams, limit]
-
-      const seriesResults = await query<{
-        id: string
-        title: string
-        original_title: string | null
-        year: number | null
-        genres: string[]
-        overview: string | null
-        poster_url: string | null
-        community_rating: number | null
-        rt_critic_score: number | null
-        network: string | null
-        text_rank: number
-        fuzzy_sim: number
-        semantic_similarity: number
-      }>(seriesQuery, seriesQueryParams)
-
-      for (const row of seriesResults.rows) {
-        const textScore = row.text_rank || 0
-        const fuzzyScore = row.fuzzy_sim || 0
-        const semanticScore = row.semantic_similarity || 0
-        const combinedScore = queryEmbedding
-          ? textScore * 0.3 + fuzzyScore * 0.3 + semanticScore * 0.4
-          : textScore * 0.4 + fuzzyScore * 0.6
-
-        allResults.push({
-          id: row.id,
-          type: 'series',
-          title: row.title,
-          original_title: row.original_title,
-          year: row.year,
-          genres: row.genres || [],
-          overview: row.overview,
-          poster_url: row.poster_url,
-          community_rating: row.community_rating,
-          rt_critic_score: row.rt_critic_score,
-          collection_name: null,
-          network: row.network,
-          text_rank: textScore,
-          fuzzy_similarity: fuzzyScore,
-          semantic_similarity: semanticScore > 0 ? semanticScore : null,
-          combined_score: combinedScore,
-        })
-      }
+    const runSearch = async (
+      source: TitleSearchTable,
+      embeddingTable: string | undefined
+    ): Promise<SearchResult[]> => {
+      const { sql, params } = buildTableSearch({
+        source,
+        tsquery,
+        searchKey,
+        filters,
+        limit,
+        embedding:
+          semantic && embeddingTable
+            ? { vector: semantic.vector, setId: semantic.setId, table: embeddingTable }
+            : null,
+      })
+      const { rows } = await query<SearchRow>(sql, params)
+      return rows.map((row) => ({
+        id: row.id,
+        type: source.table === 'movies' ? 'movie' : 'series',
+        title: row.title,
+        original_title: row.original_title,
+        year: row.year,
+        genres: row.genres || [],
+        overview: row.overview,
+        poster_url: row.poster_url,
+        community_rating: row.community_rating,
+        rt_critic_score: row.rt_critic_score,
+        collection_name: row.collection_name ?? null,
+        network: row.network ?? null,
+        text_rank: row.text_rank,
+        fuzzy_similarity: row.coverage,
+        semantic_similarity: row.semantic_similarity ?? null,
+        combined_score: row.combined_score ?? row.lexical_score,
+      }))
     }
 
-    // Sort combined results by score
-    allResults.sort((a, b) => b.combined_score - a.combined_score)
+    const [movieResults, seriesResults] = await Promise.all([
+      type === 'all' || type === 'movie'
+        ? runSearch(MOVIE_SEARCH, semantic?.movieTable)
+        : Promise.resolve([]),
+      type === 'all' || type === 'series'
+        ? runSearch(SERIES_SEARCH, semantic?.seriesTable)
+        : Promise.resolve([]),
+    ])
 
-    // Limit results
-    const finalResults = allResults.slice(0, limit)
+    // Both tables are scored by the same expression, so their scores compare.
+    const finalResults = [...movieResults, ...seriesResults]
+      .sort((a, b) => b.combined_score - a.combined_score)
+      .slice(0, limit)
 
     return reply.send({
       results: finalResults,
       total: finalResults.length,
       query: searchQuery,
       filters: {
-        type: type as 'movie' | 'series' | 'all',
+        type,
         genre,
-        year: yearMin || yearMax ? { min: yearMin ? parseInt(yearMin, 10) : undefined, max: yearMax ? parseInt(yearMax, 10) : undefined } : undefined,
-        minRtScore: minRtScore ? parseInt(minRtScore, 10) : undefined,
+        year:
+          yearMinNum !== undefined || yearMaxNum !== undefined
+            ? { min: yearMinNum, max: yearMaxNum }
+            : undefined,
+        minRtScore: rtScoreNum,
         collection,
         network,
       },

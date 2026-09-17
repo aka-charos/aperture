@@ -21,7 +21,7 @@ export const searchSchemas = {
       collection_name: { type: 'string', nullable: true, description: 'Movie collection/franchise name (movies only)' },
       network: { type: 'string', nullable: true, description: 'Network/streaming service (series only)' },
       text_rank: { type: 'number', description: 'Full-text search relevance score (higher is better)' },
-      fuzzy_similarity: { type: 'number', description: 'Trigram similarity score for fuzzy matching (0-1)' },
+      fuzzy_similarity: { type: 'number', description: 'How much of the query the title contains, typo-tolerant (trigram word similarity, 0-1)' },
       semantic_similarity: { type: 'number', nullable: true, description: 'AI semantic similarity score (0-1). Only present if semantic search is enabled.' },
       combined_score: { type: 'number', description: 'Weighted combined score used for ranking' },
     },

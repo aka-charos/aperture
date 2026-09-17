@@ -41,12 +41,11 @@ interface SearchResult {
   combined_score: number
 }
 
-interface SearchSuggestion {
-  title: string
-  type: 'movie' | 'series'
-  year: number | null
-  label: string
-}
+/**
+ * `error` is its own state because a failed search is not an empty one: the
+ * dialog used to show "No results found" for a request the server had refused.
+ */
+type SearchStatus = 'idle' | 'loading' | 'done' | 'error'
 
 export function GlobalSearch() {
   const { t } = useTranslation()
@@ -62,17 +61,15 @@ export function GlobalSearch() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
-  const [, setSuggestions] = useState<SearchSuggestion[]>([])
-  const [loading, setLoading] = useState(false)
+  const [status, setStatus] = useState<SearchStatus>('idle')
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
-  const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
   const handleClose = useCallback(() => {
     setOpen(false)
     setQuery('')
     setResults([])
-    setSuggestions([])
+    setStatus('idle')
     setSelectedIndex(-1)
   }, [])
 
@@ -101,59 +98,45 @@ export function GlobalSearch() {
     }
   }, [open])
 
-  const handleSearch = useCallback(async (searchQuery: string) => {
-    if (!searchQuery || searchQuery.trim().length < 2) {
+  // Debounced, and the in-flight request is aborted when the query moves on —
+  // otherwise a slow early response lands after a fast later one and the list
+  // shows results for text that is no longer in the box.
+  useEffect(() => {
+    const term = query.trim()
+    if (term.length < 2) {
       setResults([])
-      setSuggestions([])
+      setStatus('idle')
+      setSelectedIndex(-1)
       return
     }
 
-    setLoading(true)
-
-    try {
-      // Fetch suggestions for autocomplete
-      const suggestionsRes = await fetch(
-        `/api/search/suggestions?q=${encodeURIComponent(searchQuery)}&limit=5`,
-        { credentials: 'include' }
-      )
-      if (suggestionsRes.ok) {
-        const data = await suggestionsRes.json()
-        setSuggestions(data.suggestions)
-      }
-
-      // Fetch full results
-      const resultsRes = await fetch(
-        `/api/search?q=${encodeURIComponent(searchQuery)}&limit=10`,
-        { credentials: 'include' }
-      )
-      if (resultsRes.ok) {
-        const data = await resultsRes.json()
+    // Pending from the first keystroke, so the previous query's "no results"
+    // never shows under the new query while the debounce runs.
+    setStatus('loading')
+    const controller = new AbortController()
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(term)}&limit=10`, {
+          credentials: 'include',
+          signal: controller.signal,
+        })
+        if (!res.ok) throw new Error(`Search failed with HTTP ${res.status}`)
+        const data = (await res.json()) as { results: SearchResult[] }
         setResults(data.results)
-        setSelectedIndex(-1)
+        setStatus('done')
+      } catch {
+        if (controller.signal.aborted) return
+        setResults([])
+        setStatus('error')
       }
-    } catch {
-      // Ignore search errors
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  // Debounced search
-  useEffect(() => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current)
-    }
-
-    debounceRef.current = setTimeout(() => {
-      handleSearch(query)
+      setSelectedIndex(-1)
     }, 200)
 
     return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current)
-      }
+      clearTimeout(timer)
+      controller.abort()
     }
-  }, [query, handleSearch])
+  }, [query])
 
   const handleResultClick = useCallback(
     (result: SearchResult) => {
@@ -239,7 +222,7 @@ export function GlobalSearch() {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    {loading ? (
+                    {status === 'loading' ? (
                       <CircularProgress size={20} />
                     ) : (
                       <SearchIcon />
@@ -264,7 +247,7 @@ export function GlobalSearch() {
 
           {/* Results */}
           <Box sx={{ maxHeight: 'calc(80vh - 120px)', overflowY: 'auto' }}>
-            {!query && (
+            {status === 'idle' && (
               <Box p={4} textAlign="center">
                 <Typography color="text.secondary">
                   {t('globalSearch.emptyHint')}
@@ -275,11 +258,17 @@ export function GlobalSearch() {
               </Box>
             )}
 
-            {query && results.length === 0 && !loading && (
+            {status === 'done' && results.length === 0 && (
               <Box p={4} textAlign="center">
                 <Typography color="text.secondary">
-                  {t('globalSearch.noResults', { query })}
+                  {t('globalSearch.noResults', { query: query.trim() })}
                 </Typography>
+              </Box>
+            )}
+
+            {status === 'error' && (
+              <Box p={4} textAlign="center">
+                <Typography color="error">{t('search.errors.searchFailed')}</Typography>
               </Box>
             )}
 
@@ -334,7 +323,7 @@ export function GlobalSearch() {
                               </Typography>
                             )}
                             <Box display="flex" gap={1} mt={0.5}>
-                              {result.rt_critic_score && (
+                              {result.rt_critic_score != null && (
                                 <Chip
                                   size="small"
                                   label={`🍅 ${result.rt_critic_score}%`}
