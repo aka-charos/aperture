@@ -39,6 +39,47 @@ const report = (over: Partial<ComparisonReport> = {}): ComparisonReport => ({
   ...over,
 })
 
+/**
+ * A variant answers under its base version's number, so without its own name in
+ * the label two answers to two different prompts read as one prompt run twice.
+ */
+test('an answer written under a variant is named with it', () => {
+  const text = renderComparisonReport(
+    report({
+      promptVersion: 15,
+      entries: [
+        entry({ promptVersion: 15, model: 'ornith-1.5-9b' }),
+        entry({ promptVersion: 15, promptVariant: 'compact', model: 'ornith-1.5-9b' }),
+      ],
+    })
+  )
+  assert.match(text, /Prompt versions: 15, 15 compact/)
+  assert.match(text, /· v15 compact/)
+  assert.match(text, /ornith-1.5-9b · v15\n/)
+})
+
+test('a variant prompt prints from TASK on, under the version printed in full', () => {
+  const text = renderComparisonReport(
+    report({
+      promptVersion: 15,
+      prompts: [
+        { version: 15, variant: 'compact', text: 'HEADER\nTASK\ncompact task' },
+        { version: 15, variant: null, text: 'HEADER\nTASK\nbase task' },
+      ],
+      entries: [
+        entry({ promptVersion: 15 }),
+        entry({ promptVersion: 15, promptVariant: 'compact' }),
+      ],
+    })
+  )
+  assert.match(text, /--- PROMPT VERSION 15, in full ---/)
+  assert.match(
+    text,
+    /--- PROMPT VERSION 15 compact, from TASK on \(everything above it is identical to version 15\) ---/
+  )
+  assert.ok(text.indexOf('base task') < text.indexOf('compact task'))
+})
+
 test('states the shared control before any answer', () => {
   const text = renderComparisonReport(report())
   const sourcesAt = text.indexOf('sensesofcinema.com')

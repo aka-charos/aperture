@@ -36,6 +36,7 @@
  */
 
 import { ARCHIVED_PROMPT_EDITIONS } from './promptEditions.js'
+import { PROMPT_VARIANTS } from './promptVariants.js'
 
 /**
  * Bump when the prompt changes in a way that should invalidate stored analysis.
@@ -818,6 +819,44 @@ export interface PromptEdition {
   rules: readonly string[]
 }
 
+/**
+ * An alternative set of questions and rules for a version, for models that
+ * cannot hold that version's own. See ./promptVariants.ts for what one is and
+ * why it is not a draft.
+ *
+ * IT IS AN EDITION IN EVERYTHING BUT ITS NAME - the same three fields, so the
+ * prompt it builds differs from its base version's below the TASK line and
+ * nowhere else. What it does not have is a version NUMBER: the current version
+ * is the highest number this build carries and a variant must not displace it,
+ * which is also why it cannot simply be registered in EDITIONS.
+ */
+export interface PromptVariant {
+  /** Stable, lowercase, and stored on every bench row that ran it. */
+  id: string
+  /** What the picker shows beside the version. */
+  label: string
+  /** The version whose question ids, header and output contract it keeps. */
+  base: number
+  /** One sentence on who it is for, shown with the picker. */
+  note: string
+  movieQuestions: readonly { id: AnalysisQuestionId; text: string }[]
+  seriesQuestions: readonly { id: AnalysisQuestionId; text: string }[]
+  rules: readonly string[]
+}
+
+/**
+ * One prompt a bench run will send: a version, optionally through a variant.
+ *
+ * The pair is the identity. A variant carries its base version rather than a
+ * number of its own, so the paragraph map is still parsed against the
+ * vocabulary the questions were asked in.
+ */
+export interface PromptChoice {
+  version: number
+  /** A variant id, or null for the version's own questions and rules. */
+  variant: string | null
+}
+
 const CURRENT_EDITION: PromptEdition = {
   version: ANALYSIS_PROMPT_VERSION,
   movieQuestions: MOVIE_QUESTIONS,
@@ -901,6 +940,64 @@ export function resolveBenchPromptVersions(requested?: readonly number[] | null)
     editionFor(version)
   }
   return unique.sort((a, b) => a - b)
+}
+
+/** Every variant this build carries, in picker order. */
+export const BENCH_PROMPT_VARIANTS: readonly PromptVariant[] = PROMPT_VARIANTS
+
+/**
+ * The variant for an id.
+ *
+ * Throws rather than falling back to the base edition, for editionFor's reason:
+ * an answer labelled with a prompt it was not written under is worse than a
+ * refused run.
+ */
+export function variantFor(id: string): PromptVariant {
+  const variant = PROMPT_VARIANTS.find((entry) => entry.id === id)
+  if (!variant) {
+    const known = PROMPT_VARIANTS.map((entry) => entry.id).join(', ')
+    throw new Error(
+      `Prompt variant "${id}" is not available. This build carries ${known || 'none'}.`
+    )
+  }
+  return variant
+}
+
+/** How a choice is keyed in the stored prompt map: "15", or "15:compact". */
+export function promptChoiceKey(choice: PromptChoice): string {
+  return choice.variant ? `${choice.version}:${choice.variant}` : String(choice.version)
+}
+
+/** How a choice is named in a report or a picker: "v15", or "v15 compact". */
+export function promptChoiceLabel(choice: PromptChoice): string {
+  return choice.variant
+    ? `v${choice.version} ${choice.variant}`
+    : `v${choice.version}`
+}
+
+/**
+ * The prompts a bench run should send: plain versions oldest first, then any
+ * variants.
+ *
+ * Variants come last so a model's answers read base-then-variant, the order the
+ * questions changed in - the same reason versions are sorted ascending. Asking
+ * for variants and no versions runs the variants alone; asking for neither runs
+ * the current version, which is what the bench did before either was
+ * selectable.
+ */
+export function resolveBenchPromptChoices(
+  versions?: readonly number[] | null,
+  variants?: readonly string[] | null
+): PromptChoice[] {
+  const variantChoices = [...new Set(variants ?? [])].map((id) => {
+    const variant = variantFor(id)
+    return { version: variant.base, variant: variant.id }
+  })
+  const wantsVersions = !(variantChoices.length > 0 && (!versions || versions.length === 0))
+  const versionChoices = (wantsVersions ? resolveBenchPromptVersions(versions) : []).map(
+    (version) => ({ version, variant: null })
+  )
+  return [...versionChoices, ...variantChoices]
 }
 
 /**
@@ -1084,6 +1181,12 @@ export interface PromptOptions {
    * passes older ones. See ./promptEditions.ts.
    */
   version?: number
+  /**
+   * A variant id, which replaces the edition's questions and rules with its own
+   * and ignores the version. Bench only - the library job passes neither. See
+   * ./promptVariants.ts.
+   */
+  variant?: string | null
 }
 
 /**
@@ -1099,7 +1202,9 @@ export function buildAnalysisPrompt(
   subject: AnalysisSubject,
   options: PromptOptions
 ): string {
-  const edition = editionFor(options.version)
+  // A variant decides the questions and rules by itself; its base version is
+  // what everything else about the prompt already is.
+  const edition = options.variant ? variantFor(options.variant) : editionFor(options.version)
   const questions =
     subject.mediaType === 'series' ? edition.seriesQuestions : edition.movieQuestions
   const kind = subject.mediaType === 'series' ? 'series' : 'film'

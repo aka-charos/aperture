@@ -16,9 +16,14 @@ import {
   distinctOriginalTitle,
   extractPromptSources,
   questionIdsFor,
+  BENCH_PROMPT_VARIANTS,
   BENCH_PROMPT_VERSIONS,
   DRAFT_PROMPT_VERSION,
+  promptChoiceKey,
+  promptChoiceLabel,
+  resolveBenchPromptChoices,
   resolveBenchPromptVersions,
+  variantFor,
 } from './prompt.js'
 import { ARCHIVED_PROMPT_EDITIONS } from './promptEditions.js'
 import type { AnalysisSubject } from './prompt.js'
@@ -539,4 +544,105 @@ test('versions 9 to 14 stay benchable, each as it was sent', () => {
 test('with no draft, the current version is the newest the bench carries', () => {
   assert.equal(DRAFT_PROMPT_VERSION, null)
   assert.equal(BENCH_PROMPT_VERSIONS[BENCH_PROMPT_VERSIONS.length - 1], ANALYSIS_PROMPT_VERSION)
+})
+
+/**
+ * A VARIANT IS NOT A DRAFT and never becomes current: it is a second prompt for
+ * a second class of model. Measured on Fear and Loathing in Las Vegas under
+ * version 15, ornith-1.5-9b gave what the film is doing ONE paragraph and its
+ * reception TWO - the one proportion the prompt states as a hard cap - and
+ * dropped the performances, the sound and the cutting entirely.
+ */
+test('a variant varies its base version and does not displace it', () => {
+  const compact = variantFor('compact')
+  assert.equal(compact.base, ANALYSIS_PROMPT_VERSION)
+  assert.ok(BENCH_PROMPT_VERSIONS.includes(compact.base))
+  // Same question ids as the base, or every label its answers carry is
+  // discarded by parseParagraphMap and every label-derived signal reads zero.
+  assert.deepEqual(
+    compact.movieQuestions.map((q) => q.id),
+    questionIdsFor('movie')
+  )
+  assert.deepEqual(
+    compact.seriesQuestions.map((q) => q.id),
+    questionIdsFor('series')
+  )
+  assert.throws(() => variantFor('ornith'), /not available/)
+})
+
+test('a variant shares the documents, header and output contract with its base', () => {
+  for (const mediaType of ['movie', 'series'] as const) {
+    const base = buildAnalysisPrompt(subject({ originalTitle: 'Affeksjonsverdi', mediaType }), {
+      mode: 'crw',
+      sources: benchSources,
+    })
+    const compact = buildAnalysisPrompt(subject({ originalTitle: 'Affeksjonsverdi', mediaType }), {
+      mode: 'crw',
+      sources: benchSources,
+      variant: 'compact',
+    })
+    assert.equal(aboveTask(compact), aboveTask(base), mediaType + ' above TASK')
+    assert.equal(contract(compact), contract(base), mediaType + ' contract')
+    assert.notEqual(compact, base)
+  }
+})
+
+test('the compact variant is shorter than its base, and carries what it was written for', () => {
+  const base = buildAnalysisPrompt(subject(), { mode: 'crw', sources: benchSources })
+  const compact = buildAnalysisPrompt(subject(), {
+    mode: 'crw',
+    sources: benchSources,
+    variant: 'compact',
+  })
+  const instructions = (p: string) =>
+    p.slice(p.lastIndexOf('\nTASK\n'), p.indexOf('Output format.')).length
+  // Being materially shorter IS the theory: a 9B model reads the first clause
+  // of a long conditional and loses the rest.
+  assert.ok(
+    instructions(compact) < instructions(base) * 0.8,
+    instructions(compact) + ' vs ' + instructions(base)
+  )
+  // Each of these answers something measured on that bench.
+  assert.ok(compact.includes('Write six to nine paragraphs'), 'a budget it can follow')
+  assert.ok(compact.includes('has come to be regarded as'), 'the hedge it reached for')
+  assert.ok(compact.includes("encyclopedia's own summary of what critics think"), 'weak effects')
+  assert.ok(compact.includes('Count the paragraphs you have written'), 'the map count')
+  assert.ok(
+    compact.includes('Where a maker describes what the film does to a viewer, use it here'),
+    'the effect the base routes into the making answer'
+  )
+  // The base is untouched by any of it.
+  assert.ok(!base.includes('Write six to nine paragraphs'))
+})
+
+test('bench choices put variants after the versions they vary', () => {
+  assert.deepEqual(resolveBenchPromptChoices(), [
+    { version: ANALYSIS_PROMPT_VERSION, variant: null },
+  ])
+  assert.deepEqual(resolveBenchPromptChoices([13, 7]), [
+    { version: 7, variant: null },
+    { version: 13, variant: null },
+  ])
+  assert.deepEqual(resolveBenchPromptChoices([ANALYSIS_PROMPT_VERSION], ['compact']), [
+    { version: ANALYSIS_PROMPT_VERSION, variant: null },
+    { version: ANALYSIS_PROMPT_VERSION, variant: 'compact' },
+  ])
+  // Variants alone run alone rather than dragging the current version in.
+  assert.deepEqual(resolveBenchPromptChoices([], ['compact', 'compact']), [
+    { version: ANALYSIS_PROMPT_VERSION, variant: 'compact' },
+  ])
+  assert.throws(() => resolveBenchPromptChoices([], ['nope']), /not available/)
+  assert.equal(promptChoiceKey({ version: 15, variant: null }), '15')
+  assert.equal(promptChoiceKey({ version: 15, variant: 'compact' }), '15:compact')
+  assert.equal(promptChoiceLabel({ version: 15, variant: null }), 'v15')
+  assert.equal(promptChoiceLabel({ version: 15, variant: 'compact' }), 'v15 compact')
+})
+
+test('every variant is offerable: an id, a label, a note and a base the bench carries', () => {
+  assert.ok(BENCH_PROMPT_VARIANTS.length > 0)
+  for (const variant of BENCH_PROMPT_VARIANTS) {
+    assert.match(variant.id, /^[a-z][a-z0-9-]*$/)
+    assert.ok(variant.label.length > 0 && variant.note.length > 0, variant.id)
+    assert.ok(BENCH_PROMPT_VERSIONS.includes(variant.base), variant.id + ' base')
+  }
 })

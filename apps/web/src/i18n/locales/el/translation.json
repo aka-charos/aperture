@@ -5387,7 +5387,9 @@
     "runAnswers_other": "Run {{count}} answers",
     "controlVersions": "Every answer below was written from {{count}} source document(s), {{chars}} characters retrieved once · prompt versions {{versions}}",
     "promptVersionsShort": "prompts {{versions}}",
-    "versionDraft": "v{{version}} (draft — bench only)"
+    "versionDraft": "v{{version}} (draft — bench only)",
+    "versionVariant": "v{{version}} · {{label}} (variant — bench only)",
+    "variantsHint": "A variant is a different set of questions and rules for the same version, for a model that cannot hold that version’s own. It is never written to the library."
   },
   "settingsHomeSections": {
     "title": "Emby Home Screen Rows",
