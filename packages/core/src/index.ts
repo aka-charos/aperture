@@ -1022,10 +1022,13 @@ export {
   getBackupPath,
   formatBytes,
   cancelBackupProcess,
+  checkDatabaseClientCompatibility,
   type BackupConfig,
   type BackupInfo,
   type BackupResult,
   type RestoreResult,
+  type DatabaseClientCompatibility,
+  type DatabaseClientStatus,
 } from './backup/index.js'
 
 // Maintenance
