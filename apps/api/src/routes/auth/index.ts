@@ -246,7 +246,10 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         SYSTEM_ACTORS.login,
         { kind: 'user', id: user.id, label: user.username },
         beforeLogin,
-        user
+        // The same two columns as `beforeLogin`, not the whole row. The row
+        // carries every permission on it, and a wider `after` than `before`
+        // is what made an ordinary sign-in record six invented grants.
+        { is_admin: user.is_admin, provider_disabled: user.provider_disabled },
       )
 
       // Authenticating against the media server says nothing about whether an

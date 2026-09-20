@@ -48,6 +48,7 @@ import AddToQueueIcon from '@mui/icons-material/AddToQueue'
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck'
 import { MoviePoster } from '@aperture/ui'
 import { useAuth } from '@/hooks/useAuth'
+import { useCapability } from '@/hooks/useCapability'
 import { useWatching } from '@/hooks/useWatching'
 import { useUserRatings } from '@/hooks/useUserRatings'
 import { useViewMode } from '@/hooks/useViewMode'
@@ -139,7 +140,11 @@ export function MyWatchHistoryPage() {
   })
 
   // Check if user can manage watch history (admin or has permission)
-  const canManage = user?.isAdmin || user?.canManageWatchHistory
+  // The server's answer, not a second copy of the rule. This read
+  // `isAdmin || canManageWatchHistory` — the admin-override half of a rule
+  // whose other half lives in core, which is the shape that let the sidebar
+  // and the API disagree about Collections.
+  const canManage = useCapability('watchHistory:manage')
 
   const handleMarkUnwatched = async () => {
     if (!confirmDialog || !user) return
