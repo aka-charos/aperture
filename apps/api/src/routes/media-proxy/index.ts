@@ -7,6 +7,7 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { getMediaServerConfig } from '@aperture/core'
 import { mediaProxySchemas } from './schemas.js'
+import { requireAuth } from '../../plugins/auth.js'
 
 const mediaProxyRoutes: FastifyPluginAsync = async (fastify) => {
   // Register schemas
@@ -24,7 +25,12 @@ const mediaProxyRoutes: FastifyPluginAsync = async (fastify) => {
    * - /api/media/images/Persons/{name}/Images/Primary
    * - /api/media/images/Users/{userId}/Images/Primary
    */
-  fastify.get('/api/media/images/*', async (request, reply) => {
+  // Gated: this proxies ANY media-server image path using the admin API key,
+  // so open it is an unauthenticated read of the media server through us --
+  // including `/Users/{id}/Images/Primary`. Posters are loaded by same-origin
+  // `<img>` tags, which carry the session cookie, so nothing in the app has
+  // to change.
+  fastify.get('/api/media/images/*', { preHandler: requireAuth }, async (request, reply) => {
     // Extract the path after /api/media/images/
     const imagePath = (request.params as { '*': string })['*']
 

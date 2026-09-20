@@ -12,6 +12,7 @@ export const apiKeysSchemas = {
       userId: { type: 'string', format: 'uuid', description: 'ID of the user who owns the key' },
       name: { type: 'string', description: 'Descriptive name for the API key' },
       keyPrefix: { type: 'string', description: 'First 8 characters of the key for identification' },
+      scopes: { type: 'array', items: { type: 'string', enum: ['read', 'write', 'admin'] }, description: 'What the key may do with its account. `read` is implied; a scope only ever narrows.' },
       expiresAt: { type: 'string', format: 'date-time', nullable: true, description: 'Expiration date or null for never' },
       lastUsedAt: { type: 'string', format: 'date-time', nullable: true, description: 'Last time the key was used' },
       createdAt: { type: 'string', format: 'date-time', description: 'Creation timestamp' },
@@ -35,6 +36,7 @@ export const apiKeysSchemas = {
     properties: {
       name: { type: 'string', minLength: 1, maxLength: 255, description: 'Descriptive name for the key' },
       expiresInDays: { type: 'integer', minimum: 1, maximum: 365, nullable: true, description: 'Days until expiration, or null for never' },
+      scopes: { type: 'array', items: { type: 'string', enum: ['read', 'write', 'admin'] }, description: 'What the key may do with its account. `read` is implied; a scope only ever narrows.' },
     },
   },
 
@@ -44,6 +46,7 @@ export const apiKeysSchemas = {
     properties: {
       name: { type: 'string', minLength: 1, maxLength: 255, description: 'New name for the key' },
       expiresAt: { type: 'string', format: 'date-time', nullable: true, description: 'New expiration date' },
+      scopes: { type: 'array', items: { type: 'string', enum: ['read', 'write', 'admin'] }, description: 'What the key may do with its account. `read` is implied; a scope only ever narrows.' },
     },
   },
 

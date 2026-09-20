@@ -2086,7 +2086,19 @@
     "revoking": "취소 중…",
     "revokeKey": "키 취소",
     "errNameRequired": "이름은 필수입니다",
-    "revokedSuccess": "API 키 \"{{name}}\"이(가) 취소되었습니다"
+    "revokedSuccess": "API 키 \"{{name}}\"이(가) 취소되었습니다",
+    "colScopes": "Permissions",
+    "scopesLabel": "Permissions",
+    "scopesHelper": "A key can always read. Grant only what the integration actually needs — a key never expires unless you set an expiry, and it cannot be seen again after it is created.",
+    "scope": {
+      "read": "Read",
+      "write": "Write",
+      "admin": "Admin"
+    },
+    "scopeHelp": {
+      "write": "May change things: ratings, playlists, requests, settings.",
+      "admin": "May use this account’s admin rights, including jobs and system settings."
+    }
   },
   "settingsBackup": {
     "title": "데이터베이스 백업 및 복원",

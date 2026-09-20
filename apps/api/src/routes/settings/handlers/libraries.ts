@@ -16,7 +16,7 @@ import {
   syncLibraryConfigsFromProvider,
   getMediaServerConfig,
 } from '@aperture/core'
-import { requireAdmin } from '../../../plugins/auth.js'
+import { requireAdmin, requireAuth } from '../../../plugins/auth.js'
 import {
   librariesSchema,
   syncLibrariesSchema,
@@ -138,7 +138,7 @@ export function registerLibraryHandlers(fastify: FastifyInstance) {
   /**
    * GET /api/genres
    */
-  fastify.get('/api/genres', { schema: { tags: ['settings'], summary: 'Get available genres' } }, async (_request, reply) => {
+  fastify.get('/api/genres', { preHandler: requireAuth, schema: { tags: ['settings'], summary: 'Get available genres' } }, async (_request, reply) => {
     try {
       const config = await getMediaServerConfig()
 

@@ -1857,7 +1857,19 @@
     "revoking": "Intrekken…",
     "revokeKey": "Sleutel intrekken",
     "errNameRequired": "Naam is vereist",
-    "revokedSuccess": "API-sleutel \"{{name}}\" is ingetrokken"
+    "revokedSuccess": "API-sleutel \"{{name}}\" is ingetrokken",
+    "colScopes": "Permissions",
+    "scopesLabel": "Permissions",
+    "scopesHelper": "A key can always read. Grant only what the integration actually needs — a key never expires unless you set an expiry, and it cannot be seen again after it is created.",
+    "scope": {
+      "read": "Read",
+      "write": "Write",
+      "admin": "Admin"
+    },
+    "scopeHelp": {
+      "write": "May change things: ratings, playlists, requests, settings.",
+      "admin": "May use this account’s admin rights, including jobs and system settings."
+    }
   },
   "settingsBackup": {
     "title": "Databaseback-up en -herstel",

@@ -2086,7 +2086,19 @@
     "revoking": "撤销…",
     "revokeKey": "撤销密钥",
     "errNameRequired": "姓名为必填项",
-    "revokedSuccess": "API 密钥“{{name}}”已被撤销"
+    "revokedSuccess": "API 密钥“{{name}}”已被撤销",
+    "colScopes": "Permissions",
+    "scopesLabel": "Permissions",
+    "scopesHelper": "A key can always read. Grant only what the integration actually needs — a key never expires unless you set an expiry, and it cannot be seen again after it is created.",
+    "scope": {
+      "read": "Read",
+      "write": "Write",
+      "admin": "Admin"
+    },
+    "scopeHelp": {
+      "write": "May change things: ratings, playlists, requests, settings.",
+      "admin": "May use this account’s admin rights, including jobs and system settings."
+    }
   },
   "settingsBackup": {
     "title": "数据库备份与恢复",

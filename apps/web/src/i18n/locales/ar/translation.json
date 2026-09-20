@@ -2086,7 +2086,19 @@
     "revoking": "الإلغاء…",
     "revokeKey": "إبطال المفتاح",
     "errNameRequired": "الاسم مطلوب",
-    "revokedSuccess": "تم إبطال مفتاح واجهة برمجة التطبيقات \"{{name}}\"."
+    "revokedSuccess": "تم إبطال مفتاح واجهة برمجة التطبيقات \"{{name}}\".",
+    "colScopes": "Permissions",
+    "scopesLabel": "Permissions",
+    "scopesHelper": "A key can always read. Grant only what the integration actually needs — a key never expires unless you set an expiry, and it cannot be seen again after it is created.",
+    "scope": {
+      "read": "Read",
+      "write": "Write",
+      "admin": "Admin"
+    },
+    "scopeHelp": {
+      "write": "May change things: ratings, playlists, requests, settings.",
+      "admin": "May use this account’s admin rights, including jobs and system settings."
+    }
   },
   "settingsBackup": {
     "title": "النسخ الاحتياطي لقاعدة البيانات واستعادتها",

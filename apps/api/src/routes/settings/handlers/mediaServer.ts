@@ -21,7 +21,7 @@ import {
   InvalidServerUrlError,
   type MediaServerType,
 } from '@aperture/core'
-import { requireAdmin } from '../../../plugins/auth.js'
+import { requireAdmin, requireAuth } from '../../../plugins/auth.js'
 import {
   mediaServerInfoSchema,
   mediaServerConfigSchema,
@@ -36,7 +36,7 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
    * GET /api/settings/media-server
    * Get media server info for frontend (URL for play links)
    */
-  fastify.get('/api/settings/media-server', { schema: mediaServerInfoSchema }, async (_request, reply) => {
+  fastify.get('/api/settings/media-server', { preHandler: requireAuth, schema: mediaServerInfoSchema }, async (_request, reply) => {
     const config = await getMediaServerConfig()
     const baseUrl = config.baseUrl || ''
     // User-facing links use the public URL when set; never expose the internal URL to non-admins
