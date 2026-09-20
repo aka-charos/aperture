@@ -7,6 +7,12 @@
 
 import { randomBytes, createHash } from 'crypto'
 import { query, queryOne } from './lib/db.js'
+import {
+  DEFAULT_API_KEY_SCOPES,
+  describeApiKeyScopes,
+  normalizeApiKeyScopes,
+  type ApiKeyScope,
+} from './apiKeyScopes.js'
 import { createChildLogger } from './lib/logger.js'
 
 const logger = createChildLogger('api-keys')
@@ -22,6 +28,8 @@ export interface ApiKey {
   userId: string
   name: string
   keyPrefix: string
+  /** What this key may do with its account. Always normalized, never raw. */
+  scopes: ApiKeyScope[]
   expiresAt: Date | null
   lastUsedAt: Date | null
   createdAt: Date
@@ -54,6 +62,7 @@ interface ApiKeyRow {
   name: string
   key_hash: string
   key_prefix: string
+  scopes: string[] | null
   expires_at: Date | null
   last_used_at: Date | null
   created_at: Date
@@ -82,6 +91,34 @@ interface ApiKeyWithUserRow extends ApiKeyRow {
  */
 const API_KEY_USER_COLUMNS = `u.username, u.display_name, u.is_admin, u.is_enabled, u.can_manage_watch_history,
        u.discover_enabled, u.discover_request_enabled, u.email_notifications_allowed, u.provider_disabled`
+
+/**
+ * The `api_keys` columns every read of a key selects, written once.
+ *
+ * Four queries spelled this list out by hand, two of them joined to `users`
+ * under an alias. A column added for one and missed at another arrives as
+ * `undefined` -- and for `scopes` that means `normalizeApiKeyScopes` answers
+ * with the default, so the key silently loses authority it was granted.
+ */
+const API_KEY_COLUMNS_FOR = (alias = '') => {
+  const prefix = alias ? `${alias}.` : ''
+  return [
+    'id',
+    'user_id',
+    'name',
+    'key_hash',
+    'key_prefix',
+    'scopes',
+    'expires_at',
+    'last_used_at',
+    'created_at',
+    'revoked_at',
+  ]
+    .map((column) => `${prefix}${column}`)
+    .join(', ')
+}
+
+const API_KEY_COLUMNS = API_KEY_COLUMNS_FOR()
 
 /**
  * Predefined expiration options (in days) matching AWS IAM style
@@ -121,6 +158,9 @@ function rowToApiKey(row: ApiKeyRow): ApiKey {
     userId: row.user_id,
     name: row.name,
     keyPrefix: row.key_prefix,
+    // Normalized on the way out, so nothing downstream ever sees the raw
+    // TEXT[] -- an unrecognised member there would read as a grant.
+    scopes: normalizeApiKeyScopes(row.scopes),
     expiresAt: row.expires_at,
     lastUsedAt: row.last_used_at,
     createdAt: row.created_at,
@@ -152,12 +192,15 @@ function rowToApiKeyWithUser(row: ApiKeyWithUserRow): ApiKeyWithUser {
  * @param userId - The user ID to create the key for
  * @param name - A descriptive name for the key
  * @param expiresInDays - Days until expiration (null = never expires)
+ * @param scopes - What the key may do. Defaults to read-only; a scope only
+ *   ever narrows, so this can never exceed what the account itself holds.
  * @returns The created API key with the plaintext key (only returned once)
  */
 export async function createApiKey(
   userId: string,
   name: string,
-  expiresInDays: number | null = null
+  expiresInDays: number | null = null,
+  scopes: readonly ApiKeyScope[] = DEFAULT_API_KEY_SCOPES
 ): Promise<CreateApiKeyResult> {
   const plaintextKey = generateApiKey()
   const keyHash = hashApiKey(plaintextKey)
@@ -169,18 +212,26 @@ export async function createApiKey(
     expiresAt.setDate(expiresAt.getDate() + expiresInDays)
   }
 
+  // Normalized before the insert, not only on the way out: the column is a
+  // plain TEXT[], and a value stored there that nothing recognises would sit
+  // in the row looking like a grant to anyone reading the table by hand.
+  const storedScopes = normalizeApiKeyScopes(scopes)
+
   const row = await queryOne<ApiKeyRow>(
-    `INSERT INTO api_keys (user_id, name, key_hash, key_prefix, expires_at)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, user_id, name, key_hash, key_prefix, expires_at, last_used_at, created_at, revoked_at`,
-    [userId, name, keyHash, keyPrefix, expiresAt]
+    `INSERT INTO api_keys (user_id, name, key_hash, key_prefix, expires_at, scopes)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING ${API_KEY_COLUMNS}`,
+    [userId, name, keyHash, keyPrefix, expiresAt, storedScopes]
   )
 
   if (!row) {
     throw new Error('Failed to create API key')
   }
 
-  logger.info({ userId, keyPrefix, name }, 'Created new API key')
+  logger.info(
+    { userId, keyPrefix, name, scopes: describeApiKeyScopes(storedScopes) },
+    'Created new API key'
+  )
 
   return {
     apiKey: rowToApiKey(row),
@@ -205,8 +256,7 @@ export async function validateApiKey(key: string): Promise<ApiKeyWithUser | null
   // Find the key and join with user data
   const row = await queryOne<ApiKeyWithUserRow>(
     `SELECT 
-       ak.id, ak.user_id, ak.name, ak.key_hash, ak.key_prefix,
-       ak.expires_at, ak.last_used_at, ak.created_at, ak.revoked_at,
+       ${API_KEY_COLUMNS_FOR('ak')},
        ${API_KEY_USER_COLUMNS}
      FROM api_keys ak
      JOIN users u ON u.id = ak.user_id
@@ -268,7 +318,7 @@ export async function listApiKeys(
     : 'WHERE user_id = $1 AND revoked_at IS NULL'
 
   const result = await query<ApiKeyRow>(
-    `SELECT id, user_id, name, key_hash, key_prefix, expires_at, last_used_at, created_at, revoked_at
+    `SELECT ${API_KEY_COLUMNS}
      FROM api_keys
      ${whereClause}
      ORDER BY created_at DESC`,
@@ -289,8 +339,7 @@ export async function listAllApiKeys(includeRevoked = false): Promise<ApiKeyWith
 
   const result = await query<ApiKeyWithUserRow>(
     `SELECT 
-       ak.id, ak.user_id, ak.name, ak.key_hash, ak.key_prefix,
-       ak.expires_at, ak.last_used_at, ak.created_at, ak.revoked_at,
+       ${API_KEY_COLUMNS_FOR('ak')},
        ${API_KEY_USER_COLUMNS}
      FROM api_keys ak
      JOIN users u ON u.id = ak.user_id
@@ -309,7 +358,7 @@ export async function listAllApiKeys(includeRevoked = false): Promise<ApiKeyWith
  */
 export async function getApiKey(id: string): Promise<ApiKey | null> {
   const row = await queryOne<ApiKeyRow>(
-    `SELECT id, user_id, name, key_hash, key_prefix, expires_at, last_used_at, created_at, revoked_at
+    `SELECT ${API_KEY_COLUMNS}
      FROM api_keys
      WHERE id = $1`,
     [id]
@@ -364,10 +413,10 @@ export async function deleteApiKey(id: string): Promise<boolean> {
  */
 export async function updateApiKey(
   id: string,
-  updates: { name?: string; expiresAt?: Date | null }
+  updates: { name?: string; expiresAt?: Date | null; scopes?: readonly ApiKeyScope[] }
 ): Promise<ApiKey | null> {
   const setClauses: string[] = []
-  const values: (string | Date | null)[] = []
+  const values: (string | string[] | Date | null)[] = []
   let paramIndex = 1
 
   if (updates.name !== undefined) {
@@ -382,6 +431,16 @@ export async function updateApiKey(
     paramIndex++
   }
 
+  // Narrowing an existing key is the point of being able to edit one: the
+  // keys that predate 0182 were backfilled to full authority, and this is
+  // how an operator takes it back without minting a replacement and
+  // rewiring whatever was using it.
+  if (updates.scopes !== undefined) {
+    setClauses.push(`scopes = $${paramIndex}`)
+    values.push(normalizeApiKeyScopes(updates.scopes))
+    paramIndex++
+  }
+
   if (setClauses.length === 0) {
     // No updates, just return current key
     return getApiKey(id)
@@ -393,7 +452,7 @@ export async function updateApiKey(
     `UPDATE api_keys 
      SET ${setClauses.join(', ')}
      WHERE id = $${paramIndex} AND revoked_at IS NULL
-     RETURNING id, user_id, name, key_hash, key_prefix, expires_at, last_used_at, created_at, revoked_at`,
+     RETURNING ${API_KEY_COLUMNS}`,
     values
   )
 

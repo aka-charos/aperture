@@ -2795,3 +2795,62 @@ Three spellings of one question, none pinned by a test. The session already carr
 **API keys still carry the account's admin rights.** `validateApiKey` returns `is_admin` and the plugin copies it onto the request, so a key minted for an automation script is a full admin credential — it can purge the database and read provider credentials. `collections_enabled` is forced false for key users, which shows the concern was noticed and not followed through. Scoping keys is the next change and is deliberately not this one.
 
 **Not done, and named.** No audit trail for permission changes — nothing records who granted what, when. `max_parental_rating` is applied in the recommender, channels and discovery but **not** in browse, search, similarity or the assistant tools, so the restriction is half-enforced. `GET /api/settings/media-server`, `/api/genres`, `/api/images/dimensions` and both avatar routes answer unauthenticated. Twenty-eight hand-rolled `x !== currentUser.id && !isAdmin` checks sit beside a `requireSelfOrAdmin` helper used at 34 more, and two of the hand-rolled ones (`channels/handlers/homeScreen.ts`, `graphPlaylists/index.ts`) omit the admin clause with nothing saying whether that is deliberate. The sidebar gates on `collections` and `watching` only, so Discover and My Requests are shown to viewers who will get a 403.
+
+---
+
+## F-133
+
+**An API key was the whole account, and a route with no guard was indistinguishable from one that did not need one.** Added 2026-09-21.
+
+Two changes, made together because they are the two halves of "who may call this": what the *credential* carries, and what the *route* requires.
+
+### An API key carried the account's admin rights
+
+`validateApiKey` returns `is_admin` and the auth plugin copied it onto the request, so a key minted for a shell script could purge the database, read provider credentials and rewrite every user's permissions. It also had none of a session's limits: no 7-day idle window, no 30-day lifetime, nothing revoking it when an admin is demoted, and — until [F-132](#f-132) — no `provider_disabled` check. `collections_enabled` was forced false for key users, which shows the concern was noticed at the time and then not followed through.
+
+`packages/core/src/apiKeyScopes.ts` is the vocabulary (`read`, `write`, `admin`), pure and pinned; `0182` adds `api_keys.scopes TEXT[]`.
+
+**Seven decisions.**
+
+1. **A scope NARROWS, never widens.** `keyAllowsAdmin` answers only whether the key may exercise rights the account already holds, so `admin` on a non-admin's key grants nothing. A scope that could *add* authority would be a second permission system racing the first, and the one that granted more would win every argument.
+
+2. **`read` is implied and is a real member.** Leaving it out of the vocabulary would make the empty array mean "everything" by accident. A key that may do nothing is a revoked key, and the app already has one of those.
+
+3. **An unrecognised scope is dropped at every read, and REFUSED at the write.** The column is a plain `TEXT[]` and deliberately has no `CHECK` — that would be a second copy of the vocabulary a later scope has to be added to in two places ([F-002](#f-002)'s rule). So `normalizeApiKeyScopes` drops what it does not recognise, which is right for a value already stored; but the route 400s instead, because there somebody is *asking* for it, and quietly storing less than they asked for hands back a key that looks granted and is not.
+
+4. **Existing keys were backfilled to the full set.** They are wired into somebody's Home Assistant or cron job, and silently narrowing a running integration is a worse failure than leaving the authority visible and narrowable — which is what the Settings page now does. **New** keys default to `read` alone. This is the one place the change deliberately does not close the hole it describes; the operator closes it, per key, when they know what each key is for.
+
+5. **`isAdmin` is narrowed at the door, not inside `requireAdmin`.** `isAdmin` is read in about thirty places — the self-or-admin checks, the admin branches of list routes, the capability overrides in [F-132](#f-132) — so a guard covering only the admin-only *routes* would leave a read-only key seeing every user's keys through `/api/api-keys` and every account through the admin branch of a handler it is allowed to call.
+
+6. **The `write` guard is one hook over every route**, including routes written after it. The alternative is auditing ~490 handlers now and every handler added afterwards, forever — the same argument the read-only assumed session already makes, which is why the two now share `lib/requestWrites.ts`. That extraction moved the method rule and both its correction lists (batch lookups that are POSTs; the two Trakt OAuth GETs that write) out of `impersonation.ts`, leaving behind only what belongs to that feature alone: the exit routes. The impersonation tests pass unchanged, which is what makes the move a move.
+
+7. **A refusal says which kind it is.** `API_KEY_READ_ONLY` alongside `IMPERSONATION_READ_ONLY`: a caller whose script suddenly 403s needs to know the *key* is narrowed, not that the account lost a permission.
+
+Four queries selected into one `ApiKeyRow` type and each spelled the column list out — the same drift [F-132](#f-132) found in `ApiKeyWithUserRow`, now one `API_KEY_COLUMNS_FOR(alias)`. For `scopes` specifically, a column missed at one of them arrives `undefined`, and `normalizeApiKeyScopes` answers with the default, so the key *silently loses authority it was granted*.
+
+### A route with no guard looked exactly like a route that did not need one
+
+`apps/api/src/routes/routeGuards.test.ts` scans every registration and fails on one with no `preHandler` that is not allowlisted with a reason. Verified against an injected violation, and cleared when it was removed.
+
+**There were 31.** Most were correctly public — health probes, the login route, the branding and locale list the login page renders before any session exists, and the whole `/api/setup/*` plugin (fenced by its own `onRequest` hook, and with no admin to authenticate against yet). Finding that out required reading all 31, and five were not:
+
+- `GET /api/settings/media-server` — the server's name, id and public URL, to anyone.
+- `GET /api/genres` — the library's genre list.
+- `GET /api/media/images/*` — an unauthenticated proxy for **any** media-server image path, using the admin API key, including `/Users/{id}/Images/Primary`.
+- `GET /api/users/:id/avatar` and `/api/users/by-provider/:id/avatar` — a 200 confirms an account id exists. The first carried a comment claiming avatars appear "in public contexts"; the only caller is the app bar of an authenticated page. The second was written for the setup wizard and **has no caller at all**.
+
+All five now take `requireAuth`. Same-origin `<img>` requests carry the session cookie, so no caller changed.
+
+**Eight more checked `request.user` inside the handler** (the `/api/settings/user*` family, plus the two per-user AI-explanation routes) — the same question in a second spelling, invisible to any audit of the route table, each with its own error body, and easy to forget in the ninth. They take `requireAuth` now, which is why an inline check deliberately does **not** satisfy the scan.
+
+**Four rules for the scan.**
+
+1. **The point is the review, not the count.** It does not claim every route is guarded; it claims every unguarded route was looked at once by someone who wrote down why, and that a new one gets the same treatment at the moment it is written.
+
+2. **The head-finder reads the options object and stops at the handler.** A `preHandler` on a route nested inside a handler body must not answer for its parent, and a scan matching `preHandler` anywhere in the file would pass every case in the unit test.
+
+3. **The handler is found by its opening `async (` / `(request`, not by balancing parentheses.** Generics, object literals and template strings all sit between the call and the handler, and a brace counter that got any of them wrong would silently scan the wrong span. A handler shape this misses trips the floor assertions (`total > 400`, `guarded > 350`) rather than passing quietly.
+
+4. **A stale allowlist entry fails the test.** An entry left behind after its route was renamed is a hole nobody is watching — the route returns unguarded under a new name and *is* reported, but the list still reads as reviewed. So every entry must still be found unguarded, and every reason must be more than a word.
+
+**Still not done.** No audit trail for a permission or scope change. `max_parental_rating` is applied in the recommender, channels and discovery but not in browse, search, similarity or the assistant. Twenty-eight hand-rolled `x !== currentUser.id && !isAdmin` checks sit beside a `requireSelfOrAdmin` helper used at 34 more, two of them (`channels/handlers/homeScreen.ts`, `graphPlaylists/index.ts`) omitting the admin clause with nothing saying whether that is deliberate. The scan checks that a guard is *declared*, never that it is the *right* one — a route needing `requireAdmin` and carrying `requireAuth` passes.

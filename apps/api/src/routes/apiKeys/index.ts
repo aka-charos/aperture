@@ -8,6 +8,10 @@ import {
   deleteApiKey,
   updateApiKey,
   EXPIRATION_OPTIONS,
+  API_KEY_SCOPES,
+  DEFAULT_API_KEY_SCOPES,
+  isApiKeyScope,
+  type ApiKeyScope,
 } from '@aperture/core'
 import { requireAuth } from '../../plugins/auth.js'
 import {
@@ -23,11 +27,37 @@ import {
 interface CreateApiKeyBody {
   name: string
   expiresInDays: number | null
+  scopes?: string[]
 }
 
 interface UpdateApiKeyBody {
   name?: string
   expiresAt?: string | null
+  scopes?: string[]
+}
+
+/**
+ * A requested scope list as a decision, or a 400.
+ *
+ * REFUSED rather than filtered. `normalizeApiKeyScopes` drops an
+ * unrecognised member, which is the right answer for a value already in the
+ * database — but here somebody is asking for it, and quietly storing less
+ * than they asked for hands back a key that looks granted and is not. The
+ * same asymmetry as an unlisted reasoning effort.
+ */
+function readScopes(
+  requested: string[] | undefined
+): { ok: true; scopes: readonly ApiKeyScope[] } | { ok: false; error: string } {
+  if (requested === undefined) return { ok: true, scopes: DEFAULT_API_KEY_SCOPES }
+  if (!Array.isArray(requested)) return { ok: false, error: 'scopes must be an array' }
+  const unknown = requested.filter((scope) => !isApiKeyScope(scope))
+  if (unknown.length > 0) {
+    return {
+      ok: false,
+      error: `Unknown scope: ${unknown.join(', ')}. Valid scopes are ${API_KEY_SCOPES.join(', ')}.`,
+    }
+  }
+  return { ok: true, scopes: requested as ApiKeyScope[] }
 }
 
 interface ApiKeyParams {
@@ -74,7 +104,7 @@ const apiKeysRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/api-keys',
     { preHandler: requireAuth, schema: createApiKeySchema },
     async (request, reply) => {
-      const { name, expiresInDays } = request.body
+      const { name, expiresInDays, scopes } = request.body
 
       if (!name || typeof name !== 'string' || name.trim().length === 0) {
         return reply.status(400).send({ error: 'Name is required' })
@@ -91,8 +121,18 @@ const apiKeysRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
+      const requestedScopes = readScopes(scopes)
+      if (!requestedScopes.ok) {
+        return reply.status(400).send({ error: requestedScopes.error })
+      }
+
       try {
-        const result = await createApiKey(request.user!.id, name.trim(), expiresInDays)
+        const result = await createApiKey(
+          request.user!.id,
+          name.trim(),
+          expiresInDays,
+          requestedScopes.scopes
+        )
         
         // Return the API key with the plaintext key (only time it's shown)
         return reply.status(201).send({
@@ -141,7 +181,7 @@ const apiKeysRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: requireAuth, schema: updateApiKeySchema },
     async (request, reply) => {
       const { id } = request.params
-      const { name, expiresAt } = request.body
+      const { name, expiresAt, scopes } = request.body
 
       // First, check if the key exists and user has permission
       const existingKey = await getApiKey(id)
@@ -161,7 +201,19 @@ const apiKeysRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       // Build updates
-      const updates: { name?: string; expiresAt?: Date | null } = {}
+      const updates: {
+        name?: string
+        expiresAt?: Date | null
+        scopes?: readonly ApiKeyScope[]
+      } = {}
+
+      if (scopes !== undefined) {
+        const requestedScopes = readScopes(scopes)
+        if (!requestedScopes.ok) {
+          return reply.status(400).send({ error: requestedScopes.error })
+        }
+        updates.scopes = requestedScopes.scopes
+      }
 
       if (name !== undefined) {
         if (typeof name !== 'string' || name.trim().length === 0) {

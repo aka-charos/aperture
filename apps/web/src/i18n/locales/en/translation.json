@@ -2050,6 +2050,7 @@
     "empty": "No API keys found. Create your first API key to enable programmatic access.",
     "colName": "Name",
     "colPrefix": "Key Prefix",
+    "colScopes": "Permissions",
     "colUser": "User",
     "colStatus": "Status",
     "colExpires": "Expires",
@@ -2084,7 +2085,18 @@
     "revoking": "Revoking…",
     "revokeKey": "Revoke Key",
     "errNameRequired": "Name is required",
-    "revokedSuccess": "API key \"{{name}}\" has been revoked"
+    "revokedSuccess": "API key \"{{name}}\" has been revoked",
+    "scopesLabel": "Permissions",
+    "scopesHelper": "A key can always read. Grant only what the integration actually needs — a key never expires unless you set an expiry, and it cannot be seen again after it is created.",
+    "scope": {
+      "read": "Read",
+      "write": "Write",
+      "admin": "Admin"
+    },
+    "scopeHelp": {
+      "write": "May change things: ratings, playlists, requests, settings.",
+      "admin": "May use this account’s admin rights, including jobs and system settings."
+    }
   },
   "settingsBackup": {
     "title": "Database Backup & Restore",

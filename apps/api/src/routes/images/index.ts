@@ -445,7 +445,7 @@ const imageRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.get(
     '/api/images/dimensions',
-    { schema: imageSchemas.getDimensions },
+    { preHandler: requireAuth, schema: imageSchemas.getDimensions },
     async () => {
       return { dimensions: RECOMMENDED_DIMENSIONS }
     }

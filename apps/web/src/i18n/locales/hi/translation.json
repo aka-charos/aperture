@@ -2086,7 +2086,19 @@
     "revoking": "निरस्त किया जा रहा है...",
     "revokeKey": "कुंजी निरस्त करें",
     "errNameRequired": "नाम आवश्यक है",
-    "revokedSuccess": "एपीआई कुंजी \"{{नाम}}\" निरस्त कर दी गई है"
+    "revokedSuccess": "एपीआई कुंजी \"{{नाम}}\" निरस्त कर दी गई है",
+    "colScopes": "Permissions",
+    "scopesLabel": "Permissions",
+    "scopesHelper": "A key can always read. Grant only what the integration actually needs — a key never expires unless you set an expiry, and it cannot be seen again after it is created.",
+    "scope": {
+      "read": "Read",
+      "write": "Write",
+      "admin": "Admin"
+    },
+    "scopeHelp": {
+      "write": "May change things: ratings, playlists, requests, settings.",
+      "admin": "May use this account’s admin rights, including jobs and system settings."
+    }
   },
   "settingsBackup": {
     "title": "डेटाबेस बैकअप और पुनर्स्थापना",

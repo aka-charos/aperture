@@ -216,12 +216,9 @@ export function registerAiOutputHandlers(fastify: FastifyInstance) {
   /**
    * GET /api/settings/user/ai-explanation
    */
-  fastify.get('/api/settings/user/ai-explanation', { schema: userAiExplanationSchema }, async (request, reply) => {
+  fastify.get('/api/settings/user/ai-explanation', { preHandler: requireAuth, schema: userAiExplanationSchema }, async (request, reply) => {
     try {
-      const userId = request.user?.id
-      if (!userId) {
-        return reply.status(401).send({ error: 'Not authenticated' })
-      }
+      const userId = request.user!.id
 
       const settings = await getUserAiExplanationSettings(userId)
       const effective = await getEffectiveAiExplanationSetting(userId)
@@ -245,12 +242,9 @@ export function registerAiOutputHandlers(fastify: FastifyInstance) {
    */
   fastify.patch<{
     Body: { enabled: boolean | null }
-  }>('/api/settings/user/ai-explanation', { schema: updateUserAiExplanationSchema }, async (request, reply) => {
+  }>('/api/settings/user/ai-explanation', { preHandler: requireAuth, schema: updateUserAiExplanationSchema }, async (request, reply) => {
     try {
-      const userId = request.user?.id
-      if (!userId) {
-        return reply.status(401).send({ error: 'Not authenticated' })
-      }
+      const userId = request.user!.id
 
       const { enabled } = request.body
 

@@ -25,6 +25,11 @@ import {
   Select,
   MenuItem,
   FormControl,
+  FormControlLabel,
+  FormGroup,
+  FormHelperText,
+  FormLabel,
+  Checkbox,
   InputLabel,
   Paper,
   InputAdornment,
@@ -37,11 +42,21 @@ import CheckIcon from '@mui/icons-material/Check'
 import WarningIcon from '@mui/icons-material/Warning'
 import BlockIcon from '@mui/icons-material/Block'
 
+/**
+ * The scope vocabulary, copied by hand rather than imported: the web bundle
+ * never imports @aperture/core. `read` is implied and is not offered as a
+ * choice — a key that may do nothing is a revoked key.
+ */
+const GRANTABLE_SCOPES = ['write', 'admin'] as const
+
+type ApiKeyScope = string
+
 interface ApiKey {
   id: string
   userId: string
   name: string
   keyPrefix: string
+  scopes: ApiKeyScope[]
   expiresAt: string | null
   lastUsedAt: string | null
   createdAt: string
@@ -68,6 +83,7 @@ export function ApiKeysSection() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
   const [newKeyExpiration, setNewKeyExpiration] = useState<number | null>(null)
+  const [newKeyScopes, setNewKeyScopes] = useState<ApiKeyScope[]>([])
   const [creating, setCreating] = useState(false)
 
   // Created key display state (shown only once)
@@ -122,6 +138,8 @@ export function ApiKeysSection() {
         body: JSON.stringify({
           name: newKeyName.trim(),
           expiresInDays: newKeyExpiration,
+          // `read` is added by the server; sending [] asks for read-only.
+          scopes: newKeyScopes,
         }),
       })
 
@@ -136,6 +154,7 @@ export function ApiKeysSection() {
       setCreateDialogOpen(false)
       setNewKeyName('')
       setNewKeyExpiration(null)
+      setNewKeyScopes([])
       await fetchApiKeys()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create API key')
@@ -280,6 +299,7 @@ export function ApiKeysSection() {
                   <TableRow>
                     <TableCell>{t('settingsApiKeys.colName')}</TableCell>
                     <TableCell>{t('settingsApiKeys.colPrefix')}</TableCell>
+                    <TableCell>{t('settingsApiKeys.colScopes')}</TableCell>
                     {apiKeys.some((k) => k.username) && <TableCell>{t('settingsApiKeys.colUser')}</TableCell>}
                     <TableCell>{t('settingsApiKeys.colStatus')}</TableCell>
                     <TableCell>{t('settingsApiKeys.colExpires')}</TableCell>
@@ -312,6 +332,19 @@ export function ApiKeysSection() {
                           >
                             {key.keyPrefix}...
                           </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                            {key.scopes?.map((scope) => (
+                              <Chip
+                                key={scope}
+                                size="small"
+                                label={t(`settingsApiKeys.scope.${scope}`, scope)}
+                                color={scope === 'admin' ? 'warning' : 'default'}
+                                variant={scope === 'read' ? 'outlined' : 'filled'}
+                              />
+                            ))}
+                          </Box>
                         </TableCell>
                         {apiKeys.some((k) => k.username) && (
                           <TableCell>
@@ -408,6 +441,43 @@ export function ApiKeysSection() {
                   </MenuItem>
                 ))}
               </Select>
+            </FormControl>
+            <FormControl component="fieldset" variant="standard">
+              <FormLabel component="legend" sx={{ fontSize: 14 }}>
+                {t('settingsApiKeys.scopesLabel')}
+              </FormLabel>
+              <FormHelperText sx={{ mx: 0, mb: 1 }}>
+                {t('settingsApiKeys.scopesHelper')}
+              </FormHelperText>
+              <FormGroup>
+                {GRANTABLE_SCOPES.map((scope) => (
+                  <FormControlLabel
+                    key={scope}
+                    control={
+                      <Checkbox
+                        checked={newKeyScopes.includes(scope)}
+                        onChange={(e) =>
+                          setNewKeyScopes((prev) =>
+                            e.target.checked
+                              ? [...prev, scope]
+                              : prev.filter((s) => s !== scope)
+                          )
+                        }
+                      />
+                    }
+                    label={
+                      <Box>
+                        <Typography variant="body2">
+                          {t(`settingsApiKeys.scope.${scope}`)}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {t(`settingsApiKeys.scopeHelp.${scope}`)}
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                ))}
+              </FormGroup>
             </FormControl>
           </Box>
         </DialogContent>

@@ -12,6 +12,7 @@
  * - PATCH /api/settings/user/similarity-prefs - Update similarity graph preferences
  */
 import type { FastifyInstance } from 'fastify'
+import { requireAuth } from '../../../plugins/auth.js'
 import {
   getUserSettings,
   updateUserSettings,
@@ -33,12 +34,9 @@ export function registerUserSettingsHandlers(fastify: FastifyInstance) {
   /**
    * GET /api/settings/user
    */
-  fastify.get('/api/settings/user', { schema: userSettingsSchema }, async (request, reply) => {
+  fastify.get('/api/settings/user', { preHandler: requireAuth, schema: userSettingsSchema }, async (request, reply) => {
     try {
-      const userId = request.user?.id
-      if (!userId) {
-        return reply.status(401).send({ error: 'Not authenticated' })
-      }
+      const userId = request.user!.id
 
       const settings = await getUserSettings(userId)
       const defaultPrefix = getDefaultLibraryNamePrefix()
@@ -63,12 +61,9 @@ export function registerUserSettingsHandlers(fastify: FastifyInstance) {
       libraryName?: string | null
       seriesLibraryName?: string | null
     }
-  }>('/api/settings/user', { schema: updateUserSettingsSchema }, async (request, reply) => {
+  }>('/api/settings/user', { preHandler: requireAuth, schema: updateUserSettingsSchema }, async (request, reply) => {
     try {
-      const userId = request.user?.id
-      if (!userId) {
-        return reply.status(401).send({ error: 'Not authenticated' })
-      }
+      const userId = request.user!.id
 
       const { libraryName, seriesLibraryName } = request.body
 
@@ -108,12 +103,9 @@ export function registerUserSettingsHandlers(fastify: FastifyInstance) {
   /**
    * GET /api/settings/user/include-watched
    */
-  fastify.get('/api/settings/user/include-watched', { schema: includeWatchedSchema }, async (request, reply) => {
+  fastify.get('/api/settings/user/include-watched', { preHandler: requireAuth, schema: includeWatchedSchema }, async (request, reply) => {
     try {
-      const userId = request.user?.id
-      if (!userId) {
-        return reply.status(401).send({ error: 'Not authenticated' })
-      }
+      const userId = request.user!.id
 
       const result = await queryOne<{ include_watched: boolean }>(
         `SELECT COALESCE(include_watched, false) as include_watched FROM user_preferences WHERE user_id = $1`,
@@ -134,12 +126,9 @@ export function registerUserSettingsHandlers(fastify: FastifyInstance) {
    */
   fastify.put<{
     Body: { includeWatched: boolean }
-  }>('/api/settings/user/include-watched', { schema: updateIncludeWatchedSchema }, async (request, reply) => {
+  }>('/api/settings/user/include-watched', { preHandler: requireAuth, schema: updateIncludeWatchedSchema }, async (request, reply) => {
     try {
-      const userId = request.user?.id
-      if (!userId) {
-        return reply.status(401).send({ error: 'Not authenticated' })
-      }
+      const userId = request.user!.id
 
       const { includeWatched } = request.body
       if (typeof includeWatched !== 'boolean') {
@@ -166,12 +155,9 @@ export function registerUserSettingsHandlers(fastify: FastifyInstance) {
   /**
    * GET /api/settings/user/dislike-behavior
    */
-  fastify.get('/api/settings/user/dislike-behavior', { schema: dislikeBehaviorSchema }, async (request, reply) => {
+  fastify.get('/api/settings/user/dislike-behavior', { preHandler: requireAuth, schema: dislikeBehaviorSchema }, async (request, reply) => {
     try {
-      const userId = request.user?.id
-      if (!userId) {
-        return reply.status(401).send({ error: 'Not authenticated' })
-      }
+      const userId = request.user!.id
 
       const result = await queryOne<{ dislike_behavior: string }>(
         `SELECT COALESCE(dislike_behavior, 'exclude') as dislike_behavior FROM user_preferences WHERE user_id = $1`,
@@ -192,12 +178,9 @@ export function registerUserSettingsHandlers(fastify: FastifyInstance) {
    */
   fastify.patch<{
     Body: { dislikeBehavior: 'exclude' | 'penalize' }
-  }>('/api/settings/user/dislike-behavior', { schema: updateDislikeBehaviorSchema }, async (request, reply) => {
+  }>('/api/settings/user/dislike-behavior', { preHandler: requireAuth, schema: updateDislikeBehaviorSchema }, async (request, reply) => {
     try {
-      const userId = request.user?.id
-      if (!userId) {
-        return reply.status(401).send({ error: 'Not authenticated' })
-      }
+      const userId = request.user!.id
 
       const { dislikeBehavior } = request.body
       if (!dislikeBehavior || !['exclude', 'penalize'].includes(dislikeBehavior)) {
@@ -224,12 +207,9 @@ export function registerUserSettingsHandlers(fastify: FastifyInstance) {
   /**
    * GET /api/settings/user/similarity-prefs
    */
-  fastify.get('/api/settings/user/similarity-prefs', { schema: similarityPrefsSchema }, async (request, reply) => {
+  fastify.get('/api/settings/user/similarity-prefs', { preHandler: requireAuth, schema: similarityPrefsSchema }, async (request, reply) => {
     try {
-      const userId = request.user?.id
-      if (!userId) {
-        return reply.status(401).send({ error: 'Not authenticated' })
-      }
+      const userId = request.user!.id
 
       const result = await queryOne<{
         similarity_full_franchise: boolean
@@ -260,12 +240,9 @@ export function registerUserSettingsHandlers(fastify: FastifyInstance) {
       fullFranchiseMode?: boolean
       hideWatched?: boolean
     }
-  }>('/api/settings/user/similarity-prefs', { schema: updateSimilarityPrefsSchema }, async (request, reply) => {
+  }>('/api/settings/user/similarity-prefs', { preHandler: requireAuth, schema: updateSimilarityPrefsSchema }, async (request, reply) => {
     try {
-      const userId = request.user?.id
-      if (!userId) {
-        return reply.status(401).send({ error: 'Not authenticated' })
-      }
+      const userId = request.user!.id
 
       const { fullFranchiseMode, hideWatched } = request.body
 

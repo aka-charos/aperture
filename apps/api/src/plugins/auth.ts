@@ -2,7 +2,13 @@ import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify'
 import fp from 'fastify-plugin'
 import { randomBytes, createHash } from 'crypto'
 import { query, queryOne } from '../lib/db.js'
-import { validateApiKey } from '@aperture/core'
+import {
+  validateApiKey,
+  keyAllowsAdmin,
+  keyAllowsWrite,
+  type ApiKeyScope,
+} from '@aperture/core'
+import { requestWrites } from '../lib/requestWrites.js'
 import { createChildLogger } from '../lib/logger.js'
 import { useSecureCookies } from '../config/security.js'
 import {
@@ -70,6 +76,8 @@ declare module 'fastify' {
     isApiKeyAuth?: boolean
     /** The API key ID if authenticated via API key */
     apiKeyId?: string
+    /** The scopes of the key that authenticated this request, if any. */
+    apiKeyScopes?: ApiKeyScope[]
   }
 }
 
@@ -135,6 +143,17 @@ const SESSION_IDLE_DAYS = 7
  * no benefit — the idle window is measured in days.
  */
 const SESSION_TOUCH_INTERVAL_MS = 5 * 60 * 1000
+
+/**
+ * Refusal payload for a key that may not write, shaped like the assumed-
+ * session one so a client can tell either apart from a real 403 — a caller
+ * whose script suddenly 403s needs to know the key is narrowed, not that the
+ * account lost a permission.
+ */
+const API_KEY_READ_ONLY_ERROR = {
+  error: 'This API key is read-only. Give it the write scope to make changes.',
+  code: 'API_KEY_READ_ONLY',
+} as const
 
 /** Bytes of entropy in a session token. */
 const SESSION_TOKEN_BYTES = 32
@@ -395,6 +414,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorateRequest('sessionError', false)
   fastify.decorateRequest('isApiKeyAuth', false)
   fastify.decorateRequest('apiKeyId', undefined)
+  fastify.decorateRequest('apiKeyScopes', undefined)
 
   // Add hook to parse authentication from API key or session cookie
   fastify.addHook('onRequest', async (request, reply) => {
@@ -411,7 +431,15 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
             displayName: apiKeyUser.displayName,
             provider: 'emby', // API key users don't have a provider context, default to emby
             providerUserId: '',
-            isAdmin: apiKeyUser.isAdmin,
+            // A key with no `admin` scope acts as a non-admin, whatever the
+            // account is. Narrowed HERE rather than inside `requireAdmin`
+            // because `isAdmin` is read in about thirty other places — the
+            // self-or-admin checks, the admin branches of list routes, the
+            // capability overrides — and a guard that only covered the
+            // admin-only ROUTES would leave a read-only key seeing every
+            // user’s keys through `/api/api-keys` and every account through
+            // the admin branch of a handler it is allowed to call.
+            isAdmin: apiKeyUser.isAdmin && keyAllowsAdmin(apiKeyUser.scopes),
             isEnabled: apiKeyUser.isEnabled,
             canManageWatchHistory: apiKeyUser.canManageWatchHistory,
             // API-key users: admins are allowed via isAdmin; non-admins default to no access.
@@ -427,6 +455,26 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
           }
           request.isApiKeyAuth = true
           request.apiKeyId = apiKeyUser.id
+          request.apiKeyScopes = apiKeyUser.scopes
+
+          // A key without `write` may read anything its account can read and
+          // change nothing. One guard covers every route, including the ones
+          // written after this: the alternative is auditing ~490 handlers now
+          // and every handler added afterwards, forever. Same argument, and
+          // the same shared predicate, as the read-only assumed session.
+          if (!keyAllowsWrite(apiKeyUser.scopes) && requestWrites(request.method, request.url)) {
+            request.log.info(
+              {
+                apiKeyId: apiKeyUser.id,
+                userId: apiKeyUser.userId,
+                method: request.method,
+                url: request.url,
+              },
+              'Refused a write from a read-only API key'
+            )
+            return reply.status(403).send(API_KEY_READ_ONLY_ERROR)
+          }
+
           return // Skip session cookie check
         }
       } catch (err) {

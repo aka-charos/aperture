@@ -5,6 +5,7 @@
 
 import type { FastifyInstance } from 'fastify'
 import { queryOne } from '../../../lib/db.js'
+import { requireAuth } from '../../../plugins/auth.js'
 import { getMediaServerConfig } from '@aperture/core'
 
 interface AvatarParams {
@@ -19,10 +20,19 @@ interface UserProviderInfo {
 export function registerAvatarHandlers(fastify: FastifyInstance) {
   /**
    * GET /api/users/:id/avatar
-   * Proxies user avatar from the media server
-   * This endpoint does NOT require authentication to allow avatars in public contexts
+   * Proxies user avatar from the media server.
+   *
+   * This was open, on the reasoning that avatars appear in public contexts.
+   * They do not: the only caller is `SessionUser.avatarUrl`, rendered in the
+   * app bar of an authenticated page. What being open bought instead was an
+   * oracle -- a 200 here confirms an account id exists and names the media
+   * server it lives on. Same-origin `<img>` requests carry the session
+   * cookie, so the caller needs no change.
    */
-  fastify.get<{ Params: AvatarParams }>('/api/users/:id/avatar', async (request, reply) => {
+  fastify.get<{ Params: AvatarParams }>(
+    '/api/users/:id/avatar',
+    { preHandler: requireAuth },
+    async (request, reply) => {
     const { id } = request.params
 
     // Get user's provider info from database
@@ -80,15 +90,22 @@ export function registerAvatarHandlers(fastify: FastifyInstance) {
       fastify.log.error({ err, userId: id }, 'Failed to fetch user avatar from media server')
       return reply.status(502).send({ error: 'Failed to fetch avatar from media server' })
     }
-  })
+    }
+  )
 
   /**
    * GET /api/users/by-provider/:providerUserId/avatar
-   * Proxies user avatar using the provider user ID directly
-   * Useful for fetching avatars before a user is imported
+   * Proxies user avatar using the provider user ID directly.
+   *
+   * Written for the setup wizard, to show avatars before a user is imported.
+   * Nothing calls it -- not the wizard, not the Users page -- so it is gated
+   * like its sibling rather than left open on the strength of an intended
+   * caller. Open, it answers "does this media-server account exist" to
+   * anyone who can reach the app.
    */
   fastify.get<{ Params: { providerUserId: string } }>(
     '/api/users/by-provider/:providerUserId/avatar',
+    { preHandler: requireAuth },
     async (request, reply) => {
       const { providerUserId } = request.params
 

@@ -1857,7 +1857,19 @@
     "revoking": "Отзыв…",
     "revokeKey": "Отозвать ключ",
     "errNameRequired": "Требуется имя",
-    "revokedSuccess": "Ключ API \"{{name}}\" отозван."
+    "revokedSuccess": "Ключ API \"{{name}}\" отозван.",
+    "colScopes": "Permissions",
+    "scopesLabel": "Permissions",
+    "scopesHelper": "A key can always read. Grant only what the integration actually needs — a key never expires unless you set an expiry, and it cannot be seen again after it is created.",
+    "scope": {
+      "read": "Read",
+      "write": "Write",
+      "admin": "Admin"
+    },
+    "scopeHelp": {
+      "write": "May change things: ratings, playlists, requests, settings.",
+      "admin": "May use this account’s admin rights, including jobs and system settings."
+    }
   },
   "settingsBackup": {
     "title": "Резервное копирование и восстановление базы данных",

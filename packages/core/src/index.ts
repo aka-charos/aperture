@@ -1527,6 +1527,19 @@ export {
   type CreateApiKeyResult,
 } from './apiKeys.js'
 
+// What an API key may do with its account. A scope only ever narrows.
+export {
+  API_KEY_SCOPES,
+  DEFAULT_API_KEY_SCOPES,
+  LEGACY_API_KEY_SCOPES,
+  describeApiKeyScopes,
+  isApiKeyScope,
+  keyAllowsAdmin,
+  keyAllowsWrite,
+  normalizeApiKeyScopes,
+  type ApiKeyScope,
+} from './apiKeyScopes.js'
+
 // i18n Overrides
 export {
   getOverridesForLocale,
