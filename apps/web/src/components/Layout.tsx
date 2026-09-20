@@ -68,7 +68,21 @@ const FLYOUT_OPEN_DELAY_MS = 160
 /** Longer than the open delay, so a moment outside the panel doesn't snap it shut. */
 const FLYOUT_CLOSE_DELAY_MS = 240
 
-type NavItem = { textKey: string; icon: React.ReactElement; path: string; feature: string | null }
+/**
+ * A sidebar entry.
+ *
+ * `capability` is the server’s answer about this viewer, from
+ * `/api/auth/check`; `feature` is an instance-wide switch this component
+ * fetches for itself. They are different questions — "may I" and "is it on"
+ * — and an entry can carry either, or neither.
+ */
+type NavItem = {
+  textKey: string
+  icon: React.ReactElement
+  path: string
+  feature: string | null
+  capability?: string
+}
 
 // Base user-facing navigation items (some may be conditionally hidden)
 const baseUserMenuItems: NavItem[] = [
@@ -78,9 +92,9 @@ const baseUserMenuItems: NavItem[] = [
   { textKey: 'nav.showsYouWatch', icon: <AddToQueueIcon />, path: '/watching', feature: 'watching' },
   { textKey: 'nav.topPicks', icon: <WhatshotIcon />, path: '/top-picks', feature: null },
   { textKey: 'nav.playlists', icon: <PlaylistPlayIcon />, path: '/playlists', feature: null },
-  { textKey: 'nav.collections', icon: <CollectionsBookmarkIcon />, path: '/collections', feature: 'collections' },
+  { textKey: 'nav.collections', icon: <CollectionsBookmarkIcon />, path: '/collections', feature: null, capability: 'collections' },
   { textKey: 'nav.explore', icon: <HubOutlinedIcon />, path: '/explore', feature: null },
-  { textKey: 'nav.discover', icon: <ExploreIcon />, path: '/discovery', feature: null },
+  { textKey: 'nav.discover', icon: <ExploreIcon />, path: '/discovery', feature: null, capability: 'discover' },
   { textKey: 'nav.myRequests', icon: <PlaylistAddCheckIcon />, path: '/my-requests', feature: null },
   { textKey: 'nav.browse', icon: <VideoLibraryIcon />, path: '/browse', feature: null },
   { textKey: 'nav.watchHistory', icon: <HistoryIcon />, path: '/history', feature: null },
@@ -161,7 +175,7 @@ function AppShell() {
   const flyoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [watchingEnabled, setWatchingEnabled] = useState(true) // Default to true until we know
-  const { user, logout, impersonation } = useAuth()
+  const { user, capabilities, logout, impersonation } = useAuth()
   const { open: welcomeOpen, showWelcome, hideWelcome } = useWelcomeModal()
   // Space reserved on the inline-end side for the docked AI assistant;
   // while its resize handle is dragged, transitions are dropped so the
@@ -176,15 +190,23 @@ function AppShell() {
   const drawerWidth = collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH
   const showLabels = !collapsed || flyout
 
-  // Filter menu items based on feature flags
-  const userMenuItems = baseUserMenuItems.filter(item => {
-    if (item.feature === 'watching' && !watchingEnabled) {
-      return false
-    }
-    // Collections are admin-gated per user (like Discover/Request)
-    if (item.feature === 'collections' && !(user?.isAdmin || user?.collectionsEnabled)) {
-      return false
-    }
+  /**
+   * What this viewer actually sees.
+   *
+   * A capability is asked of the server (`capabilities`, decided by
+   * `lib/permissions.ts`) rather than worked out from the user’s flags here.
+   * The Collections entry used to read `isAdmin || collectionsEnabled`, which
+   * is the admin-override half of a rule whose other half lives in core — two
+   * copies, and only one of them gets updated. Discover carried no gate at
+   * all, so every viewer got a link to a page that answers 403.
+   *
+   * My Requests is deliberately NOT gated on `discover:request`: its Issues
+   * tab is reachable by anyone who can report a problem with a title, and
+   * hiding the list would strand the issues they already filed.
+   */
+  const userMenuItems = baseUserMenuItems.filter((item) => {
+    if (item.feature === 'watching' && !watchingEnabled) return false
+    if (item.capability && capabilities[item.capability] !== true) return false
     return true
   })
 

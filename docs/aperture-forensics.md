@@ -2854,3 +2854,59 @@ All five now take `requireAuth`. Same-origin `<img>` requests carry the session 
 4. **A stale allowlist entry fails the test.** An entry left behind after its route was renamed is a hole nobody is watching — the route returns unguarded under a new name and *is* reported, but the list still reads as reviewed. So every entry must still be found unguarded, and every reason must be more than a word.
 
 **Still not done.** No audit trail for a permission or scope change. `max_parental_rating` is applied in the recommender, channels and discovery but not in browse, search, similarity or the assistant. Twenty-eight hand-rolled `x !== currentUser.id && !isAdmin` checks sit beside a `requireSelfOrAdmin` helper used at 34 more, two of them (`channels/handlers/homeScreen.ts`, `graphPlaylists/index.ts`) omitting the admin clause with nothing saying whether that is deliberate. The scan checks that a guard is *declared*, never that it is the *right* one — a route needing `requireAdmin` and carrying `requireAuth` passes.
+
+---
+
+## F-134
+
+**Nothing recorded a permission change, and the sidebar decided who saw what from its own copy of the rules.** Added 2026-09-21.
+
+### The audit trail
+
+Ten permission booleans on `users` plus an API key's scopes, and not one change to any of them was written down. The question with no answer is the ordinary one — "I could do this yesterday" — and every cause looks identical from outside: an admin unticked a switch, the user sync saw `Policy.IsDisabled` flip on the media server, a *derived* column followed a switch that WAS ticked ([F-132](#f-132)'s `is_enabled` and `discover_request_enabled`), or a key was narrowed ([F-133](#f-133)).
+
+`packages/core/src/permissionAudit.ts` diffs and records; `0183` is the table. **Five rules.**
+
+1. **The ROW is diffed, never the request.** Callers pass the permissions before and after their write, so what is recorded is what actually changed. A recorder fed the request body would report that an admin unticked Discover and miss that request rights went with it — which is precisely the class of change nobody remembers making, and therefore the one this exists for.
+
+2. **Only real changes are stored.** The user sync runs on a schedule and rewrites the same values indefinitely. Recording no-ops would bury the handful of rows that matter and make the table grow with the clock rather than with events. Nothing prunes, and nothing needs to.
+
+3. **A creation records GRANTS only.** An account imported with everything off has granted nothing, and eleven rows saying so on every import hide the imports that did grant something.
+
+4. **It never fails the write.** The permission change already happened; reporting it as failed because an INSERT did would be a worse outcome than a missing row. Every path swallows and logs.
+
+5. **Labels are stored, not just ids.** `subject_id` carries **no foreign key** on purpose — the record of an account's permissions has to outlive the account, and a cascade would delete exactly the history somebody is asking about. `actor_user_id` is `ON DELETE SET NULL` for the same reason: deleting an admin must not erase what they did.
+
+**Why not a database trigger.** It was the first choice, and it would catch every writer by construction including ones written later. It cannot know the **actor**: Postgres has no request context, and threading one through a session GUC requires every write to run in an explicit transaction on a pinned connection, which `query()` (pooled, autocommit) does not do. "Who" is most of the value here, so the actor won — and `permissionAuditCallSites.test.ts` covers the drift the trigger would have covered for free. Verified against an injected unrecorded write.
+
+**The scan found two real things on its first run.** `setUserAiExplanationOverride` was audited at its *route* rather than in the function, so a second caller would have escaped silently — it records itself now and takes a **required** `actor`, because an optional one is a default somebody takes. And two allowlist entries were unnecessary, which the test refuses to tolerate: a stale entry is a hole nobody is watching, since the route returns unguarded under a new name and *is* reported while the list still reads as reviewed.
+
+The scan keeps **two copies of the column list** deliberately — a test that imported the list it checks would agree with itself — and pins them against each other. It lives in core rather than beside the API routes because it scans both packages, and because an api-side test reaching into `packages/core/src` drags core into that package's `rootDir` and breaks its typecheck (measured; that was the first attempt).
+
+**Six writers are wired**: `PUT /api/users/:id`, the user import, the setup wizard's import and enable, the login upsert, the user sync, the AI-explanation grant, and API key create/narrow. The login one records **before** the `is_enabled` refusal, not after: a login that is then refused still cleared `provider_disabled`, and an audit that omits a change because the request failed afterwards is not an audit.
+
+The history renders under the switches that produce it on the user detail page, not in a tab of its own — the question is asked while looking at the controls, and a separate tab is a place nobody opens. Field names resolve through `admin.userDetail.permissionField.*` **with the raw column as the fallback**, so a permission added later reads as its column name instead of as a blank row.
+
+### The sidebar held a second copy of the rules
+
+`Layout.tsx` gated on two things: `watching` (an instance switch) and `collections`, written as `user?.isAdmin || user?.collectionsEnabled` — which is the admin-override half of a rule whose other half lives in `lib/permissions.ts`. Two copies, and only one of them gets updated. **Discover carried no gate at all**, so every viewer got a sidebar link to a page that answers 403.
+
+`capabilitiesFor` ships **decided booleans** on `/api/auth/check`, `/api/auth/me` and `/api/auth/login`. Four rules.
+
+1. **Answers travel, never rules.** The bundle never imports core, and the one time it held a copy of a permission rule the API disagreed with it ([F-132](#f-132)). A rule change on the server now reaches the sidebar without this file being edited.
+
+2. **They ride on `/auth/check`**, not only `/me`: that is the call the client boots from, so capabilities on `/me` alone would leave the first paint gating on nothing.
+
+3. **An absent capability reads as false.** A client built before a capability existed hides the feature rather than offering one that 403s — and `useCapability` deliberately has no fallback logic, because working it out from the user's flags is how the second copy appears.
+
+4. **During an assumption these are the TARGET's**, which is the point: the admin sees the app the viewer sees.
+
+**My Requests is deliberately NOT gated on `discover:request`.** Its Issues tab is reachable by anyone who can report a problem with a title (`canReportIssue` is instance-level — [F-107](#f-107)), so hiding the list would strand issues they had already filed.
+
+### Six toggle handlers became one
+
+`Users.tsx` had six near-identical `handleToggleX` functions, each with its own optimistic update, and they had **already drifted**: two took `is_enabled` from the response and two did not, and the Discover one re-applied "clear requests with Discover" by hand — a copy of a rule the server owns. One `togglePermission(user, key)` over a table of switches, and `applySavedRow` takes the **whole row** from the response rather than applying the value it sent. That is the load-bearing half: two of those columns are derived, so a page that applies what it sent is right about the switch it touched and wrong about the ones that moved with it, until a reload. Exactly how this page and the database came to disagree about who could sign in ([F-127](#f-127)).
+
+The AI-explanation toggle stays separate on purpose — it is a different endpoint, and folding it into the table would hide that.
+
+**Still not done.** `max_parental_rating` is applied in the recommender, channels and discovery but not in browse, search, similarity or the assistant. Twenty-eight hand-rolled `x !== currentUser.id && !isAdmin` checks sit beside a `requireSelfOrAdmin` helper used at 34 more, two of them omitting the admin clause with nothing saying whether that is deliberate. The audit records what changed but not what was *attempted and refused*, so a failed permission escalation leaves no trace.

@@ -354,7 +354,30 @@
       "emailNotificationsTitle": "Email Notifications",
       "emailNotificationsBody": "Controls whether the Email Notifications opt-in appears in this user's settings. Feature coming soon — enabling this only reveals the setting, no emails are sent yet.",
       "emailNotificationsToggleTitle": "Show Email Notifications Setting",
-      "emailNotificationsToggleHint": "User can enter an email and opt in to future notification emails from their settings"
+      "emailNotificationsToggleHint": "User can enter an email and opt in to future notification emails from their settings",
+      "permissionHistoryTitle": "Permission history",
+      "permissionHistoryHelper": "Every permission granted or revoked on this account, newest first — including the ones that followed automatically from another switch.",
+      "permissionHistoryEmpty": "No permission changes recorded for this account yet.",
+      "permissionColWhen": "When",
+      "permissionColWhat": "Permission",
+      "permissionColChange": "Change",
+      "permissionColWho": "Changed by",
+      "permissionGranted": "Granted",
+      "permissionRevoked": "Revoked",
+      "permissionField": {
+        "is_admin": "Administrator",
+        "is_enabled": "{{appName}} access",
+        "provider_disabled": "Disabled on the media server",
+        "movies_enabled": "Movie recommendations",
+        "series_enabled": "Series recommendations",
+        "discover_enabled": "Discover",
+        "discover_request_enabled": "Content requests",
+        "collections_enabled": "Collections",
+        "can_manage_watch_history": "Watch history management",
+        "email_notifications_allowed": "Email notifications",
+        "ai_explanation_override_allowed": "AI explanation override",
+        "scopes": "API key permissions"
+      }
     },
     "jobsPage": {
       "title": "Achtergrond banen",

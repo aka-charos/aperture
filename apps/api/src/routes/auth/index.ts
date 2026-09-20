@@ -4,9 +4,12 @@ import {
   getMediaServerConfig,
   getSystemSetting,
   InvalidCredentialsError,
+  auditUserPermissions,
+  SYSTEM_ACTORS,
   type AuthResult,
 } from '@aperture/core'
 import { queryOne } from '../../lib/db.js'
+import { capabilitiesFor, type Capability } from '../../lib/permissions.js'
 import {
   createSession,
   deleteSession,
@@ -66,12 +69,19 @@ type UserRow = UserLookupRow
 
 interface LoginResponse {
   user: SessionUser
+  capabilities: Record<Capability, boolean>
 }
 
 interface MeResponse {
   user: SessionUser
   /** Non-null only while an admin is viewing the app as someone else. */
   impersonation: ImpersonationContext | null
+  /**
+   * Decided answers, never the rules. The bundle gates its navigation on
+   * these; an absent one reads as false, so a client built before a capability
+   * existed hides the feature rather than offering one that 403s.
+   */
+  capabilities: Record<Capability, boolean>
 }
 
 const authRoutes: FastifyPluginAsync = async (fastify) => {
@@ -176,6 +186,13 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         [provider.type, authResult.userId]
       )
 
+      // The login route writes two permission columns: `is_admin`, from what
+      // the media server says about the account, and `provider_disabled`,
+      // which it clears on the strength of a successful authentication.
+      const beforeLogin = existingUser
+        ? { is_admin: existingUser.is_admin, provider_disabled: existingUser.provider_disabled }
+        : null
+
       let user: UserRow
 
       // authResult.accessToken is deliberately not persisted. It is a live
@@ -222,6 +239,16 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         user = created!
       }
 
+      // Recorded here rather than after the check below: a login that is then
+      // refused still cleared `provider_disabled`, and an audit that omits a
+      // change because the request failed afterwards is not an audit.
+      await auditUserPermissions(
+        SYSTEM_ACTORS.login,
+        { kind: 'user', id: user.id, label: user.username },
+        beforeLogin,
+        user
+      )
+
       // Authenticating against the media server says nothing about whether an
       // admin has disabled the account here. Checked after the upsert so the
       // row reflects the current state, and before any session exists.
@@ -235,7 +262,11 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       const sessionToken = await createSession(user.id)
       setSessionCookie(reply, sessionToken)
 
-      return reply.send({ user: toSessionUser(user) })
+      const sessionUser = toSessionUser(user)
+      return reply.send({
+        user: sessionUser,
+        capabilities: capabilitiesFor(sessionUser),
+      })
     }
   )
 
@@ -262,7 +293,15 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/auth/me',
     { preHandler: requireAuth, schema: getMeSchema },
     async (request, reply) => {
-      return reply.send({ user: request.user!, impersonation: request.impersonation ?? null })
+      // Capabilities ride along as DECIDED booleans. The sidebar used to gate
+      // on two feature flags and show Discover to everyone, so a viewer without
+      // it got a link to a 403; the rules for that live in one place now and
+      // the client is told the answers rather than given the rules.
+      return reply.send({
+        user: request.user!,
+        impersonation: request.impersonation ?? null,
+        capabilities: capabilitiesFor(request.user!),
+      })
     }
   )
 
@@ -420,6 +459,11 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
           authenticated: true,
           user: request.user,
           impersonation: request.impersonation ?? null,
+          // The client boots from this call, not from /me, so the
+          // capabilities have to ride here or the first paint gates on
+          // nothing. During an assumption these are the TARGET’s, which is
+          // the point: the admin sees the app the viewer sees.
+          capabilities: capabilitiesFor(request.user),
         })
       }
 

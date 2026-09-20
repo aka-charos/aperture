@@ -10,11 +10,19 @@ import {
 } from '../../../plugins/auth.js'
 import { accountEnabledSql, type AccountSwitchColumn } from '../../../lib/accountEnabled.js'
 import { discoverRequestSql } from '../../../lib/permissions.js'
+import {
+  auditUserPermissions,
+  getPermissionHistory,
+  readUserPermissions,
+} from '@aperture/core'
 import type { UserRow, UserListResponse, UserUpdateBody } from '../types.js'
 
 const listLogger = createChildLogger('users-list')
 
-const USER_ROW_SELECT = `id, username, display_name, email, provider, provider_user_id, is_admin, is_enabled, movies_enabled, series_enabled, discover_enabled, discover_request_enabled, collections_enabled, email_notifications_allowed, can_manage_watch_history, seerr_user_id, created_at, updated_at`
+// `provider_disabled` and `ai_explanation_override_allowed` are here for the
+// permission audit, which diffs the row it just wrote. They are not part of
+// `UserRow`, so nothing else sees them.
+const USER_ROW_SELECT = `id, username, display_name, email, provider, provider_user_id, is_admin, is_enabled, movies_enabled, series_enabled, discover_enabled, discover_request_enabled, collections_enabled, email_notifications_allowed, can_manage_watch_history, provider_disabled, ai_explanation_override_allowed, seerr_user_id, created_at, updated_at`
 
 export function registerListHandlers(fastify: FastifyInstance) {
   /**
@@ -69,6 +77,21 @@ export function registerListHandlers(fastify: FastifyInstance) {
   )
 
   /**
+   * GET /api/users/:id/permission-history
+   *
+   * Admin only, and deliberately not self-service: the answer names the
+   * admin who made each change, which is a fact about somebody else.
+   */
+  fastify.get<{ Params: { id: string }; Querystring: { limit?: number } }>(
+    '/api/users/:id/permission-history',
+    { preHandler: requireAdmin, schema: { tags: ['users'] } },
+    async (request, reply) => {
+      const changes = await getPermissionHistory(request.params.id, request.query.limit ?? 50)
+      return reply.send({ changes })
+    }
+  )
+
+  /**
    * PUT /api/users/:id
    * Update user (admin only)
    */
@@ -77,6 +100,7 @@ export function registerListHandlers(fastify: FastifyInstance) {
     { preHandler: requireAdmin, schema: { tags: ["users"] } },
     async (request, reply) => {
       const { id } = request.params
+      const currentUser = request.user as SessionUser
       const { displayName, isEnabled, moviesEnabled, seriesEnabled, discoverEnabled, discoverRequestEnabled, collectionsEnabled, emailNotificationsAllowed, canManageWatchHistory, seerrUserId } = request.body
 
       // Build update query dynamically
@@ -163,6 +187,12 @@ export function registerListHandlers(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'No fields to update' } as never)
       }
 
+      // Read BEFORE the write, so the audit can diff the row rather than the
+      // request. The request says which switch an admin touched; only the two
+      // rows together say that request rights went with Discover, or that the
+      // account stopped being able to sign in (permissionAudit.ts rule 1).
+      const before = await readUserPermissions(id)
+
       values.push(id)
       const user = await queryOne<UserRow>(
         `UPDATE users SET ${updates.join(', ')}, updated_at = NOW()
@@ -174,6 +204,15 @@ export function registerListHandlers(fastify: FastifyInstance) {
       if (!user) {
         return reply.status(404).send({ error: 'User not found' } as never)
       }
+
+      // Never awaited into the response path beyond this: the change already
+      // happened, and the recorder swallows its own failures.
+      await auditUserPermissions(
+        { userId: currentUser.id, label: currentUser.username },
+        { kind: 'user', id: user.id, label: user.username },
+        before,
+        user
+      )
 
       // Disabling an account must end its existing sessions, not just block the
       // next login. Keyed off the written row so it covers every path that can

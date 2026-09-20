@@ -1540,6 +1540,25 @@ export {
   type ApiKeyScope,
 } from './apiKeyScopes.js'
 
+// Permission audit trail: what changed, who changed it, when.
+export {
+  AUDITED_USER_PERMISSIONS,
+  PERMISSION_AUDIT_COLUMNS,
+  SYSTEM_ACTORS,
+  auditUserPermissions,
+  diffApiKeyScopes,
+  diffUserPermissions,
+  getPermissionHistory,
+  readUserPermissions,
+  recordPermissionChanges,
+  type AuditedUserPermission,
+  type PermissionActor,
+  type PermissionChange,
+  type PermissionChangeRecord,
+  type PermissionSubject,
+  type UserPermissionSnapshot,
+} from './permissionAudit.js'
+
 // i18n Overrides
 export {
   getOverridesForLocale,

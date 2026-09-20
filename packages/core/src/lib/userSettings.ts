@@ -5,6 +5,7 @@
  */
 
 import { query, queryOne } from './db.js'
+import { auditUserPermissions, type PermissionActor } from '../permissionAudit.js'
 import { createChildLogger } from './logger.js'
 import {
   isValidAppLocale,
@@ -220,17 +221,40 @@ export async function getUserAiExplanationSettings(
 }
 
 /**
- * Update a user's AI explanation settings (admin only - sets override_allowed)
+ * Update a user's AI explanation settings (admin only - sets override_allowed).
+ *
+ * Records the change itself rather than leaving it to the route. This is a
+ * permission, and the one an admin grants outside `PUT /api/users/:id` — so
+ * a second caller added later would otherwise silently escape the audit,
+ * which is the drift `permissionAuditCallSites.test.ts` exists to catch.
+ * `actor` is required for the same reason: an optional one is a default
+ * somebody takes, and "who" is most of what an audit is for.
  */
 export async function setUserAiExplanationOverride(
   userId: string,
-  overrideAllowed: boolean
+  overrideAllowed: boolean,
+  actor: PermissionActor
 ): Promise<void> {
+  const before = await queryOne<{
+    username: string
+    ai_explanation_override_allowed: boolean | null
+  }>(
+    `SELECT username, ai_explanation_override_allowed FROM users WHERE id = $1`,
+    [userId]
+  )
+
   await query(
     `UPDATE users SET ai_explanation_override_allowed = $1, updated_at = NOW() WHERE id = $2`,
     [overrideAllowed, userId]
   )
   logger.info({ userId, overrideAllowed }, 'Updated user AI explanation override setting')
+
+  await auditUserPermissions(
+    actor,
+    { kind: 'user', id: userId, label: before?.username ?? userId },
+    before ? { ai_explanation_override_allowed: before.ai_explanation_override_allowed } : null,
+    { ai_explanation_override_allowed: overrideAllowed }
+  )
 }
 
 /**

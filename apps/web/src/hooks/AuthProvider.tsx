@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react'
 import { syncUiLanguageFromServer } from '@/i18n/syncUiLanguage'
 import { clearUserScopedCaches } from '@/lib/clientCaches'
-import { AuthContext, type ImpersonationState, type User } from './auth-context'
+import {
+  AuthContext,
+  type Capabilities,
+  type ImpersonationState,
+  type User,
+} from './auth-context'
 
 /**
  * Crossing into or out of an assumed session is a full page load, not a state
@@ -23,6 +28,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [sessionError, setSessionError] = useState<string | null>(null)
   const [impersonation, setImpersonation] = useState<ImpersonationState | null>(null)
+  // Decided server-side and replaced wholesale on every auth check, so a
+  // permission revoked between two loads is gone from the nav on the next one.
+  const [capabilities, setCapabilities] = useState<Capabilities>({})
 
   const checkAuth = useCallback(async () => {
     try {
@@ -35,10 +43,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (data.authenticated) {
           setUser(data.user)
           setImpersonation(data.impersonation ?? null)
+          setCapabilities(data.capabilities ?? {})
           setSessionError(null)
         } else {
           setUser(null)
           setImpersonation(null)
+          setCapabilities({})
           // Check if there was a session error (e.g., SESSION_SECRET changed)
           if (data.sessionError && data.message) {
             setSessionError(data.message)
@@ -47,10 +57,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setUser(null)
         setImpersonation(null)
+        setCapabilities({})
       }
     } catch {
       setUser(null)
       setImpersonation(null)
+      setCapabilities({})
     } finally {
       setLoading(false)
     }
@@ -79,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const data = await response.json()
     setUser(data.user)
+    setCapabilities(data.capabilities ?? {})
 
     try {
       await syncUiLanguageFromServer()
@@ -136,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setUser(null)
       setImpersonation(null)
+      setCapabilities({})
     }
   }
 
@@ -143,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        capabilities,
         loading,
         sessionError,
         impersonation,

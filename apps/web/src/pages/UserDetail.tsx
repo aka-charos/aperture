@@ -637,7 +637,118 @@ function UserSettingsTab({ userId, user }: { userId: string; user: User }) {
           </Box>
         </CardContent>
       </Card>
+
+      <PermissionHistoryCard userId={userId} />
     </Box>
+  )
+}
+
+interface PermissionChangeRow {
+  id: string
+  createdAt: string
+  actorLabel: string
+  field: string
+  oldValue: string | null
+  newValue: string
+}
+
+/**
+ * What was granted or revoked on this account, and by whom.
+ *
+ * Sits under the switches that produce it rather than in a tab of its own:
+ * the question it answers ("I could do this yesterday") is asked while
+ * looking at the controls, and a separate tab is a place nobody opens.
+ *
+ * Field names are shown through `admin.userDetail.permissionField.*` with the
+ * raw column as the fallback, so a permission added later reads as its column
+ * name instead of as a blank row.
+ */
+function PermissionHistoryCard({ userId }: { userId: string }) {
+  const { t } = useTranslation()
+  const [changes, setChanges] = useState<PermissionChangeRow[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    fetch(`/api/users/${userId}/permission-history`, { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : { changes: [] }))
+      .then((data) => {
+        if (!cancelled) setChanges(data.changes ?? [])
+      })
+      .catch(() => {
+        if (!cancelled) setChanges([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
+
+  return (
+    <Card sx={{ mt: 3 }}>
+      <CardContent>
+        <Typography variant="h6" gutterBottom>
+          {t('admin.userDetail.permissionHistoryTitle')}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          {t('admin.userDetail.permissionHistoryHelper')}
+        </Typography>
+
+        {loading ? (
+          <CircularProgress size={20} />
+        ) : changes.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">
+            {t('admin.userDetail.permissionHistoryEmpty')}
+          </Typography>
+        ) : (
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>{t('admin.userDetail.permissionColWhen')}</TableCell>
+                  <TableCell>{t('admin.userDetail.permissionColWhat')}</TableCell>
+                  <TableCell>{t('admin.userDetail.permissionColChange')}</TableCell>
+                  <TableCell>{t('admin.userDetail.permissionColWho')}</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {changes.map((change) => (
+                  <TableRow key={change.id}>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        {new Date(change.createdAt).toLocaleString()}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      {t(`admin.userDetail.permissionField.${change.field}`, change.field)}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        color={change.newValue === 'false' ? 'default' : 'success'}
+                        label={
+                          change.field === 'scopes'
+                            ? change.newValue
+                            : change.newValue === 'true'
+                              ? t('admin.userDetail.permissionGranted')
+                              : t('admin.userDetail.permissionRevoked')
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">{change.actorLabel}</Typography>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 

@@ -14,6 +14,19 @@ export interface User {
 }
 
 /**
+ * What this viewer may do, as decided by the server.
+ *
+ * Answers, never rules. The bundle never imports core, and it must not hold
+ * a second copy of a permission rule — the Discover/Requests dependency lived
+ * only here once already, and the API disagreed with it. So a rule change on
+ * the server reaches the sidebar without this file being edited.
+ *
+ * Every member is optional, and an absent one reads as false: a page built
+ * before a capability existed hides the feature rather than linking to a 403.
+ */
+export type Capabilities = Partial<Record<string, boolean>>
+
+/**
  * Set while an admin is viewing the app as someone else.
  *
  * `user` above is the account being viewed — every page reads it and needs no
@@ -30,6 +43,7 @@ export interface ImpersonationState {
 
 export interface AuthContextType {
   user: User | null
+  capabilities: Capabilities
   loading: boolean
   sessionError: string | null
   impersonation: ImpersonationState | null

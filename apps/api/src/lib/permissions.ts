@@ -220,3 +220,21 @@ export function discoverRequestSql(
   const discover = written.discover_enabled ?? 'discover_enabled'
   return `(${request} AND ${discover})`
 }
+
+/**
+ * Every capability this user holds, as decided values for the client.
+ *
+ * The web bundle never imports core, and it must not hold a second copy of a
+ * permission rule — the `discover:request` dependency lived only in the browser
+ * once already, and the API disagreed with it. So the answers travel, not the
+ * rules: the nav gates on what this returns, and a rule change here reaches the
+ * sidebar without the bundle being edited.
+ *
+ * An absent capability reads as false at the client, so a client built before a
+ * capability existed hides the feature rather than offering one that 403s.
+ */
+export function capabilitiesFor(subject: PermissionSubject): Record<Capability, boolean> {
+  return Object.fromEntries(
+    CAPABILITIES.map((capability) => [capability, can(subject, capability)])
+  ) as Record<Capability, boolean>
+}
