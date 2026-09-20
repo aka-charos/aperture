@@ -1,6 +1,13 @@
 import type { FastifyInstance } from 'fastify'
 import { query, queryOne } from '../../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../../plugins/auth.js'
+import {
+  can,
+  refusalFor,
+  toPermissionSubject,
+  PERMISSION_COLUMNS,
+  type PermissionRow,
+} from '../../../../lib/permissions.js'
 import { requireSelfOrAdmin } from './shared.js'
 
 export function registerEmailSettingsHandlers(fastify: FastifyInstance) {
@@ -67,15 +74,18 @@ export function registerEmailSettingsHandlers(fastify: FastifyInstance) {
 
       try {
         if (emailNotificationsEnabled) {
-          const current = await queryOne<{ email_notifications_allowed: boolean }>(
-            `SELECT email_notifications_allowed FROM users WHERE id = $1`,
+          // Read from the row, not from the session: this is a permission the
+          // TARGET holds, and an admin editing somebody else must still
+          // respect it rather than grant it by being an admin.
+          const current = await queryOne<PermissionRow>(
+            `SELECT ${PERMISSION_COLUMNS} FROM users WHERE id = $1`,
             [id]
           )
           if (!current) {
             return reply.status(404).send({ error: 'User not found' })
           }
-          if (!current.email_notifications_allowed) {
-            return reply.status(403).send({ error: 'Email notifications have not been enabled for this account by an administrator' })
+          if (!can(toPermissionSubject(current), 'emailNotifications')) {
+            return reply.status(403).send(refusalFor('emailNotifications'))
           }
         }
 

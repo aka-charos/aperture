@@ -2746,3 +2746,52 @@ So the obvious fix — pass a signal — repairs the connection and leaves the c
 **The same guard went into `lib/tasteSynopsisStream.ts`**, the other streamed call that runs inside a background job (step 2b of both recommendation pipelines). It consumes `fullStream`, so the abort throws into its existing catch, which stores the fallback identity with a NULL version and therefore retries on the next run (F-111).
 
 **Not done.** The assistant chat (`apps/api/.../assistant/handlers/chat.ts`, two `streamText` calls) has the same missing ceiling, but it holds one HTTP request rather than a job slot and has its own status line, so it was left alone. The grounding write path uses non-streaming `generateText`, where Node's 300s `headersTimeout` still bounds the call, so it is capped at five minutes — but Stop cannot interrupt it either.
+
+---
+
+## F-132
+
+**A feature permission was decided at seventeen call sites, and the one rule spanning two of them lived in the browser.** Added 2026-09-20.
+
+**What the model was.** Ten flat booleans plus two scalars on `users`, grown one migration at a time from `0003` to `0129`: `is_admin`, `is_enabled` (derived — F-127), `movies_enabled`/`series_enabled` (`0040`), `discover_enabled`/`discover_request_enabled` (`0080`), `collections_enabled` (`0116`), `can_manage_watch_history` (`0049`), `email_notifications_allowed` (`0129`), `ai_explanation_override_allowed` (`0046`), and `max_parental_rating` (`0025`). No roles, no groups, no scopes.
+
+**How each was enforced, measured before the change.**
+
+| Flag | Enforcement |
+|---|---|
+| `discover_enabled` | **17** inline `SELECT discover_enabled FROM users WHERE id = $1` |
+| `discover_request_enabled` | 6 of those, in `routes/seerr` and `franchiseDetail` |
+| `collections_enabled` | one expression, `channels/handlers/crud.ts` |
+| `can_manage_watch_history` | a private `async` helper in one handler file |
+| `email_notifications_allowed` | a bare column test in `emailSettings.ts` |
+| `movies_enabled` / `series_enabled` | **no route reads them** — jobs only |
+
+Three spellings of one question, none pinned by a test. The session already carried four of the flags (`is_admin`, `is_enabled`, `can_manage_watch_history`, `collections_enabled`) while the rest cost a query per request — and two handlers in one request could read a row that had changed between them.
+
+**The defect this shape produced.** Requesting missing content through Seerr needs Discover. `pages/Users.tsx` cleared one with the other and disabled the Request switch when Discover was off; `pages/UserDetail.tsx` did the same and even rendered an alert for the inconsistent state — but **`PUT /api/users/:id` wrote the two columns independently** and `routes/seerr` checked `discover_request_enabled` **alone**. So `{"discoverRequestEnabled": true}` on an account with Discover switched off granted working Seerr request rights, spending that user's quota through a surface they could not reach. The rule existed in two browser files and in neither of the two server files that needed it.
+
+**`provider_disabled` was read by every job and by nothing at the front door.** Both recommender pipelines, both STRM writers, discovery, `twinAffinity`, `rebuildAllTasteProfiles` and `homeSections` all gate on it, and `strm/cleanup.ts` treats it as grounds to **delete** that viewer's generated library. The auth plugin's `USER_COLUMNS` never selected it, so a viewer disabled on the media server kept a working session for up to the full 30 days and working API keys indefinitely. F-104 recorded this for discovery specifically and read it as a discovery bug; it was the front door.
+
+**What was built.** `apps/api/src/lib/permissions.ts` — a named capability list, a pure `can(subject, capability)`, a `requireCapability(cap)` preHandler, and `discoverRequestSql` for the write. Pinned by `permissions.test.ts`. Every one of the 17 inline lookups is gone; the diff is net **−9 lines** across 16 files.
+
+**Six decisions.**
+
+1. **A capability is granted from the SESSION.** All the flags ride on `SessionUser`, so a check costs nothing and cannot be skipped for being expensive, and one query decides a request's permissions rather than each handler deciding from its own read.
+
+2. **Admin override is declared per capability, never assumed.** Collections and watch-history management read `isAdmin` at their old call sites; **Discover never did**, and an admin with Discover switched off has always been refused by those routes. Granting it in passing would be a behaviour change wearing a refactor's clothes, so the test asserts the bypass set is exactly `['collections', 'watchHistory:manage']` — on the whole set, not on two members, so a capability added with a careless `adminOverride: true` fails it.
+
+3. **The dependency is enforced at the read AND at the write, and neither alone is enough.** `can()` re-checks it, so a row written before the rule existed still cannot spend a Seerr quota; `discoverRequestSql` keeps new rows out of that state. Same mechanism and the same reason as `accountEnabledSql` — an UPDATE's SET list reads the row as it was **before** the statement, so a column the statement also writes must be passed its bind parameter, or the dependency holds one save late: exactly long enough for the request that switched Discover off to leave request rights standing. `0181` re-derives the rows already stored that way, as `0174` did for `is_enabled`.
+
+4. **The refusal text is per capability, not generic.** Every string already existed at the call sites being replaced, and they are the only part of this a user ever sees; a generic "Forbidden" would have been the one user-visible regression the change could cause. `refusalFor` returns a **copy**, since the rule table is shared and a caller mutating a body would change everyone's. Two of the six Discover sites had dropped the `message` line; they get it back.
+
+5. **A target-scoped permission reads the row, and says so.** Most permissions are the caller's. `email_notifications_allowed` belongs to the account being **edited** — an admin editing somebody else must respect it rather than grant it by being an admin — so it goes through `PERMISSION_COLUMNS` + `toPermissionSubject` + the same `can()`, not a bare column test. Watch-history management is the opposite case and looks identical: its old helper read the **target's** row, but every handler runs `requireSelfOrAdmin` first, so a non-admin only ever reaches it for their own row, and an admin passed on the `isAdmin` short-circuit before the row was read at all. Asking the caller is the same question minus a query.
+
+6. **Movies and Series are deliberately not capabilities.** Nothing in the HTTP layer reads them — they gate background work through SQL of their own — and a capability nothing enforces is a promise the module cannot keep.
+
+**`provider_disabled` now refuses at three doors, and the fourth clears it.** The session lookup, the API-key lookup and the assumption lookup all refuse; the login route **sets it false**. That last is load-bearing rather than tidy: authenticating against the media server is positive evidence the account exists and is not disabled there, which is the whole of what the flag records, and without it a wrong flag would be a lockout with no path back except the next user sync. The flag mirrors Emby's `Policy.IsDisabled` and the sync clears it when an account returns — so the session rows are **not** deleted, unlike the `is_enabled` case: refusing the lookup already ends access at once, and signing everybody out over a media server that was briefly answering wrong is the expensive direction of that mistake. The assumption row **is** deleted, since it is a one-hour lease an admin can simply start again.
+
+**One row type, two queries, one drift.** `validateApiKey` and `listAllApiKeys` select into the same `ApiKeyWithUserRow` and each spelled the column list out. A flag added for one arrives as `undefined` at the other — and an undefined permission reads as "not granted", which is a wrong claim about the account rather than an error anybody would see. Both now share `API_KEY_USER_COLUMNS`. The same trap had three instances in the auth layer: the plugin, the login route and the assumption route each built a `SessionUser` from its own hand-written list, so `USER_COLUMNS` and `toSessionUser` are exported and all three use them. A flag missed at one of those is lost **only after signing in**, which is the hardest version of it to see.
+
+**API keys still carry the account's admin rights.** `validateApiKey` returns `is_admin` and the plugin copies it onto the request, so a key minted for an automation script is a full admin credential — it can purge the database and read provider credentials. `collections_enabled` is forced false for key users, which shows the concern was noticed and not followed through. Scoping keys is the next change and is deliberately not this one.
+
+**Not done, and named.** No audit trail for permission changes — nothing records who granted what, when. `max_parental_rating` is applied in the recommender, channels and discovery but **not** in browse, search, similarity or the assistant tools, so the restriction is half-enforced. `GET /api/settings/media-server`, `/api/genres`, `/api/images/dimensions` and both avatar routes answer unauthenticated. Twenty-eight hand-rolled `x !== currentUser.id && !isAdmin` checks sit beside a `requireSelfOrAdmin` helper used at 34 more, and two of the hand-rolled ones (`channels/handlers/homeScreen.ts`, `graphPlaylists/index.ts`) omit the admin clause with nothing saying whether that is deliberate. The sidebar gates on `collections` and `watching` only, so Discover and My Requests are shown to viewers who will get a 403.

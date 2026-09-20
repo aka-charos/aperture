@@ -293,15 +293,17 @@ function UserSettingsTab({ userId, user }: { userId: string; user: User }) {
         credentials: 'include',
       })
       if (!response.ok) throw new Error(t('admin.userDetail.errorUpdatePermission'))
-      
+
+      // Request rights depend on Discover and the server derives them
+      // (lib/permissions.ts), so the saved row decides rather than this
+      // page re-applying the rule from its own copy of it.
+      const saved: { discover_request_enabled?: boolean } = await response.json()
+
       if (field === 'discover') {
         setDiscoverEnabled(enabled)
-        // If disabling discovery, also disable request permission
-        if (!enabled) {
-          setDiscoverRequestEnabled(false)
-        }
+        setDiscoverRequestEnabled(saved.discover_request_enabled ?? (enabled && discoverRequestEnabled))
       } else {
-        setDiscoverRequestEnabled(enabled)
+        setDiscoverRequestEnabled(saved.discover_request_enabled ?? enabled)
       }
       
       setSuccess(

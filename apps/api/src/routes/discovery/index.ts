@@ -6,7 +6,8 @@
 
 import type { FastifyInstance, FastifyPluginAsync, FastifyReply } from 'fastify'
 import { requireAuth, requireAdmin, type SessionUser } from '../../plugins/auth.js'
-import { queryOne, query } from '../../lib/db.js'
+import { can, requireCapability } from '../../lib/permissions.js'
+import { query } from '../../lib/db.js'
 import {
   getDiscoveryCandidates,
   getDiscoveryCandidateCount,
@@ -179,20 +180,8 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
     Querystring: { mediaType?: string; locale?: string }
   }>(
     '/api/discovery/genres',
-    { preHandler: requireAuth, schema: { tags: ['discovery'] } },
+    { preHandler: [requireAuth, requireCapability('discover')], schema: { tags: ['discovery'] } },
     async (request, reply) => {
-      const currentUser = request.user as SessionUser
-      const user = await queryOne<{ discover_enabled: boolean }>(
-        `SELECT discover_enabled FROM users WHERE id = $1`,
-        [currentUser.id]
-      )
-      if (!user?.discover_enabled) {
-        return reply.status(403).send({
-          error: 'Discovery not enabled for your account',
-          message: 'Contact your admin to enable discovery suggestions',
-        })
-      }
-
       const rawType = (request.query.mediaType || 'movie').toLowerCase()
       const mediaType = rawType === 'series' || rawType === 'tv' ? 'series' : 'movie'
       const language = appLocaleToTmdbLanguage(request.query.locale)
@@ -227,23 +216,11 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
     }
   }>(
     '/api/discovery/movies',
-    { preHandler: requireAuth, schema: getDiscoveryMoviesSchema },
+    { preHandler: [requireAuth, requireCapability('discover')], schema: getDiscoveryMoviesSchema },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
       const filterOptions = parseFilterParams(request.query)
 
-      // Check if user has discovery enabled
-      const user = await queryOne<{ discover_enabled: boolean }>(
-        `SELECT discover_enabled FROM users WHERE id = $1`,
-        [currentUser.id]
-      )
-
-      if (!user?.discover_enabled) {
-        return reply.status(403).send({
-          error: 'Discovery not enabled for your account',
-          message: 'Contact your admin to enable discovery suggestions',
-        })
-      }
 
       // Get latest run
       const run = await getLatestDiscoveryRun(currentUser.id, 'movie')
@@ -282,23 +259,11 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
     }
   }>(
     '/api/discovery/series',
-    { preHandler: requireAuth, schema: getDiscoverySeriesSchema },
+    { preHandler: [requireAuth, requireCapability('discover')], schema: getDiscoverySeriesSchema },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
       const filterOptions = parseFilterParams(request.query)
 
-      // Check if user has discovery enabled
-      const user = await queryOne<{ discover_enabled: boolean }>(
-        `SELECT discover_enabled FROM users WHERE id = $1`,
-        [currentUser.id]
-      )
-
-      if (!user?.discover_enabled) {
-        return reply.status(403).send({
-          error: 'Discovery not enabled for your account',
-          message: 'Contact your admin to enable discovery suggestions',
-        })
-      }
 
       // Get latest run
       const run = await getLatestDiscoveryRun(currentUser.id, 'series')
@@ -326,21 +291,10 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.post(
     '/api/discovery/refresh/movies',
-    { preHandler: requireAuth, schema: refreshDiscoverySchema },
+    { preHandler: [requireAuth, requireCapability('discover')], schema: refreshDiscoverySchema },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
 
-      // Check if user has discovery enabled
-      const user = await queryOne<{ discover_enabled: boolean }>(
-        `SELECT discover_enabled FROM users WHERE id = $1`,
-        [currentUser.id]
-      )
-
-      if (!user?.discover_enabled) {
-        return reply.status(403).send({
-          error: 'Discovery not enabled for your account',
-        })
-      }
 
       return startRefresh(fastify, currentUser.id, 'movie', reply)
     }
@@ -352,21 +306,10 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.post(
     '/api/discovery/refresh/series',
-    { preHandler: requireAuth, schema: refreshDiscoverySchema },
+    { preHandler: [requireAuth, requireCapability('discover')], schema: refreshDiscoverySchema },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
 
-      // Check if user has discovery enabled
-      const user = await queryOne<{ discover_enabled: boolean }>(
-        `SELECT discover_enabled FROM users WHERE id = $1`,
-        [currentUser.id]
-      )
-
-      if (!user?.discover_enabled) {
-        return reply.status(403).send({
-          error: 'Discovery not enabled for your account',
-        })
-      }
 
       return startRefresh(fastify, currentUser.id, 'series', reply)
     }
@@ -388,7 +331,7 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
     }
   }>(
     '/api/discovery/:mediaType/expand',
-    { preHandler: requireAuth, schema: expandDiscoverySchema },
+    { preHandler: [requireAuth, requireCapability('discover')], schema: expandDiscoverySchema },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
       const { mediaType } = request.params
@@ -402,15 +345,6 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
       // Convert route mediaType to core MediaType
       const coreMediaType: MediaType = mediaType === 'movies' ? 'movie' : 'series'
 
-      // Check if user has discovery enabled
-      const userSettings = await queryOne<{ discover_enabled: boolean }>(
-        `SELECT discover_enabled FROM users WHERE id = $1`,
-        [currentUser.id]
-      )
-
-      if (!userSettings?.discover_enabled) {
-        return reply.status(403).send({ error: 'Discovery not enabled for your account' })
-      }
 
       try {
         // The stored configuration, so expanded rows are fetched and scored on
@@ -515,16 +449,10 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const currentUser = request.user as SessionUser
 
-      // Get user's discovery settings
-      const userSettings = await queryOne<{
-        discover_enabled: boolean
-        discover_request_enabled: boolean
-      }>(
-        `SELECT discover_enabled, discover_request_enabled FROM users WHERE id = $1`,
-        [currentUser.id]
-      )
-
-      if (!userSettings?.discover_enabled) {
+      // This one answers the question rather than refusing it — the page
+      // renders an explanation from `enabled: false` — so it asks `can`
+      // instead of carrying the capability in its preHandler.
+      if (!can(currentUser, 'discover')) {
         return reply.send({
           enabled: false,
           requestEnabled: false,
@@ -547,7 +475,7 @@ const discoveryRoutes: FastifyPluginAsync = async (fastify) => {
 
       return reply.send({
         enabled: true,
-        requestEnabled: userSettings.discover_request_enabled,
+        requestEnabled: can(currentUser, 'discover:request'),
         streamingDiscoveryEnabled,
         movieRun,
         seriesRun,

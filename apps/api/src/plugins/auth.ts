@@ -23,9 +23,23 @@ export interface SessionUser {
   providerUserId: string
   isAdmin: boolean
   isEnabled: boolean
+  avatarUrl: string | null
+
+  /**
+   * Feature permissions, carried on the session so `lib/permissions.ts` can
+   * decide a capability without a query. Every one of these used to be read
+   * per request at the handler that needed it — seventeen copies for Discover
+   * alone — which is both a round trip and a rule with no single home.
+   *
+   * `SessionUser` structurally satisfies `PermissionSubject`; a flag added
+   * there must be selected in `USER_COLUMNS` and mapped in `toSessionUser`,
+   * or every capability reading it silently answers "not granted".
+   */
   canManageWatchHistory: boolean
   collectionsEnabled: boolean
-  avatarUrl: string | null
+  discoverEnabled: boolean
+  discoverRequestEnabled: boolean
+  emailNotificationsAllowed: boolean
 }
 
 /**
@@ -59,7 +73,7 @@ declare module 'fastify' {
   }
 }
 
-interface UserLookupRow {
+export interface UserLookupRow {
   id: string
   username: string
   display_name: string | null
@@ -69,6 +83,11 @@ interface UserLookupRow {
   is_enabled: boolean
   can_manage_watch_history: boolean
   collections_enabled: boolean
+  discover_enabled: boolean
+  discover_request_enabled: boolean
+  email_notifications_allowed: boolean
+  /** The media server has dropped this account. Refused like a disabled one. */
+  provider_disabled: boolean
 }
 
 interface SessionLookupRow extends UserLookupRow {
@@ -87,9 +106,23 @@ interface ImpersonationLookupRow extends UserLookupRow {
  * The user columns every lookup here selects, written once. `alias` is the
  * table the columns come from.
  */
-const USER_COLUMNS = (alias: string) =>
+/**
+ * The `users` columns every caller that builds a `SessionUser` selects.
+ *
+ * Exported because three files build one — this plugin, the login route and
+ * the assumption route — and each used to spell the list out for itself. A
+ * permission flag added to `SessionUser` and missed at one of them arrives as
+ * `undefined`, which every capability reads as "not granted": a user quietly
+ * loses a feature after signing in, and only after signing in.
+ *
+ * `alias` is the table the columns come from, so it works in a RETURNING
+ * clause (`USER_COLUMNS('users')`) as well as in a join.
+ */
+export const USER_COLUMNS = (alias: string) =>
   `${alias}.id, ${alias}.username, ${alias}.display_name, ${alias}.provider, ${alias}.provider_user_id,
-   ${alias}.is_admin, ${alias}.is_enabled, ${alias}.can_manage_watch_history, ${alias}.collections_enabled`
+   ${alias}.is_admin, ${alias}.is_enabled, ${alias}.provider_disabled,
+   ${alias}.can_manage_watch_history, ${alias}.collections_enabled,
+   ${alias}.discover_enabled, ${alias}.discover_request_enabled, ${alias}.email_notifications_allowed`
 
 const SESSION_COOKIE_NAME = 'aperture_session'
 /** Absolute lifetime: a session dies this long after it was created. */
@@ -159,7 +192,7 @@ export async function deleteAllUserSessions(userId: string): Promise<void> {
  * and the assumption lookup so the two cannot describe the same account
  * differently.
  */
-function toSessionUser(row: UserLookupRow): SessionUser {
+export function toSessionUser(row: UserLookupRow): SessionUser {
   return {
     id: row.id,
     username: row.username,
@@ -170,6 +203,9 @@ function toSessionUser(row: UserLookupRow): SessionUser {
     isEnabled: row.is_enabled,
     canManageWatchHistory: row.can_manage_watch_history,
     collectionsEnabled: row.collections_enabled,
+    discoverEnabled: row.discover_enabled,
+    discoverRequestEnabled: row.discover_request_enabled,
+    emailNotificationsAllowed: row.email_notifications_allowed,
     // Local avatar proxy URL, to avoid mixed content issues — the avatar
     // endpoint proxies to the media server.
     avatarUrl: `/api/users/${row.id}/avatar`,
@@ -213,6 +249,27 @@ async function getSessionUser(token: string): Promise<SessionLookupResult | null
   // A disabled account must lose access immediately, not at session expiry.
   if (!row.is_enabled) {
     await query('DELETE FROM sessions WHERE user_id = $1', [row.id])
+    return null
+  }
+
+  // The media server no longer has this account. Every per-user job already
+  // gates on `provider_disabled` — both recommender pipelines, both STRM
+  // writers, discovery, the taste-profile rebuild — and `strm/cleanup.ts`
+  // treats it as grounds to delete that viewer's output. The front door was the
+  // one place that did not read it, so a dropped viewer kept a working session
+  // for up to the full thirty days, and working API keys indefinitely.
+  //
+  // The session rows are deliberately NOT deleted, unlike the disabled case:
+  // this flag is written by the user sync and cleared by it again when the
+  // account comes back, so signing everybody out over a media server that was
+  // briefly answering wrong is the expensive direction of that mistake.
+  // Refusing the lookup already ends access at once; the rows expire on their
+  // own, and come back to life with the account.
+  if (row.provider_disabled) {
+    sessionLogger.debug(
+      { userId: row.id },
+      'Refused a session for an account disabled on the media server'
+    )
     return null
   }
 
@@ -319,7 +376,13 @@ async function getImpersonationTarget(
 
   // The target was disabled while being viewed. Same rule as a session: a
   // disabled account is not browsable, by anyone, immediately.
-  if (!row.is_enabled) {
+  //
+  // `provider_disabled` ends an assumption too, and for the reason a live
+  // session ends: the account is gone from the media server, so what the admin
+  // is looking at is a view of somebody who no longer exists. The row IS
+  // dropped here, unlike the session case — an assumption is a one-hour lease
+  // an admin can simply start again if the account comes back.
+  if (!row.is_enabled || row.provider_disabled) {
     await query('DELETE FROM impersonation_sessions WHERE id = $1', [row.impersonation_id])
     return null
   }
@@ -353,6 +416,13 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
             canManageWatchHistory: apiKeyUser.canManageWatchHistory,
             // API-key users: admins are allowed via isAdmin; non-admins default to no access.
             collectionsEnabled: false,
+            // The account's real flags. These guards used to read the `users`
+            // row inside the handler, so they already applied to a key exactly
+            // this way; only Collections stays forced off, which is the
+            // behaviour an API key has always had.
+            discoverEnabled: apiKeyUser.discoverEnabled,
+            discoverRequestEnabled: apiKeyUser.discoverRequestEnabled,
+            emailNotificationsAllowed: apiKeyUser.emailNotificationsAllowed,
             avatarUrl: `/api/users/${apiKeyUser.userId}/avatar`,
           }
           request.isApiKeyAuth = true
