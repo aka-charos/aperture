@@ -1,7 +1,11 @@
 import type { FastifyInstance } from 'fastify'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAdmin } from '../../../plugins/auth.js'
-import { getMediaServerProvider, getMediaServerApiKey } from '@aperture/core'
+import {
+  getMediaServerProvider,
+  getMediaServerApiKey,
+  auditUserPermissions,
+} from '@aperture/core'
 import { isAccountEnabled } from '../../../lib/accountEnabled.js'
 import type { UserRow } from '../types.js'
 
@@ -150,6 +154,18 @@ export function registerProviderHandlers(fastify: FastifyInstance) {
         )
 
         fastify.log.info({ userId: newUser?.id, providerUserId, name: providerUser.name }, 'User imported from media server')
+
+        if (newUser) {
+          // A creation records grants only, so an import with both switches
+          // off writes nothing and one that enables Movies writes two rows
+          // (the switch, and the `is_enabled` it derived).
+          await auditUserPermissions(
+            { userId: request.user!.id, label: request.user!.username },
+            { kind: 'user', id: newUser.id, label: newUser.username },
+            null,
+            newUser
+          )
+        }
 
         return reply.status(201).send({ user: newUser })
       } catch (error) {

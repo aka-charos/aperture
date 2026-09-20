@@ -9,7 +9,7 @@
  */
 
 import { randomUUID } from 'crypto'
-import { query } from '../lib/db.js'
+import { query, queryOne } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { getMediaServerProvider } from '../media/index.js'
 import { getMediaServerConfig, getMediaServerApiKey } from '../settings/systemSettings.js'
@@ -22,6 +22,9 @@ import {
   failJob,
 } from '../jobs/progress.js'
 import { cleanupUserLibraries } from '../strm/cleanup.js'
+// The audit trail: this job is the only writer of provider_disabled, and one of
+// two writers of is_admin, so a change here is invisible unless it says so.
+import { auditUserPermissions, SYSTEM_ACTORS } from '../permissionAudit.js'
 
 const logger = createChildLogger('user-sync')
 
@@ -88,11 +91,23 @@ export async function syncUsersFromMediaServer(
 
       if (!existing) {
         // New user - import
-        await query(
+        const created = await queryOne<{ id: string }>(
           `INSERT INTO users (username, provider_user_id, provider, is_admin, is_enabled, movies_enabled, series_enabled, email, provider_disabled)
-           VALUES ($1, $2, $3, $4, false, false, false, $5, $6)`,
+           VALUES ($1, $2, $3, $4, false, false, false, $5, $6)
+           RETURNING id`,
           [pu.name, pu.id, providerType, pu.isAdmin || false, pu.email || null, !!pu.isDisabled]
         )
+
+        // A creation records grants only, so an ordinary import (everything
+        // off) writes nothing and an imported administrator writes one row.
+        if (created) {
+          await auditUserPermissions(
+            SYSTEM_ACTORS.userSync,
+            { kind: 'user', id: created.id, label: pu.name },
+            null,
+            { is_admin: pu.isAdmin || false, provider_disabled: !!pu.isDisabled }
+          )
+        }
         imported++
         addLog(jobId, 'info', `➕ Imported new user: ${pu.name}${pu.email ? ` (${pu.email})` : ''}`)
       } else {
@@ -138,6 +153,16 @@ export async function syncUsersFromMediaServer(
             values
           )
           updated++
+
+          // Both snapshots carry only the two permission columns this loop can
+          // write, and an absent column reads as false on BOTH sides, so
+          // nothing else is reported as changed.
+          await auditUserPermissions(
+            SYSTEM_ACTORS.userSync,
+            { kind: 'user', id: existing.id, label: pu.name },
+            { is_admin: existing.is_admin, provider_disabled: existing.provider_disabled },
+            { is_admin: pu.isAdmin || false, provider_disabled: !!pu.isDisabled }
+          )
           addLog(jobId, 'info', `🔄 Updated user: ${pu.name}`)
 
           if (pu.isDisabled && !existing.provider_disabled) {

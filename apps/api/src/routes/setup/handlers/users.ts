@@ -9,6 +9,13 @@ import {
 } from '@aperture/core'
 import { query, queryOne } from '../../../lib/db.js'
 import { accountEnabledSql, isAccountEnabled } from '../../../lib/accountEnabled.js'
+// The wizard grants the first permissions this instance ever has, and does it
+// before any admin exists to attribute them to.
+import {
+  auditUserPermissions,
+  readUserPermissions,
+  SYSTEM_ACTORS,
+} from '@aperture/core'
 import { setupSchemas } from '../schemas.js'
 import { requireSetupWritable } from './status.js'
 
@@ -192,6 +199,15 @@ export async function registerUsersHandlers(fastify: FastifyInstance) {
           'User imported during setup'
         )
 
+        if (newUser) {
+          await auditUserPermissions(
+            SYSTEM_ACTORS.setupWizard,
+            { kind: 'user', id: newUser.id, label: newUser.username },
+            null,
+            newUser
+          )
+        }
+
         return reply.status(201).send({ user: newUser })
       } catch (error) {
         fastify.log.error({ error, providerUserId }, 'Failed to import user during setup')
@@ -248,6 +264,8 @@ export async function registerUsersHandlers(fastify: FastifyInstance) {
         // row, admin clause included, as it was (lib/accountEnabled.ts).
         updates.push(`is_enabled = ${accountEnabledSql(written)}`)
 
+        const beforeEnable = await readUserPermissions(apertureUserId)
+
         updates.push('updated_at = NOW()')
         values.push(apertureUserId)
 
@@ -266,6 +284,13 @@ export async function registerUsersHandlers(fastify: FastifyInstance) {
         if (!updated) {
           return reply.status(404).send({ error: 'User not found' })
         }
+
+        await auditUserPermissions(
+          SYSTEM_ACTORS.setupWizard,
+          { kind: 'user', id: updated.id, label: updated.username },
+          beforeEnable,
+          updated
+        )
 
         return reply.send({ user: updated })
       } catch (error) {

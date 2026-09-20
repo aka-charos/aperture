@@ -34,7 +34,7 @@ import {
   setLibraryTitleConfig,
 } from '@aperture/core'
 import { query } from '../../../lib/db.js'
-import { requireAdmin, requireAuth } from '../../../plugins/auth.js'
+import { requireAdmin, requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import {
   aiRecsOutputConfigSchema,
   updateAiRecsOutputConfigSchema,
@@ -198,7 +198,13 @@ export function registerAiOutputHandlers(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'overrideAllowed must be a boolean' })
       }
 
-      await setUserAiExplanationOverride(userId, overrideAllowed)
+      // The setter records the change itself; this route only says who.
+      const currentUser = request.user as SessionUser
+      await setUserAiExplanationOverride(userId, overrideAllowed, {
+        userId: currentUser.id,
+        label: currentUser.username,
+      })
+
       const settings = await getUserAiExplanationSettings(userId)
       const effective = await getEffectiveAiExplanationSetting(userId)
 

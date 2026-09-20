@@ -11,6 +11,8 @@ import {
   API_KEY_SCOPES,
   DEFAULT_API_KEY_SCOPES,
   isApiKeyScope,
+  diffApiKeyScopes,
+  recordPermissionChanges,
   type ApiKeyScope,
 } from '@aperture/core'
 import { requireAuth } from '../../plugins/auth.js'
@@ -134,6 +136,14 @@ const apiKeysRoutes: FastifyPluginAsync = async (fastify) => {
           requestedScopes.scopes
         )
         
+        // A key is a credential, so what it was granted at birth is part of
+        // the same record as a later narrowing.
+        await recordPermissionChanges(
+          { userId: request.user!.id, label: request.user!.username },
+          { kind: 'api_key', id: result.apiKey.id, label: result.apiKey.name },
+          diffApiKeyScopes(null, result.apiKey.scopes)
+        )
+
         // Return the API key with the plaintext key (only time it's shown)
         return reply.status(201).send({
           apiKey: result.apiKey,
@@ -242,6 +252,15 @@ const apiKeysRoutes: FastifyPluginAsync = async (fastify) => {
 
       try {
         const updatedKey = await updateApiKey(id, updates)
+
+        if (updatedKey) {
+          await recordPermissionChanges(
+            { userId: request.user!.id, label: request.user!.username },
+            { kind: 'api_key', id: updatedKey.id, label: updatedKey.name },
+            diffApiKeyScopes(existingKey.scopes, updatedKey.scopes)
+          )
+        }
+
         return reply.send({ apiKey: updatedKey })
       } catch (err) {
         fastify.log.error({ err }, 'Failed to update API key')

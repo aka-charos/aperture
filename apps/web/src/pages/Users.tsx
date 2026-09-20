@@ -241,59 +241,115 @@ export function UsersPage() {
     }
   }
 
-  const handleToggleMovies = async (user: ProviderUser) => {
-    if (!user.apertureUserId) return
-
-    setUpdating(user.providerUserId)
-    try {
-      const newValue = !user.moviesEnabled
-      const response = await fetch(`/api/users/${user.apertureUserId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ moviesEnabled: newValue }),
-      })
-
-      if (response.ok) {
-        // The server decides whether the account is enabled — from all four switches,
-        // keeping an enabled admin enabled — so take its answer. Guessing it here from
-        // two switches is how this page and the database came to disagree.
-        const saved = (await response.json()) as { is_enabled?: boolean }
-        setProviderUsers((prev) =>
-          prev.map((u) =>
-            u.providerUserId === user.providerUserId
-              ? { ...u, moviesEnabled: newValue, isEnabled: saved.is_enabled ?? u.isEnabled }
-              : u
-          )
-        )
-      }
-    } finally {
-      setUpdating(null)
+  /**
+   * The switches `PUT /api/users/:id` writes.
+   *
+   * Six near-identical handlers stood here, each with its own optimistic
+   * update, and they had already drifted: two derived `isEnabled` from the
+   * response and two did not, and the Discover one re-applied the
+   * "clear requests with Discover" rule by hand — a copy of a rule the server
+   * owns. The AI-explanation toggle is deliberately NOT in this table: it is a
+   * different endpoint, and folding it in would hide that.
+   */
+  const PERMISSION_SWITCHES = {
+    movies: { field: 'moviesEnabled', body: 'moviesEnabled' },
+    series: { field: 'seriesEnabled', body: 'seriesEnabled' },
+    discover: {
+      field: 'discoverEnabled',
+      body: 'discoverEnabled',
+      messages: { on: 'discoverOn', off: 'discoverOff' },
+    },
+    discoverRequest: {
+      field: 'discoverRequestEnabled',
+      body: 'discoverRequestEnabled',
+      messages: { on: 'discoverReqOn', off: 'discoverReqOff' },
+    },
+    collections: {
+      field: 'collectionsEnabled',
+      body: 'collectionsEnabled',
+      messages: { on: 'collectionsOn', off: 'collectionsOff' },
+    },
+    email: {
+      field: 'emailNotificationsAllowed',
+      body: 'emailNotificationsAllowed',
+      messages: { on: 'emailOn', off: 'emailOff' },
+    },
+  } as const satisfies Record<
+    string,
+    {
+      field: keyof ProviderUser
+      body: string
+      messages?: { on: string; off: string }
     }
+  >
+
+  type PermissionSwitch = keyof typeof PERMISSION_SWITCHES
+
+  /** The saved row, in the shape the API returns it. */
+  interface SavedUserRow {
+    is_enabled?: boolean
+    movies_enabled?: boolean
+    series_enabled?: boolean
+    discover_enabled?: boolean
+    discover_request_enabled?: boolean
+    collections_enabled?: boolean
+    email_notifications_allowed?: boolean
   }
 
-  const handleToggleSeries = async (user: ProviderUser) => {
+  /**
+   * Take the whole row from the server, never a guess.
+   *
+   * Two of these columns are DERIVED — `is_enabled` from all four feature
+   * switches, `discover_request_enabled` from Discover — so a page that
+   * applies the value it sent is right about the switch it touched and wrong
+   * about the ones that moved with it, until a reload. That is exactly how
+   * this page and the database came to disagree about who could sign in.
+   */
+  const applySavedRow = (user: ProviderUser, saved: SavedUserRow): ProviderUser => ({
+    ...user,
+    isEnabled: saved.is_enabled ?? user.isEnabled,
+    moviesEnabled: saved.movies_enabled ?? user.moviesEnabled,
+    seriesEnabled: saved.series_enabled ?? user.seriesEnabled,
+    discoverEnabled: saved.discover_enabled ?? user.discoverEnabled,
+    discoverRequestEnabled: saved.discover_request_enabled ?? user.discoverRequestEnabled,
+    collectionsEnabled: saved.collections_enabled ?? user.collectionsEnabled,
+    emailNotificationsAllowed:
+      saved.email_notifications_allowed ?? user.emailNotificationsAllowed,
+  })
+
+  const togglePermission = async (user: ProviderUser, key: PermissionSwitch) => {
     if (!user.apertureUserId) return
+
+    const spec = PERMISSION_SWITCHES[key]
+    const newValue = !user[spec.field]
 
     setUpdating(user.providerUserId)
     try {
-      const newValue = !user.seriesEnabled
       const response = await fetch(`/api/users/${user.apertureUserId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ seriesEnabled: newValue }),
+        body: JSON.stringify({ [spec.body]: newValue }),
       })
 
-      if (response.ok) {
-        const saved = (await response.json()) as { is_enabled?: boolean }
-        setProviderUsers((prev) =>
-          prev.map((u) =>
-            u.providerUserId === user.providerUserId
-              ? { ...u, seriesEnabled: newValue, isEnabled: saved.is_enabled ?? u.isEnabled }
-              : u
-          )
+      if (!response.ok) return
+
+      const saved = (await response.json()) as SavedUserRow
+      setProviderUsers((prev) =>
+        prev.map((u) =>
+          u.providerUserId === user.providerUserId ? applySavedRow(u, saved) : u
         )
+      )
+
+      const messages = "messages" in spec ? spec.messages : undefined
+      if (messages) {
+        setSnackbar({
+          open: true,
+          message: t(`admin.usersPage.${newValue ? messages.on : messages.off}`, {
+            name: user.name,
+          }),
+          severity: 'success',
+        })
       }
     } finally {
       setUpdating(null)
@@ -327,160 +383,6 @@ export function UsersPage() {
             ? t('admin.usersPage.aiOverrideOn', { name: user.name })
             : t('admin.usersPage.aiOverrideOff', { name: user.name }),
           severity: 'success' 
-        })
-      }
-    } finally {
-      setUpdating(null)
-    }
-  }
-
-  const handleToggleDiscover = async (user: ProviderUser) => {
-    if (!user.apertureUserId) return
-
-    setUpdating(user.providerUserId)
-    try {
-      const newValue = !user.discoverEnabled
-      const response = await fetch(`/api/users/${user.apertureUserId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        // The server clears request rights with Discover on its own now
-        // (lib/permissions.ts), so this body names one switch and the
-        // saved row answers for the rest.
-        body: JSON.stringify({ discoverEnabled: newValue }),
-      })
-      const saved: { is_enabled?: boolean; discover_request_enabled?: boolean } = response.ok
-        ? await response.json()
-        : {}
-
-      if (response.ok) {
-        setProviderUsers((prev) =>
-          prev.map((u) =>
-            u.providerUserId === user.providerUserId
-              ? { 
-                  ...u, 
-                  discoverEnabled: newValue,
-                  discoverRequestEnabled:
-                    saved.discover_request_enabled ?? (newValue ? u.discoverRequestEnabled : false),
-                  isEnabled: saved.is_enabled ?? u.isEnabled,
-                }
-              : u
-          )
-        )
-        setSnackbar({ 
-          open: true, 
-          message: newValue 
-            ? t('admin.usersPage.discoverOn', { name: user.name })
-            : t('admin.usersPage.discoverOff', { name: user.name }),
-          severity: 'success' 
-        })
-      }
-    } finally {
-      setUpdating(null)
-    }
-  }
-
-  const handleToggleDiscoverRequest = async (user: ProviderUser) => {
-    if (!user.apertureUserId) return
-
-    setUpdating(user.providerUserId)
-    try {
-      const newValue = !user.discoverRequestEnabled
-      const response = await fetch(`/api/users/${user.apertureUserId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ discoverRequestEnabled: newValue }),
-      })
-      // Read back rather than assumed: request rights depend on Discover,
-      // and the server is the one that decides.
-      const saved: { discover_request_enabled?: boolean } = response.ok
-        ? await response.json()
-        : {}
-
-      if (response.ok) {
-        setProviderUsers((prev) =>
-          prev.map((u) =>
-            u.providerUserId === user.providerUserId
-              ? { ...u, discoverRequestEnabled: saved.discover_request_enabled ?? newValue }
-              : u
-          )
-        )
-        setSnackbar({ 
-          open: true, 
-          message: newValue 
-            ? t('admin.usersPage.discoverReqOn', { name: user.name })
-            : t('admin.usersPage.discoverReqOff', { name: user.name }),
-          severity: 'success' 
-        })
-      }
-    } finally {
-      setUpdating(null)
-    }
-  }
-
-  const handleToggleCollections = async (user: ProviderUser) => {
-    if (!user.apertureUserId) return
-
-    setUpdating(user.providerUserId)
-    try {
-      const newValue = !user.collectionsEnabled
-      const response = await fetch(`/api/users/${user.apertureUserId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ collectionsEnabled: newValue }),
-      })
-
-      if (response.ok) {
-        const saved = (await response.json()) as { is_enabled?: boolean }
-        setProviderUsers((prev) =>
-          prev.map((u) =>
-            u.providerUserId === user.providerUserId
-              ? { ...u, collectionsEnabled: newValue, isEnabled: saved.is_enabled ?? u.isEnabled }
-              : u
-          )
-        )
-        setSnackbar({
-          open: true,
-          message: newValue
-            ? t('admin.usersPage.collectionsOn', { name: user.name })
-            : t('admin.usersPage.collectionsOff', { name: user.name }),
-          severity: 'success',
-        })
-      }
-    } finally {
-      setUpdating(null)
-    }
-  }
-
-  const handleToggleEmailNotifications = async (user: ProviderUser) => {
-    if (!user.apertureUserId) return
-
-    setUpdating(user.providerUserId)
-    try {
-      const newValue = !user.emailNotificationsAllowed
-      const response = await fetch(`/api/users/${user.apertureUserId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ emailNotificationsAllowed: newValue }),
-      })
-
-      if (response.ok) {
-        setProviderUsers((prev) =>
-          prev.map((u) =>
-            u.providerUserId === user.providerUserId
-              ? { ...u, emailNotificationsAllowed: newValue }
-              : u
-          )
-        )
-        setSnackbar({
-          open: true,
-          message: newValue
-            ? t('admin.usersPage.emailOn', { name: user.name })
-            : t('admin.usersPage.emailOff', { name: user.name }),
-          severity: 'success',
         })
       }
     } finally {
@@ -882,7 +784,7 @@ export function UsersPage() {
                           <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>{t('admin.usersPage.movies')}</Typography>
                           <Switch
                             checked={user.moviesEnabled}
-                            onChange={() => handleToggleMovies(user)}
+                            onChange={() => togglePermission(user, 'movies')}
                             disabled={updating === user.providerUserId || user.isDisabled}
                             color="primary"
                             size="small"
@@ -893,7 +795,7 @@ export function UsersPage() {
                           <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>{t('admin.usersPage.series')}</Typography>
                           <Switch
                             checked={user.seriesEnabled}
-                            onChange={() => handleToggleSeries(user)}
+                            onChange={() => togglePermission(user, 'series')}
                             disabled={updating === user.providerUserId || user.isDisabled}
                             color="primary"
                             size="small"
@@ -908,7 +810,7 @@ export function UsersPage() {
                           <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>{t('admin.usersPage.discover')}</Typography>
                           <Switch
                             checked={user.discoverEnabled}
-                            onChange={() => handleToggleDiscover(user)}
+                            onChange={() => togglePermission(user, 'discover')}
                             disabled={updating === user.providerUserId || user.isDisabled}
                             color="primary"
                             size="small"
@@ -919,7 +821,7 @@ export function UsersPage() {
                           <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>{t('admin.usersPage.request')}</Typography>
                           <Switch
                             checked={user.discoverRequestEnabled}
-                            onChange={() => handleToggleDiscoverRequest(user)}
+                            onChange={() => togglePermission(user, 'discoverRequest')}
                             disabled={updating === user.providerUserId || user.isDisabled || !user.discoverEnabled}
                             color="primary"
                             size="small"
@@ -933,7 +835,7 @@ export function UsersPage() {
                         <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>{t('admin.usersPage.collections')}</Typography>
                         <Switch
                           checked={user.collectionsEnabled}
-                          onChange={() => handleToggleCollections(user)}
+                          onChange={() => togglePermission(user, 'collections')}
                           disabled={updating === user.providerUserId || user.isDisabled}
                           color="primary"
                           size="small"
@@ -948,7 +850,7 @@ export function UsersPage() {
                         <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>{t('admin.usersPage.colEmail')}</Typography>
                         <Switch
                           checked={user.emailNotificationsAllowed}
-                          onChange={() => handleToggleEmailNotifications(user)}
+                          onChange={() => togglePermission(user, 'email')}
                           disabled={updating === user.providerUserId || user.isDisabled}
                           color="primary"
                           size="small"
@@ -1279,7 +1181,7 @@ export function UsersPage() {
                     {user.isImported ? (
                       <Switch
                         checked={user.moviesEnabled}
-                        onChange={() => handleToggleMovies(user)}
+                        onChange={() => togglePermission(user, 'movies')}
                         disabled={updating === user.providerUserId || user.isDisabled}
                         color="primary"
                         size="small"
@@ -1292,7 +1194,7 @@ export function UsersPage() {
                     {user.isImported ? (
                       <Switch
                         checked={user.seriesEnabled}
-                        onChange={() => handleToggleSeries(user)}
+                        onChange={() => togglePermission(user, 'series')}
                         disabled={updating === user.providerUserId || user.isDisabled}
                         color="primary"
                         size="small"
@@ -1306,7 +1208,7 @@ export function UsersPage() {
                       <Tooltip title={user.discoverEnabled ? t('admin.usersPage.discoverToggleOn') : t('admin.usersPage.discoverToggleOff')}>
                         <Switch
                           checked={user.discoverEnabled}
-                          onChange={() => handleToggleDiscover(user)}
+                          onChange={() => togglePermission(user, 'discover')}
                           disabled={updating === user.providerUserId || user.isDisabled}
                           color="primary"
                           size="small"
@@ -1321,7 +1223,7 @@ export function UsersPage() {
                       <Tooltip title={user.discoverRequestEnabled ? t('admin.usersPage.requestToggleOn') : t('admin.usersPage.requestToggleOff')}>
                         <Switch
                           checked={user.discoverRequestEnabled}
-                          onChange={() => handleToggleDiscoverRequest(user)}
+                          onChange={() => togglePermission(user, 'discoverRequest')}
                           disabled={updating === user.providerUserId || user.isDisabled || !user.discoverEnabled}
                           color="primary"
                           size="small"
@@ -1336,7 +1238,7 @@ export function UsersPage() {
                       <Tooltip title={user.collectionsEnabled ? t('admin.usersPage.collectionsToggleOn') : t('admin.usersPage.collectionsToggleOff')}>
                         <Switch
                           checked={user.collectionsEnabled}
-                          onChange={() => handleToggleCollections(user)}
+                          onChange={() => togglePermission(user, 'collections')}
                           disabled={updating === user.providerUserId || user.isDisabled}
                           color="primary"
                           size="small"
@@ -1351,7 +1253,7 @@ export function UsersPage() {
                       <Tooltip title={user.emailNotificationsAllowed ? t('admin.usersPage.emailToggleOn') : t('admin.usersPage.emailToggleOff')}>
                         <Switch
                           checked={user.emailNotificationsAllowed}
-                          onChange={() => handleToggleEmailNotifications(user)}
+                          onChange={() => togglePermission(user, 'email')}
                           disabled={updating === user.providerUserId || user.isDisabled}
                           color="primary"
                           size="small"
