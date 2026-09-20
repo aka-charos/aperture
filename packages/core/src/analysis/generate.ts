@@ -58,6 +58,7 @@ import { budgetSources } from './budget.js'
 import { isBlockedPage } from './blockedPage.js'
 import { dropDuplicateTitles } from './duplicateSources.js'
 import { checkModeReadiness, type RetrievalMode } from './mode.js'
+import { getAnalysisPromptVariant } from './promptSetting.js'
 import {
   parseParagraphMap,
   splitAnalysisParagraphs,
@@ -137,6 +138,8 @@ export interface StoredAnalysis {
    */
   paragraphMap: ParagraphMap | null
   promptVersion: number
+  /** The variant that wrote it, or null for the version's own prompt (0180). */
+  promptVariant: string | null
   analyzedAt: string
 }
 
@@ -156,11 +159,12 @@ export async function getStoredAnalysis(
     retrieval_mode: RetrievalMode | null
     paragraph_map: ParagraphMap | null
     prompt_version: number
+    prompt_variant: string | null
     analyzed_at: Date
   }>(
     `SELECT analysis, decline_reason, sources, source_grade, source_count,
             retrieved_chars, model, retrieval_mode, paragraph_map,
-            prompt_version, analyzed_at
+            prompt_version, prompt_variant, analyzed_at
        FROM title_analysis
       WHERE media_type = $1 AND media_id = $2`,
     [mediaType, mediaId]
@@ -180,6 +184,7 @@ export async function getStoredAnalysis(
     retrievalMode: row.retrieval_mode,
     paragraphMap: row.paragraph_map,
     promptVersion: row.prompt_version,
+    promptVariant: row.prompt_variant,
     analyzedAt: row.analyzed_at.toISOString(),
   }
 }
@@ -1344,6 +1349,12 @@ export async function analyseTitle(
   }
   const mode = readiness.mode
 
+  // Resolved ONCE, above both prompt builds and the row that records it, so the
+  // prompt that was sent and the prompt the row names cannot disagree. Null is
+  // the ordinary answer and means the current version's own questions and
+  // rules; see ./promptSetting.ts for the two ways a stored id resolves to it.
+  const promptVariant = await getAnalysisPromptVariant()
+
   // Read in both modes. The output ceiling is a property of the model, not of
   // the retrieval service, but it lives on the same settings card as
   // sourceBudgetChars because how much text goes in and how much may come out
@@ -1368,7 +1379,7 @@ export async function analyseTitle(
     // no external text enters the prompt — but also far less to judge the
     // result on, which is why the floor leans on the model's own verdict here.
     const result = await writeWithGrounding(
-      buildAnalysisPrompt(subject, { mode }),
+      buildAnalysisPrompt(subject, { mode, variant: promptVariant }),
       crwConfig.analysisMaxOutputTokens,
       { shouldCancel: options.shouldCancel, onWait: options.onWait, title: subject.title }
     )
@@ -1414,7 +1425,7 @@ export async function analyseTitle(
     }
 
     const result = await writeFromSources(
-      buildAnalysisPrompt(subject, { mode, sources: retrieval.sources }),
+      buildAnalysisPrompt(subject, { mode, sources: retrieval.sources, variant: promptVariant }),
       crwConfig.analysisMaxOutputTokens,
       { shouldCancel: options.shouldCancel, onWait: options.onWait, title: subject.title }
     )
@@ -1533,8 +1544,8 @@ export async function analyseTitle(
     `INSERT INTO title_analysis
        (media_type, media_id, analysis, decline_reason, sources, source_grade,
         source_count, retrieved_chars, model, retrieval_mode, paragraph_map,
-        prompt_version, analyzed_at)
-     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11::jsonb, $12, NOW())
+        prompt_version, prompt_variant, analyzed_at)
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11::jsonb, $12, $13, NOW())
      ON CONFLICT (media_type, media_id) DO UPDATE SET
        analysis = EXCLUDED.analysis,
        decline_reason = EXCLUDED.decline_reason,
@@ -1546,6 +1557,7 @@ export async function analyseTitle(
        retrieval_mode = EXCLUDED.retrieval_mode,
        paragraph_map = EXCLUDED.paragraph_map,
        prompt_version = EXCLUDED.prompt_version,
+       prompt_variant = EXCLUDED.prompt_variant,
        analyzed_at = NOW(),
        -- A fresh analysis invalidates tags extracted from the previous prose.
        tags_prompt_version = NULL`,
@@ -1566,6 +1578,10 @@ export async function analyseTitle(
       // were checked and found unanswered.
       paragraphMap ? JSON.stringify(paragraphMap) : null,
       ANALYSIS_PROMPT_VERSION,
+      // What actually wrote it, never what was configured: a stored id this
+      // build cannot use resolved to null above, and the version's own prompt
+      // wrote the row.
+      promptVariant,
     ]
   )
 
@@ -1593,6 +1609,7 @@ export async function analyseTitle(
       grade,
       sourceCount,
       promptVersion: ANALYSIS_PROMPT_VERSION,
+      promptVariant,
     },
     'Title analysis stored'
   )
@@ -1610,6 +1627,7 @@ export async function analyseTitle(
     retrievalMode: mode,
     paragraphMap,
     promptVersion: ANALYSIS_PROMPT_VERSION,
+    promptVariant,
     analyzedAt: new Date().toISOString(),
   }
 }

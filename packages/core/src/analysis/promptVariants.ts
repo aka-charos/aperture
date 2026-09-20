@@ -30,11 +30,19 @@
  * variant that renamed a question would have every label discarded and every
  * label-derived signal read as unmeasured.
  *
- * THE LIBRARY NEVER WRITES WITH ONE. `analyseTitle` passes no version and no
- * variant, so `title_analysis` holds one kind of article per version number.
- * Letting a variant write rows needs a column recording which prompt wrote
- * each one first, or the library quietly holds two kinds of article under one
- * version and nothing can tell them apart.
+ * THE LIBRARY MAY WRITE WITH ONE, UNDER TWO CONDITIONS. It is opt-in per
+ * instance on the Title Analysis role (`ProviderConfig.analysisPromptVariant`),
+ * and `title_analysis.prompt_variant` (0180) records which prompt wrote each
+ * row - without that column the library holds two kinds of article under one
+ * version number and nothing can tell them apart. The second condition is
+ * `libraryVariantFor`'s: a variant may only write while its base IS the current
+ * version, or a row would file one version's questions under another's number.
+ *
+ * SWITCHING THE SETTING RETIRES NOTHING. Staleness is still the version number
+ * alone, so a library written under the version's own prompt stays current when
+ * the setting moves, and the two kinds coexist until something else rewrites
+ * them. That is the deliberate trade for an optional setting: retiring every
+ * stored analysis is what a version bump is for.
  *
  * PURE AND DB-FREE, like ./promptEditions.ts beside it.
  */

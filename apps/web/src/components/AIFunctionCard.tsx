@@ -257,6 +257,13 @@ export interface AIFunctionCardProps {
    * one, so this is opt-in per card rather than on for every role.
    */
   supportsFallbackModels?: boolean
+  /**
+   * Alternative prompts this build can write the library with, decided by the
+   * server: a variant is offerable only while its base is the current prompt
+   * version, and the bundle holds no copy of that rule. Empty or absent means
+   * offer no control.
+   */
+  promptVariants?: { id: string; label: string; note: string }[]
   /** Extra content rendered just above the Test/Save buttons (e.g. a usage meter). */
   footer?: React.ReactNode
 }
@@ -274,6 +281,7 @@ export function AIFunctionCard({
   isSetup = false,
   supportsFallbackKey = false,
   supportsFallbackModels = false,
+  promptVariants,
   footer,
 }: AIFunctionCardProps) {
   const { t } = useTranslation()
@@ -339,6 +347,7 @@ export function AIFunctionCard({
   /** Pinned OpenRouter upstream; '' means let OpenRouter choose. */
   const [providerOnly, setProviderOnly] = useState('')
   const [reasoningEffort, setReasoningEffort] = useState('')
+  const [promptVariant, setPromptVariant] = useState('')
   /**
    * Sampling, held as STRINGS because '' is the state that sends nothing.
    *
@@ -496,9 +505,17 @@ export function AIFunctionCard({
   // none, so it can be seen and cleared rather than stranded — the same reason
   // `reasoningEffortOptions` re-adds an off-list current value.
   const storedReasoningEffort = config?.reasoningEffort ?? ''
+  // Offered only where there is something to offer AND the role writes the
+  // library: a setting no consumer reads is worse than an absent one.
+  const offersPromptVariant = functionType === 'titleAnalysis' && (promptVariants?.length ?? 0) > 0
+  const storedPromptVariant = config?.analysisPromptVariant ?? ''
   useEffect(() => {
     setReasoningEffort(storedReasoningEffort)
   }, [storedReasoningEffort])
+
+  useEffect(() => {
+    setPromptVariant(storedPromptVariant)
+  }, [storedPromptVariant])
 
   const modelEfforts = selectedModel?.supportedEfforts
   const offersReasoningEffort =
@@ -790,6 +807,9 @@ export function AIFunctionCard({
         ? { temperature: temperature === '' ? null : Number(temperature) }
         : {}),
       ...(offersTopP ? { topP: topP === '' ? null : Number(topP) } : {}),
+      // Explicit null when cleared, and sent only by the card showing it —
+      // the same rule as the controls above.
+      ...(offersPromptVariant ? { analysisPromptVariant: promptVariant || null } : {}),
       ...(offersInputType && provider === 'openrouter'
         ? { embeddingProviderOnly: providerOnly || null }
         : {}),
@@ -1535,6 +1555,38 @@ export function AIFunctionCard({
               </Select>
             </FormControl>
             <FormHelperText>{t('aiFunctionCard.reasoningHelp')}</FormHelperText>
+          </Box>
+        )}
+
+        {/* Which prompt writes the article. A variant is an alternative set of
+            questions and rules for the SAME prompt version, for a model that
+            cannot hold that version's own — see core analysis/promptVariants.ts.
+            Absent means the version's own prompt, which is what every instance
+            had before this existed. */}
+        {offersPromptVariant && (
+          <Box sx={{ mb: 2 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel id={`${functionType}-prompt-variant-label`}>
+                {t('aiFunctionCard.promptVariantLabel')}
+              </InputLabel>
+              <Select
+                labelId={`${functionType}-prompt-variant-label`}
+                value={promptVariant}
+                label={t('aiFunctionCard.promptVariantLabel')}
+                onChange={(e) => setPromptVariant(e.target.value)}
+              >
+                <MenuItem value="">{t('aiFunctionCard.promptVariantDefault')}</MenuItem>
+                {(promptVariants ?? []).map((variant) => (
+                  <MenuItem key={variant.id} value={variant.id}>
+                    {variant.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormHelperText>
+              {promptVariants?.find((v) => v.id === promptVariant)?.note ??
+                t('aiFunctionCard.promptVariantHelp')}
+            </FormHelperText>
           </Box>
         )}
 

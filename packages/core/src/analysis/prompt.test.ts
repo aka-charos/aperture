@@ -21,6 +21,7 @@ import {
   DRAFT_PROMPT_VERSION,
   promptChoiceKey,
   promptChoiceLabel,
+  libraryVariantFor,
   resolveBenchPromptChoices,
   resolveBenchPromptVersions,
   variantFor,
@@ -636,6 +637,24 @@ test('bench choices put variants after the versions they vary', () => {
   assert.equal(promptChoiceKey({ version: 15, variant: 'compact' }), '15:compact')
   assert.equal(promptChoiceLabel({ version: 15, variant: null }), 'v15')
   assert.equal(promptChoiceLabel({ version: 15, variant: 'compact' }), 'v15 compact')
+})
+
+/**
+ * The library writer may send a variant, and the row records which one. The
+ * base check is the load-bearing half: the writer stores
+ * ANALYSIS_PROMPT_VERSION beside the prose, so a variant written for an older
+ * version would file that version's questions under this one's number.
+ */
+test('a variant may write the library only while its base is the current version', () => {
+  assert.equal(libraryVariantFor('compact')?.id, 'compact')
+  assert.equal(libraryVariantFor(null), null)
+  assert.equal(libraryVariantFor(undefined), null)
+  assert.equal(libraryVariantFor(''), null)
+  // Never throws: this answers a stored setting on the path that writes the
+  // library, and refusing would fail every title in the run.
+  assert.equal(libraryVariantFor('nope'), null)
+  // The version moved past the one it varies.
+  assert.equal(libraryVariantFor('compact', ANALYSIS_PROMPT_VERSION + 1), null)
 })
 
 test('every variant is offerable: an id, a label, a note and a base the bench carries', () => {

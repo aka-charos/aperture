@@ -255,6 +255,22 @@ export interface ProviderConfig {
    */
   temperature?: number
   topP?: number
+  /**
+   * Which prompt the Title Analysis writer sends: a variant id, or absent for
+   * the current version's own questions and rules.
+   *
+   * ON THE ROLE RATHER THAN THE PROVIDER, although it is stored here. The
+   * prompt is built ONCE per title and reused across every fallback model, so
+   * only the primary config's value is ever read - a second value on a fallback
+   * provider would describe a prompt no request carries.
+   *
+   * A variant exists for models that cannot hold the current version's rules;
+   * see core `analysis/promptVariants.ts` for what one is and what it is not.
+   * The id is resolved through `libraryVariantFor` at the write, so a build that
+   * no longer carries it, or a version bump that leaves it behind, falls back
+   * to the version's own prompt instead of failing the run.
+   */
+  analysisPromptVariant?: string
 }
 
 /**

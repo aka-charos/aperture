@@ -963,6 +963,32 @@ export function variantFor(id: string): PromptVariant {
   return variant
 }
 
+/**
+ * The variant the LIBRARY WRITER may use, or null - never a throw.
+ *
+ * Two refusals, both of which must be silent rather than fatal, because this
+ * answers a stored setting on the path that writes the library: a build that
+ * no longer carries the id, and a variant whose base is not the current
+ * version. The second is the one that matters. A variant supplies questions and
+ * rules; the writer stores ANALYSIS_PROMPT_VERSION beside the prose. So using a
+ * variant written for version 15 after the current version moves to 16 would
+ * file version 15's questions under version 16 - a row that lies about which
+ * questions were asked, which no later reader could detect. The setting goes
+ * inert on that bump instead, and the version's own prompt writes the title.
+ *
+ * Pure, so the rule is testable without a database; ./promptSetting.ts reads
+ * the setting and calls this.
+ */
+export function libraryVariantFor(
+  id: string | null | undefined,
+  version: number = ANALYSIS_PROMPT_VERSION
+): PromptVariant | null {
+  if (!id) return null
+  const variant = PROMPT_VARIANTS.find((entry) => entry.id === id)
+  if (!variant || variant.base !== version) return null
+  return variant
+}
+
 /** How a choice is keyed in the stored prompt map: "15", or "15:compact". */
 export function promptChoiceKey(choice: PromptChoice): string {
   return choice.variant ? `${choice.version}:${choice.variant}` : String(choice.version)
@@ -1183,8 +1209,8 @@ export interface PromptOptions {
   version?: number
   /**
    * A variant id, which replaces the edition's questions and rules with its own
-   * and ignores the version. Bench only - the library job passes neither. See
-   * ./promptVariants.ts.
+   * and ignores the version. The bench passes any variant; the library writer
+   * passes only one ./promptSetting.ts resolved. See ./promptVariants.ts.
    */
   variant?: string | null
 }

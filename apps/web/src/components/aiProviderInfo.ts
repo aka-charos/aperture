@@ -96,6 +96,8 @@ export interface FunctionConfig {
    * same list, so a value that saves is a value that reaches the wire.
    */
   reasoningEffort?: string | null
+  /** Which prompt the analysis writer sends; null or absent = the version's own. */
+  analysisPromptVariant?: string | null
   /**
    * How the model samples. Absent/null = the provider default, which is what
    * every role got before these existed.

@@ -1314,6 +1314,9 @@
     "reasoningLabel": "Reasoning effort",
     "reasoningDefault": "Provider default",
     "reasoningHelp": "Reasoning models bill their internal scratchpad from the same output budget as the answer, so a long think can crowd out the text and leave it cut short. Lowering this leaves more of the budget for the answer itself. The levels listed are the ones this model accepts. Leave it on the provider default if you are unsure.",
+    "promptVariantLabel": "Analysis prompt",
+    "promptVariantDefault": "Standard (current version)",
+    "promptVariantHelp": "An alternative set of questions and rules for the same prompt version, for a model that cannot hold the standard one. Changing this does not rewrite analyses already stored.",
     "reasoningOptions": {
       "none": "None",
       "minimal": "Minimal",
