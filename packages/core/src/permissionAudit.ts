@@ -69,7 +69,12 @@ export type AuditedUserPermission = (typeof AUDITED_USER_PERMISSIONS)[number]
 /** The audited columns, for a SELECT. */
 export const PERMISSION_AUDIT_COLUMNS = AUDITED_USER_PERMISSIONS.join(', ')
 
-/** A row selected with `PERMISSION_AUDIT_COLUMNS`. Absent columns read as false. */
+/**
+ * A row selected with `PERMISSION_AUDIT_COLUMNS`, or any narrower query.
+ *
+ * A column the snapshot does not carry is an absence of opinion, not a false:
+ * see `diffUserPermissions` for what that costs when it is read the other way.
+ */
 export type UserPermissionSnapshot = Partial<Record<AuditedUserPermission, boolean | null>>
 
 /**
@@ -103,12 +108,35 @@ export interface PermissionChange {
   newValue: string
 }
 
+/** Whether a snapshot carries an opinion about this column at all. */
+function carries(snapshot: UserPermissionSnapshot, field: AuditedUserPermission): boolean {
+  // `in`, not `!== undefined`: a selected but nullable column
+  // (`ai_explanation_override_allowed`) arrives as an explicit null, and that
+  // is an opinion — it means false.
+  return field in snapshot
+}
+
 /**
  * What changed between two snapshots of a user's permissions.
  *
  * Pure. `before` null means the row was created, which records grants only
- * (rule 3). A column absent from either side is read as false, since that is
- * what an unselected boolean column means for every caller here.
+ * (rule 3).
+ *
+ * **Only columns present on BOTH sides are compared.** Callers build these
+ * from whatever their query returned, and the two sides are routinely
+ * different widths: the login route knows the two columns it writes, while
+ * the row it writes them to comes back with every permission on it. Reading
+ * an absent column as false made that asymmetry fabricate changes — measured,
+ * an ordinary sign-in recorded SIX invented grants (`is_enabled`,
+ * `discover_enabled`, `discover_request_enabled`, `collections_enabled`,
+ * `can_manage_watch_history`, `email_notifications_allowed`), and switching
+ * Movies on for an imported administrator during setup recorded `is_admin`
+ * as revoked.
+ *
+ * The failure is asymmetric and this is the safe side: a column nobody
+ * selected produces no row, which is a gap somebody can notice and fix, while
+ * a fabricated row is a false accusation in the one place that is supposed to
+ * settle arguments.
  */
 export function diffUserPermissions(
   before: UserPermissionSnapshot | null,
@@ -117,6 +145,7 @@ export function diffUserPermissions(
   const changes: PermissionChange[] = []
 
   for (const field of AUDITED_USER_PERMISSIONS) {
+    if (!carries(after, field)) continue
     const now = after[field] === true
 
     if (before === null) {
@@ -124,6 +153,7 @@ export function diffUserPermissions(
       continue
     }
 
+    if (!carries(before, field)) continue
     const was = before[field] === true
     if (was !== now) {
       changes.push({ field, oldValue: String(was), newValue: String(now) })
@@ -155,6 +185,12 @@ export function diffApiKeyScopes(
  * One statement for the whole set, so a save that flips three switches is
  * three rows written together or none — a partial audit of one action is
  * worse than none, because it reads as a complete account of it.
+ *
+ * Every parameter is cast explicitly. In an `INSERT ... SELECT` the target
+ * columns do not reliably resolve a parameter’s type, and `actor_user_id` is
+ * null for the system actors — the exact case where an uncast parameter is
+ * sent as unknown and the insert fails at runtime, inside the one code path
+ * that swallows its own errors.
  */
 export async function recordPermissionChanges(
   actor: PermissionActor,
@@ -167,7 +203,8 @@ export async function recordPermissionChanges(
     await query(
       `INSERT INTO permission_changes
          (actor_user_id, actor_label, subject_kind, subject_id, subject_label, field, old_value, new_value)
-       SELECT $1, $2, $3, $4, $5, c.field, c.old_value, c.new_value
+       SELECT $1::uuid, $2::text, $3::text, $4::uuid, $5::text,
+              c.field, c.old_value, c.new_value
          FROM UNNEST($6::text[], $7::text[], $8::text[]) AS c(field, old_value, new_value)`,
       [
         actor.userId,

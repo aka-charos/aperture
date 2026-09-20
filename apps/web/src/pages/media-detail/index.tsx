@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Box, Typography, CircularProgress, Grid } from '@mui/material'
 import { useAuth } from '../../hooks/useAuth'
+import { useCapability } from '../../hooks/useCapability'
 import { useWatching } from '../../hooks/useWatching'
 import { useMediaDetail } from './hooks'
 import {
@@ -46,6 +47,10 @@ export function MediaDetailPage({
   const id = idProp ?? routeId
   const navigate = useNavigate()
   const { user } = useAuth()
+  // The server's answer, not `isAdmin || canManageWatchHistory` worked out
+  // here — that is the admin-override half of a rule whose other half lives
+  // in core, and two copies is how they come to disagree.
+  const canManageWatchHistory = useCapability('watchHistory:manage')
   const { isWatching, toggleWatching } = useWatching()
 
   const {
@@ -124,7 +129,7 @@ export function MediaDetailPage({
         onWatchingToggle={isSeries(media) && id ? () => toggleWatching(id) : undefined}
         // Movie-specific
         watchStatus={isMovie(media) ? watchStatus : undefined}
-        canManageWatchHistory={user?.isAdmin || user?.canManageWatchHistory || false}
+        canManageWatchHistory={canManageWatchHistory}
         userId={user?.id}
         onMarkedUnwatched={isMovie(media) ? clearWatchStatus : undefined}
         onMarkedWatched={isMovie(media) ? setWatchStatusWatched : undefined}
