@@ -3,7 +3,7 @@
  */
 import type { FastifyInstance } from 'fastify'
 import { requireAuth, type SessionUser } from '../../plugins/auth.js'
-import { queryOne } from '../../lib/db.js'
+import { requireCapability } from '../../lib/permissions.js'
 import {
   fetchGenreStripDiscoverCandidates,
   batchGetSeerrMediaStatus,
@@ -117,15 +117,9 @@ function rawToCandidateJson(
 }
 
 export function registerTmdbGenreRowsRoutes(fastify: FastifyInstance) {
-  fastify.get('/api/discovery/tmdb-genre-rows/config', { preHandler: requireAuth }, async (request, reply) => {
+  fastify.get('/api/discovery/tmdb-genre-rows/config', { preHandler: [requireAuth, requireCapability('discover')] }, async (request, reply) => {
     const currentUser = request.user as SessionUser
-    const user = await queryOne<{ discover_enabled: boolean }>(
-      `SELECT discover_enabled FROM users WHERE id = $1`,
-      [currentUser.id]
-    )
-    if (!user?.discover_enabled) {
-      return reply.status(403).send({ error: 'Discovery not enabled for your account' })
-    }
+
     const [movieGenreRows, seriesGenreRows] = await Promise.all([
       getGenreStripMovieRows(),
       getGenreStripSeriesRows(),
@@ -188,15 +182,9 @@ export function registerTmdbGenreRowsRoutes(fastify: FastifyInstance) {
       yearStart?: string
       yearEnd?: string
     }
-  }>('/api/discovery/tmdb-genre-row', { preHandler: requireAuth }, async (request, reply) => {
+  }>('/api/discovery/tmdb-genre-row', { preHandler: [requireAuth, requireCapability('discover')] }, async (request, reply) => {
     const currentUser = request.user as SessionUser
-    const user = await queryOne<{ discover_enabled: boolean }>(
-      `SELECT discover_enabled FROM users WHERE id = $1`,
-      [currentUser.id]
-    )
-    if (!user?.discover_enabled) {
-      return reply.status(403).send({ error: 'Discovery not enabled for your account' })
-    }
+
 
     const mt = (request.query.mediaType || '').toLowerCase()
     if (mt !== 'movie' && mt !== 'series') {

@@ -14,7 +14,10 @@ import {
   setSessionCookie,
   clearSessionCookie,
   clearImpersonationCookie,
+  USER_COLUMNS,
+  toSessionUser,
   type SessionUser,
+  type UserLookupRow,
   type ImpersonationContext,
 } from '../../plugins/auth.js'
 import {
@@ -58,17 +61,8 @@ async function isPasswordlessLoginEnabled(): Promise<boolean> {
   return (await getSystemSetting('allow_passwordless_login')) === 'true'
 }
 
-interface UserRow {
-  id: string
-  username: string
-  display_name: string | null
-  provider: 'emby' | 'jellyfin'
-  provider_user_id: string
-  is_admin: boolean
-  is_enabled: boolean
-  can_manage_watch_history: boolean
-  collections_enabled: boolean
-}
+/** The shape `USER_COLUMNS` returns; `toSessionUser` is the only reader. */
+type UserRow = UserLookupRow
 
 interface LoginResponse {
   user: SessionUser
@@ -177,7 +171,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       const providerUser = await provider.getUserById(config.apiKey, authResult.userId)
 
       const existingUser = await queryOne<UserRow>(
-        `SELECT id, username, display_name, provider, provider_user_id, is_admin, is_enabled, can_manage_watch_history, collections_enabled
+        `SELECT ${USER_COLUMNS('users')}
          FROM users WHERE provider = $1 AND provider_user_id = $2`,
         [provider.type, authResult.userId]
       )
@@ -193,9 +187,16 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
             username = $1,
             is_admin = $2,
             max_parental_rating = $3,
+            -- Authenticating against the media server is positive evidence that
+            -- the account exists and is not disabled there, which is the whole of
+            -- what this flag records. Cleared here so a stale one cannot outlive
+            -- the fact: the auth plugin now refuses a session for a
+            -- provider-disabled account, and without this the only way back from
+            -- a wrong flag would be waiting for the next user sync.
+            provider_disabled = false,
             updated_at = NOW()
            WHERE id = $4
-           RETURNING id, username, display_name, provider, provider_user_id, is_admin, is_enabled, can_manage_watch_history, collections_enabled`,
+           RETURNING ${USER_COLUMNS('users')}`,
           [
             authResult.userName,
             authResult.isAdmin,
@@ -208,7 +209,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         const created = await queryOne<UserRow>(
           `INSERT INTO users (username, display_name, provider, provider_user_id, is_admin, max_parental_rating)
            VALUES ($1, $2, $3, $4, $5, $6)
-           RETURNING id, username, display_name, provider, provider_user_id, is_admin, is_enabled, can_manage_watch_history, collections_enabled`,
+           RETURNING ${USER_COLUMNS('users')}`,
           [
             authResult.userName,
             authResult.userName,
@@ -234,22 +235,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       const sessionToken = await createSession(user.id)
       setSessionCookie(reply, sessionToken)
 
-      const avatarUrl = `/api/users/${user.id}/avatar`
-
-      const sessionUser: SessionUser = {
-        id: user.id,
-        username: user.username,
-        displayName: user.display_name,
-        provider: user.provider,
-        providerUserId: user.provider_user_id,
-        isAdmin: user.is_admin,
-        isEnabled: user.is_enabled,
-        canManageWatchHistory: user.can_manage_watch_history ?? false,
-        collectionsEnabled: user.collections_enabled ?? false,
-        avatarUrl,
-      }
-
-      return reply.send({ user: sessionUser })
+      return reply.send({ user: toSessionUser(user) })
     }
   )
 

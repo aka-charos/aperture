@@ -16,37 +16,20 @@ import {
   clearImpersonationCookie,
   requireAdmin,
   requireAuth,
-  type SessionUser,
+  USER_COLUMNS,
+  toSessionUser,
+  type UserLookupRow,
 } from '../../plugins/auth.js'
 import { IMPERSONATION_COOKIE_NAME } from '../../lib/impersonation.js'
 import { startImpersonationSchema, stopImpersonationSchema } from './schemas.js'
 
-interface TargetRow {
-  id: string
-  username: string
-  display_name: string | null
-  provider: 'emby' | 'jellyfin'
-  provider_user_id: string
-  is_admin: boolean
-  is_enabled: boolean
-  can_manage_watch_history: boolean
-  collections_enabled: boolean
-}
-
-function toSessionUser(row: TargetRow): SessionUser {
-  return {
-    id: row.id,
-    username: row.username,
-    displayName: row.display_name,
-    provider: row.provider,
-    providerUserId: row.provider_user_id,
-    isAdmin: row.is_admin,
-    isEnabled: row.is_enabled,
-    canManageWatchHistory: row.can_manage_watch_history ?? false,
-    collectionsEnabled: row.collections_enabled ?? false,
-    avatarUrl: `/api/users/${row.id}/avatar`,
-  }
-}
+/**
+ * The target, in the same shape and read from the same column list the
+ * session lookup uses — the admin is about to BE this user, so anything the
+ * two disagree about is a permission the assumed session would hold or lack
+ * differently from the real one.
+ */
+type TargetRow = UserLookupRow
 
 const impersonationRoutes: FastifyPluginAsync = async (fastify) => {
   /**
@@ -76,8 +59,7 @@ const impersonationRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const row = await queryOne<TargetRow>(
-        `SELECT id, username, display_name, provider, provider_user_id,
-                is_admin, is_enabled, can_manage_watch_history, collections_enabled
+        `SELECT ${USER_COLUMNS('users')}
            FROM users WHERE id = $1`,
         [userId]
       )
@@ -87,8 +69,10 @@ const impersonationRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       // Mirrors the login and session checks: a disabled account is not
-      // browsable by anyone, including through this door.
-      if (!row.is_enabled) {
+      // browsable by anyone, including through this door. `provider_disabled`
+      // counts as disabled here for the reason it now refuses a session — the
+      // media server has dropped the account, so there is nobody to look at.
+      if (!row.is_enabled || row.provider_disabled) {
         return reply.status(403).send({
           error: 'This account is disabled and cannot be viewed.',
         })

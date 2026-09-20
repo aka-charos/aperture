@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { deleteChannelCollection, syncChannelDescription } from '@aperture/core'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
+import { can } from '../../../lib/permissions.js'
 import {
   sanitizeMediaTypes,
   type ChannelRow,
@@ -66,7 +67,7 @@ export function registerCrudHandlers(fastify: FastifyInstance) {
 
       // Collections are server-wide (visible to everyone), so gate their creation behind an
       // admin-granted permission. Playlists (per-user) remain open to any user.
-      if (outputType === 'collection' && !currentUser.isAdmin && !currentUser.collectionsEnabled) {
+      if (outputType === 'collection' && !can(currentUser, 'collections')) {
         return reply.status(403).send({ error: 'You do not have permission to create collections' })
       }
 

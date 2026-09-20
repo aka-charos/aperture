@@ -34,6 +34,11 @@ export interface ApiKeyWithUser extends ApiKey {
   isAdmin: boolean
   isEnabled: boolean
   canManageWatchHistory: boolean
+  discoverEnabled: boolean
+  discoverRequestEnabled: boolean
+  emailNotificationsAllowed: boolean
+  /** The media server has dropped this account. A key on it is refused. */
+  providerDisabled: boolean
 }
 
 export interface CreateApiKeyResult {
@@ -61,7 +66,22 @@ interface ApiKeyWithUserRow extends ApiKeyRow {
   is_admin: boolean
   is_enabled: boolean
   can_manage_watch_history: boolean
+  discover_enabled: boolean
+  discover_request_enabled: boolean
+  email_notifications_allowed: boolean
+  provider_disabled: boolean
 }
+
+/**
+ * The `users` columns every key lookup joins in, written once.
+ *
+ * Two queries below select into this same row type. Spelled out at each, a
+ * column added for one would arrive as `undefined` at the other — and an
+ * undefined permission flag reads as "not granted", which is a wrong claim
+ * about the account rather than an error anybody would see.
+ */
+const API_KEY_USER_COLUMNS = `u.username, u.display_name, u.is_admin, u.is_enabled, u.can_manage_watch_history,
+       u.discover_enabled, u.discover_request_enabled, u.email_notifications_allowed, u.provider_disabled`
 
 /**
  * Predefined expiration options (in days) matching AWS IAM style
@@ -119,6 +139,10 @@ function rowToApiKeyWithUser(row: ApiKeyWithUserRow): ApiKeyWithUser {
     isAdmin: row.is_admin,
     isEnabled: row.is_enabled,
     canManageWatchHistory: row.can_manage_watch_history,
+    discoverEnabled: row.discover_enabled,
+    discoverRequestEnabled: row.discover_request_enabled,
+    emailNotificationsAllowed: row.email_notifications_allowed,
+    providerDisabled: row.provider_disabled,
   }
 }
 
@@ -183,7 +207,7 @@ export async function validateApiKey(key: string): Promise<ApiKeyWithUser | null
     `SELECT 
        ak.id, ak.user_id, ak.name, ak.key_hash, ak.key_prefix,
        ak.expires_at, ak.last_used_at, ak.created_at, ak.revoked_at,
-       u.username, u.display_name, u.is_admin, u.is_enabled, u.can_manage_watch_history
+       ${API_KEY_USER_COLUMNS}
      FROM api_keys ak
      JOIN users u ON u.id = ak.user_id
      WHERE ak.key_hash = $1 AND ak.revoked_at IS NULL`,
@@ -204,6 +228,19 @@ export async function validateApiKey(key: string): Promise<ApiKeyWithUser | null
   // Check if user is enabled
   if (!row.is_enabled) {
     logger.debug({ keyPrefix: row.key_prefix, userId: row.user_id }, 'API key user is disabled')
+    return null
+  }
+
+  // The media server has dropped this account. Every per-user job already
+  // refuses to spend anything on such a viewer; the credential has to go the
+  // same way, or a departed user keeps a working key until somebody revokes it
+  // by hand. Deliberately not a revocation: `provider_disabled` is cleared
+  // again by the user sync if the account comes back, and a revocation is not.
+  if (row.provider_disabled) {
+    logger.debug(
+      { keyPrefix: row.key_prefix, userId: row.user_id },
+      'API key user is disabled on the media server'
+    )
     return null
   }
 
@@ -254,7 +291,7 @@ export async function listAllApiKeys(includeRevoked = false): Promise<ApiKeyWith
     `SELECT 
        ak.id, ak.user_id, ak.name, ak.key_hash, ak.key_prefix,
        ak.expires_at, ak.last_used_at, ak.created_at, ak.revoked_at,
-       u.username, u.display_name, u.is_admin, u.is_enabled, u.can_manage_watch_history
+       ${API_KEY_USER_COLUMNS}
      FROM api_keys ak
      JOIN users u ON u.id = ak.user_id
      ${whereClause}

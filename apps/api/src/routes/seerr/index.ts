@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { requireAuth, requireAdmin, type SessionUser } from '../../plugins/auth.js'
+import { can, refusalFor } from '../../lib/permissions.js'
 import { queryOne } from '../../lib/db.js'
 import {
   getSeerrConfig,
@@ -52,8 +53,6 @@ import {
   ensureSeerrUserIdForRequest,
 } from '../../lib/seerrActingUser.js'
 import { attachLibraryMediaIds } from '../../lib/libraryLinks.js'
-
-
 
 
 const seerrRoutes: FastifyPluginAsync = async (fastify) => {
@@ -164,13 +163,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
         })
       }
 
-      // Check if user can make requests
-      const user = await queryOne<{ discover_request_enabled: boolean }>(
-        `SELECT discover_request_enabled FROM users WHERE id = $1`,
-        [currentUser.id]
-      )
-
-      const canRequest = user?.discover_request_enabled ?? false
+      const canRequest = can(currentUser, 'discover:request')
 
       // Get status from Seerr
       const status = await getSeerrMediaStatus(parseInt(tmdbId, 10), mediaType as 'movie' | 'tv')
@@ -239,9 +232,9 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
     }
   )
 
-  async function ensureUserCanRequestSeerr(userId: string): Promise<
+  async function ensureUserCanRequestSeerr(user: SessionUser): Promise<
     | { ok: true }
-    | { ok: false; reply: { status: number; body: Record<string, string> } }
+    | { ok: false; reply: { status: number; body: Record<string, unknown> } }
   > {
     if (!(await isSeerrConfigured())) {
       return {
@@ -252,20 +245,10 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
         },
       }
     }
-    const user = await queryOne<{ discover_request_enabled: boolean }>(
-      `SELECT discover_request_enabled FROM users WHERE id = $1`,
-      [userId]
-    )
-    if (!user?.discover_request_enabled) {
+    if (!can(user, 'discover:request')) {
       return {
         ok: false,
-        reply: {
-          status: 403,
-          body: {
-            error: 'Content requests not enabled for your account',
-            message: 'Contact your admin to enable content requests',
-          },
-        },
+        reply: { status: 403, body: refusalFor('discover:request') },
       }
     }
     return { ok: true }
@@ -277,7 +260,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.get('/api/seerr/service/radarr', { preHandler: requireAdmin, schema: listRadarrServiceSchema }, async (request, reply) => {
     const currentUser = request.user as SessionUser
-    const gate = await ensureUserCanRequestSeerr(currentUser.id)
+    const gate = await ensureUserCanRequestSeerr(currentUser)
     if (!gate.ok) return reply.status(gate.reply.status).send(gate.reply.body)
     const data = await listRadarrServers()
     if (!data) {
@@ -294,7 +277,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: requireAdmin, schema: getRadarrServiceSchema },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
-      const gate = await ensureUserCanRequestSeerr(currentUser.id)
+      const gate = await ensureUserCanRequestSeerr(currentUser)
       if (!gate.ok) return reply.status(gate.reply.status).send(gate.reply.body)
       const id = parseInt(request.params.id, 10)
       if (!Number.isFinite(id)) {
@@ -313,7 +296,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.get('/api/seerr/service/sonarr', { preHandler: requireAdmin, schema: listSonarrServiceSchema }, async (request, reply) => {
     const currentUser = request.user as SessionUser
-    const gate = await ensureUserCanRequestSeerr(currentUser.id)
+    const gate = await ensureUserCanRequestSeerr(currentUser)
     if (!gate.ok) return reply.status(gate.reply.status).send(gate.reply.body)
     const data = await listSonarrServers()
     if (!data) {
@@ -330,7 +313,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: requireAdmin, schema: getSonarrServiceSchema },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
-      const gate = await ensureUserCanRequestSeerr(currentUser.id)
+      const gate = await ensureUserCanRequestSeerr(currentUser)
       if (!gate.ok) return reply.status(gate.reply.status).send(gate.reply.body)
       const id = parseInt(request.params.id, 10)
       if (!Number.isFinite(id)) {
@@ -383,18 +366,6 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
         })
       }
 
-      // Check if user can make requests
-      const user = await queryOne<{ discover_request_enabled: boolean }>(
-        `SELECT discover_request_enabled FROM users WHERE id = $1`,
-        [currentUser.id]
-      )
-
-      if (!user?.discover_request_enabled) {
-        return reply.status(403).send({
-          error: 'Content requests not enabled for your account',
-          message: 'Contact your admin to enable content requests',
-        })
-      }
 
       // Check for existing request
       const existingRequest = await hasExistingRequest(currentUser.id, tmdbId, mediaType)
@@ -615,11 +586,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
         })
       }
 
-      const user = await queryOne<{ discover_request_enabled: boolean }>(
-        `SELECT discover_request_enabled FROM users WHERE id = $1`,
-        [currentUser.id]
-      )
-      const canRequest = user?.discover_request_enabled ?? false
+      const canRequest = can(currentUser, 'discover:request')
 
       // Library membership comes from Aperture's own tables, not the search
       // backend's. The two can disagree — a library Seerr does not scan, or a

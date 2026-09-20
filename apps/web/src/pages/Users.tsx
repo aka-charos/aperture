@@ -344,13 +344,14 @@ export function UsersPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ 
-          discoverEnabled: newValue,
-          // If disabling discovery, also disable request permission
-          ...(newValue === false && { discoverRequestEnabled: false }),
-        }),
+        // The server clears request rights with Discover on its own now
+        // (lib/permissions.ts), so this body names one switch and the
+        // saved row answers for the rest.
+        body: JSON.stringify({ discoverEnabled: newValue }),
       })
-      const saved: { is_enabled?: boolean } = response.ok ? await response.json() : {}
+      const saved: { is_enabled?: boolean; discover_request_enabled?: boolean } = response.ok
+        ? await response.json()
+        : {}
 
       if (response.ok) {
         setProviderUsers((prev) =>
@@ -359,8 +360,8 @@ export function UsersPage() {
               ? { 
                   ...u, 
                   discoverEnabled: newValue,
-                  // If disabling discovery, also disable request permission
-                  discoverRequestEnabled: newValue ? u.discoverRequestEnabled : false,
+                  discoverRequestEnabled:
+                    saved.discover_request_enabled ?? (newValue ? u.discoverRequestEnabled : false),
                   isEnabled: saved.is_enabled ?? u.isEnabled,
                 }
               : u
@@ -391,12 +392,17 @@ export function UsersPage() {
         credentials: 'include',
         body: JSON.stringify({ discoverRequestEnabled: newValue }),
       })
+      // Read back rather than assumed: request rights depend on Discover,
+      // and the server is the one that decides.
+      const saved: { discover_request_enabled?: boolean } = response.ok
+        ? await response.json()
+        : {}
 
       if (response.ok) {
         setProviderUsers((prev) =>
           prev.map((u) =>
             u.providerUserId === user.providerUserId
-              ? { ...u, discoverRequestEnabled: newValue }
+              ? { ...u, discoverRequestEnabled: saved.discover_request_enabled ?? newValue }
               : u
           )
         )

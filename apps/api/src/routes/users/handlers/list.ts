@@ -9,6 +9,7 @@ import {
   type SessionUser,
 } from '../../../plugins/auth.js'
 import { accountEnabledSql, type AccountSwitchColumn } from '../../../lib/accountEnabled.js'
+import { discoverRequestSql } from '../../../lib/permissions.js'
 import type { UserRow, UserListResponse, UserUpdateBody } from '../types.js'
 
 const listLogger = createChildLogger('users-list')
@@ -102,9 +103,27 @@ export function registerListHandlers(fastify: FastifyInstance) {
       setSwitch('series_enabled', seriesEnabled)
       setSwitch('discover_enabled', discoverEnabled)
 
+      // Content requests depend on Discover, and that rule used to live only in
+      // the browser: the Users page cleared one with the other, while the API
+      // wrote the two columns independently and routes/seerr checked the request
+      // flag alone. So a PUT naming `discoverRequestEnabled` on its own granted
+      // Seerr request rights to an account with Discover switched off.
+      //
+      // Derived from the whole row rather than from this request, for the same
+      // reason `is_enabled` is: the page sends one switch per request, so
+      // switching Discover off has to clear request rights in that same
+      // statement, without the caller having to remember to send both.
+      const writtenRequest: { discover_enabled?: string; discover_request_enabled?: string } = {}
+      if (writtenSwitches.discover_enabled) {
+        writtenRequest.discover_enabled = writtenSwitches.discover_enabled
+      }
       if (discoverRequestEnabled !== undefined) {
-        updates.push(`discover_request_enabled = $${paramIndex++}`)
+        writtenRequest.discover_request_enabled = `$${paramIndex}`
         values.push(discoverRequestEnabled)
+        paramIndex++
+      }
+      if (Object.keys(writtenRequest).length > 0) {
+        updates.push(`discover_request_enabled = ${discoverRequestSql(writtenRequest)}`)
       }
 
       setSwitch('collections_enabled', collectionsEnabled)

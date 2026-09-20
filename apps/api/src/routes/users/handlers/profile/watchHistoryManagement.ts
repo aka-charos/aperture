@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { query, queryOne } from '../../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../../plugins/auth.js'
+import { can, refusalFor } from '../../../../lib/permissions.js'
 import {
   getMediaServerProvider,
   getMediaServerApiKey,
@@ -9,14 +10,16 @@ import {
 } from '@aperture/core'
 import { requireSelfOrAdmin } from './shared.js'
 
-async function canManageWatchHistory(userId: string, currentUser: SessionUser): Promise<boolean> {
-  if (currentUser.isAdmin) return true
-
-  const user = await queryOne<{ can_manage_watch_history: boolean }>(
-    `SELECT can_manage_watch_history FROM users WHERE id = $1`,
-    [userId]
-  )
-  return user?.can_manage_watch_history ?? false
+/**
+ * The caller is asked, not the target.
+ *
+ * Every handler below runs `requireSelfOrAdmin` first, so a non-admin only
+ * ever reaches this for their own row — and an admin passed the old check by
+ * its `isAdmin` short-circuit before the row was read at all. Asking the
+ * session is therefore the same question, minus a query per request.
+ */
+function mayManageWatchHistory(currentUser: SessionUser): boolean {
+  return can(currentUser, 'watchHistory:manage')
 }
 
 export function registerWatchHistoryManagementHandlers(fastify: FastifyInstance) {
@@ -95,8 +98,8 @@ export function registerWatchHistoryManagementHandlers(fastify: FastifyInstance)
 
       if (!requireSelfOrAdmin(id, currentUser, reply)) return
 
-      if (!(await canManageWatchHistory(id, currentUser))) {
-        return reply.status(403).send({ error: 'Watch history management is not enabled for this user' })
+      if (!mayManageWatchHistory(currentUser)) {
+        return reply.status(403).send(refusalFor('watchHistory:manage'))
       }
 
       try {
@@ -210,8 +213,8 @@ export function registerWatchHistoryManagementHandlers(fastify: FastifyInstance)
 
       if (!requireSelfOrAdmin(id, currentUser, reply)) return
 
-      if (!(await canManageWatchHistory(id, currentUser))) {
-        return reply.status(403).send({ error: 'Watch history management is not enabled for this user' })
+      if (!mayManageWatchHistory(currentUser)) {
+        return reply.status(403).send(refusalFor('watchHistory:manage'))
       }
 
       try {
@@ -269,8 +272,8 @@ export function registerWatchHistoryManagementHandlers(fastify: FastifyInstance)
 
       if (!requireSelfOrAdmin(id, currentUser, reply)) return
 
-      if (!(await canManageWatchHistory(id, currentUser))) {
-        return reply.status(403).send({ error: 'Watch history management is not enabled for this user' })
+      if (!mayManageWatchHistory(currentUser)) {
+        return reply.status(403).send(refusalFor('watchHistory:manage'))
       }
 
       try {
@@ -328,8 +331,8 @@ export function registerWatchHistoryManagementHandlers(fastify: FastifyInstance)
 
       if (!requireSelfOrAdmin(id, currentUser, reply)) return
 
-      if (!(await canManageWatchHistory(id, currentUser))) {
-        return reply.status(403).send({ error: 'Watch history management is not enabled for this user' })
+      if (!mayManageWatchHistory(currentUser)) {
+        return reply.status(403).send(refusalFor('watchHistory:manage'))
       }
 
       try {
@@ -397,8 +400,8 @@ export function registerWatchHistoryManagementHandlers(fastify: FastifyInstance)
 
       if (!requireSelfOrAdmin(id, currentUser, reply)) return
 
-      if (!(await canManageWatchHistory(id, currentUser))) {
-        return reply.status(403).send({ error: 'Watch history management is not enabled for this user' })
+      if (!mayManageWatchHistory(currentUser)) {
+        return reply.status(403).send(refusalFor('watchHistory:manage'))
       }
 
       try {

@@ -18,8 +18,9 @@ import {
   type CollectionPartStatus,
   type SeerrMediaStatusLike,
 } from '@aperture/core'
-import { query, queryOne } from '../../../lib/db.js'
+import { query } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
+import { can } from '../../../lib/permissions.js'
 import { franchiseDetailSchema } from '../schemas.js'
 
 interface LibraryRow {
@@ -141,14 +142,7 @@ export function registerFranchiseDetailHandler(fastify: FastifyInstance) {
 
       // Decided here, the same test /api/seerr/status applies, so the page
       // never has to guess whether its Request buttons would work.
-      let canRequest = false
-      if (seerrConfigured) {
-        const row = await queryOne<{ discover_request_enabled: boolean }>(
-          `SELECT discover_request_enabled FROM users WHERE id = $1`,
-          [user.id]
-        )
-        canRequest = row?.discover_request_enabled === true
-      }
+      const canRequest = seerrConfigured && can(user, 'discover:request')
 
       const parts: FranchisePart[] = []
       const listed = new Set<string>()

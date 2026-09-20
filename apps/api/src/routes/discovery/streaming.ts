@@ -3,7 +3,7 @@
  */
 import type { FastifyInstance } from 'fastify'
 import { requireAuth, type SessionUser } from '../../plugins/auth.js'
-import { queryOne } from '../../lib/db.js'
+import { can, refusalFor } from '../../lib/permissions.js'
 import {
   attachLibraryMatch,
   attachTmdbPosterPaths,
@@ -42,19 +42,12 @@ function parseOffset(raw: string | undefined): number {
 }
 
 async function assertStreamingDiscoveryAllowed(
-  userId: string
+  user: SessionUser
 ): Promise<{ ok: true } | { ok: false; statusCode: number; body: Record<string, unknown> }> {
-  const [user, streamingOn] = await Promise.all([
-    queryOne<{ discover_enabled: boolean }>(`SELECT discover_enabled FROM users WHERE id = $1`, [userId]),
-    getStreamingDiscoveryEnabled(),
-  ])
-  if (!user?.discover_enabled) {
-    return {
-      ok: false,
-      statusCode: 403,
-      body: { error: 'Discovery not enabled for your account' },
-    }
+  if (!can(user, 'discover')) {
+    return { ok: false, statusCode: 403, body: refusalFor('discover') }
   }
+  const streamingOn = await getStreamingDiscoveryEnabled()
   if (!streamingOn) {
     return {
       ok: false,
@@ -97,7 +90,7 @@ async function attachSeerrStatuses(
 export function registerStreamingDiscoveryRoutes(fastify: FastifyInstance) {
   fastify.get('/api/discovery/streaming/config', { preHandler: requireAuth }, async (request, reply) => {
     const currentUser = request.user as SessionUser
-    const gate = await assertStreamingDiscoveryAllowed(currentUser.id)
+    const gate = await assertStreamingDiscoveryAllowed(currentUser)
     if (!gate.ok) {
       return reply.status(gate.statusCode).send(gate.body)
     }
@@ -116,7 +109,7 @@ export function registerStreamingDiscoveryRoutes(fastify: FastifyInstance) {
     }
   }>('/api/discovery/streaming/popular', { preHandler: requireAuth }, async (request, reply) => {
     const currentUser = request.user as SessionUser
-    const gate = await assertStreamingDiscoveryAllowed(currentUser.id)
+    const gate = await assertStreamingDiscoveryAllowed(currentUser)
     if (!gate.ok) {
       return reply.status(gate.statusCode).send(gate.body)
     }
@@ -180,7 +173,7 @@ export function registerStreamingDiscoveryRoutes(fastify: FastifyInstance) {
     }
   }>('/api/discovery/streaming/search', { preHandler: requireAuth }, async (request, reply) => {
     const currentUser = request.user as SessionUser
-    const gate = await assertStreamingDiscoveryAllowed(currentUser.id)
+    const gate = await assertStreamingDiscoveryAllowed(currentUser)
     if (!gate.ok) {
       return reply.status(gate.statusCode).send(gate.body)
     }
@@ -242,7 +235,7 @@ export function registerStreamingDiscoveryRoutes(fastify: FastifyInstance) {
     Querystring: { country?: string }
   }>('/api/discovery/streaming/providers', { preHandler: requireAuth }, async (request, reply) => {
     const currentUser = request.user as SessionUser
-    const gate = await assertStreamingDiscoveryAllowed(currentUser.id)
+    const gate = await assertStreamingDiscoveryAllowed(currentUser)
     if (!gate.ok) {
       return reply.status(gate.statusCode).send(gate.body)
     }
