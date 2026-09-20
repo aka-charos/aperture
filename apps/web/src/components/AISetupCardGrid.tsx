@@ -23,11 +23,18 @@ export interface AISetupGridConfig {
 
 interface AISetupCardGridProps {
   config: AISetupGridConfig | null
+  /** Alternative analysis prompts, decided by the server; see AIFunctionCard. */
+  promptVariants?: { id: string; label: string; note: string }[]
   onSave: (fn: AIFunction, config: FunctionConfig) => Promise<void>
   variant: 'setup' | 'settings'
 }
 
-export function AISetupCardGrid({ config, onSave, variant }: AISetupCardGridProps) {
+export function AISetupCardGrid({
+  config,
+  onSave,
+  variant,
+  promptVariants,
+}: AISetupCardGridProps) {
   const { t } = useTranslation()
   const isSetup = variant === 'setup'
   const keyPrefix = isSetup ? 'setup.aiSetup' : 'settingsAiSetup'
@@ -134,6 +141,7 @@ export function AISetupCardGrid({ config, onSave, variant }: AISetupCardGridProp
           // delay (core `analysis/generate.ts`). Offered here and nowhere else
           // because a setting no consumer reads is worse than an absent one.
           supportsFallbackModels
+          promptVariants={promptVariants}
           footer={
             config?.titleAnalysis?.provider === 'google' ? (
               <WebSearchUsagePanel role="titleAnalysis" />

@@ -25,6 +25,7 @@ export {
   buildAnalysisPrompt,
   buildAnalysisQuery,
   parseAnalysisResponse,
+  libraryVariantFor,
   promptChoiceKey,
   promptChoiceLabel,
   questionIdsFor,
@@ -120,6 +121,8 @@ export {
   pendingAnalysisFromSql,
   type AnalysisSqlAliases,
 } from './pending.js'
+
+export { getAnalysisPromptVariant } from './promptSetting.js'
 
 export {
   analyseTitle,

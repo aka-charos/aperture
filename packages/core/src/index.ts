@@ -1547,6 +1547,7 @@ export {
   ANALYSIS_PROMPT_VERSION,
   BENCH_PROMPT_VARIANTS,
   BENCH_PROMPT_VERSIONS,
+  libraryVariantFor,
   DRAFT_PROMPT_VERSION,
   buildAnalysisPrompt,
   buildAnalysisQuery,

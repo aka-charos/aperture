@@ -18,6 +18,11 @@ interface AIConfig {
 export function AISetupSection() {
   const { t } = useTranslation()
   const [config, setConfig] = useState<AIConfig | null>(null)
+  // Which alternative analysis prompts this build can write with is core's
+  // decision, so it rides in the response rather than being worked out here.
+  const [promptVariants, setPromptVariants] = useState<
+    { id: string; label: string; note: string }[]
+  >([])
   const [loading, setLoading] = useState(true)
 
   const fetchConfig = useCallback(async () => {
@@ -26,6 +31,7 @@ export function AISetupSection() {
       if (res.ok) {
         const data = await res.json()
         setConfig(data.config)
+        setPromptVariants(data.promptVariants ?? [])
       }
     } catch {
       // Ignore
@@ -76,7 +82,12 @@ export function AISetupSection() {
       {/* The embedding sets, the spend dashboard and the cost estimator used to
           stack below this grid. They are their own routes now — one subject per
           page — and this section is just the provider roles. */}
-      <AISetupCardGrid config={config} onSave={handleSave} variant="settings" />
+      <AISetupCardGrid
+        config={config}
+        onSave={handleSave}
+        variant="settings"
+        promptVariants={promptVariants}
+      />
     </Box>
   )
 }

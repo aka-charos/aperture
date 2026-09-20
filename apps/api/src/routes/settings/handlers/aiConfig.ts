@@ -32,6 +32,9 @@
  */
 import type { FastifyInstance } from 'fastify'
 import {
+  ANALYSIS_PROMPT_VERSION,
+  BENCH_PROMPT_VARIANTS,
+  libraryVariantFor,
   getAIConfig,
   setAIConfig,
   getFunctionConfig,
@@ -122,7 +125,14 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
     try {
       const config = await getAIConfig()
       const capabilities = await getAICapabilitiesStatus()
-      return reply.send({ config, capabilities })
+      // The alternative prompts the Title Analysis writer could be pointed at,
+      // DECIDED here: a variant is only offerable while its base is the current
+      // prompt version (core `libraryVariantFor`), and the bundle must not hold
+      // a copy of that rule or of the version number it turns on.
+      const promptVariants = BENCH_PROMPT_VARIANTS.filter(
+        (variant) => libraryVariantFor(variant.id) != null
+      ).map((variant) => ({ id: variant.id, label: variant.label, note: variant.note }))
+      return reply.send({ config, capabilities, promptVariants })
     } catch (err) {
       fastify.log.error({ err }, 'Failed to get AI config')
       return reply.status(500).send({ error: 'Failed to get AI configuration' })
@@ -922,6 +932,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       reasoningEffort?: string | null
       temperature?: number | null
       topP?: number | null
+      analysisPromptVariant?: string | null
     }
   }>('/api/settings/ai/:function', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
     try {
@@ -940,6 +951,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         reasoningEffort,
         temperature,
         topP,
+        analysisPromptVariant,
       } = request.body
 
       if (!isAIFunction(fn)) {
@@ -1117,6 +1129,35 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         nextReasoningEffort = reasoningEffort
       }
 
+      // Which prompt the analysis writer sends. Same three rules as the effort
+      // above — omitted leaves it alone, null or '' clears it, and a role that
+      // does not read it may not store one.
+      //
+      // Validated through the same function the writer resolves it with, so the
+      // offered list, the saved value and the prompt that gets built cannot
+      // disagree: a variant is usable only while its base IS the current prompt
+      // version, because the writer stores that version number beside the prose
+      // and a mismatch files one version's questions under another's number.
+      let nextPromptVariant: string | undefined
+      if (analysisPromptVariant === undefined) {
+        nextPromptVariant = existing?.analysisPromptVariant
+      } else if (analysisPromptVariant === null || analysisPromptVariant === '') {
+        nextPromptVariant = undefined
+      } else if (fn !== 'titleAnalysis') {
+        return reply.status(400).send({
+          error: `The ${fn} role does not write title analyses, so it has no prompt to vary.`,
+        })
+      } else if (libraryVariantFor(analysisPromptVariant) == null) {
+        const usable = BENCH_PROMPT_VARIANTS.filter((v) => libraryVariantFor(v.id) != null)
+          .map((v) => v.id)
+          .join(', ')
+        return reply.status(400).send({
+          error: `"${analysisPromptVariant}" is not a prompt variant this build can write with at version ${ANALYSIS_PROMPT_VERSION}.${usable ? ` It accepts: ${usable}.` : ''}`,
+        })
+      } else {
+        nextPromptVariant = analysisPromptVariant
+      }
+
       // Sampling. Same three rules as the effort above, and the same reason for
       // each: omitted means leave alone, `null` clears, and a role that does not
       // READ these may not store them — a number stored where nothing sends it
@@ -1212,6 +1253,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         reasoningEffort: nextReasoningEffort,
         temperature: sampling.temperature,
         topP: sampling.topP,
+        analysisPromptVariant: nextPromptVariant,
       })
 
       const config = await getFunctionConfig(fn)
