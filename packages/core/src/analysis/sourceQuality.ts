@@ -93,6 +93,12 @@ const listed = (domain: string): boolean => {
  * bracketed and parenthesised runs until nothing nests, and a menu line comes
  * out empty while a sentence comes out as its words.
  *
+ * A HEADING MARKER IS PUNCTUATION TOO, and leaving `#` out of the strip cost
+ * 19% of one prompt. thefilmstage.com writes every item in its article feed as
+ * a heading-link - `## [TIFF Review: Atonement …](url)` - which reduced to a
+ * lone `#`, read as content, and broke the navigation run at every headline.
+ * The page delivered 12,097 characters and about 200 words about the film.
+ *
  * AN UNPAIRED BRACKET IS PUNCTUATION, NOT CONTENT. `[` and `]` were missing
  * from the final strip, so a line opening a link that CLOSES further down the
  * page - `[![Caught Stealing](poster.jpg)`, the first line of every card on
@@ -106,7 +112,7 @@ export function isLinkOnlyLine(line: string): boolean {
   for (let pass = 0; pass < 3; pass += 1) {
     rest = rest.replace(/\([^()]*\)/g, '').replace(/\[[^[\]]*\]/g, '')
   }
-  return rest.replace(/[![\]\-*+|:"'\s]/g, '').length === 0
+  return rest.replace(/[![\]#\-*+|:"'\s]/g, '').length === 0
 }
 
 /**

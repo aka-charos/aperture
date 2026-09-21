@@ -181,6 +181,7 @@ function signalsLine(signals: ProseSignals): string {
       ? `names a writer ${signals.namedWriters} (${signals.namedWriterMatches.join(', ')})`
       : 'names a writer 0',
     `labels left in the prose ${signals.inlineLabels}`,
+    `answers split across non-adjacent paragraphs ${mapped ? signals.scattered : '—'}`,
     `unattributed ${signals.unattributed}`,
     `"rather than" ${signals.ratherThan}`,
     `left open ${signals.leftOpen}`,
@@ -275,6 +276,7 @@ const SIGNAL_COLUMNS: [string, (s: ProseSignals) => number | string][] = [
   ['sources', (s) => s.pointsAtSources],
   ['named', (s) => s.namedWriters],
   ['labels', (s) => s.inlineLabels],
+  ['split', labelled((s) => s.scattered)],
   ['unattrib', (s) => s.unattributed],
   ['rather', (s) => s.ratherThan],
   ['open', (s) => s.leftOpen],
@@ -500,7 +502,8 @@ export function renderComparisonReport(report: ComparisonReport): string {
   }
   out.push('')
 
-  const writerNames = writerNamesFromSources(report.sources)
+  // The film's own name is excluded: a site puts it where a byline goes.
+  const writerNames = writerNamesFromSources(report.sources, [report.title])
   const rows = signalRows(report, writerNames)
   if (rows.length > 0) {
     out.push('SIGNALS — counts of habits the prompt asks the model to avoid (see proseSignals.ts)')
