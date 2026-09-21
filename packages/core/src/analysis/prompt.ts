@@ -206,6 +206,19 @@ export interface AnalysisSource {
    * the domain alone.
    */
   url?: string
+  /**
+   * True when the curated criticism search found this document.
+   *
+   * Carried only so the bench report and the job log can SAY which documents
+   * came from ./curatedSearch.ts. Nothing in the prompt reads it - the source
+   * block is built identically either way, because telling the model which
+   * pages were meant to be the good ones would bias exactly the judgement
+   * `SOURCE_VALUE_RULE` asks it to make from the writing itself.
+   *
+   * Absent means the general search found it, OR that the row predates the
+   * curated search, OR that retrieval ran under native grounding.
+   */
+  curated?: boolean
 }
 
 /**

@@ -78,6 +78,13 @@ export interface ComparisonSource {
   title: string
   domain: string
   chars: number
+  /**
+   * True when the curated criticism search supplied this document.
+   *
+   * Absent on every run stored before that search existed, so a report with
+   * none cannot claim the search found nothing - see `criticismLine`.
+   */
+  curated?: boolean
 }
 
 /** The run a replay took its sources from, with that run's answers. */
@@ -298,6 +305,25 @@ function signalRows(report: ComparisonReport): SignalRow[] {
  * the logs and the picker. Repeated here rather than imported to keep this
  * module readable on its own, the way its own header asks for.
  */
+/**
+ * One line saying what the curated criticism search contributed.
+ *
+ * IT MUST NOT CLAIM THE SEARCH FOUND NOTHING when no source carries the flag.
+ * Three different things produce a zero here - the search ran and the twenty
+ * publications had nothing on this title, the run predates the curated search,
+ * or the build being measured does not have it - and this list cannot tell them
+ * apart. Saying "no criticism documents" would read as the first, which is the
+ * reading that sends someone to debug a query that is working. The container
+ * log is what separates them, and the line says so.
+ */
+export function criticismLine(sources: readonly ComparisonSource[]): string {
+  const found = sources.filter((s) => s.curated === true).length
+  if (found > 0) {
+    return `Of these, ${found} came from the curated criticism search, marked [criticism] below.`
+  }
+  return 'None are marked as coming from the curated criticism search — either it found nothing on those publications for this title, or this run was made without it.'
+}
+
 function promptName(entry: { promptVersion: number; promptVariant?: string | null }): string {
   return entry.promptVariant
     ? `${entry.promptVersion} ${entry.promptVariant}`
@@ -396,8 +422,15 @@ export function renderComparisonReport(report: ComparisonReport): string {
       ? `Sources: ${report.sources.length} document(s), ${report.retrievedChars.toLocaleString('en-US')} characters, retrieved for that run and reused unchanged — nothing was retrieved again`
       : `Sources: ${report.sources.length} document(s), ${report.retrievedChars.toLocaleString('en-US')} characters retrieved`
   )
+  out.push(`  ${criticismLine(report.sources)}`)
   for (const source of report.sources) {
-    out.push(`  - ${source.domain} — ${source.title} (${source.chars.toLocaleString('en-US')} chars)`)
+    // The marker is what makes the curated search legible at all: without it
+    // the only way to tell a film journal from a content farm in this list is
+    // to recognise the domain by eye.
+    const mark = source.curated === true ? ' [criticism]' : ''
+    out.push(
+      `  - ${source.domain} — ${source.title} (${source.chars.toLocaleString('en-US')} chars)${mark}`
+    )
   }
   out.push('')
   out.push(
