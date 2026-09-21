@@ -27,9 +27,14 @@
  * found it applying wrongly - and the budget it spends is spent whether or not
  * the model then ignores the page.
  *
- * TWO MECHANISMS, DELIBERATELY DIFFERENT. A DOMAIN is a judgement made once by
+ * FOUR MECHANISMS, DELIBERATELY DIFFERENT. A DOMAIN is a judgement made once by
  * a person who read the page; SHAPE is measured per fetch and catches the ones
- * nobody has seen yet. Neither guesses at quality from the writing.
+ * nobody has seen yet. Neither guesses at quality from the writing. Shape is
+ * two tests, because the second Requiem bench found a page neither the domain
+ * list nor the line-share test could see - a wall of review cards whose links
+ * each span seven lines - and what it lacked was a SENTENCE. The fourth is a
+ * size floor, which names a failed scrape as what it is rather than letting 11
+ * characters reach the prompt as a numbered document.
  *
  * IT FAILS OPEN. If dropping would leave nothing, nothing is dropped: a thin
  * retrieval that reaches the floor and is honestly declined is a better outcome
@@ -41,7 +46,7 @@
  */
 
 /** Why a page was dropped, for the log line naming it. */
-export type LowValueReason = 'listed-domain' | 'navigation'
+export type LowValueReason = 'listed-domain' | 'navigation' | 'no-prose' | 'empty'
 
 export interface QualitySource {
   domain: string
@@ -85,6 +90,13 @@ const listed = (domain: string): boolean => {
  * single regex describing that shape misses the next variant of it. Strip the
  * bracketed and parenthesised runs until nothing nests, and a menu line comes
  * out empty while a sentence comes out as its words.
+ *
+ * AN UNPAIRED BRACKET IS PUNCTUATION, NOT CONTENT. `[` and `]` were missing
+ * from the final strip, so a line opening a link that CLOSES further down the
+ * page - `[![Caught Stealing](poster.jpg)`, the first line of every card on
+ * rogerebert.com's director index - left a lone `[` behind and read as a line
+ * with content in it. Measured on the Requiem for a Dream bench, where that
+ * page took one of the two curated criticism slots.
  */
 function isLinkOnlyLine(line: string): boolean {
   if (!line.includes('](')) return false
@@ -92,7 +104,7 @@ function isLinkOnlyLine(line: string): boolean {
   for (let pass = 0; pass < 3; pass += 1) {
     rest = rest.replace(/\([^()]*\)/g, '').replace(/\[[^[\]]*\]/g, '')
   }
-  return rest.replace(/[!\-*+|:"'\s]/g, '').length === 0
+  return rest.replace(/[![\]\-*+|:"'\s]/g, '').length === 0
 }
 
 /**
@@ -125,6 +137,68 @@ export function isNavigationPage(text: string): boolean {
 }
 
 /**
+ * Below this many characters a fetch returned nothing, whatever it says.
+ *
+ * Deliberately far below any real page rather than at the edge of one: the
+ * measured case is a New York Times review that arrived as 11 characters - its
+ * own domain - and reached the prompt as a numbered document. Its own reason,
+ * because "the scrape came back empty" is a fault in RETRIEVAL and "this page
+ * has no prose in it" is a fact about the page, and the log line is where an
+ * operator finds out a criticism source is silently failing to fetch.
+ */
+export const MIN_USEFUL_CHARS = 200
+
+/** Words a line needs before a full stop in it means a sentence. */
+const MIN_PROSE_WORDS = 12
+
+/** Below this many sentence-like lines, a page full of links is a menu. */
+const MIN_PROSE_LINES = 3
+
+/**
+ * A line that could be a sentence: enough words, and something ending one.
+ *
+ * The URL is removed and the link TEXT kept, unlike {@link isLinkOnlyLine}:
+ * here the words inside `[…]` are prose and only the `(…)` after them is
+ * machinery. Wikipedia's opening sentence names six linked people and is still
+ * a sentence, which a test that stripped the link text could not see.
+ */
+function isProseLine(line: string): boolean {
+  const residue = line.replace(/\([^()]*\)/g, ' ').replace(/[![\]*_#>|`]/g, ' ')
+  if (!/[.!?。]/.test(residue)) return false
+  return residue.split(/\s+/).filter(Boolean).length >= MIN_PROSE_WORDS
+}
+
+/**
+ * Whether a fetched page contains no sentence anywhere.
+ *
+ * A SECOND SHAPE TEST, because the line-share one cannot see a card. Measured
+ * on the Requiem for a Dream bench: rogerebert.com's Darren Aronofsky index
+ * took one of the two curated criticism slots, and it is a wall of review cards
+ * where each markdown link is spread over seven lines - poster, heading,
+ * byline, two star images, then the `](url)` that closes it. Per line, only the
+ * star row reads as link-only, so the share lands near 0.4 against a 0.6
+ * threshold and the page survives. What it has none of is a SENTENCE: every
+ * line is a heading, a name or a date, and the longest of them ("2024 Sundance
+ * Film Festival Announces 91 Projects Selected…") has no full stop in it.
+ *
+ * That page is also the likeliest reason one model named a critic in its
+ * answer, which every prompt version forbids - it carries the byline "Roger
+ * Ebert" six times over and says nothing else.
+ *
+ * NO SENTENCE AT ALL IS THE TEST, and the second clause is what covers a menu
+ * carrying a stray caption. It is guarded by the link count so that a scraper
+ * emitting a whole article as one long line - one prose line, no standalone
+ * links - can never be dropped by it. The asymmetry is deliberate: keeping a
+ * menu costs a share of the budget, losing an article costs the analysis.
+ */
+export function hasNoProse(text: string): boolean {
+  const lines = text.split('\n').filter((line) => line.trim().length > 0)
+  const prose = lines.filter(isProseLine).length
+  if (prose === 0) return true
+  return prose < MIN_PROSE_LINES && lines.filter(isLinkOnlyLine).length >= MIN_LINK_LINES
+}
+
+/**
  * Drop the pages worth nothing, keeping everything if that would be all of them.
  */
 export function dropLowValueSources<T extends QualitySource>(
@@ -136,8 +210,18 @@ export function dropLowValueSources<T extends QualitySource>(
       dropped.push({ domain: source.domain, reason: 'listed-domain' })
       return false
     }
+    // Checked before the shape tests so the log separates a fetch that came
+    // back empty from a page that is genuinely worthless - see MIN_USEFUL_CHARS.
+    if (source.text.trim().length < MIN_USEFUL_CHARS) {
+      dropped.push({ domain: source.domain, reason: 'empty' })
+      return false
+    }
     if (isNavigationPage(source.text)) {
       dropped.push({ domain: source.domain, reason: 'navigation' })
+      return false
+    }
+    if (hasNoProse(source.text)) {
+      dropped.push({ domain: source.domain, reason: 'no-prose' })
       return false
     }
     return true
