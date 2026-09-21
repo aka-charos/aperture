@@ -926,6 +926,16 @@ const CURRENT_EDITION: PromptEdition = {
  * worth making current. Everything below is what the same bench said compact
  * got WORSE, each traced to its wording.
  *
+ * BENCHED ONCE AND CORRECTED, 2026-09-21. Three of the five corrections below
+ * held on the first run - money left the making answer entirely (4/4 runs to
+ * 0/2), the certificate came back (0/2 to 2/2), and no answer broke the
+ * sentence cap where three of four had. Two failed and are answered by the
+ * three additions marked BENCH 16: the naming ban lost on BOTH models, and one
+ * answer ran to 837 words against a ceiling of 750. THE DRAFT'S TEXT MOVED AND
+ * ITS NUMBER DID NOT - a draft is current+1 by construction, and the run that
+ * answered the first text stored that text in `analysis_comparison_runs.prompts`,
+ * so it stays readable under a label whose wording has since changed.
+ *
  * WHAT IS STILL UNTESTED, and why this is a draft rather than a promotion:
  * compact has met one title, five times. Requiem is the easy case - canonical,
  * English, with a real critic's review in the set - and it cannot exercise the
@@ -957,7 +967,7 @@ const CURRENT_EDITION: PromptEdition = {
  * without saying what to do with the half that belongs.
  */
 const DRAFT_CIRCUMSTANCES_MOVIE =
-  "How was it made? Two things belong here and nothing else. First, what a maker said they were trying to do: they must be quoted or reported as saying it, and a page describing a director's aims without quoting them does not count. Second, a condition it was made or first released under - the certificate it carried, a cut somebody required, the form it was first shown in, who was allowed to see it. Name that condition in a sentence, and say what it left on the film only when a document says what it left. If none does, name the condition and stop, exactly as you would with a choice. Money is out: a struggle to raise it, a small budget, who paid, rights, fees and schedules. It stays out when a document welds it to something that does belong, as \"developed the script with him, despite struggles to obtain funding\" does - keep the half that belongs and drop the rest. Job lists, crew and extras counts, filming locations and release dates are out too, and so is how it was received and what anyone did afterwards."
+  "How was it made? Two things belong here and nothing else. First, what a maker said they were trying to do: they must be quoted or reported as saying it, and a page describing a director's aims without quoting them does not count. A critic writing that the director tries to reproduce how his characters feel is the critic describing the film, not the director stating an aim, and moving it into the maker's mouth is the commonest way this answer goes wrong. Second, a condition it was made or first released under - the certificate it carried, a cut somebody required, the form it was first shown in, who was allowed to see it. Name that condition in a sentence, and say what it left on the film only when a document says what it left. If none does, name the condition and stop, exactly as you would with a choice. Money is out: a struggle to raise it, a small budget, who paid, rights, fees and schedules. It stays out when a document welds it to something that does belong, as \"developed the script with him, despite struggles to obtain funding\" does - keep the half that belongs and drop the rest. Job lists, crew and extras counts, filming locations and release dates are out too, and so is how it was received and what anyone did afterwards."
 
 const DRAFT_CIRCUMSTANCES_SERIES =
   "How was it made? Two things belong here and nothing else. First, what a maker said they were trying to do: they must be quoted or reported as saying it, and a page describing a creator's aims without quoting them does not count. Second, a condition it was made or first broadcast under - the certificate it carried, a cut somebody required, the slot or the form it first went out in, who was allowed to see it. Name that condition in a sentence, and say what it left on the series only when a document says what it left. If none does, name the condition and stop, exactly as you would with a choice. Money is out: a struggle to raise it, a small budget, who paid, rights, fees and schedules. It stays out when a document welds it to something that does belong, as \"developed the script with him, despite struggles to obtain funding\" does - keep the half that belongs and drop the rest. Job lists, crew and extras counts, filming locations and air dates are out too, and so is how it was received and what anyone did afterwards."
@@ -972,7 +982,7 @@ const DRAFT_CIRCUMSTANCES_SERIES =
  * now a maximum, and the sentence cap names the count it is losing to.
  */
 const DRAFT_LENGTH_RULE =
-  "Write at most nine paragraphs, separated by blank lines, and at most 750 words in all. There is no minimum: thin documents should produce a short piece, and padding one out to reach a length is worse than stopping early. Spend at most two paragraphs on where it comes from, at most four on what it is doing, at most two on how it was made, and one on how it was received, which is the last thing in the piece. Every paragraph is three or four sentences and never five, the first making one claim and the rest supporting it."
+  "Write at most nine paragraphs, separated by blank lines, and at most 750 words in all. There is no minimum: thin documents should produce a short piece, and padding one out to reach a length is worse than stopping early. Spend at most two paragraphs on where it comes from, at most four on what it is doing, at most two on how it was made, and one on how it was received, which is the last thing in the piece. Every paragraph is three or four sentences and never five, the first making one claim and the rest supporting it, and a paragraph runs to about a hundred words - if one of yours is half as long again as that, its sentences are carrying too much and need splitting or cutting."
 
 /**
  * 4. A NAME IN A DOCUMENT'S TITLE IS THE WRITER OF THAT DOCUMENT. Compact lost
@@ -983,7 +993,7 @@ const DRAFT_LENGTH_RULE =
  * still be named.
  */
 const DRAFT_ATTRIBUTION_RULE =
-  "The first answers speak in your own voice: state facts and what is on screen plainly, with nobody attached, even where a critic is who you read it from. Opinions belong in the reception answer, and every opinion has a person behind it - \"a critic\", \"a scholar\", \"a reviewer\", \"some viewers\" - never \"a reading\", \"an account\" or \"the press\". Never hide an opinion inside \"is regarded as\", \"has come to be regarded as\", \"is described as\", \"has been called\", \"is said to\" or \"reportedly\". Never name a critic, a scholar, a reviewer or a publication. A name in a document's own title or byline belongs to whoever wrote that document, never to the film, so it does not appear in your answer at all - the only people you may name are the ones who made the work. \"Critics\" means more than one critic, and two remarks by one critic are one critic."
+  "The first answers speak in your own voice: state facts and what is on screen plainly, with nobody attached, even where a critic is who you read it from. Opinions belong in the reception answer, and every opinion has a person behind it - \"a critic\", \"a scholar\", \"a reviewer\", \"some viewers\" - never \"a reading\", \"an account\" or \"the press\". Never hide an opinion inside \"is regarded as\", \"has come to be regarded as\", \"is described as\", \"has been called\", \"is said to\" or \"reportedly\". The only people you may name are the ones who made the work. Everybody else is \"a critic\", \"a scholar\", \"a reviewer\" or \"some viewers\", and that holds however the name reaches you: not \"Ebert noted\", not \"Honeybone wrote\", not \"Gayle Sequeira of BFI notes\", not \"the reviewer at HorrorNews\", not \"the Washington Post says\" and not \"the Chicago Sun-Times and the Philadelphia Inquirer both call it\". A publication printed beside a quotation is the publication that ran it, and it is not part of the quotation. \"Critics\" means more than one critic, and two remarks by one critic are one critic."
 
 /**
  * 5. THE PROMPT'S OWN NOUN IS "DOCUMENTS". The rule forbids mentioning them and

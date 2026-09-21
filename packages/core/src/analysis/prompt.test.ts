@@ -603,10 +603,18 @@ test('the draft carries the compact variant with its measured corrections', () =
   assert.ok(rulesText.includes('There is no minimum'), 'and is named as gone')
   assert.ok(rulesText.includes('never five'), 'the sentence cap names its failure')
 
-  // 4 and 5: the naming ban says where such a name comes from, and the
-  // documents rule names the phrasing that obeyed its letter.
-  assert.ok(rulesText.includes("document's own title or byline"))
+  // 4 and 5: the naming ban names the shapes that broke it on the first
+  // bench, and the documents rule names the phrasing that obeyed its letter.
+  assert.ok(rulesText.includes('The only people you may name are the ones who made the work'))
+  for (const shape of ['Ebert noted', 'Honeybone wrote', 'of BFI notes', 'the reviewer at HorrorNews']) {
+    assert.ok(rulesText.includes(shape), shape)
+  }
   assert.ok(rulesText.includes('"the documents do not name"'))
+
+  // BENCH 16: a paragraph-sized anchor, since a model cannot count 750 words,
+  // and a critic's description of a maker's aim is not the maker speaking.
+  assert.ok(rulesText.includes('about a hundred words'))
+  assert.ok(making.includes('is the critic describing the film, not the director stating an aim'))
 
   // Everything NOT named above is the variant's own text, unchanged - which is
   // what lets a bench attribute a difference to the five corrections.
