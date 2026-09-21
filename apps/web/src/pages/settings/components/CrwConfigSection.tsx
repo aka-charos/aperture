@@ -74,6 +74,7 @@ interface CrwPublicConfig {
   hasApiKey: boolean
   maxResults: number
   curatedMaxResults: number
+  curatedSites: string[]
   maxContentChars: number
   timeoutMs: number
   sourceBudgetChars: number
@@ -113,6 +114,11 @@ export function CrwConfigSection() {
   const [showApiKey, setShowApiKey] = useState(false)
   const [maxResults, setMaxResults] = useState('6')
   const [curatedMaxResults, setCuratedMaxResults] = useState('4')
+  const [curatedSites, setCuratedSites] = useState<string[]>([])
+  const [siteDraft, setSiteDraft] = useState('')
+  const [siteError, setSiteError] = useState<string | null>(null)
+
+
   const [sourceBudgetChars, setSourceBudgetChars] = useState('16000')
   const [analysisMaxOutputTokens, setAnalysisMaxOutputTokens] = useState('8000')
   const [maxContentChars, setMaxContentChars] = useState('12000')
@@ -130,6 +136,7 @@ export function CrwConfigSection() {
     setApiKey('')
     setMaxResults(String(c.maxResults ?? 6))
     setCuratedMaxResults(String(c.curatedMaxResults ?? 4))
+    setCuratedSites(c.curatedSites ?? [])
     setSourceBudgetChars(String(c.sourceBudgetChars ?? 16000))
     setAnalysisMaxOutputTokens(String(c.analysisMaxOutputTokens ?? 8000))
     setMaxContentChars(String(c.maxContentChars ?? 12000))
@@ -159,7 +166,49 @@ export function CrwConfigSection() {
     fetchConfig()
   }, [fetchConfig])
 
-  const markChanged = () => setHasChanges(true)
+  const markChanged = useCallback(() => setHasChanges(true), [])
+
+  /**
+   * Turn what somebody typed into what a `site:` operator takes.
+   *
+   * A hand copy of core's `sanitizeCuratedSites` for ONE entry, because the
+   * web bundle never imports @aperture/core. It exists so a pasted
+   * "https://www.rogerebert.com/" is accepted here rather than refused by the
+   * route - pasting from the address bar is the normal way to add a site, and
+   * `site:https://…` matches nothing at all, silently.
+   */
+  const cleanSite = (raw: string): string =>
+    raw
+      .trim()
+      .toLowerCase()
+      .replace(/^[a-z][a-z0-9+.-]*:\/\//, '')
+      .replace(/^www\./, '')
+      .replace(/\/+$/, '')
+
+  const addSite = useCallback(() => {
+    const site = cleanSite(siteDraft)
+    const host = site.split('/')[0]
+    if (!site || /\s/.test(site) || !host.includes('.') || host.startsWith('.') || host.endsWith('.')) {
+      setSiteError(t('settingsCrw.curatedSitesInvalid'))
+      return
+    }
+    if (curatedSites.includes(site)) {
+      setSiteError(t('settingsCrw.curatedSitesDuplicate'))
+      return
+    }
+    setCuratedSites((prev) => [...prev, site])
+    setSiteDraft('')
+    setSiteError(null)
+    markChanged()
+  }, [siteDraft, curatedSites, t, markChanged])
+
+  const removeSite = useCallback(
+    (site: string) => {
+      setCuratedSites((prev) => prev.filter((entry) => entry !== site))
+      markChanged()
+    },
+    [markChanged]
+  )
 
   const buildPayload = () => ({
     retrievalMode,
@@ -172,6 +221,7 @@ export function CrwConfigSection() {
     // Floor of 0: unlike maxResults, 0 is meaningful here and switches the
     // second search off.
     curatedMaxResults: clampInt(curatedMaxResults, 0, 20, 4),
+    curatedSites,
     sourceBudgetChars: clampInt(sourceBudgetChars, 2000, 200000, 16000),
     // 0 is meaningful - "no ceiling" - so it skips the range rather than being
     // clamped up to the minimum.
@@ -436,6 +486,49 @@ export function CrwConfigSection() {
             <Typography variant="caption" color="text.secondary">
               {t('settingsCrw.enginesHelp')}
             </Typography>
+          </Box>
+
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              {t('settingsCrw.curatedSitesLabel')}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+              {t('settingsCrw.curatedSitesHelp')}
+            </Typography>
+            <Box display="flex" gap={1} flexWrap="wrap" mb={1.5}>
+              {curatedSites.map((site) => (
+                <Chip key={site} label={site} size="small" onDelete={() => removeSite(site)} />
+              ))}
+              {curatedSites.length === 0 && (
+                <Typography variant="caption" color="text.secondary">
+                  {t('settingsCrw.curatedSitesEmpty')}
+                </Typography>
+              )}
+            </Box>
+            <Box display="flex" gap={1} alignItems="flex-start">
+              <TextField
+                label={t('settingsCrw.curatedSitesAddLabel')}
+                placeholder="rogerebert.com"
+                value={siteDraft}
+                onChange={(e) => {
+                  setSiteDraft(e.target.value)
+                  setSiteError(null)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    addSite()
+                  }
+                }}
+                error={!!siteError}
+                helperText={siteError ?? t('settingsCrw.curatedSitesAddHelp')}
+                size="small"
+                sx={{ flex: '1 1 260px' }}
+              />
+              <Button onClick={addSite} disabled={!siteDraft.trim()} sx={{ mt: 0.5 }}>
+                {t('settingsCrw.curatedSitesAdd')}
+              </Button>
+            </Box>
           </Box>
 
           <Box display="flex" gap={2} flexWrap="wrap">

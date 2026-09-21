@@ -2,10 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
-  CURATED_CRITICISM_SITES,
+  DEFAULT_CURATED_SITES,
   CURATED_TERMS,
   CURATED_QUERY_MAX_CHARS,
   buildCuratedQueries,
+  sanitizeCuratedSites,
+  MAX_CURATED_SITES,
   distributeCuratedResults,
   mergeSearchResults,
 } from './curatedSearch.js'
@@ -14,12 +16,12 @@ const r = (domain: string, url?: string) => ({ domain, url: url ?? `https://${do
 
 
 test('every curated site is a bare host, never a URL', () => {
-  for (const site of CURATED_CRITICISM_SITES) {
+  for (const site of DEFAULT_CURATED_SITES) {
     assert.ok(!site.includes('://'), `${site} carries a scheme`)
     assert.ok(!site.startsWith('www.'), `${site} carries a www prefix`)
     assert.ok(!site.endsWith('/'), `${site} carries a trailing slash`)
   }
-  assert.equal(new Set(CURATED_CRITICISM_SITES).size, CURATED_CRITICISM_SITES.length)
+  assert.equal(new Set(DEFAULT_CURATED_SITES).size, DEFAULT_CURATED_SITES.length)
 })
 
 test('THE CONTRACT: every general result survives, criticism is added to them', () => {
@@ -109,7 +111,7 @@ test('a long title still produces queries that fit', () => {
 
 test('every curated site is asked about, across the queries', () => {
   const all = buildCuratedQueries(BASE).join(' ')
-  for (const site of CURATED_CRITICISM_SITES) {
+  for (const site of DEFAULT_CURATED_SITES) {
     assert.ok(all.includes(`site:${site}`), `${site} is never searched`)
   }
 })
@@ -144,4 +146,53 @@ test('the allowance totals exactly what was asked for', () => {
   }
   assert.deepEqual(distributeCuratedResults(4, 3), [2, 1, 1], 'the remainder goes first')
   assert.deepEqual(distributeCuratedResults(0, 3), [], 'switched off asks nothing')
+})
+
+test('a pasted URL becomes something site: can use', () => {
+  // People add a publication by pasting from the address bar, and
+  // `site:https://www.bfi.org.uk/sight-and-sound/` matches nothing at all -
+  // silently, because an engine answers a nonsense operator with an empty
+  // result set rather than an error.
+  assert.deepEqual(sanitizeCuratedSites(['https://www.rogerebert.com/']), ['rogerebert.com'])
+  assert.deepEqual(sanitizeCuratedSites(['HTTP://MUBI.com/en/notebook/']), ['mubi.com/en/notebook'])
+})
+
+test('a path survives, because it is what narrows a big site', () => {
+  // bfi.org.uk alone answers with the whole BFI site, criterion.com with the
+  // shop. The path is the entry, not decoration.
+  assert.deepEqual(sanitizeCuratedSites(['bfi.org.uk/sight-and-sound']), [
+    'bfi.org.uk/sight-and-sound',
+  ])
+})
+
+test('a bare word is dropped, never repaired', () => {
+  // Guessing a TLD would silently search somewhere nobody named.
+  assert.deepEqual(sanitizeCuratedSites(['rogerebert', 'two words.com', '', '.com', 'x.']), [])
+  assert.deepEqual(sanitizeCuratedSites('not an array'), [])
+  assert.deepEqual(sanitizeCuratedSites([42, null, 'ok.com']), ['ok.com'])
+})
+
+test('duplicates collapse however they were spelled', () => {
+  assert.deepEqual(
+    sanitizeCuratedSites(['rogerebert.com', 'https://www.RogerEbert.com', 'rogerebert.com/']),
+    ['rogerebert.com']
+  )
+})
+
+test('the stored list is bounded', () => {
+  const many = Array.from({ length: MAX_CURATED_SITES + 10 }, (_, i) => `site${i}.com`)
+  assert.equal(sanitizeCuratedSites(many).length, MAX_CURATED_SITES)
+})
+
+test('the default list survives its own sanitizer unchanged', () => {
+  // If it did not, the shipped default would be rewritten on first read and
+  // the settings route would refuse the very list it hands out.
+  assert.deepEqual(sanitizeCuratedSites([...DEFAULT_CURATED_SITES]), [...DEFAULT_CURATED_SITES])
+})
+
+test('an operator list replaces the default in the queries', () => {
+  const queries = buildCuratedQueries('Solaris 1972 film review', ['sensesofcinema.com'])
+  assert.equal(queries.length, 1)
+  assert.ok(queries[0].includes('site:sensesofcinema.com'))
+  assert.ok(!queries[0].includes('rogerebert.com'), 'the default is not merged in')
 })

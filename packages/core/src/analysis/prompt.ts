@@ -1443,10 +1443,45 @@ function afterBeginMarker(body: string): { text: string; hadBeginMarker: boolean
  * for it, since that word is what surfaces aggregator and listicle pages -
  * precisely what ./sourceFloor.ts exists to catch.
  */
+/**
+ * The one word appended to the title and year for the general search.
+ *
+ * MEASURED against DuckDuckGo on Requiem for a Dream, 2026-09-21, reading the
+ * top ten domains of each query. The words matter far more than they look:
+ *
+ *   "film review"                     rogerebert, nytimes, metacritic,
+ *                                     rottentomatoes, wikipedia, imdb
+ *   "film"                            wikipedia, imdb, rottentomatoes,
+ *                                     rogerebert, then streaming stores
+ *   "film analysis review"            moviesense.io, darkfilmtheories,
+ *                                     rogerebert, arcplot - NO wikipedia
+ *   "film analysis criticism
+ *    production history themes style" moviesense.io, darkfilmtheories,
+ *                                     itsreleased, arcplot, scribd
+ *   "film criticism essay"            gradesfixer, scribd, bartleby,
+ *                                     ivypanda, cram, studymode
+ *
+ * THE LAST THREE ARE THE PROBLEM THIS EXISTS TO FIX. The query used to be the
+ * fourth line, and three of its top six are on ./sourceQuality.ts's own
+ * low-value domain list - so retrieval was SELECTING FOR the generated pages
+ * the filter then deletes, and the Requiem bench's five-of-eight junk source
+ * set was the query's doing rather than the web's.
+ *
+ * The mechanism is that "analysis", "themes", "style" and "production" are the
+ * section HEADINGS of an SEO'd generated analysis page, and "essay" is what
+ * student essay mills are optimised for. A real review contains none of them
+ * as keywords. "review" is the one word that pulls critics, and adding
+ * "analysis" back to it is enough to put moviesense.io first again.
+ *
+ * It is deliberately ONE word. Every term added is another chance to name the
+ * furniture of a content farm instead of the thing being looked for.
+ */
+export const RETRIEVAL_TERM = 'review'
+
 export function buildAnalysisQuery(subject: AnalysisSubject): string {
   const kind = subject.mediaType === 'series' ? 'TV series' : 'film'
   const original = distinctOriginalTitle(subject)
   const alsoKnownAs = original ? ` ${original}` : ''
   const year = subject.year ? ` ${subject.year}` : ''
-  return `${subject.title}${alsoKnownAs}${year} ${kind} analysis criticism production history themes style`
+  return `${subject.title}${alsoKnownAs}${year} ${kind} ${RETRIEVAL_TERM}`
 }

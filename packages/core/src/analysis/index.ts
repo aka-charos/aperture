@@ -24,6 +24,7 @@ export {
   DRAFT_PROMPT_VERSION,
   buildAnalysisPrompt,
   buildAnalysisQuery,
+  RETRIEVAL_TERM,
   parseAnalysisResponse,
   libraryVariantFor,
   promptChoiceKey,
@@ -146,3 +147,9 @@ export {
   type AnalysisJobOptions,
   type AnalysisJobResult,
 } from './job.js'
+
+export {
+  DEFAULT_CURATED_SITES,
+  MAX_CURATED_SITES,
+  sanitizeCuratedSites,
+} from './curatedSearch.js'
