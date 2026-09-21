@@ -56,7 +56,7 @@ import { startStreamStallGuard, type StreamAbortReason } from '../lib/streamStal
 import { recordWebSearchCall } from '../lib/webSearchUsage.js'
 import { budgetSources } from './budget.js'
 import { isBlockedPage } from './blockedPage.js'
-import { buildCuratedQuery, curatedSlots, mergeSearchResults } from './curatedSearch.js'
+import { buildCuratedQuery, mergeSearchResults } from './curatedSearch.js'
 import { dropLowValueSources } from './sourceQuality.js'
 import { findStructureProblem } from './structure.js'
 import { dropDuplicateTitles } from './duplicateSources.js'
@@ -297,35 +297,33 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
   // "nothing on those sites", which for most titles is the correct answer -
   // and it holds the cost to one extra request instead of three.
   //
-  // IT ASKS FOR ITS RESERVED SLOTS ONLY, never a full `maxResults`. This call
-  // scrapes what it finds, so pages asked for are pages fetched and paid for;
-  // requesting more than the merge can keep would buy page fetches to throw
-  // away. Zero slots means the operator's budget cannot hold a curated result,
-  // and then the search is not made at all.
+  // IT IS PURELY ADDITIVE. The general search above keeps every one of its
+  // `maxResults` results; these are appended to them, so a title with no
+  // criticism written about it reaches the prompt with exactly what retrieval
+  // produced before this existed. `curatedMaxResults` is its own setting for
+  // that reason, and 0 means the search is not made at all.
   //
   // ITS OUTCOME IS DELIBERATELY NOT RECORDED AGAINST ENGINE HEALTH. Empty is
   // the expected outcome here, and five empty curated searches running would
   // otherwise park a perfectly healthy engine at the back of the cascade for
   // half an hour - see crwEngines.
-  const criticismSlots = curatedSlots(config.maxResults)
+  const criticismWanted = config.curatedMaxResults
   // Which results the criticism search supplied, so the sources can SAY so
   // further down. Keyed by URL because the merge dedupes on one.
   let criticismUrls = new Set<string>()
   try {
-    const curated = criticismSlots
+    const curated = criticismWanted
       ? await crwSearch(buildCuratedQuery(queryText), {
           baseUrl: config.baseUrl,
           apiKey: config.apiKey,
-          maxResults: criticismSlots,
+          maxResults: criticismWanted,
           maxContentChars: config.maxContentChars,
           timeoutMs: config.timeoutMs,
           engine: engineUsed,
         })
       : { results: [] }
     if (curated.results.length > 0) {
-      const merged = mergeSearchResults(curated.results, results, {
-        limit: config.maxResults,
-      })
+      const merged = mergeSearchResults(curated.results, results)
       criticismUrls = new Set(curated.results.map((r) => r.url))
       logger.info(
         {
@@ -344,10 +342,10 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
       // one. Info rather than warn: nothing published on those twenty sites is
       // the ordinary answer for most of a library, not a fault.
       logger.info(
-        { title: subject.title, engine: engineUsed, slots: criticismSlots },
-        criticismSlots
+        { title: subject.title, engine: engineUsed, wanted: criticismWanted },
+        criticismWanted
           ? 'Criticism search returned nothing for this title'
-          : 'Criticism search skipped — the result budget reserves no slot for it'
+          : 'Criticism search is switched off (curatedMaxResults is 0)'
       )
     }
   } catch (err) {

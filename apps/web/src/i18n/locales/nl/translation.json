@@ -4983,7 +4983,9 @@
     "engineSlot2Label": "Fall back to",
     "engineSlot3Label": "Then",
     "engineNone": "None",
-    "enginesHelp": "Tried in order until one returns results. Each is a separate request, so a first choice that is permanently blocked costs one wasted search per title — drop it from the list rather than paying for it. After five empty answers in a row an engine is tried last for half an hour, then given another chance."
+    "enginesHelp": "Tried in order until one returns results. Each is a separate request, so a first choice that is permanently blocked costs one wasted search per title — drop it from the list rather than paying for it. After five empty answers in a row an engine is tried last for half an hour, then given another chance.",
+    "curatedMaxResultsLabel": "Extra criticism results",
+    "curatedMaxResultsHelp": "A second search of film-criticism publications, added to the results above rather than taken from them. 0 switches it off."
   },
   "settingsRatings": {
     "title": "Ratings Refresh",

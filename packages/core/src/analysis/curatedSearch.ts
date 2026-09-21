@@ -9,31 +9,35 @@
  * addition: ask the same question again, of the publications whose words the
  * prompt actually wants.
  *
- * IT IS A SECOND SEARCH, NEVER A REPLACEMENT. The general query stays exactly
- * as it was and runs first. A site-restricted query is a hard AND across the
- * whole disjunction, so for an obscure title it very often returns nothing -
- * and on a title nobody reputable has written about, nothing is the correct
- * answer rather than a failure. The general results are what keep Wikipedia in
- * the set, which is where every checkable fact in an analysis comes from.
+ * IT IS PURELY ADDITIVE, AND THAT IS THE WHOLE CONTRACT. The general search
+ * runs first, unchanged, and keeps EVERY one of its `maxResults` results. What
+ * this search finds is appended. A title with criticism written about it
+ * reaches the prompt with `maxResults + curatedMaxResults` documents; a title
+ * without reaches it with exactly `maxResults`, which is byte-for-byte what
+ * retrieval did before this module existed.
  *
- * THE MERGE IS BY RESERVED SLOTS, not by concatenating and truncating. The two
- * result sets are different populations - one is "the web on this title", the
- * other is "criticism on this title" - so a shared cut would let a title with
- * heavy general coverage take every slot, which is the same argument
- * similarity/crossMedia.ts makes for film-vs-series neighbours. Curated results
- * are placed FIRST within the merged list, because ./budget.ts allocates the
- * character budget in order and the pages worth reading should get it.
+ * THE FIRST VERSION CAPPED THE MERGED LIST AT `maxResults` AND WAS WRONG.
+ * Reserving half the list for criticism meant a successful curated search cut
+ * the general search from six documents to three - so the feature took away
+ * Wikipedia-and-friends to make room, and `maxResults` silently stopped meaning
+ * "how many general results" and started meaning "total, of which an
+ * unpredictable share are general". Two different questions had been folded
+ * into one number, and an operator could then reason about neither. The count
+ * of extra documents is `CrwConfig.curatedMaxResults`, its own setting, and 0
+ * turns the search off.
  *
- * WHAT IT COSTS, STATED HONESTLY. `crwSearch` searches AND SCRAPES in one call
- * (`scrapeOptions: { formats: ['markdown'] }`), so a second search is a second
- * round of page fetches, not one cheap extra request - and scraping is the
- * expensive half, where a single slow page can occupy 82.5 seconds (see
- * `CrwConfig.timeoutMs`). That is why the curated search asks for only its
- * RESERVED slots rather than a full `maxResults`: the pages fetched per title
- * go from `maxResults` to `maxResults + curatedSlots(maxResults)`, which at the
- * default share is half again rather than double. The merged list itself is
- * still capped at `maxResults`, so the prompt carries no more documents than it
- * did and nothing downstream changes size.
+ * WHAT BOUNDS THE PROMPT IS `sourceBudgetChars`, NOT THE DOCUMENT COUNT.
+ * ./budget.ts water-fills a fixed character budget across whatever it is given,
+ * so more documents divide the same budget more ways rather than growing the
+ * prompt. That is what makes "additive" affordable: the model's context does
+ * not move, and each document's slice gets a little smaller.
+ *
+ * WHAT IT COSTS. `crwSearch` searches AND SCRAPES in one call (`scrapeOptions:
+ * { formats: ['markdown'] }`), so a second search is a second round of page
+ * fetches - and scraping is the expensive half, where a single slow page can
+ * occupy 82.5 seconds (see `CrwConfig.timeoutMs`). Pages fetched per title go
+ * from `maxResults` to `maxResults + curatedMaxResults`: at the defaults, six
+ * to ten.
  *
  * PURE AND DB-FREE, like ./sourceQuality.ts and ./budget.ts around it.
  */
@@ -45,8 +49,8 @@
  * because they publish ARGUED criticism under a named byline, which is exactly
  * what `SOURCE_VALUE_RULE` says to weigh above everything else. Aggregators,
  * listings, fan wikis and generated-analysis sites are deliberately absent:
- * adding one here would spend a reserved slot on the material the whole source
- * rule exists to discount.
+ * adding one here would spend a fetch on the material the whole source rule
+ * exists to discount.
  *
  * A path is allowed and is sometimes the point - `bfi.org.uk/sight-and-sound`
  * rather than the whole BFI site, `criterion.com/current` rather than the shop.
@@ -78,7 +82,7 @@ export const CURATED_CRITICISM_SITES: readonly string[] = [
  * What kind of page is wanted, as a second disjunction.
  *
  * These sites also publish news, festival line-ups and release calendars, and
- * a bare title match on one of those is a slot spent on something with nothing
+ * a bare title match on one of those is a fetch spent on something with nothing
  * to say about the work.
  */
 export const CURATED_TERMS: readonly string[] = [
@@ -109,57 +113,30 @@ export interface MergeableResult {
   domain: string
 }
 
-/** Default share of the slots held for criticism before general results fill. */
-export const CURATED_SLOT_SHARE = 0.5
-
 /**
- * How many slots criticism is asked for, and therefore how many pages the
- * second search is allowed to fetch.
+ * The two result sets as one list: criticism first, then every general result.
  *
- * ONE COPY, read by the merge AND by the caller that sizes the request. They
- * are one decision: a request larger than the reservation pays to scrape pages
- * the merge will then discard, and a request smaller than it silently makes the
- * reservation unreachable.
+ * NOTHING IS DROPPED FOR SPACE. There is no limit argument, because the two
+ * counts were already decided when the two searches were issued - `maxResults`
+ * and `curatedMaxResults` - and a cap here would silently overrule one of them,
+ * which is the mistake this module's header records.
  *
- * FLOORED, never rounded, so criticism can never be RESERVED more than half the
- * list and the general search always keeps the rest - it is what carries
- * Wikipedia, and every checkable fact in an analysis comes from there. The
- * curated side can still take unused general slots afterwards; that is a
- * different thing from being handed them.
+ * Criticism goes first for one live reason: ./duplicateSources.ts keeps the
+ * FIRST of a repeated title, so a review and an aggregator page carrying the
+ * same headline resolve in favour of the review. (./budget.ts also consumes
+ * documents in order, but its count cut cannot fire at any legal setting -
+ * `maxKeep` is `sourceBudgetChars / 600`, far above the `maxResults` ceiling of
+ * 20 - so that is not a reason, only a tiebreak if the budget is ever lowered.)
  *
- * At a `maxResults` of 1 this is 0, and the caller skips the second search
- * outright rather than spending a scrape on a slot that cannot be kept.
- */
-export function curatedSlots(limit: number, share: number = CURATED_SLOT_SHARE): number {
-  const bounded = Math.max(0, Math.floor(limit))
-  return Math.max(0, Math.min(bounded, Math.floor(bounded * share)))
-}
-
-/**
- * One list from two, curated first, deduplicated, capped at `limit`.
- *
- * Slots are RESERVED rather than shared: `limit * share` go to criticism if
- * there is that much, the rest to the general search, and either side may take
- * the other's unused slots. Neither list is ordered against the other, because
- * a search rank from one query says nothing about a result from a different
- * one.
- *
- * Deduplicated by URL, falling back to the domain when a result carries none -
- * the same page reached by both searches must not occupy two slots. The URL is
- * compared without its scheme, `www.` or trailing slash, because two searches
- * routinely return one article in two of those spellings and a raw string
- * comparison would spend a second slot on it.
+ * Deduplicated by URL, falling back to the domain when a result carries none.
+ * The URL is compared without its scheme, `www.` or trailing slash, because two
+ * searches routinely return one article in two of those spellings and a raw
+ * string comparison would keep both.
  */
 export function mergeSearchResults<T extends MergeableResult>(
   curated: readonly T[],
-  general: readonly T[],
-  options: { limit: number; share?: number }
+  general: readonly T[]
 ): T[] {
-  const limit = Math.max(0, Math.floor(options.limit))
-  if (limit === 0) return []
-
-  const reserved = curatedSlots(limit, options.share)
-
   const seen = new Set<string>()
   const out: T[] = []
   const key = (r: T) => {
@@ -172,19 +149,11 @@ export function mergeSearchResults<T extends MergeableResult>(
       .replace(/\/+$/, '')
   }
 
-  const take = (list: readonly T[], upTo: number) => {
-    for (const result of list) {
-      if (out.length >= upTo) return
-      const id = key(result)
-      if (seen.has(id)) continue
-      seen.add(id)
-      out.push(result)
-    }
+  for (const result of [...curated, ...general]) {
+    const id = key(result)
+    if (seen.has(id)) continue
+    seen.add(id)
+    out.push(result)
   }
-
-  take(curated, reserved)
-  take(general, limit)
-  // Whatever the general search could not fill goes back to criticism.
-  take(curated, limit)
   return out
 }
