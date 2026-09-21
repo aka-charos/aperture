@@ -365,6 +365,7 @@ async function driveComparison(
               domain: source.domain,
               url: source.url ?? null,
               chars: source.text.length,
+              ...(source.curated === true ? { curated: true } : {}),
             }))
           ),
         ]
@@ -547,7 +548,9 @@ interface RunRow {
   prompt_version: number
   source_count: number | null
   retrieved_chars: number | null
-  sources: { title: string; domain: string; url: string | null; chars: number }[] | null
+  sources:
+    | { title: string; domain: string; url: string | null; chars: number; curated?: boolean }[]
+    | null
   replay_of: string | null
   /**
    * One prompt per choice, keyed "15" or "15:compact" (0172, 0179); null on
@@ -632,6 +635,9 @@ export async function getComparisonRun(runId: string): Promise<ComparisonRunView
       title: s.title,
       domain: s.domain,
       chars: s.chars,
+      // Only ever true: absent must stay absent, or a run stored before the
+      // curated search would claim that search rejected every document.
+      ...(s.curated === true ? { curated: true } : {}),
     })),
     retrievedChars: run.retrieved_chars ?? 0,
     prompt: run.prompt,

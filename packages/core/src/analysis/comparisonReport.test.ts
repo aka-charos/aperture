@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import {
+  criticismLine,
   renderComparisonReport,
   type ComparisonEntry,
   type ComparisonReport,
@@ -342,4 +343,35 @@ test('a map that could not be read is printed on one line', () => {
   // A readable map prints its sections and nothing about the raw text.
   const mapped = renderComparisonReport({ ...report(), entries: [entry({ mapText: '1: work' })] })
   assert.doesNotMatch(mapped, /map not read|map: none/)
+})
+
+test('a criticism document is marked, and the count says so', () => {
+  const out = criticismLine([
+    { title: 'A', domain: 'rogerebert.com', chars: 100, curated: true },
+    { title: 'B', domain: 'en.wikipedia.org', chars: 100 },
+  ])
+  assert.match(out, /1 came from the curated criticism search/)
+})
+
+test('no marked source never claims the search found nothing', () => {
+  // Three different things produce this zero - the search found nothing, the
+  // run predates the curated search, or the build has no curated search - and
+  // the list cannot tell them apart. Stating the first would send someone to
+  // debug a query that is working.
+  const out = criticismLine([{ title: 'A', domain: 'en.wikipedia.org', chars: 100 }])
+  assert.match(out, /either it found nothing .* or this run was made without it/)
+  assert.ok(!/^Of these/.test(out))
+})
+
+test('the marker rides on the source line, not on the heading alone', () => {
+  const rendered = renderComparisonReport(
+    report({
+      sources: [
+        { title: 'On Requiem', domain: 'sensesofcinema.com', chars: 4200, curated: true },
+        { title: 'Requiem for a Dream', domain: 'en.wikipedia.org', chars: 9000 },
+      ],
+    })
+  )
+  assert.match(rendered, /sensesofcinema\.com — On Requiem \(4,200 chars\) \[criticism\]/)
+  assert.ok(!/en\.wikipedia\.org.*\[criticism\]/.test(rendered))
 })

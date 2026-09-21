@@ -308,6 +308,9 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
   // otherwise park a perfectly healthy engine at the back of the cascade for
   // half an hour - see crwEngines.
   const criticismSlots = curatedSlots(config.maxResults)
+  // Which results the criticism search supplied, so the sources can SAY so
+  // further down. Keyed by URL because the merge dedupes on one.
+  let criticismUrls = new Set<string>()
   try {
     const curated = criticismSlots
       ? await crwSearch(buildCuratedQuery(queryText), {
@@ -323,6 +326,7 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
       const merged = mergeSearchResults(curated.results, results, {
         limit: config.maxResults,
       })
+      criticismUrls = new Set(curated.results.map((r) => r.url))
       logger.info(
         {
           title: subject.title,
@@ -333,6 +337,18 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
         'Merged criticism search into retrieval'
       )
       results = merged
+    } else {
+      // LOGGED, because an empty criticism search and a criticism search that
+      // never ran are the same silence otherwise - which is exactly how an
+      // operator ends up unable to tell a deployed feature from an undeployed
+      // one. Info rather than warn: nothing published on those twenty sites is
+      // the ordinary answer for most of a library, not a fault.
+      logger.info(
+        { title: subject.title, engine: engineUsed, slots: criticismSlots },
+        criticismSlots
+          ? 'Criticism search returned nothing for this title'
+          : 'Criticism search skipped — the result budget reserves no slot for it'
+      )
     }
   } catch (err) {
     // Never fails the title. The general search has already answered, and this
@@ -348,6 +364,10 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
     domain: r.domain,
     text: r.markdown,
     url: r.url,
+    // Only ever set to true: `curated: false` on every general result would
+    // claim the criticism search ran and rejected them, which is not what an
+    // absent flag means (see AnalysisSource.curated).
+    ...(criticismUrls.has(r.url) ? { curated: true } : {}),
   }))
 
   const fetchedChars = fetched.reduce((sum, s) => sum + s.text.length, 0)
@@ -427,6 +447,9 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
       budgeted: sources.length,
       retrievedChars,
       domains: sources.map((s) => s.domain),
+      // Survives the budget, which is the number that matters: a criticism
+      // page found and then dropped for space is not a criticism page read.
+      fromCriticism: sources.filter((s) => s.curated === true).length,
       ms: Date.now() - startedAt,
     },
     'Retrieved sources for analysis'
