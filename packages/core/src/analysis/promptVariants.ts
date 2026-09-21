@@ -76,8 +76,15 @@ import type { PromptVariant } from './prompt.js'
  * - IT COUNTS ITS PARAGRAPHS BEFORE WRITING THE MAP. A map one line short
  *   silently shifts every label after the miscount, which is worse than a map
  *   that is rejected outright, because a rejected one says so.
+ *
+ * FROZEN NOW THAT A DRAFT IS BUILT FROM IT. Version 16 is these arrays with
+ * named replacements (prompt.ts, DRAFT_EDITION), matched on the exact question
+ * id and the exact rule text - so editing one here throws at module load
+ * instead of silently leaving the draft unchanged. Bench rows already carry
+ * this id as well, and rows the library wrote under it carry it in
+ * `title_analysis.prompt_variant`, so its text is a record, not a draft.
  */
-const COMPACT_VARIANT: PromptVariant = {
+export const COMPACT_VARIANT: PromptVariant = {
   id: 'compact',
   label: 'Compact',
   base: 15,

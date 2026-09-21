@@ -19,6 +19,7 @@ import {
   BENCH_PROMPT_VARIANTS,
   BENCH_PROMPT_VERSIONS,
   DRAFT_PROMPT_VERSION,
+  editionFor,
   promptChoiceKey,
   promptChoiceLabel,
   libraryVariantFor,
@@ -542,9 +543,86 @@ test('versions 9 to 14 stay benchable, each as it was sent', () => {
   assert.deepEqual(questionIdsFor('series', 10), questionIdsFor('series'))
 })
 
-test('with no draft, the current version is the newest the bench carries', () => {
-  assert.equal(DRAFT_PROMPT_VERSION, null)
-  assert.equal(BENCH_PROMPT_VERSIONS[BENCH_PROMPT_VERSIONS.length - 1], ANALYSIS_PROMPT_VERSION)
+/**
+ * A DRAFT IS BENCH-ONLY. It is the newest number the bench carries and it must
+ * not be what anything else resolves to: the library writer, the analysis route
+ * and the paragraph map vocabulary all keep the current version, which is what
+ * stops a draft from retiring the library it is being tested against.
+ */
+test('the draft, when there is one, sits above the current version and nowhere else', () => {
+  const newest = BENCH_PROMPT_VERSIONS[BENCH_PROMPT_VERSIONS.length - 1]
+  if (DRAFT_PROMPT_VERSION == null) {
+    assert.equal(newest, ANALYSIS_PROMPT_VERSION)
+    return
+  }
+  assert.equal(newest, DRAFT_PROMPT_VERSION)
+  assert.equal(DRAFT_PROMPT_VERSION, ANALYSIS_PROMPT_VERSION + 1)
+  // What resolves without being asked is still the current version.
+  assert.equal(editionFor().version, ANALYSIS_PROMPT_VERSION)
+  assert.deepEqual(resolveBenchPromptVersions(null), [ANALYSIS_PROMPT_VERSION])
+  assert.deepEqual(questionIdsFor('movie'), questionIdsFor('movie', ANALYSIS_PROMPT_VERSION))
+})
+
+/**
+ * Draft 16 is the compact variant with named replacements, which is a first -
+ * every earlier draft varied the current version. Two things have to hold or
+ * the bench cannot attribute anything to the change: the parts that were not
+ * replaced are the variant's own, and the parts that were are not.
+ *
+ * The replacement helper throws when a base text moves, so merely building the
+ * draft - which importing this module does - is half the test.
+ */
+test('the draft carries the compact variant with its measured corrections', () => {
+  if (DRAFT_PROMPT_VERSION == null) return
+  const draft = editionFor(DRAFT_PROMPT_VERSION)
+  const compact = variantFor('compact')
+
+  // Same question ids as its base, or parseParagraphMap discards every label.
+  assert.deepEqual(
+    draft.movieQuestions.map((q) => q.id),
+    compact.movieQuestions.map((q) => q.id)
+  )
+  assert.deepEqual(
+    draft.seriesQuestions.map((q) => q.id),
+    compact.seriesQuestions.map((q) => q.id)
+  )
+  assert.equal(draft.rules.length, compact.rules.length)
+
+  const rulesText = draft.rules.join('\n')
+
+  // 1 and 2: the making question drops the counterfactual and names the welded
+  // money case, and stops asking what the making "left on the film" up front.
+  const making = draft.movieQuestions.find((q) => q.id === 'circumstances')!.text
+  assert.ok(!making.includes('would be a different film'), 'counterfactual test removed')
+  assert.ok(making.includes('only when a document says what it left'), 'document requirement')
+  assert.ok(making.includes('despite struggles to obtain funding'), 'the welded money case')
+  assert.ok(making.includes('the certificate it carried'), 'a qualifying condition is named')
+
+  // 3: every length number is a maximum now, and the sentence cap names five.
+  assert.ok(!rulesText.includes('450 to 750 words'), 'the word floor is gone')
+  assert.ok(rulesText.includes('There is no minimum'), 'and is named as gone')
+  assert.ok(rulesText.includes('never five'), 'the sentence cap names its failure')
+
+  // 4 and 5: the naming ban says where such a name comes from, and the
+  // documents rule names the phrasing that obeyed its letter.
+  assert.ok(rulesText.includes("document's own title or byline"))
+  assert.ok(rulesText.includes('"the documents do not name"'))
+
+  // Everything NOT named above is the variant's own text, unchanged - which is
+  // what lets a bench attribute a difference to the five corrections.
+  const unchangedQuestions = (
+    questions: readonly { id: string; text: string }[]
+  ) => questions.filter((q) => q.id !== 'circumstances').map((q) => q.text)
+  assert.deepEqual(unchangedQuestions(draft.movieQuestions), unchangedQuestions(compact.movieQuestions))
+  assert.deepEqual(
+    unchangedQuestions(draft.seriesQuestions),
+    unchangedQuestions(compact.seriesQuestions)
+  )
+  assert.equal(
+    draft.rules.filter((rule) => compact.rules.includes(rule)).length,
+    compact.rules.length - 3,
+    'exactly three rules replaced'
+  )
 })
 
 /**
