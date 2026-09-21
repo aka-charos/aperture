@@ -321,3 +321,61 @@ test('a named writer is counted once, and only when capitalised', () => {
   // Nothing passed means not measured, which is the zero the report prints.
   assert.equal(measureProse('Ebert called it her riskiest role.').namedWriters, 0)
 })
+
+/**
+ * "Sight and Sound" read as a two-word personal name once the lowercase
+ * connective was filtered out, so "Sound" was registered as its surname and
+ * matched "Sound is pushed to acute exaggeration" in both version-16 answers.
+ * The case-sensitive guard could not help: the word opened a sentence.
+ */
+test('a publication is registered whole, and never yields a surname', () => {
+  const names = writerNamesFromSources([
+    { title: 'The best films of 2006 | Sight and Sound' },
+    { title: 'Requiem for a Dream movie review - Roger Ebert' },
+  ])
+  assert.ok(names.includes('Sight and Sound'), 'the connective is kept')
+  assert.ok(!names.includes('Sight Sound'), 'and the mangled form is gone')
+  assert.ok(!names.includes('Sound'))
+  // A name capitalised throughout still gives its surname, which is how a
+  // critic gets named in prose.
+  assert.ok(names.includes('Roger Ebert') && names.includes('Ebert'))
+  assert.equal(measureProse('Sound is pushed to exaggeration.', null, names).namedWriters, 0)
+})
+
+/**
+ * Publications are printed beside every blurb on an aggregator page, so an
+ * answer names them without any source TITLE having supplied one. On the
+ * version-16 bench one answer named six in a paragraph while this column,
+ * reading titles alone, reported two.
+ */
+test('a publication named out of a document body is counted', () => {
+  const named =
+    'The Chicago Sun-Times and Philadelphia Inquirer both call it chilling, and the Washington Post says the style pistol-whips attention.'
+  const signals = measureProse(named, null, [])
+  assert.equal(signals.namedWriters, 3)
+  assert.deepEqual(signals.namedWriterMatches.sort(), [
+    'Chicago Sun-Times',
+    'Philadelphia Inquirer',
+    'Washington Post',
+  ])
+})
+
+/**
+ * Two shapes that name a writer and CANNOT name a maker - a maker is never "of"
+ * a publication, nor "the reviewer at" one. That is the whole reason they are
+ * shapes and not a bare surname plus a reporting verb, which would fire on
+ * "Aronofsky said" and on "Selby wrote", both of which every version requires.
+ */
+test('a writer attached to a publication is counted, and a maker never is', () => {
+  const writer = measureProse('Gayle Sequeira of Filmstage notes that time speeds up.', null, [])
+  assert.equal(writer.namedWriters, 1)
+  const at = measureProse('The reviewer at Horrornews traces the collapse.', null, [])
+  assert.equal(at.namedWriters, 1)
+
+  const makers = measureProse(
+    'Aronofsky said the film is about addiction in general, and Selby wrote the novel in 1978.',
+    null,
+    writerNamesFromSources([{ title: 'Requiem for a Dream - Wikipedia' }])
+  )
+  assert.equal(makers.namedWriters, 0, 'naming the people who made it is required, never counted')
+})

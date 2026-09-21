@@ -44,9 +44,10 @@ export interface ProseSignals {
    */
   inlineLabels: number
   /**
-   * Names from the retrieval that appear in the answer - a critic, a scholar or
-   * a publication, which every version forbids naming. Zero when the caller
-   * passed no names, and that zero means "not measured".
+   * A critic, a scholar or a publication named in the answer, which every
+   * version forbids. The measured publication list and the two writer shapes
+   * are always counted; the names a caller passes from THIS run are added to
+   * them, so a zero here means none found, never "not measured".
    */
   namedWriters: number
   /** The names behind that count, so a reader can check what matched. */
@@ -267,19 +268,78 @@ export function writerNamesFromSources(
     const parts = title.split(TITLE_SEPARATORS)
     if (parts.length < 2) continue
     const tail = parts[parts.length - 1].replace(/\(.*?\)/g, ' ').trim()
-    const words = tail.split(/\s+/).filter((word) => /^[\p{Lu}]/u.test(word))
-    if (words.length === 0 || words.length > 4) continue
-    if (words.every((word) => TITLE_BOILERPLATE.has(word.toLowerCase().replace(/[^\p{L}]/gu, ''))))
+    const raw = tail.split(/\s+/).filter(Boolean)
+    const capitalised = raw.filter((word) => /^[\p{Lu}]/u.test(word))
+    if (capitalised.length === 0 || raw.length > 5) continue
+    if (
+      capitalised.every((word) => TITLE_BOILERPLATE.has(word.toLowerCase().replace(/[^\p{L}]/gu, '')))
+    ) {
       continue
-    const full = words.join(' ')
+    }
+    // The WHOLE tail, connectives included. Joining only the capitalised words
+    // stored "Sight and Sound" as "Sight Sound", a string no answer can contain
+    // - so the publication was registered and could never be caught.
+    const full = raw.join(' ')
     if (full.length >= 4) names.add(full)
-    const last = words[words.length - 1]
-    if (words.length > 1 && last.length >= 4 && !TITLE_BOILERPLATE.has(last.toLowerCase())) {
+    // A surname only from a name that is capitalised THROUGHOUT. A lowercase
+    // connective means a publication, and dropping it made "Sight and Sound"
+    // read as a two-word personal name: "Sound" was registered as its surname
+    // and matched "Sound is pushed to acute exaggeration" in both answers on
+    // the version-16 bench. The case-sensitive guard did not help, because the
+    // word opened a sentence.
+    const last = raw[raw.length - 1]
+    if (
+      raw.length === capitalised.length &&
+      raw.length > 1 &&
+      last.length >= 4 &&
+      !TITLE_BOILERPLATE.has(last.toLowerCase())
+    ) {
       names.add(last)
     }
   }
   return [...names].sort()
 }
+
+/**
+ * Publications an answer named, which no source title could have supplied.
+ *
+ * MEASURED, EVERY ONE, like ./sourceQuality.ts's domain list: each name below
+ * was read in a retrieved document on a bench, and the model that named it was
+ * reading it out of an aggregator's quote list, where the publication is
+ * printed beside every blurb. On the version-16 bench one answer named six of
+ * these in a single paragraph while `namedWriters` - which reads source titles
+ * only - reported two.
+ *
+ * IT IS A FLOOR AND NOT A CEILING. A publication joins it when it has been
+ * seen. What it deliberately does not cover is a critic's SURNAME out of a
+ * document body ("Honeybone wrote", "Stephen Hunter says"), because the only
+ * mechanical way to tell that from a maker being named and quoted - which every
+ * version requires - is to know who made the film, and this module is handed
+ * prose and labels and nothing else.
+ */
+const PUBLICATIONS = [
+  'ABC Radio', 'BFI', 'Chicago Reader', 'Chicago Sun-Times', 'Dallas Observer', 'Empire',
+  'Fangoria', 'Film.com', 'IMDb', 'IndieWire', 'Letterboxd', 'Little White Lies', 'Metacritic',
+  'MUBI', 'New York Post', 'Philadelphia Inquirer', 'Rolling Stone', 'Rotten Tomatoes',
+  'San Francisco Chronicle', 'San Francisco Examiner', 'Screen Daily', 'Seattle Post-Intelligencer',
+  'Sight and Sound', 'Slant', 'The Guardian', 'The Hollywood Reporter', 'Time Out', 'Toronto Star',
+  'TV Guide', 'USA Today', 'Variety', 'Village Voice', 'Washington Post', 'Wikipedia',
+]
+
+/**
+ * Two shapes that name a writer and cannot name a maker.
+ *
+ * Both were read on the version-16 bench, where the rule forbidding a name had
+ * just been rewritten to explain WHERE such a name comes from and was broken
+ * anyway: "Gayle Sequeira of BFI notes that…" and "the reviewer at HorrorNews
+ * traces how…". A maker is never "of" a publication and never "the reviewer
+ * at" one, so neither pattern can fire on a director being named, which is what
+ * a bare surname plus a reporting verb cannot promise.
+ */
+const NAMED_WRITER_SHAPES = [
+  /\b\p{Lu}[\p{L}'’-]+(?:\s+\p{Lu}[\p{L}'’-]+)?\s+(?:of|at|from|writing for|writing in)\s+(?:the\s+)?\p{Lu}[\p{L}.'’-]+/gu,
+  /\b[Tt]he\s+(?:critic|reviewer|scholar|writer)\s+(?:at|for|of|from)\s+(?:the\s+)?\p{Lu}[\p{L}.'’-]+/gu,
+]
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -291,12 +351,20 @@ const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\
  * matched longer name ends with it.
  */
 function namedWriters(text: string, names: readonly string[]): string[] {
-  const hit = names.filter((name) => new RegExp(`\\b${escapeRegExp(name)}\\b`).test(text))
-  return hit.filter(
+  const candidates = [...new Set([...names, ...PUBLICATIONS])]
+  const hit = candidates.filter((name) => new RegExp(`\\b${escapeRegExp(name)}\\b`).test(text))
+  const deduped = hit.filter(
     (name) =>
       name.includes(' ') ||
       !hit.some((other) => other !== name && other.endsWith(` ${name}`))
   )
+  // The shapes are printed as what matched, trimmed, so a reader sees the
+  // phrase and can judge it - the same reason `told twice` prints its phrases.
+  const shapes = NAMED_WRITER_SHAPES.flatMap((pattern) => text.match(pattern) ?? []).map((match) =>
+    match.trim()
+  )
+  const already = (shape: string) => deduped.some((name) => shape.includes(name))
+  return [...deduped, ...new Set(shapes.filter((shape) => !already(shape)))]
 }
 
 const RATHER_THAN = [/\brather than\b/gi, /\binstead of\b/gi]
@@ -423,7 +491,7 @@ export function measureProse(
   const trimmed = (text ?? '').trim()
   const paragraphs = trimmed ? splitAnalysisParagraphs(trimmed) : []
   const repeatedPhrases = repeatsAcrossSections(paragraphs, sections)
-  const namedWriterMatches = writerNames?.length ? namedWriters(trimmed, writerNames) : []
+  const namedWriterMatches = namedWriters(trimmed, writerNames ?? [])
   return {
     words: trimmed ? trimmed.split(/\s+/).length : 0,
     paragraphs: paragraphs.length,
