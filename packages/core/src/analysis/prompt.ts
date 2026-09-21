@@ -916,115 +916,89 @@ const CURRENT_EDITION: PromptEdition = {
  * what that bench asked for. Versions 12 to 15 went live without one too.
  */
 /**
- * Version 16's texts: the compact variant with five measured corrections.
+ * Version 16's texts: the analysis re-aimed at somebody who has NOT SEEN THE
+ * FILM and is deciding whether to, and what to look for when they do.
  *
- * WHY THE DRAFT'S PARENT IS A VARIANT AND NOT VERSION 15. Compact was benched
- * against its base on Requiem for a Dream twice, five models in all, and won
- * the one proportion the prompt states as a cap: reception against the work
- * answer went 107/106 to 96/180 on ornith-1.5-9b and 207/224 to 214/335 on
- * altworld_hemmingway-1, replicating the DeepSeek result. That is the change
- * worth making current. Everything below is what the same bench said compact
- * got WORSE, each traced to its wording.
+ * WHY THE QUESTIONS CHANGED AND NOT THE RULES. Eight versions had refined HOW
+ * each question is answered and never once asked whether the questions were the
+ * right ones. Three of the four were film history - where it came from, how it
+ * was made, how it was received - and the budget gave them five of nine
+ * paragraphs. So a majority of every article was, by construction, about
+ * something other than the experience of watching the film, and no amount of
+ * rule-tightening could change that. Measured on the Suspiria bench: close to
+ * half the words went on the title's literary source, the writer's
+ * grandmother, the cinematographer's earlier employer, a dye transfer process,
+ * a trip to Greece, a certificate, a release date and a remake's cast list.
  *
- * BENCHED ONCE AND CORRECTED, 2026-09-21. Three of the five corrections below
- * held on the first run - money left the making answer entirely (4/4 runs to
- * 0/2), the certificate came back (0/2 to 2/2), and no answer broke the
- * sentence cap where three of four had. Two failed and are answered by the
- * three additions marked BENCH 16: the naming ban lost on BOTH models, and one
- * answer ran to 837 words against a ceiling of 750. THE DRAFT'S TEXT MOVED AND
- * ITS NUMBER DID NOT - a draft is current+1 by construction, and the run that
- * answered the first text stored that text in `analysis_comparison_runs.prompts`,
- * so it stays readable under a label whose wording has since changed.
+ * THE TEST IS NOT "IS IT HISTORY", IT IS "DOES KNOWING IT CHANGE HOW YOU
+ * WATCH". That distinction is the whole of this version, and it cuts across the
+ * obvious line. De Quincey's essay earns its place, because it tells a viewer
+ * to hear the title as an invocation instead of a brand. Tovoli having shot
+ * Antonioni earns its place, because it says the unreality on screen is a
+ * choice by somebody who could have shot it straight. Polanski and De Palma
+ * earn theirs, because they tell a viewer what neighbourhood they are in. The
+ * trip to Greece does not. The dye transfer process does not, unless it is
+ * named by what it puts on the screen. A remake's cast list never does.
  *
- * WHAT IS STILL UNTESTED, and why this is a draft rather than a promotion:
- * compact has met one title, five times. Requiem is the easy case - canonical,
- * English, with a real critic's review in the set - and it cannot exercise the
- * failure compact is likeliest to have, since its own documents DO place it in
- * a lineage. Bench 16 on obscure, non-English and thinly covered titles before
- * promoting it.
+ * SO CONTEXT IS NOT CUT, IT IS MADE TO WORK. A fact of provenance is allowed
+ * anywhere in the piece as long as the sentence carrying it also says what it
+ * prepares the viewer for. A name with nothing attached is a credit, and the
+ * reader can already see the credits.
+ *
+ * THE OTHER HALF IS THE EFFECT RULE, SPLIT IN TWO. Version 15 onward required a
+ * document behind every effect, which is right for a claim about the WORLD -
+ * what a maker meant, what a film changed, how it was received - and wrong for
+ * a claim about what is ON SCREEN. It left the work answer able to list choices
+ * and unable to say what they amount to, and it showed: one source wrote that
+ * Argento's frame adopts his own perspective instead of a character's, and the
+ * answer took the vivid clause and dropped the claim it supported, because a
+ * claim is a reading and readings belonged to reception. A viewer needs the
+ * claim. This is the licence earlier versions found models abusing, which is
+ * why it is a DRAFT and is benched before it retires anything.
+ *
+ * WHAT DOES NOT CHANGE: the question ids, so the panel's fifteen locales and
+ * grounding.ts keep working; the spoiler discipline, which matters more here
+ * than anywhere, since every reader is by definition pre-viewing; the source
+ * weighting; and the requirement that a maker's statement come from the maker.
  */
 
-/**
- * 1. THE MAKING QUESTION STOPS ASKING FOR AN EFFECT. Every invented effect in
- * that bench - four answers, four inventions - was in this answer, and none was
- * in the work answer, which is where version 15 put the document requirement
- * ("if a document says it, that effect is the answer"). The question's own
- * shape was the cause twice over. It ASKED for one ("what did that leave on the
- * film?"), and its only test was a COUNTERFACTUAL - "ask whether it would be a
- * different film if this had not happened" - which no document can answer and
- * imagination always can. So the question names the condition, and the work
- * question's rule now governs the effect.
- *
- * It also lost the one fact that qualified. Both compact runs dropped the
- * certificate the film went out under, which both version-15 runs kept, and
- * filled the space with financing - so the named shapes are what a condition
- * looks like, not only what it is not.
- *
- * 2. MONEY STAYS OUT WHEN A DOCUMENT WELDS IT TO A REAL FACT. All four answers
- * put financing here against a rule naming money explicitly, because the
- * encyclopedia hands it over as one sentence: "developed the script with Selby,
- * despite struggles to obtain funding". A negative list cannot survive that
- * without saying what to do with the half that belongs.
- */
+const DRAFT_TRADITION_MOVIE =
+  "What kind of film is this, and what is it in conversation with? Open by saying what a viewer is sitting down to - its mode and its register - so they know what to bring to it. Then name what it draws on: a source it adapts, a tradition a document places it in, an earlier film or body of work a maker took from, a collaborator's earlier work that this one departs from. EVERY ONE OF THOSE HAS TO EARN ITS PLACE IN THE SAME SENTENCE, by saying what it prepares the viewer for - a name with nothing attached is a credit, and the reader can already see the credits. Do not open on who directed, wrote or starred in it, and never copy the genre labels or mood tags a listing page attaches. Naming an earlier work is safe only when knowing how that one ends tells a viewer nothing about how this one ends."
+
+const DRAFT_TRADITION_SERIES =
+  "What kind of series is this, and what is it in conversation with? Open by saying what a viewer is sitting down to - its mode and its register - so they know what to bring to it. Then name what it draws on: a source it adapts, a tradition a document places it in, an earlier work or body of work a maker took from, a collaborator's earlier work that this one departs from. EVERY ONE OF THOSE HAS TO EARN ITS PLACE IN THE SAME SENTENCE, by saying what it prepares the viewer for - a name with nothing attached is a credit, and the reader can already see the credits. Do not open on who created, wrote or starred in it, and never copy the genre labels or mood tags a listing page attaches. Naming an earlier work is safe only when knowing how that one ends tells a viewer nothing about how this one ends."
+
+const DRAFT_WORK_MOVIE =
+  "What should a viewer watch and listen for? Go through the choices that shape the experience and give each one a sentence naming it: what the camera and the light do, what the cutting and the sound do, what the performances do, and how the film holds attention. Then say what each one does to somebody watching. An effect ON THE SCREEN may be your own reading of what a document describes, and drawing that out is what this answer is for - if a document says the camera takes nobody's point of view, say what that does to a viewer sitting in front of it. An effect on the WORLD - what a maker meant by it, what it changed, how it was received - needs a document saying so. Never list camera bodies, lens names, film stocks or song titles, and name a process only by what it puts on the screen. Say what an image or a figure does to a viewer, never what it turns out to be, and leave out whether any of it is good."
+
+const DRAFT_WORK_SERIES =
+  "What should a viewer watch and listen for? Go through the choices that shape the experience and give each one a sentence naming it: what the camera and the light do, what the cutting and the sound do, what the performances do, and how an episode holds attention. Then say what each one does to somebody watching. An effect ON THE SCREEN may be your own reading of what a document describes, and drawing that out is what this answer is for - if a document says the camera takes nobody's point of view, say what that does to a viewer sitting in front of it. An effect on the WORLD - what a maker meant by it, what it changed, how it was received - needs a document saying so. Never list camera bodies, lens names, film stocks or song titles, and name a process only by what it puts on the screen. Say what an image or a figure does to a viewer, never what it turns out to be, and leave out whether any of it is good."
+
 const DRAFT_CIRCUMSTANCES_MOVIE =
-  "How was it made? Two things belong here and nothing else. First, what a maker said they were trying to do: they must be quoted or reported as saying it, and a page describing a director's aims without quoting them does not count. A critic writing that the director tries to reproduce how his characters feel is the critic describing the film, not the director stating an aim, and moving it into the maker's mouth is the commonest way this answer goes wrong. Second, a condition it was made or first released under - the certificate it carried, a cut somebody required, the form it was first shown in, who was allowed to see it. Name that condition in a sentence, and say what it left on the film only when a document says what it left. If none does, name the condition and stop, exactly as you would with a choice. Money is out: a struggle to raise it, a small budget, who paid, rights, fees and schedules. It stays out when a document welds it to something that does belong, as \"developed the script with him, despite struggles to obtain funding\" does - keep the half that belongs and drop the rest. Job lists, crew and extras counts, filming locations and release dates are out too, and so is how it was received and what anyone did afterwards."
+  "What should a viewer know before they start? Two things belong here. First, what a maker said they were trying to do, quoted or reported as saying it: a page describing a director's aims without quoting them is that page's description, and a site's summary of what an interview covered is a list of topics and not the maker speaking. Second, a condition of the making or the first release that a viewer would FEEL while watching, or that explains something they would otherwise take for a fault - how the sound was got, a cut somebody required, the form it was first shown in, who was allowed to see it. Ask what a viewer does differently knowing it, and drop it when the answer is nothing. Money, rights, schedules, job lists, crew counts, filming locations and release dates all fail that test, and so does how it was received or what anyone did afterwards."
 
 const DRAFT_CIRCUMSTANCES_SERIES =
-  "How was it made? Two things belong here and nothing else. First, what a maker said they were trying to do: they must be quoted or reported as saying it, and a page describing a creator's aims without quoting them does not count. Second, a condition it was made or first broadcast under - the certificate it carried, a cut somebody required, the slot or the form it first went out in, who was allowed to see it. Name that condition in a sentence, and say what it left on the series only when a document says what it left. If none does, name the condition and stop, exactly as you would with a choice. Money is out: a struggle to raise it, a small budget, who paid, rights, fees and schedules. It stays out when a document welds it to something that does belong, as \"developed the script with him, despite struggles to obtain funding\" does - keep the half that belongs and drop the rest. Job lists, crew and extras counts, filming locations and air dates are out too, and so is how it was received and what anyone did afterwards."
+  "What should a viewer know before they start? Two things belong here. First, what a maker said they were trying to do, quoted or reported as saying it: a page describing a creator's aims without quoting them is that page's description, and a site's summary of what an interview covered is a list of topics and not the maker speaking. Second, a condition of the making or the first broadcast that a viewer would FEEL while watching, or that explains something they would otherwise take for a fault - how the sound was got, a cut somebody required, the slot or the form it first went out in, who was allowed to see it. Ask what a viewer does differently knowing it, and drop it when the answer is nothing. Money, rights, schedules, job lists, crew counts, filming locations and air dates all fail that test, and so does how it was received or what anyone did afterwards."
+
+const DRAFT_RECEPTION_MOVIE =
+  "How has it been taken, and who is it for? One paragraph, and never longer than what you wrote about the film itself. Say what critics valued and what they faulted, everyone making the same point in one sentence, so a viewer can calibrate what they are in for before they start. One sentence may give a reading of what the film means, where a critic's reading shaped how it is watched. Ordinary viewers get one sentence at most. Add a second paragraph only where a document names something specific this film passed on AND knowing it teaches a way of watching - a technique a viewer can now recognise elsewhere. A remake, a sequel, a cast list and an award are never that. No scores of any kind and no verdict of your own."
+
+const DRAFT_RECEPTION_SERIES =
+  "How has it been taken, and who is it for? One paragraph, and never longer than what you wrote about the series itself. Say what critics valued and what they faulted, everyone making the same point in one sentence, so a viewer can calibrate what they are in for before they start. One sentence may give a reading of what it means, where a critic's reading shaped how it is watched. Ordinary viewers get one sentence at most. Add a second paragraph only where a document names something specific it passed on AND knowing it teaches a way of watching - a technique a viewer can now recognise elsewhere. A remake, a spin-off, a cast list and an award are never that. No scores of any kind and no verdict of your own."
 
 /**
- * 3. THE WORD FLOOR GOES, THE SENTENCE CAP IS NAMED. Compact set 450 words as a
- * floor and three or four sentences as a paragraph cap, and on thin material
- * the two fight: ornith met 454 words with FOUR paragraphs of five sentences
- * where the rule asks for at most four, and hemmingway overran the ceiling at
- * 764. A floor buys padding, which is the lesson already paid for once when
- * compact's per-question paragraph floor became a ceiling. Every number here is
- * now a maximum, and the sentence cap names the count it is losing to.
+ * The rule the whole version turns on, and it goes FIRST because it governs
+ * every answer rather than one of them.
  */
+const DRAFT_EARNS_ITS_PLACE =
+  "You are writing for somebody who has NOT seen this and is deciding whether to, and what to look for when they do. Every fact you state has to earn its place by changing how they watch. Before writing one - a source, an earlier work, a collaborator, a condition of the making, something it passed on - ask what a viewer does differently for knowing it, and say that in the same sentence. Where you cannot say it, cut the fact. This is the line between context and trivia, and it is not the line between criticism and history: a literary source that tells a viewer how to hear the title belongs, and so does a cinematographer's earlier work when it says the strangeness on screen was chosen. A process name, a date, a certificate with no consequence, an award, a box office figure and a remake's cast belong nowhere."
+
 const DRAFT_LENGTH_RULE =
-  "Write at most nine paragraphs, separated by blank lines, and at most 750 words in all. There is no minimum: thin documents should produce a short piece, and padding one out to reach a length is worse than stopping early. Spend at most two paragraphs on where it comes from, at most four on what it is doing, at most two on how it was made, and one on how it was received, which is the last thing in the piece. Every paragraph is three or four sentences and never five, the first making one claim and the rest supporting it, and a paragraph runs to about a hundred words - if one of yours is half as long again as that, its sentences are carrying too much and need splitting or cutting."
+  "Write at most eight paragraphs, separated by blank lines, and at most 650 words in all. There is no minimum: thin documents should produce a short piece, and padding one out to reach a length is worse than stopping early. Spend at most two paragraphs on what kind of film it is and what it draws on, at most four on what to watch and listen for, at most one on what to know going in, and one on how it has been taken, which is the last thing in the piece. Every paragraph is three or four sentences and never five, the first making one claim and the rest supporting it, and a paragraph runs to about a hundred words - if one of yours is half as long again as that, its sentences are carrying too much and need splitting or cutting."
 
-/**
- * 4. THE NAMING BAN IS GONE, ON THE OPERATOR'S CALL, AND THAT IS THE END OF A
- * LOOP RATHER THAN A CONCESSION.
- *
- * "Never name a critic, a scholar or a publication" has been in every version
- * since 13 and has failed on every model ever benched. Version 16's first bench
- * broke it on BOTH models having just been rewritten to explain WHERE such a
- * name comes from: "what Ebert called her riskiest role", "Gayle Sequeira of
- * BFI notes", "the reviewer at HorrorNews traces", and six publications named
- * in a single paragraph of the other answer. Three successive versions named
- * the failing phrasing, which is version 8's mechanism, and it held for one
- * bench each time before another model found another phrasing.
- *
- * IT IS A HOUSE-STYLE RULE, NOT A CORRECTNESS ONE. Naming the critic is what
- * criticism normally does, and the rule's cost - a bench, an argument and a
- * correction every round - was being paid for consistency of voice.
- *
- * WHAT REPLACES IT IS THE PART THAT WAS ALWAYS LOAD-BEARING: if you name
- * somebody, name the right one. The same bench produced "the reviewer at
- * HorrorNews traces how the writer was bedridden", and that biography is
- * framerated's - a misattribution the ban had no way to prevent, since a model
- * writing "a critic" would have got it equally wrong and nobody could have
- * told. An accuracy requirement is checkable by a reader; a ban was not
- * enforceable by anything.
- *
- * WHAT DOES NOT CHANGE: an opinion still belongs in the reception answer, it
- * still has a person behind it rather than "a reading" or "the press", the
- * hedges are still out, and "critics" still means more than one.
- */
 const DRAFT_ATTRIBUTION_RULE =
-  "The first answers speak in your own voice: state facts and what is on screen plainly, with nobody attached, even where a critic is who you read it from. Opinions belong in the reception answer, and every opinion has a person behind it - a named critic, or \"a critic\", \"a scholar\", \"a reviewer\", \"some viewers\" - never \"a reading\", \"an account\" or \"the press\". Never hide an opinion inside \"is regarded as\", \"has come to be regarded as\", \"is described as\", \"has been called\", \"is said to\" or \"reportedly\". You may name a critic, a scholar or the publication that ran them. If you do, the name has to be the one printed beside that very claim in the document you took it from, because naming the wrong writer is worse than naming none - so where a document does not make the attribution plain, write \"a critic\" and leave it there. A SITE IS NOT ITS WRITER: a publication carries many critics and outlives all of them, so a piece with no byline in front of you is by \"a critic\", whoever the site is named after. \"Critics\" means more than one critic, and two remarks by one critic are one critic."
+  "The first answers speak in your own voice. State facts, what is on screen and what it does to a viewer plainly, with nobody attached, even where a critic is who you read it from - saying what a choice does to somebody watching is the job, not an opinion. What belongs to somebody else is a judgement of QUALITY and a claim about what the film MEANS, and both go to the reception answer with a person behind them - a named critic, or \"a critic\", \"a scholar\", \"a reviewer\", \"some viewers\" - never \"a reading\", \"an account\" or \"the press\". Never hide one inside \"is regarded as\", \"has come to be regarded as\", \"is described as\", \"has been called\", \"is said to\" or \"reportedly\". You may name a critic, a scholar or the publication that ran them. If you do, the name has to be the one printed beside that very claim in the document you took it from, because naming the wrong writer is worse than naming none - so where a document does not make the attribution plain, write \"a critic\" and leave it there. A SITE IS NOT ITS WRITER: a publication carries many critics and outlives all of them, so a piece with no byline in front of you is by \"a critic\", whoever the site is named after. \"Critics\" means more than one critic, and two remarks by one critic are one critic."
 
-/**
- * 5. THE PROMPT'S OWN NOUN IS "DOCUMENTS". The rule forbids mentioning them and
- * then names only "the sources say" and "one source credits", so a model that
- * obeys the letter writes "the documents do not name what it influenced
- * specifically" - which ornith did, and which the signals counted as clean
- * because they matched on the word "sources" too. Both halves are fixed: this,
- * and the pattern list in ./proseSignals.ts. Announcing a gap is named here as
- * well, since that sentence is how the retrieval gets mentioned at all.
- */
 const DRAFT_DOCUMENTS_RULE =
   "Never mention the documents. The reader cannot see them, so \"the sources say\", \"the sources describe\", \"one source credits\" and \"the documents do not name\" all point at nothing. When the documents do not support something, write nothing about it and nothing about the gap either. Do not quote the reception figures back."
 
@@ -1061,16 +1035,26 @@ const draftRules = (
 const DRAFT_EDITION: PromptEdition | null = {
   version: ANALYSIS_PROMPT_VERSION + 1,
   movieQuestions: draftQuestions(COMPACT_VARIANT.movieQuestions, {
+    tradition: DRAFT_TRADITION_MOVIE,
+    work: DRAFT_WORK_MOVIE,
     circumstances: DRAFT_CIRCUMSTANCES_MOVIE,
+    reception: DRAFT_RECEPTION_MOVIE,
   }),
   seriesQuestions: draftQuestions(COMPACT_VARIANT.seriesQuestions, {
+    tradition: DRAFT_TRADITION_SERIES,
+    work: DRAFT_WORK_SERIES,
     circumstances: DRAFT_CIRCUMSTANCES_SERIES,
+    reception: DRAFT_RECEPTION_SERIES,
   }),
-  rules: draftRules(COMPACT_VARIANT.rules, [
-    [COMPACT_VARIANT.rules[1], DRAFT_LENGTH_RULE],
-    [COMPACT_VARIANT.rules[6], DRAFT_ATTRIBUTION_RULE],
-    [COMPACT_VARIANT.rules[8], DRAFT_DOCUMENTS_RULE],
-  ]),
+  // The governing rule first, then the base's rules with four replaced.
+  rules: [
+    DRAFT_EARNS_ITS_PLACE,
+    ...draftRules(COMPACT_VARIANT.rules, [
+      [COMPACT_VARIANT.rules[1], DRAFT_LENGTH_RULE],
+      [COMPACT_VARIANT.rules[6], DRAFT_ATTRIBUTION_RULE],
+      [COMPACT_VARIANT.rules[8], DRAFT_DOCUMENTS_RULE],
+    ]),
+  ],
 }
 
 /** The draft's version number, or null when there is no draft. */

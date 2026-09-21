@@ -564,20 +564,27 @@ test('the draft, when there is one, sits above the current version and nowhere e
 })
 
 /**
- * Draft 16 is the compact variant with named replacements, which is a first -
- * every earlier draft varied the current version. Two things have to hold or
- * the bench cannot attribute anything to the change: the parts that were not
- * replaced are the variant's own, and the parts that were are not.
+ * Draft 16 re-aims the analysis at somebody who has NOT SEEN THE FILM.
+ *
+ * Eight versions refined HOW each question was answered and never asked whether
+ * the questions were the right ones: three of four were film history, and the
+ * budget gave them five of nine paragraphs. What is pinned here is the shape of
+ * the answer to that - the test the version turns on, the split effect rule,
+ * and the fact that the ids did NOT move, because the panel owns their labels
+ * in fifteen locales and grounding.ts selects by them.
  *
  * The replacement helper throws when a base text moves, so merely building the
  * draft - which importing this module does - is half the test.
  */
-test('the draft carries the compact variant with its measured corrections', () => {
+test('the draft re-aims every question at a viewer who has not seen the film', () => {
   if (DRAFT_PROMPT_VERSION == null) return
   const draft = editionFor(DRAFT_PROMPT_VERSION)
   const compact = variantFor('compact')
+  const rulesText = draft.rules.join('\n')
+  const question = (id: string) => draft.movieQuestions.find((q) => q.id === id)!.text
 
-  // Same question ids as its base, or parseParagraphMap discards every label.
+  // The ids are untouched, or parseParagraphMap discards every label and the
+  // panel loses its headings in fifteen locales.
   assert.deepEqual(
     draft.movieQuestions.map((q) => q.id),
     compact.movieQuestions.map((q) => q.id)
@@ -586,69 +593,54 @@ test('the draft carries the compact variant with its measured corrections', () =
     draft.seriesQuestions.map((q) => q.id),
     compact.seriesQuestions.map((q) => q.id)
   )
-  assert.equal(draft.rules.length, compact.rules.length)
 
-  const rulesText = draft.rules.join('\n')
-
-  // 1 and 2: the making question drops the counterfactual and names the welded
-  // money case, and stops asking what the making "left on the film" up front.
-  const making = draft.movieQuestions.find((q) => q.id === 'circumstances')!.text
-  assert.ok(!making.includes('would be a different film'), 'counterfactual test removed')
-  assert.ok(making.includes('only when a document says what it left'), 'document requirement')
-  assert.ok(making.includes('despite struggles to obtain funding'), 'the welded money case')
-  assert.ok(making.includes('the certificate it carried'), 'a qualifying condition is named')
-
-  // 3: every length number is a maximum now, and the sentence cap names five.
-  assert.ok(!rulesText.includes('450 to 750 words'), 'the word floor is gone')
-  assert.ok(rulesText.includes('There is no minimum'), 'and is named as gone')
-  assert.ok(rulesText.includes('never five'), 'the sentence cap names its failure')
-
-  // 4: THE NAMING BAN IS GONE, on the operator's call. It had been in every
-  // version since 13, failed on every model ever benched, and is house style
-  // rather than correctness. What replaces it is the part that was always
-  // load-bearing - name the RIGHT one, or write "a critic".
-  assert.ok(rulesText.includes('You may name a critic, a scholar or the publication that ran them'))
-  assert.ok(rulesText.includes('naming the wrong writer is worse than naming none'))
-  assert.ok(
-    !rulesText.includes('Never name a critic'),
-    'the ban is not restated further down the rules'
-  )
-  // The base variant keeps its own ban, which is the whole point of a variant
-  // and its version coexisting: both stay.
-  assert.ok(compact.rules.join('\n').includes('Never name a critic'))
-
-  // What did NOT change with it.
-  for (const kept of [
-    'Opinions belong in the reception answer',
-    '"a reading", "an account" or "the press"',
-    '"Critics" means more than one critic',
-  ]) {
-    assert.ok(rulesText.includes(kept), kept)
+  // Every question is re-aimed, and the series ones with them - the one
+  // question compact carries that this does not touch is the structure one.
+  for (const id of ['tradition', 'work', 'circumstances', 'reception']) {
+    const base = compact.movieQuestions.find((q) => q.id === id)!.text
+    assert.notEqual(question(id), base, id + ' is re-aimed')
   }
+  const structure = (qs: readonly { id: string; text: string }[]) =>
+    qs.find((q) => q.id === 'structure')?.text
+  assert.equal(structure(draft.seriesQuestions), structure(compact.seriesQuestions))
 
-  // 5: the documents rule names the phrasing that obeyed its letter.
-  assert.ok(rulesText.includes('"the documents do not name"'))
+  // THE TEST THE VERSION TURNS ON, stated once and governing every answer, so
+  // it goes first.
+  assert.ok(draft.rules[0].includes('has to earn its place by changing how they watch'))
+  assert.ok(draft.rules[0].includes('NOT seen this'))
+  assert.equal(draft.rules.length, compact.rules.length + 1)
 
-  // BENCH 16: a paragraph-sized anchor, since a model cannot count 750 words,
-  // and a critic's description of a maker's aim is not the maker speaking.
-  assert.ok(rulesText.includes('about a hundred words'))
-  assert.ok(making.includes('is the critic describing the film, not the director stating an aim'))
+  // Context is made to WORK, never cut: a fact of provenance is allowed
+  // wherever the sentence carrying it says what it prepares a viewer for.
+  assert.ok(question('tradition').includes('EARN ITS PLACE IN THE SAME SENTENCE'))
+  assert.ok(question('tradition').includes('a name with nothing attached is a credit'))
 
-  // Everything NOT named above is the variant's own text, unchanged - which is
-  // what lets a bench attribute a difference to the five corrections.
-  const unchangedQuestions = (
-    questions: readonly { id: string; text: string }[]
-  ) => questions.filter((q) => q.id !== 'circumstances').map((q) => q.text)
-  assert.deepEqual(unchangedQuestions(draft.movieQuestions), unchangedQuestions(compact.movieQuestions))
-  assert.deepEqual(
-    unchangedQuestions(draft.seriesQuestions),
-    unchangedQuestions(compact.seriesQuestions)
-  )
-  assert.equal(
-    draft.rules.filter((rule) => compact.rules.includes(rule)).length,
-    compact.rules.length - 3,
-    'exactly three rules replaced'
-  )
+  // The effect rule, split: on the screen it may be the writer's own reading,
+  // about the world it needs a document.
+  assert.ok(question('work').includes('An effect ON THE SCREEN may be your own reading'))
+  assert.ok(question('work').includes('An effect on the WORLD'))
+  assert.ok(question('work').includes('needs a document saying so'))
+
+  // Making is bounded by what a viewer would feel, and a site's summary of an
+  // interview is not the maker speaking - measured on the Suspiria bench.
+  assert.ok(question('circumstances').includes('would FEEL while watching'))
+  assert.ok(question('circumstances').includes('a list of topics and not the maker speaking'))
+
+  // Influence has to teach a way of watching or it does not appear.
+  assert.ok(question('reception').includes('teaches a way of watching'))
+  assert.ok(question('reception').includes('A remake, a sequel, a cast list and an award'))
+
+  // Carried over and still pinned: the ban is gone, the accuracy rule replaced
+  // it, and a site is not its writer.
+  assert.ok(rulesText.includes('You may name a critic, a scholar or the publication that ran them'))
+  assert.ok(rulesText.includes('A SITE IS NOT ITS WRITER'))
+  assert.ok(!rulesText.includes('Never name a critic'))
+  assert.ok(compact.rules.join('\n').includes('Never name a critic'), 'the variant keeps its ban')
+
+  // Length: every number a maximum, and the sentence cap names what it loses to.
+  assert.ok(!rulesText.includes('450 to 750 words'))
+  assert.ok(rulesText.includes('There is no minimum'))
+  assert.ok(rulesText.includes('never five'))
 })
 
 /**
