@@ -44,10 +44,18 @@ export interface ProseSignals {
    */
   inlineLabels: number
   /**
-   * A critic, a scholar or a publication named in the answer, which every
-   * version forbids. The measured publication list and the two writer shapes
-   * are always counted; the names a caller passes from THIS run are added to
-   * them, so a zero here means none found, never "not measured".
+   * A critic, a scholar or a publication named in the answer.
+   *
+   * WHETHER THAT IS A FAULT DEPENDS ON THE PROMPT, which is why this stays a
+   * count and not a verdict. Versions 13 to 15 and the compact variant forbid
+   * naming outright and are all still benchable, so for them a number here is a
+   * rule broken. Draft 16 permits it and asks only that the name be the right
+   * one, which no pattern can check - there the number is descriptive, and a
+   * high one is a cue to read the attributions rather than a failure.
+   *
+   * The measured publication list and the two writer shapes are always counted;
+   * the names a caller passes from THIS run are added to them, so a zero here
+   * means none found, never "not measured".
    */
   namedWriters: number
   /** The names behind that count, so a reader can check what matched. */
