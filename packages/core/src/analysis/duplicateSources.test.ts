@@ -4,7 +4,11 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { dropDuplicateTitles, keepOnePerDomain } from './duplicateSources.js'
+import {
+  dropDuplicateContent,
+  dropDuplicateTitles,
+  keepOnePerDomain,
+} from './duplicateSources.js'
 
 const page = (title: string, domain: string, text: string) => ({ title, domain, text })
 const FILM = ['Control', 'Kontroll', '2003']
@@ -111,4 +115,62 @@ test('subdomains are different hosts, and www is not one', () => {
     ]).kept.length,
     1
   )
+})
+
+/**
+ * The Kontroll case the title test was written for, republished under a
+ * different headline so the title cannot see it. Each site wraps it in its own
+ * furniture, which is the reason the header gives for not comparing whole
+ * texts - and exactly what shingles ignore.
+ */
+test('a page whose text is inside another page is a duplicate, wrapper or no', () => {
+  const chapter = Array.from(
+    { length: 40 },
+    (_, i) =>
+      `The film places its camera inside the apartment and holds there for a long ${i} beat before cutting away.`
+  ).join(' ')
+  // academia.edu carries the chapter AND a page of unrelated related papers, so
+  // it is the longer of the two and the one kept.
+  const related = Array.from(
+    { length: 20 },
+    (_, i) => `Related paper number ${i} on an entirely unconnected subject in another discipline.`
+  ).join(' ')
+  const sources = [
+    { domain: 'publisher.example', title: 'Inhabiting the Post-Communist', text: 'Buy this book. ' + chapter },
+    { domain: 'academia.edu', title: 'A completely different headline', text: chapter + ' ' + related },
+  ]
+  const { kept, dropped } = dropDuplicateContent(sources)
+  assert.deepEqual(kept.map((k) => k.domain), ['academia.edu'])
+  assert.deepEqual(dropped, [{ domain: 'publisher.example', duplicateOf: 'academia.edu' }])
+})
+
+/**
+ * NOT A DE-OVERLAP. Measured on Requiem for a Dream: metacritic.com and IMDb's
+ * Metacritic mirror carried five and ten critic quotes with ONE in common,
+ * because each page had been truncated at a different point. They look like
+ * duplicates by name and by source and are complementary in fact - the mirror
+ * was the densest criticism in the retrieval.
+ */
+test('two pages excerpting the same pool differently both survive', () => {
+  const quote = (n: number) =>
+    `Critic number ${n} wrote that the film brings a new urgency to its subject and never lets the viewer settle.`
+  const metacritic = [quote(1), quote(2), quote(3), quote(4), quote(5)].join('\n\n')
+  const mirror = [quote(5), quote(6), quote(7), quote(8), quote(9), quote(10)].join('\n\n')
+  const { kept, dropped } = dropDuplicateContent([
+    { domain: 'metacritic.com', title: 'Reviews', text: metacritic },
+    { domain: 'imdb.com', title: 'Metacritic reviews', text: mirror },
+  ])
+  assert.equal(kept.length, 2)
+  assert.deepEqual(dropped, [])
+})
+
+test('two reviews of one film are not duplicates', () => {
+  const a =
+    'Requiem for a Dream is a 2000 film by Darren Aronofsky. The closeups fill the screen with pills and the sound is exaggerated throughout every sequence.'
+  const b =
+    'Requiem for a Dream is a 2000 film by Darren Aronofsky. Its three seasonal movements mark how far each of the four characters has fallen by the end.'
+  assert.equal(dropDuplicateContent([
+    { domain: 'a.example', title: 'A', text: a },
+    { domain: 'b.example', title: 'B', text: b },
+  ]).kept.length, 2)
 })

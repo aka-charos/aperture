@@ -64,7 +64,11 @@ import {
 import { cleanSources } from './sourceCleanup.js'
 import { dropLowValueSources } from './sourceQuality.js'
 import { findStructureProblem } from './structure.js'
-import { dropDuplicateTitles, keepOnePerDomain } from './duplicateSources.js'
+import {
+  dropDuplicateContent,
+  dropDuplicateTitles,
+  keepOnePerDomain,
+} from './duplicateSources.js'
 import { checkModeReadiness, type RetrievalMode } from './mode.js'
 import { getAnalysisPromptVariant } from './promptSetting.js'
 import {
@@ -499,8 +503,19 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
   }
   const byDomain = new Map(cleaned.map((entry) => [entry.domain, entry.stripped]))
 
+  // A page whose text is already inside another page's, whatever it is called.
+  // Runs on the CLEANED text, so two sites' furniture cannot hide that they are
+  // carrying the same article. See ./duplicateSources.ts.
+  const { kept: unique, dropped: republished } = dropDuplicateContent(trimmed)
+  if (republished.length > 0) {
+    logger.warn(
+      { title: subject.title, republished },
+      "Dropped pages whose text was already inside another page's"
+    )
+  }
+
   const sources = budgetSources(
-    trimmed.map((source) => {
+    unique.map((source) => {
       const stripped = byDomain.get(source.domain)
       return stripped ? { ...source, strippedChars: stripped } : source
     }),
