@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { dropLowValueSources, hasNoProse, isNavigationPage } from './sourceQuality.js'
+import {
+  CHARS_PER_TITLE_MENTION,
+  dropLowValueSources,
+  hasNoProse,
+  isNavigationPage,
+  isOffTopic,
+} from './sourceQuality.js'
 
 const prose = (lines: number) =>
   Array.from(
@@ -150,4 +156,63 @@ test('a fetch that came back empty is named as empty, not as a bad page', () => 
 test('an empty fetch is still kept when it is all there is', () => {
   const only = [{ domain: 'nytimes.com', text: 'nytimes.com' }]
   assert.deepEqual(dropLowValueSources(only), { kept: only, dropped: [] })
+})
+
+/**
+ * The version-16 bench spent 7,833 characters - twelve per cent of the prompt -
+ * on a Sight and Sound poll of the best films of 2006, retrieved by the curated
+ * criticism search and marked as criticism in the report. Real prose, real
+ * publication, real films, and not about this one. Nothing else here can see it.
+ */
+test('a page that never names the film is off-topic, however good it is', () => {
+  // Both are comfortably above the size floor, or every document would be
+  // dropped and the fail-open would hand the whole set back untouched.
+  const poll = [
+    'The best films of 2006. Hidden by Michael Haneke took the top place in the poll this year.',
+    'Volver came second, and The Departed, The Queen and Red Road shared the third position.',
+    'A half-hour digital essay on cinema, death, fiction, war, home and memory, made quickly.',
+  ]
+    .join('\n\n')
+    .repeat(3)
+  const review = [
+    'Requiem for a Dream opens with a housewife chaining her television to the radiator.',
+    'Aronofsky uses extreme closeups to show the drugs acting on his characters in this film.',
+  ]
+    .join('\n\n')
+    .repeat(3)
+
+  const { kept, dropped } = dropLowValueSources(
+    [
+      { domain: 'rogerebert.com', text: review },
+      { domain: 'bfi.org.uk', text: poll },
+    ],
+    ['Requiem for a Dream']
+  )
+  assert.deepEqual(kept.map((k) => k.domain), ['rogerebert.com'])
+  assert.deepEqual(dropped, [{ domain: 'bfi.org.uk', reason: 'off-topic' }])
+
+  // Without the names the test does not run at all, which is what every caller
+  // that does not know the title should get.
+  assert.equal(dropLowValueSources([{ domain: 'bfi.org.uk', text: poll }]).dropped.length, 0)
+})
+
+/**
+ * Mentions per character, not a bare mention: the page a film is merely LISTED
+ * on names it once. Loose enough that anything discussing the film clears it.
+ */
+test('one passing mention does not make a long page about the film', () => {
+  const filler = 'The poll gathered ballots from critics and programmers across the year. '
+  const listing = filler.repeat(600) + 'Requiem for a Dream also received a vote. ' + filler.repeat(600)
+  assert.ok(listing.length > CHARS_PER_TITLE_MENTION * 2)
+  assert.equal(isOffTopic(listing, ['Requiem for a Dream']), true)
+  // The same page, naming it as often as a review would.
+  const about = listing.split('. ').join('. Requiem for a Dream. ')
+  assert.equal(isOffTopic(about, ['Requiem for a Dream']), false)
+})
+
+test('the original title counts, and a short title is never tested', () => {
+  const french = 'Un film de Gaspar Noe. Seul contre tous est un film francais de 1998.'
+  assert.equal(isOffTopic(french, ['I Stand Alone', 'Seul contre tous']), false)
+  // "Up" would match inside every document ever written, so it is skipped.
+  assert.equal(isOffTopic('A page about nothing in particular at all.', ['Up']), false)
 })
