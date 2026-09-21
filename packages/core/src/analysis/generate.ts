@@ -61,9 +61,10 @@ import {
   distributeCuratedResults,
   mergeSearchResults,
 } from './curatedSearch.js'
+import { cleanSources } from './sourceCleanup.js'
 import { dropLowValueSources } from './sourceQuality.js'
 import { findStructureProblem } from './structure.js'
-import { dropDuplicateTitles } from './duplicateSources.js'
+import { dropDuplicateTitles, keepOnePerDomain } from './duplicateSources.js'
 import { checkModeReadiness, type RetrievalMode } from './mode.js'
 import { getAnalysisPromptVariant } from './promptSetting.js'
 import {
@@ -405,6 +406,9 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
     // claim the criticism search ran and rejected them, which is not what an
     // absent flag means (see AnalysisSource.curated).
     ...(criticismUrls.has(r.url) ? { curated: true } : {}),
+    // What the scrape gave us, kept beside what survives so the log can say
+    // how much of each slot was site furniture. See ./sourceCleanup.ts.
+    fetchedChars: r.markdown.length,
   }))
 
   const fetchedChars = fetched.reduce((sum, s) => sum + s.text.length, 0)
@@ -453,8 +457,19 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
     )
   }
 
+  // Two pages from one host is one host. Dropped after the low-value test, so
+  // the slot that survives is the best-ranked page that host offered rather
+  // than whichever of its pages the search happened to rank first.
+  const { kept: oneEach, dropped: sameDomain } = keepOnePerDomain(worthwhile)
+  if (sameDomain.length > 0) {
+    logger.warn(
+      { title: subject.title, dropped: sameDomain.map((source) => source.domain) },
+      'Dropped a second page from a host already represented'
+    )
+  }
+
   // One chapter fetched from two sites is one document. See ./duplicateSources.ts.
-  const { kept: distinct, dropped: duplicates } = dropDuplicateTitles(worthwhile, [
+  const { kept: distinct, dropped: duplicates } = dropDuplicateTitles(oneEach, [
     subject.title,
     subject.originalTitle ?? '',
     subject.year ? String(subject.year) : '',
@@ -466,7 +481,27 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
     )
   }
 
-  const sources = budgetSources(distinct, { budget: config.sourceBudgetChars })
+  // Menus, cast lists and plot sections cut out BEFORE the budget divides the
+  // characters, or the slice is spent on them and no later step can recover it.
+  // Both truncations above are head-first and a page puts its menu first. See
+  // ./sourceCleanup.ts.
+  const { kept: trimmed, cleaned } = cleanSources(distinct)
+  const strippedChars = cleaned.reduce((sum, entry) => sum + entry.stripped, 0)
+  if (cleaned.length > 0) {
+    logger.info(
+      { title: subject.title, stripped: cleaned, strippedChars },
+      'Stripped site furniture and plot sections from retrieval'
+    )
+  }
+  const byDomain = new Map(cleaned.map((entry) => [entry.domain, entry.stripped]))
+
+  const sources = budgetSources(
+    trimmed.map((source) => {
+      const stripped = byDomain.get(source.domain)
+      return stripped ? { ...source, strippedChars: stripped } : source
+    }),
+    { budget: config.sourceBudgetChars }
+  )
   const retrievedChars = sources.reduce((sum, s) => sum + s.text.length, 0)
 
   // INFO, not debug. This is the line that says whether retrieval is healthy —
@@ -483,6 +518,10 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
       fetchedChars,
       budgeted: sources.length,
       retrievedChars,
+      // fetchedChars is what the scraper handed over; strippedChars is what
+      // ./sourceCleanup.ts removed; retrievedChars is what the model read. The
+      // gap between the first and the last is what a retrieval costs to carry.
+      strippedChars,
       domains: sources.map((s) => s.domain),
       // Survives the budget, which is the number that matters: a criticism
       // page found and then dropped for space is not a criticism page read.

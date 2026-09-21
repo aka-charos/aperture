@@ -85,6 +85,17 @@ export interface ComparisonSource {
    * none cannot claim the search found nothing - see `criticismLine`.
    */
   curated?: boolean
+  /**
+   * What the scraper returned for this page, against `chars` - what the model
+   * read. The gap is site furniture plus whatever the budget cut, and until
+   * these sat beside each other the report could not say which.
+   *
+   * Absent on a replay (its documents come back out of a stored prompt) and on
+   * every run stored before the measurement existed.
+   */
+  fetchedChars?: number
+  /** What ./sourceCleanup.ts removed. Absent means none, or not measured. */
+  strippedChars?: number
 }
 
 /** The run a replay took its sources from, with that run's answers. */
@@ -370,6 +381,22 @@ function versionsOf(report: ComparisonReport): string[] {
     .map((prompt) => prompt.name)
 }
 
+/**
+ * What a document cost against what it delivered.
+ *
+ * "6,392 chars" alone cannot say whether a slot went on an article or on a
+ * navigation menu, which is the question the second Requiem bench could not
+ * answer about its own retrieval. Printed only where the numbers exist, so a
+ * replay and every older run read exactly as they did before.
+ */
+function sourceSize(source: ComparisonSource): string {
+  const n = (value: number) => value.toLocaleString('en-US')
+  const parts = [`${n(source.chars)} chars`]
+  if (source.fetchedChars != null) parts.push(`of ${n(source.fetchedChars)} fetched`)
+  if (source.strippedChars) parts.push(`${n(source.strippedChars)} stripped`)
+  return parts.join(', ')
+}
+
 /** A prompt from its TASK line on — the part that differs between versions. */
 function fromTask(prompt: string): string {
   const at = prompt.lastIndexOf('\nTASK\n')
@@ -443,15 +470,22 @@ export function renderComparisonReport(report: ComparisonReport): string {
       ? `Sources: ${report.sources.length} document(s), ${report.retrievedChars.toLocaleString('en-US')} characters, retrieved for that run and reused unchanged — nothing was retrieved again`
       : `Sources: ${report.sources.length} document(s), ${report.retrievedChars.toLocaleString('en-US')} characters retrieved`
   )
+  const fetchedTotal = report.sources.reduce((sum, s) => sum + (s.fetchedChars ?? 0), 0)
+  const strippedTotal = report.sources.reduce((sum, s) => sum + (s.strippedChars ?? 0), 0)
+  if (fetchedTotal > 0) {
+    out.push(
+      `  The scraper returned ${fetchedTotal.toLocaleString('en-US')} characters; ${strippedTotal.toLocaleString(
+        'en-US'
+      )} were stripped as site furniture or plot sections, and the budget cut the rest.`
+    )
+  }
   out.push(`  ${criticismLine(report.sources)}`)
   for (const source of report.sources) {
     // The marker is what makes the curated search legible at all: without it
     // the only way to tell a film journal from a content farm in this list is
     // to recognise the domain by eye.
     const mark = source.curated === true ? ' [criticism]' : ''
-    out.push(
-      `  - ${source.domain} — ${source.title} (${source.chars.toLocaleString('en-US')} chars)${mark}`
-    )
+    out.push(`  - ${source.domain} — ${source.title} (${sourceSize(source)})${mark}`)
   }
   out.push('')
   out.push(

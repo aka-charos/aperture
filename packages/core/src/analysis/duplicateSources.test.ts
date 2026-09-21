@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { dropDuplicateTitles } from './duplicateSources.js'
+import { dropDuplicateTitles, keepOnePerDomain } from './duplicateSources.js'
 
 const page = (title: string, domain: string, text: string) => ({ title, domain, text })
 const FILM = ['Control', 'Kontroll', '2003']
@@ -63,4 +63,52 @@ test('an empty title is never a duplicate, and distinct titles pass untouched', 
   const { kept, dropped } = dropDuplicateTitles(sources, FILM)
   assert.deepEqual(kept, sources)
   assert.deepEqual(dropped, [])
+})
+
+/**
+ * The second Requiem bench spent four of eleven slots on two hosts - imdb.com
+ * twice and rogerebert.com twice - and one of those four had already been shown
+ * to be worthless. The first page from a host is the best-ranked one it
+ * offered, since the order here is relevance order with criticism ahead of it.
+ */
+test('a second page from a host already represented is dropped', () => {
+  const sources = [
+    { domain: 'rogerebert.com', title: 'Requiem for a Dream movie review', text: 'A review.' },
+    { domain: 'en.wikipedia.org', title: 'Requiem for a Dream - Wikipedia', text: 'An article.' },
+    { domain: 'www.rogerebert.com', title: 'Darren Aronofsky Movies and TV Shows', text: 'An index.' },
+    { domain: 'imdb.com', title: 'Metacritic reviews - IMDb', text: 'Quotes.' },
+    { domain: 'imdb.com', title: 'Requiem for a Dream (2000) - IMDb', text: 'A menu.' },
+  ]
+  const { kept, dropped } = keepOnePerDomain(sources)
+  assert.deepEqual(
+    kept.map((k) => k.title),
+    [
+      'Requiem for a Dream movie review',
+      'Requiem for a Dream - Wikipedia',
+      'Metacritic reviews - IMDb',
+    ]
+  )
+  assert.deepEqual(dropped, [{ domain: 'www.rogerebert.com' }, { domain: 'imdb.com' }])
+})
+
+/**
+ * The host is the key, not the registrable domain: telling framerated.co.uk
+ * from bbc.co.uk needs a public-suffix list, and two subdomains of one site are
+ * two different articles.
+ */
+test('subdomains are different hosts, and www is not one', () => {
+  const sources = [
+    { domain: 'en.wikipedia.org', title: 'A', text: 'x' },
+    { domain: 'simple.wikipedia.org', title: 'B', text: 'y' },
+    { domain: 'framerated.co.uk', title: 'C', text: 'z' },
+    { domain: 'bbc.co.uk', title: 'D', text: 'w' },
+  ]
+  assert.equal(keepOnePerDomain(sources).kept.length, 4)
+  assert.equal(
+    keepOnePerDomain([
+      { domain: 'www.imdb.com', title: 'A', text: 'x' },
+      { domain: 'imdb.com', title: 'B', text: 'y' },
+    ]).kept.length,
+    1
+  )
 })

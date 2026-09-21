@@ -98,7 +98,7 @@ const listed = (domain: string): boolean => {
  * with content in it. Measured on the Requiem for a Dream bench, where that
  * page took one of the two curated criticism slots.
  */
-function isLinkOnlyLine(line: string): boolean {
+export function isLinkOnlyLine(line: string): boolean {
   if (!line.includes('](')) return false
   let rest = line
   for (let pass = 0; pass < 3; pass += 1) {
