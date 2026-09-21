@@ -449,7 +449,11 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
   // retrieved text is its own navigation menu. Dropped after the walls and
   // before the budget, so their share goes to the pages that did answer. Fails
   // open when they are all there is. See ./sourceQuality.ts.
-  const { kept: worthwhile, dropped: lowValue } = dropLowValueSources(readable)
+  // The names, for the relevance test only - NOT the year, which appears in
+  // every page ever written about any film of that decade and would satisfy
+  // the mention count on a page that never names this one.
+  const filmNames = [subject.title, subject.originalTitle ?? ''].filter(Boolean)
+  const { kept: worthwhile, dropped: lowValue } = dropLowValueSources(readable, filmNames)
   if (lowValue.length > 0) {
     logger.warn(
       { title: subject.title, dropped: lowValue },

@@ -14,8 +14,11 @@ import {
   NAVIGATION_RUN_LINES,
   cleanSourceText,
   cleanSources,
+  isWidgetLine,
+  stripFurnitureSections,
   stripNavigationRuns,
   stripPlotSections,
+  stripWidgetLines,
 } from './sourceCleanup.js'
 
 const menu = (count: number) =>
@@ -204,4 +207,95 @@ test('a short sentence is never read as filler', () => {
 test('a single link between paragraphs is a caption, not a menu', () => {
   const page = [paragraph, '[Read the full review](https://www.example.com/x)', paragraph].join('\n')
   assert.equal(stripNavigationRuns(page), page)
+})
+
+/**
+ * Rotten Tomatoes lost SIX characters to the link-run strip on the version-16
+ * bench and still carried Where to Watch, Movie Clips, More Like This, Related
+ * Movie News, Videos and Photos. Its furniture is prose-shaped text under
+ * headings, which nothing counting links can see.
+ */
+test('a section the site writes about itself goes, and the criticism stays', () => {
+  const page = [
+    '## What to Know',
+    '',
+    'Though the movie may be too intense for some to stomach, the performances are hard to forget.',
+    '',
+    '## Where to Watch',
+    '',
+    'Watch it with a subscription on Peacock, rent on Fandango, or buy on Fandango.',
+    '',
+    '## Critics Reviews',
+    '',
+    'Clearly influenced by the cut-and-paste of hip-hop, it builds its tragic momentum.',
+    '',
+    '## More Like This',
+    '',
+    'Dancer in the Dark 69% 91% Watchlist The Virgin Suicides 80% 81% Watchlist',
+  ].join('\n')
+  const cleaned = stripFurnitureSections(page)
+  assert.equal(cleaned.includes('Peacock'), false)
+  assert.equal(cleaned.includes('Virgin Suicides'), false)
+  assert.ok(cleaned.includes('hard to forget'))
+  assert.ok(cleaned.includes('cut-and-paste of hip-hop'))
+})
+
+/**
+ * Audience reviews are thin material, never furniture: every prompt version
+ * allows one sentence on how ordinary viewers responded.
+ */
+test('audience and user reviews are kept', () => {
+  for (const heading of ['## Audience Reviews', '## User Reviews']) {
+    const page = [heading, 'It is one of the best films ever created. Will never watch again.'].join('\n')
+    assert.ok(stripFurnitureSections(page).includes('never watch again'), heading)
+  }
+})
+
+/**
+ * The Ebert review lost nothing to either section strip and carried an embedded
+ * video player's settings panel through the middle of it, with no links in any
+ * of it. Lines taken verbatim off that bench.
+ */
+test('an interface widget flattened into markdown is not text', () => {
+  for (const widget of [
+    'SettingsOffArabicChineseEnglishFrenchGermanHindiPortugueseSpanish',
+    'Font ColorwhiteFont Opacity100%Font Size100%Font FamilyArialText Shadownone',
+    'WhiteBlackRedGreenBlueYellowMagentaCyan',
+    '100%75%50%25%',
+    '200%175%150%125%100%75%50%',
+    'NoneRaisedDepressedUniformDrop Shadow',
+  ]) {
+    assert.equal(isWidgetLine(widget), true, widget)
+  }
+})
+
+/**
+ * A sentence naming a person whose name runs two capitals together is prose.
+ * Three joins are required for exactly this reason.
+ */
+test('ordinary prose with a capital inside a word is never a widget', () => {
+  for (const line of [
+    'She is addicted to a game show whose host, Christopher McDonald, leads the audience.',
+    'Aronofsky brings a new urgency to the drug movie through his subjective camera',
+    'The iPhone footage was shot by DeMarco in New York',
+    'Video Muted',
+  ]) {
+    assert.equal(isWidgetLine(line), false, line)
+  }
+})
+
+test('widget lines go, and the paragraphs around them stay', () => {
+  const page = [
+    paragraph,
+    '',
+    'SettingsOffArabicChineseEnglishFrenchGermanHindiPortugueseSpanish',
+    '',
+    '100%75%50%25%',
+    '',
+    paragraph,
+  ].join('\n')
+  const cleaned = stripWidgetLines(page)
+  assert.equal(cleaned.includes('Arabic'), false)
+  assert.equal(cleaned.includes('100%75%'), false)
+  assert.equal(cleaned.split(paragraph).length - 1, 2)
 })

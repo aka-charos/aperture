@@ -25,7 +25,7 @@
  * SO THIS RUNS BEFORE THE BUDGET, NOT AFTER. Stripping afterwards would tidy
  * text the slice had already been spent on.
  *
- * TWO MECHANISMS, BOTH CONSERVATIVE.
+ * FOUR MECHANISMS, ALL CONSERVATIVE.
  *
  * A RUN of links with no prose in it is a menu; ONE is a caption or a "read
  * more". The predicate is ./sourceQuality.ts's own `isLinkOnlyLine`, already
@@ -33,6 +33,16 @@
  * The run is measured in LINKS, not lines, because IMDb's navigation bar is one
  * line carrying a dozen of them and a line count sees that as a run of one -
  * which would leave the single largest waste in the retrieval untouched.
+ *
+ * A FURNITURE SECTION is the site talking about itself under its own heading -
+ * Where to Watch, More Like This, Related Movie News - which no link rule can
+ * see, because the text under those headings is prose. Rotten Tomatoes lost SIX
+ * characters to the link strip on the version-16 bench and carried all of that.
+ *
+ * A WIDGET LINE is an interface control flattened into markdown, with no links
+ * in it at all: the video player's settings panel through the middle of the
+ * Ebert review. It is recognised by having no sentence and running words
+ * together with no space, three times or more.
  *
  * A PLOT SECTION is content the prompt forbids the model to use, and every
  * version since 7 has spent rules forbidding it. Carrying 4,000 characters of
@@ -69,6 +79,22 @@ export const NAVIGATION_RUN_LINES = 5
  */
 const PLOT_HEADING =
   /^(#{1,6})\s*(?:plot|synopsis|storyline|plot summary|plot synopsis|synopsis of the plot)\s*:?\s*$/i
+
+/**
+ * Headings whose section is the site talking about itself.
+ *
+ * MEASURED, EVERY ONE, on the version-16 bench, where Rotten Tomatoes lost SIX
+ * characters to the link-run strip and still carried Where to Watch, Movie
+ * Clips, More Like This, Related Movie News, Videos and Photos - its furniture
+ * is prose-shaped text under headings, which no link-counting rule can see.
+ *
+ * "Audience Reviews" and "User Reviews" are deliberately NOT here: every prompt
+ * version allows one sentence on how ordinary viewers responded, so those are
+ * thin material and not furniture. Credits are, since the prompt forbids
+ * reciting them.
+ */
+const FURNITURE_HEADING =
+  /^(#{1,6})\s*(?:where to watch|movie clips|more like this|related movie news|more from this title|more to explore|recently viewed|my rating|videos|photos|cast & crew|cast and crew|share|advertisement|follow .{0,24} on social|get the .{0,24} app)\s*:?\s*$/i
 
 const HEADING = /^(#{1,6})\s/
 
@@ -150,6 +176,15 @@ export function stripNavigationRuns(text: string): string {
  * the section being removed, a shallower or equal one ends it.
  */
 export function stripPlotSections(text: string): string {
+  return stripSections(text, [PLOT_HEADING])
+}
+
+/** The same cut, for the headings a site puts its own machinery under. */
+export function stripFurnitureSections(text: string): string {
+  return stripSections(text, [FURNITURE_HEADING])
+}
+
+function stripSections(text: string, headings: readonly RegExp[]): string {
   const lines = text.split('\n')
   const out: string[] = []
   let removingAt: number | null = null
@@ -163,15 +198,45 @@ export function stripPlotSections(text: string): string {
         continue
       }
     }
-    const plot = PLOT_HEADING.exec(line)
-    if (plot) {
-      removingAt = plot[1].length
+    const match = headings.map((pattern) => pattern.exec(line)).find(Boolean)
+    if (match) {
+      removingAt = match[1].length
       continue
     }
     out.push(line)
   }
 
   return out.join('\n')
+}
+
+/**
+ * A line of interface widget rather than of text.
+ *
+ * MEASURED ON THE EBERT REVIEW, which lost nothing to either strip above and
+ * carried an embedded video player's settings panel through the middle of it:
+ * "SettingsOffArabicChineseEnglishFrenchGermanHindiPortugueseSpanish", "Font
+ * ColorwhiteFont Opacity100%Font Size100%Font FamilyArial", "100%75%50%25%".
+ * There are no links in any of it, so nothing that counts links can see it.
+ *
+ * WHAT SEPARATES IT FROM PROSE is that a label run has no sentence in it and
+ * runs several words together with no space. THREE such joins are required, so
+ * an ordinary sentence naming Christopher McDonald or an iPhone is never
+ * touched, and the line must have no terminator - which a real sentence has.
+ */
+export function isWidgetLine(line: string): boolean {
+  const text = line.trim()
+  if (text.length < 8 || /[.!?。]/.test(text)) return false
+  if (text.length >= 8 && /^[\d%\s/|.,:-]+$/.test(text)) return true
+  if (text.length < 20) return false
+  return (text.match(/\p{Ll}\p{Lu}/gu) ?? []).length >= 3
+}
+
+/** Drop those lines. One is junk on its own, so no run is required. */
+export function stripWidgetLines(text: string): string {
+  return text
+    .split('\n')
+    .filter((line) => !isWidgetLine(line))
+    .join('\n')
 }
 
 export interface CleanableSource {
@@ -187,7 +252,9 @@ export interface CleanedSource {
 
 /** One page cleaned, or returned untouched when cleaning would empty it. */
 export function cleanSourceText(text: string): { text: string; stripped: number } {
-  const cleaned = stripPlotSections(stripNavigationRuns(text))
+  const cleaned = stripWidgetLines(
+    stripFurnitureSections(stripPlotSections(stripNavigationRuns(text)))
+  )
     .replace(/\n{3,}/g, '\n\n')
     .trim()
   if (cleaned.length === 0) return { text, stripped: 0 }

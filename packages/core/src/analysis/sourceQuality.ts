@@ -34,7 +34,9 @@
  * list nor the line-share test could see - a wall of review cards whose links
  * each span seven lines - and what it lacked was a SENTENCE. The fourth is a
  * size floor, which names a failed scrape as what it is rather than letting 11
- * characters reach the prompt as a numbered document.
+ * characters reach the prompt as a numbered document. The fifth asks whether
+ * the page is about this film AT ALL, which nothing measured until a Sight and
+ * Sound poll of the best films of 2006 took twelve per cent of a prompt.
  *
  * IT FAILS OPEN. If dropping would leave nothing, nothing is dropped: a thin
  * retrieval that reaches the floor and is honestly declined is a better outcome
@@ -46,7 +48,7 @@
  */
 
 /** Why a page was dropped, for the log line naming it. */
-export type LowValueReason = 'listed-domain' | 'navigation' | 'no-prose' | 'empty'
+export type LowValueReason = 'listed-domain' | 'navigation' | 'no-prose' | 'empty' | 'off-topic'
 
 export interface QualitySource {
   domain: string
@@ -199,10 +201,66 @@ export function hasNoProse(text: string): boolean {
 }
 
 /**
+ * How many characters a document may carry per mention of the film.
+ *
+ * A review names the film it is about, repeatedly. A long page that names it
+ * once in passing is a page the film appears ON, not a page it is ABOUT, and
+ * the budget cannot tell the difference. Deliberately generous: a 20,000
+ * character essay needs one mention, a 44,000 character one needs three.
+ */
+export const CHARS_PER_TITLE_MENTION = 20_000
+
+/** Below this a title is too short to be a reliable needle. */
+const MIN_TITLE_LETTERS = 5
+
+const foldForTitle = (value: string) =>
+  value.normalize('NFKC').toLocaleLowerCase('en').replace(/\s+/g, ' ').trim()
+
+/**
+ * Whether a document is about the film at all.
+ *
+ * WHY THIS EXISTS. The version-16 bench spent 7,833 characters - twelve per
+ * cent of the whole prompt - on a Sight and Sound poll of the best films of
+ * 2006, retrieved by the curated criticism search and marked as criticism in
+ * the report. It is real prose from a real publication about real films, so the
+ * domain list passes it, both shape tests pass it, and it is nobody's
+ * duplicate. The one thing wrong with it is that it is not about this film, and
+ * nothing measured that.
+ *
+ * MENTIONS PER CHARACTER, NOT A BARE MENTION, because the page a film is merely
+ * listed on will name it once. The ratio is loose enough that any page actually
+ * discussing the film clears it, and `filmNames` carries the original title as
+ * well, since a third of retrievals are for films released under two names.
+ *
+ * A SHORT TITLE IS NOT TESTED AT ALL. "Up" and "It" appear in every document
+ * ever written, so a name with fewer than MIN_TITLE_LETTERS letters is skipped
+ * and the film keeps whatever the search found.
+ */
+export function isOffTopic(text: string, filmNames: readonly string[]): boolean {
+  const needles = filmNames
+    .map(foldForTitle)
+    .filter((name) => (name.match(/\p{L}/gu)?.length ?? 0) >= MIN_TITLE_LETTERS)
+  if (needles.length === 0) return false
+
+  const body = foldForTitle(text)
+  const wanted = 1 + Math.floor(body.length / CHARS_PER_TITLE_MENTION)
+  let found = 0
+  for (const needle of needles) {
+    found += body.split(needle).length - 1
+    if (found >= wanted) return false
+  }
+  return true
+}
+
+/**
  * Drop the pages worth nothing, keeping everything if that would be all of them.
+ *
+ * `filmNames` enables the relevance test; omitting them skips it, which is what
+ * every caller that does not know the title should do.
  */
 export function dropLowValueSources<T extends QualitySource>(
-  sources: readonly T[]
+  sources: readonly T[],
+  filmNames: readonly string[] = []
 ): { kept: T[]; dropped: DroppedSource[] } {
   const dropped: DroppedSource[] = []
   const kept = sources.filter((source) => {
@@ -222,6 +280,12 @@ export function dropLowValueSources<T extends QualitySource>(
     }
     if (hasNoProse(source.text)) {
       dropped.push({ domain: source.domain, reason: 'no-prose' })
+      return false
+    }
+    // Checked last: it is the only test that can drop a well-made page, so it
+    // runs on what the cheaper tests have already accepted.
+    if (filmNames.length > 0 && isOffTopic(source.text, filmNames)) {
+      dropped.push({ domain: source.domain, reason: 'off-topic' })
       return false
     }
     return true
