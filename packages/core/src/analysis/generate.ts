@@ -56,7 +56,11 @@ import { startStreamStallGuard, type StreamAbortReason } from '../lib/streamStal
 import { recordWebSearchCall } from '../lib/webSearchUsage.js'
 import { budgetSources } from './budget.js'
 import { isBlockedPage } from './blockedPage.js'
-import { buildCuratedQuery, mergeSearchResults } from './curatedSearch.js'
+import {
+  buildCuratedQueries,
+  distributeCuratedResults,
+  mergeSearchResults,
+} from './curatedSearch.js'
 import { dropLowValueSources } from './sourceQuality.js'
 import { findStructureProblem } from './structure.js'
 import { dropDuplicateTitles } from './duplicateSources.js'
@@ -312,24 +316,52 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
   // further down. Keyed by URL because the merge dedupes on one.
   let criticismUrls = new Set<string>()
   try {
-    const curated = criticismWanted
-      ? await crwSearch(buildCuratedQuery(queryText), {
-          baseUrl: config.baseUrl,
-          apiKey: config.apiKey,
-          maxResults: criticismWanted,
-          maxContentChars: config.maxContentChars,
-          timeoutMs: config.timeoutMs,
-          engine: engineUsed,
-        })
-      : { results: [] }
-    if (curated.results.length > 0) {
-      const merged = mergeSearchResults(curated.results, results)
-      criticismUrls = new Set(curated.results.map((r) => r.url))
+    // SEVERAL QUERIES, not one. The whole site list in a single query is past
+    // what an engine accepts and comes back as an empty result set rather than
+    // an error - see CURATED_QUERY_MAX_CHARS, where that is measured.
+    const queries = criticismWanted ? buildCuratedQueries(queryText) : []
+    const allowance = distributeCuratedResults(criticismWanted, queries.length)
+    const found: typeof results = []
+    for (const [index, query] of queries.entries()) {
+      const wanted = allowance[index] ?? 0
+      if (wanted <= 0) continue
+      const attempt = await crwSearch(query, {
+        baseUrl: config.baseUrl,
+        apiKey: config.apiKey,
+        maxResults: wanted,
+        maxContentChars: config.maxContentChars,
+        timeoutMs: config.timeoutMs,
+        engine: engineUsed,
+      })
+      // INFO, not debug, for the reason the line below this block records: at
+      // debug it sits under the default level, and this is the one record that
+      // separates an engine REFUSING a query - a long title can push one over
+      // the limit its neighbours stay under - from those publications having
+      // nothing on the film. Both are the same empty array from here, and that
+      // ambiguity is what made a broken feature look like a quiet one for a
+      // whole library. Three lines per title, against a title that takes
+      // minutes.
+      logger.info(
+        {
+          title: subject.title,
+          chars: query.length,
+          wanted,
+          got: attempt.results.length,
+          warnings: attempt.warnings,
+        },
+        'Criticism query'
+      )
+      found.push(...attempt.results)
+    }
+    if (found.length > 0) {
+      const merged = mergeSearchResults(found, results)
+      criticismUrls = new Set(found.map((r) => r.url))
       logger.info(
         {
           title: subject.title,
           engine: engineUsed,
-          criticism: curated.results.map((r) => r.domain),
+          queries: queries.length,
+          criticism: found.map((r) => r.domain),
           merged: merged.length,
         },
         'Merged criticism search into retrieval'
@@ -342,7 +374,12 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
       // one. Info rather than warn: nothing published on those twenty sites is
       // the ordinary answer for most of a library, not a fault.
       logger.info(
-        { title: subject.title, engine: engineUsed, wanted: criticismWanted },
+        {
+          title: subject.title,
+          engine: engineUsed,
+          wanted: criticismWanted,
+          queries: queries.length,
+        },
         criticismWanted
           ? 'Criticism search returned nothing for this title'
           : 'Criticism search is switched off (curatedMaxResults is 0)'

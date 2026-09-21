@@ -95,16 +95,101 @@ export const CURATED_TERMS: readonly string[] = [
 ]
 
 /**
- * The general query, plus the two disjunctions.
+ * The longest query to send an engine, in characters.
  *
- * Built from the SAME `queryText` the general search used rather than from the
- * subject again, so the two searches are provably asking about one title -
- * including `buildAnalysisQuery`'s decision about whether to append an original
- * title ([F-064](../../../docs/aperture-forensics.md)).
+ * MEASURED, not guessed. DuckDuckGo refuses an over-long query outright - it
+ * answers "Search query entered was too long. Please shorten and try again."
+ * and CRW reports zero results, which is indistinguishable from "nothing has
+ * been written about this film". All twenty sites in one query is 692
+ * characters and was refused on every title; ten sites is 420 and returns the
+ * Roger Ebert review of the film that started this. So the cap is somewhere
+ * between 420 and 555 (fifteen sites, also refused), consistent with
+ * DuckDuckGo's documented 500.
+ *
+ * 380 leaves real headroom under that, because THE BASE QUERY IS NOT A FIXED
+ * LENGTH: `buildAnalysisQuery` appends an original title for roughly a third of
+ * films, and a long title with a long original title is easily twice the
+ * 79-character example these numbers were measured on. Sitting just under a
+ * measured limit would make the feature work on short titles and fail silently
+ * on long ones, which is the worst of both.
+ *
+ * It also keeps each query near ten operators, well inside any word-count
+ * limit an engine may apply on top of the character one.
  */
-export function buildCuratedQuery(queryText: string): string {
-  const sites = CURATED_CRITICISM_SITES.map((site) => `site:${site}`).join(' OR ')
-  return `${queryText} (${sites}) (${CURATED_TERMS.join(' OR ')})`
+export const CURATED_QUERY_MAX_CHARS = 380
+
+/**
+ * How many searches one title may spend on criticism.
+ *
+ * A guard against a pathological base query making the partition below degrade
+ * into one search per site. With an ordinary query the twenty sites fit in two
+ * or three, so this never binds; when it does bind, the surplus sites are
+ * DROPPED rather than issued, because twenty searches per title across a
+ * library is the kind of traffic that gets an engine to start refusing
+ * everything.
+ */
+export const CURATED_MAX_QUERIES = 4
+
+/**
+ * The curated search, split into as many queries as the site list needs.
+ *
+ * ONE QUERY WAS THE ORIGINAL DESIGN AND IT DID NOT WORK. See
+ * `CURATED_QUERY_MAX_CHARS`: the whole disjunction is far past what an engine
+ * accepts, and the refusal arrives as an empty result set rather than as an
+ * error, so the feature reported "nothing found" on every title in the library
+ * while never having run a successful search at all.
+ *
+ * Each query is built from the SAME `queryText` the general search used rather
+ * than from the subject again, so every one of them is provably asking about
+ * one title - including `buildAnalysisQuery`'s decision about whether to append
+ * an original title ([F-064](../../../docs/aperture-forensics.md)).
+ *
+ * Partitioned greedily in list order, so a site's neighbours in
+ * `CURATED_CRITICISM_SITES` are the ones it shares a query with. That ordering
+ * is not arbitrary - it decides which publications compete with each other for
+ * that query's slots.
+ */
+export function buildCuratedQueries(queryText: string): string[] {
+  const terms = `(${CURATED_TERMS.join(' OR ')})`
+  const queries: string[] = []
+  let batch: string[] = []
+
+  // The cost of a query carrying `batch` plus one more operator.
+  const lengthWith = (extra: string) =>
+    `${queryText} (${[...batch, extra].join(' OR ')}) ${terms}`.length
+
+  for (const site of CURATED_CRITICISM_SITES) {
+    const operator = `site:${site}`
+    if (batch.length > 0 && lengthWith(operator) > CURATED_QUERY_MAX_CHARS) {
+      queries.push(`${queryText} (${batch.join(' OR ')}) ${terms}`)
+      batch = []
+      if (queries.length >= CURATED_MAX_QUERIES) return queries
+    }
+    batch.push(operator)
+  }
+  // A single operator that cannot fit is emitted anyway: one site is the
+  // smallest unit there is, and a query the engine refuses is a better signal
+  // than a site silently dropped.
+  if (batch.length > 0) queries.push(`${queryText} (${batch.join(' OR ')}) ${terms}`)
+  return queries.slice(0, CURATED_MAX_QUERIES)
+}
+
+/**
+ * How many results to ask each query for, totalling exactly `total`.
+ *
+ * EXACT, never `ceil` per query. Asking each of three queries for `ceil(4/3)`
+ * is six scrapes to fill four slots, and `crwSearch` scrapes what it finds, so
+ * that is two pages fetched and paid for and then discarded on every title.
+ * The remainder goes to the earliest queries, which hold the sites listed
+ * first.
+ *
+ * A query allotted 0 is not issued at all by the caller.
+ */
+export function distributeCuratedResults(total: number, queries: number): number[] {
+  if (queries <= 0 || total <= 0) return []
+  const base = Math.floor(total / queries)
+  const remainder = total % queries
+  return Array.from({ length: queries }, (_, i) => base + (i < remainder ? 1 : 0))
 }
 
 /** Anything with a URL and a domain — the shape a search result has. */
