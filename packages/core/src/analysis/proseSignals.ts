@@ -106,6 +106,14 @@ export interface ProseSignals {
   workWords: number
   receptionWords: number
   /**
+   * Questions whose answer is split across paragraphs that are not next to
+   * each other, which every version since 8 forbids in as many words. Measured
+   * on the Suspiria bench, where one answer labelled paragraph 3
+   * "work+circumstances" and paragraph 6 "circumstances", with two work
+   * paragraphs in between. Zero without a map.
+   */
+  scattered: number
+  /**
    * Whether the answer carried a usable paragraph map. The counts that read the
    * model's labels are zero without one, and that zero means "not measured",
    * not "none found" - the report prints a dash for them.
@@ -264,12 +272,24 @@ const TITLE_SEPARATORS = /\s[-–—|·:]\s|\s\|\s/
  * is used. Matching is case-SENSITIVE for the same reason it is worth doing at
  * all: "Rated" from "Frame Rated" is a name and "rated" is a word.
  *
+ * THE FILM'S OWN NAME IS EXCLUDED, because a site puts it where a byline goes.
+ * "The Film Stage Show Classic - Suspiria (1977)" registered "Suspiria" as a
+ * writer, and every answer about the film then named one.
+ *
  * Pure, and the result is printed beside the count, so a wrong candidate is
  * visible rather than misleading - ./comparisonReport.ts prints what matched.
  */
 export function writerNamesFromSources(
-  sources: readonly { title?: string | null }[]
+  sources: readonly { title?: string | null }[],
+  exclude: readonly string[] = []
 ): string[] {
+  const banned = exclude
+    .map((value) => value.trim().toLowerCase())
+    .filter((value) => value.length >= 3)
+  const isFilmName = (name: string) => {
+    const folded = name.toLowerCase()
+    return banned.some((value) => folded.includes(value) || value.includes(folded))
+  }
   const names = new Set<string>()
   for (const source of sources) {
     const title = (source.title ?? '').trim()
@@ -288,7 +308,7 @@ export function writerNamesFromSources(
     // stored "Sight and Sound" as "Sight Sound", a string no answer can contain
     // - so the publication was registered and could never be caught.
     const full = raw.join(' ')
-    if (full.length >= 4) names.add(full)
+    if (full.length >= 4 && !isFilmName(full)) names.add(full)
     // A surname only from a name that is capitalised THROUGHOUT. A lowercase
     // connective means a publication, and dropping it made "Sight and Sound"
     // read as a two-word personal name: "Sound" was registered as its surname
@@ -300,7 +320,8 @@ export function writerNamesFromSources(
       raw.length === capitalised.length &&
       raw.length > 1 &&
       last.length >= 4 &&
-      !TITLE_BOILERPLATE.has(last.toLowerCase())
+      !TITLE_BOILERPLATE.has(last.toLowerCase()) &&
+      !isFilmName(last)
     ) {
       names.add(last)
     }
@@ -343,9 +364,20 @@ const PUBLICATIONS = [
  * traces how…". A maker is never "of" a publication and never "the reviewer
  * at" one, so neither pattern can fire on a director being named, which is what
  * a bare surname plus a reporting verb cannot promise.
+ *
+ * THE FIRST SHAPE NEEDS THE REPORTING VERB, which the measured case had and the
+ * pattern did not require. Without it "Mother of Tears" is a critic of a
+ * publication, and so is every film title built that way - measured on the
+ * Suspiria bench, where it was counted in both answers.
  */
+const REPORTING_VERB =
+  '(?:notes?|noted|writes?|wrote|argues?|argued|says?|said|calls?|called|describes?|described|finds?|found|observes?|observed|reads?|suggests?|suggested|praises?|praised|faults?|faulted|judges?|judged|holds?|held|sees?|saw)'
+
 const NAMED_WRITER_SHAPES = [
-  /\b\p{Lu}[\p{L}'’-]+(?:\s+\p{Lu}[\p{L}'’-]+)?\s+(?:of|at|from|writing for|writing in)\s+(?:the\s+)?\p{Lu}[\p{L}.'’-]+/gu,
+  new RegExp(
+    `\\b\\p{Lu}[\\p{L}'’-]+(?:\\s+\\p{Lu}[\\p{L}'’-]+)?\\s+(?:of|at|from|writing for|writing in)\\s+(?:the\\s+)?\\p{Lu}[\\p{L}.'’-]+\\s+${REPORTING_VERB}\\b`,
+    'gu'
+  ),
   /\b[Tt]he\s+(?:critic|reviewer|scholar|writer)\s+(?:at|for|of|from)\s+(?:the\s+)?\p{Lu}[\p{L}.'’-]+/gu,
 ]
 
@@ -491,6 +523,32 @@ function repeatsAcrossSections(
   return repeated.sort()
 }
 
+/**
+ * Questions whose paragraphs are not one unbroken run.
+ *
+ * A question may share a paragraph with another and may take several, so what
+ * is counted is the SPAN: a label appearing in paragraphs 3 and 6 occupies a
+ * span of four and fills two of them, which is the shape the rule forbids.
+ */
+function scatteredQuestions(
+  sections: readonly (readonly string[])[] | null | undefined
+): number {
+  if (!sections || sections.length === 0) return 0
+  const seen = new Map<string, number[]>()
+  sections.forEach((labels, index) => {
+    for (const label of labels ?? []) {
+      const at = seen.get(label) ?? []
+      at.push(index)
+      seen.set(label, at)
+    }
+  })
+  let scattered = 0
+  for (const at of seen.values()) {
+    if (at[at.length - 1] - at[0] + 1 > at.length) scattered += 1
+  }
+  return scattered
+}
+
 export function measureProse(
   text: string | null | undefined,
   sections?: readonly (readonly string[])[] | null,
@@ -514,6 +572,7 @@ export function measureProse(
     questionEchoes: paragraphs.filter((p) => QUESTION_ECHO.test(p)).length,
     repeatedAcrossSections: repeatedPhrases.length,
     repeatedPhrases,
+    scattered: scatteredQuestions(sections),
     spill: outsideReception(paragraphs, sections, WRITER_MENTIONS),
     praise: outsideReception(paragraphs, sections, PRAISE_WORDS),
     awards: count(trimmed, AWARDS),

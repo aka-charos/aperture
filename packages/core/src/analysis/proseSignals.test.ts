@@ -379,3 +379,49 @@ test('a writer attached to a publication is counted, and a maker never is', () =
   )
   assert.equal(makers.namedWriters, 0, 'naming the people who made it is required, never counted')
 })
+
+/**
+ * Two false positives measured on the Suspiria bench, both film titles.
+ * "Suspiria" came from "The Film Stage Show Classic - Suspiria (1977)", where
+ * the film's own name sits where a byline goes. "Mother of Tears" matched the
+ * "X of Y" shape written for "Gayle Sequeira of BFI notes".
+ */
+test("the film's own name is never a writer, wherever a site puts it", () => {
+  const sources = [
+    { title: 'The Film Stage Show Classic - Suspiria (1977)' },
+    { title: 'Suspiria (Dario Argento, 1977) - Offscreen' },
+  ]
+  assert.ok(writerNamesFromSources(sources).includes('Suspiria'), 'unguarded, it is a name')
+  const guarded = writerNamesFromSources(sources, ['Suspiria'])
+  assert.ok(!guarded.includes('Suspiria'))
+  assert.ok(guarded.includes('Offscreen'), 'and the real one survives')
+})
+
+test('a film title shaped like "X of Y" is not a critic of a publication', () => {
+  // No reporting verb: a title, not an attribution.
+  assert.equal(measureProse('Inferno and Mother of Tears extended the trilogy.').namedWriters, 0)
+  assert.equal(measureProse('It opens on the Village of the Damned.').namedWriters, 0)
+  // With the verb, it is the measured case and still counts.
+  const hit = measureProse('Gayle Sequeira of Filmstage notes that time speeds up.')
+  assert.equal(hit.namedWriters, 1)
+  assert.equal(measureProse('Douglas Buck at Offscreen judged it a work of art.').namedWriters, 1)
+})
+
+/**
+ * Every version since 8 asks for a question's answer to be one unbroken run.
+ * Measured on the Suspiria bench: paragraph 3 labelled "work+circumstances",
+ * paragraph 6 "circumstances", two work paragraphs in between.
+ */
+test('an answer split across non-adjacent paragraphs is counted', () => {
+  const split = [['tradition'], ['tradition'], ['work', 'circumstances'], ['work'], ['work'], ['circumstances']]
+  assert.equal(measureProse('a\n\nb\n\nc\n\nd\n\ne\n\nf', split).scattered, 1)
+
+  const clean = [['tradition'], ['work'], ['work'], ['circumstances'], ['reception']]
+  assert.equal(measureProse('a\n\nb\n\nc\n\nd\n\ne', clean).scattered, 0)
+
+  // Two questions sharing a paragraph is allowed and is not a split.
+  const shared = [['tradition', 'work'], ['work'], ['reception']]
+  assert.equal(measureProse('a\n\nb\n\nc', shared).scattered, 0)
+
+  assert.equal(measureProse('a\n\nb').scattered, 0, 'no map, not measured')
+})
