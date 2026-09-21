@@ -34,8 +34,23 @@ export interface ProseSignals {
   paragraphs: number
   /** Sentences in the longest paragraph. The prompt asks for four at most. */
   longestParagraph: number
-  /** "the sources carry", "the source documents" — pointing at the retrieval. */
+  /** "the sources carry", "the documents do not name" — pointing at the retrieval. */
   pointsAtSources: number
+  /**
+   * Bracketed question labels left in the prose: "[tradition]" as a heading
+   * over its own paragraph. Every version forbids headings, and the panel draws
+   * its own from the map, so a row like this renders "Context" above the
+   * literal text "[tradition]". Measured on ornith-1.5-9b under version 15.
+   */
+  inlineLabels: number
+  /**
+   * Names from the retrieval that appear in the answer - a critic, a scholar or
+   * a publication, which every version forbids naming. Zero when the caller
+   * passed no names, and that zero means "not measured".
+   */
+  namedWriters: number
+  /** The names behind that count, so a reader can check what matched. */
+  namedWriterMatches: string[]
   /** A view with no holder: "is described as", "according to one reading". */
   unattributed: number
   /** "rather than" / "instead of". */
@@ -89,12 +104,36 @@ export interface ProseSignals {
   mapped: boolean
 }
 
+/**
+ * Pointing at the retrieval.
+ *
+ * THE PROMPT'S OWN NOUN IS "DOCUMENTS", and for three versions this counted
+ * only "sources". The rule names the failing phrasings as "the sources say",
+ * "the sources carry", "one source credits" - so a model that obeys the letter
+ * and writes "the documents" instead does the forbidden thing and scores zero.
+ * Measured on the Requiem for a Dream bench: "though the documents do not name
+ * what it influenced specifically", counted as clean. A prompt-primed blind
+ * spot, which is the worst kind an instrument can have.
+ */
 const POINTS_AT_SOURCES = [
   /\b(?:the|these|those|its|available|retrieved) sources\b/gi,
   /\bsource (?:documents?|material)\b/gi,
   // Withnail & I under version 13: "one fan-adjacent source credits it". A
   // source of tension, or a source novel, is not the retrieval.
   /\b(?:one|another|several|some)\s+(?:[a-z]+(?:-[a-z]+)?\s+)?sources?\b(?!\s+(?:of|material|novel|text|book|play|story)\b)/gi,
+  /\b(?:the|these|those|available|retrieved) documents?\b/gi,
+  /\b(?:one|another|several|some)\s+(?:[a-z]+(?:-[a-z]+)?\s+)?documents?\b/gi,
+]
+
+/**
+ * A question label written into the prose as a heading.
+ *
+ * The ids are the paragraph map's vocabulary across every version this build
+ * can run, `structure` and the retired `intent`/`dispute` included, since an
+ * older edition is still benchable.
+ */
+const INLINE_LABELS = [
+  /\[(?:tradition|work|structure|circumstances|reception|intent|dispute)\]/gi,
 ]
 
 const UNATTRIBUTED = [
@@ -179,6 +218,86 @@ const PRAISE_WORDS = [
 const AWARDS = [
   /\b(?:oscars?|academy award|golden globe|bafta|palme d'or|screen actors guild|independent spirit award)\w*\b/gi,
 ]
+
+/**
+ * Words a scraped page title uses about itself, which name nobody.
+ *
+ * "Darren Aronofsky Movies and TV Shows - Reviews & Ratings" would otherwise
+ * register "Reviews" and "Ratings" as writers, and both appear in ordinary
+ * prose about how a film was received.
+ */
+const TITLE_BOILERPLATE = new Set([
+  'a', 'and', 'cast', 'com', 'crew', 'film', 'films', 'for', 'free', 'full', 'home', 'movie',
+  'movies', 'net', 'news', 'official', 'online', 'org', 'page', 'part', 'rating', 'ratings',
+  'review', 'reviews', 'series', 'show', 'shows', 'site', 'stream', 'streaming', 'summary',
+  'the', 'trailer', 'tv', 'video', 'watch', 'with',
+])
+
+const TITLE_SEPARATORS = /\s[-–—|·:]\s|\s\|\s/
+
+/**
+ * The writers and publications a retrieval put in front of the model.
+ *
+ * WHY THE ANSWER CANNOT BE A FIXED LIST. Every version forbids naming a critic,
+ * a scholar or a publication, and the names a model reaches for are the ones it
+ * has just been handed - so the names to look for are a property of the RUN.
+ * Measured on the Requiem for a Dream bench, where one model wrote "what Ebert
+ * called her riskiest role" and "which Ebert had previously adapted": the name
+ * is in two source titles and nowhere in the film's credits.
+ *
+ * TAKEN FROM THE TRAILING SEGMENT ONLY. A scraped page title puts the site or
+ * the byline last, after a dash or a pipe - "… movie review - Roger Ebert",
+ * "… - Rotten Tomatoes" - and everything before it is the film's own name and
+ * its people, who MUST be nameable. A title with no separator contributes
+ * nothing rather than contributing its subject.
+ *
+ * A two-word name also registers its last word, because that is how a surname
+ * is used. Matching is case-SENSITIVE for the same reason it is worth doing at
+ * all: "Rated" from "Frame Rated" is a name and "rated" is a word.
+ *
+ * Pure, and the result is printed beside the count, so a wrong candidate is
+ * visible rather than misleading - ./comparisonReport.ts prints what matched.
+ */
+export function writerNamesFromSources(
+  sources: readonly { title?: string | null }[]
+): string[] {
+  const names = new Set<string>()
+  for (const source of sources) {
+    const title = (source.title ?? '').trim()
+    const parts = title.split(TITLE_SEPARATORS)
+    if (parts.length < 2) continue
+    const tail = parts[parts.length - 1].replace(/\(.*?\)/g, ' ').trim()
+    const words = tail.split(/\s+/).filter((word) => /^[\p{Lu}]/u.test(word))
+    if (words.length === 0 || words.length > 4) continue
+    if (words.every((word) => TITLE_BOILERPLATE.has(word.toLowerCase().replace(/[^\p{L}]/gu, ''))))
+      continue
+    const full = words.join(' ')
+    if (full.length >= 4) names.add(full)
+    const last = words[words.length - 1]
+    if (words.length > 1 && last.length >= 4 && !TITLE_BOILERPLATE.has(last.toLowerCase())) {
+      names.add(last)
+    }
+  }
+  return [...names].sort()
+}
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * Which of those names the answer uses, each WRITER counted once.
+ *
+ * A surname is registered beside its full name, so "Roger Ebert" in an answer
+ * matches both and would read as two people. A one-word match is dropped when a
+ * matched longer name ends with it.
+ */
+function namedWriters(text: string, names: readonly string[]): string[] {
+  const hit = names.filter((name) => new RegExp(`\\b${escapeRegExp(name)}\\b`).test(text))
+  return hit.filter(
+    (name) =>
+      name.includes(' ') ||
+      !hit.some((other) => other !== name && other.endsWith(` ${name}`))
+  )
+}
 
 const RATHER_THAN = [/\brather than\b/gi, /\binstead of\b/gi]
 
@@ -298,16 +417,21 @@ function repeatsAcrossSections(
 
 export function measureProse(
   text: string | null | undefined,
-  sections?: readonly (readonly string[])[] | null
+  sections?: readonly (readonly string[])[] | null,
+  writerNames?: readonly string[] | null
 ): ProseSignals {
   const trimmed = (text ?? '').trim()
   const paragraphs = trimmed ? splitAnalysisParagraphs(trimmed) : []
   const repeatedPhrases = repeatsAcrossSections(paragraphs, sections)
+  const namedWriterMatches = writerNames?.length ? namedWriters(trimmed, writerNames) : []
   return {
     words: trimmed ? trimmed.split(/\s+/).length : 0,
     paragraphs: paragraphs.length,
     longestParagraph: paragraphs.reduce((max, p) => Math.max(max, sentenceCount(p)), 0),
     pointsAtSources: count(trimmed, POINTS_AT_SOURCES),
+    inlineLabels: count(trimmed, INLINE_LABELS),
+    namedWriters: namedWriterMatches.length,
+    namedWriterMatches,
     unattributed: count(trimmed, UNATTRIBUTED),
     ratherThan: count(trimmed, RATHER_THAN),
     leftOpen: count(trimmed, LEFT_OPEN),

@@ -8,14 +8,22 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { measureProse } from './proseSignals.js'
+import { measureProse, writerNamesFromSources } from './proseSignals.js'
 
 test('an empty or missing analysis measures as zero everywhere', () => {
   for (const text of [null, undefined, '', '   ']) {
     const s = measureProse(text)
-    const { repeatedPhrases, mapped, ...counts } = s
-    assert.deepEqual(Object.values(counts), [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    const { repeatedPhrases, namedWriterMatches, mapped, ...counts } = s
+    // Every count, named rather than positional: a fixed-length array here has
+    // to be edited for each new column, and editing it is when a genuine zero
+    // gets written in beside the cosmetic one.
+    assert.deepEqual(
+      Object.entries(counts).filter(([, value]) => value !== 0),
+      []
+    )
+    assert.ok(Object.keys(counts).length >= 15, 'the shape did not collapse')
     assert.deepEqual(repeatedPhrases, [])
+    assert.deepEqual(namedWriterMatches, [])
     assert.equal(mapped, false)
   }
 })
@@ -236,4 +244,80 @@ test('a phrase repeated inside one question is not a repeat', () => {
 test('without a paragraph map there are no questions to repeat across', () => {
   assert.equal(measureProse(T2).repeatedAcrossSections, 0)
   assert.equal(measureProse(T2, []).repeatedAcrossSections, 0)
+})
+
+/**
+ * THE PROMPT'S OWN NOUN IS "DOCUMENTS" and this counted only "sources" for
+ * three versions, so a model obeying the rule's letter scored clean. Measured
+ * on the Requiem for a Dream bench.
+ */
+test('pointing at the documents counts, not only at "the sources"', () => {
+  const text =
+    'It has been noted to influence later work, though the documents do not name what it influenced specifically.'
+  assert.ok(measureProse(text).pointsAtSources >= 1)
+  assert.ok(measureProse('One document describes the cutting.').pointsAtSources >= 1)
+  // Still counted: the phrasings this list already had.
+  assert.ok(measureProse('The sources describe it as bleak.').pointsAtSources >= 1)
+  // A document IN the film, or a source novel, is not the retrieval.
+  assert.equal(measureProse('Its source novel was published in 1978.').pointsAtSources, 0)
+})
+
+/**
+ * ornith-1.5-9b wrote its paragraph labels into the prose under version 15.
+ * The panel draws its own headings from the map, so such a row renders
+ * "Context" above the literal text "[tradition]".
+ */
+test('question labels left in the prose are counted', () => {
+  const text = ['[tradition]', 'It adapts a 1978 novel.', '', '[work]', 'The camera stays close.'].join(
+    '\n'
+  )
+  assert.equal(measureProse(text).inlineLabels, 2)
+  assert.equal(measureProse('The film adapts a novel.').inlineLabels, 0)
+})
+
+/**
+ * The names a model reaches for are the ones the retrieval handed it, so they
+ * come from the run rather than from a fixed list. Taken from the trailing
+ * segment of a page title only: everything before it is the film's own name and
+ * its people, who MUST stay nameable.
+ */
+test('writer names come from source titles, and the film\u2019s own people are not among them', () => {
+  const names = writerNamesFromSources([
+    { title: 'Requiem for a Dream movie review - Roger Ebert' },
+    { title: 'Darren Aronofsky Movies and TV Shows - Reviews & Ratings' },
+    { title: 'Requiem for a Dream - Rotten Tomatoes' },
+    { title: 'FILM REVIEW; Addicted to Drugs and Drug Rituals' },
+    { title: 'REQUIEM FOR A DREAM (2000) - Frame Rated' },
+  ])
+  assert.ok(names.includes('Roger Ebert'))
+  assert.ok(names.includes('Ebert'), 'a surname is how a critic is named in prose')
+  assert.ok(names.includes('Rotten Tomatoes'))
+  // The director is named in a title and must never enter this list: every
+  // version requires naming the people who made the film.
+  assert.ok(!names.includes('Darren Aronofsky'))
+  assert.ok(!names.includes('Aronofsky'))
+  // All-boilerplate tails name nobody, and a title with no separator gives up.
+  assert.ok(!names.includes('Reviews & Ratings'))
+  assert.ok(!names.some((name) => name.includes('Addicted')))
+})
+
+test('a named writer is counted once, and only when capitalised', () => {
+  const names = writerNamesFromSources([
+    { title: 'Requiem for a Dream movie review - Roger Ebert' },
+    { title: 'REQUIEM FOR A DREAM (2000) - Frame Rated' },
+  ])
+  const surname = measureProse('Connelly took what Ebert called her riskiest role.', null, names)
+  assert.equal(surname.namedWriters, 1)
+  assert.deepEqual(surname.namedWriterMatches, ['Ebert'])
+
+  // The full name and the surname are one writer, not two.
+  const full = measureProse('Roger Ebert called it her riskiest role.', null, names)
+  assert.equal(full.namedWriters, 1)
+  assert.deepEqual(full.namedWriterMatches, ['Roger Ebert'])
+
+  // Case-sensitive: "Rated" from "Frame Rated" is a name, "rated" is a word.
+  assert.equal(measureProse('It went out NC-17 rated.', null, names).namedWriters, 0)
+
+  // Nothing passed means not measured, which is the zero the report prints.
+  assert.equal(measureProse('Ebert called it her riskiest role.').namedWriters, 0)
 })

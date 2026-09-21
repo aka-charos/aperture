@@ -31,7 +31,7 @@
  * adjacent rows. The prose is still read in full; the table is what says
  * whether a named habit went down across models, which reading cannot.
  */
-import { measureProse, type ProseSignals } from './proseSignals.js'
+import { measureProse, writerNamesFromSources, type ProseSignals } from './proseSignals.js'
 
 /** One model's turn at the shared prompt. */
 export interface ComparisonEntry {
@@ -162,7 +162,14 @@ function signalsLine(signals: ProseSignals): string {
   const mapped = signals.mapped
   return [
     `${signals.paragraphs} paragraphs (longest ${signals.longestParagraph} sentences)`,
-    `"the sources" ${signals.pointsAtSources}`,
+    `points at the documents ${signals.pointsAtSources}`,
+    // Printed like "told twice", and for the same reason: the names come from
+    // this run's own source titles, so a reader has to be able to see whether
+    // the match is a critic or a false positive.
+    signals.namedWriters > 0
+      ? `names a writer ${signals.namedWriters} (${signals.namedWriterMatches.join(', ')})`
+      : 'names a writer 0',
+    `labels left in the prose ${signals.inlineLabels}`,
     `unattributed ${signals.unattributed}`,
     `"rather than" ${signals.ratherThan}`,
     `left open ${signals.leftOpen}`,
@@ -230,8 +237,15 @@ function failureLine(entry: ComparisonEntry): string {
 
 // The sections are the model's own paragraph labels, which is what lets the
 // "told twice" count tell a repeated fact from one question's long answer.
-const signalsOf = (entry: ComparisonEntry): ProseSignals | null =>
-  entry.analysis?.trim() ? measureProse(entry.analysis, entry.sections) : null
+// The writer names come from THIS RUN's source titles, which is what makes
+// "names a writer" measurable at all: the names a model reaches for are the
+// ones the retrieval just handed it. A replay's baseline answers were written
+// from the same documents, so they take the same list.
+const signalsOf = (
+  entry: ComparisonEntry,
+  writerNames: readonly string[]
+): ProseSignals | null =>
+  entry.analysis?.trim() ? measureProse(entry.analysis, entry.sections, writerNames) : null
 
 /**
  * A count read from the model's paragraph labels is a dash, not a zero, when
@@ -248,6 +262,8 @@ const SIGNAL_COLUMNS: [string, (s: ProseSignals) => number | string][] = [
   ['paras', (s) => s.paragraphs],
   ['longest', (s) => s.longestParagraph],
   ['sources', (s) => s.pointsAtSources],
+  ['named', (s) => s.namedWriters],
+  ['labels', (s) => s.inlineLabels],
   ['unattrib', (s) => s.unattributed],
   ['rather', (s) => s.ratherThan],
   ['open', (s) => s.leftOpen],
@@ -277,7 +293,7 @@ interface SignalRow {
  * run's. A baseline model this run did not repeat still gets its rows, for the
  * same reason a failed entry does: omitting it misreports the run.
  */
-function signalRows(report: ComparisonReport): SignalRow[] {
+function signalRows(report: ComparisonReport, writerNames: readonly string[]): SignalRow[] {
   const labelled = [
     ...report.entries.map((entry, i) => ({ entry, label: `[${i + 1}] ${entryName(entry)}` })),
     ...(report.replayOf?.entries ?? []).map((entry, i) => ({
@@ -295,7 +311,7 @@ function signalRows(report: ComparisonReport): SignalRow[] {
   return labelled
     .map((row, index) => ({ row, index, group: groupOf.get(`${row.entry.provider}::${row.entry.model}`)! }))
     .sort((a, b) => a.group - b.group || a.index - b.index)
-    .map(({ row }) => ({ label: row.label, signals: signalsOf(row.entry) }))
+    .map(({ row }) => ({ label: row.label, signals: signalsOf(row.entry, writerNames) }))
 }
 
 /**
@@ -376,8 +392,13 @@ function signalsTable(rows: SignalRow[]): string[] {
   ]
 }
 
-function pushEntry(out: string[], label: string, entry: ComparisonEntry): void {
-  const signals = signalsOf(entry)
+function pushEntry(
+  out: string[],
+  label: string,
+  entry: ComparisonEntry,
+  writerNames: readonly string[]
+): void {
+  const signals = signalsOf(entry, writerNames)
   out.push(THIN)
   out.push(`${label} ${entryName(entry)}`)
   out.push(statLine(entry, signals))
@@ -445,7 +466,8 @@ export function renderComparisonReport(report: ComparisonReport): string {
   }
   out.push('')
 
-  const rows = signalRows(report)
+  const writerNames = writerNamesFromSources(report.sources)
+  const rows = signalRows(report, writerNames)
   if (rows.length > 0) {
     out.push('SIGNALS — counts of habits the prompt asks the model to avoid (see proseSignals.ts)')
     out.push(...signalsTable(rows))
@@ -453,7 +475,7 @@ export function renderComparisonReport(report: ComparisonReport): string {
   }
 
   for (const [i, entry] of report.entries.entries()) {
-    pushEntry(out, `[${i + 1}]`, entry)
+    pushEntry(out, `[${i + 1}]`, entry, writerNames)
   }
 
   if (baseline) {
@@ -462,7 +484,7 @@ export function renderComparisonReport(report: ComparisonReport): string {
     out.push(RULE)
     out.push('')
     for (const [i, entry] of baseline.entries.entries()) {
-      pushEntry(out, `[b${i + 1}]`, entry)
+      pushEntry(out, `[b${i + 1}]`, entry, writerNames)
     }
   }
 
