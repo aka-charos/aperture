@@ -45,6 +45,12 @@ export type ResponseProblem =
   | { kind: 'reasoning_only' }
   | { kind: 'no_begin_marker' }
   | { kind: 'no_contract_line' }
+  // Decided in ./structure.ts, which needs the parsed paragraph map and so
+  // cannot run here. The union keeps ONE home, because ./generate.ts switches
+  // on the kind to choose between retrying, rotating and throwing.
+  | { kind: 'no_sections' }
+  | { kind: 'thin_sections'; mapped: number; paragraphs: number }
+  | { kind: 'one_section'; questions: number }
 
 /**
  * Remove reasoning the model wrapped in explicit tags.
@@ -181,6 +187,26 @@ export function describeResponseProblem(
     ` writes its scratchpad as ordinary text is the usual cause.`
 
   switch (problem.kind) {
+    // The three structural faults. Each names the count that failed, because
+    // the fix is the same in every case - the model has to label the paragraphs
+    // it already wrote - and the number is what shows how far off it was.
+    case 'no_sections':
+      return (
+        `The analysis for "${context.title}" came back as one unbroken block: the model wrote no` +
+        ` usable list of which paragraph answers which question, so the article would have had` +
+        ` no headings.${suffix}`
+      )
+    case 'thin_sections':
+      return (
+        `The analysis for "${context.title}" labelled only ${problem.mapped} of its` +
+        ` ${problem.paragraphs} paragraphs, so most of the article would have had no heading.` +
+        `${suffix}`
+      )
+    case 'one_section':
+      return (
+        `The analysis for "${context.title}" answered only ${problem.questions} of the questions it` +
+        ` was asked, so there is nothing to break it into sections with.${suffix}`
+      )
     case 'truncated': {
       // Deliberately NOT the suffix above. `finishReason: 'length'` is the
       // provider stating that the ceiling was reached, which is a fact about

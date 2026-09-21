@@ -61,6 +61,20 @@ export interface ProseSignals {
   /** Semicolons. The prompt asks for none. */
   semicolons: number
   /**
+   * Quality words outside the reception answer: "extraordinary",
+   * "soul-shattering". Every prompt version puts whether it is good in the
+   * reception answer alone, and the work answer names four of these verbatim.
+   * Zero without a paragraph map, and scoped exactly as spill is.
+   */
+  praise: number
+  /**
+   * Named awards anywhere in the answer. The reception question says "no
+   * scores, no list of awards" and one answer named a Golden Globe and an
+   * Oscar. Whole-answer rather than scoped, since an award is no more of an
+   * answer under making than under reception - and so it needs no map.
+   */
+  awards: number
+  /**
    * Words in paragraphs labelled `work`, and in paragraphs labelled reception
    * (or version 8's `dispute`). The prompt asks for reception never to run
    * longer than the work answer. Zero without a map.
@@ -100,7 +114,7 @@ const UNATTRIBUTED = [
   // retrospective account holds" under version 13, and "The retrospective
   // account is explicit", "the retrospective press placed" under 14. "One
   // critical reading" is already counted above.
-  /\b(?:one|a|another|the)\s+(?!critical\s)(?:[a-z]+\s+)?(?:account|reading|press)\s+(?:is|was|holds|takes|reads|sees|argues|suggests|finds|calls|notes|treats|places|placed)\b/gi,
+  /\b(?:one|a|another|the)\s+(?!critical\s)(?:[a-z]+\s+){0,2}(?:account|reading|press|analysis|line|view|interpretation)\s+(?:is|was|holds|held|takes|took|reads|sees|saw|argues|argued|suggests|finds|found|calls|called|notes|treats|traces|describes|shaped|places|placed)\b/gi,
 ]
 
 /**
@@ -134,9 +148,10 @@ function wordsIn(
   )
 }
 
-function writersOutsideReception(
+function outsideReception(
   paragraphs: string[],
-  sections: readonly (readonly string[])[] | null | undefined
+  sections: readonly (readonly string[])[] | null | undefined,
+  patterns: RegExp[]
 ): number {
   if (!sections || sections.length === 0) return 0
   return paragraphs.reduce((sum, paragraph, i) => {
@@ -144,9 +159,26 @@ function writersOutsideReception(
     if (!labels || labels.length === 0 || labels.some((label) => WRITER_SECTIONS.has(label))) {
       return sum
     }
-    return sum + count(paragraph, WRITER_MENTIONS)
+    return sum + count(paragraph, patterns)
   }, 0)
 }
+
+/**
+ * Whether it is good, said outside the reception answer.
+ *
+ * The list is the words the prompt itself names plus the ones measured in
+ * answers - deliberately adjectives of QUALITY, never of description: "grim",
+ * "relentless" and "hallucinatory" describe a film and belong wherever the
+ * documents support them, while "masterful" is a verdict.
+ */
+const PRAISE_WORDS = [
+  /\b(?:sharp|powerful|masterful|masterly|career-best|extraordinary|remarkable|stunning|brilliant|flawless|breathtaking|dazzling|astonishing|superb|magnificent|soul-shattering|unforgettable|indelible|iconic|virtuosic|tour de force)\b/gi,
+  /\bleaves? (?:the |an? )?(?:deepest|indelible|lasting) (?:mark|impression)\b/gi,
+]
+
+const AWARDS = [
+  /\b(?:oscars?|academy award|golden globe|bafta|palme d'or|screen actors guild|independent spirit award)\w*\b/gi,
+]
 
 const RATHER_THAN = [/\brather than\b/gi, /\binstead of\b/gi]
 
@@ -282,7 +314,9 @@ export function measureProse(
     questionEchoes: paragraphs.filter((p) => QUESTION_ECHO.test(p)).length,
     repeatedAcrossSections: repeatedPhrases.length,
     repeatedPhrases,
-    spill: writersOutsideReception(paragraphs, sections),
+    spill: outsideReception(paragraphs, sections, WRITER_MENTIONS),
+    praise: outsideReception(paragraphs, sections, PRAISE_WORDS),
+    awards: count(trimmed, AWARDS),
     semicolons: (trimmed.match(/;/g) ?? []).length,
     workWords: wordsIn(paragraphs, sections, WORK_SECTIONS),
     receptionWords: wordsIn(paragraphs, sections, WRITER_SECTIONS),

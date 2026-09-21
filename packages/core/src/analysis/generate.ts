@@ -56,6 +56,8 @@ import { startStreamStallGuard, type StreamAbortReason } from '../lib/streamStal
 import { recordWebSearchCall } from '../lib/webSearchUsage.js'
 import { budgetSources } from './budget.js'
 import { isBlockedPage } from './blockedPage.js'
+import { dropLowValueSources } from './sourceQuality.js'
+import { findStructureProblem } from './structure.js'
 import { dropDuplicateTitles } from './duplicateSources.js'
 import { checkModeReadiness, type RetrievalMode } from './mode.js'
 import { getAnalysisPromptVariant } from './promptSetting.js'
@@ -322,8 +324,21 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
     )
   }
 
+  // Pages that were fetched perfectly well and are worth nothing: a listing
+  // site's tag tables, a generated "analysis" page, a content farm whose
+  // retrieved text is its own navigation menu. Dropped after the walls and
+  // before the budget, so their share goes to the pages that did answer. Fails
+  // open when they are all there is. See ./sourceQuality.ts.
+  const { kept: worthwhile, dropped: lowValue } = dropLowValueSources(readable)
+  if (lowValue.length > 0) {
+    logger.warn(
+      { title: subject.title, dropped: lowValue },
+      'Dropped low-value pages from retrieval'
+    )
+  }
+
   // One chapter fetched from two sites is one document. See ./duplicateSources.ts.
-  const { kept: distinct, dropped: duplicates } = dropDuplicateTitles(readable, [
+  const { kept: distinct, dropped: duplicates } = dropDuplicateTitles(worthwhile, [
     subject.title,
     subject.originalTitle ?? '',
     subject.year ? String(subject.year) : '',
@@ -424,22 +439,36 @@ export interface WriteResult {
  * is decided by the markers the prompt asked for, never by inspecting the prose
  * and guessing.
  */
-function readAnalysis(raw: string, finishReason?: string) {
+function readAnalysis(
+  raw: string,
+  finishReason: string | undefined,
+  structure: { mediaType: 'movie' | 'series'; promptVersion?: number }
+) {
   const parsed = parseAnalysisResponse(stripReasoningBlocks(raw))
+  const paragraphs = parsed.text ? splitAnalysisParagraphs(parsed.text).length : 0
   return {
     text: parsed.text,
     grade: parsed.grade,
-    // Carried up raw and judged in `analyseTitle`, which is the only frame that
-    // knows the media type -- and therefore which question labels were even
-    // offered. Deliberately absent from findResponseProblem below: a missing or
-    // broken map costs the map, never the analysis.
+    // Still carried up raw, because ./segments.ts and the stored row want the
+    // map the model actually wrote. It is now also JUDGED here rather than only
+    // in analyseTitle: an unusable map means an unheaded article, and this is
+    // the only frame that can still ask the model to try again. See ./structure.ts.
     mapText: parsed.mapText,
-    problem: findResponseProblem({
-      text: parsed.text,
-      grade: parsed.grade,
-      hadBeginMarker: parsed.hadBeginMarker,
-      finishReason,
-    }),
+    problem:
+      findResponseProblem({
+        text: parsed.text,
+        grade: parsed.grade,
+        hadBeginMarker: parsed.hadBeginMarker,
+        finishReason,
+      }) ??
+      findStructureProblem({
+        paragraphs,
+        map: parseParagraphMap(parsed.mapText, {
+          paragraphCount: paragraphs,
+          mediaType: structure.mediaType,
+          ...(structure.promptVersion != null && { promptVersion: structure.promptVersion }),
+        }),
+      }),
   }
 }
 
@@ -458,6 +487,18 @@ export type AttemptOutcome =
   | { kind: 'cancelled' }
 
 export interface WriteOptions {
+  /**
+   * Which question labels the prompt offered, so the paragraph map can be
+   * judged against the right vocabulary - only a series is asked about
+   * `structure`. REQUIRED rather than optional, although every other field here
+   * is optional: a caller that omitted it would silently skip the structure
+   * half of the output contract and its answers would look identical to ones
+   * that passed it, which is the defect an optional argument that changes the
+   * answer always is.
+   */
+  mediaType: 'movie' | 'series'
+  /** The version whose vocabulary applies. Absent means the current one; only the bench passes another. */
+  promptVersion?: number
   shouldCancel?: () => Promise<boolean> | boolean
   /** Told when a pacing cool-off begins, so a job console can say why it is idle. */
   onWait?: (seconds: number) => void
@@ -914,7 +955,10 @@ export async function runWriteAttempt(
     // and this path had no shared key with the provider at all. Kept for the
     // final line too, so a title that succeeded is equally traceable.
     generationId = response.response?.id
-    reading = readAnalysis(response.text ?? '', response.finishReason)
+    reading = readAnalysis(response.text ?? '', response.finishReason, {
+      mediaType: options.mediaType,
+      ...(options.promptVersion != null && { promptVersion: options.promptVersion }),
+    })
 
     if (!reading.problem) break
 
@@ -1023,7 +1067,7 @@ export async function runWriteAttempt(
 async function writeFromSources(
   prompt: string,
   maxOutputTokens: number,
-  options: WriteOptions = {}
+  options: WriteOptions
 ): Promise<WriteResult> {
   const attempts = await getTitleAnalysisModelAttempts()
 
@@ -1119,7 +1163,7 @@ function extractGroundingSources(raw: unknown): AnalysisSourceRef[] {
 async function writeWithGrounding(
   prompt: string,
   maxOutputTokens: number,
-  options: WriteOptions = {}
+  options: WriteOptions
 ): Promise<WriteResult> {
   const tools = await getGroundingProviderTools('titleAnalysis')
   // Read once, outside the key loop: pacing is a property of the role's
@@ -1204,7 +1248,10 @@ async function writeWithGrounding(
           | undefined
       )?.groundingMetadata
 
-      const reading = readAnalysis(response.text ?? '', response.finishReason)
+      const reading = readAnalysis(response.text ?? '', response.finishReason, {
+        mediaType: options.mediaType,
+        ...(options.promptVersion != null && { promptVersion: options.promptVersion }),
+      })
       result = {
         ...reading,
         modelId: response.response?.modelId ?? keyAttempt.modelId,
@@ -1381,7 +1428,12 @@ export async function analyseTitle(
     const result = await writeWithGrounding(
       buildAnalysisPrompt(subject, { mode, variant: promptVariant }),
       crwConfig.analysisMaxOutputTokens,
-      { shouldCancel: options.shouldCancel, onWait: options.onWait, title: subject.title }
+      {
+        mediaType,
+        shouldCancel: options.shouldCancel,
+        onWait: options.onWait,
+        title: subject.title,
+      }
     )
 
     // A grounded call that retrieved NOTHING did not answer the question — it
@@ -1427,7 +1479,12 @@ export async function analyseTitle(
     const result = await writeFromSources(
       buildAnalysisPrompt(subject, { mode, sources: retrieval.sources, variant: promptVariant }),
       crwConfig.analysisMaxOutputTokens,
-      { shouldCancel: options.shouldCancel, onWait: options.onWait, title: subject.title }
+      {
+        mediaType,
+        shouldCancel: options.shouldCancel,
+        onWait: options.onWait,
+        title: subject.title,
+      }
     )
     text = result.text
     mapText = result.mapText

@@ -604,7 +604,12 @@ test('the compact variant is shorter than its base, and carries what it was writ
     instructions(compact) + ' vs ' + instructions(base)
   )
   // Each of these answers something measured on that bench.
-  assert.ok(compact.includes('Write six to nine paragraphs'), 'a budget it can follow')
+  assert.ok(compact.includes('Write five to nine paragraphs'), 'a budget it can follow')
+  // The work-paragraph FLOOR caused padding on the Requiem bench - a fifth
+  // paragraph restating the second, and one run that dropped the reception
+  // answer to make room. A ceiling does what the floor was meant to.
+  assert.ok(compact.includes('up to four on what it is doing'), 'a ceiling, not a floor')
+  assert.ok(!compact.includes('three or four on what it is doing'))
   assert.ok(compact.includes('has come to be regarded as'), 'the hedge it reached for')
   assert.ok(compact.includes("encyclopedia's own summary of what critics think"), 'weak effects')
   assert.ok(compact.includes('Count the paragraphs you have written'), 'the map count')
@@ -613,7 +618,7 @@ test('the compact variant is shorter than its base, and carries what it was writ
     'the effect the base routes into the making answer'
   )
   // The base is untouched by any of it.
-  assert.ok(!base.includes('Write six to nine paragraphs'))
+  assert.ok(!base.includes('Write five to nine paragraphs'))
 })
 
 test('bench choices put variants after the versions they vary', () => {

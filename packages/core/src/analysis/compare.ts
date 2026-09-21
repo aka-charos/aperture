@@ -449,6 +449,8 @@ async function runOneEntry(
   try {
     const attempt = await buildTitleAnalysisAttemptFor(entry.provider as ProviderType, entry.model)
     const outcome = await runWriteAttempt(attempt, prompt, maxOutputTokens, {
+      mediaType,
+      promptVersion,
       shouldCancel: () => cancelled.has(runId),
       title: `${entry.model} (comparison)`,
     })

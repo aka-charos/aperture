@@ -85,7 +85,7 @@ const COMPACT_VARIANT: PromptVariant = {
   movieQuestions: [
     {
       id: 'tradition',
-      text: "Where does this film come from? Say what kind of work it is and what it adapts or draws on, then name the tradition, movement or body of work it belongs to. Do not open on who directed, wrote or starred in it - the reader can already see the credits - and never copy the genre labels or mood tags a listing page attaches. Do not name one earlier film as this one's model: that is a critic's view, it belongs in the reception answer, and it can give away how this film ends.",
+      text: "Where does this film come from? Say what kind of work it is and what it adapts or draws on. Name a tradition, movement or body of work only if a document places it in one - inventing a movement to fill the slot is worse than naming none. Do not open on who directed, wrote or starred in it - the reader can already see the credits - and never copy the genre labels or mood tags a listing page attaches. Do not name one earlier film as this one's model: that is a critic's view, it belongs in the reception answer, and it can give away how this film ends.",
     },
     {
       id: 'work',
@@ -93,7 +93,7 @@ const COMPACT_VARIANT: PromptVariant = {
     },
     {
       id: 'circumstances',
-      text: "How was it made, and what did that leave on the film? Two things belong here and nothing else. First, what a maker said they were trying to do: they must be quoted or reported as saying it, and a page describing a director's aims without quoting them does not count. Second, a condition of the making or the first release that changed the film - ask whether the film would look or sound different if it had not happened, and drop it if the answer is no. Money, rights, schedules, job lists, crew and extras counts, filming locations and release dates all fail that test. How the film was received is not a making fact, and neither is what anyone went on to do afterwards.",
+      text: "How was it made, and what did that leave on the film? Two things belong here and nothing else. First, what a maker said they were trying to do: they must be quoted or reported as saying it, and a page describing a director's aims without quoting them does not count. Second, a condition of the making or the first release that changed the film - ask whether it would be a different film, or would have reached its audience differently, if this had not happened, and drop it if the answer is no. Money, rights, schedules, job lists, crew and extras counts, filming locations and release dates all fail that test. How the film was received is not a making fact, and neither is what anyone went on to do afterwards.",
     },
     {
       id: 'reception',
@@ -103,7 +103,7 @@ const COMPACT_VARIANT: PromptVariant = {
   seriesQuestions: [
     {
       id: 'tradition',
-      text: "Where does this series come from? Say what kind of work it is and what it adapts or draws on, then name the tradition, movement or body of work it belongs to. Do not open on who created, wrote or starred in it - the reader can already see the credits - and never copy the genre labels or mood tags a listing page attaches. Do not name one earlier work as this one's model: that is a critic's view, it belongs in the reception answer, and it can give away how this one ends.",
+      text: "Where does this series come from? Say what kind of work it is and what it adapts or draws on. Name a tradition, movement or body of work only if a document places it in one - inventing a movement to fill the slot is worse than naming none. Do not open on who created, wrote or starred in it - the reader can already see the credits - and never copy the genre labels or mood tags a listing page attaches. Do not name one earlier work as this one's model: that is a critic's view, it belongs in the reception answer, and it can give away how this one ends.",
     },
     {
       id: 'work',
@@ -115,7 +115,7 @@ const COMPACT_VARIANT: PromptVariant = {
     },
     {
       id: 'circumstances',
-      text: "How was it made, and what did that leave on the series? Two things belong here and nothing else. First, what a maker said they were trying to do: they must be quoted or reported as saying it, and a page describing a creator's aims without quoting them does not count. Second, a condition of the making or the first broadcast that changed the series - ask whether it would look or sound different if it had not happened, and drop it if the answer is no. Money, rights, schedules, job lists, crew and extras counts, filming locations and air dates all fail that test. How it was received is not a making fact, and neither is what anyone went on to do afterwards.",
+      text: "How was it made, and what did that leave on the series? Two things belong here and nothing else. First, what a maker said they were trying to do: they must be quoted or reported as saying it, and a page describing a creator's aims without quoting them does not count. Second, a condition of the making or the first broadcast that changed the series - ask whether it would be a different series, or would have reached its audience differently, if this had not happened, and drop it if the answer is no. Money, rights, schedules, job lists, crew and extras counts, filming locations and air dates all fail that test. How it was received is not a making fact, and neither is what anyone went on to do afterwards.",
     },
     {
       id: 'reception',
@@ -124,7 +124,7 @@ const COMPACT_VARIANT: PromptVariant = {
   ],
   rules: [
     "Describe how it works, never what happens in it. No endings, no reveals, nothing about what a character, creature or image turns out to be, and nothing about a changed ending or which character gets out. Someone who has not seen it must be able to read this safely.",
-    "Write six to nine paragraphs, 500 to 750 words in all, separated by blank lines. Spend one or two paragraphs on where it comes from, three or four on what it is doing, one or two on how it was made, and one on how it was received. Every paragraph is three or four sentences: the first makes one claim and the rest support it.",
+    "Write five to nine paragraphs, 450 to 750 words in all, separated by blank lines. Spend one or two paragraphs on where it comes from, up to four on what it is doing - as many as the documents support and no more - one or two on how it was made, and one on how it was received, which is the last thing in the piece. Every paragraph is three or four sentences: the first makes one claim and the rest support it.",
     "Answer the questions in the order given, and keep each answer in one unbroken run of paragraphs. Say each fact once, under the question it belongs to - if you have written it already, do not write it again under another question. Leave out a question the documents cannot answer, which is the right outcome and not a gap, and if none of them can be answered, say so in two sentences and stop.",
     "Write every sentence in your own words. Never copy a phrase out of a document: anything reading like a crew note, a caption or a list of items has to be turned into English first. Say what a choice does, not what it avoids, so no \"rather than\" and no \"not X but Y\". No semicolons. Plain prose only - no headings, no bullet points, no numbered lists, no bold.",
     "Open each answer with a fact about the work. Never open by announcing what the answer covers - not \"The film sits in\", not \"Critics disagree about\", and not a sentence saying that the making left its mark on the work.",

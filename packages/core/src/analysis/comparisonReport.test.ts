@@ -288,7 +288,7 @@ test('a fact told under two questions is counted and named in the report', () =>
     })
   )
   assert.match(text, /told twice \d+ \([^)]*liquid metal/)
-  assert.match(text, /\s+twice\s+spill\s+semi\s+rec\/work\n/)
+  assert.match(text, /\s+twice\s+spill\s+praise\s+awards\s+semi\s+rec\/work\n/)
 })
 
 /**
@@ -306,7 +306,7 @@ test('an answer with no map prints dashes for what the map measures', () => {
   )
   const row = (name: string) => text.split('\n').find((line) => line.includes(' / ' + name + ' · v7 '))!
   assert.match(row('mapped'), /\s0\s+0\s+0\s+6\/2!$/)
-  assert.match(row('unmapped'), /\s—\s+—\s+1\s+—$/)
+  assert.match(row('unmapped'), /\s—\s+—\s+—\s+0\s+1\s+—$/)
   assert.match(text, /told twice — \(no map\)/)
   assert.match(text, /writers outside reception —/)
   assert.match(text, /reception 6 words, work 2 \(reception longer\)/)

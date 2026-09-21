@@ -170,6 +170,8 @@ function signalsLine(signals: ProseSignals): string {
         })`
       : 'told twice 0',
     `writers outside reception ${mapped ? signals.spill : '—'}`,
+    `quality words outside reception ${mapped ? signals.praise : '—'}`,
+    `awards named ${signals.awards}`,
     `semicolons ${signals.semicolons}`,
     mapped
       ? `reception ${signals.receptionWords} words, work ${signals.workWords}${
@@ -245,6 +247,8 @@ const SIGNAL_COLUMNS: [string, (s: ProseSignals) => number | string][] = [
   ['echoes', (s) => s.questionEchoes],
   ['twice', labelled((s) => s.repeatedAcrossSections)],
   ['spill', labelled((s) => s.spill)],
+  ['praise', labelled((s) => s.praise)],
+  ['awards', (s) => s.awards],
   ['semi', (s) => s.semicolons],
   [
     'rec/work',
