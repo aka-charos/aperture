@@ -299,3 +299,42 @@ test('widget lines go, and the paragraphs around them stay', () => {
   assert.equal(cleaned.includes('100%75%'), false)
   assert.equal(cleaned.split(paragraph).length - 1, 2)
 })
+
+/**
+ * Metacritic writes each of its eighteen cast entries as one link over three
+ * lines - photograph, blank, then "Ellen BurstynSara Goldfarb](/person/…)" - so
+ * the photograph scores one link, the closing line reads as content, and every
+ * entry breaks the run at a weight of one. Shape taken off the version-16
+ * bench, where the list survived both strips and 40% of that page was credits.
+ */
+test('a cast list written as multi-line links is a run', () => {
+  const entry = (name: string, role: string, slug: string) =>
+    [
+      `[![${name}](https://www.metacritic.com/a/img/resize/${slug}.jpg)`,
+      '',
+      `${name}${role}](/person/${slug}/)`,
+    ].join('\n')
+  const page = [
+    paragraph,
+    '',
+    entry('Ellen Burstyn', 'Sara Goldfarb', 'ellen-burstyn'),
+    entry('Jared Leto', 'Harry Goldfarb', 'jared-leto'),
+    entry('Jennifer Connelly', 'Marion Silver', 'jennifer-connelly'),
+    entry('Marlon Wayans', 'Tyrone C. Love', 'marlon-wayans'),
+    entry('Louise Lasser', 'Ada', 'louise-lasser'),
+    '',
+    paragraph,
+  ].join('\n')
+  const cleaned = stripNavigationRuns(page)
+  assert.equal(cleaned.includes('Sara Goldfarb'), false)
+  assert.equal(cleaned.includes('metacritic.com/a/img'), false)
+  assert.equal(cleaned.split(paragraph).length - 1, 2)
+})
+
+test('a sentence that happens to end in a link is not a link tail', () => {
+  const page = [
+    'Aronofsky uses extreme closeups to show the drugs acting on his characters, as set out in [the full review](https://example.com/x)',
+    'It opens on a television chained to a radiator, and the son wheels it to a pawn shop.',
+  ].join('\n')
+  assert.equal(stripNavigationRuns(page), page)
+})

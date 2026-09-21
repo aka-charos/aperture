@@ -108,3 +108,76 @@ export function keepOnePerDomain<T extends { domain: string }>(
   }
   return { kept, dropped }
 }
+
+/** Words in a shingle. Long enough that a shared sentence is not a coincidence. */
+export const SHINGLE_WORDS = 8
+
+/** Share of the shorter document's shingles that must be in the longer one. */
+export const DUPLICATE_SHINGLE_SHARE = 0.5
+
+const shingles = (text: string): Set<string> => {
+  const words = fold(text).split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+  const out = new Set<string>()
+  for (let i = 0; i + SHINGLE_WORDS <= words.length; i += 1) {
+    out.add(words.slice(i, i + SHINGLE_WORDS).join(' '))
+  }
+  return out
+}
+
+/**
+ * Drop a page whose text is already inside another page's.
+ *
+ * WHY THE TITLE TEST IS NOT ENOUGH. One chapter on two sites shares a title and
+ * is caught above; the same material republished, syndicated or mirrored under
+ * a different headline is not. This file's header says the text was not
+ * compared because in the Kontroll case it did not match - each site wrapped
+ * the chapter in its own furniture - and that is an argument against comparing
+ * WHOLE TEXTS, not against comparing what is inside them. Shingles ignore the
+ * wrapper: the furniture contributes shingles nobody shares, and the chapter
+ * contributes the ones that decide it.
+ *
+ * MEASURED AGAINST THE SHORTER DOCUMENT, because a 4,000-character page wholly
+ * inside a 25,000-character one is a duplicate and their symmetric overlap is
+ * only sixteen per cent. The longer one is the one kept, and it keeps its own
+ * place - unlike the title test above, which promotes the survivor into the
+ * first one's slot, since there the two were the same document and here one
+ * contains the other.
+ *
+ * EIGHT WORDS, HALF THE SHINGLES. Two reviews of one film share phrases - the
+ * title, the director, a quoted line - and an eight-word run is long enough
+ * that sharing half of them is republication and not a common subject.
+ *
+ * IT IS NOT A DE-OVERLAP. Two aggregator pages listing DIFFERENT excerpts from
+ * the same pool of reviews are not duplicates and must both survive: measured
+ * on Requiem for a Dream, metacritic.com and IMDb's Metacritic mirror carried
+ * five and ten critic quotes with ONE in common, because each page had been
+ * truncated at a different point. Calling those a duplicate would throw away
+ * the densest criticism in the retrieval.
+ */
+export function dropDuplicateContent<T extends { domain: string; text: string }>(
+  sources: readonly T[]
+): { kept: T[]; dropped: { domain: string; duplicateOf: string }[] } {
+  const prints = sources.map((source) => shingles(source.text))
+  const dropped: { domain: string; duplicateOf: string }[] = []
+  const gone = new Set<number>()
+
+  for (let i = 0; i < sources.length; i += 1) {
+    if (gone.has(i)) continue
+    for (let j = i + 1; j < sources.length; j += 1) {
+      if (gone.has(j)) continue
+      const [a, b] = [prints[i], prints[j]]
+      const [small, large] = a.size <= b.size ? [a, b] : [b, a]
+      if (small.size === 0) continue
+      let shared = 0
+      for (const shingle of small) if (large.has(shingle)) shared += 1
+      if (shared < small.size * DUPLICATE_SHINGLE_SHARE) continue
+      const loser = a.size <= b.size ? i : j
+      const winner = loser === j ? i : j
+      gone.add(loser)
+      dropped.push({ domain: sources[loser].domain, duplicateOf: sources[winner].domain })
+      if (loser === i) break
+    }
+  }
+
+  return { kept: sources.filter((_, i) => !gone.has(i)), dropped }
+}

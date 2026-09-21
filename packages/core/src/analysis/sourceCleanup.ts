@@ -101,15 +101,38 @@ const HEADING = /^(#{1,6})\s/
 /** Words a non-link line may have and still be part of a menu around it. */
 const FILLER_WORDS = 3
 
+/** Words the closing line of a multi-line link may have and still be its tail. */
+const LINK_TAIL_WORDS = 6
+
 /**
  * A line that holds a menu together without being one of its links: a category
- * label ("Movies", "TV shows"), a code-fence, a bullet on its own.
+ * label ("Movies", "TV shows"), a code-fence, a bullet on its own, or the TAIL
+ * of a link that opened on an earlier line.
+ *
+ * THE TAIL CASE IS A CAST LIST. Metacritic writes each of its eighteen cast
+ * entries as one link over three lines - the actor's photograph, a blank, then
+ * "Ellen BurstynSara Goldfarb](/person/ellen-burstyn/)" - so the photograph
+ * scores one link, the closing line reads as content, and every entry breaks
+ * the run at a weight of one. A line that CLOSES a markdown link is part of
+ * that link and not prose, and requiring it to be short and unpunctuated keeps
+ * a sentence ending in a link out of it.
  *
  * Checked only INSIDE a run, never to start one, and a sentence terminator
  * disqualifies it - the point is to bridge "Movies" between two navigation
  * bars, not to swallow a short sentence at the end of a paragraph.
  */
 function isRunFiller(line: string): boolean {
+  const trimmed = line.trim()
+  // The tail of a link opened earlier. Tested BEFORE the sentence guard and
+  // without it, because a cast entry's period is an initial: Metacritic's list
+  // carries "Tyrone C. Love", "Mr. Rabinowitz" and "Dr. Pill", and a rule that
+  // treated those as sentence ends broke the run at every third entry. What
+  // keeps a real sentence out is the word count, since a sentence ending in a
+  // link is not six words long.
+  if (/\]\([^()\s]*\)$/.test(trimmed)) {
+    const label = trimmed.replace(/\]\([^()]*\)$/, '')
+    if (label.split(/\s+/).filter(Boolean).length <= LINK_TAIL_WORDS) return true
+  }
   const bare = line.replace(/[#*_`>|[\]()!-]/g, ' ').trim()
   if (bare.length === 0) return true
   if (/[.!?。]/.test(bare)) return false
