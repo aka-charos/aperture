@@ -56,6 +56,7 @@ import { startStreamStallGuard, type StreamAbortReason } from '../lib/streamStal
 import { recordWebSearchCall } from '../lib/webSearchUsage.js'
 import { budgetSources } from './budget.js'
 import { isBlockedPage } from './blockedPage.js'
+import { buildCuratedQuery, curatedSlots, mergeSearchResults } from './curatedSearch.js'
 import { dropLowValueSources } from './sourceQuality.js'
 import { findStructureProblem } from './structure.js'
 import { dropDuplicateTitles } from './duplicateSources.js'
@@ -284,7 +285,65 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
     throw new Error(`Retrieval returned no results for "${queryText}".${reported}`)
   }
 
-  const fetched: AnalysisSource[] = response.results.map((r) => ({
+  let results = response.results
+
+  // A SECOND search, restricted to publications that print criticism, merged
+  // into the first. See ./curatedSearch.ts for why it is an addition rather
+  // than a replacement, and why the merge reserves slots instead of sharing a
+  // cut.
+  //
+  // It runs on the engine that just ANSWERED rather than through the cascade:
+  // that engine is demonstrably responding, so an empty curated result means
+  // "nothing on those sites", which for most titles is the correct answer -
+  // and it holds the cost to one extra request instead of three.
+  //
+  // IT ASKS FOR ITS RESERVED SLOTS ONLY, never a full `maxResults`. This call
+  // scrapes what it finds, so pages asked for are pages fetched and paid for;
+  // requesting more than the merge can keep would buy page fetches to throw
+  // away. Zero slots means the operator's budget cannot hold a curated result,
+  // and then the search is not made at all.
+  //
+  // ITS OUTCOME IS DELIBERATELY NOT RECORDED AGAINST ENGINE HEALTH. Empty is
+  // the expected outcome here, and five empty curated searches running would
+  // otherwise park a perfectly healthy engine at the back of the cascade for
+  // half an hour - see crwEngines.
+  const criticismSlots = curatedSlots(config.maxResults)
+  try {
+    const curated = criticismSlots
+      ? await crwSearch(buildCuratedQuery(queryText), {
+          baseUrl: config.baseUrl,
+          apiKey: config.apiKey,
+          maxResults: criticismSlots,
+          maxContentChars: config.maxContentChars,
+          timeoutMs: config.timeoutMs,
+          engine: engineUsed,
+        })
+      : { results: [] }
+    if (curated.results.length > 0) {
+      const merged = mergeSearchResults(curated.results, results, {
+        limit: config.maxResults,
+      })
+      logger.info(
+        {
+          title: subject.title,
+          engine: engineUsed,
+          criticism: curated.results.map((r) => r.domain),
+          merged: merged.length,
+        },
+        'Merged criticism search into retrieval'
+      )
+      results = merged
+    }
+  } catch (err) {
+    // Never fails the title. The general search has already answered, and this
+    // is the half that is allowed to find nothing - so a retrieval service that
+    // is up enough to have answered once must not lose a title on the second
+    // ask. Nothing is hidden by swallowing it: crwSearch has already written
+    // the fault to `api_errors` under the 'crw' provider before throwing.
+    logger.warn({ title: subject.title, err }, 'Criticism search failed')
+  }
+
+  const fetched: AnalysisSource[] = results.map((r) => ({
     title: r.title,
     domain: r.domain,
     text: r.markdown,
@@ -294,7 +353,7 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
   const fetchedChars = fetched.reduce((sum, s) => sum + s.text.length, 0)
   if (fetchedChars === 0) {
     throw new Error(
-      `Retrieval returned ${response.results.length} result(s) but no page text — check the scraper.${reported}`
+      `Retrieval returned ${results.length} result(s) but no page text — check the scraper.${reported}`
     )
   }
 
@@ -318,7 +377,7 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
   // stored as a decline.
   if (readable.every((source) => source.text.trim().length === 0)) {
     throw new Error(
-      `Retrieval returned ${response.results.length} result(s) but every page was a bot check or access wall (${blocked
+      `Retrieval returned ${results.length} result(s) but every page was a bot check or access wall (${blocked
         .map((source) => source.domain)
         .join(', ')}) — the scraper is being blocked.${reported}`
     )
@@ -363,7 +422,7 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
     {
       title: subject.title,
       engine: engineUsed,
-      results: response.results.length,
+      results: results.length,
       fetchedChars,
       budgeted: sources.length,
       retrievedChars,
