@@ -36,7 +36,7 @@
  */
 
 import { ARCHIVED_PROMPT_EDITIONS } from './promptEditions.js'
-import { PROMPT_VARIANTS } from './promptVariants.js'
+import { COMPACT_VARIANT, PROMPT_VARIANTS } from './promptVariants.js'
 
 /**
  * Bump when the prompt changes in a way that should invalidate stored analysis.
@@ -904,7 +904,132 @@ const CURRENT_EDITION: PromptEdition = {
  * draft on the operator's call: the version-10 draft was benched, and 11 is
  * what that bench asked for. Versions 12 to 15 went live without one too.
  */
-const DRAFT_EDITION = null as PromptEdition | null
+/**
+ * Version 16's texts: the compact variant with five measured corrections.
+ *
+ * WHY THE DRAFT'S PARENT IS A VARIANT AND NOT VERSION 15. Compact was benched
+ * against its base on Requiem for a Dream twice, five models in all, and won
+ * the one proportion the prompt states as a cap: reception against the work
+ * answer went 107/106 to 96/180 on ornith-1.5-9b and 207/224 to 214/335 on
+ * altworld_hemmingway-1, replicating the DeepSeek result. That is the change
+ * worth making current. Everything below is what the same bench said compact
+ * got WORSE, each traced to its wording.
+ *
+ * WHAT IS STILL UNTESTED, and why this is a draft rather than a promotion:
+ * compact has met one title, five times. Requiem is the easy case - canonical,
+ * English, with a real critic's review in the set - and it cannot exercise the
+ * failure compact is likeliest to have, since its own documents DO place it in
+ * a lineage. Bench 16 on obscure, non-English and thinly covered titles before
+ * promoting it.
+ */
+
+/**
+ * 1. THE MAKING QUESTION STOPS ASKING FOR AN EFFECT. Every invented effect in
+ * that bench - four answers, four inventions - was in this answer, and none was
+ * in the work answer, which is where version 15 put the document requirement
+ * ("if a document says it, that effect is the answer"). The question's own
+ * shape was the cause twice over. It ASKED for one ("what did that leave on the
+ * film?"), and its only test was a COUNTERFACTUAL - "ask whether it would be a
+ * different film if this had not happened" - which no document can answer and
+ * imagination always can. So the question names the condition, and the work
+ * question's rule now governs the effect.
+ *
+ * It also lost the one fact that qualified. Both compact runs dropped the
+ * certificate the film went out under, which both version-15 runs kept, and
+ * filled the space with financing - so the named shapes are what a condition
+ * looks like, not only what it is not.
+ *
+ * 2. MONEY STAYS OUT WHEN A DOCUMENT WELDS IT TO A REAL FACT. All four answers
+ * put financing here against a rule naming money explicitly, because the
+ * encyclopedia hands it over as one sentence: "developed the script with Selby,
+ * despite struggles to obtain funding". A negative list cannot survive that
+ * without saying what to do with the half that belongs.
+ */
+const DRAFT_CIRCUMSTANCES_MOVIE =
+  "How was it made? Two things belong here and nothing else. First, what a maker said they were trying to do: they must be quoted or reported as saying it, and a page describing a director's aims without quoting them does not count. Second, a condition it was made or first released under - the certificate it carried, a cut somebody required, the form it was first shown in, who was allowed to see it. Name that condition in a sentence, and say what it left on the film only when a document says what it left. If none does, name the condition and stop, exactly as you would with a choice. Money is out: a struggle to raise it, a small budget, who paid, rights, fees and schedules. It stays out when a document welds it to something that does belong, as \"developed the script with him, despite struggles to obtain funding\" does - keep the half that belongs and drop the rest. Job lists, crew and extras counts, filming locations and release dates are out too, and so is how it was received and what anyone did afterwards."
+
+const DRAFT_CIRCUMSTANCES_SERIES =
+  "How was it made? Two things belong here and nothing else. First, what a maker said they were trying to do: they must be quoted or reported as saying it, and a page describing a creator's aims without quoting them does not count. Second, a condition it was made or first broadcast under - the certificate it carried, a cut somebody required, the slot or the form it first went out in, who was allowed to see it. Name that condition in a sentence, and say what it left on the series only when a document says what it left. If none does, name the condition and stop, exactly as you would with a choice. Money is out: a struggle to raise it, a small budget, who paid, rights, fees and schedules. It stays out when a document welds it to something that does belong, as \"developed the script with him, despite struggles to obtain funding\" does - keep the half that belongs and drop the rest. Job lists, crew and extras counts, filming locations and air dates are out too, and so is how it was received and what anyone did afterwards."
+
+/**
+ * 3. THE WORD FLOOR GOES, THE SENTENCE CAP IS NAMED. Compact set 450 words as a
+ * floor and three or four sentences as a paragraph cap, and on thin material
+ * the two fight: ornith met 454 words with FOUR paragraphs of five sentences
+ * where the rule asks for at most four, and hemmingway overran the ceiling at
+ * 764. A floor buys padding, which is the lesson already paid for once when
+ * compact's per-question paragraph floor became a ceiling. Every number here is
+ * now a maximum, and the sentence cap names the count it is losing to.
+ */
+const DRAFT_LENGTH_RULE =
+  "Write at most nine paragraphs, separated by blank lines, and at most 750 words in all. There is no minimum: thin documents should produce a short piece, and padding one out to reach a length is worse than stopping early. Spend at most two paragraphs on where it comes from, at most four on what it is doing, at most two on how it was made, and one on how it was received, which is the last thing in the piece. Every paragraph is three or four sentences and never five, the first making one claim and the rest supporting it."
+
+/**
+ * 4. A NAME IN A DOCUMENT'S TITLE IS THE WRITER OF THAT DOCUMENT. Compact lost
+ * the naming ban twice on one model - "what Ebert called her riskiest role",
+ * and a fabricated "which Ebert had previously adapted" - where version 15 held
+ * on the same documents. The name was in two source titles and nowhere in the
+ * film's credits, so the rule says where such a name comes from and who may
+ * still be named.
+ */
+const DRAFT_ATTRIBUTION_RULE =
+  "The first answers speak in your own voice: state facts and what is on screen plainly, with nobody attached, even where a critic is who you read it from. Opinions belong in the reception answer, and every opinion has a person behind it - \"a critic\", \"a scholar\", \"a reviewer\", \"some viewers\" - never \"a reading\", \"an account\" or \"the press\". Never hide an opinion inside \"is regarded as\", \"has come to be regarded as\", \"is described as\", \"has been called\", \"is said to\" or \"reportedly\". Never name a critic, a scholar, a reviewer or a publication. A name in a document's own title or byline belongs to whoever wrote that document, never to the film, so it does not appear in your answer at all - the only people you may name are the ones who made the work. \"Critics\" means more than one critic, and two remarks by one critic are one critic."
+
+/**
+ * 5. THE PROMPT'S OWN NOUN IS "DOCUMENTS". The rule forbids mentioning them and
+ * then names only "the sources say" and "one source credits", so a model that
+ * obeys the letter writes "the documents do not name what it influenced
+ * specifically" - which ornith did, and which the signals counted as clean
+ * because they matched on the word "sources" too. Both halves are fixed: this,
+ * and the pattern list in ./proseSignals.ts. Announcing a gap is named here as
+ * well, since that sentence is how the retrieval gets mentioned at all.
+ */
+const DRAFT_DOCUMENTS_RULE =
+  "Never mention the documents. The reader cannot see them, so \"the sources say\", \"the sources describe\", \"one source credits\" and \"the documents do not name\" all point at nothing. When the documents do not support something, write nothing about it and nothing about the gap either. Do not quote the reception figures back."
+
+/** Questions with named texts replaced, so the rest cannot drift from the base. */
+const draftQuestions = (
+  questions: readonly { id: AnalysisQuestionId; text: string }[],
+  replacements: Partial<Record<AnalysisQuestionId, string>>
+): { id: AnalysisQuestionId; text: string }[] =>
+  questions.map((question) => ({ ...question, text: replacements[question.id] ?? question.text }))
+
+/**
+ * Rules with named texts replaced, matched on the base's exact wording.
+ *
+ * THROWS WHEN A REPLACEMENT NO LONGER MATCHES, which is why COMPACT_VARIANT is
+ * marked frozen: a silent miss would ship a draft that quietly is its base, and
+ * a bench would attribute the unchanged behaviour to a change never made.
+ * prompt.test.ts builds the draft, so the throw lands in CI.
+ */
+const draftRules = (
+  rules: readonly string[],
+  replacements: readonly (readonly [string, string])[]
+): string[] => {
+  const next = [...rules]
+  for (const [from, to] of replacements) {
+    const at = next.indexOf(from)
+    if (at < 0) {
+      throw new Error('Draft rule replacement no longer matches its base: ' + from.slice(0, 60))
+    }
+    next[at] = to
+  }
+  return next
+}
+
+const DRAFT_EDITION: PromptEdition | null = {
+  version: ANALYSIS_PROMPT_VERSION + 1,
+  movieQuestions: draftQuestions(COMPACT_VARIANT.movieQuestions, {
+    circumstances: DRAFT_CIRCUMSTANCES_MOVIE,
+  }),
+  seriesQuestions: draftQuestions(COMPACT_VARIANT.seriesQuestions, {
+    circumstances: DRAFT_CIRCUMSTANCES_SERIES,
+  }),
+  rules: draftRules(COMPACT_VARIANT.rules, [
+    [COMPACT_VARIANT.rules[1], DRAFT_LENGTH_RULE],
+    [COMPACT_VARIANT.rules[6], DRAFT_ATTRIBUTION_RULE],
+    [COMPACT_VARIANT.rules[8], DRAFT_DOCUMENTS_RULE],
+  ]),
+}
 
 /** The draft's version number, or null when there is no draft. */
 export const DRAFT_PROMPT_VERSION: number | null = DRAFT_EDITION?.version ?? null
