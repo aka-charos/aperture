@@ -985,15 +985,36 @@ const DRAFT_LENGTH_RULE =
   "Write at most nine paragraphs, separated by blank lines, and at most 750 words in all. There is no minimum: thin documents should produce a short piece, and padding one out to reach a length is worse than stopping early. Spend at most two paragraphs on where it comes from, at most four on what it is doing, at most two on how it was made, and one on how it was received, which is the last thing in the piece. Every paragraph is three or four sentences and never five, the first making one claim and the rest supporting it, and a paragraph runs to about a hundred words - if one of yours is half as long again as that, its sentences are carrying too much and need splitting or cutting."
 
 /**
- * 4. A NAME IN A DOCUMENT'S TITLE IS THE WRITER OF THAT DOCUMENT. Compact lost
- * the naming ban twice on one model - "what Ebert called her riskiest role",
- * and a fabricated "which Ebert had previously adapted" - where version 15 held
- * on the same documents. The name was in two source titles and nowhere in the
- * film's credits, so the rule says where such a name comes from and who may
- * still be named.
+ * 4. THE NAMING BAN IS GONE, ON THE OPERATOR'S CALL, AND THAT IS THE END OF A
+ * LOOP RATHER THAN A CONCESSION.
+ *
+ * "Never name a critic, a scholar or a publication" has been in every version
+ * since 13 and has failed on every model ever benched. Version 16's first bench
+ * broke it on BOTH models having just been rewritten to explain WHERE such a
+ * name comes from: "what Ebert called her riskiest role", "Gayle Sequeira of
+ * BFI notes", "the reviewer at HorrorNews traces", and six publications named
+ * in a single paragraph of the other answer. Three successive versions named
+ * the failing phrasing, which is version 8's mechanism, and it held for one
+ * bench each time before another model found another phrasing.
+ *
+ * IT IS A HOUSE-STYLE RULE, NOT A CORRECTNESS ONE. Naming the critic is what
+ * criticism normally does, and the rule's cost - a bench, an argument and a
+ * correction every round - was being paid for consistency of voice.
+ *
+ * WHAT REPLACES IT IS THE PART THAT WAS ALWAYS LOAD-BEARING: if you name
+ * somebody, name the right one. The same bench produced "the reviewer at
+ * HorrorNews traces how the writer was bedridden", and that biography is
+ * framerated's - a misattribution the ban had no way to prevent, since a model
+ * writing "a critic" would have got it equally wrong and nobody could have
+ * told. An accuracy requirement is checkable by a reader; a ban was not
+ * enforceable by anything.
+ *
+ * WHAT DOES NOT CHANGE: an opinion still belongs in the reception answer, it
+ * still has a person behind it rather than "a reading" or "the press", the
+ * hedges are still out, and "critics" still means more than one.
  */
 const DRAFT_ATTRIBUTION_RULE =
-  "The first answers speak in your own voice: state facts and what is on screen plainly, with nobody attached, even where a critic is who you read it from. Opinions belong in the reception answer, and every opinion has a person behind it - \"a critic\", \"a scholar\", \"a reviewer\", \"some viewers\" - never \"a reading\", \"an account\" or \"the press\". Never hide an opinion inside \"is regarded as\", \"has come to be regarded as\", \"is described as\", \"has been called\", \"is said to\" or \"reportedly\". The only people you may name are the ones who made the work. Everybody else is \"a critic\", \"a scholar\", \"a reviewer\" or \"some viewers\", and that holds however the name reaches you: not \"Ebert noted\", not \"Honeybone wrote\", not \"Gayle Sequeira of BFI notes\", not \"the reviewer at HorrorNews\", not \"the Washington Post says\" and not \"the Chicago Sun-Times and the Philadelphia Inquirer both call it\". A publication printed beside a quotation is the publication that ran it, and it is not part of the quotation. \"Critics\" means more than one critic, and two remarks by one critic are one critic."
+  "The first answers speak in your own voice: state facts and what is on screen plainly, with nobody attached, even where a critic is who you read it from. Opinions belong in the reception answer, and every opinion has a person behind it - a named critic, or \"a critic\", \"a scholar\", \"a reviewer\", \"some viewers\" - never \"a reading\", \"an account\" or \"the press\". Never hide an opinion inside \"is regarded as\", \"has come to be regarded as\", \"is described as\", \"has been called\", \"is said to\" or \"reportedly\". You may name a critic, a scholar or the publication that ran them. If you do, the name has to be the one printed beside that very claim in the document you took it from, because naming the wrong writer is worse than naming none - so where a document does not make the attribution plain, write \"a critic\" and leave it there. \"Critics\" means more than one critic, and two remarks by one critic are one critic."
 
 /**
  * 5. THE PROMPT'S OWN NOUN IS "DOCUMENTS". The rule forbids mentioning them and

@@ -603,12 +603,30 @@ test('the draft carries the compact variant with its measured corrections', () =
   assert.ok(rulesText.includes('There is no minimum'), 'and is named as gone')
   assert.ok(rulesText.includes('never five'), 'the sentence cap names its failure')
 
-  // 4 and 5: the naming ban names the shapes that broke it on the first
-  // bench, and the documents rule names the phrasing that obeyed its letter.
-  assert.ok(rulesText.includes('The only people you may name are the ones who made the work'))
-  for (const shape of ['Ebert noted', 'Honeybone wrote', 'of BFI notes', 'the reviewer at HorrorNews']) {
-    assert.ok(rulesText.includes(shape), shape)
+  // 4: THE NAMING BAN IS GONE, on the operator's call. It had been in every
+  // version since 13, failed on every model ever benched, and is house style
+  // rather than correctness. What replaces it is the part that was always
+  // load-bearing - name the RIGHT one, or write "a critic".
+  assert.ok(rulesText.includes('You may name a critic, a scholar or the publication that ran them'))
+  assert.ok(rulesText.includes('naming the wrong writer is worse than naming none'))
+  assert.ok(
+    !rulesText.includes('Never name a critic'),
+    'the ban is not restated further down the rules'
+  )
+  // The base variant keeps its own ban, which is the whole point of a variant
+  // and its version coexisting: both stay.
+  assert.ok(compact.rules.join('\n').includes('Never name a critic'))
+
+  // What did NOT change with it.
+  for (const kept of [
+    'Opinions belong in the reception answer',
+    '"a reading", "an account" or "the press"',
+    '"Critics" means more than one critic',
+  ]) {
+    assert.ok(rulesText.includes(kept), kept)
   }
+
+  // 5: the documents rule names the phrasing that obeyed its letter.
   assert.ok(rulesText.includes('"the documents do not name"'))
 
   // BENCH 16: a paragraph-sized anchor, since a model cannot count 750 words,
