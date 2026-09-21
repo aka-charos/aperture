@@ -4985,7 +4985,15 @@
     "engineNone": "None",
     "enginesHelp": "Tried in order until one returns results. Each is a separate request, so a first choice that is permanently blocked costs one wasted search per title — drop it from the list rather than paying for it. After five empty answers in a row an engine is tried last for half an hour, then given another chance.",
     "curatedMaxResultsLabel": "Extra criticism results",
-    "curatedMaxResultsHelp": "A second search of film-criticism publications, added to the results above rather than taken from them. 0 switches it off."
+    "curatedMaxResultsHelp": "A second search of film-criticism publications, added to the results above rather than taken from them. 0 switches it off.",
+    "curatedSitesLabel": "Criticism publications",
+    "curatedSitesHelp": "The sites the extra search asks. Choose publications that print argued criticism — aggregators, fan wikis and generated-analysis sites return the material the analysis is meant to weigh least.",
+    "curatedSitesEmpty": "No sites — the built-in list will be used.",
+    "curatedSitesAddLabel": "Add a site",
+    "curatedSitesAddHelp": "A host, optionally with a path: mubi.com/en/notebook",
+    "curatedSitesAdd": "Add",
+    "curatedSitesInvalid": "Enter a host such as rogerebert.com",
+    "curatedSitesDuplicate": "That site is already listed"
   },
   "settingsRatings": {
     "title": "Ratings Refresh",

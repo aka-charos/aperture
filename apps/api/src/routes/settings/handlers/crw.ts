@@ -12,6 +12,8 @@ import {
   getCrwConfig,
   isCrwSearchEngine,
   isRetrievalMode,
+  sanitizeCuratedSites,
+  MAX_CURATED_SITES,
   sanitizeSearchEngines,
   setCrwConfig,
   setRetrievalMode,
@@ -28,6 +30,7 @@ interface CrwUpdateBody {
   apiKey?: string
   maxResults?: number
   curatedMaxResults?: number
+  curatedSites?: string[]
   maxContentChars?: number
   timeoutMs?: number
   sourceBudgetChars?: number
@@ -52,6 +55,7 @@ interface PublicCrwConfig {
   hasApiKey: boolean
   maxResults: number
   curatedMaxResults: number
+  curatedSites: string[]
   maxContentChars: number
   timeoutMs: number
   sourceBudgetChars: number
@@ -77,6 +81,20 @@ function validateConfig(config: CrwConfig): string | null {
     config.curatedMaxResults > 20
   ) {
     return 'curatedMaxResults must be an integer between 0 and 20'
+  }
+  // REFUSED rather than silently cleaned, unlike the stored value: somebody is
+  // asking for these right now, and handing back a shorter list than they typed
+  // looks like it saved. sanitizeCuratedSites is the same function the reader
+  // uses, so the offered list and the stored one cannot drift.
+  if (!Array.isArray(config.curatedSites)) {
+    return 'curatedSites must be an array of site hosts'
+  }
+  if (config.curatedSites.length > MAX_CURATED_SITES) {
+    return `curatedSites cannot hold more than ${MAX_CURATED_SITES} entries`
+  }
+  const cleanedSites = sanitizeCuratedSites(config.curatedSites)
+  if (cleanedSites.length !== config.curatedSites.length) {
+    return 'curatedSites entries must be bare hosts such as rogerebert.com or mubi.com/en/notebook'
   }
   if (
     !Number.isInteger(config.maxContentChars) ||
@@ -132,6 +150,7 @@ function toPublicConfig(config: CrwConfig): PublicCrwConfig {
     hasApiKey: !!config.apiKey.trim(),
     maxResults: config.maxResults,
     curatedMaxResults: config.curatedMaxResults,
+    curatedSites: config.curatedSites,
     maxContentChars: config.maxContentChars,
     timeoutMs: config.timeoutMs,
     sourceBudgetChars: config.sourceBudgetChars,
@@ -187,6 +206,7 @@ export function registerCrwHandlers(fastify: FastifyInstance) {
           apiKey: body.apiKey === undefined ? current.apiKey : body.apiKey.trim(),
           maxResults: body.maxResults ?? current.maxResults,
           curatedMaxResults: body.curatedMaxResults ?? current.curatedMaxResults,
+          curatedSites: body.curatedSites ?? current.curatedSites,
           maxContentChars: body.maxContentChars ?? current.maxContentChars,
           timeoutMs: body.timeoutMs ?? current.timeoutMs,
           sourceBudgetChars: body.sourceBudgetChars ?? current.sourceBudgetChars,

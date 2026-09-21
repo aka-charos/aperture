@@ -33,6 +33,10 @@
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
 import { createChildLogger } from './logger.js'
 import { parseApiError, logApiError, hasRecentSimilarError } from '../errors/index.js'
+import {
+  DEFAULT_CURATED_SITES,
+  sanitizeCuratedSites,
+} from '../analysis/curatedSearch.js'
 
 const logger = createChildLogger('crw')
 
@@ -86,6 +90,18 @@ export interface CrwConfig {
    * divide the same character budget more ways rather than growing it.
    */
   curatedMaxResults: number
+  /**
+   * The publications the curated search asks, as bare `site:` values.
+   *
+   * Editable because which publications count as criticism is a judgement
+   * about taste and language coverage: twenty English-language journals serve
+   * a Greek or Korean library badly, and nobody but the operator knows that.
+   * Empty means the shipped default, NOT "search nowhere" - an empty list with
+   * `curatedMaxResults` still set would issue a query with an empty
+   * disjunction, which matches nothing; switching the search off is what
+   * `curatedMaxResults: 0` is for.
+   */
+  curatedSites: string[]
   /**
    * Hard per-result cap on returned markdown (1,000–100,000).
    *
@@ -193,6 +209,7 @@ export const DEFAULT_CRW_CONFIG: CrwConfig = {
   // Four: enough that a well-covered film arrives with several real essays,
   // small enough that the extra scraping is four pages and not another six.
   curatedMaxResults: 4,
+  curatedSites: [...DEFAULT_CURATED_SITES],
   maxContentChars: 12000,
   timeoutMs: 180000,
   sourceBudgetChars: 16000,
@@ -217,6 +234,17 @@ const clampInt = (n: number, min: number, max: number, fallback: number): number
 const clampMaxResults = (n: number) => clampInt(n, 1, 20, DEFAULT_CRW_CONFIG.maxResults)
 const clampCuratedResults = (n: number) =>
   clampInt(n, 0, 20, DEFAULT_CRW_CONFIG.curatedMaxResults)
+/**
+ * A stored list, cleaned - or the shipped default when there is nothing usable.
+ *
+ * The fallback is what stops a list that sanitizes to empty (every entry a
+ * bare word, say) from building a query with an empty disjunction, which
+ * matches nothing and reports it as "no criticism written about this title".
+ */
+const resolveCuratedSites = (value: unknown): string[] => {
+  const cleaned = sanitizeCuratedSites(value)
+  return cleaned.length > 0 ? cleaned : [...DEFAULT_CURATED_SITES]
+}
 const clampContentChars = (n: number) =>
   clampInt(n, 1000, 100_000, DEFAULT_CRW_CONFIG.maxContentChars)
 const clampTimeout = (n: number) => clampInt(n, 5000, 300_000, DEFAULT_CRW_CONFIG.timeoutMs)
@@ -267,6 +295,7 @@ function sanitize(config: Partial<CrwConfig>): CrwConfig {
     curatedMaxResults: clampCuratedResults(
       config.curatedMaxResults ?? DEFAULT_CRW_CONFIG.curatedMaxResults
     ),
+    curatedSites: resolveCuratedSites(config.curatedSites),
     maxContentChars: clampContentChars(
       config.maxContentChars ?? DEFAULT_CRW_CONFIG.maxContentChars
     ),

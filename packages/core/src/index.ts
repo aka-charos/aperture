@@ -1583,6 +1583,7 @@ export {
   DRAFT_PROMPT_VERSION,
   buildAnalysisPrompt,
   buildAnalysisQuery,
+  RETRIEVAL_TERM,
   parseAnalysisResponse,
   parseParagraphMap,
   selectMappedParagraphs,
@@ -1717,3 +1718,9 @@ export {
   type SaveUserPlacementResult,
 } from './homeSections/index.js'
 export { MANAGED_TAG_PREFIX, isManagedTag, withoutManagedTags } from './media/managedTags.js'
+
+export {
+  DEFAULT_CURATED_SITES,
+  MAX_CURATED_SITES,
+  sanitizeCuratedSites,
+} from './analysis/curatedSearch.js'

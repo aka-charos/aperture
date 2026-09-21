@@ -39,14 +39,14 @@ const subject = (over: Partial<AnalysisSubject> = {}): AnalysisSubject => ({
 
 test('no original title, the query is unchanged', () => {
   const q = buildAnalysisQuery(subject())
-  assert.equal(q, 'Sentimental Value 2025 film analysis criticism production history themes style')
+  assert.equal(q, 'Sentimental Value 2025 film review')
 })
 
 test('a different original title rides beside the localized one, before the year', () => {
   const q = buildAnalysisQuery(subject({ originalTitle: 'Affeksjonsverdi' }))
   assert.equal(
     q,
-    'Sentimental Value Affeksjonsverdi 2025 film analysis criticism production history themes style'
+    'Sentimental Value Affeksjonsverdi 2025 film review'
   )
 })
 
@@ -668,5 +668,19 @@ test('every variant is offerable: an id, a label, a note and a base the bench ca
     assert.match(variant.id, /^[a-z][a-z0-9-]*$/)
     assert.ok(variant.label.length > 0 && variant.note.length > 0, variant.id)
     assert.ok(BENCH_PROMPT_VERSIONS.includes(variant.base), variant.id + ' base')
+  }
+})
+
+test('the retrieval query names the film and asks for a review, nothing else', () => {
+  // MEASURED on DuckDuckGo: "analysis criticism production history themes
+  // style" returned moviesense.io, darkfilmtheories, itsreleased and arcplot -
+  // three of them on sourceQuality's own low-value domain list - because those
+  // words are the section headings of a generated analysis page. "review"
+  // returns Ebert, the NYT, Metacritic and Wikipedia. Adding "analysis" back
+  // to "review" is enough to put moviesense.io first again.
+  const query = buildAnalysisQuery(subject({ title: 'Requiem for a Dream', year: 2000 }))
+  assert.equal(query, 'Requiem for a Dream 2000 film review')
+  for (const word of ['analysis', 'criticism', 'themes', 'style', 'essay', 'production']) {
+    assert.ok(!query.includes(word), `"${word}" pulls generated pages and essay mills`)
   }
 })

@@ -54,8 +54,14 @@
  *
  * A path is allowed and is sometimes the point - `bfi.org.uk/sight-and-sound`
  * rather than the whole BFI site, `criterion.com/current` rather than the shop.
+ *
+ * THIS IS ONLY THE DEFAULT. The live list is `CrwConfig.curatedSites`, which
+ * an operator edits in Settings > Integrations > Retrieval, because which
+ * publications count as criticism is a judgement about taste and language
+ * coverage - a Greek or Korean library is badly served by twenty
+ * English-language journals, and nobody but the operator knows that.
  */
-export const CURATED_CRITICISM_SITES: readonly string[] = [
+export const DEFAULT_CURATED_SITES: readonly string[] = [
   'bfi.org.uk/sight-and-sound',
   'cinema-scope.com',
   'reverseshot.org',
@@ -149,7 +155,10 @@ export const CURATED_MAX_QUERIES = 4
  * is not arbitrary - it decides which publications compete with each other for
  * that query's slots.
  */
-export function buildCuratedQueries(queryText: string): string[] {
+export function buildCuratedQueries(
+  queryText: string,
+  sites: readonly string[] = DEFAULT_CURATED_SITES
+): string[] {
   const terms = `(${CURATED_TERMS.join(' OR ')})`
   const queries: string[] = []
   let batch: string[] = []
@@ -158,7 +167,7 @@ export function buildCuratedQueries(queryText: string): string[] {
   const lengthWith = (extra: string) =>
     `${queryText} (${[...batch, extra].join(' OR ')}) ${terms}`.length
 
-  for (const site of CURATED_CRITICISM_SITES) {
+  for (const site of sites) {
     const operator = `site:${site}`
     if (batch.length > 0 && lengthWith(operator) > CURATED_QUERY_MAX_CHARS) {
       queries.push(`${queryText} (${batch.join(' OR ')}) ${terms}`)
@@ -190,6 +199,55 @@ export function distributeCuratedResults(total: number, queries: number): number
   const base = Math.floor(total / queries)
   const remainder = total % queries
   return Array.from({ length: queries }, (_, i) => base + (i < remainder ? 1 : 0))
+}
+
+/** The most sites an operator may store. */
+export const MAX_CURATED_SITES = 60
+
+/**
+ * Clean a stored or submitted site list into what a `site:` operator takes.
+ *
+ * PEOPLE PASTE URLS. Someone adding Sight & Sound will paste
+ * `https://www.bfi.org.uk/sight-and-sound/` from the address bar, and
+ * `site:https://www.bfi.org.uk/sight-and-sound/` matches nothing at all -
+ * silently, because a search engine answers a nonsense operator with an empty
+ * result set rather than an error, which is the same failure mode that hid the
+ * over-long query. So the scheme, the `www.` and the trailing slash come off
+ * here, at the one boundary both the settings route and the reader go through.
+ *
+ * A PATH IS KEPT, deliberately: `bfi.org.uk/sight-and-sound` and
+ * `mubi.com/en/notebook` are the entries that stop the BFI's whole site and
+ * MUBI's shop from answering, and `site:` honours a path.
+ *
+ * Anything with whitespace or no dot is DROPPED rather than repaired - a bare
+ * word is not a host, and guessing a TLD for it would silently search
+ * somewhere nobody named. Duplicates collapse case-insensitively.
+ *
+ * Pure and pinned.
+ */
+export function sanitizeCuratedSites(input: unknown): string[] {
+  if (!Array.isArray(input)) return []
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of input) {
+    if (typeof raw !== 'string') continue
+    const site = raw
+      .trim()
+      .toLowerCase()
+      .replace(/^[a-z][a-z0-9+.-]*:\/\//, '')
+      .replace(/^www\./, '')
+      .replace(/\/+$/, '')
+    if (!site || /\s/.test(site)) continue
+    // The host is everything before the first slash; it is the part that has
+    // to look like a domain.
+    const host = site.split('/')[0]
+    if (!host.includes('.') || host.startsWith('.') || host.endsWith('.')) continue
+    if (seen.has(site)) continue
+    seen.add(site)
+    out.push(site)
+    if (out.length >= MAX_CURATED_SITES) break
+  }
+  return out
 }
 
 /** Anything with a URL and a domain — the shape a search result has. */

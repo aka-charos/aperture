@@ -319,7 +319,9 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
     // SEVERAL QUERIES, not one. The whole site list in a single query is past
     // what an engine accepts and comes back as an empty result set rather than
     // an error - see CURATED_QUERY_MAX_CHARS, where that is measured.
-    const queries = criticismWanted ? buildCuratedQueries(queryText) : []
+    const queries = criticismWanted
+      ? buildCuratedQueries(queryText, config.curatedSites)
+      : []
     const allowance = distributeCuratedResults(criticismWanted, queries.length)
     const found: typeof results = []
     for (const [index, query] of queries.entries()) {
