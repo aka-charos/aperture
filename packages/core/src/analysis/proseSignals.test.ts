@@ -14,7 +14,7 @@ test('an empty or missing analysis measures as zero everywhere', () => {
   for (const text of [null, undefined, '', '   ']) {
     const s = measureProse(text)
     const { repeatedPhrases, mapped, ...counts } = s
-    assert.deepEqual(Object.values(counts), [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    assert.deepEqual(Object.values(counts), [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     assert.deepEqual(repeatedPhrases, [])
     assert.equal(mapped, false)
   }
@@ -78,6 +78,17 @@ test('a view with no holder, and not a view with one', () => {
     2
   )
   assert.equal(measureProse('The press screening sold out.').unattributed, 0)
+  // Requiem for a Dream: four misses on one shape, all of them a holder that
+  // is not a person. "held" was named a bench earlier and was still missing.
+  assert.equal(
+    measureProse(
+      'One account describes it as vertigo. One analysis traces the seasons. A recurring interpretive line held that it is about appetite.'
+    ).unattributed,
+    3
+  )
+  // Not a negative test for "the account was …": that shape is a holder with
+  // no person in ordinary prose too, and this is an instrument, not a validator.
+  assert.equal(measureProse('The press screening sold out again.').unattributed, 0)
 })
 
 /**
@@ -165,6 +176,39 @@ const T2 = [
   'Brian Eggert praised the action and faulted the script.',
 ].join('\n\n')
 const T2_SECTIONS = [['tradition'], ['work'], ['work'], ['circumstances'], ['reception']]
+
+/**
+ * Whether it is good belongs to the reception answer in every prompt version,
+ * and the work answers on the Requiem bench carried four of these verbatim.
+ * Scoped exactly as spill is, for the same reason.
+ */
+test('quality words are counted outside the reception answer only', () => {
+  const text = [
+    'Her emaciated face is the part that leaves the deepest mark.',
+    'The quartet of performances gives the descent its soul-shattering weight.',
+    'A critic called the technique remarkable and the performances extraordinary.',
+  ].join('\n\n')
+  const s = measureProse(text, [['work'], ['work'], ['reception']])
+  assert.equal(s.praise, 2, 'the reception paragraph is where a verdict belongs')
+  assert.equal(measureProse(text).praise, 0, 'without a map there are no sections to judge')
+  // Description is not a verdict: these must not be counted.
+  assert.equal(
+    measureProse('The grim, hallucinatory images are relentless.', [['work']]).praise,
+    0
+  )
+})
+
+/**
+ * "No scores, no list of awards" - and one answer named a Golden Globe and an
+ * Oscar. Whole-answer rather than scoped, so it needs no map.
+ */
+test('named awards are counted wherever they appear', () => {
+  assert.equal(
+    measureProse('It was nominated for a Golden Globe and an Oscar for its lead.').awards,
+    2
+  )
+  assert.equal(measureProse('It premiered at Cannes out of competition.').awards, 0)
+})
 
 test('a fact told under two questions is found and named', () => {
   const s = measureProse(T2, T2_SECTIONS)
