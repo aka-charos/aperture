@@ -3,7 +3,6 @@ import test from 'node:test'
 
 import {
   DEFAULT_CURATED_SITES,
-  CURATED_TERMS,
   CURATED_QUERY_MAX_CHARS,
   buildCuratedQueries,
   sanitizeCuratedSites,
@@ -116,15 +115,37 @@ test('every curated site is asked about, across the queries', () => {
   }
 })
 
-test('each query carries the base query and the term block', () => {
+/**
+ * THE TERM BLOCK IS GONE. It ANDed six words onto a `site:` disjunction of
+ * publications that print criticism almost exclusively, so it could only ever
+ * remove results - measured at two documents on two consecutive benches for
+ * Requiem for a Dream, one of them junk both times. What it guarded against is
+ * now sourceQuality's `isOffTopic`, which tests the page instead of the query.
+ */
+test('a query is the title and one group of sites, and nothing else', () => {
   const queries = buildCuratedQueries(BASE)
   assert.ok(queries.length > 1, 'twenty sites do not fit in one query')
   for (const q of queries) {
     assert.ok(q.startsWith(BASE), 'the title leads every query')
-    for (const term of CURATED_TERMS) assert.ok(q.includes(term))
-    // Two groups per query, or the engine reads the OR as spanning both.
-    assert.equal(q.match(/\(/g)?.length, 2)
+    // ONE group per query now. A second would be ANDed onto the first.
+    assert.equal(q.match(/\(/g)?.length, 1)
+    for (const term of ['review', 'criticism', 'essay', 'retrospective', 'interview']) {
+      assert.ok(!q.includes(` OR ${term}`), `the term block is gone: ${term}`)
+    }
   }
+})
+
+/**
+ * The freed characters buy operators. Roughly seventy per query, which is two
+ * more sites inside the same budget - so the same list fits in fewer queries,
+ * and fewer queries each ask for more results.
+ */
+test('dropping the terms fits more sites into each query', () => {
+  const perQuery = buildCuratedQueries(BASE).map(
+    (q) => (q.match(/site:/g) ?? []).length
+  )
+  assert.ok(Math.min(...perQuery) >= 8, 'at least eight operators fit: ' + perQuery.join(', '))
+  assert.ok(buildCuratedQueries(BASE).length <= 3)
 })
 
 test('the allowance totals exactly what was asked for', () => {

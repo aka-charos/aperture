@@ -85,20 +85,27 @@ export const DEFAULT_CURATED_SITES: readonly string[] = [
 ]
 
 /**
- * What kind of page is wanted, as a second disjunction.
+ * THE TERM BLOCK IS GONE, AND IT COULD ONLY EVER SUBTRACT.
  *
- * These sites also publish news, festival line-ups and release calendars, and
- * a bare title match on one of those is a fetch spent on something with nothing
- * to say about the work.
+ * Every query used to carry `(review OR criticism OR analysis OR essay OR
+ * retrospective OR interview)` ANDed on top of the `site:` disjunction, to keep
+ * a bare title match on a festival line-up or a release calendar from spending
+ * a fetch. The reasoning was sound and the arithmetic was not: an AND can only
+ * remove results, and these sites publish criticism almost exclusively, so on
+ * the pages worth having it was removing them for not using one of six words.
+ *
+ * MEASURED: two documents, on two consecutive benches, for Requiem for a Dream
+ * - one of the most written-about American films of its decade - and one of the
+ * two was junk both times. A site list of twenty publications returning two
+ * results is not a fact about the film.
+ *
+ * What the block was guarding against is now guarded elsewhere and better:
+ * `sourceQuality.ts`'s `isOffTopic` drops a page that does not name the film,
+ * which is what a festival line-up is, and it tests the page rather than the
+ * query. Removing the block also frees about seventy characters per query,
+ * which is two more `site:` operators inside `CURATED_QUERY_MAX_CHARS` - so the
+ * same twenty sites fit in fewer queries, and fewer queries each ask for more.
  */
-export const CURATED_TERMS: readonly string[] = [
-  'review',
-  'criticism',
-  'analysis',
-  'essay',
-  'retrospective',
-  'interview',
-]
 
 /**
  * The longest query to send an engine, in characters.
@@ -159,18 +166,15 @@ export function buildCuratedQueries(
   queryText: string,
   sites: readonly string[] = DEFAULT_CURATED_SITES
 ): string[] {
-  const terms = `(${CURATED_TERMS.join(' OR ')})`
   const queries: string[] = []
   let batch: string[] = []
-
-  // The cost of a query carrying `batch` plus one more operator.
-  const lengthWith = (extra: string) =>
-    `${queryText} (${[...batch, extra].join(' OR ')}) ${terms}`.length
+  const build = (operators: readonly string[]) =>
+    `${queryText} (${operators.join(' OR ')})`
 
   for (const site of sites) {
     const operator = `site:${site}`
-    if (batch.length > 0 && lengthWith(operator) > CURATED_QUERY_MAX_CHARS) {
-      queries.push(`${queryText} (${batch.join(' OR ')}) ${terms}`)
+    if (batch.length > 0 && build([...batch, operator]).length > CURATED_QUERY_MAX_CHARS) {
+      queries.push(build(batch))
       batch = []
       if (queries.length >= CURATED_MAX_QUERIES) return queries
     }
@@ -179,7 +183,7 @@ export function buildCuratedQueries(
   // A single operator that cannot fit is emitted anyway: one site is the
   // smallest unit there is, and a query the engine refuses is a better signal
   // than a site silently dropped.
-  if (batch.length > 0) queries.push(`${queryText} (${batch.join(' OR ')}) ${terms}`)
+  if (batch.length > 0) queries.push(build(batch))
   return queries.slice(0, CURATED_MAX_QUERIES)
 }
 
