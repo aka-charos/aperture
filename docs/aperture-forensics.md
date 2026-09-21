@@ -2653,6 +2653,43 @@ Meanwhile the work answers are sourced throughout — the extreme closeups, the 
 
 **Unchanged and still unfixed: a flat ban is not self-enforcing.** "rather than" rose under compact on both models (2→3 and 2→3) and semicolons survived compact's "No semicolons." five and six times on hemmingway. Three of four answers exceeded the four-sentence paragraph rule, both version-15 runs included. Nothing in either prompt has ever made a flat ban hold, and naming the phrasing verbatim — version 8's mechanism — is the only thing that has.
 
+**Addendum, 2026-09-21, fifth pass: the retrieval audited document by document, and roughly a third of it was site furniture.** Eleven documents, four of them genuine criticism, one excellent factual source delivered with its most valuable half cut off.
+
+| # | source | worth | what the slice went on |
+|---|---|---|---|
+| 1 | rogerebert.com review `[criticism]` | real criticism | ~600 chars of embedded video-player settings mid-review |
+| 2 | rogerebert.com Aronofsky index `[criticism]` | nothing | all of it |
+| 3 | rottentomatoes.com | mixed | consensus and six critic blurbs, then Where to Watch, cast, clip titles |
+| 4 | metacritic.com | mixed | a dozen critic quotes, then a cast list of image URLs and an ExpressVPN ad |
+| 5 | framerated.co.uk | real criticism | site nav printed **twice** before the review starts |
+| 6 | en.wikipedia.org | best factual source | lead, then **Plot**, cut off before Production |
+| 7 | imdb.com (Metacritic reviews) | duplicate of #4 | ~2,500 chars of IMDb menu first |
+| 8 | imdb.com (title page) | near-nothing | ~90% menu, twice over |
+| 9 | ashleyhajimirsadeghi.com | weak | the blogger's biography, then a plot summary **including the ending** |
+| 10 | horrornews.net | real criticism | clean |
+| 11 | nytimes.com | empty (11 chars) | — |
+
+**THE STRUCTURAL FAULT IS TWO HEAD-FIRST TRUNCATIONS STACKED.** `readResult` does `markdown.slice(0, maxContentChars)` at 12,000, and `budgetSources`' `clip` does `text.slice(0, room)` after water-filling `sourceBudgetChars`. Every document on that bench landed at ~6,390 characters because the 64,000 budget divided by ten, and each of those 6,390 was the page's own FIRST 6,390. A page puts its menu first.
+
+**Two consequences, and the second is the serious one.** A page that is nine parts menu is allocated by its RAW length, so it takes the same share as an article and spends it on the menu — bloat is rewarded. And for the best document in the set, the head is the worst part: Wikipedia runs lead → Plot → Cast → Production → Release → Reception, so the one page carrying the making and reception facts contributed its lead and four paragraphs of plot and was cut off at "Harry and Tyrone being". That is not a marginal loss. It is most of why the making answers across five models have been thin enough to get filled with financing.
+
+**So the cleaner runs BEFORE the budget**, and both of its mechanisms had to be corrected once against real scraper output before they fired.
+
+**The run is measured in LINKS, not in lines, and getting that wrong first is instructive.** The obvious rule — five consecutive link-only lines — was written, tested against a fixture, and would have missed the single largest waste in the retrieval: IMDb's navigation bar is ONE line carrying a dozen links (`[Release calendar](…)[Top 250 movies](…)[Most popular movies](…)…`), so a line count sees a run of one. The fixture passed because the fixture was invented. Checking it against the markdown in the bench report is what caught it, which is the same discipline `sourceQuality.ts`'s domain list already states: every entry read by a person first.
+
+**Filler bridges a run and a sentence never does.** A scraped menu is link bars separated by its own category labels — "Movies", "TV shows", "Watch" — and treating those as the end of a run cuts every real menu into pieces below the threshold. So a non-link line of three words or fewer with no sentence terminator continues a run, blank lines continue it, and anything with a full stop in it ends it. **Only up to the last link is cut**, so filler sitting between the menu and the article — usually the article's own heading — is never taken with it, and filler before the first link is left for the same reason.
+
+**Measured on the real IMDb page as the model received it: 4,246 characters in, 1,338 out, 68% removed.** What survives is the title, the year, the **NC-17 certificate**, the runtime, the rating, the genre tags, the logline and the credits — which is everything that page had. The remainder that still leaks through is a language picker (`Français (Canada)`, `Deutsch (Deutschland)`…), which carries no links and so is not a link line; it is ~200 characters and has not been chased.
+
+**The plot strip is the structural version of a rule the prompt has had to re-state in four versions.** Version 7 onward forbids describing what happens; the retrieval hands the model 4,000+ characters of exactly that, plus a blog's plot summary carrying the ending. Only unambiguous headings match — `Plot`, `Synopsis`, `Storyline` and their two-word forms — because "Story" and "Summary" are words an essay uses about its own argument, and the section ends at the next heading of the same or a higher level so a `### Plot` inside `## Production` cannot swallow the rest of Production. The blog's summary has no heading at all and is not caught; partial coverage is still coverage.
+
+**It never empties a document, and that boundary is deliberate.** Removing parts is this module's job; deciding a whole page is worthless belongs to `sourceQuality.ts` with evidence behind it. A page that is nothing but a plot summary is a judgement to add there later, not a side effect here.
+
+**`keepOnePerDomain` is the cheapest thing in the retrieval to give up.** Four of eleven slots went to two hosts — imdb.com twice, rogerebert.com twice — and one of those four had already been shown worthless. The first page from a host is the best-ranked one it offered, which on this bench meant the Ebert review over the index and the Metacritic quotes over the title page. The key is the host with `www.` removed, not the registrable domain: telling `framerated.co.uk` from `bbc.co.uk` needs a public-suffix list, and without one a two-label rule folds every British site into `co.uk`.
+
+**And none of the above was measurable before.** `AnalysisSource.fetchedChars` and `.strippedChars` now ride to the retrieval log and into the bench report, which prints "6,392 chars, of 12,000 fetched, 2,100 stripped" per document and a total line under the source list. Every figure in this entry except the 68% and the truncation direction is a reading of the excerpts rather than a measurement; the next bench prints the real ones. **That ordering was the mistake worth naming**: four passes of this feature were tuned against a retrieval nobody had counted.
+
+**Named and not done.** `maxContentChars` is 12,000 and is also head-first, so nothing here can recover what the scraper never fetched — Wikipedia's Reception section may simply not be in the payload. Raising it costs transfer and scrape time and nothing at the prompt, since `sourceBudgetChars` still bounds that, so it is a cheap lever and an operator's decision. Content-level dedupe (documents 4 and 7 are the same Metacritic quotes reached two ways, and their titles differ, so `dropDuplicateTitles` passes both) needs a shingle-overlap measure and has not been built. Inline junk that is not link lines — the video-player settings panel inside the Ebert review — has no pattern yet.
 ## F-125
 
 **The collection name on a detail page opens the franchise, with what is missing and a way to request it.** Added 2026-09-14.
