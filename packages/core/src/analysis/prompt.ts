@@ -219,6 +219,17 @@ export interface AnalysisSource {
    * curated search, OR that retrieval ran under native grounding.
    */
   curated?: boolean
+  /**
+   * Characters the scraper returned for this page, before anything was cut.
+   *
+   * Carried only so the retrieval log and the bench report can say how much of
+   * a slot was furniture: `text.length` at the end is what reached the prompt,
+   * and until these two numbers sat beside each other nothing measured the
+   * difference. Absent under native grounding and on rows predating it.
+   */
+  fetchedChars?: number
+  /** Characters ./sourceCleanup.ts removed from it. Absent means none. */
+  strippedChars?: number
 }
 
 /**

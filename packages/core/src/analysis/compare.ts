@@ -366,6 +366,11 @@ async function driveComparison(
               url: source.url ?? null,
               chars: source.text.length,
               ...(source.curated === true ? { curated: true } : {}),
+              // Absent on a replay, which reads its documents back out of a
+              // stored prompt and so never saw what the scraper first handed
+              // over. See ComparisonSource.fetchedChars.
+              ...(source.fetchedChars != null ? { fetchedChars: source.fetchedChars } : {}),
+              ...(source.strippedChars ? { strippedChars: source.strippedChars } : {}),
             }))
           ),
         ]
@@ -549,7 +554,15 @@ interface RunRow {
   source_count: number | null
   retrieved_chars: number | null
   sources:
-    | { title: string; domain: string; url: string | null; chars: number; curated?: boolean }[]
+    | {
+        title: string
+        domain: string
+        url: string | null
+        chars: number
+        curated?: boolean
+        fetchedChars?: number
+        strippedChars?: number
+      }[]
     | null
   replay_of: string | null
   /**
@@ -638,6 +651,8 @@ export async function getComparisonRun(runId: string): Promise<ComparisonRunView
       // Only ever true: absent must stay absent, or a run stored before the
       // curated search would claim that search rejected every document.
       ...(s.curated === true ? { curated: true } : {}),
+      ...(s.fetchedChars != null ? { fetchedChars: s.fetchedChars } : {}),
+      ...(s.strippedChars ? { strippedChars: s.strippedChars } : {}),
     })),
     retrievedChars: run.retrieved_chars ?? 0,
     prompt: run.prompt,

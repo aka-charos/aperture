@@ -67,3 +67,44 @@ export function dropDuplicateTitles<T extends { title: string; text: string }>(
   }
   return { kept, dropped }
 }
+
+/**
+ * Keep the best-ranked page from each host, and drop the rest.
+ *
+ * WHY A SECOND DEDUPE. The title test above cannot see two pages that carry the
+ * same material under different names. On the second Requiem for a Dream bench,
+ * imdb.com supplied both its title page and its Metacritic-reviews page, and
+ * rogerebert.com supplied both a review and a director index - four of eleven
+ * slots on two hosts, one of which had already been shown to be worthless. A
+ * slot is a page fetched, scraped and paid for, so a second page from a host
+ * already represented is the cheapest thing in the retrieval to give up.
+ *
+ * THE FIRST ONE IS THE ONE TO KEEP, because the order here is relevance order
+ * with criticism ahead of it - so "first" is the best-ranked page that host
+ * offered, which on that bench meant the Ebert review over the index and the
+ * Metacritic quotes over the title page.
+ *
+ * THE HOST IS THE KEY, NOT THE REGISTRABLE DOMAIN. Telling `framerated.co.uk`
+ * from `bbc.co.uk` needs a public-suffix list, and without one the two-label
+ * rule would fold every British site into `co.uk`. Comparing hosts with `www.`
+ * removed treats `en.wikipedia.org` and `simple.wikipedia.org` as different,
+ * which is right - they are different articles - and misses a site serving one
+ * article from two subdomains, which nothing has yet been seen to do.
+ */
+export function keepOnePerDomain<T extends { domain: string }>(
+  sources: readonly T[]
+): { kept: T[]; dropped: { domain: string }[] } {
+  const seen = new Set<string>()
+  const kept: T[] = []
+  const dropped: { domain: string }[] = []
+  for (const source of sources) {
+    const host = source.domain.trim().toLowerCase().replace(/^www\./, '')
+    if (host && seen.has(host)) {
+      dropped.push({ domain: source.domain })
+      continue
+    }
+    if (host) seen.add(host)
+    kept.push(source)
+  }
+  return { kept, dropped }
+}
