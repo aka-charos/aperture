@@ -2586,6 +2586,32 @@ GLM, not addressed by the prompt: on the Greek documents it read a fact backward
 
 **Unverified.** Still nothing has run against a live retrieval service. Open on the first bench: whether `site:` with a path behaves on DuckDuckGo and Bing as on Google, and whether the term block keeps `indiewire.com` and `thefilmstage.com` off release announcements.
 
+**Addendum, 2026-09-21, third pass: the curated search had never once run successfully, and the failure presented as "nothing found".** The operator read the CRW logs on Requiem for a Dream and said no results at all was suspicious for a film that famous. The logs answered it exactly:
+
+```
+17:59:34  navigated  url=https://duckduckgo.com/?q=Requiem+for+a+Dream+2000+film+analysis...
+17:59:45  navigate   (same tab, userId=crw-search)
+17:59:47  navigated  url=https://duckduckgo.com/50x.html?e=3
+```
+
+The first is the general search. The second is the curated one, and DuckDuckGo answered with its **error page**. Reproduced in a browser against the live engine: the twenty-site query is 692 characters and DuckDuckGo replies *"Search query entered was too long. Please shorten and try again."*
+
+**THE REFUSAL ARRIVES AS AN EMPTY RESULT SET, NOT AS AN ERROR.** CRW gets a page with no results, reports zero, and the code logged "Criticism search returned nothing for this title" — which was already written to be honest about ambiguity and was reporting the wrong half of it. Every title in the library would have read that way, forever, while the feature had never completed a single search. The visibility work from the previous addendum is what made this diagnosable at all, and it still was not enough: what finally identified it was the CRW container's own navigation log, one layer below anything Aperture writes.
+
+**Measured, by bisection against the live engine.** 692 chars (20 sites) refused. 555 (15 sites) refused. 420 (10 sites) answers, top result the Roger Ebert review of the film. So the cap sits between 420 and 555, consistent with DuckDuckGo's documented 500.
+
+**`CURATED_QUERY_MAX_CHARS` is 380, not 490, and the gap is the point.** The base query is **not a fixed length**: `buildAnalysisQuery` appends an original title for roughly a third of films, and a long title with a long original title is easily twice the 79-character base these numbers were measured on. A budget sitting just under a measured limit would work on short titles and fail silently on long ones — the same invisible failure, restricted to the films most likely to need criticism. Ten operators per query also stays well inside any word-count limit an engine may apply on top of the character one.
+
+**So the search is several queries, partitioned greedily in list order.** For the Requiem query that is three, at 369, 363 and 264 characters. `CURATED_MAX_QUERIES` (4) bounds a pathological base query from degrading into one search per site; the surplus sites are dropped rather than issued, because twenty searches per title across a library is the traffic that gets an engine refusing everything. The exact query the code now builds was verified in a browser and returns the Ebert review.
+
+**`distributeCuratedResults` splits the allowance EXACTLY, never `ceil` per query.** Asking each of three queries for `ceil(4/3)` is six scrapes to fill four slots, and `crwSearch` scrapes what it finds — two pages fetched, paid for and discarded on every title. `[2, 1, 1]` totals four. A query allotted 0 is not issued.
+
+**Each query is logged at info, with its length, its allowance and what it returned.** This file already records that debug was the wrong level for the retrieval line, for exactly this reason. An engine refusing one query — a long title can push one over the limit its neighbours stay under — and those publications having nothing on the film are the same empty array from inside the code, and that ambiguity is what let a wholly broken feature look like a quiet one.
+
+**The general lesson, which is not about search engines.** A dependency that answers a malformed request with a well-formed empty success is indistinguishable from one answering honestly, and no amount of logging *on our side of the call* separates them — the previous addendum added exactly that logging and it reported the wrong cause confidently. What identified it was the layer below. When a feature reports "nothing" uniformly across a population where some hits are near-certain, the hypothesis to test first is that the request never succeeded, and the test is to reproduce it by hand against the real service. `Requiem for a Dream` having no criticism written about it was never plausible, and that implausibility was the whole signal.
+
+**Still unverified.** Whether Google and Bing accept the chunked queries — they are in the cascade, and a browser probe from here cannot separate "Google refuses this syntax" from "Google refuses an automated browser", so that measurement would not be sound and was not attempted. The 380-character budget is conservative enough that it should hold, and the per-query log line is what will say so.
+
 ## F-125
 
 **The collection name on a detail page opens the franchise, with what is missing and a way to request it.** Added 2026-09-14.
