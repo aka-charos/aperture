@@ -27,6 +27,7 @@ interface CrwUpdateBody {
   baseUrl?: string
   apiKey?: string
   maxResults?: number
+  curatedMaxResults?: number
   maxContentChars?: number
   timeoutMs?: number
   sourceBudgetChars?: number
@@ -50,6 +51,7 @@ interface PublicCrwConfig {
   baseUrl: string
   hasApiKey: boolean
   maxResults: number
+  curatedMaxResults: number
   maxContentChars: number
   timeoutMs: number
   sourceBudgetChars: number
@@ -66,6 +68,15 @@ function validateConfig(config: CrwConfig): string | null {
   }
   if (!Number.isInteger(config.maxResults) || config.maxResults < 1 || config.maxResults > 20) {
     return 'maxResults must be an integer between 1 and 20'
+  }
+  // Floor of 0, unlike maxResults: 0 is the off switch for the second search,
+  // not an invalid value. See CrwConfig.curatedMaxResults.
+  if (
+    !Number.isInteger(config.curatedMaxResults) ||
+    config.curatedMaxResults < 0 ||
+    config.curatedMaxResults > 20
+  ) {
+    return 'curatedMaxResults must be an integer between 0 and 20'
   }
   if (
     !Number.isInteger(config.maxContentChars) ||
@@ -120,6 +131,7 @@ function toPublicConfig(config: CrwConfig): PublicCrwConfig {
     baseUrl: config.baseUrl,
     hasApiKey: !!config.apiKey.trim(),
     maxResults: config.maxResults,
+    curatedMaxResults: config.curatedMaxResults,
     maxContentChars: config.maxContentChars,
     timeoutMs: config.timeoutMs,
     sourceBudgetChars: config.sourceBudgetChars,
@@ -174,6 +186,7 @@ export function registerCrwHandlers(fastify: FastifyInstance) {
           baseUrl: body.baseUrl ?? current.baseUrl,
           apiKey: body.apiKey === undefined ? current.apiKey : body.apiKey.trim(),
           maxResults: body.maxResults ?? current.maxResults,
+          curatedMaxResults: body.curatedMaxResults ?? current.curatedMaxResults,
           maxContentChars: body.maxContentChars ?? current.maxContentChars,
           timeoutMs: body.timeoutMs ?? current.timeoutMs,
           sourceBudgetChars: body.sourceBudgetChars ?? current.sourceBudgetChars,

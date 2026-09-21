@@ -67,6 +67,26 @@ export interface CrwConfig {
   /** How many search results to fetch and scrape (1–20). */
   maxResults: number
   /**
+   * How many EXTRA documents the curated criticism search may add (0–20).
+   *
+   * ADDITIVE, NEVER A SHARE OF `maxResults`. The general search keeps every
+   * one of its results; this is a second search whose hits are appended. So a
+   * title with criticism written about it reaches the prompt with
+   * `maxResults + curatedMaxResults` documents, and one without it reaches the
+   * prompt with exactly `maxResults` - unchanged from before this existed.
+   *
+   * It has its own number rather than a slice of `maxResults` because those
+   * are two different questions. Taking criticism out of `maxResults` made
+   * that setting mean "documents in total, of which an unpredictable share are
+   * general", so an operator could no longer reason about either number.
+   *
+   * 0 turns the second search off entirely - no query, no scrape, no cost.
+   *
+   * What bounds the PROMPT is `sourceBudgetChars`, not this: more documents
+   * divide the same character budget more ways rather than growing it.
+   */
+  curatedMaxResults: number
+  /**
    * Hard per-result cap on returned markdown (1,000–100,000).
    *
    * This is a SAFETY VALVE, not the token budget. A single pathological page
@@ -170,6 +190,9 @@ export const DEFAULT_CRW_CONFIG: CrwConfig = {
   baseUrl: '',
   apiKey: '',
   maxResults: 6,
+  // Four: enough that a well-covered film arrives with several real essays,
+  // small enough that the extra scraping is four pages and not another six.
+  curatedMaxResults: 4,
   maxContentChars: 12000,
   timeoutMs: 180000,
   sourceBudgetChars: 16000,
@@ -192,6 +215,8 @@ const clampInt = (n: number, min: number, max: number, fallback: number): number
 }
 
 const clampMaxResults = (n: number) => clampInt(n, 1, 20, DEFAULT_CRW_CONFIG.maxResults)
+const clampCuratedResults = (n: number) =>
+  clampInt(n, 0, 20, DEFAULT_CRW_CONFIG.curatedMaxResults)
 const clampContentChars = (n: number) =>
   clampInt(n, 1000, 100_000, DEFAULT_CRW_CONFIG.maxContentChars)
 const clampTimeout = (n: number) => clampInt(n, 5000, 300_000, DEFAULT_CRW_CONFIG.timeoutMs)
@@ -239,6 +264,9 @@ function sanitize(config: Partial<CrwConfig>): CrwConfig {
     baseUrl: (config.baseUrl ?? '').trim().replace(/\/+$/, ''),
     apiKey: (config.apiKey ?? '').trim(),
     maxResults: clampMaxResults(config.maxResults ?? DEFAULT_CRW_CONFIG.maxResults),
+    curatedMaxResults: clampCuratedResults(
+      config.curatedMaxResults ?? DEFAULT_CRW_CONFIG.curatedMaxResults
+    ),
     maxContentChars: clampContentChars(
       config.maxContentChars ?? DEFAULT_CRW_CONFIG.maxContentChars
     ),

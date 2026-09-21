@@ -73,6 +73,7 @@ interface CrwPublicConfig {
   baseUrl: string
   hasApiKey: boolean
   maxResults: number
+  curatedMaxResults: number
   maxContentChars: number
   timeoutMs: number
   sourceBudgetChars: number
@@ -111,6 +112,7 @@ export function CrwConfigSection() {
   const [apiKey, setApiKey] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
   const [maxResults, setMaxResults] = useState('6')
+  const [curatedMaxResults, setCuratedMaxResults] = useState('4')
   const [sourceBudgetChars, setSourceBudgetChars] = useState('16000')
   const [analysisMaxOutputTokens, setAnalysisMaxOutputTokens] = useState('8000')
   const [maxContentChars, setMaxContentChars] = useState('12000')
@@ -127,6 +129,7 @@ export function CrwConfigSection() {
     setBaseUrl(c.baseUrl ?? '')
     setApiKey('')
     setMaxResults(String(c.maxResults ?? 6))
+    setCuratedMaxResults(String(c.curatedMaxResults ?? 4))
     setSourceBudgetChars(String(c.sourceBudgetChars ?? 16000))
     setAnalysisMaxOutputTokens(String(c.analysisMaxOutputTokens ?? 8000))
     setMaxContentChars(String(c.maxContentChars ?? 12000))
@@ -166,6 +169,9 @@ export function CrwConfigSection() {
     // empty string as "clear the key", which is the only way to remove one.
     ...(apiKey ? { apiKey } : {}),
     maxResults: clampInt(maxResults, 1, 20, 6),
+    // Floor of 0: unlike maxResults, 0 is meaningful here and switches the
+    // second search off.
+    curatedMaxResults: clampInt(curatedMaxResults, 0, 20, 4),
     sourceBudgetChars: clampInt(sourceBudgetChars, 2000, 200000, 16000),
     // 0 is meaningful - "no ceiling" - so it skips the range rather than being
     // clamped up to the minimum.
@@ -442,6 +448,17 @@ export function CrwConfigSection() {
                 markChanged()
               }}
               helperText={t('settingsCrw.maxResultsHelp')}
+              sx={{ flex: '1 1 160px' }}
+            />
+            <TextField
+              label={t('settingsCrw.curatedMaxResultsLabel')}
+              type="number"
+              value={curatedMaxResults}
+              onChange={(e) => {
+                setCuratedMaxResults(e.target.value)
+                markChanged()
+              }}
+              helperText={t('settingsCrw.curatedMaxResultsHelp')}
               sx={{ flex: '1 1 160px' }}
             />
             <TextField
