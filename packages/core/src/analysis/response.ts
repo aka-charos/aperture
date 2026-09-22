@@ -48,6 +48,7 @@ export type ResponseProblem =
   // Decided in ./structure.ts, which needs the parsed paragraph map and so
   // cannot run here. The union keeps ONE home, because ./generate.ts switches
   // on the kind to choose between retrying, rotating and throwing.
+  | { kind: 'runaway'; paragraphs: number }
   | { kind: 'no_sections' }
   | { kind: 'thin_sections'; mapped: number; paragraphs: number }
   | { kind: 'one_section'; questions: number }
@@ -190,6 +191,12 @@ export function describeResponseProblem(
     // The three structural faults. Each names the count that failed, because
     // the fix is the same in every case - the model has to label the paragraphs
     // it already wrote - and the number is what shows how far off it was.
+    case 'runaway':
+      return (
+        `The analysis for "${context.title}" ran to ${problem.paragraphs} paragraphs against a prompt` +
+        ` asking for at most eight, which is a model that lost the thread and repeated itself` +
+        ` rather than one that wrote at length.${suffix}`
+      )
     case 'no_sections':
       return (
         `The analysis for "${context.title}" came back as one unbroken block: the model wrote no` +

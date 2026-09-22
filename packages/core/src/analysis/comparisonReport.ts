@@ -31,7 +31,13 @@
  * adjacent rows. The prose is still read in full; the table is what says
  * whether a named habit went down across models, which reading cannot.
  */
-import { measureProse, writerNamesFromSources, type ProseSignals } from './proseSignals.js'
+import { extractPromptSources } from './prompt.js'
+import {
+  measureProse,
+  namesFromDocuments,
+  writerNamesFromSources,
+  type ProseSignals,
+} from './proseSignals.js'
 
 /** One model's turn at the shared prompt. */
 export interface ComparisonEntry {
@@ -239,6 +245,27 @@ function unmappedLine(entry: ComparisonEntry): string {
   return `map not read: ${oneLine.slice(0, MAP_TEXT_LIMIT)}${clipped}`
 }
 
+/**
+ * A rejected answer says it was rejected, EVEN WHEN IT HAS PROSE.
+ *
+ * The failure line below only ever printed when there was nothing else to
+ * print, so a model that broke the contract and still wrote something
+ * rendered identically to one that succeeded. Measured on the Suspiria
+ * bench: ornith-1.5-9b failed BOTH its entries - one labelling six of ten
+ * paragraphs, one running to 304 with no closing contract line - and both
+ * read as answers, while the database had them as unusable all along. The
+ * library would have thrown both and rotated to the next model, so a report
+ * that does not say so is describing a different run from the one the job
+ * would have made.
+ */
+function rejectedLine(entry: ComparisonEntry): string {
+  return (
+    `[UNUSABLE] the response broke the output contract: ${entry.problem}. The library would` +
+    ` have rejected this and moved to the next model. The prose below is printed so the` +
+    ` failure can be read, not because it is an answer.`
+  )
+}
+
 /** Why this entry has no prose, in a sentence a reader can act on. */
 function failureLine(entry: ComparisonEntry): string {
   if (entry.status === 'pending') return '[not run]'
@@ -324,7 +351,10 @@ function signalRows(report: ComparisonReport, writerNames: readonly string[]): S
   return labelled
     .map((row, index) => ({ row, index, group: groupOf.get(`${row.entry.provider}::${row.entry.model}`)! }))
     .sort((a, b) => a.group - b.group || a.index - b.index)
-    .map(({ row }) => ({ label: row.label, signals: signalsOf(row.entry, writerNames) }))
+    .map(({ row }) => ({
+      label: row.entry.problem ? `${row.label} [unusable]` : row.label,
+      signals: signalsOf(row.entry, writerNames),
+    }))
 }
 
 /**
@@ -431,6 +461,7 @@ function pushEntry(
   out.push(THIN)
   out.push(`${label} ${entryName(entry)}`)
   out.push(statLine(entry, signals))
+  if (entry.problem && entry.analysis?.trim()) out.push(rejectedLine(entry))
   if (signals) out.push(signalsLine(signals))
   const sections = sectionLine(entry)
   if (sections) out.push(`sections: ${sections}`)
@@ -503,7 +534,21 @@ export function renderComparisonReport(report: ComparisonReport): string {
   out.push('')
 
   // The film's own name is excluded: a site puts it where a byline goes.
-  const writerNames = writerNamesFromSources(report.sources, [report.title])
+  //
+  // The document BODIES are read too, because on an aggregator-heavy
+  // retrieval the titles carry no critic at all and the bylines carry them
+  // all. The texts come back out of the stored prompt, the way a replay
+  // recovers them - they are not stored per source.
+  const promptText = report.prompt ?? report.prompts?.[0]?.text ?? null
+  const documentTexts = promptText
+    ? (extractPromptSources(promptText, report.sources) ?? []).map((source) => source.text)
+    : []
+  const writerNames = [
+    ...new Set([
+      ...writerNamesFromSources(report.sources, [report.title]),
+      ...namesFromDocuments(documentTexts),
+    ]),
+  ]
   const rows = signalRows(report, writerNames)
   if (rows.length > 0) {
     out.push('SIGNALS — counts of habits the prompt asks the model to avoid (see proseSignals.ts)')

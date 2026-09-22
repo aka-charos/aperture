@@ -114,3 +114,34 @@ test('a paragraph claimed twice counts once', () => {
     { kind: 'thin_sections', mapped: 2, paragraphs: 5 }
   )
 })
+
+/**
+ * A runaway, measured: ornith-1.5-9b answered draft 16 with 5,674 words in 304
+ * paragraphs and stopped of its own accord, so the truncation check could not
+ * see it and the report printed it as an answer.
+ */
+test('an answer many times longer than any prompt allows is a broken generation', () => {
+  const problem = findStructureProblem({ paragraphs: 304, map: null })
+  assert.deepEqual(problem, { kind: 'runaway', paragraphs: 304 })
+})
+
+/**
+ * Checked BEFORE the map, because a runaway has no usable map either and
+ * naming that sends an operator to fix the labelling of a non-answer.
+ */
+test('a runaway is named as one even when it did label its paragraphs', () => {
+  const map = Array.from({ length: 200 }, (_, i) => ({
+    paragraph: i + 1,
+    questions: ['work' as const],
+  }))
+  assert.equal(findStructureProblem({ paragraphs: 200, map })?.kind, 'runaway')
+})
+
+/** A long but legitimate answer is untouched: 900 words is about ten paragraphs. */
+test('a long answer inside the cap is not a runaway', () => {
+  const map = Array.from({ length: 12 }, (_, i) => ({
+    paragraph: i + 1,
+    questions: [i < 6 ? ('work' as const) : ('reception' as const)],
+  }))
+  assert.equal(findStructureProblem({ paragraphs: 12, map }), null)
+})

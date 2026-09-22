@@ -375,3 +375,38 @@ test('the marker rides on the source line, not on the heading alone', () => {
   assert.match(rendered, /sensesofcinema\.com — On Requiem \(4,200 chars\) \[criticism\]/)
   assert.ok(!/en\.wikipedia\.org.*\[criticism\]/.test(rendered))
 })
+
+/**
+ * A REJECTED ANSWER SAYS IT WAS REJECTED, EVEN WHEN IT HAS PROSE.
+ *
+ * The failure line only ever printed when there was nothing else to print, so a
+ * model that broke the contract and still wrote something rendered identically
+ * to one that succeeded. Measured on the Suspiria bench, where one model failed
+ * both its entries - one labelling six of ten paragraphs, one running to 304
+ * with no closing contract line - and both read as answers.
+ */
+test('an answer that broke the contract is marked, prose or no prose', () => {
+  const text = renderComparisonReport(
+    report({
+      entries: [
+        entry({
+          status: 'unusable',
+          problem: 'no_contract_line',
+          grade: null,
+          analysis: 'A phantasmagoria of unnatural colours, repeated without end.',
+        }),
+      ],
+    })
+  )
+  assert.ok(text.includes('[UNUSABLE]'), 'the entry is marked above its prose')
+  assert.ok(text.includes('no_contract_line'), 'and names which check rejected it')
+  assert.ok(text.includes('[1] lmstudio / ornith-1.5-9b · v7 [unusable]'), 'and so is its row')
+  assert.ok(text.includes('A phantasmagoria'), 'while the prose is still printed to be read')
+})
+
+/** The control: a good answer carries no marker anywhere. */
+test('an accepted answer is not marked', () => {
+  const text = renderComparisonReport(report())
+  assert.equal(text.includes('[UNUSABLE]'), false)
+  assert.equal(text.includes('[unusable]'), false)
+})

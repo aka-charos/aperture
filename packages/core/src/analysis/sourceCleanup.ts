@@ -140,6 +140,35 @@ function isRunFiller(line: string): boolean {
 }
 
 /**
+ * How many links a line carries, when the line is NOTHING BUT links and a
+ * label short enough to be one of the menu's own captions - and zero when it
+ * is anything else.
+ *
+ * A PARTLY-LINK LINE BROKE EVERY RUN, which is what let a page consisting
+ * ENTIRELY of menu lose nothing. Measured on the Suspiria bench: bfi.org.uk
+ * writes each menu entry as `[Watch and discover](/)Open submenu` - links
+ * plus a two-word label - which is neither link-only nor {@link isRunFiller},
+ * so the run counter restarted at every single item and reached four where it
+ * needed five. That page was stripped by 0%. Counting those lines takes it to
+ * eight and the menu block goes.
+ *
+ * The same test as isRunFiller's second half with links required, so a line
+ * carrying a sentence is never a menu entry however short it is.
+ */
+function menuLinkCount(line: string): number {
+  const links = (line.match(/\]\(/g) ?? []).length
+  if (links === 0) return 0
+  if (isLinkOnlyLine(line)) return Math.max(1, links)
+  let rest = line
+  for (let pass = 0; pass < 3; pass += 1) {
+    rest = rest.replace(/\([^()]*\)/g, '').replace(/\[[^[\]]*\]/g, '')
+  }
+  const bare = rest.replace(/[#*_`>|[\]()!-]/g, ' ').trim()
+  if (/[.!?。]/.test(bare)) return 0
+  return bare.split(/\s+/).filter(Boolean).length <= FILLER_WORDS ? Math.max(1, links) : 0
+}
+
+/**
  * Drop every run of link-only lines heavy enough to be a menu.
  *
  * MEASURED IN LINKS, NOT IN LINES, because a scraped navigation bar is not one
@@ -176,10 +205,11 @@ export function stripNavigationRuns(text: string): string {
 
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i]
-    if (isLinkOnlyLine(line)) {
+    const links = menuLinkCount(line)
+    if (links > 0) {
       if (runStart < 0) runStart = i
       lastLink = i
-      weight += Math.max(1, (line.match(/\]\(/g) ?? []).length)
+      weight += links
       continue
     }
     if (runStart >= 0 && isRunFiller(line)) continue

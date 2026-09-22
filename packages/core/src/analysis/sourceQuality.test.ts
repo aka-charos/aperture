@@ -216,3 +216,59 @@ test('the original title counts, and a short title is never tested', () => {
   // "Up" would match inside every document ever written, so it is skipped.
   assert.equal(isOffTopic('A page about nothing in particular at all.', ['Up']), false)
 })
+
+/**
+ * reddit.com's related-discussions page, which is 9,836 characters of OTHER
+ * threads' titles and their vote counts with no comment body anywhere on it.
+ *
+ * A thread title IS a sentence, so a wall of them scored three prose lines,
+ * cleared MIN_PROSE_LINES by exactly one, and passed every test in this file -
+ * while the cleaner, over the same text, stripped nothing.
+ */
+test('a page whose every sentence is somebody else’s headline has no prose', () => {
+  const thread = (title: string, id: string) =>
+    [
+      '*   [' + title + '](https://www.reddit.com/r/horror/comments/' + id + '/)',
+      '',
+      '[![](https://styles.redditmedia.com/t5_2qh9x/styles/icon.png?width=48&s=555d)',
+      '',
+      'r/horror](https://www.reddit.com/r/horror/)',
+      '',
+      ' • 9mo ago',
+      '',
+      '[### ' + title + '](/r/horror/comments/' + id + '/)',
+      '',
+      '119 upvotes · 45 comments',
+      '',
+      '* * *',
+    ].join('\n')
+  const page = [
+    '# Suspiria (1977) is the best Horror movie of all time : r/horror - Reddit',
+    '',
+    thread(
+      'Finally watched Suspiria for the first time and completely blind. Another classic to mark off my list.',
+      '1plo1iw'
+    ),
+    thread(
+      'I rewatched The Exorcist. I take back everything I said about it previously. This movie is genuinely horrifying.',
+      'ulb938'
+    ),
+  ].join('\n')
+  assert.equal(hasNoProse(page), true)
+})
+
+/** The control: the review in the same retrieval, which must survive. */
+test('an article with headings above its paragraphs is still prose', () => {
+  const page = [
+    '# Suspiria',
+    '',
+    '#### By Brian Eggert | October 28, 2018',
+    '',
+    'A phantasmagoria of unnatural colours and only slightly less unnatural situations, this remains the Italian director’s finest achievement.',
+    '',
+    '## Style',
+    '',
+    'His aesthetic approach triumphs over the necessity for dramatic context, creating an experience that proves haunting throughout.',
+  ].join('\n')
+  assert.equal(hasNoProse(page), false)
+})

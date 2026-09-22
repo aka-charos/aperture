@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { measureProse, writerNamesFromSources } from './proseSignals.js'
+import { measureProse, namesFromDocuments, writerNamesFromSources } from './proseSignals.js'
 
 test('an empty or missing analysis measures as zero everywhere', () => {
   for (const text of [null, undefined, '', '   ']) {
@@ -424,4 +424,78 @@ test('an answer split across non-adjacent paragraphs is counted', () => {
   assert.equal(measureProse('a\n\nb\n\nc', shared).scattered, 0)
 
   assert.equal(measureProse('a\n\nb').scattered, 0, 'no map, not measured')
+})
+
+/**
+ * The critics a run actually handed the model, which on an aggregator-heavy
+ * retrieval are all in the document BODIES and none in the titles.
+ *
+ * Measured on the Suspiria bench: an answer named five and the report counted
+ * one, the only hit being the publication that happened to be in the
+ * hand-written list. Every fixture here is verbatim page text from that run.
+ */
+test('bylines and credited links are the names this run handed the model', () => {
+  const metacritic = [
+    '[100',
+    '',
+    'RogerEbert.com](/publication/rogerebertcom/)',
+    '',
+    'Suspiria truly is one of the absolute classics of the horror genre.',
+    '',
+    '[By Peter Sobczynski](/critic/peter-sobczynski/)[FULL REVIEW](https://www.rogerebert.com/x)',
+    '',
+    '[100',
+    '',
+    'Empire](/publication/empire/)',
+    '',
+    '[Washington Post](/publication/washington-post/)',
+    '[By Gary Arnold](/critic/gary-arnold/)[FULL REVIEW](https://www.washingtonpost.com/x)',
+    '[The New York Times](/publication/the-new-york-times/)',
+    '[By Janet Maslin](/critic/janet-maslin/)[FULL REVIEW](http://www.nytimes.com/x)',
+  ].join('\n')
+  const deepFocus = '#### By Brian Eggert | October 28, 2018'
+
+  const names = namesFromDocuments([metacritic, deepFocus])
+  for (const name of ['Peter Sobczynski', 'Gary Arnold', 'Janet Maslin', 'Brian Eggert', 'Empire']) {
+    assert.ok(names.includes(name), name + ' is a name this run supplied')
+  }
+})
+
+/**
+ * A SITE-NAME IS USED AS A PERSON, and that is the misattribution the rule
+ * names: the document carries "RogerEbert.com" over a review bylined Peter
+ * Sobczynski, and the answer wrote "Roger Ebert called it an absolute classic".
+ */
+test('a run-together site name is registered the way an answer writes it', () => {
+  const names = namesFromDocuments(['[RogerEbert.com](/publication/rogerebertcom/)'])
+  assert.ok(names.includes('Roger Ebert'))
+})
+
+/**
+ * THE SAFETY PROPERTY, and the reason this reads bylines rather than a surname
+ * plus a reporting verb: a director is never bylined on a review of their own
+ * film and never filed under /critic/, so the makers stay nameable.
+ */
+test('the film’s own makers are never read as critics', () => {
+  const page = [
+    'Directed By:[Dario Argento](/person/dario-argento/)',
+    '',
+    'Written By:[Dario Argento](/person/dario-argento/), [Daria Nicolodi](/person/daria-nicolodi/)',
+    '',
+    'Cast',
+    '',
+    '[Jessica Harper](https://www.deepfocusreview.com/actor/jessica-harper/)',
+    '',
+    '[Dario Argento](https://www.deepfocusreview.com/director/dario-argento/)',
+  ].join('\n')
+  const names = namesFromDocuments([page])
+  assert.deepEqual(
+    names.filter((name) => name.includes('Argento') || name.includes('Nicolodi') || name.includes('Harper')),
+    []
+  )
+})
+
+/** A byline naming nobody is not a name. */
+test('an uncredited byline contributes nothing', () => {
+  assert.deepEqual(namesFromDocuments(['By Staff (Not Credited)']), [])
 })

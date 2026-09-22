@@ -158,6 +158,8 @@ export const MIN_USEFUL_CHARS = 200
 
 /** Words a line needs before a full stop in it means a sentence. */
 const MIN_PROSE_WORDS = 12
+/** A markdown heading, at any level, with or without the usual indent. */
+const MARKDOWN_HEADING = /^\s{0,3}#{1,6}\s/
 
 /** Below this many sentence-like lines, a page full of links is a menu. */
 const MIN_PROSE_LINES = 3
@@ -169,8 +171,32 @@ const MIN_PROSE_LINES = 3
  * here the words inside `[…]` are prose and only the `(…)` after them is
  * machinery. Wikipedia's opening sentence names six linked people and is still
  * a sentence, which a test that stripped the link text could not see.
+ *
+ * A HEADING IS A TITLE AND A LINK-ONLY LINE IS A LABEL, however many
+ * sentences either happens to contain, and both were counted here as prose.
+ * Measured on the Suspiria bench, where reddit.com delivered 9,836 characters
+ * - 17% of the prompt - of OTHER discussions' titles and their vote counts,
+ * with not one comment body anywhere on the page. A thread title IS a
+ * sentence ("I rewatched The Exorcist. I take back everything I said about it
+ * previously."), so a wall of them scored three prose lines, cleared
+ * MIN_PROSE_LINES by exactly one, and survived every test in this file -
+ * while ../analysis/sourceCleanup.ts, run over the same text, stripped
+ * nothing from it at all.
+ *
+ * That a line could be BOTH link-only and prose was a contradiction rather
+ * than a gap: {@link isLinkOnlyLine} says the line is nothing but links, and
+ * this said the same line is a sentence. Measured on the two shapes together,
+ * that page drops outright while the two real reviews in the same retrieval
+ * are untouched, as is a BFI article page.
+ *
+ * DELIBERATELY NOT A reddit.com ENTRY IN {@link LOW_VALUE_DOMAINS}: a thread
+ * with comments in it is worth reading, and what is worthless here is a
+ * SHAPE - a page whose every sentence is somebody else's headline - not a
+ * host.
  */
 function isProseLine(line: string): boolean {
+  if (MARKDOWN_HEADING.test(line)) return false
+  if (isLinkOnlyLine(line)) return false
   const residue = line.replace(/\([^()]*\)/g, ' ').replace(/[![\]*_#>|`]/g, ' ')
   if (!/[.!?。]/.test(residue)) return false
   return residue.split(/\s+/).filter(Boolean).length >= MIN_PROSE_WORDS

@@ -373,6 +373,86 @@ const PUBLICATIONS = [
 const REPORTING_VERB =
   '(?:notes?|noted|writes?|wrote|argues?|argued|says?|said|calls?|called|describes?|described|finds?|found|observes?|observed|reads?|suggests?|suggested|praises?|praised|faults?|faulted|judges?|judged|holds?|held|sees?|saw)'
 
+/** A capitalised name of up to four words, which is what a byline looks like. */
+const NAME_PATTERN = String.raw`\p{Lu}[\p{L}'’.-]+(?:\s+\p{Lu}[\p{L}'’.-]+){0,3}`
+
+/** "By Janet Maslin", with the leading bracket or hash an aggregator adds. */
+const BYLINE_SHAPE = new RegExp(String.raw`^[\s\[#*]*[Bb]y\s+\[?(${NAME_PATTERN})`, 'gmu')
+
+/**
+ * A link whose href files its label as a critic or a publication. The label can
+ * span lines - Metacritic puts the score above the name inside the same
+ * brackets - so the last non-empty line of it is the name.
+ */
+const CREDITED_LINK_SHAPE = new RegExp(
+  String.raw`\[([^\]]{1,120}?)\]\([^)]*\/(?:critic|publication|contributors|author|profile)\/[^)]*\)`,
+  'gsu'
+)
+
+const PERSON_SHAPE = new RegExp(`^${NAME_PATTERN}$`, 'u')
+
+/** Bylines that name nobody. */
+const NOT_A_BYLINE = new Set(['Staff', 'Staff Writer', 'Editor', 'Admin', 'Guest'])
+
+/**
+ * Names this run handed the model inside the document BODIES.
+ *
+ * {@link writerNamesFromSources} reads the source TITLES, and on an
+ * aggregator-heavy retrieval there is nothing in them: the titles are "Suspiria
+ * Reviews - Metacritic" and "Suspiria | Rotten Tomatoes", while every critic is
+ * a BYLINE further down the page. Measured on the Suspiria bench, where one
+ * answer named Roger Ebert, Bradley Warren, Empire, Gary Arnold and Janet
+ * Maslin and the report counted ONE - the only match being the publication that
+ * happened to sit in the hand-written PUBLICATIONS list. Four of the five were
+ * in the documents and unreachable from a title.
+ *
+ * Two shapes, both read off this run and neither guessed at. A BYLINE, which is
+ * what a review page puts above its text. And a link whose href says the label
+ * is a critic or a publication, which is how an aggregator files every quote it
+ * prints. Both are safe where a bare surname plus a reporting verb is not: a
+ * DIRECTOR is never bylined on a review and never filed under /critic/, so
+ * neither can fire on "Argento said" - which is the whole reason
+ * NAMED_WRITER_SHAPES has to demand a publication beside the name.
+ *
+ * A SITE-NAME IS ALSO REGISTERED AS A PERSON, because that is exactly how one
+ * gets used: the document carries "RogerEbert.com" and the answer wrote "Roger
+ * Ebert called it an absolute classic" - of a review bylined Peter Sobczynski.
+ * So the trailing domain is dropped and the run-together words are split, and
+ * both forms are matched. That naming is the failure the A SITE IS NOT ITS
+ * WRITER rule was written for, broken on the first bench after it was added,
+ * and it was invisible to every count in this file.
+ *
+ * Still a COUNT and never a verdict, like everything else here. The matches are
+ * printed beside it, so a reader checks the attributions against the prose
+ * directly below them.
+ */
+export function namesFromDocuments(texts: readonly string[]): string[] {
+  const found = new Set<string>()
+  const add = (raw: string): void => {
+    const name = raw.trim().replace(/[,.;:]+$/, '')
+    if (name.length < 4 || NOT_A_BYLINE.has(name)) return
+    found.add(name)
+    const spaced = name
+      .replace(/\.(?:com|net|org|co\.uk)$/i, '')
+      .replace(/([\p{Ll}])(\p{Lu})/gu, '$1 $2')
+      .trim()
+    if (spaced !== name && spaced.length >= 4) found.add(spaced)
+  }
+  for (const text of texts) {
+    for (const match of text.matchAll(BYLINE_SHAPE)) add(match[1])
+    for (const match of text.matchAll(CREDITED_LINK_SHAPE)) {
+      const label = match[1]
+        .replace(/^\s*[Bb]y\s+/, '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .pop()
+      if (label && PERSON_SHAPE.test(label)) add(label)
+    }
+  }
+  return [...found]
+}
+
 const NAMED_WRITER_SHAPES = [
   new RegExp(
     `\\b\\p{Lu}[\\p{L}'’-]+(?:\\s+\\p{Lu}[\\p{L}'’-]+)?\\s+(?:of|at|from|writing for|writing in)\\s+(?:the\\s+)?\\p{Lu}[\\p{L}.'’-]+\\s+${REPORTING_VERB}\\b`,
