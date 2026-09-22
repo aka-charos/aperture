@@ -499,3 +499,84 @@ test('the film’s own makers are never read as critics', () => {
 test('an uncredited byline contributes nothing', () => {
   assert.deepEqual(namesFromDocuments(['By Staff (Not Credited)']), [])
 })
+
+/**
+ * A SINGULAR VIEWER IS THE PROMPT'S OWN PHRASING, and counting it reported the
+ * instruction being obeyed as a fault.
+ *
+ * Measured on the second Suspiria bench: deepseek-v4.1-flash scored spill 7 and
+ * all seven were "a viewer" in the answers version 16 asks for it in - "say
+ * what that does to a viewer sitting in front of it". The exclusion used to be
+ * on "the viewer", calibrated against version 13's wording.
+ */
+test('a single viewer is how the prompt asks for an effect, not a spilled view', () => {
+  const sections = [['work'], ['reception']]
+  const clean = [
+    'The camera takes a perspective belonging to nobody on screen, so a viewer has no safe avatar. That jolt pulls a viewer out of one dread state and into another. The viewer starts scanning ordinary details for menace.',
+    'Critics valued the colour and faulted the plot.',
+  ].join('\n\n')
+  assert.equal(measureProse(clean, sections).spill, 0)
+
+  // Plural is audience response, which is what this exists to catch, and a
+  // named critic outside reception is the original fault.
+  const spilled = [
+    'Some viewers find the plot thin, and one critic likens it to watching a stage.',
+    'Critics valued the colour and faulted the plot.',
+  ].join('\n\n')
+  assert.equal(measureProse(spilled, sections).spill, 2)
+})
+
+/**
+ * The longest paragraph in WORDS. Version 16 states a hundred-word anchor and
+ * flags one half as long again, and only sentences were counted - so a set of
+ * paragraphs inside the sentence cap and carrying 150 words each read clean.
+ */
+test('a paragraph is measured in words as well as sentences', () => {
+  const short = 'One short sentence here. Another short one. A third.'
+  const heavy = 'A sentence. ' + Array.from({ length: 160 }, () => 'word').join(' ') + '.'
+  const signals = measureProse([short, heavy].join('\n\n'))
+  assert.equal(signals.longestParagraph, 3)
+  assert.ok(signals.longestParagraphWords > 150, String(signals.longestParagraphWords))
+  assert.equal(measureProse('').longestParagraphWords, 0)
+})
+
+/**
+ * An aggregator credits a critic beside a DATE, with no byline and no link -
+ * which is how Rotten Tomatoes writes every card, and neither shape above can
+ * see it. Measured on the second Suspiria bench, where one answer named four
+ * critics, every attribution was correct, and the report counted zero.
+ */
+test('a critic credited beside a date is a name this run supplied', () => {
+  const rottenTomatoes = [
+    ' Alyx Vesey Bitch Media Jan 7, 2021',
+    '',
+    'Go to Full Review Adam Nayman The Ringer Oct 5, 2018',
+    '',
+    'Go to Full Review Christy Lemire ChristyLemire.com Apr 16, 2018',
+    '',
+    'Go to Full Review Max Allen Horror Movie Talk Sep 23, 2025',
+  ].join('\n')
+  const names = namesFromDocuments([rottenTomatoes])
+  for (const critic of ['Alyx Vesey', 'Adam Nayman', 'Christy Lemire', 'Max Allen']) {
+    assert.ok(names.includes(critic), critic)
+  }
+  // The publication half is kept too, since an answer may name either.
+  assert.ok(names.includes('The Ringer'))
+  assert.ok(names.includes('Bitch Media'))
+})
+
+/**
+ * The boilerplate between cards is capitalised, so it joins the run in front of
+ * the name: without the lead-noise trim this yields "Review Adam" and "Nayman
+ * The Ringer", and neither can match what an answer wrote.
+ */
+test('an aggregator’s own furniture is not read as part of a name', () => {
+  const names = namesFromDocuments(['Go to Full Review Adam Nayman The Ringer Oct 5, 2018'])
+  assert.ok(names.includes('Adam Nayman'))
+  assert.deepEqual(names.filter((n) => /Review|Full|^Go/.test(n)), [])
+})
+
+/** A dated line that credits nobody contributes nothing. */
+test('a release date is not a byline', () => {
+  assert.deepEqual(namesFromDocuments(['Release Date (Theaters)\n\nFeb 1, 1977, Original']), [])
+})

@@ -34,6 +34,15 @@ export interface ProseSignals {
   paragraphs: number
   /** Sentences in the longest paragraph. The prompt asks for four at most. */
   longestParagraph: number
+  /**
+   * The longest paragraph in WORDS.
+   *
+   * Version 16 states a hundred-word paragraph anchor and flags one half as
+   * long again, and only SENTENCES were counted - so an answer whose paragraphs
+   * were inside the sentence cap while carrying 150 words each read as clean.
+   * Measured on the second Suspiria bench.
+   */
+  longestParagraphWords: number
   /** "the sources carry", "the documents do not name" — pointing at the retrieval. */
   pointsAtSources: number
   /**
@@ -178,13 +187,28 @@ const UNATTRIBUTED = [
  *
  * Version 13 keeps every critic, scholar and viewer in reception, after The
  * Zero Years' form answer ran "one Italian critic ... the same critic ...
- * another viewer" for three paragraphs. Viewers count only with a determiner,
- * because "the viewer" is how the prompt itself asks for an effect to be
- * described. Reception and its version-8 predecessor are where these belong.
+ * another viewer" for three paragraphs. Reception and its version-8
+ * predecessor are where these belong.
+ *
+ * A SINGULAR VIEWER IS THE PROMPT'S OWN PHRASING AND NEVER COUNTS. The rule
+ * used to exclude "the viewer" alone, calibrated against version 13's wording.
+ * Version 16 says "a viewer" throughout - "say what that does to a viewer
+ * sitting in front of it", "What should a viewer watch and listen for?" - so
+ * the exclusion was on the wrong article, and the column began reporting the
+ * instruction being obeyed as a fault. Measured on the second Suspiria bench:
+ * deepseek-v4.1-flash scored 7, and ALL SEVEN were "a viewer" in the answers
+ * the prompt asks for it in. This is the ./sourceQuality.ts lesson in reverse -
+ * there a prompt-primed noun was invisible to a pattern, here a prompt-primed
+ * noun IS the pattern.
+ *
+ * The split is clean because the prompt is consistent: every use it asks for is
+ * SINGULAR, and what this exists to catch - audience response smuggled into a
+ * craft answer - is PLURAL. "one viewer" and "another viewer" stay, since the
+ * prompt never writes either and both name somebody's reaction.
  */
 const WRITER_MENTIONS = [
   /\b(?:critics?|reviewers?|scholars?|commentators?)\b/gi,
-  /\b(?:one|a|another|some|several|other|many|most)\s+viewers?\b/gi,
+  /\b(?:one|another|some|several|other|many|most)\s+viewers?\b/gi,
   /\bwriting (?:in|for)\b/gi,
 ]
 const WRITER_SECTIONS = new Set(['reception', 'dispute'])
@@ -389,6 +413,45 @@ const CREDITED_LINK_SHAPE = new RegExp(
   'gsu'
 )
 
+/**
+ * A critic credited beside a DATE, which is how an aggregator prints a review
+ * card: "Alyx Vesey Bitch Media Jan 7, 2021".
+ *
+ * Neither a byline nor a link, so the two shapes above cannot see it - measured
+ * on the second Suspiria bench, where one answer named Christy Lemire, Max
+ * Allen, Adam Nayman and Alyx Vesey, every attribution was CORRECT, and the
+ * report counted ZERO. Metacritic had dropped out of that retrieval and Rotten
+ * Tomatoes had come in, and RT writes its credits as bare text.
+ *
+ * The date is the anchor, because it is reliable and rare. Everything before it
+ * is <critic, two words> <publication, the rest>, so both halves are kept: the
+ * answer may name either.
+ */
+const MONTH = '(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)'
+const CAPITALISED = String.raw`\p{Lu}[\p{L}'’.-]*`
+const DATED_CREDIT_SHAPE = new RegExp(
+  String.raw`(${CAPITALISED}(?:\s+${CAPITALISED}){1,4})\s+${MONTH}\s+\d{1,2},\s*\d{4}`,
+  'gu'
+)
+
+/**
+ * Capitalised boilerplate an aggregator prints between cards, which joins the
+ * run in front of the name: "… Go to Full Review Adam Nayman The Ringer Oct 5,
+ * 2018" would otherwise yield "Review Adam" and "Nayman The Ringer".
+ */
+const CREDIT_LEAD_NOISE = new Set([
+  'Go',
+  'To',
+  'Full',
+  'Review',
+  'Reviews',
+  'Read',
+  'See',
+  'More',
+  'View',
+  'All',
+])
+
 const PERSON_SHAPE = new RegExp(`^${NAME_PATTERN}$`, 'u')
 
 /** Bylines that name nobody. */
@@ -448,6 +511,13 @@ export function namesFromDocuments(texts: readonly string[]): string[] {
         .filter(Boolean)
         .pop()
       if (label && PERSON_SHAPE.test(label)) add(label)
+    }
+    for (const match of text.matchAll(DATED_CREDIT_SHAPE)) {
+      const words = match[1].split(/\s+/).filter(Boolean)
+      while (words.length > 0 && CREDIT_LEAD_NOISE.has(words[0])) words.shift()
+      if (words.length < 2) continue
+      add(words.slice(0, 2).join(' '))
+      if (words.length > 2) add(words.slice(2).join(' '))
     }
   }
   return [...found]
@@ -642,6 +712,10 @@ export function measureProse(
     words: trimmed ? trimmed.split(/\s+/).length : 0,
     paragraphs: paragraphs.length,
     longestParagraph: paragraphs.reduce((max, p) => Math.max(max, sentenceCount(p)), 0),
+    longestParagraphWords: paragraphs.reduce(
+      (max, p) => Math.max(max, p.trim() ? p.trim().split(/\s+/).length : 0),
+      0
+    ),
     pointsAtSources: count(trimmed, POINTS_AT_SOURCES),
     inlineLabels: count(trimmed, INLINE_LABELS),
     namedWriters: namedWriterMatches.length,
