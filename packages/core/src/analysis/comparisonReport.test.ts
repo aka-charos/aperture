@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
+import { BENCH_PROMPT_VERSIONS, editionFor } from './prompt.js'
 import {
   criticismLine,
+  lengthCapsFor,
   renderComparisonReport,
   type ComparisonEntry,
   type ComparisonReport,
@@ -409,4 +411,54 @@ test('an accepted answer is not marked', () => {
   const text = renderComparisonReport(report())
   assert.equal(text.includes('[UNUSABLE]'), false)
   assert.equal(text.includes('[unusable]'), false)
+})
+
+/**
+ * A COUNT NOBODY CHECKS IS NOT A MEASUREMENT. Version 16 asks for at most eight
+ * paragraphs and 650 words, and the second Suspiria bench printed "9" and "684"
+ * beside a row that read as passing.
+ */
+test('an answer that ran past its prompt’s length rule is flagged', () => {
+  const paragraph = 'One sentence here. A second sentence follows it. A third closes.'
+  const nine = Array.from({ length: 9 }, () => paragraph).join('\n\n')
+  const text = renderComparisonReport(
+    report({
+      promptVersion: 16,
+      entries: [entry({ promptVersion: 16, analysis: nine, sections: [['work']] })],
+    })
+  )
+  assert.match(text, /9! paragraphs/)
+
+  // The control: eight is what it asked for.
+  const eight = Array.from({ length: 8 }, () => paragraph).join('\n\n')
+  const fine = renderComparisonReport(
+    report({
+      promptVersion: 16,
+      entries: [entry({ promptVersion: 16, analysis: eight, sections: [['work']] })],
+    })
+  )
+  assert.match(fine, /8 paragraphs/)
+  assert.equal(fine.includes('8!'), false)
+})
+
+/**
+ * The table is read from, so the figures it carries have to be what the prompt
+ * of that version actually states. A reworded length rule fails here rather
+ * than leaving the flags quietly wrong.
+ */
+test('every length cap is a figure its own edition states', () => {
+  const spelled: Record<number, string> = { 8: 'eight', 10: 'ten' }
+  for (const version of BENCH_PROMPT_VERSIONS) {
+    const caps = lengthCapsFor(version)
+    assert.ok(caps, 'version ' + version + ' has no length caps')
+    const rules = editionFor(version).rules.join('\n')
+    assert.ok(rules.includes(String(caps!.words)), version + ' states ' + caps!.words + ' words')
+    if (caps!.paragraphs != null) {
+      const word = spelled[caps!.paragraphs] ?? String(caps!.paragraphs)
+      assert.ok(
+        rules.includes(word) || rules.includes(String(caps!.paragraphs)),
+        version + ' states ' + caps!.paragraphs + ' paragraphs'
+      )
+    }
+  }
 })

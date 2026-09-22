@@ -157,9 +157,13 @@ function formatDuration(ms: number | null): string {
  * truncated analysis and the total alone cannot say so — the failure this
  * repo has already paid for twice.
  */
-function statLine(entry: ComparisonEntry, signals: ProseSignals | null): string {
+function statLine(
+  entry: ComparisonEntry,
+  signals: ProseSignals | null,
+  caps: LengthCaps | null
+): string {
   const parts: string[] = []
-  if (signals) parts.push(`${signals.words} words`)
+  if (signals) parts.push(`${against(signals.words, caps?.words)} words`)
   parts.push(formatDuration(entry.durationMs))
   if (entry.inputTokens != null) parts.push(`${entry.inputTokens} in`)
   if (entry.outputTokens != null) parts.push(`${entry.outputTokens} out`)
@@ -175,10 +179,12 @@ function statLine(entry: ComparisonEntry, signals: ProseSignals | null): string 
  * The habit counts, spelled out under each answer so a reader can check what
  * matched against the prose directly below. See ./proseSignals.ts.
  */
-function signalsLine(signals: ProseSignals): string {
+function signalsLine(signals: ProseSignals, caps: LengthCaps | null): string {
   const mapped = signals.mapped
   return [
-    `${signals.paragraphs} paragraphs (longest ${signals.longestParagraph} sentences)`,
+    `${against(signals.paragraphs, caps?.paragraphs)} paragraphs (longest ${
+      signals.longestParagraph
+    } sentences, ${against(signals.longestParagraphWords, caps?.paragraphWords)} words)`,
     `points at the documents ${signals.pointsAtSources}`,
     // Printed like "told twice", and for the same reason: the names come from
     // this run's own source titles, so a reader has to be able to see whether
@@ -291,15 +297,21 @@ const signalsOf = (
  * there were no labels: GLM's unmapped Terminator 2 answer read as clean on
  * "twice" and "spill" when neither had been measured.
  */
-const labelled = (read: (s: ProseSignals) => number | string) => (s: ProseSignals) =>
-  s.mapped ? read(s) : '—'
+const labelled =
+  (read: (s: ProseSignals) => number | string) =>
+  (s: ProseSignals): number | string =>
+    s.mapped ? read(s) : '—'
 
 // "rec/work" carries a "!" when reception ran longer than the work answer,
 // which the prompt forbids.
-const SIGNAL_COLUMNS: [string, (s: ProseSignals) => number | string][] = [
-  ['words', (s) => s.words],
-  ['paras', (s) => s.paragraphs],
+const SIGNAL_COLUMNS: [
+  string,
+  (s: ProseSignals, caps: LengthCaps | null) => number | string,
+][] = [
+  ['words', (s, caps) => against(s.words, caps?.words)],
+  ['paras', (s, caps) => against(s.paragraphs, caps?.paragraphs)],
   ['longest', (s) => s.longestParagraph],
+  ['longest-w', (s, caps) => against(s.longestParagraphWords, caps?.paragraphWords)],
   ['sources', (s) => s.pointsAtSources],
   ['named', (s) => s.namedWriters],
   ['labels', (s) => s.inlineLabels],
@@ -319,9 +331,63 @@ const SIGNAL_COLUMNS: [string, (s: ProseSignals) => number | string][] = [
   ],
 ]
 
+/**
+ * What each prompt version's length rule actually states, so the report can say
+ * when an answer went over instead of printing a number nobody checks.
+ *
+ * Measured on the second Suspiria bench, where one answer ran to 9 paragraphs
+ * and 684 words against version 16's 8 and 650, and the table printed "9" and
+ * "684" beside a passing row.
+ *
+ * A TABLE RATHER THAN A PARSE of the rule text. Parsing prose would track a
+ * rewording automatically and would also break on one, silently, which is worse
+ * for an instrument than a stale number - and `comparisonReport.test.ts` asserts
+ * every figure here still appears in that edition's own rules, so a reworded
+ * length rule fails there rather than drifting.
+ *
+ * Versions 7 and 8 set no paragraph cap and 9 to 15 state theirs as "about ten
+ * short paragraphs", which is an anchor and not a limit - so their counts are
+ * flagged generously. Only version 16 states a word cap PER PARAGRAPH.
+ */
+interface LengthCaps {
+  words: number
+  paragraphs?: number
+  /** The point at which one paragraph is carrying too much. */
+  paragraphWords?: number
+}
+
+const LENGTH_CAPS: ReadonlyMap<number, LengthCaps> = new Map([
+  [7, { words: 900 }],
+  [8, { words: 900 }],
+  [9, { words: 900, paragraphs: 10 }],
+  [10, { words: 900, paragraphs: 10 }],
+  [11, { words: 900, paragraphs: 10 }],
+  [12, { words: 900, paragraphs: 10 }],
+  [13, { words: 900, paragraphs: 10 }],
+  [14, { words: 900, paragraphs: 10 }],
+  [15, { words: 900, paragraphs: 10 }],
+  [16, { words: 650, paragraphs: 8, paragraphWords: 150 }],
+])
+
+/**
+ * The caps an entry answered under, or null when the build no longer carries
+ * that version. A variant keeps its base version's length rule unless it
+ * replaced it, which is not knowable from here - so a variant is flagged
+ * against its base and the note above says so.
+ */
+export function lengthCapsFor(version: number): LengthCaps | null {
+  return LENGTH_CAPS.get(version) ?? null
+}
+
+/** A count, with "!" when the prompt asked for fewer. */
+const against = (value: number, cap: number | undefined): string =>
+  cap != null && value > cap ? `${value}!` : String(value)
+
 interface SignalRow {
   label: string
   signals: ProseSignals | null
+  /** Null when this build no longer carries the version that answered. */
+  caps: LengthCaps | null
 }
 
 /**
@@ -354,6 +420,7 @@ function signalRows(report: ComparisonReport, writerNames: readonly string[]): S
     .map(({ row }) => ({
       label: row.entry.problem ? `${row.label} [unusable]` : row.label,
       signals: signalsOf(row.entry, writerNames),
+      caps: lengthCapsFor(row.entry.promptVersion),
     }))
 }
 
@@ -437,14 +504,15 @@ function fromTask(prompt: string): string {
 
 function signalsTable(rows: SignalRow[]): string[] {
   const width = Math.max(5, ...rows.map((row) => row.label.length)) + 2
-  const cell = (value: string) => value.padStart(9)
+  // Ten, because 'longest-w' is nine characters and the header ran together.
+  const cell = (value: string) => value.padStart(10)
   return [
     `${'answer'.padEnd(width)}${SIGNAL_COLUMNS.map(([name]) => cell(name)).join('')}`,
     ...rows.map(
       (row) =>
         `${row.label.padEnd(width)}${
           row.signals
-            ? SIGNAL_COLUMNS.map(([, read]) => cell(String(read(row.signals!)))).join('')
+            ? SIGNAL_COLUMNS.map(([, read]) => cell(String(read(row.signals!, row.caps)))).join('')
             : cell('—')
         }`
     ),
@@ -458,11 +526,12 @@ function pushEntry(
   writerNames: readonly string[]
 ): void {
   const signals = signalsOf(entry, writerNames)
+  const caps = lengthCapsFor(entry.promptVersion)
   out.push(THIN)
   out.push(`${label} ${entryName(entry)}`)
-  out.push(statLine(entry, signals))
+  out.push(statLine(entry, signals, caps))
   if (entry.problem && entry.analysis?.trim()) out.push(rejectedLine(entry))
-  if (signals) out.push(signalsLine(signals))
+  if (signals) out.push(signalsLine(signals, caps))
   const sections = sectionLine(entry)
   if (sections) out.push(`sections: ${sections}`)
   else if (signals) out.push(unmappedLine(entry))
