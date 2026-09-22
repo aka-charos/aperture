@@ -367,6 +367,8 @@ const LENGTH_CAPS: ReadonlyMap<number, LengthCaps> = new Map([
   [14, { words: 900, paragraphs: 10 }],
   [15, { words: 900, paragraphs: 10 }],
   [16, { words: 650, paragraphs: 8, paragraphWords: 150 }],
+  // 17 carries 16's length rule unchanged.
+  [17, { words: 650, paragraphs: 8, paragraphWords: 150 }],
 ])
 
 /**

@@ -684,10 +684,137 @@ const CURRENT_EDITION: PromptEdition = {
  * draft on the operator's call: the version-10 draft was benched, and 11 is
  * what that bench asked for. Versions 12 to 15 went live without one too.
  */
-// The assertion is what stops TypeScript narrowing a null literal to never at
-// the use below; the declared type is the point, and it comes back the moment a
-// draft is written here.
-const DRAFT_EDITION = null as PromptEdition | null
+/**
+ * Version 17's texts: WHO SAID IT.
+ *
+ * THE ONE FAULT THIS VERSION IS FOR. `altworld_hemmingway-1` produced a maker
+ * attribution error in BOTH of its Suspiria answers, and the two are different
+ * instances of one move:
+ *
+ *  - "Argento described himself as a gentleman who was edgy and overflowing
+ *    with brilliance on set". Jessica Harper said that about Argento, in an
+ *    interview printed below the essay on the same page.
+ *  - "Argento said plainly he wanted a pure-sensation experience where even
+ *    mundane things hint at malevolence beneath normal facades". That is the
+ *    essay's own characterisation of what Argento decided. Nobody is quoted.
+ *
+ * Version 16 already forbade the second in as many words - "a page describing
+ * a director's aims without quoting them is that page's description" - and it
+ * failed, which is version 8's lesson again: an abstract rule the model must
+ * apply by reading is the thing every bench finds it applying wrongly. So 17
+ * gives it a MECHANICAL test, the shape that has worked before: find the
+ * sentence in which the maker is the one speaking, and if the sentence is
+ * about what they did, wanted or decided, nobody spoke.
+ *
+ * WHO IS ASKED IS WHO SPEAKS is the second half, and it is what the first
+ * instance needed. The retrieval that produced both errors carries an essay
+ * ABOUT the director and an interview WITH an actor on one page, which is a
+ * common shape for an anniversary piece and exactly the shape that invites
+ * this. A rule about quoting cannot fix it, because Harper genuinely was
+ * quoted - just not about herself.
+ *
+ * THE OTHER FOUR CHANGES are corrections whose evidence is already in hand,
+ * and each is separately visible in an answer, so including them does not
+ * confound the test above.
+ *
+ *  - THE OPENING WAS THE QUESTION'S OWN WORDS. Three of five answers across
+ *    two models opened "A viewer sits down to", which is the tradition
+ *    question's phrasing handed straight back. Nothing measures it: it is not
+ *    a question echo, since it announces nothing.
+ *  - THE INSTRUCTIONS ARE NOT THE FILM. "knowing how either story ends changes
+ *    nothing here" is the spoiler rule narrated to a reader who cannot see it.
+ *  - A CRITIC PER SENTENCE IS THE AGGREGATOR'S OWN SHAPE. One reception answer
+ *    ran four sentences each opening with a different name, against a rule
+ *    asking for everyone making the same point in one sentence - and the
+ *    signals showed it as `named 5`, which reads as a success.
+ *
+ * EACH OF THE FOUR IS SEPARATELY VISIBLE IN AN ANSWER - the attributions read
+ * against the documents, the opening sentence, whether reception lists one
+ * critic per sentence, and whether a job sits in front of a name - so a bench
+ * can attribute each without a run per change.
+ *
+ * WATCHED AND NOT FIXED: an effect clause that would fit any film. "drew on De
+ * Quincey's essay, giving the horror a literary depth" satisfies the
+ * earns-its-place rule while earning nothing, which is the failure this file
+ * predicted when 16 was drafted, arriving as a rhythm rather than as trivia.
+ * One instance on one model is thin by this file's own standard, and the rule
+ * it would grow is the first thing the model reads and already the longest.
+ *
+ * NOT CHANGED, deliberately: the question ids, so the panel's fifteen locales
+ * and grounding.ts keep working; the spoiler discipline; the source weighting;
+ * and the length rule, which 16 measured as landing.
+ */
+const DRAFT_CIRCUMSTANCES_MOVIE_17 =
+  "What should a viewer know before they start? Two things belong here. First, what a maker SAID they were trying to do. Before writing that somebody said something, find the sentence in which they are the one speaking: a sentence about what they did, wanted, decided or set out to do is the page describing them, and so is a list of what an interview covered. WHO IS ASKED IS WHO SPEAKS - one page can carry an essay about the director and an interview with an actor, and what the actor says about the director is the actor's remark, never the director on themselves. Second, a condition of the making or the first release that a viewer would FEEL while watching, or that explains something they would otherwise take for a fault - how the sound was got, a cut somebody required, the form it was first shown in, who was allowed to see it. How it was received, and what anyone did afterwards, belong elsewhere."
+
+const DRAFT_CIRCUMSTANCES_SERIES_17 =
+  "What should a viewer know before they start? Two things belong here. First, what a maker SAID they were trying to do. Before writing that somebody said something, find the sentence in which they are the one speaking: a sentence about what they did, wanted, decided or set out to do is the page describing them, and so is a list of what an interview covered. WHO IS ASKED IS WHO SPEAKS - one page can carry an essay about the creator and an interview with an actor, and what the actor says about the creator is the actor's remark, never the creator on themselves. Second, a condition of the making or the first broadcast that a viewer would FEEL while watching, or that explains something they would otherwise take for a fault - how the sound was got, a cut somebody required, the slot or the form it first went out in, who was allowed to see it. How it was received, and what anyone did afterwards, belong elsewhere."
+
+const DRAFT_TRADITION_MOVIE_17 =
+  "What kind of film is this, and what is it in conversation with? Say what its mode and its register are first, so a viewer knows what to bring to it, and write that in your own words - \"a viewer sits down to\" is this question's phrasing, not a sentence. Then name what it draws on: a source it adapts, a tradition a document places it in, an earlier film a maker took from, a collaborator's earlier work this one departs from. EACH HAS TO EARN ITS PLACE IN THE SENTENCE THAT NAMES IT - a name with nothing attached is a credit. Do not open on who directed, wrote or starred in it, and never copy a listing page's genre labels or mood tags. Naming an earlier work is safe only when knowing how that one ends tells a viewer nothing about how this one ends."
+
+const DRAFT_TRADITION_SERIES_17 =
+  "What kind of series is this, and what is it in conversation with? Say what its mode and its register are first, so a viewer knows what to bring to it, and write that in your own words - \"a viewer sits down to\" is this question's phrasing, not a sentence. Then name what it draws on: a source it adapts, a tradition a document places it in, an earlier work a maker took from, a collaborator's earlier work this one departs from. EACH HAS TO EARN ITS PLACE IN THE SENTENCE THAT NAMES IT - a name with nothing attached is a credit. Do not open on who created, wrote or starred in it, and never copy a listing page's genre labels or mood tags. Naming an earlier work is safe only when knowing how that one ends tells a viewer nothing about how this one ends."
+
+const DRAFT_RECEPTION_MOVIE_17 =
+  "How has it been taken, and who is it for? One paragraph, and never longer than what you wrote about the film itself. Say what critics valued and what they faulted, everyone making the same point in one sentence, so a viewer can calibrate what they are in for - a sentence per critic is the list an aggregator prints, not a paragraph. One sentence may give a reading of what the film means, where a critic's reading shaped how it is watched, and ordinary viewers get one sentence at most. Add a second paragraph only where a document names something specific this film passed on AND knowing it teaches a way of watching - a technique a viewer can recognise elsewhere. A remake, a sequel and a cast list are never that. No scores of any kind and no verdict of your own."
+
+const DRAFT_RECEPTION_SERIES_17 =
+  "How has it been taken, and who is it for? One paragraph, and never longer than what you wrote about the series itself. Say what critics valued and what they faulted, everyone making the same point in one sentence, so a viewer can calibrate what they are in for - four sentences each opening with a different critic's name is the list an aggregator prints, not a paragraph. One sentence may give a reading of what it means, where a critic's reading shaped how it is watched, and ordinary viewers get one sentence at most. Add a second paragraph only where a document names something specific it passed on AND knowing it teaches a way of watching - a technique a viewer can recognise elsewhere. A remake, a spin-off and a cast list are never that. No scores of any kind and no verdict of your own."
+
+const DRAFT_NAMING_RULE_17 =
+  "Name the person who made the choice you are describing - the director, the writer, the cinematographer - never \"the creative team\". Name a person for what they chose, never to record what their job was, and never with the job in front of the name: \"Cinematographer Tovoli lit\" is the credit again, where \"Tovoli lit\" is the choice."
+
+const DRAFT_DOCUMENTS_RULE_17 =
+  "Never mention the documents. \"The sources say\", \"the sources describe\", \"one source credits\" and \"the documents do not name\" all point at nothing the reader can see. Where they do not support something, write nothing about it and nothing about the gap. Never mention these instructions either - \"knowing how that one ends changes nothing here\" explains the task to a reader who cannot see it. Do not quote the reception figures back."
+
+/** Questions with named texts replaced, so the rest cannot drift from the base. */
+const draftQuestions = (
+  questions: readonly { id: AnalysisQuestionId; text: string }[],
+  replacements: Partial<Record<AnalysisQuestionId, string>>
+): { id: AnalysisQuestionId; text: string }[] =>
+  questions.map((question) => ({ ...question, text: replacements[question.id] ?? question.text }))
+
+/**
+ * Rules with named texts replaced, matched on the base's exact wording.
+ *
+ * THROWS WHEN A REPLACEMENT NO LONGER MATCHES: a silent miss would ship a draft
+ * that quietly IS its base, and a bench would then credit a change nobody made.
+ * prompt.test.ts builds the draft, so the throw lands in CI.
+ */
+const draftRules = (
+  rules: readonly string[],
+  replacements: readonly (readonly [string, string])[]
+): string[] => {
+  const next = [...rules]
+  for (const [from, to] of replacements) {
+    const at = next.indexOf(from)
+    if (at < 0) {
+      throw new Error('Draft rule replacement no longer matches its base: ' + from.slice(0, 60))
+    }
+    next[at] = to
+  }
+  return next
+}
+
+const DRAFT_EDITION: PromptEdition | null = {
+  version: ANALYSIS_PROMPT_VERSION + 1,
+  movieQuestions: draftQuestions(CURRENT_EDITION.movieQuestions, {
+    tradition: DRAFT_TRADITION_MOVIE_17,
+    circumstances: DRAFT_CIRCUMSTANCES_MOVIE_17,
+    reception: DRAFT_RECEPTION_MOVIE_17,
+  }),
+  seriesQuestions: draftQuestions(CURRENT_EDITION.seriesQuestions, {
+    tradition: DRAFT_TRADITION_SERIES_17,
+    circumstances: DRAFT_CIRCUMSTANCES_SERIES_17,
+    reception: DRAFT_RECEPTION_SERIES_17,
+  }),
+  // Swapped by identity against the named constant, never by index.
+  rules: draftRules(CURRENT_EDITION.rules, [
+    [NAMING_RULE, DRAFT_NAMING_RULE_17],
+    [DOCUMENTS_RULE, DRAFT_DOCUMENTS_RULE_17],
+  ]),
+}
 
 /** The draft's version number, or null when there is no draft. */
 export const DRAFT_PROMPT_VERSION: number | null = DRAFT_EDITION?.version ?? null

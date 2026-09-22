@@ -700,6 +700,81 @@ test('version 16 aims every question at a viewer who has not seen the film', () 
 })
 
 /**
+ * DRAFT 17: WHO SAID IT.
+ *
+ * `altworld_hemmingway-1` produced a maker attribution error in BOTH of its
+ * Suspiria answers under version 16 - once turning an actress's description of
+ * the director into the director describing himself, once turning a page's own
+ * characterisation into "Argento said plainly". Version 16 already forbade the
+ * second in as many words and it failed, so 17 gives it a MECHANICAL test.
+ *
+ * The three smaller corrections are pinned beside it because each is
+ * separately visible in an answer, so a bench can attribute them without a run
+ * per change.
+ *
+ * The replacement helper throws when a base text moves, so merely building the
+ * draft - which importing this module does - is half the test.
+ */
+test('draft 17 decides who is speaking before it reports a maker', () => {
+  if (DRAFT_PROMPT_VERSION == null) return
+  const draft = editionFor(DRAFT_PROMPT_VERSION)
+  const current = editionFor(ANALYSIS_PROMPT_VERSION)
+  const rulesText = draft.rules.join('\n')
+  const question = (id: string) => draft.movieQuestions.find((q) => q.id === id)!.text
+
+  assert.equal(DRAFT_PROMPT_VERSION, ANALYSIS_PROMPT_VERSION + 1)
+
+  // The ids are untouched, or parseParagraphMap discards every label and the
+  // panel loses its headings in fifteen locales.
+  for (const media of ['movieQuestions', 'seriesQuestions'] as const) {
+    assert.deepEqual(
+      draft[media].map((q) => q.id),
+      current[media].map((q) => q.id)
+    )
+  }
+
+  // THE MECHANICAL TEST, which is what the version is for: find the sentence in
+  // which the maker is the one speaking, and a sentence about what they did or
+  // decided is the page describing them.
+  assert.ok(question('circumstances').includes('find the sentence in which they are the one speaking'))
+  assert.ok(question('circumstances').includes('did, wanted, decided or set out to do'))
+  // The half the first error needed: a quote belongs to whoever was asked.
+  assert.ok(question('circumstances').includes('WHO IS ASKED IS WHO SPEAKS'))
+  assert.ok(question('circumstances').includes("is the actor's remark"))
+  // Version 16's own clause, which worked on the BFI page, is carried over.
+  assert.ok(question('circumstances').includes('a list of what an interview covered'))
+
+  // The opening stopped being the question's own words: three of five answers
+  // across two models opened with this phrase because the question offered it.
+  assert.ok(question('tradition').includes("this question's phrasing, not a sentence"))
+  assert.ok(question('tradition').includes('a viewer sits down to'))
+
+  // A critic per sentence is the aggregator's own shape, which one answer
+  // reproduced while scoring `named 5`.
+  assert.ok(question('reception').includes('a sentence per critic'))
+
+  // A job in front of a name is the credit again.
+  assert.ok(rulesText.includes('"Cinematographer Tovoli lit" is the credit again'))
+
+  // The instructions are not the film.
+  assert.ok(rulesText.includes('Never mention these instructions either'))
+
+  // NOT grown: the governing rule is the first thing the model reads and is
+  // already the longest, and the effect-clause fault has one instance on one
+  // model. Watched, not fixed.
+  assert.equal(draft.rules[0], current.rules[0])
+  assert.ok(!rulesText.includes('giving it a literary depth'))
+
+  // Everything version 16 measured as landing is carried unchanged.
+  assert.equal(draft.rules.length, current.rules.length)
+  assert.ok(rulesText.includes('There is no minimum'))
+  assert.ok(rulesText.includes('never five'))
+  assert.ok(rulesText.includes('THESE NEVER EARN IT, in any answer'))
+  assert.ok(rulesText.includes('A SITE IS NOT ITS WRITER'))
+  assert.ok(question('work') === current.movieQuestions.find((q) => q.id === 'work')!.text)
+})
+
+/**
  * THE VARIANT MECHANISM SURVIVES ITS ONLY VARIANT, and an empty registry is a
  * supported state rather than a gap.
  *
