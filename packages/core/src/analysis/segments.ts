@@ -12,7 +12,7 @@
  * IT USED TO HIDE ONE OF THEM AND NO LONGER DOES. The first version of this
  * module gated `tradition` behind a disclosure, because for a work whose
  * revelation is its antecedent that paragraph gives the ending away (measured
- * on Incendies — see TRADITION_QUESTION in ./prompt.ts). Removed on the
+ * on Incendies — see TRADITION_QUESTION_MOVIE in ./prompt.ts). Removed on the
  * operator's call after seeing it: a control that collapses part of a short
  * article costs every reader a click on every title to protect a minority of
  * them, and labelling the parts is what they actually wanted the index for.
