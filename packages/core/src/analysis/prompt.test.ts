@@ -107,8 +107,15 @@ test('a non-Latin original title is kept', () => {
 })
 
 /**
- * The version-8 and version-9 corrections, pinned because nothing else can see
- * them.
+ * The corrections versions 8 to 15 paid for, pinned AGAINST VERSION 15,
+ * which is now archived and frozen.
+ *
+ * They used to run against whatever the current prompt was, which is how a
+ * promotion turns twenty of them red at once. Version 15 is the edition that
+ * accumulated all of them, so that is where they belong - and ./promptEditions.ts
+ * says an archived edition must never be edited, which until now nothing
+ * checked. These are that check. Version 16 has its own test below, and it
+ * deliberately does NOT repeat these: several of them name rules 16 dropped.
  *
  * Each one exists because an abstract rule was already present and did not
  * catch the behaviour - so these are not paraphrases of a rule above them, they
@@ -121,14 +128,14 @@ const questionOrder = (p: string) =>
   [...p.matchAll(/^\d+\. \[([a-z]+)\]/gm)].map((match) => match[1])
 
 test('version 9 reads before, during, after: context, work, making, reception', () => {
-  assert.deepEqual(questionOrder(buildAnalysisPrompt(subject(), { mode: 'grounding' })), [
+  assert.deepEqual(questionOrder(buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })), [
     'tradition',
     'work',
     'circumstances',
     'reception',
   ])
   assert.deepEqual(
-    questionOrder(buildAnalysisPrompt(subject({ mediaType: 'series' }), { mode: 'grounding' })),
+    questionOrder(buildAnalysisPrompt(subject({ mediaType: 'series' }), { mode: 'grounding', version: 15 })),
     ['tradition', 'work', 'structure', 'circumstances', 'reception']
   )
 })
@@ -144,7 +151,7 @@ test('version 9 asks neither intent nor dispute, and the map vocabulary agrees',
 })
 
 test('influence moved from the lineage question to reception', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(!p.includes('what did it influence?'), p)
   assert.ok(p.includes('what it went on to influence to the reception question'), p)
   assert.ok(p.includes('what did it go on to influence?'), p)
@@ -153,7 +160,7 @@ test('influence moved from the lineage question to reception', () => {
 // The two measured failures of the dispute question: an invented split, and
 // "leave it open" carried out as a sentence announcing that it is open.
 test('reception asks for consensus where there is one and forbids announcing openness', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('If critics largely agree, say what they agree on.'), p)
   assert.ok(p.includes('with no sentence remarking that the question stays open'), p)
   assert.ok(p.includes('is not a disagreement about it'), p)
@@ -161,7 +168,7 @@ test('reception asks for consensus where there is one and forbids announcing ope
 })
 
 test('the making question holds intent to what someone actually said', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('Neither is an intention read back off the finished work'), p)
   assert.ok(p.includes('Neither is how it was received'), p)
   assert.ok(
@@ -172,7 +179,7 @@ test('the making question holds intent to what someone actually said', () => {
 })
 
 test('the work question refuses credit lists and reveals', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('even with a sentence about its effect attached'), p)
   assert.ok(p.includes('never what it turns out to be'), p)
 })
@@ -180,7 +187,7 @@ test('the work question refuses credit lists and reveals', () => {
 // Version 8's list of banned phrasings was met with synonyms, so the principle
 // is what is pinned now, with the measured synonyms named beneath it.
 test('attribution is a principle: facts plainly, views with a holder', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('state facts, what is on screen and what it does to the viewer plainly'), p)
   assert.ok(p.includes('Never state such a view as your own'), p)
   assert.ok(p.includes('"is described as"'), p)
@@ -189,7 +196,7 @@ test('attribution is a principle: facts plainly, views with a holder', () => {
 })
 
 test('paragraphs open on substance and a fact is told once', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('its first sentence says something about the film itself'), p)
   // Version 15: GLM paraphrased this example three times.
   assert.ok(!p.includes('"The circumstances of its making"'), p)
@@ -199,7 +206,7 @@ test('paragraphs open on substance and a fact is told once', () => {
 // Kept from version 8: the half of rule 3 that had to go stays gone, and the
 // adjacency constraint that replaced it stays.
 test('a question may take several paragraphs, but keeps them together', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(!p.includes('Do not write one paragraph per question'), p)
   assert.ok(p.includes('Give a question as many paragraphs as the sources support'), p)
   assert.ok(
@@ -209,7 +216,7 @@ test('a question may take several paragraphs, but keeps them together', () => {
 })
 
 test('the size of the source block does not license length', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('Length follows the work, not the amount of source text'), p)
   assert.ok(p.includes('A long source block is not a reason to write more'), p)
 })
@@ -227,7 +234,7 @@ test('the prompt version carries the version-15 corrections', () => {
  * constants in ./prompt.ts.
  */
 test('context opens on the kind of work, and a single-work comparison is a critic view', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('not on who directed, wrote or stars in it'), p)
   assert.ok(p.includes('and not on the tags or mood keywords a listing site attaches'), p)
   assert.ok(p.includes("is a critic's view unless a maker said it, and a critic's view belongs to the reception answer"), p)
@@ -245,14 +252,14 @@ test('context opens on the kind of work, and a single-work comparison is a criti
  * knows, and the work answer had lost what its choices achieve.
  */
 test('the work answer says what its choices achieve, and quality stays out', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('if a document says it, that effect is the answer'), p)
   assert.ok(p.includes('whether it is good belongs to the reception question'), p)
   assert.ok(!p.includes('What one critic reads into a choice belongs to the reception answer'), p)
 })
 
 test('reception is the shortest answer and says each point once', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('This is the shortest answer: at most two short paragraphs'), p)
   assert.ok(p.includes('never longer than the answer about what the work is doing'), p)
   assert.ok(p.includes('not a sentence for each critic who did'), p)
@@ -266,7 +273,7 @@ test('reception is the shortest answer and says each point once', () => {
  * pages are weighed as what they are.
  */
 test('nobody is named', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('Never name a critic, scholar, reviewer or publication'), p)
   // v12 still named a critic a general reader would recognise.
   assert.ok(!p.includes('only when a general reader would recognise it'), p)
@@ -275,7 +282,7 @@ test('nobody is named', () => {
 })
 
 test("the craft answers speak in the analysis's own voice; readings and verdicts go to reception", () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes("The context, work and making answers speak in your own voice"), p)
   assert.ok(p.includes('it belongs in the reception answer, marked as a critic'), p)
   assert.ok(p.includes('is a reading, and readings belong to the reception question too'), p)
@@ -285,13 +292,13 @@ test("the craft answers speak in the analysis's own voice; readings and verdicts
 })
 
 test('weak pages give reception one sentence at most', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('take no reading of the work from them and no claim about where it sits'), p)
   assert.ok(p.includes("Ordinary viewers' reactions get one sentence at most"), p)
 })
 
 test('the work, making and reception answers carry the other measured corrections', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('no "sharp", "powerful", "masterful" or "career-best"'), p)
   assert.ok(p.includes('say how a comedy is funny or how a thriller builds suspense'), p)
   assert.ok(p.includes('A list of who held which job is not an answer either'), p)
@@ -300,14 +307,14 @@ test('the work, making and reception answers carry the other measured correction
 })
 
 test('a paragraph develops one point instead of listing facts', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('Each paragraph makes one point and develops it'), p)
   assert.ok(p.includes('is notes, not prose'), p)
   assert.ok(!p.includes('if a sentence carries two ideas, make it two sentences'), p)
 })
 
 test("a critic's guess at intent is not the maker speaking", () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes("a critic's guess at what the maker wanted is not a statement by the maker"), p)
 })
 
@@ -316,7 +323,7 @@ test("a critic's guess at intent is not the maker speaking", () => {
  * Withnail & I and The Wretches Are Still Singing under 13.
  */
 test('documents are weighed by who is speaking, and a wrong fact discounts a page', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('Weigh what each document says by who is saying it'), p)
   assert.ok(p.includes('a critic quoted on any other page still counts as one'), p)
   assert.ok(p.includes("an aggregator's summary of what critics think"), p)
@@ -327,13 +334,13 @@ test('documents are weighed by who is speaking, and a wrong fact discounts a pag
 })
 
 test('a statement needs the maker', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('That needs the maker as the speaker'), p)
   assert.ok(p.includes('without quoting them is giving its own description'), p)
 })
 
 test('critics are counted as the documents count them, and every holder is a person', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('Count critics the way the documents do'), p)
   assert.ok(p.includes('whether they are in separate documents or one document reports them'), p)
   assert.ok(p.includes('two remarks by the same critic are one critic'), p)
@@ -346,7 +353,7 @@ test('critics are counted as the documents count them, and every holder is a per
 })
 
 test('reception takes one reading and one comparison, and drops a re-release review quietly', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('Give at most one reading of what the film means, in a sentence of its own'), p)
   assert.ok(p.includes("A critic's comparison with one earlier work may take a sentence of its own"), p)
   assert.ok(p.includes('without saying that you did'), p)
@@ -356,7 +363,7 @@ test('reception takes one reading and one comparison, and drops a re-release rev
 })
 
 test('money is not a making answer, and a changed ending is ending discussion', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('That it would not exist at all does not count'), p)
   assert.ok(p.includes('who paid for it, rights deals and fees'), p)
   assert.ok(p.includes('a published screenplay included'), p)
@@ -368,7 +375,7 @@ test('money is not a making answer, and a changed ending is ending discussion', 
  * the same documents: every answer carried an effect no document described.
  */
 test('the work answer names the choice first and adds an effect only from a document', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(p.includes('Name the choices that matter to what it is doing. For each one, look for what a document says it does to the viewer'), p)
   assert.ok(p.includes('if none does, name the choice and stop - never supply an effect yourself'), p)
   assert.ok(p.includes('"so that", "which gives", "lets it" or "the result is"'), p)
@@ -377,7 +384,7 @@ test('the work answer names the choice first and adds an effect only from a docu
 })
 
 test('the opening may describe the kind of work; only a listing site\'s tags stay out', () => {
-  const p = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const p = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(!p.includes('a string of genre labels'), p)
   assert.ok(p.includes('a listing, store or streaming page attaches'), p)
 })
@@ -411,7 +418,7 @@ test('a stored prompt gives back the documents it was built from, byte for byte'
 })
 
 test('a prompt with no documents recovers nothing rather than an empty list', () => {
-  const prompt = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const prompt = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.equal(extractPromptSources(prompt, [{ title: 'x', domain: 'y' }]), null)
   assert.equal(extractPromptSources('not a prompt', []), null)
 })
@@ -422,7 +429,7 @@ test('the prompt names the original title, and only when there is one', () => {
   })
   assert.ok(withOriginal.includes('Original title: Affeksjonsverdi'), withOriginal.slice(0, 200))
 
-  const without = buildAnalysisPrompt(subject(), { mode: 'grounding' })
+  const without = buildAnalysisPrompt(subject(), { mode: 'grounding', version: 15 })
   assert.ok(!without.includes('Original title:'), without.slice(0, 200))
 })
 
@@ -517,11 +524,20 @@ test('bench versions: current by default, deduplicated oldest first, unknown ref
 const versionPrompt = (version: number) =>
   buildAnalysisPrompt(subject(), { mode: 'crw', sources: benchSources, version })
 
-test('versions 9 to 14 stay benchable, each as it was sent', () => {
-  assert.ok([9, 10, 11, 12, 13, 14].every((version) => BENCH_PROMPT_VERSIONS.includes(version)))
-  const [v9, v10, v11, v12, v13, v14, now] = [9, 10, 11, 12, 13, 14, ANALYSIS_PROMPT_VERSION].map(
-    versionPrompt
+test('versions 9 to 15 stay benchable, each as it was sent', () => {
+  assert.ok(
+    [9, 10, 11, 12, 13, 14, 15].every((version) => BENCH_PROMPT_VERSIONS.includes(version))
   )
+  const [v9, v10, v11, v12, v13, v14, v15, now] = [
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    ANALYSIS_PROMPT_VERSION,
+  ].map(versionPrompt)
   assert.ok(v9.includes('not in every sentence'), 'v9 carried the naming licence')
   assert.ok(v10.includes('what earlier works, genres or movements'), 'v10 draft wording')
   assert.ok(!v10.includes('grouped by the point made'), 'v11 reception is not in v10')
@@ -533,11 +549,19 @@ test('versions 9 to 14 stay benchable, each as it was sent', () => {
   assert.ok(v13.includes('only when more than one document holds the view'), 'v13 plural rule')
   assert.ok(v14.includes('but only an effect a document describes'), 'v14 effect clause')
   assert.ok(v14.includes('a string of genre labels'), 'v14 opener wording')
+  assert.ok(
+    v15.includes('A clause such as "so that", "which gives", "lets it" or "the result is"'),
+    'v15 named the clause shapes that smuggle an effect in'
+  )
+  assert.ok(!v15.includes('There is no minimum'), 'v16 length rule is not in v15')
   // v13 added a rule, which 14 and 15 kept; the archive must still hold v12's eight.
   assert.equal(v12.split('\n- ').length + 1, v13.split('\n- ').length)
   assert.equal(v13.split('\n- ').length, v14.split('\n- ').length)
-  assert.equal(v14.split('\n- ').length, now.split('\n- ').length)
-  assert.equal(new Set([v9, v10, v11, v12, v13, v14, now]).size, 7)
+  assert.equal(v14.split('\n- ').length, v15.split('\n- ').length)
+  // 16 merged four banned-fact lists into one governing rule and split the
+  // old omnibus ones, so it is the first version since 13 to change the count.
+  assert.ok(now.split('\n- ').length > v15.split('\n- ').length)
+  assert.equal(new Set([v9, v10, v11, v12, v13, v14, v15, now]).size, 8)
   // Same questions in the same order, so their maps share a vocabulary.
   assert.deepEqual(questionOrder(v9), questionOrder(now))
   assert.deepEqual(questionIdsFor('series', 10), questionIdsFor('series'))
@@ -564,56 +588,67 @@ test('the draft, when there is one, sits above the current version and nowhere e
 })
 
 /**
- * Draft 16 re-aims the analysis at somebody who has NOT SEEN THE FILM.
+ * VERSION 16, the current edition: the analysis re-aimed at somebody who has
+ * NOT SEEN THE FILM.
  *
  * Eight versions refined HOW each question was answered and never asked whether
  * the questions were the right ones: three of four were film history, and the
  * budget gave them five of nine paragraphs. What is pinned here is the shape of
  * the answer to that - the test the version turns on, the split effect rule,
- * and the fact that the ids did NOT move, because the panel owns their labels
- * in fifteen locales and grounding.ts selects by them.
- *
- * The replacement helper throws when a base text moves, so merely building the
- * draft - which importing this module does - is half the test.
+ * the single list of facts that never earn their place, and the fact that the
+ * question ids did NOT move, because the panel owns their labels in fifteen
+ * locales and grounding.ts selects by them.
  */
-test('the draft re-aims every question at a viewer who has not seen the film', () => {
-  if (DRAFT_PROMPT_VERSION == null) return
-  const draft = editionFor(DRAFT_PROMPT_VERSION)
-  const compact = variantFor('compact')
-  const rulesText = draft.rules.join('\n')
-  const question = (id: string) => draft.movieQuestions.find((q) => q.id === id)!.text
+test('version 16 aims every question at a viewer who has not seen the film', () => {
+  const current = editionFor(ANALYSIS_PROMPT_VERSION)
+  const previous = editionFor(ANALYSIS_PROMPT_VERSION - 1)
+  const rulesText = current.rules.join('\n')
+  const question = (id: string) => current.movieQuestions.find((q) => q.id === id)!.text
+
+  assert.equal(ANALYSIS_PROMPT_VERSION, 16)
 
   // The ids are untouched, or parseParagraphMap discards every label and the
   // panel loses its headings in fifteen locales.
   assert.deepEqual(
-    draft.movieQuestions.map((q) => q.id),
-    compact.movieQuestions.map((q) => q.id)
+    current.movieQuestions.map((q) => q.id),
+    previous.movieQuestions.map((q) => q.id)
   )
   assert.deepEqual(
-    draft.seriesQuestions.map((q) => q.id),
-    compact.seriesQuestions.map((q) => q.id)
+    current.seriesQuestions.map((q) => q.id),
+    previous.seriesQuestions.map((q) => q.id)
   )
 
-  // Every question is re-aimed, and the series ones with them - the one
-  // question compact carries that this does not touch is the structure one.
+  // Every question is re-aimed, and the series ones with them.
   for (const id of ['tradition', 'work', 'circumstances', 'reception']) {
-    const base = compact.movieQuestions.find((q) => q.id === id)!.text
-    assert.notEqual(question(id), base, id + ' is re-aimed')
+    const was = previous.movieQuestions.find((q) => q.id === id)!.text
+    assert.notEqual(question(id), was, id + ' is re-aimed')
   }
-  const structure = (qs: readonly { id: string; text: string }[]) =>
-    qs.find((q) => q.id === 'structure')?.text
-  assert.equal(structure(draft.seriesQuestions), structure(compact.seriesQuestions))
 
   // THE TEST THE VERSION TURNS ON, stated once and governing every answer, so
   // it goes first.
-  assert.ok(draft.rules[0].includes('has to earn its place by changing how they watch'))
-  assert.ok(draft.rules[0].includes('NOT seen this'))
-  assert.equal(draft.rules.length, compact.rules.length + 1)
+  assert.ok(current.rules[0].includes('has to earn its place by changing how they watch'))
+  assert.ok(current.rules[0].includes('NOT seen this'))
+
+  // ONE LIST OF FACTS THAT NEVER EARN THEIR PLACE, in that same rule. There
+  // were four, spread over a thousand words, and they did not agree: one held
+  // "a date", another "release dates", a third "an award", a fourth "a cast
+  // list". That disagreement was most of what made the instruction long, and a
+  // model reading four partial lists cannot apply any of them.
+  assert.ok(current.rules[0].includes('THESE NEVER EARN IT, in any answer'))
+  for (const banned of ['film-stock', 'box office', 'crew count', 'filming location']) {
+    assert.ok(current.rules[0].includes(banned), banned + ' is in the one list')
+  }
+  // …and the questions no longer carry their own copies.
+  assert.ok(!question('work').includes('camera bodies'))
+  assert.ok(!question('circumstances').includes('crew counts'))
+  assert.ok(!question('reception').includes('an award are never'))
 
   // Context is made to WORK, never cut: a fact of provenance is allowed
   // wherever the sentence carrying it says what it prepares a viewer for.
   assert.ok(question('tradition').includes('EARN ITS PLACE IN THE SENTENCE THAT NAMES IT'))
   assert.ok(question('tradition').includes('a name with nothing attached is a credit'))
+  // F-116's mechanical spoiler test, which this question has carried since 7.
+  assert.ok(question('tradition').includes('tells a viewer nothing about how this one ends'))
 
   // The effect rule, split: on the screen it may be the writer's own reading,
   // about the world it needs a document.
@@ -630,27 +665,16 @@ test('the draft re-aims every question at a viewer who has not seen the film', (
   assert.ok(question('reception').includes('teaches a way of watching'))
   assert.ok(question('reception').includes('A remake, a sequel and a cast list are never that'))
 
-  // Carried over and still pinned: the ban is gone, the accuracy rule replaced
-  // it, and a site is not its writer.
+  // The naming ban is gone; the accuracy rule replaced it, and a site is not
+  // its writer. The permission is stated rather than implied, because the
+  // accuracy rule presupposes it and leaving it out reverts the change.
   assert.ok(rulesText.includes('You may name a critic or the publication that ran them'))
   assert.ok(rulesText.includes('A SITE IS NOT ITS WRITER'))
   assert.ok(!rulesText.includes('Never name a critic'))
-  assert.ok(compact.rules.join('\n').includes('Never name a critic'), 'the variant keeps its ban')
-
-  // ONE LIST OF FACTS THAT NEVER EARN THEIR PLACE, in the rule that governs
-  // every answer. There were four, spread over a thousand words, and they did
-  // not agree: one held "a date", another "release dates", a third "an award",
-  // a fourth "a cast list". That disagreement was most of what made the
-  // instruction long, and a model reading four partial lists cannot apply any
-  // of them.
-  assert.ok(draft.rules[0].includes('THESE NEVER EARN IT, in any answer'))
-  for (const banned of ['film-stock', 'box office', 'crew count', 'filming location']) {
-    assert.ok(draft.rules[0].includes(banned), banned + ' is in the one list')
-  }
-  // …and the questions no longer carry their own copies.
-  assert.ok(!question('work').includes('camera bodies'))
-  assert.ok(!question('circumstances').includes('crew counts'))
-  assert.ok(!question('reception').includes('an award are never'))
+  assert.ok(
+    previous.rules.join('\n').includes('Never name a critic'),
+    'version 15 is archived with its ban intact'
+  )
 
   // Every named phrasing a bench earned survives the shortening, because the
   // phrasing IS the mechanism - version 8's lesson. What went is the sentence
@@ -676,126 +700,65 @@ test('the draft re-aims every question at a viewer who has not seen the film', (
 })
 
 /**
- * A VARIANT IS NOT A DRAFT and never becomes current: it is a second prompt for
- * a second class of model. Measured on Fear and Loathing in Las Vegas under
- * version 15, ornith-1.5-9b gave what the film is doing ONE paragraph and its
- * reception TWO - the one proportion the prompt states as a hard cap - and
- * dropped the performances, the sound and the cutting entirely.
+ * THE VARIANT MECHANISM SURVIVES ITS ONLY VARIANT, and an empty registry is a
+ * supported state rather than a gap.
+ *
+ * `compact` was written against ornith-1.5-9b on version 15 and removed when 16
+ * was promoted, for two reasons: version 16 was BUILT from it, so what it was
+ * written to fix is now in the prompt every model gets; and it did not work for
+ * the model it was for, which failed the OUTPUT CONTRACT on all four of its
+ * benched answers, a fault no shorter prose rule can reach.
+ *
+ * What is pinned here is that nothing STORED breaks. Rows in
+ * `title_analysis.prompt_variant` keep their label, an instance still
+ * configured for `compact` falls back to the version's own prompt instead of
+ * failing every title, and a bench run labelled "v15 compact" still renders.
  */
-test('a variant varies its base version and does not displace it', () => {
-  const compact = variantFor('compact')
-  assert.equal(compact.base, ANALYSIS_PROMPT_VERSION)
-  assert.ok(BENCH_PROMPT_VERSIONS.includes(compact.base))
-  // Same question ids as the base, or every label its answers carry is
-  // discarded by parseParagraphMap and every label-derived signal reads zero.
-  assert.deepEqual(
-    compact.movieQuestions.map((q) => q.id),
-    questionIdsFor('movie')
-  )
-  assert.deepEqual(
-    compact.seriesQuestions.map((q) => q.id),
-    questionIdsFor('series')
-  )
-  assert.throws(() => variantFor('ornith'), /not available/)
-})
+test('a build may carry no variants, and stored rows still read', () => {
+  assert.deepEqual([...BENCH_PROMPT_VARIANTS], [])
 
-test('a variant shares the documents, header and output contract with its base', () => {
-  for (const mediaType of ['movie', 'series'] as const) {
-    const base = buildAnalysisPrompt(subject({ originalTitle: 'Affeksjonsverdi', mediaType }), {
-      mode: 'crw',
-      sources: benchSources,
-    })
-    const compact = buildAnalysisPrompt(subject({ originalTitle: 'Affeksjonsverdi', mediaType }), {
-      mode: 'crw',
-      sources: benchSources,
-      variant: 'compact',
-    })
-    assert.equal(aboveTask(compact), aboveTask(base), mediaType + ' above TASK')
-    assert.equal(contract(compact), contract(base), mediaType + ' contract')
-    assert.notEqual(compact, base)
-  }
-})
-
-test('the compact variant is shorter than its base, and carries what it was written for', () => {
-  const base = buildAnalysisPrompt(subject(), { mode: 'crw', sources: benchSources })
-  const compact = buildAnalysisPrompt(subject(), {
-    mode: 'crw',
-    sources: benchSources,
-    variant: 'compact',
-  })
-  const instructions = (p: string) =>
-    p.slice(p.lastIndexOf('\nTASK\n'), p.indexOf('Output format.')).length
-  // Being materially shorter IS the theory: a 9B model reads the first clause
-  // of a long conditional and loses the rest.
-  assert.ok(
-    instructions(compact) < instructions(base) * 0.8,
-    instructions(compact) + ' vs ' + instructions(base)
-  )
-  // Each of these answers something measured on that bench.
-  assert.ok(compact.includes('Write five to nine paragraphs'), 'a budget it can follow')
-  // The work-paragraph FLOOR caused padding on the Requiem bench - a fifth
-  // paragraph restating the second, and one run that dropped the reception
-  // answer to make room. A ceiling does what the floor was meant to.
-  assert.ok(compact.includes('up to four on what it is doing'), 'a ceiling, not a floor')
-  assert.ok(!compact.includes('three or four on what it is doing'))
-  assert.ok(compact.includes('has come to be regarded as'), 'the hedge it reached for')
-  assert.ok(compact.includes("encyclopedia's own summary of what critics think"), 'weak effects')
-  assert.ok(compact.includes('Count the paragraphs you have written'), 'the map count')
-  assert.ok(
-    compact.includes('Where a maker describes what the film does to a viewer, use it here'),
-    'the effect the base routes into the making answer'
-  )
-  // The base is untouched by any of it.
-  assert.ok(!base.includes('Write five to nine paragraphs'))
-})
-
-test('bench choices put variants after the versions they vary', () => {
-  assert.deepEqual(resolveBenchPromptChoices(), [
-    { version: ANALYSIS_PROMPT_VERSION, variant: null },
-  ])
-  assert.deepEqual(resolveBenchPromptChoices([13, 7]), [
-    { version: 7, variant: null },
-    { version: 13, variant: null },
-  ])
-  assert.deepEqual(resolveBenchPromptChoices([ANALYSIS_PROMPT_VERSION], ['compact']), [
-    { version: ANALYSIS_PROMPT_VERSION, variant: null },
-    { version: ANALYSIS_PROMPT_VERSION, variant: 'compact' },
-  ])
-  // Variants alone run alone rather than dragging the current version in.
-  assert.deepEqual(resolveBenchPromptChoices([], ['compact', 'compact']), [
-    { version: ANALYSIS_PROMPT_VERSION, variant: 'compact' },
-  ])
-  assert.throws(() => resolveBenchPromptChoices([], ['nope']), /not available/)
-  assert.equal(promptChoiceKey({ version: 15, variant: null }), '15')
-  assert.equal(promptChoiceKey({ version: 15, variant: 'compact' }), '15:compact')
-  assert.equal(promptChoiceLabel({ version: 15, variant: null }), 'v15')
-  assert.equal(promptChoiceLabel({ version: 15, variant: 'compact' }), 'v15 compact')
-})
-
-/**
- * The library writer may send a variant, and the row records which one. The
- * base check is the load-bearing half: the writer stores
- * ANALYSIS_PROMPT_VERSION beside the prose, so a variant written for an older
- * version would file that version's questions under this one's number.
- */
-test('a variant may write the library only while its base is the current version', () => {
-  assert.equal(libraryVariantFor('compact')?.id, 'compact')
+  // The settings path: a dropped id is a SILENT refusal, never a throw. This
+  // answers a stored setting on the path that writes the library.
+  assert.equal(libraryVariantFor('compact'), null)
   assert.equal(libraryVariantFor(null), null)
   assert.equal(libraryVariantFor(undefined), null)
   assert.equal(libraryVariantFor(''), null)
-  // Never throws: this answers a stored setting on the path that writes the
-  // library, and refusing would fail every title in the run.
   assert.equal(libraryVariantFor('nope'), null)
-  // The version moved past the one it varies.
-  assert.equal(libraryVariantFor('compact', ANALYSIS_PROMPT_VERSION + 1), null)
+
+  // The bench path: selecting one that does not exist is a refusal, because an
+  // answer labelled with a prompt it was not written under is worse than a
+  // refused run. Nothing offers it, so nothing can select it.
+  assert.throws(() => variantFor('compact'), /not available/)
+
+  // A stored run's label is formatted from the string, never looked up, so an
+  // archived bench row survives the variant being dropped.
+  assert.equal(promptChoiceLabel({ version: 15, variant: 'compact' }), 'v15 compact')
+  assert.equal(promptChoiceKey({ version: 15, variant: 'compact' }), '15:compact')
+
+  // And the bench still works with versions alone.
+  assert.deepEqual(resolveBenchPromptChoices([15, 16], []), [
+    { version: 15, variant: null },
+    { version: 16, variant: null },
+  ])
 })
 
+/**
+ * Kept for the next variant: the shape every one must hold. Vacuous today, and
+ * that is the point - it fails the moment one is added that cannot be offered.
+ */
 test('every variant is offerable: an id, a label, a note and a base the bench carries', () => {
-  assert.ok(BENCH_PROMPT_VARIANTS.length > 0)
   for (const variant of BENCH_PROMPT_VARIANTS) {
     assert.match(variant.id, /^[a-z][a-z0-9-]*$/)
     assert.ok(variant.label.length > 0 && variant.note.length > 0, variant.id)
     assert.ok(BENCH_PROMPT_VERSIONS.includes(variant.base), variant.id + ' base')
+    assert.deepEqual(
+      variant.movieQuestions.map((q) => q.id),
+      questionIdsFor('movie', variant.base)
+    )
+    assert.deepEqual(
+      variant.seriesQuestions.map((q) => q.id),
+      questionIdsFor('series', variant.base)
+    )
   }
 })
 
