@@ -612,7 +612,7 @@ test('the draft re-aims every question at a viewer who has not seen the film', (
 
   // Context is made to WORK, never cut: a fact of provenance is allowed
   // wherever the sentence carrying it says what it prepares a viewer for.
-  assert.ok(question('tradition').includes('EARN ITS PLACE IN THE SAME SENTENCE'))
+  assert.ok(question('tradition').includes('EARN ITS PLACE IN THE SENTENCE THAT NAMES IT'))
   assert.ok(question('tradition').includes('a name with nothing attached is a credit'))
 
   // The effect rule, split: on the screen it may be the writer's own reading,
@@ -628,14 +628,46 @@ test('the draft re-aims every question at a viewer who has not seen the film', (
 
   // Influence has to teach a way of watching or it does not appear.
   assert.ok(question('reception').includes('teaches a way of watching'))
-  assert.ok(question('reception').includes('A remake, a sequel, a cast list and an award'))
+  assert.ok(question('reception').includes('A remake, a sequel and a cast list are never that'))
 
   // Carried over and still pinned: the ban is gone, the accuracy rule replaced
   // it, and a site is not its writer.
-  assert.ok(rulesText.includes('You may name a critic, a scholar or the publication that ran them'))
+  assert.ok(rulesText.includes('You may name a critic or the publication that ran them'))
   assert.ok(rulesText.includes('A SITE IS NOT ITS WRITER'))
   assert.ok(!rulesText.includes('Never name a critic'))
   assert.ok(compact.rules.join('\n').includes('Never name a critic'), 'the variant keeps its ban')
+
+  // ONE LIST OF FACTS THAT NEVER EARN THEIR PLACE, in the rule that governs
+  // every answer. There were four, spread over a thousand words, and they did
+  // not agree: one held "a date", another "release dates", a third "an award",
+  // a fourth "a cast list". That disagreement was most of what made the
+  // instruction long, and a model reading four partial lists cannot apply any
+  // of them.
+  assert.ok(draft.rules[0].includes('THESE NEVER EARN IT, in any answer'))
+  for (const banned of ['film-stock', 'box office', 'crew count', 'filming location']) {
+    assert.ok(draft.rules[0].includes(banned), banned + ' is in the one list')
+  }
+  // …and the questions no longer carry their own copies.
+  assert.ok(!question('work').includes('camera bodies'))
+  assert.ok(!question('circumstances').includes('crew counts'))
+  assert.ok(!question('reception').includes('an award are never'))
+
+  // Every named phrasing a bench earned survives the shortening, because the
+  // phrasing IS the mechanism - version 8's lesson. What went is the sentence
+  // after each one saying why it is there.
+  for (const kept of [
+    'not "The film sits in"',
+    'the creative team',
+    '"rather than"',
+    'No semicolons',
+    'is regarded as',
+    'is said to',
+    'the sources describe',
+    'one source credits',
+    'the documents do not name',
+  ]) {
+    assert.ok(rulesText.includes(kept), kept + ' is still named')
+  }
 
   // Length: every number a maximum, and the sentence cap names what it loses to.
   assert.ok(!rulesText.includes('450 to 750 words'))
