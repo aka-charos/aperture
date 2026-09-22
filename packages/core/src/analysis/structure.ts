@@ -43,6 +43,29 @@ import type { ResponseProblem } from './response.js'
  * three model calls and a thrown title.
  */
 export const MIN_PARAGRAPHS_FOR_STRUCTURE = 3
+/**
+ * Paragraphs past which the answer is a BROKEN GENERATION, not a long one.
+ *
+ * Measured on the Suspiria bench: ornith-1.5-9b answered draft 16 with 5,674
+ * words in 304 paragraphs - chunks of one source document reproduced
+ * verbatim, then a single sentence repeated about eighty times - and stopped
+ * of its own accord, so finishReason was "stop" and the truncation check
+ * could not see it. Every prompt version since 9 caps the piece at eight to
+ * ten paragraphs, and nothing compared what came back against that.
+ *
+ * A GROSS overrun, deliberately, at roughly three times the largest cap any
+ * version has set. Rejecting a 10% overrun would fail a title permanently
+ * over a model writing slightly long, which is the asymmetry this whole file
+ * is built on; 304 against 8 is not a judgement call.
+ *
+ * Checked FIRST, because a runaway also has no usable map and no closing
+ * contract line, and naming those instead sends an operator to fix the
+ * labelling of an answer that was never an answer.
+ */
+export const MAX_PARAGRAPHS = 30
+
+/** Spelled once, so the union in ./response.ts and the check below agree. */
+const MAX_PARAGRAPHS_PROBLEM = 'runaway' as const
 
 /**
  * How much of the answer must carry a label.
@@ -80,6 +103,10 @@ export function findStructureProblem(input: {
   /** `parseParagraphMap(...)` - null when the model wrote none or wrote one that was refused. */
   map: readonly MappedParagraph[] | null
 }): ResponseProblem | null {
+  if (input.paragraphs > MAX_PARAGRAPHS) {
+    return { kind: MAX_PARAGRAPHS_PROBLEM, paragraphs: input.paragraphs }
+  }
+
   if (input.paragraphs < MIN_PARAGRAPHS_FOR_STRUCTURE) return null
 
   if (!input.map || input.map.length === 0) return { kind: 'no_sections' }

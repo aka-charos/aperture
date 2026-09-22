@@ -338,3 +338,45 @@ test('a sentence that happens to end in a link is not a link tail', () => {
   ].join('\n')
   assert.equal(stripNavigationRuns(page), page)
 })
+
+/**
+ * A menu whose every entry is links PLUS a caption, which is bfi.org.uk's.
+ *
+ * The shipped strip removed 0% of this page, because a line that is neither
+ * link-only nor filler broke the run at every item and the counter reached four
+ * where it needed five. It is the shape that lets a page consisting entirely of
+ * menu lose nothing at all.
+ */
+test('links plus a short caption are a menu entry, not a break in the run', () => {
+  const page = [
+    '[Skip to content](#content-start)',
+    '[![BFI home](/dist/client/e51.svg)](/)[![BFI home](/dist/client/e51.svg)](/)Menu',
+    '',
+    '*   [![BFI home](/dist/client/e51.svg)](/)',
+    '*   [Watch and discover](/)Open submenu',
+    '*   [Learning and training](/learning-training)Open submenu',
+    '*   [Funding and industry](/funding-industry)Open submenu',
+    '',
+    '[Become a Member](/become-a-bfi-member)[Shop](https://shop.bfi.org.uk/)',
+    '',
+    'The master of giallo looks back on his horror masterpiece at 40 in this celebratory video interview.',
+  ].join('\n')
+  const cleaned = stripNavigationRuns(page)
+  assert.equal(cleaned.includes('Open submenu'), false)
+  assert.equal(cleaned.includes('Skip to content'), false)
+  assert.equal(cleaned.includes('Become a Member'), false)
+  assert.ok(cleaned.includes('The master of giallo'))
+})
+
+/** A caption is a caption because it carries no sentence, however short it is. */
+test('a link with a sentence beside it is never a menu entry', () => {
+  const page = [
+    '[Read more](/x)',
+    '[Read more](/y)',
+    '[Read more](/z)',
+    '[Read more](/a)',
+    'Argento saturates the film in solid primary colours, as [one review](/b) sets out.',
+    'The camera hovers and glides through the rooms without taking anyone as its subject.',
+  ].join('\n')
+  assert.ok(stripNavigationRuns(page).includes('Argento saturates'))
+})
