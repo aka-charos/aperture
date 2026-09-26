@@ -7,8 +7,7 @@ export interface UserRow {
   provider_user_id: string
   is_admin: boolean
   is_enabled: boolean
-  movies_enabled: boolean
-  series_enabled: boolean
+  recommendations_enabled: boolean
   discover_enabled: boolean
   discover_request_enabled: boolean
   collections_enabled: boolean
@@ -29,8 +28,7 @@ export interface UserListResponse {
 export interface UserUpdateBody {
   displayName?: string
   isEnabled?: boolean
-  moviesEnabled?: boolean
-  seriesEnabled?: boolean
+  recommendationsEnabled?: boolean
   discoverEnabled?: boolean
   discoverRequestEnabled?: boolean
   collectionsEnabled?: boolean

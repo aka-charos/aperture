@@ -46,6 +46,7 @@ import {
 } from 'recharts'
 import { getProxiedImageUrl } from '@aperture/ui'
 import { useAuth } from '@/hooks/useAuth'
+import { useCapability } from '@/hooks/useCapability'
 import { useTranslation } from 'react-i18next'
 import { PageHeading } from '@/components/PageHeading'
 import { WatcherIdentityCard } from '@/components/WatcherIdentityCard'
@@ -122,6 +123,8 @@ export function WatchStatsPage() {
 }
 
 function WatchStatsContent() {
+  const hasMovies = useCapability('movies')
+  const hasSeries = useCapability('series')
   const theme = useTheme()
   const { t, i18n } = useTranslation()
   const { user } = useAuth()
@@ -627,15 +630,22 @@ function WatchStatsContent() {
           </Grid>
 
 
-          {/* The sentence version of everything below it. */}
-          <Grid container spacing={2.5} mb={2.5}>
-            <Grid item xs={12} md={6}>
-              <WatcherIdentityCard mediaType="movie" />
+          {/* The sentence version of everything below it — one per kind of
+              title this viewer can see; the server decides which (F-136). */}
+          {(hasMovies || hasSeries) && (
+            <Grid container spacing={2.5} mb={2.5}>
+              {hasMovies && (
+                <Grid item xs={12} md={hasSeries ? 6 : 12}>
+                  <WatcherIdentityCard mediaType="movie" />
+                </Grid>
+              )}
+              {hasSeries && (
+                <Grid item xs={12} md={hasMovies ? 6 : 12}>
+                  <WatcherIdentityCard mediaType="series" />
+                </Grid>
+              )}
             </Grid>
-            <Grid item xs={12} md={6}>
-              <WatcherIdentityCard mediaType="series" />
-            </Grid>
-          </Grid>
+          )}
           {/* Activity and the weekly rhythm are the same question at two
               resolutions — when across the year, when across the week — so they
               share a row. Neither needed the whole width; the heatmap sizes its

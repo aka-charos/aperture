@@ -13,15 +13,16 @@
  * `isEnabled`, and a feature switch never moves it (F-135).
  *
  * **Derivation survives where a writer offers no access control of its own**:
- * the setup wizard's per-user Movies/Series checkboxes and the admin import.
+ * the setup wizard's per-user Recommendations switch and the admin import.
  * There the checkboxes are the only way to say "this person uses the app", so
  * initial access follows initial features. That is what the two functions
  * below are for, and nothing else should call them.
  *
- * Four switches count. Discover counts because a Discover-only viewer is a
- * supported population (F-104); Collections because it is a permission only a
- * signed-in person can use. Request depends on Discover, and Email only permits
- * notifications, so neither enables an account by itself.
+ * Three switches count: Recommendations (which replaced Movies and Series,
+ * F-136), Discover because a Discover-only viewer is a supported population
+ * (F-104), and Collections because it is a permission only a signed-in person
+ * can use. Request depends on Discover, and Email only permits notifications,
+ * so neither enables an account by itself.
  *
  * An admin who is ALREADY enabled stays enabled with every switch off, so the
  * setup wizard cannot lock the admin running it out. It never enables an admin
@@ -29,8 +30,7 @@
  */
 
 export const ACCOUNT_SWITCH_COLUMNS = [
-  'movies_enabled',
-  'series_enabled',
+  'recommendations_enabled',
   'discover_enabled',
   'collections_enabled',
 ] as const
@@ -38,8 +38,7 @@ export const ACCOUNT_SWITCH_COLUMNS = [
 export type AccountSwitchColumn = (typeof ACCOUNT_SWITCH_COLUMNS)[number]
 
 export interface AccountEnabledInput {
-  moviesEnabled: boolean
-  seriesEnabled: boolean
+  recommendationsEnabled: boolean
   discoverEnabled: boolean
   collectionsEnabled: boolean
   isAdmin: boolean
@@ -50,8 +49,7 @@ export interface AccountEnabledInput {
 /** The rule for a row being written whole, as an INSERT does. */
 export function isAccountEnabled(account: AccountEnabledInput): boolean {
   return (
-    account.moviesEnabled ||
-    account.seriesEnabled ||
+    account.recommendationsEnabled ||
     account.discoverEnabled ||
     account.collectionsEnabled ||
     (account.isAdmin && account.wasEnabled)

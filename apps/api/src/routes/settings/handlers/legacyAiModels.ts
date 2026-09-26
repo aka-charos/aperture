@@ -27,6 +27,7 @@ import {
   type EmbeddingModel,
   type TextGenerationModel,
   type ChatAssistantModel,
+  loadRecommendationRecipients,
 } from '@aperture/core'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAdmin } from '../../../plugins/auth.js'
@@ -123,17 +124,13 @@ export function registerLegacyAiModelsHandlers(fastify: FastifyInstance) {
     try {
       const currentModel = await getTextGenerationModel()
 
-      const enabledUsersResult = await query<{
-        movies_enabled_count: string
-        series_enabled_count: string
-      }>(`
-        SELECT 
-          COUNT(*) FILTER (WHERE movies_enabled = true) as movies_enabled_count,
-          COUNT(*) FILTER (WHERE series_enabled = true) as series_enabled_count
-        FROM users
-      `)
-      const moviesEnabledUsers = parseInt(enabledUsersResult.rows[0]?.movies_enabled_count || '0', 10)
-      const seriesEnabledUsers = parseInt(enabledUsersResult.rows[0]?.series_enabled_count || '0', 10)
+      // Who each pipeline actually runs for (recipients.ts).
+      const [movieRecipients, seriesRecipients] = await Promise.all([
+        loadRecommendationRecipients('movies'),
+        loadRecommendationRecipients('series'),
+      ])
+      const moviesEnabledUsers = movieRecipients.length
+      const seriesEnabledUsers = seriesRecipients.length
 
       const movieCountResult = await query<{ count: string }>(`
         SELECT COUNT(*) as count FROM movies m

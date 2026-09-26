@@ -45,8 +45,7 @@ import HistoryIcon from '@mui/icons-material/History'
 import RecommendIcon from '@mui/icons-material/Recommend'
 import FolderIcon from '@mui/icons-material/Folder'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
-import MovieIcon from '@mui/icons-material/Movie'
-import TvIcon from '@mui/icons-material/Tv'
+import AutoAwesomeMotionIcon from '@mui/icons-material/AutoAwesomeMotion'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
 import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark'
@@ -68,8 +67,12 @@ interface ProviderUser {
   apertureUserId: string | null
   isImported: boolean
   isEnabled: boolean
-  moviesEnabled: boolean
-  seriesEnabled: boolean
+  recommendationsEnabled: boolean
+  /**
+   * Which kinds of recommendation this account would get, decided by the server
+   * from the libraries the media server lets it see. Null when not imported.
+   */
+  libraryKinds: { movies: boolean; series: boolean; unread: boolean } | null
   discoverEnabled: boolean
   discoverRequestEnabled: boolean
   collectionsEnabled: boolean
@@ -265,8 +268,11 @@ export function UsersPage() {
       body: 'isEnabled',
       messages: { on: 'accessOn', off: 'accessOff' },
     },
-    movies: { field: 'moviesEnabled', body: 'moviesEnabled' },
-    series: { field: 'seriesEnabled', body: 'seriesEnabled' },
+    recommendations: {
+      field: 'recommendationsEnabled',
+      body: 'recommendationsEnabled',
+      messages: { on: 'recommendationsOn', off: 'recommendationsOff' },
+    },
     discover: {
       field: 'discoverEnabled',
       body: 'discoverEnabled',
@@ -306,8 +312,7 @@ export function UsersPage() {
   /** The saved row, in the shape the API returns it. */
   interface SavedUserRow {
     is_enabled?: boolean
-    movies_enabled?: boolean
-    series_enabled?: boolean
+    recommendations_enabled?: boolean
     discover_enabled?: boolean
     discover_request_enabled?: boolean
     collections_enabled?: boolean
@@ -327,8 +332,7 @@ export function UsersPage() {
   const applySavedRow = (user: ProviderUser, saved: SavedUserRow): ProviderUser => ({
     ...user,
     isEnabled: saved.is_enabled ?? user.isEnabled,
-    moviesEnabled: saved.movies_enabled ?? user.moviesEnabled,
-    seriesEnabled: saved.series_enabled ?? user.seriesEnabled,
+    recommendationsEnabled: saved.recommendations_enabled ?? user.recommendationsEnabled,
     discoverEnabled: saved.discover_enabled ?? user.discoverEnabled,
     discoverRequestEnabled: saved.discover_request_enabled ?? user.discoverRequestEnabled,
     collectionsEnabled: saved.collections_enabled ?? user.collectionsEnabled,
@@ -660,6 +664,47 @@ export function UsersPage() {
    */
   const dormantSx = (user: ProviderUser) => (user.isEnabled ? undefined : { opacity: 0.45 })
 
+  /**
+   * Which kinds of recommendation the account gets — movies, series, both or
+   * neither — follows from the libraries the media server lets it see, so the
+   * one switch says what it actually buys.
+   */
+  const libraryKindsLabel = (user: ProviderUser): string | null => {
+    const kinds = user.libraryKinds
+    if (!kinds) return null
+    if (kinds.movies && kinds.series) return t('admin.usersPage.recsKindsBoth')
+    if (kinds.movies) return t('admin.usersPage.recsKindsMovies')
+    if (kinds.series) return t('admin.usersPage.recsKindsSeries')
+    return t('admin.usersPage.recsKindsNone')
+  }
+
+  const renderRecommendationsSwitch = (user: ProviderUser) => (
+    <Tooltip
+      title={
+        user.libraryKinds?.unread
+          ? t('admin.usersPage.recsKindsUnreadTooltip', { provider: providerLabel })
+          : t('admin.usersPage.recsKindsTooltip', { provider: providerLabel })
+      }
+    >
+      <Box sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
+        <Switch
+          checked={user.recommendationsEnabled}
+          onChange={() => togglePermission(user, 'recommendations')}
+          sx={dormantSx(user)}
+          disabled={updating === user.providerUserId || user.isDisabled}
+          color="primary"
+          size="small"
+          inputProps={{ 'aria-label': t('admin.usersPage.colRecommendations') }}
+        />
+        {user.recommendationsEnabled && libraryKindsLabel(user) && (
+          <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+            {libraryKindsLabel(user)}
+          </Typography>
+        )}
+      </Box>
+    </Tooltip>
+  )
+
   const sortControl = (
     <Stack direction="row" alignItems="center" spacing={0.5} flexWrap="wrap">
       <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
@@ -779,7 +824,7 @@ export function UsersPage() {
                         </Stack>
                       </Box>
                     </Stack>
-                    {user.isImported && (user.moviesEnabled || user.seriesEnabled) ? (
+                    {user.isImported && user.recommendationsEnabled ? (
                       <Tooltip title={t('admin.usersPage.recsEnabledTooltip')}>
                         <CheckCircleIcon color="success" />
                       </Tooltip>
@@ -851,32 +896,13 @@ export function UsersPage() {
                         {renderAccessSwitch(user)}
                       </Stack>
 
-                      {/* Media toggles in a compact row */}
-                      <Stack direction="row" alignItems="center" spacing={2} mb={1.5}>
-                        <Stack direction="row" alignItems="center" spacing={1}>
-                          <MovieIcon fontSize="small" color="action" />
-                          <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>{t('admin.usersPage.movies')}</Typography>
-                          <Switch
-                            checked={user.moviesEnabled}
-                            onChange={() => togglePermission(user, 'movies')}
-                            sx={dormantSx(user)}
-                            disabled={updating === user.providerUserId || user.isDisabled}
-                            color="primary"
-                            size="small"
-                          />
-                        </Stack>
-                        <Stack direction="row" alignItems="center" spacing={1}>
-                          <TvIcon fontSize="small" color="action" />
-                          <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>{t('admin.usersPage.series')}</Typography>
-                          <Switch
-                            checked={user.seriesEnabled}
-                            onChange={() => togglePermission(user, 'series')}
-                            sx={dormantSx(user)}
-                            disabled={updating === user.providerUserId || user.isDisabled}
-                            color="primary"
-                            size="small"
-                          />
-                        </Stack>
+                      {/* Recommendations: one switch; the kinds follow the libraries */}
+                      <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
+                        <AutoAwesomeMotionIcon fontSize="small" color="action" />
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>
+                          {t('admin.usersPage.colRecommendations')}
+                        </Typography>
+                        {renderRecommendationsSwitch(user)}
                       </Stack>
 
                       {/* Discovery toggles in a compact row */}
@@ -1130,16 +1156,12 @@ export function UsersPage() {
               </TableCell>
               <TableCell align="center">{t('admin.usersPage.colImported')}</TableCell>
               <TableCell align="center">
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                  <MovieIcon fontSize="small" />
-                  {t('admin.usersPage.colMovies')}
-                </Box>
-              </TableCell>
-              <TableCell align="center">
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                  <TvIcon fontSize="small" />
-                  {t('admin.usersPage.colSeries')}
-                </Box>
+                <Tooltip title={t('admin.usersPage.recommendationsColTooltip', { provider: providerLabel })}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                    <AutoAwesomeMotionIcon fontSize="small" />
+                    {t('admin.usersPage.colRecommendations')}
+                  </Box>
+                </Tooltip>
               </TableCell>
               <TableCell align="center">
                 <Tooltip title={t('admin.usersPage.discoverColTooltip')}>
@@ -1197,7 +1219,7 @@ export function UsersPage() {
           <TableBody>
             {sortedUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={globalAiConfig?.userOverrideAllowed ? 13 : 12} align="center">
+                <TableCell colSpan={globalAiConfig?.userOverrideAllowed ? 12 : 11} align="center">
                   <Typography variant="body2" color="text.secondary" py={4}>
                     {t('admin.usersPage.noUsers', { provider: providerLabel })}
                   </Typography>
@@ -1284,28 +1306,7 @@ export function UsersPage() {
                   </TableCell>
                   <TableCell align="center">
                     {user.isImported ? (
-                      <Switch
-                        checked={user.moviesEnabled}
-                        onChange={() => togglePermission(user, 'movies')}
-                        sx={dormantSx(user)}
-                        disabled={updating === user.providerUserId || user.isDisabled}
-                        color="primary"
-                        size="small"
-                      />
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">—</Typography>
-                    )}
-                  </TableCell>
-                  <TableCell align="center">
-                    {user.isImported ? (
-                      <Switch
-                        checked={user.seriesEnabled}
-                        onChange={() => togglePermission(user, 'series')}
-                        sx={dormantSx(user)}
-                        disabled={updating === user.providerUserId || user.isDisabled}
-                        color="primary"
-                        size="small"
-                      />
+                      renderRecommendationsSwitch(user)
                     ) : (
                       <Typography variant="body2" color="text.secondary">—</Typography>
                     )}

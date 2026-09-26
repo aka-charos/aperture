@@ -251,8 +251,6 @@
       "providerActive": "{{provider}}: Active",
       "recsEnabledTooltip": "Recommendations enabled",
       "enableAiRecs": "Enable for AI Recommendations",
-      "movies": "Movies",
-      "series": "Series",
       "discover": "Discover",
       "request": "Request",
       "collections": "Collections",
@@ -276,8 +274,6 @@
       "serverAccountColTooltip": "Whether the account is enabled on {{provider}} itself. It is set in {{provider}}'s dashboard, not here, and a disabled account gets nothing from {{appName}}.",
       "colAccess": "{{appName}} access",
       "colImported": "Imported",
-      "colMovies": "Movies",
-      "colSeries": "Series",
       "colDiscover": "Discover",
       "colRequest": "Request",
       "colCollections": "Collections",
@@ -331,7 +327,17 @@
       "assistantToggleOn": "Disable the assistant",
       "assistantToggleOff": "Enable the assistant",
       "assistantOn": "{{name}} can now use the assistant",
-      "assistantOff": "{{name}} can no longer use the assistant"
+      "assistantOff": "{{name}} can no longer use the assistant",
+      "colRecommendations": "Recommendations",
+      "recommendationsColTooltip": "Personal recommendations, generated libraries and home rows. Whether that means movies, series or both follows from the libraries {{provider}} lets the account see.",
+      "recommendationsOn": "{{name}} will now get recommendations",
+      "recommendationsOff": "{{name}} will no longer get recommendations",
+      "recsKindsBoth": "Movies & series",
+      "recsKindsMovies": "Movies only",
+      "recsKindsSeries": "Series only",
+      "recsKindsNone": "No library",
+      "recsKindsTooltip": "The kinds follow from the libraries {{provider}} lets this account see, among those enabled here.",
+      "recsKindsUnreadTooltip": "This account's library access hasn't been read from {{provider}} yet; it will be at the next user sync or sign-in. Until then every enabled library counts."
     },
     "userDetail": {
       "userNotFound": "User not found",
@@ -425,6 +431,7 @@
       "permissionField": {
         "is_admin": "Administrator",
         "is_enabled": "{{appName}} access",
+        "recommendations_enabled": "Recommendations",
         "provider_disabled": "Disabled on the media server",
         "movies_enabled": "Movie recommendations",
         "series_enabled": "Series recommendations",
@@ -4749,8 +4756,6 @@
     "users": {
       "noteLabel": "Note:",
       "colUser": "User",
-      "colMovies": "Movies",
-      "colSeries": "Series",
       "adminChip": "Admin",
       "disabledChip": "Disabled",
       "tooltipLastAdmin": "At least one admin must remain enabled",
@@ -4761,14 +4766,15 @@
       "setupCompleteFallback": "Setup is complete.",
       "manageUsersLink": "Manage users in Admin → Users",
       "back": "Back",
-      "bodyParagraph": "Choose which users should receive personalized AI recommendations. For each user, you can enable recommendations for Movies, TV Series, or both. {{appName}} analyzes each user's watch history individually to generate tailored suggestions that appear in their personal recommendation libraries.",
       "noUsersWarning": "No users found on your media server. Please ensure your media server has active user accounts, then click the refresh button to reload the list.",
       "adminSectionTitle": "Admin Users ({{count}})",
       "adminInfoCaption": "Admin users have been automatically enabled to ensure you can log in and manage {{appName}}. At least one admin must stay enabled to maintain access to the admin dashboard.",
       "otherUsersTitle": "Other Users ({{count}})",
       "otherUsersCaption": "Enable recommendations for family members or other users on your media server. Each enabled user will get their own personalized recommendations based on their viewing history.",
-      "noteWarning": "Users with both Movies and Series disabled will not receive any recommendations and won't be able to log in to {{appName}}. You can always change these settings later in Admin → Users.",
-      "paginationRange": "{{from}}-{{to}} of {{count}}"
+      "paginationRange": "{{from}}-{{to}} of {{count}}",
+      "colRecommendations": "Recommendations",
+      "bodyText": "Choose which users should receive personalized recommendations. Whether that means movies, series or both follows from the libraries each account can see on your media server. {{appName}} analyzes each user's watch history individually to generate tailored suggestions that appear in their personal recommendation libraries.",
+      "noteText": "Users with recommendations switched off won't receive any and won't be able to sign in to {{appName}}. You can change all of this later in Admin → Users."
     },
     "complete": {
       "title": "Setup Complete!",

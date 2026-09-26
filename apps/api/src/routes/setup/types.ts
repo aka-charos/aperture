@@ -75,8 +75,7 @@ export interface SetupUserImportBody {
 export interface SetupUserEnableBody {
   userId: string
   isEnabled: boolean
-  moviesEnabled?: boolean
-  seriesEnabled?: boolean
+  recommendationsEnabled?: boolean
 }
 
 export interface LibraryImageBody {

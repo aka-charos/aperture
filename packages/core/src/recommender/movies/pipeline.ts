@@ -1,6 +1,6 @@
 // Re-organized pipeline - imports from modular files
 import { createChildLogger } from '../../lib/logger.js'
-import { query, queryOne } from '../../lib/db.js'
+import { queryOne } from '../../lib/db.js'
 import {
   isCenteringReady,
   resolveEmbeddingSpace,
@@ -28,6 +28,8 @@ import { getRecommendationConfig } from '../../lib/recommendationConfig.js'
 import { refreshTasteSynopsis } from '../../lib/tasteSynopsisRefresh.js'
 import { getWatchHistory, buildTasteProfile as buildLegacyTasteProfile, storeTasteProfile as storeLegacyTasteProfile, getUserMovieRatings, getDislikedMovieIds } from './taste.js'
 import { getCandidates, getMultiClusterCandidates, getInterestMatchIndex } from './candidates.js'
+import { getLibraryScopeForUser } from '../../lib/libraryScope.js'
+import { loadRecommendationRecipients } from '../recipients.js'
 import { scoreCandidates } from './scoring.js'
 import { applyDiversityAndSelect } from './selection.js'
 import {
@@ -177,6 +179,19 @@ export async function generateRecommendationsForUser(
   const startTime = Date.now()
 
   logger.info({ userId: user.id, username: user.username }, '🎬 Starting recommendation generation')
+
+  // 0a. Only a kind this viewer can see. The job loops already select by this
+  // (recipients.ts), but the regenerate button and the admin's per-user actions
+  // come straight here. Returning before a run row exists, as the activity gate
+  // does, so the page keeps whatever it last showed.
+  const scope = user.scope ?? (await getLibraryScopeForUser(user.id))
+  if (!scope.hasMovies) {
+    logger.info(
+      { userId: user.id, username: user.username },
+      '⏭️ No movie library in scope for this user, skipping movie recommendations'
+    )
+    return { runId: null, recommendations: [], skipped: true }
+  }
 
   // 0. Sync watch history from media server to ensure we have latest data.
   // Ahead of both the activity gate and the run record: the gate reads
@@ -422,7 +437,7 @@ export async function generateRecommendationsForUser(
           excludeIds,
           cfg.maxCandidates,
           includeWatched,
-          user.maxParentalRating ?? null,
+          scope,
           retrievalSpace
         )
         logger.info(
@@ -439,7 +454,7 @@ export async function generateRecommendationsForUser(
           excludeIds,
           cfg.maxCandidates,
           includeWatched,
-          user.maxParentalRating ?? null,
+          scope,
           retrievalSpace
         )
       }
@@ -449,7 +464,7 @@ export async function generateRecommendationsForUser(
         excludeIds,
         cfg.maxCandidates,
         includeWatched,
-        user.maxParentalRating ?? null,
+        scope,
         retrievalSpace
       )
     }
@@ -532,7 +547,7 @@ export async function generateRecommendationsForUser(
           })),
           excludeIds,
           includeWatched,
-          user.maxParentalRating ?? null
+          scope
         )
       }
     } catch (err) {
@@ -1080,14 +1095,9 @@ export async function generateRecommendationsForAllUsers(
     setJobStep(actualJobId, 0, 'Finding enabled users')
     addLog(actualJobId, 'info', '🔍 Finding enabled users...')
 
-    const result = await query<{
-      id: string
-      username: string
-      provider_user_id: string
-      max_parental_rating: number | null
-    }>(
-      `SELECT id, username, provider_user_id, max_parental_rating FROM users WHERE is_enabled = true AND movies_enabled = true AND provider_disabled = false`
-    )
+    // Recommendations on, and at least one movie library the media server lets
+    // them see (recipients.ts).
+    const result = { rows: await loadRecommendationRecipients('movies') }
 
     const totalUsers = result.rows.length
 
@@ -1133,6 +1143,7 @@ export async function generateRecommendationsForAllUsers(
             username: user.username,
             providerUserId: user.provider_user_id,
             maxParentalRating: user.max_parental_rating,
+            scope: user.scope,
           },
           {},
           // The scheduled sweep is the one caller that should do nothing when
@@ -1232,18 +1243,9 @@ export async function clearAndRebuildAllRecommendations(existingJobId?: string):
 
     // Step 3: Regenerate for all users
     setJobStep(jobId, 2, 'Regenerating recommendations')
-    const result = await query<{
-      id: string
-      username: string
-      provider_user_id: string
-      max_parental_rating: number | null
-    }>(
-      // movies_enabled matters here exactly as much as it does in the scheduled
-      // job above: without it the reset generates movie recommendations for
-      // users who have movies switched off.
-      `SELECT id, username, provider_user_id, max_parental_rating FROM users WHERE is_enabled = true AND movies_enabled = true AND provider_disabled = false`
-    )
-    const users = result.rows
+    // The same population as the scheduled job: without it the reset generates
+    // movie recommendations for people who cannot see a movie library.
+    const users = await loadRecommendationRecipients('movies')
     addLog(jobId, 'info', `👥 Regenerating for ${users.length} enabled user(s)`)
 
     let success = 0
@@ -1277,6 +1279,7 @@ export async function clearAndRebuildAllRecommendations(existingJobId?: string):
             username: user.username,
             providerUserId: user.provider_user_id,
             maxParentalRating: user.max_parental_rating,
+            scope: user.scope,
           },
           {},
           { twinIndex, shouldCancel }
@@ -1340,10 +1343,10 @@ export async function regenerateUserRecommendations(userId: string): Promise<{
   })
 
   if (!result.runId) {
-    // Unreachable: runId is only null when the activity gate skips, and this
-    // path never opts into it. Asserted rather than widened so the caller's
-    // contract stays a plain string.
-    throw new Error('Recommendation run produced no run id')
+    // This path never opts into the activity gate, so a null run id means the
+    // account cannot see any movie library. Said plainly rather than widened, so
+    // the caller's contract stays a plain string.
+    throw new Error('This account has no movie library to recommend from')
   }
 
   return {

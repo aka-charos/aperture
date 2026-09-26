@@ -96,6 +96,15 @@ import { getWatchedYears, summarizeEraFit } from '../eraDiagnostics.js'
 import { getEffectiveAiExplanationSetting } from '../../lib/userSettings.js'
 import { WATCH_HISTORY_TASTE_SQL } from '../watchedExclusion.js'
 import { loadConfigForUser } from '../config.js'
+import {
+  binderFor,
+  getLibraryScopeForUser,
+  libraryScopeSql,
+  loadConfiguredLibraries,
+  resolveLibraryScope,
+  type LibraryScope,
+} from '../../lib/libraryScope.js'
+import { loadRecommendationRecipients } from '../recipients.js'
 import type { PipelineConfig } from '../types.js'
 
 const logger = createChildLogger('series-recommender')
@@ -106,6 +115,8 @@ export interface SeriesUser {
   username: string
   providerUserId: string
   maxParentalRating?: number | null
+  /** What this viewer may be shown; read by the pipeline when omitted. */
+  scope?: LibraryScope
 }
 
 export interface WatchedSeriesData {
@@ -297,6 +308,11 @@ interface SeriesCandidateQueryContext {
    * movie mirror of this carries the same field for the same reason.
    */
   embeddingColumn: string
+  /**
+   * What a caller that passed no viewer scope is limited to: the libraries the
+   * operator enabled, no parental ceiling.
+   */
+  defaultScope: LibraryScope
 }
 
 /**
@@ -313,7 +329,12 @@ async function resolveSeriesCandidateQueryContext(
     return null
   }
   const tableName = await getActiveEmbeddingTableName('series_embeddings')
-  return { model, tableName, embeddingColumn: embeddingColumnFor(space) }
+  const defaultScope = resolveLibraryScope({
+    libraries: await loadConfiguredLibraries(),
+    userLibraryIds: null,
+    maxParentalRating: null,
+  })
+  return { model, tableName, embeddingColumn: embeddingColumnFor(space), defaultScope }
 }
 
 /**
@@ -329,28 +350,19 @@ async function querySeriesCandidatesForVector(
   limit: number,
   includeWatched: boolean,
   watchedSeriesIds: Set<string>,
-  maxParentalRating: number | null,
+  scope: LibraryScope | null,
   ctx: SeriesCandidateQueryContext
 ): Promise<SeriesCandidate[]> {
   const queryLimit = includeWatched ? limit : limit + watchedSeriesIds.size
 
-  // Build query with optional parental rating filter
-  let ratingFilter = ''
-  const params: (string | number)[] = [vectorStr, ctx.model, queryLimit]
-
-  if (maxParentalRating !== null) {
-    // Map parental rating to content ratings
-    // This is a simplified mapping - adjust based on your data
-    ratingFilter = `AND (s.content_rating IS NULL OR s.content_rating IN (
-      SELECT unnest(CASE
-        WHEN $4 >= 18 THEN ARRAY['TV-MA', 'TV-14', 'TV-PG', 'TV-G', 'TV-Y7', 'TV-Y']
-        WHEN $4 >= 14 THEN ARRAY['TV-14', 'TV-PG', 'TV-G', 'TV-Y7', 'TV-Y']
-        WHEN $4 >= 7 THEN ARRAY['TV-PG', 'TV-G', 'TV-Y7', 'TV-Y']
-        ELSE ARRAY['TV-G', 'TV-Y7', 'TV-Y']
-      END)
-    ))`
-    params.push(maxParentalRating)
-  }
+  // The viewer's scope: the libraries the media server lets them see and the
+  // operator enabled, and their parental rating. This used to be a rating
+  // mapping of its own, thresholded at ages (18/14/7) against the media server's
+  // rating VALUES (TV-MA is 10 there), so a viewer allowed TV-MA was shown TV-PG
+  // and below; it now shares the movie side's table. The operator's library
+  // switch was not applied here at all.
+  const params: unknown[] = [vectorStr, ctx.model, queryLimit]
+  const inScope = libraryScopeSql(scope ?? ctx.defaultScope, 's', binderFor(params))
 
   const result = await query<{
     series_id: string
@@ -373,7 +385,7 @@ async function querySeriesCandidatesForVector(
        1 - (se.${ctx.embeddingColumn} <=> $1::halfvec) as similarity
      FROM series s
      JOIN ${ctx.tableName} se ON se.series_id = s.id AND se.model = $2
-     WHERE 1=1 ${ratingFilter}
+     WHERE ${inScope}
      ORDER BY se.${ctx.embeddingColumn} <=> $1::halfvec
      LIMIT $3`,
     params
@@ -414,14 +426,14 @@ async function getSeriesCandidates(
   watchedSeriesIds: Set<string>,
   maxCandidates: number,
   includeWatched: boolean,
-  maxParentalRating: number | null,
+  scope: LibraryScope | null,
   space: EmbeddingSpace = 'raw'
 ): Promise<SeriesCandidate[]> {
   const ctx = await resolveSeriesCandidateQueryContext(space)
   if (!ctx) return []
 
   const vectorStr = `[${tasteProfile.join(',')}]`
-  return querySeriesCandidatesForVector(vectorStr, maxCandidates, includeWatched, watchedSeriesIds, maxParentalRating, ctx)
+  return querySeriesCandidatesForVector(vectorStr, maxCandidates, includeWatched, watchedSeriesIds, scope, ctx)
 }
 
 export interface SeriesClusterQueryInput {
@@ -465,12 +477,14 @@ export async function getMultiClusterSeriesCandidates(
   watchedSeriesIds: Set<string>,
   totalLimit: number,
   includeWatched: boolean,
-  maxParentalRating: number | null,
+  scope: LibraryScope | null,
   space: EmbeddingSpace = 'raw'
 ): Promise<SeriesCandidate[]> {
   if (clusters.length === 0) return []
   if (clusters.length === 1) {
-    return getSeriesCandidates(clusters[0].embedding, watchedSeriesIds, totalLimit, includeWatched, maxParentalRating)
+    // `space` passed on, as the movie mirror always did: dropped here, a single
+    // centred cluster would be compared against the raw column.
+    return getSeriesCandidates(clusters[0].embedding, watchedSeriesIds, totalLimit, includeWatched, scope, space)
   }
 
   const ctx = await resolveSeriesCandidateQueryContext(space)
@@ -490,7 +504,7 @@ export async function getMultiClusterSeriesCandidates(
         perClusterLimits[i],
         includeWatched,
         watchedSeriesIds,
-        maxParentalRating,
+        scope,
         ctx
       )
     })
@@ -522,7 +536,7 @@ export async function getSeriesInterestMatchIndex(
   interests: SeriesInterestQueryInput[],
   watchedSeriesIds: Set<string>,
   includeWatched: boolean,
-  maxParentalRating: number | null
+  scope: LibraryScope | null
 ): Promise<InterestMatchIndex> {
   if (interests.length === 0) return buildInterestMatchIndex([])
 
@@ -569,7 +583,7 @@ export async function getSeriesInterestMatchIndex(
         SERIES_INTEREST_ANN_LIMIT,
         includeWatched,
         watchedSeriesIds,
-        maxParentalRating,
+        scope,
         ctx
       )
 
@@ -945,6 +959,17 @@ export async function generateSeriesRecommendationsForUser(
     '📺 Starting series recommendation generation'
   )
 
+  // 0a. Only a kind this viewer can see — the mirror of the movie pipeline's
+  // guard, for the single-user paths that do not come through recipients.ts.
+  const scope = user.scope ?? (await getLibraryScopeForUser(user.id))
+  if (!scope.hasSeries) {
+    logger.info(
+      { userId: user.id, username: user.username },
+      '⏭️ No series library in scope for this user, skipping series recommendations'
+    )
+    return { runId: null, recommendations: [], skipped: true }
+  }
+
   // 0. Sync watch history from media server to ensure we have latest data.
   // Ahead of both the activity gate and the run record — see the movie pipeline
   // for why the order matters.
@@ -1163,7 +1188,7 @@ export async function generateSeriesRecommendationsForUser(
           excludeIds,
           cfg.maxCandidates,
           includeWatched,
-          user.maxParentalRating ?? null,
+          scope,
           retrievalSpace
         )
         logger.info(
@@ -1180,7 +1205,7 @@ export async function generateSeriesRecommendationsForUser(
           excludeIds,
           cfg.maxCandidates,
           includeWatched,
-          user.maxParentalRating ?? null,
+          scope,
           retrievalSpace
         )
       }
@@ -1190,7 +1215,7 @@ export async function generateSeriesRecommendationsForUser(
         excludeIds,
         cfg.maxCandidates,
         includeWatched,
-        user.maxParentalRating ?? null,
+        scope,
         retrievalSpace
       )
     }
@@ -1253,7 +1278,7 @@ export async function generateSeriesRecommendationsForUser(
           })),
           excludeIds,
           includeWatched,
-          user.maxParentalRating ?? null
+          scope
         )
       }
     } catch (err) {
@@ -1735,14 +1760,9 @@ export async function generateSeriesRecommendationsForAllUsers(
     setJobStep(actualJobId, 0, 'Finding enabled users')
     addLog(actualJobId, 'info', '🔍 Finding enabled users...')
 
-    const result = await query<{
-      id: string
-      username: string
-      provider_user_id: string
-      max_parental_rating: number | null
-    }>(
-      `SELECT id, username, provider_user_id, max_parental_rating FROM users WHERE is_enabled = true AND series_enabled = true AND provider_disabled = false`
-    )
+    // Recommendations on, and at least one series library the media server lets
+    // them see (recipients.ts).
+    const result = { rows: await loadRecommendationRecipients('series') }
 
     const totalUsers = result.rows.length
 
@@ -1788,6 +1808,7 @@ export async function generateSeriesRecommendationsForAllUsers(
             username: user.username,
             providerUserId: user.provider_user_id,
             maxParentalRating: user.max_parental_rating,
+            scope: user.scope,
           },
           {},
           // Only the scheduled sweep skips; every manual path means someone
@@ -1895,15 +1916,7 @@ export async function clearAndRebuildAllSeriesRecommendations(existingJobId?: st
 
     // Step 3: Regenerate for all users
     setJobStep(jobId, 2, 'Regenerating series recommendations')
-    const result = await query<{
-      id: string
-      username: string
-      provider_user_id: string
-      max_parental_rating: number | null
-    }>(
-      `SELECT id, username, provider_user_id, max_parental_rating FROM users WHERE is_enabled = true AND series_enabled = true AND provider_disabled = false`
-    )
-    const users = result.rows
+    const users = await loadRecommendationRecipients('series')
     addLog(jobId, 'info', `👥 Regenerating for ${users.length} enabled user(s)`)
 
     let success = 0
@@ -1937,6 +1950,7 @@ export async function clearAndRebuildAllSeriesRecommendations(existingJobId?: st
             username: user.username,
             providerUserId: user.provider_user_id,
             maxParentalRating: user.max_parental_rating,
+            scope: user.scope,
           },
           {},
           { twinIndex, shouldCancel }
@@ -2008,9 +2022,9 @@ export async function regenerateUserSeriesRecommendations(userId: string): Promi
   )
 
   if (!result.runId) {
-    // Unreachable: only the activity gate returns a null runId, and this path
-    // never opts into it.
-    throw new Error('Series recommendation run produced no run id')
+    // This path never opts into the activity gate, so a null run id means the
+    // account cannot see any series library.
+    throw new Error('This account has no series library to recommend from')
   }
 
   return {

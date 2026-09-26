@@ -5,6 +5,8 @@ import {
   getMediaServerProvider,
   getMediaServerApiKey,
   auditUserPermissions,
+  loadConfiguredLibraries,
+  resolveLibraryScope,
 } from '@aperture/core'
 import { isAccountEnabled } from '../../../lib/accountEnabled.js'
 import type { UserRow } from '../types.js'
@@ -29,16 +31,19 @@ export function registerProviderHandlers(fastify: FastifyInstance) {
         const providerUsers = await provider.getUsers(apiKey)
 
         // Get existing users from our DB to check import status
-        const existingResult = await query<{ provider_user_id: string; id: string; is_enabled: boolean; movies_enabled: boolean; series_enabled: boolean; discover_enabled: boolean; discover_request_enabled: boolean; collections_enabled: boolean; assistant_enabled: boolean; email_notifications_allowed: boolean; ai_explanation_override_allowed: boolean; email: string | null; last_login_at: Date | null }>(
-          `SELECT provider_user_id, id, is_enabled, movies_enabled, series_enabled, discover_enabled, discover_request_enabled, collections_enabled, assistant_enabled, email_notifications_allowed, COALESCE(ai_explanation_override_allowed, false) as ai_explanation_override_allowed, email, last_login_at FROM users WHERE provider = $1`,
+        const existingResult = await query<{ provider_user_id: string; id: string; is_enabled: boolean; recommendations_enabled: boolean; discover_enabled: boolean; discover_request_enabled: boolean; collections_enabled: boolean; assistant_enabled: boolean; email_notifications_allowed: boolean; ai_explanation_override_allowed: boolean; email: string | null; last_login_at: Date | null; library_access: string[] | null; library_access_synced_at: Date | null; max_parental_rating: number | null }>(
+          `SELECT provider_user_id, id, is_enabled, recommendations_enabled, discover_enabled, discover_request_enabled, collections_enabled, assistant_enabled, email_notifications_allowed, COALESCE(ai_explanation_override_allowed, false) as ai_explanation_override_allowed, email, last_login_at, library_access, library_access_synced_at, max_parental_rating FROM users WHERE provider = $1`,
           [provider.type]
         )
+        // Which kinds each account would get recommendations for, decided here
+        // (lib/libraryScope.ts) rather than in the page: it depends on the
+        // libraries the media server lets them see, which the bundle never holds.
+        const libraries = await loadConfiguredLibraries()
         const existingMap = new Map(
           existingResult.rows.map((row) => [row.provider_user_id, {
             id: row.id,
             isEnabled: row.is_enabled,
-            moviesEnabled: row.movies_enabled,
-            seriesEnabled: row.series_enabled,
+            recommendationsEnabled: row.recommendations_enabled,
             discoverEnabled: row.discover_enabled,
             discoverRequestEnabled: row.discover_request_enabled,
             collectionsEnabled: row.collections_enabled,
@@ -47,6 +52,19 @@ export function registerProviderHandlers(fastify: FastifyInstance) {
             aiOverrideAllowed: row.ai_explanation_override_allowed,
             email: row.email,
             lastLoginAt: row.last_login_at,
+            libraryKinds: (() => {
+              const scope = resolveLibraryScope({
+                libraries,
+                userLibraryIds: row.library_access,
+                maxParentalRating: row.max_parental_rating,
+              })
+              return {
+                movies: scope.hasMovies,
+                series: scope.hasSeries,
+                // Never read yet: the kinds above are the unrestricted default.
+                unread: row.library_access_synced_at === null,
+              }
+            })(),
           }])
         )
 
@@ -63,8 +81,7 @@ export function registerProviderHandlers(fastify: FastifyInstance) {
             apertureUserId: existing?.id || null,
             isImported: !!existing,
             isEnabled: existing?.isEnabled || false,
-            moviesEnabled: existing?.moviesEnabled || false,
-            seriesEnabled: existing?.seriesEnabled || false,
+            recommendationsEnabled: existing?.recommendationsEnabled || false,
             discoverEnabled: existing?.discoverEnabled || false,
             discoverRequestEnabled: existing?.discoverRequestEnabled || false,
             collectionsEnabled: existing?.collectionsEnabled || false,
@@ -73,6 +90,7 @@ export function registerProviderHandlers(fastify: FastifyInstance) {
             aiOverrideAllowed: existing?.aiOverrideAllowed || false,
             email: existing?.email || null,
             lastLoginAt: existing?.lastLoginAt || null,
+            libraryKinds: existing?.libraryKinds ?? null,
           }
         })
 
@@ -91,15 +109,14 @@ export function registerProviderHandlers(fastify: FastifyInstance) {
    * POST /api/users/import
    * Import a user from the media server into Aperture
    */
-  fastify.post<{ Body: { providerUserId: string; isEnabled?: boolean; moviesEnabled?: boolean; seriesEnabled?: boolean } }>(
+  fastify.post<{ Body: { providerUserId: string; isEnabled?: boolean; recommendationsEnabled?: boolean } }>(
     '/api/users/import',
     { preHandler: requireAdmin, schema: { tags: ["users"] } },
     async (request, reply) => {
-      const { providerUserId, isEnabled = false, moviesEnabled, seriesEnabled } = request.body
+      const { providerUserId, isEnabled = false, recommendationsEnabled } = request.body
 
-      // Default movies to enabled if isEnabled is true (backwards compatibility)
-      const enableMovies = moviesEnabled ?? isEnabled
-      const enableSeries = seriesEnabled ?? false
+      // "Import and enable" means recommendations too, as it always did.
+      const enableRecommendations = recommendationsEnabled ?? isEnabled
 
       if (!providerUserId) {
         return reply.status(400).send({ error: 'providerUserId is required' })
@@ -131,8 +148,8 @@ export function registerProviderHandlers(fastify: FastifyInstance) {
 
         // Insert user into our database
         const newUser = await queryOne<UserRow>(
-          `INSERT INTO users (username, display_name, provider, provider_user_id, is_admin, is_enabled, movies_enabled, series_enabled, max_parental_rating)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          `INSERT INTO users (username, display_name, provider, provider_user_id, is_admin, is_enabled, recommendations_enabled, max_parental_rating)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
            RETURNING *`,
           [
             providerUser.name,
@@ -142,15 +159,13 @@ export function registerProviderHandlers(fastify: FastifyInstance) {
             providerUser.isAdmin,
             // Discover and Collections are not written here and default to off (0080, 0116).
             isAccountEnabled({
-              moviesEnabled: enableMovies,
-              seriesEnabled: enableSeries,
+              recommendationsEnabled: enableRecommendations,
               discoverEnabled: false,
               collectionsEnabled: false,
               isAdmin: providerUser.isAdmin,
               wasEnabled: false,
             }),
-            enableMovies,
-            enableSeries,
+            enableRecommendations,
             providerUser.maxParentalRating ?? null,
           ]
         )

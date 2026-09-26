@@ -49,9 +49,9 @@ test('a creation records grants and not the switches that stayed off', () => {
   // saying so on every import is noise that hides the imports that did grant.
   assert.deepEqual(diffUserPermissions(null, ALL_OFF), [])
 
-  assert.deepEqual(diffUserPermissions(null, { ...ALL_OFF, movies_enabled: true, is_enabled: true }), [
+  assert.deepEqual(diffUserPermissions(null, { ...ALL_OFF, recommendations_enabled: true, is_enabled: true }), [
     { field: 'is_enabled', oldValue: null, newValue: 'true' },
-    { field: 'movies_enabled', oldValue: null, newValue: 'true' },
+    { field: 'recommendations_enabled', oldValue: null, newValue: 'true' },
   ])
 
   // And over a narrow one: an INSERT returning three columns claims nothing
@@ -91,14 +91,14 @@ test('a login does not record the permissions it never touched', () => {
 
 test('a narrow RETURNING does not revoke what it failed to select', () => {
   // Measured on the live shape: the setup wizard reads the full row before its
-  // write and returns five columns after it, which recorded `is_admin` as
+  // write and returns four columns after it, which recorded `is_admin` as
   // revoked for every imported administrator whose switches it touched.
   const before = { ...ALL_OFF, is_admin: true }
-  const narrow = { is_enabled: true, movies_enabled: true, series_enabled: false }
+  const narrow = { is_enabled: true, recommendations_enabled: true }
 
   assert.deepEqual(diffUserPermissions(before, narrow), [
     { field: 'is_enabled', oldValue: 'false', newValue: 'true' },
-    { field: 'movies_enabled', oldValue: 'false', newValue: 'true' },
+    { field: 'recommendations_enabled', oldValue: 'false', newValue: 'true' },
   ])
 })
 

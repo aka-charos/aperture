@@ -16,6 +16,7 @@ import { getMediaServerProvider } from '../../media/index.js'
 import { downloadImage } from '../images.js'
 import { generateSeriesNfoContent } from './nfo.js'
 import { getEffectiveAiExplanationSetting } from '../../lib/userSettings.js'
+import { binderFor, getLibraryScopeForUser, libraryScopeSql } from '../../lib/libraryScope.js'
 import { symlinkArtwork, symlinkBasenameMatchedSidecars, SERIES_SKIP_FILES, getSeriesFolderFromSeasonPath } from '../artwork.js'
 import type { Series, Actor } from './types.js'
 import type { ImageDownloadTask } from '../types.js'
@@ -200,6 +201,15 @@ export async function writeSeriesStrmFilesForUser(
     return { written: 0, seriesCount: 0, deleted: 0, localPath, embyPath }
   }
 
+  // Only what this viewer may see NOW. The run may predate a change to their
+  // library permission, and these files point straight at the originals, so a
+  // pick from a library the media server now hides from them would be playable
+  // from here. Filtered at write time rather than trusted from the run, which
+  // also removes it from disk (see the folder sweep below).
+  const scope = await getLibraryScopeForUser(userId)
+  const pickParams: unknown[] = [latestRun.id]
+  const inScope = libraryScopeSql(scope, 's', binderFor(pickParams))
+
   // Get selected series from the run with full metadata for NFO generation
   const recommendations = await query<{
     series_id: string
@@ -250,9 +260,9 @@ export async function writeSeriesStrmFilesForUser(
             rc.ai_explanation, rc.selected_rank as rank, rc.final_score
      FROM recommendation_candidates rc
      JOIN series s ON s.id = rc.series_id
-     WHERE rc.run_id = $1 AND rc.is_selected = true
+     WHERE rc.run_id = $1 AND rc.is_selected = true AND ${inScope}
      ORDER BY rc.selected_rank ASC`,
-    [latestRun.id]
+    pickParams
   )
 
   let recommendationRows = recommendations.rows

@@ -201,8 +201,6 @@
       "providerActive": "{{provider}}: פעיל",
       "recsEnabledTooltip": "המלצות מופעלות",
       "enableAiRecs": "הפעל להמלצות AI",
-      "movies": "סרטים",
-      "series": "סדרות",
       "discover": "לְגַלוֹת",
       "request": "בקשה",
       "aiOverride": "עקיפת AI",
@@ -215,8 +213,6 @@
       "menuUpdateStrm": "עדכון קבצי STRM",
       "colUser": "משתמש",
       "colImported": "יובא",
-      "colMovies": "סרטים",
-      "colSeries": "סדרות",
       "colDiscover": "לְגַלוֹת",
       "colRequest": "בקשה",
       "colAiOverride": "עקיפת AI",
@@ -285,7 +281,17 @@
       "assistantToggleOn": "Disable the assistant",
       "assistantToggleOff": "Enable the assistant",
       "assistantOn": "{{name}} can now use the assistant",
-      "assistantOff": "{{name}} can no longer use the assistant"
+      "assistantOff": "{{name}} can no longer use the assistant",
+      "colRecommendations": "Recommendations",
+      "recommendationsColTooltip": "Personal recommendations, generated libraries and home rows. Whether that means movies, series or both follows from the libraries {{provider}} lets the account see.",
+      "recommendationsOn": "{{name}} will now get recommendations",
+      "recommendationsOff": "{{name}} will no longer get recommendations",
+      "recsKindsBoth": "Movies & series",
+      "recsKindsMovies": "Movies only",
+      "recsKindsSeries": "Series only",
+      "recsKindsNone": "No library",
+      "recsKindsTooltip": "The kinds follow from the libraries {{provider}} lets this account see, among those enabled here.",
+      "recsKindsUnreadTooltip": "This account's library access hasn't been read from {{provider}} yet; it will be at the next user sync or sign-in. Until then every enabled library counts."
     },
     "userDetail": {
       "userNotFound": "המשתמש לא נמצא",
@@ -389,7 +395,8 @@
         "email_notifications_allowed": "Email notifications",
         "ai_explanation_override_allowed": "AI explanation override",
         "scopes": "API key permissions",
-        "assistant_enabled": "Assistant"
+        "assistant_enabled": "Assistant",
+        "recommendations_enabled": "Recommendations"
       }
     },
     "jobsPage": {
@@ -3741,8 +3748,6 @@
     "users": {
       "noteLabel": "פֶּתֶק:",
       "colUser": "מִשׁתַמֵשׁ",
-      "colMovies": "סרטים",
-      "colSeries": "סִדרָה",
       "adminChip": "מנהל מערכת",
       "disabledChip": "נָכֶה",
       "tooltipLastAdmin": "לפחות מנהל מערכת אחד חייב להישאר מופעל",
@@ -3753,14 +3758,15 @@
       "setupCompleteFallback": "ההגדרה הושלמה.",
       "manageUsersLink": "נהל משתמשים ב-Admin → משתמשים",
       "back": "בְּחֲזָרָה",
-      "bodyParagraph": "בחר אילו משתמשים צריכים לקבל המלצות AI מותאמות אישית. עבור כל משתמש, אתה יכול להפעיל המלצות עבור סרטים, סדרות טלוויזיה או שניהם. {{appName}} מנתח את היסטוריית הצפייה של כל משתמש בנפרד כדי ליצור הצעות מותאמות המופיעות בספריות ההמלצות האישיות שלו.",
       "noUsersWarning": "לא נמצאו משתמשים בשרת המדיה שלך. אנא ודא שלשרת המדיה שלך יש חשבונות משתמש פעילים, ולאחר מכן לחץ על לחצן הרענון כדי לטעון מחדש את הרשימה.",
       "adminSectionTitle": "מנהלי משתמשים ({{count}})",
       "adminInfoCaption": "משתמשי מנהל מערכת הופעלו אוטומטית כדי להבטיח שתוכל להתחבר ולנהל את {{appName}}. לפחות מנהל מערכת אחד חייב להישאר מופעל כדי לשמור על גישה ללוח המחוונים של מנהל המערכת.",
       "otherUsersTitle": "משתמשים אחרים ({{count}})",
       "otherUsersCaption": "אפשר המלצות עבור בני משפחה או משתמשים אחרים בשרת המדיה שלך. כל משתמש מופעל יקבל המלצות מותאמות אישית משלו על סמך היסטוריית הצפייה שלו.",
-      "noteWarning": "משתמשים עם סרטים וסדרות מושבתים לא יקבלו המלצות ולא יוכלו להיכנס ל-{{appName}}. אתה תמיד יכול לשנות את ההגדרות האלה מאוחר יותר ב-Admin ← משתמשים.",
-      "paginationRange": "{{from}}-{{to}} מתוך {{count}}"
+      "paginationRange": "{{from}}-{{to}} מתוך {{count}}",
+      "colRecommendations": "Recommendations",
+      "bodyText": "Choose which users should receive personalized recommendations. Whether that means movies, series or both follows from the libraries each account can see on your media server. {{appName}} analyzes each user's watch history individually to generate tailored suggestions that appear in their personal recommendation libraries.",
+      "noteText": "Users with recommendations switched off won't receive any and won't be able to sign in to {{appName}}. You can change all of this later in Admin → Users."
     },
     "complete": {
       "title": "ההתקנה הושלמה!",

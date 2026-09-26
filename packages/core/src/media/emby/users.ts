@@ -28,6 +28,11 @@ export async function getUsers(
     lastActivityDate: user.LastActivityDate,
     primaryImageTag: user.PrimaryImageTag,
     maxParentalRating: user.Policy.MaxParentalRating,
+    // Absent EnableAllFolders is the server default, which is every folder.
+    folderAccess: {
+      enableAllFolders: user.Policy.EnableAllFolders ?? true,
+      enabledFolders: user.Policy.EnabledFolders ?? [],
+    },
     // ConnectUserName is the Emby Connect username - only use if it looks like an email
     // Note: Emby does NOT expose actual email addresses via API for privacy reasons
     email: isValidEmail(user.ConnectUserName) ? user.ConnectUserName : undefined,
@@ -50,6 +55,11 @@ export async function getUserById(
     lastActivityDate: user.LastActivityDate,
     primaryImageTag: user.PrimaryImageTag,
     maxParentalRating: user.Policy.MaxParentalRating,
+    // Absent EnableAllFolders is the server default, which is every folder.
+    folderAccess: {
+      enableAllFolders: user.Policy.EnableAllFolders ?? true,
+      enabledFolders: user.Policy.EnabledFolders ?? [],
+    },
     // Only use ConnectUserName if it looks like an email
     email: isValidEmail(user.ConnectUserName) ? user.ConnectUserName : undefined,
   }

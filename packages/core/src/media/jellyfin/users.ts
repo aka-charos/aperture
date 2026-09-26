@@ -21,6 +21,11 @@ export async function getUsers(
     lastActivityDate: user.LastActivityDate,
     primaryImageTag: user.PrimaryImageTag,
     maxParentalRating: user.Policy.MaxParentalRating,
+    // Absent EnableAllFolders is the server default, which is every folder.
+    folderAccess: {
+      enableAllFolders: user.Policy.EnableAllFolders ?? true,
+      enabledFolders: user.Policy.EnabledFolders ?? [],
+    },
   }))
 }
 
@@ -40,6 +45,11 @@ export async function getUserById(
     lastActivityDate: user.LastActivityDate,
     primaryImageTag: user.PrimaryImageTag,
     maxParentalRating: user.Policy.MaxParentalRating,
+    // Absent EnableAllFolders is the server default, which is every folder.
+    folderAccess: {
+      enableAllFolders: user.Policy.EnableAllFolders ?? true,
+      enabledFolders: user.Policy.EnabledFolders ?? [],
+    },
   }
 }
 

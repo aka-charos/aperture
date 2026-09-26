@@ -37,6 +37,12 @@ export interface MediaServerUser {
   primaryImageTag?: string
   maxParentalRating?: number // NULL means unrestricted
   email?: string // Email from Emby Connect or user configuration
+  /**
+   * Which libraries the server lets this account open (Policy EnableAllFolders /
+   * EnabledFolders). Folders are named by GUID on Emby and may be item ids on
+   * Jellyfin; `libraryIdsFromFolderAccess` translates them.
+   */
+  folderAccess?: { enableAllFolders: boolean; enabledFolders: string[] }
 }
 
 export interface Library {

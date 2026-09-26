@@ -35,7 +35,7 @@ export function registerJobHandlers(fastify: FastifyInstance) {
       }
 
       if (!user.is_enabled) {
-        return reply.status(400).send({ error: 'User is not enabled for AI recommendations' })
+        return reply.status(400).send({ error: 'User has no access' })
       }
 
       logger.info({ userId: id, username: user.username }, 'Starting watch history sync for user')
@@ -74,7 +74,10 @@ export function registerJobHandlers(fastify: FastifyInstance) {
       }
 
       if (!user.is_enabled) {
-        return reply.status(400).send({ error: 'User is not enabled for AI recommendations' })
+        return reply.status(400).send({ error: 'User has no access' })
+      }
+      if (!user.recommendations_enabled) {
+        return reply.status(400).send({ error: 'Recommendations are switched off for this user' })
       }
 
       logger.info({ userId: id, username: user.username }, 'Starting recommendation generation for user')
@@ -119,7 +122,10 @@ export function registerJobHandlers(fastify: FastifyInstance) {
       }
 
       if (!user.is_enabled) {
-        return reply.status(400).send({ error: 'User is not enabled for AI recommendations' })
+        return reply.status(400).send({ error: 'User has no access' })
+      }
+      if (!user.recommendations_enabled) {
+        return reply.status(400).send({ error: 'Recommendations are switched off for this user' })
       }
 
       logger.info({ userId: id, username: user.username }, 'Starting STRM update for user')
@@ -171,7 +177,10 @@ export function registerJobHandlers(fastify: FastifyInstance) {
       }
 
       if (!user.is_enabled) {
-        return reply.status(400).send({ error: 'User is not enabled for AI recommendations' })
+        return reply.status(400).send({ error: 'User has no access' })
+      }
+      if (!user.recommendations_enabled) {
+        return reply.status(400).send({ error: 'Recommendations are switched off for this user' })
       }
 
       logger.info({ userId: id, username: user.username }, 'Starting full pipeline for user')

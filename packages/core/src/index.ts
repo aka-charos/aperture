@@ -554,6 +554,27 @@ export {
   type AccessibleLibrary,
 } from './lib/libraryExclusions.js'
 
+// Library scope: what one viewer may be shown
+export {
+  resolveLibraryScope,
+  scopeHas,
+  libraryIdsFromFolderAccess,
+  libraryScopeSql,
+  binderFor,
+  loadConfiguredLibraries,
+  getLibraryScopeForUser,
+  saveUserLibraryAccess,
+  type LibraryScope,
+  type LibraryKind,
+  type ConfiguredLibrary,
+  type BindParam,
+} from './lib/libraryScope.js'
+export {
+  loadRecommendationRecipients,
+  RECOMMENDATION_RECIPIENT_SQL,
+  type RecommendationRecipient,
+} from './recommender/recipients.js'
+
 // System Settings
 export {
   getSystemSetting,
