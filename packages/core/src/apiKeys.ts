@@ -42,6 +42,7 @@ export interface ApiKeyWithUser extends ApiKey {
   isAdmin: boolean
   isEnabled: boolean
   canManageWatchHistory: boolean
+  assistantEnabled: boolean
   discoverEnabled: boolean
   discoverRequestEnabled: boolean
   emailNotificationsAllowed: boolean
@@ -75,6 +76,7 @@ interface ApiKeyWithUserRow extends ApiKeyRow {
   is_admin: boolean
   is_enabled: boolean
   can_manage_watch_history: boolean
+  assistant_enabled: boolean
   discover_enabled: boolean
   discover_request_enabled: boolean
   email_notifications_allowed: boolean
@@ -89,7 +91,7 @@ interface ApiKeyWithUserRow extends ApiKeyRow {
  * undefined permission flag reads as "not granted", which is a wrong claim
  * about the account rather than an error anybody would see.
  */
-const API_KEY_USER_COLUMNS = `u.username, u.display_name, u.is_admin, u.is_enabled, u.can_manage_watch_history,
+const API_KEY_USER_COLUMNS = `u.username, u.display_name, u.is_admin, u.is_enabled, u.can_manage_watch_history, u.assistant_enabled,
        u.discover_enabled, u.discover_request_enabled, u.email_notifications_allowed, u.provider_disabled`
 
 /**
@@ -179,6 +181,7 @@ function rowToApiKeyWithUser(row: ApiKeyWithUserRow): ApiKeyWithUser {
     isAdmin: row.is_admin,
     isEnabled: row.is_enabled,
     canManageWatchHistory: row.can_manage_watch_history,
+    assistantEnabled: row.assistant_enabled,
     discoverEnabled: row.discover_enabled,
     discoverRequestEnabled: row.discover_request_enabled,
     emailNotificationsAllowed: row.email_notifications_allowed,

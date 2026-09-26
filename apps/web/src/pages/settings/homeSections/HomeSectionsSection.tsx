@@ -61,6 +61,7 @@ interface ServerStatus {
 interface HomeSectionsForm {
   enabled: boolean
   topPicksEnabled: boolean
+  topPicksWithoutAccess: boolean
   recommendationsEnabled: boolean
   playlistsEnabled: boolean
   topPicksMoviesName: string
@@ -120,6 +121,8 @@ function toForm(config: HomeSectionsForm): HomeSectionsForm {
   return {
     enabled: config.enabled,
     topPicksEnabled: config.topPicksEnabled,
+    // Absent from a server built before 0184, which always behaved as "on".
+    topPicksWithoutAccess: config.topPicksWithoutAccess !== false,
     recommendationsEnabled: config.recommendationsEnabled,
     playlistsEnabled: config.playlistsEnabled,
     topPicksMoviesName: config.topPicksMoviesName,
@@ -549,7 +552,23 @@ export function HomeSectionsSection() {
           {t('settingsHomeSections.rowsHeading')}
         </Typography>
         <Stack spacing={1}>
-          {rowSwitch('topPicksEnabled', 'settingsHomeSections.topPicksEnabled', 'settingsHomeSections.topPicksHelp')}
+          {rowSwitch('topPicksEnabled', 'settingsHomeSections.topPicksEnabled', 'settingsHomeSections.topPicksRowsHelp')}
+          <Box id="home-sections-top-picks-without-access" sx={{ ps: 4 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  size="small"
+                  checked={form.topPicksWithoutAccess}
+                  disabled={inactive || !form.topPicksEnabled}
+                  onChange={(e) => update({ topPicksWithoutAccess: e.target.checked })}
+                />
+              }
+              label={t('settingsHomeSections.topPicksWithoutAccess')}
+            />
+            <Typography variant="caption" color={captionColor} component="p">
+              {t('settingsHomeSections.topPicksWithoutAccessHelp')}
+            </Typography>
+          </Box>
           {rowSwitch(
             'recommendationsEnabled',
             'settingsHomeSections.recommendationsEnabled',

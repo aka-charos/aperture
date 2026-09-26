@@ -15,7 +15,13 @@ import type { MediaServerProvider } from '../media/MediaServerProvider.js'
 import type { MediaServerTag } from '../media/types.js'
 import { getMediaServerApiKey } from '../settings/systemSettings.js'
 import { getHomeSectionsConfig } from './config.js'
-import { diffMembership, isHomeSectionTarget, planViewerSections, sectionTagIds } from './plan.js'
+import {
+  diffMembership,
+  isHomeSectionTarget,
+  mayReceiveHomeRows,
+  planViewerSections,
+  sectionTagIds,
+} from './plan.js'
 import type { PlacementFeature } from './placement.js'
 import { getAppliedPlacementKeys, getUserPlacements } from './placementStore.js'
 import { loadHomePlaylists, type HomePlaylistSource } from './playlists.js'
@@ -104,7 +110,15 @@ export async function applyPlacementForUser(userId: string): Promise<InstantOutc
     const ctx = await serverContext(true)
     if ('applied' in ctx) return ctx
     const [viewer] = await loadViewers(ctx.provider.type, userId)
-    if (!viewer || viewer.provider_disabled) return { applied: false, reason: 'not-a-target' }
+    if (
+      !viewer ||
+      !mayReceiveHomeRows(
+        { isEnabled: viewer.is_enabled, providerDisabled: viewer.provider_disabled },
+        ctx.config.topPicksWithoutAccess
+      )
+    ) {
+      return { applied: false, reason: 'not-a-target' }
+    }
     const tags = await ctx.provider.getTagsByPrefix(ctx.apiKey, MANAGED_TAG_PREFIX)
     return { applied: true, moved: await placeForViewer(ctx, viewer, tags, new Set()) }
   } catch (err) {

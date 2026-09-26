@@ -4,6 +4,7 @@
 import type { FastifyInstance } from 'fastify'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
+import { requireCapability } from '../../../lib/permissions.js'
 import type { ConversationRow, MessageRow } from '../types.js'
 import { isTurnActive } from '../helpers/activeTurns.js'
 
@@ -12,7 +13,7 @@ export function registerConversationHandlers(fastify: FastifyInstance) {
    * GET /api/assistant/conversations
    * List user's conversations
    */
-  fastify.get('/api/assistant/conversations', { preHandler: requireAuth, schema: { tags: ["ai-assistant"] } }, async (request, reply) => {
+  fastify.get('/api/assistant/conversations', { preHandler: [requireAuth, requireCapability('assistant')], schema: { tags: ["ai-assistant"] } }, async (request, reply) => {
     const user = request.user as SessionUser
 
     const conversations = await query<ConversationRow>(
@@ -33,7 +34,7 @@ export function registerConversationHandlers(fastify: FastifyInstance) {
    */
   fastify.post<{ Body: { title?: string } }>(
     '/api/assistant/conversations',
-    { preHandler: requireAuth, schema: { tags: ["ai-assistant"] } },
+    { preHandler: [requireAuth, requireCapability('assistant')], schema: { tags: ["ai-assistant"] } },
     async (request, reply) => {
       const user = request.user as SessionUser
       const { title = 'New Chat' } = request.body || {}
@@ -55,7 +56,7 @@ export function registerConversationHandlers(fastify: FastifyInstance) {
    */
   fastify.get<{ Params: { id: string } }>(
     '/api/assistant/conversations/:id',
-    { preHandler: requireAuth, schema: { tags: ["ai-assistant"] } },
+    { preHandler: [requireAuth, requireCapability('assistant')], schema: { tags: ["ai-assistant"] } },
     async (request, reply) => {
       try {
         const user = request.user as SessionUser
@@ -105,7 +106,7 @@ export function registerConversationHandlers(fastify: FastifyInstance) {
    */
   fastify.patch<{ Params: { id: string }; Body: { title: string } }>(
     '/api/assistant/conversations/:id',
-    { preHandler: requireAuth, schema: { tags: ["ai-assistant"] } },
+    { preHandler: [requireAuth, requireCapability('assistant')], schema: { tags: ["ai-assistant"] } },
     async (request, reply) => {
       const user = request.user as SessionUser
       const { id } = request.params
@@ -133,7 +134,7 @@ export function registerConversationHandlers(fastify: FastifyInstance) {
    */
   fastify.delete<{ Params: { id: string } }>(
     '/api/assistant/conversations/:id',
-    { preHandler: requireAuth, schema: { tags: ["ai-assistant"] } },
+    { preHandler: [requireAuth, requireCapability('assistant')], schema: { tags: ["ai-assistant"] } },
     async (request, reply) => {
       const user = request.user as SessionUser
       const { id } = request.params
@@ -171,7 +172,7 @@ export function registerConversationHandlers(fastify: FastifyInstance) {
     }
   }>(
     '/api/assistant/conversations/:id/messages',
-    { preHandler: requireAuth, schema: { tags: ["ai-assistant"] } },
+    { preHandler: [requireAuth, requireCapability('assistant')], schema: { tags: ["ai-assistant"] } },
     async (request, reply) => {
       const user = request.user as SessionUser
       const { id } = request.params

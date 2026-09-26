@@ -212,7 +212,12 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
     const targetIds = new Set(targets.map((viewer) => viewer.id))
     const topPicksViewerIds = new Set(
       viewers
-        .filter((viewer) => isTopPicksTarget({ providerDisabled: viewer.provider_disabled }))
+        .filter((viewer) =>
+          isTopPicksTarget(
+            { isEnabled: viewer.is_enabled, providerDisabled: viewer.provider_disabled },
+            config.topPicksWithoutAccess
+          )
+        )
         .map((viewer) => viewer.id)
     )
 

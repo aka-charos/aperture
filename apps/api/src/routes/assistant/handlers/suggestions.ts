@@ -7,6 +7,7 @@
 import type { FastifyInstance } from 'fastify'
 import { queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
+import { requireCapability } from '../../../lib/permissions.js'
 
 interface SuggestionsRow {
   suggestions: string[]
@@ -24,7 +25,7 @@ export function registerSuggestionsHandler(fastify: FastifyInstance) {
    * GET /api/assistant/suggestions
    * Get pre-generated personalized suggestion prompts for the user
    */
-  fastify.get('/api/assistant/suggestions', { preHandler: requireAuth, schema: { tags: ["ai-assistant"] } }, async (request, reply) => {
+  fastify.get('/api/assistant/suggestions', { preHandler: [requireAuth, requireCapability('assistant')], schema: { tags: ["ai-assistant"] } }, async (request, reply) => {
     const user = request.user as SessionUser
 
     try {

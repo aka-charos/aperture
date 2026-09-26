@@ -19,6 +19,7 @@ const NOBODY: PermissionSubject = {
   discoverEnabled: false,
   discoverRequestEnabled: false,
   collectionsEnabled: false,
+  assistantEnabled: false,
   canManageWatchHistory: false,
   emailNotificationsAllowed: false,
 }
@@ -28,6 +29,7 @@ const EVERYTHING: PermissionSubject = {
   discoverEnabled: true,
   discoverRequestEnabled: true,
   collectionsEnabled: true,
+  assistantEnabled: true,
   canManageWatchHistory: true,
   emailNotificationsAllowed: true,
 }
@@ -60,13 +62,15 @@ test('content requests need Discover as well as the request flag', () => {
   )
 })
 
-test('an admin bypasses exactly the two capabilities that always bypassed', () => {
+test('an admin bypasses exactly the capabilities that always bypassed', () => {
   // Collections and watch-history management read `isAdmin` at their old call
   // sites; Discover never did, and an admin with Discover off has always been
   // refused. Granting it here would be a behaviour change disguised as a move.
+  // The assistant had no gate at all before it became a capability, so every
+  // admin held it, and still does.
   const admin = { ...NOBODY, isAdmin: true }
   const bypassed = CAPABILITIES.filter((capability) => can(admin, capability))
-  assert.deepEqual(bypassed, ['collections', 'watchHistory:manage'])
+  assert.deepEqual(bypassed, ['collections', 'assistant', 'watchHistory:manage'])
 })
 
 test('every capability refuses with its own words', () => {

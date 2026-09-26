@@ -55,6 +55,7 @@ import LoginIcon from '@mui/icons-material/Login'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import VisibilityIcon from '@mui/icons-material/Visibility'
+import SmartToyIcon from '@mui/icons-material/SmartToy'
 import { usePageHeader } from '@/hooks/usePageHeader'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -72,6 +73,7 @@ interface ProviderUser {
   discoverEnabled: boolean
   discoverRequestEnabled: boolean
   collectionsEnabled: boolean
+  assistantEnabled: boolean
   emailNotificationsAllowed: boolean
   aiOverrideAllowed: boolean
   /** From `users.email` — set via media server sync, LLDAP import, or manual entry. Only imported users have one. */
@@ -227,10 +229,12 @@ export function UsersPage() {
 
       if (response.ok) {
         const data = await response.json()
+        // The whole saved row, as for a toggle: the import decides Movies and
+        // access together, and setting one of them here left the other stale.
         setProviderUsers((prev) =>
           prev.map((user) =>
             user.providerUserId === providerUserId
-              ? { ...user, isImported: true, apertureUserId: data.user.id, isEnabled: enableAfterImport }
+              ? applySavedRow({ ...user, isImported: true, apertureUserId: data.user.id }, data.user)
               : user
           )
         )
@@ -250,8 +254,17 @@ export function UsersPage() {
    * "clear requests with Discover" rule by hand — a copy of a rule the server
    * owns. The AI-explanation toggle is deliberately NOT in this table: it is a
    * different endpoint, and folding it in would hide that.
+   *
+   * Access is a switch like the others, and deliberately independent of them:
+   * turning it off keeps every feature as it was set, so turning it back on
+   * restores the account exactly (F-135).
    */
   const PERMISSION_SWITCHES = {
+    access: {
+      field: 'isEnabled',
+      body: 'isEnabled',
+      messages: { on: 'accessOn', off: 'accessOff' },
+    },
     movies: { field: 'moviesEnabled', body: 'moviesEnabled' },
     series: { field: 'seriesEnabled', body: 'seriesEnabled' },
     discover: {
@@ -268,6 +281,11 @@ export function UsersPage() {
       field: 'collectionsEnabled',
       body: 'collectionsEnabled',
       messages: { on: 'collectionsOn', off: 'collectionsOff' },
+    },
+    assistant: {
+      field: 'assistantEnabled',
+      body: 'assistantEnabled',
+      messages: { on: 'assistantOn', off: 'assistantOff' },
     },
     email: {
       field: 'emailNotificationsAllowed',
@@ -293,17 +311,18 @@ export function UsersPage() {
     discover_enabled?: boolean
     discover_request_enabled?: boolean
     collections_enabled?: boolean
+    assistant_enabled?: boolean
     email_notifications_allowed?: boolean
   }
 
   /**
    * Take the whole row from the server, never a guess.
    *
-   * Two of these columns are DERIVED — `is_enabled` from all four feature
-   * switches, `discover_request_enabled` from Discover — so a page that
+   * `discover_request_enabled` is DERIVED from Discover, so a page that
    * applies the value it sent is right about the switch it touched and wrong
-   * about the ones that moved with it, until a reload. That is exactly how
-   * this page and the database came to disagree about who could sign in.
+   * about the one that moved with it, until a reload. `is_enabled` was
+   * derived too until F-135, and that is exactly how this page and the
+   * database came to disagree about who could sign in.
    */
   const applySavedRow = (user: ProviderUser, saved: SavedUserRow): ProviderUser => ({
     ...user,
@@ -313,6 +332,7 @@ export function UsersPage() {
     discoverEnabled: saved.discover_enabled ?? user.discoverEnabled,
     discoverRequestEnabled: saved.discover_request_enabled ?? user.discoverRequestEnabled,
     collectionsEnabled: saved.collections_enabled ?? user.collectionsEnabled,
+    assistantEnabled: saved.assistant_enabled ?? user.assistantEnabled,
     emailNotificationsAllowed:
       saved.email_notifications_allowed ?? user.emailNotificationsAllowed,
   })
@@ -332,7 +352,17 @@ export function UsersPage() {
         body: JSON.stringify({ [spec.body]: newValue }),
       })
 
-      if (!response.ok) return
+      if (!response.ok) {
+        // A refusal says why (turning off your own access, say); a switch that
+        // silently springs back reads as a broken page.
+        const err = await response.json().catch(() => ({}))
+        setSnackbar({
+          open: true,
+          message: err.error || t('admin.usersPage.permissionSaveFailed'),
+          severity: 'error',
+        })
+        return
+      }
 
       const saved = (await response.json()) as SavedUserRow
       setProviderUsers((prev) =>
@@ -437,7 +467,7 @@ export function UsersPage() {
    */
   const viewAsBlockedReason = (user: ProviderUser | null): string | null => {
     if (!user?.apertureUserId) return t('admin.usersPage.viewAsNotImported')
-    if (!user.isEnabled) return t('admin.usersPage.viewAsDisabled')
+    if (!user.isEnabled) return t('admin.usersPage.viewAsNoAccess')
     if (user.apertureUserId === currentUser?.id) return t('admin.usersPage.viewAsSelf')
     // Assumptions do not stack: there has to be exactly one account to return
     // to, so the server refuses a second one and the menu says so first.
@@ -569,18 +599,20 @@ export function UsersPage() {
   const isJobRunning = (userId: string) => runningJobs.has(userId)
   const providerLabel = provider.charAt(0).toUpperCase() + provider.slice(1)
 
-  // Whether the account can sign in to this app: users.is_enabled, which the API
-  // derives from the switches on this page. It used to show only as a faint green
-  // row tint, beside a "Status: Active" chip that describes the media-server
-  // account instead — so the one label on the row described the half this page
-  // cannot change. A server-disabled account cannot sign in whatever the flag says.
+  // Whether the account can sign in to this app: users.is_enabled, an admin
+  // decision of its own (F-135). It used to be derived from the feature switches,
+  // and before that it showed only as a faint green row tint, beside a "Status:
+  // Active" chip that describes the media-server account instead. A server-disabled
+  // account cannot sign in whatever the flag says.
   const renderAccessChip = (user: ProviderUser, compact = false) => {
     const canSignIn = user.isEnabled && !user.isDisabled
     const tooltip = canSignIn
       ? t('admin.usersPage.accessCanSignInTooltip', { provider: providerLabel })
       : user.isDisabled
         ? t('admin.usersPage.accessNoneServerTooltip', { provider: providerLabel })
-        : t('admin.usersPage.accessNoneTooltip')
+        : !user.isImported
+          ? t('admin.usersPage.notImportedTooltip')
+          : t('admin.usersPage.accessNoneHelp')
     return (
       <Tooltip title={tooltip}>
         <Chip
@@ -594,6 +626,39 @@ export function UsersPage() {
       </Tooltip>
     )
   }
+
+  /** You cannot switch off your own access; the server refuses it too. */
+  const isOwnAccess = (user: ProviderUser) =>
+    !!user.apertureUserId && user.apertureUserId === currentUser?.id && user.isEnabled
+
+  const accessSwitchTooltip = (user: ProviderUser) => {
+    if (isOwnAccess(user)) return t('admin.usersPage.accessOwnTooltip')
+    if (user.isDisabled) return t('admin.usersPage.accessNoneServerTooltip', { provider: providerLabel })
+    return user.isEnabled ? t('admin.usersPage.accessToggleOn') : t('admin.usersPage.accessToggleOff')
+  }
+
+  /** The Access switch for an imported account. */
+  const renderAccessSwitch = (user: ProviderUser) => (
+    <Tooltip title={accessSwitchTooltip(user)}>
+      <span>
+        <Switch
+          checked={user.isEnabled}
+          onChange={() => togglePermission(user, 'access')}
+          disabled={updating === user.providerUserId || user.isDisabled || isOwnAccess(user)}
+          color="primary"
+          size="small"
+          inputProps={{ 'aria-label': t('admin.usersPage.colAccess') }}
+        />
+      </span>
+    </Tooltip>
+  )
+
+  /**
+   * Feature switches on an account without access stay editable — setting an
+   * account up before letting it in is the point of keeping them apart — but
+   * read as dormant, so nobody mistakes a ticked switch for a working feature.
+   */
+  const dormantSx = (user: ProviderUser) => (user.isEnabled ? undefined : { opacity: 0.45 })
 
   const sortControl = (
     <Stack direction="row" alignItems="center" spacing={0.5} flexWrap="wrap">
@@ -777,6 +842,15 @@ export function UsersPage() {
                   {/* Settings for imported users */}
                   {user.isImported && (
                     <>
+                      {/* Access, apart from the features it gates */}
+                      <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
+                        <LoginIcon fontSize="small" color="action" />
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>
+                          {t('admin.usersPage.colAccess')}
+                        </Typography>
+                        {renderAccessSwitch(user)}
+                      </Stack>
+
                       {/* Media toggles in a compact row */}
                       <Stack direction="row" alignItems="center" spacing={2} mb={1.5}>
                         <Stack direction="row" alignItems="center" spacing={1}>
@@ -785,6 +859,7 @@ export function UsersPage() {
                           <Switch
                             checked={user.moviesEnabled}
                             onChange={() => togglePermission(user, 'movies')}
+                            sx={dormantSx(user)}
                             disabled={updating === user.providerUserId || user.isDisabled}
                             color="primary"
                             size="small"
@@ -796,6 +871,7 @@ export function UsersPage() {
                           <Switch
                             checked={user.seriesEnabled}
                             onChange={() => togglePermission(user, 'series')}
+                            sx={dormantSx(user)}
                             disabled={updating === user.providerUserId || user.isDisabled}
                             color="primary"
                             size="small"
@@ -811,6 +887,7 @@ export function UsersPage() {
                           <Switch
                             checked={user.discoverEnabled}
                             onChange={() => togglePermission(user, 'discover')}
+                            sx={dormantSx(user)}
                             disabled={updating === user.providerUserId || user.isDisabled}
                             color="primary"
                             size="small"
@@ -822,6 +899,7 @@ export function UsersPage() {
                           <Switch
                             checked={user.discoverRequestEnabled}
                             onChange={() => togglePermission(user, 'discoverRequest')}
+                            sx={dormantSx(user)}
                             disabled={updating === user.providerUserId || user.isDisabled || !user.discoverEnabled}
                             color="primary"
                             size="small"
@@ -836,6 +914,23 @@ export function UsersPage() {
                         <Switch
                           checked={user.collectionsEnabled}
                           onChange={() => togglePermission(user, 'collections')}
+                          sx={dormantSx(user)}
+                          disabled={updating === user.providerUserId || user.isDisabled}
+                          color="primary"
+                          size="small"
+                        />
+                      </Stack>
+
+                      {/* Assistant permission toggle */}
+                      <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
+                        <Tooltip title={t('admin.usersPage.assistantColTooltip')}>
+                          <SmartToyIcon fontSize="small" color="action" />
+                        </Tooltip>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>{t('admin.usersPage.colAssistant')}</Typography>
+                        <Switch
+                          checked={user.assistantEnabled}
+                          onChange={() => togglePermission(user, 'assistant')}
+                          sx={dormantSx(user)}
                           disabled={updating === user.providerUserId || user.isDisabled}
                           color="primary"
                           size="small"
@@ -851,6 +946,7 @@ export function UsersPage() {
                         <Switch
                           checked={user.emailNotificationsAllowed}
                           onChange={() => togglePermission(user, 'email')}
+                          sx={dormantSx(user)}
                           disabled={updating === user.providerUserId || user.isDisabled}
                           color="primary"
                           size="small"
@@ -865,6 +961,7 @@ export function UsersPage() {
                           <Switch
                             checked={user.aiOverrideAllowed}
                             onChange={() => handleToggleAiOverride(user)}
+                            sx={dormantSx(user)}
                             disabled={updating === user.providerUserId || user.isDisabled}
                             color="secondary"
                             size="small"
@@ -1027,7 +1124,7 @@ export function UsersPage() {
                 </Tooltip>
               </TableCell>
               <TableCell>
-                <Tooltip title={t('admin.usersPage.accessColTooltip')}>
+                <Tooltip title={t('admin.usersPage.accessColHelp')}>
                   <span>{t('admin.usersPage.colAccess')}</span>
                 </Tooltip>
               </TableCell>
@@ -1069,6 +1166,14 @@ export function UsersPage() {
                 </Tooltip>
               </TableCell>
               <TableCell align="center">
+                <Tooltip title={t('admin.usersPage.assistantColTooltip')}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                    <SmartToyIcon fontSize="small" />
+                    {t('admin.usersPage.colAssistant')}
+                  </Box>
+                </Tooltip>
+              </TableCell>
+              <TableCell align="center">
                 <Tooltip title={t('admin.usersPage.emailColTooltip')}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                     <EmailIcon fontSize="small" />
@@ -1092,7 +1197,7 @@ export function UsersPage() {
           <TableBody>
             {sortedUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={globalAiConfig?.userOverrideAllowed ? 12 : 11} align="center">
+                <TableCell colSpan={globalAiConfig?.userOverrideAllowed ? 13 : 12} align="center">
                   <Typography variant="body2" color="text.secondary" py={4}>
                     {t('admin.usersPage.noUsers', { provider: providerLabel })}
                   </Typography>
@@ -1165,7 +1270,7 @@ export function UsersPage() {
                       )}
                     </Tooltip>
                   </TableCell>
-                  <TableCell>{renderAccessChip(user)}</TableCell>
+                  <TableCell>{user.isImported ? renderAccessSwitch(user) : renderAccessChip(user)}</TableCell>
                   <TableCell align="center">
                     {user.isImported ? (
                       <Tooltip title={t('admin.usersPage.importedTooltip')}>
@@ -1182,6 +1287,7 @@ export function UsersPage() {
                       <Switch
                         checked={user.moviesEnabled}
                         onChange={() => togglePermission(user, 'movies')}
+                        sx={dormantSx(user)}
                         disabled={updating === user.providerUserId || user.isDisabled}
                         color="primary"
                         size="small"
@@ -1195,6 +1301,7 @@ export function UsersPage() {
                       <Switch
                         checked={user.seriesEnabled}
                         onChange={() => togglePermission(user, 'series')}
+                        sx={dormantSx(user)}
                         disabled={updating === user.providerUserId || user.isDisabled}
                         color="primary"
                         size="small"
@@ -1209,6 +1316,7 @@ export function UsersPage() {
                         <Switch
                           checked={user.discoverEnabled}
                           onChange={() => togglePermission(user, 'discover')}
+                          sx={dormantSx(user)}
                           disabled={updating === user.providerUserId || user.isDisabled}
                           color="primary"
                           size="small"
@@ -1224,6 +1332,7 @@ export function UsersPage() {
                         <Switch
                           checked={user.discoverRequestEnabled}
                           onChange={() => togglePermission(user, 'discoverRequest')}
+                          sx={dormantSx(user)}
                           disabled={updating === user.providerUserId || user.isDisabled || !user.discoverEnabled}
                           color="primary"
                           size="small"
@@ -1239,6 +1348,23 @@ export function UsersPage() {
                         <Switch
                           checked={user.collectionsEnabled}
                           onChange={() => togglePermission(user, 'collections')}
+                          sx={dormantSx(user)}
+                          disabled={updating === user.providerUserId || user.isDisabled}
+                          color="primary"
+                          size="small"
+                        />
+                      </Tooltip>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">—</Typography>
+                    )}
+                  </TableCell>
+                  <TableCell align="center">
+                    {user.isImported ? (
+                      <Tooltip title={user.assistantEnabled ? t('admin.usersPage.assistantToggleOn') : t('admin.usersPage.assistantToggleOff')}>
+                        <Switch
+                          checked={user.assistantEnabled}
+                          onChange={() => togglePermission(user, 'assistant')}
+                          sx={dormantSx(user)}
                           disabled={updating === user.providerUserId || user.isDisabled}
                           color="primary"
                           size="small"
@@ -1254,6 +1380,7 @@ export function UsersPage() {
                         <Switch
                           checked={user.emailNotificationsAllowed}
                           onChange={() => togglePermission(user, 'email')}
+                          sx={dormantSx(user)}
                           disabled={updating === user.providerUserId || user.isDisabled}
                           color="primary"
                           size="small"
@@ -1269,6 +1396,7 @@ export function UsersPage() {
                         <Switch
                           checked={user.aiOverrideAllowed}
                           onChange={() => handleToggleAiOverride(user)}
+                          sx={dormantSx(user)}
                           disabled={updating === user.providerUserId || user.isDisabled}
                           color="secondary"
                           size="small"

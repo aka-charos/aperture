@@ -87,7 +87,7 @@ type NavItem = {
 // Base user-facing navigation items (some may be conditionally hidden)
 const baseUserMenuItems: NavItem[] = [
   { textKey: 'nav.dashboard', icon: <HomeIcon />, path: '/', feature: null },
-  { textKey: 'nav.assistant', icon: <SmartToyIcon />, path: '/assistant', feature: null },
+  { textKey: 'nav.assistant', icon: <SmartToyIcon />, path: '/assistant', feature: null, capability: 'assistant' },
   { textKey: 'nav.recommendations', icon: <AutoAwesomeIcon />, path: '/recommendations', feature: null },
   { textKey: 'nav.showsYouWatch', icon: <AddToQueueIcon />, path: '/watching', feature: 'watching' },
   { textKey: 'nav.topPicks', icon: <WhatshotIcon />, path: '/top-picks', feature: null },

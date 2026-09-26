@@ -8,7 +8,7 @@ import {
   deleteAllUserSessions,
   type SessionUser,
 } from '../../../plugins/auth.js'
-import { accountEnabledSql, type AccountSwitchColumn } from '../../../lib/accountEnabled.js'
+import { accessChangeRefusal } from '../../../lib/accountEnabled.js'
 import { discoverRequestSql } from '../../../lib/permissions.js'
 import {
   auditUserPermissions,
@@ -22,7 +22,7 @@ const listLogger = createChildLogger('users-list')
 // `provider_disabled` and `ai_explanation_override_allowed` are here for the
 // permission audit, which diffs the row it just wrote. They are not part of
 // `UserRow`, so nothing else sees them.
-const USER_ROW_SELECT = `id, username, display_name, email, provider, provider_user_id, is_admin, is_enabled, movies_enabled, series_enabled, discover_enabled, discover_request_enabled, collections_enabled, email_notifications_allowed, can_manage_watch_history, provider_disabled, ai_explanation_override_allowed, seerr_user_id, created_at, updated_at`
+const USER_ROW_SELECT = `id, username, display_name, email, provider, provider_user_id, is_admin, is_enabled, movies_enabled, series_enabled, discover_enabled, discover_request_enabled, collections_enabled, assistant_enabled, email_notifications_allowed, can_manage_watch_history, provider_disabled, ai_explanation_override_allowed, seerr_user_id, created_at, updated_at`
 
 export function registerListHandlers(fastify: FastifyInstance) {
   /**
@@ -101,7 +101,12 @@ export function registerListHandlers(fastify: FastifyInstance) {
     async (request, reply) => {
       const { id } = request.params
       const currentUser = request.user as SessionUser
-      const { displayName, isEnabled, moviesEnabled, seriesEnabled, discoverEnabled, discoverRequestEnabled, collectionsEnabled, emailNotificationsAllowed, canManageWatchHistory, seerrUserId } = request.body
+      const { displayName, isEnabled, moviesEnabled, seriesEnabled, discoverEnabled, discoverRequestEnabled, collectionsEnabled, assistantEnabled, emailNotificationsAllowed, canManageWatchHistory, seerrUserId } = request.body
+
+      const refusal = accessChangeRefusal({ actorId: currentUser.id, targetId: id, isEnabled })
+      if (refusal) {
+        return reply.status(400).send({ error: refusal } as never)
+      }
 
       // Build update query dynamically
       const updates: string[] = []
@@ -113,10 +118,10 @@ export function registerListHandlers(fastify: FastifyInstance) {
         values.push(displayName)
       }
 
-      // The switches this request writes, by column, so is_enabled is derived from
-      // their NEW values (accountEnabledSql says why the bare column would not do).
-      const writtenSwitches: Partial<Record<AccountSwitchColumn, string>> = {}
-      const setSwitch = (column: AccountSwitchColumn, value: boolean | undefined) => {
+      // The switches this request writes, by column. Discover's is read back by
+      // the request-rights derivation below, which needs its NEW value.
+      const writtenSwitches: Partial<Record<string, string>> = {}
+      const setSwitch = (column: string, value: boolean | undefined) => {
         if (value === undefined) return
         writtenSwitches[column] = `$${paramIndex}`
         updates.push(`${column} = $${paramIndex++}`)
@@ -151,6 +156,7 @@ export function registerListHandlers(fastify: FastifyInstance) {
       }
 
       setSwitch('collections_enabled', collectionsEnabled)
+      setSwitch('assistant_enabled', assistantEnabled)
 
       if (emailNotificationsAllowed !== undefined) {
         updates.push(`email_notifications_allowed = $${paramIndex++}`)
@@ -172,15 +178,15 @@ export function registerListHandlers(fastify: FastifyInstance) {
         values.push(seerrUserId)
       }
 
-      // An explicit isEnabled is the caller's decision. Otherwise changing any switch
-      // re-derives it from the whole row, not from this request: the Users page
-      // sends one switch per request, and deciding from the request alone left
-      // accounts switched off one at a time enabled (lib/accountEnabled.ts).
+      // Access is written from an explicit isEnabled and from nothing else. It
+      // used to be re-derived from the feature switches on every save, so the
+      // only way to shut someone out was to switch all their features off, and
+      // letting them back in meant re-ticking everything from memory. A feature
+      // switch now leaves access alone, and access leaves the features alone
+      // (lib/accountEnabled.ts, F-135).
       if (isEnabled !== undefined) {
         updates.push(`is_enabled = $${paramIndex++}`)
         values.push(isEnabled)
-      } else if (Object.keys(writtenSwitches).length > 0) {
-        updates.push(`is_enabled = ${accountEnabledSql(writtenSwitches)}`)
       }
 
       if (updates.length === 0) {
@@ -215,14 +221,19 @@ export function registerListHandlers(fastify: FastifyInstance) {
       )
 
       // Disabling an account must end its existing sessions, not just block the
-      // next login. Keyed off the written row so it covers every path that can
-      // clear is_enabled, including the derived one when the last switch goes off.
+      // next login. Keyed off the written row rather than the request, so an
+      // account that was already off cannot be left holding a session.
       if (!user.is_enabled) {
         await deleteAllUserSessions(id).catch((err: unknown) =>
           listLogger.error({ err, userId: id }, 'Failed to revoke sessions for disabled user')
         )
       }
 
+      // With access off the account's generated libraries go, like its personal
+      // home rows do; everything they are built from (runs, taste profile,
+      // identity, every switch) stays, so turning access back on rebuilds them on
+      // the next run. STRM cleanup would remove them on its own sweep anyway,
+      // since it already treats `NOT is_enabled` as grounds.
       const disableAllRecommendations =
         isEnabled === false ||
         (moviesEnabled === false && seriesEnabled === false)

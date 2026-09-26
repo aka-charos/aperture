@@ -73,7 +73,12 @@ export function LoginPage() {
       await login(username, password)
       navigate('/')
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('login.loginFailed'))
+      const { code, serverName } = (err ?? {}) as { code?: string; serverName?: string }
+      if (code === 'ACCOUNT_ACCESS_DISABLED') {
+        setError(t('login.accessDisabled', { server: serverName || t('login.yourMediaServer') }))
+      } else {
+        setError(err instanceof Error ? err.message : t('login.loginFailed'))
+      }
     } finally {
       setLoading(false)
     }

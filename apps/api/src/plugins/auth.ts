@@ -43,6 +43,7 @@ export interface SessionUser {
    */
   canManageWatchHistory: boolean
   collectionsEnabled: boolean
+  assistantEnabled: boolean
   discoverEnabled: boolean
   discoverRequestEnabled: boolean
   emailNotificationsAllowed: boolean
@@ -91,6 +92,7 @@ export interface UserLookupRow {
   is_enabled: boolean
   can_manage_watch_history: boolean
   collections_enabled: boolean
+  assistant_enabled: boolean
   discover_enabled: boolean
   discover_request_enabled: boolean
   email_notifications_allowed: boolean
@@ -129,7 +131,7 @@ interface ImpersonationLookupRow extends UserLookupRow {
 export const USER_COLUMNS = (alias: string) =>
   `${alias}.id, ${alias}.username, ${alias}.display_name, ${alias}.provider, ${alias}.provider_user_id,
    ${alias}.is_admin, ${alias}.is_enabled, ${alias}.provider_disabled,
-   ${alias}.can_manage_watch_history, ${alias}.collections_enabled,
+   ${alias}.can_manage_watch_history, ${alias}.collections_enabled, ${alias}.assistant_enabled,
    ${alias}.discover_enabled, ${alias}.discover_request_enabled, ${alias}.email_notifications_allowed`
 
 const SESSION_COOKIE_NAME = 'aperture_session'
@@ -222,6 +224,7 @@ export function toSessionUser(row: UserLookupRow): SessionUser {
     isEnabled: row.is_enabled,
     canManageWatchHistory: row.can_manage_watch_history,
     collectionsEnabled: row.collections_enabled,
+    assistantEnabled: row.assistant_enabled,
     discoverEnabled: row.discover_enabled,
     discoverRequestEnabled: row.discover_request_enabled,
     emailNotificationsAllowed: row.email_notifications_allowed,
@@ -448,6 +451,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
             // row inside the handler, so they already applied to a key exactly
             // this way; only Collections stays forced off, which is the
             // behaviour an API key has always had.
+            assistantEnabled: apiKeyUser.assistantEnabled,
             discoverEnabled: apiKeyUser.discoverEnabled,
             discoverRequestEnabled: apiKeyUser.discoverRequestEnabled,
             emailNotificationsAllowed: apiKeyUser.emailNotificationsAllowed,

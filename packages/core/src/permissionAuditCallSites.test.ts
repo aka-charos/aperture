@@ -66,6 +66,7 @@ const PERMISSION_COLUMNS = [
   'discover_enabled',
   'discover_request_enabled',
   'collections_enabled',
+  'assistant_enabled',
   'can_manage_watch_history',
   'email_notifications_allowed',
   'ai_explanation_override_allowed',

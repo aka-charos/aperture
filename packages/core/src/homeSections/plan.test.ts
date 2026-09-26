@@ -15,6 +15,7 @@ import {
   featureOfKind,
   isHomeSectionTarget,
   isTopPicksTarget,
+  mayReceiveHomeRows,
   planViewerSections,
   playlistTagName,
   recsTagName,
@@ -87,9 +88,36 @@ describe('isHomeSectionTarget', () => {
 })
 
 describe('isTopPicksTarget', () => {
-  test('every account the media server has not disabled, enabled in Aperture or not', () => {
-    assert.equal(isTopPicksTarget({ providerDisabled: false }), true)
-    assert.equal(isTopPicksTarget({ providerDisabled: true }), false)
+  test('with the option on: every account the media server has not disabled, with access or not', () => {
+    assert.equal(isTopPicksTarget({ isEnabled: true, providerDisabled: false }, true), true)
+    assert.equal(isTopPicksTarget({ isEnabled: false, providerDisabled: false }, true), true)
+    assert.equal(isTopPicksTarget({ isEnabled: true, providerDisabled: true }, true), false)
+    assert.equal(isTopPicksTarget({ isEnabled: false, providerDisabled: true }, true), false)
+  })
+
+  test('with the option off: only accounts with access', () => {
+    assert.equal(isTopPicksTarget({ isEnabled: true, providerDisabled: false }, false), true)
+    assert.equal(isTopPicksTarget({ isEnabled: false, providerDisabled: false }, false), false)
+    assert.equal(isTopPicksTarget({ isEnabled: true, providerDisabled: true }, false), false)
+  })
+})
+
+describe('mayReceiveHomeRows', () => {
+  test('anyone who gets personal rows or Top Picks rows, and nobody else', () => {
+    for (const isEnabled of [false, true]) {
+      for (const providerDisabled of [false, true]) {
+        for (const withoutAccess of [false, true]) {
+          const viewer = { isEnabled, providerDisabled }
+          assert.equal(
+            mayReceiveHomeRows(viewer, withoutAccess),
+            isHomeSectionTarget(viewer) || isTopPicksTarget(viewer, withoutAccess),
+            JSON.stringify({ ...viewer, withoutAccess })
+          )
+        }
+      }
+    }
+    // A viewer without access gets nothing once Top Picks stops reaching them.
+    assert.equal(mayReceiveHomeRows({ isEnabled: false, providerDisabled: false }, false), false)
   })
 })
 

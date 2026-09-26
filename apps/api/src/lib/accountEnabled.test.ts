@@ -4,7 +4,12 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { accountEnabledSql, isAccountEnabled, type AccountEnabledInput } from './accountEnabled.js'
+import {
+  accessChangeRefusal,
+  accountEnabledSql,
+  isAccountEnabled,
+  type AccountEnabledInput,
+} from './accountEnabled.js'
 
 const ALL_OFF: AccountEnabledInput = {
   moviesEnabled: false,
@@ -71,4 +76,18 @@ test('the SQL and the function agree on every row', () => {
     })
     assert.equal(evaluate(accountEnabledSql(), row), expected, JSON.stringify(row))
   }
+})
+
+test('nobody can turn off their own access', () => {
+  // Neither the login route nor the session lookup exempts admins, so an admin
+  // who switched themselves off would be locked out with nobody to switch them
+  // back on.
+  assert.notEqual(accessChangeRefusal({ actorId: 'a', targetId: 'a', isEnabled: false }), null)
+})
+
+test('turning access on, or off for someone else, is allowed', () => {
+  assert.equal(accessChangeRefusal({ actorId: 'a', targetId: 'a', isEnabled: true }), null)
+  assert.equal(accessChangeRefusal({ actorId: 'a', targetId: 'b', isEnabled: false }), null)
+  // A request that does not touch access is not an access change at all.
+  assert.equal(accessChangeRefusal({ actorId: 'a', targetId: 'a', isEnabled: undefined }), null)
 })
