@@ -3190,3 +3190,45 @@ The history renders under the switches that produce it on the user detail page, 
 The AI-explanation toggle stays separate on purpose — it is a different endpoint, and folding it into the table would hide that.
 
 **Still not done.** `max_parental_rating` is applied in the recommender, channels and discovery but not in browse, search, similarity or the assistant. Twenty-eight hand-rolled `x !== currentUser.id && !isAdmin` checks sit beside a `requireSelfOrAdmin` helper used at 34 more, two of them omitting the admin clause with nothing saying whether that is deliberate. The audit records what changed but not what was *attempted and refused*, so a failed permission escalation leaves no trace.
+
+---
+
+## F-135
+
+**Access was a side effect of the feature switches, so shutting someone out erased how their account was set up.** Added 2026-09-26.
+
+### Why access had to become its own switch
+
+[F-127](#f-127) made `users.is_enabled` derived: an account could sign in while Movies, Series, Discover or Collections was on. That fixed a real drift — accounts switched off one switch at a time stayed signed in — but it left the switches doing two jobs. To shut someone out, an admin switched every feature off; to let them back in, they had to remember which features the person had and re-tick them. There was no way to say "not now" and keep the setup, and no way to prepare an account's features before letting it in. The Users page showed access as a read-only chip ("Can sign in") because there was nothing to click.
+
+`PUT /api/users/:id` now writes `is_enabled` only from an explicit `isEnabled`, and the Users page's Access column is a switch. **Five rules.**
+
+1. **Access off keeps every switch and stops everything per-user.** Nothing new had to be gated for this: every per-user job already reads `is_enabled` — both recommender pipelines, taste-profile rebuilds, the Watcher Identity refresh (which runs inside the pipelines), discovery, both STRM writers, home sections, the suggestion chips. Sessions end at once (the PUT deletes them) and API keys stop working (`validateApiKey` refuses the account). The generated STRM libraries are removed, which is what `isEnabled: false` already triggered and what `strm/cleanup.ts`'s sweep already did for `NOT is_enabled`; the runs, taste profile, identity and ratings they are built from are kept, so turning access back on brings the libraries back at the next library sync (every three hours by default) with nothing to redo. That was a choice with an alternative — keep the libraries on disk while access is off — and removing them was taken because a library in Emby named for someone is the one piece of Aperture output that person still sees without signing in, so leaving it would make "access off" mean less than it says.
+
+2. **Features stay editable without access.** Setting an account up before switching it on is half the point of separating the two. The page draws those switches at reduced opacity, so a ticked switch on an account without access does not read as a working feature.
+
+3. **You cannot switch off your own access.** The derivation carried an admin clause — "an admin already enabled stays enabled with every switch off" — because neither the login route nor the session lookup exempts admins. Removing the derivation removed that guard with it, so an explicit one replaces it: `accessChangeRefusal` (pure, pinned) refuses the request at the API, and the page disables the switch on the admin's own row with a tooltip saying why. Only turning access OFF on yourself is refused; an admin can only be making the request if they already have access.
+
+4. **Derivation survives where a writer has no access control of its own.** The setup wizard's per-user Movies/Series checkboxes and the admin import (`POST /api/users/import`) are the only way those screens can say "this person uses the app", so initial access follows initial features there. `isAccountEnabled`/`accountEnabledSql` are kept for those two and nothing else; a new writer does not join them.
+
+5. **No migration re-derives anything.** Every stored value already was the derived value, which is precisely the access each account has today. `0184` changes only the rule for later writes (and the column comment that states it).
+
+**The login refusal now says whose decision it was.** It read "This account has been disabled. Contact your administrator." — the same words whether access was off here or the account was disabled in Emby, which have different fixes and different people to ask. It is now "Your {{appName}} access is turned off. Contact your {{server}} administrator.", with `code: ACCOUNT_ACCESS_DISABLED` and `serverName` in the body so the page translates it. The server name is the admin's display name for it, else what the server reports, else "Emby"/"Jellyfin". Naming it leaks nothing: the refusal is only reached after the caller authenticated against that server.
+
+**Two Users-page fixes rode along.** A refused toggle used to return silently and leave the switch where it was, which reads as a broken page; it now shows the server's reason. And importing a user set only `isEnabled` locally while the server also switched Movies on, so the row was wrong until a reload — it now applies the saved row, the same rule `applySavedRow` already followed for toggles.
+
+### The assistant had no permission at all
+
+Every `/api/assistant/*` route checked only for a session, and every turn is paid model calls. It is now the `assistant` capability (`users.assistant_enabled`, `0184`), gated on all eight routes. Three decisions:
+
+- **Default on.** Adding a permission must not take the feature from anyone who has it; access still gates it for accounts that should not have it.
+- **Admin override.** Every admin had it before it existed, and the permissions test asserts the bypass *set*, so this was a deliberate edit to that assertion rather than a side effect.
+- **API keys carry the account's flag**, like Discover, rather than being forced off. Nothing showed a key using the chat, but forcing it off would be a behaviour change nobody asked for; a key's scopes already bound what it can do.
+
+The suggestion-chip job now builds chips only for accounts that can open the assistant, and the web hides the nav entry, does not mount the floating chat (so it reserves no dock width), and sends `/assistant` home for an account without it — the address outlives the link in bookmarks.
+
+### Top Picks for accounts without access became a choice
+
+Top Picks rows went to every account the media server had not disabled, with or without access here ([F-128](#f-128)), and nothing could change that. That is right for a household that wants everyone to see the server-wide list, and wrong for an operator who shut someone out on purpose. `home_sections_config.top_picks_without_access` (default on, which is the old behaviour) makes it a setting under the Top Picks switch.
+
+`isTopPicksTarget(viewer, withoutAccess)` takes the setting as a **required** argument — a default is a decision a caller can forget, and forgetting this one puts the rows back on the screens of the people it was turned off for. `mayReceiveHomeRows` is the union of that and the personal-rows target, and it is now the population the anchor list reads home screens from and the one an instant placement may touch; both used to test `provider_disabled` alone, which was the Top Picks rule under another name. Turning the option off removes the rows at the next sync, like any other viewer who stops qualifying.

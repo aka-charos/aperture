@@ -19,6 +19,7 @@ import {
 } from 'ai'
 import { getChatModelInstance, getEmbeddingInvocation, withInferenceContext } from '@aperture/core'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
+import { requireCapability } from '../../../lib/permissions.js'
 import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText, loadConversationHistory, withUnwatchedFilter, createStatusEmitter, withStatusEvents, withRequestContext } from '../helpers/index.js'
 import { createTools, createN8nTools, createEpisodeTools, createDiscoveryResolveTool, DISCOVERY_PROMPT } from '../tools/index.js'
 import { withToolErrorHandling } from '../tools/utils.js'
@@ -153,7 +154,7 @@ function describeToolResult(result: { toolName: string; output?: unknown }): str
 export function registerChatHandler(fastify: FastifyInstance) {
   fastify.post<{ Body: ChatBody }>(
     '/api/assistant/chat',
-    { preHandler: requireAuth, schema: { tags: ["ai-assistant"] } },
+    { preHandler: [requireAuth, requireCapability('assistant')], schema: { tags: ["ai-assistant"] } },
     async (request: FastifyRequest<{ Body: ChatBody }>, reply: FastifyReply) => {
       const user = request.user as SessionUser
       const { messages } = request.body

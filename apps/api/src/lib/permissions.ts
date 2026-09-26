@@ -29,8 +29,8 @@
  *    two halves — a stale row, or a route that trusts the column — wrong.
  *
  * 3. **Admin override is declared per capability, never assumed.** An admin
- *    bypasses Collections and watch-history management, and deliberately does
- *    NOT bypass Discover: an admin with Discover switched off has always been
+ *    bypasses Collections, watch-history management and the assistant, and
+ *    deliberately does NOT bypass Discover: an admin with Discover switched off has always been
  *    refused by those routes, and quietly granting it here would be a change
  *    of behaviour wearing a refactor's clothes.
  *
@@ -48,6 +48,7 @@ export interface PermissionSubject {
   discoverEnabled: boolean
   discoverRequestEnabled: boolean
   collectionsEnabled: boolean
+  assistantEnabled: boolean
   canManageWatchHistory: boolean
   emailNotificationsAllowed: boolean
 }
@@ -56,6 +57,7 @@ export const CAPABILITIES = [
   'discover',
   'discover:request',
   'collections',
+  'assistant',
   'watchHistory:manage',
   'emailNotifications',
 ] as const
@@ -109,6 +111,21 @@ const RULES: Record<Capability, CapabilityRule> = {
     granted: (s) => s.collectionsEnabled,
     adminOverride: true,
     refusal: { error: 'Collections are not enabled for your account' },
+  },
+
+  /**
+   * The AI assistant — every turn is paid model calls, which is why it is a
+   * permission at all. It had none: the chat routes checked only that someone
+   * was signed in. Admins bypass it because everyone, admins included, had it
+   * before it existed, and the column defaults on (0184) for the same reason.
+   */
+  assistant: {
+    granted: (s) => s.assistantEnabled,
+    adminOverride: true,
+    refusal: {
+      error: 'The assistant is not enabled for your account',
+      message: 'Contact your admin to enable the assistant',
+    },
   },
 
   /**
@@ -177,7 +194,7 @@ export function requireCapability(capability: Capability) {
  * `can()` as everyone else rather than a bare column test.
  */
 export const PERMISSION_COLUMNS = `is_admin, discover_enabled, discover_request_enabled,
-       collections_enabled, can_manage_watch_history, email_notifications_allowed`
+       collections_enabled, assistant_enabled, can_manage_watch_history, email_notifications_allowed`
 
 /** A row selected with `PERMISSION_COLUMNS`. */
 export interface PermissionRow {
@@ -185,6 +202,7 @@ export interface PermissionRow {
   discover_enabled: boolean
   discover_request_enabled: boolean
   collections_enabled: boolean
+  assistant_enabled: boolean
   can_manage_watch_history: boolean
   email_notifications_allowed: boolean
 }
@@ -195,6 +213,7 @@ export function toPermissionSubject(row: PermissionRow): PermissionSubject {
     discoverEnabled: row.discover_enabled,
     discoverRequestEnabled: row.discover_request_enabled,
     collectionsEnabled: row.collections_enabled,
+    assistantEnabled: row.assistant_enabled,
     canManageWatchHistory: row.can_manage_watch_history,
     emailNotificationsAllowed: row.email_notifications_allowed,
   }

@@ -15,6 +15,7 @@ import { getFeaturePlacements, saveFeaturePlacements } from './placementStore.js
 interface HomeSectionsConfigRow {
   enabled: boolean
   top_picks_enabled: boolean
+  top_picks_without_access: boolean
   recommendations_enabled: boolean
   playlists_enabled: boolean
   top_picks_movies_name: string
@@ -31,6 +32,7 @@ type ColumnField = Exclude<keyof HomeSectionsConfigUpdate, 'placements'>
 const COLUMN_FOR: Record<ColumnField, string> = {
   enabled: 'enabled',
   topPicksEnabled: 'top_picks_enabled',
+  topPicksWithoutAccess: 'top_picks_without_access',
   recommendationsEnabled: 'recommendations_enabled',
   playlistsEnabled: 'playlists_enabled',
   topPicksMoviesName: 'top_picks_movies_name',
@@ -50,6 +52,8 @@ export async function getHomeSectionsConfig(): Promise<HomeSectionsConfig> {
   return {
     enabled: row.enabled,
     topPicksEnabled: row.top_picks_enabled,
+    // Absent on a row read before 0184 ran; absent means the old behaviour.
+    topPicksWithoutAccess: row.top_picks_without_access !== false,
     recommendationsEnabled: row.recommendations_enabled,
     playlistsEnabled: row.playlists_enabled,
     topPicksMoviesName: row.top_picks_movies_name,

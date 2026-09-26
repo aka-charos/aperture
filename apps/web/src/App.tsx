@@ -16,6 +16,7 @@ import { AssistantDockProvider } from './hooks/AssistantDockProvider'
 import { Layout } from './components/Layout'
 import { AdminShell } from './components/AdminShell'
 import { AssistantModal } from './components/AssistantModal'
+import { useCapability } from './hooks/useCapability'
 import { LoginPage } from './pages/Login'
 import { SetupPage } from './pages/setup'
 import { DashboardPage } from './pages/dashboard'
@@ -69,6 +70,23 @@ function SetupGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+/**
+ * The floating chat, for an account allowed the assistant. Not mounted at all
+ * otherwise, so it never reserves dock width for a chat that cannot open.
+ */
+function AssistantEntry() {
+  return useCapability('assistant') ? <AssistantModal /> : null
+}
+
+/**
+ * /assistant for an account without the assistant goes home rather than
+ * rendering a chat whose every request would answer 403 — the address still
+ * exists in bookmarks and browser history after the link leaves the sidebar.
+ */
+function AssistantRoute() {
+  return useCapability('assistant') ? <AssistantPage /> : <Navigate to="/" replace />
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
 
@@ -100,7 +118,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
             <WatchingProvider>
               <AssistantDockProvider>
                 {children}
-                <AssistantModal />
+                <AssistantEntry />
               </AssistantDockProvider>
             </WatchingProvider>
           </WatchStatusProvider>
@@ -161,7 +179,7 @@ function AppRoutes() {
       >
         {/* User Routes */}
         <Route index element={<DashboardPage />} />
-        <Route path="assistant" element={<AssistantPage />} />
+        <Route path="assistant" element={<AssistantRoute />} />
         <Route path="recommendations" element={<MyRecommendationsPage />} />
         <Route path="watching" element={<WatchingPage />} />
         <Route path="top-picks" element={<TopPicksPage />} />

@@ -25,6 +25,7 @@ import {
 } from './placement.js'
 import { clearUserPlacement, getUserPlacements, setUserPlacement } from './placementStore.js'
 import { loadHomePlaylists } from './playlists.js'
+import { isTopPicksTarget } from './plan.js'
 
 export interface UserHomeScreenFeature {
   feature: PlacementFeature
@@ -76,7 +77,11 @@ export async function getUserHomeScreenSettings(userId: string): Promise<UserHom
 
   const target = user.is_enabled === true
   const reaching: Array<[PlacementFeature, string | null]> = []
-  if (config.topPicksEnabled && (await getTopPicksConfig()).isEnabled) {
+  const topPicksTarget = isTopPicksTarget(
+    { isEnabled: user.is_enabled === true, providerDisabled: user.provider_disabled },
+    config.topPicksWithoutAccess
+  )
+  if (topPicksTarget && config.topPicksEnabled && (await getTopPicksConfig()).isEnabled) {
     reaching.push(['top-picks-movies', config.topPicksMoviesName], ['top-picks-series', config.topPicksSeriesName])
   }
   if (target && config.recommendationsEnabled) {

@@ -14,7 +14,8 @@ import { MANAGED_TAG_PREFIX } from '../media/managedTags.js'
 import type { MediaServerProvider } from '../media/MediaServerProvider.js'
 import type { ContentSection } from '../media/types.js'
 import { getMediaServerApiKey } from '../settings/systemSettings.js'
-import { isTopPicksTarget, sectionTagIds } from './plan.js'
+import { mayReceiveHomeRows, sectionTagIds } from './plan.js'
+import { getHomeSectionsConfig } from './config.js'
 import { collapseExpandedRows, isTypeMatchable, type HomeScreenRow } from './placement.js'
 import { loadViewers } from './sources.js'
 
@@ -94,8 +95,14 @@ const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensiti
  */
 export async function listSharedHomeRows(): Promise<SharedHomeRows> {
   const { provider, apiKey } = await requireServer()
+  // Everyone a managed row could land on — so an account that will never get
+  // one does not count toward, or against, a row it has.
+  const { topPicksWithoutAccess } = await getHomeSectionsConfig()
   const viewers = (await loadViewers(provider.type)).filter((viewer) =>
-    isTopPicksTarget({ providerDisabled: viewer.provider_disabled })
+    mayReceiveHomeRows(
+      { isEnabled: viewer.is_enabled, providerDisabled: viewer.provider_disabled },
+      topPicksWithoutAccess
+    )
   )
   const managed = await managedTagIds(provider, apiKey)
 

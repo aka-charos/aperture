@@ -173,9 +173,12 @@ export async function refreshAssistantSuggestions(jobId: string): Promise<{ user
   let errors = 0
 
   try {
-    // Get all users
+    // Everyone who can open the assistant, and nobody else: the chips are the
+    // assistant's own opening prompts, so a user without it has nowhere to see
+    // them. Mirrors the 'assistant' capability (lib/permissions.ts), admins
+    // included.
     const users = await query<UserRow>(
-      `SELECT id FROM users WHERE is_enabled = true`
+      `SELECT id FROM users WHERE is_enabled = true AND (assistant_enabled = true OR is_admin = true)`
     )
 
     const totalUsers = users.rows.length

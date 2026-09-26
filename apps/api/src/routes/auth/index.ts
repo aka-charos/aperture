@@ -84,6 +84,26 @@ interface MeResponse {
   capabilities: Record<Capability, boolean>
 }
 
+/**
+ * What a person calls the media server: the admin's display name for it, else the
+ * name the server reports, else its product name. Never throws — this words a
+ * refusal, and a refusal that failed to render would read as a broken login.
+ */
+async function mediaServerNameForHumans(
+  provider: { type: string; getServerInfo(apiKey: string): Promise<{ name: string }> },
+  apiKey: string
+): Promise<string> {
+  try {
+    const custom = ((await getSystemSetting('server_display_name')) ?? '').trim()
+    if (custom) return custom
+    const reported = (await provider.getServerInfo(apiKey)).name?.trim()
+    if (reported) return reported
+  } catch {
+    // Fall through to the product name.
+  }
+  return provider.type === 'jellyfin' ? 'Jellyfin' : 'Emby'
+}
+
 const authRoutes: FastifyPluginAsync = async (fastify) => {
   // Register schemas
   for (const [name, schema] of Object.entries(authSchemas)) {
@@ -255,10 +275,17 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       // Authenticating against the media server says nothing about whether an
       // admin has disabled the account here. Checked after the upsert so the
       // row reflects the current state, and before any session exists.
+      //
+      // The refusal names the server, and carries a code so the page can say it
+      // in the reader's language. Naming the server leaks nothing: the caller has
+      // just proved they hold an account on it.
       if (!user.is_enabled) {
-        fastify.log.warn({ userId: user.id }, 'Login refused: account disabled')
+        fastify.log.warn({ userId: user.id }, 'Login refused: account access is off')
+        const serverName = await mediaServerNameForHumans(provider, config.apiKey)
         return reply.status(403).send({
-          error: 'This account has been disabled. Contact your administrator.',
+          error: `Your access is turned off. Contact your ${serverName} administrator.`,
+          code: 'ACCOUNT_ACCESS_DISABLED',
+          serverName,
         } as never)
       }
 

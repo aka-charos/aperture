@@ -85,8 +85,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Login failed')
+      const error = await response.json().catch(() => ({}))
+      // The code and server name ride along so the login page can word a
+      // refusal in the reader's language; the English text is the fallback.
+      throw Object.assign(new Error(error.error || 'Login failed'), {
+        code: typeof error.code === 'string' ? error.code : undefined,
+        serverName: typeof error.serverName === 'string' ? error.serverName : undefined,
+      })
     }
 
     const data = await response.json()

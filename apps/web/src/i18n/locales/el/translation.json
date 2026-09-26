@@ -3674,7 +3674,9 @@
     "signingIn": "Γίνεται σύνδεση…",
     "loginFailed": "Η σύνδεση απέτυχε",
     "sessionError": "Δεν ήταν δυνατή η επαναφορά της συνεδρίας σας.",
-    "footerProviders": "Χρησιμοποιήστε τον λογαριασμό σας σε Emby ή Jellyfin"
+    "footerProviders": "Χρησιμοποιήστε τον λογαριασμό σας σε Emby ή Jellyfin",
+    "accessDisabled": "Your {{appName}} access is turned off. Contact your {{server}} administrator.",
+    "yourMediaServer": "media server"
   },
   "explorationConfig": {
     "title": "Νέα Λειτουργία: AI Εξερεύνησης",
@@ -4280,21 +4282,33 @@
       "menuViewAs": "View the app as this user",
       "menuViewAsSecondary": "Read-only. Nothing is saved to their account.",
       "viewAsNotImported": "Only imported users can be viewed",
-      "viewAsDisabled": "This account is disabled",
       "viewAsSelf": "This is your own account",
       "viewAsAlreadyActive": "You are already viewing the app as someone else",
       "viewAsError": "Could not view the app as {{name}}: {{error}}",
       "colServerAccount": "{{provider}} account",
       "serverAccountColTooltip": "Whether the account is enabled on {{provider}} itself. It is set in {{provider}}'s dashboard, not here, and a disabled account gets nothing from {{appName}}.",
       "colAccess": "{{appName}} access",
-      "accessColTooltip": "Whether the account can sign in to {{appName}}. It can once Movies, Series, Discover or Collections is switched on; an admin who already has access keeps it with everything off.",
       "serverAccountActive": "Active",
       "serverAccountDisabled": "Disabled in {{provider}}",
       "accessCanSignIn": "Can sign in",
       "accessCanSignInTooltip": "Signs in with their {{provider}} account and sees the features switched on.",
       "accessNone": "No access",
-      "accessNoneTooltip": "Switch on Movies, Series, Discover or Collections to let this account sign in.",
-      "accessNoneServerTooltip": "Disabled in {{provider}}, so it cannot sign in."
+      "accessNoneServerTooltip": "Disabled in {{provider}}, so it cannot sign in.",
+      "accessColHelp": "Whether the account can sign in to {{appName}}. Separate from the feature switches: turning it off keeps them as they are, ends the account's sessions and stops all background work for it.",
+      "accessNoneHelp": "Access is off. Turn it on to let this account sign in.",
+      "accessToggleOn": "Turn off access. The feature switches keep their settings.",
+      "accessToggleOff": "Turn on access to let this account sign in",
+      "accessOwnTooltip": "You cannot turn off your own access",
+      "accessOn": "{{name}} can now sign in to {{appName}}",
+      "accessOff": "{{name}} can no longer sign in to {{appName}}. Their settings are kept.",
+      "permissionSaveFailed": "Could not save the change",
+      "viewAsNoAccess": "This account has no access",
+      "colAssistant": "Assistant",
+      "assistantColTooltip": "Allow the AI assistant. Every message costs model calls. Admins always have it.",
+      "assistantToggleOn": "Disable the assistant",
+      "assistantToggleOff": "Enable the assistant",
+      "assistantOn": "{{name}} can now use the assistant",
+      "assistantOff": "{{name}} can no longer use the assistant"
     },
     "userDetail": {
       "userNotFound": "Ο χρήστης δεν βρέθηκε",
@@ -4397,7 +4411,8 @@
         "can_manage_watch_history": "Watch history management",
         "email_notifications_allowed": "Email notifications",
         "ai_explanation_override_allowed": "AI explanation override",
-        "scopes": "API key permissions"
+        "scopes": "API key permissions",
+        "assistant_enabled": "Assistant"
       }
     },
     "jobsPage": {
@@ -5458,7 +5473,6 @@
     "enableBlocked": "Needs Emby {{minVersion}} or newer",
     "rowsHeading": "Rows",
     "topPicksEnabled": "Top Picks — one row for movies, one for series",
-    "topPicksHelp": "Shown to every Emby user, including those not enabled in {{appName}}. Reads the Top Picks list, so Top Picks itself must be switched on.",
     "recommendationsEnabled": "Each viewer's own recommendations — one row for movies, one for series",
     "recommendationsHelp": "The picks from their most recent recommendation runs. A viewer only gets the row for a media type switched on for them.",
     "namesHeading": "Row names",
@@ -5505,7 +5519,10 @@
     "anchorsUnreadableAccounts": "Did not answer: {{names}}",
     "anchorMissingAccounts": "Not on: {{names}}",
     "anchorFallbackPrompt": "Those accounts get:",
-    "namesAndMore": "{{names}} and {{extra}} more"
+    "namesAndMore": "{{names}} and {{extra}} more",
+    "topPicksRowsHelp": "One list for the whole server, so it says nothing about the person looking at it. Reads the Top Picks list, so Top Picks itself must be switched on.",
+    "topPicksWithoutAccess": "Also show Top Picks to accounts without {{appName}} access",
+    "topPicksWithoutAccessHelp": "Off: only accounts that can sign in to {{appName}} get these rows, and everyone else loses them at the next sync. Accounts disabled in Emby never get them."
   },
   "homeScreenPlacement": {
     "mode": "Placement",

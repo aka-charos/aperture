@@ -78,15 +78,32 @@ export function isHomeSectionTarget(viewer: HomeSectionViewer): boolean {
 }
 
 /**
- * Whose home screen gets the Top Picks rows: every account the media server has
- * not disabled, enabled in Aperture or not (the operator's call). Top Picks is one
- * list for the whole server and says nothing about the person looking at it, so it
- * does not need the consent a viewer's own picks do. The user sync imports every
- * account on the server, so the users table is everyone — bar accounts created
- * since it last ran. A `provider_disabled` account still has its rows removed.
+ * Whose home screen gets the Top Picks rows: every account with access, and —
+ * when `withoutAccess` is set, which is the default — every account the media
+ * server has not disabled, whether it has access here or not. Top Picks is one
+ * list for the whole server and says nothing about the person looking at it, so
+ * it does not need the consent a viewer's own picks do; whether it should reach
+ * people who were deliberately given no access is the operator's call
+ * (`home_sections_config.top_picks_without_access`, 0184). The user sync imports
+ * every account on the server, so the users table is everyone — bar accounts
+ * created since it last ran. A `provider_disabled` account always has its rows
+ * removed.
+ *
+ * `withoutAccess` is required rather than defaulted: a default is a decision a
+ * caller can forget, and forgetting this one puts rows back on the screens of the
+ * people an operator switched it off for.
  */
-export function isTopPicksTarget(viewer: Pick<HomeSectionViewer, 'providerDisabled'>): boolean {
-  return !viewer.providerDisabled
+export function isTopPicksTarget(viewer: HomeSectionViewer, withoutAccess: boolean): boolean {
+  if (viewer.providerDisabled) return false
+  return viewer.isEnabled || withoutAccess
+}
+
+/**
+ * Whether a viewer can receive ANY managed row — the population whose home
+ * screens anchors are read from, and the one an instant placement may touch.
+ */
+export function mayReceiveHomeRows(viewer: HomeSectionViewer, topPicksWithoutAccess: boolean): boolean {
+  return isHomeSectionTarget(viewer) || isTopPicksTarget(viewer, topPicksWithoutAccess)
 }
 
 export interface MembershipDiff {

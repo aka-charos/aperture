@@ -51,6 +51,11 @@ export interface HomeSectionsConfig {
   enabled: boolean
   /** Both Top Picks rows. */
   topPicksEnabled: boolean
+  /**
+   * Whether the Top Picks rows also reach accounts without access here. On by
+   * default, which is how Top Picks always behaved (0184).
+   */
+  topPicksWithoutAccess: boolean
   /** Both recommendation rows (movies and series). */
   recommendationsEnabled: boolean
   /** Whether viewers may put their own generated playlists on their home screen. */
@@ -69,6 +74,7 @@ export interface HomeSectionsConfig {
 export const DEFAULT_HOME_SECTIONS_CONFIG: HomeSectionsConfig = {
   enabled: false,
   topPicksEnabled: true,
+  topPicksWithoutAccess: true,
   recommendationsEnabled: true,
   playlistsEnabled: true,
   topPicksMoviesName: 'Top Picks: Movies',
@@ -88,6 +94,7 @@ export type HomeSectionsConfigUpdate = Partial<
     HomeSectionsConfig,
     | 'enabled'
     | 'topPicksEnabled'
+    | 'topPicksWithoutAccess'
     | 'recommendationsEnabled'
     | 'playlistsEnabled'
     | 'topPicksMoviesName'
@@ -99,7 +106,13 @@ export type HomeSectionsConfigUpdate = Partial<
   >
 > & { placements?: Partial<Record<PlacementFeature, FeaturePlacement>> }
 
-const BOOLEAN_FIELDS = ['enabled', 'topPicksEnabled', 'recommendationsEnabled', 'playlistsEnabled'] as const
+const BOOLEAN_FIELDS = [
+  'enabled',
+  'topPicksEnabled',
+  'topPicksWithoutAccess',
+  'recommendationsEnabled',
+  'playlistsEnabled',
+] as const
 const NAME_FIELDS = [
   'topPicksMoviesName',
   'topPicksSeriesName',
