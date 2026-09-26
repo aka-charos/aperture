@@ -2,7 +2,7 @@
  * Type definitions for the AI Assistant module
  */
 
-import type { EmbeddingInvocation } from '@aperture/core'
+import type { EmbeddingInvocation, LibraryScope } from '@aperture/core'
 import type { StatusEmitter } from './helpers/status.js'
 
 // Database query result types
@@ -100,6 +100,13 @@ export interface DiscoveryCandidate {
 export interface ToolContext {
   userId: string
   isAdmin: boolean
+  /**
+   * What the viewer may open (lib/libraryScope.ts). Required, so a context
+   * built anywhere cannot forget it: every tool's cards are filtered to it by
+   * `withLibraryScope`, and the search tools also put it in their SQL, since a
+   * `brief` result is text the wrapper cannot see into.
+   */
+  scope: LibraryScope
   /**
    * The model, its per-call provider options, and the set id those imply —
    * resolved once per turn and handed over together.

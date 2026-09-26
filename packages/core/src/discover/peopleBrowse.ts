@@ -1,4 +1,5 @@
 import { query, queryOne } from '../lib/db.js'
+import { binderFor, libraryScopeSql, type LibraryScope } from '../lib/libraryScope.js'
 
 export interface ListPeopleBrowseOptions {
   search?: string
@@ -7,6 +8,11 @@ export interface ListPeopleBrowseOptions {
   sortBy?: 'name' | 'credits'
   /** When true, include items from disabled libraries (only applies if library_config rows exist). */
   showAll?: boolean
+  /**
+   * What the viewer may see (lib/libraryScope.ts). When given it decides alone:
+   * `showAll` never widens a viewer's scope.
+   */
+  scope?: LibraryScope
 }
 
 export interface PersonBrowseRow {
@@ -43,28 +49,33 @@ export async function listPeopleForBrowse(
   const hasLibraryConfigs = configCheck && parseInt(configCheck.count, 10) > 0
   const filterByLibrary = hasLibraryConfigs && !showAll
 
-  const libMovie = filterByLibrary
-    ? `EXISTS (
+  const searchParam = search.length > 0 ? search : null
+  const params: unknown[] = [searchParam, pageSize, offset]
+
+  const libMovie = options.scope
+    ? libraryScopeSql(options.scope, 'm', binderFor(params))
+    : filterByLibrary
+      ? `EXISTS (
         SELECT 1 FROM library_config lc
         WHERE lc.provider_library_id = m.provider_library_id
         AND lc.is_enabled = true
       )`
-    : 'TRUE'
+      : 'TRUE'
 
-  const libSeries = filterByLibrary
-    ? `EXISTS (
+  const libSeries = options.scope
+    ? libraryScopeSql(options.scope, 's', binderFor(params))
+    : filterByLibrary
+      ? `EXISTS (
         SELECT 1 FROM library_config lc
         WHERE lc.provider_library_id = s.provider_library_id
         AND lc.is_enabled = true
       )`
-    : 'TRUE'
+      : 'TRUE'
 
   const orderClause =
     sortBy === 'credits'
       ? 'credits DESC NULLS LAST, name ASC'
       : 'name ASC'
-
-  const searchParam = search.length > 0 ? search : null
 
   const sql = `
 WITH all_contributions AS (
@@ -118,7 +129,7 @@ LIMIT $2 OFFSET $3
     movie_credits: number
     series_credits: number
     full_total: string
-  }>(sql, [searchParam, pageSize, offset])
+  }>(sql, params)
 
   const rows = result.rows
   const total = rows.length > 0 ? parseInt(rows[0].full_total, 10) : 0

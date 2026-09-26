@@ -1,5 +1,6 @@
 import { createChildLogger } from '../lib/logger.js'
 import { query, queryOne } from '../lib/db.js'
+import { getLibraryScopeForUser, libraryScopeSql, scopedAnnQuery, type LibraryScope } from '../lib/libraryScope.js'
 import { getMovieEmbedding, embedText } from '../recommender/movies/embeddings.js'
 import { getSeriesEmbedding } from '../recommender/series/embeddings.js'
 import { averageEmbeddings } from '../recommender/shared/embeddings.js'
@@ -63,7 +64,13 @@ async function getWatchedSeriesIds(userId: string): Promise<Set<string>> {
 
 interface CandidateContext {
   genreFilters: string[]
-  maxParentalRating: number | null
+  /**
+   * The OWNER's scope (lib/libraryScope.ts): the libraries the media server lets
+   * them see and the operator enabled, and their parental rating. A channel is
+   * written to the owner's media server as their playlist or collection, so it
+   * holds only what they may open.
+   */
+  scope: LibraryScope
   watchedIds: Set<string>
   poolSize: number
 }
@@ -89,14 +96,13 @@ async function fetchCandidatePool(
     params.push(ctx.genreFilters)
   }
 
-  // Parental rating filter - filter items based on user's max allowed rating
-  if (ctx.maxParentalRating !== null) {
-    whereClauses.push(`(
-      t.content_rating IS NULL OR
-      COALESCE((SELECT prv.rating_value FROM parental_rating_values prv WHERE prv.rating_name = t.content_rating LIMIT 1), 0) <= $${paramIndex++}
-    )`)
-    params.push(ctx.maxParentalRating)
-  }
+  // The owner's scope: libraries and parental rating.
+  whereClauses.push(
+    libraryScopeSql(ctx.scope, 't', (value) => {
+      params.push(value)
+      return `$${paramIndex++}`
+    })
+  )
 
   const fetchLimit = ctx.poolSize + ctx.watchedIds.size
 
@@ -110,7 +116,9 @@ async function fetchCandidatePool(
     const vectorStr = `[${tasteProfile.join(',')}]`
     params.push(vectorStr)
 
-    const result = await query<{
+    // A post-filtered nearest-neighbour scan: widened, or a narrow scope
+    // leaves the pool nearly empty (see scopedAnnQuery).
+    const result = await scopedAnnQuery<{
       id: string
       provider_item_id: string
       title: string
@@ -316,12 +324,13 @@ export async function generateChannelRecommendations(
 
   // Fetch more candidates than needed (3x) to enable variety through weighted sampling
   const poolSize = limit * 3
+  const ownerScope = await getLibraryScopeForUser(channel.owner_id)
 
   const pools = await Promise.all(
     mediaTypes.map((mediaType) =>
       fetchCandidatePool(mediaType, tasteProfile, modelId, {
         genreFilters: channel.genre_filters ?? [],
-        maxParentalRating: channel.max_parental_rating,
+        scope: ownerScope,
         watchedIds: mediaType === 'movie' ? watchedMovieIds : watchedSeriesIds,
         poolSize,
       })

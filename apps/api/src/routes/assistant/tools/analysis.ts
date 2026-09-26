@@ -31,6 +31,7 @@ import {
 } from '@aperture/core'
 import { queryOne } from '../../../lib/db.js'
 import { anyTitleMatchesSql, titleMatchRankSql } from '../helpers/titleMatch.js'
+import { binderFor, libraryScopeSql, type LibraryScope } from '@aperture/core'
 import type { ToolContext } from '../types.js'
 
 /**
@@ -98,7 +99,8 @@ const SELECT_COLUMNS = 'id, title, year, poster_url'
 
 async function resolveTitle(
   title: string,
-  type: 'movie' | 'series' | 'any'
+  type: 'movie' | 'series' | 'any',
+  scope: LibraryScope
 ): Promise<{ row: TitleRow; mediaType: 'movie' | 'series' } | null> {
   // Movie first when unconstrained, matching getContentDetails. `type` exists
   // so the model can break the tie the ordering cannot — Fargo is a film and a
@@ -117,18 +119,22 @@ async function resolveTitle(
     // The one title-matching path in the repo: unaccent()ed across all three
     // name columns, ranked localized > original > sort, because the name on the
     // poster is the one the user typed.
+    // Only a title this viewer may open: an analysis of one they may not is
+    // answered as not in the library, which for them it is not.
+    const params: unknown[] = [`%${title}%`, title]
+    const inScope = libraryScopeSql(scope, table, binderFor(params))
     const row = await queryOne<TitleRow>(
       `SELECT ${SELECT_COLUMNS} FROM ${table}
-        WHERE ${anyTitleMatchesSql('$1')}
+        WHERE ${anyTitleMatchesSql('$1')} AND ${inScope}
         ORDER BY ${titleMatchRankSql('$2')} LIMIT 1`,
-      [`%${title}%`, title]
+      params
     )
     if (row) return { row, mediaType }
   }
   return null
 }
 
-export function createAnalysisTools(_ctx: ToolContext) {
+export function createAnalysisTools(ctx: ToolContext) {
   return {
     getTitleAnalysis: tool({
       description:
@@ -168,7 +174,7 @@ export function createAnalysisTools(_ctx: ToolContext) {
           analyzedAt: null,
         }
 
-        const resolved = await resolveTitle(title, type)
+        const resolved = await resolveTitle(title, type, ctx.scope)
         if (!resolved) {
           // Not an error: the library simply does not hold it. The model can
           // still answer from what it knows, and saying so is more useful than

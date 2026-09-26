@@ -564,6 +564,8 @@ export {
   loadConfiguredLibraries,
   getLibraryScopeForUser,
   saveUserLibraryAccess,
+  scopedAnnQuery,
+  SCOPED_ANN_EF_SEARCH,
   type LibraryScope,
   type LibraryKind,
   type ConfiguredLibrary,

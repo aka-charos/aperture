@@ -11,7 +11,7 @@
  * `ef_search` transaction and the NUMERIC handling are each a silent-failure
  * trap, and a second copy is a second place to get them wrong.
  */
-import { getActiveEmbeddingTableName, createChildLogger } from '@aperture/core'
+import { getActiveEmbeddingTableName, createChildLogger, binderFor, libraryScopeSql } from '@aperture/core'
 import { transaction } from '../../../lib/db.js'
 import { readTwinSharedIds, resolveTwinSharedTitles } from '../../../lib/twinShared.js'
 import { blendQueryAndTaste } from './tasteBlend.js'
@@ -169,6 +169,11 @@ export async function searchScoredPool(
     const idColumn = isMovie ? 'movie_id' : 'series_id'
     const contentTable = isMovie ? 'movies' : 'series'
 
+    // The run may predate a change to the viewer's library permission, so the
+    // pool is filtered to what they may open now (ctx.scope).
+    const poolParams: unknown[] = [ctx.userId, media, embeddingStr, ctx.embedding.setId, ANN_POOL_SIZE]
+    const inScope = libraryScopeSql(ctx.scope, 'c', binderFor(poolParams))
+
     // Runs in a transaction solely to carry `SET LOCAL hnsw.ef_search` — see
     // the constant above for why a bare LIMIT cannot be trusted here.
     const rows = await transaction(async (client) => {
@@ -208,8 +213,9 @@ export async function searchScoredPool(
                JOIN recommendation_candidates rc
                  ON rc.${idColumn} = near.item_id
                 AND rc.run_id = (SELECT id FROM latest)
-               JOIN ${contentTable} c ON c.id = near.item_id`,
-        [ctx.userId, media, embeddingStr, ctx.embedding.setId, ANN_POOL_SIZE]
+               JOIN ${contentTable} c ON c.id = near.item_id
+              WHERE ${inScope}`,
+        poolParams
       )
     })
 

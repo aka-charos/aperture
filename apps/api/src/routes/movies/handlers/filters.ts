@@ -13,6 +13,7 @@
 import type { FastifyInstance } from 'fastify'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
+import { scopeClause, viewerScope } from '../../../lib/viewerScope.js'
 import {
   genresSchema,
   keywordsSchema,
@@ -34,9 +35,15 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
       preHandler: requireAuth,
       schema: genresSchema,
     },
-    async (_request, reply) => {
+    async (request, reply) => {
+      // Options only from what this viewer may see (lib/viewerScope.ts), or a
+      // filter list names genres, collections and countries of libraries the
+      // media server keeps them out of.
+      const params: unknown[] = []
+      const inScope = scopeClause(await viewerScope(request), 'movies', params)
       const result = await query<{ genre: string }>(
-        `SELECT DISTINCT unnest(genres) as genre FROM movies ORDER BY genre`
+        `SELECT DISTINCT unnest(genres) as genre FROM movies WHERE ${inScope} ORDER BY genre`,
+        params
       )
 
       return reply.send({ genres: result.rows.map((r) => r.genre) })
@@ -53,14 +60,20 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
       preHandler: requireAuth,
       schema: keywordsSchema,
     },
-    async (_request, reply) => {
+    async (request, reply) => {
+      // Options only from what this viewer may see (lib/viewerScope.ts), or a
+      // filter list names genres, collections and countries of libraries the
+      // media server keeps them out of.
+      const params: unknown[] = []
+      const inScope = scopeClause(await viewerScope(request), 'movies', params)
       const result = await query<{ keyword: string; count: string }>(
         `SELECT unnest(keywords) as keyword, COUNT(*) as count
-         FROM movies WHERE keywords IS NOT NULL AND array_length(keywords, 1) > 0
+         FROM movies WHERE ${inScope} AND keywords IS NOT NULL AND array_length(keywords, 1) > 0
          GROUP BY unnest(keywords)
          HAVING COUNT(*) > 1
          ORDER BY COUNT(*) DESC
-         LIMIT 100`
+         LIMIT 100`,
+        params
       )
 
       return reply.send({ 
@@ -79,13 +92,19 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
       preHandler: requireAuth,
       schema: collectionsSchema,
     },
-    async (_request, reply) => {
+    async (request, reply) => {
+      // Options only from what this viewer may see (lib/viewerScope.ts), or a
+      // filter list names genres, collections and countries of libraries the
+      // media server keeps them out of.
+      const params: unknown[] = []
+      const inScope = scopeClause(await viewerScope(request), 'movies', params)
       const result = await query<{ collection_name: string; count: string }>(
         `SELECT collection_name, COUNT(*) as count
          FROM movies 
-         WHERE collection_name IS NOT NULL
+         WHERE ${inScope} AND collection_name IS NOT NULL
          GROUP BY collection_name
-         ORDER BY COUNT(*) DESC`
+         ORDER BY COUNT(*) DESC`,
+        params
       )
 
       return reply.send({ 
@@ -104,11 +123,16 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
       preHandler: requireAuth,
       schema: contentRatingsSchema,
     },
-    async (_request, reply) => {
+    async (request, reply) => {
+      // Options only from what this viewer may see (lib/viewerScope.ts), or a
+      // filter list names genres, collections and countries of libraries the
+      // media server keeps them out of.
+      const params: unknown[] = []
+      const inScope = scopeClause(await viewerScope(request), 'movies', params)
       const result = await query<{ content_rating: string; count: string }>(
         `SELECT content_rating, COUNT(*) as count
          FROM movies 
-         WHERE content_rating IS NOT NULL
+         WHERE ${inScope} AND content_rating IS NOT NULL
          GROUP BY content_rating
          ORDER BY 
            CASE content_rating
@@ -122,7 +146,8 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
              WHEN 'TV-14' THEN 8
              WHEN 'TV-MA' THEN 9
              ELSE 10
-           END`
+           END`,
+        params
       )
 
       return reply.send({ 
@@ -141,7 +166,12 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
       preHandler: requireAuth,
       schema: resolutionsSchema,
     },
-    async (_request, reply) => {
+    async (request, reply) => {
+      // Options only from what this viewer may see (lib/viewerScope.ts), or a
+      // filter list names genres, collections and countries of libraries the
+      // media server keeps them out of.
+      const params: unknown[] = []
+      const inScope = scopeClause(await viewerScope(request), 'movies', params)
       // ORDER BY must not reference the SELECT alias after GROUP BY in all PG versions — use MIN(sort key) per group.
       const result = await query<{ category: string; count: string }>(
         `SELECT 
@@ -153,7 +183,7 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
           END AS category,
           COUNT(*)::text AS count
          FROM movies 
-         WHERE video_resolution IS NOT NULL
+         WHERE ${inScope} AND video_resolution IS NOT NULL
          GROUP BY 1
          ORDER BY MIN(
            CASE 
@@ -162,7 +192,8 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
              WHEN video_resolution LIKE '1280x%' OR video_resolution LIKE '%x720' THEN 3
              ELSE 4
            END
-         )`
+         )`,
+        params
       )
 
       return reply.send({ 
@@ -181,12 +212,19 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
       preHandler: requireAuth,
       schema: countriesSchema,
     },
-    async (_request, reply) => {
+    async (request, reply) => {
+      // Options only from what this viewer may see (lib/viewerScope.ts), or a
+      // filter list names genres, collections and countries of libraries the
+      // media server keeps them out of.
+      const params: unknown[] = []
+      const inScope = scopeClause(await viewerScope(request), 'movies', params)
       const result = await query<{ country: string; count: string }>(
         `SELECT c AS country, COUNT(*)::text AS count
          FROM movies, unnest(production_countries) AS c
+         WHERE ${inScope}
          GROUP BY c
-         ORDER BY c`
+         ORDER BY c`,
+        params
       )
 
       return reply.send({
@@ -208,7 +246,12 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
       preHandler: requireAuth,
       schema: filterRangesSchema,
     },
-    async (_request, reply) => {
+    async (request, reply) => {
+      // Options only from what this viewer may see (lib/viewerScope.ts), or a
+      // filter list names genres, collections and countries of libraries the
+      // media server keeps them out of.
+      const params: unknown[] = []
+      const inScope = scopeClause(await viewerScope(request), 'movies', params)
       const result = await queryOne<{
         min_year: number
         max_year: number
@@ -225,7 +268,8 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
           MIN(community_rating) as min_rating,
           MAX(community_rating) as max_rating
          FROM movies 
-         WHERE year IS NOT NULL`
+         WHERE ${inScope} AND year IS NOT NULL`,
+        params
       )
 
       return reply.send({

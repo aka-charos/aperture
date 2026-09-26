@@ -18,7 +18,7 @@ import {
 import { recommendationSchemas } from '../schemas.js'
 import { resolveTwinShared } from '../../../lib/twinShared.js'
 import type { MovieRecommendationCandidate, RecommendationRun } from '../types.js'
-import { WATCH_HISTORY_TASTE_SQL } from '@aperture/core'
+import { WATCH_HISTORY_TASTE_SQL, binderFor, getLibraryScopeForUser, libraryScopeSql } from '@aperture/core'
 
 export async function registerMovieHandlers(fastify: FastifyInstance) {
   /**
@@ -62,6 +62,12 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
         })
       }
 
+      // What this account may open NOW (lib/libraryScope.ts): the run can predate
+      // a change to their library permission. Resolved for the account whose
+      // picks these are, so an admin reading someone else's sees what they would.
+      const pickParams: unknown[] = [run.id]
+      const inScope = libraryScopeSql(await getLibraryScopeForUser(userId), 'm', binderFor(pickParams))
+
       const candidates = await query<MovieRecommendationCandidate>(
         `SELECT rc.*,
                 json_build_object(
@@ -77,17 +83,12 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
                 ) as movie
          FROM recommendation_candidates rc
          JOIN movies m ON m.id = rc.movie_id
-         LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
          WHERE rc.run_id = $1 
            AND rc.is_selected = true
            AND rc.movie_id IS NOT NULL
-           AND (
-             NOT EXISTS (SELECT 1 FROM library_config WHERE collection_type = 'movies')
-             OR lc.is_enabled = true
-             OR m.provider_library_id IS NULL
-           )
+           AND ${inScope}
          ORDER BY rc.selected_rank ASC NULLS LAST`,
-        [run.id]
+        pickParams
       )
 
       return reply.send({

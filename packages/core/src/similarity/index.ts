@@ -71,6 +71,35 @@ export interface SimilarityOptions {
   includeCrossMedia?: boolean
   depth?: number // How many levels of connections to fetch (1 = direct only, 2 = include connections of connections)
   userId?: string // If provided, user preferences are applied (hide watched, full franchise mode)
+  /**
+   * What the viewer may be shown (lib/libraryScope.ts). Resolved from `userId`
+   * when omitted; with neither, nothing is filtered — the internal callers that
+   * have no viewer.
+   */
+  scope?: LibraryScope
+}
+
+/**
+ * A nearest-neighbour query, filtered to `scope` when there is one. `sqlFor`
+ * receives the scope clause (or TRUE) to place in its WHERE; a scoped query runs
+ * through scopedAnnQuery, since a post-filtered HNSW scan otherwise comes back
+ * nearly empty for a viewer allowed few libraries.
+ */
+async function annQuery<T>(
+  sqlFor: (scopeSql: string) => string,
+  params: unknown[],
+  scope: LibraryScope | undefined,
+  alias: string
+): Promise<{ rows: T[] }> {
+  if (!scope) return query<T>(sqlFor('TRUE'), params)
+  const clause = libraryScopeSql(scope, alias, binderFor(params))
+  return scopedAnnQuery<T>(sqlFor(clause), params)
+}
+
+/** The scope a top-level entry point filters by: given, or the user's. */
+async function resolveScope(options: { scope?: LibraryScope; userId?: string }): Promise<LibraryScope | undefined> {
+  if (options.scope) return options.scope
+  return options.userId ? getLibraryScopeForUser(options.userId) : undefined
 }
 
 // User similarity preferences
@@ -239,6 +268,7 @@ export async function getSimilarMovies(
   options: SimilarityOptions = {}
 ): Promise<SimilarityResult> {
   const { limit = 12, includeCrossMedia = false } = options
+  const scope = await resolveScope(options)
 
   // Get the source movie
   const sourceMovie = await queryOne<{
@@ -300,15 +330,17 @@ export async function getSimilarMovies(
   }
 
   // Find similar movies using vector similarity
-  const similarMovies = await query<MovieSimilarityRow>(
-    `SELECT ${MOVIE_SIMILARITY_COLUMNS},
+  const similarMovies = await annQuery<MovieSimilarityRow>(
+    (inScope) => `SELECT ${MOVIE_SIMILARITY_COLUMNS},
             1 - (e.embedding <=> $1::halfvec) as similarity
      FROM ${tableName} e
      JOIN movies m ON m.id = e.movie_id
-     WHERE m.id != $2 AND e.model = $3
+     WHERE m.id != $2 AND e.model = $3 AND ${inScope}
      ORDER BY e.embedding <=> $1::halfvec
      LIMIT $4`,
-    [embeddingResult.embedding, movieId, modelId, limit]
+    [embeddingResult.embedding, movieId, modelId, limit],
+    scope,
+    'm'
   )
 
   let connections: SimilarityConnection[] = similarMovies.rows.map((row) =>
@@ -322,15 +354,17 @@ export async function getSimilarMovies(
     // getCurrentEmbeddingDimensions() call. So this film's own vector can be
     // measured against them without re-embedding anything.
     const seriesTable = await getActiveEmbeddingTableName('series_embeddings')
-    const similarSeries = await query<SeriesSimilarityRow>(
-      `SELECT ${SERIES_SIMILARITY_COLUMNS},
+    const similarSeries = await annQuery<SeriesSimilarityRow>(
+      (inScope) => `SELECT ${SERIES_SIMILARITY_COLUMNS},
               1 - (e.embedding <=> $1::halfvec) as similarity
        FROM ${seriesTable} e
        JOIN series s ON s.id = e.series_id
-       WHERE e.model = $2
+       WHERE e.model = $2 AND ${inScope}
        ORDER BY e.embedding <=> $1::halfvec
        LIMIT $3`,
-      [embeddingResult.embedding, modelId, limit]
+      [embeddingResult.embedding, modelId, limit],
+      scope,
+      's'
     )
 
     connections = mergeCrossMedia(
@@ -363,6 +397,7 @@ export async function getSimilarSeries(
   options: SimilarityOptions = {}
 ): Promise<SimilarityResult> {
   const { limit = 12, includeCrossMedia = false } = options
+  const scope = await resolveScope(options)
 
   // Get the source series
   const sourceSeries = await queryOne<{
@@ -424,15 +459,17 @@ export async function getSimilarSeries(
   }
 
   // Find similar series using vector similarity
-  const similarSeries = await query<SeriesSimilarityRow>(
-    `SELECT ${SERIES_SIMILARITY_COLUMNS},
+  const similarSeries = await annQuery<SeriesSimilarityRow>(
+    (inScope) => `SELECT ${SERIES_SIMILARITY_COLUMNS},
             1 - (e.embedding <=> $1::halfvec) as similarity
      FROM ${tableName} e
      JOIN series s ON s.id = e.series_id
-     WHERE s.id != $2 AND e.model = $3
+     WHERE s.id != $2 AND e.model = $3 AND ${inScope}
      ORDER BY e.embedding <=> $1::halfvec
      LIMIT $4`,
-    [embeddingResult.embedding, seriesId, modelId, limit]
+    [embeddingResult.embedding, seriesId, modelId, limit],
+    scope,
+    's'
   )
 
   let connections: SimilarityConnection[] = similarSeries.rows.map((row) =>
@@ -442,15 +479,17 @@ export async function getSimilarSeries(
   if (includeCrossMedia) {
     // Same space, different table -- see the note in getSimilarMovies.
     const movieTable = await getActiveEmbeddingTableName('embeddings')
-    const similarMovies = await query<MovieSimilarityRow>(
-      `SELECT ${MOVIE_SIMILARITY_COLUMNS},
+    const similarMovies = await annQuery<MovieSimilarityRow>(
+      (inScope) => `SELECT ${MOVIE_SIMILARITY_COLUMNS},
               1 - (e.embedding <=> $1::halfvec) as similarity
        FROM ${movieTable} e
        JOIN movies m ON m.id = e.movie_id
-       WHERE e.model = $2
+       WHERE e.model = $2 AND ${inScope}
        ORDER BY e.embedding <=> $1::halfvec
        LIMIT $3`,
-      [embeddingResult.embedding, modelId, limit]
+      [embeddingResult.embedding, modelId, limit],
+      scope,
+      'm'
     )
 
     connections = mergeCrossMedia(
@@ -519,6 +558,7 @@ export async function getSimilarWithDepth(
   options: SimilarityOptions = {}
 ): Promise<GraphData> {
   const { limit = 6, depth = 1, userId } = options
+  const scope = await resolveScope(options)
 
   // Fetch user preferences if userId provided
   const prefs: SimilarityPreferences = userId
@@ -668,8 +708,8 @@ export async function getSimilarWithDepth(
   // Get the center item's similarity data
   const centerResult =
     itemType === 'movie'
-      ? await getSimilarMovies(itemId, { limit })
-      : await getSimilarSeries(itemId, { limit })
+      ? await getSimilarMovies(itemId, { limit, scope })
+      : await getSimilarSeries(itemId, { limit, scope })
 
   // Add center node
   addNode(centerResult.center, true)
@@ -716,8 +756,8 @@ export async function getSimilarWithDepth(
         // Request more items so we can filter
         const result =
           type === 'movie'
-            ? await getSimilarMovies(id, { limit: levelLimit * 3 })
-            : await getSimilarSeries(id, { limit: levelLimit * 3 })
+            ? await getSimilarMovies(id, { limit: levelLimit * 3, scope })
+            : await getSimilarSeries(id, { limit: levelLimit * 3, scope })
 
         let addedForThisNode = 0
         for (const conn of result.connections) {
@@ -850,24 +890,26 @@ export async function getGraphForSource(
 ): Promise<GraphData> {
   const { limit = 20, includeCrossMedia = false } = options
   const connectionsPerNode = 3 // How many connections to show per center node
+  // Always the viewer's: every source here is someone's graph.
+  const scope = options.scope ?? (await getLibraryScopeForUser(userId))
 
   let centerItems: SimilarityItem[] = []
 
   switch (source) {
     case 'ai-movies':
-      centerItems = await getUserAIMovies(userId, limit)
+      centerItems = await getUserAIMovies(userId, limit, scope)
       break
     case 'ai-series':
-      centerItems = await getUserAISeries(userId, limit)
+      centerItems = await getUserAISeries(userId, limit, scope)
       break
     case 'watching':
-      centerItems = await getUserWatchingSeries(userId, limit)
+      centerItems = await getUserWatchingSeries(userId, limit, scope)
       break
     case 'top-movies':
-      centerItems = await getTopPicksMovies(limit)
+      centerItems = await getTopPicksMovies(limit, scope)
       break
     case 'top-series':
-      centerItems = await getTopPicksSeries(limit)
+      centerItems = await getTopPicksSeries(limit, scope)
       break
     default:
       throw new Error(`Unknown graph source: ${source}`)
@@ -913,10 +955,12 @@ export async function getGraphForSource(
         ? await getSimilarMovies(centerItem.id, {
             limit: connectionsPerNode * 2,
             includeCrossMedia,
+            scope,
           })
         : await getSimilarSeries(centerItem.id, {
             limit: connectionsPerNode * 2,
             includeCrossMedia,
+            scope,
           })
 
     // Rank: connections to other center nodes first (they tie the graph
@@ -1007,6 +1051,8 @@ export interface SemanticSearchOptions {
   limit?: number
   hideWatched?: boolean
   userId?: string
+  /** What the viewer may be shown; resolved from `userId` when omitted. */
+  scope?: LibraryScope
 }
 
 export interface SemanticSearchResult {
@@ -1035,6 +1081,7 @@ export async function semanticSearch(
   options: SemanticSearchOptions = {}
 ): Promise<SemanticSearchResult> {
   const { type = 'both', limit = 20, hideWatched = false, userId } = options
+  const scope = await resolveScope(options)
 
   if (!searchQuery.trim()) {
     return { query: searchQuery, results: [] }
@@ -1083,7 +1130,7 @@ export async function semanticSearch(
         ? [embeddingVector, modelId, movieLimit, userId]
         : [embeddingVector, modelId, movieLimit]
 
-    const movieResults = await query<{
+    const movieResults = await annQuery<{
       id: string
       title: string
       year: number | null
@@ -1096,16 +1143,18 @@ export async function semanticSearch(
       studios: unknown
       similarity: number
     }>(
-      `SELECT m.id, m.title, m.year, m.poster_url, m.genres, m.directors, 
+      (inScope) => `SELECT m.id, m.title, m.year, m.poster_url, m.genres, m.directors, 
               m.actors, m.collection_name, m.keywords, m.studios,
               1 - (e.embedding <=> $1::halfvec) as similarity
        FROM ${movieTableName} e
        JOIN movies m ON m.id = e.movie_id
-       WHERE e.model = $2
+       WHERE e.model = $2 AND ${inScope}
        ${watchedFilter}
        ORDER BY e.embedding <=> $1::halfvec
        LIMIT $3`,
-      movieParams
+      [...movieParams],
+      scope,
+      'm'
     )
 
     for (const row of movieResults.rows) {
@@ -1151,7 +1200,7 @@ export async function semanticSearch(
         ? [embeddingVector, modelId, seriesLimit, userId]
         : [embeddingVector, modelId, seriesLimit]
 
-    const seriesResults = await query<{
+    const seriesResults = await annQuery<{
       id: string
       title: string
       year: number | null
@@ -1164,16 +1213,18 @@ export async function semanticSearch(
       studios: unknown
       similarity: number
     }>(
-      `SELECT s.id, s.title, s.year, s.poster_url, s.genres, s.directors, 
+      (inScope) => `SELECT s.id, s.title, s.year, s.poster_url, s.genres, s.directors, 
               s.actors, s.network, s.keywords, s.studios,
               1 - (e.embedding <=> $1::halfvec) as similarity
        FROM ${seriesTableName} e
        JOIN series s ON s.id = e.series_id
-       WHERE e.model = $2
+       WHERE e.model = $2 AND ${inScope}
        ${seriesWatchedFilter}
        ORDER BY e.embedding <=> $1::halfvec
        LIMIT $3`,
-      seriesParams
+      [...seriesParams],
+      scope,
+      's'
     )
 
     for (const row of seriesResults.rows) {
@@ -1223,9 +1274,9 @@ export async function semanticSearch(
  */
 export async function buildGraphFromSemanticSearch(
   searchResults: SemanticSearchResult,
-  options: { useAI?: boolean; connectionsPerSeed?: number } = {}
+  options: { useAI?: boolean; connectionsPerSeed?: number; scope?: LibraryScope } = {}
 ): Promise<GraphData> {
-  const { connectionsPerSeed = 3 } = options
+  const { connectionsPerSeed = 3, scope } = options
 
   if (searchResults.results.length === 0) {
     return { nodes: [], edges: [] }
@@ -1281,8 +1332,8 @@ export async function buildGraphFromSemanticSearch(
       // Find similar items for this seed
       const similarResult =
         seed.type === 'movie'
-          ? await getSimilarMovies(seed.id, { limit: connectionsPerSeed * 3 })
-          : await getSimilarSeries(seed.id, { limit: connectionsPerSeed * 3 })
+          ? await getSimilarMovies(seed.id, { limit: connectionsPerSeed * 3, scope })
+          : await getSimilarSeries(seed.id, { limit: connectionsPerSeed * 3, scope })
 
       let addedForThisSeed = 0
 
@@ -1367,8 +1418,8 @@ export async function buildGraphFromSemanticSearch(
     try {
       const similarResult =
         nodeA.type === 'movie'
-          ? await getSimilarMovies(nodeA.id, { limit: 10 })
-          : await getSimilarSeries(nodeA.id, { limit: 10 })
+          ? await getSimilarMovies(nodeA.id, { limit: 10, scope })
+          : await getSimilarSeries(nodeA.id, { limit: 10, scope })
 
       for (const conn of similarResult.connections) {
         if (crossConnectionCount >= maxCrossConnections) break
@@ -1405,8 +1456,8 @@ export async function buildGraphFromSemanticSearch(
       try {
         const similarResult =
           seed.type === 'movie'
-            ? await getSimilarMovies(seed.id, { limit: 5 })
-            : await getSimilarSeries(seed.id, { limit: 5 })
+            ? await getSimilarMovies(seed.id, { limit: 5, scope })
+            : await getSimilarSeries(seed.id, { limit: 5, scope })
 
         if (similarResult.connections.length > 0) {
           const conn = similarResult.connections[0]
@@ -1452,7 +1503,9 @@ export async function buildGraphFromSemanticSearch(
 // Data Source Helpers
 // ============================================================================
 
-async function getUserAIMovies(userId: string, limit: number): Promise<SimilarityItem[]> {
+async function getUserAIMovies(userId: string, limit: number, scope: LibraryScope): Promise<SimilarityItem[]> {
+  const params: unknown[] = [userId, limit]
+  const inScope = libraryScopeSql(scope, 'm', binderFor(params))
   const result = await query<{
     id: string
     title: string
@@ -1470,14 +1523,14 @@ async function getUserAIMovies(userId: string, limit: number): Promise<Similarit
      FROM recommendation_candidates rc
      JOIN recommendation_runs rr ON rc.run_id = rr.id
      JOIN movies m ON rc.movie_id = m.id
-     WHERE rr.user_id = $1 
+     WHERE rr.user_id = $1 AND ${inScope} 
        AND rr.media_type = 'movie'
        AND rr.status = 'completed'
        AND rc.is_selected = true
        AND rc.movie_id IS NOT NULL
      ORDER BY rr.created_at DESC, rc.rank
      LIMIT $2`,
-    [userId, limit]
+    params
   )
 
   return result.rows.map((row) => ({
@@ -1496,7 +1549,9 @@ async function getUserAIMovies(userId: string, limit: number): Promise<Similarit
   }))
 }
 
-async function getUserAISeries(userId: string, limit: number): Promise<SimilarityItem[]> {
+async function getUserAISeries(userId: string, limit: number, scope: LibraryScope): Promise<SimilarityItem[]> {
+  const params: unknown[] = [userId, limit]
+  const inScope = libraryScopeSql(scope, 's', binderFor(params))
   const result = await query<{
     id: string
     title: string
@@ -1514,14 +1569,14 @@ async function getUserAISeries(userId: string, limit: number): Promise<Similarit
      FROM recommendation_candidates rc
      JOIN recommendation_runs rr ON rc.run_id = rr.id
      JOIN series s ON rc.series_id = s.id
-     WHERE rr.user_id = $1 
+     WHERE rr.user_id = $1 AND ${inScope} 
        AND rr.media_type = 'series'
        AND rr.status = 'completed'
        AND rc.is_selected = true
        AND rc.series_id IS NOT NULL
      ORDER BY rr.created_at DESC, rc.rank
      LIMIT $2`,
-    [userId, limit]
+    params
   )
 
   return result.rows.map((row) => ({
@@ -1540,7 +1595,9 @@ async function getUserAISeries(userId: string, limit: number): Promise<Similarit
   }))
 }
 
-async function getUserWatchingSeries(userId: string, limit: number): Promise<SimilarityItem[]> {
+async function getUserWatchingSeries(userId: string, limit: number, scope: LibraryScope): Promise<SimilarityItem[]> {
+  const params: unknown[] = [userId, limit]
+  const inScope = libraryScopeSql(scope, 's', binderFor(params))
   const result = await query<{
     id: string
     title: string
@@ -1557,10 +1614,10 @@ async function getUserWatchingSeries(userId: string, limit: number): Promise<Sim
             s.actors, s.network, s.keywords, s.studios
      FROM user_watching_series uws
      JOIN series s ON uws.series_id = s.id
-     WHERE uws.user_id = $1
+     WHERE uws.user_id = $1 AND ${inScope}
      ORDER BY uws.added_at DESC
      LIMIT $2`,
-    [userId, limit]
+    params
   )
 
   return result.rows.map((row) => ({
@@ -1579,7 +1636,9 @@ async function getUserWatchingSeries(userId: string, limit: number): Promise<Sim
   }))
 }
 
-async function getTopPicksMovies(limit: number): Promise<SimilarityItem[]> {
+async function getTopPicksMovies(limit: number, scope: LibraryScope): Promise<SimilarityItem[]> {
+  const params: unknown[] = [limit]
+  const inScope = libraryScopeSql(scope, 'm', binderFor(params))
   // Get top picks config to see what list/method is being used
   const result = await query<{
     id: string
@@ -1596,10 +1655,10 @@ async function getTopPicksMovies(limit: number): Promise<SimilarityItem[]> {
     `SELECT m.id, m.title, m.year, m.poster_url, m.genres, m.directors, 
             m.actors, m.collection_name, m.keywords, m.studios
      FROM movies m
-     WHERE m.community_rating IS NOT NULL
+     WHERE m.community_rating IS NOT NULL AND ${inScope}
      ORDER BY m.community_rating DESC, m.year DESC NULLS LAST
      LIMIT $1`,
-    [limit]
+    params
   )
 
   return result.rows.map((row) => ({
@@ -1618,7 +1677,9 @@ async function getTopPicksMovies(limit: number): Promise<SimilarityItem[]> {
   }))
 }
 
-async function getTopPicksSeries(limit: number): Promise<SimilarityItem[]> {
+async function getTopPicksSeries(limit: number, scope: LibraryScope): Promise<SimilarityItem[]> {
+  const params: unknown[] = [limit]
+  const inScope = libraryScopeSql(scope, 's', binderFor(params))
   const result = await query<{
     id: string
     title: string
@@ -1634,10 +1695,10 @@ async function getTopPicksSeries(limit: number): Promise<SimilarityItem[]> {
     `SELECT s.id, s.title, s.year, s.poster_url, s.genres, s.directors, 
             s.actors, s.network, s.keywords, s.studios
      FROM series s
-     WHERE s.community_rating IS NOT NULL
+     WHERE s.community_rating IS NOT NULL AND ${inScope}
      ORDER BY s.community_rating DESC, s.year DESC NULLS LAST
      LIMIT $1`,
-    [limit]
+    params
   )
 
   return result.rows.map((row) => ({
@@ -1712,3 +1773,10 @@ export {
   type DiverseResult,
   type ConnectionValidation,
 } from './diverse.js'
+import {
+  binderFor,
+  getLibraryScopeForUser,
+  libraryScopeSql,
+  scopedAnnQuery,
+  type LibraryScope,
+} from '../lib/libraryScope.js'

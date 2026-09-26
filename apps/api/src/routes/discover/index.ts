@@ -14,6 +14,7 @@ import {
 } from '@aperture/core'
 import { query, queryOne } from '../../lib/db.js'
 import { requireAuth, requireAdmin } from '../../plugins/auth.js'
+import { scopeClause, viewerScope } from '../../lib/viewerScope.js'
 import { discoverSchemas, getPeopleListSchema } from './schemas.js'
 import { registerTmdbExternalDetailRoutes } from './tmdbExternalDetail.js'
 
@@ -93,6 +94,7 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
       const showAll = request.query.showAll === 'true'
 
       return listPeopleForBrowse({
+        scope: await viewerScope(request),
         page,
         pageSize,
         sortBy,
@@ -148,6 +150,7 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
         ? parseInt(request.query.maxMissing, 10)
         : undefined
       const gap = await getPersonCreditsGap(decodedName, {
+        scope: await viewerScope(request),
         showAll,
         maxMissing: Number.isFinite(maxMissing) ? maxMissing : undefined,
       })
@@ -208,6 +211,13 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
       const { name } = request.params
       const decodedName = decodeURIComponent(name)
 
+      // Only titles this viewer may open (lib/viewerScope.ts).
+      const scope = await viewerScope(request)
+      const movieParams: unknown[] = [decodedName]
+      const moviesInScope = scopeClause(scope, 'm', movieParams)
+      const seriesParams: unknown[] = [decodedName]
+      const seriesInScope = scopeClause(scope, 's', seriesParams)
+
       // Query movies where person is actor or director
       const movieResults = await query<{
         id: string
@@ -240,11 +250,12 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
             LIMIT 1
           ) as role
         FROM movies m
-        WHERE 
-          EXISTS(SELECT 1 FROM jsonb_array_elements(m.actors) AS a WHERE a->>'name' ILIKE $1)
-          OR $1 = ANY(m.directors)
+        WHERE
+          (EXISTS(SELECT 1 FROM jsonb_array_elements(m.actors) AS a WHERE a->>'name' ILIKE $1)
+          OR $1 = ANY(m.directors))
+          AND ${moviesInScope}
         ORDER BY m.year DESC NULLS LAST, m.title ASC`,
-        [decodedName]
+        movieParams
       )
 
       // Query series where person is actor or director
@@ -279,11 +290,12 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
             LIMIT 1
           ) as role
         FROM series s
-        WHERE 
-          EXISTS(SELECT 1 FROM jsonb_array_elements(s.actors) AS a WHERE a->>'name' ILIKE $1)
-          OR $1 = ANY(s.directors)
+        WHERE
+          (EXISTS(SELECT 1 FROM jsonb_array_elements(s.actors) AS a WHERE a->>'name' ILIKE $1)
+          OR $1 = ANY(s.directors))
+          AND ${seriesInScope}
         ORDER BY s.year DESC NULLS LAST, s.title ASC`,
-        [decodedName]
+        seriesParams
       )
 
       // Build person image URL through our proxy
@@ -351,6 +363,11 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
       const { name } = request.params
       const decodedName = decodeURIComponent(name)
 
+      // Only titles this viewer may open (lib/viewerScope.ts).
+      const studioScope = await viewerScope(request)
+      const studioMovieParams: unknown[] = [decodedName]
+      const studioSeriesParams: unknown[] = [decodedName]
+
       // Query movies from this studio
       const movieResults = await query<{
         id: string
@@ -371,11 +388,11 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
           m.community_rating
         FROM movies m
         WHERE EXISTS(
-          SELECT 1 FROM jsonb_array_elements(m.studios) AS s 
+          SELECT 1 FROM jsonb_array_elements(m.studios) AS s
           WHERE s->>'name' ILIKE $1
-        )
+        ) AND ${scopeClause(studioScope, 'm', studioMovieParams)}
         ORDER BY m.year DESC NULLS LAST, m.title ASC`,
-        [decodedName]
+        studioMovieParams
       )
 
       // Query series from this studio OR network
@@ -397,14 +414,15 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
           s.genres,
           s.community_rating
         FROM series s
-        WHERE 
+        WHERE (
           EXISTS(
-            SELECT 1 FROM jsonb_array_elements(s.studios) AS st 
+            SELECT 1 FROM jsonb_array_elements(s.studios) AS st  
             WHERE st->>'name' ILIKE $1
           )
           OR s.network ILIKE $1
+        ) AND ${scopeClause(studioScope, 's', studioSeriesParams)}
         ORDER BY s.year DESC NULLS LAST, s.title ASC`,
-        [decodedName]
+        studioSeriesParams
       )
 
       // Check if we have logo data from TMDB enrichment or Emby ID for fallback

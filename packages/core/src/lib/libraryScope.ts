@@ -34,7 +34,7 @@
  *    unrestricted case costs one `IS NULL` test rather than a second query text.
  */
 
-import { query, queryOne } from './db.js'
+import { query, queryOne, transaction } from './db.js'
 
 export type LibraryKind = 'movies' | 'series'
 
@@ -190,4 +190,26 @@ export async function saveUserLibraryAccess(userId: string, libraryIds: string[]
     `UPDATE users SET library_access = $2, library_access_synced_at = NOW() WHERE id = $1`,
     [userId, libraryIds]
   )
+}
+
+/**
+ * How far an HNSW scan walks when a nearest-neighbour query is post-filtered by
+ * scope. pgvector returns at most `ef_search` rows (default 40) and applies a
+ * WHERE after the scan, so a viewer allowed one small library would get a
+ * similar-titles list that is nearly empty rather than one drawn from their
+ * libraries. See the ef_search invariant in CLAUDE.md.
+ */
+export const SCOPED_ANN_EF_SEARCH = 500
+
+/**
+ * Run a nearest-neighbour query whose WHERE carries a scope clause. SET LOCAL,
+ * inside a transaction, so the wider walk cannot leak onto the pooled
+ * connection and change the other vector queries tuned for the default.
+ */
+export async function scopedAnnQuery<T>(sql: string, params: unknown[]): Promise<{ rows: T[] }> {
+  return transaction(async (client) => {
+    await client.query(`SET LOCAL hnsw.ef_search = ${SCOPED_ANN_EF_SEARCH}`)
+    const result = await client.query(sql, params)
+    return { rows: result.rows as T[] }
+  })
 }

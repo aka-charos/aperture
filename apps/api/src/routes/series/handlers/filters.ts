@@ -12,6 +12,7 @@
 import type { FastifyInstance } from 'fastify'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
+import { scopeClause, viewerScope } from '../../../lib/viewerScope.js'
 import {
   genresSchema,
   networksSchema,
@@ -32,9 +33,15 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
       preHandler: requireAuth,
       schema: genresSchema,
     },
-    async (_request, reply) => {
+    async (request, reply) => {
+      // Options only from what this viewer may see (lib/viewerScope.ts), or a
+      // filter list names genres, collections and countries of libraries the
+      // media server keeps them out of.
+      const params: unknown[] = []
+      const inScope = scopeClause(await viewerScope(request), 'series', params)
       const result = await query<{ genre: string }>(
-        `SELECT DISTINCT unnest(genres) as genre FROM series ORDER BY genre`
+        `SELECT DISTINCT unnest(genres) as genre FROM series WHERE ${inScope} ORDER BY genre`,
+        params
       )
 
       return reply.send({ genres: result.rows.map((r) => r.genre) })
@@ -51,13 +58,19 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
       preHandler: requireAuth,
       schema: networksSchema,
     },
-    async (_request, reply) => {
+    async (request, reply) => {
+      // Options only from what this viewer may see (lib/viewerScope.ts), or a
+      // filter list names genres, collections and countries of libraries the
+      // media server keeps them out of.
+      const params: unknown[] = []
+      const inScope = scopeClause(await viewerScope(request), 'series', params)
       const result = await query<{ network: string; count: number }>(
         `SELECT network, COUNT(*)::int AS count
            FROM series
-          WHERE network IS NOT NULL
+          WHERE ${inScope} AND network IS NOT NULL
           GROUP BY network
-          ORDER BY count DESC, network`
+          ORDER BY count DESC, network`,
+        params
       )
 
       return reply.send({
@@ -76,14 +89,20 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
       preHandler: requireAuth,
       schema: keywordsSchema,
     },
-    async (_request, reply) => {
+    async (request, reply) => {
+      // Options only from what this viewer may see (lib/viewerScope.ts), or a
+      // filter list names genres, collections and countries of libraries the
+      // media server keeps them out of.
+      const params: unknown[] = []
+      const inScope = scopeClause(await viewerScope(request), 'series', params)
       const result = await query<{ keyword: string; count: string }>(
         `SELECT unnest(keywords) as keyword, COUNT(*) as count
-         FROM series WHERE keywords IS NOT NULL AND array_length(keywords, 1) > 0
+         FROM series WHERE ${inScope} AND keywords IS NOT NULL AND array_length(keywords, 1) > 0
          GROUP BY unnest(keywords)
          HAVING COUNT(*) > 1
          ORDER BY COUNT(*) DESC
-         LIMIT 100`
+         LIMIT 100`,
+        params
       )
 
       return reply.send({ 
@@ -102,11 +121,16 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
       preHandler: requireAuth,
       schema: contentRatingsSchema,
     },
-    async (_request, reply) => {
+    async (request, reply) => {
+      // Options only from what this viewer may see (lib/viewerScope.ts), or a
+      // filter list names genres, collections and countries of libraries the
+      // media server keeps them out of.
+      const params: unknown[] = []
+      const inScope = scopeClause(await viewerScope(request), 'series', params)
       const result = await query<{ content_rating: string; count: string }>(
         `SELECT content_rating, COUNT(*) as count
          FROM series 
-         WHERE content_rating IS NOT NULL
+         WHERE ${inScope} AND content_rating IS NOT NULL
          GROUP BY content_rating
          ORDER BY 
            CASE content_rating
@@ -121,7 +145,8 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
              WHEN 'PG-13' THEN 9
              WHEN 'R' THEN 10
              ELSE 11
-           END`
+           END`,
+        params
       )
 
       return reply.send({ 
@@ -140,12 +165,19 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
       preHandler: requireAuth,
       schema: countriesSchema,
     },
-    async (_request, reply) => {
+    async (request, reply) => {
+      // Options only from what this viewer may see (lib/viewerScope.ts), or a
+      // filter list names genres, collections and countries of libraries the
+      // media server keeps them out of.
+      const params: unknown[] = []
+      const inScope = scopeClause(await viewerScope(request), 'series', params)
       const result = await query<{ country: string; count: string }>(
         `SELECT c AS country, COUNT(*)::text AS count
          FROM series, unnest(production_countries) AS c
+         WHERE ${inScope}
          GROUP BY c
-         ORDER BY c`
+         ORDER BY c`,
+        params
       )
 
       return reply.send({
@@ -167,7 +199,12 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
       preHandler: requireAuth,
       schema: filterRangesSchema,
     },
-    async (_request, reply) => {
+    async (request, reply) => {
+      // Options only from what this viewer may see (lib/viewerScope.ts), or a
+      // filter list names genres, collections and countries of libraries the
+      // media server keeps them out of.
+      const params: unknown[] = []
+      const inScope = scopeClause(await viewerScope(request), 'series', params)
       const result = await queryOne<{
         min_year: number
         max_year: number
@@ -184,7 +221,8 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
           MIN(community_rating) as min_rating,
           MAX(community_rating) as max_rating
          FROM series 
-         WHERE year IS NOT NULL`
+         WHERE ${inScope} AND year IS NOT NULL`,
+        params
       )
 
       return reply.send({

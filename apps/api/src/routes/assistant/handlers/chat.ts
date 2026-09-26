@@ -17,10 +17,10 @@ import {
   type UIMessage,
   type ToolSet,
 } from 'ai'
-import { getChatModelInstance, getEmbeddingInvocation, withInferenceContext } from '@aperture/core'
+import { getChatModelInstance, getEmbeddingInvocation, withInferenceContext, getLibraryScopeForUser } from '@aperture/core'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import { requireCapability } from '../../../lib/permissions.js'
-import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText, loadConversationHistory, withUnwatchedFilter, createStatusEmitter, withStatusEvents, withRequestContext } from '../helpers/index.js'
+import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText, loadConversationHistory, withUnwatchedFilter, createStatusEmitter, withStatusEvents, withRequestContext, withLibraryScope } from '../helpers/index.js'
 import { createTools, createN8nTools, createEpisodeTools, createDiscoveryResolveTool, DISCOVERY_PROMPT } from '../tools/index.js'
 import { withToolErrorHandling } from '../tools/utils.js'
 import { persistTurn, persistQuestion, type TurnPart } from '../helpers/persistTurn.js'
@@ -232,10 +232,16 @@ export function registerChatHandler(fastify: FastifyInstance) {
               excludeWatched
             )
 
+            // What this viewer may open: the libraries the media server lets
+            // them into, those enabled here, and their parental rating. During
+            // an assumption this is the assumed account's, which is the point.
+            const scope = await getLibraryScopeForUser(user.id)
+
             // Create tool context
             const toolContext: ToolContext = {
               userId: user.id,
               isAdmin: user.isAdmin,
+              scope,
               // setId is "provider:model", plus "~<mode>" when the embeddings
               // role names a retrieval mode.
               embedding,
@@ -352,10 +358,14 @@ export function registerChatHandler(fastify: FastifyInstance) {
             // of it runs; withRequestContext is outermost because it stamps the
             // finished result, once the filter has settled which cards remain.
             const allTools = { ...baseTools, ...discoveryTools }
+            // withLibraryScope is innermost and unconditional: it is a
+            // permission, so no card may reach a later wrapper — or the model —
+            // before it has been filtered.
+            const scopedTools = withLibraryScope(allTools, scope)
             const tools = withRequestContext(
               withStatusEvents(
                 withToolErrorHandling(
-                  excludeWatched ? withUnwatchedFilter(allTools, user.id) : allTools
+                  excludeWatched ? withUnwatchedFilter(scopedTools, user.id) : scopedTools
                 ),
                 emit
               ),
