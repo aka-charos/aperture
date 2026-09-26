@@ -21,8 +21,7 @@ import {
   TablePagination,
 } from '@mui/material'
 import RefreshIcon from '@mui/icons-material/Refresh'
-import MovieIcon from '@mui/icons-material/LocalMovies'
-import TvIcon from '@mui/icons-material/Tv'
+import AutoAwesomeMotionIcon from '@mui/icons-material/AutoAwesomeMotion'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import { useTranslation } from 'react-i18next'
 import type { SetupWizardContext, SetupUser } from '../types'
@@ -35,13 +34,12 @@ interface UsersStepProps {
 
 interface UserTableProps {
   users: SetupUser[]
-  toggleUserMovies: (providerUserId: string, enabled: boolean) => Promise<void>
-  toggleUserSeries: (providerUserId: string, enabled: boolean) => Promise<void>
+  toggleUserRecommendations: (providerUserId: string, enabled: boolean) => Promise<void>
   enabledAdminCount: number
   isAdminSection?: boolean
 }
 
-function UserTable({ users, toggleUserMovies, toggleUserSeries, enabledAdminCount, isAdminSection }: UserTableProps) {
+function UserTable({ users, toggleUserRecommendations, enabledAdminCount, isAdminSection }: UserTableProps) {
   const { t } = useTranslation()
   const [page, setPage] = useState(0)
 
@@ -56,16 +54,10 @@ function UserTable({ users, toggleUserMovies, toggleUserSeries, enabledAdminCoun
         <TableHead>
           <TableRow>
             <TableCell>{t('setup.users.colUser')}</TableCell>
-            <TableCell align="center" sx={{ width: 100 }}>
+            <TableCell align="center" sx={{ width: 160 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                <MovieIcon fontSize="small" />
-                {t('setup.users.colMovies')}
-              </Box>
-            </TableCell>
-            <TableCell align="center" sx={{ width: 100 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                <TvIcon fontSize="small" />
-                {t('setup.users.colSeries')}
+                <AutoAwesomeMotionIcon fontSize="small" />
+                {t('setup.users.colRecommendations')}
               </Box>
             </TableCell>
           </TableRow>
@@ -74,7 +66,7 @@ function UserTable({ users, toggleUserMovies, toggleUserSeries, enabledAdminCoun
           {paginatedUsers.map((user) => {
             // For admins: prevent disabling if this is the last enabled admin
             const isLastEnabledAdmin =
-              isAdminSection && user.isAdmin && (user.moviesEnabled || user.seriesEnabled) && enabledAdminCount <= 1
+              isAdminSection && user.isAdmin && user.recommendationsEnabled && enabledAdminCount <= 1
 
             return (
               <TableRow
@@ -102,28 +94,12 @@ function UserTable({ users, toggleUserMovies, toggleUserSeries, enabledAdminCoun
                   </Box>
                 </TableCell>
                 <TableCell align="center">
-                  <Tooltip
-                    title={isLastEnabledAdmin && user.moviesEnabled ? t('setup.users.tooltipLastAdmin') : ''}
-                  >
+                  <Tooltip title={isLastEnabledAdmin ? t('setup.users.tooltipLastAdmin') : ''}>
                     <span>
                       <Switch
-                        checked={user.moviesEnabled}
-                        onChange={(e) => toggleUserMovies(user.providerUserId, e.target.checked)}
-                        disabled={user.isDisabled || (isLastEnabledAdmin && user.moviesEnabled && !user.seriesEnabled)}
-                        size="small"
-                      />
-                    </span>
-                  </Tooltip>
-                </TableCell>
-                <TableCell align="center">
-                  <Tooltip
-                    title={isLastEnabledAdmin && user.seriesEnabled ? t('setup.users.tooltipLastAdmin') : ''}
-                  >
-                    <span>
-                      <Switch
-                        checked={user.seriesEnabled}
-                        onChange={(e) => toggleUserSeries(user.providerUserId, e.target.checked)}
-                        disabled={user.isDisabled || (isLastEnabledAdmin && user.seriesEnabled && !user.moviesEnabled)}
+                        checked={user.recommendationsEnabled}
+                        onChange={(e) => toggleUserRecommendations(user.providerUserId, e.target.checked)}
+                        disabled={user.isDisabled || isLastEnabledAdmin}
                         size="small"
                       />
                     </span>
@@ -162,8 +138,7 @@ export function UsersStep({ wizard }: UsersStepProps) {
     usersError,
     setupCompleteForUsers,
     fetchSetupUsers,
-    toggleUserMovies,
-    toggleUserSeries,
+    toggleUserRecommendations,
   } = wizard
 
   // Fetch users when this step loads
@@ -175,7 +150,7 @@ export function UsersStep({ wizard }: UsersStepProps) {
   const { adminUsers, regularUsers, enabledAdminCount } = useMemo(() => {
     const admins = setupUsers.filter((u) => u.isAdmin)
     const regular = setupUsers.filter((u) => !u.isAdmin)
-    const enabledCount = admins.filter((u) => u.moviesEnabled || u.seriesEnabled).length
+    const enabledCount = admins.filter((u) => u.recommendationsEnabled).length
     return { adminUsers: admins, regularUsers: regular, enabledAdminCount: enabledCount }
   }, [setupUsers])
 
@@ -225,7 +200,7 @@ export function UsersStep({ wizard }: UsersStepProps) {
       </Box>
 
       <Typography variant="body2" color="text.secondary" paragraph>
-        {t('setup.users.bodyParagraph')}
+        {t('setup.users.bodyText')}
       </Typography>
 
       {usersError && !setupCompleteForUsers && (
@@ -261,8 +236,7 @@ export function UsersStep({ wizard }: UsersStepProps) {
               </Alert>
               <UserTable
                 users={adminUsers}
-                toggleUserMovies={toggleUserMovies}
-                toggleUserSeries={toggleUserSeries}
+                toggleUserRecommendations={toggleUserRecommendations}
                 enabledAdminCount={enabledAdminCount}
                 isAdminSection
               />
@@ -281,8 +255,7 @@ export function UsersStep({ wizard }: UsersStepProps) {
               </Typography>
               <UserTable
                 users={regularUsers}
-                toggleUserMovies={toggleUserMovies}
-                toggleUserSeries={toggleUserSeries}
+                toggleUserRecommendations={toggleUserRecommendations}
                 enabledAdminCount={enabledAdminCount}
               />
             </Box>
@@ -292,7 +265,7 @@ export function UsersStep({ wizard }: UsersStepProps) {
 
       <Alert severity="warning" sx={{ mb: 2, py: 0.5 }} icon={false}>
         <Typography variant="caption">
-          <strong>{t('setup.users.noteLabel')}</strong> {t('setup.users.noteWarning')}
+          <strong>{t('setup.users.noteLabel')}</strong> {t('setup.users.noteText')}
         </Typography>
       </Alert>
 

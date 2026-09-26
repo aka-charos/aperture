@@ -20,6 +20,7 @@
 
 import crypto from 'crypto'
 import { query } from '../lib/db.js'
+import { loadConfiguredLibraries, resolveLibraryScope } from '../lib/libraryScope.js'
 import { createChildLogger } from '../lib/logger.js'
 import {
   createJobProgress,
@@ -50,9 +51,10 @@ export interface RebuildAllTasteProfilesResult {
 interface UserRow {
   id: string
   username: string
-  movies_enabled: boolean
-  series_enabled: boolean
+  recommendations_enabled: boolean
   discover_enabled: boolean
+  library_access: string[] | null
+  max_parental_rating: number | null
 }
 
 /**
@@ -124,13 +126,14 @@ export async function rebuildAllTasteProfiles(
     // of everyone else's. Anything that scores a profile has to be able to
     // maintain it.
     const users = await query<UserRow>(
-      `SELECT id, username, movies_enabled, series_enabled, discover_enabled
+      `SELECT id, username, recommendations_enabled, discover_enabled, library_access, max_parental_rating
          FROM users
         WHERE is_enabled = true
           AND provider_disabled = false
-          AND (movies_enabled = true OR series_enabled = true OR discover_enabled = true)
+          AND (recommendations_enabled = true OR discover_enabled = true)
         ORDER BY username`
     )
+    const libraries = await loadConfiguredLibraries()
 
     const totalUsers = users.rows.length
 
@@ -150,11 +153,19 @@ export async function rebuildAllTasteProfiles(
       // Discovery runs BOTH media types for every discovery-enabled viewer --
       // its pipeline loops them unconditionally -- so a discover-only viewer
       // needs both profiles. Widening the WHERE clause without this would admit
-      // them and then rebuild nothing, since both recommendation flags are
-      // false and the list would come out empty.
+      // them and then rebuild nothing, since the recommendations flag is false
+      // and the list would come out empty. Recommendations need a kind only
+      // when the viewer can see a library of it — the pipeline serves nothing
+      // else (recommender/recipients.ts) — while Discover is about titles NOT in
+      // the library, so it keeps both.
+      const scope = resolveLibraryScope({
+        libraries,
+        userLibraryIds: user.library_access,
+        maxParentalRating: user.max_parental_rating,
+      })
       const mediaTypes: MediaType[] = []
-      if (user.movies_enabled || user.discover_enabled) mediaTypes.push('movie')
-      if (user.series_enabled || user.discover_enabled) mediaTypes.push('series')
+      if ((user.recommendations_enabled && scope.hasMovies) || user.discover_enabled) mediaTypes.push('movie')
+      if ((user.recommendations_enabled && scope.hasSeries) || user.discover_enabled) mediaTypes.push('series')
 
       const outcomes: string[] = []
 

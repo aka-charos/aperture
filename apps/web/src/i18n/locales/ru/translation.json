@@ -201,8 +201,6 @@
       "providerActive": "{{provider}}: активен",
       "recsEnabledTooltip": "Рекомендации включены",
       "enableAiRecs": "Включить рекомендации ИИ",
-      "movies": "Фильмы",
-      "series": "Ряд",
       "discover": "Обнаружить",
       "request": "Запрос",
       "aiOverride": "Переопределение ИИ",
@@ -215,8 +213,6 @@
       "menuUpdateStrm": "Обновить файлы STRM",
       "colUser": "Пользователь",
       "colImported": "Импортировано",
-      "colMovies": "Фильмы",
-      "colSeries": "Ряд",
       "colDiscover": "Обнаружить",
       "colRequest": "Запрос",
       "colAiOverride": "Переопределение ИИ",
@@ -285,7 +281,17 @@
       "assistantToggleOn": "Disable the assistant",
       "assistantToggleOff": "Enable the assistant",
       "assistantOn": "{{name}} can now use the assistant",
-      "assistantOff": "{{name}} can no longer use the assistant"
+      "assistantOff": "{{name}} can no longer use the assistant",
+      "colRecommendations": "Recommendations",
+      "recommendationsColTooltip": "Personal recommendations, generated libraries and home rows. Whether that means movies, series or both follows from the libraries {{provider}} lets the account see.",
+      "recommendationsOn": "{{name}} will now get recommendations",
+      "recommendationsOff": "{{name}} will no longer get recommendations",
+      "recsKindsBoth": "Movies & series",
+      "recsKindsMovies": "Movies only",
+      "recsKindsSeries": "Series only",
+      "recsKindsNone": "No library",
+      "recsKindsTooltip": "The kinds follow from the libraries {{provider}} lets this account see, among those enabled here.",
+      "recsKindsUnreadTooltip": "This account's library access hasn't been read from {{provider}} yet; it will be at the next user sync or sign-in. Until then every enabled library counts."
     },
     "userDetail": {
       "userNotFound": "Пользователь не найден",
@@ -389,7 +395,8 @@
         "email_notifications_allowed": "Email notifications",
         "ai_explanation_override_allowed": "AI explanation override",
         "scopes": "API key permissions",
-        "assistant_enabled": "Assistant"
+        "assistant_enabled": "Assistant",
+        "recommendations_enabled": "Recommendations"
       }
     },
     "jobsPage": {
@@ -3938,8 +3945,6 @@
     "users": {
       "noteLabel": "Примечание:",
       "colUser": "Пользователь",
-      "colMovies": "Фильмы",
-      "colSeries": "Ряд",
       "adminChip": "Админ",
       "disabledChip": "Неполноценный",
       "tooltipLastAdmin": "Хотя бы один администратор должен оставаться включенным",
@@ -3950,14 +3955,15 @@
       "setupCompleteFallback": "Настройка завершена.",
       "manageUsersLink": "Управляйте пользователями в Администратор → Пользователи.",
       "back": "Назад",
-      "bodyParagraph": "Выберите, какие пользователи должны получать персональные рекомендации ИИ. Для каждого пользователя вы можете включить рекомендации для фильмов, сериалов или того и другого. {{appName}} анализирует историю просмотров каждого пользователя индивидуально, чтобы генерировать индивидуальные предложения, которые появляются в их личных библиотеках рекомендаций.",
       "noUsersWarning": "На вашем медиасервере не найдено пользователей. Убедитесь, что на вашем медиасервере есть активные учетные записи пользователей, затем нажмите кнопку обновления, чтобы перезагрузить список.",
       "adminSectionTitle": "Пользователи-администраторы ({{count}})",
       "adminInfoCaption": "Пользователи с правами администратора были автоматически включены, чтобы вы могли входить в систему и управлять {{appName}}. Хотя бы один администратор должен оставаться включенным, чтобы иметь доступ к панели администратора.",
       "otherUsersTitle": "Другие пользователи ({{count}})",
       "otherUsersCaption": "Включите рекомендации для членов семьи или других пользователей на вашем медиасервере. Каждый включенный пользователь получит свои персональные рекомендации, основанные на его истории просмотров.",
-      "noteWarning": "Пользователи, у которых отключены фильмы и сериалы, не получат никаких рекомендаций и не смогут войти в {{appName}}. Вы всегда можете изменить эти настройки позже в Администратор → Пользователи.",
-      "paginationRange": "{{от}}-{{до}} из {{count}}"
+      "paginationRange": "{{от}}-{{до}} из {{count}}",
+      "colRecommendations": "Recommendations",
+      "bodyText": "Choose which users should receive personalized recommendations. Whether that means movies, series or both follows from the libraries each account can see on your media server. {{appName}} analyzes each user's watch history individually to generate tailored suggestions that appear in their personal recommendation libraries.",
+      "noteText": "Users with recommendations switched off won't receive any and won't be able to sign in to {{appName}}. You can change all of this later in Admin → Users."
     },
     "complete": {
       "title": "Настройка завершена!",

@@ -149,7 +149,10 @@ function tasteSetSql(mediaType: 'movie' | 'series'): string {
  */
 export async function getTwinPairs(mediaType: 'movie' | 'series'): Promise<TwinPair[]> {
   const pairs: TwinPair[] = []
-  const enabledColumn = mediaType === 'movie' ? 'movies_enabled' : 'series_enabled'
+  // Who may RECEIVE a twin pick. The kind is not tested here: a recipient who
+  // cannot see any library of it gets no run of that kind (recipients.ts), so a
+  // pair naming them is simply never read.
+  const enabledColumn = 'recommendations_enabled'
 
   try {
     const result = await query<TwinRow>(

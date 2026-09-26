@@ -6,6 +6,9 @@ import {
   InvalidCredentialsError,
   auditUserPermissions,
   SYSTEM_ACTORS,
+  libraryIdsFromFolderAccess,
+  saveUserLibraryAccess,
+  getLibraryScopeForUser,
   type AuthResult,
 } from '@aperture/core'
 import { queryOne } from '../../lib/db.js'
@@ -82,6 +85,25 @@ interface MeResponse {
    * existed hides the feature rather than offering one that 403s.
    */
   capabilities: Record<Capability, boolean>
+}
+
+/**
+ * The capabilities the client gates on, plus which kinds of title this viewer
+ * can see at all — `movies` and `series`, decided from their library scope
+ * (lib/libraryScope.ts). They ride in the same map because they are answered the
+ * same way: the bundle is told the answer and never works it out. If the scope
+ * cannot be read the kinds read as present: the server still refuses what is
+ * out of scope, and hiding a whole kind over a failed read is the worse miss.
+ */
+async function decidedCapabilities(user: SessionUser): Promise<Record<string, boolean>> {
+  let kinds = { movies: true, series: true }
+  try {
+    const scope = await getLibraryScopeForUser(user.id)
+    kinds = { movies: scope.hasMovies, series: scope.hasSeries }
+  } catch {
+    // Keep the permissive default; see above.
+  }
+  return { ...capabilitiesFor(user), ...kinds }
 }
 
 /**
@@ -259,6 +281,19 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         user = created!
       }
 
+      // Signing in is when a permission changed on the media server matters
+      // most, so the account's library access is refreshed here as well as by the
+      // user sync. Best effort: a failed read keeps the stored permission, and
+      // never fails a sign-in the media server has already accepted.
+      if (providerUser.folderAccess) {
+        try {
+          const libraries = await provider.getLibraries(config.apiKey)
+          await saveUserLibraryAccess(user.id, libraryIdsFromFolderAccess(providerUser.folderAccess, libraries))
+        } catch (err) {
+          fastify.log.warn({ err, userId: user.id }, 'Could not refresh library access at sign-in')
+        }
+      }
+
       // Recorded here rather than after the check below: a login that is then
       // refused still cleared `provider_disabled`, and an audit that omits a
       // change because the request failed afterwards is not an audit.
@@ -295,7 +330,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       const sessionUser = toSessionUser(user)
       return reply.send({
         user: sessionUser,
-        capabilities: capabilitiesFor(sessionUser),
+        capabilities: await decidedCapabilities(sessionUser),
       })
     }
   )
@@ -330,7 +365,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.send({
         user: request.user!,
         impersonation: request.impersonation ?? null,
-        capabilities: capabilitiesFor(request.user!),
+        capabilities: await decidedCapabilities(request.user!),
       })
     }
   )
@@ -493,7 +528,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
           // capabilities have to ride here or the first paint gates on
           // nothing. During an assumption these are the TARGET’s, which is
           // the point: the admin sees the app the viewer sees.
-          capabilities: capabilitiesFor(request.user),
+          capabilities: await decidedCapabilities(request.user),
         })
       }
 

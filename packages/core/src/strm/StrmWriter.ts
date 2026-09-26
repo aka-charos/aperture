@@ -1,6 +1,5 @@
 // Re-exports from modular files for backwards compatibility
 import { createChildLogger } from '../lib/logger.js'
-import { query } from '../lib/db.js'
 import {
   createJobProgress,
   updateJobProgress,
@@ -62,6 +61,7 @@ import {
   updateUserSeriesLibraryPermissions,
 } from './series/library.js'
 import { reconcileStaleStrmLibraries } from './cleanup.js'
+import { loadRecommendationRecipients } from '../recommender/recipients.js'
 
 const logger = createChildLogger('strm-writer')
 
@@ -82,14 +82,10 @@ export async function processStrmForAllUsers(
     setJobStep(actualJobId, 0, 'Finding enabled users')
     addLog(actualJobId, 'info', '🔍 Finding enabled users...')
 
-    const users = await query<{
-      id: string
-      provider_user_id: string
-      display_name: string | null
-      username: string
-    }>(
-      'SELECT id, provider_user_id, display_name, username FROM users WHERE is_enabled = true AND movies_enabled = true AND provider_disabled = false'
-    )
+    // The same population the movie pipeline serves (recipients.ts): someone
+    // who cannot see a movie library gets no movie library written, and the
+    // reconcile sweep below removes one they already had.
+    const users = { rows: await loadRecommendationRecipients('movies') }
 
     const totalUsers = users.rows.length
 
@@ -239,14 +235,7 @@ export async function processSeriesStrmForAllUsers(
     setJobStep(actualJobId, 0, 'Finding enabled users')
     addLog(actualJobId, 'info', '🔍 Finding enabled users...')
 
-    const users = await query<{
-      id: string
-      provider_user_id: string
-      display_name: string | null
-      username: string
-    }>(
-      'SELECT id, provider_user_id, display_name, username FROM users WHERE is_enabled = true AND series_enabled = true AND provider_disabled = false'
-    )
+    const users = { rows: await loadRecommendationRecipients('series') }
 
     const totalUsers = users.rows.length
 

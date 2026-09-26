@@ -23,6 +23,7 @@ import {
   getSystemSetting,
   setSystemSetting,
   type MediaTypeConfig,
+  loadRecommendationRecipients,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
 import {
@@ -336,17 +337,23 @@ export function registerRecommendationHandlers(fastify: FastifyInstance) {
       const modelFilter = modelName ? `AND e.model = '${modelName}'` : ''
 
       const [enabledUsersResult, itemCountsResult, totalLibraryResult] = await Promise.all([
-        query<{
-          movies_enabled_count: string
-          series_enabled_count: string
-          total_enabled_count: string
-        }>(`
-          SELECT 
-            COUNT(*) FILTER (WHERE movies_enabled = true) as movies_enabled_count,
-            COUNT(*) FILTER (WHERE series_enabled = true) as series_enabled_count,
-            COUNT(*) FILTER (WHERE is_enabled = true) as total_enabled_count
-          FROM users
-        `),
+        // Who each pipeline actually runs for (recipients.ts), not a flag count:
+        // recommendations on, and a library of that kind in the viewer's scope.
+        Promise.all([
+          loadRecommendationRecipients('movies'),
+          loadRecommendationRecipients('series'),
+          query<{ total_enabled_count: string }>(
+            `SELECT COUNT(*) FILTER (WHERE is_enabled = true) as total_enabled_count FROM users`
+          ),
+        ]).then(([movieRecipients, seriesRecipients, total]) => ({
+          rows: [
+            {
+              movies_enabled_count: String(movieRecipients.length),
+              series_enabled_count: String(seriesRecipients.length),
+              total_enabled_count: total.rows[0]?.total_enabled_count ?? '0',
+            },
+          ],
+        })),
         query<{
           movie_count: string
           series_count: string

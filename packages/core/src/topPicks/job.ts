@@ -21,7 +21,7 @@ import { getTopPicksConfig, updateTopPicksLastRefreshed } from './config.js'
 import { getTopMovies, getTopSeries } from './popularity.js'
 import { writeTopPicksMovies, writeTopPicksSeries } from './writer.js'
 import { writeTopPicksCollectionsAndPlaylists } from './collectionWriter.js'
-import { grantTopPicksAccessToAllUsers, getTopPicksLibraries } from './permissions.js'
+import { grantTopPicksAccessToAllUsers, getTopPicksLibraries, sourceLibraryIdsFor } from './permissions.js'
 import { getMediaServerProvider } from '../media/index.js'
 import { getMediaServerApiKey } from '../settings/systemSettings.js'
 import { getConfig } from '../strm/config.js'
@@ -310,13 +310,24 @@ export async function refreshTopPicks(
       // Grant access to all users
       if (moviesLib || seriesLib) {
         addLog(jobId, 'info', '👥 Granting access to all users...')
-        const accessResult = await grantTopPicksAccessToAllUsers(moviesLib, seriesLib)
+        const sources = {
+          movies: await sourceLibraryIdsFor('movies', topMovies.map((pick) => pick.movieId)),
+          series: await sourceLibraryIdsFor('series', topSeries.map((pick) => pick.seriesId)),
+        }
+        const accessResult = await grantTopPicksAccessToAllUsers(moviesLib, seriesLib, sources)
         addLog(jobId, 'info', `✅ Permissions updated: ${accessResult.updated} users granted access`)
         if (accessResult.alreadyHadAccess > 0) {
           addLog(jobId, 'info', `   ℹ️ ${accessResult.alreadyHadAccess} users already had access`)
         }
         if (accessResult.hasAllFolders > 0) {
           addLog(jobId, 'info', `   ℹ️ ${accessResult.hasAllFolders} users have access to all libraries`)
+        }
+        if (accessResult.withheld > 0) {
+          addLog(
+            jobId,
+            'info',
+            `   🔒 ${accessResult.withheld} users not given a Top Picks library that holds titles from a library they cannot open`
+          )
         }
         if (accessResult.failed > 0) {
           addLog(jobId, 'warn', `   ⚠️ ${accessResult.failed} users failed`)

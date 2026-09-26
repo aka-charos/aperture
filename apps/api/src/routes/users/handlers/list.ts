@@ -22,7 +22,7 @@ const listLogger = createChildLogger('users-list')
 // `provider_disabled` and `ai_explanation_override_allowed` are here for the
 // permission audit, which diffs the row it just wrote. They are not part of
 // `UserRow`, so nothing else sees them.
-const USER_ROW_SELECT = `id, username, display_name, email, provider, provider_user_id, is_admin, is_enabled, movies_enabled, series_enabled, discover_enabled, discover_request_enabled, collections_enabled, assistant_enabled, email_notifications_allowed, can_manage_watch_history, provider_disabled, ai_explanation_override_allowed, seerr_user_id, created_at, updated_at`
+const USER_ROW_SELECT = `id, username, display_name, email, provider, provider_user_id, is_admin, is_enabled, recommendations_enabled, discover_enabled, discover_request_enabled, collections_enabled, assistant_enabled, email_notifications_allowed, can_manage_watch_history, provider_disabled, ai_explanation_override_allowed, seerr_user_id, created_at, updated_at`
 
 export function registerListHandlers(fastify: FastifyInstance) {
   /**
@@ -101,7 +101,15 @@ export function registerListHandlers(fastify: FastifyInstance) {
     async (request, reply) => {
       const { id } = request.params
       const currentUser = request.user as SessionUser
-      const { displayName, isEnabled, moviesEnabled, seriesEnabled, discoverEnabled, discoverRequestEnabled, collectionsEnabled, assistantEnabled, emailNotificationsAllowed, canManageWatchHistory, seerrUserId } = request.body
+      const { displayName, isEnabled, recommendationsEnabled, discoverEnabled, discoverRequestEnabled, collectionsEnabled, assistantEnabled, emailNotificationsAllowed, canManageWatchHistory, seerrUserId } = request.body
+
+      // Movies and Series were folded into one switch (F-136). A caller still
+      // sending them is told so, rather than having a switch silently ignored.
+      if (request.body && ('moviesEnabled' in request.body || 'seriesEnabled' in request.body)) {
+        return reply.status(400).send({
+          error: 'moviesEnabled and seriesEnabled were replaced by recommendationsEnabled',
+        } as never)
+      }
 
       const refusal = accessChangeRefusal({ actorId: currentUser.id, targetId: id, isEnabled })
       if (refusal) {
@@ -128,8 +136,7 @@ export function registerListHandlers(fastify: FastifyInstance) {
         values.push(value)
       }
 
-      setSwitch('movies_enabled', moviesEnabled)
-      setSwitch('series_enabled', seriesEnabled)
+      setSwitch('recommendations_enabled', recommendationsEnabled)
       setSwitch('discover_enabled', discoverEnabled)
 
       // Content requests depend on Discover, and that rule used to live only in
@@ -234,25 +241,10 @@ export function registerListHandlers(fastify: FastifyInstance) {
       // identity, every switch) stays, so turning access back on rebuilds them on
       // the next run. STRM cleanup would remove them on its own sweep anyway,
       // since it already treats `NOT is_enabled` as grounds.
-      const disableAllRecommendations =
-        isEnabled === false ||
-        (moviesEnabled === false && seriesEnabled === false)
-
-      if (disableAllRecommendations) {
+      if (isEnabled === false || recommendationsEnabled === false) {
         void cleanupUserLibraries(id).catch((err: unknown) =>
           listLogger.error({ err, userId: id }, 'cleanupUserLibraries after disabling recommendations')
         )
-      } else {
-        if (moviesEnabled === false) {
-          void cleanupUserLibraries(id, 'movies').catch((err: unknown) =>
-            listLogger.error({ err, userId: id }, 'cleanupUserLibraries after disabling movie recommendations')
-          )
-        }
-        if (seriesEnabled === false) {
-          void cleanupUserLibraries(id, 'series').catch((err: unknown) =>
-            listLogger.error({ err, userId: id }, 'cleanupUserLibraries after disabling series recommendations')
-          )
-        }
       }
 
       return reply.send(user)

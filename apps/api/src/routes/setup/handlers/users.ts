@@ -21,14 +21,12 @@ import { requireSetupWritable } from './status.js'
 
 interface SetupUserImportBody {
   providerUserId: string
-  moviesEnabled?: boolean
-  seriesEnabled?: boolean
+  recommendationsEnabled?: boolean
 }
 
 interface SetupUserEnableBody {
   apertureUserId: string
-  moviesEnabled?: boolean
-  seriesEnabled?: boolean
+  recommendationsEnabled?: boolean
 }
 
 export async function registerUsersHandlers(fastify: FastifyInstance) {
@@ -60,10 +58,9 @@ export async function registerUsersHandlers(fastify: FastifyInstance) {
           provider_user_id: string
           id: string
           is_enabled: boolean
-          movies_enabled: boolean
-          series_enabled: boolean
+          recommendations_enabled: boolean
         }>(
-          `SELECT provider_user_id, id, is_enabled, movies_enabled, series_enabled 
+          `SELECT provider_user_id, id, is_enabled, recommendations_enabled
            FROM users WHERE provider = $1`,
           [provider.type]
         )
@@ -74,8 +71,7 @@ export async function registerUsersHandlers(fastify: FastifyInstance) {
             {
               id: row.id,
               isEnabled: row.is_enabled,
-              moviesEnabled: row.movies_enabled,
-              seriesEnabled: row.series_enabled,
+              recommendationsEnabled: row.recommendations_enabled,
             },
           ])
         )
@@ -91,8 +87,7 @@ export async function registerUsersHandlers(fastify: FastifyInstance) {
             apertureUserId: existing?.id || null,
             isImported: !!existing,
             isEnabled: existing?.isEnabled || false,
-            moviesEnabled: existing?.moviesEnabled || false,
-            seriesEnabled: existing?.seriesEnabled || false,
+            recommendationsEnabled: existing?.recommendationsEnabled || false,
           }
         })
 
@@ -122,7 +117,7 @@ export async function registerUsersHandlers(fastify: FastifyInstance) {
         })
       }
 
-      const { providerUserId, moviesEnabled = false, seriesEnabled = false } = request.body || {}
+      const { providerUserId, recommendationsEnabled = false } = request.body || {}
 
       if (!providerUserId) {
         return reply.status(400).send({ error: 'providerUserId is required' })
@@ -146,16 +141,15 @@ export async function registerUsersHandlers(fastify: FastifyInstance) {
             id: string
             username: string
             is_enabled: boolean
-            movies_enabled: boolean
-            series_enabled: boolean
+            recommendations_enabled: boolean
           }>(
             `UPDATE users 
-             SET movies_enabled = $1, series_enabled = $2,
-                 is_enabled = ${accountEnabledSql({ movies_enabled: '$1', series_enabled: '$2' })},
+             SET recommendations_enabled = $1,
+                 is_enabled = ${accountEnabledSql({ recommendations_enabled: '$1' })},
                  updated_at = NOW()
-             WHERE id = $3
-             RETURNING id, username, is_enabled, movies_enabled, series_enabled`,
-            [moviesEnabled, seriesEnabled, existing.id]
+             WHERE id = $2
+             RETURNING id, username, is_enabled, recommendations_enabled`,
+            [recommendationsEnabled, existing.id]
           )
           return reply.send({ user: updated, alreadyImported: true })
         }
@@ -167,12 +161,11 @@ export async function registerUsersHandlers(fastify: FastifyInstance) {
           username: string
           is_admin: boolean
           is_enabled: boolean
-          movies_enabled: boolean
-          series_enabled: boolean
+          recommendations_enabled: boolean
         }>(
-          `INSERT INTO users (username, display_name, provider, provider_user_id, is_admin, is_enabled, movies_enabled, series_enabled, max_parental_rating)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-           RETURNING id, username, is_admin, is_enabled, movies_enabled, series_enabled`,
+          `INSERT INTO users (username, display_name, provider, provider_user_id, is_admin, is_enabled, recommendations_enabled, max_parental_rating)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           RETURNING id, username, is_admin, is_enabled, recommendations_enabled`,
           [
             providerUser.name,
             providerUser.name,
@@ -181,15 +174,13 @@ export async function registerUsersHandlers(fastify: FastifyInstance) {
             providerUser.isAdmin,
             // Discover and Collections are not written here and default to off (0080, 0116).
             isAccountEnabled({
-              moviesEnabled,
-              seriesEnabled,
+              recommendationsEnabled,
               discoverEnabled: false,
               collectionsEnabled: false,
               isAdmin: providerUser.isAdmin,
               wasEnabled: false,
             }),
-            moviesEnabled,
-            seriesEnabled,
+            recommendationsEnabled,
             providerUser.maxParentalRating ?? null,
           ]
         )
@@ -231,7 +222,7 @@ export async function registerUsersHandlers(fastify: FastifyInstance) {
         })
       }
 
-      const { apertureUserId, moviesEnabled, seriesEnabled } = request.body || {}
+      const { apertureUserId, recommendationsEnabled } = request.body || {}
 
       if (!apertureUserId) {
         return reply.status(400).send({ error: 'apertureUserId is required' })
@@ -242,22 +233,17 @@ export async function registerUsersHandlers(fastify: FastifyInstance) {
         const values: unknown[] = []
         let paramIndex = 1
 
-        const written: { movies_enabled?: string; series_enabled?: string } = {}
-        if (moviesEnabled !== undefined) {
-          written.movies_enabled = `$${paramIndex}`
-          updates.push(`movies_enabled = $${paramIndex++}`)
-          values.push(moviesEnabled)
-        }
-        if (seriesEnabled !== undefined) {
-          written.series_enabled = `$${paramIndex}`
-          updates.push(`series_enabled = $${paramIndex++}`)
-          values.push(seriesEnabled)
+        const written: { recommendations_enabled?: string } = {}
+        if (recommendationsEnabled !== undefined) {
+          written.recommendations_enabled = `$${paramIndex}`
+          updates.push(`recommendations_enabled = $${paramIndex++}`)
+          values.push(recommendationsEnabled)
         }
 
         if (updates.length === 0) {
           return reply
             .status(400)
-            .send({ error: 'At least one of moviesEnabled or seriesEnabled is required' })
+            .send({ error: 'recommendationsEnabled is required' })
         }
 
         // The switches written here are read from their new values; the rest of the
@@ -273,11 +259,10 @@ export async function registerUsersHandlers(fastify: FastifyInstance) {
           id: string
           username: string
           is_enabled: boolean
-          movies_enabled: boolean
-          series_enabled: boolean
+          recommendations_enabled: boolean
         }>(
           `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramIndex}
-           RETURNING id, username, is_enabled, movies_enabled, series_enabled`,
+           RETURNING id, username, is_enabled, recommendations_enabled`,
           values
         )
 

@@ -12,6 +12,11 @@ import { getMediaServerApiKey } from '../settings/systemSettings.js'
 import { getConfig } from './config.js'
 import { getUserFolderName } from './filenames.js'
 import { addLog } from '../jobs/progress.js'
+import {
+  loadConfiguredLibraries,
+  resolveLibraryScope,
+  scopeHas,
+} from '../lib/libraryScope.js'
 
 const logger = createChildLogger('strm-cleanup')
 
@@ -139,24 +144,37 @@ export async function reconcileStaleStrmLibraries(jobId?: string): Promise<void>
     provider_user_id: string
     display_name: string | null
     username: string
+    eligible: boolean
+    library_access: string[] | null
+    max_parental_rating: number | null
   }
 
-  const result = await query<StaleRow>(
+  // A personal library is stale when its owner may not have recommendations at
+  // all, or can no longer see any library of its kind — the same two questions
+  // recipients.ts asks before writing one, or a library the writer stopped
+  // updating would sit in Emby forever with the last picks in it.
+  const candidates = await query<StaleRow>(
     `SELECT sl.id, sl.name, sl.media_type, sl.user_id,
-            u.provider_user_id, u.display_name, u.username
+            u.provider_user_id, u.display_name, u.username,
+            (u.is_enabled AND u.recommendations_enabled AND NOT u.provider_disabled) AS eligible,
+            u.library_access, u.max_parental_rating
      FROM strm_libraries sl
      JOIN users u ON u.id = sl.user_id
      WHERE sl.user_id IS NOT NULL
-     AND (
-       (sl.media_type = 'movies' AND sl.channel_id IS NULL AND (
-         u.provider_disabled OR NOT u.is_enabled OR NOT u.movies_enabled
-       ))
-       OR
-       (sl.media_type = 'series' AND (
-         u.provider_disabled OR NOT u.is_enabled OR NOT u.series_enabled
-       ))
-     )`
+       AND (sl.media_type = 'series' OR (sl.media_type = 'movies' AND sl.channel_id IS NULL))`
   )
+  const libraries = await loadConfiguredLibraries()
+  const result = {
+    rows: candidates.rows.filter((row) => {
+      if (!row.eligible) return true
+      const scope = resolveLibraryScope({
+        libraries,
+        userLibraryIds: row.library_access,
+        maxParentalRating: row.max_parental_rating,
+      })
+      return !scopeHas(scope, row.media_type === 'series' ? 'series' : 'movies')
+    }),
+  }
 
   if (result.rows.length === 0) {
     log('info', 'Reconcile: no stale STRM libraries found')

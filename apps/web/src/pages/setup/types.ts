@@ -108,8 +108,7 @@ export interface SetupUser {
   apertureUserId: string | null
   isImported: boolean
   isEnabled: boolean
-  moviesEnabled: boolean
-  seriesEnabled: boolean
+  recommendationsEnabled: boolean
 }
 
 export type JobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
@@ -260,9 +259,8 @@ export interface SetupWizardActions {
 
   // Users
   fetchSetupUsers: () => Promise<void>
-  importAndEnableUser: (providerUserId: string, moviesEnabled: boolean, seriesEnabled: boolean) => Promise<void>
-  toggleUserMovies: (providerUserId: string, enabled: boolean) => Promise<void>
-  toggleUserSeries: (providerUserId: string, enabled: boolean) => Promise<void>
+  importAndEnableUser: (providerUserId: string, recommendationsEnabled: boolean) => Promise<void>
+  toggleUserRecommendations: (providerUserId: string, enabled: boolean) => Promise<void>
 
   // AI Configuration (multi-provider)
   loadAIConfig: () => Promise<void>

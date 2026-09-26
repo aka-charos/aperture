@@ -1,10 +1,20 @@
 /**
  * Top Picks Library Permissions
- * 
- * Manages granting all Emby users access to Top Picks libraries.
+ *
+ * Grants the Top Picks libraries to the accounts allowed to see what is in them.
+ *
+ * A Top Picks library is one set of files for the whole server, each pointing
+ * straight at an original. Adding it to an account's permitted folders therefore
+ * hands that account every title in it — including titles from libraries the
+ * media server keeps them out of. So an account restricted to some libraries is
+ * granted a Top Picks library only when its permission covers EVERY library the
+ * current picks come from, and has it taken away again when that stops being
+ * true. An account granted every folder needs nothing (F-136).
  */
 
 import { createChildLogger } from '../lib/logger.js'
+import { query } from '../lib/db.js'
+import { libraryIdsFromFolderAccess } from '../lib/libraryScope.js'
 import { getMediaServerProvider } from '../media/index.js'
 import { getMediaServerApiKey } from '../settings/systemSettings.js'
 import { getTopPicksConfig } from './config.js'
@@ -18,13 +28,37 @@ interface LibraryInfo {
 }
 
 /**
- * Grant all Emby users access to the Top Picks libraries
- * This makes the Top Picks libraries visible to everyone
+ * The provider libraries a set of titles comes from — what an account must be
+ * allowed to open before a library holding those titles may be granted to it.
+ */
+export async function sourceLibraryIdsFor(
+  table: 'movies' | 'series',
+  ids: readonly string[]
+): Promise<string[]> {
+  if (ids.length === 0) return []
+  const rows = await query<{ provider_library_id: string | null }>(
+    `SELECT DISTINCT provider_library_id FROM ${table} WHERE id = ANY($1)`,
+    [ids]
+  )
+  return rows.rows.map((row) => row.provider_library_id).filter((id): id is string => !!id)
+}
+
+/** Whether a permission covers every source library (pure). */
+export function coversSources(allowedLibraryIds: readonly string[], sourceLibraryIds: readonly string[]): boolean {
+  const allowed = new Set(allowedLibraryIds)
+  return sourceLibraryIds.every((id) => allowed.has(id))
+}
+
+/**
+ * Grant the Top Picks libraries to every account allowed to see what is in them,
+ * and withdraw them from any account that is not (see the module note).
  */
 export async function grantTopPicksAccessToAllUsers(
   moviesLibrary: LibraryInfo | null,
-  seriesLibrary: LibraryInfo | null
-): Promise<{ updated: number; failed: number; alreadyHadAccess: number; hasAllFolders: number }> {
+  seriesLibrary: LibraryInfo | null,
+  /** Provider library ids each Top Picks library's titles come from. */
+  sources: { movies: string[]; series: string[] } = { movies: [], series: [] }
+): Promise<{ updated: number; failed: number; alreadyHadAccess: number; hasAllFolders: number; withheld: number }> {
   const provider = await getMediaServerProvider()
   const apiKey = await getMediaServerApiKey()
 
@@ -45,6 +79,10 @@ export async function grantTopPicksAccessToAllUsers(
   let alreadyHadAccess = 0
   let hasAllFolders = 0
   let failed = 0
+  let withheld = 0
+
+  // Folder permissions name libraries by GUID; titles carry the item id.
+  const serverLibraries = await provider.getLibraries(apiKey)
 
   for (const user of mediaServerUsers) {
     try {
@@ -65,15 +103,29 @@ export async function grantTopPicksAccessToAllUsers(
         continue
       }
 
-      // Add Top Picks library GUIDs to user's enabled folders
+      // Add each Top Picks library the account may see into, and take away one
+      // it may not — its titles come from a library the server keeps it out of.
+      const allowed = libraryIdsFromFolderAccess(currentAccess, serverLibraries) ?? []
       const newEnabledFolders = new Set(currentAccess.enabledFolders)
-      
-      if (moviesLibrary && moviesLibrary.guid) {
-        newEnabledFolders.add(moviesLibrary.guid)
+      let withheldHere = false
+      for (const [library, source] of [
+        [moviesLibrary, sources.movies],
+        [seriesLibrary, sources.series],
+      ] as const) {
+        if (!library?.guid) continue
+        if (coversSources(allowed, source)) {
+          newEnabledFolders.add(library.guid)
+        } else {
+          newEnabledFolders.delete(library.guid)
+          withheldHere = true
+        }
       }
-      
-      if (seriesLibrary && seriesLibrary.guid) {
-        newEnabledFolders.add(seriesLibrary.guid)
+      if (withheldHere) {
+        withheld++
+        logger.info(
+          { userId: user.id, username: user.name },
+          'Top Picks library withheld: it holds titles from a library this account may not open'
+        )
       }
 
       // Update user's library access if there are changes
@@ -113,7 +165,7 @@ export async function grantTopPicksAccessToAllUsers(
     total: mediaServerUsers.length 
   }, 'Top Picks access grant completed')
   
-  return { updated, failed, alreadyHadAccess, hasAllFolders }
+  return { updated, failed, alreadyHadAccess, hasAllFolders, withheld }
 }
 
 /**

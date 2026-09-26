@@ -201,8 +201,6 @@
       "providerActive": "{{provider}}: Actief",
       "recsEnabledTooltip": "Aanbevelingen ingeschakeld",
       "enableAiRecs": "Schakel AI-aanbevelingen in",
-      "movies": "Films",
-      "series": "Serie",
       "discover": "Ontdekken",
       "request": "Verzoek",
       "aiOverride": "AI-overschrijving",
@@ -215,8 +213,6 @@
       "menuUpdateStrm": "STRM-bestanden bijwerken",
       "colUser": "Gebruiker",
       "colImported": "Geïmporteerd",
-      "colMovies": "Films",
-      "colSeries": "Serie",
       "colDiscover": "Ontdekken",
       "colRequest": "Verzoek",
       "colAiOverride": "AI-overschrijving",
@@ -285,7 +281,17 @@
       "assistantToggleOn": "Disable the assistant",
       "assistantToggleOff": "Enable the assistant",
       "assistantOn": "{{name}} can now use the assistant",
-      "assistantOff": "{{name}} can no longer use the assistant"
+      "assistantOff": "{{name}} can no longer use the assistant",
+      "colRecommendations": "Recommendations",
+      "recommendationsColTooltip": "Personal recommendations, generated libraries and home rows. Whether that means movies, series or both follows from the libraries {{provider}} lets the account see.",
+      "recommendationsOn": "{{name}} will now get recommendations",
+      "recommendationsOff": "{{name}} will no longer get recommendations",
+      "recsKindsBoth": "Movies & series",
+      "recsKindsMovies": "Movies only",
+      "recsKindsSeries": "Series only",
+      "recsKindsNone": "No library",
+      "recsKindsTooltip": "The kinds follow from the libraries {{provider}} lets this account see, among those enabled here.",
+      "recsKindsUnreadTooltip": "This account's library access hasn't been read from {{provider}} yet; it will be at the next user sync or sign-in. Until then every enabled library counts."
     },
     "userDetail": {
       "userNotFound": "Gebruiker niet gevonden",
@@ -389,7 +395,8 @@
         "email_notifications_allowed": "Email notifications",
         "ai_explanation_override_allowed": "AI explanation override",
         "scopes": "API key permissions",
-        "assistant_enabled": "Assistant"
+        "assistant_enabled": "Assistant",
+        "recommendations_enabled": "Recommendations"
       }
     },
     "jobsPage": {
@@ -3938,8 +3945,6 @@
     "users": {
       "noteLabel": "Opmerking:",
       "colUser": "Gebruiker",
-      "colMovies": "Films",
-      "colSeries": "Serie",
       "adminChip": "Beheerder",
       "disabledChip": "Gehandicapt",
       "tooltipLastAdmin": "Er moet ten minste één beheerder ingeschakeld blijven",
@@ -3950,14 +3955,15 @@
       "setupCompleteFallback": "De installatie is voltooid.",
       "manageUsersLink": "Beheer gebruikers in Beheer → Gebruikers",
       "back": "Rug",
-      "bodyParagraph": "Kies welke gebruikers gepersonaliseerde AI-aanbevelingen moeten ontvangen. Voor elke gebruiker kunt u aanbevelingen inschakelen voor films, tv-series of beide. {{appName}} analyseert de kijkgeschiedenis van elke gebruiker afzonderlijk om op maat gemaakte suggesties te genereren die in hun persoonlijke aanbevelingsbibliotheken verschijnen.",
       "noUsersWarning": "Er zijn geen gebruikers gevonden op uw mediaserver. Zorg ervoor dat uw mediaserver actieve gebruikersaccounts heeft en klik vervolgens op de knop Vernieuwen om de lijst opnieuw te laden.",
       "adminSectionTitle": "Beheerders ({{count}})",
       "adminInfoCaption": "Beheerders zijn automatisch ingeschakeld om ervoor te zorgen dat u zich kunt aanmelden en {{appName}} kunt beheren. Er moet ten minste één beheerder ingeschakeld blijven om toegang tot het beheerdersdashboard te behouden.",
       "otherUsersTitle": "Andere gebruikers ({{count}})",
       "otherUsersCaption": "Schakel aanbevelingen in voor familieleden of andere gebruikers op uw mediaserver. Elke ingeschakelde gebruiker krijgt zijn eigen gepersonaliseerde aanbevelingen op basis van zijn kijkgeschiedenis.",
-      "noteWarning": "Gebruikers waarbij zowel Films als Series zijn uitgeschakeld, ontvangen geen aanbevelingen en kunnen niet inloggen bij {{appName}}. U kunt deze instellingen altijd later wijzigen in Beheer → Gebruikers.",
-      "paginationRange": "{{van}}-{{tot}} van {{count}}"
+      "paginationRange": "{{van}}-{{tot}} van {{count}}",
+      "colRecommendations": "Recommendations",
+      "bodyText": "Choose which users should receive personalized recommendations. Whether that means movies, series or both follows from the libraries each account can see on your media server. {{appName}} analyzes each user's watch history individually to generate tailored suggestions that appear in their personal recommendation libraries.",
+      "noteText": "Users with recommendations switched off won't receive any and won't be able to sign in to {{appName}}. You can change all of this later in Admin → Users."
     },
     "complete": {
       "title": "Installatie voltooid!",

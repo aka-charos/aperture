@@ -281,15 +281,14 @@ const getUsers = {
 const importUser = {
   tags: ['setup'],
   summary: 'Import user',
-  description: 'Import a user from media server into Aperture. Can enable/disable recommendations per media type.',
+  description: 'Import a user from media server into Aperture, optionally enabling recommendations.',
   body: {
     type: 'object' as const,
     additionalProperties: true,
     required: ['providerUserId'] as string[],
     properties: {
       providerUserId: { type: 'string' as const, description: 'User ID from media server' },
-      moviesEnabled: { type: 'boolean' as const, description: 'Enable movie recommendations', default: true },
-      seriesEnabled: { type: 'boolean' as const, description: 'Enable series recommendations', default: true },
+      recommendationsEnabled: { type: 'boolean' as const, description: 'Enable recommendations (media types follow the libraries the account can see)', default: true },
     },
   },
 }
@@ -304,8 +303,7 @@ const enableUser = {
     required: ['apertureUserId'] as string[],
     properties: {
       apertureUserId: { type: 'string' as const, format: 'uuid', description: 'Aperture user ID' },
-      moviesEnabled: { type: 'boolean' as const, description: 'Enable movie recommendations' },
-      seriesEnabled: { type: 'boolean' as const, description: 'Enable series recommendations' },
+      recommendationsEnabled: { type: 'boolean' as const, description: 'Enable recommendations' },
     },
   },
 }

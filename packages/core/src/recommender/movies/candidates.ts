@@ -1,5 +1,12 @@
 import { createChildLogger } from '../../lib/logger.js'
-import { query, queryOne } from '../../lib/db.js'
+import { query } from '../../lib/db.js'
+import {
+  binderFor,
+  libraryScopeSql,
+  loadConfiguredLibraries,
+  resolveLibraryScope,
+  type LibraryScope,
+} from '../../lib/libraryScope.js'
 import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../../lib/ai-provider.js'
 import {
   buildInterestMatchIndex,
@@ -14,7 +21,12 @@ const logger = createChildLogger('recommender-candidates')
 interface CandidateQueryContext {
   modelId: string
   tableName: string
-  hasLibraryConfigs: boolean
+  /**
+   * What a caller that passed no viewer scope is limited to: the libraries the
+   * operator enabled, no parental ceiling — exactly what this query applied to
+   * everyone before viewer scope existed.
+   */
+  defaultScope: LibraryScope
   /**
    * Which column holds the vectors this query compares against. Resolved from
    * the SPACE THE VIEWER'S STORED PROFILE WAS BUILT IN, never decided here --
@@ -40,19 +52,13 @@ async function resolveCandidateQueryContext(
 
   const tableName = await getActiveEmbeddingTableName('embeddings')
 
-  const configCheck = await queryOne<{ count: string }>('SELECT COUNT(*) FROM library_config')
-  const hasLibraryConfigs = Boolean(configCheck && parseInt(configCheck.count, 10) > 0)
+  const defaultScope = resolveLibraryScope({
+    libraries: await loadConfiguredLibraries(),
+    userLibraryIds: null,
+    maxParentalRating: null,
+  })
 
-  return { modelId, tableName, hasLibraryConfigs, embeddingColumn: embeddingColumnFor(space) }
-}
-
-function buildParentalFilter(maxParentalRating: number | null): string {
-  return maxParentalRating !== null
-    ? ` AND (m.content_rating IS NULL OR COALESCE((
-        SELECT prv.rating_value FROM parental_rating_values prv
-        WHERE prv.rating_name = m.content_rating LIMIT 1
-      ), 0) <= ${maxParentalRating})`
-    : ''
+  return { modelId, tableName, defaultScope, embeddingColumn: embeddingColumnFor(space) }
 }
 
 /**
@@ -68,13 +74,17 @@ async function queryCandidatesForVector(
   limit: number,
   includeWatched: boolean,
   watchedIds: Set<string>,
-  parentalFilter: string,
+  scope: LibraryScope | null,
   ctx: CandidateQueryContext
 ): Promise<Candidate[]> {
   // Calculate query limit - if excluding watched, need more results to filter from
   const queryLimit = includeWatched ? limit : limit + watchedIds.size
 
-  // Use pgvector to find similar movies, filtered by enabled libraries, parental rating, and model
+  // Use pgvector to find similar movies, filtered by the viewer's scope (the
+  // libraries the media server lets them see and the operator enabled, and their
+  // parental rating) and by model.
+  const params: unknown[] = [vectorStr, queryLimit, ctx.modelId]
+  const inScope = libraryScopeSql(scope ?? ctx.defaultScope, 'm', binderFor(params))
   const result = await query<{
     id: string
     title: string
@@ -84,26 +94,14 @@ async function queryCandidatesForVector(
     imdb_vote_count: number | null
     similarity: number
   }>(
-    ctx.hasLibraryConfigs
-      ? `SELECT m.id, m.title, m.year, m.genres, m.community_rating, m.imdb_vote_count,
-                1 - (e.${ctx.embeddingColumn} <=> $1::halfvec) as similarity
-         FROM ${ctx.tableName} e
-         JOIN movies m ON m.id = e.movie_id
-         WHERE e.model = $3 AND EXISTS (
-           SELECT 1 FROM library_config lc
-           WHERE lc.provider_library_id = m.provider_library_id
-           AND lc.is_enabled = true
-         )${parentalFilter}
-         ORDER BY e.${ctx.embeddingColumn} <=> $1::halfvec
-         LIMIT $2`
-      : `SELECT m.id, m.title, m.year, m.genres, m.community_rating, m.imdb_vote_count,
-                1 - (e.${ctx.embeddingColumn} <=> $1::halfvec) as similarity
-         FROM ${ctx.tableName} e
-         JOIN movies m ON m.id = e.movie_id
-         WHERE e.model = $3${parentalFilter}
-         ORDER BY e.${ctx.embeddingColumn} <=> $1::halfvec
-         LIMIT $2`,
-    [vectorStr, queryLimit, ctx.modelId]
+    `SELECT m.id, m.title, m.year, m.genres, m.community_rating, m.imdb_vote_count,
+            1 - (e.${ctx.embeddingColumn} <=> $1::halfvec) as similarity
+     FROM ${ctx.tableName} e
+     JOIN movies m ON m.id = e.movie_id
+     WHERE e.model = $3 AND ${inScope}
+     ORDER BY e.${ctx.embeddingColumn} <=> $1::halfvec
+     LIMIT $2`,
+    params
   )
 
   // Filter out watched movies if not including them
@@ -135,7 +133,8 @@ export async function getCandidates(
   watchedIds: Set<string>,
   limit: number,
   includeWatched: boolean = false,
-  maxParentalRating: number | null = null,
+  /** What this viewer may be shown; null limits to the operator's libraries only. */
+  scope: LibraryScope | null = null,
   /**
    * Must match the space `tasteProfile` was built in. Defaults to 'raw' so a
    * caller that has not thought about it gets today's behaviour rather than a
@@ -148,9 +147,8 @@ export async function getCandidates(
   if (!ctx) return []
 
   const vectorStr = `[${tasteProfile.join(',')}]`
-  const parentalFilter = buildParentalFilter(maxParentalRating)
 
-  return queryCandidatesForVector(vectorStr, limit, includeWatched, watchedIds, parentalFilter, ctx)
+  return queryCandidatesForVector(vectorStr, limit, includeWatched, watchedIds, scope, ctx)
 }
 
 export interface ClusterQueryInput {
@@ -200,18 +198,17 @@ export async function getMultiClusterCandidates(
   watchedIds: Set<string>,
   totalLimit: number,
   includeWatched: boolean = false,
-  maxParentalRating: number | null = null,
+  scope: LibraryScope | null = null,
   space: EmbeddingSpace = 'raw'
 ): Promise<Candidate[]> {
   if (clusters.length === 0) return []
   if (clusters.length === 1) {
-    return getCandidates(clusters[0].embedding, watchedIds, totalLimit, includeWatched, maxParentalRating, space)
+    return getCandidates(clusters[0].embedding, watchedIds, totalLimit, includeWatched, scope, space)
   }
 
   const ctx = await resolveCandidateQueryContext(space)
   if (!ctx) return []
 
-  const parentalFilter = buildParentalFilter(maxParentalRating)
   const { allocateClusterCandidateLimits } = await import('../shared/index.js')
   const perClusterLimits = allocateClusterCandidateLimits(
     clusters.map((c) => c.weight),
@@ -226,7 +223,7 @@ export async function getMultiClusterCandidates(
         perClusterLimits[i],
         includeWatched,
         watchedIds,
-        parentalFilter,
+        scope,
         ctx
       )
     })
@@ -267,7 +264,7 @@ export interface InterestQueryInput {
  * list and one item embedding for every candidate it looked at -- roughly 200
  * round-trips per user per run, and capped at the top 100 candidates, so the
  * signal was simply absent for everything else. Going through
- * queryCandidatesForVector means no new SQL: the same library/parental/watched
+ * queryCandidatesForVector means no new SQL: the same viewer-scope/watched
  * filtering and the same index-friendly `ORDER BY <=> LIMIT` shape apply.
  *
  * Interests embedded with a different model are skipped rather than queried --
@@ -280,7 +277,7 @@ export async function getInterestMatchIndex(
   interests: InterestQueryInput[],
   watchedIds: Set<string>,
   includeWatched: boolean = false,
-  maxParentalRating: number | null = null
+  scope: LibraryScope | null = null
 ): Promise<InterestMatchIndex> {
   if (interests.length === 0) return buildInterestMatchIndex([])
 
@@ -317,7 +314,6 @@ export async function getInterestMatchIndex(
     )
   }
 
-  const parentalFilter = buildParentalFilter(maxParentalRating)
   const results: InterestQueryResult[] = []
 
   // Sequential on purpose: the interest count is user-controlled, and firing
@@ -331,7 +327,7 @@ export async function getInterestMatchIndex(
         INTEREST_ANN_LIMIT,
         includeWatched,
         watchedIds,
-        parentalFilter,
+        scope,
         ctx
       )
 

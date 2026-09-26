@@ -6,6 +6,7 @@
  * - Updates email for existing users (if not locked)
  * - Updates admin status
  * - Updates provider_disabled from media server Policy.IsDisabled
+ * - Refreshes each account's library access (lib/libraryScope.ts)
  */
 
 import { randomUUID } from 'crypto'
@@ -25,6 +26,8 @@ import { cleanupUserLibraries } from '../strm/cleanup.js'
 // The audit trail: this job is the only writer of provider_disabled, and one of
 // two writers of is_admin, so a change here is invisible unless it says so.
 import { auditUserPermissions, SYSTEM_ACTORS } from '../permissionAudit.js'
+import { libraryIdsFromFolderAccess, saveUserLibraryAccess } from '../lib/libraryScope.js'
+import type { Library } from '../media/types.js'
 
 const logger = createChildLogger('user-sync')
 
@@ -67,8 +70,9 @@ export async function syncUsersFromMediaServer(
       email_locked: boolean
       is_admin: boolean
       provider_disabled: boolean
+      library_access: string[] | null
     }>(
-      'SELECT id, provider_user_id, email, email_locked, is_admin, provider_disabled FROM users WHERE provider_user_id IS NOT NULL'
+      'SELECT id, provider_user_id, email, email_locked, is_admin, provider_disabled, library_access FROM users WHERE provider_user_id IS NOT NULL'
     )
     const existingUserMap = new Map(
       existingUsers.rows.map(u => [u.provider_user_id, u])
@@ -79,7 +83,29 @@ export async function syncUsersFromMediaServer(
 
     const msConfig = await getMediaServerConfig()
     const providerType = msConfig.type || 'emby'
-    
+
+    // The server names a user's permitted libraries by GUID; titles carry the
+    // library's item id. One listing translates every account. If it cannot be
+    // read, every stored permission is left as it was rather than guessed at.
+    let libraries: Library[] | null = null
+    try {
+      libraries = await provider.getLibraries(apiKey)
+    } catch (err) {
+      logger.warn({ err }, 'Could not list libraries; library access left unchanged this run')
+      addLog(jobId, 'warn', '⚠️ Could not list libraries — library access not refreshed this run')
+    }
+    let accessChanged = 0
+    const refreshAccess = async (
+      userId: string,
+      folderAccess: (typeof providerUsers)[number]['folderAccess'],
+      before: string[] | null | undefined
+    ) => {
+      if (!libraries || !folderAccess) return
+      const ids = libraryIdsFromFolderAccess(folderAccess, libraries)
+      await saveUserLibraryAccess(userId, ids)
+      if (before !== undefined && !sameLibraries(before, ids)) accessChanged++
+    }
+
     let imported = 0
     let updated = 0
 
@@ -92,8 +118,8 @@ export async function syncUsersFromMediaServer(
       if (!existing) {
         // New user - import
         const created = await queryOne<{ id: string }>(
-          `INSERT INTO users (username, provider_user_id, provider, is_admin, is_enabled, movies_enabled, series_enabled, email, provider_disabled)
-           VALUES ($1, $2, $3, $4, false, false, false, $5, $6)
+          `INSERT INTO users (username, provider_user_id, provider, is_admin, is_enabled, recommendations_enabled, email, provider_disabled)
+           VALUES ($1, $2, $3, $4, false, false, $5, $6)
            RETURNING id`,
           [pu.name, pu.id, providerType, pu.isAdmin || false, pu.email || null, !!pu.isDisabled]
         )
@@ -101,6 +127,7 @@ export async function syncUsersFromMediaServer(
         // A creation records grants only, so an ordinary import (everything
         // off) writes nothing and an imported administrator writes one row.
         if (created) {
+          await refreshAccess(created.id, pu.folderAccess, undefined)
           await auditUserPermissions(
             SYSTEM_ACTORS.userSync,
             { kind: 'user', id: created.id, label: pu.name },
@@ -111,6 +138,8 @@ export async function syncUsersFromMediaServer(
         imported++
         addLog(jobId, 'info', `➕ Imported new user: ${pu.name}${pu.email ? ` (${pu.email})` : ''}`)
       } else {
+        await refreshAccess(existing.id, pu.folderAccess, existing.library_access)
+
         // Existing user - check for updates
         const updates: string[] = []
         const values: (string | boolean | null)[] = []
@@ -183,6 +212,9 @@ export async function syncUsersFromMediaServer(
       jobId,
     }
 
+    if (accessChanged > 0) {
+      addLog(jobId, 'info', `📚 Library access changed for ${accessChanged} user(s)`)
+    }
     addLog(jobId, 'info', `✅ User sync complete: ${imported} imported, ${updated} updated, ${providerUsers.length} total`)
     completeJob(jobId, result)
 
@@ -198,3 +230,11 @@ export async function syncUsersFromMediaServer(
   }
 }
 
+
+/** Whether two stored permissions name the same libraries (NULL = all). */
+function sameLibraries(a: string[] | null, b: string[] | null): boolean {
+  if (a === null || b === null) return a === b
+  if (a.length !== b.length) return false
+  const set = new Set(a)
+  return b.every((id) => set.has(id))
+}

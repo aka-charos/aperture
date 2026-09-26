@@ -26,6 +26,7 @@ import {
 import { clearUserPlacement, getUserPlacements, setUserPlacement } from './placementStore.js'
 import { loadHomePlaylists } from './playlists.js'
 import { isTopPicksTarget } from './plan.js'
+import { getLibraryScopeForUser } from '../lib/libraryScope.js'
 
 export interface UserHomeScreenFeature {
   feature: PlacementFeature
@@ -64,10 +65,9 @@ export async function getUserHomeScreenSettings(userId: string): Promise<UserHom
       provider_user_id: string | null
       is_enabled: boolean
       provider_disabled: boolean
-      movies_enabled: boolean
-      series_enabled: boolean
+      recommendations_enabled: boolean
     }>(
-      `SELECT provider_user_id, is_enabled, provider_disabled, movies_enabled, series_enabled FROM users WHERE id = $1`,
+      `SELECT provider_user_id, is_enabled, provider_disabled, recommendations_enabled FROM users WHERE id = $1`,
       [userId]
     ),
   ])
@@ -84,9 +84,10 @@ export async function getUserHomeScreenSettings(userId: string): Promise<UserHom
   if (topPicksTarget && config.topPicksEnabled && (await getTopPicksConfig()).isEnabled) {
     reaching.push(['top-picks-movies', config.topPicksMoviesName], ['top-picks-series', config.topPicksSeriesName])
   }
-  if (target && config.recommendationsEnabled) {
-    if (user.movies_enabled) reaching.push(['recs-movies', config.recommendationsMoviesName])
-    if (user.series_enabled) reaching.push(['recs-series', config.recommendationsSeriesName])
+  if (target && config.recommendationsEnabled && user.recommendations_enabled) {
+    const scope = await getLibraryScopeForUser(userId)
+    if (scope.hasMovies) reaching.push(['recs-movies', config.recommendationsMoviesName])
+    if (scope.hasSeries) reaching.push(['recs-series', config.recommendationsSeriesName])
   }
   if (target && config.playlistsEnabled && (await loadHomePlaylists()).some((p) => p.ownerId === userId)) {
     reaching.push(['playlists', null])

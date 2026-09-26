@@ -6,6 +6,7 @@
 
 import { randomBytes } from 'crypto'
 import { query } from '../lib/db.js'
+import { loadConfiguredLibraries, resolveLibraryScope } from '../lib/libraryScope.js'
 import { isEmbyNotFoundError } from '../media/emby/fetchHelpers.js'
 import type { MediaServerProvider } from '../media/MediaServerProvider.js'
 import { getTopMovies, getTopSeries } from '../topPicks/popularity.js'
@@ -17,21 +18,35 @@ export interface ViewerRow {
   username: string
   provider_user_id: string
   is_enabled: boolean
-  movies_enabled: boolean
-  series_enabled: boolean
+  recommendations_enabled: boolean
   provider_disabled: boolean
+  /** Whether the viewer can see any movie / series library (lib/libraryScope.ts). */
+  has_movies: boolean
+  has_series: boolean
+}
+
+type ViewerQueryRow = Omit<ViewerRow, 'has_movies' | 'has_series'> & {
+  library_access: string[] | null
+  max_parental_rating: number | null
 }
 
 /** Every account on this media server, or one of them. */
 export async function loadViewers(providerType: string, userId?: string): Promise<ViewerRow[]> {
-  const result = await query<ViewerRow>(
-    `SELECT id, username, provider_user_id, is_enabled, movies_enabled, series_enabled, provider_disabled
-     FROM users
-     WHERE provider = $1 AND provider_user_id IS NOT NULL ${userId ? 'AND id = $2' : ''}
-     ORDER BY username`,
-    userId ? [providerType, userId] : [providerType]
-  )
-  return result.rows
+  const [result, libraries] = await Promise.all([
+    query<ViewerQueryRow>(
+      `SELECT id, username, provider_user_id, is_enabled, recommendations_enabled, provider_disabled,
+              library_access, max_parental_rating
+       FROM users
+       WHERE provider = $1 AND provider_user_id IS NOT NULL ${userId ? 'AND id = $2' : ''}
+       ORDER BY username`,
+      userId ? [providerType, userId] : [providerType]
+    ),
+    loadConfiguredLibraries(),
+  ])
+  return result.rows.map(({ library_access, max_parental_rating, ...viewer }) => {
+    const scope = resolveLibraryScope({ libraries, userLibraryIds: library_access, maxParentalRating: max_parental_rating })
+    return { ...viewer, has_movies: scope.hasMovies, has_series: scope.hasSeries }
+  })
 }
 
 /** Library ids for a Top Picks list, in rank order. */
@@ -56,15 +71,16 @@ export async function topPicksProviderIds(kind: 'top-picks-movies' | 'top-picks-
  * best rank first. `selected_rank`, never `final_score` — rank is what the page
  * shows, and score would bury reserved-slot picks (F-020). A superseded run
  * still holds its selected rows by design, which is why the run is pinned
- * rather than selecting every `is_selected` row the viewer ever had. Nothing for
- * a media type the viewer has switched off.
+ * rather than selecting every `is_selected` row the viewer ever had. Nothing
+ * when recommendations are off, or for a media type the viewer cannot see.
  */
 export async function recommendedProviderIds(
   viewer: ViewerRow,
   mediaType: 'movie' | 'series',
   limit: number
 ): Promise<string[]> {
-  if (mediaType === 'movie' ? !viewer.movies_enabled : !viewer.series_enabled) return []
+  if (!viewer.recommendations_enabled) return []
+  if (mediaType === 'movie' ? !viewer.has_movies : !viewer.has_series) return []
 
   const [table, column] = mediaType === 'movie' ? ['movies', 'movie_id'] : ['series', 'series_id']
   const rows = await query<{ provider_item_id: string }>(

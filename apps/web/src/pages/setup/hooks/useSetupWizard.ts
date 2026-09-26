@@ -583,7 +583,7 @@ export function useSetupWizard(): SetupWizardContext {
       const users = data.users as SetupUser[]
       setSetupUsers(users)
 
-      // Auto-import admin users with movies+series enabled
+      // Auto-import admin users with recommendations on
       const adminUsers = users.filter((u) => u.isAdmin && !u.isImported)
       for (const adminUser of adminUsers) {
         try {
@@ -593,8 +593,7 @@ export function useSetupWizard(): SetupWizardContext {
             credentials: 'include',
             body: JSON.stringify({
               providerUserId: adminUser.providerUserId,
-              moviesEnabled: true,
-              seriesEnabled: true,
+              recommendationsEnabled: true,
             }),
           })
           if (importRes.ok) {
@@ -608,8 +607,7 @@ export function useSetupWizard(): SetupWizardContext {
                       apertureUserId: importData.user?.id || null,
                       isImported: true,
                       isEnabled: true,
-                      moviesEnabled: true,
-                      seriesEnabled: true,
+                      recommendationsEnabled: true,
                     }
                   : u
               )
@@ -627,14 +625,14 @@ export function useSetupWizard(): SetupWizardContext {
   }, [])
 
   const importAndEnableUser = useCallback(
-    async (providerUserId: string, moviesEnabled: boolean, seriesEnabled: boolean) => {
+    async (providerUserId: string, recommendationsEnabled: boolean) => {
       setUsersError(null)
       try {
         const res = await fetch('/api/setup/users/import', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ providerUserId, moviesEnabled, seriesEnabled }),
+          body: JSON.stringify({ providerUserId, recommendationsEnabled }),
         })
 
         if (res.status === 403) {
@@ -655,9 +653,8 @@ export function useSetupWizard(): SetupWizardContext {
                   ...u,
                   apertureUserId: data.user?.id || u.apertureUserId,
                   isImported: true,
-                  isEnabled: moviesEnabled || seriesEnabled,
-                  moviesEnabled,
-                  seriesEnabled,
+                  isEnabled: recommendationsEnabled,
+                  recommendationsEnabled,
                 }
               : u
           )
@@ -669,89 +666,51 @@ export function useSetupWizard(): SetupWizardContext {
     []
   )
 
-  const toggleUserMovies = useCallback(
+  const toggleUserRecommendations = useCallback(
     async (providerUserId: string, enabled: boolean) => {
       const user = setupUsers.find((u) => u.providerUserId === providerUserId)
       if (!user) return
 
       if (!user.isImported) {
         // Need to import first
-        await importAndEnableUser(providerUserId, enabled, false)
-      } else {
-        // Update existing user
-        setUsersError(null)
-        try {
-          const res = await fetch('/api/setup/users/enable', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ apertureUserId: user.apertureUserId, moviesEnabled: enabled }),
-          })
-
-          if (res.status === 403) {
-            const data = await res.json()
-            setSetupCompleteForUsers(true)
-            setUsersError(data.error || 'Setup is complete.')
-            return
-          }
-
-          const data = await res.json()
-          if (!res.ok) throw new Error(data.error || 'Failed to update user')
-
-          setSetupUsers((prev) =>
-            prev.map((u) =>
-              u.providerUserId === providerUserId
-                ? { ...u, moviesEnabled: enabled, isEnabled: enabled || u.seriesEnabled }
-                : u
-            )
-          )
-        } catch (err) {
-          setUsersError(err instanceof Error ? err.message : 'Failed to update user')
-        }
+        await importAndEnableUser(providerUserId, enabled)
+        return
       }
-    },
-    [setupUsers, importAndEnableUser]
-  )
 
-  const toggleUserSeries = useCallback(
-    async (providerUserId: string, enabled: boolean) => {
-      const user = setupUsers.find((u) => u.providerUserId === providerUserId)
-      if (!user) return
+      setUsersError(null)
+      try {
+        const res = await fetch('/api/setup/users/enable', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ apertureUserId: user.apertureUserId, recommendationsEnabled: enabled }),
+        })
 
-      if (!user.isImported) {
-        // Need to import first
-        await importAndEnableUser(providerUserId, false, enabled)
-      } else {
-        // Update existing user
-        setUsersError(null)
-        try {
-          const res = await fetch('/api/setup/users/enable', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ apertureUserId: user.apertureUserId, seriesEnabled: enabled }),
-          })
-
-          if (res.status === 403) {
-            const data = await res.json()
-            setSetupCompleteForUsers(true)
-            setUsersError(data.error || 'Setup is complete.')
-            return
-          }
-
+        if (res.status === 403) {
           const data = await res.json()
-          if (!res.ok) throw new Error(data.error || 'Failed to update user')
-
-          setSetupUsers((prev) =>
-            prev.map((u) =>
-              u.providerUserId === providerUserId
-                ? { ...u, seriesEnabled: enabled, isEnabled: u.moviesEnabled || enabled }
-                : u
-            )
-          )
-        } catch (err) {
-          setUsersError(err instanceof Error ? err.message : 'Failed to update user')
+          setSetupCompleteForUsers(true)
+          setUsersError(data.error || 'Setup is complete.')
+          return
         }
+
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Failed to update user')
+
+        // The server derives access from the switch here (the wizard has no
+        // access control of its own), so take both from what it saved.
+        setSetupUsers((prev) =>
+          prev.map((u) =>
+            u.providerUserId === providerUserId
+              ? {
+                  ...u,
+                  recommendationsEnabled: data.user?.recommendations_enabled ?? enabled,
+                  isEnabled: data.user?.is_enabled ?? enabled,
+                }
+              : u
+          )
+        )
+      } catch (err) {
+        setUsersError(err instanceof Error ? err.message : 'Failed to update user')
       }
     },
     [setupUsers, importAndEnableUser]
@@ -1244,8 +1203,7 @@ export function useSetupWizard(): SetupWizardContext {
     runValidation,
     fetchSetupUsers,
     importAndEnableUser,
-    toggleUserMovies,
-    toggleUserSeries,
+    toggleUserRecommendations,
     loadAIConfig,
     loadAIProviders,
     setAIFunctionConfig,

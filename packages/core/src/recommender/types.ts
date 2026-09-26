@@ -1,10 +1,15 @@
+import type { LibraryScope } from '../lib/libraryScope.js'
+
 export interface User {
   id: string
   username: string
   providerUserId: string
   maxParentalRating?: number | null
-  moviesEnabled?: boolean
-  seriesEnabled?: boolean
+  /**
+   * What this viewer may be shown. Resolved by the job loops for everyone at
+   * once; a single-user caller may omit it and the pipeline reads it.
+   */
+  scope?: LibraryScope
 }
 
 export interface WatchedMovie {

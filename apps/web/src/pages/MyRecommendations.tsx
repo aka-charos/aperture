@@ -47,6 +47,7 @@ import {
   TrailerModal,
 } from '@aperture/ui'
 import { useAuth } from '@/hooks/useAuth'
+import { useCapability } from '@/hooks/useCapability'
 import { useUserRatings } from '@/hooks/useUserRatings'
 import { useWatchStatus } from '@/hooks/useWatchStatus'
 import { useWatching } from '@/hooks/useWatching'
@@ -142,8 +143,14 @@ export function MyRecommendationsPage() {
   const { isWatched, getEpisodeProgress } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
   
+  // Which kinds this viewer can see, decided by the server from the libraries
+  // the media server lets them into (F-136). A kind they cannot see gets no tab,
+  // and the page opens on one they can.
+  const hasMovies = useCapability('movies')
+  const hasSeries = useCapability('series')
+
   // Tab state
-  const [mediaType, setMediaType] = useState<MediaType>('movies')
+  const [mediaType, setMediaType] = useState<MediaType>(!hasMovies && hasSeries ? 'series' : 'movies')
 
   const handleRate = useCallback(
     async (type: 'movie' | 'series', id: string, rating: number | null) => {
@@ -416,7 +423,7 @@ export function MyRecommendationsPage() {
         }}
         sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}
       >
-        <Tab
+        {hasMovies && <Tab
           value="movies"
           icon={<MovieIcon />}
           iconPosition="start"
@@ -443,8 +450,8 @@ export function MyRecommendationsPage() {
             color: mediaType === 'movies' ? theme.palette.primary.main : 'text.secondary',
             '&.Mui-selected': { color: theme.palette.primary.main },
           }}
-        />
-        <Tab
+        />}
+        {hasSeries && <Tab
           value="series"
           icon={<TvIcon />}
           iconPosition="start"
@@ -471,7 +478,7 @@ export function MyRecommendationsPage() {
             color: mediaType === 'series' ? '#ec4899' : 'text.secondary',
             '&.Mui-selected': { color: '#ec4899' },
           }}
-        />
+        />}
       </Tabs>
 
       {/* Run Info */}

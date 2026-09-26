@@ -979,8 +979,8 @@ export async function syncWatchHistoryForAllUsers(
     for (const pu of providerUsers) {
       if (!existingProviderIds.has(pu.id)) {
         await query(
-          `INSERT INTO users (username, provider_user_id, provider, is_admin, is_enabled, movies_enabled, series_enabled, email)
-           VALUES ($1, $2, $3, $4, false, false, false, $5)`,
+          `INSERT INTO users (username, provider_user_id, provider, is_admin, is_enabled, recommendations_enabled, email)
+           VALUES ($1, $2, $3, $4, false, false, $5)`,
           [pu.name, pu.id, providerType, pu.isAdmin || false, pu.email || null]
         )
         imported++
