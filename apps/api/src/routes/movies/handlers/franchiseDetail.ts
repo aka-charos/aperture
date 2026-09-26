@@ -20,6 +20,7 @@ import {
 } from '@aperture/core'
 import { query } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
+import { scopeClause, viewerScope } from '../../../lib/viewerScope.js'
 import { can } from '../../../lib/permissions.js'
 import { franchiseDetailSchema } from '../schemas.js'
 
@@ -91,15 +92,20 @@ export function registerFranchiseDetailHandler(fastify: FastifyInstance) {
       // played = true, not "has a row": a favorited-but-unplayed title and one
       // abandoned minutes in both have a watch_history row, and this is the
       // figure a tick is drawn from (F-109, F-114).
+      // What this viewer owns is what they can open (lib/viewerScope.ts). A part
+      // held in a library they cannot open reads as not in the library for them,
+      // and Seerr's own state keeps it from being offered as a request.
+      const libraryParams: unknown[] = [user.id, partTmdbIds, String(collectionId)]
+      const inScope = scopeClause(await viewerScope(request), 'm', libraryParams)
       const libraryResult = await query<LibraryRow>(
         `SELECT m.id, m.tmdb_id, m.title, m.year, m.poster_url, m.community_rating,
                 m.collection_name, (wh.id IS NOT NULL) AS watched
          FROM movies m
          LEFT JOIN watch_history wh
            ON wh.movie_id = m.id AND wh.user_id = $1 AND wh.played = true
-         WHERE m.tmdb_id = ANY($2::text[]) OR m.collection_id = $3
+         WHERE (m.tmdb_id = ANY($2::text[]) OR m.collection_id = $3) AND ${inScope}
          ORDER BY m.year NULLS LAST, m.title`,
-        [user.id, partTmdbIds, String(collectionId)]
+        libraryParams
       )
 
       if (!collection && libraryResult.rows.length === 0) {

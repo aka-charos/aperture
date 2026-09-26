@@ -3232,3 +3232,50 @@ The suggestion-chip job now builds chips only for accounts that can open the ass
 Top Picks rows went to every account the media server had not disabled, with or without access here ([F-128](#f-128)), and nothing could change that. That is right for a household that wants everyone to see the server-wide list, and wrong for an operator who shut someone out on purpose. `home_sections_config.top_picks_without_access` (default on, which is the old behaviour) makes it a setting under the Top Picks switch.
 
 `isTopPicksTarget(viewer, withoutAccess)` takes the setting as a **required** argument — a default is a decision a caller can forget, and forgetting this one puts the rows back on the screens of the people it was turned off for. `mayReceiveHomeRows` is the union of that and the personal-rows target, and it is now the population the anchor list reads home screens from and the one an instant placement may touch; both used to test `provider_disabled` alone, which was the Top Picks rule under another name. Turning the option off removes the rows at the next sync, like any other viewer who stops qualifying.
+
+---
+
+## F-136
+
+**Aperture ignored the media server's library permissions, and a STRM file made that a playback leak.** Added 2026-09-26.
+
+### What was wrong
+
+Emby and Jellyfin both record which libraries each account may open (`Policy.EnableAllFolders` / `EnabledFolders`). Aperture read that list in exactly one place — `strm/movies/library.ts`, to ADD the account's generated library to it — and nowhere to decide what the account was shown. So:
+
+- **Recommendations** were drawn from every library enabled in Aperture. Someone kept out of a "4K" or "Adult" library could be recommended its titles.
+- **Their generated library made those titles playable.** A STRM file holds the original's path (or is a symlink to it), and it sits in a library the account IS allowed into, so the folder permission that hid the original never applies to the copy.
+- **The Top Picks library** was added to every account's permitted folders, whatever libraries its titles came from — the same leak, server-wide.
+- **Browse, search, similar titles, the Explore graph, person and studio pages, franchises and the assistant** listed titles from every enabled library, whoever was asking. Even the operator's own library switch was applied to Browse and recommendations and not to search, similar titles, the assistant or a detail page, and the parental rating reached only the recommender, channels and discovery.
+
+### The model
+
+`packages/core/src/lib/libraryScope.ts` decides a viewer's scope: the libraries the media server lets them open, intersected with the libraries enabled here, plus their parental rating. `apps/api/src/lib/viewerScope.ts` is the per-request wrapper routes use. The server's permission is cached as `users.library_access` (`0185`), translated from folder GUIDs to the provider library ids titles carry, and refreshed by the user sync (every 30 minutes) and at sign-in — the operator's call was that a change on the media server may take effect at the next sync.
+
+**NULL is unrestricted**, and that covers two cases on purpose: the server grants every folder, or the account has not been read yet. The second has to behave as it did before this migration, and it did not restrict anything. `library_access_synced_at` separates them, and the Users page says so on the tooltip. `[]` — an account granted no library at all — is a real answer and must never be read as NULL.
+
+### Movies and Series became one switch
+
+With kinds following from libraries, a per-type switch had nothing left to decide: in practice nobody wants movie recommendations but not series, and the one real case — someone who never watches movies — is exactly someone the media server gives no movie library. So `recommendations_enabled` replaced both (backfilled as either-on; the old columns stay for rollback and nothing reads them), and `hasMovies`/`hasSeries` from the scope decide the rest. `recommender/recipients.ts` answers "who gets recommendations of this kind" for both pipelines, both STRM writers and the cost estimators. **The two jobs stay separate** — they run at different frequencies, and only the permission was unified.
+
+The Watcher Identity follows the same kinds: its routes answer 404 for a kind outside the account's scope, the card is not drawn, and the scheduled refresh already rides the recommendation run. The setup wizard has one Recommendations column; the Users page shows one switch with a caption saying which kinds it buys ("Movies & series", "Series only", "No library"), decided on the server. A PUT still sending `moviesEnabled`/`seriesEnabled` is told they were replaced rather than having a switch silently ignored.
+
+### Where the scope is applied
+
+- **Generation and output.** Both pipelines retrieve candidates through it (the old global library EXISTS and the per-pipeline parental filters are gone); both STRM writers filter the picks they write by it, because a run can predate a permission change and the folder sweep then removes what fell out; the reconcile sweep removes a personal library whose kind left scope; the Top Picks library is granted only to an account whose permission covers every library the current picks come from, and withdrawn from one that stops qualifying.
+- **Every browse surface.** Lists and their filter options, detail/trailer/episodes/watcher counts (out of scope answers exactly like "not found"), similar titles, the Explore graph and its sources, semantic and lexical search (through a hook in the pure `searchSql.ts` builder, so it stays free of core), suggestions, person and studio pages and the credits gap, franchises, the Top Picks page, the dashboard's rails, recommendation read routes, and the channel builder (the owner's scope — a channel is written to their media server).
+- **The assistant, twice.** `withLibraryScope` wraps every tool, innermost and unconditionally, and fails CLOSED (it is a permission; the unwatched filter it is modelled on is a preference and fails open). The search, episode and analysis tools also scope their SQL, because a `brief` result is text with no card list for the wrapper to inspect.
+
+**A scoped nearest-neighbour query is a post-filtered HNSW scan**, so every one goes through `scopedAnnQuery` (`SET LOCAL hnsw.ef_search = 500` in a transaction). Without it a viewer allowed one small library gets a similar-titles list that is nearly empty rather than one drawn from what they can see.
+
+### Deliberately not scoped
+
+The viewer's own record — watch history, stats, ratings, the Watching page — lists titles they could open when they watched, rated or followed them. Admin surfaces see everything. Aggregate assistant answers (library statistics, genre and studio lists) name no title. `libraryScopeCallSites.test.ts` lists each exempt file with its reason and fails on a new route file that reads titles without naming a scope helper; it was verified against an injected file, and a stale exemption fails too.
+
+### Fixed in passing
+
+The series pipeline had its own parental mapping, commented "simplified — adjust based on your data", that thresholded **ages** (18/14/7) against the media server's rating **values** (TV-MA is 10, TV-14 is 8). A viewer allowed TV-MA was therefore shown TV-PG and below. It now shares the movie side's `parental_rating_values` test. And `showAll=true` on the browse lists bypassed the operator's library switch; under viewer scope it would have bypassed the media server's permission too, so it no longer widens anything (nothing in the app sent it).
+
+### Still open
+
+`/api/media/images/*` will proxy an image for any item id it is given; it lists nothing, but an id obtained elsewhere still resolves. A shared channel's Box Set is server-wide on the media server, so its viewers see what the owner's scope allowed. Home-screen rows need nothing: they are tag queries, and the media server filters them by the viewer's own permission.

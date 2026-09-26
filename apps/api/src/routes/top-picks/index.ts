@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { requireAuth, requireAdmin } from '../../plugins/auth.js'
+import { idsInScope } from '../../lib/viewerScope.js'
 import { topPicksSchemas } from './schemas.js'
 import type { PopularitySource, HybridExternalSource } from '@aperture/core'
 
@@ -62,14 +63,18 @@ const topPicksRoutes: FastifyPluginAsync = async (fastify) => {
       movies: PopularMovieResponse[]
       config: TopPicksConfigResponse
     }
-  }>('/api/top-picks/movies', { preHandler: requireAuth, schema: { tags: ["top-picks"] } }, async (_request, reply) => {
+  }>('/api/top-picks/movies', { preHandler: requireAuth, schema: { tags: ["top-picks"] } }, async (request, reply) => {
     try {
       const { getTopMovies, getTopPicksConfig } = await import('@aperture/core')
-      
-      const [movies, config] = await Promise.all([
+
+      const [allMovies, config] = await Promise.all([
         getTopMovies(),
         getTopPicksConfig()
       ])
+      // One list for the whole server, shown only as far as this viewer may
+      // open it (lib/viewerScope.ts). Ranks stay the server-wide ones.
+      const visible = await idsInScope(request, 'movies', allMovies.map((m) => m.movieId))
+      const movies = allMovies.filter((m) => visible.has(m.movieId))
 
       return reply.send({
         movies,
@@ -98,14 +103,16 @@ const topPicksRoutes: FastifyPluginAsync = async (fastify) => {
       series: PopularSeriesResponse[]
       config: TopPicksConfigResponse
     }
-  }>('/api/top-picks/series', { preHandler: requireAuth, schema: { tags: ["top-picks"] } }, async (_request, reply) => {
+  }>('/api/top-picks/series', { preHandler: requireAuth, schema: { tags: ["top-picks"] } }, async (request, reply) => {
     try {
       const { getTopSeries, getTopPicksConfig } = await import('@aperture/core')
-      
-      const [series, config] = await Promise.all([
+
+      const [allSeries, config] = await Promise.all([
         getTopSeries(),
         getTopPicksConfig()
       ])
+      const visible = await idsInScope(request, 'series', allSeries.map((s) => s.seriesId))
+      const series = allSeries.filter((s) => visible.has(s.seriesId))
 
       return reply.send({
         series,

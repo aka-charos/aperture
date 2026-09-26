@@ -6,6 +6,7 @@
 import type { FastifyInstance } from 'fastify'
 import { queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
+import { titleInScope } from '../../../lib/viewerScope.js'
 import { refreshStaleTmdbTotals } from '@aperture/core/watching'
 import { getSeriesSchema } from '../schemas.js'
 import type { SeriesDetailRow } from '../types.js'
@@ -19,6 +20,12 @@ export function registerDetailHandler(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       const { id } = request.params
+
+      // A title in a library this viewer may not open answers exactly like one
+      // that does not exist (lib/viewerScope.ts).
+      if (!(await titleInScope(request, 'series', id))) {
+        return reply.status(404).send({ error: 'Series not found' } as never)
+      }
 
       // Ensure TMDB season data is cached for this series so the page can
       // show aired-but-missing seasons. At most one TMDB call; a no-op when

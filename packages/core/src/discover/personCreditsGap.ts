@@ -4,6 +4,7 @@
  */
 
 import { query, queryOne } from '../lib/db.js'
+import { binderFor, libraryScopeSql, type LibraryScope } from '../lib/libraryScope.js'
 import {
   getCachedOrFetchCombinedCredits,
   resolveTmdbPersonId,
@@ -17,6 +18,8 @@ export interface PersonCreditsGapOptions {
   showAll?: boolean
   /** Max missing rows returned total (default 80). */
   maxMissing?: number
+  /** What the viewer may see; when given, `showAll` never widens it. */
+  scope?: LibraryScope
 }
 
 /** How this credit is classified for grouping (cast → actor; crew by job). */
@@ -232,7 +235,7 @@ function sortRowsByDateDesc(a: PersonCreditsGapRow, b: PersonCreditsGapRow): num
   return yb - ya
 }
 
-async function loadLibraryTmdbIds(showAll: boolean): Promise<{
+async function loadLibraryTmdbIds(showAll: boolean, scope?: LibraryScope): Promise<{
   movieIds: Set<string>
   seriesIds: Set<string>
 }> {
@@ -242,35 +245,43 @@ async function loadLibraryTmdbIds(showAll: boolean): Promise<{
   const hasLibraryConfigs = configCheck && parseInt(configCheck.count, 10) > 0
   const filterByLibrary = hasLibraryConfigs && !showAll
 
-  const libMovie = filterByLibrary
-    ? `EXISTS (
+  // A credit held in a library this viewer may not open is not "in the
+  // library" for them — it is listed with the rest of the gap.
+  const movieParams: unknown[] = []
+  const seriesParams: unknown[] = []
+  const libMovie = scope
+    ? libraryScopeSql(scope, 'm', binderFor(movieParams))
+    : filterByLibrary
+      ? `EXISTS (
         SELECT 1 FROM library_config lc
         WHERE lc.provider_library_id = m.provider_library_id
         AND lc.is_enabled = true
       )`
-    : 'TRUE'
+      : 'TRUE'
 
-  const libSeries = filterByLibrary
-    ? `EXISTS (
+  const libSeries = scope
+    ? libraryScopeSql(scope, 's', binderFor(seriesParams))
+    : filterByLibrary
+      ? `EXISTS (
         SELECT 1 FROM library_config lc
         WHERE lc.provider_library_id = s.provider_library_id
         AND lc.is_enabled = true
       )`
-    : 'TRUE'
+      : 'TRUE'
 
   const movieRows = await query<{ tmdb_id: string }>(
     `SELECT DISTINCT m.tmdb_id::text AS tmdb_id
      FROM movies m
      WHERE m.tmdb_id IS NOT NULL AND trim(m.tmdb_id)::text != ''
      AND (${libMovie})`,
-    []
+    movieParams
   )
   const seriesRows = await query<{ tmdb_id: string }>(
     `SELECT DISTINCT s.tmdb_id::text AS tmdb_id
      FROM series s
      WHERE s.tmdb_id IS NOT NULL AND trim(s.tmdb_id)::text != ''
      AND (${libSeries})`,
-    []
+    seriesParams
   )
 
   const movieIds = new Set<string>()
@@ -317,7 +328,7 @@ export async function getPersonCreditsGap(
   }
 
   const flat = flattenCombinedCreditsWithRoles(credits)
-  const { movieIds, seriesIds } = await loadLibraryTmdbIds(showAll)
+  const { movieIds, seriesIds } = await loadLibraryTmdbIds(showAll, options.scope)
 
   const inLibrary: PersonCreditsGapRow[] = []
   const missing: PersonCreditsGapRow[] = []

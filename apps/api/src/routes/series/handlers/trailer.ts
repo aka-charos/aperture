@@ -5,6 +5,7 @@ import type { FastifyInstance } from 'fastify'
 import { getTVVideos, pickBestYoutubeTrailer } from '@aperture/core'
 import { queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
+import { titleInScope } from '../../../lib/viewerScope.js'
 
 export function registerTrailerHandler(fastify: FastifyInstance) {
   fastify.get<{ Params: { id: string } }>(
@@ -12,6 +13,12 @@ export function registerTrailerHandler(fastify: FastifyInstance) {
     { preHandler: requireAuth },
     async (request, reply) => {
       const { id } = request.params
+
+      // A title in a library this viewer may not open answers exactly like one
+      // that does not exist (lib/viewerScope.ts).
+      if (!(await titleInScope(request, 'series', id))) {
+        return reply.status(404).send({ error: 'Series not found' } as never)
+      }
 
       const row = await queryOne<{ tmdb_id: string | null }>(
         `SELECT tmdb_id FROM series WHERE id = $1`,

@@ -6,6 +6,7 @@
 import type { FastifyInstance } from 'fastify'
 import { queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
+import { titleInScope } from '../../../lib/viewerScope.js'
 import { getMovieSchema } from '../schemas.js'
 import type { MovieDetailRow } from '../types.js'
 
@@ -18,6 +19,12 @@ export function registerDetailHandler(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       const { id } = request.params
+
+      // A title in a library this viewer may not open answers exactly like one
+      // that does not exist (lib/viewerScope.ts).
+      if (!(await titleInScope(request, 'movies', id))) {
+        return reply.status(404).send({ error: 'Movie not found' } as never)
+      }
 
       const movie = await queryOne<MovieDetailRow>(
         `SELECT id, provider_item_id, title, original_title, year, genres, overview,

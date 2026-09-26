@@ -9,6 +9,7 @@ import type { FastifyInstance } from 'fastify'
 import { getUpcomingEpisodeForSeries } from '@aperture/core/watching'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
+import { titleInScope } from '../../../lib/viewerScope.js'
 import { episodesSchema } from '../schemas.js'
 import type { EpisodeRow, SeasonAvailability, TmdbSeasonSummary } from '../types.js'
 
@@ -30,6 +31,12 @@ export function registerEpisodesHandler(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       const { id } = request.params
+
+      // A title in a library this viewer may not open answers exactly like one
+      // that does not exist (lib/viewerScope.ts).
+      if (!(await titleInScope(request, 'series', id))) {
+        return reply.status(404).send({ error: 'Series not found' } as never)
+      }
       // requireAuth guarantees a user; null keeps the join valid if it is ever absent.
       const userId = request.user?.id ?? null
 

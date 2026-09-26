@@ -24,6 +24,7 @@ import { BrowseSeriesTab } from './browse/BrowseSeriesTab'
 import { useBrowseFilterPresets, useBrowseMovies, useBrowsePeople, useBrowseSeries } from './browse/hooks'
 import { useViewMode } from '../hooks/useViewMode'
 import { useServerDisplayName } from '../hooks/useServerDisplayName'
+import { useCapability } from '../hooks/useCapability'
 import { PageHeading } from '@/components/PageHeading'
 
 export function BrowsePage() {
@@ -32,7 +33,16 @@ export function BrowsePage() {
   const serverName = useServerDisplayName()
   const [searchParams, setSearchParams] = useSearchParams()
   const initialTabIndex = browseTabFromSearchParam(searchParams.get('tab'))
-  const [tabIndex, setTabIndex] = useState(initialTabIndex)
+  // Which kinds this viewer can see, decided by the server (F-136). A kind
+  // they cannot see gets no tab, and a link to it opens the first one they can.
+  const hasMovies = useCapability('movies')
+  const hasSeries = useCapability('series')
+  const firstVisibleTab = hasMovies ? 0 : hasSeries ? 1 : 2
+  const [tabIndex, setTabIndex] = useState(
+    (initialTabIndex === 0 && !hasMovies) || (initialTabIndex === 1 && !hasSeries)
+      ? firstVisibleTab
+      : initialTabIndex
+  )
   const tabQuery = searchParams.get('tab')
   const { viewMode, setViewMode } = useViewMode('browse')
   const { viewMode: peopleViewMode, setViewMode: setPeopleViewMode } = useViewMode('browsePeople')
@@ -128,7 +138,8 @@ export function BrowsePage() {
             },
           }}
         >
-          <Tab
+          {hasMovies && <Tab
+            value={0}
             icon={<MovieIcon />}
             iconPosition="start"
             label={t('browse.tabMovies')}
@@ -136,8 +147,9 @@ export function BrowsePage() {
               color: tabIndex === 0 ? theme.palette.primary.main : 'text.secondary',
               '&.Mui-selected': { color: theme.palette.primary.main },
             }}
-          />
-          <Tab
+          />}
+          {hasSeries && <Tab
+            value={1}
             icon={<TvIcon />}
             iconPosition="start"
             label={t('browse.tabSeries')}
@@ -145,8 +157,9 @@ export function BrowsePage() {
               color: tabIndex === 1 ? '#ec4899' : 'text.secondary',
               '&.Mui-selected': { color: '#ec4899' },
             }}
-          />
+          />}
           <Tab
+            value={2}
             icon={<PersonIcon />}
             iconPosition="start"
             label={t('browse.tabPeople')}

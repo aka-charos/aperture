@@ -7,6 +7,7 @@ import type { FastifyInstance } from 'fastify'
 import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
+import { scopeClause, viewerScope } from '../../../lib/viewerScope.js'
 import { listMoviesSchema } from '../schemas.js'
 import type { MovieRow, MoviesListResponse, MoviesListQuerystring } from '../types.js'
 
@@ -31,7 +32,7 @@ export function registerListHandler(fastify: FastifyInstance) {
       const pageSize = Math.min(parseInt(request.query.pageSize || '50', 10), 100)
       const offset = (page - 1) * pageSize
       const { 
-        search, genre, collection, minRtScore, showAll, hasAwards,
+        search, genre, collection, minRtScore, hasAwards,
         minYear, maxYear, contentRating, minRuntime, maxRuntime,
         minCommunityRating, minMetacritic, resolution,
         country, watchStatus, minWatchers, maxWatchers,
@@ -40,25 +41,15 @@ export function registerListHandler(fastify: FastifyInstance) {
 
       const userId = request.user!.id
 
-      // Check if library configs exist
-      const configCheck = await queryOne<{ count: string }>(
-        'SELECT COUNT(*) FROM library_config'
-      )
-      const hasLibraryConfigs = configCheck && parseInt(configCheck.count, 10) > 0
-      const filterByLibrary = hasLibraryConfigs && showAll !== 'true'
-
-      let whereClause = ''
       const params: unknown[] = []
-      let paramIndex = 1
 
-      // Filter by enabled libraries (unless showAll=true or no library configs exist)
-      if (filterByLibrary) {
-        whereClause = ` WHERE EXISTS (
-          SELECT 1 FROM library_config lc 
-          WHERE lc.provider_library_id = movies.provider_library_id 
-          AND lc.is_enabled = true
-        )`
-      }
+      // What this viewer may see: the libraries the media server lets them into
+      // and the operator enabled, and their parental rating (lib/viewerScope.ts).
+      // `showAll` no longer widens it: it bypassed the operator's switch, and
+      // under viewer scope it would have been a way around the media server's
+      // own permission. Nothing in the app sends it.
+      let whereClause = ` WHERE ${scopeClause(await viewerScope(request), 'movies', params)}`
+      let paramIndex = params.length + 1
 
       if (search) {
         whereClause += whereClause ? ' AND ' : ' WHERE '

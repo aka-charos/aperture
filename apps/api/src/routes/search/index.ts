@@ -1,7 +1,8 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { query, queryOne } from '../../lib/db.js'
 import { requireAuth } from '../../plugins/auth.js'
-import { getEmbeddingInvocation, getActiveEmbeddingTableName } from '@aperture/core'
+import { scopeClause, viewerScope } from '../../lib/viewerScope.js'
+import { getEmbeddingInvocation, getActiveEmbeddingTableName, libraryScopeSql } from '@aperture/core'
 import { searchSchemas, searchSchema, searchSuggestionsSchema, searchFiltersSchema } from './schemas.js'
 import {
   MOVIE_SEARCH,
@@ -194,11 +195,15 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
       network,
     }
 
+    // Only what this viewer may see (lib/viewerScope.ts).
+    const scope = await viewerScope(request)
+
     const runSearch = async (
       source: TitleSearchTable,
       embeddingTable: string | undefined
     ): Promise<SearchResult[]> => {
       const { sql, params } = buildTableSearch({
+        scopeFilter: (bind) => libraryScopeSql(scope, 't', bind),
         source,
         tsquery,
         searchKey,
@@ -281,7 +286,12 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
     const limit = Math.min(parseInt(limitStr || '10', 10), 20)
     const queryLower = searchQuery.toLowerCase().trim()
 
-    // Get matching titles using trigram similarity
+    // Get matching titles using trigram similarity, from what this viewer may
+    // see — a suggestion is a title, and naming one is the leak.
+    const scope = await viewerScope(request)
+    const suggestionParams: unknown[] = [queryLower, limit]
+    const moviesInScope = scopeClause(scope, 'movies', suggestionParams)
+    const seriesInScope = scopeClause(scope, 'series', suggestionParams)
     const results = await query<{
       title: string
       type: 'movie' | 'series'
@@ -291,7 +301,7 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
       `(
         SELECT title, 'movie' as type, year, similarity(title, $1) as similarity
         FROM movies
-        WHERE title % $1
+        WHERE title % $1 AND ${moviesInScope}
         ORDER BY similarity DESC
         LIMIT $2
       )
@@ -299,13 +309,13 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
       (
         SELECT title, 'series' as type, year, similarity(title, $1) as similarity
         FROM series
-        WHERE title % $1
+        WHERE title % $1 AND ${seriesInScope}
         ORDER BY similarity DESC
         LIMIT $2
       )
       ORDER BY similarity DESC
       LIMIT $2`,
-      [queryLower, limit]
+      suggestionParams
     )
 
     return reply.send({
@@ -322,43 +332,58 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
    * GET /api/search/filters
    * Get available filter options
    */
-  fastify.get('/api/search/filters', { preHandler: requireAuth, schema: searchFiltersSchema }, async (_request, reply) => {
+  fastify.get('/api/search/filters', { preHandler: requireAuth, schema: searchFiltersSchema }, async (request, reply) => {
+    // Options only from what this viewer may see (lib/viewerScope.ts).
+    const scope = await viewerScope(request)
+    const genreParams: unknown[] = []
+    const genreMovies = scopeClause(scope, 'movies', genreParams)
+    const genreSeries = scopeClause(scope, 'series', genreParams)
+
     // Get unique genres from both movies and series
     const genreResults = await query<{ genre: string; count: string }>(
       `SELECT genre, SUM(count)::text as count FROM (
-        SELECT unnest(genres) as genre, COUNT(*) as count FROM movies GROUP BY 1
+        SELECT unnest(genres) as genre, COUNT(*) as count FROM movies WHERE ${genreMovies} GROUP BY 1
         UNION ALL
-        SELECT unnest(genres) as genre, COUNT(*) as count FROM series GROUP BY 1
+        SELECT unnest(genres) as genre, COUNT(*) as count FROM series WHERE ${genreSeries} GROUP BY 1
       ) combined
       GROUP BY genre
-      ORDER BY SUM(count) DESC`
+      ORDER BY SUM(count) DESC`,
+      genreParams
     )
 
     // Get collections
+    const collectionParams: unknown[] = []
     const collectionResults = await query<{ name: string; count: string }>(
       `SELECT collection_name as name, COUNT(*) as count
-       FROM movies WHERE collection_name IS NOT NULL
+       FROM movies WHERE collection_name IS NOT NULL AND ${scopeClause(scope, 'movies', collectionParams)}
        GROUP BY collection_name
-       ORDER BY COUNT(*) DESC`
+       ORDER BY COUNT(*) DESC`,
+      collectionParams
     )
 
     // Get networks
+    const networkParams: unknown[] = []
     const networkResults = await query<{ network: string; count: string }>(
       `SELECT network, COUNT(*) as count
-       FROM series WHERE network IS NOT NULL
+       FROM series WHERE network IS NOT NULL AND ${scopeClause(scope, 'series', networkParams)}
        GROUP BY network
        ORDER BY COUNT(*) DESC
-       LIMIT 50`
+       LIMIT 50`,
+      networkParams
     )
 
     // Get year range
+    const yearParams: unknown[] = []
+    const yearMovies = scopeClause(scope, 'movies', yearParams)
+    const yearSeries = scopeClause(scope, 'series', yearParams)
     const yearRange = await queryOne<{ min_year: number; max_year: number }>(
       `SELECT 
          MIN(LEAST(COALESCE(m.min_year, s.min_year), COALESCE(s.min_year, m.min_year))) as min_year,
          MAX(GREATEST(COALESCE(m.max_year, s.max_year), COALESCE(s.max_year, m.max_year))) as max_year
        FROM 
-         (SELECT MIN(year) as min_year, MAX(year) as max_year FROM movies WHERE year IS NOT NULL) m,
-         (SELECT MIN(year) as min_year, MAX(year) as max_year FROM series WHERE year IS NOT NULL) s`
+         (SELECT MIN(year) as min_year, MAX(year) as max_year FROM movies WHERE year IS NOT NULL AND ${yearMovies}) m,
+         (SELECT MIN(year) as min_year, MAX(year) as max_year FROM series WHERE year IS NOT NULL AND ${yearSeries}) s`,
+      yearParams
     )
 
     return reply.send({

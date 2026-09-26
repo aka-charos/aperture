@@ -146,6 +146,13 @@ export interface TableSearchInput {
   limit: number
   /** Present only when semantic search is on and resolved. */
   embedding: { vector: string; setId: string; table: string } | null
+  /**
+   * The viewer's scope as a condition over the row alias `t`, binding its values
+   * through the builder's own placeholder counter. A function rather than SQL so
+   * this module stays free of core (and of the database), which is what lets it
+   * be pinned by a test.
+   */
+  scopeFilter?: (bind: (value: unknown) => string) => string
 }
 
 /**
@@ -164,6 +171,7 @@ export function buildTableSearch(input: TableSearchInput): { sql: string; params
   const tsqueryParam = param(input.tsquery)
   const keyParam = param(input.searchKey)
   const filters: string[] = []
+  if (input.scopeFilter) filters.push(input.scopeFilter(param))
   if (f.genre) filters.push(`${param(f.genre)}::text = ANY(genres)`)
   if (f.yearMin !== undefined) filters.push(`year >= ${param(f.yearMin)}::int`)
   if (f.yearMax !== undefined) filters.push(`year <= ${param(f.yearMax)}::int`)

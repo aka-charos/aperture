@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { query, queryOne } from '../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../plugins/auth.js'
+import { idsInScope } from '../../lib/viewerScope.js'
 import { dashboardSchemas, getDashboardSchema } from './schemas.js'
 // Shared with the Watch Stats page. The bar links there, so a viewer will
 // compare the two: they have to be counting the same population.
@@ -400,8 +401,22 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
         watchTimeMinutes: parseInt(statsResult?.watch_time_minutes || '0', 10),
       }
 
+      // Everything on these rails is filtered to what the viewer may open now
+      // (lib/viewerScope.ts): recommendations can predate a change to their
+      // library permission, and Top Picks is one list for the whole server.
+      const [visibleMovies, visibleSeries] = await Promise.all([
+        idsInScope(request, 'movies', [
+          ...movieRecsResult.rows.map((r) => r.movie_id),
+          ...popularMovies.map((m) => m.movieId),
+        ]),
+        idsInScope(request, 'series', [
+          ...seriesRecsResult.rows.map((r) => r.series_id),
+          ...popularSeries.map((s) => s.seriesId),
+        ]),
+      ])
+
       // Build recommendations (interleave movies and series)
-      const movieRecs = movieRecsResult.rows.map((r) => ({
+      const movieRecs = movieRecsResult.rows.filter((r) => visibleMovies.has(r.movie_id)).map((r) => ({
         id: r.movie_id,
         type: 'movie' as const,
         title: r.title,
@@ -411,7 +426,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
         matchScore: r.final_score ? Math.round(r.final_score * 100) : null,
         runtimeMinutes: r.runtime_minutes,
       }))
-      const seriesRecs = seriesRecsResult.rows.map((r) => ({
+      const seriesRecs = seriesRecsResult.rows.filter((r) => visibleSeries.has(r.series_id)).map((r) => ({
         id: r.series_id,
         type: 'series' as const,
         title: r.title,
@@ -431,7 +446,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       // Build top picks (interleave movies and series)
-      const topMovies = popularMovies.map((m) => ({
+      const topMovies = popularMovies.filter((m) => visibleMovies.has(m.movieId)).map((m) => ({
         id: m.movieId,
         type: 'movie' as const,
         title: m.title,
@@ -441,7 +456,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
         rank: m.rank,
         popularityScore: m.popularityScore,
       }))
-      const topSeries = popularSeries.map((s) => ({
+      const topSeries = popularSeries.filter((s) => visibleSeries.has(s.seriesId)).map((s) => ({
         id: s.seriesId,
         type: 'series' as const,
         title: s.title,

@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test:routes": "node --import tsx --test src/routes/routeGuards.test.ts",
+    "test:routes": "node --import tsx --test src/routes/routeGuards.test.ts src/routes/libraryScopeCallSites.test.ts",
     "test:security": "node --import tsx --test src/config/security.test.ts",
     "test:auth": "node --import tsx --test src/lib/impersonation.test.ts src/lib/providerCredentials.test.ts src/lib/accountEnabled.test.ts src/lib/permissions.test.ts",
     "test:schemas": "node --import tsx --test src/routes/aiFunctionSchemas.test.ts",

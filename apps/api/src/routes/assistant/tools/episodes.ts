@@ -17,7 +17,7 @@
  */
 import { tool, type ToolSet } from 'ai'
 import { z } from 'zod'
-import { getActiveEmbeddingTableName, getEpisodeEmbeddingsEnabled } from '@aperture/core'
+import { getActiveEmbeddingTableName, getEpisodeEmbeddingsEnabled, libraryScopeSql } from '@aperture/core'
 import { query, transaction } from '../../../lib/db.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import { anyTitleMatchesSql } from '../helpers/titleMatch.js'
@@ -249,6 +249,15 @@ export async function createEpisodeTools(ctx: ToolContext): Promise<ToolSet> {
             extra.push(ctx.userId)
             idx++
           }
+          // Only shows this viewer may open (ctx.scope), in the SQL because a
+          // `brief` result is text the card wrapper cannot filter. Always a
+          // clause, so the scan below is always widened.
+          clauses.push(
+            `AND ${libraryScopeSql(ctx.scope, 's', (value) => {
+              extra.push(value)
+              return `$${idx++}`
+            })}`
+          )
 
           const sql = `
             SELECT ep.id, ep.title, ep.season_number, ep.episode_number, ep.overview,

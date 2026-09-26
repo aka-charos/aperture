@@ -6,6 +6,7 @@
 import type { FastifyInstance } from 'fastify'
 import { query } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
+import { scopeClause, viewerScope } from '../../../lib/viewerScope.js'
 import { franchisesSchema } from '../schemas.js'
 import type { FranchisesQuerystring } from '../types.js'
 
@@ -26,6 +27,15 @@ export function registerFranchisesHandler(fastify: FastifyInstance) {
       const sortBy = request.query.sortBy || 'total'
       const showCompleted = request.query.showCompleted !== 'false'
 
+      const statsParams: unknown[] = [userId]
+      if (search) {
+        statsParams.push(`%${search}%`)
+      }
+      // Counted over what this viewer may see (lib/viewerScope.ts): a film in a
+      // library they cannot open is neither owned nor unwatched for them.
+      const scope = await viewerScope(request)
+      const inScope = scopeClause(scope, 'm', statsParams)
+
       // Get aggregated franchise stats with a single query
       const franchiseStatsQuery = `
         WITH franchise_stats AS (
@@ -41,7 +51,7 @@ export function registerFranchisesHandler(fastify: FastifyInstance) {
           -- for a favorited-but-unplayed title and for one abandoned six minutes
           -- in, and this column is labelled "watched" on the page.
           LEFT JOIN watch_history wh ON wh.movie_id = m.id AND wh.user_id = $1 AND wh.played = true
-          WHERE m.collection_name IS NOT NULL
+          WHERE m.collection_name IS NOT NULL AND ${inScope}
           GROUP BY m.collection_name
         )
         SELECT
@@ -65,11 +75,6 @@ export function registerFranchisesHandler(fastify: FastifyInstance) {
           'total_movies DESC'
         }
       `
-
-      const statsParams: unknown[] = [userId]
-      if (search) {
-        statsParams.push(`%${search}%`)
-      }
 
       const allFranchiseStats = await query<{
         collection_name: string
@@ -106,6 +111,7 @@ export function registerFranchisesHandler(fastify: FastifyInstance) {
 
       // Get movies only for the paginated franchises
       const franchiseNames = paginatedStats.map(f => f.collection_name)
+      const moviesParams: unknown[] = [userId, franchiseNames]
       const moviesResult = await query<{
         collection_name: string
         movie_id: string
@@ -127,9 +133,9 @@ export function registerFranchisesHandler(fastify: FastifyInstance) {
            CASE WHEN wh.id IS NOT NULL THEN true ELSE false END as watched
          FROM movies m
          LEFT JOIN watch_history wh ON wh.movie_id = m.id AND wh.user_id = $1 AND wh.played = true
-         WHERE m.collection_name = ANY($2)
+         WHERE m.collection_name = ANY($2) AND ${scopeClause(scope, 'm', moviesParams)}
          ORDER BY m.year NULLS LAST`,
-        [userId, franchiseNames]
+        moviesParams
       )
 
       // Group movies by collection

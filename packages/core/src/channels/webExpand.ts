@@ -14,6 +14,7 @@ import { generateObject, generateText } from 'ai'
 import { z } from 'zod'
 import { createChildLogger } from '../lib/logger.js'
 import { query, queryOne } from '../lib/db.js'
+import { getLibraryScopeForUser, type LibraryScope } from '../lib/libraryScope.js'
 import { withWebSearchModel, getWebSearchProviderTools } from '../lib/ai-provider.js'
 import { WATCH_HISTORY_PLAYED_SQL } from '../recommender/watchedExclusion.js'
 import { parseChannelMediaTypes } from './recommendations.js'
@@ -45,9 +46,10 @@ interface LibraryRow {
   imdb_id: string | null
   tmdb_id: string | null
   content_rating: string | null
+  provider_library_id: string | null
 }
 
-const RESOLVE_COLUMNS = 'id, title, year, provider_item_id, imdb_id, tmdb_id, content_rating'
+const RESOLVE_COLUMNS = 'id, title, year, provider_item_id, imdb_id, tmdb_id, content_rating, provider_library_id'
 
 const MEDIA_TABLES: Record<ChannelMediaType, string> = {
   movie: 'movies',
@@ -190,10 +192,14 @@ async function resolveToLibraryItems(
   mediaTypes: ChannelMediaType[],
   excludeIds: Set<string>,
   watchedIdsByType: Record<ChannelMediaType, Set<string>>,
-  maxParentalRating: number | null,
+  /** The channel owner's scope; a title outside it is never matched. */
+  scope: LibraryScope,
   limit: number
 ): Promise<ChannelRecommendation[]> {
   if (candidates.length === 0) return []
+
+  const maxParentalRating = scope.maxParentalRating
+  const allowedLibraries = scope.libraryIds ? new Set(scope.libraryIds) : null
 
   // Rating-name → numeric value lookup for the parental cap
   const ratingMap = new Map<string, number>()
@@ -210,6 +216,8 @@ async function resolveToLibraryItems(
 
   const accept = (row: LibraryRow, cand: WebCandidate, mediaType: ChannelMediaType): boolean => {
     if (!row.provider_item_id) return false
+    // Held in a library the owner may not open (lib/libraryScope.ts).
+    if (allowedLibraries && (!row.provider_library_id || !allowedLibraries.has(row.provider_library_id))) return false
     if (seen.has(row.id) || watchedIdsByType[mediaType].has(row.id)) return false
     if (cand.year && row.year && Math.abs(row.year - cand.year) > 1) return false
     if (maxParentalRating !== null && row.content_rating) {
@@ -376,7 +384,7 @@ export async function gatherWebExpansion(
     mediaTypes,
     excludeIds,
     watchedIdsByType,
-    channel.max_parental_rating,
+    await getLibraryScopeForUser(channel.owner_id),
     limit
   )
 

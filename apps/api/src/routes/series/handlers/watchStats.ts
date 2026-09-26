@@ -7,6 +7,7 @@ import type { FastifyInstance } from 'fastify'
 import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
+import { titleInScope } from '../../../lib/viewerScope.js'
 import {
   resolveWatcherAudience,
   fetchSeriesWatchers,
@@ -22,6 +23,12 @@ export function registerWatchStatsHandler(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       const { id } = request.params
+
+      // A title in a library this viewer may not open answers exactly like one
+      // that does not exist (lib/viewerScope.ts).
+      if (!(await titleInScope(request, 'series', id))) {
+        return reply.status(404).send({ error: 'Series not found' } as never)
+      }
       const currentUser = request.user as SessionUser
 
       // Get total episodes for calculating completion percentage

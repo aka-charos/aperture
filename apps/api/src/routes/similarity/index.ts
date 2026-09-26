@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { requireAuth, type SessionUser } from '../../plugins/auth.js'
+import { titleInScope, viewerScope } from '../../lib/viewerScope.js'
 import {
   getSimilarMovies,
   getSimilarSeries,
@@ -40,14 +41,20 @@ const similarityRoutes: FastifyPluginAsync = async (fastify) => {
     const limit = request.query.limit ? parseInt(request.query.limit, 10) : 12
     const depth = request.query.depth ? parseInt(request.query.depth, 10) : 1
 
+    // A title the viewer may not open answers like one that does not exist.
+    if (!(await titleInScope(request, 'movies', id))) {
+      return reply.status(404).send({ error: `Movie not found: ${id}` })
+    }
+    const scope = await viewerScope(request)
+
     try {
       // If depth > 1, return graph data for multi-level view
       if (depth > 1) {
-        const graphData = await getSimilarWithDepth(id, 'movie', { limit, depth, userId: currentUser.id })
+        const graphData = await getSimilarWithDepth(id, 'movie', { limit, depth, userId: currentUser.id, scope })
         return reply.send(graphData)
       }
-      
-      const result = await getSimilarMovies(id, { limit })
+
+      const result = await getSimilarMovies(id, { limit, scope })
       return reply.send(result)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -79,14 +86,19 @@ const similarityRoutes: FastifyPluginAsync = async (fastify) => {
     const limit = request.query.limit ? parseInt(request.query.limit, 10) : 12
     const depth = request.query.depth ? parseInt(request.query.depth, 10) : 1
 
+    if (!(await titleInScope(request, 'series', id))) {
+      return reply.status(404).send({ error: `Series not found: ${id}` })
+    }
+    const scope = await viewerScope(request)
+
     try {
       // If depth > 1, return graph data for multi-level view
       if (depth > 1) {
-        const graphData = await getSimilarWithDepth(id, 'series', { limit, depth, userId: currentUser.id })
+        const graphData = await getSimilarWithDepth(id, 'series', { limit, depth, userId: currentUser.id, scope })
         return reply.send(graphData)
       }
-      
-      const result = await getSimilarSeries(id, { limit })
+
+      const result = await getSimilarSeries(id, { limit, scope })
       return reply.send(result)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -134,6 +146,7 @@ const similarityRoutes: FastifyPluginAsync = async (fastify) => {
 
     try {
       const result = await getGraphForSource(source as GraphSource, currentUser.id, {
+        scope: await viewerScope(request),
         limit,
         includeCrossMedia,
       })
@@ -181,11 +194,14 @@ const similarityRoutes: FastifyPluginAsync = async (fastify) => {
         limit,
         hideWatched,
         userId: currentUser.id,
+        scope: await viewerScope(request),
       })
 
       if (returnGraph) {
         // Build graph with connections between results
-        const graphData = await buildGraphFromSemanticSearch(searchResult)
+        const graphData = await buildGraphFromSemanticSearch(searchResult, {
+          scope: await viewerScope(request),
+        })
         return reply.send({
           query: searchResult.query,
           resultCount: searchResult.results.length,

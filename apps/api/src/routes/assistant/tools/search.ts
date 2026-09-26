@@ -4,7 +4,7 @@
 import { tool } from 'ai'
 import { nullSafe } from './utils.js'
 import { z } from 'zod'
-import { getActiveEmbeddingTableName } from '@aperture/core'
+import { getActiveEmbeddingTableName, binderFor, libraryScopeSql } from '@aperture/core'
 import { query, queryOne, transaction } from '../../../lib/db.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import { annotateWatchedItems } from '../helpers/unwatched.js'
@@ -165,7 +165,8 @@ export async function findSimilarItems(
    * shortfall grows with how much of the library they have seen.
    */
   const runAnn = async <T,>(sql: string, params: unknown[]): Promise<{ rows: T[] }> => {
-    if (!excludeWatched) return query<T>(sql, params)
+    // Always widened: the viewer's library scope is a post-filter on every scan
+    // (see the ef_search invariant), not only the watched exclusion.
     return transaction(async (client) => {
       await client.query(`SET LOCAL hnsw.ef_search = ${HNSW_EF_SEARCH_FILTERED}`)
       const res = await client.query(sql, params)
@@ -195,33 +196,37 @@ export async function findSimilarItems(
   let movie: MovieWithMeta | null = null
   if (searchMovies) {
     const movieEmbeddingTable = await getActiveEmbeddingTableName('embeddings')
+    // The seed is only a title this viewer may open: naming one they may not,
+    // even as "similar to X", tells them it is on the server.
+    const seedMovieParams: unknown[] = [`%${title}%`, modelId, title, `${title}%`]
     movie = await queryOne<MovieWithMeta>(
       `SELECT m.id, m.title, m.overview, m.year, m.tagline, m.directors, m.actors, m.studios, m.tags
        FROM movies m
        LEFT JOIN ${movieEmbeddingTable} e ON e.movie_id = m.id AND e.model = $2
-       WHERE ${anyTitleMatchesSql('$1', 'm')}
+       WHERE ${anyTitleMatchesSql('$1', 'm')} AND ${libraryScopeSql(ctx.scope, 'm', binderFor(seedMovieParams))}
        ORDER BY
          ${titleMatchRankSql('$3', 'm')},
          CASE WHEN unaccent(LOWER(m.title)) LIKE unaccent(LOWER($4)) THEN 0 ELSE 1 END,
          e.id IS NOT NULL DESC
        LIMIT 1`,
-      [`%${title}%`, modelId, title, `${title}%`]
+      seedMovieParams
     )
   }
 
   let series: { id: string; title: string; overview: string | null; year: number | null } | null = null
   if (searchSeries) {
     const seriesEmbeddingTable = await getActiveEmbeddingTableName('series_embeddings')
+    const seedSeriesParams: unknown[] = [`%${title}%`, modelId, title, `${title}%`]
     series = await queryOne<{ id: string; title: string; overview: string | null; year: number | null }>(
       `SELECT s.id, s.title, s.overview, s.year FROM series s
        LEFT JOIN ${seriesEmbeddingTable} se ON se.series_id = s.id AND se.model = $2
-       WHERE ${anyTitleMatchesSql('$1', 's')}
+       WHERE ${anyTitleMatchesSql('$1', 's')} AND ${libraryScopeSql(ctx.scope, 's', binderFor(seedSeriesParams))}
        ORDER BY
          ${titleMatchRankSql('$3', 's')},
          CASE WHEN unaccent(LOWER(s.title)) LIKE unaccent(LOWER($4)) THEN 0 ELSE 1 END,
          se.id IS NOT NULL DESC
        LIMIT 1`,
-      [`%${title}%`, modelId, title, `${title}%`]
+      seedSeriesParams
     )
   }
 
@@ -250,7 +255,7 @@ export async function findSimilarItems(
       ? `AND m.id NOT IN (SELECT wh.movie_id FROM watch_history wh
           WHERE wh.user_id = $4 AND wh.movie_id IS NOT NULL AND ${WATCH_HISTORY_PLAYED_SQL})`
       : ''
-    const params = excludeWatched
+    const params: unknown[] = excludeWatched
       ? [movie.id, modelId, embeddingStr, ctx.userId, limit]
       : [movie.id, modelId, embeddingStr, limit]
 
@@ -258,6 +263,7 @@ export async function findSimilarItems(
       `SELECT m.id, m.title, m.year, m.genres, m.overview, m.community_rating, m.poster_url, m.provider_item_id, m.directors
        FROM ${movieEmbeddingTable} e JOIN movies m ON m.id = e.movie_id
        WHERE e.movie_id != $1 AND e.model = $2 ${watchedFilter}
+         AND ${libraryScopeSql(ctx.scope, 'm', binderFor(params))}
        ORDER BY e.embedding <=> $3::halfvec
        LIMIT ${excludeWatched ? '$5' : '$4'}`,
       params
@@ -287,7 +293,7 @@ export async function findSimilarItems(
           WHERE wh.user_id = $4 AND ${WATCH_HISTORY_PLAYED_SQL}
         )`
       : ''
-    const params = excludeWatched
+    const params: unknown[] = excludeWatched
       ? [series.id, modelId, embeddingStr, ctx.userId, limit]
       : [series.id, modelId, embeddingStr, limit]
 
@@ -298,6 +304,7 @@ export async function findSimilarItems(
        WHERE se.series_id != $1
          AND se.model = $2
          ${watchedFilter}
+         AND ${libraryScopeSql(ctx.scope, 's', binderFor(params))}
        ORDER BY se.embedding <=> $3::halfvec
        LIMIT ${excludeWatched ? '$5' : '$4'}`,
       params
@@ -559,6 +566,14 @@ export function createSearchTools(ctx: ToolContext) {
             values.push(ctx.userId)
             idx++
           }
+          // Only what this viewer may open (ctx.scope) — in the SQL and not only
+          // in the card wrapper, since a `brief` result is text it cannot see.
+          conditions.push(
+            libraryScopeSql(ctx.scope, isMovie ? 'movies' : 'series', (value) => {
+              values.push(value)
+              return `$${idx++}`
+            })
+          )
 
           values.push(safeLimit)
           const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
@@ -729,9 +744,9 @@ export function createSearchTools(ctx: ToolContext) {
           // filter — see HNSW_EF_SEARCH_FILTERED.
           const filterWatch = watchStatus !== 'all'
           const countryFilter = country?.trim() ? normalizeCountryQuery(country) : null
-          const hasPostFilter = filterWatch || countryFilter !== null
+          // Always widened: the viewer's library scope is a post-filter on
+          // every scan, on top of watch status and country.
           const runAnn = async <T,>(sql: string, params: unknown[]): Promise<{ rows: T[] }> => {
-            if (!hasPostFilter) return query<T>(sql, params)
             return transaction(async (client) => {
               await client.query(`SET LOCAL hnsw.ef_search = ${HNSW_EF_SEARCH_FILTERED}`)
               const res = await client.query(sql, params)
@@ -756,6 +771,12 @@ export function createSearchTools(ctx: ToolContext) {
               extra.push(`%${countryFilter}%`)
               idx++
             }
+            clauses.push(
+              `AND ${libraryScopeSql(ctx.scope, alias, (value) => {
+                extra.push(value)
+                return `$${idx++}`
+              })}`
+            )
             return { clause: clauses.join(' '), extra }
           }
 
