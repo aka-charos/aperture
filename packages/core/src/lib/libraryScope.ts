@@ -96,22 +96,47 @@ export function scopeHas(scope: LibraryScope, kind: LibraryKind): boolean {
 }
 
 /**
+ * Ids compared as the server writes them in either form: case and dashes
+ * ignored. Tolerates a missing id — the listing's types promise a string the
+ * server does not always send (Jellyfin names the field ItemId) — so one odd
+ * library cannot throw inside the user sync.
+ */
+function normalizeFolderId(id: string | null | undefined): string {
+  return String(id ?? '').toLowerCase().replace(/[{}-]/g, '')
+}
+
+/**
  * Translate the media server's per-user folder permission into the provider
  * library ids titles are stored under.
  *
+ * - `null`: every library (the server grants all folders).
+ * - `string[]`: exactly these; `[]` is an account granted none.
+ * - `undefined`: the permission could not be translated — it names folders and
+ *   NOT ONE matches a library the server lists. Callers keep what they had.
+ *
  * The server's permission list names libraries by GUID while titles carry the
- * library's item id, and the two differ on Emby. An unknown GUID is a library
- * this instance has not seen, and is dropped: it cannot contain a title we hold.
+ * library's item id, and the two differ on Emby. A single unknown GUID is a
+ * library since removed, and is dropped. But when nothing matches at all the
+ * likelier cause is an id this code does not read the way the server writes it,
+ * and answering `[]` there would be destructive: the account would see no
+ * library, and the STRM sweep would delete its generated libraries on the next
+ * run (F-046). A genuine permission names libraries the server lists, so a list
+ * none of which is recognised is either a translation fault or every permitted
+ * library deleted — and keeping the stored value is the right answer to both.
  */
 export function libraryIdsFromFolderAccess(
   access: { enableAllFolders: boolean; enabledFolders: readonly string[] },
   libraries: ReadonlyArray<{ id: string; guid: string }>
-): string[] | null {
+): string[] | null | undefined {
   if (access.enableAllFolders) return null
-  const allowed = new Set(access.enabledFolders.map((folder) => folder.toLowerCase()))
-  return libraries
-    .filter((library) => allowed.has(library.guid.toLowerCase()) || allowed.has(library.id.toLowerCase()))
-    .map((library) => library.id)
+  const allowed = new Set(access.enabledFolders.map(normalizeFolderId).filter(Boolean))
+  const matches = (id: string | null | undefined) => {
+    const key = normalizeFolderId(id)
+    return key !== '' && allowed.has(key)
+  }
+  const matched = libraries.filter((library) => !!library.id && (matches(library.guid) || matches(library.id)))
+  if (access.enabledFolders.length > 0 && matched.length === 0) return undefined
+  return matched.map((library) => library.id)
 }
 
 /** Adds one value to a query's parameters and returns its placeholder. */

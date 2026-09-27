@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { query } from '../../../lib/db.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import type { ToolContext } from '../types.js'
-import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
+import { WATCH_HISTORY_PLAYED_SQL, binderFor, libraryScopeSql } from '@aperture/core'
 
 export function createDiscoveryTools(ctx: ToolContext) {
   return {
@@ -122,6 +122,10 @@ export function createDiscoveryTools(ctx: ToolContext) {
         const searchCondition = search ? ` AND m.collection_name ILIKE $2` : ''
         const params: unknown[] = [ctx.userId]
         if (search) params.push(`%${search}%`)
+        params.push(limit)
+        const limitParam = `$${params.length}`
+        // Titles returned as data, not cards: the scope goes in the SQL.
+        const inScope = libraryScopeSql(ctx.scope, 'm', binderFor(params))
 
         const result = await query<{
           collection_name: string
@@ -141,11 +145,11 @@ export function createDiscoveryTools(ctx: ToolContext) {
            FROM movies m
            LEFT JOIN watch_history wh ON wh.movie_id = m.id AND wh.user_id = $1
              AND ${WATCH_HISTORY_PLAYED_SQL}
-           WHERE m.collection_name IS NOT NULL${searchCondition}
+           WHERE m.collection_name IS NOT NULL${searchCondition} AND ${inScope}
            GROUP BY m.collection_name
            ORDER BY COUNT(m.id) DESC
-           LIMIT ${search ? '$3' : '$2'}`,
-          search ? [...params, limit] : [ctx.userId, limit]
+           LIMIT ${limitParam}`,
+          params
         )
 
         return {
@@ -419,6 +423,8 @@ export function createDiscoveryTools(ctx: ToolContext) {
         franchiseName: z.string().describe('Name of the franchise/collection to check'),
       })),
       execute: async ({ franchiseName }) => {
+        // Titles returned as data, not cards: the scope goes in the SQL.
+        const progressParams: unknown[] = [ctx.userId, `%${franchiseName}%`]
         const movies = await query<{
           id: string
           title: string
@@ -436,9 +442,9 @@ export function createDiscoveryTools(ctx: ToolContext) {
            FROM movies m
            LEFT JOIN watch_history wh ON wh.movie_id = m.id AND wh.user_id = $1
              AND ${WATCH_HISTORY_PLAYED_SQL}
-           WHERE m.collection_name ILIKE $2
+           WHERE m.collection_name ILIKE $2 AND ${libraryScopeSql(ctx.scope, 'm', binderFor(progressParams))}
            ORDER BY m.year NULLS LAST`,
-          [ctx.userId, `%${franchiseName}%`]
+          progressParams
         )
 
         if (movies.rows.length === 0) {

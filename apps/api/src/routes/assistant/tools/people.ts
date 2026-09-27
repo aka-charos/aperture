@@ -6,7 +6,7 @@ import { nullSafe } from './utils.js'
 import { z } from 'zod'
 import { query } from '../../../lib/db.js'
 import type { ToolContext } from '../types.js'
-import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
+import { WATCH_HISTORY_PLAYED_SQL, binderFor, libraryScopeSql } from '@aperture/core'
 
 export function createPeopleTools(ctx: ToolContext) {
   return {
@@ -32,6 +32,10 @@ export function createPeopleTools(ctx: ToolContext) {
         }> = []
 
         if (role === 'actor' || role === 'any') {
+          // Filmographies are titles returned as data, not cards, so the
+          // scope wrapper cannot see them: the scope goes in the SQL (ctx.scope).
+          const actorMovieParams: unknown[] = [`%${name}%`, (limit ?? 10) * 5]
+          const actorSeriesParams: unknown[] = [`%${name}%`, (limit ?? 10) * 5]
           const actorMovies = await query<{
             id: string
             actor_name: string
@@ -43,9 +47,9 @@ export function createPeopleTools(ctx: ToolContext) {
             `SELECT m.id, actor->>'name' as actor_name, actor->>'thumb' as actor_thumb,
              actor->>'role' as actor_role, m.title, m.year
              FROM movies m, LATERAL jsonb_array_elements(m.actors) as actor
-             WHERE actor->>'name' ILIKE $1
+             WHERE actor->>'name' ILIKE $1 AND ${libraryScopeSql(ctx.scope, 'm', binderFor(actorMovieParams))}
              ORDER BY m.year DESC NULLS LAST LIMIT $2`,
-            [`%${name}%`, (limit ?? 10) * 5]
+            actorMovieParams
           )
 
           const actorSeries = await query<{
@@ -59,9 +63,9 @@ export function createPeopleTools(ctx: ToolContext) {
             `SELECT s.id, actor->>'name' as actor_name, actor->>'thumb' as actor_thumb,
              actor->>'role' as actor_role, s.title, s.year
              FROM series s, LATERAL jsonb_array_elements(s.actors) as actor
-             WHERE actor->>'name' ILIKE $1
+             WHERE actor->>'name' ILIKE $1 AND ${libraryScopeSql(ctx.scope, 's', binderFor(actorSeriesParams))}
              ORDER BY s.year DESC NULLS LAST LIMIT $2`,
-            [`%${name}%`, (limit ?? 10) * 5]
+            actorSeriesParams
           )
 
           // Group by actor name
@@ -118,6 +122,7 @@ export function createPeopleTools(ctx: ToolContext) {
         }
 
         if (role === 'director' || role === 'any') {
+          const directorParams: unknown[] = [`%${name}%`, (limit ?? 10) * 5]
           const directorMovies = await query<{
             id: string
             director: string
@@ -126,8 +131,9 @@ export function createPeopleTools(ctx: ToolContext) {
           }>(
             `SELECT id, unnest(directors) as director, title, year FROM movies
              WHERE EXISTS (SELECT 1 FROM unnest(directors) d WHERE d ILIKE $1)
+               AND ${libraryScopeSql(ctx.scope, 'movies', binderFor(directorParams))}
              ORDER BY year DESC NULLS LAST LIMIT $2`,
-            [`%${name}%`, (limit ?? 10) * 5]
+            directorParams
           )
 
           const directorMap = new Map<
@@ -167,6 +173,7 @@ export function createPeopleTools(ctx: ToolContext) {
         }
 
         if (role === 'writer' || role === 'any') {
+          const writerParams: unknown[] = [`%${name}%`, (limit ?? 10) * 5]
           const writerMovies = await query<{
             id: string
             writer: string
@@ -175,8 +182,9 @@ export function createPeopleTools(ctx: ToolContext) {
           }>(
             `SELECT id, unnest(writers) as writer, title, year FROM movies
              WHERE EXISTS (SELECT 1 FROM unnest(writers) w WHERE w ILIKE $1)
+               AND ${libraryScopeSql(ctx.scope, 'movies', binderFor(writerParams))}
              ORDER BY year DESC NULLS LAST LIMIT $2`,
-            [`%${name}%`, (limit ?? 10) * 5]
+            writerParams
           )
 
           const writerMap = new Map<

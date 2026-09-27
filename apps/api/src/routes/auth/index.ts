@@ -288,7 +288,9 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       if (providerUser.folderAccess) {
         try {
           const libraries = await provider.getLibraries(config.apiKey)
-          await saveUserLibraryAccess(user.id, libraryIdsFromFolderAccess(providerUser.folderAccess, libraries))
+          const ids = libraryIdsFromFolderAccess(providerUser.folderAccess, libraries)
+          // Untranslatable keeps what is stored (see libraryIdsFromFolderAccess).
+          if (ids !== undefined) await saveUserLibraryAccess(user.id, ids)
         } catch (err) {
           fastify.log.warn({ err, userId: user.id }, 'Could not refresh library access at sign-in')
         }

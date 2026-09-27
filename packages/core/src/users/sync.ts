@@ -95,13 +95,37 @@ export async function syncUsersFromMediaServer(
       addLog(jobId, 'warn', '⚠️ Could not list libraries — library access not refreshed this run')
     }
     let accessChanged = 0
+    let accessUntranslated = 0
     const refreshAccess = async (
       userId: string,
       folderAccess: (typeof providerUsers)[number]['folderAccess'],
       before: string[] | null | undefined
     ) => {
       if (!libraries || !folderAccess) return
+      // Library access must never be what fails the user sync.
+      try {
+        await refreshAccessFor(userId, folderAccess, before, libraries)
+      } catch (err) {
+        logger.warn({ err, userId }, 'Could not refresh library access; left unchanged')
+      }
+    }
+    const refreshAccessFor = async (
+      userId: string,
+      folderAccess: NonNullable<(typeof providerUsers)[number]['folderAccess']>,
+      before: string[] | null | undefined,
+      libraries: Library[]
+    ) => {
       const ids = libraryIdsFromFolderAccess(folderAccess, libraries)
+      // Untranslatable: keep what is stored rather than save "no library" —
+      // see libraryIdsFromFolderAccess for why that answer is destructive.
+      if (ids === undefined) {
+        accessUntranslated++
+        logger.warn(
+          { userId, folders: folderAccess.enabledFolders.length },
+          'None of this account\'s permitted folders matched a library; library access left unchanged'
+        )
+        return
+      }
       await saveUserLibraryAccess(userId, ids)
       if (before !== undefined && !sameLibraries(before, ids)) accessChanged++
     }
@@ -214,6 +238,13 @@ export async function syncUsersFromMediaServer(
 
     if (accessChanged > 0) {
       addLog(jobId, 'info', `📚 Library access changed for ${accessChanged} user(s)`)
+    }
+    if (accessUntranslated > 0) {
+      addLog(
+        jobId,
+        'warn',
+        `⚠️ ${accessUntranslated} user(s): permitted folders matched no library, access left unchanged`
+      )
     }
     addLog(jobId, 'info', `✅ User sync complete: ${imported} imported, ${updated} updated, ${providerUsers.length} total`)
     completeJob(jobId, result)

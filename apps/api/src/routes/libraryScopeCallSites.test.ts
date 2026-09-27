@@ -51,14 +51,13 @@ const EXEMPT: Record<string, string> = {
   'assistant/jobs/refreshSuggestions.ts': 'own history and own picks, for suggestion chips',
   'assistant/helpers/unwatched.ts': 'answers "watched?" for ids it is handed; lists nothing',
   // Assistant tools returning cards: every card is filtered by withLibraryScope,
-  // which wraps every tool. None of these returns titles as `brief` text — the
-  // tools that do (search, episodes) put the scope in their SQL.
+  // which wraps every tool. None of these returns titles outside a card list —
+  // the tools that do (brief results, franchise lists, filmographies) put the
+  // scope in their own SQL instead, which is why they are not listed here.
   'assistant/tools/content.ts': 'card and single-title results, filtered by withLibraryScope',
-  'assistant/tools/discovery.ts': 'card results, filtered by withLibraryScope',
   'assistant/tools/recommendations.ts': 'card results, filtered by withLibraryScope',
   'assistant/tools/library.ts':
     'rankings are cards (filtered by withLibraryScope); stats, genres and studios are aggregates naming no title',
-  'assistant/tools/people.ts': 'returns people, not titles; any title cards are filtered by withLibraryScope',
   // Hydration of items a scoped builder already chose.
   'channels/handlers/playlist.ts': "hydrates items the channel builder chose within the owner's scope",
   // Admin-only surfaces.

@@ -105,7 +105,14 @@ export async function grantTopPicksAccessToAllUsers(
 
       // Add each Top Picks library the account may see into, and take away one
       // it may not — its titles come from a library the server keeps it out of.
-      const allowed = libraryIdsFromFolderAccess(currentAccess, serverLibraries) ?? []
+      const allowed = libraryIdsFromFolderAccess(currentAccess, serverLibraries)
+      if (allowed === undefined) {
+        // Could not read this account's permission (see libraryIdsFromFolderAccess):
+        // leave its folders exactly as they are rather than add or take anything.
+        logger.warn({ userId: user.id, username: user.name }, 'Permitted folders matched no library; Top Picks access left unchanged')
+        failed++
+        continue
+      }
       const newEnabledFolders = new Set(currentAccess.enabledFolders)
       let withheldHere = false
       for (const [library, source] of [
@@ -113,7 +120,7 @@ export async function grantTopPicksAccessToAllUsers(
         [seriesLibrary, sources.series],
       ] as const) {
         if (!library?.guid) continue
-        if (coversSources(allowed, source)) {
+        if (coversSources(allowed ?? [], source)) {
           newEnabledFolders.add(library.guid)
         } else {
           newEnabledFolders.delete(library.guid)

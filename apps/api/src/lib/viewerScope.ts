@@ -59,11 +59,15 @@ export function scopeClause(
  * title that does not exist: a 404 that says "in a library you cannot open"
  * would confirm the title is on the server.
  */
+/** A library title's id. A malformed one answers "not found" rather than a 500. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export async function titleInScope(
   request: FastifyRequest,
   table: 'movies' | 'series',
   id: string
 ): Promise<boolean> {
+  if (!UUID.test(id)) return false
   const params: unknown[] = [id]
   const inScope = scopeClause(await viewerScope(request), 't', params)
   const row = await queryOne<{ ok: boolean }>(
@@ -83,8 +87,11 @@ export async function idsInScope(
   table: 'movies' | 'series',
   ids: readonly string[]
 ): Promise<Set<string>> {
-  if (ids.length === 0) return new Set()
-  const params: unknown[] = [ids]
+  // Only uuids reach the query; anything else cannot be a library row and would
+  // make the uuid cast throw.
+  const lookups = ids.filter((id) => UUID.test(id))
+  if (lookups.length === 0) return new Set()
+  const params: unknown[] = [lookups]
   const inScope = scopeClause(await viewerScope(request), 't', params)
   const rows = await query<{ id: string }>(
     `SELECT t.id FROM ${table} t WHERE t.id = ANY($1) AND ${inScope}`,

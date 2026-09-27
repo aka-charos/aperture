@@ -76,9 +76,9 @@ test('folder access maps GUIDs to the library ids titles carry', () => {
     { id: 'item-2', guid: 'bbbb-2222' },
   ]
   assert.equal(libraryIdsFromFolderAccess({ enableAllFolders: true, enabledFolders: [] }, libraries), null)
-  // Case-insensitive, and a GUID this instance has never seen is dropped.
+  // Case and dashes ignored, and one GUID this instance has never seen is dropped.
   assert.deepEqual(
-    libraryIdsFromFolderAccess({ enableAllFolders: false, enabledFolders: ['aaaa-1111', 'unknown'] }, libraries),
+    libraryIdsFromFolderAccess({ enableAllFolders: false, enabledFolders: ['aaaa1111', 'unknown'] }, libraries),
     ['item-1']
   )
   // Jellyfin can name a library by its item id.
@@ -87,6 +87,28 @@ test('folder access maps GUIDs to the library ids titles carry', () => {
     ['item-2']
   )
   assert.deepEqual(libraryIdsFromFolderAccess({ enableAllFolders: false, enabledFolders: [] }, libraries), [])
+})
+
+test('a library listed without an id never throws and never matches', () => {
+  // Jellyfin's listing names the field ItemId; the mapper reads Id.
+  const libraries = [
+    { id: undefined as unknown as string, guid: undefined as unknown as string },
+    { id: 'item-1', guid: 'aaaa-1111' },
+  ]
+  assert.deepEqual(
+    libraryIdsFromFolderAccess({ enableAllFolders: false, enabledFolders: ['aaaa-1111'] }, libraries),
+    ['item-1']
+  )
+})
+
+test('a permission naming only folders nobody recognises is untranslatable, never "none"', () => {
+  // Saving [] would hide every library from the account and let the STRM sweep
+  // delete its generated libraries; undefined tells the caller to keep what it had.
+  const libraries = [{ id: 'item-1', guid: 'aaaa-1111' }]
+  assert.equal(
+    libraryIdsFromFolderAccess({ enableAllFolders: false, enabledFolders: ['zzzz', 'yyyy'] }, libraries),
+    undefined
+  )
 })
 
 test('the SQL binds the scope rather than inlining it, and one shape covers every scope', () => {

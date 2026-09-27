@@ -57,13 +57,20 @@ function cardKey(item: ContentItem): { table: 'movies' | 'series'; id: string } 
   return null
 }
 
+/** A library title's id. Anything else is not a row this can look up. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 async function visibleIds(
   scope: LibraryScope,
   table: 'movies' | 'series',
   ids: string[]
 ): Promise<Set<string>> {
-  if (ids.length === 0) return new Set()
-  const params: unknown[] = [ids]
+  // Only uuids reach the query: one malformed id would make the uuid cast
+  // throw, and this filter fails CLOSED, so a single odd card would otherwise
+  // empty the whole answer.
+  const lookups = ids.filter((id) => UUID.test(id))
+  if (lookups.length === 0) return new Set()
+  const params: unknown[] = [lookups]
   const inScope = libraryScopeSql(scope, 't', binderFor(params))
   const rows = await query<{ id: string }>(
     `SELECT t.id FROM ${table} t WHERE t.id = ANY($1) AND ${inScope}`,
@@ -89,9 +96,9 @@ export async function filterItemsToScope(scope: LibraryScope, items: ContentItem
     ])
     return items.filter((_, i) => {
       const key = keys[i]
-      // Not a library title (a person, a web-only pick with no id match): the
+      // Not a library title (a person, a web-only pick with no library id): the
       // scope has nothing to say about it.
-      if (!key) return true
+      if (!key || !UUID.test(key.id)) return true
       return key.table === 'movies' ? movies.has(key.id) : series.has(key.id)
     })
   } catch {
