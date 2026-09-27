@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Box, Typography, CircularProgress, Grid } from '@mui/material'
 import { useAuth } from '../../hooks/useAuth'
 import { useCapability } from '../../hooks/useCapability'
 import { useWatching } from '../../hooks/useWatching'
+import { useConnections } from '../../hooks/useConnections'
 import { useMediaDetail } from './hooks'
 import {
   MediaBackdrop,
@@ -14,6 +16,7 @@ import {
   SimilarMedia,
   MovieInsights,
   TitleAnalysis,
+  RecommendToDialog,
 } from './components'
 import { insightsHaveDetail } from './helpers'
 import { isMovie, isSeries } from './types'
@@ -52,6 +55,10 @@ export function MediaDetailPage({
   // in core, and two copies is how they come to disagree.
   const canManageWatchHistory = useCapability('watchHistory:manage')
   const { isWatching, toggleWatching } = useWatching()
+  // Decided server-side (the `social` capability): only someone with at least
+  // one connection gets a Recommend button.
+  const { hasConnections } = useConnections()
+  const [recommendOpen, setRecommendOpen] = useState(false)
 
   const {
     media,
@@ -136,7 +143,18 @@ export function MediaDetailPage({
         isFavorite={isFavorite}
         favoriteLoading={favoriteLoading}
         onFavoriteToggle={isMovie(media) && user?.id ? toggleFavorite : undefined}
+        onRecommend={hasConnections && id ? () => setRecommendOpen(true) : undefined}
       />
+
+      {id && hasConnections && (
+        <RecommendToDialog
+          open={recommendOpen}
+          mediaType={mediaType}
+          itemId={id}
+          itemTitle={media.title}
+          onClose={() => setRecommendOpen(false)}
+        />
+      )}
 
       {/* AI Recommendation Insights — about the READER: why this was picked
           for them, from measured pipeline output.

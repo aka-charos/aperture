@@ -23,6 +23,8 @@ export {
 
 export {
   getWatchStatusForUser,
+  movieFinishedSql,
+  seriesFinishedSql,
   type WatchStatusForUser,
   type SeriesWatchProgress,
 } from './watchedItems.js'

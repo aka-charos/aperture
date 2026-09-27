@@ -6,12 +6,15 @@
  * alongside those numbers, and which ones.
  *
  * It is one function rather than an `isAdmin` check in each handler because the
- * rule is expected to grow: the planned shape is that friends can see each
- * other's activity while everyone else stays anonymous, which changes this
- * decision and nothing else. `WatcherAudience` is a discriminated union rather
- * than a boolean for the same reason — `users` is the branch that feature will
- * fill in, and having it here now means the handlers and the client are already
- * written against a *set* of visible people rather than a yes/no.
+ * rule grew exactly as planned: admins see everyone, a viewer with connections
+ * sees themselves and their connections (docs/plans/social-connections.md), and
+ * everyone else stays anonymous. `WatcherAudience` is a discriminated union for
+ * that reason, and the pure decision lives in `watcherAudience.ts`. The client
+ * is told which audience it got (`watcherAudience`, a decided value) and picks
+ * its copy from that, never from `isAdmin`.
+ *
+ * The counters and the names are separate claims (F-110): the aggregate stays
+ * the true total, and names are a subset of it whenever the audience is partial.
  *
  * The rule that makes this safe: names are attached SERVER-SIDE or not at all.
  * A viewer with no visibility gets no `watchers` key in the response — not an
@@ -31,21 +34,12 @@
  * different question, and a viewer who bookmarked an episode should have it
  * counted whether or not they got to it.
  */
-import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
+import { WATCH_HISTORY_PLAYED_SQL, displayNameSql, getVisibleConnectionIds } from '@aperture/core'
 import { query } from './db.js'
 import type { SessionUser } from '../plugins/auth.js'
+import { resolveWatcherAudience, type WatcherAudience } from './watcherAudience.js'
 
-export type WatcherAudience =
-  /** Every watcher may be named (admins). */
-  | { kind: 'all' }
-  /** Nobody may be named — the caller omits the field entirely. */
-  | { kind: 'none' }
-  /**
-   * Only these users may be named. Unused today; this is the branch the
-   * friends feature fills in, and it is declared now so callers already
-   * handle a partial audience rather than a boolean.
-   */
-  | { kind: 'users'; userIds: string[] }
+export { audienceLabel, resolveWatcherAudience, type WatcherAudience } from './watcherAudience.js'
 
 export interface WatcherEntry {
   userId: string
@@ -58,16 +52,22 @@ export interface WatcherEntry {
   favorite: boolean
 }
 
-export function resolveWatcherAudience(viewer: SessionUser): WatcherAudience {
-  return viewer.isAdmin ? { kind: 'all' } : { kind: 'none' }
+/**
+ * The audience for this viewer. An admin's is decided without a query (it is
+ * everyone); anyone else's needs their visible connections.
+ */
+export async function watcherAudienceFor(viewer: SessionUser): Promise<WatcherAudience> {
+  const connected = viewer.isAdmin ? [] : await getVisibleConnectionIds(viewer.id)
+  return resolveWatcherAudience(viewer, connected)
 }
 
 /**
  * `display_name` is what the media server shows; `username` is the login. Fall
  * back rather than showing a blank row — an Emby user imported without a
- * display name is common.
+ * display name is common. Core's `displayNameSql`, so a person is called the
+ * same thing here as in their connections' dialogs and sliders.
  */
-const NAME_SQL = `NULLIF(TRIM(COALESCE(u.display_name, '')), '') , u.username`
+const NAME_SQL = displayNameSql('u')
 
 /** Restricts a watcher query to the audience. Returns null when nobody may be named. */
 function audienceClause(
@@ -97,7 +97,7 @@ export async function fetchMovieWatchers(
     is_favorite: boolean
   }>(
     `SELECT wh.user_id,
-            COALESCE(${NAME_SQL}) AS name,
+            ${NAME_SQL} AS name,
             wh.play_count,
             wh.last_played_at,
             wh.is_favorite
@@ -145,7 +145,7 @@ export async function fetchSeriesWatchers(
     // also played". The HAVING is what keeps this a list of watchers: someone
     // who only bookmarked an episode has no played rows and does not appear.
     `SELECT wh.user_id,
-            COALESCE(${NAME_SQL}) AS name,
+            ${NAME_SQL} AS name,
             COUNT(DISTINCT wh.episode_id) FILTER (WHERE ${WATCH_HISTORY_PLAYED_SQL})
               AS episodes_watched,
             COALESCE(SUM(wh.play_count) FILTER (WHERE ${WATCH_HISTORY_PLAYED_SQL}), 0)

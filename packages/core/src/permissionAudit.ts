@@ -106,6 +106,12 @@ export interface PermissionChange {
   field: string
   oldValue: string | null
   newValue: string
+  /**
+   * The object of the change when the field alone does not say it — for
+   * `connection`, the other account's username. A label rather than an id, for
+   * the same reason `subject_label` is one: the record outlives the account.
+   */
+  detail?: string | null
 }
 
 /** Whether a snapshot carries an opinion about this column at all. */
@@ -202,10 +208,10 @@ export async function recordPermissionChanges(
   try {
     await query(
       `INSERT INTO permission_changes
-         (actor_user_id, actor_label, subject_kind, subject_id, subject_label, field, old_value, new_value)
+         (actor_user_id, actor_label, subject_kind, subject_id, subject_label, field, old_value, new_value, detail)
        SELECT $1::uuid, $2::text, $3::text, $4::uuid, $5::text,
-              c.field, c.old_value, c.new_value
-         FROM UNNEST($6::text[], $7::text[], $8::text[]) AS c(field, old_value, new_value)`,
+              c.field, c.old_value, c.new_value, c.detail
+         FROM UNNEST($6::text[], $7::text[], $8::text[], $9::text[]) AS c(field, old_value, new_value, detail)`,
       [
         actor.userId,
         actor.label,
@@ -215,6 +221,7 @@ export async function recordPermissionChanges(
         changes.map((c) => c.field),
         changes.map((c) => c.oldValue),
         changes.map((c) => c.newValue),
+        changes.map((c) => c.detail ?? null),
       ]
     )
   } catch (err) {
@@ -259,6 +266,8 @@ export interface PermissionChangeRecord {
   field: string
   oldValue: string | null
   newValue: string
+  /** See `PermissionChange.detail`; null on every row that needs none. */
+  detail: string | null
 }
 
 interface PermissionChangeRow {
@@ -272,6 +281,7 @@ interface PermissionChangeRow {
   field: string
   old_value: string | null
   new_value: string
+  detail: string | null
 }
 
 /**
@@ -288,7 +298,7 @@ export async function getPermissionHistory(
 ): Promise<PermissionChangeRecord[]> {
   const rows = await query<PermissionChangeRow>(
     `SELECT id, created_at, actor_user_id, actor_label, subject_kind, subject_id,
-            subject_label, field, old_value, new_value
+            subject_label, field, old_value, new_value, detail
        FROM permission_changes
       WHERE subject_id = $1
       ORDER BY created_at DESC, field ASC
@@ -307,5 +317,6 @@ export async function getPermissionHistory(
     field: row.field,
     oldValue: row.old_value,
     newValue: row.new_value,
+    detail: row.detail,
   }))
 }

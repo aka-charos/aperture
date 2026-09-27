@@ -2,6 +2,7 @@ import React, { useCallback, useState, useEffect, useRef } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import {
   AppBar,
+  Badge,
   Box,
   Button,
   Drawer,
@@ -40,7 +41,9 @@ import VideoLibraryIcon from '@mui/icons-material/VideoLibrary'
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck'
 import MenuOpenIcon from '@mui/icons-material/MenuOpen'
 import SmartToyIcon from '@mui/icons-material/SmartToy'
+import RecommendIcon from '@mui/icons-material/Recommend'
 import { useAuth } from '@/hooks/useAuth'
+import { useConnections } from '@/hooks/useConnections'
 import { useAssistantDock } from '@/hooks/useAssistantDock'
 import { WelcomeModal } from './WelcomeModal'
 import { useWelcomeModal } from './useWelcomeModal'
@@ -82,6 +85,8 @@ type NavItem = {
   path: string
   feature: string | null
   capability?: string
+  /** A live count drawn on the icon. `socialInbox`: titles waiting under Shared with me. */
+  badge?: 'socialInbox'
 }
 
 // Base user-facing navigation items (some may be conditionally hidden)
@@ -89,6 +94,9 @@ const baseUserMenuItems: NavItem[] = [
   { textKey: 'nav.dashboard', icon: <HomeIcon />, path: '/', feature: null },
   { textKey: 'nav.assistant', icon: <SmartToyIcon />, path: '/assistant', feature: null, capability: 'assistant' },
   { textKey: 'nav.recommendations', icon: <AutoAwesomeIcon />, path: '/recommendations', feature: null },
+  // `social` is decided data (has at least one visible connection), not a
+  // permission; the filter below treats it like any other capability.
+  { textKey: 'nav.sharedWithMe', icon: <RecommendIcon />, path: '/shared-with-me', feature: null, capability: 'social', badge: 'socialInbox' },
   { textKey: 'nav.showsYouWatch', icon: <AddToQueueIcon />, path: '/watching', feature: 'watching' },
   { textKey: 'nav.topPicks', icon: <WhatshotIcon />, path: '/top-picks', feature: null },
   { textKey: 'nav.playlists', icon: <PlaylistPlayIcon />, path: '/playlists', feature: null },
@@ -176,6 +184,7 @@ function AppShell() {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [watchingEnabled, setWatchingEnabled] = useState(true) // Default to true until we know
   const { user, capabilities, logout, impersonation } = useAuth()
+  const { pendingCount } = useConnections()
   const { open: welcomeOpen, showWelcome, hideWelcome } = useWelcomeModal()
   // Space reserved on the inline-end side for the docked AI assistant;
   // while its resize handle is dragged, transitions are dropped so the
@@ -409,6 +418,13 @@ function AppShell() {
               <ListItemButton
                 selected={isPathActive(item.path)}
                 onClick={() => handleNavClick(item.path)}
+                // A badge's number is not announced on its own, so the button
+                // carries the label and the count together.
+                aria-label={
+                  item.badge === 'socialInbox' && pendingCount > 0
+                    ? `${t(item.textKey)}, ${t('nav.sharedWithMeBadge', { count: pendingCount })}`
+                    : undefined
+                }
                 sx={{
                   justifyContent: labels ? 'flex-start' : 'center',
                   px: labels ? 3 : 2,
@@ -421,7 +437,19 @@ function AppShell() {
                     mr: labels ? 1 : 0,
                   }}
                 >
-                  {item.icon}
+                  {/* On the icon, so the count shows on the collapsed rail too. */}
+                  {item.badge === 'socialInbox' ? (
+                    <Badge
+                      badgeContent={pendingCount}
+                      color="primary"
+                      invisible={pendingCount === 0}
+                      max={99}
+                    >
+                      {item.icon}
+                    </Badge>
+                  ) : (
+                    item.icon
+                  )}
                 </ListItemIcon>
                 {labels && (
                   <ListItemText

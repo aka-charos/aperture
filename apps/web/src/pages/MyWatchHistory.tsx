@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Box,
   Typography,
@@ -26,6 +26,11 @@ import {
   Button,
   Tooltip,
   Snackbar,
+  Avatar,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
   useTheme,
   useMediaQuery,
 } from '@mui/material'
@@ -49,6 +54,7 @@ import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck'
 import { MoviePoster } from '@aperture/ui'
 import { useAuth } from '@/hooks/useAuth'
 import { useCapability } from '@/hooks/useCapability'
+import { useConnections } from '@/hooks/useConnections'
 import { useWatching } from '@/hooks/useWatching'
 import { useUserRatings } from '@/hooks/useUserRatings'
 import { useViewMode } from '@/hooks/useViewMode'
@@ -105,6 +111,42 @@ export function MyWatchHistoryPage() {
   const { isWatching, toggleWatching } = useWatching()
   const { getRating, setRating } = useUserRatings()
   const [tabValue, setTabValue] = useState(0) // 0 = Movies, 1 = Series
+
+  // Whose history. The selection lives in the URL (?user=<id>), so it survives a
+  // reload, a link can carry it, and Back undoes it. Only the viewer or one of
+  // their connections can be chosen; anything else in the URL is dropped once
+  // the connections are known, and the server refuses it anyway.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { connections, hasConnections, loading: connectionsLoading } = useConnections()
+  const requestedUser = searchParams.get('user')
+  const requestedOther = requestedUser && user && requestedUser !== user.id ? requestedUser : null
+  const selectedConnection = requestedOther
+    ? connections.find((c) => c.id === requestedOther) ?? null
+    : null
+  // While the connections are still loading a requested id cannot be checked
+  // yet, so nothing is fetched rather than the viewer's own history flashing in.
+  const selectionPending = requestedOther !== null && connectionsLoading
+  const historyUserId = selectionPending ? null : selectedConnection?.id ?? user?.id ?? null
+  const viewingSelf = historyUserId != null && historyUserId === user?.id
+
+  useEffect(() => {
+    if (!requestedUser || connectionsLoading || !user) return
+    if (requestedUser === user.id || !connections.some((c) => c.id === requestedUser)) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('user')
+          return next
+        },
+        { replace: true }
+      )
+    }
+  }, [requestedUser, connectionsLoading, connections, user, setSearchParams])
+
+  // A response for anyone other than the person now selected, or for an older
+  // request, is dropped: a late answer must never render under the new heading.
+  const movieRequest = useRef(0)
+  const seriesRequest = useRef(0)
   
   // Movies state
   const [movieHistory, setMovieHistory] = useState<MovieWatchHistoryItem[]>([])
@@ -144,7 +186,8 @@ export function MyWatchHistoryPage() {
   // `isAdmin || canManageWatchHistory` — the admin-override half of a rule
   // whose other half lives in core, which is the shape that let the sidebar
   // and the API disagree about Collections.
-  const canManage = useCapability('watchHistory:manage')
+  // Someone else's history is read-only; the server refuses edits to it too.
+  const canManage = useCapability('watchHistory:manage') && viewingSelf
 
   const handleMarkUnwatched = async () => {
     if (!confirmDialog || !user) return
@@ -184,50 +227,75 @@ export function MyWatchHistoryPage() {
   }
 
   const fetchMovieHistory = useCallback(async (page: number, sort: string, search: string, filter: string) => {
-    if (!user) return
+    if (!historyUserId) return
 
+    const ticket = ++movieRequest.current
     setMovieLoading(true)
     try {
       const searchParam = search ? `&search=${encodeURIComponent(search)}` : ''
       const filterParam = filter && filter !== 'all' ? `&filter=${filter}` : ''
       const response = await fetch(
-        `/api/users/${user.id}/watch-history?page=${page}&pageSize=50&sortBy=${sort}${searchParam}${filterParam}`,
+        `/api/users/${historyUserId}/watch-history?page=${page}&pageSize=50&sortBy=${sort}${searchParam}${filterParam}`,
         { credentials: 'include' }
       )
       if (response.ok) {
         const data: WatchHistoryResponse<MovieWatchHistoryItem> = await response.json()
+        if (ticket !== movieRequest.current) return
         setMovieHistory(data.history)
         setMoviePagination(data.pagination)
       }
     } catch (err) {
       console.error('Failed to fetch movie watch history:', err)
     } finally {
-      setMovieLoading(false)
+      if (ticket === movieRequest.current) setMovieLoading(false)
     }
-  }, [user])
+  }, [historyUserId])
 
   const fetchSeriesHistory = useCallback(async (page: number, sort: string, search: string, filter: string) => {
-    if (!user) return
+    if (!historyUserId) return
 
+    const ticket = ++seriesRequest.current
     setSeriesLoading(true)
     try {
       const searchParam = search ? `&search=${encodeURIComponent(search)}` : ''
       const filterParam = filter && filter !== 'all' ? `&filter=${filter}` : ''
       const response = await fetch(
-        `/api/users/${user.id}/series-watch-history?page=${page}&pageSize=50&sortBy=${sort}${searchParam}${filterParam}`,
+        `/api/users/${historyUserId}/series-watch-history?page=${page}&pageSize=50&sortBy=${sort}${searchParam}${filterParam}`,
         { credentials: 'include' }
       )
       if (response.ok) {
         const data: WatchHistoryResponse<SeriesWatchHistoryItem> = await response.json()
+        if (ticket !== seriesRequest.current) return
         setSeriesHistory(data.history)
         setSeriesPagination(data.pagination)
       }
     } catch (err) {
       console.error('Failed to fetch series watch history:', err)
     } finally {
-      setSeriesLoading(false)
+      if (ticket === seriesRequest.current) setSeriesLoading(false)
     }
-  }, [user])
+  }, [historyUserId])
+
+  // Switching whose history is shown clears what is on screen at once, so the
+  // previous person's titles never sit under the new heading while it loads.
+  // The page goes back to 1 through the refetch below; sort and filter are kept.
+  useEffect(() => {
+    setMovieHistory([])
+    setSeriesHistory([])
+    setMoviePagination((prev) => ({ ...prev, page: 1, total: 0, totalPages: 1 }))
+    setSeriesPagination((prev) => ({ ...prev, page: 1, total: 0, totalPages: 1 }))
+  }, [historyUserId])
+
+  const handleWhoseHistoryChange = (value: string) => {
+    setSearchQuery('')
+    setDebouncedSearch('')
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (value === 'me') next.delete('user')
+      else next.set('user', value)
+      return next
+    })
+  }
 
   // Debounce the search box before hitting the server (300ms while typing, immediate when cleared)
   useEffect(() => {
@@ -289,7 +357,11 @@ export function MyWatchHistoryPage() {
   return (
     <Box>
       <PageHeading
-        title={t('watchHistoryPage.title')}
+        title={
+          selectedConnection
+            ? t('watchHistoryPage.otherUsersHistory', { name: selectedConnection.name })
+            : t('watchHistoryPage.title')
+        }
         description={t('watchHistoryPage.subtitleStats', {
           movies: moviePagination.total.toLocaleString(),
           series: seriesPagination.total.toLocaleString(),
@@ -355,9 +427,58 @@ export function MyWatchHistoryPage() {
         </ToggleButtonGroup>
       </Box>
 
+      {selectedConnection && (
+        <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
+          {t('watchHistoryPage.viewingReadOnly', { name: selectedConnection.name })}
+        </Alert>
+      )}
+
       {/* Controls */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
-        <Box display="flex" alignItems="center" gap={2}>
+        <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
+          {hasConnections && (
+            <FormControl size="small" sx={{ minWidth: 180 }}>
+              <InputLabel id="whose-history-label">{t('watchHistoryPage.whoseHistory')}</InputLabel>
+              <Select
+                labelId="whose-history-label"
+                label={t('watchHistoryPage.whoseHistory')}
+                value={selectedConnection?.id ?? 'me'}
+                onChange={(e) => handleWhoseHistoryChange(String(e.target.value))}
+                renderValue={(value) => {
+                  const person = connections.find((c) => c.id === value)
+                  const label = person ? person.name : t('watchHistoryPage.me')
+                  const avatar = person ? person.avatarUrl : user?.avatarUrl ?? undefined
+                  return (
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <Avatar src={avatar} alt="" sx={{ width: 22, height: 22, fontSize: '0.7rem' }}>
+                        {label.charAt(0).toUpperCase()}
+                      </Avatar>
+                      <span>{label}</span>
+                    </Box>
+                  )
+                }}
+              >
+                <MenuItem value="me">
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <Avatar src={user?.avatarUrl ?? undefined} alt="" sx={{ width: 24, height: 24, fontSize: '0.7rem' }}>
+                      {t('watchHistoryPage.me').charAt(0).toUpperCase()}
+                    </Avatar>
+                    {t('watchHistoryPage.me')}
+                  </Box>
+                </MenuItem>
+                {connections.map((c) => (
+                  <MenuItem key={c.id} value={c.id}>
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <Avatar src={c.avatarUrl} alt="" sx={{ width: 24, height: 24, fontSize: '0.7rem' }}>
+                        {c.name.charAt(0).toUpperCase()}
+                      </Avatar>
+                      {c.name}
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
           <TextField
             size="small"
             placeholder={tabValue === 0 ? t('watchHistoryPage.searchMovies') : t('watchHistoryPage.searchSeries')}

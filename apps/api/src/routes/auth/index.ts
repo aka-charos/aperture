@@ -9,6 +9,7 @@ import {
   libraryIdsFromFolderAccess,
   saveUserLibraryAccess,
   getLibraryScopeForUser,
+  getVisibleConnectionIds,
   type AuthResult,
 } from '@aperture/core'
 import { queryOne } from '../../lib/db.js'
@@ -103,7 +104,17 @@ async function decidedCapabilities(user: SessionUser): Promise<Record<string, bo
   } catch {
     // Keep the permissive default; see above.
   }
-  return { ...capabilitiesFor(user), ...kinds }
+  // `social`: whether this viewer has at least one visible connection, which
+  // is what shows the Shared with me page, the Recommend button, the history
+  // picker and the dashboard sliders. Decided data rather than a permission —
+  // nothing server-side gates on it — so it is not in permissions.ts.
+  let social = false
+  try {
+    social = (await getVisibleConnectionIds(user.id)).length > 0
+  } catch {
+    // Fail closed: hiding a nav entry over a failed read breaks nothing.
+  }
+  return { ...capabilitiesFor(user), ...kinds, social }
 }
 
 /**

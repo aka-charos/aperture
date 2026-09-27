@@ -2,7 +2,8 @@ import { Box, Grid, Alert } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { useAuth } from '@/hooks/useAuth'
-import { useDashboardData } from './hooks'
+import { useConnections } from '@/hooks/useConnections'
+import { useDashboardData, useConnectionsRecentWatches } from './hooks'
 import { useWatchingData } from '../watching/hooks/useWatchingData'
 import {
   QuickStatsBar,
@@ -10,6 +11,7 @@ import {
   WatchingCarousel,
   RecentRatingsList,
   RecentWatchesList,
+  ConnectionsRecentWatches,
 } from './components'
 import { PageHeading } from '@/components/PageHeading'
 
@@ -18,6 +20,9 @@ export function DashboardPage() {
   const { user } = useAuth()
   const { data, loading, error } = useDashboardData()
   const { series: watchingSeries, loading: watchingLoading } = useWatchingData()
+  const { hasConnections } = useConnections()
+  const { users: connectionUsers, loading: connectionsLoading } =
+    useConnectionsRecentWatches(hasConnections)
 
   // Filter watching series to only those with upcoming episodes, sorted by air date
   const upcomingShows = watchingSeries
@@ -137,6 +142,13 @@ export function DashboardPage() {
           />
         </Grid>
       </Grid>
+
+      {/* What the viewer's connections watched lately — after their own rows */}
+      {hasConnections && (
+        <Box sx={{ mt: 4 }}>
+          <ConnectionsRecentWatches users={connectionUsers} loading={connectionsLoading} />
+        </Box>
+      )}
     </Box>
   )
 }

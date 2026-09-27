@@ -1,8 +1,19 @@
 import type { FastifyInstance } from 'fastify'
 import { query, queryOne } from '../../../../lib/db.js'
+import { scopeClause, viewerScope } from '../../../../lib/viewerScope.js'
 import { requireAuth, type SessionUser } from '../../../../plugins/auth.js'
-import { requireSelfOrAdmin } from './shared.js'
+import { connectedReadNeedsScope, requireSelfOrAdminOrConnected } from './shared.js'
 
+/**
+ * The two watch-history LISTS. Self, an admin, or a visible connection of the
+ * target may read them (`requireSelfOrAdminOrConnected`); everything that
+ * EDITS a history lives in watchHistoryManagement.ts and stays self-or-admin.
+ *
+ * A connection reading someone else's history sees only titles in their OWN
+ * library scope, applied to the count and the page alike so the two agree.
+ * Placeholders are numbered as values are pushed and never renumbered
+ * afterwards (F-130 rule 5).
+ */
 export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
   /**
    * GET /api/users/:id/watch-history
@@ -23,14 +34,22 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
       const search = (request.query.search || '').trim()
       const filter = request.query.filter || 'all' // all, completed, in_progress
 
-      if (!requireSelfOrAdmin(id, currentUser, reply)) return
+      if (!(await requireSelfOrAdminOrConnected(id, currentUser, reply))) return
+
+      const params: unknown[] = [id]
 
       // Optional search across the entire history (title or any genre), not just the current page.
-      // When present, it occupies $2 in both queries.
-      const searchClause = search
-        ? ' AND (m.title ILIKE $2 OR EXISTS (SELECT 1 FROM unnest(m.genres) g WHERE g ILIKE $2))'
+      let searchClause = ''
+      if (search) {
+        params.push(`%${search}%`)
+        const p = `$${params.length}`
+        searchClause = ` AND (m.title ILIKE ${p} OR EXISTS (SELECT 1 FROM unnest(m.genres) g WHERE g ILIKE ${p}))`
+      }
+
+      // Someone else's history, read as a connection: only titles the reader can open.
+      const scopeFilter = connectedReadNeedsScope(id, currentUser)
+        ? ` AND ${scopeClause(await viewerScope(request), 'm', params)}`
         : ''
-      const searchParams = search ? [`%${search}%`] : []
 
       // Watch-status filter (literal SQL, no bound params).
       // "all" deliberately excludes bookmark-only favorites (favorited but never played),
@@ -51,8 +70,8 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
          FROM watch_history wh
          JOIN movies m ON m.id = wh.movie_id
          JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
-         WHERE wh.user_id = $1 AND lc.is_enabled = true${searchClause}${statusClause}`,
-        [id, ...searchParams]
+         WHERE wh.user_id = $1 AND lc.is_enabled = true${searchClause}${scopeFilter}${statusClause}`,
+        params
       )
       const total = parseInt(countResult?.count || '0', 10)
 
@@ -65,8 +84,7 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
       }
 
       const offset = (page - 1) * pageSize
-      const limitIdx = search ? 3 : 2
-      const offsetIdx = search ? 4 : 3
+      const pageParams = [...params, pageSize, offset]
 
       const result = await query(
         `SELECT
@@ -89,10 +107,10 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
          FROM watch_history wh
          JOIN movies m ON m.id = wh.movie_id
          JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
-         WHERE wh.user_id = $1 AND lc.is_enabled = true${searchClause}${statusClause}
+         WHERE wh.user_id = $1 AND lc.is_enabled = true${searchClause}${scopeFilter}${statusClause}
          ORDER BY ${orderBy}
-         LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
-        [id, ...searchParams, pageSize, offset]
+         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        pageParams
       )
 
       return reply.send({
@@ -126,14 +144,22 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
       const search = (request.query.search || '').trim()
       const filter = request.query.filter || 'all' // all, completed, in_progress
 
-      if (!requireSelfOrAdmin(id, currentUser, reply)) return
+      if (!(await requireSelfOrAdminOrConnected(id, currentUser, reply))) return
+
+      const params: unknown[] = [id]
 
       // Optional search across the entire history (title or any genre), not just the current page.
-      // When present, it occupies $2 in both queries.
-      const searchClause = search
-        ? ' AND (s.title ILIKE $2 OR EXISTS (SELECT 1 FROM unnest(s.genres) g WHERE g ILIKE $2))'
+      let searchClause = ''
+      if (search) {
+        params.push(`%${search}%`)
+        const p = `$${params.length}`
+        searchClause = ` AND (s.title ILIKE ${p} OR EXISTS (SELECT 1 FROM unnest(s.genres) g WHERE g ILIKE ${p}))`
+      }
+
+      // Someone else's history, read as a connection: only titles the reader can open.
+      const scopeFilter = connectedReadNeedsScope(id, currentUser)
+        ? ` AND ${scopeClause(await viewerScope(request), 's', params)}`
         : ''
-      const searchParams = search ? [`%${search}%`] : []
 
       // Aggregate expressions used to classify a series (all literal SQL, no bound params).
       // An episode counts as "watched" once fully played; "active" also includes in-progress resumes.
@@ -162,11 +188,11 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
            LEFT JOIN library_config lc ON lc.provider_library_id = s.provider_library_id
            WHERE wh.user_id = $1
              AND wh.episode_id IS NOT NULL
-             AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)${searchClause}
+             AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)${searchClause}${scopeFilter}
            GROUP BY s.id
            ${havingClause}
          ) sub`,
-        [id, ...searchParams]
+        params
       )
       const total = parseInt(countResult?.count || '0', 10)
 
@@ -179,8 +205,7 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
       }
 
       const offset = (page - 1) * pageSize
-      const limitIdx = search ? 3 : 2
-      const offsetIdx = search ? 4 : 3
+      const pageParams = [...params, pageSize, offset]
 
       // Group by series to get aggregate watch data
       const result = await query(
@@ -203,12 +228,12 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
          LEFT JOIN library_config lc ON lc.provider_library_id = s.provider_library_id
          WHERE wh.user_id = $1
            AND wh.episode_id IS NOT NULL
-           AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)${searchClause}
+           AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)${searchClause}${scopeFilter}
          GROUP BY s.id, s.title, s.year, s.poster_url, s.genres, s.community_rating, s.overview
          ${havingClause}
          ORDER BY ${orderBy}
-         LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
-        [id, ...searchParams, pageSize, offset]
+         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        pageParams
       )
 
       return reply.send({

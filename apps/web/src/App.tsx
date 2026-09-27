@@ -10,6 +10,7 @@ import { SetupProvider } from './hooks/SetupProvider'
 import { useSetupStatus } from './hooks/useSetupStatus'
 import { UserRatingsProvider } from './hooks/UserRatingsProvider'
 import { WatchStatusProvider } from './hooks/WatchStatusProvider'
+import { ConnectionsProvider } from './hooks/ConnectionsProvider'
 import { ViewModeProvider } from './hooks/ViewModeProvider'
 import { PosterPrefsProvider } from './hooks/PosterPrefsProvider'
 import { AssistantDockProvider } from './hooks/AssistantDockProvider'
@@ -22,6 +23,7 @@ import { SetupPage } from './pages/setup'
 import { DashboardPage } from './pages/dashboard'
 import { MyRecommendationsPage } from './pages/MyRecommendations'
 import { MyWatchHistoryPage } from './pages/MyWatchHistory'
+import { SharedWithMePage } from './pages/SharedWithMe'
 import { MoviesPage } from './pages/Movies'
 import { SeriesPage } from './pages/Series'
 import { MovieDetailPage, SeriesDetailPage } from './pages/media-detail'
@@ -115,12 +117,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       <PosterPrefsProvider>
         <UserRatingsProvider>
           <WatchStatusProvider>
-            <WatchingProvider>
-              <AssistantDockProvider>
-                {children}
-                <AssistantEntry />
-              </AssistantDockProvider>
-            </WatchingProvider>
+            <ConnectionsProvider>
+              <WatchingProvider>
+                <AssistantDockProvider>
+                  {children}
+                  <AssistantEntry />
+                </AssistantDockProvider>
+              </WatchingProvider>
+            </ConnectionsProvider>
           </WatchStatusProvider>
         </UserRatingsProvider>
       </PosterPrefsProvider>
@@ -181,6 +185,7 @@ function AppRoutes() {
         <Route index element={<DashboardPage />} />
         <Route path="assistant" element={<AssistantRoute />} />
         <Route path="recommendations" element={<MyRecommendationsPage />} />
+        <Route path="shared-with-me" element={<SharedWithMePage />} />
         <Route path="watching" element={<WatchingPage />} />
         <Route path="top-picks" element={<TopPicksPage />} />
         <Route path="top-picks/movies" element={<TopPicksMoviesPage />} />

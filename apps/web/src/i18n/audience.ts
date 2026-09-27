@@ -57,6 +57,8 @@ export const ADMIN_SURFACE_PATHS: readonly string[] = [
   'pages/setup/',
   'pages/Users.tsx',
   'pages/UserDetail.tsx',
+  // Opened only from the Users page's row menu; people never manage connections.
+  'pages/UserConnectionsDialog.tsx',
   'components/Admin',
   'components/AIFallbackModels.tsx',
   'components/AIFunctionCard.tsx',

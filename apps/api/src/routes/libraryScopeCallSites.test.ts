@@ -37,7 +37,8 @@ const SCOPE_HELPERS = /\b(?:viewerScope|titleInScope|idsInScope|scopeClause|libr
 const EXEMPT: Record<string, string> = {
   // The viewer's own record — every title in it was one they could open when
   // they watched, rated or followed it.
-  'users/handlers/profile/watchHistory.ts': 'own watch history',
+  // (watchHistory.ts is not here: a connection can read those lists, so it
+  // scopes them to the reader — docs/plans/social-connections.md §6.5.)
   'users/handlers/profile/watchHistoryManagement.ts': 'own watch history, edited by id',
   'users/handlers/profile/watchStats.ts': 'own watch statistics',
   'users/handlers/profile/watchStatsBreakdown.ts': 'own watch statistics, drilled into',

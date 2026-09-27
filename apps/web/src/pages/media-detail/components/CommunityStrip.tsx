@@ -10,6 +10,8 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import type { Media, MovieWatchStats, SeriesWatchStats, Watcher } from '../types'
 import { isMovie } from '../types'
 import { WatcherListDialog } from './WatcherListDialog'
+import { useAuth } from '@/hooks/useAuth'
+import { unnamedCount, watcherLabel } from '../watcherNames'
 
 type WatchStats = MovieWatchStats | SeriesWatchStats
 
@@ -32,6 +34,11 @@ interface Stat {
   watchers?: Watcher[]
   /** Heading for the drill-in dialog. Required alongside `watchers`. */
   watchersTitle?: string
+  /**
+   * The true total behind this counter. With a partial audience the named list
+   * is a subset, and the difference is said as a count, never as names.
+   */
+  total?: number
 }
 
 /** Names for the hover summary; the dialog carries the full list. */
@@ -68,8 +75,14 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
   // Above the early returns: this component bails in three places and a hook
   // after any of them is a hooks-order violation.
   const [openStat, setOpenStat] = useState<Stat | null>(null)
+  const { user } = useAuth()
 
   if (!watchStats) return null
+
+  // Decided by the server (F-134): `connections` means the names are the viewer
+  // and the people they are connected to, and everyone else is a count.
+  const partial = watchStats.watcherAudience === 'connections'
+  const you = t('mediaDetail.infoCard.watcherYou')
 
   const stats: Stat[] = []
   const meters: Meter[] = []
@@ -89,6 +102,7 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
       }),
       watchers: s.watchers,
       watchersTitle: t('mediaDetail.infoCard.watchedByTitle'),
+      total: s.totalWatchers,
     })
     if (s.totalPlays > 0) {
       stats.push({
@@ -106,6 +120,9 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
         label: t('mediaDetail.infoCard.favorited'),
         watchers: s.watchers?.filter((w) => w.favorite),
         watchersTitle: t('mediaDetail.infoCard.favoritedByTitle'),
+        // A floor: a connection who favorited without playing is not in the
+        // played list the names come from, so they read as unnamed.
+        total: s.favoritesCount,
       })
     }
     if (s.averageUserRating != null) {
@@ -144,6 +161,7 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
         label: t('mediaDetail.infoCard.viewers'),
         watchers: s.watchers,
         watchersTitle: t('mediaDetail.infoCard.watchedByTitle'),
+        total: s.totalViewers,
       })
     }
     if (s.completedViewers > 0) {
@@ -210,7 +228,7 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
       }}
     >
       {stats.map((stat) => {
-        const { id, icon, value, label, tooltip, watchers } = stat
+        const { id, icon, value, label, tooltip, watchers, total } = stat
         // Names only where the server sent some. An empty list means the
         // counter has no one behind it this viewer may see, which is not a
         // reason to offer an empty dialog.
@@ -259,13 +277,22 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
             <Box component="span" sx={{ display: 'block' }}>
               {named
                 .slice(0, TOOLTIP_NAMES)
-                .map((w) => w.name)
+                .map((w) => (partial ? watcherLabel(w, user?.id, you) : w.name))
                 .join(', ')}
               {named.length > TOOLTIP_NAMES &&
                 t('mediaDetail.infoCard.watchersMore', { count: named.length - TOOLTIP_NAMES })}
             </Box>
+            {partial && unnamedCount(total ?? 0, named.length) > 0 && (
+              <Box component="span" sx={{ display: 'block' }}>
+                {t('mediaDetail.infoCard.watchersUnnamed', {
+                  count: unnamedCount(total ?? 0, named.length),
+                })}
+              </Box>
+            )}
             <Box component="span" sx={{ display: 'block', opacity: 0.7, mt: 0.5 }}>
-              {t('mediaDetail.infoCard.watchersOpenHint')}
+              {partial
+                ? t('mediaDetail.infoCard.watchersOpenHintNamed')
+                : t('mediaDetail.infoCard.watchersOpenHint')}
             </Box>
           </>
         ) : (
@@ -324,6 +351,8 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
           open
           title={openStat.watchersTitle ?? openStat.label}
           watchers={openStat.watchers}
+          audience={watchStats.watcherAudience}
+          unnamed={partial ? unnamedCount(openStat.total ?? 0, openStat.watchers.length) : 0}
           onClose={() => setOpenStat(null)}
         />
       )}

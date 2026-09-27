@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply } from 'fastify'
+import { isVisibleConnection } from '@aperture/core'
 import type { SessionUser } from '../../../../plugins/auth.js'
 
 export function requireSelfOrAdmin(
@@ -11,6 +12,39 @@ export function requireSelfOrAdmin(
     return false
   }
   return true
+}
+
+/**
+ * READ-ONLY widening of `requireSelfOrAdmin`: self, an admin, or a visible
+ * connection of the target (docs/plans/social-connections.md §6.5).
+ *
+ * Only the two watch-history LIST reads use it. Everything that edits a
+ * history (mark watched/unwatched), and the stats pages, stay self-or-admin: a
+ * connection shares what someone watched, never the right to change it or the
+ * rest of their profile. A caller who is neither self nor admin must also
+ * scope what it returns to THEIR library scope — see `connectedReadNeedsScope`.
+ */
+export async function requireSelfOrAdminOrConnected(
+  id: string,
+  currentUser: SessionUser,
+  reply: FastifyReply
+): Promise<boolean> {
+  if (id === currentUser.id || currentUser.isAdmin) return true
+  // isVisibleConnection answers false for a malformed id rather than letting
+  // the uuid cast throw, so an unvalidated route param is safe here.
+  if (await isVisibleConnection(currentUser.id, id)) return true
+  reply.status(403).send({ error: 'Forbidden' })
+  return false
+}
+
+/**
+ * Whether a history read is someone ELSE's, read as a connection. The viewer's
+ * own record is unscoped (F-136), and so is an admin reading anyone's (an admin
+ * surface); a connection sees only titles they could open themselves, or a
+ * poster in the other person's history would answer "not found" when clicked.
+ */
+export function connectedReadNeedsScope(id: string, currentUser: SessionUser): boolean {
+  return id !== currentUser.id && !currentUser.isAdmin
 }
 
 export async function streamSseGenerator<T>(

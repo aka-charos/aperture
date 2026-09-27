@@ -36,6 +36,7 @@ import OndemandVideoIcon from '@mui/icons-material/OndemandVideo'
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents'
 import ThumbUpIcon from '@mui/icons-material/ThumbUp'
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
+import RecommendIcon from '@mui/icons-material/Recommend'
 import type {
   Media,
   MediaServerInfo,
@@ -116,6 +117,11 @@ interface MediaHeroProps {
   isFavorite?: boolean | null
   favoriteLoading?: boolean
   onFavoriteToggle?: () => Promise<boolean>
+  /**
+   * Opens the recommend-to-connections dialog. Set only for a viewer with
+   * connections; the button is not drawn otherwise.
+   */
+  onRecommend?: () => void
 }
 
 export function MediaHero({
@@ -138,6 +144,7 @@ export function MediaHero({
   isFavorite,
   favoriteLoading = false,
   onFavoriteToggle,
+  onRecommend,
 }: MediaHeroProps) {
   const { t } = useTranslation()
   // The grid this page was opened from is still mounted behind it and reads the
@@ -830,6 +837,21 @@ export function MediaHero({
                     {isFavorite
                       ? t('mediaDetail.hero.favorited')
                       : t('mediaDetail.hero.favorite')}
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
+            {/* Recommend to connections — only for a viewer who has any */}
+            {onRecommend && (
+              <Tooltip title={t('mediaDetail.hero.recommendTooltip')}>
+                <span>
+                  <Button
+                    variant="outlined"
+                    startIcon={<RecommendIcon />}
+                    onClick={onRecommend}
+                    sx={actionBtnSx}
+                  >
+                    {t('mediaDetail.hero.recommend')}
                   </Button>
                 </span>
               </Tooltip>

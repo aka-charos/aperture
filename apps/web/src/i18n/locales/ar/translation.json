@@ -48,7 +48,10 @@
     "howItWorks": "كيف يعمل",
     "roleLabelAdmin": "مسؤول",
     "roleLabelUser": "مستخدم",
-    "collections": "Collections"
+    "collections": "Collections",
+    "sharedWithMe": "Shared with me",
+    "sharedWithMeBadge_one": "{{count}} new recommendation",
+    "sharedWithMeBadge_other": "{{count}} new recommendations"
   },
   "admin": {
     "title": "الإدارة",
@@ -291,7 +294,9 @@
       "recsKindsSeries": "Series only",
       "recsKindsNone": "No library",
       "recsKindsTooltip": "The kinds follow from the libraries {{provider}} lets this account see, among those enabled here.",
-      "recsKindsUnreadTooltip": "This account's library access hasn't been read from {{provider}} yet; it will be at the next user sync or sign-in. Until then every enabled library counts."
+      "recsKindsUnreadTooltip": "This account's library access hasn't been read from {{provider}} yet; it will be at the next user sync or sign-in. Until then every enabled library counts.",
+      "menuConnections": "Connections…",
+      "menuConnectionsSecondary": "Who this person shares their viewing with"
     },
     "userDetail": {
       "userNotFound": "المستخدم غير موجود",
@@ -396,7 +401,8 @@
         "ai_explanation_override_allowed": "AI explanation override",
         "scopes": "API key permissions",
         "assistant_enabled": "Assistant",
-        "recommendations_enabled": "Recommendations"
+        "recommendations_enabled": "Recommendations",
+        "connection": "Connection"
       }
     },
     "jobsPage": {
@@ -670,6 +676,17 @@
       "audienceAll": "All strings",
       "audienceUser": "User-facing",
       "audienceAdmin": "Admin console"
+    },
+    "connectionsDialog": {
+      "title": "Connections for {{name}}",
+      "description": "Connected people see each other's watch history, recent watches and names on titles, and can recommend titles to each other.",
+      "addPlaceholder": "Add a connection…",
+      "empty": "Not connected to anyone yet.",
+      "remove": "Remove connection",
+      "noAccess": "No access. Hidden from the other person until access is turned back on.",
+      "added": "Connected {{a}} and {{b}}",
+      "removed": "Connection removed",
+      "failed": "Couldn't change the connection"
     }
   },
   "home": {
@@ -752,7 +769,9 @@
       "showShortPlot": "Show short summary",
       "plusMore": "+{{count}} more",
       "genreEnjoyedTooltip": "A genre you already watch a lot of",
-      "genreNewTooltip": "New to you — this would be a first"
+      "genreNewTooltip": "New to you — this would be a first",
+      "recommend": "Recommend to…",
+      "recommendTooltip": "Send this to people you're connected to"
     },
     "insights": {
       "recommendedForYou": "موصى به لك",
@@ -871,7 +890,14 @@
       "watchersAdminOnly": "Only admins can see these names.",
       "watcherPlays": "{{count}} plays",
       "watcherEpisodes": "{{count}} episodes",
-      "watcherLastWatched": "Last watched {{date}}"
+      "watcherLastWatched": "Last watched {{date}}",
+      "watcherYou": "You",
+      "watchersUnnamed_one": "and {{count}} other person you're not connected to",
+      "watchersUnnamed_other": "and {{count}} other people you're not connected to",
+      "watchersOpenHintNamed": "Click to see their names",
+      "watchersConnectionsOnly": "Names are shown only for you and the people you're connected to.",
+      "watchersUnnamedFooter_one": "{{count}} other person watched this too.",
+      "watchersUnnamedFooter_other": "{{count}} other people watched this too."
     },
     "similar": {
       "titleMovies": "أفلام ذات صلة",
@@ -937,6 +963,22 @@
         "circumstances": "Production Context",
         "reception": "Critical Reception"
       }
+    },
+    "recommendDialog": {
+      "title": "Recommend {{title}}",
+      "description": "The people you pick will find it under Shared with me.",
+      "alreadyWatched": "Already watched",
+      "unavailable": "Not in their libraries",
+      "alreadyRecommended": "Already sent. Sending again moves it to the top",
+      "send": "Send",
+      "sent_one": "Sent to {{count}} person",
+      "sent_other": "Sent to {{count}} people",
+      "skippedWatched": "{{name}} has already watched it",
+      "skippedUnavailable": "{{name}} can't open this title",
+      "skippedDisconnected": "{{name}} is no longer connected",
+      "failed": "Couldn't send the recommendation",
+      "loadFailed": "Couldn't load your connections",
+      "empty": "You're not connected to anyone yet"
     }
   },
   "browse": {
@@ -3193,7 +3235,9 @@
     "typeMovie": "فيلم",
     "typeSeries": "مسلسل",
     "statsWindow": "Last {{count}} days",
-    "statsMoreDetails": "More details"
+    "statsMoreDetails": "More details",
+    "recentlyWatchedBy": "Recently watched by {{name}}",
+    "subtitleFromConnections": "From your connections"
   },
   "playlists": {
     "pageTitle": "قوائم التشغيل",
@@ -3451,7 +3495,11 @@
     "inProgressTooltip": "In progress · {{percent}}% watched",
     "filterAll": "All",
     "filterInProgress": "In Progress",
-    "filterCompleted": "Completed"
+    "filterCompleted": "Completed",
+    "whoseHistory": "Whose history",
+    "me": "Me",
+    "otherUsersHistory": "{{name}}'s watch history",
+    "viewingReadOnly": "You're viewing {{name}}'s history. It's read-only."
   },
   "topPicksPage": {
     "pageTitle": "أفضل اللقطات",
@@ -5563,5 +5611,15 @@
     "groups": {
       "latestmedia": "Latest Media"
     }
+  },
+  "sharedWithMe": {
+    "subtitle": "Titles the people you're connected to think you'll like",
+    "recommendedBy": "Recommended by {{name}}",
+    "dismiss": "Dismiss",
+    "dismissed": "Recommendation dismissed",
+    "dismissFailed": "Couldn't dismiss it",
+    "loadFailed": "Couldn't load what's been shared with you",
+    "empty": "Nothing shared with you yet",
+    "emptyHint": "When someone you're connected to recommends a title, it appears here. Titles you finish leave on their own."
   }
 }

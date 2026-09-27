@@ -14,12 +14,22 @@ import {
 } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 import FavoriteIcon from '@mui/icons-material/Favorite'
-import type { Watcher } from '../types'
+import { useAuth } from '@/hooks/useAuth'
+import type { Watcher, WatcherAudience } from '../types'
+import { watcherLabel } from '../watcherNames'
 
 interface WatcherListDialogProps {
   open: boolean
   title: string
   watchers: Watcher[]
+  /**
+   * Who the names were chosen for, as the server decided it. `connections` is a
+   * partial list (the viewer and their connections); `all` or absent is the
+   * admin's full list.
+   */
+  audience?: WatcherAudience
+  /** People behind the counter who are not named here (connections audience). */
+  unnamed?: number
   onClose: () => void
 }
 
@@ -37,14 +47,25 @@ function initials(name: string): string {
  *
  * Opened from a counter in the community strip. The strip itself stays
  * anonymous — this is the drill-in, and it only ever renders rows the server
- * chose to send, which today means an admin is looking.
+ * chose to send: everyone for an admin, or the viewer and the people they are
+ * connected to.
  *
  * A dialog rather than only a tooltip because this page renders on phones and
  * inside MediaDetailModal, where a hover target is not reachable; the tooltip
  * is the desktop shortcut and this is the answer everywhere.
  */
-export function WatcherListDialog({ open, title, watchers, onClose }: WatcherListDialogProps) {
+export function WatcherListDialog({
+  open,
+  title,
+  watchers,
+  audience,
+  unnamed = 0,
+  onClose,
+}: WatcherListDialogProps) {
   const { t, i18n } = useTranslation()
+  const { user } = useAuth()
+  const you = t('mediaDetail.infoCard.watcherYou')
+  const partial = audience === 'connections'
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
@@ -57,6 +78,7 @@ export function WatcherListDialog({ open, title, watchers, onClose }: WatcherLis
       <DialogContent dividers sx={{ p: 0 }}>
         <List dense disablePadding>
           {watchers.map((w) => {
+            const label = watcherLabel(w, user?.id, you)
             const details: string[] = []
             if (w.episodesWatched != null) {
               details.push(t('mediaDetail.infoCard.watcherEpisodes', { count: w.episodesWatched }))
@@ -81,11 +103,15 @@ export function WatcherListDialog({ open, title, watchers, onClose }: WatcherLis
                 ) : undefined
               }>
                 <ListItemAvatar>
-                  <Avatar sx={{ width: 32, height: 32, fontSize: '0.8rem' }}>
+                  <Avatar
+                    src={`/api/users/${w.userId}/avatar`}
+                    alt=""
+                    sx={{ width: 32, height: 32, fontSize: '0.8rem' }}
+                  >
                     {initials(w.name)}
                   </Avatar>
                 </ListItemAvatar>
-                <ListItemText primary={w.name} secondary={details.join(' · ') || undefined} />
+                <ListItemText primary={label} secondary={details.join(' · ') || undefined} />
               </ListItem>
             )
           })}
@@ -95,7 +121,15 @@ export function WatcherListDialog({ open, title, watchers, onClose }: WatcherLis
           color="text.secondary"
           sx={{ display: 'block', px: 2, py: 1.5 }}
         >
-          {t('mediaDetail.infoCard.watchersAdminOnly')}
+          {partial
+            ? t('mediaDetail.infoCard.watchersConnectionsOnly')
+            : t('mediaDetail.infoCard.watchersAdminOnly')}
+          {partial && unnamed > 0 && (
+            <>
+              {' '}
+              {t('mediaDetail.infoCard.watchersUnnamedFooter', { count: unnamed })}
+            </>
+          )}
         </Typography>
       </DialogContent>
     </Dialog>

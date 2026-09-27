@@ -9,7 +9,8 @@ import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import { titleInScope } from '../../../lib/viewerScope.js'
 import {
-  resolveWatcherAudience,
+  audienceLabel,
+  watcherAudienceFor,
   fetchSeriesWatchers,
 } from '../../../lib/watcherVisibility.js'
 import { watchStatsSchema } from '../schemas.js'
@@ -120,11 +121,12 @@ export function registerWatchStatsHandler(fastify: FastifyInstance) {
 
       // Names ride the same response as the counts, decided server-side: a
       // viewer with no visibility never receives them. Mirrors the movie handler.
-      const watcherList = await fetchSeriesWatchers(id, resolveWatcherAudience(currentUser))
+      const audience = await watcherAudienceFor(currentUser)
+      const watcherList = await fetchSeriesWatchers(id, audience)
 
       return reply.send({
         currentlyWatching: parseInt(watchingCount?.count || '0', 10),
-        ...(watcherList ? { watchers: watcherList } : {}),
+        ...(watcherList ? { watchers: watcherList, watcherAudience: audienceLabel(audience) } : {}),
         totalViewers: viewerRows.length,
         completedViewers,
         totalEpisodes,

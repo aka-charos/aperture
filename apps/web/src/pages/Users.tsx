@@ -55,6 +55,8 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import SmartToyIcon from '@mui/icons-material/SmartToy'
+import GroupIcon from '@mui/icons-material/Group'
+import { UserConnectionsDialog } from './UserConnectionsDialog'
 import { usePageHeader } from '@/hooks/usePageHeader'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -142,6 +144,9 @@ export function UsersPage() {
   // Menu state
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null)
   const [menuUser, setMenuUser] = useState<ProviderUser | null>(null)
+  // Its own pair rather than menuUser: closing the menu clears menuUser, and the
+  // dialog outlives the menu it was opened from.
+  const [connectionsUser, setConnectionsUser] = useState<ProviderUser | null>(null)
   
   // Global AI config (to know if per-user overrides are enabled globally)
   const [globalAiConfig, setGlobalAiConfig] = useState<GlobalAiConfig | null>(null)
@@ -501,6 +506,39 @@ export function UsersPage() {
       </MenuItem>
     )
   }
+
+  /**
+   * Connections… — who this person shares their viewing with. Admin-only, like
+   * everything on this page; people never manage their own connections. Needs
+   * an imported account, since a connection is between two Aperture users.
+   */
+  const renderConnectionsMenuItem = () => (
+    <MenuItem
+      onClick={() => {
+        if (!menuUser?.apertureUserId) return
+        setConnectionsUser(menuUser)
+        handleMenuClose()
+      }}
+      disabled={!menuUser?.apertureUserId}
+    >
+      <ListItemIcon>
+        <GroupIcon fontSize="small" />
+      </ListItemIcon>
+      <ListItemText
+        primary={t('admin.usersPage.menuConnections')}
+        secondary={t('admin.usersPage.menuConnectionsSecondary')}
+      />
+    </MenuItem>
+  )
+
+  const connectionsDialog = (
+    <UserConnectionsDialog
+      open={connectionsUser !== null}
+      user={connectionsUser}
+      users={providerUsers}
+      onClose={() => setConnectionsUser(null)}
+    />
+  )
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, user: ProviderUser) => {
     setMenuAnchor(event.currentTarget)
@@ -1083,7 +1121,10 @@ export function UsersPage() {
           </MenuItem>
           <Divider />
           {renderViewAsMenuItem()}
+          {renderConnectionsMenuItem()}
         </Menu>
+
+        {connectionsDialog}
 
         {/* Snackbar for notifications */}
         <Snackbar
@@ -1513,7 +1554,10 @@ export function UsersPage() {
         </MenuItem>
         <Divider />
         {renderViewAsMenuItem()}
+        {renderConnectionsMenuItem()}
       </Menu>
+
+      {connectionsDialog}
 
       {/* Snackbar for notifications */}
       <Snackbar

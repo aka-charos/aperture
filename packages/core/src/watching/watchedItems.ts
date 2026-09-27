@@ -30,6 +30,41 @@
  * to complete, never harder.
  */
 import { query } from '../lib/db.js'
+// Direct, not through the barrel: a barrel import from inside core is a cycle.
+import { WATCH_HISTORY_PLAYED_SQL } from '../recommender/watchedExclusion.js'
+
+/**
+ * SQL boolean: `user` has finished this movie — the badge's movie rule
+ * (`played = true`), for callers asking about a handful of titles rather than
+ * the whole library. `user` and `movieId` are SQL expressions (a placeholder
+ * such as `'$1::uuid'`, or a column).
+ *
+ * THE SAME RULE as the movie half of `getWatchStatusForUser` below. It lives
+ * beside it so the two cannot drift: the shared-with-me inbox drops a title
+ * the recipient has finished, and a title that drops out of the inbox while
+ * its poster shows no tick (or the reverse) is exactly the disagreement a
+ * duplicated predicate produces. The `wh` alias is scoped to the subquery, so
+ * it binds to this subquery's `watch_history` even when the caller also uses
+ * `wh`.
+ */
+export function movieFinishedSql(user: string, movieId: string): string {
+  return `EXISTS (SELECT 1 FROM watch_history wh
+                   WHERE wh.user_id = ${user} AND wh.movie_id = ${movieId}
+                     AND ${WATCH_HISTORY_PLAYED_SQL})`
+}
+
+/**
+ * SQL boolean: `user` has played every non-special episode of this series, and
+ * there is at least one — `getWatchStatusForUser`'s finished rule for a show
+ * (a tick rather than an `8/24` pill). A show partway through is NOT finished.
+ */
+export function seriesFinishedSql(user: string, seriesId: string): string {
+  return `(SELECT COUNT(*) > 0 AND COUNT(wh.episode_id) = COUNT(*)
+             FROM episodes fe
+             LEFT JOIN watch_history wh
+               ON wh.episode_id = fe.id AND wh.user_id = ${user} AND ${WATCH_HISTORY_PLAYED_SQL}
+            WHERE fe.series_id = ${seriesId} AND fe.season_number > 0)`
+}
 
 /** Episode counts for one series, specials excluded. `total` is always > 0. */
 export interface SeriesWatchProgress {

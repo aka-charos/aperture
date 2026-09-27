@@ -579,7 +579,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'users',
     titleKey: 'adminNav.users.title',
     blurbKey: 'adminNav.users.blurb',
-    aliases: ['users', 'accounts', 'admin', 'enable', 'disable', 'permissions'],
+    aliases: ['users', 'accounts', 'admin', 'enable', 'disable', 'permissions', 'connections', 'social'],
     ownsHeading: true,
   },
   {

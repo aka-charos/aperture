@@ -299,6 +299,9 @@ export interface MediaServerInfo {
  * names — today that means an admin — and ABSENT otherwise, never an empty
  * array, so the payload is the privacy boundary rather than a UI condition.
  */
+/** Whose names a watch counter carries. See MovieWatchStats.watcherAudience. */
+export type WatcherAudience = 'all' | 'connections'
+
 export interface Watcher {
   userId: string
   name: string
@@ -320,6 +323,12 @@ export interface MovieWatchStats {
   watchPercentage: number
   totalUsers: number
   watchers?: Watcher[]
+  /**
+   * Who the names in `watchers` were chosen for, decided by the server: `all`
+   * (an admin sees everyone) or `connections` (the viewer and the people they
+   * are connected to — a partial list). Absent means the pre-connections copy.
+   */
+  watcherAudience?: WatcherAudience
 }
 
 export interface SeriesWatchStats {
@@ -337,5 +346,11 @@ export interface SeriesWatchStats {
   watchPercentage: number
   totalUsers: number
   watchers?: Watcher[]
+  /**
+   * Who the names in `watchers` were chosen for, decided by the server: `all`
+   * (an admin sees everyone) or `connections` (the viewer and the people they
+   * are connected to — a partial list). Absent means the pre-connections copy.
+   */
+  watcherAudience?: WatcherAudience
 }
 

@@ -649,6 +649,8 @@ interface PermissionChangeRow {
   field: string
   oldValue: string | null
   newValue: string
+  /** Who a `connection` change was with; absent or null for every other field. */
+  detail?: string | null
 }
 
 /**
@@ -723,6 +725,13 @@ function PermissionHistoryCard({ userId }: { userId: string }) {
                     </TableCell>
                     <TableCell>
                       {t(`admin.userDetail.permissionField.${change.field}`, change.field)}
+                      {/* The object of the change, e.g. who a connection was with. */}
+                      {change.detail && (
+                        <Box component="span" sx={{ color: 'primary.light' }}>
+                          {' · '}
+                          {change.detail}
+                        </Box>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Chip

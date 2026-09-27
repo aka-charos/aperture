@@ -5,3 +5,4 @@ export { RecentRatingsList } from './RecentRatingsList'
 export { RecentWatchesList } from './RecentWatchesList'
 
 
+export { ConnectionsRecentWatches } from './ConnectionsRecentWatches'

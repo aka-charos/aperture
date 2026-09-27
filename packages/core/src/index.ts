@@ -748,9 +748,40 @@ export {
   processWatchingFavoritesForAllUsers,
   type ReconcileWatchingFavoritesResult,
   getWatchStatusForUser,
+  movieFinishedSql,
+  seriesFinishedSql,
   type WatchStatusForUser,
   type SeriesWatchProgress,
 } from './watching/index.js'
+
+// Social layer: admin-managed connections and peer recommendations
+export {
+  avatarUrlFor,
+  createUserConnection,
+  removeUserConnection,
+  listAllConnections,
+  listVisibleConnections,
+  getVisibleConnectionIds,
+  isVisibleConnection,
+  SocialUserNotFoundError,
+  assessRecipients,
+  recommendItemToUsers,
+  listInbox,
+  countInbox,
+  dismissRecommendation,
+  displayNameSql,
+  visibleConnectionsSql,
+  type ConnectedUser,
+  type ConnectionEnd,
+  type ConnectionPair,
+  type SocialMediaType,
+  type SocialItemRef,
+  type SocialRecommendationItem,
+  type RecommendationGroup,
+  type RecipientAssessment,
+  type RecommendOutcome,
+  type SkipReason,
+} from './social/index.js'
 
 // Trakt Integration
 export {
