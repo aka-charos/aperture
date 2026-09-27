@@ -120,9 +120,10 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
         label: t('mediaDetail.infoCard.favorited'),
         watchers: s.watchers?.filter((w) => w.favorite),
         watchersTitle: t('mediaDetail.infoCard.favoritedByTitle'),
-        // A floor: a connection who favorited without playing is not in the
-        // played list the names come from, so they read as unnamed.
-        total: s.favoritesCount,
+        // No `total`, deliberately: favoritesCount counts bookmarks too, while
+        // the names come from the PLAYED list, so a connection who favorited
+        // without playing would be counted among "people you're not connected
+        // to" — a false claim. Names only; no unnamed line here.
       })
     }
     if (s.averageUserRating != null) {
