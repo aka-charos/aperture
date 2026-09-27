@@ -82,6 +82,9 @@ export function SharedWithMePage() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
         const data = (await response.json()) as { groups?: SharedGroup[] }
         if (!cancelled) setGroups(data.groups ?? [])
+        // The badge is read from the same list, so re-read it now: something may
+        // have arrived, been finished or been scoped out since it was fetched.
+        if (!cancelled) void refresh()
       } catch (err) {
         console.error('Failed to load shared-with-me:', err)
         if (!cancelled) setLoadFailed(true)
@@ -93,7 +96,7 @@ export function SharedWithMePage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [refresh])
 
   const handleDismiss = useCallback(
     async (item: SharedItem) => {

@@ -542,7 +542,9 @@ export function MyWatchHistoryPage() {
             <Alert severity="info" sx={{ borderRadius: 2 }}>
               {searchQuery
                 ? t('watchHistoryPage.emptySearchMovies', { query: searchQuery })
-                : t('watchHistoryPage.emptyMovies')}
+                : selectedConnection
+                  ? t('watchHistoryPage.emptyMoviesOther', { name: selectedConnection.name })
+                  : t('watchHistoryPage.emptyMovies')}
             </Alert>
           ) : (
             <>
@@ -727,7 +729,9 @@ export function MyWatchHistoryPage() {
             <Alert severity="info" sx={{ borderRadius: 2 }}>
               {searchQuery
                 ? t('watchHistoryPage.emptySearchSeries', { query: searchQuery })
-                : t('watchHistoryPage.emptySeries')}
+                : selectedConnection
+                  ? t('watchHistoryPage.emptySeriesOther', { name: selectedConnection.name })
+                  : t('watchHistoryPage.emptySeries')}
             </Alert>
           ) : (
             <>

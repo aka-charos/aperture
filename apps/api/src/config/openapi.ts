@@ -157,6 +157,11 @@ const tags = [
       url: `${DOCS_BASE}/features/watch-history.md`,
     },
   },
+  {
+    name: 'social',
+    description:
+      'Admin-managed connections between users, and what they share: each other’s recent watches, and titles recommended to each other (Shared with me). Pairing is admin-only.',
+  },
 
   // === Media Library ===
   {

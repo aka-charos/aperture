@@ -3499,7 +3499,9 @@
     "whoseHistory": "Whose history",
     "me": "Me",
     "otherUsersHistory": "{{name}}'s watch history",
-    "viewingReadOnly": "You're viewing {{name}}'s history. It's read-only."
+    "viewingReadOnly": "You're viewing {{name}}'s history. It's read-only.",
+    "emptyMoviesOther": "No movies in {{name}}'s history that you can open.",
+    "emptySeriesOther": "No series in {{name}}'s history that you can open."
   },
   "topPicksPage": {
     "pageTitle": "おすすめ",

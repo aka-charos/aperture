@@ -242,7 +242,6 @@ export function RecommendToDialog({ open, mediaType, itemId, itemTitle, onClose 
                     <ListItemButton
                       onClick={() => toggle(r.id)}
                       disabled={disabled || sending}
-                      role={undefined}
                       dense
                     >
                       <ListItemAvatar sx={{ minWidth: 48 }}>
