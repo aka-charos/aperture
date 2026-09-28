@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { syncUiLanguageFromServer } from '@/i18n/syncUiLanguage'
 import { clearUserScopedCaches } from '@/lib/clientCaches'
 import {
@@ -31,6 +31,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Decided server-side and replaced wholesale on every auth check, so a
   // permission revoked between two loads is gone from the nav on the next one.
   const [capabilities, setCapabilities] = useState<Capabilities>({})
+  // Who the capabilities currently on screen belong to, for refreshCapabilities.
+  const userIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    userIdRef.current = user?.id ?? null
+  }, [user])
 
   const checkAuth = useCallback(async () => {
     try {
@@ -65,6 +70,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setCapabilities({})
     } finally {
       setLoading(false)
+    }
+  }, [])
+
+  /**
+   * Re-read the decided capabilities without touching the session.
+   *
+   * For answers that can change under a signed-in person — an admin connecting
+   * them to someone makes `social` true — so a feature can appear without a
+   * reload. Deliberately NOT `checkAuth`: that one treats any failure as signed
+   * out, which is right at boot and wrong for a background refresh, where a
+   * blip would log someone out mid-page. Here only a successful answer about
+   * the SAME account replaces anything; everything else leaves state alone and
+   * lets the next real request deal with a dead session.
+   */
+  const refreshCapabilities = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/check', { credentials: 'include' })
+      if (!response.ok) return
+      const data = await response.json()
+      if (!data.authenticated || data.user?.id == null || data.user.id !== userIdRef.current) return
+      setCapabilities(data.capabilities ?? {})
+    } catch {
+      // Leave what is on screen; see above.
     }
   }, [])
 
@@ -169,6 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         checkAuth,
+        refreshCapabilities,
         clearSessionError,
         impersonate,
         stopImpersonation,

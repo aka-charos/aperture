@@ -24,6 +24,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import { withServerMessageDetail } from '@/lib/withServerMessageDetail'
+import { useAuth } from '@/hooks/useAuth'
 
 /** The fields this dialog needs from a Users-page row. */
 export interface ConnectionCandidate {
@@ -81,6 +82,9 @@ async function serverMessage(response: Response): Promise<string | null> {
  */
 export function UserConnectionsDialog({ open, user, users, onClose }: UserConnectionsDialogProps) {
   const { t } = useTranslation()
+  // An admin can connect themselves; their own Shared with me, Recommend button
+  // and dashboard rows depend on the `social` capability, decided at page load.
+  const { refreshCapabilities } = useAuth()
   const [pairs, setPairs] = useState<ConnectionPair[]>([])
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState(false)
@@ -149,6 +153,9 @@ export function UserConnectionsDialog({ open, user, users, onClose }: UserConnec
   }
 
   const refetch = async () => {
+    // Re-read the capabilities too: if the admin was one end of the change,
+    // their own social features appear or go without a reload.
+    void refreshCapabilities()
     try {
       setPairs(await load())
     } catch (err) {

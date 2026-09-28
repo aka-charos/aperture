@@ -18,6 +18,21 @@ Deviations from the text below, all small:
 - `watcherVisibility.ts` gained `watcherAudienceFor(viewer)`, so the two watch-stats handlers
   share one call instead of each fetching connection ids.
 
+Changed after the first deploy (2026-09-28, owner's call), each overriding the text below:
+
+- **The dashboard rows sit right after Upcoming Episodes**, above Top Picks, not after the
+  Recent Watches/Ratings grid. At the bottom they were ~3,000px down and read as missing.
+  This replaces the §1.1 "Dashboard" row and the §7.6 placement.
+- **"Recently watched by" counts played titles only** (`WATCH_HISTORY_PLAYED_SQL`), not
+  `WATCHED_SQL`. On the live instance a film the connection had only started sat in their row
+  while its title page said nobody had watched it. This replaces §6.3's predicate.
+- **`social` is re-read without a reload** (§6.7 said "a full load"). The admin dialog re-reads
+  it after every change, and `ConnectionsProvider` re-reads it when the window regains focus,
+  at most once a minute, through the new `refreshCapabilities()` on the auth context. That
+  function changes nothing on a failure or an answer about another account; `checkAuth` would
+  log the viewer out on a blip. The first person connected on the live instance saw no
+  change until they reloaded, and took the feature for missing.
+
 Written for implementer agents. Every path, symbol, SQL shape and i18n key below was checked
 against the tree on the revision date. **Line numbers are approximate — search by symbol.**
 Where the codebase already supplies a mechanism, this spec names it and does not reinvent it.
@@ -118,7 +133,7 @@ cannot see the pairing UI. Once connected, two users mutually get:
 | Item-page counters | Anonymous household counts stay for everyone; connected users are *added* as names. |
 | Recommend picker | Multi-select recipients in one dialog. |
 | Recommendation playlists | In-app only. Nothing is written to Emby/Jellyfin. |
-| Dashboard | Own rows stay first; connected-user sliders appended after own Recent Watches/Ratings. |
+| Dashboard | Own rows stay first; connected-user sliders appended after own Recent Watches/Ratings. **Superseded 2026-09-28:** directly after Upcoming Episodes (see the top of this file). |
 
 ### 1.2 Added by this revision (defaults — see §12 to flip)
 
@@ -710,6 +725,11 @@ interface RecentWatchItem {
 
 ### 6.3 `handlers/recentWatches.ts` — why api-side, and its SQL
 
+**Superseded 2026-09-28: the predicate is `WATCH_HISTORY_PLAYED_SQL` (core), not
+`WATCHED_SQL`.** The row names a person, and the title page beside it counts played titles
+only, so the looser reading showed films the connection had only started while their page
+said nobody had watched them. Read `WATCHED_SQL` below as `WATCH_HISTORY_PLAYED_SQL`.
+
 `WATCHED_SQL` is an api-side singleton (`profile/watchStatsFilters.ts`, pinned to the `wh`
 alias), and core cannot import from the api app. So the aggregation lives in the handler.
 Import `WATCHED_SQL` from `../../users/handlers/profile/watchStatsFilters.js` — never restate
@@ -887,7 +907,8 @@ It is decided data rather than a permission, so it is **not** added to `CAPABILI
 `permissions.ts` (nothing server-side gates on it). The web gates the nav entry, the button
 and the fetches on it (§7), and absent reads as false (F-134 rule 2). It refreshes on the
 next `/auth/check`, which means a full load. An assumption start or stop is a full load
-already.
+already. **Superseded 2026-09-28:** it is also re-read on window focus and after an admin
+changes a pair (see the top of this file).
 
 ## 7. Web — `apps/web/src`
 
@@ -1067,6 +1088,7 @@ initials as fallback. Footer:
   haven't seen this one").
 - Place it in `pages/dashboard/index.tsx` **after** the own Recent Watches / Recent
   Ratings `Grid` (locked: own content first), with `enabled = hasConnections`.
+  **Superseded 2026-09-28:** directly after Upcoming Episodes, above Top Picks.
 - Add both files to the `components/index.ts` and `hooks/index.ts` barrels. Do **not**
   add fields to `GET /api/dashboard`.
 

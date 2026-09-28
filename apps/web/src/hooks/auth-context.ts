@@ -50,6 +50,11 @@ export interface AuthContextType {
   login: (username: string, password: string) => Promise<void>
   logout: () => Promise<void>
   checkAuth: () => Promise<void>
+  /**
+   * Re-read the capabilities for the signed-in account without touching the
+   * session: a failure, or an answer about a different account, changes nothing.
+   */
+  refreshCapabilities: () => Promise<void>
   clearSessionError: () => void
   /** Admin only. Starts a read-only assumed session and reloads into it. */
   impersonate: (userId: string) => Promise<void>

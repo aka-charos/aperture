@@ -1,12 +1,15 @@
 /**
  * What the caller's connections watched lately — one dashboard slider each.
  *
- * Lives here rather than in core because the watched predicate it uses,
- * `WATCHED_SQL` (played, replayed or resumed; bookmarks excluded), is the API's
- * own — the same reading the viewer's own Recent Watches list uses — and core
- * cannot import from the API app. Imported, never restated.
+ * **Watched means PLAYED** (`WATCH_HISTORY_PLAYED_SQL`), not the looser
+ * `WATCHED_SQL` (played, replayed or resumed) the viewer's own history pages
+ * use. "Recently watched by Tom" is a claim about one person made to another,
+ * and the title page's counter and named-watcher list beside it count played
+ * titles only — so with the looser reading a film Tom had started sat in his
+ * row while its page said nobody had watched it (seen live on the first
+ * deploy). Same predicate as the named list, so the two cannot disagree.
  *
- * Three rules.
+ * Four rules.
  *
  * 1. **The CALLER's scope, on both kinds.** A poster from a library the viewer
  *    cannot open would answer "not found" when clicked. The scope already
@@ -20,13 +23,14 @@
  *    plays (F-108) are included exactly as the viewer's own recent list
  *    includes them; if a date is ever shown here, apply F-108's time-axis rule
  *    first.
+ * 4. **A series is in the row once its most recent PLAYED episode is recent** —
+ *    an episode abandoned halfway neither adds the show nor moves it up.
  */
 import type { FastifyInstance } from 'fastify'
-import { listVisibleConnections, visibleConnectionsSql } from '@aperture/core'
+import { listVisibleConnections, visibleConnectionsSql, WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 import { query } from '../../../lib/db.js'
 import { scopeClause, viewerScope } from '../../../lib/viewerScope.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
-import { WATCHED_SQL } from '../../users/handlers/profile/watchStatsFilters.js'
 import { recentWatchesSchema } from '../schemas.js'
 
 /** The dashboard's own recent-watch shape, plus `genres` (MediaCarousel requires it). */
@@ -92,7 +96,7 @@ export function registerRecentWatchesHandler(fastify: FastifyInstance) {
                  JOIN movies m ON m.id = wh.movie_id
                 WHERE wh.user_id IN (${visibleConnectionsSql('$1::uuid')})
                   AND wh.movie_id IS NOT NULL AND wh.last_played_at IS NOT NULL
-                  AND ${WATCHED_SQL}
+                  AND ${WATCH_HISTORY_PLAYED_SQL}
                   AND ${movieScope}
              )
              SELECT * FROM ranked WHERE rn <= ${movieLimit}`,
@@ -109,7 +113,7 @@ export function registerRecentWatchesHandler(fastify: FastifyInstance) {
                  JOIN series s ON s.id = e.series_id
                 WHERE wh.user_id IN (${visibleConnectionsSql('$1::uuid')})
                   AND wh.episode_id IS NOT NULL AND wh.last_played_at IS NOT NULL
-                  AND ${WATCHED_SQL}
+                  AND ${WATCH_HISTORY_PLAYED_SQL}
                   AND ${seriesScope}
              ), latest AS (
                SELECT *, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY last_played_at DESC) AS urn
