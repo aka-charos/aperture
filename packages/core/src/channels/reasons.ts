@@ -12,10 +12,9 @@
  * and a schema failure would cost the notes entirely), and failing open per item — an unanswered
  * title simply has no note, never a broken preview.
  */
-import { generateText, type LanguageModel } from 'ai'
 import { createChildLogger } from '../lib/logger.js'
 import { query, queryOne } from '../lib/db.js'
-import { getTextGenerationModelInstance, getChatModelInstance } from '../lib/ai-provider.js'
+import { generateShortText, getShortTextWriter, type ShortTextWriter } from '../lib/shortText.js'
 import { buildAiLanguageInstruction } from '../lib/locales.js'
 import { resolvePlaylistAiLocale } from '../lib/ai-playlist-generation.js'
 
@@ -26,8 +25,6 @@ const SDK_MAX_RETRIES = 1
 /** Titles per request. Small chunks run concurrently, so this is faster AND more reliable than
  *  one long completion, which tends to stop answering partway down a long list. */
 const BATCH_SIZE = 8
-/** Output budget per title, generous enough that a 25-word answer never truncates. */
-const TOKENS_PER_REASON = 110
 /** Synopsis context per title: enough to ground the model, small enough to stay cheap. */
 const MAX_SYNOPSIS_CHARS = 220
 /** Guard against a model that ignores the length instruction. */
@@ -43,19 +40,6 @@ export interface ChannelPickReasonInput {
   title: string
   year: number | null
   overview: string | null
-}
-
-/**
- * A model chosen for prose: the text-generation role first (its whole purpose), then the chat
- * model. Never an embedding or structuring model.
- */
-async function getWritingModel(): Promise<LanguageModel> {
-  try {
-    return await getTextGenerationModelInstance()
-  } catch {
-    // Text-generation role not configured — fall back to the chat model.
-  }
-  return await getChatModelInstance()
 }
 
 function truncate(text: string, max: number): string {
@@ -141,16 +125,24 @@ interface IndexedPick {
   pick: ChannelPickReasonInput
 }
 
+/**
+ * One batch of notes. The call is `generateShortText` — the same reasoning cap and output ceiling
+ * as the dialog's name and description. It used to budget 110 tokens per title, which a reasoning
+ * model spent entirely on its scratchpad: measured on a production ledger, every call of
+ * the previews checked (both passes) came back with no visible text, and the notes vanished without a word
+ * because this fails open. A cut-off batch is now refused whole rather than parsed, since its last line is the
+ * half-written one; the second pass retries it.
+ */
 async function writeChunk(
-  model: LanguageModel,
+  writer: ShortTextWriter,
   brief: string,
   langBlock: string,
   chunk: IndexedPick[]
 ): Promise<Array<{ index: number; reason: string }>> {
-  const { text } = await generateText({
-    model,
+  const text = await generateShortText({
+    purpose: 'preview pick reasons',
+    writer,
     maxRetries: SDK_MAX_RETRIES,
-    maxOutputTokens: chunk.length * TOKENS_PER_REASON + 200,
     prompt: buildPrompt(
       brief,
       chunk.map((entry) => entry.pick),
@@ -199,9 +191,11 @@ export async function generateChannelPickReasons(
 
   if (!channel) return reasons
 
-  let model: LanguageModel
+  // The text-generation role first (its whole purpose), then the chat model. Resolved once, so
+  // the reasoning cap is looked up once for every batch.
+  let writer: ShortTextWriter
   try {
-    model = await getWritingModel()
+    writer = await getShortTextWriter({ fallbackToChat: true })
   } catch (err) {
     logger.info({ err, channelId }, 'No writing model configured; preview reasons skipped')
     return reasons
@@ -229,7 +223,7 @@ export async function generateChannelPickReasons(
   for (let pass = 0; pass < 2 && remaining.length > 0; pass++) {
     const results = await Promise.all(
       chunkBy(remaining, BATCH_SIZE).map((chunk) =>
-        writeChunk(model, brief, langBlock, chunk).catch((err) => {
+        writeChunk(writer, brief, langBlock, chunk).catch((err) => {
           firstError ??= err
           return [] as Array<{ index: number; reason: string }>
         })

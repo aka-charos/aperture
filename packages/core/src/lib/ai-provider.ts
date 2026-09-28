@@ -30,6 +30,7 @@ import {
   reasoningEffortsFor,
   resolveReasoningEffort,
   resolveReasoningOptions,
+  weakestEffortAtOrAbove,
   type ReasoningCapableModel,
 } from './reasoningEffort.js'
 import {
@@ -1250,6 +1251,40 @@ export async function getReasoningProviderOptions(
     fn,
     resolveReasoningEffort(config)
   )
+}
+
+/**
+ * The reasoning cap for SHORT interactive text on one provider+model: the
+ * weakest effort the model offers at or above `SHORT_TEXT_REASONING_FLOOR`
+ * (`low`), whatever the role is configured with.
+ *
+ * Deliberately not {@link getReasoningProviderOptions}. The role's effort is
+ * chosen for batch prose, and sending it here is what starved these calls — see
+ * the floor's docstring. `effort` comes back beside the options so a caller can
+ * log what was actually asked for; both are undefined for a model that publishes
+ * no effort vocabulary, which is then sent nothing.
+ */
+export async function getShortTextReasoningFor(
+  provider: string,
+  modelId: string,
+  fn: AIFunction
+): Promise<{
+  effort?: string
+  providerOptions?: Record<string, Record<string, JSONValue>>
+}> {
+  const model = await getReasoningModelFacts(provider, modelId, fn)
+  const effort = weakestEffortAtOrAbove(reasoningEffortsFor(model))
+  if (!effort) return {}
+
+  // Chosen from the model's own list, so this cannot be undeliverable for the
+  // effort; `provider` stays possible in principle (a catalog entry naming
+  // another provider's mechanism), and then nothing is sent.
+  const { providerOptions } = resolveReasoningOptions({ provider, model, effort })
+  if (!providerOptions) return {}
+  return {
+    effort,
+    providerOptions: providerOptions as Record<string, Record<string, JSONValue>>,
+  }
 }
 
 /**

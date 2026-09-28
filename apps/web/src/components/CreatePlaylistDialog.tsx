@@ -20,6 +20,9 @@ import CloseIcon from '@mui/icons-material/Close'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd'
 import { getProxiedImageUrl } from '@aperture/ui'
+import { aiFailureMessage } from '../lib/aiFailureMessage'
+import { isAbortError } from '../lib/requestGuard'
+import { useRequestGuard } from '../hooks/useRequestGuard'
 
 interface GraphNode {
   id: string
@@ -60,10 +63,14 @@ export function CreatePlaylistDialog({
   const movieIds = nodes.filter((n) => n.type === 'movie').map((n) => n.id)
   const seriesIds = nodes.filter((n) => n.type === 'series').map((n) => n.id)
 
+  // An answer that lands after the dialog closed is dropped, not written into the next opening.
+  const requests = useRequestGuard(open)
+
   /** `useNotes` keeps the drafted name as the thing to sharpen — see the description below. */
   const handleGenerateName = useCallback(
     async (useNotes = false) => {
       const notes = useNotes ? name.trim() : ''
+      const ticket = requests.begin()
       setGeneratingName(true)
       setError(null)
 
@@ -73,21 +80,26 @@ export function CreatePlaylistDialog({
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ movieIds, seriesIds, userNotes: notes || undefined }),
+          signal: ticket.signal,
         })
 
         if (!response.ok) {
-          throw new Error('Failed to generate name')
+          // The server's sentence says why (a model that thought past its limit, a bad key);
+          // the fallback only says that it failed.
+          const message = await aiFailureMessage(t, response, t('playlists.errGenerateName'))
+          if (ticket.isCurrent()) setError(message)
+          return
         }
 
         const data = await response.json()
-        setName(data.name)
-      } catch {
-        setError(t('playlists.errGenerateName'))
+        if (ticket.isCurrent()) setName(data.name)
+      } catch (err) {
+        if (ticket.isCurrent() && !isAbortError(err)) setError(t('playlists.errGenerateName'))
       } finally {
         setGeneratingName(false)
       }
     },
-    [movieIds, seriesIds, name, t]
+    [movieIds, seriesIds, name, t, requests]
   )
 
   /**
@@ -99,6 +111,7 @@ export function CreatePlaylistDialog({
   const handleGenerateDescription = useCallback(
     async (useNotes = false) => {
       const notes = useNotes ? description.trim() : ''
+      const ticket = requests.begin()
       setGeneratingDescription(true)
       setError(null)
 
@@ -113,21 +126,26 @@ export function CreatePlaylistDialog({
             name: name || undefined,
             userNotes: notes || undefined,
           }),
+          signal: ticket.signal,
         })
 
         if (!response.ok) {
-          throw new Error('Failed to generate description')
+          const message = await aiFailureMessage(t, response, t('playlists.errGenerateDescription'))
+          if (ticket.isCurrent()) setError(message)
+          return
         }
 
         const data = await response.json()
-        setDescription(data.description)
-      } catch {
-        setError(t('playlists.errGenerateDescription'))
+        if (ticket.isCurrent()) setDescription(data.description)
+      } catch (err) {
+        if (ticket.isCurrent() && !isAbortError(err)) {
+          setError(t('playlists.errGenerateDescription'))
+        }
       } finally {
         setGeneratingDescription(false)
       }
     },
-    [movieIds, seriesIds, name, description, t]
+    [movieIds, seriesIds, name, description, t, requests]
   )
 
   const handleCreate = useCallback(async () => {

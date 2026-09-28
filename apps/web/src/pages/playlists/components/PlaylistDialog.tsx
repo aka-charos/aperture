@@ -37,30 +37,11 @@ import DescriptionIcon from '@mui/icons-material/Description'
 import AddIcon from '@mui/icons-material/Add'
 import { getProxiedImageUrl } from '@aperture/ui'
 import { useMediaSearch } from '../hooks'
-import { withServerMessageDetail } from '../../../lib/withServerMessageDetail'
+import { aiFailureMessage } from '../../../lib/aiFailureMessage'
+import { isAbortError } from '../../../lib/requestGuard'
+import { useRequestGuard } from '../../../hooks/useRequestGuard'
 import type { Channel, MediaSummary, MediaType, FormData, SnackbarState } from '../types'
 import type { Theme } from '@mui/material'
-import type { TFunction } from 'i18next'
-
-/**
- * The AI routes answer a failure with a sentence worth reading ("Your Google API key is missing
- * or invalid. Check your API key in Settings > AI."). Show that instead of the flat fallback —
- * without it, the only signal is "Failed to generate name" and the button gets re-clicked.
- */
-async function aiFailureMessage(
-  t: TFunction,
-  response: Response,
-  fallback: string
-): Promise<string> {
-  try {
-    const data = await response.json()
-    return typeof data?.error === 'string' && data.error
-      ? withServerMessageDetail(t, data.error)
-      : fallback
-  } catch {
-    return fallback
-  }
-}
 
 // AI button component - defined outside to prevent re-renders
 /**
@@ -448,6 +429,10 @@ export function PlaylistDialog({
   const [generatingAIName, setGeneratingAIName] = useState(false)
   const [generatingAIDescription, setGeneratingAIDescription] = useState(false)
 
+  // One "session" per opening of this dialog for one playlist. Closing it, or reopening it for
+  // another, drops every generation still in flight — see useRequestGuard.
+  const requests = useRequestGuard(open ? (editingChannel?.id ?? 'new') : null)
+
   // Reset searches when dialog closes
   useEffect(() => {
     if (!open) {
@@ -469,7 +454,7 @@ export function PlaylistDialog({
   const handleMediaTypeChange = (value: string | null) => {
     const choice = MEDIA_TYPE_CHOICES.find((c) => c.value === value)
     if (!choice) return
-    setFormData({ ...formData, mediaTypes: choice.mediaTypes })
+    setFormData((prev) => ({ ...prev, mediaTypes: choice.mediaTypes }))
   }
 
   const canGenerate =
@@ -481,6 +466,71 @@ export function PlaylistDialog({
   const hasPreferences = formData.textPreferences.trim().length > 0
 
   /**
+   * Run one sparkle button: ask the server, then write the answer into its own box.
+   *
+   * Two rules every button used to break. The answer is written with a functional update that
+   * touches only its own field — each handler used to write back the whole form as it stood when
+   * the button was clicked, so a second generation finishing later (or anything typed meanwhile)
+   * was silently reverted. And an answer that arrives after the dialog closed or switched playlist
+   * is dropped: the guard aborts it, and anything that still resolves is stale.
+   */
+  const generateInto = async (options: {
+    endpoint: string
+    body: Record<string, unknown>
+    /** The response key holding the text, and the form field it replaces. */
+    responseKey: 'preferences' | 'name' | 'description'
+    field: 'textPreferences' | 'name' | 'description'
+    setGenerating: (value: boolean) => void
+    okMessage: string
+    failMessage: string
+  }) => {
+    if (!canGenerate) {
+      setSnackbar({ open: true, message: pt('snackbarNeedGenresOrMovies'), severity: 'error' })
+      return
+    }
+
+    const ticket = requests.begin()
+    options.setGenerating(true)
+    try {
+      const response = await fetch(options.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(options.body),
+        signal: ticket.signal,
+      })
+
+      if (!response.ok) {
+        const message = await aiFailureMessage(t, response, options.failMessage)
+        if (ticket.isCurrent()) setSnackbar({ open: true, message, severity: 'error' })
+        return
+      }
+
+      const data = await response.json()
+      const text = data?.[options.responseKey]
+      if (!ticket.isCurrent()) return
+      if (typeof text !== 'string') {
+        setSnackbar({ open: true, message: options.failMessage, severity: 'error' })
+        return
+      }
+      setFormData((prev) => ({ ...prev, [options.field]: text }))
+      setSnackbar({ open: true, message: options.okMessage, severity: 'success' })
+    } catch (err) {
+      if (!ticket.isCurrent() || isAbortError(err)) return
+      setSnackbar({ open: true, message: options.failMessage, severity: 'error' })
+    } finally {
+      options.setGenerating(false)
+    }
+  }
+
+  // What every request carries: the seeds as they stand now.
+  const seedBody = () => ({
+    genres: formData.genreFilters,
+    exampleMovieIds: formData.exampleMovies.map((m) => m.id),
+    exampleSeriesIds: formData.exampleSeries.map((s) => s.id),
+  })
+
+  /**
    * Generate AI-powered text preferences.
    *
    * The result always replaces the box, so `useNotes` decides whether what's in there survives:
@@ -488,52 +538,17 @@ export function PlaylistDialog({
    * would never suggest. Off — the pre-existing behaviour — ignores the box, which is the only
    * way to get a genuinely different take once it already holds an earlier generation.
    */
-  const handleGenerateAIPreferences = async (useNotes = false) => {
-    if (!canGenerate) {
-      setSnackbar({
-        open: true,
-        message: pt('snackbarNeedGenresOrMovies'),
-        severity: 'error',
-      })
-      return
-    }
-
+  const handleGenerateAIPreferences = (useNotes = false) => {
     const notes = useNotes ? formData.textPreferences.trim() : ''
-
-    setGeneratingAIPreferences(true)
-    try {
-      const response = await fetch('/api/channels/ai-preferences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          genres: formData.genreFilters,
-          exampleMovieIds: formData.exampleMovies.map((m) => m.id),
-          exampleSeriesIds: formData.exampleSeries.map((s) => s.id),
-          userNotes: notes || undefined,
-        }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setFormData({ ...formData, textPreferences: data.preferences })
-        setSnackbar({
-          open: true,
-          message: pt(notes ? 'snackbarAIPreferencesRefinedOk' : 'snackbarAIPreferencesOk'),
-          severity: 'success',
-        })
-      } else {
-        setSnackbar({
-          open: true,
-          message: await aiFailureMessage(t, response, pt('snackbarAIPreferencesFail')),
-          severity: 'error',
-        })
-      }
-    } catch {
-      setSnackbar({ open: true, message: pt('snackbarAIPreferencesFail'), severity: 'error' })
-    } finally {
-      setGeneratingAIPreferences(false)
-    }
+    return generateInto({
+      endpoint: '/api/channels/ai-preferences',
+      body: { ...seedBody(), userNotes: notes || undefined },
+      responseKey: 'preferences',
+      field: 'textPreferences',
+      setGenerating: setGeneratingAIPreferences,
+      okMessage: pt(notes ? 'snackbarAIPreferencesRefinedOk' : 'snackbarAIPreferencesOk'),
+      failMessage: pt('snackbarAIPreferencesFail'),
+    })
   }
 
   const preferencesMenu = [
@@ -548,48 +563,20 @@ export function PlaylistDialog({
    * starting point to sharpen rather than as one more input to weigh. Off is the pre-existing
    * behaviour: invent from the seeds alone, which is what a re-roll wants.
    */
-  const handleGenerateAIName = async (useNotes = false) => {
-    if (!canGenerate) {
-      setSnackbar({
-        open: true,
-        message: pt('snackbarNeedGenresOrMovies'),
-        severity: 'error',
-      })
-      return
-    }
-
-    setGeneratingAIName(true)
-    try {
-      const response = await fetch('/api/channels/ai-name', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          genres: formData.genreFilters,
-          exampleMovieIds: formData.exampleMovies.map((m) => m.id),
-          exampleSeriesIds: formData.exampleSeries.map((s) => s.id),
-          textPreferences: formData.textPreferences || undefined,
-          userNotes: (useNotes ? formData.name.trim() : '') || undefined,
-        }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setFormData({ ...formData, name: data.name })
-        setSnackbar({ open: true, message: pt('snackbarAINameOk'), severity: 'success' })
-      } else {
-        setSnackbar({
-          open: true,
-          message: await aiFailureMessage(t, response, pt('snackbarAINameFail')),
-          severity: 'error',
-        })
-      }
-    } catch {
-      setSnackbar({ open: true, message: pt('snackbarAINameFail'), severity: 'error' })
-    } finally {
-      setGeneratingAIName(false)
-    }
-  }
+  const handleGenerateAIName = (useNotes = false) =>
+    generateInto({
+      endpoint: '/api/channels/ai-name',
+      body: {
+        ...seedBody(),
+        textPreferences: formData.textPreferences || undefined,
+        userNotes: (useNotes ? formData.name.trim() : '') || undefined,
+      },
+      responseKey: 'name',
+      field: 'name',
+      setGenerating: setGeneratingAIName,
+      okMessage: pt('snackbarAINameOk'),
+      failMessage: pt('snackbarAINameFail'),
+    })
 
   const nameMenu = [
     { label: pt('aiBuildOnNotes'), onClick: () => handleGenerateAIName(true) },
@@ -597,49 +584,21 @@ export function PlaylistDialog({
   ]
 
   /** Generate AI-powered playlist description — same `useNotes` contract as the name above. */
-  const handleGenerateAIDescription = async (useNotes = false) => {
-    if (!canGenerate) {
-      setSnackbar({
-        open: true,
-        message: pt('snackbarNeedGenresOrMovies'),
-        severity: 'error',
-      })
-      return
-    }
-
-    setGeneratingAIDescription(true)
-    try {
-      const response = await fetch('/api/channels/ai-description', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          genres: formData.genreFilters,
-          exampleMovieIds: formData.exampleMovies.map((m) => m.id),
-          exampleSeriesIds: formData.exampleSeries.map((s) => s.id),
-          textPreferences: formData.textPreferences || undefined,
-          playlistName: formData.name || undefined,
-          userNotes: (useNotes ? formData.description.trim() : '') || undefined,
-        }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setFormData({ ...formData, description: data.description })
-        setSnackbar({ open: true, message: pt('snackbarAIDescriptionOk'), severity: 'success' })
-      } else {
-        setSnackbar({
-          open: true,
-          message: await aiFailureMessage(t, response, pt('snackbarAIDescriptionFail')),
-          severity: 'error',
-        })
-      }
-    } catch {
-      setSnackbar({ open: true, message: pt('snackbarAIDescriptionFail'), severity: 'error' })
-    } finally {
-      setGeneratingAIDescription(false)
-    }
-  }
+  const handleGenerateAIDescription = (useNotes = false) =>
+    generateInto({
+      endpoint: '/api/channels/ai-description',
+      body: {
+        ...seedBody(),
+        textPreferences: formData.textPreferences || undefined,
+        playlistName: formData.name || undefined,
+        userNotes: (useNotes ? formData.description.trim() : '') || undefined,
+      },
+      responseKey: 'description',
+      field: 'description',
+      setGenerating: setGeneratingAIDescription,
+      okMessage: pt('snackbarAIDescriptionOk'),
+      failMessage: pt('snackbarAIDescriptionFail'),
+    })
 
   const descriptionMenu = [
     { label: pt('aiBuildOnNotes'), onClick: () => handleGenerateAIDescription(true) },
@@ -715,7 +674,7 @@ export function PlaylistDialog({
             filterSelectedOptions
             options={availableGenres}
             value={formData.genreFilters}
-            onChange={(_, newValue) => setFormData({ ...formData, genreFilters: newValue })}
+            onChange={(_, newValue) => setFormData((prev) => ({ ...prev, genreFilters: newValue }))}
             loading={loadingGenres}
             size="small"
             renderInput={(params) => (
@@ -823,7 +782,10 @@ export function PlaylistDialog({
               <Switch
                 size="small"
                 checked={formData.includeSeeds}
-                onChange={(e) => setFormData({ ...formData, includeSeeds: e.target.checked })}
+                onChange={(e) => {
+                  const includeSeeds = e.target.checked
+                  setFormData((prev) => ({ ...prev, includeSeeds }))
+                }}
               />
             }
             label={
@@ -866,7 +828,10 @@ export function PlaylistDialog({
             maxRows={18}
             size="small"
             value={formData.textPreferences}
-            onChange={(e) => setFormData({ ...formData, textPreferences: e.target.value })}
+            onChange={(e) => {
+              const textPreferences = e.target.value
+              setFormData((prev) => ({ ...prev, textPreferences }))
+            }}
             placeholder={pt('preferencesPlaceholder')}
           />
         </Section>
@@ -891,7 +856,10 @@ export function PlaylistDialog({
             fullWidth
             size="small"
             value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            onChange={(e) => {
+              const name = e.target.value
+              setFormData((prev) => ({ ...prev, name }))
+            }}
             placeholder={pt('nameExamplePlaceholder')}
           />
         </Section>
@@ -922,7 +890,10 @@ export function PlaylistDialog({
             maxRows={10}
             size="small"
             value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            onChange={(e) => {
+              const description = e.target.value
+              setFormData((prev) => ({ ...prev, description }))
+            }}
             placeholder={pt('descriptionCuratedPlaceholder')}
           />
         </Section>

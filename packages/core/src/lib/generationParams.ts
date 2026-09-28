@@ -226,11 +226,11 @@ export function resolveGenerationDelivery(input: {
  *
  * ONE ROLE, and the reason is coverage rather than caution. A sampling value is
  * a top-level option on the generation call, so it reaches a model only at the
- * call sites that pass it — and `textGeneration` has eight of them
- * (`channels/reasons.ts`, `channels/ai.ts`, `ai-playlist-generation.ts`, both
+ * call sites that pass it — and `textGeneration` has six of them
+ * (`lib/shortText.ts` for every playlist text box and the preview notes, both
  * taste synopses, both explanation generators, the discovery structuring pass),
- * three of which choose between `textGeneration` and `chat` at runtime, so the
- * role whose value should apply is not even known to the caller. Wiring some of
+ * some of which choose between `textGeneration` and `chat` at runtime, so the
+ * role whose value should apply is not always known to the caller. Wiring some of
  * them would ship a knob that works on recommendation explanations and silently
  * does nothing on playlists — a control that appears to work, which is worse
  * than an absent one.

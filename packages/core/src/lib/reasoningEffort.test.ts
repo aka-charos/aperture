@@ -25,6 +25,8 @@ import {
   resolveReasoningEffort,
   resolveReasoningOptions,
   roleReadsReasoningEffort,
+  SHORT_TEXT_REASONING_FLOOR,
+  weakestEffortAtOrAbove,
   type ReasoningCapableModel,
 } from './reasoningEffort.js'
 
@@ -395,4 +397,66 @@ test('only the batch writing roles read an effort', () => {
   assert.ok(!roleReadsReasoningEffort('embeddings'))
   assert.ok(!roleReadsReasoningEffort('webSearch'))
   assert.ok(!roleReadsReasoningEffort('exploration'))
+})
+
+// ---------------------------------------------------------------------------
+// Short interactive text: the weakest effort at or above `low`
+// ---------------------------------------------------------------------------
+
+test('short text asks for low, and the floor is low', () => {
+  assert.equal(SHORT_TEXT_REASONING_FLOOR, 'low')
+  // The model a production ledger measured starving: deepseek-v4.1-flash.
+  assert.equal(weakestEffortAtOrAbove(['low', 'high', 'max']), 'low')
+  assert.equal(weakestEffortAtOrAbove(GLM_REASONING_EFFORTS), 'low')
+  assert.equal(weakestEffortAtOrAbove(OPENROUTER.claude), 'low')
+})
+
+test('none and minimal are skipped even when offered', () => {
+  // The operator's call: the floor is low, not "as little as the model allows".
+  assert.equal(weakestEffortAtOrAbove(OPENROUTER.gpt), 'low')
+  assert.equal(weakestEffortAtOrAbove(OPENROUTER.gemini), 'low')
+  assert.equal(weakestEffortAtOrAbove(THINKING_LEVELS), 'low')
+})
+
+test('a model without low gets the next level up, never one below', () => {
+  assert.equal(weakestEffortAtOrAbove(['medium', 'high']), 'medium')
+  assert.equal(weakestEffortAtOrAbove(OPENROUTER.fugu), 'high')
+  // Only levels below the floor: send nothing rather than go under it.
+  assert.equal(weakestEffortAtOrAbove(['none', 'minimal']), undefined)
+})
+
+test('the answer does not depend on the order the catalog lists words in', () => {
+  // OpenRouter publishes strongest-first; a sort-dependent pick would say max.
+  assert.equal(weakestEffortAtOrAbove(['max', 'high', 'low']), 'low')
+  assert.equal(weakestEffortAtOrAbove(['high', 'medium', 'max']), 'medium')
+})
+
+test('an unrankable word is never chosen, and no vocabulary means send nothing', () => {
+  assert.equal(weakestEffortAtOrAbove(['ultra', 'high']), 'high')
+  assert.equal(weakestEffortAtOrAbove(['ultra']), undefined)
+  assert.equal(weakestEffortAtOrAbove([]), undefined)
+  // A model with no mechanism has an empty vocabulary.
+  assert.equal(weakestEffortAtOrAbove(reasoningEffortsFor(null)), undefined)
+})
+
+test('the chosen word is always one the resolver will send', () => {
+  // Chosen from the model's own list, so it can never be reported undeliverable.
+  for (const efforts of Object.values(OPENROUTER)) {
+    const effort = weakestEffortAtOrAbove(efforts)
+    const out = resolveReasoningOptions({ provider: 'openrouter', model: orModel(efforts), effort })
+    assert.equal(out.undeliverable, null, efforts.join(','))
+    assert.deepEqual(out.providerOptions, { openrouter: { reasoning: { effort } } })
+  }
+  const zai = resolveReasoningOptions({
+    provider: 'zai',
+    model: zaiModel,
+    effort: weakestEffortAtOrAbove(reasoningEffortsFor(zaiModel)),
+  })
+  assert.deepEqual(zai.providerOptions, { zai: { reasoningEffort: 'low' } })
+  const gemini = resolveReasoningOptions({
+    provider: 'google',
+    model: googleModel,
+    effort: weakestEffortAtOrAbove(reasoningEffortsFor(googleModel)),
+  })
+  assert.deepEqual(gemini.providerOptions, { google: { thinkingConfig: { thinkingLevel: 'low' } } })
 })

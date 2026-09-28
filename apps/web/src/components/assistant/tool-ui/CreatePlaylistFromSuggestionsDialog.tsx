@@ -26,6 +26,9 @@ import CloseIcon from '@mui/icons-material/Close'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd'
 import { getProxiedImageUrl } from '@aperture/ui'
+import { aiFailureMessage } from '../../../lib/aiFailureMessage'
+import { isAbortError } from '../../../lib/requestGuard'
+import { useRequestGuard } from '../../../hooks/useRequestGuard'
 import type { ContentItem } from './types'
 
 interface CreatePlaylistFromSuggestionsDialogProps {
@@ -57,6 +60,9 @@ export function CreatePlaylistFromSuggestionsDialog({
   // Offered only when the API says this viewer can have home rows; false until it answers.
   const [homeAvailable, setHomeAvailable] = useState(false)
   const [showOnHome, setShowOnHome] = useState(false)
+
+  // An answer that lands after the dialog closed is dropped, not written into the next opening.
+  const requests = useRequestGuard(open)
 
   // Pre-select every suggestion whenever the dialog opens ("add all" by default).
   useEffect(() => {
@@ -119,6 +125,7 @@ export function CreatePlaylistFromSuggestionsDialog({
   /** `useNotes` keeps the drafted name as the thing to sharpen — see the description below. */
   const handleGenerateName = async (useNotes = false) => {
     const notes = useNotes ? name.trim() : ''
+    const ticket = requests.begin()
     setGeneratingName(true)
     setError(null)
     try {
@@ -132,12 +139,19 @@ export function CreatePlaylistFromSuggestionsDialog({
           chatContext: chatContext(),
           userNotes: notes || undefined,
         }),
+        signal: ticket.signal,
       })
-      if (!response.ok) throw new Error('Failed to generate name')
+      if (!response.ok) {
+        // The server's sentence says why (a model that thought past its limit, a bad key);
+        // the fallback only says that it failed.
+        const message = await aiFailureMessage(t, response, t('playlists.errGenerateName'))
+        if (ticket.isCurrent()) setError(message)
+        return
+      }
       const data = await response.json()
-      setName(data.name)
-    } catch {
-      setError(t('playlists.errGenerateName'))
+      if (ticket.isCurrent()) setName(data.name)
+    } catch (err) {
+      if (ticket.isCurrent() && !isAbortError(err)) setError(t('playlists.errGenerateName'))
     } finally {
       setGeneratingName(false)
     }
@@ -151,6 +165,7 @@ export function CreatePlaylistFromSuggestionsDialog({
    */
   const handleGenerateDescription = async (useNotes = false) => {
     const notes = useNotes ? description.trim() : ''
+    const ticket = requests.begin()
     setGeneratingDescription(true)
     setError(null)
     try {
@@ -165,12 +180,17 @@ export function CreatePlaylistFromSuggestionsDialog({
           chatContext: chatContext(),
           userNotes: notes || undefined,
         }),
+        signal: ticket.signal,
       })
-      if (!response.ok) throw new Error('Failed to generate description')
+      if (!response.ok) {
+        const message = await aiFailureMessage(t, response, t('playlists.errGenerateDescription'))
+        if (ticket.isCurrent()) setError(message)
+        return
+      }
       const data = await response.json()
-      setDescription(data.description)
-    } catch {
-      setError(t('playlists.errGenerateDescription'))
+      if (ticket.isCurrent()) setDescription(data.description)
+    } catch (err) {
+      if (ticket.isCurrent() && !isAbortError(err)) setError(t('playlists.errGenerateDescription'))
     } finally {
       setGeneratingDescription(false)
     }

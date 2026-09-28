@@ -374,36 +374,36 @@ export function usePlaylistsData(outputType: 'playlist' | 'collection' = 'playli
     }
   }
 
+  // Functional updates throughout: the dialog's AI buttons write into this same form when their
+  // answer lands, and a whole-form write from an older render would revert it.
   const addExampleMovie = (movie: MediaSummary) => {
-    if (!formData.exampleMovies.find((m) => m.id === movie.id)) {
-      setFormData({
-        ...formData,
-        exampleMovies: [...formData.exampleMovies, movie],
-      })
-    }
+    setFormData((prev) =>
+      prev.exampleMovies.some((m) => m.id === movie.id)
+        ? prev
+        : { ...prev, exampleMovies: [...prev.exampleMovies, movie] }
+    )
   }
 
   const removeExampleMovie = (movieId: string) => {
-    setFormData({
-      ...formData,
-      exampleMovies: formData.exampleMovies.filter((m) => m.id !== movieId),
-    })
+    setFormData((prev) => ({
+      ...prev,
+      exampleMovies: prev.exampleMovies.filter((m) => m.id !== movieId),
+    }))
   }
 
   const addExampleSeries = (series: MediaSummary) => {
-    if (!formData.exampleSeries.find((s) => s.id === series.id)) {
-      setFormData({
-        ...formData,
-        exampleSeries: [...formData.exampleSeries, series],
-      })
-    }
+    setFormData((prev) =>
+      prev.exampleSeries.some((s) => s.id === series.id)
+        ? prev
+        : { ...prev, exampleSeries: [...prev.exampleSeries, series] }
+    )
   }
 
   const removeExampleSeries = (seriesId: string) => {
-    setFormData({
-      ...formData,
-      exampleSeries: formData.exampleSeries.filter((s) => s.id !== seriesId),
-    })
+    setFormData((prev) => ({
+      ...prev,
+      exampleSeries: prev.exampleSeries.filter((s) => s.id !== seriesId),
+    }))
   }
 
   // Playlist view/edit functions

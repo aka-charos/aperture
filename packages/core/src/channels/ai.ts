@@ -1,7 +1,5 @@
 import { createChildLogger } from '../lib/logger.js'
-import { getFunctionConfig, getTextGenerationModelInstance } from '../lib/ai-provider.js'
-import { describeAiFailure } from '../lib/aiFailure.js'
-import { generateText } from 'ai'
+import { generateShortText } from '../lib/shortText.js'
 import { queryOne } from '../lib/db.js'
 import { buildAiLanguageInstruction } from '../lib/locales.js'
 import { resolveEffectiveAiLanguage } from '../lib/userSettings.js'
@@ -121,24 +119,22 @@ export async function generateAIPreferences(
     return 'Please select some genres or example titles to help generate preferences.'
   }
 
-  const config = await getFunctionConfig('textGeneration')
+  const aiLocale = await resolveEffectiveAiLanguage(userId)
+  const langBlock = `\n\n${buildAiLanguageInstruction(aiLocale)}`
 
-  try {
-    const aiLocale = await resolveEffectiveAiLanguage(userId)
-    const langBlock = `\n\n${buildAiLanguageInstruction(aiLocale)}`
-    const model = await getTextGenerationModelInstance()
-
-    // Without this the model treats the notes as one more piece of context and writes over
-    // them — which is the whole complaint: the user types an angle, and it disappears.
-    const notesRule = notes
-      ? `
+  // Without this the model treats the notes as one more piece of context and writes over
+  // them — which is the whole complaint: the user types an angle, and it disappears.
+  const notesRule = notes
+    ? `
 
 The user has already written notes of their own (THE USER'S OWN NOTES). Those outrank the genres and the example titles. Keep every angle they raise, including one the examples give no reason to expect, and build the rest around it. Sharpen and expand their wording; never drop it, contradict it, or hand it back word for word.`
-      : ''
+    : ''
 
-    const { text } = await generateText({
-      model,
-      system: `You are a movie curator helping create a custom playlist. Based on the user's taste profile, selected genres, and example movies, generate 2-3 short preference paragraphs that describe what kind of movies should be included in this playlist.${notesRule}
+  // The call — reasoning cap, output ceiling, refusing a cut-off answer — is shared with the
+  // name and description; this used to be its own copy with its own budget, and drifted.
+  const text = await generateShortText({
+    purpose: 'playlist preferences',
+    system: `You are a movie curator helping create a custom playlist. Based on the user's taste profile, selected genres, and example movies, generate 2-3 short preference paragraphs that describe what kind of movies should be included in this playlist.${notesRule}
 
 Be specific and actionable. Reference the qualities, themes, and styles evident in the example movies. Consider what makes these movies work together as a collection.
 
@@ -151,23 +147,12 @@ Focus on:
 - What to avoid if implied by the examples
 
 Write in first person as if the user is describing what they want. Keep it concise but specific - each paragraph should be 1-2 sentences. Don't use bullet points.${langBlock}`,
-      prompt: contextParts.join('\n\n'),
-      temperature: 0.7,
-      // Headroom for reasoning models, which spend the budget thinking before they write
-      // anything — the same starvation that used to make this fail at random.
-      maxOutputTokens: 1500,
-    })
+    prompt: contextParts.join('\n\n'),
+    temperature: 0.7,
+  })
 
-    if (!text?.trim()) {
-      throw new Error('The AI model returned an empty response.')
-    }
-
-    logger.info({ userId, preferencesLength: text.length }, 'AI preferences generated')
-    return text
-  } catch (error) {
-    logger.error({ error, userId, provider: config?.provider }, 'Failed to generate AI preferences')
-    throw new Error(await describeAiFailure(config?.provider, error))
-  }
+  logger.info({ userId, preferencesLength: text.length }, 'AI preferences generated')
+  return text
 }
 
 /**

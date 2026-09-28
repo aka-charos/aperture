@@ -213,6 +213,55 @@ export function orderReasoningEfforts(efforts: readonly string[]): readonly stri
 }
 
 /**
+ * The weakest reasoning short interactive text may ask for — playlist names,
+ * descriptions, preferences and preview notes.
+ *
+ * Those calls are sent this rather than the role's configured effort, because
+ * the role's setting is chosen for batch prose (explanations, the Watcher
+ * Identity) and "max" there is what starved them: measured on a production
+ * ledger, `deepseek-v4.1-flash` spent all 600 tokens of a name call reasoning
+ * in most attempts and every token of every preview-note call. A three-word name
+ * needs no deliberation.
+ *
+ * A FLOOR, not a target of "as little as possible": `none` and `minimal` are
+ * skipped even when a model offers them, on the operator's call — some thought
+ * is what keeps a name from being the first cliché that fits.
+ */
+export const SHORT_TEXT_REASONING_FLOOR = 'low'
+
+/**
+ * The weakest effort this model offers at or above `floor`, or `undefined` to
+ * send nothing.
+ *
+ * `low` when the model has it; otherwise the next level up the model does have
+ * (`medium`, then `high`…), since a model offering only strong levels still
+ * thinks less at its weakest one. Never anything below the floor.
+ *
+ * An unrecognised word is never chosen: this has to RANK, and a word absent from
+ * {@link KNOWN_REASONING_EFFORTS} has no rank. That is not the filtering that
+ * constant forbids — the word stays offered in the settings picker; it just
+ * cannot be called the weakest.
+ */
+export function weakestEffortAtOrAbove(
+  efforts: readonly string[],
+  floor: string = SHORT_TEXT_REASONING_FLOOR
+): string | undefined {
+  const known = KNOWN_REASONING_EFFORTS as readonly string[]
+  const floorRank = known.indexOf(floor)
+  if (floorRank === -1) return undefined
+
+  let chosen: string | undefined
+  let chosenRank = Number.POSITIVE_INFINITY
+  for (const effort of efforts) {
+    const rank = known.indexOf(effort)
+    if (rank === -1 || rank < floorRank || rank >= chosenRank) continue
+    chosen = effort
+    chosenRank = rank
+  }
+  return chosen
+}
+
+/**
  * The effort stored on a config, trimmed and lower-cased — or `undefined`.
  *
  * Normalisation only. Whether the value is *acceptable* depends on the model
