@@ -33,7 +33,7 @@ const LIBRARY: DecadeCounts = new Map([
   [2020, 1958],
 ])
 
-/** Viewer "viewer B": 198 films, a clean recency ramp. */
+/** A real viewer's shape (~200 films): a clean recency ramp. */
 const RECENCY_VIEWER: DecadeCounts = new Map([
   [1960, 1],
   [1970, 5],
@@ -45,7 +45,7 @@ const RECENCY_VIEWER: DecadeCounts = new Map([
 ])
 
 /**
- * Viewer "viewer C": 1,563 films -- five times the median history on that library,
+ * A real viewer's shape (~1,500 films) -- several times the median history,
  * and the least noisy profile available. Counts reconstructed from the measured
  * lifts, which is why the assertions below test the SHAPE rather than exact
  * values. The shape is the part that matters: this viewer peaks at the 2000s

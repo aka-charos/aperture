@@ -53,15 +53,15 @@
  *
  * ## Why a per-decade vector rather than a recency curve
  *
- * Measured across nine viewers on the live instance, the shapes genuinely
+ * Measured across several viewers on a real library, the shapes genuinely
  * differ and no two-parameter curve fits them:
  *
- *   viewer A   (337)  .27 .21 .22 .54  .80 1.08 1.07 2.30   recency ramp
- *   viewer B   (198)  .39 .38 .54 .73  .92  .96  .88 2.37   recency ramp
- *   viewer C   (1563)  .72 .90 .99 1.11 1.35 1.46 .76  .89   peaks at the 2000s
- *   viewer D    (384) 1.04 1.11 1.42 1.11 1.28 1.08 .61 1.17  peaks at the 1970s
+ *   A  (~300)  .27 .21 .22 .54  .80 1.08 1.07 2.30   recency ramp
+ *   B  (~200)  .39 .38 .54 .73  .92  .96  .88 2.37   recency ramp
+ *   C (~1500)  .72 .90 .99 1.11 1.35 1.46 .76  .89   peaks at the 2000s
+ *   D  (~400) 1.04 1.11 1.42 1.11 1.28 1.08 .61 1.17  peaks at the 1970s
  *
- * viewer C has five times the median history on that library -- the least noisy
+ * C has several times the median history on that library -- the least noisy
  * row available -- and sits BELOW neutral on the 2020s. A recency model would
  * have pushed recent films at the two viewers who most clearly avoid them.
  *
