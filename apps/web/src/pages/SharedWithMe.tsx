@@ -398,7 +398,7 @@ export function SharedWithMePage() {
                             onClick={() => openItem(item)}
                           >
                             {/* Top-left: the top-right corner is the poster's badge
-                            stack, and this page draws no rank badge. */}
+                                stack, and this page draws no rank badge. */}
                             <Tooltip title={t('sharedWithMe.dismiss')}>
                               <IconButton
                                 size="small"

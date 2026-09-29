@@ -30,10 +30,21 @@ export function TypeSection({
     <Box sx={{ '& + &': { mt: 3 } }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, color: 'text.secondary' }}>
         <Icon sx={{ fontSize: 18 }} />
-        <Typography variant="subtitle2" component="h3" color="text.secondary">
+        {/* The count sits inside the heading, so a screen reader hears
+            "Movies 3" rather than the heading and then a bare number. */}
+        <Typography
+          variant="subtitle2"
+          component="h3"
+          color="text.secondary"
+          sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+        >
           {type === 'movie' ? t('dashboard.movies') : t('dashboard.series')}
+          <Chip
+            label={count}
+            size="small"
+            sx={{ height: 20, fontSize: '0.7rem', fontWeight: 600 }}
+          />
         </Typography>
-        <Chip label={count} size="small" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 600 }} />
       </Box>
       {children}
     </Box>
