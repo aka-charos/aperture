@@ -37,7 +37,9 @@ Filling **all** missing strings (~1.4k per locale × 13 non-English locales) is 
 
 ## Pluralization
 
-- Use `_plural` suffix keys where needed (e.g. `admin.runningJobs` / `admin.runningJobs_plural`).
+- i18next (v21+, v26 here) picks a key by the language's **CLDR plural category**: `key_one` / `key_other` in English, but `_few` and `_many` in Russian, `_zero` / `_two` / `_few` / `_many` in Arabic, `_two` in Hebrew, `_many` in Spanish, French, Italian and Portuguese (millions), and `_other` alone in Japanese, Korean and Chinese. `new Intl.PluralRules(lang).resolvedOptions().pluralCategories` lists them. The old `_plural` suffix is not read.
+- **A missing category falls back to ENGLISH, not to the language's own `_other`** (measured: a Russian file with only `_one` / `_other` renders "3 titles" in English for 2, 3, 5 and 11). `i18n:sync` only stamps the categories English has, so a translated plural must add the language's other categories by hand. Most plural strings translated before 2026-09-29 carry only `_one` / `_other` and leak English for those counts; the social-feature strings carry every category.
+- A label with a count that does not inflect (`Watched: {{count}}`) can be a single key without a suffix: i18next tries the category first and then the bare key, in the same language.
 
 ## RTL (Arabic, Hebrew)
 

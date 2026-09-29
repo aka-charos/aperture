@@ -49,9 +49,10 @@
     "roleLabelAdmin": "Administrateur",
     "roleLabelUser": "Utilisateur",
     "collections": "Collections",
-    "sharedWithMeBadge_one": "{{count}} new recommendation",
-    "sharedWithMeBadge_other": "{{count}} new recommendations",
-    "watchThis": "À voir"
+    "sharedWithMeBadge_one": "{{count}} nouvelle recommandation",
+    "sharedWithMeBadge_other": "{{count}} nouvelles recommandations",
+    "watchThis": "À voir",
+    "sharedWithMeBadge_many": "{{count}} nouvelles recommandations"
   },
   "admin": {
     "title": "Administration",
@@ -295,8 +296,8 @@
       "recsKindsNone": "No library",
       "recsKindsTooltip": "The kinds follow from the libraries {{provider}} lets this account see, among those enabled here.",
       "recsKindsUnreadTooltip": "This account's library access hasn't been read from {{provider}} yet; it will be at the next user sync or sign-in. Until then every enabled library counts.",
-      "menuConnections": "Connections…",
-      "menuConnectionsSecondary": "Who this person shares their viewing with"
+      "menuConnections": "Connexions…",
+      "menuConnectionsSecondary": "Avec qui cette personne partage ce qu'elle regarde"
     },
     "userDetail": {
       "userNotFound": "Utilisateur introuvable",
@@ -402,7 +403,7 @@
         "scopes": "API key permissions",
         "assistant_enabled": "Assistant",
         "recommendations_enabled": "Recommendations",
-        "connection": "Connection"
+        "connection": "Connexion"
       }
     },
     "jobsPage": {
@@ -678,15 +679,15 @@
       "audienceAdmin": "Admin console"
     },
     "connectionsDialog": {
-      "title": "Connections for {{name}}",
-      "description": "Connected people see each other's watch history, recent watches and names on titles, and can recommend titles to each other.",
-      "addPlaceholder": "Add a connection…",
-      "empty": "Not connected to anyone yet.",
-      "remove": "Remove connection",
-      "noAccess": "No access. Hidden from the other person until access is turned back on.",
-      "added": "Connected {{a}} and {{b}}",
-      "removed": "Connection removed",
-      "failed": "Couldn't change the connection"
+      "title": "Connexions de {{name}}",
+      "description": "Les personnes connectées voient mutuellement leur historique de visionnage, ce qu'elles ont regardé récemment et leur nom sur les titres, et peuvent se recommander des titres.",
+      "addPlaceholder": "Ajouter une connexion…",
+      "empty": "Aucune connexion pour l'instant.",
+      "remove": "Supprimer la connexion",
+      "noAccess": "Pas d'accès. Masqué pour l'autre personne jusqu'à ce que l'accès soit réactivé.",
+      "added": "{{a}} et {{b}} sont maintenant connectés",
+      "removed": "Connexion supprimée",
+      "failed": "Impossible de modifier la connexion"
     }
   },
   "home": {
@@ -770,8 +771,8 @@
       "plusMore": "+{{count}} more",
       "genreEnjoyedTooltip": "A genre you already watch a lot of",
       "genreNewTooltip": "New to you — this would be a first",
-      "recommend": "Recommend to…",
-      "recommendTooltip": "Send this to people you're connected to"
+      "recommend": "Recommander à…",
+      "recommendTooltip": "Envoyer ce titre à vos connexions"
     },
     "insights": {
       "recommendedForYou": "Recommandé pour vous",
@@ -891,13 +892,15 @@
       "watcherPlays": "{{count}} plays",
       "watcherEpisodes": "{{count}} episodes",
       "watcherLastWatched": "Last watched {{date}}",
-      "watcherYou": "You",
-      "watchersUnnamed_one": "and {{count}} other person you're not connected to",
-      "watchersUnnamed_other": "and {{count}} other people you're not connected to",
-      "watchersOpenHintNamed": "Click to see their names",
-      "watchersConnectionsOnly": "Names are shown only for you and the people you're connected to.",
-      "watchersUnnamedFooter_one": "{{count}} other person watched this too.",
-      "watchersUnnamedFooter_other": "{{count}} other people watched this too."
+      "watcherYou": "Vous",
+      "watchersUnnamed_one": "et {{count}} autre personne hors de vos connexions",
+      "watchersUnnamed_other": "et {{count}} autres personnes hors de vos connexions",
+      "watchersOpenHintNamed": "Cliquez pour voir leurs noms",
+      "watchersConnectionsOnly": "Les noms ne s'affichent que pour vous et vos connexions.",
+      "watchersUnnamedFooter_one": "{{count}} autre personne l'a aussi regardé.",
+      "watchersUnnamedFooter_other": "{{count}} autres personnes l'ont aussi regardé.",
+      "watchersUnnamedFooter_many": "{{count}} autres personnes l'ont aussi regardé.",
+      "watchersUnnamed_many": "et {{count}} autres personnes hors de vos connexions"
     },
     "similar": {
       "titleMovies": "Films associés",
@@ -965,20 +968,21 @@
       }
     },
     "recommendDialog": {
-      "title": "Recommend {{title}}",
-      "alreadyWatched": "Already watched",
-      "unavailable": "Not in their libraries",
-      "alreadyRecommended": "Already sent. Sending again moves it to the top",
-      "send": "Send",
-      "sent_one": "Sent to {{count}} person",
-      "sent_other": "Sent to {{count}} people",
-      "skippedWatched": "{{name}} has already watched it",
-      "skippedUnavailable": "{{name}} can't open this title",
-      "skippedDisconnected": "{{name}} is no longer connected",
-      "failed": "Couldn't send the recommendation",
-      "loadFailed": "Couldn't load your connections",
-      "empty": "You're not connected to anyone yet",
-      "descriptionWatchThis": "Les personnes choisies le retrouveront dans « À voir »."
+      "title": "Recommander {{title}}",
+      "alreadyWatched": "Déjà regardé",
+      "unavailable": "Absent de ses bibliothèques",
+      "alreadyRecommended": "Déjà envoyé. Le renvoyer le fait remonter en tête",
+      "send": "Envoyer",
+      "sent_one": "Envoyé à {{count}} personne",
+      "sent_other": "Envoyé à {{count}} personnes",
+      "skippedWatched": "{{name}} a déjà regardé ce titre",
+      "skippedUnavailable": "{{name}} ne peut pas ouvrir ce titre",
+      "skippedDisconnected": "{{name}} ne fait plus partie de vos connexions",
+      "failed": "Impossible d'envoyer la recommandation",
+      "loadFailed": "Impossible de charger vos connexions",
+      "empty": "Vous n'avez encore aucune connexion",
+      "descriptionWatchThis": "Les personnes choisies le retrouveront dans « À voir ».",
+      "sent_many": "Envoyé à {{count}} personnes"
     }
   },
   "browse": {
@@ -3236,8 +3240,8 @@
     "typeSeries": "Série",
     "statsWindow": "Last {{count}} days",
     "statsMoreDetails": "More details",
-    "recentlyWatchedBy": "Recently watched by {{name}}",
-    "subtitleFromConnections": "From your connections"
+    "recentlyWatchedBy": "Regardé récemment par {{name}}",
+    "subtitleFromConnections": "De vos connexions"
   },
   "playlists": {
     "pageTitle": "Listes de lecture",
@@ -3496,12 +3500,12 @@
     "filterAll": "All",
     "filterInProgress": "In Progress",
     "filterCompleted": "Completed",
-    "whoseHistory": "Whose history",
-    "me": "Me",
-    "otherUsersHistory": "{{name}}'s watch history",
-    "viewingReadOnly": "You're viewing {{name}}'s history. It's read-only.",
-    "emptyMoviesOther": "No movies in {{name}}'s history that you can open.",
-    "emptySeriesOther": "No series in {{name}}'s history that you can open."
+    "whoseHistory": "Historique de",
+    "me": "Moi",
+    "otherUsersHistory": "Historique de {{name}}",
+    "viewingReadOnly": "Vous consultez l'historique de {{name}}. Il est en lecture seule.",
+    "emptyMoviesOther": "Aucun film de l'historique de {{name}} que vous puissiez ouvrir.",
+    "emptySeriesOther": "Aucune série de l'historique de {{name}} que vous puissiez ouvrir."
   },
   "topPicksPage": {
     "pageTitle": "Meilleurs choix",
@@ -5615,47 +5619,49 @@
     }
   },
   "sharedWithMe": {
-    "recommendedBy": "Recommended by {{name}}",
-    "dismiss": "Dismiss",
-    "dismissed": "Recommendation dismissed",
-    "dismissFailed": "Couldn't dismiss it",
-    "loadFailed": "Couldn't load what's been shared with you",
-    "empty": "Nothing shared with you yet",
-    "emptyHint": "When someone you're connected to recommends a title, it appears here. Titles you finish leave on their own.",
+    "recommendedBy": "Recommandé par {{name}}",
+    "dismiss": "Ignorer",
+    "dismissed": "Recommandation ignorée",
+    "dismissFailed": "Impossible de l'ignorer",
+    "loadFailed": "Impossible de charger ce qui a été partagé avec vous",
+    "empty": "Rien n'a encore été partagé avec vous",
+    "emptyHint": "Quand l'une de vos connexions vous recommande un titre, il apparaît ici. Les titres que vous terminez disparaissent d'eux-mêmes.",
     "title": "À voir !",
-    "subtitleBoth": "What the people you're connected to recommend to you, and what you've recommended to them",
-    "tabReceived": "Received",
-    "tabSent": "Sent",
-    "tileWaiting": "Waiting for you",
-    "tileSent": "You shared",
-    "tileWatched": "Finished by them",
-    "tileWatchedValue": "{{watched}} of {{total}}",
-    "receivedSummary_one": "{{count}} title · last shared {{when}}",
-    "receivedSummary_other": "{{count}} titles · last shared {{when}}",
-    "sentTo": "Sent to {{name}}",
-    "sentSummary_one": "{{count}} title sent",
-    "sentSummary_other": "{{count}} titles sent",
-    "sentEmpty": "You haven't recommended anything yet",
-    "sentEmptyHint": "Open a movie or series and choose “Recommend to…” to send it to someone you're connected to. You'll see here whether they've watched it.",
-    "sentLoadFailed": "Couldn't load what you've shared",
+    "subtitleBoth": "Ce que vos connexions vous recommandent, et ce que vous leur avez recommandé",
+    "tabReceived": "Reçus",
+    "tabSent": "Envoyés",
+    "tileWaiting": "Pour vous",
+    "tileSent": "Partagés par vous",
+    "tileWatched": "Regardés par eux",
+    "tileWatchedValue": "{{watched}} sur {{total}}",
+    "receivedSummary_one": "{{count}} titre · dernier partage {{when}}",
+    "receivedSummary_other": "{{count}} titres · dernier partage {{when}}",
+    "sentTo": "Envoyé à {{name}}",
+    "sentSummary_one": "{{count}} titre envoyé",
+    "sentSummary_other": "{{count}} titres envoyés",
+    "sentEmpty": "Vous n'avez encore rien recommandé",
+    "sentEmptyHint": "Ouvrez un film ou une série et choisissez « Recommander à… » pour l'envoyer à l'une de vos connexions. Vous verrez ici si elle l'a regardé.",
+    "sentLoadFailed": "Impossible de charger ce que vous avez partagé",
     "status": {
-      "watched": "Watched",
-      "watching": "Watching",
-      "waiting": "Waiting",
-      "unavailable": "Can't open"
+      "watched": "Regardé",
+      "watching": "En cours",
+      "waiting": "En attente",
+      "unavailable": "Inaccessible"
     },
-    "statusWatchingProgress": "{{watched}}/{{total}} episodes",
+    "statusWatchingProgress": "{{watched}}/{{total}} épisodes",
     "statusHint": {
-      "watched": "{{name}} finished it",
-      "watching": "{{name}} has watched {{watched}} of {{total}} episodes",
-      "waiting": "{{name}} hasn't watched it yet",
-      "unavailable": "{{name}} can't open this any more: it's outside their libraries now"
+      "watched": "{{name}} l'a terminé",
+      "watching": "{{name}} a regardé {{watched}} épisodes sur {{total}}",
+      "waiting": "{{name}} ne l'a pas encore regardé",
+      "unavailable": "{{name}} ne peut plus l'ouvrir : ce titre n'est plus dans ses bibliothèques"
     },
     "statusCount": {
-      "watched": "{{count}} watched",
-      "watching": "{{count}} watching",
-      "waiting": "{{count}} waiting",
-      "unavailable": "{{count}} can't open"
-    }
+      "watched": "Regardé : {{count}}",
+      "watching": "En cours : {{count}}",
+      "waiting": "En attente : {{count}}",
+      "unavailable": "Inaccessible : {{count}}"
+    },
+    "receivedSummary_many": "{{count}} titres · dernier partage {{when}}",
+    "sentSummary_many": "{{count}} titres envoyés"
   }
 }

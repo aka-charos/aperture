@@ -49,8 +49,8 @@
     "roleLabelAdmin": "Beheerder",
     "roleLabelUser": "Gebruiker",
     "collections": "Collections",
-    "sharedWithMeBadge_one": "{{count}} new recommendation",
-    "sharedWithMeBadge_other": "{{count}} new recommendations",
+    "sharedWithMeBadge_one": "{{count}} nieuwe aanrader",
+    "sharedWithMeBadge_other": "{{count}} nieuwe aanraders",
     "watchThis": "Moet je zien"
   },
   "admin": {
@@ -295,8 +295,8 @@
       "recsKindsNone": "No library",
       "recsKindsTooltip": "The kinds follow from the libraries {{provider}} lets this account see, among those enabled here.",
       "recsKindsUnreadTooltip": "This account's library access hasn't been read from {{provider}} yet; it will be at the next user sync or sign-in. Until then every enabled library counts.",
-      "menuConnections": "Connections…",
-      "menuConnectionsSecondary": "Who this person shares their viewing with"
+      "menuConnections": "Verbindingen…",
+      "menuConnectionsSecondary": "Met wie deze persoon deelt wat die kijkt"
     },
     "userDetail": {
       "userNotFound": "Gebruiker niet gevonden",
@@ -402,7 +402,7 @@
         "scopes": "API key permissions",
         "assistant_enabled": "Assistant",
         "recommendations_enabled": "Recommendations",
-        "connection": "Connection"
+        "connection": "Verbinding"
       }
     },
     "jobsPage": {
@@ -678,15 +678,15 @@
       "audienceAdmin": "Admin console"
     },
     "connectionsDialog": {
-      "title": "Connections for {{name}}",
-      "description": "Connected people see each other's watch history, recent watches and names on titles, and can recommend titles to each other.",
-      "addPlaceholder": "Add a connection…",
-      "empty": "Not connected to anyone yet.",
-      "remove": "Remove connection",
-      "noAccess": "No access. Hidden from the other person until access is turned back on.",
-      "added": "Connected {{a}} and {{b}}",
-      "removed": "Connection removed",
-      "failed": "Couldn't change the connection"
+      "title": "Verbindingen van {{name}}",
+      "description": "Verbonden mensen zien elkaars kijkgeschiedenis, wat ze onlangs hebben gekeken en elkaars naam bij titels, en kunnen elkaar titels aanraden.",
+      "addPlaceholder": "Verbinding toevoegen…",
+      "empty": "Nog met niemand verbonden.",
+      "remove": "Verbinding verwijderen",
+      "noAccess": "Geen toegang. Verborgen voor de ander tot de toegang weer aan staat.",
+      "added": "{{a}} en {{b}} zijn nu verbonden",
+      "removed": "Verbinding verwijderd",
+      "failed": "Kan de verbinding niet wijzigen"
     }
   },
   "home": {
@@ -869,13 +869,13 @@
       "watcherPlays": "{{count}} plays",
       "watcherEpisodes": "{{count}} episodes",
       "watcherLastWatched": "Last watched {{date}}",
-      "watcherYou": "You",
-      "watchersUnnamed_one": "and {{count}} other person you're not connected to",
-      "watchersUnnamed_other": "and {{count}} other people you're not connected to",
-      "watchersOpenHintNamed": "Click to see their names",
-      "watchersConnectionsOnly": "Names are shown only for you and the people you're connected to.",
-      "watchersUnnamedFooter_one": "{{count}} other person watched this too.",
-      "watchersUnnamedFooter_other": "{{count}} other people watched this too."
+      "watcherYou": "Jij",
+      "watchersUnnamed_one": "en {{count}} andere persoon met wie je niet verbonden bent",
+      "watchersUnnamed_other": "en {{count}} andere mensen met wie je niet verbonden bent",
+      "watchersOpenHintNamed": "Klik om hun namen te zien",
+      "watchersConnectionsOnly": "Namen zijn alleen zichtbaar voor jou en je verbindingen.",
+      "watchersUnnamedFooter_one": "Nog {{count}} persoon heeft dit ook gekeken.",
+      "watchersUnnamedFooter_other": "Nog {{count}} mensen hebben dit ook gekeken."
     },
     "hero": {
       "watched": "Bekeken",
@@ -925,8 +925,8 @@
       "plusMore": "+{{count}} more",
       "genreEnjoyedTooltip": "A genre you already watch a lot of",
       "genreNewTooltip": "New to you — this would be a first",
-      "recommend": "Recommend to…",
-      "recommendTooltip": "Send this to people you're connected to"
+      "recommend": "Aanraden aan…",
+      "recommendTooltip": "Stuur dit naar je verbindingen"
     },
     "insights": {
       "recommendedForYou": "Aanbevolen voor u",
@@ -1063,19 +1063,19 @@
       }
     },
     "recommendDialog": {
-      "title": "Recommend {{title}}",
-      "alreadyWatched": "Already watched",
-      "unavailable": "Not in their libraries",
-      "alreadyRecommended": "Already sent. Sending again moves it to the top",
-      "send": "Send",
-      "sent_one": "Sent to {{count}} person",
-      "sent_other": "Sent to {{count}} people",
-      "skippedWatched": "{{name}} has already watched it",
-      "skippedUnavailable": "{{name}} can't open this title",
-      "skippedDisconnected": "{{name}} is no longer connected",
-      "failed": "Couldn't send the recommendation",
-      "loadFailed": "Couldn't load your connections",
-      "empty": "You're not connected to anyone yet",
+      "title": "{{title}} aanraden",
+      "alreadyWatched": "Al gekeken",
+      "unavailable": "Niet in hun bibliotheken",
+      "alreadyRecommended": "Al verstuurd. Opnieuw versturen zet het bovenaan",
+      "send": "Versturen",
+      "sent_one": "Verstuurd naar {{count}} persoon",
+      "sent_other": "Verstuurd naar {{count}} mensen",
+      "skippedWatched": "{{name}} heeft dit al gekeken",
+      "skippedUnavailable": "{{name}} kan deze titel niet openen",
+      "skippedDisconnected": "{{name}} is niet meer verbonden",
+      "failed": "Kan de aanrader niet versturen",
+      "loadFailed": "Kan je verbindingen niet laden",
+      "empty": "Je bent nog met niemand verbonden",
       "descriptionWatchThis": "De mensen die je kiest, vinden het onder ‘Moet je zien’."
     }
   },
@@ -3201,8 +3201,8 @@
     "typeSeries": "Serie",
     "statsWindow": "Last {{count}} days",
     "statsMoreDetails": "More details",
-    "recentlyWatchedBy": "Recently watched by {{name}}",
-    "subtitleFromConnections": "From your connections"
+    "recentlyWatchedBy": "Onlangs gekeken door {{name}}",
+    "subtitleFromConnections": "Van je verbindingen"
   },
   "playlists": {
     "pageTitle": "Afspeellijsten",
@@ -3461,12 +3461,12 @@
     "filterAll": "All",
     "filterInProgress": "In Progress",
     "filterCompleted": "Completed",
-    "whoseHistory": "Whose history",
-    "me": "Me",
-    "otherUsersHistory": "{{name}}'s watch history",
-    "viewingReadOnly": "You're viewing {{name}}'s history. It's read-only.",
-    "emptyMoviesOther": "No movies in {{name}}'s history that you can open.",
-    "emptySeriesOther": "No series in {{name}}'s history that you can open."
+    "whoseHistory": "Geschiedenis van",
+    "me": "Ik",
+    "otherUsersHistory": "Kijkgeschiedenis van {{name}}",
+    "viewingReadOnly": "Je bekijkt de geschiedenis van {{name}}. Die is alleen-lezen.",
+    "emptyMoviesOther": "Geen films in de geschiedenis van {{name}} die je kunt openen.",
+    "emptySeriesOther": "Geen series in de geschiedenis van {{name}} die je kunt openen."
   },
   "topPicksPage": {
     "pageTitle": "Topkeuzes",
@@ -5615,47 +5615,47 @@
     }
   },
   "sharedWithMe": {
-    "recommendedBy": "Recommended by {{name}}",
-    "dismiss": "Dismiss",
-    "dismissed": "Recommendation dismissed",
-    "dismissFailed": "Couldn't dismiss it",
-    "loadFailed": "Couldn't load what's been shared with you",
-    "empty": "Nothing shared with you yet",
-    "emptyHint": "When someone you're connected to recommends a title, it appears here. Titles you finish leave on their own.",
+    "recommendedBy": "Aangeraden door {{name}}",
+    "dismiss": "Negeren",
+    "dismissed": "Aanrader genegeerd",
+    "dismissFailed": "Kan het niet negeren",
+    "loadFailed": "Kan niet laden wat met je is gedeeld",
+    "empty": "Nog niets met je gedeeld",
+    "emptyHint": "Als iemand met wie je verbonden bent je een titel aanraadt, verschijnt die hier. Titels die je uitkijkt verdwijnen vanzelf.",
     "title": "Moet je zien!",
-    "subtitleBoth": "What the people you're connected to recommend to you, and what you've recommended to them",
-    "tabReceived": "Received",
-    "tabSent": "Sent",
-    "tileWaiting": "Waiting for you",
-    "tileSent": "You shared",
-    "tileWatched": "Finished by them",
-    "tileWatchedValue": "{{watched}} of {{total}}",
-    "receivedSummary_one": "{{count}} title · last shared {{when}}",
-    "receivedSummary_other": "{{count}} titles · last shared {{when}}",
-    "sentTo": "Sent to {{name}}",
-    "sentSummary_one": "{{count}} title sent",
-    "sentSummary_other": "{{count}} titles sent",
-    "sentEmpty": "You haven't recommended anything yet",
-    "sentEmptyHint": "Open a movie or series and choose “Recommend to…” to send it to someone you're connected to. You'll see here whether they've watched it.",
-    "sentLoadFailed": "Couldn't load what you've shared",
+    "subtitleBoth": "Wat je verbindingen je aanraden, en wat jij hun hebt aangeraden",
+    "tabReceived": "Ontvangen",
+    "tabSent": "Verstuurd",
+    "tileWaiting": "Wacht op jou",
+    "tileSent": "Door jou gedeeld",
+    "tileWatched": "Door hen gekeken",
+    "tileWatchedValue": "{{watched}} van {{total}}",
+    "receivedSummary_one": "{{count}} titel · laatst gedeeld {{when}}",
+    "receivedSummary_other": "{{count}} titels · laatst gedeeld {{when}}",
+    "sentTo": "Verstuurd naar {{name}}",
+    "sentSummary_one": "{{count}} titel verstuurd",
+    "sentSummary_other": "{{count}} titels verstuurd",
+    "sentEmpty": "Je hebt nog niets aangeraden",
+    "sentEmptyHint": "Open een film of serie en kies ‘Aanraden aan…’ om die naar iemand te sturen met wie je verbonden bent. Hier zie je of die het heeft gekeken.",
+    "sentLoadFailed": "Kan niet laden wat je hebt gedeeld",
     "status": {
-      "watched": "Watched",
-      "watching": "Watching",
-      "waiting": "Waiting",
-      "unavailable": "Can't open"
+      "watched": "Gekeken",
+      "watching": "Bezig",
+      "waiting": "Nog niet gekeken",
+      "unavailable": "Geen toegang"
     },
-    "statusWatchingProgress": "{{watched}}/{{total}} episodes",
+    "statusWatchingProgress": "{{watched}}/{{total}} afleveringen",
     "statusHint": {
-      "watched": "{{name}} finished it",
-      "watching": "{{name}} has watched {{watched}} of {{total}} episodes",
-      "waiting": "{{name}} hasn't watched it yet",
-      "unavailable": "{{name}} can't open this any more: it's outside their libraries now"
+      "watched": "{{name}} heeft het uitgekeken",
+      "watching": "{{name}} heeft {{watched}} van de {{total}} afleveringen gekeken",
+      "waiting": "{{name}} heeft het nog niet gekeken",
+      "unavailable": "{{name}} kan dit niet meer openen: het staat niet meer in hun bibliotheken"
     },
     "statusCount": {
-      "watched": "{{count}} watched",
-      "watching": "{{count}} watching",
-      "waiting": "{{count}} waiting",
-      "unavailable": "{{count}} can't open"
+      "watched": "Gekeken: {{count}}",
+      "watching": "Bezig: {{count}}",
+      "waiting": "Nog niet gekeken: {{count}}",
+      "unavailable": "Geen toegang: {{count}}"
     }
   }
 }

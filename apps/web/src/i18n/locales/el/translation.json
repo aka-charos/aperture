@@ -2963,12 +2963,12 @@
     "filterAll": "Όλα",
     "filterInProgress": "Σε εξέλιξη",
     "filterCompleted": "Ολοκληρωμένα",
-    "whoseHistory": "Whose history",
-    "me": "Me",
-    "otherUsersHistory": "{{name}}'s watch history",
-    "viewingReadOnly": "You're viewing {{name}}'s history. It's read-only.",
-    "emptyMoviesOther": "No movies in {{name}}'s history that you can open.",
-    "emptySeriesOther": "No series in {{name}}'s history that you can open."
+    "whoseHistory": "Ιστορικό χρήστη",
+    "me": "Εγώ",
+    "otherUsersHistory": "Ιστορικό προβολών: {{name}}",
+    "viewingReadOnly": "Βλέπετε το ιστορικό του χρήστη {{name}}. Είναι μόνο για ανάγνωση.",
+    "emptyMoviesOther": "Δεν υπάρχουν ταινίες στο ιστορικό του χρήστη {{name}} που μπορείτε να ανοίξετε.",
+    "emptySeriesOther": "Δεν υπάρχουν σειρές στο ιστορικό του χρήστη {{name}} που μπορείτε να ανοίξετε."
   },
   "mediaGraph": {
     "searchPlaceholder": "Ψάξτε με διάθεση, θέμα ή περιγραφή…",
@@ -3039,8 +3039,8 @@
     "howItWorks": "Πώς λειτουργεί",
     "roleLabelAdmin": "Διαχειριστής",
     "roleLabelUser": "Χρήστης",
-    "sharedWithMeBadge_one": "{{count}} new recommendation",
-    "sharedWithMeBadge_other": "{{count}} new recommendations",
+    "sharedWithMeBadge_one": "{{count}} νέα σύσταση",
+    "sharedWithMeBadge_other": "{{count}} νέες συστάσεις",
     "watchThis": "Δείτε το"
   },
   "settingsMdblist": {
@@ -3187,13 +3187,13 @@
       "watcherPlays": "{{count}} plays",
       "watcherEpisodes": "{{count}} episodes",
       "watcherLastWatched": "Last watched {{date}}",
-      "watcherYou": "You",
-      "watchersUnnamed_one": "and {{count}} other person you're not connected to",
-      "watchersUnnamed_other": "and {{count}} other people you're not connected to",
-      "watchersOpenHintNamed": "Click to see their names",
-      "watchersConnectionsOnly": "Names are shown only for you and the people you're connected to.",
-      "watchersUnnamedFooter_one": "{{count}} other person watched this too.",
-      "watchersUnnamedFooter_other": "{{count}} other people watched this too."
+      "watcherYou": "Εσείς",
+      "watchersUnnamed_one": "και {{count}} ακόμη άτομο εκτός των συνδέσεών σας",
+      "watchersUnnamed_other": "και {{count}} ακόμη άτομα εκτός των συνδέσεών σας",
+      "watchersOpenHintNamed": "Κάντε κλικ για να δείτε τα ονόματα",
+      "watchersConnectionsOnly": "Τα ονόματα εμφανίζονται μόνο για εσάς και τις συνδέσεις σας.",
+      "watchersUnnamedFooter_one": "Ακόμη {{count}} άτομο το είδε επίσης.",
+      "watchersUnnamedFooter_other": "Ακόμη {{count}} άτομα το είδαν επίσης."
     },
     "hero": {
       "watched": "Το είδατε",
@@ -3243,8 +3243,8 @@
       "plusMore": "+{{count}} ακόμη",
       "genreEnjoyedTooltip": "Είδος που ήδη βλέπετε πολύ",
       "genreNewTooltip": "Κάτι καινούριο για εσάς — θα ήταν η πρώτη φορά",
-      "recommend": "Recommend to…",
-      "recommendTooltip": "Send this to people you're connected to"
+      "recommend": "Σύσταση σε…",
+      "recommendTooltip": "Στείλτε το στις συνδέσεις σας"
     },
     "insights": {
       "recommendedForYou": "Προτείνεται για εσάς",
@@ -3381,19 +3381,19 @@
       }
     },
     "recommendDialog": {
-      "title": "Recommend {{title}}",
-      "alreadyWatched": "Already watched",
-      "unavailable": "Not in their libraries",
-      "alreadyRecommended": "Already sent. Sending again moves it to the top",
-      "send": "Send",
-      "sent_one": "Sent to {{count}} person",
-      "sent_other": "Sent to {{count}} people",
-      "skippedWatched": "{{name}} has already watched it",
-      "skippedUnavailable": "{{name}} can't open this title",
-      "skippedDisconnected": "{{name}} is no longer connected",
-      "failed": "Couldn't send the recommendation",
-      "loadFailed": "Couldn't load your connections",
-      "empty": "You're not connected to anyone yet",
+      "title": "Σύσταση: {{title}}",
+      "alreadyWatched": "Το έχει ήδη δει",
+      "unavailable": "Εκτός των βιβλιοθηκών του ατόμου",
+      "alreadyRecommended": "Έχει ήδη σταλεί. Αν το στείλετε ξανά, μετακινείται στην κορυφή",
+      "send": "Αποστολή",
+      "sent_one": "Στάλθηκε σε {{count}} άτομο",
+      "sent_other": "Στάλθηκε σε {{count}} άτομα",
+      "skippedWatched": "{{name}}: το έχει ήδη δει",
+      "skippedUnavailable": "{{name}}: δεν έχει πρόσβαση σε αυτόν τον τίτλο",
+      "skippedDisconnected": "{{name}}: δεν είναι πλέον σύνδεση",
+      "failed": "Δεν ήταν δυνατή η αποστολή της σύστασης",
+      "loadFailed": "Δεν ήταν δυνατή η φόρτωση των συνδέσεών σας",
+      "empty": "Δεν έχετε ακόμη συνδέσεις",
       "descriptionWatchThis": "Τα άτομα που θα επιλέξετε θα το βρουν στην ενότητα «Δείτε το»."
     }
   },
@@ -3895,8 +3895,8 @@
     "typeSeries": "Σειρά",
     "statsWindow": "Last {{count}} days",
     "statsMoreDetails": "More details",
-    "recentlyWatchedBy": "Recently watched by {{name}}",
-    "subtitleFromConnections": "From your connections"
+    "recentlyWatchedBy": "Πρόσφατες προβολές: {{name}}",
+    "subtitleFromConnections": "Από τις συνδέσεις σας"
   },
   "algorithmSettings": {
     "weightSimilarity": "Ομοιότητα",
@@ -4350,8 +4350,8 @@
       "recsKindsNone": "No library",
       "recsKindsTooltip": "The kinds follow from the libraries {{provider}} lets this account see, among those enabled here.",
       "recsKindsUnreadTooltip": "This account's library access hasn't been read from {{provider}} yet; it will be at the next user sync or sign-in. Until then every enabled library counts.",
-      "menuConnections": "Connections…",
-      "menuConnectionsSecondary": "Who this person shares their viewing with"
+      "menuConnections": "Συνδέσεις…",
+      "menuConnectionsSecondary": "Με ποιους μοιράζεται αυτό το άτομο τι βλέπει"
     },
     "userDetail": {
       "userNotFound": "Ο χρήστης δεν βρέθηκε",
@@ -4457,7 +4457,7 @@
         "scopes": "API key permissions",
         "assistant_enabled": "Assistant",
         "recommendations_enabled": "Recommendations",
-        "connection": "Connection"
+        "connection": "Σύνδεση"
       }
     },
     "jobsPage": {
@@ -4733,15 +4733,15 @@
       "audienceAdmin": "Της διαχείρισης"
     },
     "connectionsDialog": {
-      "title": "Connections for {{name}}",
-      "description": "Connected people see each other's watch history, recent watches and names on titles, and can recommend titles to each other.",
-      "addPlaceholder": "Add a connection…",
-      "empty": "Not connected to anyone yet.",
-      "remove": "Remove connection",
-      "noAccess": "No access. Hidden from the other person until access is turned back on.",
-      "added": "Connected {{a}} and {{b}}",
-      "removed": "Connection removed",
-      "failed": "Couldn't change the connection"
+      "title": "Συνδέσεις: {{name}}",
+      "description": "Τα συνδεδεμένα άτομα βλέπουν το ιστορικό προβολών το ένα του άλλου, τι είδαν πρόσφατα και τα ονόματά τους στους τίτλους, και μπορούν να συστήνουν τίτλους το ένα στο άλλο.",
+      "addPlaceholder": "Προσθήκη σύνδεσης…",
+      "empty": "Δεν υπάρχει καμία σύνδεση ακόμη.",
+      "remove": "Κατάργηση σύνδεσης",
+      "noAccess": "Χωρίς πρόσβαση. Κρυφό για το άλλο άτομο μέχρι να ενεργοποιηθεί ξανά η πρόσβαση.",
+      "added": "Συνδέθηκαν: {{a}} και {{b}}",
+      "removed": "Η σύνδεση καταργήθηκε",
+      "failed": "Δεν ήταν δυνατή η αλλαγή της σύνδεσης"
     }
   },
   "networkFilter": {
@@ -5615,47 +5615,47 @@
     }
   },
   "sharedWithMe": {
-    "recommendedBy": "Recommended by {{name}}",
-    "dismiss": "Dismiss",
-    "dismissed": "Recommendation dismissed",
-    "dismissFailed": "Couldn't dismiss it",
-    "loadFailed": "Couldn't load what's been shared with you",
-    "empty": "Nothing shared with you yet",
-    "emptyHint": "When someone you're connected to recommends a title, it appears here. Titles you finish leave on their own.",
+    "recommendedBy": "Σύσταση από {{name}}",
+    "dismiss": "Απόρριψη",
+    "dismissed": "Η σύσταση απορρίφθηκε",
+    "dismissFailed": "Δεν ήταν δυνατή η απόρριψη",
+    "loadFailed": "Δεν ήταν δυνατή η φόρτωση όσων σας έχουν κοινοποιηθεί",
+    "empty": "Δεν έχει κοινοποιηθεί τίποτα σε εσάς ακόμη",
+    "emptyHint": "Όταν μια σύνδεσή σας σάς συστήσει έναν τίτλο, θα εμφανιστεί εδώ. Οι τίτλοι που ολοκληρώνετε φεύγουν από μόνοι τους.",
     "title": "Δείτε το!",
-    "subtitleBoth": "What the people you're connected to recommend to you, and what you've recommended to them",
-    "tabReceived": "Received",
-    "tabSent": "Sent",
-    "tileWaiting": "Waiting for you",
-    "tileSent": "You shared",
-    "tileWatched": "Finished by them",
-    "tileWatchedValue": "{{watched}} of {{total}}",
-    "receivedSummary_one": "{{count}} title · last shared {{when}}",
-    "receivedSummary_other": "{{count}} titles · last shared {{when}}",
-    "sentTo": "Sent to {{name}}",
-    "sentSummary_one": "{{count}} title sent",
-    "sentSummary_other": "{{count}} titles sent",
-    "sentEmpty": "You haven't recommended anything yet",
-    "sentEmptyHint": "Open a movie or series and choose “Recommend to…” to send it to someone you're connected to. You'll see here whether they've watched it.",
-    "sentLoadFailed": "Couldn't load what you've shared",
+    "subtitleBoth": "Τι σας συστήνουν οι συνδέσεις σας και τι έχετε συστήσει εσείς σε αυτές",
+    "tabReceived": "Ληφθέντα",
+    "tabSent": "Απεσταλμένα",
+    "tileWaiting": "Σας περιμένουν",
+    "tileSent": "Κοινοποιήσατε",
+    "tileWatched": "Τα είδαν",
+    "tileWatchedValue": "{{watched}} από {{total}}",
+    "receivedSummary_one": "{{count}} τίτλος · τελευταία κοινοποίηση {{when}}",
+    "receivedSummary_other": "{{count}} τίτλοι · τελευταία κοινοποίηση {{when}}",
+    "sentTo": "Στάλθηκε σε: {{name}}",
+    "sentSummary_one": "{{count}} τίτλος στάλθηκε",
+    "sentSummary_other": "{{count}} τίτλοι στάλθηκαν",
+    "sentEmpty": "Δεν έχετε κάνει ακόμη καμία σύσταση",
+    "sentEmptyHint": "Ανοίξτε μια ταινία ή σειρά και επιλέξτε «Σύσταση σε…» για να τη στείλετε σε μια σύνδεσή σας. Εδώ θα βλέπετε αν την έχει δει.",
+    "sentLoadFailed": "Δεν ήταν δυνατή η φόρτωση όσων έχετε κοινοποιήσει",
     "status": {
-      "watched": "Watched",
-      "watching": "Watching",
-      "waiting": "Waiting",
-      "unavailable": "Can't open"
+      "watched": "Το είδε",
+      "watching": "Σε εξέλιξη",
+      "waiting": "Σε αναμονή",
+      "unavailable": "Χωρίς πρόσβαση"
     },
-    "statusWatchingProgress": "{{watched}}/{{total}} episodes",
+    "statusWatchingProgress": "{{watched}}/{{total}} επεισόδια",
     "statusHint": {
-      "watched": "{{name}} finished it",
-      "watching": "{{name}} has watched {{watched}} of {{total}} episodes",
-      "waiting": "{{name}} hasn't watched it yet",
-      "unavailable": "{{name}} can't open this any more: it's outside their libraries now"
+      "watched": "{{name}}: το ολοκλήρωσε",
+      "watching": "{{name}}: έχει δει {{watched}} από {{total}} επεισόδια",
+      "waiting": "{{name}}: δεν το έχει δει ακόμη",
+      "unavailable": "{{name}}: δεν μπορεί πλέον να το ανοίξει, είναι εκτός των βιβλιοθηκών του ατόμου"
     },
     "statusCount": {
-      "watched": "{{count}} watched",
-      "watching": "{{count}} watching",
-      "waiting": "{{count}} waiting",
-      "unavailable": "{{count}} can't open"
+      "watched": "Το είδε: {{count}}",
+      "watching": "Σε εξέλιξη: {{count}}",
+      "waiting": "Σε αναμονή: {{count}}",
+      "unavailable": "Χωρίς πρόσβαση: {{count}}"
     }
   }
 }

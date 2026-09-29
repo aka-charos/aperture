@@ -49,8 +49,8 @@
     "roleLabelAdmin": "관리자",
     "roleLabelUser": "사용자",
     "collections": "Collections",
-    "sharedWithMeBadge_one": "{{count}} new recommendation",
-    "sharedWithMeBadge_other": "{{count}} new recommendations",
+    "sharedWithMeBadge_one": "새 작품 {{count}}개",
+    "sharedWithMeBadge_other": "새 작품 {{count}}개",
     "watchThis": "이거 봐요"
   },
   "admin": {
@@ -295,8 +295,8 @@
       "recsKindsNone": "No library",
       "recsKindsTooltip": "The kinds follow from the libraries {{provider}} lets this account see, among those enabled here.",
       "recsKindsUnreadTooltip": "This account's library access hasn't been read from {{provider}} yet; it will be at the next user sync or sign-in. Until then every enabled library counts.",
-      "menuConnections": "Connections…",
-      "menuConnectionsSecondary": "Who this person shares their viewing with"
+      "menuConnections": "연결…",
+      "menuConnectionsSecondary": "이 사람이 시청 내역을 공유하는 대상"
     },
     "userDetail": {
       "userNotFound": "사용자를 찾을 수 없습니다",
@@ -402,7 +402,7 @@
         "scopes": "API key permissions",
         "assistant_enabled": "Assistant",
         "recommendations_enabled": "Recommendations",
-        "connection": "Connection"
+        "connection": "연결"
       }
     },
     "jobsPage": {
@@ -678,15 +678,15 @@
       "audienceAdmin": "Admin console"
     },
     "connectionsDialog": {
-      "title": "Connections for {{name}}",
-      "description": "Connected people see each other's watch history, recent watches and names on titles, and can recommend titles to each other.",
-      "addPlaceholder": "Add a connection…",
-      "empty": "Not connected to anyone yet.",
-      "remove": "Remove connection",
-      "noAccess": "No access. Hidden from the other person until access is turned back on.",
-      "added": "Connected {{a}} and {{b}}",
-      "removed": "Connection removed",
-      "failed": "Couldn't change the connection"
+      "title": "{{name}} 님의 연결",
+      "description": "연결된 사람들은 서로의 시청 기록, 최근 시청한 작품, 작품 페이지의 이름을 볼 수 있고 서로 작품을 권할 수 있습니다.",
+      "addPlaceholder": "연결 추가…",
+      "empty": "아직 연결된 사람이 없습니다.",
+      "remove": "연결 해제",
+      "noAccess": "접근 권한 없음. 접근 권한이 다시 켜질 때까지 상대방에게 표시되지 않습니다.",
+      "added": "{{a}} 님과 {{b}} 님을 연결했습니다",
+      "removed": "연결을 해제했습니다",
+      "failed": "연결을 변경하지 못했습니다"
     }
   },
   "home": {
@@ -770,8 +770,8 @@
       "plusMore": "+{{count}} more",
       "genreEnjoyedTooltip": "A genre you already watch a lot of",
       "genreNewTooltip": "New to you — this would be a first",
-      "recommend": "Recommend to…",
-      "recommendTooltip": "Send this to people you're connected to"
+      "recommend": "권하기…",
+      "recommendTooltip": "연결된 사람들에게 이 작품을 보냅니다"
     },
     "insights": {
       "recommendedForYou": "당신에게 추천",
@@ -891,13 +891,13 @@
       "watcherPlays": "{{count}} plays",
       "watcherEpisodes": "{{count}} episodes",
       "watcherLastWatched": "Last watched {{date}}",
-      "watcherYou": "You",
-      "watchersUnnamed_one": "and {{count}} other person you're not connected to",
-      "watchersUnnamed_other": "and {{count}} other people you're not connected to",
-      "watchersOpenHintNamed": "Click to see their names",
-      "watchersConnectionsOnly": "Names are shown only for you and the people you're connected to.",
-      "watchersUnnamedFooter_one": "{{count}} other person watched this too.",
-      "watchersUnnamedFooter_other": "{{count}} other people watched this too."
+      "watcherYou": "나",
+      "watchersUnnamed_one": "그리고 연결되지 않은 {{count}}명",
+      "watchersUnnamed_other": "그리고 연결되지 않은 {{count}}명",
+      "watchersOpenHintNamed": "클릭하여 이름 보기",
+      "watchersConnectionsOnly": "이름은 나와 연결된 사람에게만 표시됩니다.",
+      "watchersUnnamedFooter_one": "그 밖에 {{count}}명도 시청했습니다.",
+      "watchersUnnamedFooter_other": "그 밖에 {{count}}명도 시청했습니다."
     },
     "similar": {
       "titleMovies": "관련 영화",
@@ -965,19 +965,19 @@
       }
     },
     "recommendDialog": {
-      "title": "Recommend {{title}}",
-      "alreadyWatched": "Already watched",
-      "unavailable": "Not in their libraries",
-      "alreadyRecommended": "Already sent. Sending again moves it to the top",
-      "send": "Send",
-      "sent_one": "Sent to {{count}} person",
-      "sent_other": "Sent to {{count}} people",
-      "skippedWatched": "{{name}} has already watched it",
-      "skippedUnavailable": "{{name}} can't open this title",
-      "skippedDisconnected": "{{name}} is no longer connected",
-      "failed": "Couldn't send the recommendation",
-      "loadFailed": "Couldn't load your connections",
-      "empty": "You're not connected to anyone yet",
+      "title": "{{title}} 권하기",
+      "alreadyWatched": "이미 시청함",
+      "unavailable": "상대방 라이브러리에 없음",
+      "alreadyRecommended": "이미 보냈습니다. 다시 보내면 맨 위로 올라갑니다",
+      "send": "보내기",
+      "sent_one": "{{count}}명에게 보냈습니다",
+      "sent_other": "{{count}}명에게 보냈습니다",
+      "skippedWatched": "{{name}} 님은 이미 시청했습니다",
+      "skippedUnavailable": "{{name}} 님은 이 작품을 열 수 없습니다",
+      "skippedDisconnected": "{{name}} 님과 더 이상 연결되어 있지 않습니다",
+      "failed": "보내지 못했습니다",
+      "loadFailed": "연결 목록을 불러오지 못했습니다",
+      "empty": "아직 연결된 사람이 없습니다",
       "descriptionWatchThis": "선택한 사람들은 ‘이거 봐요’에서 확인할 수 있어요."
     }
   },
@@ -3236,8 +3236,8 @@
     "typeSeries": "시리즈",
     "statsWindow": "Last {{count}} days",
     "statsMoreDetails": "More details",
-    "recentlyWatchedBy": "Recently watched by {{name}}",
-    "subtitleFromConnections": "From your connections"
+    "recentlyWatchedBy": "{{name}} 님이 최근 본 작품",
+    "subtitleFromConnections": "연결된 사람들로부터"
   },
   "playlists": {
     "pageTitle": "재생목록",
@@ -3496,12 +3496,12 @@
     "filterAll": "All",
     "filterInProgress": "In Progress",
     "filterCompleted": "Completed",
-    "whoseHistory": "Whose history",
-    "me": "Me",
-    "otherUsersHistory": "{{name}}'s watch history",
-    "viewingReadOnly": "You're viewing {{name}}'s history. It's read-only.",
-    "emptyMoviesOther": "No movies in {{name}}'s history that you can open.",
-    "emptySeriesOther": "No series in {{name}}'s history that you can open."
+    "whoseHistory": "기록 보기",
+    "me": "나",
+    "otherUsersHistory": "{{name}} 님의 시청 기록",
+    "viewingReadOnly": "{{name}} 님의 기록을 보고 있습니다. 읽기 전용입니다.",
+    "emptyMoviesOther": "{{name}} 님의 기록에 내가 열 수 있는 영화가 없습니다.",
+    "emptySeriesOther": "{{name}} 님의 기록에 내가 열 수 있는 시리즈가 없습니다."
   },
   "topPicksPage": {
     "pageTitle": "최고 추천 상품",
@@ -5615,47 +5615,47 @@
     }
   },
   "sharedWithMe": {
-    "recommendedBy": "Recommended by {{name}}",
-    "dismiss": "Dismiss",
-    "dismissed": "Recommendation dismissed",
-    "dismissFailed": "Couldn't dismiss it",
-    "loadFailed": "Couldn't load what's been shared with you",
-    "empty": "Nothing shared with you yet",
-    "emptyHint": "When someone you're connected to recommends a title, it appears here. Titles you finish leave on their own.",
+    "recommendedBy": "{{name}} 님이 권한 작품",
+    "dismiss": "숨기기",
+    "dismissed": "숨겼습니다",
+    "dismissFailed": "숨기지 못했습니다",
+    "loadFailed": "공유받은 작품을 불러오지 못했습니다",
+    "empty": "아직 공유받은 작품이 없습니다",
+    "emptyHint": "연결된 사람이 작품을 권하면 여기에 표시됩니다. 다 본 작품은 자동으로 사라집니다.",
     "title": "이거 봐요!",
-    "subtitleBoth": "What the people you're connected to recommend to you, and what you've recommended to them",
-    "tabReceived": "Received",
-    "tabSent": "Sent",
-    "tileWaiting": "Waiting for you",
-    "tileSent": "You shared",
-    "tileWatched": "Finished by them",
-    "tileWatchedValue": "{{watched}} of {{total}}",
-    "receivedSummary_one": "{{count}} title · last shared {{when}}",
-    "receivedSummary_other": "{{count}} titles · last shared {{when}}",
-    "sentTo": "Sent to {{name}}",
-    "sentSummary_one": "{{count}} title sent",
-    "sentSummary_other": "{{count}} titles sent",
-    "sentEmpty": "You haven't recommended anything yet",
-    "sentEmptyHint": "Open a movie or series and choose “Recommend to…” to send it to someone you're connected to. You'll see here whether they've watched it.",
-    "sentLoadFailed": "Couldn't load what you've shared",
+    "subtitleBoth": "연결된 사람들이 나에게 권한 작품과 내가 권한 작품",
+    "tabReceived": "받은 작품",
+    "tabSent": "보낸 작품",
+    "tileWaiting": "나를 기다리는 작품",
+    "tileSent": "내가 공유함",
+    "tileWatched": "상대방이 시청함",
+    "tileWatchedValue": "{{total}}개 중 {{watched}}개",
+    "receivedSummary_one": "작품 {{count}}개 · 마지막 공유 {{when}}",
+    "receivedSummary_other": "작품 {{count}}개 · 마지막 공유 {{when}}",
+    "sentTo": "{{name}} 님에게 보낸 작품",
+    "sentSummary_one": "작품 {{count}}개 보냄",
+    "sentSummary_other": "작품 {{count}}개 보냄",
+    "sentEmpty": "아직 권한 작품이 없습니다",
+    "sentEmptyHint": "영화나 시리즈를 열고 ‘권하기…’를 선택하면 연결된 사람에게 보낼 수 있습니다. 상대방이 시청했는지 여기에서 확인할 수 있습니다.",
+    "sentLoadFailed": "보낸 작품을 불러오지 못했습니다",
     "status": {
-      "watched": "Watched",
-      "watching": "Watching",
-      "waiting": "Waiting",
-      "unavailable": "Can't open"
+      "watched": "시청함",
+      "watching": "시청 중",
+      "waiting": "대기 중",
+      "unavailable": "열 수 없음"
     },
-    "statusWatchingProgress": "{{watched}}/{{total}} episodes",
+    "statusWatchingProgress": "{{watched}}/{{total}}화",
     "statusHint": {
-      "watched": "{{name}} finished it",
-      "watching": "{{name}} has watched {{watched}} of {{total}} episodes",
-      "waiting": "{{name}} hasn't watched it yet",
-      "unavailable": "{{name}} can't open this any more: it's outside their libraries now"
+      "watched": "{{name}} 님이 다 봤습니다",
+      "watching": "{{name}} 님이 {{total}}화 중 {{watched}}화를 시청했습니다",
+      "waiting": "{{name}} 님은 아직 시청하지 않았습니다",
+      "unavailable": "{{name}} 님은 이제 이 작품을 열 수 없습니다: 라이브러리 범위를 벗어났습니다"
     },
     "statusCount": {
-      "watched": "{{count}} watched",
-      "watching": "{{count}} watching",
-      "waiting": "{{count}} waiting",
-      "unavailable": "{{count}} can't open"
+      "watched": "시청함 {{count}}",
+      "watching": "시청 중 {{count}}",
+      "waiting": "대기 중 {{count}}",
+      "unavailable": "열 수 없음 {{count}}"
     }
   }
 }

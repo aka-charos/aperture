@@ -49,9 +49,11 @@
     "roleLabelAdmin": "Администратор",
     "roleLabelUser": "Пользователь",
     "collections": "Collections",
-    "sharedWithMeBadge_one": "{{count}} new recommendation",
-    "sharedWithMeBadge_other": "{{count}} new recommendations",
-    "watchThis": "Стоит посмотреть"
+    "sharedWithMeBadge_one": "{{count}} новый совет",
+    "sharedWithMeBadge_other": "{{count}} нового совета",
+    "watchThis": "Стоит посмотреть",
+    "sharedWithMeBadge_few": "{{count}} новых совета",
+    "sharedWithMeBadge_many": "{{count}} новых советов"
   },
   "admin": {
     "title": "Администрация",
@@ -295,8 +297,8 @@
       "recsKindsNone": "No library",
       "recsKindsTooltip": "The kinds follow from the libraries {{provider}} lets this account see, among those enabled here.",
       "recsKindsUnreadTooltip": "This account's library access hasn't been read from {{provider}} yet; it will be at the next user sync or sign-in. Until then every enabled library counts.",
-      "menuConnections": "Connections…",
-      "menuConnectionsSecondary": "Who this person shares their viewing with"
+      "menuConnections": "Связи…",
+      "menuConnectionsSecondary": "С кем этот пользователь делится своими просмотрами"
     },
     "userDetail": {
       "userNotFound": "Пользователь не найден",
@@ -402,7 +404,7 @@
         "scopes": "API key permissions",
         "assistant_enabled": "Assistant",
         "recommendations_enabled": "Recommendations",
-        "connection": "Connection"
+        "connection": "Связь"
       }
     },
     "jobsPage": {
@@ -678,15 +680,15 @@
       "audienceAdmin": "Admin console"
     },
     "connectionsDialog": {
-      "title": "Connections for {{name}}",
-      "description": "Connected people see each other's watch history, recent watches and names on titles, and can recommend titles to each other.",
-      "addPlaceholder": "Add a connection…",
-      "empty": "Not connected to anyone yet.",
-      "remove": "Remove connection",
-      "noAccess": "No access. Hidden from the other person until access is turned back on.",
-      "added": "Connected {{a}} and {{b}}",
-      "removed": "Connection removed",
-      "failed": "Couldn't change the connection"
+      "title": "Связи пользователя {{name}}",
+      "description": "Связанные пользователи видят историю просмотров друг друга, недавние просмотры и имена на страницах фильмов и сериалов, а также могут советовать друг другу, что посмотреть.",
+      "addPlaceholder": "Добавить связь…",
+      "empty": "Пока нет связей.",
+      "remove": "Удалить связь",
+      "noAccess": "Нет доступа. Скрыт от другого пользователя, пока доступ снова не включат.",
+      "added": "{{a}} и {{b}} теперь связаны",
+      "removed": "Связь удалена",
+      "failed": "Не удалось изменить связь"
     }
   },
   "home": {
@@ -869,13 +871,17 @@
       "watcherPlays": "{{count}} plays",
       "watcherEpisodes": "{{count}} episodes",
       "watcherLastWatched": "Last watched {{date}}",
-      "watcherYou": "You",
-      "watchersUnnamed_one": "and {{count}} other person you're not connected to",
-      "watchersUnnamed_other": "and {{count}} other people you're not connected to",
-      "watchersOpenHintNamed": "Click to see their names",
-      "watchersConnectionsOnly": "Names are shown only for you and the people you're connected to.",
-      "watchersUnnamedFooter_one": "{{count}} other person watched this too.",
-      "watchersUnnamedFooter_other": "{{count}} other people watched this too."
+      "watcherYou": "Вы",
+      "watchersUnnamed_one": "и ещё {{count}} человек не из ваших связей",
+      "watchersUnnamed_other": "и ещё {{count}} человека не из ваших связей",
+      "watchersOpenHintNamed": "Нажмите, чтобы увидеть имена",
+      "watchersConnectionsOnly": "Имена видны только вам и вашим связям.",
+      "watchersUnnamedFooter_one": "Ещё {{count}} человек тоже это посмотрел.",
+      "watchersUnnamedFooter_other": "Ещё {{count}} человека тоже это посмотрели.",
+      "watchersUnnamedFooter_few": "Ещё {{count}} человека тоже это посмотрели.",
+      "watchersUnnamedFooter_many": "Ещё {{count}} человек тоже это посмотрели.",
+      "watchersUnnamed_few": "и ещё {{count}} человека не из ваших связей",
+      "watchersUnnamed_many": "и ещё {{count}} человек не из ваших связей"
     },
     "hero": {
       "watched": "Смотрел",
@@ -925,8 +931,8 @@
       "plusMore": "+{{count}} more",
       "genreEnjoyedTooltip": "A genre you already watch a lot of",
       "genreNewTooltip": "New to you — this would be a first",
-      "recommend": "Recommend to…",
-      "recommendTooltip": "Send this to people you're connected to"
+      "recommend": "Посоветовать…",
+      "recommendTooltip": "Отправить вашим связям"
     },
     "insights": {
       "recommendedForYou": "Рекомендуется для вас",
@@ -1063,20 +1069,22 @@
       }
     },
     "recommendDialog": {
-      "title": "Recommend {{title}}",
-      "alreadyWatched": "Already watched",
-      "unavailable": "Not in their libraries",
-      "alreadyRecommended": "Already sent. Sending again moves it to the top",
-      "send": "Send",
-      "sent_one": "Sent to {{count}} person",
-      "sent_other": "Sent to {{count}} people",
-      "skippedWatched": "{{name}} has already watched it",
-      "skippedUnavailable": "{{name}} can't open this title",
-      "skippedDisconnected": "{{name}} is no longer connected",
-      "failed": "Couldn't send the recommendation",
-      "loadFailed": "Couldn't load your connections",
-      "empty": "You're not connected to anyone yet",
-      "descriptionWatchThis": "Выбранные вами люди найдут его в разделе «Стоит посмотреть»."
+      "title": "Посоветовать «{{title}}»",
+      "alreadyWatched": "Уже посмотрено",
+      "unavailable": "Нет в библиотеках получателя",
+      "alreadyRecommended": "Уже отправлено. Повторная отправка поднимет в начало",
+      "send": "Отправить",
+      "sent_one": "Отправлено {{count}} получателю",
+      "sent_other": "Отправлено {{count}} получателям",
+      "skippedWatched": "{{name}}: уже посмотрено",
+      "skippedUnavailable": "{{name}} не может открыть это",
+      "skippedDisconnected": "{{name}}: связи больше нет",
+      "failed": "Не удалось отправить совет",
+      "loadFailed": "Не удалось загрузить ваши связи",
+      "empty": "У вас пока нет связей",
+      "descriptionWatchThis": "Выбранные вами люди найдут его в разделе «Стоит посмотреть».",
+      "sent_few": "Отправлено {{count}} получателям",
+      "sent_many": "Отправлено {{count}} получателям"
     }
   },
   "imageUpload": {
@@ -3201,8 +3209,8 @@
     "typeSeries": "Ряд",
     "statsWindow": "Last {{count}} days",
     "statsMoreDetails": "More details",
-    "recentlyWatchedBy": "Recently watched by {{name}}",
-    "subtitleFromConnections": "From your connections"
+    "recentlyWatchedBy": "Недавние просмотры: {{name}}",
+    "subtitleFromConnections": "От ваших связей"
   },
   "playlists": {
     "pageTitle": "Плейлисты",
@@ -3461,12 +3469,12 @@
     "filterAll": "All",
     "filterInProgress": "In Progress",
     "filterCompleted": "Completed",
-    "whoseHistory": "Whose history",
-    "me": "Me",
-    "otherUsersHistory": "{{name}}'s watch history",
-    "viewingReadOnly": "You're viewing {{name}}'s history. It's read-only.",
-    "emptyMoviesOther": "No movies in {{name}}'s history that you can open.",
-    "emptySeriesOther": "No series in {{name}}'s history that you can open."
+    "whoseHistory": "Чья история",
+    "me": "Я",
+    "otherUsersHistory": "История просмотров: {{name}}",
+    "viewingReadOnly": "Вы просматриваете историю пользователя {{name}}. Только для чтения.",
+    "emptyMoviesOther": "В истории пользователя {{name}} нет фильмов, которые вы можете открыть.",
+    "emptySeriesOther": "В истории пользователя {{name}} нет сериалов, которые вы можете открыть."
   },
   "topPicksPage": {
     "pageTitle": "Лучшие предложения",
@@ -5615,47 +5623,51 @@
     }
   },
   "sharedWithMe": {
-    "recommendedBy": "Recommended by {{name}}",
-    "dismiss": "Dismiss",
-    "dismissed": "Recommendation dismissed",
-    "dismissFailed": "Couldn't dismiss it",
-    "loadFailed": "Couldn't load what's been shared with you",
-    "empty": "Nothing shared with you yet",
-    "emptyHint": "When someone you're connected to recommends a title, it appears here. Titles you finish leave on their own.",
+    "recommendedBy": "Советует {{name}}",
+    "dismiss": "Скрыть",
+    "dismissed": "Совет скрыт",
+    "dismissFailed": "Не удалось скрыть",
+    "loadFailed": "Не удалось загрузить то, чем с вами поделились",
+    "empty": "С вами пока ничем не поделились",
+    "emptyHint": "Когда кто-то из ваших связей посоветует вам фильм или сериал, он появится здесь. Досмотренное исчезает само.",
     "title": "Стоит посмотреть",
-    "subtitleBoth": "What the people you're connected to recommend to you, and what you've recommended to them",
-    "tabReceived": "Received",
-    "tabSent": "Sent",
-    "tileWaiting": "Waiting for you",
-    "tileSent": "You shared",
-    "tileWatched": "Finished by them",
-    "tileWatchedValue": "{{watched}} of {{total}}",
-    "receivedSummary_one": "{{count}} title · last shared {{when}}",
-    "receivedSummary_other": "{{count}} titles · last shared {{when}}",
-    "sentTo": "Sent to {{name}}",
-    "sentSummary_one": "{{count}} title sent",
-    "sentSummary_other": "{{count}} titles sent",
-    "sentEmpty": "You haven't recommended anything yet",
-    "sentEmptyHint": "Open a movie or series and choose “Recommend to…” to send it to someone you're connected to. You'll see here whether they've watched it.",
-    "sentLoadFailed": "Couldn't load what you've shared",
+    "subtitleBoth": "Что вам советуют ваши связи и что вы посоветовали им",
+    "tabReceived": "Полученные",
+    "tabSent": "Отправленные",
+    "tileWaiting": "Ждут вас",
+    "tileSent": "Вы поделились",
+    "tileWatched": "Посмотрели они",
+    "tileWatchedValue": "{{watched}} из {{total}}",
+    "receivedSummary_one": "{{count}} название · последнее {{when}}",
+    "receivedSummary_other": "{{count}} названия · последнее {{when}}",
+    "sentTo": "Отправлено: {{name}}",
+    "sentSummary_one": "Отправлено: {{count}}",
+    "sentSummary_other": "Отправлено: {{count}}",
+    "sentEmpty": "Вы пока ничего не посоветовали",
+    "sentEmptyHint": "Откройте фильм или сериал и выберите «Посоветовать…», чтобы отправить его одной из ваших связей. Здесь будет видно, посмотрели ли его.",
+    "sentLoadFailed": "Не удалось загрузить то, чем вы поделились",
     "status": {
-      "watched": "Watched",
-      "watching": "Watching",
-      "waiting": "Waiting",
-      "unavailable": "Can't open"
+      "watched": "Посмотрено",
+      "watching": "Смотрит",
+      "waiting": "Ожидает",
+      "unavailable": "Нет доступа"
     },
-    "statusWatchingProgress": "{{watched}}/{{total}} episodes",
+    "statusWatchingProgress": "{{watched}}/{{total}} серий",
     "statusHint": {
-      "watched": "{{name}} finished it",
-      "watching": "{{name}} has watched {{watched}} of {{total}} episodes",
-      "waiting": "{{name}} hasn't watched it yet",
-      "unavailable": "{{name}} can't open this any more: it's outside their libraries now"
+      "watched": "{{name}}: досмотрено",
+      "watching": "{{name}}: просмотрено {{watched}} из {{total}} серий",
+      "waiting": "{{name}}: ещё не посмотрено",
+      "unavailable": "{{name}} больше не может это открыть: теперь это вне доступных библиотек"
     },
     "statusCount": {
-      "watched": "{{count}} watched",
-      "watching": "{{count}} watching",
-      "waiting": "{{count}} waiting",
-      "unavailable": "{{count}} can't open"
-    }
+      "watched": "Посмотрено: {{count}}",
+      "watching": "Смотрит: {{count}}",
+      "waiting": "Ожидает: {{count}}",
+      "unavailable": "Нет доступа: {{count}}"
+    },
+    "receivedSummary_few": "{{count}} названия · последнее {{when}}",
+    "receivedSummary_many": "{{count}} названий · последнее {{when}}",
+    "sentSummary_few": "Отправлено: {{count}}",
+    "sentSummary_many": "Отправлено: {{count}}"
   }
 }

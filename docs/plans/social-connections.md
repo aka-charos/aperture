@@ -51,7 +51,12 @@ text below:
   (Hebrew, Arabic), the label uses that language's "worth watching" or "must-see" form
   instead: À voir, Da vedere, Стоит посмотреть, שווה צפייה, يستحق المشاهدة, 值得一看,
   Imperdíveis. Greek uses the app's formal Δείτε το. The file, the component and the
-  `sharedWithMe.*` keys keep the first name. `GET /api/social/recommendations/sent` groups
+  `sharedWithMe.*` keys keep the first name. **The whole feature is translated** (79 strings
+  × 14 languages, by hand): where "recommend" would collide with the AI Recommendations
+  page, peer recommendations take their own word (Tipp, indicação, consiglio, совет,
+  σύσταση, 紹介, 권하다, 分享, שיתוף, ترشيح, सुझाव). Every plural string carries each
+  language's full set of CLDR categories, because i18next falls back to English, not to
+  the language's own `_other` (see `src/i18n/CONVENTIONS.md`). `GET /api/social/recommendations/sent` groups
   by recipient, and each title carries a status: `watched`, `watching` (a series, with
   episode progress), `waiting`, or `unavailable` (they can no longer open it). Three rules:
   - **A dismissal is never disclosed.** It reads as `waiting`, and the recommend dialog's

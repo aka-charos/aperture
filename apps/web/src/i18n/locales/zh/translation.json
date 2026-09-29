@@ -49,8 +49,8 @@
     "roleLabelAdmin": "管理员",
     "roleLabelUser": "用户",
     "collections": "Collections",
-    "sharedWithMeBadge_one": "{{count}} new recommendation",
-    "sharedWithMeBadge_other": "{{count}} new recommendations",
+    "sharedWithMeBadge_one": "{{count}} 个新分享",
+    "sharedWithMeBadge_other": "{{count}} 个新分享",
     "watchThis": "值得一看"
   },
   "admin": {
@@ -295,8 +295,8 @@
       "recsKindsNone": "No library",
       "recsKindsTooltip": "The kinds follow from the libraries {{provider}} lets this account see, among those enabled here.",
       "recsKindsUnreadTooltip": "This account's library access hasn't been read from {{provider}} yet; it will be at the next user sync or sign-in. Until then every enabled library counts.",
-      "menuConnections": "Connections…",
-      "menuConnectionsSecondary": "Who this person shares their viewing with"
+      "menuConnections": "关联…",
+      "menuConnectionsSecondary": "此用户与谁分享观看记录"
     },
     "jobsPage": {
       "title": "后台任务",
@@ -628,7 +628,7 @@
         "scopes": "API key permissions",
         "assistant_enabled": "Assistant",
         "recommendations_enabled": "Recommendations",
-        "connection": "Connection"
+        "connection": "关联"
       }
     },
     "translations": "Translations",
@@ -678,15 +678,15 @@
       "audienceAdmin": "Admin console"
     },
     "connectionsDialog": {
-      "title": "Connections for {{name}}",
-      "description": "Connected people see each other's watch history, recent watches and names on titles, and can recommend titles to each other.",
-      "addPlaceholder": "Add a connection…",
-      "empty": "Not connected to anyone yet.",
-      "remove": "Remove connection",
-      "noAccess": "No access. Hidden from the other person until access is turned back on.",
-      "added": "Connected {{a}} and {{b}}",
-      "removed": "Connection removed",
-      "failed": "Couldn't change the connection"
+      "title": "{{name}} 的关联",
+      "description": "相互关联的用户可以看到彼此的观看历史、最近观看的作品以及作品页上的名字，并可以互相分享作品。",
+      "addPlaceholder": "添加关联…",
+      "empty": "尚未与任何人关联。",
+      "remove": "解除关联",
+      "noAccess": "无访问权限。在重新开启访问权限之前，对方看不到此用户。",
+      "added": "已关联 {{a}} 和 {{b}}",
+      "removed": "已解除关联",
+      "failed": "无法更改关联"
     }
   },
   "login": {
@@ -1240,8 +1240,8 @@
       "plusMore": "+{{count}} more",
       "genreEnjoyedTooltip": "A genre you already watch a lot of",
       "genreNewTooltip": "New to you — this would be a first",
-      "recommend": "Recommend to…",
-      "recommendTooltip": "Send this to people you're connected to"
+      "recommend": "分享给…",
+      "recommendTooltip": "把它发给与你关联的人"
     },
     "insights": {
       "recommendedForYou": "为您推荐",
@@ -1361,13 +1361,13 @@
       "watcherPlays": "{{count}} plays",
       "watcherEpisodes": "{{count}} episodes",
       "watcherLastWatched": "Last watched {{date}}",
-      "watcherYou": "You",
-      "watchersUnnamed_one": "and {{count}} other person you're not connected to",
-      "watchersUnnamed_other": "and {{count}} other people you're not connected to",
-      "watchersOpenHintNamed": "Click to see their names",
-      "watchersConnectionsOnly": "Names are shown only for you and the people you're connected to.",
-      "watchersUnnamedFooter_one": "{{count}} other person watched this too.",
-      "watchersUnnamedFooter_other": "{{count}} other people watched this too."
+      "watcherYou": "你",
+      "watchersUnnamed_one": "以及 {{count}} 位未关联的用户",
+      "watchersUnnamed_other": "以及 {{count}} 位未关联的用户",
+      "watchersOpenHintNamed": "点击查看名字",
+      "watchersConnectionsOnly": "只有你和与你关联的人会显示名字。",
+      "watchersUnnamedFooter_one": "另有 {{count}} 人也看过。",
+      "watchersUnnamedFooter_other": "另有 {{count}} 人也看过。"
     },
     "similar": {
       "titleMovies": "相关电影",
@@ -1435,19 +1435,19 @@
       }
     },
     "recommendDialog": {
-      "title": "Recommend {{title}}",
-      "alreadyWatched": "Already watched",
-      "unavailable": "Not in their libraries",
-      "alreadyRecommended": "Already sent. Sending again moves it to the top",
-      "send": "Send",
-      "sent_one": "Sent to {{count}} person",
-      "sent_other": "Sent to {{count}} people",
-      "skippedWatched": "{{name}} has already watched it",
-      "skippedUnavailable": "{{name}} can't open this title",
-      "skippedDisconnected": "{{name}} is no longer connected",
-      "failed": "Couldn't send the recommendation",
-      "loadFailed": "Couldn't load your connections",
-      "empty": "You're not connected to anyone yet",
+      "title": "分享《{{title}}》",
+      "alreadyWatched": "已看过",
+      "unavailable": "不在对方的媒体库中",
+      "alreadyRecommended": "已发送。再次发送会移到最前",
+      "send": "发送",
+      "sent_one": "已发送给 {{count}} 人",
+      "sent_other": "已发送给 {{count}} 人",
+      "skippedWatched": "{{name}} 已经看过了",
+      "skippedUnavailable": "{{name}} 无法打开此作品",
+      "skippedDisconnected": "{{name}} 已不再关联",
+      "failed": "无法发送",
+      "loadFailed": "无法加载与你关联的人",
+      "empty": "你还没有关联任何人",
       "descriptionWatchThis": "你选择的人会在“值得一看”里看到它。"
     }
   },
@@ -3236,8 +3236,8 @@
     "typeSeries": "系列",
     "statsWindow": "Last {{count}} days",
     "statsMoreDetails": "More details",
-    "recentlyWatchedBy": "Recently watched by {{name}}",
-    "subtitleFromConnections": "From your connections"
+    "recentlyWatchedBy": "{{name}} 最近看过",
+    "subtitleFromConnections": "来自与你关联的人"
   },
   "playlists": {
     "pageTitle": "播放列表",
@@ -3496,12 +3496,12 @@
     "filterAll": "All",
     "filterInProgress": "In Progress",
     "filterCompleted": "Completed",
-    "whoseHistory": "Whose history",
-    "me": "Me",
-    "otherUsersHistory": "{{name}}'s watch history",
-    "viewingReadOnly": "You're viewing {{name}}'s history. It's read-only.",
-    "emptyMoviesOther": "No movies in {{name}}'s history that you can open.",
-    "emptySeriesOther": "No series in {{name}}'s history that you can open."
+    "whoseHistory": "查看谁的历史",
+    "me": "我",
+    "otherUsersHistory": "{{name}} 的观看历史",
+    "viewingReadOnly": "你正在查看 {{name}} 的历史，仅供查看。",
+    "emptyMoviesOther": "{{name}} 的历史中没有你可以打开的电影。",
+    "emptySeriesOther": "{{name}} 的历史中没有你可以打开的剧集。"
   },
   "topPicksPage": {
     "pageTitle": "热门精选",
@@ -5615,47 +5615,47 @@
     }
   },
   "sharedWithMe": {
-    "recommendedBy": "Recommended by {{name}}",
-    "dismiss": "Dismiss",
-    "dismissed": "Recommendation dismissed",
-    "dismissFailed": "Couldn't dismiss it",
-    "loadFailed": "Couldn't load what's been shared with you",
-    "empty": "Nothing shared with you yet",
-    "emptyHint": "When someone you're connected to recommends a title, it appears here. Titles you finish leave on their own.",
+    "recommendedBy": "{{name}} 分享的作品",
+    "dismiss": "忽略",
+    "dismissed": "已忽略",
+    "dismissFailed": "无法忽略",
+    "loadFailed": "无法加载与你分享的内容",
+    "empty": "还没有人与你分享",
+    "emptyHint": "当与你关联的人向你分享作品时，它会显示在这里。看完的作品会自动移除。",
     "title": "值得一看",
-    "subtitleBoth": "What the people you're connected to recommend to you, and what you've recommended to them",
-    "tabReceived": "Received",
-    "tabSent": "Sent",
-    "tileWaiting": "Waiting for you",
-    "tileSent": "You shared",
-    "tileWatched": "Finished by them",
-    "tileWatchedValue": "{{watched}} of {{total}}",
-    "receivedSummary_one": "{{count}} title · last shared {{when}}",
-    "receivedSummary_other": "{{count}} titles · last shared {{when}}",
-    "sentTo": "Sent to {{name}}",
-    "sentSummary_one": "{{count}} title sent",
-    "sentSummary_other": "{{count}} titles sent",
-    "sentEmpty": "You haven't recommended anything yet",
-    "sentEmptyHint": "Open a movie or series and choose “Recommend to…” to send it to someone you're connected to. You'll see here whether they've watched it.",
-    "sentLoadFailed": "Couldn't load what you've shared",
+    "subtitleBoth": "与你关联的人分享给你的作品，以及你分享给他们的作品",
+    "tabReceived": "收到的",
+    "tabSent": "发出的",
+    "tileWaiting": "等你看",
+    "tileSent": "你分享的",
+    "tileWatched": "对方已看完",
+    "tileWatchedValue": "{{watched}} / {{total}}",
+    "receivedSummary_one": "{{count}} 部作品 · 最近分享于{{when}}",
+    "receivedSummary_other": "{{count}} 部作品 · 最近分享于{{when}}",
+    "sentTo": "发给 {{name}} 的作品",
+    "sentSummary_one": "已发送 {{count}} 部作品",
+    "sentSummary_other": "已发送 {{count}} 部作品",
+    "sentEmpty": "你还没有分享任何作品",
+    "sentEmptyHint": "打开一部电影或剧集，选择“分享给…”，即可发给与你关联的人。你可以在这里看到对方是否看过。",
+    "sentLoadFailed": "无法加载你分享的内容",
     "status": {
-      "watched": "Watched",
-      "watching": "Watching",
-      "waiting": "Waiting",
-      "unavailable": "Can't open"
+      "watched": "已看完",
+      "watching": "在看",
+      "waiting": "未观看",
+      "unavailable": "无法打开"
     },
-    "statusWatchingProgress": "{{watched}}/{{total}} episodes",
+    "statusWatchingProgress": "{{watched}}/{{total}} 集",
     "statusHint": {
-      "watched": "{{name}} finished it",
-      "watching": "{{name}} has watched {{watched}} of {{total}} episodes",
-      "waiting": "{{name}} hasn't watched it yet",
-      "unavailable": "{{name}} can't open this any more: it's outside their libraries now"
+      "watched": "{{name}} 已看完",
+      "watching": "{{name}} 已看 {{watched}}/{{total}} 集",
+      "waiting": "{{name}} 还没看",
+      "unavailable": "{{name}} 已无法打开：它已不在对方的媒体库中"
     },
     "statusCount": {
-      "watched": "{{count}} watched",
-      "watching": "{{count}} watching",
-      "waiting": "{{count}} waiting",
-      "unavailable": "{{count}} can't open"
+      "watched": "已看完 {{count}}",
+      "watching": "在看 {{count}}",
+      "waiting": "未观看 {{count}}",
+      "unavailable": "无法打开 {{count}}"
     }
   }
 }

@@ -49,8 +49,8 @@
     "roleLabelAdmin": "व्यवस्थापक",
     "roleLabelUser": "उपयोगकर्ता",
     "collections": "Collections",
-    "sharedWithMeBadge_one": "{{count}} new recommendation",
-    "sharedWithMeBadge_other": "{{count}} new recommendations",
+    "sharedWithMeBadge_one": "{{count}} नया सुझाव",
+    "sharedWithMeBadge_other": "{{count}} नए सुझाव",
     "watchThis": "यह देखें"
   },
   "admin": {
@@ -295,8 +295,8 @@
       "recsKindsNone": "No library",
       "recsKindsTooltip": "The kinds follow from the libraries {{provider}} lets this account see, among those enabled here.",
       "recsKindsUnreadTooltip": "This account's library access hasn't been read from {{provider}} yet; it will be at the next user sync or sign-in. Until then every enabled library counts.",
-      "menuConnections": "Connections…",
-      "menuConnectionsSecondary": "Who this person shares their viewing with"
+      "menuConnections": "कनेक्शन…",
+      "menuConnectionsSecondary": "इस व्यक्ति का देखा हुआ किसके साथ साझा होता है"
     },
     "userDetail": {
       "userNotFound": "उपयोगकर्ता नहीं मिला",
@@ -402,7 +402,7 @@
         "scopes": "API key permissions",
         "assistant_enabled": "Assistant",
         "recommendations_enabled": "Recommendations",
-        "connection": "Connection"
+        "connection": "कनेक्शन"
       }
     },
     "jobsPage": {
@@ -678,15 +678,15 @@
       "audienceAdmin": "Admin console"
     },
     "connectionsDialog": {
-      "title": "Connections for {{name}}",
-      "description": "Connected people see each other's watch history, recent watches and names on titles, and can recommend titles to each other.",
-      "addPlaceholder": "Add a connection…",
-      "empty": "Not connected to anyone yet.",
-      "remove": "Remove connection",
-      "noAccess": "No access. Hidden from the other person until access is turned back on.",
-      "added": "Connected {{a}} and {{b}}",
-      "removed": "Connection removed",
-      "failed": "Couldn't change the connection"
+      "title": "{{name}} के कनेक्शन",
+      "description": "कनेक्टेड लोग एक-दूसरे का देखने का इतिहास, हाल में देखे गए शीर्षक और शीर्षकों पर नाम देख सकते हैं, और एक-दूसरे को शीर्षक सुझा सकते हैं।",
+      "addPlaceholder": "कनेक्शन जोड़ें…",
+      "empty": "अभी तक किसी से कनेक्शन नहीं है।",
+      "remove": "कनेक्शन हटाएँ",
+      "noAccess": "पहुँच नहीं है। पहुँच दोबारा चालू होने तक दूसरे व्यक्ति से छिपा रहेगा।",
+      "added": "{{a}} और {{b}} अब कनेक्टेड हैं",
+      "removed": "कनेक्शन हटाया गया",
+      "failed": "कनेक्शन नहीं बदला जा सका"
     }
   },
   "home": {
@@ -770,8 +770,8 @@
       "plusMore": "+{{count}} more",
       "genreEnjoyedTooltip": "A genre you already watch a lot of",
       "genreNewTooltip": "New to you — this would be a first",
-      "recommend": "Recommend to…",
-      "recommendTooltip": "Send this to people you're connected to"
+      "recommend": "सुझाएँ…",
+      "recommendTooltip": "इसे अपने कनेक्शन को भेजें"
     },
     "insights": {
       "recommendedForYou": "आप के लिए अनुशंसित",
@@ -891,13 +891,13 @@
       "watcherPlays": "{{count}} plays",
       "watcherEpisodes": "{{count}} episodes",
       "watcherLastWatched": "Last watched {{date}}",
-      "watcherYou": "You",
-      "watchersUnnamed_one": "and {{count}} other person you're not connected to",
-      "watchersUnnamed_other": "and {{count}} other people you're not connected to",
-      "watchersOpenHintNamed": "Click to see their names",
-      "watchersConnectionsOnly": "Names are shown only for you and the people you're connected to.",
-      "watchersUnnamedFooter_one": "{{count}} other person watched this too.",
-      "watchersUnnamedFooter_other": "{{count}} other people watched this too."
+      "watcherYou": "आप",
+      "watchersUnnamed_one": "और {{count}} अन्य व्यक्ति, जिनसे आपका कनेक्शन नहीं है",
+      "watchersUnnamed_other": "और {{count}} अन्य लोग, जिनसे आपका कनेक्शन नहीं है",
+      "watchersOpenHintNamed": "नाम देखने के लिए क्लिक करें",
+      "watchersConnectionsOnly": "नाम केवल आपको और आपके कनेक्शन के लिए दिखाए जाते हैं।",
+      "watchersUnnamedFooter_one": "{{count}} और व्यक्ति ने भी इसे देखा।",
+      "watchersUnnamedFooter_other": "{{count}} और लोगों ने भी इसे देखा।"
     },
     "similar": {
       "titleMovies": "संबंधित फ़िल्में",
@@ -965,19 +965,19 @@
       }
     },
     "recommendDialog": {
-      "title": "Recommend {{title}}",
-      "alreadyWatched": "Already watched",
-      "unavailable": "Not in their libraries",
-      "alreadyRecommended": "Already sent. Sending again moves it to the top",
-      "send": "Send",
-      "sent_one": "Sent to {{count}} person",
-      "sent_other": "Sent to {{count}} people",
-      "skippedWatched": "{{name}} has already watched it",
-      "skippedUnavailable": "{{name}} can't open this title",
-      "skippedDisconnected": "{{name}} is no longer connected",
-      "failed": "Couldn't send the recommendation",
-      "loadFailed": "Couldn't load your connections",
-      "empty": "You're not connected to anyone yet",
+      "title": "{{title}} सुझाएँ",
+      "alreadyWatched": "पहले ही देख चुके हैं",
+      "unavailable": "उनकी लाइब्रेरी में नहीं",
+      "alreadyRecommended": "पहले ही भेजा जा चुका है। दोबारा भेजने पर यह सबसे ऊपर आ जाएगा",
+      "send": "भेजें",
+      "sent_one": "{{count}} व्यक्ति को भेजा गया",
+      "sent_other": "{{count}} लोगों को भेजा गया",
+      "skippedWatched": "{{name}} इसे पहले ही देख चुके हैं",
+      "skippedUnavailable": "{{name}} यह शीर्षक नहीं खोल सकते",
+      "skippedDisconnected": "{{name}} अब कनेक्टेड नहीं हैं",
+      "failed": "सुझाव नहीं भेजा जा सका",
+      "loadFailed": "आपके कनेक्शन लोड नहीं हो सके",
+      "empty": "आपका अभी तक किसी से कनेक्शन नहीं है",
       "descriptionWatchThis": "आप जिन लोगों को चुनेंगे, वे इसे “यह देखें” में पाएँगे।"
     }
   },
@@ -3236,8 +3236,8 @@
     "typeSeries": "शृंखला",
     "statsWindow": "Last {{count}} days",
     "statsMoreDetails": "More details",
-    "recentlyWatchedBy": "Recently watched by {{name}}",
-    "subtitleFromConnections": "From your connections"
+    "recentlyWatchedBy": "{{name}} ने हाल ही में देखा",
+    "subtitleFromConnections": "आपके कनेक्शन से"
   },
   "playlists": {
     "pageTitle": "प्लेलिस्ट",
@@ -3496,12 +3496,12 @@
     "filterAll": "All",
     "filterInProgress": "In Progress",
     "filterCompleted": "Completed",
-    "whoseHistory": "Whose history",
-    "me": "Me",
-    "otherUsersHistory": "{{name}}'s watch history",
-    "viewingReadOnly": "You're viewing {{name}}'s history. It's read-only.",
-    "emptyMoviesOther": "No movies in {{name}}'s history that you can open.",
-    "emptySeriesOther": "No series in {{name}}'s history that you can open."
+    "whoseHistory": "किसका इतिहास",
+    "me": "मैं",
+    "otherUsersHistory": "{{name}} का देखने का इतिहास",
+    "viewingReadOnly": "आप {{name}} का इतिहास देख रहे हैं। यह केवल पढ़ने के लिए है।",
+    "emptyMoviesOther": "{{name}} के इतिहास में ऐसी कोई फ़िल्म नहीं है जिसे आप खोल सकें।",
+    "emptySeriesOther": "{{name}} के इतिहास में ऐसी कोई सीरीज़ नहीं है जिसे आप खोल सकें।"
   },
   "topPicksPage": {
     "pageTitle": "ऊपर उठाता है",
@@ -5615,47 +5615,47 @@
     }
   },
   "sharedWithMe": {
-    "recommendedBy": "Recommended by {{name}}",
-    "dismiss": "Dismiss",
-    "dismissed": "Recommendation dismissed",
-    "dismissFailed": "Couldn't dismiss it",
-    "loadFailed": "Couldn't load what's been shared with you",
-    "empty": "Nothing shared with you yet",
-    "emptyHint": "When someone you're connected to recommends a title, it appears here. Titles you finish leave on their own.",
+    "recommendedBy": "{{name}} का सुझाव",
+    "dismiss": "हटाएँ",
+    "dismissed": "सुझाव हटाया गया",
+    "dismissFailed": "हटाया नहीं जा सका",
+    "loadFailed": "आपके साथ साझा की गई चीज़ें लोड नहीं हो सकीं",
+    "empty": "अभी तक आपके साथ कुछ साझा नहीं किया गया",
+    "emptyHint": "जब आपका कोई कनेक्शन आपको कोई शीर्षक सुझाएगा, तो वह यहाँ दिखेगा। जिन शीर्षकों को आप पूरा देख लेते हैं, वे अपने-आप हट जाते हैं।",
     "title": "यह देखें!",
-    "subtitleBoth": "What the people you're connected to recommend to you, and what you've recommended to them",
-    "tabReceived": "Received",
-    "tabSent": "Sent",
-    "tileWaiting": "Waiting for you",
-    "tileSent": "You shared",
-    "tileWatched": "Finished by them",
-    "tileWatchedValue": "{{watched}} of {{total}}",
-    "receivedSummary_one": "{{count}} title · last shared {{when}}",
-    "receivedSummary_other": "{{count}} titles · last shared {{when}}",
-    "sentTo": "Sent to {{name}}",
-    "sentSummary_one": "{{count}} title sent",
-    "sentSummary_other": "{{count}} titles sent",
-    "sentEmpty": "You haven't recommended anything yet",
-    "sentEmptyHint": "Open a movie or series and choose “Recommend to…” to send it to someone you're connected to. You'll see here whether they've watched it.",
-    "sentLoadFailed": "Couldn't load what you've shared",
+    "subtitleBoth": "आपके कनेक्शन आपको क्या सुझाते हैं, और आपने उन्हें क्या सुझाया है",
+    "tabReceived": "मिले हुए",
+    "tabSent": "भेजे गए",
+    "tileWaiting": "आपके लिए",
+    "tileSent": "आपने साझा किए",
+    "tileWatched": "उन्होंने देखे",
+    "tileWatchedValue": "{{total}} में से {{watched}}",
+    "receivedSummary_one": "{{count}} शीर्षक · आख़िरी बार {{when}} साझा किया",
+    "receivedSummary_other": "{{count}} शीर्षक · आख़िरी बार {{when}} साझा किया",
+    "sentTo": "{{name}} को भेजा गया",
+    "sentSummary_one": "{{count}} शीर्षक भेजा गया",
+    "sentSummary_other": "{{count}} शीर्षक भेजे गए",
+    "sentEmpty": "आपने अभी तक कुछ नहीं सुझाया है",
+    "sentEmptyHint": "कोई फ़िल्म या सीरीज़ खोलें और “सुझाएँ…” चुनें, ताकि उसे अपने किसी कनेक्शन को भेज सकें। यहाँ आप देख पाएँगे कि उन्होंने उसे देखा या नहीं।",
+    "sentLoadFailed": "आपकी साझा की गई चीज़ें लोड नहीं हो सकीं",
     "status": {
-      "watched": "Watched",
-      "watching": "Watching",
-      "waiting": "Waiting",
-      "unavailable": "Can't open"
+      "watched": "देख लिया",
+      "watching": "देख रहे हैं",
+      "waiting": "प्रतीक्षा में",
+      "unavailable": "खुल नहीं सकता"
     },
-    "statusWatchingProgress": "{{watched}}/{{total}} episodes",
+    "statusWatchingProgress": "{{watched}}/{{total}} एपिसोड",
     "statusHint": {
-      "watched": "{{name}} finished it",
-      "watching": "{{name}} has watched {{watched}} of {{total}} episodes",
-      "waiting": "{{name}} hasn't watched it yet",
-      "unavailable": "{{name}} can't open this any more: it's outside their libraries now"
+      "watched": "{{name}} ने इसे पूरा देख लिया",
+      "watching": "{{name}} ने {{total}} में से {{watched}} एपिसोड देखे हैं",
+      "waiting": "{{name}} ने इसे अभी तक नहीं देखा",
+      "unavailable": "{{name}} अब इसे नहीं खोल सकते: यह अब उनकी लाइब्रेरी में नहीं है"
     },
     "statusCount": {
-      "watched": "{{count}} watched",
-      "watching": "{{count}} watching",
-      "waiting": "{{count}} waiting",
-      "unavailable": "{{count}} can't open"
+      "watched": "देख लिया: {{count}}",
+      "watching": "देख रहे हैं: {{count}}",
+      "waiting": "प्रतीक्षा में: {{count}}",
+      "unavailable": "खुल नहीं सकते: {{count}}"
     }
   }
 }

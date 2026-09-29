@@ -49,8 +49,8 @@
     "roleLabelAdmin": "管理者",
     "roleLabelUser": "ユーザー",
     "collections": "Collections",
-    "sharedWithMeBadge_one": "{{count}} new recommendation",
-    "sharedWithMeBadge_other": "{{count}} new recommendations",
+    "sharedWithMeBadge_one": "新着 {{count}} 件",
+    "sharedWithMeBadge_other": "新着 {{count}} 件",
     "watchThis": "これ見て"
   },
   "admin": {
@@ -295,8 +295,8 @@
       "recsKindsNone": "No library",
       "recsKindsTooltip": "The kinds follow from the libraries {{provider}} lets this account see, among those enabled here.",
       "recsKindsUnreadTooltip": "This account's library access hasn't been read from {{provider}} yet; it will be at the next user sync or sign-in. Until then every enabled library counts.",
-      "menuConnections": "Connections…",
-      "menuConnectionsSecondary": "Who this person shares their viewing with"
+      "menuConnections": "つながり…",
+      "menuConnectionsSecondary": "このユーザーが視聴内容を共有する相手"
     },
     "jobsPage": {
       "title": "バックグラウンドジョブ",
@@ -628,7 +628,7 @@
         "scopes": "API key permissions",
         "assistant_enabled": "Assistant",
         "recommendations_enabled": "Recommendations",
-        "connection": "Connection"
+        "connection": "つながり"
       }
     },
     "translations": "Translations",
@@ -678,15 +678,15 @@
       "audienceAdmin": "Admin console"
     },
     "connectionsDialog": {
-      "title": "Connections for {{name}}",
-      "description": "Connected people see each other's watch history, recent watches and names on titles, and can recommend titles to each other.",
-      "addPlaceholder": "Add a connection…",
-      "empty": "Not connected to anyone yet.",
-      "remove": "Remove connection",
-      "noAccess": "No access. Hidden from the other person until access is turned back on.",
-      "added": "Connected {{a}} and {{b}}",
-      "removed": "Connection removed",
-      "failed": "Couldn't change the connection"
+      "title": "{{name}} のつながり",
+      "description": "つながっているユーザー同士は、互いの視聴履歴・最近視聴した作品・作品ページ上の名前を見ることができ、作品を紹介し合えます。",
+      "addPlaceholder": "つながりを追加…",
+      "empty": "まだ誰ともつながっていません。",
+      "remove": "つながりを解除",
+      "noAccess": "アクセス権なし。アクセスが再び有効になるまで、相手には表示されません。",
+      "added": "{{a}} と {{b}} をつなげました",
+      "removed": "つながりを解除しました",
+      "failed": "つながりを変更できませんでした"
     }
   },
   "login": {
@@ -1240,8 +1240,8 @@
       "plusMore": "+{{count}} more",
       "genreEnjoyedTooltip": "A genre you already watch a lot of",
       "genreNewTooltip": "New to you — this would be a first",
-      "recommend": "Recommend to…",
-      "recommendTooltip": "Send this to people you're connected to"
+      "recommend": "紹介する…",
+      "recommendTooltip": "つながっている人にこの作品を送ります"
     },
     "insights": {
       "recommendedForYou": "あなたにおすすめ",
@@ -1361,13 +1361,13 @@
       "watcherPlays": "{{count}} plays",
       "watcherEpisodes": "{{count}} episodes",
       "watcherLastWatched": "Last watched {{date}}",
-      "watcherYou": "You",
-      "watchersUnnamed_one": "and {{count}} other person you're not connected to",
-      "watchersUnnamed_other": "and {{count}} other people you're not connected to",
-      "watchersOpenHintNamed": "Click to see their names",
-      "watchersConnectionsOnly": "Names are shown only for you and the people you're connected to.",
-      "watchersUnnamedFooter_one": "{{count}} other person watched this too.",
-      "watchersUnnamedFooter_other": "{{count}} other people watched this too."
+      "watcherYou": "あなた",
+      "watchersUnnamed_one": "ほか、つながりのない {{count}} 人",
+      "watchersUnnamed_other": "ほか、つながりのない {{count}} 人",
+      "watchersOpenHintNamed": "クリックして名前を表示",
+      "watchersConnectionsOnly": "名前が表示されるのは、あなたとつながりのある人だけです。",
+      "watchersUnnamedFooter_one": "ほかに {{count}} 人も視聴しました。",
+      "watchersUnnamedFooter_other": "ほかに {{count}} 人も視聴しました。"
     },
     "similar": {
       "titleMovies": "関連映画",
@@ -1435,19 +1435,19 @@
       }
     },
     "recommendDialog": {
-      "title": "Recommend {{title}}",
-      "alreadyWatched": "Already watched",
-      "unavailable": "Not in their libraries",
-      "alreadyRecommended": "Already sent. Sending again moves it to the top",
-      "send": "Send",
-      "sent_one": "Sent to {{count}} person",
-      "sent_other": "Sent to {{count}} people",
-      "skippedWatched": "{{name}} has already watched it",
-      "skippedUnavailable": "{{name}} can't open this title",
-      "skippedDisconnected": "{{name}} is no longer connected",
-      "failed": "Couldn't send the recommendation",
-      "loadFailed": "Couldn't load your connections",
-      "empty": "You're not connected to anyone yet",
+      "title": "{{title}} を紹介",
+      "alreadyWatched": "視聴済み",
+      "unavailable": "相手のライブラリにありません",
+      "alreadyRecommended": "送信済み。もう一度送ると先頭に移動します",
+      "send": "送る",
+      "sent_one": "{{count}} 人に送りました",
+      "sent_other": "{{count}} 人に送りました",
+      "skippedWatched": "{{name}} はすでに視聴済みです",
+      "skippedUnavailable": "{{name}} はこの作品を開けません",
+      "skippedDisconnected": "{{name}} とのつながりはもうありません",
+      "failed": "紹介を送れませんでした",
+      "loadFailed": "つながりを読み込めませんでした",
+      "empty": "まだ誰ともつながっていません",
       "descriptionWatchThis": "選んだ人は「これ見て」で見つけられます。"
     }
   },
@@ -3236,8 +3236,8 @@
     "typeSeries": "シリーズ",
     "statsWindow": "Last {{count}} days",
     "statsMoreDetails": "More details",
-    "recentlyWatchedBy": "Recently watched by {{name}}",
-    "subtitleFromConnections": "From your connections"
+    "recentlyWatchedBy": "{{name}} が最近観た作品",
+    "subtitleFromConnections": "つながりのあるユーザーから"
   },
   "playlists": {
     "pageTitle": "プレイリスト",
@@ -3496,12 +3496,12 @@
     "filterAll": "All",
     "filterInProgress": "In Progress",
     "filterCompleted": "Completed",
-    "whoseHistory": "Whose history",
-    "me": "Me",
-    "otherUsersHistory": "{{name}}'s watch history",
-    "viewingReadOnly": "You're viewing {{name}}'s history. It's read-only.",
-    "emptyMoviesOther": "No movies in {{name}}'s history that you can open.",
-    "emptySeriesOther": "No series in {{name}}'s history that you can open."
+    "whoseHistory": "表示する履歴",
+    "me": "自分",
+    "otherUsersHistory": "{{name}} の視聴履歴",
+    "viewingReadOnly": "{{name}} の履歴を表示しています。閲覧のみです。",
+    "emptyMoviesOther": "{{name}} の履歴に、あなたが開ける映画はありません。",
+    "emptySeriesOther": "{{name}} の履歴に、あなたが開けるシリーズはありません。"
   },
   "topPicksPage": {
     "pageTitle": "おすすめ",
@@ -5615,47 +5615,47 @@
     }
   },
   "sharedWithMe": {
-    "recommendedBy": "Recommended by {{name}}",
-    "dismiss": "Dismiss",
-    "dismissed": "Recommendation dismissed",
-    "dismissFailed": "Couldn't dismiss it",
-    "loadFailed": "Couldn't load what's been shared with you",
-    "empty": "Nothing shared with you yet",
-    "emptyHint": "When someone you're connected to recommends a title, it appears here. Titles you finish leave on their own.",
+    "recommendedBy": "{{name}} が紹介した作品",
+    "dismiss": "非表示",
+    "dismissed": "非表示にしました",
+    "dismissFailed": "非表示にできませんでした",
+    "loadFailed": "届いた作品を読み込めませんでした",
+    "empty": "まだ何も届いていません",
+    "emptyHint": "つながっている人が作品を紹介すると、ここに表示されます。観終わった作品は自動的に消えます。",
     "title": "これ見て！",
-    "subtitleBoth": "What the people you're connected to recommend to you, and what you've recommended to them",
-    "tabReceived": "Received",
-    "tabSent": "Sent",
-    "tileWaiting": "Waiting for you",
-    "tileSent": "You shared",
-    "tileWatched": "Finished by them",
-    "tileWatchedValue": "{{watched}} of {{total}}",
-    "receivedSummary_one": "{{count}} title · last shared {{when}}",
-    "receivedSummary_other": "{{count}} titles · last shared {{when}}",
-    "sentTo": "Sent to {{name}}",
-    "sentSummary_one": "{{count}} title sent",
-    "sentSummary_other": "{{count}} titles sent",
-    "sentEmpty": "You haven't recommended anything yet",
-    "sentEmptyHint": "Open a movie or series and choose “Recommend to…” to send it to someone you're connected to. You'll see here whether they've watched it.",
-    "sentLoadFailed": "Couldn't load what you've shared",
+    "subtitleBoth": "つながっている人から紹介された作品と、あなたが紹介した作品",
+    "tabReceived": "受け取った",
+    "tabSent": "送った",
+    "tileWaiting": "あなた宛て",
+    "tileSent": "紹介した作品",
+    "tileWatched": "相手が視聴済み",
+    "tileWatchedValue": "{{total}} 件中 {{watched}} 件",
+    "receivedSummary_one": "{{count}} 作品 · 最終共有 {{when}}",
+    "receivedSummary_other": "{{count}} 作品 · 最終共有 {{when}}",
+    "sentTo": "{{name}} に送った作品",
+    "sentSummary_one": "{{count}} 作品を送信",
+    "sentSummary_other": "{{count}} 作品を送信",
+    "sentEmpty": "まだ何も紹介していません",
+    "sentEmptyHint": "映画やシリーズを開いて「紹介する…」を選ぶと、つながっている人に送れます。相手が視聴したかどうかはここで確認できます。",
+    "sentLoadFailed": "送った作品を読み込めませんでした",
     "status": {
-      "watched": "Watched",
-      "watching": "Watching",
-      "waiting": "Waiting",
-      "unavailable": "Can't open"
+      "watched": "視聴済み",
+      "watching": "視聴中",
+      "waiting": "未視聴",
+      "unavailable": "開けません"
     },
-    "statusWatchingProgress": "{{watched}}/{{total}} episodes",
+    "statusWatchingProgress": "{{watched}}/{{total}} 話",
     "statusHint": {
-      "watched": "{{name}} finished it",
-      "watching": "{{name}} has watched {{watched}} of {{total}} episodes",
-      "waiting": "{{name}} hasn't watched it yet",
-      "unavailable": "{{name}} can't open this any more: it's outside their libraries now"
+      "watched": "{{name}} は観終わりました",
+      "watching": "{{name}} は {{total}} 話中 {{watched}} 話を視聴しました",
+      "waiting": "{{name}} はまだ視聴していません",
+      "unavailable": "{{name}} はこの作品を開けなくなりました（ライブラリの対象外です）"
     },
     "statusCount": {
-      "watched": "{{count}} watched",
-      "watching": "{{count}} watching",
-      "waiting": "{{count}} waiting",
-      "unavailable": "{{count}} can't open"
+      "watched": "視聴済み {{count}}",
+      "watching": "視聴中 {{count}}",
+      "waiting": "未視聴 {{count}}",
+      "unavailable": "開けない {{count}}"
     }
   }
 }

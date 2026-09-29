@@ -49,9 +49,13 @@
     "roleLabelAdmin": "مسؤول",
     "roleLabelUser": "مستخدم",
     "collections": "Collections",
-    "sharedWithMeBadge_one": "{{count}} new recommendation",
-    "sharedWithMeBadge_other": "{{count}} new recommendations",
-    "watchThis": "يستحق المشاهدة"
+    "sharedWithMeBadge_one": "ترشيح جديد واحد",
+    "sharedWithMeBadge_other": "{{count}} ترشيح جديد",
+    "watchThis": "يستحق المشاهدة",
+    "sharedWithMeBadge_zero": "لا ترشيحات جديدة",
+    "sharedWithMeBadge_two": "ترشيحان جديدان",
+    "sharedWithMeBadge_few": "{{count}} ترشيحات جديدة",
+    "sharedWithMeBadge_many": "{{count}} ترشيحًا جديدًا"
   },
   "admin": {
     "title": "الإدارة",
@@ -295,8 +299,8 @@
       "recsKindsNone": "No library",
       "recsKindsTooltip": "The kinds follow from the libraries {{provider}} lets this account see, among those enabled here.",
       "recsKindsUnreadTooltip": "This account's library access hasn't been read from {{provider}} yet; it will be at the next user sync or sign-in. Until then every enabled library counts.",
-      "menuConnections": "Connections…",
-      "menuConnectionsSecondary": "Who this person shares their viewing with"
+      "menuConnections": "الاتصالات…",
+      "menuConnectionsSecondary": "مع مَن يُشارَك ما يشاهده هذا الشخص"
     },
     "userDetail": {
       "userNotFound": "المستخدم غير موجود",
@@ -402,7 +406,7 @@
         "scopes": "API key permissions",
         "assistant_enabled": "Assistant",
         "recommendations_enabled": "Recommendations",
-        "connection": "Connection"
+        "connection": "اتصال"
       }
     },
     "jobsPage": {
@@ -678,15 +682,15 @@
       "audienceAdmin": "Admin console"
     },
     "connectionsDialog": {
-      "title": "Connections for {{name}}",
-      "description": "Connected people see each other's watch history, recent watches and names on titles, and can recommend titles to each other.",
-      "addPlaceholder": "Add a connection…",
-      "empty": "Not connected to anyone yet.",
-      "remove": "Remove connection",
-      "noAccess": "No access. Hidden from the other person until access is turned back on.",
-      "added": "Connected {{a}} and {{b}}",
-      "removed": "Connection removed",
-      "failed": "Couldn't change the connection"
+      "title": "اتصالات {{name}}",
+      "description": "يرى الأشخاص المرتبطون سجلّ مشاهدة بعضهم ومشاهداتهم الأخيرة وأسماءهم على العناوين، ويمكنهم ترشيح العناوين لبعضهم.",
+      "addPlaceholder": "إضافة اتصال…",
+      "empty": "لا توجد اتصالات بعد.",
+      "remove": "إزالة الاتصال",
+      "noAccess": "لا يوجد وصول. مخفي عن الشخص الآخر حتى يُعاد تفعيل الوصول.",
+      "added": "تم ربط {{a}} و{{b}}",
+      "removed": "تمت إزالة الاتصال",
+      "failed": "تعذّر تغيير الاتصال"
     }
   },
   "home": {
@@ -770,8 +774,8 @@
       "plusMore": "+{{count}} more",
       "genreEnjoyedTooltip": "A genre you already watch a lot of",
       "genreNewTooltip": "New to you — this would be a first",
-      "recommend": "Recommend to…",
-      "recommendTooltip": "Send this to people you're connected to"
+      "recommend": "ترشيح إلى…",
+      "recommendTooltip": "إرسال هذا إلى اتصالاتك"
     },
     "insights": {
       "recommendedForYou": "موصى به لك",
@@ -891,13 +895,21 @@
       "watcherPlays": "{{count}} plays",
       "watcherEpisodes": "{{count}} episodes",
       "watcherLastWatched": "Last watched {{date}}",
-      "watcherYou": "You",
-      "watchersUnnamed_one": "and {{count}} other person you're not connected to",
-      "watchersUnnamed_other": "and {{count}} other people you're not connected to",
-      "watchersOpenHintNamed": "Click to see their names",
-      "watchersConnectionsOnly": "Names are shown only for you and the people you're connected to.",
-      "watchersUnnamedFooter_one": "{{count}} other person watched this too.",
-      "watchersUnnamedFooter_other": "{{count}} other people watched this too."
+      "watcherYou": "أنت",
+      "watchersUnnamed_one": "وشخص آخر خارج اتصالاتك",
+      "watchersUnnamed_other": "و{{count}} شخص آخر خارج اتصالاتك",
+      "watchersOpenHintNamed": "انقر لعرض الأسماء",
+      "watchersConnectionsOnly": "تظهر الأسماء لك ولاتصالاتك فقط.",
+      "watchersUnnamedFooter_one": "شاهده شخص آخر أيضًا.",
+      "watchersUnnamedFooter_other": "شاهده {{count}} شخص آخر أيضًا.",
+      "watchersUnnamedFooter_zero": "لم يشاهده أي شخص آخر.",
+      "watchersUnnamedFooter_two": "شاهده شخصان آخران أيضًا.",
+      "watchersUnnamedFooter_few": "شاهده {{count}} أشخاص آخرين أيضًا.",
+      "watchersUnnamedFooter_many": "شاهده {{count}} شخصًا آخر أيضًا.",
+      "watchersUnnamed_zero": "ولا أحد غيرهم خارج اتصالاتك",
+      "watchersUnnamed_two": "وشخصان آخران خارج اتصالاتك",
+      "watchersUnnamed_few": "و{{count}} أشخاص آخرين خارج اتصالاتك",
+      "watchersUnnamed_many": "و{{count}} شخصًا آخر خارج اتصالاتك"
     },
     "similar": {
       "titleMovies": "أفلام ذات صلة",
@@ -965,20 +977,24 @@
       }
     },
     "recommendDialog": {
-      "title": "Recommend {{title}}",
-      "alreadyWatched": "Already watched",
-      "unavailable": "Not in their libraries",
-      "alreadyRecommended": "Already sent. Sending again moves it to the top",
-      "send": "Send",
-      "sent_one": "Sent to {{count}} person",
-      "sent_other": "Sent to {{count}} people",
-      "skippedWatched": "{{name}} has already watched it",
-      "skippedUnavailable": "{{name}} can't open this title",
-      "skippedDisconnected": "{{name}} is no longer connected",
-      "failed": "Couldn't send the recommendation",
-      "loadFailed": "Couldn't load your connections",
-      "empty": "You're not connected to anyone yet",
-      "descriptionWatchThis": "سيجده الأشخاص المختارون في قسم «يستحق المشاهدة»."
+      "title": "ترشيح {{title}}",
+      "alreadyWatched": "شوهد بالفعل",
+      "unavailable": "ليس ضمن مكتبات المستلم",
+      "alreadyRecommended": "أُرسل بالفعل. إعادة الإرسال تنقله إلى الأعلى",
+      "send": "إرسال",
+      "sent_one": "أُرسل إلى شخص واحد",
+      "sent_other": "أُرسل إلى {{count}} شخص",
+      "skippedWatched": "{{name}}: شوهد بالفعل",
+      "skippedUnavailable": "{{name}}: لا يمكن فتح هذا العنوان",
+      "skippedDisconnected": "{{name}}: لم يعد الاتصال قائمًا",
+      "failed": "تعذّر إرسال الترشيح",
+      "loadFailed": "تعذّر تحميل اتصالاتك",
+      "empty": "لا توجد لديك اتصالات بعد",
+      "descriptionWatchThis": "سيجده الأشخاص المختارون في قسم «يستحق المشاهدة».",
+      "sent_zero": "لم يُرسل إلى أحد",
+      "sent_two": "أُرسل إلى شخصين",
+      "sent_few": "أُرسل إلى {{count}} أشخاص",
+      "sent_many": "أُرسل إلى {{count}} شخصًا"
     }
   },
   "browse": {
@@ -3236,8 +3252,8 @@
     "typeSeries": "مسلسل",
     "statsWindow": "Last {{count}} days",
     "statsMoreDetails": "More details",
-    "recentlyWatchedBy": "Recently watched by {{name}}",
-    "subtitleFromConnections": "From your connections"
+    "recentlyWatchedBy": "مشاهدات {{name}} الأخيرة",
+    "subtitleFromConnections": "من اتصالاتك"
   },
   "playlists": {
     "pageTitle": "قوائم التشغيل",
@@ -3496,12 +3512,12 @@
     "filterAll": "All",
     "filterInProgress": "In Progress",
     "filterCompleted": "Completed",
-    "whoseHistory": "Whose history",
-    "me": "Me",
-    "otherUsersHistory": "{{name}}'s watch history",
-    "viewingReadOnly": "You're viewing {{name}}'s history. It's read-only.",
-    "emptyMoviesOther": "No movies in {{name}}'s history that you can open.",
-    "emptySeriesOther": "No series in {{name}}'s history that you can open."
+    "whoseHistory": "سجل مَن",
+    "me": "أنا",
+    "otherUsersHistory": "سجل مشاهدة {{name}}",
+    "viewingReadOnly": "أنت تعرض سجل {{name}}. للقراءة فقط.",
+    "emptyMoviesOther": "لا توجد أفلام في سجل {{name}} يمكنك فتحها.",
+    "emptySeriesOther": "لا توجد مسلسلات في سجل {{name}} يمكنك فتحها."
   },
   "topPicksPage": {
     "pageTitle": "أفضل اللقطات",
@@ -5615,47 +5631,55 @@
     }
   },
   "sharedWithMe": {
-    "recommendedBy": "Recommended by {{name}}",
-    "dismiss": "Dismiss",
-    "dismissed": "Recommendation dismissed",
-    "dismissFailed": "Couldn't dismiss it",
-    "loadFailed": "Couldn't load what's been shared with you",
-    "empty": "Nothing shared with you yet",
-    "emptyHint": "When someone you're connected to recommends a title, it appears here. Titles you finish leave on their own.",
+    "recommendedBy": "ترشيح من {{name}}",
+    "dismiss": "تجاهل",
+    "dismissed": "تم تجاهل الترشيح",
+    "dismissFailed": "تعذّر التجاهل",
+    "loadFailed": "تعذّر تحميل ما شورك معك",
+    "empty": "لم يُشارَك معك أي شيء بعد",
+    "emptyHint": "عندما يرشّح لك أحد اتصالاتك عنوانًا، يظهر هنا. العناوين التي تكتمل مشاهدتها تختفي تلقائيًا.",
     "title": "يستحق المشاهدة",
-    "subtitleBoth": "What the people you're connected to recommend to you, and what you've recommended to them",
-    "tabReceived": "Received",
-    "tabSent": "Sent",
-    "tileWaiting": "Waiting for you",
-    "tileSent": "You shared",
-    "tileWatched": "Finished by them",
-    "tileWatchedValue": "{{watched}} of {{total}}",
-    "receivedSummary_one": "{{count}} title · last shared {{when}}",
-    "receivedSummary_other": "{{count}} titles · last shared {{when}}",
-    "sentTo": "Sent to {{name}}",
-    "sentSummary_one": "{{count}} title sent",
-    "sentSummary_other": "{{count}} titles sent",
-    "sentEmpty": "You haven't recommended anything yet",
-    "sentEmptyHint": "Open a movie or series and choose “Recommend to…” to send it to someone you're connected to. You'll see here whether they've watched it.",
-    "sentLoadFailed": "Couldn't load what you've shared",
+    "subtitleBoth": "ما ترشّحه لك اتصالاتك، وما رشّحته أنت لهم",
+    "tabReceived": "المستلمة",
+    "tabSent": "المرسلة",
+    "tileWaiting": "بانتظارك",
+    "tileSent": "ما شاركته",
+    "tileWatched": "شاهدوها",
+    "tileWatchedValue": "{{watched}} من {{total}}",
+    "receivedSummary_one": "عنوان واحد · آخر مشاركة {{when}}",
+    "receivedSummary_other": "{{count}} عنوان · آخر مشاركة {{when}}",
+    "sentTo": "أُرسل إلى {{name}}",
+    "sentSummary_one": "أُرسل عنوان واحد",
+    "sentSummary_other": "أُرسل {{count}} عنوان",
+    "sentEmpty": "لم ترشّح أي شيء بعد",
+    "sentEmptyHint": "افتح فيلمًا أو مسلسلًا واختر «ترشيح إلى…» لإرساله إلى أحد اتصالاتك. ستعرف هنا إن كان قد شوهد.",
+    "sentLoadFailed": "تعذّر تحميل ما شاركته",
     "status": {
-      "watched": "Watched",
-      "watching": "Watching",
-      "waiting": "Waiting",
-      "unavailable": "Can't open"
+      "watched": "شوهد",
+      "watching": "قيد المشاهدة",
+      "waiting": "بالانتظار",
+      "unavailable": "لا يمكن فتحه"
     },
-    "statusWatchingProgress": "{{watched}}/{{total}} episodes",
+    "statusWatchingProgress": "{{watched}}/{{total}} حلقة",
     "statusHint": {
-      "watched": "{{name}} finished it",
-      "watching": "{{name}} has watched {{watched}} of {{total}} episodes",
-      "waiting": "{{name}} hasn't watched it yet",
-      "unavailable": "{{name}} can't open this any more: it's outside their libraries now"
+      "watched": "{{name}}: اكتملت المشاهدة",
+      "watching": "{{name}}: شوهدت {{watched}} من أصل {{total}} حلقة",
+      "waiting": "{{name}}: لم يُشاهَد بعد",
+      "unavailable": "{{name}}: لم يعد بالإمكان فتحه، فهو الآن خارج المكتبات المتاحة"
     },
     "statusCount": {
-      "watched": "{{count}} watched",
-      "watching": "{{count}} watching",
-      "waiting": "{{count}} waiting",
-      "unavailable": "{{count}} can't open"
-    }
+      "watched": "شوهد: {{count}}",
+      "watching": "قيد المشاهدة: {{count}}",
+      "waiting": "بالانتظار: {{count}}",
+      "unavailable": "لا يمكن فتحه: {{count}}"
+    },
+    "receivedSummary_zero": "لا عناوين · آخر مشاركة {{when}}",
+    "receivedSummary_two": "عنوانان · آخر مشاركة {{when}}",
+    "receivedSummary_few": "{{count}} عناوين · آخر مشاركة {{when}}",
+    "receivedSummary_many": "{{count}} عنوانًا · آخر مشاركة {{when}}",
+    "sentSummary_zero": "لم يُرسل أي عنوان",
+    "sentSummary_two": "أُرسل عنوانان",
+    "sentSummary_few": "أُرسل {{count}} عناوين",
+    "sentSummary_many": "أُرسل {{count}} عنوانًا"
   }
 }
