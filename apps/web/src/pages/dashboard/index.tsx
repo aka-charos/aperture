@@ -103,15 +103,6 @@ export function DashboardPage() {
         </Box>
       )}
 
-      {/* What the viewer's connections watched lately. Straight after the
-          viewer's own personal rows (their recommendations and upcoming
-          episodes) and above the server-wide Top Picks: at the bottom of the
-          page, under the recent-activity lists, it was ~3,000px down and read as
-          missing. Each slider carries its own bottom margin. */}
-      {hasConnections && (
-        <ConnectionsRecentWatches users={connectionUsers} loading={connectionsLoading} />
-      )}
-
       {/* Top Pick Movies */}
       <Box sx={{ mb: 4 }}>
         <MediaCarousel
@@ -135,6 +126,14 @@ export function DashboardPage() {
           emptyMessage={t('dashboard.emptyTrendingSeries')}
         />
       </Box>
+
+      {/* What the viewer's connections watched lately: under Top Picks, above
+          the recent-activity lists. Not at the very bottom, where it was
+          ~3,000px down and read as missing. Each slider carries its own bottom
+          margin. */}
+      {hasConnections && (
+        <ConnectionsRecentWatches users={connectionUsers} loading={connectionsLoading} />
+      )}
 
       {/* Bottom section: Recent Watches + Recent Ratings */}
       <Grid container spacing={3}>

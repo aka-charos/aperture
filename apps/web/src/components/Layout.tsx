@@ -85,7 +85,10 @@ type NavItem = {
   path: string
   feature: string | null
   capability?: string
-  /** A live count drawn on the icon. `socialInbox`: titles waiting under Shared with me. */
+  /**
+   * A live count drawn on the icon. `socialInbox`: titles waiting under Shared
+   * with me — and that entry is listed only while the count is above zero.
+   */
   badge?: 'socialInbox'
 }
 
@@ -216,6 +219,12 @@ function AppShell() {
   const userMenuItems = baseUserMenuItems.filter((item) => {
     if (item.feature === 'watching' && !watchingEnabled) return false
     if (item.capability && capabilities[item.capability] !== true) return false
+    // Shared with me is an inbox, and an empty one in the sidebar is noise. It
+    // stays while the viewer is on the page, so dismissing the last title does
+    // not pull the selected entry out from under them.
+    if (item.badge === 'socialInbox' && pendingCount === 0 && location.pathname !== item.path) {
+      return false
+    }
     return true
   })
 

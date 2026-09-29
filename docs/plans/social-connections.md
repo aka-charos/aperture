@@ -18,11 +18,21 @@ Deviations from the text below, all small:
 - `watcherVisibility.ts` gained `watcherAudienceFor(viewer)`, so the two watch-stats handlers
   share one call instead of each fetching connection ids.
 
-Changed after the first deploy (2026-09-28, owner's call), each overriding the text below:
+Changed after the first deploy (2026-09-28 and 2026-09-29, owner's call), each overriding the
+text below:
 
-- **The dashboard rows sit right after Upcoming Episodes**, above Top Picks, not after the
-  Recent Watches/Ratings grid. At the bottom they were ~3,000px down and read as missing.
-  This replaces the §1.1 "Dashboard" row and the §7.6 placement.
+- **The dashboard rows sit directly under Top Picks**, above the Recent Watches/Ratings grid.
+  At the bottom they were ~3,000px down and read as missing. They moved up to just after
+  Upcoming Episodes on 2026-09-28, then down to under Top Picks on 2026-09-29. This replaces
+  the §1.1 "Dashboard" row and the §7.6 placement.
+- **The Shared with me entry is listed only while the inbox holds something** (2026-09-29),
+  and while the viewer is on the page, so dismissing the last title does not remove the
+  selected entry. An empty inbox in the sidebar read as clutter. The count it keys on is the
+  badge count, so the two cannot disagree. The route stays reachable by URL and keeps its
+  empty state. Because the entry now depends on the count, `ConnectionsProvider` also
+  re-reads the count on navigation, under the same once-a-minute limit as focus, so a share
+  surfaces at the recipient's next click. A timer was rejected, since it costs requests while
+  nobody is looking. This adds to §7.2.
 - **"Recently watched by" counts played titles only** (`WATCH_HISTORY_PLAYED_SQL`), not
   `WATCHED_SQL`. On the live instance a film the connection had only started sat in their row
   while its title page said nobody had watched it. This replaces §6.3's predicate.
@@ -133,7 +143,7 @@ cannot see the pairing UI. Once connected, two users mutually get:
 | Item-page counters | Anonymous household counts stay for everyone; connected users are *added* as names. |
 | Recommend picker | Multi-select recipients in one dialog. |
 | Recommendation playlists | In-app only. Nothing is written to Emby/Jellyfin. |
-| Dashboard | Own rows stay first; connected-user sliders appended after own Recent Watches/Ratings. **Superseded 2026-09-28:** directly after Upcoming Episodes (see the top of this file). |
+| Dashboard | Own rows stay first; connected-user sliders appended after own Recent Watches/Ratings. **Superseded 2026-09-29:** directly under Top Picks (see the top of this file). |
 
 ### 1.2 Added by this revision (defaults — see §12 to flip)
 
@@ -965,6 +975,8 @@ In `components/Layout.tsx`:
   so put `nav.sharedWithMeBadge` on the `ListItemButton` as `aria-label` (label plus count)
   whenever `pendingCount > 0`. The badge sits on the icon, so it shows on the collapsed rail
   as well as the labelled drawer.
+- **Added 2026-09-29:** the filter also drops the entry while `pendingCount` is 0, unless the
+  viewer is on `/shared-with-me` itself.
 
 ### 7.3 MediaHero button + RecommendToDialog
 
@@ -1088,7 +1100,8 @@ initials as fallback. Footer:
   haven't seen this one").
 - Place it in `pages/dashboard/index.tsx` **after** the own Recent Watches / Recent
   Ratings `Grid` (locked: own content first), with `enabled = hasConnections`.
-  **Superseded 2026-09-28:** directly after Upcoming Episodes, above Top Picks.
+  **Superseded 2026-09-29:** directly under Top Picks, above the Recent Watches / Recent
+  Ratings `Grid`.
 - Add both files to the `components/index.ts` and `hooks/index.ts` barrels. Do **not**
   add fields to `GET /api/dashboard`.
 
@@ -1337,11 +1350,12 @@ library that B cannot open.
 3. A opens Watch History → picks B (URL `?user=`): B's movies and series render, no
    mark-unwatched affordance, no ticks, and nothing from the library A cannot open.
    Reload keeps the selection.
-4. A recommends an item to B: B's nav entry shows a badge, and "Shared with me" shows
-   "Recommended by A". B dismisses → gone, badge drops. A sends a second title; B finishes
+4. Before anything is shared, B has no "Shared with me" entry. A recommends an item to B:
+   the entry appears with a badge, and the page shows "Recommended by A". B dismisses →
+   gone, badge drops, and the entry stays until B leaves the page. A sends a second title; B finishes
    it via playback sync → gone on next load, badge drops. A tries to send a title from the
    library B cannot open → B's row is disabled "Not in their libraries".
-5. B's dashboard: one slider for A below own lists; none for C; nothing for a connection with
+5. B's dashboard: one slider for A under Top Picks; none for C; nothing for a connection with
    no recent watches.
 6. Admin Users page: row menu → Connections… → add/remove reflected in both users' UIs after
    reload, and in each user's permission history on UserDetail ("Connection · B").

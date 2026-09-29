@@ -2,7 +2,8 @@
  * ConnectionsProvider
  *
  * The viewer's connections and how many titles are waiting for them under
- * Shared with me (the sidebar badge). Connections are made by an admin and are
+ * Shared with me (the sidebar badge, and whether that entry is listed at all —
+ * it is hidden while the count is zero). Connections are made by an admin and are
  * mutual; see docs/plans/social-connections.md.
  *
  * Gated on the server's decided `social` capability: someone with no
@@ -16,16 +17,25 @@
  * list and the badge count too. The admin dialog also re-reads it the moment it
  * changes a pair, which covers an admin connecting themselves.
  *
+ * The badge count is also re-read when the viewer moves to another page, under
+ * the same once-a-minute limit, so a title shared while they stay in one tab
+ * surfaces at their next click rather than at their next reload. A timer was
+ * rejected: it costs requests while nobody is looking. Only the count — `social`
+ * is left to focus, since re-reading it per navigation would put an auth check
+ * on every viewer's clicks, connected or not.
+ *
  * No localStorage cache: an assumed session starts and stops with a full page
  * load anyway, and a stale badge is a wrong claim on first paint.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
 import { ConnectionsContext, type ConnectionSummary } from './connections-context'
 import { useCapability } from './useCapability'
 import { useAuth } from './useAuth'
 
-const FOCUS_REFRESH_MS = 60_000
+/** At most one background re-read per minute, whether focus or navigation asked. */
+const REFRESH_THROTTLE_MS = 60_000
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { credentials: 'include' })
@@ -36,6 +46,7 @@ async function fetchJson<T>(url: string): Promise<T> {
 export function ConnectionsProvider({ children }: { children: ReactNode }) {
   const enabled = useCapability('social')
   const { refreshCapabilities } = useAuth()
+  const { pathname } = useLocation()
   const [connections, setConnections] = useState<ConnectionSummary[]>([])
   const [pendingCount, setPendingCount] = useState(0)
   const [loading, setLoading] = useState(enabled)
@@ -89,7 +100,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onFocus = () => {
-      if (Date.now() - lastRefreshAt.current < FOCUS_REFRESH_MS) return
+      if (Date.now() - lastRefreshAt.current < REFRESH_THROTTLE_MS) return
       lastRefreshAt.current = Date.now()
       // A change of `social` re-runs the effect above, which loads everything;
       // while it holds, the list and the badge are refreshed here.
@@ -99,6 +110,14 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
   }, [enabled, refresh, refreshCapabilities])
+
+  // Declared after the initial load on purpose: that load stamps
+  // `lastRefreshAt` before this runs, so the first render does not fetch twice.
+  useEffect(() => {
+    if (!enabled) return
+    if (Date.now() - lastRefreshAt.current < REFRESH_THROTTLE_MS) return
+    void loadCount()
+  }, [pathname, enabled, loadCount])
 
   const value = useMemo(
     () => ({
