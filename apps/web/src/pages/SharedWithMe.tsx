@@ -16,7 +16,7 @@
  * window: the assistant dock and the media dialog both shrink the pane below
  * what a breakpoint assumes.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -106,7 +106,10 @@ async function serverMessage(response: Response): Promise<string | null> {
   }
 }
 
-/** Items across every group; null while loading. A failed list counts as empty. */
+/**
+ * Items across every group; null while loading. A failed list counts as empty
+ * here, which only the opening-tab choice reads — the tiles show "—" for it.
+ */
 function itemCount<G extends { items: unknown[] }>(list: Loaded<G>): number | null {
   if (list.state === 'loading') return null
   if (list.state === 'failed') return 0
@@ -260,8 +263,10 @@ export function SharedWithMePage() {
   const openItem = (item: SharedItem) =>
     navigate(`/${item.mediaType === 'movie' ? 'movies' : 'series'}/${item.itemId}`)
 
-  const tileValue = (value: number | null, text?: string) =>
-    value === null ? <Skeleton width={32} /> : (text ?? value)
+  // A list that failed to load is "—", never 0: zero is a claim about the
+  // viewer, and the tab below says the load failed.
+  const tileValue = (list: Loaded<unknown>, value: ReactNode) =>
+    list.state === 'loading' ? <Skeleton width={32} /> : list.state === 'failed' ? '—' : value
 
   return (
     <Box>
@@ -276,14 +281,14 @@ export function SharedWithMePage() {
         }}
       >
         <MetricTile
-          value={tileValue(receivedCount)}
+          value={tileValue(received, receivedCount)}
           label={t('sharedWithMe.tileWaiting')}
           icon={<MoveToInboxIcon />}
           color={theme.palette.primary.main}
           onClick={() => selectTab('received')}
         />
         <MetricTile
-          value={tileValue(sentCount)}
+          value={tileValue(sent, sentCount)}
           label={t('sharedWithMe.tileSent')}
           icon={<SendIcon />}
           color={theme.palette.secondary.main}
@@ -291,7 +296,7 @@ export function SharedWithMePage() {
         />
         <MetricTile
           value={tileValue(
-            sentCount,
+            sent,
             sentCount
               ? t('sharedWithMe.tileWatchedValue', { watched: sentStatusCounts.watched, total: sentCount })
               : '—'

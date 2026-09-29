@@ -53,6 +53,8 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
   const [sentCount, setSentCount] = useState(0)
   const [loading, setLoading] = useState(enabled)
   const lastRefreshAt = useRef(0)
+  /** Numbers each count request; only the newest may write (see loadCount). */
+  const countRequest = useRef(0)
   const mounted = useRef(true)
 
   useEffect(() => {
@@ -64,9 +66,13 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
 
   const loadCount = useCallback(async () => {
     lastRefreshAt.current = Date.now()
+    // Navigation, focus, the Shared page's load and a dismiss can each start
+    // one, so two can be in flight. An older answer landing last would put back
+    // a count the viewer just changed — and the sidebar entry hangs off it.
+    const ticket = ++countRequest.current
     try {
       const data = await fetchJson<{ count?: number; sentCount?: number }>('/api/social/recommendations/count')
-      if (!mounted.current) return
+      if (!mounted.current || ticket !== countRequest.current) return
       setPendingCount(typeof data.count === 'number' ? data.count : 0)
       setSentCount(typeof data.sentCount === 'number' ? data.sentCount : 0)
     } catch (err) {

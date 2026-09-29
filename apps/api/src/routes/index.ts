@@ -129,7 +129,7 @@ const routes: FastifyPluginAsync = async (fastify) => {
   await fastify.register(favoritesRoutes)
   await fastify.register(watchStatusRoutes)
 
-  // Social layer: connections, Shared with me, connections' recent watches
+  // Social layer: connections, Shared (received and sent), connections' recent watches
   await fastify.register(socialRoutes)
 
   // Register discovery routes (missing content suggestions)

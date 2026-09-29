@@ -105,7 +105,7 @@ async function decidedCapabilities(user: SessionUser): Promise<Record<string, bo
     // Keep the permissive default; see above.
   }
   // `social`: whether this viewer has at least one visible connection, which
-  // is what shows the Shared with me page, the Recommend button, the history
+  // is what shows the Shared page, the Recommend button, the history
   // picker and the dashboard sliders. Decided data rather than a permission —
   // nothing server-side gates on it — so it is not in permissions.ts.
   let social = false

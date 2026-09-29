@@ -52,7 +52,7 @@ export function registerRecommendationHandlers(fastify: FastifyInstance) {
       const groups = await listInbox(currentUser.id, await viewerScope(request))
       return reply.send({ groups })
     } catch (err) {
-      request.log.error({ err, userId: currentUser.id }, 'Failed to load shared-with-me inbox')
+      request.log.error({ err, userId: currentUser.id }, 'Failed to load received recommendations')
       return reply.status(500).send({ error: 'Failed to load recommendations' })
     }
   })

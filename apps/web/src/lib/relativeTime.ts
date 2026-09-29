@@ -26,8 +26,13 @@ export function relativeTimeParts(then: Date, now: Date): { value: number; unit:
   return { value: signed(Math.floor(days / 365)), unit: 'year' }
 }
 
-/** `then` relative to `now` in the reader's language ("yesterday", "3 days ago"). */
+/**
+ * A past moment relative to `now` in the reader's language ("yesterday",
+ * "3 days ago"). A timestamp ahead of `now` — the server's clock running a
+ * little ahead of the browser's, on something sent seconds ago — reads as
+ * "now", never "in 2 minutes".
+ */
 export function formatRelativeTime(then: Date, now: Date, locale: string): string {
-  const { value, unit } = relativeTimeParts(then, now)
+  const { value, unit } = relativeTimeParts(then > now ? now : then, now)
   return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(value, unit)
 }

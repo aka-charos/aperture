@@ -160,7 +160,7 @@ const tags = [
   {
     name: 'social',
     description:
-      'Admin-managed connections between users, and what they share: each other’s recent watches, and titles recommended to each other (Shared with me). Pairing is admin-only.',
+      'Admin-managed connections between users, and what they share: each other’s recent watches, and titles recommended to each other (the Shared page: received and sent). Pairing is admin-only.',
   },
 
   // === Media Library ===

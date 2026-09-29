@@ -454,8 +454,8 @@ export async function listSent(recommenderId: string, scope: LibraryScope): Prom
 }
 
 /**
- * How many titles the Sent tab lists — the length of the same read, for the
- * sidebar's "has this person shared anything" and the tab label.
+ * How many titles the Sent tab lists — the length of the same read, so the
+ * sidebar's "has this person shared anything" cannot disagree with the tab.
  */
 export async function countSent(recommenderId: string, scope: LibraryScope): Promise<number> {
   return (await readSent(recommenderId, scope)).length
