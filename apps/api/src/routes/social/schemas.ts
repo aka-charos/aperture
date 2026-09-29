@@ -55,7 +55,7 @@ export const inboxCountSchema = {
   tags: ['social'],
   summary: 'How many titles are waiting for the caller, and how many they have sent',
   description:
-    '`count` is the length of the received list (the sidebar badge); `sentCount` the length of the sent list. The Shared entry is listed while either is above zero.',
+    '`count` is the length of the received list (the sidebar badge); `sentCount` the length of the sent list. The Watch This entry is listed while either is above zero.',
 }
 
 export const sentSchema = {

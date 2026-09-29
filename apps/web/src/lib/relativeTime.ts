@@ -1,6 +1,6 @@
 /**
  * "3 days ago" for any surface. Moved here from the gap-analysis listing when
- * the Shared page needed the same wording; `listing.ts` re-exports it so its
+ * the Watch This page needed the same wording; `listing.ts` re-exports it so its
  * test and page are unchanged.
  */
 

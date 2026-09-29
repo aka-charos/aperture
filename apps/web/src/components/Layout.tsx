@@ -86,8 +86,8 @@ type NavItem = {
   feature: string | null
   capability?: string
   /**
-   * A live count drawn on the icon. `socialInbox`: titles waiting under Shared —
-   * and that entry is listed only while something was received or sent.
+   * A live count drawn on the icon. `socialInbox`: titles waiting under Watch
+   * This — and that entry is listed only while something was received or sent.
    */
   badge?: 'socialInbox'
 }
@@ -99,7 +99,7 @@ const baseUserMenuItems: NavItem[] = [
   { textKey: 'nav.recommendations', icon: <AutoAwesomeIcon />, path: '/recommendations', feature: null },
   // `social` is decided data (has at least one visible connection), not a
   // permission; the filter below treats it like any other capability.
-  { textKey: 'nav.shared', icon: <RecommendIcon />, path: '/shared-with-me', feature: null, capability: 'social', badge: 'socialInbox' },
+  { textKey: 'nav.watchThis', icon: <RecommendIcon />, path: '/watch-this', feature: null, capability: 'social', badge: 'socialInbox' },
   { textKey: 'nav.showsYouWatch', icon: <AddToQueueIcon />, path: '/watching', feature: 'watching' },
   { textKey: 'nav.topPicks', icon: <WhatshotIcon />, path: '/top-picks', feature: null },
   { textKey: 'nav.playlists', icon: <PlaylistPlayIcon />, path: '/playlists', feature: null },
@@ -219,7 +219,7 @@ function AppShell() {
   const userMenuItems = baseUserMenuItems.filter((item) => {
     if (item.feature === 'watching' && !watchingEnabled) return false
     if (item.capability && capabilities[item.capability] !== true) return false
-    // Shared with nothing received and nothing sent is noise in the sidebar. It
+    // Watch This with nothing received and nothing sent is noise in the sidebar. It
     // stays while the viewer is on the page, so dismissing the last title does
     // not pull the selected entry out from under them.
     if (

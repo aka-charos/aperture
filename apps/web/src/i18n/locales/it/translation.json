@@ -51,7 +51,7 @@
     "collections": "Collections",
     "sharedWithMeBadge_one": "{{count}} new recommendation",
     "sharedWithMeBadge_other": "{{count}} new recommendations",
-    "shared": "Shared"
+    "watchThis": "Da vedere"
   },
   "admin": {
     "title": "Amministrazione",
@@ -978,7 +978,7 @@
       "failed": "Couldn't send the recommendation",
       "loadFailed": "Couldn't load your connections",
       "empty": "You're not connected to anyone yet",
-      "descriptionShared": "The people you pick will find it under Shared."
+      "descriptionWatchThis": "Le persone che scegli lo troveranno in «Da vedere»."
     }
   },
   "browse": {
@@ -5622,6 +5622,7 @@
     "loadFailed": "Couldn't load what's been shared with you",
     "empty": "Nothing shared with you yet",
     "emptyHint": "When someone you're connected to recommends a title, it appears here. Titles you finish leave on their own.",
+    "title": "Da vedere!",
     "subtitleBoth": "What the people you're connected to recommend to you, and what you've recommended to them",
     "tabReceived": "Received",
     "tabSent": "Sent",

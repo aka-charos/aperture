@@ -1,6 +1,7 @@
 /**
- * Social layer: admin-managed connections, the Shared page (received and sent
- * recommendations), and what connections watched lately. Design record: docs/plans/social-connections.md.
+ * Social layer: admin-managed connections, the Watch This page (received and
+ * sent recommendations), and what connections watched lately. Design record:
+ * docs/plans/social-connections.md.
  *
  * No capability guard: having a connection is data, not a permission, and every
  * endpoint answers for the caller's own connections (an empty list for someone

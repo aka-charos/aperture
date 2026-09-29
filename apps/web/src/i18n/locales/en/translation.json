@@ -49,7 +49,7 @@
     "howItWorks": "How It Works",
     "roleLabelAdmin": "Administrator",
     "roleLabelUser": "User",
-    "shared": "Shared",
+    "watchThis": "Watch This",
     "sharedWithMeBadge_one": "{{count}} new recommendation",
     "sharedWithMeBadge_other": "{{count}} new recommendations"
   },
@@ -1263,7 +1263,7 @@
     },
     "recommendDialog": {
       "title": "Recommend {{title}}",
-      "descriptionShared": "The people you pick will find it under Shared.",
+      "descriptionWatchThis": "The people you pick will find it under Watch This.",
       "alreadyWatched": "Already watched",
       "unavailable": "Not in their libraries",
       "alreadyRecommended": "Already sent. Sending again moves it to the top",
@@ -5572,6 +5572,7 @@
     "replayTag": "replay"
   },
   "sharedWithMe": {
+    "title": "Watch This!",
     "subtitleBoth": "What the people you're connected to recommend to you, and what you've recommended to them",
     "recommendedBy": "Recommended by {{name}}",
     "dismiss": "Dismiss",

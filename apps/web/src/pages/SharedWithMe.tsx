@@ -1,7 +1,11 @@
 /**
- * Shared — what the viewer's connections recommended to them (Received) and
- * what the viewer recommended to them (Sent), one card per person
+ * Watch This (route `/watch-this`; the file keeps its first name, Shared with
+ * me) — what the viewer's connections recommended to them (Received) and what
+ * the viewer recommended to them (Sent), one card per person
  * (docs/plans/social-connections.md §7.7 and its 2026-09-29 notes).
+ *
+ * The heading is its own key (`sharedWithMe.title`), not the sidebar label:
+ * it may carry an exclamation mark the sidebar does not, per language.
  *
  * Received: a title leaves when the viewer finishes it (decided server-side by
  * the poster badge's own rule), dismisses it, can no longer open it, or when
@@ -270,7 +274,7 @@ export function SharedWithMePage() {
 
   return (
     <Box>
-      <PageHeading title={t('nav.shared')} description={t('sharedWithMe.subtitleBoth')} sx={{ mb: 3 }} />
+      <PageHeading title={t('sharedWithMe.title')} description={t('sharedWithMe.subtitleBoth')} sx={{ mb: 3 }} />
 
       <Box
         sx={{

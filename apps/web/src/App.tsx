@@ -1,5 +1,5 @@
 import React from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { I18nextProvider } from 'react-i18next'
 import i18n from './i18n/config'
 import { RtlProviders } from './RtlProviders'
@@ -87,6 +87,15 @@ function AssistantEntry() {
  */
 function AssistantRoute() {
   return useCapability('assistant') ? <AssistantPage /> : <Navigate to="/" replace />
+}
+
+/**
+ * The Watch This page's first address, from when it was "Shared with me". Kept
+ * so bookmarks land, with `?tab=` carried across.
+ */
+function LegacySharedRedirect() {
+  const { search } = useLocation()
+  return <Navigate to={{ pathname: '/watch-this', search }} replace />
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -185,7 +194,8 @@ function AppRoutes() {
         <Route index element={<DashboardPage />} />
         <Route path="assistant" element={<AssistantRoute />} />
         <Route path="recommendations" element={<MyRecommendationsPage />} />
-        <Route path="shared-with-me" element={<SharedWithMePage />} />
+        <Route path="watch-this" element={<SharedWithMePage />} />
+        <Route path="shared-with-me" element={<LegacySharedRedirect />} />
         <Route path="watching" element={<WatchingPage />} />
         <Route path="top-picks" element={<TopPicksPage />} />
         <Route path="top-picks/movies" element={<TopPicksMoviesPage />} />

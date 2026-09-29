@@ -51,7 +51,7 @@
     "collections": "Collections",
     "sharedWithMeBadge_one": "{{count}} new recommendation",
     "sharedWithMeBadge_other": "{{count}} new recommendations",
-    "shared": "Shared"
+    "watchThis": "值得一看"
   },
   "admin": {
     "title": "管理",
@@ -1448,7 +1448,7 @@
       "failed": "Couldn't send the recommendation",
       "loadFailed": "Couldn't load your connections",
       "empty": "You're not connected to anyone yet",
-      "descriptionShared": "The people you pick will find it under Shared."
+      "descriptionWatchThis": "你选择的人会在“值得一看”里看到它。"
     }
   },
   "search": {
@@ -5622,6 +5622,7 @@
     "loadFailed": "Couldn't load what's been shared with you",
     "empty": "Nothing shared with you yet",
     "emptyHint": "When someone you're connected to recommends a title, it appears here. Titles you finish leave on their own.",
+    "title": "值得一看",
     "subtitleBoth": "What the people you're connected to recommend to you, and what you've recommended to them",
     "tabReceived": "Received",
     "tabSent": "Sent",

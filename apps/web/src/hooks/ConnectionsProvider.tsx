@@ -1,8 +1,8 @@
 /**
  * ConnectionsProvider
  *
- * The viewer's connections, how many titles are waiting for them under Shared
- * (the sidebar badge) and how many they have sent. Together the two counts
+ * The viewer's connections, how many titles are waiting for them under Watch
+ * This (the sidebar badge) and how many they have sent. Together the two counts
  * decide whether the entry is listed at all: it is hidden while both are zero.
  * Connections are made by an admin and are mutual; see
  * docs/plans/social-connections.md.
@@ -66,7 +66,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
 
   const loadCount = useCallback(async () => {
     lastRefreshAt.current = Date.now()
-    // Navigation, focus, the Shared page's load and a dismiss can each start
+    // Navigation, focus, the Watch This page's load and a dismiss can each start
     // one, so two can be in flight. An older answer landing last would put back
     // a count the viewer just changed — and the sidebar entry hangs off it.
     const ticket = ++countRequest.current

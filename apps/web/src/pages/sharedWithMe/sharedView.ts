@@ -1,5 +1,5 @@
 /**
- * The Shared page's decisions, pure so they are pinned by `sharedView.test.ts`.
+ * The Watch This page's decisions, pure so they are pinned by `sharedView.test.ts`.
  *
  * `SentStatus` mirrors core `social/rules.ts` by hand — the web bundle never
  * imports core. The server decides each status; this module only counts and

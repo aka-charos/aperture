@@ -82,7 +82,7 @@ async function serverMessage(response: Response): Promise<string | null> {
  */
 export function UserConnectionsDialog({ open, user, users, onClose }: UserConnectionsDialogProps) {
   const { t } = useTranslation()
-  // An admin can connect themselves; their own Shared with me, Recommend button
+  // An admin can connect themselves; their own Watch This entry, Recommend button
   // and dashboard rows depend on the `social` capability, decided at page load.
   const { refreshCapabilities } = useAuth()
   const [pairs, setPairs] = useState<ConnectionPair[]>([])

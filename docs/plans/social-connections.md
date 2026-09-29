@@ -25,7 +25,7 @@ text below:
   At the bottom they were ~3,000px down and read as missing. They moved up to just after
   Upcoming Episodes on 2026-09-28, then down to under Top Picks on 2026-09-29. This replaces
   the §1.1 "Dashboard" row and the §7.6 placement.
-- **The Shared entry is listed only while something was received or sent** (2026-09-29),
+- **The Watch This entry is listed only while something was received or sent** (2026-09-29),
   and while the viewer is on the page, so dismissing the last title does not remove the
   selected entry. An empty inbox in the sidebar read as clutter. It keys on the badge count
   and on `sentCount` from the same count endpoint, each the length of its tab's list, so
@@ -35,10 +35,23 @@ text below:
   surfaces at the recipient's next click. A timer was rejected, since it costs requests while
   nobody is looking. This adds to §7.2.
 - **The page shows what the viewer SENT as well** (2026-09-29). There was no way to see what
-  you had recommended to whom. `/shared-with-me` now has Received and Sent tabs, three
-  summary tiles (waiting for you, you shared, finished by them) and one card per person.
-  The nav label became **"Shared"** (`nav.shared`), since "Shared with me" no longer
-  describes the page; the route is unchanged. `GET /api/social/recommendations/sent` groups
+  you had recommended to whom. The page now has Received and Sent tabs, three summary
+  tiles (waiting for you, you shared, finished by them) and one card per person.
+  "Shared with me" no longer described it, so it became **"Watch This"** (`nav.watchThis`,
+  heading `sharedWithMe.title` = "Watch This!") at **`/watch-this`**, with
+  `/shared-with-me` redirecting and keeping `?tab=`. Two other names were tried and dropped
+  first. "Shared" was vague. "Shared Finds" failed translation: the natural word for "finds"
+  in Japanese, Korean and Chinese is the same word as their Discover menu item (発見 /
+  발견 / 发现), Hindi's collides with both Discover and Search (खोजें / खोज), and Italian,
+  Greek and Arabic share Discover's root. "Watch This" is how people actually pass a title
+  on, and every language has an everyday form of it. The 14 translations of the label, the
+  heading and the dialog line naming the page were written by hand, not left as English
+  placeholders, so no language names a page its sidebar does not show. Where an imperative
+  would force a choice the app does not make consistently (tu/vous, ты/вы) or a gender
+  (Hebrew, Arabic), the label uses that language's "worth watching" or "must-see" form
+  instead: À voir, Da vedere, Стоит посмотреть, שווה צפייה, يستحق المشاهدة, 值得一看,
+  Imperdíveis. Greek uses the app's formal Δείτε το. The file, the component and the
+  `sharedWithMe.*` keys keep the first name. `GET /api/social/recommendations/sent` groups
   by recipient, and each title carries a status: `watched`, `watching` (a series, with
   episode progress), `waiting`, or `unavailable` (they can no longer open it). Three rules:
   - **A dismissal is never disclosed.** It reads as `waiting`, and the recommend dialog's
@@ -175,7 +188,7 @@ cannot see the pairing UI. Once connected, two users mutually get:
 | Visible connection | Connected **and** the other account has access (`is_enabled`) **and** is not disabled on the media server (`NOT provider_disabled`). Rows are kept; visibility returns when access does. | Matches the session lookup and every per-user job. F-135: switching access off keeps setup. |
 | Inbox after disconnect | Filtered at read, not deleted. Reconnecting brings pending items back. | One rule ("every social read goes through the visible-connection relation") instead of a delete path plus a filter. |
 | The viewer in the named list | The viewer's own play is named "You" whenever they have at least one connection. | Otherwise "Joe and 1 other" counts the viewer as a stranger, on a page they're looking at. |
-| Sidebar label | **"Shared with me"** (route `/shared-with-me`), not "Recommended for me". **Superseded 2026-09-29:** "Shared", once the page gained a Sent tab (see the top of this file). | The sidebar already has "Recommendations" (the AI list) one row above. Two near-identical labels for unrelated pages is a support question. |
+| Sidebar label | **"Shared with me"** (route `/shared-with-me`), not "Recommended for me". **Superseded 2026-09-29:** "Watch This" at `/watch-this`, once the page gained a Sent tab (see the top of this file). | The sidebar already has "Recommendations" (the AI list) one row above. Two near-identical labels for unrelated pages is a support question. |
 | Audit | Connecting and disconnecting are recorded in `permission_changes` for both people. | F-134: "every permission change is recorded". A connection grants read access to someone's watch history. |
 
 ## 2. Non-goals (explicitly out of scope)
@@ -998,7 +1011,7 @@ In `components/Layout.tsx`:
   whenever `pendingCount > 0`. The badge sits on the icon, so it shows on the collapsed rail
   as well as the labelled drawer.
 - **Added 2026-09-29:** the filter also drops the entry while `pendingCount` is 0, unless the
-  viewer is on `/shared-with-me` itself.
+  viewer is on the page itself (now `/watch-this`).
 
 ### 7.3 MediaHero button + RecommendToDialog
 
@@ -1372,12 +1385,12 @@ library that B cannot open.
 3. A opens Watch History → picks B (URL `?user=`): B's movies and series render, no
    mark-unwatched affordance, no ticks, and nothing from the library A cannot open.
    Reload keeps the selection.
-4. Before anything is shared, B has no "Shared" entry. A recommends an item to B: A's entry
+4. Before anything is shared, B has no "Watch This" entry. A recommends an item to B: A's entry
    appears with no badge, and A's Sent tab shows the title under "Sent to B" as Waiting;
    B's entry appears with a badge, and B's Received tab shows "Recommended by A". B dismisses
    → gone for B, badge drops, B's entry stays until B leaves the page, and A still sees
    Waiting (and the dialog still says "Already recommended" for B). B finishes it → A sees
-   Watched. A sends a second title; B finishes
+   Watched. An old bookmark to `/shared-with-me?tab=sent` lands on `/watch-this?tab=sent`. A sends a second title; B finishes
    it via playback sync → gone on next load, badge drops. A tries to send a title from the
    library B cannot open → B's row is disabled "Not in their libraries".
 5. B's dashboard: one slider for A under Top Picks; none for C; nothing for a connection with
