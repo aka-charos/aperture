@@ -38,6 +38,8 @@ export function ConnectionsRecentWatches({ users, loading }: ConnectionsRecentWa
               title={t('dashboard.recentlyWatchedBy', { name: entry.user.name })}
               subtitle={t('dashboard.subtitleFromConnections')}
               items={entry.items}
+              // The only dashboard row mixing movies and series.
+              showMediaType
             />
           </Box>
         ))}

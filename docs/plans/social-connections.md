@@ -56,7 +56,19 @@ text below:
   page, peer recommendations take their own word (Tipp, indicação, consiglio, совет,
   σύσταση, 紹介, 권하다, 分享, שיתוף, ترشيح, सुझाव). Every plural string carries each
   language's full set of CLDR categories, because i18next falls back to English, not to
-  the language's own `_other` (see `src/i18n/CONVENTIONS.md`). `GET /api/social/recommendations/sent` groups
+  the language's own `_other` (see `src/i18n/CONVENTIONS.md`).
+- **Movies and series are told apart** (2026-09-29). Every list here mixed the two with
+  nothing saying which a title was. On Watch This, each person's card is split into a
+  **Movies** and a **Series** section (`TypeSection`, the dashboard Recent Watches
+  columns' icon and label, with a count). A per-poster badge was not possible there:
+  top-left holds Dismiss or the Sent status, top-right holds the viewer's own badges,
+  and the bottom edge is where library artwork burns in flags and ratings. The
+  dashboard's "Recently watched by" rows have a free top-left, so each poster gets a
+  neutral **Movie / Series** chip there (`MediaTypeChip`, `MediaCarousel`'s
+  `showMediaType`). It is neutral rather than coloured because green already means "you
+  watched it" on those posters. The type labels it reuses were wrong in several
+  languages and are corrected: Russian "Ряд" (a row), Korean "영화 산업" (the film
+  industry), Spanish "Cine", and singulars used as plural column headers. `GET /api/social/recommendations/sent` groups
   by recipient, and each title carries a status: `watched`, `watching` (a series, with
   episode progress), `waiting`, or `unavailable` (they can no longer open it). Three rules:
   - **A dismissal is never disclosed.** It reads as `waiting`, and the recommend dialog's

@@ -30,10 +30,28 @@ export function defaultSharedTab(receivedCount: number, sentCount: number): Shar
 }
 
 /** How many titles sit in each status. Every status is present, zero or not. */
-export function countStatuses(items: ReadonlyArray<{ status: SentStatus }>): Record<SentStatus, number> {
+export function countStatuses(
+  items: ReadonlyArray<{ status: SentStatus }>
+): Record<SentStatus, number> {
   const counts: Record<SentStatus, number> = { watched: 0, watching: 0, waiting: 0, unavailable: 0 }
   for (const item of items) counts[item.status] += 1
   return counts
+}
+
+export type MediaKind = 'movie' | 'series'
+
+/**
+ * A person's titles as a Movies section and a Series section: movies first,
+ * the order the dashboard's own Recent Watches columns use. Each keeps the
+ * order it arrived in (newest first), and a kind with nothing is left out, so
+ * an all-movies card shows one labelled section rather than an empty second.
+ */
+export function splitByType<T extends { mediaType: MediaKind }>(
+  items: readonly T[]
+): Array<{ type: MediaKind; items: T[] }> {
+  return (['movie', 'series'] as const)
+    .map((type) => ({ type, items: items.filter((item) => item.mediaType === type) }))
+    .filter((section) => section.items.length > 0)
 }
 
 /** The newest `recommendedAt` in a group (ISO strings sort as dates), or null for none. */

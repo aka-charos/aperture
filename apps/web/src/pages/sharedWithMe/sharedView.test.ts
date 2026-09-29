@@ -5,9 +5,32 @@ import {
   defaultSharedTab,
   latestSharedAt,
   parseSharedTab,
+  splitByType,
   STATUS_ORDER,
   type SentStatus,
 } from './sharedView'
+
+test('splitByType puts movies first, keeps each order, and drops an empty kind', () => {
+  const items = [
+    { id: 's1', mediaType: 'series' as const },
+    { id: 'm1', mediaType: 'movie' as const },
+    { id: 's2', mediaType: 'series' as const },
+    { id: 'm2', mediaType: 'movie' as const },
+  ]
+  assert.deepEqual(
+    splitByType(items).map((s) => [s.type, s.items.map((i) => i.id)]),
+    [
+      ['movie', ['m1', 'm2']],
+      ['series', ['s1', 's2']],
+    ]
+  )
+  assert.deepEqual(
+    splitByType([{ id: 's1', mediaType: 'series' as const }]).map((s) => s.type),
+    ['series'],
+    'an all-series card has one section, not an empty Movies one'
+  )
+  assert.deepEqual(splitByType([]), [])
+})
 
 test('parseSharedTab accepts the two tabs and nothing else', () => {
   assert.equal(parseSharedTab('received'), 'received')

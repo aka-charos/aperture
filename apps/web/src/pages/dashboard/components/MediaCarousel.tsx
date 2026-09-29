@@ -6,6 +6,7 @@ import { MoviePoster, RankBadge, BaseCarousel, CarouselItem } from '@aperture/ui
 import { useUserRatings } from '../../../hooks/useUserRatings'
 import { useWatchStatus } from '../../../hooks/useWatchStatus'
 import { useWatching } from '../../../hooks/useWatching'
+import { MediaTypeChip } from '../../../components/MediaTypeChip'
 
 interface MediaItem {
   id: string
@@ -27,6 +28,11 @@ interface MediaCarouselProps {
   showRank?: boolean
   emptyMessage?: string
   rows?: 1 | 2
+  /**
+   * Label each poster Movie or Series, for a row that mixes the two. Shares
+   * the top-left corner with the rank badge, so never set it with `showRank`.
+   */
+  showMediaType?: boolean
 }
 
 export function MediaCarousel({
@@ -38,6 +44,7 @@ export function MediaCarousel({
   showRank = false,
   emptyMessage: emptyMessageProp,
   rows = 1,
+  showMediaType = false,
 }: MediaCarouselProps) {
   const { t } = useTranslation()
   const emptyMessage = emptyMessageProp ?? t('dashboard.carouselEmpty')
@@ -83,6 +90,7 @@ export function MediaCarousel({
       size="medium"
     >
       {showRank && item.rank && <RankBadge rank={item.rank} />}
+      {showMediaType && !showRank && <MediaTypeChip type={item.type} />}
     </MoviePoster>
   )
 

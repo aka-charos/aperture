@@ -50,11 +50,13 @@ import { withServerMessageDetail } from '@/lib/withServerMessageDetail'
 import { MetricTile } from './watch-stats/MetricTile'
 import { PersonSection } from './sharedWithMe/PersonSection'
 import { SentStatusCount, SentStatusPill } from './sharedWithMe/SentStatusPill'
+import { TypeSection } from './sharedWithMe/TypeSection'
 import {
   countStatuses,
   defaultSharedTab,
   latestSharedAt,
   parseSharedTab,
+  splitByType,
   STATUS_ORDER,
   type SentStatus,
   type SharedTab,
@@ -158,7 +160,10 @@ export function SharedWithMePage() {
   const [received, setReceived] = useState<Loaded<ReceivedGroup>>({ state: 'loading' })
   const [sent, setSent] = useState<Loaded<SentGroup>>({ state: 'loading' })
   const [openingTab, setOpeningTab] = useState<SharedTab | null>(null)
-  const [snackbar, setSnackbar] = useState<{ message: string; severity: 'success' | 'error' } | null>(null)
+  const [snackbar, setSnackbar] = useState<{
+    message: string
+    severity: 'success' | 'error'
+  } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -236,7 +241,10 @@ export function SharedWithMePage() {
             : {
                 state: 'ready',
                 groups: prev.groups
-                  .map((group) => ({ ...group, items: group.items.filter((i) => i.id !== item.id) }))
+                  .map((group) => ({
+                    ...group,
+                    items: group.items.filter((i) => i.id !== item.id),
+                  }))
                   .filter((group) => group.items.length > 0),
               }
         )
@@ -263,7 +271,8 @@ export function SharedWithMePage() {
 
   const now = new Date()
   const when = (iso: string) => formatRelativeTime(new Date(iso), now, i18n.language)
-  const metaLine = (item: SharedItem) => (item.year ? `${item.year} · ${when(item.recommendedAt)}` : when(item.recommendedAt))
+  const metaLine = (item: SharedItem) =>
+    item.year ? `${item.year} · ${when(item.recommendedAt)}` : when(item.recommendedAt)
   const openItem = (item: SharedItem) =>
     navigate(`/${item.mediaType === 'movie' ? 'movies' : 'series'}/${item.itemId}`)
 
@@ -274,7 +283,11 @@ export function SharedWithMePage() {
 
   return (
     <Box>
-      <PageHeading title={t('sharedWithMe.title')} description={t('sharedWithMe.subtitleBoth')} sx={{ mb: 3 }} />
+      <PageHeading
+        title={t('sharedWithMe.title')}
+        description={t('sharedWithMe.subtitleBoth')}
+        sx={{ mb: 3 }}
+      />
 
       <Box
         sx={{
@@ -302,7 +315,10 @@ export function SharedWithMePage() {
           value={tileValue(
             sent,
             sentCount
-              ? t('sharedWithMe.tileWatchedValue', { watched: sentStatusCounts.watched, total: sentCount })
+              ? t('sharedWithMe.tileWatchedValue', {
+                  watched: sentStatusCounts.watched,
+                  total: sentCount,
+                })
               : '—'
           )}
           label={t('sharedWithMe.tileWatched')}
@@ -338,7 +354,9 @@ export function SharedWithMePage() {
       {tab === 'received' && (
         <Box role="tabpanel">
           {received.state === 'loading' && <GridSkeleton />}
-          {received.state === 'failed' && <Alert severity="error">{t('sharedWithMe.loadFailed')}</Alert>}
+          {received.state === 'failed' && (
+            <Alert severity="error">{t('sharedWithMe.loadFailed')}</Alert>
+          )}
           {received.state === 'ready' && received.groups.length === 0 && (
             <EmptyState title={t('sharedWithMe.empty')} hint={t('sharedWithMe.emptyHint')} />
           )}
@@ -355,52 +373,60 @@ export function SharedWithMePage() {
                     when: latest ? when(latest) : '',
                   })}
                 >
-                  <Box sx={GRID_SX}>
-                    {group.items.map((item) => (
-                      <MoviePoster
-                        key={item.id}
-                        title={item.title}
-                        year={item.year}
-                        posterUrl={item.posterUrl}
-                        genres={item.genres}
-                        metaLine={metaLine(item)}
-                        responsive
-                        titleLines={2}
-                        userRating={getRating(item.mediaType, item.itemId)}
-                        onRate={(rating) => handleRate(item.mediaType, item.itemId, rating)}
-                        watched={isWatched(item.mediaType, item.itemId)}
-                        episodeProgress={getEpisodeProgress(item.mediaType, item.itemId)}
-                        hideWatchingToggle
-                        onClick={() => openItem(item)}
-                      >
-                        {/* Top-left: the top-right corner is the poster's badge
-                            stack, and this page draws no rank badge. */}
-                        <Tooltip title={t('sharedWithMe.dismiss')}>
-                          <IconButton
-                            size="small"
-                            aria-label={t('sharedWithMe.dismiss')}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              void handleDismiss(item)
-                            }}
-                            sx={{
-                              position: 'absolute',
-                              top: 6,
-                              insetInlineStart: 6,
-                              zIndex: 2,
-                              width: 28,
-                              height: 28,
-                              backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                              color: 'common.white',
-                              '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.8)' },
-                            }}
+                  {splitByType(group.items).map((section) => (
+                    <TypeSection
+                      key={section.type}
+                      type={section.type}
+                      count={section.items.length}
+                    >
+                      <Box sx={GRID_SX}>
+                        {section.items.map((item) => (
+                          <MoviePoster
+                            key={item.id}
+                            title={item.title}
+                            year={item.year}
+                            posterUrl={item.posterUrl}
+                            genres={item.genres}
+                            metaLine={metaLine(item)}
+                            responsive
+                            titleLines={2}
+                            userRating={getRating(item.mediaType, item.itemId)}
+                            onRate={(rating) => handleRate(item.mediaType, item.itemId, rating)}
+                            watched={isWatched(item.mediaType, item.itemId)}
+                            episodeProgress={getEpisodeProgress(item.mediaType, item.itemId)}
+                            hideWatchingToggle
+                            onClick={() => openItem(item)}
                           >
-                            <CloseIcon sx={{ fontSize: 16 }} />
-                          </IconButton>
-                        </Tooltip>
-                      </MoviePoster>
-                    ))}
-                  </Box>
+                            {/* Top-left: the top-right corner is the poster's badge
+                            stack, and this page draws no rank badge. */}
+                            <Tooltip title={t('sharedWithMe.dismiss')}>
+                              <IconButton
+                                size="small"
+                                aria-label={t('sharedWithMe.dismiss')}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  void handleDismiss(item)
+                                }}
+                                sx={{
+                                  position: 'absolute',
+                                  top: 6,
+                                  insetInlineStart: 6,
+                                  zIndex: 2,
+                                  width: 28,
+                                  height: 28,
+                                  backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                                  color: 'common.white',
+                                  '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.8)' },
+                                }}
+                              >
+                                <CloseIcon sx={{ fontSize: 16 }} />
+                              </IconButton>
+                            </Tooltip>
+                          </MoviePoster>
+                        ))}
+                      </Box>
+                    </TypeSection>
+                  ))}
                 </PersonSection>
               )
             })}
@@ -410,9 +436,14 @@ export function SharedWithMePage() {
       {tab === 'sent' && (
         <Box role="tabpanel">
           {sent.state === 'loading' && <GridSkeleton />}
-          {sent.state === 'failed' && <Alert severity="error">{t('sharedWithMe.sentLoadFailed')}</Alert>}
+          {sent.state === 'failed' && (
+            <Alert severity="error">{t('sharedWithMe.sentLoadFailed')}</Alert>
+          )}
           {sent.state === 'ready' && sent.groups.length === 0 && (
-            <EmptyState title={t('sharedWithMe.sentEmpty')} hint={t('sharedWithMe.sentEmptyHint')} />
+            <EmptyState
+              title={t('sharedWithMe.sentEmpty')}
+              hint={t('sharedWithMe.sentEmptyHint')}
+            />
           )}
           {sent.state === 'ready' &&
             sent.groups.map((group) => {
@@ -427,32 +458,43 @@ export function SharedWithMePage() {
                     <SentStatusCount key={status} status={status} count={counts[status]} />
                   ))}
                 >
-                  <Box sx={GRID_SX}>
-                    {group.items.map((item) => (
-                      // A title they can no longer open is dimmed: it is not in
-                      // their list, and the pill says why.
-                      <Box key={item.id} sx={{ opacity: item.status === 'unavailable' ? 0.55 : 1 }}>
-                        <MoviePoster
-                          title={item.title}
-                          year={item.year}
-                          posterUrl={item.posterUrl}
-                          genres={item.genres}
-                          metaLine={metaLine(item)}
-                          responsive
-                          titleLines={2}
-                          hideUserRating
-                          hideWatchingToggle
-                          onClick={() => openItem(item)}
-                        >
-                          <SentStatusPill
-                            status={item.status}
-                            progress={item.progress}
-                            name={group.recipient.name}
-                          />
-                        </MoviePoster>
+                  {splitByType(group.items).map((section) => (
+                    <TypeSection
+                      key={section.type}
+                      type={section.type}
+                      count={section.items.length}
+                    >
+                      <Box sx={GRID_SX}>
+                        {section.items.map((item) => (
+                          // A title they can no longer open is dimmed: it is not in
+                          // their list, and the pill says why.
+                          <Box
+                            key={item.id}
+                            sx={{ opacity: item.status === 'unavailable' ? 0.55 : 1 }}
+                          >
+                            <MoviePoster
+                              title={item.title}
+                              year={item.year}
+                              posterUrl={item.posterUrl}
+                              genres={item.genres}
+                              metaLine={metaLine(item)}
+                              responsive
+                              titleLines={2}
+                              hideUserRating
+                              hideWatchingToggle
+                              onClick={() => openItem(item)}
+                            >
+                              <SentStatusPill
+                                status={item.status}
+                                progress={item.progress}
+                                name={group.recipient.name}
+                              />
+                            </MoviePoster>
+                          </Box>
+                        ))}
                       </Box>
-                    ))}
-                  </Box>
+                    </TypeSection>
+                  ))}
                 </PersonSection>
               )
             })}
@@ -465,7 +507,11 @@ export function SharedWithMePage() {
         onClose={() => setSnackbar(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert severity={snackbar?.severity ?? 'success'} onClose={() => setSnackbar(null)} variant="filled">
+        <Alert
+          severity={snackbar?.severity ?? 'success'}
+          onClose={() => setSnackbar(null)}
+          variant="filled"
+        >
           {snackbar?.message}
         </Alert>
       </Snackbar>
