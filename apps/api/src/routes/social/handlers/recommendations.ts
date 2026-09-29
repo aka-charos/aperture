@@ -1,6 +1,7 @@
 /**
- * Peer recommendations: the recipient's inbox ("Shared with me"), its badge
- * count, the recipient list for one title, sending, and dismissing.
+ * Peer recommendations: the recipient's inbox (Received), the sender's record
+ * (Sent), their counts, the recipient list for one title, sending, and
+ * dismissing.
  *
  * Two things are re-checked here that the dialog also shows, because the
  * dialog's flags are UX and not authorization: the title must be in the
@@ -12,8 +13,10 @@ import type { FastifyInstance, FastifyReply } from 'fastify'
 import {
   assessRecipients,
   countInbox,
+  countSent,
   dismissRecommendation,
   listInbox,
+  listSent,
   recommendItemToUsers,
   type SocialItemRef,
 } from '@aperture/core'
@@ -25,6 +28,7 @@ import {
   inboxSchema,
   recipientsSchema,
   recommendSchema,
+  sentSchema,
 } from '../schemas.js'
 
 /** Exactly one of the two ids, as an item; null (the caller answers 400) otherwise. */
@@ -53,17 +57,33 @@ export function registerRecommendationHandlers(fastify: FastifyInstance) {
     }
   })
 
-  /** GET /api/social/recommendations/count — the sidebar badge. */
+  /** GET /api/social/recommendations/sent — what the caller sent, grouped by recipient. */
+  fastify.get('/api/social/recommendations/sent', { preHandler: requireAuth, schema: sentSchema }, async (request, reply) => {
+    const currentUser = request.user as SessionUser
+    try {
+      const groups = await listSent(currentUser.id, await viewerScope(request))
+      return reply.send({ groups })
+    } catch (err) {
+      request.log.error({ err, userId: currentUser.id }, 'Failed to load sent recommendations')
+      return reply.status(500).send({ error: 'Failed to load the titles you shared' })
+    }
+  })
+
+  /** GET /api/social/recommendations/count — the sidebar badge, and whether anything was sent. */
   fastify.get(
     '/api/social/recommendations/count',
     { preHandler: requireAuth, schema: inboxCountSchema },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
       try {
-        const count = await countInbox(currentUser.id, await viewerScope(request))
-        return reply.send({ count })
+        const scope = await viewerScope(request)
+        const [count, sentCount] = await Promise.all([
+          countInbox(currentUser.id, scope),
+          countSent(currentUser.id, scope),
+        ])
+        return reply.send({ count, sentCount })
       } catch (err) {
-        request.log.error({ err, userId: currentUser.id }, 'Failed to count shared-with-me inbox')
+        request.log.error({ err, userId: currentUser.id }, 'Failed to count shared recommendations')
         return reply.status(500).send({ error: 'Failed to count recommendations' })
       }
     }

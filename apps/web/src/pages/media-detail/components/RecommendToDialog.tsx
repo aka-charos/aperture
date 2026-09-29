@@ -204,7 +204,7 @@ export function RecommendToDialog({ open, mediaType, itemId, itemTitle, onClose 
         </DialogTitle>
         <DialogContent dividers sx={{ p: 0 }}>
           <Typography variant="body2" color="text.secondary" sx={{ px: 2, pt: 1.5, pb: 1 }}>
-            {t('mediaDetail.recommendDialog.description')}
+            {t('mediaDetail.recommendDialog.descriptionShared')}
           </Typography>
 
           {loading && (

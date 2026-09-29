@@ -1,8 +1,9 @@
 /**
- * Titles one person recommends to another, and the recipient's inbox of them
- * (the "Shared with me" page and its sidebar badge).
+ * Titles one person recommends to another: the recipient's inbox of them (the
+ * Received tab and its sidebar badge) and the sender's record of them (the
+ * Sent tab).
  *
- * In-app only: nothing is written to the media server. Three rules.
+ * In-app only: nothing is written to the media server. Four rules.
  *
  * 1. **"Finished" is derived, never stored.** A title leaves the inbox when the
  *    recipient finishes it, by the poster badge's own rule
@@ -20,6 +21,13 @@
  *    the one assessment: the recommend dialog renders it and the POST re-runs
  *    it, so a recipient the dialog greyed out can never be sent to by a client
  *    that ignores the greying, and the two cannot report different reasons.
+ *
+ * 4. **The sender never learns of a dismissal.** The Sent tab reports a
+ *    dismissed title as still waiting, and the dialog still says "already
+ *    recommended" to that person. Either one disagreeing would give it away.
+ *    What the sender does see — watched, partway through, can no longer open
+ *    it — is what a connection could already read from the recipient's watch
+ *    history, or what the dialog already says about their libraries.
  */
 
 import { query } from '../lib/db.js'
@@ -28,16 +36,19 @@ import {
   getLibraryScopeForUser,
   libraryScopeSql,
   loadConfiguredLibraries,
+  type ConfiguredLibrary,
   type LibraryScope,
 } from '../lib/libraryScope.js'
-import { movieFinishedSql, seriesFinishedSql } from '../watching/watchedItems.js'
+import { getWatchStatusForUser, movieFinishedSql, seriesFinishedSql } from '../watching/watchedItems.js'
 import { avatarUrlFor, listVisibleConnections, type ConnectedUser } from './connections.js'
 import {
   displayNameSql,
   groupInbox,
   isUuid,
   recipientSkipReason,
+  sentStatus,
   visibleConnectionsSql,
+  type SentStatus,
   type SkipReason,
 } from './rules.js'
 
@@ -68,13 +79,32 @@ export interface RecommendationGroup {
   items: SocialRecommendationItem[]
 }
 
+export interface SentRecommendationItem extends SocialRecommendationItem {
+  status: SentStatus
+  /**
+   * Their played episodes of a series they have started, specials excluded —
+   * the numbers their own poster pill shows. Absent for a movie and for a
+   * series they have not started.
+   */
+  progress?: { watched: number; total: number }
+}
+
+export interface SentGroup {
+  recipient: { id: string; name: string; avatarUrl: string }
+  /** Newest first. */
+  items: SentRecommendationItem[]
+}
+
 export interface RecipientAssessment {
   user: ConnectedUser
   /** Finished it. Always false when `unavailable` — see rules.ts rule 3. */
   alreadyWatched: boolean
   /** Outside THEIR library scope or above their parental rating. */
   unavailable: boolean
-  /** A live row sender → them for this item already exists. */
+  /**
+   * A row sender → them for this item exists, dismissed or not: counting only
+   * live rows would tell the sender about a dismissal (rule 4).
+   */
   alreadyRecommended: boolean
 }
 
@@ -118,7 +148,7 @@ export async function assessRecipients(
                 ${finishedSql(item.mediaType, '$2::uuid', 't.id')} AS finished,
                 EXISTS (SELECT 1 FROM social_recommendations r
                          WHERE r.recommender_user_id = $3::uuid AND r.recipient_user_id = $2::uuid
-                           AND r.${column} = t.id AND r.dismissed_at IS NULL) AS already_recommended
+                           AND r.${column} = t.id) AS already_recommended
            FROM ${table} t
           WHERE t.id = $1::uuid`,
         params
@@ -288,4 +318,145 @@ export async function dismissRecommendation(recipientId: string, id: string): Pr
     [id, recipientId]
   )
   return rows.rows.length > 0
+}
+
+interface SentRow {
+  id: string
+  recipient_user_id: string
+  media_type: SocialMediaType
+  movie_id: string | null
+  series_id: string | null
+  recommended_at: Date
+  title: string
+  year: number | null
+  poster_url: string | null
+  genres: string[] | null
+}
+
+/**
+ * What the sender sent, to people still visible to them, that the SENDER can
+ * open now (their scope, as on every social surface). Dismissed rows are kept
+ * on purpose (rule 4). The unique index leads with `recommender_user_id`, so
+ * this reads by index.
+ */
+async function readSent(recommenderId: string, scope: LibraryScope): Promise<SentRow[]> {
+  if (!isUuid(recommenderId)) return []
+  const params: unknown[] = [recommenderId]
+  const bind = binderFor(params)
+  const rows = await query<SentRow>(
+    `SELECT r.id, r.recipient_user_id, r.media_type, r.movie_id, r.series_id, r.recommended_at,
+            COALESCE(m.title, s.title) AS title, COALESCE(m.year, s.year) AS year,
+            COALESCE(m.poster_url, s.poster_url) AS poster_url,
+            COALESCE(m.genres, s.genres, '{}') AS genres
+       FROM social_recommendations r
+       LEFT JOIN movies m ON r.media_type = 'movie'  AND m.id = r.movie_id
+       LEFT JOIN series s ON r.media_type = 'series' AND s.id = r.series_id
+      WHERE r.recommender_user_id = $1::uuid
+        AND r.recipient_user_id IN (${visibleConnectionsSql('$1::uuid')})
+        AND CASE r.media_type
+              WHEN 'movie' THEN m.id IS NOT NULL AND ${libraryScopeSql(scope, 'm', bind)}
+              ELSE              s.id IS NOT NULL AND ${libraryScopeSql(scope, 's', bind)}
+            END
+      ORDER BY r.recommended_at DESC, r.id`,
+    params
+  )
+  return rows.rows
+}
+
+/**
+ * For one recipient: which of these titles they can open now, and which they
+ * have finished — by the same two predicates the inbox and the recommend
+ * dialog use, so "watched" here is exactly "left their inbox by being finished".
+ */
+async function recipientView(
+  recipientId: string,
+  rows: readonly SentRow[],
+  libraries: readonly ConfiguredLibrary[]
+): Promise<Map<string, { inScope: boolean; finished: boolean }>> {
+  const scope = await getLibraryScopeForUser(recipientId, libraries)
+  const movieIds = rows.filter((r) => r.movie_id).map((r) => r.movie_id)
+  const seriesIds = rows.filter((r) => r.series_id).map((r) => r.series_id)
+  const params: unknown[] = [recipientId, movieIds, seriesIds]
+  const bind = binderFor(params)
+  const result = await query<{ id: string; in_scope: boolean; finished: boolean }>(
+    `SELECT t.id, ${libraryScopeSql(scope, 't', bind)} AS in_scope,
+            ${movieFinishedSql('$1::uuid', 't.id')} AS finished
+       FROM movies t WHERE t.id = ANY($2::uuid[])
+     UNION ALL
+     SELECT t.id, ${libraryScopeSql(scope, 't', bind)} AS in_scope,
+            ${seriesFinishedSql('$1::uuid', 't.id')} AS finished
+       FROM series t WHERE t.id = ANY($3::uuid[])`,
+    params
+  )
+  return new Map(
+    result.rows.map((row) => [row.id, { inScope: row.in_scope === true, finished: row.finished === true }])
+  )
+}
+
+/**
+ * The sender's Sent tab: one group per recipient in name order, newest first
+ * inside each, with where each title stands with that person (`sentStatus`).
+ * A household is a handful of people, so the per-recipient lookups run one
+ * recipient at a time in parallel rather than as one clever query.
+ */
+export async function listSent(recommenderId: string, scope: LibraryScope): Promise<SentGroup[]> {
+  const rows = await readSent(recommenderId, scope)
+  if (rows.length === 0) return []
+
+  const [connections, libraries] = await Promise.all([
+    listVisibleConnections(recommenderId),
+    loadConfiguredLibraries(),
+  ])
+
+  const groups = await Promise.all(
+    connections.map(async (user): Promise<SentGroup | null> => {
+      const theirs = rows.filter((row) => row.recipient_user_id === user.id)
+      if (theirs.length === 0) return null
+
+      const [view, watch] = await Promise.all([
+        recipientView(user.id, theirs, libraries),
+        // Progress only matters for a series; skip the history read without one.
+        theirs.some((row) => row.media_type === 'series') ? getWatchStatusForUser(user.id) : null,
+      ])
+      const progressById = new Map((watch?.series ?? []).map((s) => [s.id, s]))
+
+      return {
+        recipient: { id: user.id, name: user.name, avatarUrl: user.avatarUrl },
+        items: theirs.map((row): SentRecommendationItem => {
+          const itemId = (row.media_type === 'movie' ? row.movie_id : row.series_id) as string
+          const seen = view.get(itemId)
+          const progress = row.media_type === 'series' ? progressById.get(itemId) : undefined
+          const status = sentStatus({
+            inScope: seen?.inScope === true,
+            finished: seen?.finished === true,
+            episodesWatched: progress?.watched ?? 0,
+          })
+          return {
+            id: row.id,
+            mediaType: row.media_type,
+            itemId,
+            title: row.title,
+            year: row.year ?? null,
+            posterUrl: row.poster_url,
+            genres: row.genres ?? [],
+            recommendedAt: row.recommended_at.toISOString(),
+            status,
+            // Not for a title they cannot open: rule 3 says it tells nothing.
+            ...(progress && status !== 'unavailable'
+              ? { progress: { watched: progress.watched, total: progress.total } }
+              : {}),
+          }
+        }),
+      }
+    })
+  )
+  return groups.filter((group): group is SentGroup => group !== null)
+}
+
+/**
+ * How many titles the Sent tab lists — the length of the same read, for the
+ * sidebar's "has this person shared anything" and the tab label.
+ */
+export async function countSent(recommenderId: string, scope: LibraryScope): Promise<number> {
+  return (await readSent(recommenderId, scope)).length
 }

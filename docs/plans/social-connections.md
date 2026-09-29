@@ -25,14 +25,36 @@ text below:
   At the bottom they were ~3,000px down and read as missing. They moved up to just after
   Upcoming Episodes on 2026-09-28, then down to under Top Picks on 2026-09-29. This replaces
   the §1.1 "Dashboard" row and the §7.6 placement.
-- **The Shared with me entry is listed only while the inbox holds something** (2026-09-29),
+- **The Shared entry is listed only while something was received or sent** (2026-09-29),
   and while the viewer is on the page, so dismissing the last title does not remove the
-  selected entry. An empty inbox in the sidebar read as clutter. The count it keys on is the
-  badge count, so the two cannot disagree. The route stays reachable by URL and keeps its
-  empty state. Because the entry now depends on the count, `ConnectionsProvider` also
+  selected entry. An empty inbox in the sidebar read as clutter. It keys on the badge count
+  and on `sentCount` from the same count endpoint, each the length of its tab's list, so
+  the entry and the page cannot disagree. The route stays reachable by URL and keeps its
+  empty states. Because the entry now depends on the count, `ConnectionsProvider` also
   re-reads the count on navigation, under the same once-a-minute limit as focus, so a share
   surfaces at the recipient's next click. A timer was rejected, since it costs requests while
   nobody is looking. This adds to §7.2.
+- **The page shows what the viewer SENT as well** (2026-09-29). There was no way to see what
+  you had recommended to whom. `/shared-with-me` now has Received and Sent tabs, three
+  summary tiles (waiting for you, you shared, finished by them) and one card per person.
+  The nav label became **"Shared"** (`nav.shared`), since "Shared with me" no longer
+  describes the page; the route is unchanged. `GET /api/social/recommendations/sent` groups
+  by recipient, and each title carries a status: `watched`, `watching` (a series, with
+  episode progress), `waiting`, or `unavailable` (they can no longer open it). Three rules:
+  - **A dismissal is never disclosed.** It reads as `waiting`, and the recommend dialog's
+    "already recommended" now counts dismissed rows, because the dialog falling silent
+    after a dismissal would give it away just as a status would. A re-send still revives
+    the row.
+  - **The statuses reuse existing answers.** "Watched" is `movieFinishedSql`/
+    `seriesFinishedSql`, the predicates that drop a title from the recipient's inbox.
+    Progress is `getWatchStatusForUser`, the numbers on the recipient's own poster pill.
+    "Unavailable" is the recipient's library scope, which the recommend dialog already
+    reports. Precedence is the pure `sentStatus`, which puts unavailable first as
+    `recipientSkipReason` does.
+  - **The sender's own scope still filters the list**, as on every social surface, and a
+    recipient who is no longer a visible connection drops out of it.
+
+  This replaces §1.2's "Sidebar label" row and extends §7.7.
 - **"Recently watched by" counts played titles only** (`WATCH_HISTORY_PLAYED_SQL`), not
   `WATCHED_SQL`. On the live instance a film the connection had only started sat in their row
   while its title page said nobody had watched it. This replaces §6.3's predicate.
@@ -153,7 +175,7 @@ cannot see the pairing UI. Once connected, two users mutually get:
 | Visible connection | Connected **and** the other account has access (`is_enabled`) **and** is not disabled on the media server (`NOT provider_disabled`). Rows are kept; visibility returns when access does. | Matches the session lookup and every per-user job. F-135: switching access off keeps setup. |
 | Inbox after disconnect | Filtered at read, not deleted. Reconnecting brings pending items back. | One rule ("every social read goes through the visible-connection relation") instead of a delete path plus a filter. |
 | The viewer in the named list | The viewer's own play is named "You" whenever they have at least one connection. | Otherwise "Joe and 1 other" counts the viewer as a stranger, on a page they're looking at. |
-| Sidebar label | **"Shared with me"** (route `/shared-with-me`), not "Recommended for me" | The sidebar already has "Recommendations" (the AI list) one row above. Two near-identical labels for unrelated pages is a support question. |
+| Sidebar label | **"Shared with me"** (route `/shared-with-me`), not "Recommended for me". **Superseded 2026-09-29:** "Shared", once the page gained a Sent tab (see the top of this file). | The sidebar already has "Recommendations" (the AI list) one row above. Two near-identical labels for unrelated pages is a support question. |
 | Audit | Connecting and disconnecting are recorded in `permission_changes` for both people. | F-134: "every permission change is recorded". A connection grants read access to someone's watch history. |
 
 ## 2. Non-goals (explicitly out of scope)
@@ -1350,9 +1372,12 @@ library that B cannot open.
 3. A opens Watch History → picks B (URL `?user=`): B's movies and series render, no
    mark-unwatched affordance, no ticks, and nothing from the library A cannot open.
    Reload keeps the selection.
-4. Before anything is shared, B has no "Shared with me" entry. A recommends an item to B:
-   the entry appears with a badge, and the page shows "Recommended by A". B dismisses →
-   gone, badge drops, and the entry stays until B leaves the page. A sends a second title; B finishes
+4. Before anything is shared, B has no "Shared" entry. A recommends an item to B: A's entry
+   appears with no badge, and A's Sent tab shows the title under "Sent to B" as Waiting;
+   B's entry appears with a badge, and B's Received tab shows "Recommended by A". B dismisses
+   → gone for B, badge drops, B's entry stays until B leaves the page, and A still sees
+   Waiting (and the dialog still says "Already recommended" for B). B finishes it → A sees
+   Watched. A sends a second title; B finishes
    it via playback sync → gone on next load, badge drops. A tries to send a title from the
    library B cannot open → B's row is disabled "Not in their libraries".
 5. B's dashboard: one slider for A under Top Picks; none for C; nothing for a connection with

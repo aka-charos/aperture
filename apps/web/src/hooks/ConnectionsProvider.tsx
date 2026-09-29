@@ -1,10 +1,11 @@
 /**
  * ConnectionsProvider
  *
- * The viewer's connections and how many titles are waiting for them under
- * Shared with me (the sidebar badge, and whether that entry is listed at all —
- * it is hidden while the count is zero). Connections are made by an admin and are
- * mutual; see docs/plans/social-connections.md.
+ * The viewer's connections, how many titles are waiting for them under Shared
+ * (the sidebar badge) and how many they have sent. Together the two counts
+ * decide whether the entry is listed at all: it is hidden while both are zero.
+ * Connections are made by an admin and are mutual; see
+ * docs/plans/social-connections.md.
  *
  * Gated on the server's decided `social` capability: someone with no
  * connections — most people — fetches nothing social at all.
@@ -49,6 +50,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const [connections, setConnections] = useState<ConnectionSummary[]>([])
   const [pendingCount, setPendingCount] = useState(0)
+  const [sentCount, setSentCount] = useState(0)
   const [loading, setLoading] = useState(enabled)
   const lastRefreshAt = useRef(0)
   const mounted = useRef(true)
@@ -63,11 +65,13 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
   const loadCount = useCallback(async () => {
     lastRefreshAt.current = Date.now()
     try {
-      const data = await fetchJson<{ count?: number }>('/api/social/recommendations/count')
-      if (mounted.current) setPendingCount(typeof data.count === 'number' ? data.count : 0)
+      const data = await fetchJson<{ count?: number; sentCount?: number }>('/api/social/recommendations/count')
+      if (!mounted.current) return
+      setPendingCount(typeof data.count === 'number' ? data.count : 0)
+      setSentCount(typeof data.sentCount === 'number' ? data.sentCount : 0)
     } catch (err) {
       // A badge that fails to load shows nothing, which is the quiet direction.
-      console.error('Failed to fetch the shared-with-me count:', err)
+      console.error('Failed to fetch the shared counts:', err)
     }
   }, [])
 
@@ -89,6 +93,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     if (!enabled) {
       setConnections([])
       setPendingCount(0)
+      setSentCount(0)
       setLoading(false)
       return
     }
@@ -124,11 +129,12 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       enabled,
       connections,
       pendingCount,
+      sentCount,
       loading,
       hasConnections: enabled && (loading || connections.length > 0),
       refresh,
     }),
-    [enabled, connections, pendingCount, loading, refresh]
+    [enabled, connections, pendingCount, sentCount, loading, refresh]
   )
 
   return <ConnectionsContext.Provider value={value}>{children}</ConnectionsContext.Provider>

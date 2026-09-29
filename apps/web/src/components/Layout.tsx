@@ -86,8 +86,8 @@ type NavItem = {
   feature: string | null
   capability?: string
   /**
-   * A live count drawn on the icon. `socialInbox`: titles waiting under Shared
-   * with me — and that entry is listed only while the count is above zero.
+   * A live count drawn on the icon. `socialInbox`: titles waiting under Shared —
+   * and that entry is listed only while something was received or sent.
    */
   badge?: 'socialInbox'
 }
@@ -99,7 +99,7 @@ const baseUserMenuItems: NavItem[] = [
   { textKey: 'nav.recommendations', icon: <AutoAwesomeIcon />, path: '/recommendations', feature: null },
   // `social` is decided data (has at least one visible connection), not a
   // permission; the filter below treats it like any other capability.
-  { textKey: 'nav.sharedWithMe', icon: <RecommendIcon />, path: '/shared-with-me', feature: null, capability: 'social', badge: 'socialInbox' },
+  { textKey: 'nav.shared', icon: <RecommendIcon />, path: '/shared-with-me', feature: null, capability: 'social', badge: 'socialInbox' },
   { textKey: 'nav.showsYouWatch', icon: <AddToQueueIcon />, path: '/watching', feature: 'watching' },
   { textKey: 'nav.topPicks', icon: <WhatshotIcon />, path: '/top-picks', feature: null },
   { textKey: 'nav.playlists', icon: <PlaylistPlayIcon />, path: '/playlists', feature: null },
@@ -187,7 +187,7 @@ function AppShell() {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [watchingEnabled, setWatchingEnabled] = useState(true) // Default to true until we know
   const { user, capabilities, logout, impersonation } = useAuth()
-  const { pendingCount } = useConnections()
+  const { pendingCount, sentCount } = useConnections()
   const { open: welcomeOpen, showWelcome, hideWelcome } = useWelcomeModal()
   // Space reserved on the inline-end side for the docked AI assistant;
   // while its resize handle is dragged, transitions are dropped so the
@@ -219,10 +219,15 @@ function AppShell() {
   const userMenuItems = baseUserMenuItems.filter((item) => {
     if (item.feature === 'watching' && !watchingEnabled) return false
     if (item.capability && capabilities[item.capability] !== true) return false
-    // Shared with me is an inbox, and an empty one in the sidebar is noise. It
+    // Shared with nothing received and nothing sent is noise in the sidebar. It
     // stays while the viewer is on the page, so dismissing the last title does
     // not pull the selected entry out from under them.
-    if (item.badge === 'socialInbox' && pendingCount === 0 && location.pathname !== item.path) {
+    if (
+      item.badge === 'socialInbox' &&
+      pendingCount === 0 &&
+      sentCount === 0 &&
+      location.pathname !== item.path
+    ) {
       return false
     }
     return true

@@ -53,7 +53,16 @@ export const inboxSchema = {
 
 export const inboxCountSchema = {
   tags: ['social'],
-  summary: 'How many titles are waiting under Shared with me',
+  summary: 'How many titles are waiting for the caller, and how many they have sent',
+  description:
+    '`count` is the length of the received list (the sidebar badge); `sentCount` the length of the sent list. The Shared entry is listed while either is above zero.',
+}
+
+export const sentSchema = {
+  tags: ['social'],
+  summary: 'Titles the caller recommended to others',
+  description:
+    'Grouped by recipient, with where each title stands with them: watched, watching (a series, with episode progress), waiting, or unavailable (they can no longer open it). A dismissal is not disclosed; it reads as waiting.',
 }
 
 export const recipientsSchema = {

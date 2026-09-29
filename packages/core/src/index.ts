@@ -769,6 +769,8 @@ export {
   listInbox,
   countInbox,
   dismissRecommendation,
+  listSent,
+  countSent,
   displayNameSql,
   visibleConnectionsSql,
   type ConnectedUser,
@@ -780,6 +782,9 @@ export {
   type RecommendationGroup,
   type RecipientAssessment,
   type RecommendOutcome,
+  type SentRecommendationItem,
+  type SentGroup,
+  type SentStatus,
   type SkipReason,
 } from './social/index.js'
 

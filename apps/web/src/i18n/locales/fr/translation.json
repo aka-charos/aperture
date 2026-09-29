@@ -49,9 +49,9 @@
     "roleLabelAdmin": "Administrateur",
     "roleLabelUser": "Utilisateur",
     "collections": "Collections",
-    "sharedWithMe": "Shared with me",
     "sharedWithMeBadge_one": "{{count}} new recommendation",
-    "sharedWithMeBadge_other": "{{count}} new recommendations"
+    "sharedWithMeBadge_other": "{{count}} new recommendations",
+    "shared": "Shared"
   },
   "admin": {
     "title": "Administration",
@@ -966,7 +966,6 @@
     },
     "recommendDialog": {
       "title": "Recommend {{title}}",
-      "description": "The people you pick will find it under Shared with me.",
       "alreadyWatched": "Already watched",
       "unavailable": "Not in their libraries",
       "alreadyRecommended": "Already sent. Sending again moves it to the top",
@@ -978,7 +977,8 @@
       "skippedDisconnected": "{{name}} is no longer connected",
       "failed": "Couldn't send the recommendation",
       "loadFailed": "Couldn't load your connections",
-      "empty": "You're not connected to anyone yet"
+      "empty": "You're not connected to anyone yet",
+      "descriptionShared": "The people you pick will find it under Shared."
     }
   },
   "browse": {
@@ -5615,13 +5615,46 @@
     }
   },
   "sharedWithMe": {
-    "subtitle": "Titles the people you're connected to think you'll like",
     "recommendedBy": "Recommended by {{name}}",
     "dismiss": "Dismiss",
     "dismissed": "Recommendation dismissed",
     "dismissFailed": "Couldn't dismiss it",
     "loadFailed": "Couldn't load what's been shared with you",
     "empty": "Nothing shared with you yet",
-    "emptyHint": "When someone you're connected to recommends a title, it appears here. Titles you finish leave on their own."
+    "emptyHint": "When someone you're connected to recommends a title, it appears here. Titles you finish leave on their own.",
+    "subtitleBoth": "What the people you're connected to recommend to you, and what you've recommended to them",
+    "tabReceived": "Received",
+    "tabSent": "Sent",
+    "tileWaiting": "Waiting for you",
+    "tileSent": "You shared",
+    "tileWatched": "Finished by them",
+    "tileWatchedValue": "{{watched}} of {{total}}",
+    "receivedSummary_one": "{{count}} title · last shared {{when}}",
+    "receivedSummary_other": "{{count}} titles · last shared {{when}}",
+    "sentTo": "Sent to {{name}}",
+    "sentSummary_one": "{{count}} title sent",
+    "sentSummary_other": "{{count}} titles sent",
+    "sentEmpty": "You haven't recommended anything yet",
+    "sentEmptyHint": "Open a movie or series and choose “Recommend to…” to send it to someone you're connected to. You'll see here whether they've watched it.",
+    "sentLoadFailed": "Couldn't load what you've shared",
+    "status": {
+      "watched": "Watched",
+      "watching": "Watching",
+      "waiting": "Waiting",
+      "unavailable": "Can't open"
+    },
+    "statusWatchingProgress": "{{watched}}/{{total}} episodes",
+    "statusHint": {
+      "watched": "{{name}} finished it",
+      "watching": "{{name}} has watched {{watched}} of {{total}} episodes",
+      "waiting": "{{name}} hasn't watched it yet",
+      "unavailable": "{{name}} can't open this any more: it's outside their libraries now"
+    },
+    "statusCount": {
+      "watched": "{{count}} watched",
+      "watching": "{{count}} watching",
+      "waiting": "{{count}} waiting",
+      "unavailable": "{{count}} can't open"
+    }
   }
 }

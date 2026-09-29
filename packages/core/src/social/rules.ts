@@ -105,6 +105,32 @@ export function recipientSkipReason(s: {
   return null
 }
 
+/**
+ * Where one sent title stands with the person it was sent to, as the sender's
+ * Sent tab shows it.
+ *
+ * - `unavailable`: they can no longer open it here (library scope or parental
+ *   rating changed since it was sent), so it is not in their inbox.
+ * - `watched`: they finished it — the poster badge's own rule.
+ * - `watching`: a series they are partway through.
+ * - `waiting`: none of the above. **A dismissal also reads as `waiting`**: it is
+ *   the recipient's private housekeeping, and telling the sender would turn a
+ *   tidy-up into a snub.
+ */
+export type SentStatus = 'unavailable' | 'watched' | 'watching' | 'waiting'
+
+/**
+ * Precedence: unavailable > watched > watching > waiting — rule 3 again, so a
+ * title the recipient cannot open says nothing about their history here either.
+ * `episodesWatched` is 0 for a movie.
+ */
+export function sentStatus(s: { inScope: boolean; finished: boolean; episodesWatched: number }): SentStatus {
+  if (!s.inScope) return 'unavailable'
+  if (s.finished) return 'watched'
+  if (s.episodesWatched > 0) return 'watching'
+  return 'waiting'
+}
+
 export interface InboxGroup<Row> {
   recommenderId: string
   recommenderName: string

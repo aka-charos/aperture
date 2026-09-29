@@ -5,6 +5,7 @@ import {
   groupInbox,
   isUuid,
   recipientSkipReason,
+  sentStatus,
   validatePair,
   visibleConnectionsSql,
 } from './rules.js'
@@ -57,6 +58,26 @@ test('recipientSkipReason: not_connected > unavailable > already_watched > send'
       recipientSkipReason({ connected, inScope, finished }),
       expected,
       `connected=${connected} inScope=${inScope} finished=${finished}`
+    )
+  }
+})
+
+test('sentStatus: unavailable > watched > watching > waiting', () => {
+  const cases: Array<[boolean, boolean, number, string]> = [
+    // inScope, finished, episodesWatched, expected
+    // Out of scope wins over watched, as in recipientSkipReason.
+    [false, true, 10, 'unavailable'],
+    [false, false, 0, 'unavailable'],
+    [true, true, 10, 'watched'],
+    [true, true, 0, 'watched'],
+    [true, false, 3, 'watching'],
+    [true, false, 0, 'waiting'],
+  ]
+  for (const [inScope, finished, episodesWatched, expected] of cases) {
+    assert.equal(
+      sentStatus({ inScope, finished, episodesWatched }),
+      expected,
+      `inScope=${inScope} finished=${finished} episodesWatched=${episodesWatched}`
     )
   }
 })
