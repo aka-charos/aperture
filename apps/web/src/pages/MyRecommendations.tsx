@@ -416,6 +416,9 @@ export function MyRecommendationsPage() {
 
       {/* Tabs */}
       <Tabs
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
         value={mediaType}
         onChange={(_, v) => {
           setMediaType(v)

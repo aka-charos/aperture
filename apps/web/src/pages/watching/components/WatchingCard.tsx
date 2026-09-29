@@ -17,6 +17,7 @@ import { MoviePoster, usePosterDisplaySettings } from '@aperture/ui'
 import { useUserRatings } from '@/hooks/useUserRatings'
 import { useWatchStatus } from '@/hooks/useWatchStatus'
 import { EpisodeAvailabilityBar } from './EpisodeAvailabilityBar'
+import { SHOW_WITHOUT_HOVER } from '@/lib/touch'
 import type { WatchingSeries, UpcomingEpisode } from '../hooks/useWatchingData'
 
 interface WatchingCardProps {
@@ -135,6 +136,7 @@ export function WatchingCard({ series, onRemove }: WatchingCardProps) {
                 }}
                 sx={{
                   opacity: 0,
+                  ...SHOW_WITHOUT_HOVER,
                   color: '#fff',
                   bgcolor: alpha(theme.palette.primary.main, 0.95),
                   border: '1.5px solid rgba(255, 255, 255, 0.75)',

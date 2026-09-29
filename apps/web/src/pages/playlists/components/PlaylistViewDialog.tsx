@@ -1,3 +1,4 @@
+import { useIsPhone } from '@/hooks/useIsPhone'
 import { useState, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -50,6 +51,7 @@ export function PlaylistViewDialog({
   i18nNamespace = 'playlists',
 }: PlaylistViewDialogProps) {
   const { t } = useTranslation()
+  const fullScreen = useIsPhone()
   const pt = (key: string, options?: Record<string, unknown>) => t(`${i18nNamespace}.${key}`, options)
   const [addMovieSearch, setAddMovieSearch] = useState('')
   const [addMovieResults, setAddMovieResults] = useState<Movie[]>([])
@@ -102,7 +104,7 @@ export function PlaylistViewDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog fullScreen={fullScreen} open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Box>

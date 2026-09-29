@@ -61,6 +61,7 @@ import { useViewMode } from '@/hooks/useViewMode'
 import { formatWatchHistoryRelativeDate, formatWatchHistoryExactDate } from '@/lib/formatWatchHistoryRelativeDate'
 import { WatchHistoryMovieListItem, WatchHistorySeriesListItem } from './watch-history/components'
 import { PageHeading } from '@/components/PageHeading'
+import { SHOW_WITHOUT_HOVER } from '@/lib/touch'
 
 interface MovieWatchHistoryItem {
   movie_id: string
@@ -625,6 +626,7 @@ export function MyWatchHistoryPage() {
                                 backgroundColor: 'rgba(0,0,0,0.7)',
                                 color: 'white',
                                 opacity: 0,
+                                ...SHOW_WITHOUT_HOVER,
                                 transition: 'opacity 0.2s',
                                 '&:hover': {
                                   backgroundColor: 'error.main',
@@ -784,6 +786,7 @@ export function MyWatchHistoryPage() {
                                 left: 8,
                                 zIndex: 4,
                                 opacity: 0,
+                                ...SHOW_WITHOUT_HOVER,
                                 color: '#fff',
                                 bgcolor: isWatching(item.series_id)
                                   ? alpha(theme.palette.primary.main, 0.95)
@@ -842,6 +845,7 @@ export function MyWatchHistoryPage() {
                                   backgroundColor: 'rgba(0,0,0,0.7)',
                                   color: 'white',
                                   opacity: 0,
+                                  ...SHOW_WITHOUT_HOVER,
                                   transition: 'opacity 0.2s',
                                   '&:hover': {
                                     backgroundColor: 'error.main',

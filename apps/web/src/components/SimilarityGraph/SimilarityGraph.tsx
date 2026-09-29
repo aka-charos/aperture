@@ -18,6 +18,10 @@ const PRIMARY_NODE_WIDTH = 110
 const PRIMARY_NODE_HEIGHT = 165
 const TITLE_HEIGHT = 32
 const PRIMARY_LABEL_HEIGHT = 16
+/** How long a touch must rest on a node before it opens that node's details. */
+const LONG_PRESS_MS = 500
+/** Movement allowed during a long press before it counts as a drag instead. */
+const LONG_PRESS_SLOP_PX = 8
 
 interface NodeConnectionInfo {
   node: GraphNode
@@ -221,6 +225,24 @@ export const SimilarityGraph = memo(function SimilarityGraph({
         setHoveredEdge(null)
       })
 
+    // Long press opens details on touch, where there is no double-click to speak
+    // of (a double tap zooms the page) and the mobile hint has always promised
+    // it. It rides on d3's drag, which already owns the pointer: the timer
+    // starts with the gesture, a real drag cancels it, and the click that ends a
+    // long press is swallowed so it does not also select the node.
+    let longPressTimer: ReturnType<typeof setTimeout> | null = null
+    let longPressStart: { x: number; y: number } | null = null
+    let longPressFired = false
+    const cancelLongPress = () => {
+      if (longPressTimer) clearTimeout(longPressTimer)
+      longPressTimer = null
+      longPressStart = null
+    }
+    const isTouchGesture = (sourceEvent: unknown) => {
+      const e = sourceEvent as { pointerType?: string; type?: string } | null
+      return e?.pointerType === 'touch' || (e?.type?.startsWith('touch') ?? false)
+    }
+
     // Create node groups
     const nodes = container
       .append('g')
@@ -236,12 +258,29 @@ export const SimilarityGraph = memo(function SimilarityGraph({
             if (!event.active) simulationRef.current?.alphaTarget(0.3).restart()
             d.fx = d.x
             d.fy = d.y
+            longPressFired = false
+            if (isTouchGesture(event.sourceEvent)) {
+              cancelLongPress()
+              longPressStart = { x: event.x, y: event.y }
+              longPressTimer = setTimeout(() => {
+                longPressTimer = null
+                longPressFired = true
+                onNodeDoubleClickRef.current?.(d)
+              }, LONG_PRESS_MS)
+            }
           })
           .on('drag', (event, d) => {
             d.fx = event.x
             d.fy = event.y
+            if (
+              longPressStart &&
+              Math.hypot(event.x - longPressStart.x, event.y - longPressStart.y) > LONG_PRESS_SLOP_PX
+            ) {
+              cancelLongPress()
+            }
           })
           .on('end', (event, d) => {
+            cancelLongPress()
             if (!event.active) simulationRef.current?.alphaTarget(0)
             d.fx = null
             d.fy = null
@@ -249,14 +288,22 @@ export const SimilarityGraph = memo(function SimilarityGraph({
       )
       .on('click', (event, d) => {
         event.stopPropagation()
+        if (longPressFired) {
+          longPressFired = false
+          return
+        }
         onNodeClickRef.current?.(d)
       })
       .on('dblclick', (event, d) => {
         event.stopPropagation()
         onNodeDoubleClickRef.current?.(d)
       })
-      .on('mouseenter', (_, d) => setHoveredNode(d))
-      .on('mouseleave', () => setHoveredNode(null))
+      // pointer events filtered to a mouse: a tap fires mouseenter and never
+      // mouseleave, which left the connection panel stuck over the graph.
+      .on('pointerenter', (event: PointerEvent, d) => {
+        if (event.pointerType === 'mouse') setHoveredNode(d)
+      })
+      .on('pointerleave', () => setHoveredNode(null))
 
     // Node background (card)
     nodes
@@ -476,6 +523,7 @@ export const SimilarityGraph = memo(function SimilarityGraph({
     }, 500)
 
     return () => {
+      cancelLongPress()
       simulation.stop()
     }
   }, [dataKey, dimensions, compact, getPrimaryConnectionType])
@@ -487,7 +535,9 @@ export const SimilarityGraph = memo(function SimilarityGraph({
         sx={{
           width: '100%',
           height: compact ? 550 : '100%',
-          minHeight: compact ? 550 : 600,
+          // A phone's pane is shorter than 600px, and a floor taller than the
+          // container clipped the SVG and centred the graph off screen.
+          minHeight: compact ? 550 : { xs: 0, md: 600 },
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -603,7 +653,9 @@ export const SimilarityGraph = memo(function SimilarityGraph({
         sx={{
           width: '100%',
           height: compact ? 550 : '100%',
-          minHeight: compact ? 550 : 600,
+          // A phone's pane is shorter than 600px, and a floor taller than the
+          // container clipped the SVG and centred the graph off screen.
+          minHeight: compact ? 550 : { xs: 0, md: 600 },
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -622,7 +674,9 @@ export const SimilarityGraph = memo(function SimilarityGraph({
       sx={{
         width: '100%',
         height: compact ? 550 : '100%',
-        minHeight: compact ? 550 : 600,
+        // A phone's pane is shorter than 600px, and a floor taller than the
+          // container clipped the SVG and centred the graph off screen.
+          minHeight: compact ? 550 : { xs: 0, md: 600 },
         position: 'relative',
         bgcolor: '#0f0f1a',
         borderRadius: 2,
@@ -646,7 +700,7 @@ export const SimilarityGraph = memo(function SimilarityGraph({
             bgcolor: 'rgba(10,10,20,0.95)',
             borderRadius: 2,
             p: 2,
-            maxWidth: 380,
+            maxWidth: 'min(380px, calc(100% - 32px))',
             maxHeight: 300,
             overflowY: 'auto',
             pointerEvents: 'none',

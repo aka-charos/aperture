@@ -1,3 +1,4 @@
+import { useIsPhone } from '@/hooks/useIsPhone'
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -49,6 +50,7 @@ type SearchStatus = 'idle' | 'loading' | 'done' | 'error'
 
 export function GlobalSearch() {
   const { t } = useTranslation()
+  const fullScreen = useIsPhone()
   const theme = useTheme()
   const navigate = useNavigate()
   const searchShortcutTooltip = useMemo(
@@ -188,14 +190,15 @@ export function GlobalSearch() {
 
       {/* Search Dialog */}
       <Dialog
+        fullScreen={fullScreen}
         open={open}
         onClose={handleClose}
         maxWidth="sm"
         fullWidth
         PaperProps={{
           sx: {
-            borderRadius: 3,
-            maxHeight: '80vh',
+            borderRadius: fullScreen ? 0 : 3,
+            maxHeight: fullScreen ? 'none' : '80dvh',
           },
         }}
       >
@@ -210,6 +213,9 @@ export function GlobalSearch() {
               top: 0,
               bgcolor: 'background.paper',
               zIndex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
             }}
           >
             <TextField
@@ -243,10 +249,16 @@ export function GlobalSearch() {
                 },
               }}
             />
+            {/* Full screen has no backdrop to tap and a phone has no Esc key. */}
+            {fullScreen && (
+              <IconButton onClick={handleClose} aria-label={t('common.close')} edge="end">
+                <CloseIcon />
+              </IconButton>
+            )}
           </Box>
 
           {/* Results */}
-          <Box sx={{ maxHeight: 'calc(80vh - 120px)', overflowY: 'auto' }}>
+          <Box sx={{ maxHeight: fullScreen ? 'none' : 'calc(80dvh - 120px)', overflowY: 'auto' }}>
             {status === 'idle' && (
               <Box p={4} textAlign="center">
                 <Typography color="text.secondary">
@@ -379,9 +391,10 @@ export function GlobalSearch() {
             )}
           </Box>
 
-          {/* Keyboard shortcuts hint */}
+          {/* Keyboard shortcuts hint — meaningless on a phone */}
           <Box
             sx={{
+              ...(fullScreen && { display: 'none' }),
               p: 1.5,
               borderTop: 1,
               borderColor: 'divider',

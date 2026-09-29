@@ -4,6 +4,7 @@
  * Modal dialog showing detailed metadata for a discovery candidate
  * with a fanart backdrop and 2-column card layout
  */
+import { useIsPhone } from '@/hooks/useIsPhone'
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -107,6 +108,7 @@ export function DiscoveryDetailPopper({
   isRequested = false,
 }: DiscoveryDetailPopperProps) {
   const { t, i18n } = useTranslation()
+  const fullScreen = useIsPhone()
   const navigate = useNavigate()
   const theme = useTheme()
   const [trailerLoading, setTrailerLoading] = useState(false)
@@ -247,18 +249,19 @@ export function DiscoveryDetailPopper({
     <>
     {candidate && displayCandidate ? (
     <Dialog
+      fullScreen={fullScreen}
       open={open}
       onClose={onClose}
       maxWidth="lg"
       fullWidth
       PaperProps={{
         sx: {
-          backgroundColor: 'transparent',
+          backgroundColor: { xs: 'background.default', sm: 'transparent' },
           backgroundImage: 'none',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
-          borderRadius: 2,
+          borderRadius: { xs: 0, sm: 2 },
           // Allow scrolling on mobile
-          maxHeight: { xs: '90vh', md: '85vh' },
+          maxHeight: { xs: '100%', sm: '90vh', md: '85vh' },
           overflow: 'auto',
         },
       }}

@@ -2,6 +2,7 @@
  * Create a media-server playlist from a set of chat-assistant suggestions.
  * All suggestions start selected; the user deselects the ones they don't want.
  */
+import { useIsPhone } from '@/hooks/useIsPhone'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -48,6 +49,7 @@ export function CreatePlaylistFromSuggestionsDialog({
   onCreated,
 }: CreatePlaylistFromSuggestionsDialogProps) {
   const { t } = useTranslation()
+  const fullScreen = useIsPhone()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -247,11 +249,12 @@ export function CreatePlaylistFromSuggestionsDialog({
 
   return (
     <Dialog
+      fullScreen={fullScreen}
       open={open}
       onClose={handleClose}
       maxWidth="sm"
       fullWidth
-      PaperProps={{ sx: { borderRadius: 2, bgcolor: 'background.paper' } }}
+      PaperProps={{ sx: { borderRadius: { xs: 0, sm: 2 }, bgcolor: 'background.paper' } }}
     >
       <DialogTitle
         sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}

@@ -1,3 +1,4 @@
+import { useIsPhone } from '@/hooks/useIsPhone'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -40,6 +41,7 @@ import { useMediaSearch } from '../hooks'
 import { aiFailureMessage } from '../../../lib/aiFailureMessage'
 import { isAbortError } from '../../../lib/requestGuard'
 import { useRequestGuard } from '../../../hooks/useRequestGuard'
+import { SHOW_WITHOUT_HOVER } from '@/lib/touch'
 import type { Channel, MediaSummary, MediaType, FormData, SnackbarState } from '../types'
 import type { Theme } from '@mui/material'
 
@@ -340,6 +342,7 @@ function SeedPicker({
                     alignItems: 'center',
                     justifyContent: 'center',
                     opacity: 0,
+                    ...SHOW_WITHOUT_HOVER,
                     transition: 'opacity 0.2s',
                   }}
                 >
@@ -402,6 +405,7 @@ export function PlaylistDialog({
   i18nNamespace = 'playlists',
 }: PlaylistDialogProps) {
   const { t } = useTranslation()
+  const fullScreen = useIsPhone()
   const pt = (key: string, options?: Record<string, unknown>) => t(`${i18nNamespace}.${key}`, options)
   const theme = useTheme()
 
@@ -611,13 +615,14 @@ export function PlaylistDialog({
 
   return (
     <Dialog
+      fullScreen={fullScreen}
       open={open}
       onClose={onClose}
       maxWidth="sm"
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 3,
+          borderRadius: { xs: 0, sm: 3 },
           overflow: 'hidden',
           bgcolor: 'background.paper',
         },
@@ -627,7 +632,7 @@ export function PlaylistDialog({
       <Box
         sx={{
           background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.15)} 0%, ${alpha(theme.palette.secondary.main, 0.1)} 100%)`,
-          p: 3,
+          p: { xs: 2, sm: 3 },
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -661,7 +666,7 @@ export function PlaylistDialog({
         </IconButton>
       </Box>
 
-      <DialogContent sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <DialogContent sx={{ p: { xs: 2, sm: 3 }, display: 'flex', flexDirection: 'column', gap: 2 }}>
         {/* Genres Section */}
         <Section
           icon={<CategoryIcon fontSize="small" />}
@@ -899,7 +904,7 @@ export function PlaylistDialog({
         </Section>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
+      <DialogActions sx={{ px: { xs: 2, sm: 3 }, pb: { xs: 2, sm: 3 }, gap: 1 }}>
         <Button onClick={onClose} variant="outlined" color="inherit">
           {t('common.cancel')}
         </Button>

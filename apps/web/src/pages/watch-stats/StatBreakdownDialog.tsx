@@ -1,3 +1,4 @@
+import { useIsPhone } from '@/hooks/useIsPhone'
 import { useEffect, useState } from 'react'
 import {
   Alert,
@@ -35,6 +36,7 @@ interface StatBreakdownDialogProps {
  */
 export function StatBreakdownDialog({ request, onClose }: StatBreakdownDialogProps) {
   const { t } = useTranslation()
+  const fullScreen = useIsPhone()
   const { user } = useAuth()
   const navigate = useNavigate()
   const openMediaDetail = useMediaDetailModal()
@@ -111,7 +113,7 @@ export function StatBreakdownDialog({ request, onClose }: StatBreakdownDialogPro
   const maxWidth = loading ? 'md' : shown <= 4 ? 'sm' : shown <= 10 ? 'md' : 'lg'
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth={maxWidth} fullWidth scroll="paper">
+    <Dialog fullScreen={fullScreen} open={open} onClose={onClose} maxWidth={maxWidth} fullWidth scroll="paper">
       <DialogTitle sx={{ pr: 6, pb: 1 }}>
         <Typography variant="h6" fontWeight={700} component="div" noWrap>
           {request?.label ?? ''}
@@ -131,7 +133,16 @@ export function StatBreakdownDialog({ request, onClose }: StatBreakdownDialogPro
               onClose()
               navigate(request.moreHref!)
             }}
-            sx={{ position: 'absolute', top: 14, insetInlineEnd: 52 }}
+            // On a phone there is no room beside the heading, and absolutely
+            // placed it sat on top of it; it goes under the count instead.
+            sx={{
+              position: { xs: 'static', sm: 'absolute' },
+              top: 14,
+              insetInlineEnd: 52,
+              mt: { xs: 0.5, sm: 0 },
+              ml: { xs: -0.5, sm: 0 },
+              display: { xs: 'flex', sm: 'inline-flex' },
+            }}
           >
             {request.moreLabel}
           </Button>

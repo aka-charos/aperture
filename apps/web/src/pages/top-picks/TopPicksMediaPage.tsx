@@ -1,3 +1,4 @@
+import { useIsPhone } from '@/hooks/useIsPhone'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
@@ -87,6 +88,7 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const theme = useTheme()
+  const isPhone = useIsPhone()
   const { getRating, setRating } = useUserRatings()
   const { isWatched, getEpisodeProgress } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
@@ -219,6 +221,11 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
                 <MoviePoster
                   title={item.title}
                   year={item.year}
+                  metaLine={
+                    item.mediaType === 'series'
+                      ? [item.year, item.network].filter(Boolean).join(' · ') || undefined
+                      : undefined
+                  }
                   posterUrl={item.posterUrl}
                   genres={item.genres}
                   rating={item.communityRating}
@@ -233,7 +240,7 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
                   size={item.mediaType === 'series' ? 'medium' : undefined}
                   onClick={() => navigate(`/${item.mediaType === 'movie' ? 'movies' : 'series'}/${item.id}`)}
                 />
-                <RankBadge rank={item.rank} size="large" />
+                <RankBadge rank={item.rank} size={isPhone ? 'medium' : 'large'} />
                 <Chip
                   icon={<PeopleIcon sx={{ fontSize: 14 }} />}
                   label={item.uniqueViewers}
@@ -249,26 +256,6 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
                     '& .MuiChip-icon': { color: 'white' },
                   }}
                 />
-                {item.mediaType === 'series' && item.network && (
-                  <Chip
-                    label={item.network}
-                    size="small"
-                    sx={{
-                      position: 'absolute',
-                      top: 8,
-                      right: 8,
-                      backgroundColor: alpha(theme.palette.secondary.main, 0.9),
-                      color: 'white',
-                      fontSize: '0.65rem',
-                      height: 20,
-                      maxWidth: 80,
-                      '& .MuiChip-label': {
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      },
-                    }}
-                  />
-                )}
               </Box>
             </Grid>
           ))}
@@ -290,16 +277,16 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
               }}
               onClick={item.mediaType === 'movie' ? () => navigate(`/movies/${item.id}`) : undefined}
             >
-              <CardContent sx={{ display: 'flex', gap: 3, p: 2 }}>
-                <RankBadge rank={item.rank} size="xlarge" absolute={false} />
+              <CardContent sx={{ display: 'flex', flexWrap: { xs: 'wrap', sm: 'nowrap' }, gap: { xs: 1.5, sm: 3 }, p: 2 }}>
+                <RankBadge rank={item.rank} size={isPhone ? 'medium' : 'xlarge'} absolute={false} />
 
                 <Box
                   component="img"
                   src={item.posterUrl || undefined}
                   alt={item.title}
                   sx={{
-                    width: 80,
-                    height: 120,
+                    width: { xs: 60, sm: 80 },
+                    height: { xs: 90, sm: 120 },
                     objectFit: 'cover',
                     borderRadius: 1,
                     backgroundColor: 'grey.800',
@@ -341,13 +328,19 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
                   </Typography>
                 </Box>
 
+                {/* On a phone the stats wrap under the row as their own line; beside
+                    the text they left the title about 0px. */}
                 <Box
-                  display="flex"
-                  flexDirection="column"
-                  alignItems="flex-end"
-                  justifyContent="center"
-                  gap={1}
-                  flexShrink={0}
+                  sx={{
+                    display: 'flex',
+                    flexDirection: { xs: 'row', sm: 'column' },
+                    flexWrap: 'wrap',
+                    flexBasis: { xs: '100%', sm: 'auto' },
+                    alignItems: { xs: 'center', sm: 'flex-end' },
+                    justifyContent: { xs: 'flex-start', sm: 'center' },
+                    gap: 1,
+                    flexShrink: 0,
+                  }}
                 >
                   <Chip
                     icon={<PeopleIcon sx={{ fontSize: 16 }} />}

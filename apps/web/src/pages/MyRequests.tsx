@@ -21,6 +21,7 @@ import {
   Select,
   MenuItem,
   Stack,
+  Divider,
   TablePagination,
   Snackbar,
   FormControlLabel,
@@ -44,6 +45,7 @@ import { MediaDetailModalProvider } from '../hooks/MediaDetailModalProvider'
 import { useMediaDetailModal } from '../hooks/useMediaDetailModal'
 import { PageHeading } from '@/components/PageHeading'
 import { useAuth } from '@/hooks/useAuth'
+import { useIsPhone } from '@/hooks/useIsPhone'
 
 type SeerrLive = {
   status: 'pending' | 'approved' | 'declined'
@@ -261,10 +263,110 @@ function MyRequestsContent() {
     }
   }
 
+  const isPhone = useIsPhone()
   const showRequesterColumn = isAdmin && allUsers
 
+  // Each cell's content is built once and placed twice: in a table row on a
+  // wide screen, and in a stacked card on a phone, where seven fixed-width
+  // columns pushed status and actions off screen and left the title its
+  // minimum width.
+  const requesterName = (r: DiscoveryRequestRow) =>
+    r.requestedByDisplayName || r.requestedByUsername || t('myRequests.unknownUser')
+  const typeChip = (r: DiscoveryRequestRow) => (
+    <Chip
+      size="small"
+      label={r.mediaType === 'movie' ? t('myRequests.typeMovie') : t('myRequests.typeSeries')}
+      variant="outlined"
+    />
+  )
+  const sourceChipEl = (r: DiscoveryRequestRow) => (
+    <Chip
+      size="small"
+      label={t(sourceChip(r.source).key)}
+      variant="outlined"
+      color={sourceChip(r.source).color}
+    />
+  )
+  const requestedDate = (r: DiscoveryRequestRow) =>
+    new Date(r.createdAt).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    })
+  const statusChip = (r: DiscoveryRequestRow) => (
+    <Tooltip
+      title={
+        r.seerrLive
+          ? t('myRequests.tooltipLive', {
+              reqStatus: r.seerrLive.status,
+              mediaStatus: r.seerrLive.mediaStatus,
+            })
+          : ''
+      }
+    >
+      <Chip
+        size="small"
+        label={formatRequestStatus(r)}
+        color={statusColor(r)}
+        variant={statusColor(r) === 'default' ? 'outlined' : 'filled'}
+      />
+    </Tooltip>
+  )
+  const actions = (r: DiscoveryRequestRow) => (
+    <>
+      {isAdmin && isActionable(r) && (
+        <>
+          <Tooltip title={t('myRequests.approve')}>
+            <span>
+              <Button
+                size="small"
+                variant="outlined"
+                color="success"
+                disabled={deciding === r.id}
+                onClick={() => void decide(r, 'approve')}
+                startIcon={<CheckIcon />}
+              >
+                {t('myRequests.approve')}
+              </Button>
+            </span>
+          </Tooltip>
+          <Tooltip title={t('myRequests.decline')}>
+            <span>
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                disabled={deciding === r.id}
+                onClick={() => void decide(r, 'decline')}
+                startIcon={<CloseIcon />}
+              >
+                {t('myRequests.decline')}
+              </Button>
+            </span>
+          </Tooltip>
+        </>
+      )}
+      {isRowAvailable(r) && r.libraryMediaId ? (
+        <Button
+          size="small"
+          variant="outlined"
+          component={RouterLink}
+          to={r.mediaType === 'movie' ? `/movies/${r.libraryMediaId}` : `/series/${r.libraryMediaId}`}
+        >
+          {t('myRequests.openInLibrary')}
+        </Button>
+      ) : (
+        <Button size="small" variant="outlined" onClick={() => openTmdbModal(r)}>
+          {t('myRequests.details')}
+        </Button>
+      )}
+    </>
+  )
+
   return (
-    <Box sx={{ maxWidth: 1400, mx: 'auto', p: { xs: 2, md: 3 } }}>
+    // Layout already pads the page on a phone; a second 16px here left the
+    // content 32px in from each edge.
+    <Box sx={{ maxWidth: 1400, mx: 'auto', p: { xs: 0, md: 3 } }}>
       <PageHeading
         title={t('nav.myRequests')}
         description={t('myRequests.pageSubtitle')}
@@ -277,9 +379,10 @@ function MyRequestsContent() {
         direction="row"
         alignItems="center"
         justifyContent="space-between"
+        flexWrap="wrap"
         sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
       >
-        <Tabs value={tab} onChange={(_, next: 'requests' | 'issues') => setTab(next)}>
+        <Tabs variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile value={tab} onChange={(_, next: 'requests' | 'issues') => setTab(next)}>
           <Tab value="requests" label={t('myRequests.tabRequests')} />
           <Tab value="issues" label={t('myRequests.tabIssues')} />
         </Tabs>
@@ -370,6 +473,35 @@ function MyRequestsContent() {
               {t('myRequests.empty')}
             </Typography>
           </Box>
+        ) : isPhone ? (
+          <Stack divider={<Divider flexItem />}>
+            {rows.map((r) => (
+              <Box key={r.id} sx={{ p: 2 }}>
+                <Typography fontWeight={600} sx={{ overflowWrap: 'anywhere' }}>
+                  {r.title}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  {[
+                    requestedDate(r),
+                    showRequesterColumn ? requesterName(r) : null,
+                    r.seerrRequestId != null
+                      ? t('myRequests.seerrRequest', { id: r.seerrRequestId })
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </Typography>
+                <Stack direction="row" flexWrap="wrap" useFlexGap spacing={1} sx={{ mt: 1 }}>
+                  {statusChip(r)}
+                  {typeChip(r)}
+                  {sourceChipEl(r)}
+                </Stack>
+                <Stack direction="row" flexWrap="wrap" useFlexGap spacing={1} sx={{ mt: 1.5 }}>
+                  {actions(r)}
+                </Stack>
+              </Box>
+            ))}
+          </Stack>
         ) : (
           <TableContainer>
             <Table size="small">
@@ -399,110 +531,20 @@ function MyRequestsContent() {
                         </Typography>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <Chip
-                        size="small"
-                        label={r.mediaType === 'movie' ? t('myRequests.typeMovie') : t('myRequests.typeSeries')}
-                        variant="outlined"
-                      />
-                    </TableCell>
+                    <TableCell>{typeChip(r)}</TableCell>
                     {showRequesterColumn && (
                       <TableCell>
-                        <Typography variant="body2">
-                          {r.requestedByDisplayName ||
-                            r.requestedByUsername ||
-                            t('myRequests.unknownUser')}
-                        </Typography>
+                        <Typography variant="body2">{requesterName(r)}</Typography>
                       </TableCell>
                     )}
+                    <TableCell>{sourceChipEl(r)}</TableCell>
                     <TableCell>
-                      <Chip
-                        size="small"
-                        label={t(sourceChip(r.source).key)}
-                        variant="outlined"
-                        color={sourceChip(r.source).color}
-                      />
+                      <Typography variant="body2">{requestedDate(r)}</Typography>
                     </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {new Date(r.createdAt).toLocaleDateString(undefined, {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Tooltip
-                        title={
-                          r.seerrLive
-                            ? t('myRequests.tooltipLive', {
-                                reqStatus: r.seerrLive.status,
-                                mediaStatus: r.seerrLive.mediaStatus,
-                              })
-                            : ''
-                        }
-                      >
-                        <Chip
-                          size="small"
-                          label={formatRequestStatus(r)}
-                          color={statusColor(r)}
-                          variant={statusColor(r) === 'default' ? 'outlined' : 'filled'}
-                        />
-                      </Tooltip>
-                    </TableCell>
+                    <TableCell>{statusChip(r)}</TableCell>
                     <TableCell align="right">
                       <Stack direction="row" spacing={1} justifyContent="flex-end">
-                        {isAdmin && isActionable(r) && (
-                          <>
-                            <Tooltip title={t('myRequests.approve')}>
-                              <span>
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  color="success"
-                                  disabled={deciding === r.id}
-                                  onClick={() => void decide(r, 'approve')}
-                                  startIcon={<CheckIcon />}
-                                >
-                                  {t('myRequests.approve')}
-                                </Button>
-                              </span>
-                            </Tooltip>
-                            <Tooltip title={t('myRequests.decline')}>
-                              <span>
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  color="error"
-                                  disabled={deciding === r.id}
-                                  onClick={() => void decide(r, 'decline')}
-                                  startIcon={<CloseIcon />}
-                                >
-                                  {t('myRequests.decline')}
-                                </Button>
-                              </span>
-                            </Tooltip>
-                          </>
-                        )}
-                        {isRowAvailable(r) && r.libraryMediaId ? (
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            component={RouterLink}
-                            to={
-                              r.mediaType === 'movie'
-                                ? `/movies/${r.libraryMediaId}`
-                                : `/series/${r.libraryMediaId}`
-                            }
-                          >
-                            {t('myRequests.openInLibrary')}
-                          </Button>
-                        ) : (
-                          <Button size="small" variant="outlined" onClick={() => openTmdbModal(r)}>
-                            {t('myRequests.details')}
-                          </Button>
-                        )}
+                        {actions(r)}
                       </Stack>
                     </TableCell>
                   </TableRow>
@@ -524,6 +566,13 @@ function MyRequestsContent() {
             }}
             rowsPerPageOptions={[10, 25, 50, 100]}
             labelRowsPerPage={t('common.rowsPerPage')}
+            // The rows-per-page picker does not fit beside the range and the
+            // arrows on a phone; the default page size stands there.
+            sx={{
+              '& .MuiTablePagination-selectLabel, & .MuiTablePagination-input': {
+                display: { xs: 'none', sm: 'inline-flex' },
+              },
+            }}
           />
         )}
       </Paper>

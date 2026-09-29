@@ -40,8 +40,8 @@ export function AssistantPage() {
         // grows by the impersonation banner's height while an admin is viewing
         // the app as someone else.
         height: {
-          xs: 'calc(100vh - var(--aperture-chrome-top, 64px) - 32px)',
-          sm: 'calc(100vh - var(--aperture-chrome-top, 64px) - 48px)',
+          xs: 'calc(100dvh - var(--aperture-chrome-top, 64px) - 32px)',
+          sm: 'calc(100dvh - var(--aperture-chrome-top, 64px) - 48px)',
         },
         border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: 3,

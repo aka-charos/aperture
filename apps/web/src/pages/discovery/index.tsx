@@ -313,6 +313,9 @@ export function DiscoveryPage() {
 
       {/* Tabs */}
       <Tabs
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
         value={discoveryTab}
         onChange={(_, v) => setDiscoveryTab(v)}
         sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}
@@ -390,6 +393,9 @@ export function DiscoveryPage() {
       {/* Movies / TV: browse by overall popularity vs genre strips */}
       {(discoveryTab === 'movie' || discoveryTab === 'series') && (
         <Tabs
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
           value={browseSubTab}
           onChange={handleBrowseSubChange}
           sx={{ borderBottom: 1, borderColor: 'divider', mb: 2, minHeight: 40 }}

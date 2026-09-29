@@ -206,6 +206,9 @@ export function SimilarMedia({
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Tabs
+            variant="scrollable"
+            scrollButtons="auto"
+            allowScrollButtonsMobile
             value={viewMode}
             onChange={handleViewModeChange}
             sx={{ minHeight: 36 }}

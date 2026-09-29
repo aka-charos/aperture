@@ -180,6 +180,9 @@ export function UserSettingsPage() {
 
       <Paper sx={{ backgroundColor: 'background.paper', borderRadius: 2 }} elevation={0}>
         <Tabs
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
           value={tabValue}
           onChange={handleMainTabChange}
           sx={{
@@ -202,6 +205,9 @@ export function UserSettingsPage() {
         <Box sx={{ p: 3 }}>
           <TabPanel value={tabValue} index={0}>
             <Tabs
+              variant="scrollable"
+              scrollButtons="auto"
+              allowScrollButtonsMobile
               value={identityMediaType}
               onChange={(_, value: 'movie' | 'series') => setIdentityMediaType(value)}
               sx={{

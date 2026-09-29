@@ -1,3 +1,4 @@
+import { useIsPhone } from '@/hooks/useIsPhone'
 import { useTranslation } from 'react-i18next'
 import {
   Dialog,
@@ -46,12 +47,13 @@ export function PlaylistPreviewDialog({
   i18nNamespace = 'playlists',
 }: PlaylistPreviewDialogProps) {
   const { t } = useTranslation()
+  const fullScreen = useIsPhone()
   const pt = (key: string, options?: Record<string, unknown>) => t(`${i18nNamespace}.${key}`, options)
 
   const seedCount = items.filter((item) => item.isSeed).length
 
   return (
-    <Dialog open={!!channel} onClose={confirming ? undefined : onClose} maxWidth="md" fullWidth>
+    <Dialog fullScreen={fullScreen} open={!!channel} onClose={confirming ? undefined : onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Box>

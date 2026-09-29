@@ -62,8 +62,15 @@ import { applyEffectiveUiLanguage } from '@/i18n/syncUiLanguage'
 
 const DRAWER_WIDTH = 260
 const DRAWER_WIDTH_COLLAPSED = 72
-/** The app bar's own height. Everything below it is positioned off this. */
-const APP_BAR_HEIGHT = 64
+/**
+ * The app bar's own height, per breakpoint. Everything below it is positioned
+ * off this, and the toolbar is pinned to the same numbers: MUI's default is
+ * 56px on phones (48px in landscape) and 64px from `sm`, so a single 64 left an
+ * 8px gap under the bar on every phone.
+ */
+const APP_BAR_HEIGHT = { xs: 56, sm: 64 } as const
+/** Pages that fill the pane edge to edge and size themselves against the viewport. */
+const FULL_VIEWPORT_PATHS = new Set(['/assistant', '/explore'])
 /** Shown in the sidebar footer, and in the rail's tooltip where there's no room for it. */
 const APP_VERSION = 'v0.7.8'
 /** Pointer intent: brushing past the rail on the way somewhere else must not open it. */
@@ -563,14 +570,19 @@ function AppShell() {
   // /explore) size themselves against it from inside the outlet and would
   // otherwise each need a copy of this arithmetic — and would each be a place
   // for it to go stale.
-  const chromeTop = APP_BAR_HEIGHT + (impersonation ? IMPERSONATION_BANNER_HEIGHT : 0)
+  const bannerHeight = impersonation ? IMPERSONATION_BANNER_HEIGHT : 0
 
   return (
     <Box
       sx={{
         display: 'flex',
-        minHeight: '100vh',
-        '--aperture-chrome-top': `${chromeTop}px`,
+        // dvh, not vh: on a phone 100vh is the height with the browser's
+        // toolbars hidden, so a vh-sized page runs under them.
+        minHeight: '100dvh',
+        '--aperture-chrome-top': {
+          xs: `${APP_BAR_HEIGHT.xs + bannerHeight}px`,
+          sm: `${APP_BAR_HEIGHT.sm + bannerHeight}px`,
+        },
       }}
     >
       {/* App Bar */}
@@ -595,7 +607,7 @@ function AppShell() {
             about the page, and this is about who you currently are. */}
         <ImpersonationBanner />
 
-        <Toolbar>
+        <Toolbar sx={{ minHeight: { xs: APP_BAR_HEIGHT.xs, sm: APP_BAR_HEIGHT.sm }, gap: { xs: 0.5, sm: 0 } }}>
           {/* Mobile: Hamburger on left */}
           <IconButton
             color="inherit"
@@ -624,7 +636,13 @@ function AppShell() {
               sx={{ width: 28, height: 28 }}
             />
             <Typography
+              noWrap
               sx={{
+                // An admin's bar carries two more controls on the right, which
+                // reach the centre on a phone; the logo alone still says where
+                // you are.
+                display: { xs: user?.isAdmin ? 'none' : 'block', sm: 'block' },
+                maxWidth: '40vw',
                 fontFamily: '"Open Sans", sans-serif',
                 fontWeight: 600,
                 fontSize: '1.1rem',
@@ -797,10 +815,20 @@ function AppShell() {
           width: { md: `calc(100% - ${drawerWidth}px)` },
           marginInlineEnd: { md: `${dockWidth}px` },
           maxWidth: '100%',
-          overflowX: 'hidden',
+          // clip, not hidden: `hidden` makes <main> a scroll container that
+          // never scrolls, and every position:sticky descendant then sticks to
+          // it instead of the viewport — i.e. never sticks at all.
+          overflowX: 'clip',
           mt: 'var(--aperture-chrome-top, 64px)',
           backgroundColor: 'background.default',
-          minHeight: 'calc(100vh - var(--aperture-chrome-top, 64px))',
+          minHeight: 'calc(100dvh - var(--aperture-chrome-top, 64px))',
+          // Room for the floating assistant button and the iOS home bar, so
+          // neither sits on the last row or on the pagination. The two
+          // full-viewport pages size themselves to the pane and break out of
+          // its padding, so extra room there would only add a scrollbar.
+          ...(!FULL_VIEWPORT_PATHS.has(location.pathname) && {
+            pb: { xs: 'calc(88px + env(safe-area-inset-bottom))', md: 3 },
+          }),
           transition: dockResizing
             ? 'none'
             : theme.transitions.create(['width', 'margin'], {

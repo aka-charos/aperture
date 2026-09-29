@@ -56,7 +56,7 @@ function SetupGuard({ children }: { children: React.ReactNode }) {
         display="flex"
         alignItems="center"
         justifyContent="center"
-        minHeight="100vh"
+        minHeight="100dvh"
         bgcolor="background.default"
       >
         <CircularProgress />
@@ -107,7 +107,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
         display="flex"
         alignItems="center"
         justifyContent="center"
-        minHeight="100vh"
+        minHeight="100dvh"
         bgcolor="background.default"
       >
         <CircularProgress />
@@ -150,7 +150,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
         display="flex"
         alignItems="center"
         justifyContent="center"
-        minHeight="100vh"
+        minHeight="100dvh"
         bgcolor="background.default"
       >
         <CircularProgress />

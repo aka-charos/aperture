@@ -1,3 +1,4 @@
+import { useIsPhone } from '@/hooks/useIsPhone'
 import React, { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -13,7 +14,7 @@ import {
   Tabs,
   Tab,
 } from '@mui/material'
-import { alpha, useTheme } from '@mui/material/styles'
+import { useTheme } from '@mui/material/styles'
 import WhatshotIcon from '@mui/icons-material/Whatshot'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
@@ -74,6 +75,7 @@ export function TopPicksPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const theme = useTheme()
+  const isPhone = useIsPhone()
   const [searchParams, setSearchParams] = useSearchParams()
   const { getRating, setRating } = useUserRatings()
   const { isWatched, getEpisodeProgress } = useWatchStatus()
@@ -191,7 +193,7 @@ export function TopPicksPage() {
               responsive
               onClick={() => navigate(`/movies/${movie.movieId}`)}
             />
-            <RankBadge rank={movie.rank} size="large" />
+            <RankBadge rank={movie.rank} size={isPhone ? 'medium' : 'large'} />
             <Chip
               icon={<PeopleIcon sx={{ fontSize: 14 }} />}
               label={movie.uniqueViewers}
@@ -235,6 +237,9 @@ export function TopPicksPage() {
             <MoviePoster
               title={show.title}
               year={show.year}
+              // The network used to be a chip in the poster's top-right corner,
+              // on top of the poster's own rating chip; it reads here instead.
+              metaLine={[show.year, show.network].filter(Boolean).join(' · ') || undefined}
               posterUrl={show.posterUrl}
               genres={show.genres}
               rating={show.communityRating}
@@ -249,7 +254,7 @@ export function TopPicksPage() {
               size="medium"
               onClick={() => navigate(`/series/${show.seriesId}`)}
             />
-            <RankBadge rank={show.rank} size="large" />
+            <RankBadge rank={show.rank} size={isPhone ? 'medium' : 'large'} />
             <Chip
               icon={<PeopleIcon sx={{ fontSize: 14 }} />}
               label={show.uniqueViewers}
@@ -265,26 +270,6 @@ export function TopPicksPage() {
                 '& .MuiChip-icon': { color: 'white' },
               }}
             />
-            {show.network && (
-              <Chip
-                label={show.network}
-                size="small"
-                sx={{
-                  position: 'absolute',
-                  top: 8,
-                  right: 8,
-                  backgroundColor: alpha(theme.palette.secondary.main, 0.9),
-                  color: 'white',
-                  fontSize: '0.65rem',
-                  height: 20,
-                  maxWidth: 80,
-                  '& .MuiChip-label': { 
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  },
-                }}
-              />
-            )}
           </Box>
         </Grid>
       ))}
@@ -382,6 +367,9 @@ export function TopPicksPage() {
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs 
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
           value={tabIndex} 
           onChange={handleTabChange}
           sx={{

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Box, Typography, Paper, Chip, Skeleton, Tooltip, IconButton } from '@mui/material'
+import { Box, Typography, Paper, Chip, Skeleton, Tooltip, IconButton, useMediaQuery } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
 import Star from '@mui/icons-material/Star'
 import AddToQueue from '@mui/icons-material/AddToQueue'
@@ -129,6 +129,11 @@ export function MoviePoster({
   children,
 }: MoviePosterProps) {
   const [isHovered, setIsHovered] = useState(false)
+  // A touch screen has no hover, but a tap still fires mouseenter and never the
+  // matching mouseleave, so the zoom and the details overlay stuck on after the
+  // first tap. On touch the hover state is never entered, and the control hover
+  // reveals (the rating) is shown outright instead.
+  const canHover = useMediaQuery('(hover: hover) and (pointer: fine)', { noSsr: true })
   const [ratingOpen, setRatingOpen] = useState(false)
   const [imageError, setImageError] = useState(false)
   const [isOffRatio, setIsOffRatio] = useState(false)
@@ -199,8 +204,8 @@ export function MoviePoster({
     >
       <Paper
         elevation={isHovered ? 8 : 3}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        onMouseEnter={canHover ? () => setIsHovered(true) : undefined}
+        onMouseLeave={canHover ? () => setIsHovered(false) : undefined}
         sx={{
           position: 'relative',
           width: '100%',
@@ -380,8 +385,8 @@ export function MoviePoster({
                 alignItems: 'center',
                 justifyContent: 'center',
                 backdropFilter: 'blur(4px)',
-                opacity: isHovered || ratingOpen ? 1 : 0,
-                pointerEvents: isHovered || ratingOpen ? 'auto' : 'none',
+                opacity: isHovered || ratingOpen || !canHover ? 1 : 0,
+                pointerEvents: isHovered || ratingOpen || !canHover ? 'auto' : 'none',
                 transition: 'opacity 0.25s ease, background-color 0.2s ease',
                 '&:hover': {
                   backgroundColor: 'rgba(0, 0, 0, 0.8)',

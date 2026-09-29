@@ -17,7 +17,12 @@ import {
   Collapse,
   Chip,
   Tooltip,
+  Button,
+  Drawer,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material'
+import TuneIcon from '@mui/icons-material/Tune'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
@@ -60,6 +65,9 @@ export function ExplorePage() {
   // No in-page block: the graph fills the viewport and breaks out of the
   // layout padding, so the bar is the only place a title fits.
   usePageHeader(t('nav.explore'))
+  const theme = useTheme()
+  const isNarrow = useMediaQuery(theme.breakpoints.down('md'))
+  const [controlsOpen, setControlsOpen] = useState(false)
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -470,13 +478,245 @@ export function ExplorePage() {
     [t]
   )
 
+  // Choosing a source or re-running a search from the sheet is the end of that
+  // visit to it; leaving it open would cover the graph that just changed.
+  useEffect(() => {
+    setControlsOpen(false)
+  }, [selectedBrowseSource, semanticSearch.query])
+
+  // The sidebar's controls, rendered beside the graph where there is room for
+  // both and in a bottom sheet where there is not: a fixed 280px column next to
+  // the graph left a phone about 80px of graph.
+  const controls = (
+    <>
+      {/* Quick Filters */}
+      <Box sx={{ px: 2, py: 1.5 }}>
+        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+          {t('mediaGraph.filterByType')}
+        </Typography>
+        <ToggleButtonGroup
+          value={mediaFilter}
+          exclusive
+          onChange={(_, value) => value && setMediaFilter(value)}
+          size="small"
+          fullWidth
+          sx={{
+            '& .MuiToggleButton-root': {
+              py: 0.5,
+              fontSize: '0.75rem',
+            },
+          }}
+        >
+          <ToggleButton value="movie">
+            <MovieIcon fontSize="small" sx={{ mr: 0.5 }} />
+            {t('mediaGraph.movies')}
+          </ToggleButton>
+          <ToggleButton value="series">
+            <TvIcon fontSize="small" sx={{ mr: 0.5 }} />
+            {t('mediaGraph.series')}
+          </ToggleButton>
+          <ToggleButton value="both">{t('mediaGraph.both')}</ToggleButton>
+        </ToggleButtonGroup>
+
+        {/* Hide Watched Toggle */}
+        <FormControlLabel
+          control={
+            <Switch
+              size="small"
+              checked={hideWatched}
+              onChange={(e) => setHideWatched(e.target.checked)}
+            />
+          }
+          label={
+            <Typography variant="caption" color="text.secondary">
+              {t('mediaGraph.hideWatched')}
+            </Typography>
+          }
+          sx={{ mt: 1.5, ml: 0 }}
+        />
+      </Box>
+
+      <Divider />
+
+      {/* Browse By Section */}
+      <Box>
+        <ListItemButton onClick={() => setBrowseSectionOpen(!browseSectionOpen)}>
+          <ListItemText
+            primary={t('mediaGraph.browseBy')}
+            primaryTypographyProps={{ variant: 'subtitle2', fontWeight: 600 }}
+          />
+          {browseSectionOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+        </ListItemButton>
+
+        <Collapse in={browseSectionOpen}>
+          <List dense disablePadding>
+            <ListItemButton
+              selected={selectedBrowseSource === 'ai-movies'}
+              onClick={() => handleBrowseSourceSelect('ai-movies')}
+              sx={{ pl: 3 }}
+            >
+              <ListItemIcon sx={{ minWidth: 32 }}>
+                <AutoAwesomeIcon fontSize="small" color="primary" />
+              </ListItemIcon>
+              <ListItemText primary={t('mediaGraph.sourceAiMovies')} />
+            </ListItemButton>
+
+            <ListItemButton
+              selected={selectedBrowseSource === 'ai-series'}
+              onClick={() => handleBrowseSourceSelect('ai-series')}
+              sx={{ pl: 3 }}
+            >
+              <ListItemIcon sx={{ minWidth: 32 }}>
+                <AutoAwesomeIcon fontSize="small" color="secondary" />
+              </ListItemIcon>
+              <ListItemText primary={t('mediaGraph.sourceAiSeries')} />
+            </ListItemButton>
+
+            <ListItemButton
+              selected={selectedBrowseSource === 'watching'}
+              onClick={() => handleBrowseSourceSelect('watching')}
+              sx={{ pl: 3 }}
+            >
+              <ListItemIcon sx={{ minWidth: 32 }}>
+                <PlaylistPlayIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText primary={t('mediaGraph.sourceWatching')} />
+            </ListItemButton>
+
+            <ListItemButton
+              selected={selectedBrowseSource === 'top-movies'}
+              onClick={() => handleBrowseSourceSelect('top-movies')}
+              sx={{ pl: 3 }}
+            >
+              <ListItemIcon sx={{ minWidth: 32 }}>
+                <TrendingUpIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText primary={t('mediaGraph.sourceTopMovies')} />
+            </ListItemButton>
+
+            <ListItemButton
+              selected={selectedBrowseSource === 'top-series'}
+              onClick={() => handleBrowseSourceSelect('top-series')}
+              sx={{ pl: 3 }}
+            >
+              <ListItemIcon sx={{ minWidth: 32 }}>
+                <TrendingUpIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText primary={t('mediaGraph.sourceTopSeries')} />
+            </ListItemButton>
+          </List>
+        </Collapse>
+      </Box>
+
+      <Divider />
+
+      {/* Recent Searches */}
+      {recentSearches.length > 0 && (
+        <>
+          <Box sx={{ p: 2 }}>
+            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <HistoryIcon fontSize="small" />
+              {t('mediaGraph.recentSearches')}
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+              {recentSearches.map((query) => (
+                <Chip
+                  key={query}
+                  label={query}
+                  size="small"
+                  onClick={() => {
+                    setSearchQuery(query)
+                    handleSemanticSearch(query)
+                  }}
+                  onDelete={() => clearRecentSearch(query)}
+                  sx={{ fontSize: '0.7rem' }}
+                />
+              ))}
+            </Box>
+          </Box>
+          <Divider />
+        </>
+      )}
+
+      {/* Connection Legend */}
+      <Box sx={{ p: 2 }}>
+        <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+          {t('mediaGraph.connectionTypesHeading')}
+        </Typography>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          {(Object.keys(CONNECTION_COLORS) as ConnectionType[]).map((type) => (
+            <Box key={type} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box
+                sx={{
+                  width: 14,
+                  height: 3,
+                  bgcolor: CONNECTION_COLORS[type],
+                  borderRadius: 1,
+                }}
+              />
+              <Typography variant="caption" sx={{ fontSize: '10px' }}>
+                {connectionTypeLabel(type, t)}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+
+      <Divider />
+
+      {/* Cross-Media Toggle */}
+      <Box sx={{ p: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={crossMediaEnabled}
+                disabled={!crossMediaApplies}
+                onChange={(e) => setCrossMediaEnabled(e.target.checked)}
+              />
+            }
+            label={<Typography variant="caption">{t('mediaGraph.crossMedia')}</Typography>}
+            sx={{ mr: 0 }}
+          />
+          <Tooltip
+            arrow
+            placement="top"
+            title={
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, py: 0.5 }}>
+                <Typography variant="caption" component="span">
+                  {t('mediaGraph.crossMediaHelp')}
+                </Typography>
+                <Typography variant="caption" component="span" sx={{ opacity: 0.85 }}>
+                  {crossMediaApplies
+                    ? t('mediaGraph.crossMediaHelpSlots')
+                    : t('mediaGraph.crossMediaUnavailable')}
+                </Typography>
+              </Box>
+            }
+          >
+            <InfoOutlinedIcon
+              sx={{ fontSize: 16, color: 'text.secondary', cursor: 'help' }}
+              // Reachable without a mouse: the tooltip is the only place the
+              // switch's behaviour is written down.
+              tabIndex={0}
+              role="button"
+              aria-label={t('mediaGraph.crossMediaHelpAria')}
+            />
+          </Tooltip>
+        </Box>
+      </Box>
+    </>
+  )
+
   return (
     <Box 
       sx={{ 
-        display: 'flex', 
+        display: 'flex',
+        position: 'relative',
         // Grows to include the impersonation banner when one is on screen —
         // see --aperture-chrome-top in Layout.
-        height: 'calc(100vh - var(--aperture-chrome-top, 64px))',
+        height: 'calc(100dvh - var(--aperture-chrome-top, 64px))',
         // Break out of parent Layout padding
         m: { xs: -2, sm: -3 },
         width: { xs: 'calc(100% + 32px)', sm: 'calc(100% + 48px)' },
@@ -510,238 +750,59 @@ export function ExplorePage() {
       </Box>
 
       {/* Right Sidebar - Controls */}
-      <Paper
-        sx={{
-          width: 280,
-          flexShrink: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          borderRadius: 0,
-          borderLeft: 1,
-          borderColor: 'divider',
-          bgcolor: 'background.paper',
-          height: '100%',
-          overflowY: 'auto',
-        }}
-      >
-        {/* Quick Filters */}
-        <Box sx={{ px: 2, py: 1.5 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-            {t('mediaGraph.filterByType')}
-          </Typography>
-          <ToggleButtonGroup
-            value={mediaFilter}
-            exclusive
-            onChange={(_, value) => value && setMediaFilter(value)}
+      {isNarrow ? (
+        <>
+          <Button
+            variant="contained"
             size="small"
-            fullWidth
+            startIcon={<TuneIcon />}
+            onClick={() => setControlsOpen(true)}
             sx={{
-              '& .MuiToggleButton-root': {
-                py: 0.5,
-                fontSize: '0.75rem',
+              position: 'absolute',
+              // Bottom-start: bottom-end is the assistant's button.
+              bottom: 16,
+              insetInlineStart: 16,
+              zIndex: 2,
+              borderRadius: 5,
+              boxShadow: 4,
+            }}
+          >
+            {t('mediaGraph.controlsButton')}
+          </Button>
+          <Drawer
+            anchor="bottom"
+            open={controlsOpen}
+            onClose={() => setControlsOpen(false)}
+            PaperProps={{
+              sx: {
+                maxHeight: '80dvh',
+                borderTopLeftRadius: 16,
+                borderTopRightRadius: 16,
+                pb: 'env(safe-area-inset-bottom)',
               },
             }}
           >
-            <ToggleButton value="movie">
-              <MovieIcon fontSize="small" sx={{ mr: 0.5 }} />
-              {t('mediaGraph.movies')}
-            </ToggleButton>
-            <ToggleButton value="series">
-              <TvIcon fontSize="small" sx={{ mr: 0.5 }} />
-              {t('mediaGraph.series')}
-            </ToggleButton>
-            <ToggleButton value="both">{t('mediaGraph.both')}</ToggleButton>
-          </ToggleButtonGroup>
-
-          {/* Hide Watched Toggle */}
-          <FormControlLabel
-            control={
-              <Switch
-                size="small"
-                checked={hideWatched}
-                onChange={(e) => setHideWatched(e.target.checked)}
-              />
-            }
-            label={
-              <Typography variant="caption" color="text.secondary">
-                {t('mediaGraph.hideWatched')}
-              </Typography>
-            }
-            sx={{ mt: 1.5, ml: 0 }}
-          />
-        </Box>
-
-        <Divider />
-
-        {/* Browse By Section */}
-        <Box>
-          <ListItemButton onClick={() => setBrowseSectionOpen(!browseSectionOpen)}>
-            <ListItemText
-              primary={t('mediaGraph.browseBy')}
-              primaryTypographyProps={{ variant: 'subtitle2', fontWeight: 600 }}
-            />
-            {browseSectionOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-          </ListItemButton>
-
-          <Collapse in={browseSectionOpen}>
-            <List dense disablePadding>
-              <ListItemButton
-                selected={selectedBrowseSource === 'ai-movies'}
-                onClick={() => handleBrowseSourceSelect('ai-movies')}
-                sx={{ pl: 3 }}
-              >
-                <ListItemIcon sx={{ minWidth: 32 }}>
-                  <AutoAwesomeIcon fontSize="small" color="primary" />
-                </ListItemIcon>
-                <ListItemText primary={t('mediaGraph.sourceAiMovies')} />
-              </ListItemButton>
-
-              <ListItemButton
-                selected={selectedBrowseSource === 'ai-series'}
-                onClick={() => handleBrowseSourceSelect('ai-series')}
-                sx={{ pl: 3 }}
-              >
-                <ListItemIcon sx={{ minWidth: 32 }}>
-                  <AutoAwesomeIcon fontSize="small" color="secondary" />
-                </ListItemIcon>
-                <ListItemText primary={t('mediaGraph.sourceAiSeries')} />
-              </ListItemButton>
-
-              <ListItemButton
-                selected={selectedBrowseSource === 'watching'}
-                onClick={() => handleBrowseSourceSelect('watching')}
-                sx={{ pl: 3 }}
-              >
-                <ListItemIcon sx={{ minWidth: 32 }}>
-                  <PlaylistPlayIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText primary={t('mediaGraph.sourceWatching')} />
-              </ListItemButton>
-
-              <ListItemButton
-                selected={selectedBrowseSource === 'top-movies'}
-                onClick={() => handleBrowseSourceSelect('top-movies')}
-                sx={{ pl: 3 }}
-              >
-                <ListItemIcon sx={{ minWidth: 32 }}>
-                  <TrendingUpIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText primary={t('mediaGraph.sourceTopMovies')} />
-              </ListItemButton>
-
-              <ListItemButton
-                selected={selectedBrowseSource === 'top-series'}
-                onClick={() => handleBrowseSourceSelect('top-series')}
-                sx={{ pl: 3 }}
-              >
-                <ListItemIcon sx={{ minWidth: 32 }}>
-                  <TrendingUpIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText primary={t('mediaGraph.sourceTopSeries')} />
-              </ListItemButton>
-            </List>
-          </Collapse>
-        </Box>
-
-        <Divider />
-
-        {/* Recent Searches */}
-        {recentSearches.length > 0 && (
-          <>
-            <Box sx={{ p: 2 }}>
-              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <HistoryIcon fontSize="small" />
-                {t('mediaGraph.recentSearches')}
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                {recentSearches.map((query) => (
-                  <Chip
-                    key={query}
-                    label={query}
-                    size="small"
-                    onClick={() => {
-                      setSearchQuery(query)
-                      handleSemanticSearch(query)
-                    }}
-                    onDelete={() => clearRecentSearch(query)}
-                    sx={{ fontSize: '0.7rem' }}
-                  />
-                ))}
-              </Box>
-            </Box>
-            <Divider />
-          </>
-        )}
-
-        {/* Connection Legend */}
-        <Box sx={{ p: 2 }}>
-          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-            {t('mediaGraph.connectionTypesHeading')}
-          </Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-            {(Object.keys(CONNECTION_COLORS) as ConnectionType[]).map((type) => (
-              <Box key={type} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box
-                  sx={{
-                    width: 14,
-                    height: 3,
-                    bgcolor: CONNECTION_COLORS[type],
-                    borderRadius: 1,
-                  }}
-                />
-                <Typography variant="caption" sx={{ fontSize: '10px' }}>
-                  {connectionTypeLabel(type, t)}
-                </Typography>
-              </Box>
-            ))}
-          </Box>
-        </Box>
-
-        <Divider />
-
-        {/* Cross-Media Toggle */}
-        <Box sx={{ p: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  size="small"
-                  checked={crossMediaEnabled}
-                  disabled={!crossMediaApplies}
-                  onChange={(e) => setCrossMediaEnabled(e.target.checked)}
-                />
-              }
-              label={<Typography variant="caption">{t('mediaGraph.crossMedia')}</Typography>}
-              sx={{ mr: 0 }}
-            />
-            <Tooltip
-              arrow
-              placement="top"
-              title={
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, py: 0.5 }}>
-                  <Typography variant="caption" component="span">
-                    {t('mediaGraph.crossMediaHelp')}
-                  </Typography>
-                  <Typography variant="caption" component="span" sx={{ opacity: 0.85 }}>
-                    {crossMediaApplies
-                      ? t('mediaGraph.crossMediaHelpSlots')
-                      : t('mediaGraph.crossMediaUnavailable')}
-                  </Typography>
-                </Box>
-              }
-            >
-              <InfoOutlinedIcon
-                sx={{ fontSize: 16, color: 'text.secondary', cursor: 'help' }}
-                // Reachable without a mouse: the tooltip is the only place the
-                // switch's behaviour is written down.
-                tabIndex={0}
-                role="button"
-                aria-label={t('mediaGraph.crossMediaHelpAria')}
-              />
-            </Tooltip>
-          </Box>
-        </Box>
-      </Paper>
+            {controls}
+          </Drawer>
+        </>
+      ) : (
+        <Paper
+          sx={{
+            width: 280,
+            flexShrink: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            borderRadius: 0,
+            borderLeft: 1,
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+            height: '100%',
+            overflowY: 'auto',
+          }}
+        >
+          {controls}
+        </Paper>
+      )}
     </Box>
   )
 }

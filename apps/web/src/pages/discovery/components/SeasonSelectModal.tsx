@@ -1,3 +1,4 @@
+import { useIsPhone } from '@/hooks/useIsPhone'
 import React, { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -63,6 +64,7 @@ export function SeasonSelectModal({
   loading = false,
 }: SeasonSelectModalProps) {
   const { t } = useTranslation()
+  const fullScreen = useIsPhone()
 
   const statusConfigByCode = useMemo(
     () =>
@@ -167,7 +169,8 @@ export function SeasonSelectModal({
   }
 
   return (
-    <Dialog 
+    <Dialog
+      fullScreen={fullScreen}
       open={open} 
       onClose={onClose}
       maxWidth="sm"

@@ -136,10 +136,10 @@ export function RunningJobsWidget() {
         sx={{
           display: 'flex',
           alignItems: 'center',
-          gap: 1.5,
-          px: 2,
+          gap: { xs: 0, sm: 1.5 },
+          px: { xs: 1, sm: 2 },
           py: 0.75,
-          mr: 1,
+          mr: { xs: 0.5, sm: 1 },
           borderRadius: 2,
           backgroundColor: 'rgba(255, 255, 255, 0.1)',
           cursor: 'pointer',
@@ -147,10 +147,13 @@ export function RunningJobsWidget() {
           '&:hover': {
             backgroundColor: 'rgba(255, 255, 255, 0.15)',
           },
-          minWidth: 200,
+          // On a phone the bar has no room for a name and a bar; the
+          // percentage alone still says work is running, and a tap opens the
+          // detail.
+          minWidth: { xs: 0, sm: 200 },
         }}
       >
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Box sx={{ flex: 1, minWidth: 0, display: { xs: 'none', sm: 'block' } }}>
           <Typography
             variant="caption"
             sx={{
@@ -215,8 +218,8 @@ export function RunningJobsWidget() {
               elevation={8}
               sx={{
                 mt: 1,
-                minWidth: 340,
-                maxWidth: 400,
+                minWidth: 'min(340px, calc(100vw - 16px))',
+                maxWidth: 'min(400px, calc(100vw - 16px))',
                 maxHeight: 400,
                 overflow: 'auto',
                 borderRadius: 2,

@@ -463,6 +463,9 @@ export function AlgorithmSettingsSection({ userId }: Props) {
           <CardContent>
             {/* Media Type Tabs */}
             <Tabs
+              variant="scrollable"
+              scrollButtons="auto"
+              allowScrollButtonsMobile
               value={mediaType}
               onChange={(_, v) => setMediaType(v)}
               sx={{ 

@@ -4,6 +4,7 @@
  * Dialog for searching and adding series to the watching list.
  */
 
+import { useIsPhone } from '@/hooks/useIsPhone'
 import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -26,6 +27,7 @@ import {
 import AddIcon from '@mui/icons-material/Add'
 import CheckIcon from '@mui/icons-material/Check'
 import SearchIcon from '@mui/icons-material/Search'
+import CloseIcon from '@mui/icons-material/Close'
 import { useWatching } from '@/hooks/useWatching'
 
 interface SearchResult {
@@ -44,6 +46,7 @@ interface AddSeriesDialogProps {
 
 export function AddSeriesDialog({ open, onClose }: AddSeriesDialogProps) {
   const { t } = useTranslation()
+  const fullScreen = useIsPhone()
   const { isWatching, addToWatching } = useWatching()
   const [search, setSearch] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
@@ -119,15 +122,23 @@ export function AddSeriesDialog({ open, onClose }: AddSeriesDialogProps) {
 
   return (
     <Dialog
+      fullScreen={fullScreen}
       open={open}
       onClose={handleClose}
       maxWidth="sm"
       fullWidth
       PaperProps={{
-        sx: { minHeight: 400 },
+        sx: { minHeight: { xs: 0, sm: 400 } },
       }}
     >
-      <DialogTitle>{t('watching.addDialogTitle')}</DialogTitle>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box component="span" sx={{ flex: 1 }}>
+          {t('watching.addDialogTitle')}
+        </Box>
+        <IconButton onClick={handleClose} aria-label={t('common.close')} edge="end">
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
       <DialogContent>
         <TextField
           autoFocus

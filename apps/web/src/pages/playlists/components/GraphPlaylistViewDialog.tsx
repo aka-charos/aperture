@@ -1,3 +1,4 @@
+import { useIsPhone } from '@/hooks/useIsPhone'
 import { useTranslation } from 'react-i18next'
 import {
   Dialog,
@@ -37,6 +38,7 @@ export function GraphPlaylistViewDialog({
   onClose,
 }: GraphPlaylistViewDialogProps) {
   const { t, i18n } = useTranslation()
+  const fullScreen = useIsPhone()
   const navigate = useNavigate()
 
   const handleItemClick = (item: GraphPlaylistItem) => {
@@ -49,7 +51,7 @@ export function GraphPlaylistViewDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog fullScreen={fullScreen} open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="flex-start">
           <Box>

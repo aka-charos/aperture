@@ -116,13 +116,15 @@ export function BrowseMoviesTab({ viewMode, movies, presets }: BrowseMoviesTabPr
     <>
       <Box
         sx={{
-          position: 'sticky',
-          top: { xs: 56, sm: 64 },
+          // Sticky only where the filters fit on one or two rows: on a phone they
+          // stack to ~400px, and pinning that would cover half the screen.
+          position: { xs: 'static', md: 'sticky' },
+          top: 'var(--aperture-chrome-top, 64px)',
           zIndex: 10,
           backgroundColor: 'background.default',
           py: 2,
-          mx: -3,
-          px: 3,
+          mx: { xs: -2, sm: -3 },
+          px: { xs: 2, sm: 3 },
           mb: 2,
           borderBottom: 1,
           borderColor: 'divider',

@@ -329,6 +329,9 @@ export function SharedWithMePage() {
       </Box>
 
       <Tabs
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
         value={tab ?? false}
         onChange={(_, next: SharedTab) => selectTab(next)}
         sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}

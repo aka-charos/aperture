@@ -32,6 +32,7 @@ import { setStatusPhase } from './assistantStatus'
 import { AICapabilityBanner } from '../AICapabilityBanner'
 import { MediaDetailModalProvider } from '@/hooks/MediaDetailModalProvider'
 import { gradients } from '@/theme'
+import { NO_HOVER_MEDIA } from '@/lib/touch'
 import type { AssistantChatState, BackendMessage } from './useAssistantChat'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -417,6 +418,8 @@ export function AssistantChatSurface({
                       '& .MuiInputBase-input': {
                         py: 0.5,
                         fontSize: '0.875rem',
+                        // iOS zooms the page into any input under 16px.
+                        [NO_HOVER_MEDIA]: { fontSize: 16 },
                       },
                       '& .MuiOutlinedInput-root': {
                         bgcolor: 'rgba(26, 26, 26, 0.6)',
@@ -474,6 +477,18 @@ export function AssistantChatSurface({
                       opacity: 0,
                       pointerEvents: 'none',
                       transition: 'opacity 0.2s',
+                      // Nothing hovers on a touch screen, and a tap on the row
+                      // opens the chat, so the actions could never be reached
+                      // there. They stand beside the title instead.
+                      [NO_HOVER_MEDIA]: {
+                        position: 'static',
+                        transform: 'none',
+                        opacity: 1,
+                        pointerEvents: 'auto',
+                        bgcolor: 'transparent',
+                        backdropFilter: 'none',
+                        flexShrink: 0,
+                      },
                     }}
                   >
                     <IconButton

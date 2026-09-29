@@ -128,6 +128,9 @@ export function BrowsePage() {
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
           value={tabIndex}
           onChange={handleTabChange}
           sx={{
