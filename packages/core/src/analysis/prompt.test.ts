@@ -588,8 +588,8 @@ test('the draft, when there is one, sits above the current version and nowhere e
 })
 
 /**
- * VERSION 16, the current edition: the analysis re-aimed at somebody who has
- * NOT SEEN THE FILM.
+ * VERSION 16, now archived: the analysis re-aimed at somebody who has NOT SEEN
+ * THE FILM.
  *
  * Eight versions refined HOW each question was answered and never asked whether
  * the questions were the right ones: three of four were film history, and the
@@ -598,14 +598,17 @@ test('the draft, when there is one, sits above the current version and nowhere e
  * the single list of facts that never earn their place, and the fact that the
  * question ids did NOT move, because the panel owns their labels in fifteen
  * locales and grounding.ts selects by them.
+ *
+ * PINNED AT 16 EXPLICITLY, NOT AT "THE CURRENT VERSION", since 17 promoted.
+ * That is not bookkeeping: promptEditions.ts says an archived edition is
+ * byte-for-byte what its number sent and must never be edited, and nothing
+ * else enforces it. Read this and the version-15 tests above as the freeze.
  */
 test('version 16 aims every question at a viewer who has not seen the film', () => {
-  const current = editionFor(ANALYSIS_PROMPT_VERSION)
-  const previous = editionFor(ANALYSIS_PROMPT_VERSION - 1)
+  const current = editionFor(16)
+  const previous = editionFor(15)
   const rulesText = current.rules.join('\n')
   const question = (id: string) => current.movieQuestions.find((q) => q.id === id)!.text
-
-  assert.equal(ANALYSIS_PROMPT_VERSION, 16)
 
   // The ids are untouched, or parseParagraphMap discards every label and the
   // panel loses its headings in fifteen locales.
@@ -700,7 +703,7 @@ test('version 16 aims every question at a viewer who has not seen the film', () 
 })
 
 /**
- * DRAFT 17: WHO SAID IT.
+ * VERSION 17, the current edition: WHO SAID IT.
  *
  * `altworld_hemmingway-1` produced a maker attribution error in BOTH of its
  * Suspiria answers under version 16 - once turning an actress's description of
@@ -709,27 +712,31 @@ test('version 16 aims every question at a viewer who has not seen the film', () 
  * second in as many words and it failed, so 17 gives it a MECHANICAL test.
  *
  * The three smaller corrections are pinned beside it because each is
- * separately visible in an answer, so a bench can attribute them without a run
- * per change.
+ * separately visible in an answer, so a bench could attribute them without a
+ * run per change.
  *
- * The replacement helper throws when a base text moves, so merely building the
- * draft - which importing this module does - is half the test.
+ * WHAT 17 MUST NOT HAVE CHANGED is pinned as hard as what it did: the question
+ * ids, the work question, the governing rule and the rule count are asserted
+ * EQUAL to 16's, so the diff between the two editions stays the size it was
+ * argued to be.
  */
-test('draft 17 decides who is speaking before it reports a maker', () => {
-  if (DRAFT_PROMPT_VERSION == null) return
-  const draft = editionFor(DRAFT_PROMPT_VERSION)
+test('version 17 decides who is speaking before it reports a maker', () => {
   const current = editionFor(ANALYSIS_PROMPT_VERSION)
-  const rulesText = draft.rules.join('\n')
-  const question = (id: string) => draft.movieQuestions.find((q) => q.id === id)!.text
+  const previous = editionFor(16)
+  const rulesText = current.rules.join('\n')
+  const question = (id: string) => current.movieQuestions.find((q) => q.id === id)!.text
 
-  assert.equal(DRAFT_PROMPT_VERSION, ANALYSIS_PROMPT_VERSION + 1)
+  assert.equal(ANALYSIS_PROMPT_VERSION, 17)
+  // The draft is cleared by a promotion. A leftover draft would sit in the
+  // bench picker claiming to be 18 while holding 17's text.
+  assert.equal(DRAFT_PROMPT_VERSION, null)
 
   // The ids are untouched, or parseParagraphMap discards every label and the
   // panel loses its headings in fifteen locales.
   for (const media of ['movieQuestions', 'seriesQuestions'] as const) {
     assert.deepEqual(
-      draft[media].map((q) => q.id),
-      current[media].map((q) => q.id)
+      current[media].map((q) => q.id),
+      previous[media].map((q) => q.id)
     )
   }
 
@@ -752,6 +759,14 @@ test('draft 17 decides who is speaking before it reports a maker', () => {
   // A critic per sentence is the aggregator's own shape, which one answer
   // reproduced while scoring `named 5`.
   assert.ok(question('reception').includes('a sentence per critic'))
+  // BOTH MEDIA TYPES SAY IT THE SAME WAY. The compression pass that shortened
+  // this clause reached the movie text and not the series one, leaving two
+  // wordings of one rule - and a promotion freezes whatever is there. Each
+  // media type has had its own text since 16, so only a test can catch an
+  // asymmetry nobody chose.
+  const seriesReception = current.seriesQuestions.find((q) => q.id === 'reception')!.text
+  assert.ok(seriesReception.includes('a sentence per critic'))
+  assert.ok(!seriesReception.includes('four sentences each opening'))
 
   // A job in front of a name is the credit again.
   assert.ok(rulesText.includes('"Cinematographer Tovoli lit" is the credit again'))
@@ -762,16 +777,22 @@ test('draft 17 decides who is speaking before it reports a maker', () => {
   // NOT grown: the governing rule is the first thing the model reads and is
   // already the longest, and the effect-clause fault has one instance on one
   // model. Watched, not fixed.
-  assert.equal(draft.rules[0], current.rules[0])
+  assert.equal(current.rules[0], previous.rules[0])
   assert.ok(!rulesText.includes('giving it a literary depth'))
 
   // Everything version 16 measured as landing is carried unchanged.
-  assert.equal(draft.rules.length, current.rules.length)
+  assert.equal(current.rules.length, previous.rules.length)
   assert.ok(rulesText.includes('There is no minimum'))
   assert.ok(rulesText.includes('never five'))
   assert.ok(rulesText.includes('THESE NEVER EARN IT, in any answer'))
   assert.ok(rulesText.includes('A SITE IS NOT ITS WRITER'))
-  assert.ok(question('work') === current.movieQuestions.find((q) => q.id === 'work')!.text)
+  assert.equal(question('work'), previous.movieQuestions.find((q) => q.id === 'work')!.text)
+
+  // Exactly four texts moved, and 16 is archived holding what it sent.
+  assert.ok(previous.movieQuestions.find((q) => q.id === 'circumstances')!.text.includes(
+    'a list of topics and not the maker speaking'
+  ))
+  assert.ok(!question('circumstances').includes('a list of topics and not the maker speaking'))
 })
 
 /**
