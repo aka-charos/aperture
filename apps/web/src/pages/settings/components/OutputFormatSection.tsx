@@ -20,14 +20,31 @@ import LinkIcon from '@mui/icons-material/Link'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
+import { useLegacyLibraryOutput } from '@/hooks/legacyLibraryOutput'
+import { LegacyLibraryOutputCard } from './LegacyLibraryOutputCard'
 
 interface OutputFormatConfig {
   moviesUseSymlinks: boolean
   seriesUseSymlinks: boolean
 }
 
+/**
+ * The legacy switch sits above the format it governs: with the output off
+ * there is nothing for the format to describe, so the card below is kept
+ * readable but greyed rather than hidden.
+ */
 export function OutputFormatSection() {
+  return (
+    <Stack spacing={3}>
+      <LegacyLibraryOutputCard />
+      <OutputFormatCard />
+    </Stack>
+  )
+}
+
+function OutputFormatCard() {
   const { t } = useTranslation()
+  const { off: legacyOff } = useLegacyLibraryOutput()
   const [config, setConfig] = useState<OutputFormatConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -106,7 +123,10 @@ export function OutputFormatSection() {
   const anyUseSymlinks = config.moviesUseSymlinks || config.seriesUseSymlinks
 
   return (
-    <Card sx={{ backgroundColor: 'background.paper', borderRadius: 2 }}>
+    <Card
+      sx={{ backgroundColor: 'background.paper', borderRadius: 2, opacity: legacyOff ? 0.6 : 1 }}
+      aria-disabled={legacyOff || undefined}
+    >
       <CardContent>
         <Box mb={2}>
           <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -148,6 +168,7 @@ export function OutputFormatSection() {
                     checked={config.moviesUseSymlinks}
                     onChange={(e) => updateConfig({ moviesUseSymlinks: e.target.checked })}
                     color="primary"
+                    disabled={legacyOff}
                   />
                 }
                 label={
@@ -184,6 +205,7 @@ export function OutputFormatSection() {
                     checked={config.seriesUseSymlinks}
                     onChange={(e) => updateConfig({ seriesUseSymlinks: e.target.checked })}
                     color="primary"
+                    disabled={legacyOff}
                   />
                 }
                 label={
@@ -259,7 +281,7 @@ export function OutputFormatSection() {
             variant="contained"
             startIcon={saving ? <CircularProgress size={16} /> : <SaveIcon />}
             onClick={handleSave}
-            disabled={saving || !hasChanges}
+            disabled={saving || !hasChanges || legacyOff}
           >
             {saving ? t('settingsOutputFormat.saving') : t('settingsOutputFormat.saveChanges')}
           </Button>

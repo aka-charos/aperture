@@ -17,6 +17,7 @@ import {
   getUserSettings,
   updateUserSettings,
   getDefaultLibraryNamePrefix,
+  isLegacyLibraryOutputEnabled,
 } from '@aperture/core'
 import { query, queryOne } from '../../../lib/db.js'
 import {
@@ -45,6 +46,10 @@ export function registerUserSettingsHandlers(fastify: FastifyInstance) {
         settings,
         defaults: {
           libraryNamePrefix: defaultPrefix,
+          // Decided here for the viewer's library-name card: the switch itself
+          // is admin-only, and a viewer must not be offered names for libraries
+          // the server no longer creates.
+          libraryOutputEnabled: await isLegacyLibraryOutputEnabled(),
         },
       })
     } catch (err) {

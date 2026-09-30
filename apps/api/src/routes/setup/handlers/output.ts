@@ -4,8 +4,6 @@
 
 import type { FastifyInstance } from 'fastify'
 import {
-  getAiRecsOutputConfig,
-  setAiRecsOutputConfig,
   getOutputPathConfig,
   setOutputPathConfig,
   detectPathMappings,
@@ -22,34 +20,13 @@ interface LibraryImageBody {
   filename?: string
 }
 
+/**
+ * The setup wizard no longer asks about legacy library output (F-142): a new
+ * install starts with it off, and the STRM-vs-symlink choice lives in Admin →
+ * Output format. What stays here is what the admin File locations section
+ * still calls — the paths and their auto-detection.
+ */
 export async function registerOutputHandlers(fastify: FastifyInstance) {
-  /**
-   * GET /api/setup/ai-recs-output
-   */
-  fastify.get(
-    '/api/setup/ai-recs-output',
-    { schema: setupSchemas.getAiRecsOutput },
-    async (request, reply) => {
-      const { complete, isAdmin } = await requireSetupWritable(request)
-      if (complete && !isAdmin) return reply.status(404).send({ error: 'Not Found' })
-      return reply.send(await getAiRecsOutputConfig())
-    }
-  )
-
-  /**
-   * POST /api/setup/ai-recs-output
-   */
-  fastify.post<{ Body: Partial<Awaited<ReturnType<typeof getAiRecsOutputConfig>>> }>(
-    '/api/setup/ai-recs-output',
-    { schema: setupSchemas.setAiRecsOutput },
-    async (request, reply) => {
-      const { complete, isAdmin } = await requireSetupWritable(request)
-      if (complete && !isAdmin) return reply.status(404).send({ error: 'Not Found' })
-      const updated = await setAiRecsOutputConfig(request.body ?? {})
-      return reply.send(updated)
-    }
-  )
-
   /**
    * GET /api/setup/output-config
    * Get output path configuration for STRM/symlink files

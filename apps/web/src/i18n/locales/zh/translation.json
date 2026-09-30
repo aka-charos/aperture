@@ -375,6 +375,10 @@
         "globalEvaluation": {
           "title": "Evaluation",
           "description": "Measure how well recommendations retrieve what people actually watch"
+        },
+        "globalLegacy": {
+          "title": "Legacy Library Output",
+          "description": "Removes the STRM / symlink libraries once their output is switched off — run once, on purpose, when phasing them out"
         }
       },
       "jobNames": {
@@ -867,7 +871,8 @@
       "previewNew": "New",
       "previewSort": "Titles within each row: {{sort}}."
     },
-    "tabHomeScreen": "Emby home screen"
+    "tabHomeScreen": "Emby home screen",
+    "aiLibraryNamesOutputOff": "These libraries are no longer created on this server, so their names have no effect."
   },
   "settingsPage": {
     "tabSetup": "设置向导",
@@ -1784,27 +1789,6 @@
     "promptVariantLabel": "Analysis prompt",
     "promptVariantDefault": "Standard (current version)",
     "promptVariantHelp": "An alternative set of questions and rules for the same prompt version, for a model that cannot hold the standard one. Changing this does not rewrite analyses already stored."
-  },
-  "topPicksOutputConfig": {
-    "accordionTitle": "图书馆、收藏和播放列表之间有什么区别？",
-    "libraryTitle": "图书馆",
-    "libraryBody": "在媒体服务器侧栏中显示为单独的库。 包含媒体的虚拟副本（STRM 文件）。 最适合专门浏览热门精选。",
-    "collectionTitle": "收藏品（盒装）",
-    "collectionBody": "将现有的库项目分组到浏览时出现的“框集”中。 直接使用您的原始媒体文件。 最适合在现有图书馆内进行组织。",
-    "playlistTitle": "播放列表",
-    "playlistBody": "在播放列表部分创建有序播放列表。 直接使用您的原始媒体文件。 最适合顺序观看或随机播放。",
-    "moviesOutput": "电影输出",
-    "seriesOutput": "系列输出",
-    "imageSet": "图像集",
-    "libraryCoverImage": "图书馆封面图片",
-    "dropImage": "放下图像",
-    "outputTypes": "输出类型",
-    "outputLibrary": "图书馆",
-    "outputCollection": "收藏",
-    "outputPlaylist": "播放列表",
-    "libraryFileType": "库文件类型",
-    "symlinks": "符号链接",
-    "strmFiles": "STRM 文件"
   },
   "tmdbExternalModal": {
     "defaultSource": "TMDb",
@@ -3672,15 +3656,6 @@
       "mediaLibraries": {
         "label": "图书馆"
       },
-      "fileLocations": {
-        "label": "路径"
-      },
-      "aiRecsLibraries": {
-        "label": "建议"
-      },
-      "validate": {
-        "label": "证实"
-      },
       "users": {
         "label": "用户"
       },
@@ -3734,20 +3709,7 @@
       "generateSeriesRecommendations": {
         "name": "生成系列推荐",
         "description": "为每个用户创建个性化的电视剧推荐"
-      },
-      "syncMovieLibraries": {
-        "name": "构建 {{appName}} 电影库",
-        "description": "在媒体服务器中创建人工智能推荐电影库"
-      },
-      "syncSeriesLibraries": {
-        "name": "构建 {{appName}} 系列库",
-        "description": "在媒体服务器中创建人工智能推荐系列库"
-      },
-      "refreshTopPicks": {
-        "name": "同步精选",
-        "description": "创建热门精选电影和系列库"
-      },
-      "skipTopPicks": "前 10 名未启用"
+      }
     },
     "jobs": {
       "statusStarting": "开始…",
@@ -3755,7 +3717,6 @@
       "statusProcessingShort": "加工",
       "logStartingBatch": "开始初始设置作业...",
       "logAllComplete": "所有工作均顺利完成！",
-      "logSkippedTopPicks": "⊘ 跳过：{{name}}（热门精选未启用）",
       "errRunInitial": "无法运行初始作业",
       "unknownError": "未知错误",
       "logSetupFailed": "设置失败：{{message}}",
@@ -3811,18 +3772,6 @@
       "noneSecondary": "单击“刷新”加载库",
       "back": "后退",
       "saveContinue": "保存并继续"
-    },
-    "validate": {
-      "title": "验证设置",
-      "subtitle": "检查 {{appName}} 是否可以访问所有必需的路径并且您的媒体服务器是否可以访问。",
-      "running": "运行验证检查...",
-      "errorPrefix": "错误：",
-      "allPassed": "所有检查均通过！ 您的设置已准备就绪。",
-      "someFailed": "一些检查失败了。 请修复上述问题并重试，或检查您的 docker-compose.yml 卷安装情况。",
-      "back": "后退",
-      "checking": "检查…",
-      "retry": "重试",
-      "continue": "继续"
     },
     "restore": {
       "title": "从备份恢复",
@@ -3886,26 +3835,9 @@
     },
     "complete": {
       "title": "设置完成！",
-      "subtitle": "{{appName}} 已在您的媒体服务器中创建了个性化推荐库。",
-      "issuesAlert": "一些用户被跳过或遇到问题。 用户需要观看历史记录才能生成推荐。 他们将在观看更多内容并运行下一次同步后收到推荐。",
-      "librariesCreatedIn": "在 {{name}} 创建的库",
-      "mediaServerFallback": "媒体服务器",
-      "movies": "电影",
-      "tvSeries": "电视剧",
-      "recommendationsChip": "{{count}} 条建议",
-      "aiPicksPrimary": "{{name}} 的 AI 精选",
-      "skippedNoHistory": "已跳过（无观看历史记录）",
-      "failed": "失败的",
-      "topPicksGlobal": "热门精选（全球）",
-      "topPicksMovies": "热门精选 - 电影",
-      "topPicksMoviesSecondary": "{{count}} 部热门电影",
-      "topPicksSeries": "热门精选 - 系列",
-      "topPicksSeriesSecondary": "{{count}}个热门系列",
       "gettingStarted": "入门",
       "loginPrimary": "使用您的媒体服务器管理员凭据登录",
       "loginSecondary": "使用与 Emby/Jellyfin 相同的用户名和密码",
-      "openServerPrimary": "打开您的媒体服务器以查看新库",
-      "openServerSecondary": "新的“AI Picks”库将为 {{appName}} 中的每个启用的用户显示",
       "schedulesTitle": "自动时间表",
       "schedulesIntro": "{{appName}} 运行后台作业以保持推荐的新鲜度。 可以在管理 → 作业中修改默认计划。",
       "schedWatchHistory": "观看历史",
@@ -3916,8 +3848,6 @@
       "schedEmbeddingsDesc": "每天凌晨 3 点 — 处理 AI 推荐内容",
       "schedAiRecs": "人工智能建议",
       "schedAiRecsDesc": "每周日凌晨 4 点 — 为每个用户生成个性化选择",
-      "schedTopPicks": "热门精选",
-      "schedTopPicksDesc": "每日凌晨 5 点 — 更新全球热门内容库",
       "unlockTitle": "解锁更多功能",
       "unlockIntro": "登录后，访问管理 → 设置以启用这些附加功能：",
       "featTrakt": "特拉克特集成",
@@ -3930,22 +3860,16 @@
       "featUserPrefsDesc": "每个用户都可以自定义他们的推荐偏好和设置",
       "backToJobs": "返回职位",
       "finishSetup": "完成设置",
-      "finishHint": "单击“完成”将禁用公共设置向导、保护 {{appName}} 并重定向到登录。"
+      "finishHint": "单击“完成”将禁用公共设置向导、保护 {{appName}} 并重定向到登录。",
+      "subtitleReady": "{{appName}} is set up, and recommendations are ready for every enabled viewer.",
+      "appPrimary": "Recommendations live in {{appName}}",
+      "appSecondary": "Each viewer signs in with their media server account to see their picks and why each one was chosen",
+      "homeRowsPrimary": "Put them on Emby home screens",
+      "homeRowsSecondary": "In Admin → Recommendations → Emby Home Rows, choose which rows appear on each viewer's home screen and where",
+      "schedHomeRows": "Emby Home Rows",
+      "schedHomeRowsDesc": "Daily at 5:45am — Refreshes the rows on each viewer's Emby home screen, once you have set them up"
     },
     "initialJobsStep": {
-      "newLibraryChip": "新图书馆",
-      "libSummaryMoviesTitle": "创建电影库",
-      "libSummarySeriesTitle": "创建电视剧库",
-      "createdCount": "已创建 {{count}}",
-      "skippedCount": "已跳过 {{count}}",
-      "failedCount": "{{count}} 失败",
-      "topPicksLibsCreated": "创建的热门精选库",
-      "moviesChip": "{{count}} 部电影",
-      "seriesChip": "{{count}}系列",
-      "failedChip": "失败的",
-      "topPicksMoviesRow": "热门精选 - 电影",
-      "topPicksSeriesRow": "热门精选 - 系列",
-      "topPicksFailedDefault": "无法创建热门精选库",
       "rerunRun": "运行{{名称}}",
       "rerunRerun": "重新运行 {{name}}",
       "itemsProcessed": "{{count}} 件",
@@ -3957,7 +3881,6 @@
       "bulletWatchHistory": "同步观看历史记录 — 导入观看历史记录以了解偏好",
       "bulletEmbeddings": "生成嵌入 - 创建 AI 向量以理解内容主题（使用 OpenAI）",
       "bulletRecs": "生成推荐——为每个用户创建个性化选择",
-      "bulletLibraries": "同步库 - 将推荐库推送到您的媒体服务器",
       "headsUp": "这可能需要几分钟到 30 多分钟，具体取决于媒体库的大小。 包含数千部电影和剧集的大型收藏将需要更长的时间。",
       "headsUpLabel": "小心！",
       "progressLine": "进度：{{done}} 个作业（共 {{total}} 个）",
@@ -3965,7 +3888,6 @@
       "chipAllComplete": "全部完成",
       "chipFailed": "失败的",
       "chipRunning": "跑步",
-      "libraryResultsTitle": "库创建结果",
       "back": "后退",
       "startInit": "开始初始化",
       "runningProgress": "正在运行...（{{完成}}/{{总计}}）",
@@ -3984,68 +3906,13 @@
     },
     "topPicksStep": {
       "title": "热门精选（可选）",
-      "body": "根据所有用户聚合的观看历史记录创建全球“流行内容”库。 与个性化 AI 推荐不同，热门精选向每个人显示相同的热门内容 - 非常适合发现服务器上的热门内容。",
       "enableTitle": "启用热门精选",
-      "enableSubtitle": "创建所有用户可见的趋势内容库",
       "noteAdvanced": "高级设置（例如流行度算法权重、时间窗口和刷新计划）可以稍后在管理 → 设置 → 热门精选中进行自定义。",
       "noteLabel": "笔记：",
-      "outputConfig": "输出配置",
-      "symlinkWarning": "符号链接要求 {{appName}} 可以通过与媒体服务器使用的完全相同的路径访问您的媒体文件。 如果系统（例如 Docker 容器）之间的路径不同，请改用 STRM 文件。",
-      "symlinkLabel": "符号链接",
       "back": "后退",
       "saveContinue": "保存并继续",
-      "errUpload": "上传失败",
-      "errDelete": "删除失败"
-    },
-    "fileLocations": {
-      "title": "文件位置",
-      "body": "配置媒体服务器查看 {{appName}} 库文件的位置。 这些路径必须与您的媒体服务器访问 Docker 配置中安装的卷的方式匹配。",
-      "saved": "文件位置已保存！",
-      "autoDetectTitle": "自动检测路径",
-      "autoDetectBody": "{{appName}} 可以通过比较媒体服务器查看文件的方式与 {{appName}} 查看文件的方式来自动检测正确的路径。",
-      "detecting": "检测...",
-      "detectButton": "自动检测路径",
-      "pathsDetected": "路径检测成功！",
-      "mediaServerSees": "媒体服务器看到：",
-      "apertureSees": "光圈看到：",
-      "detectedPrefix": "检测到的前缀：",
-      "hideManual": "隐藏手动配置",
-      "orManual": "或者手动配置",
-      "howToFindTitle": "如何找到这些路径：",
-      "howToFindBody": "打开媒体服务器中的任何电影，转到媒体信息，然后查看文件路径。 如果显示 /mnt/Movies/SomeMovie/file.mkv，则您的媒体路径前缀是 /mnt/。",
-      "apertureLibsPath": "{{appName}} 库路径",
-      "apertureLibsHelp": "您的媒体服务器在哪里查看 {{appName}} 的输出库？",
-      "helperApertureLibs": "媒体服务器看到 /aperture-libraries 的路径",
-      "mediaPrefixTitle": "媒体服务器路径前缀",
-      "mediaPrefixHelp": "您的媒体服务器在哪里看到您的原始媒体文件？",
-      "symlinkHelper": "用于创建媒体文件的符号链接",
-      "currentConfig": "当前配置",
-      "librariesPathLine": "库路径：",
-      "mediaPrefixLine": "媒体前缀：",
-      "back": "后退",
-      "skipDefaults": "跳过（使用默认值）",
-      "saveContinue": "保存并继续",
-      "errDetect": "自动检测失败",
-      "errSave": "保存配置失败"
-    },
-    "aiRecs": {
-      "title": "配置AI推荐库",
-      "body": "{{appName}} 在您的媒体服务器中创建虚拟库，其中包含针对每个用户的个性化推荐。 配置这些库的创建方式，并可选择自定义其封面图像。",
-      "strmVsSymlink": "STRM 与符号链接：STRM 文件通用并支持流 URL，而符号链接提供直接文件访问（更适合本地播放），但要求 {{appName}} 在与媒体服务器相同的路径中访问媒体文件。 对于电视剧，建议使用符号链接以获得更好的性能。",
-      "moviesLibrary": "电影库",
-      "seriesLibrary": "系列库",
-      "imageSet": "图像集",
-      "outputFormat": "输出格式",
-      "symlinks": "符号链接",
-      "strmFiles": "STRM 文件",
-      "moviesSymlinkHelp": "创建原始电影文件的符号链接",
-      "moviesStrmHelp": "使用路径或流 URL 创建 .strm 文件",
-      "seriesSymlinkHelp": "创建原始季节文件夹的符号链接（推荐）",
-      "seriesStrmHelp": "为每个剧集创建 .strm 文件",
-      "coverImage": "图书馆封面图片",
-      "dropImage": "放下图像",
-      "back": "后退",
-      "saveContinue": "保存并继续"
+      "bodyRows": "Show everyone what's popular on your server, worked out from all users' watch history. Unlike personalized recommendations, Top Picks is the same list for every viewer. It appears in {{appName}} and, on Emby, can be a row on each viewer's home screen.",
+      "enableSubtitleRows": "The same trending list for every viewer"
     },
     "aiSetup": {
       "nameEmbeddings": "嵌入",
@@ -5348,7 +5215,8 @@
     "homeSections": {
       "title": "Emby Home Rows",
       "blurb": "Top Picks and each viewer's recommendations on their Emby home screen"
-    }
+    },
+    "gateLegacyLibraryOutput": "Legacy library output is switched off — these settings are not used"
   },
   "settingsEvaluation": {
     "title": "Evaluation seeds",
@@ -5728,5 +5596,43 @@
       "waiting": "未观看 {{count}}",
       "unavailable": "无法打开 {{count}}"
     }
+  },
+  "legacyLibraryOutput": {
+    "legacyChip": "Legacy",
+    "card": {
+      "title": "Legacy library output",
+      "subtitle": "Each viewer's AI Picks libraries and the shared Top Picks libraries, written as STRM files or symlinks under /aperture-libraries and added to the media server as extra libraries. Emby home rows now put the same recommendations and Top Picks on each viewer's home screen straight from the original titles — no files, no extra mount, no duplicate library. This output is being phased out.",
+      "homeRowsLink": "Set up Emby home rows",
+      "switchLabel": "Write STRM / symlink libraries",
+      "switchOnHelp": "On: the library jobs keep writing the AI Picks and Top Picks libraries.",
+      "switchOffHelp": "Off: nothing is written or created any more, the library jobs do nothing, and the settings that only concern these libraries are greyed out. Libraries already in the media server keep their last contents until you remove them below.",
+      "savedOn": "Legacy library output switched on. The next library sync brings the libraries up to date.",
+      "savedOff": "Legacy library output switched off. Nothing more will be written.",
+      "saveFailed": "Could not save the setting.",
+      "remainingTitle": "Libraries still in the media server",
+      "remainingCount_one": "{{count}} generated library is recorded ({{personal}} per viewer, {{topPicks}} Top Picks).",
+      "remainingCount_other": "{{count}} generated libraries are recorded ({{personal}} per viewer, {{topPicks}} Top Picks).",
+      "noneRemaining": "No generated libraries are recorded. Removing still looks for libraries left behind by earlier renames, and for the Top Picks collection and playlist.",
+      "removeButton": "Remove generated libraries",
+      "removeNeedsOff": "Switch the output off first — while it is on, the next library sync would rebuild them.",
+      "confirmTitle": "Remove every generated library?",
+      "confirmBody_one": "This deletes every library legacy output made from the media server — {{count}} recorded, plus any an earlier rename left behind — with their folders under /aperture-libraries, and the Top Picks collection and playlist. Recommendations are not touched: switching the output back on and running the library jobs rebuilds the libraries.",
+      "confirmBody_other": "This deletes every library legacy output made from the media server — {{count}} recorded, plus any an earlier rename left behind — with their folders under /aperture-libraries, and the Top Picks collection and playlist. Recommendations are not touched: switching the output back on and running the library jobs rebuilds the libraries.",
+      "confirmAction": "Remove libraries",
+      "cancel": "Cancel",
+      "removeStarted": "Removal started. A library the media server refuses to delete is kept, and running the job again retries it.",
+      "openJob": "Open job",
+      "removeFailed": "Could not start the removal."
+    },
+    "notice": {
+      "title": "Legacy library output is switched off",
+      "body": "These settings only concern the STRM / symlink libraries, which are no longer written. They are kept as they are in case the output is switched back on.",
+      "action": "Output format"
+    },
+    "jobBlocked": {
+      "legacyLibraryOutputOff": "Legacy library output is switched off (Output format), so this job has nothing to write.",
+      "legacyLibraryOutputOn": "Switch legacy library output off in Output format first — while it is on, the next library sync would rebuild what this removes."
+    },
+    "usersMenuDisabled": "Legacy library output is off"
   }
 }

@@ -62,6 +62,7 @@ import {
 } from './series/library.js'
 import { reconcileStaleStrmLibraries } from './cleanup.js'
 import { loadRecommendationRecipients } from '../recommender/recipients.js'
+import { skipIfLegacyLibraryOutputOff } from './legacyOutput.js'
 
 const logger = createChildLogger('strm-writer')
 
@@ -79,6 +80,15 @@ export async function processStrmForAllUsers(
   createJobProgress(actualJobId, 'sync-movie-libraries', 2)
   
   try {
+    // Frozen, but still reconciled: a viewer who lost access keeps no library.
+    if (
+      await skipIfLegacyLibraryOutputOff(actualJobId, () =>
+        reconcileStaleStrmLibraries(actualJobId, { frozen: true })
+      )
+    ) {
+      return { success: 0, failed: 0, skipped: 0, jobId: actualJobId, users: [] }
+    }
+
     setJobStep(actualJobId, 0, 'Finding enabled users')
     addLog(actualJobId, 'info', '🔍 Finding enabled users...')
 
@@ -232,6 +242,14 @@ export async function processSeriesStrmForAllUsers(
   createJobProgress(actualJobId, 'sync-series-libraries', 2)
 
   try {
+    if (
+      await skipIfLegacyLibraryOutputOff(actualJobId, () =>
+        reconcileStaleStrmLibraries(actualJobId, { frozen: true })
+      )
+    ) {
+      return { success: 0, failed: 0, skipped: 0, jobId: actualJobId, users: [] }
+    }
+
     setJobStep(actualJobId, 0, 'Finding enabled users')
     addLog(actualJobId, 'info', '🔍 Finding enabled users...')
 

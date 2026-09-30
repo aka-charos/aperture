@@ -35,6 +35,7 @@ export interface JellyfinLibrary {
   Name: string
   CollectionType: string
   Path?: string
+  Locations?: string[]
   RefreshStatus?: string
 }
 

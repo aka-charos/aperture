@@ -28,6 +28,12 @@ interface JobCardProps {
   logsContainerRef: (el: HTMLDivElement | null) => void
   disabled?: boolean
   disabledMessage?: string
+  /**
+   * Why Run would do nothing right now. Unlike `disabled`, which covers the
+   * whole card, only the Run button is disabled: the job still runs on its
+   * schedule and records each skipped run, so History and Configure stay open.
+   */
+  runBlockedMessage?: string
 }
 
 export function JobCard({
@@ -43,6 +49,7 @@ export function JobCard({
   logsContainerRef,
   disabled = false,
   disabledMessage,
+  runBlockedMessage,
 }: JobCardProps) {
   const { t } = useTranslation()
   const isRunning = job.status === 'running' || progress?.status === 'running'
@@ -193,6 +200,11 @@ export function JobCard({
             <Typography variant="body2" color="text.secondary" mb={1}>
               {job.description}
             </Typography>
+            {runBlockedMessage && !isRunning && (
+              <Typography variant="caption" color="warning.main" component="p" mb={1}>
+                {runBlockedMessage}
+              </Typography>
+            )}
             <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">
               <Stack direction="row" alignItems="center" spacing={0.5}>
                 <ScheduleIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
@@ -292,26 +304,31 @@ export function JobCard({
                 {isCancelling ? t('admin.jobsPage.ui.stopping') : t('admin.jobsPage.ui.stop')}
               </Button>
             ) : (
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<PlayArrowIcon />}
-                onClick={onRun}
-                disabled={disabled}
-                sx={{
-                  bgcolor: jobColor,
-                  minWidth: 90,
-                  '&:hover': {
-                    bgcolor: jobColor,
-                    filter: 'brightness(1.15)',
-                  },
-                  '&.Mui-disabled': {
-                    bgcolor: 'action.disabledBackground',
-                  },
-                }}
-              >
-                {t('admin.jobsPage.ui.run')}
-              </Button>
+              <Tooltip title={runBlockedMessage ?? ''}>
+                {/* A span, because a disabled button fires no events for the tooltip. */}
+                <span>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={<PlayArrowIcon />}
+                    onClick={onRun}
+                    disabled={disabled || !!runBlockedMessage}
+                    sx={{
+                      bgcolor: jobColor,
+                      minWidth: 90,
+                      '&:hover': {
+                        bgcolor: jobColor,
+                        filter: 'brightness(1.15)',
+                      },
+                      '&.Mui-disabled': {
+                        bgcolor: 'action.disabledBackground',
+                      },
+                    }}
+                  >
+                    {t('admin.jobsPage.ui.run')}
+                  </Button>
+                </span>
+              </Tooltip>
             )}
           </Stack>
         </Stack>

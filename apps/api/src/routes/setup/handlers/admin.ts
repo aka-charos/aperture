@@ -11,8 +11,6 @@ import {
   markSetupComplete,
   getMediaServerConfig,
   getLibraryConfigs,
-  getAiRecsOutputConfig,
-  getOutputPathConfig,
   getTopPicksConfig,
   hasOpenAIApiKey,
 } from '@aperture/core'
@@ -53,7 +51,7 @@ export async function registerAdminHandlers(fastify: FastifyInstance) {
    * Admin-only: start the initial job set.
    *
    * NOTE: these are *started* in pipeline order, not run in it — startJob does
-   * not await completion, so all ten are in flight at once and the later stages
+   * not await completion, so all eight are in flight at once and the later stages
    * (embeddings, recommendations) will find little to do until the syncs ahead
    * of them finish. Harmless (they no-op rather than corrupt) but ineffective.
    * The setup wizard does not use this route; it drives one job at a time from
@@ -74,8 +72,6 @@ export async function registerAdminHandlers(fastify: FastifyInstance) {
         'generate-series-embeddings',
         'generate-movie-recommendations',
         'generate-series-recommendations',
-        'sync-movie-libraries',
-        'sync-series-libraries',
       ] as const
 
       const jobIds: string[] = []
@@ -111,8 +107,6 @@ export async function registerAdminHandlers(fastify: FastifyInstance) {
       const mediaServerConfig = await getMediaServerConfig()
       const hasOpenAI = await hasOpenAIApiKey()
       const libraries = await getLibraryConfigs(true)
-      const aiRecsOutput = await getAiRecsOutputConfig()
-      const outputPathConfig = await getOutputPathConfig()
       const topPicks = await getTopPicksConfig()
 
       return reply.send({
@@ -121,8 +115,6 @@ export async function registerAdminHandlers(fastify: FastifyInstance) {
           mediaServer: mediaServerConfig,
           openai: { configured: hasOpenAI },
           libraries,
-          aiRecsOutput,
-          outputPathConfig,
           topPicks,
         },
       })

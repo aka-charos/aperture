@@ -68,7 +68,6 @@ const PUBLIC_FILES: Record<string, string> = {
   'apps/api/src/routes/setup/handlers/status.ts': 'Setup wizard; see above.',
   'apps/api/src/routes/setup/handlers/topPicks.ts': 'Setup wizard; see above.',
   'apps/api/src/routes/setup/handlers/users.ts': 'Setup wizard; see above.',
-  'apps/api/src/routes/setup/handlers/validation.ts': 'Setup wizard; see above.',
   'apps/api/src/routes/backup/handlers/setup.ts':
     'Restore-from-backup during setup. Registered under /api/setup/*, so the ' +
     'same plugin hook fences it.',

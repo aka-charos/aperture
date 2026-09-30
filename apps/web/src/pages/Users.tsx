@@ -59,6 +59,7 @@ import GroupIcon from '@mui/icons-material/Group'
 import { UserConnectionsDialog } from './UserConnectionsDialog'
 import { usePageHeader } from '@/hooks/usePageHeader'
 import { useAuth } from '@/hooks/useAuth'
+import { useLegacyLibraryOutput } from '@/hooks/legacyLibraryOutput'
 
 interface ProviderUser {
   providerUserId: string
@@ -121,6 +122,9 @@ interface GlobalAiConfig {
 
 export function UsersPage() {
   const { t } = useTranslation()
+  // Update STRM writes a legacy library, so it greys with that output. Run all
+  // still runs: the API skips its library step and does the rest.
+  const { off: legacyOff } = useLegacyLibraryOutput()
   usePageHeader(t('admin.users'))
   const { user: currentUser, impersonation, impersonate } = useAuth()
   const navigate = useNavigate()
@@ -1113,11 +1117,17 @@ export function UsersPage() {
             </ListItemIcon>
             <ListItemText primary={t('admin.usersPage.menuGenRecs')} />
           </MenuItem>
-          <MenuItem onClick={() => menuUser?.apertureUserId && runUserJob(menuUser.apertureUserId, 'update-strm', menuUser.name)}>
+          <MenuItem
+            onClick={() => menuUser?.apertureUserId && runUserJob(menuUser.apertureUserId, 'update-strm', menuUser.name)}
+            disabled={legacyOff}
+          >
             <ListItemIcon>
               <FolderIcon fontSize="small" />
             </ListItemIcon>
-            <ListItemText primary={t('admin.usersPage.menuUpdateStrm')} />
+            <ListItemText
+              primary={t('admin.usersPage.menuUpdateStrm')}
+              secondary={legacyOff ? t('legacyLibraryOutput.usersMenuDisabled') : undefined}
+            />
           </MenuItem>
           <Divider />
           {renderViewAsMenuItem()}
@@ -1546,11 +1556,17 @@ export function UsersPage() {
           </ListItemIcon>
           <ListItemText primary={t('admin.usersPage.menuGenRecs')} />
         </MenuItem>
-        <MenuItem onClick={() => menuUser?.apertureUserId && runUserJob(menuUser.apertureUserId, 'update-strm', menuUser.name)}>
+        <MenuItem
+          onClick={() => menuUser?.apertureUserId && runUserJob(menuUser.apertureUserId, 'update-strm', menuUser.name)}
+          disabled={legacyOff}
+        >
           <ListItemIcon>
             <FolderIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText primary={t('admin.usersPage.menuUpdateStrm')} />
+          <ListItemText
+            primary={t('admin.usersPage.menuUpdateStrm')}
+            secondary={legacyOff ? t('legacyLibraryOutput.usersMenuDisabled') : undefined}
+          />
         </MenuItem>
         <Divider />
         {renderViewAsMenuItem()}

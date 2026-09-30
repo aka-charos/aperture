@@ -38,9 +38,6 @@ export async function registerJobsHandlers(fastify: FastifyInstance) {
         'generate-series-embeddings',
         'generate-movie-recommendations',
         'generate-series-recommendations',
-        'sync-movie-libraries',
-        'sync-series-libraries',
-        'refresh-top-picks',
       ]
 
       if (!allowedJobs.includes(name)) {
@@ -125,9 +122,6 @@ export async function registerJobsHandlers(fastify: FastifyInstance) {
         'generate-series-embeddings',
         'generate-movie-recommendations',
         'generate-series-recommendations',
-        'sync-movie-libraries',
-        'sync-series-libraries',
-        'refresh-top-picks',
       ]
 
       for (const jobName of setupJobs) {

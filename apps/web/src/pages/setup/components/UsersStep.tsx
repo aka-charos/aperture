@@ -177,7 +177,7 @@ export function UsersStep({ wizard }: UsersStepProps) {
         </Alert>
 
         <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
-          <Button variant="outlined" onClick={() => goToStep('validate')}>
+          <Button variant="outlined" onClick={() => goToStep('mediaLibraries')}>
             {t('setup.users.back')}
           </Button>
           <Button variant="contained" onClick={handleContinue}>
@@ -270,7 +270,7 @@ export function UsersStep({ wizard }: UsersStepProps) {
       </Alert>
 
       <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
-        <Button variant="outlined" onClick={() => goToStep('validate')}>
+        <Button variant="outlined" onClick={() => goToStep('mediaLibraries')}>
           {t('setup.users.back')}
         </Button>
         <Button variant="contained" onClick={handleContinue}>

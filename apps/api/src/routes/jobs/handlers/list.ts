@@ -9,6 +9,8 @@ import {
   getJobConfig,
   formatSchedule,
   getLastJobRuns,
+  isLegacyLibraryOutputEnabled,
+  legacyJobBlockedReason,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
 import { jobSchemas } from '../schemas.js'
@@ -32,6 +34,10 @@ export async function registerListHandlers(fastify: FastifyInstance) {
       // Get last runs for all jobs
       const lastRunsMap = await getLastJobRuns()
 
+      // Read once for the whole list. The console greys a card on the decided
+      // reason rather than holding its own list of which jobs are legacy.
+      const legacyOutputEnabled = await isLegacyLibraryOutputEnabled()
+
       const jobs = await Promise.all(
         jobDefinitions.map(async (def) => {
           const activeJobId = activeJobs.get(def.name)
@@ -47,6 +53,7 @@ export async function registerListHandlers(fastify: FastifyInstance) {
               ? { ...def.runLimit, value: resolveRunLimit(def.runLimit, config.maxItemsPerRun) }
               : undefined,
             status: progress?.status === 'running' ? 'running' : 'idle',
+            blockedReason: legacyJobBlockedReason(def.name, legacyOutputEnabled),
             currentJobId: activeJobId,
             progress: progress
               ? {

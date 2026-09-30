@@ -105,7 +105,13 @@ function JobCategoryList({
               {categoryJobs.map((job) => {
                 // Check if this is the discovery job and apply disabled state
                 const isDiscoveryJob = job.name === 'generate-discovery-suggestions'
-                const isDisabled = isDiscoveryJob && discoveryReady === false
+                const discoveryBlocked = isDiscoveryJob && discoveryReady === false
+                // Decided by the API, never worked out here. Only Run is
+                // blocked: the card stays open for History and Configure, and
+                // a job started before the switch flipped keeps its Stop.
+                const runBlockedMessage = job.blockedReason
+                  ? t(`legacyLibraryOutput.jobBlocked.${job.blockedReason}`)
+                  : undefined
                 
                 return (
                   <JobCard
@@ -122,8 +128,9 @@ function JobCategoryList({
                     logsContainerRef={(el) => {
                       if (el) logsContainerRefs.current.set(job.name, el)
                     }}
-                    disabled={isDisabled}
-                    disabledMessage={isDisabled ? discoveryMessage ?? undefined : undefined}
+                    disabled={discoveryBlocked}
+                    disabledMessage={discoveryBlocked ? discoveryMessage ?? undefined : undefined}
+                    runBlockedMessage={runBlockedMessage}
                   />
                 )
               })}

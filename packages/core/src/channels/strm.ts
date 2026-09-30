@@ -5,6 +5,7 @@ import { queryOne } from '../lib/db.js'
 import { getMediaServerProvider } from '../media/index.js'
 import { generateChannelRecommendations } from './recommendations.js'
 import { getConfig } from '../strm/config.js'
+import { assertLegacyLibraryOutputEnabled } from '../strm/legacyOutput.js'
 
 const logger = createChildLogger('channels')
 
@@ -15,6 +16,9 @@ export async function writeChannelStrm(channelId: string): Promise<{
   written: number
   libraryPath: string
 }> {
+  // Legacy output switched off: refuse before anything is created or written.
+  await assertLegacyLibraryOutputEnabled()
+
   // Get channel details
   const channel = await queryOne<{
     id: string

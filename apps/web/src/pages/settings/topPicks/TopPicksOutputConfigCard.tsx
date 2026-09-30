@@ -2,10 +2,12 @@ import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Card, CardCo
 import CollectionsIcon from '@mui/icons-material/Collections'; import ExpandMoreIcon from '@mui/icons-material/ExpandMore'; import FolderIcon from '@mui/icons-material/Folder'; import ImageIcon from '@mui/icons-material/Image'; import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'; import MovieIcon from '@mui/icons-material/Movie'; import OutputIcon from '@mui/icons-material/Output'; import PlaylistPlayIcon from '@mui/icons-material/PlaylistPlay'; import TvIcon from '@mui/icons-material/Tv'; import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import { Trans, useTranslation } from 'react-i18next'
 import { ImageUpload } from '../../../components/ImageUpload'
+import { useLegacyLibraryOutput } from '@/hooks/legacyLibraryOutput'
+import { LegacyLibraryOutputNotice } from '../components/LegacyLibraryOutputNotice'
 import { RECOMMENDED_DIMENSIONS } from './constants'
 import type { LibraryImageInfo, TopPicksConfig } from './types'
 export interface TopPicksOutputConfigCardProps { config: TopPicksConfig; images: Record<string, LibraryImageInfo>; uploadingFor: string | null; updateConfig: (u: Partial<TopPicksConfig>) => void; handleUpload: (id: string, file: File) => Promise<void>; handleDeleteImage: (id: string) => Promise<void> }
-export function TopPicksOutputConfigCard({ config, images, uploadingFor, updateConfig, handleUpload, handleDeleteImage }: TopPicksOutputConfigCardProps) { const { t } = useTranslation(); return (      <Card sx={{ backgroundColor: 'background.paper', borderRadius: 2 }}>
+export function TopPicksOutputConfigCard({ config, images, uploadingFor, updateConfig, handleUpload, handleDeleteImage }: TopPicksOutputConfigCardProps) { const { t } = useTranslation(); const { off: legacyOff } = useLegacyLibraryOutput(); const inactive = !config.isEnabled || legacyOff; return (      <Card sx={{ backgroundColor: 'background.paper', borderRadius: 2 }}>
         <CardContent>
           <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
             <OutputIcon fontSize="small" color="primary" />
@@ -14,6 +16,8 @@ export function TopPicksOutputConfigCard({ config, images, uploadingFor, updateC
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             {t('topPicksAdmin.output.subtitle')}
           </Typography>
+
+          <LegacyLibraryOutputNotice />
 
           {/* Output Type Explanations */}
           <Accordion defaultExpanded={false} sx={{ mb: 3, bgcolor: 'action.hover' }}>
@@ -89,7 +93,8 @@ export function TopPicksOutputConfigCard({ config, images, uploadingFor, updateC
                     loading={uploadingFor === 'top-picks-movies'}
                     height={160}
                     label={t('topPicksAdmin.output.dropImage169')}
-                    showDelete={!!images['top-picks-movies']?.url}
+                    showDelete={!!images['top-picks-movies']?.url && !legacyOff}
+                    disabled={legacyOff}
                   />
                 </Box>
               </Box>
@@ -107,7 +112,7 @@ export function TopPicksOutputConfigCard({ config, images, uploadingFor, updateC
                         <Checkbox
                           checked={config.moviesLibraryEnabled}
                           onChange={(e) => updateConfig({ moviesLibraryEnabled: e.target.checked })}
-                          disabled={!config.isEnabled}
+                          disabled={inactive}
                         />
                       }
                       label={
@@ -122,7 +127,7 @@ export function TopPicksOutputConfigCard({ config, images, uploadingFor, updateC
                         <Checkbox
                           checked={config.moviesCollectionEnabled}
                           onChange={(e) => updateConfig({ moviesCollectionEnabled: e.target.checked })}
-                          disabled={!config.isEnabled}
+                          disabled={inactive}
                         />
                       }
                       label={
@@ -137,7 +142,7 @@ export function TopPicksOutputConfigCard({ config, images, uploadingFor, updateC
                         <Checkbox
                           checked={config.moviesPlaylistEnabled}
                           onChange={(e) => updateConfig({ moviesPlaylistEnabled: e.target.checked })}
-                          disabled={!config.isEnabled}
+                          disabled={inactive}
                         />
                       }
                       label={
@@ -163,7 +168,7 @@ export function TopPicksOutputConfigCard({ config, images, uploadingFor, updateC
                           value={config.moviesLibraryName}
                           onChange={(e) => updateConfig({ moviesLibraryName: e.target.value })}
                           size="small"
-                          disabled={!config.isEnabled}
+                          disabled={inactive}
                           sx={{ mb: 2 }}
                         />
                       )}
@@ -174,7 +179,7 @@ export function TopPicksOutputConfigCard({ config, images, uploadingFor, updateC
                           value={config.moviesCollectionName}
                           onChange={(e) => updateConfig({ moviesCollectionName: e.target.value })}
                           size="small"
-                          disabled={!config.isEnabled}
+                          disabled={inactive}
                         />
                       )}
                     </Box>
@@ -189,7 +194,7 @@ export function TopPicksOutputConfigCard({ config, images, uploadingFor, updateC
                             <Switch
                               checked={config.moviesUseSymlinks}
                               onChange={(e) => updateConfig({ moviesUseSymlinks: e.target.checked })}
-                              disabled={!config.isEnabled}
+                              disabled={inactive}
                               size="small"
                             />
                           }
@@ -238,7 +243,8 @@ export function TopPicksOutputConfigCard({ config, images, uploadingFor, updateC
                         loading={uploadingFor === 'top-picks-series'}
                         height={160}
                         label={t('topPicksAdmin.output.dropImage169')}
-                        showDelete={!!images['top-picks-series']?.url}
+                        showDelete={!!images['top-picks-series']?.url && !legacyOff}
+                        disabled={legacyOff}
                       />
                     </Box>
                   </Box>
@@ -256,7 +262,7 @@ export function TopPicksOutputConfigCard({ config, images, uploadingFor, updateC
                         <Checkbox
                           checked={config.seriesLibraryEnabled}
                           onChange={(e) => updateConfig({ seriesLibraryEnabled: e.target.checked })}
-                          disabled={!config.isEnabled}
+                          disabled={inactive}
                         />
                       }
                       label={
@@ -271,7 +277,7 @@ export function TopPicksOutputConfigCard({ config, images, uploadingFor, updateC
                         <Checkbox
                           checked={config.seriesCollectionEnabled}
                           onChange={(e) => updateConfig({ seriesCollectionEnabled: e.target.checked })}
-                          disabled={!config.isEnabled}
+                          disabled={inactive}
                         />
                       }
                       label={
@@ -286,7 +292,7 @@ export function TopPicksOutputConfigCard({ config, images, uploadingFor, updateC
                         <Checkbox
                           checked={config.seriesPlaylistEnabled}
                           onChange={(e) => updateConfig({ seriesPlaylistEnabled: e.target.checked })}
-                          disabled={!config.isEnabled}
+                          disabled={inactive}
                         />
                       }
                       label={
@@ -312,7 +318,7 @@ export function TopPicksOutputConfigCard({ config, images, uploadingFor, updateC
                           value={config.seriesLibraryName}
                           onChange={(e) => updateConfig({ seriesLibraryName: e.target.value })}
                           size="small"
-                          disabled={!config.isEnabled}
+                          disabled={inactive}
                           sx={{ mb: 2 }}
                         />
                       )}
@@ -323,7 +329,7 @@ export function TopPicksOutputConfigCard({ config, images, uploadingFor, updateC
                           value={config.seriesCollectionName}
                           onChange={(e) => updateConfig({ seriesCollectionName: e.target.value })}
                           size="small"
-                          disabled={!config.isEnabled}
+                          disabled={inactive}
                         />
                       )}
                     </Box>
@@ -338,7 +344,7 @@ export function TopPicksOutputConfigCard({ config, images, uploadingFor, updateC
                             <Switch
                               checked={config.seriesUseSymlinks}
                               onChange={(e) => updateConfig({ seriesUseSymlinks: e.target.checked })}
-                              disabled={!config.isEnabled}
+                              disabled={inactive}
                               size="small"
                             />
                           }

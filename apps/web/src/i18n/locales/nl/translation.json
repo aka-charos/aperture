@@ -482,6 +482,10 @@
         "globalEvaluation": {
           "title": "Evaluation",
           "description": "Measure how well recommendations retrieve what people actually watch"
+        },
+        "globalLegacy": {
+          "title": "Legacy Library Output",
+          "description": "Removes the STRM / symlink libraries once their output is switched off — run once, on purpose, when phasing them out"
         }
       },
       "jobNames": {
@@ -1268,27 +1272,6 @@
       "message": "Alle AI-functies zijn beschikbaar met uw huidige configuratie."
     }
   },
-  "topPicksOutputConfig": {
-    "accordionTitle": "Wat is het verschil tussen Bibliotheek, Collectie en Afspeellijst?",
-    "libraryTitle": "Bibliotheek",
-    "libraryBody": "Verschijnt als een aparte bibliotheek in de zijbalk van uw mediaserver. Bevat virtuele kopieën (STRM-bestanden) van de media. Het beste voor specifiek bladeren door topkeuzes.",
-    "collectionTitle": "Collectie (boxset)",
-    "collectionBody": "Groepeert uw bestaande bibliotheekitems in een \"boxset\" die verschijnt tijdens het browsen. Gebruikt rechtstreeks uw originele mediabestanden. Beste voor organisatie binnen bestaande bibliotheken.",
-    "playlistTitle": "Afspeellijst",
-    "playlistBody": "Creëert een geordende afspeellijst in de sectie Afspeellijsten. Gebruikt rechtstreeks uw originele mediabestanden. Het beste voor opeenvolgend kijken of afspelen in willekeurige volgorde.",
-    "moviesOutput": "Filmuitvoer",
-    "seriesOutput": "Serie-uitvoer",
-    "imageSet": "Afbeelding ingesteld",
-    "libraryCoverImage": "Omslagafbeelding bibliotheek",
-    "dropImage": "Afbeelding laten vallen",
-    "outputTypes": "Uitvoertypen",
-    "outputLibrary": "Bibliotheek",
-    "outputCollection": "Verzameling",
-    "outputPlaylist": "Afspeellijst",
-    "libraryFileType": "Bibliotheek bestandstype",
-    "symlinks": "Symlinks",
-    "strmFiles": "STRM-bestanden"
-  },
   "tmdbExternalModal": {
     "defaultSource": "TMDb",
     "typeMovie": "Film",
@@ -1781,7 +1764,8 @@
       "previewNew": "New",
       "previewSort": "Titles within each row: {{sort}}."
     },
-    "tabHomeScreen": "Emby home screen"
+    "tabHomeScreen": "Emby home screen",
+    "aiLibraryNamesOutputOff": "These libraries are no longer created on this server, so their names have no effect."
   },
   "watcherIdentity": {
     "refreshInterval": {
@@ -3869,15 +3853,6 @@
       "mediaLibraries": {
         "label": "Bibliotheken"
       },
-      "fileLocations": {
-        "label": "Paden"
-      },
-      "aiRecsLibraries": {
-        "label": "Recensies"
-      },
-      "validate": {
-        "label": "Valideer"
-      },
       "users": {
         "label": "Gebruikers"
       },
@@ -3931,20 +3906,7 @@
       "generateSeriesRecommendations": {
         "name": "Genereer reeksaanbevelingen",
         "description": "Het creëren van gepersonaliseerde tv-serie-aanbevelingen voor elke gebruiker"
-      },
-      "syncMovieLibraries": {
-        "name": "Bouw {{appName}}-filmbibliotheken",
-        "description": "Het creëren van AI-aanbevelingsfilmbibliotheken op uw mediaserver"
-      },
-      "syncSeriesLibraries": {
-        "name": "Bouw bibliotheken uit de {{appName}}-serie",
-        "description": "Bibliotheken van AI-aanbevelingsreeksen maken op uw mediaserver"
-      },
-      "refreshTopPicks": {
-        "name": "Synchroniseer topkeuzes",
-        "description": "Bibliotheken van Top Picks-films en series maken"
-      },
-      "skipTopPicks": "Top 10 niet ingeschakeld"
+      }
     },
     "jobs": {
       "statusStarting": "Beginnen…",
@@ -3952,7 +3914,6 @@
       "statusProcessingShort": "Verwerking",
       "logStartingBatch": "Initiële installatietaken starten…",
       "logAllComplete": "Alle klussen succesvol afgerond!",
-      "logSkippedTopPicks": "⊘ Overgeslagen: {{name}} (Topkeuzes niet ingeschakeld)",
       "errRunInitial": "Kan de initiële taken niet uitvoeren",
       "unknownError": "Onbekende fout",
       "logSetupFailed": "Installatie mislukt: {{message}}",
@@ -4008,18 +3969,6 @@
       "noneSecondary": "Klik op Vernieuwen om bibliotheken te laden",
       "back": "Rug",
       "saveContinue": "Opslaan en doorgaan"
-    },
-    "validate": {
-      "title": "Valideer de installatie",
-      "subtitle": "Controleren of {{appName}} toegang heeft tot alle vereiste paden en of uw mediaserver bereikbaar is.",
-      "running": "Validatiecontroles uitvoeren…",
-      "errorPrefix": "Fout:",
-      "allPassed": "Alle controles geslaagd! Uw installatie is klaar voor gebruik.",
-      "someFailed": "Sommige controles zijn mislukt. Los de bovenstaande problemen op en probeer het opnieuw, of controleer de volumekoppelingen van uw docker-compose.yml.",
-      "back": "Rug",
-      "checking": "Controleren…",
-      "retry": "Opnieuw proberen",
-      "continue": "Doorgaan"
     },
     "restore": {
       "title": "Herstellen vanuit back-up",
@@ -4083,26 +4032,9 @@
     },
     "complete": {
       "title": "Installatie voltooid!",
-      "subtitle": "{{appName}} heeft gepersonaliseerde aanbevelingsbibliotheken op uw mediaserver gemaakt.",
-      "issuesAlert": "Sommige gebruikers werden overgeslagen of hadden problemen. Gebruikers hebben kijkgeschiedenis nodig om aanbevelingen te kunnen genereren. Ze ontvangen aanbevelingen nadat ze meer inhoud hebben bekeken en de volgende synchronisatie hebben uitgevoerd.",
-      "librariesCreatedIn": "Bibliotheken gemaakt in {{name}}",
-      "mediaServerFallback": "Mediaserver",
-      "movies": "Films",
-      "tvSeries": "TV-serie",
-      "recommendationsChip": "{{count}} aanbevelingen",
-      "aiPicksPrimary": "De AI-keuzes van {{name}}",
-      "skippedNoHistory": "Overgeslagen (geen kijkgeschiedenis)",
-      "failed": "Mislukt",
-      "topPicksGlobal": "Topkeuzes (wereldwijd)",
-      "topPicksMovies": "Topkeuzes - Films",
-      "topPicksMoviesSecondary": "{{count}} populaire films",
-      "topPicksSeries": "Topkeuzes - Serie",
-      "topPicksSeriesSecondary": "{{count}} populaire serie",
       "gettingStarted": "Aan de slag",
       "loginPrimary": "Meld u aan met uw Media Server-beheerdersreferenties",
       "loginSecondary": "Gebruik dezelfde gebruikersnaam en hetzelfde wachtwoord als voor Emby/Jellyfin",
-      "openServerPrimary": "Open uw mediaserver om de nieuwe bibliotheken te bekijken",
-      "openServerSecondary": "Voor elke ingeschakelde gebruiker in {{appName}} verschijnen nieuwe 'AI Picks'-bibliotheken",
       "schedulesTitle": "Automatische schema's",
       "schedulesIntro": "{{appName}} voert achtergrondtaken uit om de aanbevelingen actueel te houden. Standaardschema's kunnen worden gewijzigd in Beheer → Taken.",
       "schedWatchHistory": "Bekijk Geschiedenis",
@@ -4113,8 +4045,6 @@
       "schedEmbeddingsDesc": "Dagelijks om 03.00 uur: verwerkt inhoud voor AI-aanbevelingen",
       "schedAiRecs": "AI-aanbevelingen",
       "schedAiRecsDesc": "Wekelijks op zondag om 04.00 uur: genereert gepersonaliseerde keuzes voor elke gebruiker",
-      "schedTopPicks": "Topkeuzes",
-      "schedTopPicksDesc": "Dagelijks om 5 uur 's ochtends: werkt wereldwijde trending contentbibliotheken bij",
       "unlockTitle": "Ontgrendel meer functies",
       "unlockIntro": "Ga na het inloggen naar Beheerder → Instellingen om deze extra functies in te schakelen:",
       "featTrakt": "Trakt-integratie",
@@ -4127,22 +4057,16 @@
       "featUserPrefsDesc": "Elke gebruiker kan zijn aanbevelingsvoorkeuren en -instellingen aanpassen",
       "backToJobs": "Terug naar Vacatures",
       "finishSetup": "Voltooi de installatie",
-      "finishHint": "Als u op Voltooien klikt, wordt de openbare installatiewizard uitgeschakeld, wordt {{appName}} beveiligd en wordt u doorgestuurd naar inloggen."
+      "finishHint": "Als u op Voltooien klikt, wordt de openbare installatiewizard uitgeschakeld, wordt {{appName}} beveiligd en wordt u doorgestuurd naar inloggen.",
+      "subtitleReady": "{{appName}} is set up, and recommendations are ready for every enabled viewer.",
+      "appPrimary": "Recommendations live in {{appName}}",
+      "appSecondary": "Each viewer signs in with their media server account to see their picks and why each one was chosen",
+      "homeRowsPrimary": "Put them on Emby home screens",
+      "homeRowsSecondary": "In Admin → Recommendations → Emby Home Rows, choose which rows appear on each viewer's home screen and where",
+      "schedHomeRows": "Emby Home Rows",
+      "schedHomeRowsDesc": "Daily at 5:45am — Refreshes the rows on each viewer's Emby home screen, once you have set them up"
     },
     "initialJobsStep": {
-      "newLibraryChip": "Nieuwe bibliotheek",
-      "libSummaryMoviesTitle": "Filmbibliotheken gemaakt",
-      "libSummarySeriesTitle": "Bibliotheken voor tv-series gemaakt",
-      "createdCount": "{{count}} aangemaakt",
-      "skippedCount": "{{count}} overgeslagen",
-      "failedCount": "{{count}} mislukt",
-      "topPicksLibsCreated": "Topkeuze Bibliotheken gemaakt",
-      "moviesChip": "{{count}} films",
-      "seriesChip": "{{count}} serie",
-      "failedChip": "Mislukt",
-      "topPicksMoviesRow": "Topkeuzes - Films",
-      "topPicksSeriesRow": "Topkeuzes - Serie",
-      "topPicksFailedDefault": "Kan Top Picks-bibliotheken niet maken",
       "rerunRun": "Voer {{naam}} uit",
       "rerunRerun": "Opnieuw uitvoeren van {{name}}",
       "itemsProcessed": "{{count}} artikelen",
@@ -4154,7 +4078,6 @@
       "bulletWatchHistory": "Synchroniseer kijkgeschiedenis: importeer de kijkgeschiedenis om voorkeuren te begrijpen",
       "bulletEmbeddings": "Genereer insluitingen – Creëer AI-vectoren om inhoudsthema’s te begrijpen (gebruikt OpenAI)",
       "bulletRecs": "Genereer aanbevelingen – Maak gepersonaliseerde keuzes voor elke gebruiker",
-      "bulletLibraries": "Bibliotheken synchroniseren: push aanbevelingsbibliotheken naar uw mediaserver",
       "headsUp": "Dit kan enkele minuten tot meer dan 30 minuten duren, afhankelijk van de grootte van uw mediabibliotheken. Grote collecties met duizenden films en afleveringen zullen langer duren.",
       "headsUpLabel": "Let op!",
       "progressLine": "Voortgang: {{klaar}} van {{total}} taken",
@@ -4162,7 +4085,6 @@
       "chipAllComplete": "Allemaal compleet",
       "chipFailed": "Mislukt",
       "chipRunning": "Rennen",
-      "libraryResultsTitle": "Resultaten van het maken van bibliotheken",
       "back": "Rug",
       "startInit": "Initialisatie starten",
       "runningProgress": "Hardlopen... ({{klaar}}/{{totaal}})",
@@ -4181,68 +4103,13 @@
     },
     "topPicksStep": {
       "title": "Topkeuzes (optioneel)",
-      "body": "Creëer mondiale 'wat is populair'-bibliotheken op basis van de verzamelde kijkgeschiedenis van alle gebruikers. In tegenstelling tot gepersonaliseerde AI-aanbevelingen tonen Top Picks aan iedereen dezelfde trending content - ideaal om te ontdekken wat populair is op uw server.",
       "enableTitle": "Schakel Topkeuzes in",
-      "enableSubtitle": "Creëer trending contentbibliotheken die zichtbaar zijn voor alle gebruikers",
       "noteAdvanced": "Geavanceerde instellingen zoals de gewichten van populariteitsalgoritmen, tijdvensters en vernieuwingsschema's kunnen later worden aangepast in Beheerder → Instellingen → Topkeuzes.",
       "noteLabel": "Opmerking:",
-      "outputConfig": "Uitgangsconfiguratie",
-      "symlinkWarning": "Symlinks vereisen dat {{appName}} toegang heeft tot uw mediabestanden via exact dezelfde paden die uw mediaserver gebruikt. Als paden tussen systemen verschillen (bijvoorbeeld Docker-containers), gebruik dan STRM-bestanden.",
-      "symlinkLabel": "Symlinks",
       "back": "Rug",
       "saveContinue": "Opslaan en doorgaan",
-      "errUpload": "Uploaden mislukt",
-      "errDelete": "Verwijderen is mislukt"
-    },
-    "fileLocations": {
-      "title": "Bestandslocaties",
-      "body": "Configureer waar uw mediaserver de bibliotheekbestanden van {{appName}} ziet. Deze paden moeten overeenkomen met de manier waarop uw mediaserver toegang krijgt tot de volumes die zijn gekoppeld in uw Docker-configuratie.",
-      "saved": "Bestandslocaties opgeslagen!",
-      "autoDetectTitle": "Paden automatisch detecteren",
-      "autoDetectBody": "{{appName}} kan automatisch de juiste paden detecteren door te vergelijken hoe uw mediaserver bestanden ziet met hoe {{appName}} ze ziet.",
-      "detecting": "Detecteren...",
-      "detectButton": "Paden automatisch detecteren",
-      "pathsDetected": "Paden zijn succesvol gedetecteerd!",
-      "mediaServerSees": "Mediaserver ziet:",
-      "apertureSees": "Diafragma ziet:",
-      "detectedPrefix": "Gedetecteerd voorvoegsel:",
-      "hideManual": "Handmatige configuratie verbergen",
-      "orManual": "Of handmatig configureren",
-      "howToFindTitle": "Zo vindt u deze paden:",
-      "howToFindBody": "Open een film op uw mediaserver, ga naar Media Info en kijk naar het bestandspad. Als /mnt/Movies/SomeMovie/file.mkv wordt weergegeven, is uw mediapadvoorvoegsel /mnt/.",
-      "apertureLibsPath": "{{appName}} Bibliothekenpad",
-      "apertureLibsHelp": "Waar ziet uw mediaserver de uitvoerbibliotheken van {{appName}}?",
-      "helperApertureLibs": "Pad waar uw mediaserver /aperture-libraries ziet",
-      "mediaPrefixTitle": "Voorvoegsel mediaserverpad",
-      "mediaPrefixHelp": "Waar ziet uw mediaserver uw originele mediabestanden?",
-      "symlinkHelper": "Wordt gebruikt voor het maken van symlinks naar uw mediabestanden",
-      "currentConfig": "Huidige configuratie",
-      "librariesPathLine": "Bibliothekenpad:",
-      "mediaPrefixLine": "Mediavoorvoegsel:",
-      "back": "Rug",
-      "skipDefaults": "Overslaan (standaardinstellingen gebruiken)",
-      "saveContinue": "Opslaan en doorgaan",
-      "errDetect": "Automatische detectie mislukt",
-      "errSave": "Kan configuratie niet opslaan"
-    },
-    "aiRecs": {
-      "title": "Configureer AI-aanbevelingsbibliotheken",
-      "body": "{{appName}} creëert virtuele bibliotheken op uw mediaserver met gepersonaliseerde aanbevelingen voor elke gebruiker. Configureer hoe deze bibliotheken worden gemaakt en pas optioneel hun omslagafbeeldingen aan.",
-      "strmVsSymlink": "STRM versus Symlinks: STRM-bestanden werken universeel en ondersteunen streaming-URL's, terwijl Symlinks directe bestandstoegang bieden (beter voor lokaal afspelen), maar {{appName}} vereisen om toegang te krijgen tot uw mediabestanden op dezelfde paden als uw mediaserver. Voor tv-series worden symlinks aanbevolen voor betere prestaties.",
-      "moviesLibrary": "Filmbibliotheek",
-      "seriesLibrary": "Seriebibliotheek",
-      "imageSet": "Afbeelding ingesteld",
-      "outputFormat": "Uitvoerformaat",
-      "symlinks": "Symlinks",
-      "strmFiles": "STRM-bestanden",
-      "moviesSymlinkHelp": "Creëert symbolische koppelingen naar originele filmbestanden",
-      "moviesStrmHelp": "Creëert .strm-bestanden met paden of streaming-URL's",
-      "seriesSymlinkHelp": "Creëert symlinks naar originele seizoensmappen (aanbevolen)",
-      "seriesStrmHelp": "Creëert .strm-bestanden voor elke aflevering",
-      "coverImage": "Omslagafbeelding bibliotheek",
-      "dropImage": "Afbeelding laten vallen",
-      "back": "Rug",
-      "saveContinue": "Opslaan en doorgaan"
+      "bodyRows": "Show everyone what's popular on your server, worked out from all users' watch history. Unlike personalized recommendations, Top Picks is the same list for every viewer. It appears in {{appName}} and, on Emby, can be a row on each viewer's home screen.",
+      "enableSubtitleRows": "The same trending list for every viewer"
     },
     "aiSetup": {
       "nameEmbeddings": "Inbedding",
@@ -5348,7 +5215,8 @@
     "homeSections": {
       "title": "Emby Home Rows",
       "blurb": "Top Picks and each viewer's recommendations on their Emby home screen"
-    }
+    },
+    "gateLegacyLibraryOutput": "Legacy library output is switched off — these settings are not used"
   },
   "settingsEvaluation": {
     "title": "Evaluation seeds",
@@ -5728,5 +5596,43 @@
       "waiting": "Nog niet gekeken: {{count}}",
       "unavailable": "Geen toegang: {{count}}"
     }
+  },
+  "legacyLibraryOutput": {
+    "legacyChip": "Legacy",
+    "card": {
+      "title": "Legacy library output",
+      "subtitle": "Each viewer's AI Picks libraries and the shared Top Picks libraries, written as STRM files or symlinks under /aperture-libraries and added to the media server as extra libraries. Emby home rows now put the same recommendations and Top Picks on each viewer's home screen straight from the original titles — no files, no extra mount, no duplicate library. This output is being phased out.",
+      "homeRowsLink": "Set up Emby home rows",
+      "switchLabel": "Write STRM / symlink libraries",
+      "switchOnHelp": "On: the library jobs keep writing the AI Picks and Top Picks libraries.",
+      "switchOffHelp": "Off: nothing is written or created any more, the library jobs do nothing, and the settings that only concern these libraries are greyed out. Libraries already in the media server keep their last contents until you remove them below.",
+      "savedOn": "Legacy library output switched on. The next library sync brings the libraries up to date.",
+      "savedOff": "Legacy library output switched off. Nothing more will be written.",
+      "saveFailed": "Could not save the setting.",
+      "remainingTitle": "Libraries still in the media server",
+      "remainingCount_one": "{{count}} generated library is recorded ({{personal}} per viewer, {{topPicks}} Top Picks).",
+      "remainingCount_other": "{{count}} generated libraries are recorded ({{personal}} per viewer, {{topPicks}} Top Picks).",
+      "noneRemaining": "No generated libraries are recorded. Removing still looks for libraries left behind by earlier renames, and for the Top Picks collection and playlist.",
+      "removeButton": "Remove generated libraries",
+      "removeNeedsOff": "Switch the output off first — while it is on, the next library sync would rebuild them.",
+      "confirmTitle": "Remove every generated library?",
+      "confirmBody_one": "This deletes every library legacy output made from the media server — {{count}} recorded, plus any an earlier rename left behind — with their folders under /aperture-libraries, and the Top Picks collection and playlist. Recommendations are not touched: switching the output back on and running the library jobs rebuilds the libraries.",
+      "confirmBody_other": "This deletes every library legacy output made from the media server — {{count}} recorded, plus any an earlier rename left behind — with their folders under /aperture-libraries, and the Top Picks collection and playlist. Recommendations are not touched: switching the output back on and running the library jobs rebuilds the libraries.",
+      "confirmAction": "Remove libraries",
+      "cancel": "Cancel",
+      "removeStarted": "Removal started. A library the media server refuses to delete is kept, and running the job again retries it.",
+      "openJob": "Open job",
+      "removeFailed": "Could not start the removal."
+    },
+    "notice": {
+      "title": "Legacy library output is switched off",
+      "body": "These settings only concern the STRM / symlink libraries, which are no longer written. They are kept as they are in case the output is switched back on.",
+      "action": "Output format"
+    },
+    "jobBlocked": {
+      "legacyLibraryOutputOff": "Legacy library output is switched off (Output format), so this job has nothing to write.",
+      "legacyLibraryOutputOn": "Switch legacy library output off in Output format first — while it is on, the next library sync would rebuild what this removes."
+    },
+    "usersMenuDisabled": "Legacy library output is off"
   }
 }

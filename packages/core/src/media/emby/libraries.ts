@@ -24,6 +24,7 @@ export async function getLibraries(provider: EmbyProviderBase, apiKey: string): 
     name: lib.Name,
     collectionType: lib.CollectionType,
     path: lib.Path,
+    locations: lib.Locations ?? (lib.Path ? [lib.Path] : undefined),
     refreshStatus: lib.RefreshStatus,
   }))
 }

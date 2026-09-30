@@ -212,6 +212,8 @@ export const JOB_SCHEDULE_DEFAULTS: Record<
   'evaluate-recommender': { scheduleType: 'manual', hour: 0, minute: 0 },
   'refresh-embedding-centering': { scheduleType: 'manual', hour: 0, minute: 0 },
   'refresh-recommendation-explanations': { scheduleType: 'manual', hour: 0, minute: 0 },
+  // Deletes every viewer's legacy library, so it is only ever run on purpose.
+  'remove-legacy-libraries': { scheduleType: 'manual', hour: 0, minute: 0 },
   // Schedulable, but seeded manual: every title is a search, several page
   // fetches and a model call, so a cadence is an operator's decision about
   // their hardware (or their bill), never a default someone inherits.

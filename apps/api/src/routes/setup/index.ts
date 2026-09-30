@@ -13,7 +13,6 @@ import {
   registerMediaServerHandlers,
   registerLibrariesHandlers,
   registerOutputHandlers,
-  registerValidationHandlers,
   registerUsersHandlers,
   registerOpenAIHandlers,
   registerJobsHandlers,
@@ -68,7 +67,6 @@ const setupRoutes: FastifyPluginAsync = async (fastify) => {
   await registerMediaServerHandlers(fastify)
   await registerLibrariesHandlers(fastify)
   await registerOutputHandlers(fastify)
-  await registerValidationHandlers(fastify)
   await registerUsersHandlers(fastify)
   await registerOpenAIHandlers(fastify)
   await registerJobsHandlers(fastify)

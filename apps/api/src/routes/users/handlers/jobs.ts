@@ -9,6 +9,8 @@ import {
   updateUserLibraryPermissions,
   refreshUserLibrary,
   createChildLogger,
+  isLegacyLibraryOutputEnabled,
+  LegacyLibraryOutputDisabledError,
 } from '@aperture/core'
 import type { UserRow } from '../types.js'
 
@@ -128,6 +130,15 @@ export function registerJobHandlers(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Recommendations are switched off for this user' })
       }
 
+      // The writers refuse on their own; asking first is what turns that into
+      // a 409 naming the setting rather than a generic 500.
+      if (!(await isLegacyLibraryOutputEnabled())) {
+        return reply.status(409).send({
+          error: new LegacyLibraryOutputDisabledError().message,
+          code: 'LEGACY_LIBRARY_OUTPUT_DISABLED',
+        })
+      }
+
       logger.info({ userId: id, username: user.username }, 'Starting STRM update for user')
 
       try {
@@ -199,12 +210,20 @@ export function registerJobHandlers(fastify: FastifyInstance) {
         })
         logger.info({ userId: id, recommendations: recsResult.recommendations.length }, 'Recommendations generated')
 
-        // Step 3: Update STRM files
-        await ensureUserLibrary(id, user.provider_user_id, user.display_name || user.username)
-        const strmResult = await writeStrmFilesForUser(id, user.provider_user_id, user.display_name || user.username)
-        await updateUserLibraryPermissions(id, user.provider_user_id)
-        await refreshUserLibrary(id)
-        logger.info({ userId: id, written: strmResult.written }, 'STRM files updated')
+        // Step 3: Update STRM files — legacy output, skipped while it is off.
+        // Home rows need nothing per user here: the next sync-home-sections run
+        // (or the viewer's own page) reads the recommendations just made.
+        let strm: { written: number; deleted: number } | { skipped: true; reason: 'legacyLibraryOutputOff' }
+        if (await isLegacyLibraryOutputEnabled()) {
+          await ensureUserLibrary(id, user.provider_user_id, user.display_name || user.username)
+          const strmResult = await writeStrmFilesForUser(id, user.provider_user_id, user.display_name || user.username)
+          await updateUserLibraryPermissions(id, user.provider_user_id)
+          await refreshUserLibrary(id)
+          logger.info({ userId: id, written: strmResult.written }, 'STRM files updated')
+          strm = { written: strmResult.written, deleted: strmResult.deleted }
+        } else {
+          strm = { skipped: true, reason: 'legacyLibraryOutputOff' }
+        }
 
         return reply.send({ 
           message: 'Full pipeline complete',
@@ -213,10 +232,7 @@ export function registerJobHandlers(fastify: FastifyInstance) {
             runId: recsResult.runId,
             count: recsResult.recommendations.length,
           },
-          strm: {
-            written: strmResult.written,
-            deleted: strmResult.deleted,
-          },
+          strm,
         })
       } catch (error) {
         logger.error({ error, userId: id }, 'Failed to run full pipeline for user')

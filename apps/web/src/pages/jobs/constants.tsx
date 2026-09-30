@@ -23,6 +23,7 @@ import TheatersIcon from '@mui/icons-material/Theaters'
 import StarHalfIcon from '@mui/icons-material/StarHalf'
 import BiotechIcon from '@mui/icons-material/Biotech'
 import HomeIcon from '@mui/icons-material/Home'
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep'
 import { JOB_DISPLAY_NAME_KEYS, titleCaseJobName } from './registry'
 import { getAppName } from '@/lib/branding'
 
@@ -63,6 +64,7 @@ export const JOB_ICONS: Record<string, React.ReactNode> = {
   'generate-title-analysis': <TheatersIcon />,
   'refresh-ratings': <StarHalfIcon />,
   'sync-home-sections': <HomeIcon />,
+  'remove-legacy-libraries': <DeleteSweepIcon />,
 }
 
 export const JOB_COLORS: Record<string, string> = {
@@ -96,6 +98,7 @@ export const JOB_COLORS: Record<string, string> = {
   'generate-title-analysis': '#e91e63',
   'refresh-ratings': '#f97316',
   'sync-home-sections': '#eab308',
+  'remove-legacy-libraries': '#78716c',
 }
 
 

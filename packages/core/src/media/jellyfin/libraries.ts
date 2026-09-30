@@ -28,6 +28,7 @@ export async function getLibraries(
     name: lib.Name,
     collectionType: lib.CollectionType,
     path: lib.Path,
+    locations: lib.Locations ?? (lib.Path ? [lib.Path] : undefined),
     refreshStatus: lib.RefreshStatus,
   }))
 }

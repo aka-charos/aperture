@@ -10,6 +10,7 @@ import fs from 'fs/promises'
 import path from 'path'
 import { createChildLogger } from '../lib/logger.js'
 import { getConfig } from '../strm/config.js'
+import { assertLegacyLibraryOutputEnabled } from '../strm/legacyOutput.js'
 import { downloadImage } from '../strm/images.js'
 import { sanitizeFilename } from '../strm/filenames.js'
 import { resolvePosterUrlCandidates } from '../strm/posterUrl.js'
@@ -555,6 +556,8 @@ function getMovieFilePath(movie: TopPicksMovie): string | null {
 export async function writeTopPicksMovies(
   movies: PopularMovie[]
 ): Promise<{ written: number; localPath: string; embyPath: string }> {
+  // Legacy output switched off: refuse before anything is created or written.
+  await assertLegacyLibraryOutputEnabled()
   const config = await getConfig()
   const topPicksConfig = await getTopPicksConfig()
   const startTime = Date.now()
@@ -835,6 +838,8 @@ export async function writeTopPicksMovies(
 export async function writeTopPicksSeries(
   seriesList: PopularSeries[]
 ): Promise<{ written: number; localPath: string; embyPath: string }> {
+  // Legacy output switched off: refuse before anything is created or written.
+  await assertLegacyLibraryOutputEnabled()
   const config = await getConfig()
   const topPicksConfig = await getTopPicksConfig()
   const startTime = Date.now()

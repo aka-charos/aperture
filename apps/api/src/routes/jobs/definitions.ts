@@ -42,7 +42,8 @@ export const jobDefinitions: JobDefinition[] = [
   },
   {
     name: 'sync-movie-libraries',
-    description: 'Build Aperture movie libraries with AI recommendations (STRM or symlinks)',
+    description:
+      'Build the per-viewer AI Picks movie libraries (STRM or symlinks). Legacy output: does nothing while it is switched off in Output format, where Emby home rows replace it.',
     cron: process.env.PERMS_CRON || '0 5 * * *',
   },
   // === Series Jobs ===
@@ -74,7 +75,8 @@ export const jobDefinitions: JobDefinition[] = [
   },
   {
     name: 'sync-series-libraries',
-    description: 'Build Aperture series libraries with AI recommendations (STRM or symlinks)',
+    description:
+      'Build the per-viewer AI Picks series libraries (STRM or symlinks). Legacy output: does nothing while it is switched off in Output format, where Emby home rows replace it.',
     cron: process.env.PERMS_CRON || '0 5 * * *',
   },
   // === Explanations only (both media types) ===
@@ -131,13 +133,25 @@ export const jobDefinitions: JobDefinition[] = [
   // === Top Picks Jobs ===
   {
     name: 'refresh-top-picks',
-    description: 'Refresh global Top Picks libraries based on popularity',
+    description:
+      'Write the shared Top Picks libraries, and the collections and playlists built from them. Legacy output: does nothing while it is switched off in Output format — the Top Picks pages and home rows compute their lists live.',
     cron: '0 6 * * *',
   },
   {
     name: 'auto-request-top-picks',
     description: 'Automatically request missing Top Picks content via Seerr',
     cron: '0 0 * * 0', // Weekly on Sunday at midnight (configurable via settings)
+  },
+  // === Legacy library output removal ===
+  // Manual only, and refused while the output is still on: switching the
+  // output off freezes what exists, and deleting every viewer's library is a
+  // separate decision made by running this.
+  {
+    name: 'remove-legacy-libraries',
+    description:
+      'Remove every library legacy output made — the AI Picks and Top Picks libraries in the media server, their STRM/symlink folders and their records. Only runs once legacy library output is switched off in Output format. A library the media server refuses to delete is kept and can be retried.',
+    cron: null,
+    manualOnly: true,
   },
   // === Emby Home Screen Rows ===
   {

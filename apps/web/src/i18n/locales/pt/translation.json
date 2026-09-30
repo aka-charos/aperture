@@ -483,6 +483,10 @@
         "globalEvaluation": {
           "title": "Evaluation",
           "description": "Measure how well recommendations retrieve what people actually watch"
+        },
+        "globalLegacy": {
+          "title": "Legacy Library Output",
+          "description": "Removes the STRM / symlink libraries once their output is switched off — run once, on purpose, when phasing them out"
         }
       },
       "jobNames": {
@@ -1324,7 +1328,8 @@
       "previewNew": "New",
       "previewSort": "Titles within each row: {{sort}}."
     },
-    "tabHomeScreen": "Emby home screen"
+    "tabHomeScreen": "Emby home screen",
+    "aiLibraryNamesOutputOff": "These libraries are no longer created on this server, so their names have no effect."
   },
   "settingsPage": {
     "profileTitle": "Seu perfil",
@@ -1788,27 +1793,6 @@
     "promptVariantLabel": "Analysis prompt",
     "promptVariantDefault": "Standard (current version)",
     "promptVariantHelp": "An alternative set of questions and rules for the same prompt version, for a model that cannot hold the standard one. Changing this does not rewrite analyses already stored."
-  },
-  "topPicksOutputConfig": {
-    "accordionTitle": "Qual é a diferença entre Biblioteca, Coleção e Playlist?",
-    "libraryTitle": "Biblioteca",
-    "libraryBody": "Aparece como uma biblioteca separada na barra lateral do servidor de mídia. Contém cópias virtuais (arquivos STRM) da mídia. Melhor para navegação dedicada nas principais escolhas.",
-    "collectionTitle": "Coleção (conjunto de caixas)",
-    "collectionBody": "Agrupa os itens de sua biblioteca existentes em um \"conjunto de caixas\" que aparece durante a navegação. Usa seus arquivos de mídia originais diretamente. Melhor para organização em bibliotecas existentes.",
-    "playlistTitle": "Lista de reprodução",
-    "playlistBody": "Cria uma lista de reprodução ordenada na seção Listas de reprodução. Usa seus arquivos de mídia originais diretamente. Melhor para assistir sequencialmente ou reproduzir aleatoriamente.",
-    "moviesOutput": "Saída de filmes",
-    "seriesOutput": "Saída em série",
-    "imageSet": "Conjunto de imagens",
-    "libraryCoverImage": "Imagem da capa da biblioteca",
-    "dropImage": "Soltar imagem",
-    "outputTypes": "Tipos de saída",
-    "outputLibrary": "Biblioteca",
-    "outputCollection": "Coleção",
-    "outputPlaylist": "Lista de reprodução",
-    "libraryFileType": "Tipo de arquivo de biblioteca",
-    "symlinks": "Links simbólicos",
-    "strmFiles": "Arquivos STRM"
   },
   "tmdbExternalModal": {
     "defaultSource": "TMDb",
@@ -3676,15 +3660,6 @@
       "mediaLibraries": {
         "label": "Bibliotecas"
       },
-      "fileLocations": {
-        "label": "Caminhos"
-      },
-      "aiRecsLibraries": {
-        "label": "Recomendações"
-      },
-      "validate": {
-        "label": "Validar"
-      },
       "users": {
         "label": "Usuárias"
       },
@@ -3738,20 +3713,7 @@
       "generateSeriesRecommendations": {
         "name": "Gerar recomendações de séries",
         "description": "Criação de recomendações personalizadas de séries de TV para cada usuário"
-      },
-      "syncMovieLibraries": {
-        "name": "Crie bibliotecas de filmes do {{appName}}",
-        "description": "Criando bibliotecas de filmes de recomendação de IA em seu servidor de mídia"
-      },
-      "syncSeriesLibraries": {
-        "name": "Crie bibliotecas da série {{appName}}",
-        "description": "Criando bibliotecas de séries de recomendações de IA em seu servidor de mídia"
-      },
-      "refreshTopPicks": {
-        "name": "Sincronizar as principais escolhas",
-        "description": "Criação de bibliotecas de filmes e séries Top Picks"
-      },
-      "skipTopPicks": "Os 10 principais não ativados"
+      }
     },
     "jobs": {
       "statusStarting": "Começando…",
@@ -3759,7 +3721,6 @@
       "statusProcessingShort": "Processamento",
       "logStartingBatch": "Iniciando trabalhos de configuração inicial…",
       "logAllComplete": "Todos os trabalhos concluídos com sucesso!",
-      "logSkippedTopPicks": "⊘ Ignorado: {{name}} (Principais escolhas não habilitadas)",
       "errRunInitial": "Falha ao executar jobs iniciais",
       "unknownError": "Erro desconhecido",
       "logSetupFailed": "Falha na configuração: {{message}}",
@@ -3815,18 +3776,6 @@
       "noneSecondary": "Clique em Atualizar para carregar bibliotecas",
       "back": "Voltar",
       "saveContinue": "Salvar e continuar"
-    },
-    "validate": {
-      "title": "Validar configuração",
-      "subtitle": "Verificando se o {{appName}} pode acessar todos os caminhos necessários e se seu servidor de mídia está acessível.",
-      "running": "Executando verificações de validação…",
-      "errorPrefix": "Erro:",
-      "allPassed": "Todas as verificações foram aprovadas! Sua configuração está pronta para uso.",
-      "someFailed": "Algumas verificações falharam. Corrija os problemas acima e tente novamente ou verifique as montagens de volume do docker-compose.yml.",
-      "back": "Voltar",
-      "checking": "Verificando…",
-      "retry": "Tentar novamente",
-      "continue": "Continuar"
     },
     "restore": {
       "title": "Restaurar do backup",
@@ -3890,26 +3839,9 @@
     },
     "complete": {
       "title": "Configuração concluída!",
-      "subtitle": "O {{appName}} criou bibliotecas de recomendações personalizadas em seu servidor de mídia.",
-      "issuesAlert": "Alguns usuários foram ignorados ou tiveram problemas. Os usuários precisam do histórico de exibição para que as recomendações sejam geradas. Eles receberão recomendações depois de assistir a mais conteúdo e executar a próxima sincronização.",
-      "librariesCreatedIn": "Bibliotecas criadas em {{name}}",
-      "mediaServerFallback": "Servidor de mídia",
-      "movies": "Filmes",
-      "tvSeries": "Série de TV",
-      "recommendationsChip": "{{count}} recomendações",
-      "aiPicksPrimary": "Escolhas de IA de {{name}}",
-      "skippedNoHistory": "Ignorado (sem histórico de exibição)",
-      "failed": "Fracassada",
-      "topPicksGlobal": "Principais escolhas (globais)",
-      "topPicksMovies": "Principais escolhas - Filmes",
-      "topPicksMoviesSecondary": "{{count}} filmes populares",
-      "topPicksSeries": "Principais escolhas - Série",
-      "topPicksSeriesSecondary": "{{count}} séries populares",
       "gettingStarted": "Começando",
       "loginPrimary": "Faça login com suas credenciais de administrador do Media Server",
       "loginSecondary": "Use o mesmo nome de usuário e senha que você usa para Emby/Jellyfin",
-      "openServerPrimary": "Abra seu servidor de mídia para ver as novas bibliotecas",
-      "openServerSecondary": "Novas bibliotecas ‘AI Picks’ aparecerão para cada usuário habilitado no {{appName}}",
       "schedulesTitle": "Agendamentos Automáticos",
       "schedulesIntro": "O {{appName}} executa trabalhos em segundo plano para manter as recomendações atualizadas. Agendamentos padrão podem ser modificados em Admin → Jobs.",
       "schedWatchHistory": "Histórico de exibição",
@@ -3920,8 +3852,6 @@
       "schedEmbeddingsDesc": "Diariamente às 3h – Processa conteúdo para recomendações de IA",
       "schedAiRecs": "Recomendações de IA",
       "schedAiRecsDesc": "Semanalmente aos domingos às 4h – Gera escolhas personalizadas para cada usuário",
-      "schedTopPicks": "Principais escolhas",
-      "schedTopPicksDesc": "Diariamente às 5h – Atualiza bibliotecas de conteúdo de tendências globais",
       "unlockTitle": "Desbloqueie mais recursos",
       "unlockIntro": "Após fazer login, visite Admin → Configurações para ativar estes recursos adicionais:",
       "featTrakt": "Integração Trakt",
@@ -3934,22 +3864,16 @@
       "featUserPrefsDesc": "Cada usuário pode personalizar suas preferências e configurações de recomendação",
       "backToJobs": "Voltar para Empregos",
       "finishSetup": "Concluir configuração",
-      "finishHint": "Clicar em Concluir desativará o assistente de configuração pública, protegerá o {{appName}} e redirecionará para login."
+      "finishHint": "Clicar em Concluir desativará o assistente de configuração pública, protegerá o {{appName}} e redirecionará para login.",
+      "subtitleReady": "{{appName}} is set up, and recommendations are ready for every enabled viewer.",
+      "appPrimary": "Recommendations live in {{appName}}",
+      "appSecondary": "Each viewer signs in with their media server account to see their picks and why each one was chosen",
+      "homeRowsPrimary": "Put them on Emby home screens",
+      "homeRowsSecondary": "In Admin → Recommendations → Emby Home Rows, choose which rows appear on each viewer's home screen and where",
+      "schedHomeRows": "Emby Home Rows",
+      "schedHomeRowsDesc": "Daily at 5:45am — Refreshes the rows on each viewer's Emby home screen, once you have set them up"
     },
     "initialJobsStep": {
-      "newLibraryChip": "Nova biblioteca",
-      "libSummaryMoviesTitle": "Bibliotecas de filmes criadas",
-      "libSummarySeriesTitle": "Bibliotecas de séries de TV criadas",
-      "createdCount": "{{contagem}} criados",
-      "skippedCount": "{{count}} ignorado",
-      "failedCount": "{{contagem}} falhou",
-      "topPicksLibsCreated": "Principais bibliotecas criadas",
-      "moviesChip": "{{contar}} filmes",
-      "seriesChip": "{{contagem}} série",
-      "failedChip": "Fracassada",
-      "topPicksMoviesRow": "Principais escolhas - Filmes",
-      "topPicksSeriesRow": "Principais escolhas - Série",
-      "topPicksFailedDefault": "Falha ao criar bibliotecas de Melhores escolhas",
       "rerunRun": "Execute {{nome}}",
       "rerunRerun": "Execute novamente {{nome}}",
       "itemsProcessed": "{{contar}} itens",
@@ -3961,7 +3885,6 @@
       "bulletWatchHistory": "Sincronizar histórico de exibição – importe o histórico de exibição para entender as preferências",
       "bulletEmbeddings": "Gerar Embeddings – Crie vetores de IA para entender temas de conteúdo (usa OpenAI)",
       "bulletRecs": "Gerar recomendações — Crie escolhas personalizadas para cada usuário",
-      "bulletLibraries": "Sincronizar Bibliotecas – Envie bibliotecas de recomendação para o seu servidor de mídia",
       "headsUp": "Isso pode levar de alguns minutos a mais de 30 minutos, dependendo do tamanho de suas bibliotecas de mídia. Grandes coleções com milhares de filmes e episódios levarão mais tempo.",
       "headsUpLabel": "Atenção!",
       "progressLine": "Progresso: {{concluído}} de {{total}} trabalhos",
@@ -3969,7 +3892,6 @@
       "chipAllComplete": "Tudo completo",
       "chipFailed": "Fracassada",
       "chipRunning": "Correndo",
-      "libraryResultsTitle": "Resultados da criação da biblioteca",
       "back": "Voltar",
       "startInit": "Iniciar inicialização",
       "runningProgress": "Executando... ({{concluído}}/{{total}})",
@@ -3988,68 +3910,13 @@
     },
     "topPicksStep": {
       "title": "Principais escolhas (opcional)",
-      "body": "Crie bibliotecas globais de \"o que é popular\" com base no histórico de exibição agregado de todos os usuários. Ao contrário das recomendações personalizadas de IA, as Melhores Escolhas mostram o mesmo conteúdo de tendência para todos – ótimo para descobrir o que é popular em seu servidor.",
       "enableTitle": "Ativar escolhas principais",
-      "enableSubtitle": "Crie bibliotecas de conteúdo de tendência visíveis para todos os usuários",
       "noteAdvanced": "Configurações avançadas, como pesos de algoritmos de popularidade, janelas de tempo e programações de atualização, podem ser personalizadas posteriormente em Admin → Configurações → Principais escolhas.",
       "noteLabel": "Observação:",
-      "outputConfig": "Configuração de saída",
-      "symlinkWarning": "Os links simbólicos exigem que o {{appName}} possa acessar seus arquivos de mídia exatamente nos mesmos caminhos que seu servidor de mídia usa. Se os caminhos diferirem entre sistemas (por exemplo, contêineres Docker), use arquivos STRM.",
-      "symlinkLabel": "Links simbólicos",
       "back": "Voltar",
       "saveContinue": "Salvar e continuar",
-      "errUpload": "Falha no upload",
-      "errDelete": "Falha na exclusão"
-    },
-    "fileLocations": {
-      "title": "Locais de arquivos",
-      "body": "Configure onde seu servidor de mídia vê os arquivos da biblioteca do {{appName}}. Esses caminhos devem corresponder à forma como o seu servidor de mídia acessa os volumes montados na configuração do Docker.",
-      "saved": "Locais de arquivos salvos!",
-      "autoDetectTitle": "Detecção automática de caminhos",
-      "autoDetectBody": "O {{appName}} pode detectar automaticamente os caminhos corretos comparando como o seu servidor de mídia vê os arquivos com a forma como o {{appName}} os vê.",
-      "detecting": "Detecção...",
-      "detectButton": "Detectar caminhos automaticamente",
-      "pathsDetected": "Caminhos detectados com sucesso!",
-      "mediaServerSees": "O servidor de mídia vê:",
-      "apertureSees": "A abertura vê:",
-      "detectedPrefix": "Prefixo detectado:",
-      "hideManual": "Ocultar configuração manual",
-      "orManual": "Ou configure manualmente",
-      "howToFindTitle": "Como encontrar esses caminhos:",
-      "howToFindBody": "Abra qualquer filme em seu servidor de mídia, vá para Informações de mídia e observe o caminho do arquivo. Se mostrar /mnt/Movies/SomeMovie/file.mkv, o prefixo do caminho de mídia é /mnt/.",
-      "apertureLibsPath": "Caminho das bibliotecas do {{appName}}",
-      "apertureLibsHelp": "Onde o seu servidor de mídia vê as bibliotecas de saída do {{appName}}?",
-      "helperApertureLibs": "Caminho onde seu servidor de mídia vê /aperture-libraries",
-      "mediaPrefixTitle": "Prefixo do caminho do servidor de mídia",
-      "mediaPrefixHelp": "Onde seu servidor de mídia vê seus arquivos de mídia originais?",
-      "symlinkHelper": "Usado para criar links simbólicos para seus arquivos de mídia",
-      "currentConfig": "Configuração atual",
-      "librariesPathLine": "Caminho das Bibliotecas:",
-      "mediaPrefixLine": "Prefixo de mídia:",
-      "back": "Voltar",
-      "skipDefaults": "Pular (usar padrões)",
-      "saveContinue": "Salvar e continuar",
-      "errDetect": "Falha na detecção automática",
-      "errSave": "Falha ao salvar a configuração"
-    },
-    "aiRecs": {
-      "title": "Configurar bibliotecas de recomendação de IA",
-      "body": "O {{appName}} cria bibliotecas virtuais em seu servidor de mídia contendo recomendações personalizadas para cada usuário. Configure como essas bibliotecas são criadas e, opcionalmente, personalize suas imagens de capa.",
-      "strmVsSymlink": "STRM vs Symlinks: Os arquivos STRM funcionam universalmente e suportam URLs de streaming, enquanto os Symlinks fornecem acesso direto aos arquivos (melhor para reprodução local), mas exigem que o {{appName}} acesse seus arquivos de mídia nos mesmos caminhos do seu servidor de mídia. Para séries de TV, links simbólicos são recomendados para melhor desempenho.",
-      "moviesLibrary": "Biblioteca de filmes",
-      "seriesLibrary": "Biblioteca de séries",
-      "imageSet": "Conjunto de imagens",
-      "outputFormat": "Formato de saída",
-      "symlinks": "Links simbólicos",
-      "strmFiles": "Arquivos STRM",
-      "moviesSymlinkHelp": "Cria links simbólicos para arquivos originais do filme",
-      "moviesStrmHelp": "Cria arquivos .strm com caminhos ou URLs de streaming",
-      "seriesSymlinkHelp": "Cria links simbólicos para pastas originais da temporada (recomendado)",
-      "seriesStrmHelp": "Cria arquivos .strm para cada episódio",
-      "coverImage": "Imagem da capa da biblioteca",
-      "dropImage": "Soltar imagem",
-      "back": "Voltar",
-      "saveContinue": "Salvar e continuar"
+      "bodyRows": "Show everyone what's popular on your server, worked out from all users' watch history. Unlike personalized recommendations, Top Picks is the same list for every viewer. It appears in {{appName}} and, on Emby, can be a row on each viewer's home screen.",
+      "enableSubtitleRows": "The same trending list for every viewer"
     },
     "aiSetup": {
       "nameEmbeddings": "Incorporações",
@@ -5352,7 +5219,8 @@
     "homeSections": {
       "title": "Emby Home Rows",
       "blurb": "Top Picks and each viewer's recommendations on their Emby home screen"
-    }
+    },
+    "gateLegacyLibraryOutput": "Legacy library output is switched off — these settings are not used"
   },
   "settingsEvaluation": {
     "title": "Evaluation seeds",
@@ -5734,5 +5602,43 @@
     },
     "receivedSummary_many": "{{count}} títulos · último compartilhado {{when}}",
     "sentSummary_many": "{{count}} títulos enviados"
+  },
+  "legacyLibraryOutput": {
+    "legacyChip": "Legacy",
+    "card": {
+      "title": "Legacy library output",
+      "subtitle": "Each viewer's AI Picks libraries and the shared Top Picks libraries, written as STRM files or symlinks under /aperture-libraries and added to the media server as extra libraries. Emby home rows now put the same recommendations and Top Picks on each viewer's home screen straight from the original titles — no files, no extra mount, no duplicate library. This output is being phased out.",
+      "homeRowsLink": "Set up Emby home rows",
+      "switchLabel": "Write STRM / symlink libraries",
+      "switchOnHelp": "On: the library jobs keep writing the AI Picks and Top Picks libraries.",
+      "switchOffHelp": "Off: nothing is written or created any more, the library jobs do nothing, and the settings that only concern these libraries are greyed out. Libraries already in the media server keep their last contents until you remove them below.",
+      "savedOn": "Legacy library output switched on. The next library sync brings the libraries up to date.",
+      "savedOff": "Legacy library output switched off. Nothing more will be written.",
+      "saveFailed": "Could not save the setting.",
+      "remainingTitle": "Libraries still in the media server",
+      "remainingCount_one": "{{count}} generated library is recorded ({{personal}} per viewer, {{topPicks}} Top Picks).",
+      "remainingCount_other": "{{count}} generated libraries are recorded ({{personal}} per viewer, {{topPicks}} Top Picks).",
+      "noneRemaining": "No generated libraries are recorded. Removing still looks for libraries left behind by earlier renames, and for the Top Picks collection and playlist.",
+      "removeButton": "Remove generated libraries",
+      "removeNeedsOff": "Switch the output off first — while it is on, the next library sync would rebuild them.",
+      "confirmTitle": "Remove every generated library?",
+      "confirmBody_one": "This deletes every library legacy output made from the media server — {{count}} recorded, plus any an earlier rename left behind — with their folders under /aperture-libraries, and the Top Picks collection and playlist. Recommendations are not touched: switching the output back on and running the library jobs rebuilds the libraries.",
+      "confirmBody_other": "This deletes every library legacy output made from the media server — {{count}} recorded, plus any an earlier rename left behind — with their folders under /aperture-libraries, and the Top Picks collection and playlist. Recommendations are not touched: switching the output back on and running the library jobs rebuilds the libraries.",
+      "confirmAction": "Remove libraries",
+      "cancel": "Cancel",
+      "removeStarted": "Removal started. A library the media server refuses to delete is kept, and running the job again retries it.",
+      "openJob": "Open job",
+      "removeFailed": "Could not start the removal."
+    },
+    "notice": {
+      "title": "Legacy library output is switched off",
+      "body": "These settings only concern the STRM / symlink libraries, which are no longer written. They are kept as they are in case the output is switched back on.",
+      "action": "Output format"
+    },
+    "jobBlocked": {
+      "legacyLibraryOutputOff": "Legacy library output is switched off (Output format), so this job has nothing to write.",
+      "legacyLibraryOutputOn": "Switch legacy library output off in Output format first — while it is on, the next library sync would rebuild what this removes."
+    },
+    "usersMenuDisabled": "Legacy library output is off"
   }
 }

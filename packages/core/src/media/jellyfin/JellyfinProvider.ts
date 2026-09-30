@@ -65,6 +65,7 @@ import {
   createPlaylistWithOverview,
   updatePlaylistOverview,
   deletePlaylist,
+  findPlaylistByName,
   getPlaylistItems,
   removePlaylistItems,
   addPlaylistItems,
@@ -74,6 +75,7 @@ import {
   createOrUpdateCollection,
   updateCollectionOverview,
   deleteCollection,
+  findCollectionByName,
   getCollectionItems,
   addCollectionItems,
   removeCollectionItems,
@@ -271,6 +273,10 @@ export class JellyfinProvider extends JellyfinProviderBase implements MediaServe
     return deletePlaylist(this, apiKey, playlistId)
   }
 
+  async findPlaylistByName(apiKey: string, userId: string, name: string): Promise<string | null> {
+    return findPlaylistByName(this, apiKey, userId, name)
+  }
+
   async getPlaylistItems(apiKey: string, playlistId: string): Promise<PlaylistItem[]> {
     return getPlaylistItems(this, apiKey, playlistId)
   }
@@ -308,6 +314,10 @@ export class JellyfinProvider extends JellyfinProviderBase implements MediaServe
 
   async deleteCollection(apiKey: string, collectionId: string): Promise<void> {
     return deleteCollection(this, apiKey, collectionId)
+  }
+
+  async findCollectionByName(apiKey: string, name: string): Promise<string | null> {
+    return findCollectionByName(this, apiKey, name)
   }
 
   async getCollectionItems(apiKey: string, collectionId: string): Promise<string[]> {

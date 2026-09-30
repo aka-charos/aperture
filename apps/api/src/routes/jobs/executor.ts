@@ -16,6 +16,7 @@ import {
   generateSeriesRecommendationsForAllUsers,
   clearAndRebuildAllSeriesRecommendations,
   processSeriesStrmForAllUsers,
+  removeGeneratedLibraries,
   refreshTopPicks,
   enrichMetadata,
   enrichStudioLogos,
@@ -625,6 +626,14 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
           },
           `✅ Auto-request Top Picks complete`
         )
+        break
+      }
+      // === Legacy library output removal ===
+      case 'remove-legacy-libraries': {
+        // Completes, fails or (when cancelled) leaves the run record to
+        // cancelJob itself, like the library jobs it undoes.
+        const result = await removeGeneratedLibraries(jobId)
+        logger.info({ job: name, jobId, ...result }, `✅ Legacy library removal finished`)
         break
       }
       // === Emby Home Screen Rows ===

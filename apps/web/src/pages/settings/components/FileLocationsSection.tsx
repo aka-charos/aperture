@@ -15,6 +15,8 @@ import FolderIcon from '@mui/icons-material/Folder'
 import SaveIcon from '@mui/icons-material/Save'
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import { useLegacyLibraryOutput } from '@/hooks/legacyLibraryOutput'
+import { LegacyLibraryOutputNotice } from './LegacyLibraryOutputNotice'
 
 interface OutputPathConfig {
   mediaServerLibrariesPath: string
@@ -28,8 +30,10 @@ interface DetectionResult {
   sampleAperturePath: string
 }
 
+/** Both paths exist only for legacy library output, so the section greys with it. */
 export function FileLocationsSection() {
   const { t } = useTranslation()
+  const { off: legacyOff } = useLegacyLibraryOutput()
   const [config, setConfig] = useState<OutputPathConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -155,13 +159,15 @@ export function FileLocationsSection() {
           {t('settingsFileLocations.subtitle')}
         </Typography>
 
+        <LegacyLibraryOutputNotice />
+
         <Stack spacing={3}>
           {/* Auto-detect Button */}
           <Box>
             <Button
               variant="outlined"
               onClick={handleDetect}
-              disabled={detecting}
+              disabled={detecting || legacyOff}
               startIcon={detecting ? <CircularProgress size={16} /> : <AutoFixHighIcon />}
             >
               {detecting ? t('settingsFileLocations.detecting') : t('settingsFileLocations.detectPaths')}
@@ -195,6 +201,7 @@ export function FileLocationsSection() {
               size="small"
               value={config?.mediaServerLibrariesPath || ''}
               onChange={(e) => updateConfig({ mediaServerLibrariesPath: e.target.value })}
+              disabled={legacyOff}
               placeholder="/mnt/ApertureLibraries/"
               helperText={t('settingsFileLocations.apertureLibrariesHelper')}
             />
@@ -210,6 +217,7 @@ export function FileLocationsSection() {
               size="small"
               value={config?.mediaServerPathPrefix || ''}
               onChange={(e) => updateConfig({ mediaServerPathPrefix: e.target.value })}
+              disabled={legacyOff}
               placeholder="/mnt/"
               helperText={t('settingsFileLocations.mediaServerPathPrefixHelper')}
             />
@@ -232,7 +240,7 @@ export function FileLocationsSection() {
             <Button
               variant="contained"
               onClick={handleSave}
-              disabled={saving || !hasChanges}
+              disabled={saving || !hasChanges || legacyOff}
               startIcon={saving ? <CircularProgress size={16} /> : <SaveIcon />}
             >
               {saving ? t('settingsFileLocations.saving') : t('settingsFileLocations.saveChanges')}

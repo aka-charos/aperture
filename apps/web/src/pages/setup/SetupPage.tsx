@@ -10,9 +10,6 @@ import {
   RestoreStep,
   MediaServerStep,
   LibrariesStep,
-  FileLocationsStep,
-  AiRecsStep,
-  ValidateStep,
   UsersStep,
   TopPicksStep,
   AISetupStep,
@@ -46,12 +43,6 @@ export function SetupPage() {
         return <MediaServerStep wizard={wizard} />
       case 'mediaLibraries':
         return <LibrariesStep wizard={wizard} />
-      case 'fileLocations':
-        return <FileLocationsStep wizard={wizard} />
-      case 'aiRecsLibraries':
-        return <AiRecsStep wizard={wizard} />
-      case 'validate':
-        return <ValidateStep wizard={wizard} />
       case 'users':
         return <UsersStep wizard={wizard} />
       case 'topPicks':

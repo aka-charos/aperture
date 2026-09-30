@@ -65,11 +65,12 @@ const topPicksRoutes: FastifyPluginAsync = async (fastify) => {
     }
   }>('/api/top-picks/movies', { preHandler: requireAuth, schema: { tags: ["top-picks"] } }, async (request, reply) => {
     try {
-      const { getTopMovies, getTopPicksConfig } = await import('@aperture/core')
+      const { getTopMovies, getTopPicksConfig, isLegacyLibraryOutputEnabled } = await import('@aperture/core')
 
-      const [allMovies, config] = await Promise.all([
+      const [allMovies, config, legacyOutput] = await Promise.all([
         getTopMovies(),
-        getTopPicksConfig()
+        getTopPicksConfig(),
+        isLegacyLibraryOutputEnabled(),
       ])
       // One list for the whole server, shown only as far as this viewer may
       // open it (lib/viewerScope.ts). Ranks stay the server-wide ones.
@@ -85,7 +86,10 @@ const topPicksRoutes: FastifyPluginAsync = async (fastify) => {
           seriesTimeWindowDays: config.seriesTimeWindowDays,
           seriesMinUniqueViewers: config.seriesMinUniqueViewers,
           seriesCount: config.seriesCount,
-          lastRefreshedAt: config.lastRefreshedAt
+          // When refresh-top-picks last WROTE the Top Picks libraries. With
+          // legacy output off it writes nothing and this list is live, so the
+          // date would name a moment nothing here came from.
+          lastRefreshedAt: legacyOutput ? config.lastRefreshedAt : null
         }
       })
     } catch (err) {
@@ -105,11 +109,12 @@ const topPicksRoutes: FastifyPluginAsync = async (fastify) => {
     }
   }>('/api/top-picks/series', { preHandler: requireAuth, schema: { tags: ["top-picks"] } }, async (request, reply) => {
     try {
-      const { getTopSeries, getTopPicksConfig } = await import('@aperture/core')
+      const { getTopSeries, getTopPicksConfig, isLegacyLibraryOutputEnabled } = await import('@aperture/core')
 
-      const [allSeries, config] = await Promise.all([
+      const [allSeries, config, legacyOutput] = await Promise.all([
         getTopSeries(),
-        getTopPicksConfig()
+        getTopPicksConfig(),
+        isLegacyLibraryOutputEnabled(),
       ])
       const visible = await idsInScope(request, 'series', allSeries.map((s) => s.seriesId))
       const series = allSeries.filter((s) => visible.has(s.seriesId))
@@ -123,7 +128,7 @@ const topPicksRoutes: FastifyPluginAsync = async (fastify) => {
           seriesTimeWindowDays: config.seriesTimeWindowDays,
           seriesMinUniqueViewers: config.seriesMinUniqueViewers,
           seriesCount: config.seriesCount,
-          lastRefreshedAt: config.lastRefreshedAt
+          lastRefreshedAt: legacyOutput ? config.lastRefreshedAt : null
         }
       })
     } catch (err) {

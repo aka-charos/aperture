@@ -42,20 +42,6 @@ export const SETUP_JOB_DEFINITIONS = [
     nameKey: 'setup.initialJobs.generateSeriesRecommendations.name',
     descriptionKey: 'setup.initialJobs.generateSeriesRecommendations.description',
   },
-  {
-    id: 'sync-movie-libraries',
-    nameKey: 'setup.initialJobs.syncMovieLibraries.name',
-    descriptionKey: 'setup.initialJobs.syncMovieLibraries.description',
-  },
-  {
-    id: 'sync-series-libraries',
-    nameKey: 'setup.initialJobs.syncSeriesLibraries.name',
-    descriptionKey: 'setup.initialJobs.syncSeriesLibraries.description',
-  },
-  {
-    id: 'refresh-top-picks',
-    nameKey: 'setup.initialJobs.refreshTopPicks.name',
-    descriptionKey: 'setup.initialJobs.refreshTopPicks.description',
-    optional: true as const,
-  },
+  // The library sync jobs and refresh-top-picks were here. Their whole product
+  // is legacy library output, which a new install starts without (F-142).
 ] as const

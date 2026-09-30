@@ -15,6 +15,7 @@ import { getAiRecsOutputConfig, getAppName } from '../../settings/systemSettings
 import { getMediaServerProvider } from '../../media/index.js'
 import { downloadImage } from '../images.js'
 import { generateSeriesNfoContent } from './nfo.js'
+import { assertLegacyLibraryOutputEnabled, recordWrittenScope } from '../legacyOutput.js'
 import { getEffectiveAiExplanationSetting } from '../../lib/userSettings.js'
 import { binderFor, getLibraryScopeForUser, libraryScopeSql } from '../../lib/libraryScope.js'
 import { symlinkArtwork, symlinkBasenameMatchedSidecars, SERIES_SKIP_FILES, getSeriesFolderFromSeasonPath } from '../artwork.js'
@@ -141,6 +142,8 @@ export async function writeSeriesStrmFilesForUser(
   providerUserId: string,
   displayName: string
 ): Promise<{ written: number; seriesCount: number; deleted: number; localPath: string; embyPath: string }> {
+  // Legacy output switched off: refuse before anything is created or written.
+  await assertLegacyLibraryOutputEnabled()
   const config = await getConfig()
   const outputConfig = await getAiRecsOutputConfig()
   const useSymlinks = outputConfig.seriesUseSymlinks
@@ -683,6 +686,12 @@ export async function writeSeriesStrmFilesForUser(
     },
     `✅ Series ${useSymlinks ? 'symlink' : 'STRM'} generation complete`
   )
+
+  // What this library may now hold — read back while the output is frozen.
+  await recordWrittenScope(userId, 'series', {
+    libraryIds: scope.libraryIds,
+    maxParentalRating: scope.maxParentalRating,
+  })
 
   return {
     written: filesWritten,

@@ -20,9 +20,6 @@ export type SetupStepId =
   | 'restoreFromBackup'
   | 'mediaServer'
   | 'mediaLibraries'
-  | 'fileLocations'
-  | 'aiRecsLibraries'
-  | 'validate'
   | 'users'
   | 'topPicks'
   | 'aiSetup'
@@ -76,26 +73,12 @@ export interface LibraryConfig {
   isEnabled: boolean
 }
 
-export interface AiRecsOutputConfig {
-  moviesUseSymlinks: boolean
-  seriesUseSymlinks: boolean
-}
-
-export interface LibraryImageInfo {
-  url?: string
-  isDefault?: boolean
-}
-
+/**
+ * The wizard asks only whether Top Picks is on. Its library, collection and
+ * playlist output is legacy (F-142) and configured in Admin → Top Picks.
+ */
 export interface TopPicksConfig {
   isEnabled: boolean
-  moviesLibraryEnabled: boolean
-  moviesCollectionEnabled: boolean
-  moviesPlaylistEnabled: boolean
-  moviesUseSymlinks: boolean
-  seriesLibraryEnabled: boolean
-  seriesCollectionEnabled: boolean
-  seriesPlaylistEnabled: boolean
-  seriesUseSymlinks: boolean
 }
 
 export interface SetupUser {
@@ -119,29 +102,6 @@ export interface JobLogEntry {
   message: string
 }
 
-export interface UserLibraryResult {
-  userId: string
-  providerUserId: string
-  username: string
-  displayName: string
-  status: 'success' | 'skipped' | 'failed'
-  recommendationCount?: number
-  libraryName?: string
-  libraryCreated?: boolean
-  error?: string
-}
-
-export interface LibrarySyncResult {
-  success: number
-  failed: number
-  skipped: number
-  users?: UserLibraryResult[]
-  // Top Picks specific fields
-  moviesCount?: number
-  seriesCount?: number
-  usersUpdated?: number
-}
-
 export interface JobProgress {
   id: string
   name: string
@@ -156,21 +116,7 @@ export interface JobProgress {
   itemsTotal?: number
   currentItem?: string
   // Job result (populated on completion)
-  result?: LibrarySyncResult
-}
-
-export interface ValidationCheck {
-  id: string
-  name: string
-  description: string
-  status: 'pending' | 'running' | 'passed' | 'failed'
-  error?: string
-  suggestion?: string
-}
-
-export interface ValidationResult {
-  checks: ValidationCheck[]
-  allPassed: boolean
+  result?: Record<string, unknown>
 }
 
 export interface SetupWizardState {
@@ -193,15 +139,6 @@ export interface SetupWizardState {
   // Libraries
   libraries: LibraryConfig[]
   loadingLibraries: boolean
-
-  // AI Recs
-  aiRecsOutput: AiRecsOutputConfig
-  libraryImages: Record<string, LibraryImageInfo>
-  uploadingImage: string | null
-
-  // Validation
-  validationResult: ValidationResult | null
-  validating: boolean
 
   // Users
   setupUsers: SetupUser[]
@@ -247,15 +184,6 @@ export interface SetupWizardActions {
   setLibraries: React.Dispatch<React.SetStateAction<LibraryConfig[]>>
   loadLibraries: () => Promise<void>
   saveLibraries: () => Promise<void>
-
-  // AI Recs
-  setAiRecsOutput: React.Dispatch<React.SetStateAction<AiRecsOutputConfig>>
-  saveAiRecsOutput: () => Promise<void>
-  uploadLibraryImage: (libraryType: string, file: File) => Promise<void>
-  deleteLibraryImage: (libraryType: string) => Promise<void>
-
-  // Validation
-  runValidation: () => Promise<void>
 
   // Users
   fetchSetupUsers: () => Promise<void>

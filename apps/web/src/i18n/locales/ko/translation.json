@@ -482,6 +482,10 @@
         "globalEvaluation": {
           "title": "Evaluation",
           "description": "Measure how well recommendations retrieve what people actually watch"
+        },
+        "globalLegacy": {
+          "title": "Legacy Library Output",
+          "description": "Removes the STRM / symlink libraries once their output is switched off — run once, on purpose, when phasing them out"
         }
       },
       "jobNames": {
@@ -1320,7 +1324,8 @@
       "previewNew": "New",
       "previewSort": "Titles within each row: {{sort}}."
     },
-    "tabHomeScreen": "Emby home screen"
+    "tabHomeScreen": "Emby home screen",
+    "aiLibraryNamesOutputOff": "These libraries are no longer created on this server, so their names have no effect."
   },
   "settingsPage": {
     "profileTitle": "내 프로필",
@@ -1784,27 +1789,6 @@
     "promptVariantLabel": "Analysis prompt",
     "promptVariantDefault": "Standard (current version)",
     "promptVariantHelp": "An alternative set of questions and rules for the same prompt version, for a model that cannot hold the standard one. Changing this does not rewrite analyses already stored."
-  },
-  "topPicksOutputConfig": {
-    "accordionTitle": "라이브러리, 컬렉션, 재생목록의 차이점은 무엇인가요?",
-    "libraryTitle": "도서관",
-    "libraryBody": "미디어 서버 사이드바에 별도의 라이브러리로 표시됩니다. 미디어의 가상 복사본(STRM 파일)을 포함합니다. Top Picks 전용 검색에 가장 적합합니다.",
-    "collectionTitle": "컬렉션(박스세트)",
-    "collectionBody": "탐색할 때 나타나는 \"상자 세트\"로 기존 라이브러리 항목을 그룹화합니다. 원본 미디어 파일을 직접 사용합니다. 기존 도서관 내의 조직에 가장 적합합니다.",
-    "playlistTitle": "재생목록",
-    "playlistBody": "재생 목록 섹션에 순서가 지정된 재생 목록을 만듭니다. 원본 미디어 파일을 직접 사용합니다. 순차 시청이나 셔플 재생에 가장 적합합니다.",
-    "moviesOutput": "영화 출력",
-    "seriesOutput": "시리즈 출력",
-    "imageSet": "이미지 세트",
-    "libraryCoverImage": "도서관 표지 이미지",
-    "dropImage": "이미지 삭제",
-    "outputTypes": "출력 유형",
-    "outputLibrary": "도서관",
-    "outputCollection": "수집",
-    "outputPlaylist": "재생목록",
-    "libraryFileType": "라이브러리 파일 유형",
-    "symlinks": "심볼릭 링크",
-    "strmFiles": "STRM 파일"
   },
   "tmdbExternalModal": {
     "defaultSource": "TMDb",
@@ -3672,15 +3656,6 @@
       "mediaLibraries": {
         "label": "도서관"
       },
-      "fileLocations": {
-        "label": "경로"
-      },
-      "aiRecsLibraries": {
-        "label": "추천"
-      },
-      "validate": {
-        "label": "검증"
-      },
       "users": {
         "label": "사용자"
       },
@@ -3734,20 +3709,7 @@
       "generateSeriesRecommendations": {
         "name": "시리즈 추천 생성",
         "description": "각 사용자를 위한 맞춤형 TV 시리즈 추천 생성"
-      },
-      "syncMovieLibraries": {
-        "name": "{{appName}} 영화 라이브러리 구축",
-        "description": "미디어 서버에 AI 추천 영화 라이브러리 생성"
-      },
-      "syncSeriesLibraries": {
-        "name": "{{appName}} 시리즈 라이브러리 구축",
-        "description": "미디어 서버에 AI 추천 시리즈 라이브러리 생성"
-      },
-      "refreshTopPicks": {
-        "name": "최고 추천 동기화",
-        "description": "Top Picks 영화 및 시리즈 라이브러리 만들기"
-      },
-      "skipTopPicks": "상위 10개는 활성화되지 않았습니다."
+      }
     },
     "jobs": {
       "statusStarting": "시작 중…",
@@ -3755,7 +3717,6 @@
       "statusProcessingShort": "처리",
       "logStartingBatch": "초기 설정 작업 시작 중…",
       "logAllComplete": "모든 작업이 성공적으로 완료되었습니다!",
-      "logSkippedTopPicks": "⊘ 건너뛰기: {{name}} (최고 추천이 활성화되지 않음)",
       "errRunInitial": "초기 작업을 실행하지 못했습니다.",
       "unknownError": "알 수 없는 오류",
       "logSetupFailed": "설정 실패: {{메시지}}",
@@ -3811,18 +3772,6 @@
       "noneSecondary": "라이브러리를 로드하려면 새로 고침을 클릭하세요.",
       "back": "뒤쪽에",
       "saveContinue": "저장하고 계속하기"
-    },
-    "validate": {
-      "title": "설정 확인",
-      "subtitle": "{{appName}}가 필요한 모든 경로에 접근할 수 있고 미디어 서버에 접근할 수 있는지 확인합니다.",
-      "running": "유효성 검사 실행 중…",
-      "errorPrefix": "오류:",
-      "allPassed": "모든 점검이 통과되었습니다! 이제 설정을 시작할 준비가 되었습니다.",
-      "someFailed": "일부 확인에 실패했습니다. 위의 문제를 해결하고 다시 시도하거나 docker-compose.yml 볼륨 마운트를 확인하세요.",
-      "back": "뒤쪽에",
-      "checking": "확인 중…",
-      "retry": "다시 해 보다",
-      "continue": "계속하다"
     },
     "restore": {
       "title": "백업에서 복원",
@@ -3886,26 +3835,9 @@
     },
     "complete": {
       "title": "설정 완료!",
-      "subtitle": "{{appName}}는 귀하의 미디어 서버에 개인화된 추천 라이브러리를 생성했습니다.",
-      "issuesAlert": "일부 사용자를 건너뛰거나 문제가 발생했습니다. 사용자가 추천을 생성하려면 시청 기록이 필요합니다. 더 많은 콘텐츠를 시청하고 다음 동기화를 실행하면 추천을 받게 됩니다.",
-      "librariesCreatedIn": "{{name}}에 생성된 라이브러리",
-      "mediaServerFallback": "미디어 서버",
-      "movies": "영화 산업",
-      "tvSeries": "TV 시리즈",
-      "recommendationsChip": "{{count}} 추천",
-      "aiPicksPrimary": "{{name}}의 AI 추천",
-      "skippedNoHistory": "건너뛰었습니다(시청 기록 없음)",
-      "failed": "실패한",
-      "topPicksGlobal": "탑픽(글로벌)",
-      "topPicksMovies": "최고 추천 영화 - 영화",
-      "topPicksMoviesSecondary": "{{count}}개의 인기 영화",
-      "topPicksSeries": "최고 추천 상품 - 시리즈",
-      "topPicksSeriesSecondary": "{{count}} 인기 시리즈",
       "gettingStarted": "시작하기",
       "loginPrimary": "미디어 서버 관리자 자격 증명으로 로그인",
       "loginSecondary": "Emby/Jellyfin에 사용하는 것과 동일한 사용자 이름과 비밀번호를 사용하세요.",
-      "openServerPrimary": "미디어 서버를 열어 새 라이브러리를 확인하세요",
-      "openServerSecondary": "{{appName}}에서 활성화된 각 사용자에 대해 새로운 'AI 추천' 라이브러리가 나타납니다.",
       "schedulesTitle": "자동 일정",
       "schedulesIntro": "{{appName}}는 추천 항목을 최신 상태로 유지하기 위해 백그라운드 작업을 실행합니다. 기본 일정은 관리 → 작업에서 수정할 수 있습니다.",
       "schedWatchHistory": "시청 기록",
@@ -3916,8 +3848,6 @@
       "schedEmbeddingsDesc": "매일 오전 3시 — AI 추천을 위한 콘텐츠 처리",
       "schedAiRecs": "AI 추천",
       "schedAiRecsDesc": "매주 일요일 오전 4시 — 각 사용자에 대한 개인화된 선택 생성",
-      "schedTopPicks": "최고 추천 상품",
-      "schedTopPicksDesc": "매일 오전 5시 — 글로벌 트렌드 콘텐츠 라이브러리 업데이트",
       "unlockTitle": "더 많은 기능 잠금 해제",
       "unlockIntro": "로그인 후 관리 → 설정으로 이동하여 다음 추가 기능을 활성화하세요.",
       "featTrakt": "트랙트 통합",
@@ -3930,22 +3860,16 @@
       "featUserPrefsDesc": "각 사용자는 권장 사항 기본 설정 및 설정을 맞춤 설정할 수 있습니다.",
       "backToJobs": "채용정보로 돌아가기",
       "finishSetup": "설정 완료",
-      "finishHint": "마침을 클릭하면 공개 설정 마법사가 비활성화되고 {{appName}}가 보호되며 로그인으로 리디렉션됩니다."
+      "finishHint": "마침을 클릭하면 공개 설정 마법사가 비활성화되고 {{appName}}가 보호되며 로그인으로 리디렉션됩니다.",
+      "subtitleReady": "{{appName}} is set up, and recommendations are ready for every enabled viewer.",
+      "appPrimary": "Recommendations live in {{appName}}",
+      "appSecondary": "Each viewer signs in with their media server account to see their picks and why each one was chosen",
+      "homeRowsPrimary": "Put them on Emby home screens",
+      "homeRowsSecondary": "In Admin → Recommendations → Emby Home Rows, choose which rows appear on each viewer's home screen and where",
+      "schedHomeRows": "Emby Home Rows",
+      "schedHomeRowsDesc": "Daily at 5:45am — Refreshes the rows on each viewer's Emby home screen, once you have set them up"
     },
     "initialJobsStep": {
-      "newLibraryChip": "새로운 도서관",
-      "libSummaryMoviesTitle": "영화 라이브러리가 생성되었습니다.",
-      "libSummarySeriesTitle": "TV 시리즈 라이브러리 생성",
-      "createdCount": "{{count}}개 생성됨",
-      "skippedCount": "{{count}} 건 건너뛰었습니다",
-      "failedCount": "{{count}}개 실패",
-      "topPicksLibsCreated": "Top Picks 라이브러리 생성",
-      "moviesChip": "{{count}}편의 영화",
-      "seriesChip": "{{count}} 시리즈",
-      "failedChip": "실패한",
-      "topPicksMoviesRow": "최고 추천 영화 - 영화",
-      "topPicksSeriesRow": "최고 추천 상품 - 시리즈",
-      "topPicksFailedDefault": "Top Picks 라이브러리를 생성하지 못했습니다.",
       "rerunRun": "{{name}} 실행",
       "rerunRerun": "{{name}} 재실행",
       "itemsProcessed": "{{count}}개 항목",
@@ -3957,7 +3881,6 @@
       "bulletWatchHistory": "시청 기록 동기화 — 선호도를 이해하기 위해 시청 기록을 가져옵니다.",
       "bulletEmbeddings": "임베딩 생성 — 콘텐츠 테마를 이해하기 위한 AI 벡터 생성(OpenAI 사용)",
       "bulletRecs": "추천 생성 — 각 사용자를 위한 맞춤형 추천 생성",
-      "bulletLibraries": "동기화 라이브러리 — 권장 라이브러리를 미디어 서버에 푸시",
       "headsUp": "미디어 라이브러리의 크기에 따라 이 작업은 몇 분에서 30분 이상 걸릴 수 있습니다. 수천 편의 영화와 에피소드가 포함된 대규모 컬렉션의 경우 시간이 더 오래 걸립니다.",
       "headsUpLabel": "주의하세요!",
       "progressLine": "진행률: 작업 {{total}}개 중 {{done}}개",
@@ -3965,7 +3888,6 @@
       "chipAllComplete": "모두 완료",
       "chipFailed": "실패한",
       "chipRunning": "달리기",
-      "libraryResultsTitle": "라이브러리 생성 결과",
       "back": "뒤쪽에",
       "startInit": "초기화 시작",
       "runningProgress": "실행 중... ({{완료}}/{{총계}})",
@@ -3984,68 +3906,13 @@
     },
     "topPicksStep": {
       "title": "최고 추천 상품(선택사항)",
-      "body": "모든 사용자의 집계된 시청 기록을 기반으로 글로벌 \"인기 콘텐츠\" 라이브러리를 만듭니다. 개인화된 AI 추천과 달리 Top Picks는 모든 사람에게 동일한 인기 콘텐츠를 표시하므로 서버에서 인기 있는 콘텐츠를 찾는 데 좋습니다.",
       "enableTitle": "최고 추천 활성화",
-      "enableSubtitle": "모든 사용자가 볼 수 있는 인기 콘텐츠 라이브러리 만들기",
       "noteAdvanced": "인기 알고리즘 가중치, 기간 및 새로 고침 일정과 같은 고급 설정은 나중에 관리 → 설정 → 상위 추천에서 사용자 정의할 수 있습니다.",
       "noteLabel": "메모:",
-      "outputConfig": "출력 구성",
-      "symlinkWarning": "Symlink를 사용하려면 {{appName}}가 미디어 서버가 사용하는 것과 정확히 동일한 경로에서 미디어 파일에 액세스할 수 있어야 합니다. 시스템(예: Docker 컨테이너) 간에 경로가 다른 경우 대신 STRM 파일을 사용하세요.",
-      "symlinkLabel": "심볼릭 링크",
       "back": "뒤쪽에",
       "saveContinue": "저장하고 계속하기",
-      "errUpload": "업로드 실패",
-      "errDelete": "삭제 실패"
-    },
-    "fileLocations": {
-      "title": "파일 위치",
-      "body": "미디어 서버가 {{appName}}의 라이브러리 파일을 볼 수 있는 위치를 구성하세요. 이러한 경로는 미디어 서버가 Docker 구성에 탑재된 볼륨에 액세스하는 방식과 일치해야 합니다.",
-      "saved": "파일 위치가 저장되었습니다!",
-      "autoDetectTitle": "자동 감지 경로",
-      "autoDetectBody": "{{appName}}는 미디어 서버가 파일을 보는 방식과 {{appName}}가 파일을 보는 방식을 비교하여 올바른 경로를 자동으로 감지할 수 있습니다.",
-      "detecting": "감지 중...",
-      "detectButton": "자동으로 경로 감지",
-      "pathsDetected": "경로가 성공적으로 감지되었습니다!",
-      "mediaServerSees": "미디어 서버는 다음을 확인합니다.",
-      "apertureSees": "조리개는 다음을 확인합니다.",
-      "detectedPrefix": "감지된 접두사:",
-      "hideManual": "수동 구성 숨기기",
-      "orManual": "또는 수동으로 구성",
-      "howToFindTitle": "이러한 경로를 찾는 방법:",
-      "howToFindBody": "미디어 서버에서 영화를 열고 미디어 정보로 이동하여 파일 경로를 확인하세요. /mnt/Movies/SomeMovie/file.mkv가 표시되면 미디어 경로 접두사는 /mnt/입니다.",
-      "apertureLibsPath": "조리개 라이브러리 경로",
-      "apertureLibsHelp": "미디어 서버는 {{appName}}의 출력 라이브러리를 어디에서 보나요?",
-      "helperApertureLibs": "미디어 서버가 /aperture-libraries를 보는 경로",
-      "mediaPrefixTitle": "미디어 서버 경로 접두사",
-      "mediaPrefixHelp": "미디어 서버는 원본 미디어 파일을 어디에서 볼 수 있나요?",
-      "symlinkHelper": "미디어 파일에 대한 심볼릭 링크를 만드는 데 사용됩니다.",
-      "currentConfig": "현재 구성",
-      "librariesPathLine": "라이브러리 경로:",
-      "mediaPrefixLine": "미디어 접두어:",
-      "back": "뒤쪽에",
-      "skipDefaults": "건너뛰기(기본값 사용)",
-      "saveContinue": "저장하고 계속하기",
-      "errDetect": "자동 감지 실패",
-      "errSave": "구성을 저장하지 못했습니다."
-    },
-    "aiRecs": {
-      "title": "AI 추천 라이브러리 구성",
-      "body": "{{appName}}는 미디어 서버에 각 사용자를 위한 맞춤 추천이 포함된 가상 라이브러리를 생성합니다. 이러한 라이브러리가 생성되는 방법을 구성하고 선택적으로 표지 이미지를 사용자 정의합니다.",
-      "strmVsSymlink": "STRM 대 Symlink: STRM 파일은 보편적으로 작동하고 스트리밍 URL을 지원하는 반면, Symlink는 직접 파일 액세스(로컬 재생에 더 좋음)를 제공하지만 미디어 서버와 동일한 경로에 있는 미디어 파일에 액세스하려면 {{appName}}가 필요합니다. TV 시리즈의 경우 더 나은 성능을 위해 심볼릭 링크를 사용하는 것이 좋습니다.",
-      "moviesLibrary": "영화 라이브러리",
-      "seriesLibrary": "시리즈 라이브러리",
-      "imageSet": "이미지 세트",
-      "outputFormat": "출력 형식",
-      "symlinks": "심볼릭 링크",
-      "strmFiles": "STRM 파일",
-      "moviesSymlinkHelp": "원본 영화 파일에 대한 심볼릭 링크를 생성합니다.",
-      "moviesStrmHelp": "경로 또는 스트리밍 URL이 포함된 .strm 파일을 생성합니다.",
-      "seriesSymlinkHelp": "원본 시즌 폴더에 대한 심볼릭 링크 생성(권장)",
-      "seriesStrmHelp": "각 에피소드에 대한 .strm 파일을 생성합니다.",
-      "coverImage": "도서관 표지 이미지",
-      "dropImage": "이미지 삭제",
-      "back": "뒤쪽에",
-      "saveContinue": "저장하고 계속하기"
+      "bodyRows": "Show everyone what's popular on your server, worked out from all users' watch history. Unlike personalized recommendations, Top Picks is the same list for every viewer. It appears in {{appName}} and, on Emby, can be a row on each viewer's home screen.",
+      "enableSubtitleRows": "The same trending list for every viewer"
     },
     "aiSetup": {
       "nameEmbeddings": "임베딩",
@@ -5348,7 +5215,8 @@
     "homeSections": {
       "title": "Emby Home Rows",
       "blurb": "Top Picks and each viewer's recommendations on their Emby home screen"
-    }
+    },
+    "gateLegacyLibraryOutput": "Legacy library output is switched off — these settings are not used"
   },
   "settingsEvaluation": {
     "title": "Evaluation seeds",
@@ -5728,5 +5596,43 @@
       "waiting": "대기 중 {{count}}",
       "unavailable": "열 수 없음 {{count}}"
     }
+  },
+  "legacyLibraryOutput": {
+    "legacyChip": "Legacy",
+    "card": {
+      "title": "Legacy library output",
+      "subtitle": "Each viewer's AI Picks libraries and the shared Top Picks libraries, written as STRM files or symlinks under /aperture-libraries and added to the media server as extra libraries. Emby home rows now put the same recommendations and Top Picks on each viewer's home screen straight from the original titles — no files, no extra mount, no duplicate library. This output is being phased out.",
+      "homeRowsLink": "Set up Emby home rows",
+      "switchLabel": "Write STRM / symlink libraries",
+      "switchOnHelp": "On: the library jobs keep writing the AI Picks and Top Picks libraries.",
+      "switchOffHelp": "Off: nothing is written or created any more, the library jobs do nothing, and the settings that only concern these libraries are greyed out. Libraries already in the media server keep their last contents until you remove them below.",
+      "savedOn": "Legacy library output switched on. The next library sync brings the libraries up to date.",
+      "savedOff": "Legacy library output switched off. Nothing more will be written.",
+      "saveFailed": "Could not save the setting.",
+      "remainingTitle": "Libraries still in the media server",
+      "remainingCount_one": "{{count}} generated library is recorded ({{personal}} per viewer, {{topPicks}} Top Picks).",
+      "remainingCount_other": "{{count}} generated libraries are recorded ({{personal}} per viewer, {{topPicks}} Top Picks).",
+      "noneRemaining": "No generated libraries are recorded. Removing still looks for libraries left behind by earlier renames, and for the Top Picks collection and playlist.",
+      "removeButton": "Remove generated libraries",
+      "removeNeedsOff": "Switch the output off first — while it is on, the next library sync would rebuild them.",
+      "confirmTitle": "Remove every generated library?",
+      "confirmBody_one": "This deletes every library legacy output made from the media server — {{count}} recorded, plus any an earlier rename left behind — with their folders under /aperture-libraries, and the Top Picks collection and playlist. Recommendations are not touched: switching the output back on and running the library jobs rebuilds the libraries.",
+      "confirmBody_other": "This deletes every library legacy output made from the media server — {{count}} recorded, plus any an earlier rename left behind — with their folders under /aperture-libraries, and the Top Picks collection and playlist. Recommendations are not touched: switching the output back on and running the library jobs rebuilds the libraries.",
+      "confirmAction": "Remove libraries",
+      "cancel": "Cancel",
+      "removeStarted": "Removal started. A library the media server refuses to delete is kept, and running the job again retries it.",
+      "openJob": "Open job",
+      "removeFailed": "Could not start the removal."
+    },
+    "notice": {
+      "title": "Legacy library output is switched off",
+      "body": "These settings only concern the STRM / symlink libraries, which are no longer written. They are kept as they are in case the output is switched back on.",
+      "action": "Output format"
+    },
+    "jobBlocked": {
+      "legacyLibraryOutputOff": "Legacy library output is switched off (Output format), so this job has nothing to write.",
+      "legacyLibraryOutputOn": "Switch legacy library output off in Output format first — while it is on, the next library sync would rebuild what this removes."
+    },
+    "usersMenuDisabled": "Legacy library output is off"
   }
 }

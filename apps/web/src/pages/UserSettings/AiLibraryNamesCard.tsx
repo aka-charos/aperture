@@ -25,6 +25,9 @@ export function AiLibraryNamesCard({ user }: { user: User | null }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  // Legacy library output switched off by an admin: these names rename
+  // libraries that are no longer created, so the card greys with it.
+  const [outputOff, setOutputOff] = useState(false)
 
   const fetchSettings = useCallback(async () => {
     setLoading(true)
@@ -33,10 +36,12 @@ export function AiLibraryNamesCard({ user }: { user: User | null }) {
       const response = await fetch('/api/settings/user', { credentials: 'include' })
       if (response.ok) {
         const data = (await response.json()) as {
-          defaults?: { libraryNamePrefix?: string }
+          defaults?: { libraryNamePrefix?: string; libraryOutputEnabled?: boolean }
           settings?: { libraryName?: string; seriesLibraryName?: string }
         }
         setDefaultLibraryPrefix(data.defaults?.libraryNamePrefix || 'AI Picks - ')
+        // Absent is not false: an API from before the switch still writes them.
+        setOutputOff(data.defaults?.libraryOutputEnabled === false)
         setMoviesLibraryName(data.settings?.libraryName || '')
         setSeriesLibraryName(data.settings?.seriesLibraryName || '')
       } else {
@@ -93,6 +98,12 @@ export function AiLibraryNamesCard({ user }: { user: User | null }) {
           {t('userSettings.aiLibraryNamesSubtitle')}
         </Typography>
 
+        {outputOff && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            {t('userSettings.aiLibraryNamesOutputOff')}
+          </Alert>
+        )}
+
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
             {error}
@@ -119,6 +130,7 @@ export function AiLibraryNamesCard({ user }: { user: User | null }) {
                 placeholder={`${defaultLibraryPrefix}${user?.displayName || user?.username || 'User'} - Movies`}
                 value={moviesLibraryName}
                 onChange={(e) => setMoviesLibraryName(e.target.value)}
+                disabled={outputOff}
                 size="small"
                 fullWidth
                 inputProps={{ maxLength: 100 }}
@@ -138,6 +150,7 @@ export function AiLibraryNamesCard({ user }: { user: User | null }) {
                 placeholder={`${defaultLibraryPrefix}${user?.displayName || user?.username || 'User'} - TV Series`}
                 value={seriesLibraryName}
                 onChange={(e) => setSeriesLibraryName(e.target.value)}
+                disabled={outputOff}
                 size="small"
                 fullWidth
                 inputProps={{ maxLength: 100 }}
@@ -154,7 +167,7 @@ export function AiLibraryNamesCard({ user }: { user: User | null }) {
                 variant="contained"
                 startIcon={saving ? <CircularProgress size={16} /> : <SaveIcon />}
                 onClick={() => void saveSettings()}
-                disabled={saving}
+                disabled={saving || outputOff}
                 size="small"
               >
                 {saving ? t('userSettings.saving') : t('common.save')}
@@ -166,7 +179,7 @@ export function AiLibraryNamesCard({ user }: { user: User | null }) {
                     setMoviesLibraryName('')
                     setSeriesLibraryName('')
                   }}
-                  disabled={saving}
+                  disabled={saving || outputOff}
                   size="small"
                 >
                   {t('userSettings.resetToDefaults')}

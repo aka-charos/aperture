@@ -4,25 +4,20 @@ import { useSetupStatus } from '@/hooks/useSetupStatus'
 import { useTranslation } from 'react-i18next'
 import {
   STEP_ORDER_IDS,
-  DEFAULT_AI_RECS_OUTPUT,
   DEFAULT_TOP_PICKS,
   DEFAULT_MEDIA_SERVER_TYPES,
-  DEFAULT_LIBRARY_IMAGES,
 } from '../constants'
 import { SETUP_JOB_DEFINITIONS } from '../setupJobDefinitions'
 import type {
   SetupStepId,
   SetupProgress,
   LibraryConfig,
-  AiRecsOutputConfig,
   TopPicksConfig,
   MediaServerType,
   SetupWizardContext,
-  LibraryImageInfo,
   SetupUser,
   DiscoveredServer,
   JobProgress,
-  ValidationResult,
   AIConfig,
   AIFunctionConfig,
   AIProviderOption,
@@ -59,19 +54,6 @@ export function useSetupWizard(): SetupWizardContext {
   const [libraries, setLibraries] = useState<LibraryConfig[]>([])
   const [loadingLibraries, setLoadingLibraries] = useState(false)
 
-  // AI rec output
-  const [aiRecsOutput, setAiRecsOutput] = useState<AiRecsOutputConfig>(DEFAULT_AI_RECS_OUTPUT)
-  // Initialize with bundled default images
-  const [libraryImages, setLibraryImages] = useState<Record<string, LibraryImageInfo>>({
-    'ai-recs-movies': { url: DEFAULT_LIBRARY_IMAGES['ai-recs-movies'], isDefault: true },
-    'ai-recs-series': { url: DEFAULT_LIBRARY_IMAGES['ai-recs-series'], isDefault: true },
-  })
-  const [uploadingImage, setUploadingImage] = useState<string | null>(null)
-
-  // Validation state
-  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
-  const [validating, setValidating] = useState(false)
-
   // Users state
   const [setupUsers, setSetupUsers] = useState<SetupUser[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
@@ -107,7 +89,6 @@ export function useSetupWizard(): SetupWizardContext {
         id: def.id,
         name: t(def.nameKey),
         description: t(def.descriptionKey),
-        optional: 'optional' in def ? def.optional : undefined,
       })),
     [t]
   )
@@ -180,7 +161,6 @@ export function useSetupWizard(): SetupWizardContext {
       .then((data) => {
         if (data?.progress) setProgress(data.progress)
         if (data?.snapshot?.libraries) setLibraries(data.snapshot.libraries)
-        if (data?.snapshot?.aiRecsOutput) setAiRecsOutput(data.snapshot.aiRecsOutput)
         if (data?.snapshot?.topPicks) setTopPicks((tp) => ({ ...tp, ...data.snapshot.topPicks }))
 
         // Set existing media server config if configured
@@ -238,17 +218,7 @@ export function useSetupWizard(): SetupWizardContext {
               itemsProcessed: lastRun.itemsProcessed,
               itemsTotal: lastRun.itemsTotal,
               error: lastRun.error,
-              result: lastRun.result as import('../types').LibrarySyncResult | undefined,
-            }
-          }
-          // For optional jobs that haven't run, mark as skipped if not enabled
-          if (job.optional && job.id === 'refresh-top-picks' && !topPicks.isEnabled) {
-            return {
-              id: job.id,
-              name: job.name,
-              description: job.description,
-              status: 'skipped' as const,
-              message: t('setup.initialJobs.skipTopPicks'),
+              result: lastRun.result,
             }
           }
           return {
@@ -289,7 +259,7 @@ export function useSetupWizard(): SetupWizardContext {
       .catch(() => {
         // non-fatal
       })
-  }, [stepId, jobsProgress.length, topPicks.isEnabled, initialJobs, t])
+  }, [stepId, jobsProgress.length, initialJobs, t])
 
   const updateProgress = useCallback(
     async (opts: { currentStep?: SetupStepId | null; completedStep?: SetupStepId }) => {
@@ -443,121 +413,16 @@ export function useSetupWizard(): SetupWizardContext {
       if (!res.ok) throw new Error(data?.error || 'Failed to save libraries')
       setLibraries(data.libraries || libraries)
       await updateProgress({ completedStep: 'mediaLibraries' })
-      goToStep('fileLocations')
+      // Straight on to users: the paths, output format and mount checks that
+      // used to follow were all for legacy library output, which a new install
+      // starts without (F-142) and which lives in Admin → Output format.
+      goToStep('users')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save libraries')
     } finally {
       setSaving(false)
     }
   }, [libraries, updateProgress, goToStep])
-
-  // AI Recs handlers
-  const saveAiRecsOutput = useCallback(async () => {
-    setSaving(true)
-    setError('')
-    try {
-      const res = await fetch('/api/setup/ai-recs-output', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(aiRecsOutput),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'Failed to save output format')
-      setAiRecsOutput(data)
-      await updateProgress({ completedStep: 'aiRecsLibraries' })
-      // Reset validation when moving to validate step
-      setValidationResult(null)
-      goToStep('validate')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save output format')
-    } finally {
-      setSaving(false)
-    }
-  }, [aiRecsOutput, updateProgress, goToStep])
-
-  // Validation handler
-  const runValidation = useCallback(async () => {
-    setValidating(true)
-    setError('')
-    try {
-      const res = await fetch('/api/setup/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ useSymlinks: aiRecsOutput.moviesUseSymlinks || aiRecsOutput.seriesUseSymlinks }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'Validation failed')
-      setValidationResult(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Validation failed')
-      setValidationResult({
-        checks: [],
-        allPassed: false,
-      })
-    } finally {
-      setValidating(false)
-    }
-  }, [aiRecsOutput.moviesUseSymlinks, aiRecsOutput.seriesUseSymlinks])
-
-  const uploadLibraryImage = useCallback(async (libraryType: string, file: File) => {
-    setUploadingImage(libraryType)
-    setError('')
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const res = await fetch(`/api/admin/images/library/${libraryType}/default?imageType=Primary`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      })
-
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Upload failed')
-      }
-
-      const data = await res.json()
-      setLibraryImages((prev) => ({
-        ...prev,
-        [libraryType]: { url: data.url, isDefault: true },
-      }))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload image')
-      throw err
-    } finally {
-      setUploadingImage(null)
-    }
-  }, [])
-
-  const deleteLibraryImage = useCallback(async (libraryType: string) => {
-    setUploadingImage(libraryType)
-    setError('')
-    try {
-      const res = await fetch(`/api/admin/images/library/${libraryType}/default?imageType=Primary`, {
-        method: 'DELETE',
-        credentials: 'include',
-      })
-
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Delete failed')
-      }
-
-      // Revert to bundled default image
-      setLibraryImages((prev) => ({
-        ...prev,
-        [libraryType]: { url: DEFAULT_LIBRARY_IMAGES[libraryType], isDefault: true },
-      }))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete image')
-      throw err
-    } finally {
-      setUploadingImage(null)
-    }
-  }, [])
 
   // Users handlers
   const fetchSetupUsers = useCallback(async () => {
@@ -857,7 +722,9 @@ export function useSetupWizard(): SetupWizardContext {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(topPicks),
+        // Only the switch: the library, collection and playlist choices are
+        // legacy output, left at their stored values for Admin → Top Picks.
+        body: JSON.stringify({ isEnabled: topPicks.isEnabled }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'Failed to save Top Picks config')
@@ -1010,24 +877,12 @@ export function useSetupWizard(): SetupWizardContext {
     // No auth required - setup endpoint only works before setup is complete
     // Initialize job progress for all jobs
     setJobsProgress(
-      initialJobs.map((job) => {
-        // Mark optional jobs as skipped if not enabled
-        if (job.optional && job.id === 'refresh-top-picks' && !topPicks.isEnabled) {
-          return {
-            id: job.id,
-            name: job.name,
-            description: job.description,
-            status: 'skipped' as const,
-            message: t('setup.initialJobs.skipTopPicks'),
-          }
-        }
-        return {
-          id: job.id,
-          name: job.name,
-          description: job.description,
-          status: 'pending' as const,
-        }
-      })
+      initialJobs.map((job) => ({
+        id: job.id,
+        name: job.name,
+        description: job.description,
+        status: 'pending' as const,
+      }))
     )
     setCurrentJobIndex(-1)
     setRunningJobs(true)
@@ -1036,15 +891,6 @@ export function useSetupWizard(): SetupWizardContext {
 
     try {
       for (let i = 0; i < initialJobs.length; i++) {
-        const job = initialJobs[i]
-        // Skip optional jobs that aren't enabled
-        if (job.optional && job.id === 'refresh-top-picks' && !topPicks.isEnabled) {
-          setJobLogs((l) => [
-            ...l,
-            `[${new Date().toLocaleTimeString()}] ${t('setup.jobs.logSkippedTopPicks', { name: job.name })}`,
-          ])
-          continue
-        }
         await runJobAndWait(i, initialJobs)
       }
       setJobLogs((l) => [...l, `[${new Date().toLocaleTimeString()}] ${t('setup.jobs.logAllComplete')}`])
@@ -1062,7 +908,7 @@ export function useSetupWizard(): SetupWizardContext {
       setRunningJobs(false)
       setCurrentJobIndex(-1)
     }
-  }, [runJobAndWait, updateProgress, goToStep, topPicks.isEnabled, initialJobs, t])
+  }, [runJobAndWait, updateProgress, goToStep, initialJobs, t])
 
   // Run a single job by ID (for re-running completed or failed jobs)
   const runSingleJob = useCallback(async (jobId: string) => {
@@ -1150,11 +996,6 @@ export function useSetupWizard(): SetupWizardContext {
     existingMediaServer,
     libraries,
     loadingLibraries,
-    aiRecsOutput,
-    libraryImages,
-    uploadingImage,
-    validationResult,
-    validating,
     setupUsers,
     loadingUsers,
     usersError,
@@ -1196,11 +1037,6 @@ export function useSetupWizard(): SetupWizardContext {
     setLibraries,
     loadLibraries,
     saveLibraries,
-    setAiRecsOutput,
-    saveAiRecsOutput,
-    uploadLibraryImage,
-    deleteLibraryImage,
-    runValidation,
     fetchSetupUsers,
     importAndEnableUser,
     toggleUserRecommendations,

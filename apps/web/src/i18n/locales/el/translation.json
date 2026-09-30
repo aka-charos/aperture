@@ -10,15 +10,6 @@
       "mediaLibraries": {
         "label": "Βιβλιοθήκες"
       },
-      "fileLocations": {
-        "label": "Διαδρομές"
-      },
-      "aiRecsLibraries": {
-        "label": "Προτάσεις"
-      },
-      "validate": {
-        "label": "Επικύρωση"
-      },
       "users": {
         "label": "Χρήστες"
       },
@@ -72,20 +63,7 @@
       "generateSeriesRecommendations": {
         "name": "Δημιουργία Προτάσεων Σειρών",
         "description": "Δημιουργία εξατομικευμένων προτάσεων τηλεοπτικών σειρών για κάθε χρήστη"
-      },
-      "syncMovieLibraries": {
-        "name": "Δημιουργία Βιβλιοθηκών Ταινιών {{appName}}",
-        "description": "Δημιουργία βιβλιοθηκών ταινιών με προτάσεις AI στον διακομιστή πολυμέσων σας"
-      },
-      "syncSeriesLibraries": {
-        "name": "Δημιουργία Βιβλιοθηκών Σειρών {{appName}}",
-        "description": "Δημιουργία βιβλιοθηκών σειρών με προτάσεις AI στον διακομιστή πολυμέσων σας"
-      },
-      "refreshTopPicks": {
-        "name": "Συγχρονισμός Κορυφαίων Επιλογών",
-        "description": "Δημιουργία βιβλιοθηκών ταινιών και σειρών Κορυφαίων Επιλογών"
-      },
-      "skipTopPicks": "Τα Κορυφαία 10 δεν είναι ενεργοποιημένα"
+      }
     },
     "jobs": {
       "statusStarting": "Εκκίνηση…",
@@ -93,7 +71,6 @@
       "statusProcessingShort": "Επεξεργασία",
       "logStartingBatch": "Εκκίνηση αρχικών εργασιών ρύθμισης…",
       "logAllComplete": "Όλες οι εργασίες ολοκληρώθηκαν με επιτυχία!",
-      "logSkippedTopPicks": "⊘ Παραλείφθηκε: {{name}} (τα Κορυφαία 10 δεν είναι ενεργοποιημένα)",
       "errRunInitial": "Αποτυχία εκτέλεσης αρχικών εργασιών",
       "unknownError": "Άγνωστο σφάλμα",
       "logSetupFailed": "Η ρύθμιση απέτυχε: {{message}}",
@@ -149,18 +126,6 @@
       "noneSecondary": "Κάντε κλικ στο Ανανέωση για να φορτώσετε βιβλιοθήκες",
       "back": "Πίσω",
       "saveContinue": "Αποθήκευση & Συνέχεια"
-    },
-    "validate": {
-      "title": "Επικύρωση Ρύθμισης",
-      "subtitle": "Έλεγχος ότι το {{appName}} έχει πρόσβαση σε όλες τις απαιτούμενες διαδρομές και ότι ο διακομιστής πολυμέσων σας είναι προσβάσιμος.",
-      "running": "Εκτέλεση ελέγχων επικύρωσης…",
-      "errorPrefix": "Σφάλμα:",
-      "allPassed": "Όλοι οι έλεγχοι πέρασαν! Η ρύθμισή σας είναι έτοιμη.",
-      "someFailed": "Ορισμένοι έλεγχοι απέτυχαν. Διορθώστε τα παραπάνω προβλήματα και δοκιμάστε ξανά, ή ελέγξτε τις προσαρτήσεις τόμων στο docker-compose.yml.",
-      "back": "Πίσω",
-      "checking": "Έλεγχος…",
-      "retry": "Επανάληψη",
-      "continue": "Συνέχεια"
     },
     "restore": {
       "title": "Επαναφορά από Αντίγραφο Ασφαλείας",
@@ -224,26 +189,9 @@
     },
     "complete": {
       "title": "Η Ρύθμιση Ολοκληρώθηκε!",
-      "subtitle": "Το {{appName}} δημιούργησε εξατομικευμένες βιβλιοθήκες προτάσεων στον διακομιστή πολυμέσων σας.",
-      "issuesAlert": "Ορισμένοι χρήστες παραλείφθηκαν ή αντιμετώπισαν προβλήματα. Οι χρήστες χρειάζονται ιστορικό παρακολούθησης για να δημιουργηθούν προτάσεις. Θα λάβουν προτάσεις αφού παρακολουθήσουν περισσότερο περιεχόμενο και εκτελεστεί ο επόμενος συγχρονισμός.",
-      "librariesCreatedIn": "Βιβλιοθήκες που Δημιουργήθηκαν στο {{name}}",
-      "mediaServerFallback": "Διακομιστής Πολυμέσων",
-      "movies": "Ταινίες",
-      "tvSeries": "Τηλεοπτικές Σειρές",
-      "recommendationsChip": "{{count}} προτάσεις",
-      "aiPicksPrimary": "Επιλογές AI του {{name}}",
-      "skippedNoHistory": "Παραλείφθηκε (χωρίς ιστορικό παρακολούθησης)",
-      "failed": "Απέτυχε",
-      "topPicksGlobal": "Κορυφαίες Επιλογές (Καθολικές)",
-      "topPicksMovies": "Κορυφαίες Επιλογές - Ταινίες",
-      "topPicksMoviesSecondary": "{{count}} δημοφιλείς ταινίες",
-      "topPicksSeries": "Κορυφαίες Επιλογές - Σειρές",
-      "topPicksSeriesSecondary": "{{count}} δημοφιλείς σειρές",
       "gettingStarted": "Ξεκινώντας",
       "loginPrimary": "Συνδεθείτε με τα διαπιστευτήρια διαχειριστή του Διακομιστή Πολυμέσων σας",
       "loginSecondary": "Χρησιμοποιήστε το ίδιο όνομα χρήστη και κωδικό πρόσβασης που χρησιμοποιείτε για το Emby/Jellyfin",
-      "openServerPrimary": "Ανοίξτε τον διακομιστή πολυμέσων σας για να δείτε τις νέες βιβλιοθήκες",
-      "openServerSecondary": "Νέες βιβλιοθήκες «Επιλογές AI» θα εμφανιστούν για κάθε ενεργοποιημένο χρήστη στο {{appName}}",
       "schedulesTitle": "Αυτόματα Προγράμματα",
       "schedulesIntro": "Το {{appName}} εκτελεί εργασίες παρασκηνίου για να διατηρεί τις προτάσεις ενημερωμένες. Τα προεπιλεγμένα προγράμματα μπορούν να τροποποιηθούν στο Διαχείριση → Εργασίες.",
       "schedWatchHistory": "Ιστορικό Παρακολούθησης",
@@ -254,8 +202,6 @@
       "schedEmbeddingsDesc": "Καθημερινά στις 3π.μ. — Επεξεργάζεται περιεχόμενο για προτάσεις AI",
       "schedAiRecs": "Προτάσεις AI",
       "schedAiRecsDesc": "Εβδομαδιαία την Κυριακή στις 4π.μ. — Δημιουργεί εξατομικευμένες επιλογές για κάθε χρήστη",
-      "schedTopPicks": "Κορυφαίες Επιλογές",
-      "schedTopPicksDesc": "Καθημερινά στις 5π.μ. — Ενημερώνει τις καθολικές βιβλιοθήκες δημοφιλούς περιεχομένου",
       "unlockTitle": "Ξεκλειδώστε Περισσότερες Λειτουργίες",
       "unlockIntro": "Μετά τη σύνδεση, επισκεφθείτε το Διαχείριση → Ρυθμίσεις για να ενεργοποιήσετε αυτές τις επιπλέον λειτουργίες:",
       "featTrakt": "Ενσωμάτωση Trakt",
@@ -268,22 +214,16 @@
       "featUserPrefsDesc": "Κάθε χρήστης μπορεί να προσαρμόσει τις προτιμήσεις και τις ρυθμίσεις προτάσεών του",
       "backToJobs": "Πίσω στις Εργασίες",
       "finishSetup": "Ολοκλήρωση Ρύθμισης",
-      "finishHint": "Κάνοντας κλικ στο Ολοκλήρωση θα απενεργοποιηθεί ο δημόσιος οδηγός ρύθμισης, θα ασφαλιστεί το {{appName}} και θα γίνει ανακατεύθυνση στη σύνδεση."
+      "finishHint": "Κάνοντας κλικ στο Ολοκλήρωση θα απενεργοποιηθεί ο δημόσιος οδηγός ρύθμισης, θα ασφαλιστεί το {{appName}} και θα γίνει ανακατεύθυνση στη σύνδεση.",
+      "subtitleReady": "{{appName}} is set up, and recommendations are ready for every enabled viewer.",
+      "appPrimary": "Recommendations live in {{appName}}",
+      "appSecondary": "Each viewer signs in with their media server account to see their picks and why each one was chosen",
+      "homeRowsPrimary": "Put them on Emby home screens",
+      "homeRowsSecondary": "In Admin → Recommendations → Emby Home Rows, choose which rows appear on each viewer's home screen and where",
+      "schedHomeRows": "Emby Home Rows",
+      "schedHomeRowsDesc": "Daily at 5:45am — Refreshes the rows on each viewer's Emby home screen, once you have set them up"
     },
     "initialJobsStep": {
-      "newLibraryChip": "Νέα βιβλιοθήκη",
-      "libSummaryMoviesTitle": "Βιβλιοθήκες Ταινιών που Δημιουργήθηκαν",
-      "libSummarySeriesTitle": "Βιβλιοθήκες Τηλεοπτικών Σειρών που Δημιουργήθηκαν",
-      "createdCount": "{{count}} δημιουργήθηκαν",
-      "skippedCount": "{{count}} παραλείφθηκαν",
-      "failedCount": "{{count}} απέτυχαν",
-      "topPicksLibsCreated": "Βιβλιοθήκες Κορυφαίων Επιλογών που Δημιουργήθηκαν",
-      "moviesChip": "{{count}} ταινίες",
-      "seriesChip": "{{count}} σειρές",
-      "failedChip": "Απέτυχε",
-      "topPicksMoviesRow": "Κορυφαίες Επιλογές - Ταινίες",
-      "topPicksSeriesRow": "Κορυφαίες Επιλογές - Σειρές",
-      "topPicksFailedDefault": "Αποτυχία δημιουργίας βιβλιοθηκών Κορυφαίων Επιλογών",
       "rerunRun": "Εκτέλεση {{name}}",
       "rerunRerun": "Επανεκτέλεση {{name}}",
       "itemsProcessed": "{{count}} στοιχεία",
@@ -295,7 +235,6 @@
       "bulletWatchHistory": "Συγχρονισμός Ιστορικού Παρακολούθησης — Εισαγωγή ιστορικού παρακολούθησης για κατανόηση προτιμήσεων",
       "bulletEmbeddings": "Δημιουργία Embeddings — Δημιουργία AI διανυσμάτων για κατανόηση θεματικών περιεχομένου (χρησιμοποιεί OpenAI)",
       "bulletRecs": "Δημιουργία Προτάσεων — Δημιουργία εξατομικευμένων επιλογών για κάθε χρήστη",
-      "bulletLibraries": "Συγχρονισμός Βιβλιοθηκών — Αποστολή βιβλιοθηκών προτάσεων στον διακομιστή πολυμέσων σας",
       "headsUp": "Αυτό μπορεί να διαρκέσει από λίγα λεπτά έως και 30+ λεπτά, ανάλογα με το μέγεθος των βιβλιοθηκών πολυμέσων σας. Μεγάλες συλλογές με χιλιάδες ταινίες και επεισόδια θα διαρκέσουν περισσότερο.",
       "headsUpLabel": "Προσοχή!",
       "progressLine": "Πρόοδος: {{done}} από {{total}} εργασίες",
@@ -303,7 +242,6 @@
       "chipAllComplete": "Όλα Ολοκληρώθηκαν",
       "chipFailed": "Απέτυχε",
       "chipRunning": "Εκτελείται",
-      "libraryResultsTitle": "Αποτελέσματα Δημιουργίας Βιβλιοθηκών",
       "back": "Πίσω",
       "startInit": "Έναρξη Αρχικοποίησης",
       "runningProgress": "Εκτελείται... ({{done}}/{{total}})",
@@ -322,68 +260,13 @@
     },
     "topPicksStep": {
       "title": "Κορυφαίες Επιλογές (Προαιρετικό)",
-      "body": "Δημιουργήστε καθολικές βιβλιοθήκες «τι είναι δημοφιλές» με βάση το συγκεντρωτικό ιστορικό παρακολούθησης όλων των χρηστών. Σε αντίθεση με τις εξατομικευμένες προτάσεις AI, οι Κορυφαίες Επιλογές δείχνουν το ίδιο δημοφιλές περιεχόμενο σε όλους - ιδανικό για να ανακαλύψετε τι είναι δημοφιλές στον διακομιστή σας.",
       "enableTitle": "Ενεργοποίηση Κορυφαίων Επιλογών",
-      "enableSubtitle": "Δημιουργία βιβλιοθηκών δημοφιλούς περιεχομένου ορατών σε όλους τους χρήστες",
       "noteAdvanced": "Προηγμένες ρυθμίσεις, όπως βάρη αλγορίθμου δημοφιλίας, χρονικά παράθυρα και προγράμματα ανανέωσης, μπορούν να προσαρμοστούν αργότερα στο Διαχείριση → Ρυθμίσεις → Κορυφαίες Επιλογές.",
       "noteLabel": "Σημείωση:",
-      "outputConfig": "Ρύθμιση Εξόδου",
-      "symlinkWarning": "Τα symlinks απαιτούν το {{appName}} να έχει πρόσβαση στα αρχεία πολυμέσων σας στις ίδιες ακριβώς διαδρομές που χρησιμοποιεί ο διακομιστής πολυμέσων σας. Αν οι διαδρομές διαφέρουν μεταξύ συστημάτων (π.χ. Docker containers), χρησιμοποιήστε αρχεία STRM αντ' αυτού.",
-      "symlinkLabel": "Symlinks",
       "back": "Πίσω",
       "saveContinue": "Αποθήκευση & Συνέχεια",
-      "errUpload": "Η μεταφόρτωση απέτυχε",
-      "errDelete": "Η διαγραφή απέτυχε"
-    },
-    "fileLocations": {
-      "title": "Τοποθεσίες Αρχείων",
-      "body": "Ρυθμίστε πού βλέπει ο διακομιστής πολυμέσων σας τα αρχεία βιβλιοθήκης του {{appName}}. Αυτές οι διαδρομές πρέπει να ταιριάζουν με τον τρόπο που ο διακομιστής πολυμέσων σας έχει πρόσβαση στους τόμους που έχουν προσαρτηθεί στη ρύθμιση Docker σας.",
-      "saved": "Οι τοποθεσίες αρχείων αποθηκεύτηκαν!",
-      "autoDetectTitle": "Αυτόματος Εντοπισμός Διαδρομών",
-      "autoDetectBody": "Το {{appName}} μπορεί να εντοπίσει αυτόματα τις σωστές διαδρομές συγκρίνοντας το πώς βλέπει τα αρχεία ο διακομιστής πολυμέσων σας με το πώς τα βλέπει το {{appName}}.",
-      "detecting": "Εντοπισμός...",
-      "detectButton": "Αυτόματος Εντοπισμός Διαδρομών",
-      "pathsDetected": "Οι διαδρομές εντοπίστηκαν με επιτυχία!",
-      "mediaServerSees": "Ο διακομιστής πολυμέσων βλέπει:",
-      "apertureSees": "Το {{appName}} βλέπει:",
-      "detectedPrefix": "Εντοπισμένο πρόθεμα:",
-      "hideManual": "Απόκρυψη χειροκίνητης ρύθμισης",
-      "orManual": "Ή ρύθμιση με το χέρι",
-      "howToFindTitle": "Πώς να βρείτε αυτές τις διαδρομές:",
-      "howToFindBody": "Ανοίξτε οποιαδήποτε ταινία στον διακομιστή πολυμέσων σας, πηγαίνετε στις Πληροφορίες Πολυμέσου και δείτε τη διαδρομή αρχείου. Αν εμφανίζει /mnt/Movies/SomeMovie/file.mkv, το πρόθεμα διαδρομής πολυμέσων σας είναι /mnt/.",
-      "apertureLibsPath": "Διαδρομή Βιβλιοθηκών {{appName}}",
-      "apertureLibsHelp": "Πού βλέπει ο διακομιστής πολυμέσων σας τις βιβλιοθήκες εξόδου του {{appName}};",
-      "helperApertureLibs": "Διαδρομή όπου ο διακομιστής πολυμέσων σας βλέπει το /aperture-libraries",
-      "mediaPrefixTitle": "Πρόθεμα Διαδρομής Διακομιστή Πολυμέσων",
-      "mediaPrefixHelp": "Πού βλέπει ο διακομιστής πολυμέσων σας τα αρχικά αρχεία πολυμέσων σας;",
-      "symlinkHelper": "Χρησιμοποιείται για τη δημιουργία symlinks προς τα αρχεία πολυμέσων σας",
-      "currentConfig": "Τρέχουσα Ρύθμιση",
-      "librariesPathLine": "Διαδρομή Βιβλιοθηκών:",
-      "mediaPrefixLine": "Πρόθεμα Πολυμέσων:",
-      "back": "Πίσω",
-      "skipDefaults": "Παράλειψη (Χρήση Προεπιλογών)",
-      "saveContinue": "Αποθήκευση & Συνέχεια",
-      "errDetect": "Ο αυτόματος εντοπισμός απέτυχε",
-      "errSave": "Αποτυχία αποθήκευσης ρύθμισης"
-    },
-    "aiRecs": {
-      "title": "Ρύθμιση Βιβλιοθηκών Προτάσεων AI",
-      "body": "Το {{appName}} δημιουργεί εικονικές βιβλιοθήκες στον διακομιστή πολυμέσων σας που περιέχουν εξατομικευμένες προτάσεις για κάθε χρήστη. Ρυθμίστε πώς δημιουργούνται αυτές οι βιβλιοθήκες και προαιρετικά προσαρμόστε τις εικόνες εξωφύλλου τους.",
-      "strmVsSymlink": "STRM έναντι Symlinks: Τα αρχεία STRM λειτουργούν παντού και υποστηρίζουν URL ροής, ενώ τα Symlinks παρέχουν άμεση πρόσβαση στα αρχεία (καλύτερα για τοπική αναπαραγωγή) αλλά απαιτούν το {{appName}} να έχει πρόσβαση στα αρχεία πολυμέσων σας στις ίδιες διαδρομές με τον διακομιστή πολυμέσων σας. Για τηλεοπτικές σειρές, τα symlinks συνιστώνται για καλύτερη απόδοση.",
-      "moviesLibrary": "Βιβλιοθήκη Ταινιών",
-      "seriesLibrary": "Βιβλιοθήκη Σειρών",
-      "imageSet": "Σετ Εικόνων",
-      "outputFormat": "Μορφή Εξόδου",
-      "symlinks": "Symlinks",
-      "strmFiles": "Αρχεία STRM",
-      "moviesSymlinkHelp": "Δημιουργεί συμβολικούς συνδέσμους προς τα αρχικά αρχεία ταινιών",
-      "moviesStrmHelp": "Δημιουργεί αρχεία .strm με διαδρομές ή URL ροής",
-      "seriesSymlinkHelp": "Δημιουργεί symlinks προς τους αρχικούς φακέλους σεζόν (συνιστάται)",
-      "seriesStrmHelp": "Δημιουργεί αρχεία .strm για κάθε επεισόδιο",
-      "coverImage": "Εικόνα Εξωφύλλου Βιβλιοθήκης",
-      "dropImage": "Αφήστε εικόνα",
-      "back": "Πίσω",
-      "saveContinue": "Αποθήκευση & Συνέχεια"
+      "bodyRows": "Show everyone what's popular on your server, worked out from all users' watch history. Unlike personalized recommendations, Top Picks is the same list for every viewer. It appears in {{appName}} and, on Emby, can be a row on each viewer's home screen.",
+      "enableSubtitleRows": "The same trending list for every viewer"
     },
     "aiSetup": {
       "nameEmbeddings": "Embeddings",
@@ -2423,7 +2306,8 @@
       "previewNew": "New",
       "previewSort": "Titles within each row: {{sort}}."
     },
-    "tabHomeScreen": "Emby home screen"
+    "tabHomeScreen": "Emby home screen",
+    "aiLibraryNamesOutputOff": "These libraries are no longer created on this server, so their names have no effect."
   },
   "watching": {
     "subtitle": "Παρακολουθήστε τις σειρές που βλέπετε και δείτε τα επεισόδια που έρχονται",
@@ -4107,27 +3991,6 @@
     "saveDefaultsFailed": "Η αποθήκευση απέτυχε",
     "connectionError": "Δεν ήταν δυνατή η σύνδεση με τον διακομιστή"
   },
-  "topPicksOutputConfig": {
-    "accordionTitle": "Ποια είναι η διαφορά μεταξύ Βιβλιοθήκης, Συλλογής και Λίστας αναπαραγωγής;",
-    "libraryTitle": "Βιβλιοθήκη",
-    "libraryBody": "Εμφανίζεται ως ξεχωριστή βιβλιοθήκη στην πλαϊνή μπάρα του media server σας. Περιέχει εικονικά αντίγραφα (αρχεία STRM) του περιεχομένου. Ιδανικό για αποκλειστική περιήγηση στις Κορυφαίες επιλογές.",
-    "collectionTitle": "Συλλογή (Box Set)",
-    "collectionBody": "Ομαδοποιεί τα υπάρχοντα στοιχεία της βιβλιοθήκης σας σε ένα \"box set\" που εμφανίζεται κατά την περιήγηση. Χρησιμοποιεί απευθείας τα αρχικά αρχεία πολυμέσων σας. Ιδανικό για οργάνωση εντός υπαρχουσών βιβλιοθηκών.",
-    "playlistTitle": "Λίστα αναπαραγωγής",
-    "playlistBody": "Δημιουργεί μια ταξινομημένη λίστα αναπαραγωγής στην ενότητα Λίστες αναπαραγωγής. Χρησιμοποιεί απευθείας τα αρχικά αρχεία πολυμέσων σας. Ιδανικό για διαδοχική παρακολούθηση ή τυχαία αναπαραγωγή.",
-    "moviesOutput": "Έξοδος ταινιών",
-    "seriesOutput": "Έξοδος σειρών",
-    "imageSet": "Σετ εικόνων",
-    "libraryCoverImage": "Εικόνα εξωφύλλου βιβλιοθήκης",
-    "dropImage": "Ρίξτε εδώ την εικόνα",
-    "outputTypes": "Τύποι εξόδου",
-    "outputLibrary": "Βιβλιοθήκη",
-    "outputCollection": "Συλλογή",
-    "outputPlaylist": "Λίστα αναπαραγωγής",
-    "libraryFileType": "Τύπος αρχείου βιβλιοθήκης",
-    "symlinks": "Symlinks",
-    "strmFiles": "Αρχεία STRM"
-  },
   "globalSearch": {
     "tooltipMac": "Αναζήτηση (⌘K)",
     "tooltipWin": "Αναζήτηση (Ctrl+K)",
@@ -4603,6 +4466,10 @@
         "globalEvaluation": {
           "title": "Evaluation",
           "description": "Measure how well recommendations retrieve what people actually watch"
+        },
+        "globalLegacy": {
+          "title": "Legacy Library Output",
+          "description": "Removes the STRM / symlink libraries once their output is switched off — run once, on purpose, when phasing them out"
         }
       },
       "jobNames": {
@@ -5348,7 +5215,8 @@
     "homeSections": {
       "title": "Emby Home Rows",
       "blurb": "Top Picks and each viewer's recommendations on their Emby home screen"
-    }
+    },
+    "gateLegacyLibraryOutput": "Legacy library output is switched off — these settings are not used"
   },
   "settingsEvaluation": {
     "title": "Evaluation seeds",
@@ -5728,5 +5596,43 @@
       "waiting": "Σε αναμονή: {{count}}",
       "unavailable": "Χωρίς πρόσβαση: {{count}}"
     }
+  },
+  "legacyLibraryOutput": {
+    "legacyChip": "Legacy",
+    "card": {
+      "title": "Legacy library output",
+      "subtitle": "Each viewer's AI Picks libraries and the shared Top Picks libraries, written as STRM files or symlinks under /aperture-libraries and added to the media server as extra libraries. Emby home rows now put the same recommendations and Top Picks on each viewer's home screen straight from the original titles — no files, no extra mount, no duplicate library. This output is being phased out.",
+      "homeRowsLink": "Set up Emby home rows",
+      "switchLabel": "Write STRM / symlink libraries",
+      "switchOnHelp": "On: the library jobs keep writing the AI Picks and Top Picks libraries.",
+      "switchOffHelp": "Off: nothing is written or created any more, the library jobs do nothing, and the settings that only concern these libraries are greyed out. Libraries already in the media server keep their last contents until you remove them below.",
+      "savedOn": "Legacy library output switched on. The next library sync brings the libraries up to date.",
+      "savedOff": "Legacy library output switched off. Nothing more will be written.",
+      "saveFailed": "Could not save the setting.",
+      "remainingTitle": "Libraries still in the media server",
+      "remainingCount_one": "{{count}} generated library is recorded ({{personal}} per viewer, {{topPicks}} Top Picks).",
+      "remainingCount_other": "{{count}} generated libraries are recorded ({{personal}} per viewer, {{topPicks}} Top Picks).",
+      "noneRemaining": "No generated libraries are recorded. Removing still looks for libraries left behind by earlier renames, and for the Top Picks collection and playlist.",
+      "removeButton": "Remove generated libraries",
+      "removeNeedsOff": "Switch the output off first — while it is on, the next library sync would rebuild them.",
+      "confirmTitle": "Remove every generated library?",
+      "confirmBody_one": "This deletes every library legacy output made from the media server — {{count}} recorded, plus any an earlier rename left behind — with their folders under /aperture-libraries, and the Top Picks collection and playlist. Recommendations are not touched: switching the output back on and running the library jobs rebuilds the libraries.",
+      "confirmBody_other": "This deletes every library legacy output made from the media server — {{count}} recorded, plus any an earlier rename left behind — with their folders under /aperture-libraries, and the Top Picks collection and playlist. Recommendations are not touched: switching the output back on and running the library jobs rebuilds the libraries.",
+      "confirmAction": "Remove libraries",
+      "cancel": "Cancel",
+      "removeStarted": "Removal started. A library the media server refuses to delete is kept, and running the job again retries it.",
+      "openJob": "Open job",
+      "removeFailed": "Could not start the removal."
+    },
+    "notice": {
+      "title": "Legacy library output is switched off",
+      "body": "These settings only concern the STRM / symlink libraries, which are no longer written. They are kept as they are in case the output is switched back on.",
+      "action": "Output format"
+    },
+    "jobBlocked": {
+      "legacyLibraryOutputOff": "Legacy library output is switched off (Output format), so this job has nothing to write.",
+      "legacyLibraryOutputOn": "Switch legacy library output off in Output format first — while it is on, the next library sync would rebuild what this removes."
+    },
+    "usersMenuDisabled": "Legacy library output is off"
   }
 }

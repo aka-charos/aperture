@@ -61,8 +61,13 @@ export const ADMIN_GROUPS: readonly AdminGroup[] = [
  * strips are meaningless without TMDB, which the old page expressed as a
  * `disabled` prop on one `<Tab>` plus a redirect effect; here it is a property
  * of the entry, so the nav, the search index and the route all agree.
+ *
+ * `legacyLibraryOutput` passes while STRM/symlink library output is switched
+ * on. The sections it gates stay reachable and greyed rather than hidden: the
+ * settings are kept for switching back, and the switch itself lives on
+ * Output format, which is therefore deliberately NOT gated.
  */
-export type AdminGate = 'tmdbConfigured'
+export type AdminGate = 'tmdbConfigured' | 'legacyLibraryOutput'
 
 /**
  * A control worth reaching by name. Optional and deliberately partial: every
@@ -146,7 +151,8 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'paths',
     titleKey: 'adminNav.fileLocations.title',
     blurbKey: 'adminNav.fileLocations.blurb',
-    aliases: ['paths', 'strm', 'output', 'directory', 'folder', 'mount'],
+    aliases: ['paths', 'strm', 'output', 'directory', 'folder', 'mount', 'symlink', 'legacy'],
+    gate: 'legacyLibraryOutput',
   },
   {
     id: 'gap-analysis',
@@ -424,7 +430,26 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'output',
     titleKey: 'adminNav.outputFormat.title',
     blurbKey: 'adminNav.outputFormat.blurb',
-    aliases: ['strm', 'nfo', 'output', 'format', 'poster overlay'],
+    aliases: [
+      'strm',
+      'nfo',
+      'output',
+      'format',
+      'poster overlay',
+      'symlink',
+      'legacy',
+      'virtual library',
+      'ai picks library',
+      'phase out',
+      'remove libraries',
+    ],
+    fields: [
+      {
+        anchor: 'legacy-library-output-enabled',
+        labelKey: 'legacyLibraryOutput.card.switchLabel',
+        aliases: ['legacy library output', 'disable strm', 'disable symlinks', 'turn off libraries'],
+      },
+    ],
   },
   {
     id: 'library-naming',
@@ -432,7 +457,8 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'naming',
     titleKey: 'adminNav.libraryNaming.title',
     blurbKey: 'adminNav.libraryNaming.blurb',
-    aliases: ['naming', 'prefix', 'library name', 'ai picks'],
+    aliases: ['naming', 'prefix', 'library name', 'ai picks', 'legacy'],
+    gate: 'legacyLibraryOutput',
   },
   {
     id: 'top-picks',

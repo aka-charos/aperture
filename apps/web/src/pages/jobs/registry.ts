@@ -73,6 +73,15 @@ export const GLOBAL_JOB_CATEGORIES: JobCategory[] = [
     color: '#f59e0b',
     jobs: ['refresh-top-picks', 'auto-request-top-picks', 'sync-home-sections', 'sync-watching-favorites'],
   },
+  // Its own category rather than a card beside the library jobs: it is run
+  // once, on purpose, when phasing legacy library output out — never as part
+  // of anything's regular work.
+  {
+    titleKey: 'admin.jobsPage.categories.globalLegacy.title',
+    descriptionKey: 'admin.jobsPage.categories.globalLegacy.description',
+    color: '#78716c',
+    jobs: ['remove-legacy-libraries'],
+  },
   {
     titleKey: 'admin.jobsPage.categories.globalDiscovery.title',
     descriptionKey: 'admin.jobsPage.categories.globalDiscovery.description',

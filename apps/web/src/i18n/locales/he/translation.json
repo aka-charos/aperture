@@ -483,6 +483,10 @@
         "globalEvaluation": {
           "title": "Evaluation",
           "description": "Measure how well recommendations retrieve what people actually watch"
+        },
+        "globalLegacy": {
+          "title": "Legacy Library Output",
+          "description": "Removes the STRM / symlink libraries once their output is switched off — run once, on purpose, when phasing them out"
         }
       },
       "jobNames": {
@@ -1324,7 +1328,8 @@
       "previewNew": "New",
       "previewSort": "Titles within each row: {{sort}}."
     },
-    "tabHomeScreen": "Emby home screen"
+    "tabHomeScreen": "Emby home screen",
+    "aiLibraryNamesOutputOff": "These libraries are no longer created on this server, so their names have no effect."
   },
   "settingsPage": {
     "profileTitle": "הפרופיל שלך",
@@ -1788,27 +1793,6 @@
     "promptVariantLabel": "Analysis prompt",
     "promptVariantDefault": "Standard (current version)",
     "promptVariantHelp": "An alternative set of questions and rules for the same prompt version, for a model that cannot hold the standard one. Changing this does not rewrite analyses already stored."
-  },
-  "topPicksOutputConfig": {
-    "accordionTitle": "מה ההבדל בין ספרייה, אוסף ופלייליסט?",
-    "libraryTitle": "סִפְרִיָה",
-    "libraryBody": "מופיע כספרייה נפרדת בסרגל הצד של שרת המדיה שלך. מכיל עותקים וירטואליים (קבצי STRM) של המדיה. הטוב ביותר עבור גלישה ייעודית בבחירות המובילות.",
-    "collectionTitle": "אוסף (סט קופסה)",
-    "collectionBody": "מקבץ את פריטי הספרייה הקיימים שלך ל\"סט קופסא\" המופיע בעת הגלישה. משתמש ישירות בקבצי המדיה המקוריים שלך. הטוב ביותר לארגון בתוך ספריות קיימות.",
-    "playlistTitle": "רשימת השמעה",
-    "playlistBody": "יוצר פלייליסט מסודר בקטע פלייליסטים. משתמש ישירות בקבצי המדיה המקוריים שלך. הטוב ביותר לצפייה ברצף או למשחק אקראי.",
-    "moviesOutput": "פלט סרטים",
-    "seriesOutput": "פלט סדרה",
-    "imageSet": "סט תמונה",
-    "libraryCoverImage": "תמונת שער הספרייה",
-    "dropImage": "זרוק תמונה",
-    "outputTypes": "סוגי פלט",
-    "outputLibrary": "סִפְרִיָה",
-    "outputCollection": "גְבִיָה",
-    "outputPlaylist": "רשימת השמעה",
-    "libraryFileType": "סוג קובץ ספרייה",
-    "symlinks": "סימלינקים",
-    "strmFiles": "קבצי STRM"
   },
   "tmdbExternalModal": {
     "defaultSource": "TMDb",
@@ -3676,15 +3660,6 @@
       "mediaLibraries": {
         "label": "ספריות"
       },
-      "fileLocations": {
-        "label": "שבילים"
-      },
-      "aiRecsLibraries": {
-        "label": "Recs"
-      },
-      "validate": {
-        "label": "לְאַמֵת"
-      },
       "users": {
         "label": "משתמשים"
       },
@@ -3738,20 +3713,7 @@
       "generateSeriesRecommendations": {
         "name": "צור המלצות לסדרות",
         "description": "יצירת המלצות לסדרות טלוויזיה מותאמות אישית לכל משתמש"
-      },
-      "syncMovieLibraries": {
-        "name": "בניית ספריות סרטי {{appName}}",
-        "description": "יצירת ספריות סרטי המלצות בינה מלאכותית בשרת המדיה שלך"
-      },
-      "syncSeriesLibraries": {
-        "name": "בניית ספריות מסדרת {{appName}}",
-        "description": "יצירת ספריות סדרת המלצות בינה מלאכותית בשרת המדיה שלך"
-      },
-      "refreshTopPicks": {
-        "name": "סנכרן את הבחירות המובילות",
-        "description": "יצירת מבחר סרטים וספריות סדרות"
-      },
-      "skipTopPicks": "10 המובילים לא מופעלים"
+      }
     },
     "jobs": {
       "statusStarting": "מתחיל...",
@@ -3759,7 +3721,6 @@
       "statusProcessingShort": "עיבוד",
       "logStartingBatch": "מתחיל בעבודות הגדרה ראשוניות...",
       "logAllComplete": "כל העבודות הושלמו בהצלחה!",
-      "logSkippedTopPicks": "⊘ דילוג: {{name}} (הבחירות המובילות לא מופעלות)",
       "errRunInitial": "הפעלת המשימות הראשוניות נכשלה",
       "unknownError": "שגיאה לא ידועה",
       "logSetupFailed": "ההגדרה נכשלה: {{הודעה}}",
@@ -3815,18 +3776,6 @@
       "noneSecondary": "לחץ על רענן כדי לטעון ספריות",
       "back": "בְּחֲזָרָה",
       "saveContinue": "שמור והמשך"
-    },
-    "validate": {
-      "title": "אמת את ההגדרה",
-      "subtitle": "בדיקה ש- {{appName}} יכולה לגשת לכל הנתיבים הנדרשים וששרת המדיה שלך נגיש.",
-      "running": "מפעיל בדיקות אימות...",
-      "errorPrefix": "שְׁגִיאָה:",
-      "allPassed": "כל הצ'קים עברו! ההגדרה שלך מוכנה להפעלה.",
-      "someFailed": "כמה בדיקות נכשלו. אנא תקן את הבעיות שלמעלה ונסה שוב, או בדוק את רכיבי הנפח של docker-compose.yml.",
-      "back": "בְּחֲזָרָה",
-      "checking": "בודק...",
-      "retry": "נסה שוב",
-      "continue": "לְהַמשִׁיך"
     },
     "restore": {
       "title": "שחזר מגיבוי",
@@ -3890,26 +3839,9 @@
     },
     "complete": {
       "title": "ההתקנה הושלמה!",
-      "subtitle": "{{appName}} יצרה ספריות המלצות מותאמות אישית בשרת המדיה שלך.",
-      "issuesAlert": "חלק מהמשתמשים דילגו או שהיו להם בעיות. משתמשים צריכים היסטוריית צפייה כדי להפיק המלצות. הם יקבלו המלצות לאחר צפייה בתכנים נוספים והפעלת הסנכרון הבא.",
-      "librariesCreatedIn": "ספריות שנוצרו ב-{{name}}",
-      "mediaServerFallback": "שרת מדיה",
-      "movies": "סרטים",
-      "tvSeries": "סדרת טלוויזיה",
-      "recommendationsChip": "{{count}} המלצות",
-      "aiPicksPrimary": "בחירות הבינה המלאכותית של {{name}}",
-      "skippedNoHistory": "דילג (ללא היסטוריית צפייה)",
-      "failed": "נִכשָׁל",
-      "topPicksGlobal": "בחירות מובילות (גלובלי)",
-      "topPicksMovies": "בחירות מובילות - סרטים",
-      "topPicksMoviesSecondary": "{{count}} סרטים פופולריים",
-      "topPicksSeries": "בחירות מובילות - סדרה",
-      "topPicksSeriesSecondary": "{{count}} סדרות פופולריות",
       "gettingStarted": "תחילת העבודה",
       "loginPrimary": "התחבר עם אישורי המנהל של Media Server שלך",
       "loginSecondary": "השתמש באותו שם משתמש וסיסמה שאתה משתמש עבור Emby/Jellyfin",
-      "openServerPrimary": "פתח את שרת המדיה שלך כדי לראות את הספריות החדשות",
-      "openServerSecondary": "ספריות 'בחירות AI' חדשות יופיעו עבור כל משתמש מופעל ב-{{appName}}",
       "schedulesTitle": "לוחות זמנים אוטומטיים",
       "schedulesIntro": "{{appName}} מפעיל עבודות רקע כדי לשמור על המלצות טריות. ניתן לשנות את לוחות הזמנים המוגדרים כברירת מחדל בניהול → משרות.",
       "schedWatchHistory": "צפה בהיסטוריה",
@@ -3920,8 +3852,6 @@
       "schedEmbeddingsDesc": "מדי יום בשעה 3:00 - מעבד תוכן עבור המלצות בינה מלאכותית",
       "schedAiRecs": "המלצות AI",
       "schedAiRecsDesc": "מדי שבוע ביום ראשון בשעה 04:00 - מייצר בחירות מותאמות אישית לכל משתמש",
-      "schedTopPicks": "בחירות מובילות",
-      "schedTopPicksDesc": "מדי יום ב-5:00 - עדכון ספריות תוכן מגמתיות בעולם",
       "unlockTitle": "בטל את הנעילה של תכונות נוספות",
       "unlockIntro": "לאחר הכניסה, בקר ב-Admin → הגדרות כדי להפעיל את התכונות הנוספות הבאות:",
       "featTrakt": "אינטגרציה של טראקט",
@@ -3934,22 +3864,16 @@
       "featUserPrefsDesc": "כל משתמש יכול להתאים אישית את העדפות ההמלצה וההגדרות שלו",
       "backToJobs": "חזרה למשרות",
       "finishSetup": "סיים את ההגדרה",
-      "finishHint": "לחיצה על סיום תשבית את אשף ההגדרה הציבורי, אבטח את צמצם ותפנה מחדש לכניסה."
+      "finishHint": "לחיצה על סיום תשבית את אשף ההגדרה הציבורי, אבטח את צמצם ותפנה מחדש לכניסה.",
+      "subtitleReady": "{{appName}} is set up, and recommendations are ready for every enabled viewer.",
+      "appPrimary": "Recommendations live in {{appName}}",
+      "appSecondary": "Each viewer signs in with their media server account to see their picks and why each one was chosen",
+      "homeRowsPrimary": "Put them on Emby home screens",
+      "homeRowsSecondary": "In Admin → Recommendations → Emby Home Rows, choose which rows appear on each viewer's home screen and where",
+      "schedHomeRows": "Emby Home Rows",
+      "schedHomeRowsDesc": "Daily at 5:45am — Refreshes the rows on each viewer's Emby home screen, once you have set them up"
     },
     "initialJobsStep": {
-      "newLibraryChip": "ספרייה חדשה",
-      "libSummaryMoviesTitle": "ספריות סרטים נוצרו",
-      "libSummarySeriesTitle": "ספריות סדרות טלוויזיה נוצרו",
-      "createdCount": "{{count}} נוצר",
-      "skippedCount": "{{count}} דילג",
-      "failedCount": "{{count}} נכשלו",
-      "topPicksLibsCreated": "הבחירות המובילות ספריות שנוצרו",
-      "moviesChip": "{{count}} סרטים",
-      "seriesChip": "{{count}} סדרות",
-      "failedChip": "נִכשָׁל",
-      "topPicksMoviesRow": "בחירות מובילות - סרטים",
-      "topPicksSeriesRow": "בחירות מובילות - סדרה",
-      "topPicksFailedDefault": "יצירת ספריות מובילות נכשלה",
       "rerunRun": "הפעל את {{name}}",
       "rerunRerun": "הפעל מחדש את {{name}}",
       "itemsProcessed": "{{count}} פריטים",
@@ -3961,7 +3885,6 @@
       "bulletWatchHistory": "סנכרן היסטוריית צפייה — ייבא היסטוריית צפייה כדי להבין העדפות",
       "bulletEmbeddings": "צור הטמעות - צור וקטורים של AI כדי להבין נושאי תוכן (משתמש ב-OpenAI)",
       "bulletRecs": "צור המלצות - צור בחירות מותאמות אישית עבור כל משתמש",
-      "bulletLibraries": "סנכרון ספריות - דחף ספריות המלצות לשרת המדיה שלך",
       "headsUp": "זה יכול להימשך בין כמה דקות ל-30+ דקות, תלוי בגודל ספריות המדיה שלך. אוספים גדולים עם אלפי סרטים ופרקים יידרשו זמן רב יותר.",
       "headsUpLabel": "ראש למעלה!",
       "progressLine": "התקדמות: {{בוצע}} מתוך {{סה\"כ}} משרות",
@@ -3969,7 +3892,6 @@
       "chipAllComplete": "הכל שלם",
       "chipFailed": "נִכשָׁל",
       "chipRunning": "רִיצָה",
-      "libraryResultsTitle": "תוצאות יצירת ספרייה",
       "back": "בְּחֲזָרָה",
       "startInit": "התחל אתחול",
       "runningProgress": "פועל... ({{done}}/{{total}})",
@@ -3988,68 +3910,13 @@
     },
     "topPicksStep": {
       "title": "בחירות מובילות (אופציונלי)",
-      "body": "צור ספריות \"מה פופולרי\" גלובליות המבוססות על היסטוריית צפייה מצטברת מכל המשתמשים. בניגוד להמלצות בינה מלאכותית מותאמות אישית, הבחירות המובילות מציגות את אותו תוכן מגמתי לכולם - מצוין לגילוי מה פופולרי בשרת שלך.",
       "enableTitle": "הפעל את הבחירות המובילות",
-      "enableSubtitle": "צור ספריות תוכן מגמתיות גלויות לכל המשתמשים",
       "noteAdvanced": "ניתן להתאים הגדרות מתקדמות כמו משקלי אלגוריתם פופולריות, חלונות זמן ולוחות רענון מאוחר יותר ב-Admin ← הגדרות ← בחירות מובילות.",
       "noteLabel": "פֶּתֶק:",
-      "outputConfig": "תצורת פלט",
-      "symlinkWarning": "קישורי סימול מחייבים ש-{{appName}} תוכל לגשת לקבצי המדיה שלך באותם נתיבים בדיוק שבהם משתמש שרת המדיה שלך. אם הנתיבים שונים בין מערכות (למשל, מכולות Docker), השתמשו בקבצי STRM במקום זאת.",
-      "symlinkLabel": "סימלינקים",
       "back": "בְּחֲזָרָה",
       "saveContinue": "שמור והמשך",
-      "errUpload": "ההעלאה נכשלה",
-      "errDelete": "המחיקה נכשלה"
-    },
-    "fileLocations": {
-      "title": "מיקומי קבצים",
-      "body": "קבע היכן שרת המדיה שלך רואה את קבצי הספרייה של {{appName}}. נתיבים אלה חייבים להתאים לאופן שבו שרת המדיה שלך ניגש לאמצעי האחסון המותקן בתצורת Docker שלך.",
-      "saved": "מיקומי הקבצים נשמרו!",
-      "autoDetectTitle": "זיהוי אוטומטי של נתיבים",
-      "autoDetectBody": "{{appName}} יכולה לזהות באופן אוטומטי את הנתיבים הנכונים על ידי השוואת האופן שבו שרת המדיה שלך רואה קבצים עם האופן שבו {{appName}} רואה אותם.",
-      "detecting": "מזהה...",
-      "detectButton": "זיהוי נתיבים באופן אוטומטי",
-      "pathsDetected": "נתיבים זוהו בהצלחה!",
-      "mediaServerSees": "שרת המדיה רואה:",
-      "apertureSees": "הצמצם רואה:",
-      "detectedPrefix": "קידומת שזוהתה:",
-      "hideManual": "הסתר תצורה ידנית",
-      "orManual": "או להגדיר באופן ידני",
-      "howToFindTitle": "איך למצוא את הנתיבים האלה:",
-      "howToFindBody": "פתח כל סרט בשרת המדיה שלך, עבור אל מידע מדיה והסתכל על נתיב הקובץ. אם הוא מציג /mnt/Movies/SomeMovie/file.mkv, קידומת נתיב המדיה שלך היא /mnt/.",
-      "apertureLibsPath": "נתיב ספריות צמצם",
-      "apertureLibsHelp": "היכן שרת המדיה שלך רואה את ספריות הפלט של {{appName}}?",
-      "helperApertureLibs": "נתיב שבו שרת המדיה שלך רואה /aperture-libraries",
-      "mediaPrefixTitle": "קידומת נתיב שרת מדיה",
-      "mediaPrefixHelp": "היכן שרת המדיה שלך רואה את קבצי המדיה המקוריים שלך?",
-      "symlinkHelper": "משמש ליצירת קישורים סימליים לקובצי המדיה שלך",
-      "currentConfig": "תצורה נוכחית",
-      "librariesPathLine": "נתיב ספריות:",
-      "mediaPrefixLine": "קידומת מדיה:",
-      "back": "בְּחֲזָרָה",
-      "skipDefaults": "דלג (השתמש בברירות המחדל)",
-      "saveContinue": "שמור והמשך",
-      "errDetect": "זיהוי אוטומטי נכשל",
-      "errSave": "שמירת התצורה נכשלה"
-    },
-    "aiRecs": {
-      "title": "הגדר ספריות המלצות AI",
-      "body": "{{appName}} יוצר ספריות וירטואליות בשרת המדיה שלך המכילות המלצות מותאמות אישית לכל משתמש. הגדר את אופן היצירה של ספריות אלה ואפשר להתאים אישית את תמונות הכריכה שלהן.",
-      "strmVsSymlink": "STRM לעומת סימלינקים: קובצי STRM פועלים באופן אוניברסלי ותומכים בכתובות URL זורמות, בעוד ש-Symlinks מספקים גישה ישירה לקבצים (עדיף להפעלה מקומית) אך דורשים מ- {{appName}} לגשת לקבצי המדיה שלך באותם נתיבים כמו שרת המדיה שלך. עבור סדרות טלוויזיה, סימלינקים מומלצים לביצועים טובים יותר.",
-      "moviesLibrary": "ספריית סרטים",
-      "seriesLibrary": "ספריית סדרות",
-      "imageSet": "סט תמונה",
-      "outputFormat": "פורמט פלט",
-      "symlinks": "סימלינקים",
-      "strmFiles": "קבצי STRM",
-      "moviesSymlinkHelp": "יוצר קישורים סמליים לקבצי סרטים מקוריים",
-      "moviesStrmHelp": "יוצר קובצי Strm עם נתיבים או כתובות URL זורמות",
-      "seriesSymlinkHelp": "יוצר קישורים סימנים לתיקיות העונה המקוריות (מומלץ)",
-      "seriesStrmHelp": "יוצר קבצי Strm עבור כל פרק",
-      "coverImage": "תמונת שער הספרייה",
-      "dropImage": "זרוק תמונה",
-      "back": "בְּחֲזָרָה",
-      "saveContinue": "שמור והמשך"
+      "bodyRows": "Show everyone what's popular on your server, worked out from all users' watch history. Unlike personalized recommendations, Top Picks is the same list for every viewer. It appears in {{appName}} and, on Emby, can be a row on each viewer's home screen.",
+      "enableSubtitleRows": "The same trending list for every viewer"
     },
     "aiSetup": {
       "nameEmbeddings": "הטבעות",
@@ -5352,7 +5219,8 @@
     "homeSections": {
       "title": "Emby Home Rows",
       "blurb": "Top Picks and each viewer's recommendations on their Emby home screen"
-    }
+    },
+    "gateLegacyLibraryOutput": "Legacy library output is switched off — these settings are not used"
   },
   "settingsEvaluation": {
     "title": "Evaluation seeds",
@@ -5734,5 +5602,43 @@
     },
     "receivedSummary_two": "שני כותרים · שיתוף אחרון {{when}}",
     "sentSummary_two": "שני כותרים נשלחו"
+  },
+  "legacyLibraryOutput": {
+    "legacyChip": "Legacy",
+    "card": {
+      "title": "Legacy library output",
+      "subtitle": "Each viewer's AI Picks libraries and the shared Top Picks libraries, written as STRM files or symlinks under /aperture-libraries and added to the media server as extra libraries. Emby home rows now put the same recommendations and Top Picks on each viewer's home screen straight from the original titles — no files, no extra mount, no duplicate library. This output is being phased out.",
+      "homeRowsLink": "Set up Emby home rows",
+      "switchLabel": "Write STRM / symlink libraries",
+      "switchOnHelp": "On: the library jobs keep writing the AI Picks and Top Picks libraries.",
+      "switchOffHelp": "Off: nothing is written or created any more, the library jobs do nothing, and the settings that only concern these libraries are greyed out. Libraries already in the media server keep their last contents until you remove them below.",
+      "savedOn": "Legacy library output switched on. The next library sync brings the libraries up to date.",
+      "savedOff": "Legacy library output switched off. Nothing more will be written.",
+      "saveFailed": "Could not save the setting.",
+      "remainingTitle": "Libraries still in the media server",
+      "remainingCount_one": "{{count}} generated library is recorded ({{personal}} per viewer, {{topPicks}} Top Picks).",
+      "remainingCount_other": "{{count}} generated libraries are recorded ({{personal}} per viewer, {{topPicks}} Top Picks).",
+      "noneRemaining": "No generated libraries are recorded. Removing still looks for libraries left behind by earlier renames, and for the Top Picks collection and playlist.",
+      "removeButton": "Remove generated libraries",
+      "removeNeedsOff": "Switch the output off first — while it is on, the next library sync would rebuild them.",
+      "confirmTitle": "Remove every generated library?",
+      "confirmBody_one": "This deletes every library legacy output made from the media server — {{count}} recorded, plus any an earlier rename left behind — with their folders under /aperture-libraries, and the Top Picks collection and playlist. Recommendations are not touched: switching the output back on and running the library jobs rebuilds the libraries.",
+      "confirmBody_other": "This deletes every library legacy output made from the media server — {{count}} recorded, plus any an earlier rename left behind — with their folders under /aperture-libraries, and the Top Picks collection and playlist. Recommendations are not touched: switching the output back on and running the library jobs rebuilds the libraries.",
+      "confirmAction": "Remove libraries",
+      "cancel": "Cancel",
+      "removeStarted": "Removal started. A library the media server refuses to delete is kept, and running the job again retries it.",
+      "openJob": "Open job",
+      "removeFailed": "Could not start the removal."
+    },
+    "notice": {
+      "title": "Legacy library output is switched off",
+      "body": "These settings only concern the STRM / symlink libraries, which are no longer written. They are kept as they are in case the output is switched back on.",
+      "action": "Output format"
+    },
+    "jobBlocked": {
+      "legacyLibraryOutputOff": "Legacy library output is switched off (Output format), so this job has nothing to write.",
+      "legacyLibraryOutputOn": "Switch legacy library output off in Output format first — while it is on, the next library sync would rebuild what this removes."
+    },
+    "usersMenuDisabled": "Legacy library output is off"
   }
 }

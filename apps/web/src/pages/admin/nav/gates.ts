@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { AdminGate } from './registry'
+import {
+  currentLegacyLibraryOutput,
+  loadLegacyLibraryOutput,
+  useLegacyLibraryOutput,
+} from '@/hooks/legacyLibraryOutput'
 
 /**
  * Preconditions a destination can declare, resolved once per page load.
@@ -24,6 +29,7 @@ type GateState = { ready: boolean; passed: boolean }
  */
 export const GATE_TOOLTIP_KEYS: Record<AdminGate, string> = {
   tmdbConfigured: 'adminNav.gateTmdb',
+  legacyLibraryOutput: 'adminNav.gateLegacyLibraryOutput',
 }
 
 const UNRESOLVED: GateState = { ready: false, passed: false }
@@ -56,6 +62,10 @@ function resolveGate(gate: AdminGate): Promise<boolean> {
           return false
         })
       return tmdbProbe
+    case 'legacyLibraryOutput':
+      // The shared store already fetches this once per page load; asking it
+      // keeps a single-gate reader from making a request of its own.
+      return loadLegacyLibraryOutput().then(() => !currentLegacyLibraryOutput().off)
   }
 }
 
@@ -65,7 +75,21 @@ function resolveGate(gate: AdminGate): Promise<boolean> {
  * touching it, which is the point of the registry declaring gates at all.
  */
 export function useAdminGates(): Record<AdminGate, GateState> {
-  return { tmdbConfigured: useAdminGate('tmdbConfigured') }
+  return {
+    tmdbConfigured: useAdminGate('tmdbConfigured'),
+    legacyLibraryOutput: useLegacyLibraryOutputGate(),
+  }
+}
+
+/**
+ * The legacy gate is the one an operator flips from inside the console, so it
+ * reads the live store rather than a probe resolved once: the nav column stays
+ * mounted across navigation, and a probe would leave File locations bright
+ * until a reload after the output was switched off.
+ */
+function useLegacyLibraryOutputGate(): GateState {
+  const { ready, off } = useLegacyLibraryOutput()
+  return { ready, passed: !off }
 }
 
 /**

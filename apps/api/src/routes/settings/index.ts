@@ -24,6 +24,7 @@ import {
   registerLldapHandlers,
   registerTopPicksHandlers,
   registerAiOutputHandlers,
+  registerLegacyLibraryOutputHandlers,
   registerTasteProfileHandlers,
   registerLegacyAiModelsHandlers,
   registerLanguageDefaultsHandlers,
@@ -55,6 +56,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   registerLldapHandlers(fastify)
   registerTopPicksHandlers(fastify)
   registerAiOutputHandlers(fastify)
+  registerLegacyLibraryOutputHandlers(fastify)
   registerTasteProfileHandlers(fastify)
   registerLegacyAiModelsHandlers(fastify)
   registerN8nHandlers(fastify)

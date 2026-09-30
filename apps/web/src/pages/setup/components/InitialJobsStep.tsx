@@ -17,9 +17,6 @@ import {
   IconButton,
   Paper,
   Chip,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
 } from '@mui/material'
 import {
   CheckCircle as CheckCircleIcon,
@@ -31,14 +28,10 @@ import {
   Sync as SyncIcon,
   Psychology as PsychologyIcon,
   AutoAwesome as AutoAwesomeIcon,
-  CloudSync as CloudSyncIcon,
-  Warning as WarningIcon,
   SkipNext as SkipIcon,
-  ExpandMore as ExpandMoreIcon,
-  TrendingUp as TrendingUpIcon,
 } from '@mui/icons-material'
 import { useTranslation } from 'react-i18next'
-import type { SetupWizardContext, JobProgress, UserLibraryResult } from '../types'
+import type { SetupWizardContext, JobProgress } from '../types'
 
 import { WAITING_MESSAGES } from '../constants/waitingMessages'
 
@@ -48,13 +41,10 @@ interface InitialJobsStepProps {
 
 function getJobIcon(jobId: string) {
   if (jobId.includes('sync-movie') || jobId.includes('sync-series')) {
-    if (jobId.includes('watch-history')) return <SyncIcon fontSize="small" />
-    if (jobId.includes('libraries')) return <CloudSyncIcon fontSize="small" />
     return <SyncIcon fontSize="small" />
   }
   if (jobId.includes('embedding')) return <PsychologyIcon fontSize="small" />
   if (jobId.includes('recommendation')) return <AutoAwesomeIcon fontSize="small" />
-  if (jobId.includes('top-picks')) return <TrendingUpIcon fontSize="small" />
   return <SyncIcon fontSize="small" />
 }
 
@@ -71,249 +61,6 @@ function JobStatusIcon({ status }: { status: JobProgress['status'] }) {
     default:
       return <PendingIcon color="disabled" />
   }
-}
-
-function UserStatusIcon({ status }: { status: UserLibraryResult['status'] }) {
-  switch (status) {
-    case 'success':
-      return <CheckCircleIcon fontSize="small" color="success" />
-    case 'skipped':
-      return <SkipIcon fontSize="small" color="warning" />
-    case 'failed':
-      return <ErrorIcon fontSize="small" color="error" />
-    default:
-      return <PendingIcon fontSize="small" color="disabled" />
-  }
-}
-
-function UserLibraryResultItem({ user }: { user: UserLibraryResult }) {
-  const { t } = useTranslation()
-  return (
-    <Box
-      sx={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: 1.5,
-        py: 1,
-        px: 1.5,
-        borderLeft: '3px solid',
-        borderColor:
-          user.status === 'success'
-            ? 'success.main'
-            : user.status === 'skipped'
-              ? 'warning.main'
-              : 'error.main',
-        backgroundColor: 'action.hover',
-        borderRadius: '0 4px 4px 0',
-      }}
-    >
-      <UserStatusIcon status={user.status} />
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-          <Typography variant="body2" fontWeight={500}>
-            {user.displayName}
-          </Typography>
-          {user.status === 'success' && user.recommendationCount !== undefined && (
-            <Chip
-              label={t('setup.complete.recommendationsChip', { count: user.recommendationCount })}
-              size="small"
-              color="success"
-              variant="outlined"
-              sx={{ height: 20, fontSize: '0.7rem' }}
-            />
-          )}
-          {user.libraryCreated && (
-            <Chip
-              label={t('setup.initialJobsStep.newLibraryChip')}
-              size="small"
-              color="primary"
-              variant="outlined"
-              sx={{ height: 20, fontSize: '0.7rem' }}
-            />
-          )}
-        </Box>
-        {user.libraryName && user.status === 'success' && (
-          <Typography variant="caption" color="text.secondary">
-            {user.libraryName}
-          </Typography>
-        )}
-        {user.status === 'skipped' && user.error && (
-          <Typography variant="caption" color="warning.main">
-            {user.error}
-          </Typography>
-        )}
-        {user.status === 'failed' && user.error && (
-          <Typography variant="caption" color="error.main">
-            {user.error}
-          </Typography>
-        )}
-      </Box>
-    </Box>
-  )
-}
-
-function LibraryResultsSummary({ jobs, type }: { jobs: JobProgress[]; type: 'movies' | 'series' }) {
-  const { t } = useTranslation()
-  const jobId = type === 'movies' ? 'sync-movie-libraries' : 'sync-series-libraries'
-  const job = jobs.find((j) => j.id === jobId)
-
-  if (!job || job.status !== 'completed' || !job.result?.users?.length) {
-    return null
-  }
-
-  const users = job.result.users
-  const successCount = users.filter((u) => u.status === 'success').length
-  const skippedCount = users.filter((u) => u.status === 'skipped').length
-  const failedCount = users.filter((u) => u.status === 'failed').length
-
-  const hasIssues = skippedCount > 0 || failedCount > 0
-
-  return (
-    <Accordion
-      defaultExpanded={hasIssues}
-      sx={{
-        mt: 1.5,
-        '&:before': { display: 'none' },
-        border: '1px solid',
-        borderColor: failedCount > 0 ? 'error.main' : skippedCount > 0 ? 'warning.main' : 'success.main',
-        borderRadius: '8px !important',
-        overflow: 'hidden',
-      }}
-    >
-      <AccordionSummary
-        expandIcon={<ExpandMoreIcon />}
-        sx={{
-          backgroundColor: failedCount > 0 ? 'error.dark' : skippedCount > 0 ? 'warning.dark' : 'success.dark',
-          '& .MuiAccordionSummary-content': { alignItems: 'center', gap: 1 },
-        }}
-      >
-        <CloudSyncIcon fontSize="small" />
-        <Typography variant="body2" fontWeight={600}>
-          {type === 'movies' ? t('setup.initialJobsStep.libSummaryMoviesTitle') : t('setup.initialJobsStep.libSummarySeriesTitle')}
-        </Typography>
-        <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
-          {successCount > 0 && (
-            <Chip
-              icon={<CheckCircleIcon />}
-              label={t('setup.initialJobsStep.createdCount', { count: successCount })}
-              size="small"
-              color="success"
-              sx={{ height: 24 }}
-            />
-          )}
-          {skippedCount > 0 && (
-            <Chip
-              icon={<WarningIcon />}
-              label={t('setup.initialJobsStep.skippedCount', { count: skippedCount })}
-              size="small"
-              color="warning"
-              sx={{ height: 24 }}
-            />
-          )}
-          {failedCount > 0 && (
-            <Chip
-              icon={<ErrorIcon />}
-              label={t('setup.initialJobsStep.failedCount', { count: failedCount })}
-              size="small"
-              color="error"
-              sx={{ height: 24 }}
-            />
-          )}
-        </Box>
-      </AccordionSummary>
-      <AccordionDetails sx={{ p: 0 }}>
-        <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {users.map((user) => (
-            <UserLibraryResultItem key={user.userId} user={user} />
-          ))}
-        </Box>
-      </AccordionDetails>
-    </Accordion>
-  )
-}
-
-function TopPicksResultsSummary({ jobs }: { jobs: JobProgress[] }) {
-  const { t } = useTranslation()
-  const job = jobs.find((j) => j.id === 'refresh-top-picks')
-
-  if (!job || (job.status !== 'completed' && job.status !== 'failed')) {
-    return null
-  }
-
-  const isSuccess = job.status === 'completed'
-  const moviesCount = job.result?.moviesCount ?? 0
-  const seriesCount = job.result?.seriesCount ?? 0
-
-  return (
-    <Accordion
-      defaultExpanded={!isSuccess}
-      sx={{
-        mt: 1.5,
-        '&:before': { display: 'none' },
-        border: '1px solid',
-        borderColor: isSuccess ? 'success.main' : 'error.main',
-        borderRadius: '8px !important',
-        overflow: 'hidden',
-      }}
-    >
-      <AccordionSummary
-        expandIcon={<ExpandMoreIcon />}
-        sx={{
-          backgroundColor: isSuccess ? 'success.dark' : 'error.dark',
-          '& .MuiAccordionSummary-content': { alignItems: 'center', gap: 1 },
-        }}
-      >
-        <TrendingUpIcon fontSize="small" />
-        <Typography variant="body2" fontWeight={600}>
-          {t('setup.initialJobsStep.topPicksLibsCreated')}
-        </Typography>
-        <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
-          {isSuccess ? (
-            <>
-              <Chip
-                icon={<CheckCircleIcon />}
-                label={t('setup.initialJobsStep.moviesChip', { count: moviesCount })}
-                size="small"
-                color="success"
-                sx={{ height: 24 }}
-              />
-              <Chip
-                icon={<CheckCircleIcon />}
-                label={t('setup.initialJobsStep.seriesChip', { count: seriesCount })}
-                size="small"
-                color="success"
-                sx={{ height: 24 }}
-              />
-            </>
-          ) : (
-            <Chip icon={<ErrorIcon />} label={t('setup.initialJobsStep.failedChip')} size="small" color="error" sx={{ height: 24 }} />
-          )}
-        </Box>
-      </AccordionSummary>
-      <AccordionDetails sx={{ p: 0 }}>
-        <Box sx={{ p: 1.5 }}>
-          {isSuccess ? (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
-                <CheckCircleIcon color="success" fontSize="small" />
-                <Typography variant="body2">{t('setup.initialJobsStep.topPicksMoviesRow')}</Typography>
-                <Chip label={t('setup.initialJobsStep.moviesChip', { count: moviesCount })} size="small" variant="outlined" sx={{ ml: 'auto' }} />
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, borderRadius: 1, bgcolor: 'action.hover' }}>
-                <CheckCircleIcon color="success" fontSize="small" />
-                <Typography variant="body2">{t('setup.initialJobsStep.topPicksSeriesRow')}</Typography>
-                <Chip label={t('setup.initialJobsStep.seriesChip', { count: seriesCount })} size="small" variant="outlined" sx={{ ml: 'auto' }} />
-              </Box>
-            </Box>
-          ) : (
-            <Typography variant="body2" color="error">
-              {job.error || t('setup.initialJobsStep.topPicksFailedDefault')}
-            </Typography>
-          )}
-        </Box>
-      </AccordionDetails>
-    </Accordion>
-  )
 }
 
 interface JobListItemProps {
@@ -528,9 +275,6 @@ export function InitialJobsStep({ wizard }: InitialJobsStepProps) {
             <li>
               <Typography variant="body2">{t('setup.initialJobsStep.bulletRecs')}</Typography>
             </li>
-            <li>
-              <Typography variant="body2">{t('setup.initialJobsStep.bulletLibraries')}</Typography>
-            </li>
           </Box>
         </Alert>
       )}
@@ -601,17 +345,6 @@ export function InitialJobsStep({ wizard }: InitialJobsStepProps) {
             ))}
           </List>
         </Paper>
-      )}
-
-      {hasStarted && (allCompleted || hasFailed) && (
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            {t('setup.initialJobsStep.libraryResultsTitle')}
-          </Typography>
-          <LibraryResultsSummary jobs={jobsProgress} type="movies" />
-          <LibraryResultsSummary jobs={jobsProgress} type="series" />
-          <TopPicksResultsSummary jobs={jobsProgress} />
-        </Box>
       )}
 
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>

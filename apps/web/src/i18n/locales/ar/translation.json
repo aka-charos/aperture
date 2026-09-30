@@ -486,6 +486,10 @@
         "globalEvaluation": {
           "title": "Evaluation",
           "description": "Measure how well recommendations retrieve what people actually watch"
+        },
+        "globalLegacy": {
+          "title": "Legacy Library Output",
+          "description": "Removes the STRM / symlink libraries once their output is switched off — run once, on purpose, when phasing them out"
         }
       },
       "jobNames": {
@@ -1336,7 +1340,8 @@
       "previewNew": "New",
       "previewSort": "Titles within each row: {{sort}}."
     },
-    "tabHomeScreen": "Emby home screen"
+    "tabHomeScreen": "Emby home screen",
+    "aiLibraryNamesOutputOff": "These libraries are no longer created on this server, so their names have no effect."
   },
   "settingsPage": {
     "profileTitle": "ملفّك الشخصي",
@@ -1800,27 +1805,6 @@
     "promptVariantLabel": "Analysis prompt",
     "promptVariantDefault": "Standard (current version)",
     "promptVariantHelp": "An alternative set of questions and rules for the same prompt version, for a model that cannot hold the standard one. Changing this does not rewrite analyses already stored."
-  },
-  "topPicksOutputConfig": {
-    "accordionTitle": "ما الفرق بين المكتبة والمجموعة وقائمة التشغيل؟",
-    "libraryTitle": "مكتبة",
-    "libraryBody": "تظهر كمكتبة منفصلة في الشريط الجانبي لخادم الوسائط. يحتوي على نسخ افتراضية (ملفات STRM) من الوسائط. الأفضل للتصفح المخصص لأفضل اللقطات.",
-    "collectionTitle": "المجموعة (مجموعة الصناديق)",
-    "collectionBody": "قم بتجميع عناصر المكتبة الموجودة لديك في \"مجموعة مربعات\" تظهر عند التصفح. يستخدم ملفات الوسائط الأصلية الخاصة بك مباشرة. الأفضل للتنظيم داخل المكتبات الموجودة.",
-    "playlistTitle": "قائمة التشغيل",
-    "playlistBody": "يقوم بإنشاء قائمة تشغيل مرتبة في قسم قوائم التشغيل. يستخدم ملفات الوسائط الأصلية الخاصة بك مباشرة. الأفضل للمشاهدة المتسلسلة أو اللعب العشوائي.",
-    "moviesOutput": "إخراج الأفلام",
-    "seriesOutput": "إخراج السلسلة",
-    "imageSet": "مجموعة الصور",
-    "libraryCoverImage": "صورة غلاف المكتبة",
-    "dropImage": "إسقاط الصورة",
-    "outputTypes": "أنواع المخرجات",
-    "outputLibrary": "مكتبة",
-    "outputCollection": "مجموعة",
-    "outputPlaylist": "قائمة التشغيل",
-    "libraryFileType": "نوع ملف المكتبة",
-    "symlinks": "الروابط الرمزية",
-    "strmFiles": "ملفات STRM"
   },
   "tmdbExternalModal": {
     "defaultSource": "TMDb",
@@ -3688,15 +3672,6 @@
       "mediaLibraries": {
         "label": "المكتبات"
       },
-      "fileLocations": {
-        "label": "المسارات"
-      },
-      "aiRecsLibraries": {
-        "label": "التوصيات"
-      },
-      "validate": {
-        "label": "التحقق من صحة"
-      },
       "users": {
         "label": "المستخدمين"
       },
@@ -3750,20 +3725,7 @@
       "generateSeriesRecommendations": {
         "name": "إنشاء توصيات السلسلة",
         "description": "إنشاء توصيات مسلسلات تلفزيونية مخصصة لكل مستخدم"
-      },
-      "syncMovieLibraries": {
-        "name": "بناء مكتبات أفلام {{appName}}",
-        "description": "إنشاء مكتبات أفلام توصيات AI في خادم الوسائط الخاص بك"
-      },
-      "syncSeriesLibraries": {
-        "name": "بناء مكتبات سلسلة {{appName}}",
-        "description": "إنشاء مكتبات سلسلة توصيات AI في خادم الوسائط الخاص بك"
-      },
-      "refreshTopPicks": {
-        "name": "مزامنة أفضل اللقطات",
-        "description": "إنشاء مكتبات أفضل الأفلام والمسلسلات"
-      },
-      "skipTopPicks": "العشرة الأوائل غير مفعلين"
+      }
     },
     "jobs": {
       "statusStarting": "جارٍ البدء…",
@@ -3771,7 +3733,6 @@
       "statusProcessingShort": "يعالج",
       "logStartingBatch": "جارٍ بدء مهام الإعداد الأولي…",
       "logAllComplete": "تمت جميع المهام بنجاح!",
-      "logSkippedTopPicks": "⊘ تم تخطي: {{name}} (أفضل الاختيارات غير ممكّنة)",
       "errRunInitial": "فشل في تشغيل المهام الأولية",
       "unknownError": "خطأ غير معروف",
       "logSetupFailed": "فشل الإعداد: {{message}}",
@@ -3827,18 +3788,6 @@
       "noneSecondary": "انقر فوق تحديث لتحميل المكتبات",
       "back": "خلف",
       "saveContinue": "حفظ ومتابعة"
-    },
-    "validate": {
-      "title": "التحقق من صحة الإعداد",
-      "subtitle": "التحقق من أن {{appName}} يمكنه الوصول إلى جميع المسارات المطلوبة ومن إمكانية الوصول إلى خادم الوسائط الخاص بك.",
-      "running": "جارٍ إجراء عمليات التحقق من الصحة…",
-      "errorPrefix": "خطأ:",
-      "allPassed": "مرت جميع الشيكات! الإعداد الخاص بك جاهز للبدء.",
-      "someFailed": "فشلت بعض عمليات التحقق. يرجى إصلاح المشكلات المذكورة أعلاه وإعادة المحاولة، أو التحقق من عمليات تثبيت وحدة التخزين docker-compose.yml.",
-      "back": "خلف",
-      "checking": "جارٍ التحقق…",
-      "retry": "أعد المحاولة",
-      "continue": "يكمل"
     },
     "restore": {
       "title": "استعادة من النسخة الاحتياطية",
@@ -3902,26 +3851,9 @@
     },
     "complete": {
       "title": "اكتمل الإعداد!",
-      "subtitle": "قامت {{appName}} بإنشاء مكتبات توصيات مخصصة في خادم الوسائط الخاص بك.",
-      "issuesAlert": "تم تخطي بعض المستخدمين أو واجهوا مشكلات. يحتاج المستخدمون إلى سجل المشاهدة حتى يتم إنشاء التوصيات. سوف يتلقون توصيات بعد مشاهدة المزيد من المحتوى وتشغيل المزامنة التالية.",
-      "librariesCreatedIn": "المكتبات التي تم إنشاؤها في {{name}}",
-      "mediaServerFallback": "خادم الوسائط",
-      "movies": "أفلام",
-      "tvSeries": "مسلسل تلفزيوني",
-      "recommendationsChip": "{{عدد}} من التوصيات",
-      "aiPicksPrimary": "اختيارات الذكاء الاصطناعي لـ {{name}}",
-      "skippedNoHistory": "تم التخطي (لا يوجد سجل مشاهدة)",
-      "failed": "فشل",
-      "topPicksGlobal": "أفضل الاختيارات (عالميًا)",
-      "topPicksMovies": "أفضل اللقطات - أفلام",
-      "topPicksMoviesSecondary": "{{count}} من الأفلام المشهورة",
-      "topPicksSeries": "أفضل اللقطات - سلسلة",
-      "topPicksSeriesSecondary": "{{count}} سلسلة شعبية",
       "gettingStarted": "ابدء",
       "loginPrimary": "قم بتسجيل الدخول باستخدام بيانات اعتماد مسؤول Media Server الخاص بك",
       "loginSecondary": "استخدم نفس اسم المستخدم وكلمة المرور اللذين تستخدمهما لـ Emby/Jellyfin",
-      "openServerPrimary": "افتح خادم الوسائط الخاص بك لرؤية المكتبات الجديدة",
-      "openServerSecondary": "ستظهر مكتبات \"AI Picks\" الجديدة لكل مستخدم ممكّن في {{appName}}",
       "schedulesTitle": "الجداول التلقائية",
       "schedulesIntro": "تقوم {{appName}} بتشغيل وظائف الخلفية للحفاظ على التوصيات متجددة. يمكن تعديل الجداول الافتراضية في المسؤول → الوظائف.",
       "schedWatchHistory": "شاهد التاريخ",
@@ -3932,8 +3864,6 @@
       "schedEmbeddingsDesc": "يوميًا عند الساعة 3 صباحًا — يعالج محتوى توصيات الذكاء الاصطناعي",
       "schedAiRecs": "توصيات الذكاء الاصطناعي",
       "schedAiRecsDesc": "أسبوعيًا يوم الأحد الساعة 4 صباحًا - يُنشئ اختيارات مخصصة لكل مستخدم",
-      "schedTopPicks": "أفضل اللقطات",
-      "schedTopPicksDesc": "يوميًا في الساعة 5 صباحًا - يقوم بتحديث مكتبات المحتوى الرائجة عالميًا",
       "unlockTitle": "فتح المزيد من الميزات",
       "unlockIntro": "بعد تسجيل الدخول، قم بزيارة المسؤول → الإعدادات لتمكين هذه الميزات الإضافية:",
       "featTrakt": "تكامل المسار",
@@ -3946,22 +3876,16 @@
       "featUserPrefsDesc": "يمكن لكل مستخدم تخصيص تفضيلات وإعدادات التوصية الخاصة به",
       "backToJobs": "العودة إلى الوظائف",
       "finishSetup": "إنهاء الإعداد",
-      "finishHint": "سيؤدي النقر فوق \"إنهاء\" إلى تعطيل معالج الإعداد العام والفتحة الآمنة وإعادة التوجيه لتسجيل الدخول."
+      "finishHint": "سيؤدي النقر فوق \"إنهاء\" إلى تعطيل معالج الإعداد العام والفتحة الآمنة وإعادة التوجيه لتسجيل الدخول.",
+      "subtitleReady": "{{appName}} is set up, and recommendations are ready for every enabled viewer.",
+      "appPrimary": "Recommendations live in {{appName}}",
+      "appSecondary": "Each viewer signs in with their media server account to see their picks and why each one was chosen",
+      "homeRowsPrimary": "Put them on Emby home screens",
+      "homeRowsSecondary": "In Admin → Recommendations → Emby Home Rows, choose which rows appear on each viewer's home screen and where",
+      "schedHomeRows": "Emby Home Rows",
+      "schedHomeRowsDesc": "Daily at 5:45am — Refreshes the rows on each viewer's Emby home screen, once you have set them up"
     },
     "initialJobsStep": {
-      "newLibraryChip": "مكتبة جديدة",
-      "libSummaryMoviesTitle": "تم إنشاء مكتبات الأفلام",
-      "libSummarySeriesTitle": "تم إنشاء مكتبات المسلسلات التلفزيونية",
-      "createdCount": "تم إنشاء {{count}}.",
-      "skippedCount": "تم تخطي {{count}}.",
-      "failedCount": "فشل {{عدد}}.",
-      "topPicksLibsCreated": "تم إنشاء المكتبات المختارة",
-      "moviesChip": "{{عدد}} أفلام",
-      "seriesChip": "سلسلة {{عدد}}.",
-      "failedChip": "فشل",
-      "topPicksMoviesRow": "أفضل اللقطات - أفلام",
-      "topPicksSeriesRow": "أفضل اللقطات - سلسلة",
-      "topPicksFailedDefault": "فشل في إنشاء مكتبات اللقطات الأفضل",
       "rerunRun": "تشغيل {{اسم}}",
       "rerunRerun": "إعادة تشغيل {{name}}",
       "itemsProcessed": "{{عدد}} عنصر",
@@ -3973,7 +3897,6 @@
       "bulletWatchHistory": "مزامنة سجل المشاهدة - قم باستيراد سجل العرض لفهم التفضيلات",
       "bulletEmbeddings": "إنشاء التضمينات - إنشاء متجهات الذكاء الاصطناعي لفهم سمات المحتوى (يستخدم OpenAI)",
       "bulletRecs": "إنشاء توصيات - إنشاء اختيارات مخصصة لكل مستخدم",
-      "bulletLibraries": "مزامنة المكتبات - ادفع مكتبات التوصيات إلى خادم الوسائط الخاص بك",
       "headsUp": "يمكن أن يستغرق ذلك من بضع دقائق إلى أكثر من 30 دقيقة حسب حجم مكتبات الوسائط لديك. ستستغرق المجموعات الكبيرة التي تحتوي على آلاف الأفلام والحلقات وقتًا أطول.",
       "headsUpLabel": "انتباه!",
       "progressLine": "التقدم: {{تم}} من {{total}} من الوظائف",
@@ -3981,7 +3904,6 @@
       "chipAllComplete": "الكل مكتمل",
       "chipFailed": "فشل",
       "chipRunning": "جري",
-      "libraryResultsTitle": "نتائج إنشاء المكتبة",
       "back": "خلف",
       "startInit": "بدء التهيئة",
       "runningProgress": "جارٍ... ({{تم}}/{{الإجمالي}})",
@@ -4000,68 +3922,13 @@
     },
     "topPicksStep": {
       "title": "أفضل اللقطات (اختياري)",
-      "body": "أنشئ مكتبات عالمية \"للأشياء الشائعة\" استنادًا إلى سجل المشاهدة المجمع من جميع المستخدمين. على عكس توصيات الذكاء الاصطناعي المخصصة، تعرض أفضل اللقطات نفس المحتوى الرائج للجميع - وهو أمر رائع لاكتشاف الأشياء الشائعة على خادمك.",
       "enableTitle": "تمكين أفضل الاختيارات",
-      "enableSubtitle": "إنشاء مكتبات محتوى رائجة مرئية لجميع المستخدمين",
       "noteAdvanced": "يمكن تخصيص الإعدادات المتقدمة مثل أوزان خوارزمية الشعبية والنوافذ الزمنية وجداول التحديث لاحقًا في المسؤول → الإعدادات → أفضل الاختيارات.",
       "noteLabel": "ملحوظة:",
-      "outputConfig": "تكوين الإخراج",
-      "symlinkWarning": "تتطلب الروابط الرمزية أن يتمكن {{appName}} من الوصول إلى ملفات الوسائط الخاصة بك بنفس المسارات التي يستخدمها خادم الوسائط الخاص بك. إذا كانت المسارات تختلف بين الأنظمة (على سبيل المثال، حاويات Docker)، فاستخدم ملفات STRM بدلاً من ذلك.",
-      "symlinkLabel": "الروابط الرمزية",
       "back": "خلف",
       "saveContinue": "حفظ ومتابعة",
-      "errUpload": "فشل التحميل",
-      "errDelete": "فشل الحذف"
-    },
-    "fileLocations": {
-      "title": "مواقع الملفات",
-      "body": "قم بتكوين المكان الذي يرى فيه خادم الوسائط الخاص بك ملفات مكتبة {{appName}}. يجب أن تتطابق هذه المسارات مع كيفية وصول خادم الوسائط إلى وحدات التخزين المثبتة في تكوين Docker الخاص بك.",
-      "saved": "تم حفظ مواقع الملفات!",
-      "autoDetectTitle": "الكشف التلقائي عن المسارات",
-      "autoDetectBody": "يمكن لـ {{appName}} اكتشاف المسارات الصحيحة تلقائيًا من خلال مقارنة كيفية رؤية خادم الوسائط للملفات مع كيفية رؤية {{appName}} لها.",
-      "detecting": "جارٍ الكشف...",
-      "detectButton": "كشف المسارات تلقائيا",
-      "pathsDetected": "تم اكتشاف المسارات بنجاح!",
-      "mediaServerSees": "يرى خادم الوسائط:",
-      "apertureSees": "الفتحة ترى:",
-      "detectedPrefix": "البادئة المكتشفة:",
-      "hideManual": "إخفاء التكوين اليدوي",
-      "orManual": "أو تكوين يدويا",
-      "howToFindTitle": "كيفية العثور على هذه المسارات:",
-      "howToFindBody": "افتح أي فيلم في خادم الوسائط الخاص بك، وانتقل إلى معلومات الوسائط، وانظر إلى مسار الملف. إذا كان يعرض /mnt/Movies/SomeMovie/file.mkv، فإن بادئة مسار الوسائط الخاصة بك هي /mnt/.",
-      "apertureLibsPath": "مسار مكتبات الفتحة",
-      "apertureLibsHelp": "أين يرى خادم الوسائط الخاص بك مكتبات إخراج {{appName}}؟",
-      "helperApertureLibs": "المسار الذي يرى فيه خادم الوسائط الخاص بك /aperture-libraries",
-      "mediaPrefixTitle": "بادئة مسار خادم الوسائط",
-      "mediaPrefixHelp": "أين يرى خادم الوسائط الخاص بك ملفات الوسائط الأصلية؟",
-      "symlinkHelper": "يستخدم لإنشاء روابط رمزية لملفات الوسائط الخاصة بك",
-      "currentConfig": "التكوين الحالي",
-      "librariesPathLine": "مسار المكتبات:",
-      "mediaPrefixLine": "بادئة الوسائط:",
-      "back": "خلف",
-      "skipDefaults": "تخطي (استخدام الإعدادات الافتراضية)",
-      "saveContinue": "حفظ ومتابعة",
-      "errDetect": "فشل الكشف التلقائي",
-      "errSave": "فشل حفظ التكوين"
-    },
-    "aiRecs": {
-      "title": "تكوين مكتبات توصيات الذكاء الاصطناعي",
-      "body": "تقوم {{appName}} بإنشاء مكتبات افتراضية في خادم الوسائط الخاص بك تحتوي على توصيات مخصصة لكل مستخدم. قم بتكوين كيفية إنشاء هذه المكتبات وتخصيص صور الغلاف الخاصة بها بشكل اختياري.",
-      "strmVsSymlink": "STRM مقابل Symlinks: تعمل ملفات STRM عالميًا وتدعم عناوين URL المتدفقة، بينما توفر Symlinks وصولاً مباشرًا إلى الملفات (أفضل للتشغيل المحلي) ولكنها تتطلب {{appName}} للوصول إلى ملفات الوسائط الخاصة بك بنفس المسارات مثل خادم الوسائط الخاص بك. بالنسبة للمسلسلات التلفزيونية، يوصى باستخدام الارتباطات الرمزية للحصول على أداء أفضل.",
-      "moviesLibrary": "مكتبة الأفلام",
-      "seriesLibrary": "مكتبة المسلسلات",
-      "imageSet": "مجموعة الصور",
-      "outputFormat": "تنسيق الإخراج",
-      "symlinks": "الروابط الرمزية",
-      "strmFiles": "ملفات STRM",
-      "moviesSymlinkHelp": "ينشئ روابط رمزية لملفات الأفلام الأصلية",
-      "moviesStrmHelp": "ينشئ ملفات .strm بمسارات أو عناوين URL متدفقة",
-      "seriesSymlinkHelp": "إنشاء روابط رمزية لمجلدات الموسم الأصلية (مستحسن)",
-      "seriesStrmHelp": "يقوم بإنشاء ملفات .strm لكل حلقة",
-      "coverImage": "صورة غلاف المكتبة",
-      "dropImage": "إسقاط الصورة",
-      "back": "خلف",
-      "saveContinue": "حفظ ومتابعة"
+      "bodyRows": "Show everyone what's popular on your server, worked out from all users' watch history. Unlike personalized recommendations, Top Picks is the same list for every viewer. It appears in {{appName}} and, on Emby, can be a row on each viewer's home screen.",
+      "enableSubtitleRows": "The same trending list for every viewer"
     },
     "aiSetup": {
       "nameEmbeddings": "التضمين",
@@ -5364,7 +5231,8 @@
     "homeSections": {
       "title": "Emby Home Rows",
       "blurb": "Top Picks and each viewer's recommendations on their Emby home screen"
-    }
+    },
+    "gateLegacyLibraryOutput": "Legacy library output is switched off — these settings are not used"
   },
   "settingsEvaluation": {
     "title": "Evaluation seeds",
@@ -5752,5 +5620,43 @@
     "sentSummary_two": "أُرسل عنوانان",
     "sentSummary_few": "أُرسل {{count}} عناوين",
     "sentSummary_many": "أُرسل {{count}} عنوانًا"
+  },
+  "legacyLibraryOutput": {
+    "legacyChip": "Legacy",
+    "card": {
+      "title": "Legacy library output",
+      "subtitle": "Each viewer's AI Picks libraries and the shared Top Picks libraries, written as STRM files or symlinks under /aperture-libraries and added to the media server as extra libraries. Emby home rows now put the same recommendations and Top Picks on each viewer's home screen straight from the original titles — no files, no extra mount, no duplicate library. This output is being phased out.",
+      "homeRowsLink": "Set up Emby home rows",
+      "switchLabel": "Write STRM / symlink libraries",
+      "switchOnHelp": "On: the library jobs keep writing the AI Picks and Top Picks libraries.",
+      "switchOffHelp": "Off: nothing is written or created any more, the library jobs do nothing, and the settings that only concern these libraries are greyed out. Libraries already in the media server keep their last contents until you remove them below.",
+      "savedOn": "Legacy library output switched on. The next library sync brings the libraries up to date.",
+      "savedOff": "Legacy library output switched off. Nothing more will be written.",
+      "saveFailed": "Could not save the setting.",
+      "remainingTitle": "Libraries still in the media server",
+      "remainingCount_one": "{{count}} generated library is recorded ({{personal}} per viewer, {{topPicks}} Top Picks).",
+      "remainingCount_other": "{{count}} generated libraries are recorded ({{personal}} per viewer, {{topPicks}} Top Picks).",
+      "noneRemaining": "No generated libraries are recorded. Removing still looks for libraries left behind by earlier renames, and for the Top Picks collection and playlist.",
+      "removeButton": "Remove generated libraries",
+      "removeNeedsOff": "Switch the output off first — while it is on, the next library sync would rebuild them.",
+      "confirmTitle": "Remove every generated library?",
+      "confirmBody_one": "This deletes every library legacy output made from the media server — {{count}} recorded, plus any an earlier rename left behind — with their folders under /aperture-libraries, and the Top Picks collection and playlist. Recommendations are not touched: switching the output back on and running the library jobs rebuilds the libraries.",
+      "confirmBody_other": "This deletes every library legacy output made from the media server — {{count}} recorded, plus any an earlier rename left behind — with their folders under /aperture-libraries, and the Top Picks collection and playlist. Recommendations are not touched: switching the output back on and running the library jobs rebuilds the libraries.",
+      "confirmAction": "Remove libraries",
+      "cancel": "Cancel",
+      "removeStarted": "Removal started. A library the media server refuses to delete is kept, and running the job again retries it.",
+      "openJob": "Open job",
+      "removeFailed": "Could not start the removal."
+    },
+    "notice": {
+      "title": "Legacy library output is switched off",
+      "body": "These settings only concern the STRM / symlink libraries, which are no longer written. They are kept as they are in case the output is switched back on.",
+      "action": "Output format"
+    },
+    "jobBlocked": {
+      "legacyLibraryOutputOff": "Legacy library output is switched off (Output format), so this job has nothing to write.",
+      "legacyLibraryOutputOn": "Switch legacy library output off in Output format first — while it is on, the next library sync would rebuild what this removes."
+    },
+    "usersMenuDisabled": "Legacy library output is off"
   }
 }

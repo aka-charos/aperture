@@ -21,10 +21,17 @@ import { getTopPicksConfig, updateTopPicksLastRefreshed } from './config.js'
 import { getTopMovies, getTopSeries } from './popularity.js'
 import { writeTopPicksMovies, writeTopPicksSeries } from './writer.js'
 import { writeTopPicksCollectionsAndPlaylists } from './collectionWriter.js'
-import { grantTopPicksAccessToAllUsers, getTopPicksLibraries, sourceLibraryIdsFor } from './permissions.js'
+import {
+  grantTopPicksAccessToAllUsers,
+  getTopPicksLibraries,
+  recordTopPicksSources,
+  sourceLibraryIdsFor,
+  withdrawFrozenTopPicksAccess,
+} from './permissions.js'
 import { getMediaServerProvider } from '../media/index.js'
 import { getMediaServerApiKey } from '../settings/systemSettings.js'
 import { getConfig } from '../strm/config.js'
+import { skipIfLegacyLibraryOutputOff } from '../strm/legacyOutput.js'
 import { syncLibraryTypeImage } from '../uploads/mediaServerSync.js'
 import { query } from '../lib/db.js'
 import path from 'path'
@@ -125,6 +132,23 @@ export async function refreshTopPicks(
   createJobProgress(jobId, 'refresh-top-picks', 8)
 
   try {
+    // Everything this job produces is legacy output: the libraries, and the
+    // collections and playlists built from the library's own items. The Top
+    // Picks pages and home rows compute their lists live and need none of it.
+    // Frozen, but an account whose permission narrowed still loses a Top
+    // Picks library holding titles it may no longer open.
+    const skipped = await skipIfLegacyLibraryOutputOff(jobId, async () => {
+      const { withdrawn, failed } = await withdrawFrozenTopPicksAccess()
+      addLog(
+        jobId,
+        'info',
+        `🔒 Top Picks libraries checked against current permissions: withdrawn from ${withdrawn} account(s)${failed > 0 ? `, ${failed} could not be checked` : ''}`
+      )
+    })
+    if (skipped) {
+      return { moviesCount: 0, seriesCount: 0, usersUpdated: 0, jobId }
+    }
+
     // Step 1: Check if Top Picks is enabled
     setJobStep(jobId, 0, 'Checking configuration')
     const config = await getTopPicksConfig()
@@ -315,6 +339,9 @@ export async function refreshTopPicks(
           series: await sourceLibraryIdsFor('series', topSeries.map((pick) => pick.seriesId)),
         }
         const accessResult = await grantTopPicksAccessToAllUsers(moviesLib, seriesLib, sources)
+        // Kept for when the output is switched off and nothing rewrites these
+        // libraries: withdrawals are then judged against what they hold.
+        await recordTopPicksSources(sources)
         addLog(jobId, 'info', `✅ Permissions updated: ${accessResult.updated} users granted access`)
         if (accessResult.alreadyHadAccess > 0) {
           addLog(jobId, 'info', `   ℹ️ ${accessResult.alreadyHadAccess} users already had access`)

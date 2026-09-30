@@ -52,6 +52,13 @@ export interface Library {
   name: string
   collectionType: string
   path?: string
+  /**
+   * Every folder the library reads, as the media server sees it (VirtualFolder
+   * `Locations`). Emby does not send `Path` on a virtual folder, so this is
+   * the one field that says what a library points at — which is how a library
+   * Aperture generated can be recognised with no record of it.
+   */
+  locations?: string[]
   refreshStatus?: string
 }
 

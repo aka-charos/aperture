@@ -33,15 +33,14 @@ After the Setup Wizard, work through this to get Aperture fully operational.
 2. `sync-movie-watch-history` / `sync-series-watch-history`
 3. `generate-movie-embeddings` / `generate-series-embeddings`
 4. `generate-movie-recommendations` / `generate-series-recommendations`
-5. `sync-movie-libraries` / `sync-series-libraries` — AI Picks libraries appear in Emby/Jellyfin
 
 The wizard's last step runs all of these; if any show red, open its logs before going further.
 
 ## 5. Output Sanity
 
-- Libraries appear on the media server with **rank badges burned into posters**
-- Open an AI Picks library on a TV/client — sort order should read #1 down
-- Spot-check the [File locations](file-locations.md) mapping if the server sees nothing
+- Sign in as a viewer: **My Recommendations** should list picks with explanations
+- On Emby, set up home rows (Admin → Recommendations → Emby Home Rows) and check a viewer's home screen
+- Only if you switched on legacy library output ([Output format](output-format.md)): libraries appear on the media server with **rank badges burned into posters**, and the [File locations](file-locations.md) mapping is right
 
 ## 6. Schedules
 

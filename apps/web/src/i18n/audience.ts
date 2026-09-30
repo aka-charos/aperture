@@ -42,8 +42,7 @@ export type StringAudience = 'admin' | 'user'
  *   `pages/admin/` — they are wired up in `pages/admin/nav/routes.tsx`.
  * - The `AI*` components and `WebSearchUsagePanel` are the provider-setup
  *   cards, rendered by the settings and setup wizards only.
- * - `ImageUpload` and `TopPicksOutputConfig` are reachable only from those
- *   same two places.
+ * - `ImageUpload` is reachable only from those same two places.
  * - `RunningJobsWidget` and `ExplorationConfigModal` are mounted by
  *   `Layout.tsx`, which every viewer renders, but both return null unless
  *   `user.isAdmin` — so the file's location says nothing and the gate inside
@@ -65,7 +64,6 @@ export const ADMIN_SURFACE_PATHS: readonly string[] = [
   'components/AISetupCardGrid.tsx',
   'components/aiProviderInfo.ts',
   'components/WebSearchUsagePanel.tsx',
-  'components/TopPicksOutputConfig.tsx',
   'components/ImageUpload.tsx',
   'components/ExplorationConfigModal.tsx',
   'components/RunningJobsWidget.tsx',
@@ -86,6 +84,7 @@ export const ADMIN_ONLY_NAMESPACES: readonly string[] = [
   'imageUpload',
   'inferenceDashboard',
   'jobsUi',
+  'legacyLibraryOutput',
   'runningJobs',
   'settingsAiExplanation',
   'settingsAiSetup',
@@ -125,7 +124,6 @@ export const ADMIN_ONLY_NAMESPACES: readonly string[] = [
   'settingsWatching',
   'setup',
   'topPicksAdmin',
-  'topPicksOutputConfig',
   'webSearchUsage',
 ]
 

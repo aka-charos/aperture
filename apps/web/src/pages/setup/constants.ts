@@ -1,6 +1,8 @@
 import type { SetupStepId } from './types'
 
-// Default library cover images (bundled with the app)
+// Default library cover images (bundled with the app). Read by the admin Top
+// Picks section as well, so they stay here although the wizard no longer asks
+// for covers.
 export const DEFAULT_LIBRARY_IMAGES: Record<string, string> = {
   'ai-recs-movies': '/AI_MOVIE_PICKS.png',
   'ai-recs-series': '/AI_SERIES_PICKS.png',
@@ -9,14 +11,18 @@ export const DEFAULT_LIBRARY_IMAGES: Record<string, string> = {
   'watching': '/Shows_You_Watch.png',
 }
 
-/** Ordered step ids; labels use `setup.step.<id>.label` in i18n */
+/**
+ * Ordered step ids; labels use `setup.step.<id>.label` in i18n.
+ *
+ * The three steps that sat between Libraries and Users — file locations, the
+ * STRM-or-symlink choice and the mount checks — were all for legacy library
+ * output and are gone (F-142). A resumed wizard whose stored progress still
+ * names them simply never finds them here, which is harmless.
+ */
 export const STEP_ORDER_IDS: SetupStepId[] = [
   'restoreFromBackup',
   'mediaServer',
   'mediaLibraries',
-  'fileLocations',
-  'aiRecsLibraries',
-  'validate',
   'users',
   'topPicks',
   'aiSetup',
@@ -24,21 +30,8 @@ export const STEP_ORDER_IDS: SetupStepId[] = [
   'complete',
 ]
 
-export const DEFAULT_AI_RECS_OUTPUT = {
-  moviesUseSymlinks: true,
-  seriesUseSymlinks: true,
-}
-
 export const DEFAULT_TOP_PICKS = {
   isEnabled: false,
-  moviesLibraryEnabled: true,
-  moviesCollectionEnabled: false,
-  moviesPlaylistEnabled: false,
-  moviesUseSymlinks: true,
-  seriesLibraryEnabled: true,
-  seriesCollectionEnabled: false,
-  seriesPlaylistEnabled: false,
-  seriesUseSymlinks: true,
 }
 
 export const DEFAULT_MEDIA_SERVER_TYPES = [

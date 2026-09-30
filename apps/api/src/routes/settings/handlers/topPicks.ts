@@ -22,8 +22,11 @@ export function registerTopPicksHandlers(fastify: FastifyInstance) {
    */
   fastify.get('/api/settings/top-picks', { preHandler: requireAdmin, schema: topPicksConfigSchema }, async (_request, reply) => {
     try {
-      const { getTopPicksConfig, getTopPicksLibraries } = await import('@aperture/core')
+      const { getTopPicksConfig, getTopPicksLibraries, isLegacyLibraryOutputEnabled } = await import('@aperture/core')
       const config = await getTopPicksConfig()
+      // Only meaningful while refresh-top-picks writes the libraries; see
+      // routes/top-picks/index.ts.
+      const lastRefreshedAt = (await isLegacyLibraryOutputEnabled()) ? config.lastRefreshedAt : null
 
       let libraries: {
         movies: { id: string; guid: string; name: string } | null
@@ -37,6 +40,7 @@ export function registerTopPicksHandlers(fastify: FastifyInstance) {
 
       return reply.send({
         ...config,
+        lastRefreshedAt,
         libraries,
       })
     } catch (err) {

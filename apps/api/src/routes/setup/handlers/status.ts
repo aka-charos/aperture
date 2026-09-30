@@ -12,8 +12,6 @@ import {
   type SetupStepId,
   getMediaServerConfig,
   getLibraryConfigs,
-  getAiRecsOutputConfig,
-  getOutputPathConfig,
   getTopPicksConfig,
   hasOpenAIApiKey,
 } from '@aperture/core'
@@ -93,8 +91,6 @@ export async function registerStatusHandlers(fastify: FastifyInstance) {
       const hasOpenAI = await hasOpenAIApiKey()
       // Exclude Aperture-created libraries from selection
       const libraries = await getLibraryConfigs(true)
-      const aiRecsOutput = await getAiRecsOutputConfig()
-      const outputPathConfig = await getOutputPathConfig()
       const topPicks = await getTopPicksConfig()
 
       return reply.send({
@@ -103,8 +99,6 @@ export async function registerStatusHandlers(fastify: FastifyInstance) {
           mediaServer: mediaServerConfig,
           openai: { configured: hasOpenAI },
           libraries,
-          aiRecsOutput,
-          outputPathConfig,
           topPicks,
         },
       })

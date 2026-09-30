@@ -60,6 +60,24 @@ export async function createOrUpdatePlaylist(
   return { playlistId: created.Id }
 }
 
+export async function findPlaylistByName(
+  provider: EmbyProviderBase,
+  apiKey: string,
+  userId: string,
+  name: string
+): Promise<string | null> {
+  const params = buildItemSearchParams({
+    includeItemTypes: 'Playlist',
+    searchTerm: name,
+    userId,
+  })
+
+  const response = await provider.fetch<EmbyItemsResponse>(`/Items?${params}`, apiKey)
+  const playlist = response.Items.find((p) => p.Name === name)
+
+  return playlist?.Id ?? null
+}
+
 export async function deletePlaylist(
   provider: EmbyProviderBase,
   apiKey: string,

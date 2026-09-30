@@ -14,6 +14,7 @@ import { getConfig } from '../config.js'
 import { getEffectiveLibraryTitle } from '../../lib/userSettings.js'
 import { syncLibraryTypeImage } from '../../uploads/mediaServerSync.js'
 import type { StrmConfig } from '../types.js'
+import { assertLegacyLibraryOutputEnabled } from '../legacyOutput.js'
 
 const logger = createChildLogger('strm-series-library')
 
@@ -36,6 +37,8 @@ export async function ensureUserSeriesLibrary(
   providerUserId: string,
   displayName: string
 ): Promise<{ libraryId: string; libraryGuid: string; created: boolean; name: string }> {
+  // Legacy output switched off: refuse before anything is created or written.
+  await assertLegacyLibraryOutputEnabled()
   const config = await getConfig()
   const provider = await getMediaServerProvider()
   const apiKey = await getMediaServerApiKey()
@@ -68,6 +71,20 @@ export async function ensureUserSeriesLibrary(
   // If library name changed, delete the old record so we create a new one
   if (dbRecord && dbRecord.name !== libraryName) {
     logger.info({ userId, oldName: dbRecord.name, newName: libraryName }, 'Series library name changed, clearing old record')
+    // Remove the library under its old name too, not just its record. Both read
+    // the same folder, so the old one would otherwise stay in the media server
+    // as a duplicate nothing points at — which is how every rename used to leave
+    // an orphan behind (F-142). A failure is not fatal: the removal job finds a
+    // left-behind library by the folder it reads.
+    try {
+      const stale = (await provider.getLibraries(apiKey)).some((lib) => lib.name === dbRecord.name)
+      if (stale) {
+        await provider.deleteVirtualLibrary(apiKey, dbRecord.name)
+        logger.info({ userId, oldName: dbRecord.name }, 'Series library under the old name removed')
+      }
+    } catch (err) {
+      logger.warn({ err, userId, oldName: dbRecord.name }, 'Could not remove the series library under its old name')
+    }
     await query(
       `DELETE FROM strm_libraries WHERE user_id = $1 AND media_type = 'series'`,
       [userId]

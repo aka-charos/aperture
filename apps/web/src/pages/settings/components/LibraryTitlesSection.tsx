@@ -20,6 +20,8 @@ import InfoIcon from '@mui/icons-material/Info'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
 import { ImageUpload } from '../../../components/ImageUpload'
+import { useLegacyLibraryOutput } from '@/hooks/legacyLibraryOutput'
+import { LegacyLibraryOutputNotice } from './LegacyLibraryOutputNotice'
 
 interface MergeTag {
   tag: string
@@ -48,8 +50,10 @@ const RECOMMENDED_DIMENSIONS = {
   height: 1080,
 }
 
+/** Names and covers for the AI Picks libraries — legacy output, so it greys with it. */
 export function LibraryTitlesSection() {
   const { t } = useTranslation()
+  const { off: legacyOff } = useLegacyLibraryOutput()
   const [config, setConfig] = useState<LibraryTitleConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -265,6 +269,8 @@ export function LibraryTitlesSection() {
           {t('settingsLibraryTitles.subtitle')}
         </Typography>
 
+        <LegacyLibraryOutputNotice />
+
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
             {error}
@@ -324,6 +330,7 @@ export function LibraryTitlesSection() {
                   fullWidth
                   value={config.moviesTemplate}
                   onChange={(e) => updateConfig({ moviesTemplate: e.target.value })}
+                  disabled={legacyOff}
                   placeholder="{{username}}'s AI Picks - Movies"
                   size="small"
                   sx={{ mb: 1 }}
@@ -335,6 +342,7 @@ export function LibraryTitlesSection() {
                       label={tag.tag}
                       size="small"
                       onClick={() => insertTag('moviesTemplate', tag.tag)}
+                      disabled={legacyOff}
                       sx={{ 
                         fontFamily: 'monospace', 
                         fontSize: '0.7rem',
@@ -362,7 +370,8 @@ export function LibraryTitlesSection() {
                   loading={uploadingFor === 'ai-recs-movies'}
                   height={180}
                   label={t('settingsLibraryTitles.dropImageLabel')}
-                  showDelete={!!moviesImage.url}
+                  showDelete={!!moviesImage.url && !legacyOff}
+                  disabled={legacyOff}
                 />
               </CardContent>
             </Card>
@@ -388,6 +397,7 @@ export function LibraryTitlesSection() {
                   fullWidth
                   value={config.seriesTemplate}
                   onChange={(e) => updateConfig({ seriesTemplate: e.target.value })}
+                  disabled={legacyOff}
                   placeholder="{{username}}'s AI Picks - TV Series"
                   size="small"
                   sx={{ mb: 1 }}
@@ -399,6 +409,7 @@ export function LibraryTitlesSection() {
                       label={tag.tag}
                       size="small"
                       onClick={() => insertTag('seriesTemplate', tag.tag)}
+                      disabled={legacyOff}
                       sx={{ 
                         fontFamily: 'monospace', 
                         fontSize: '0.7rem',
@@ -426,7 +437,8 @@ export function LibraryTitlesSection() {
                   loading={uploadingFor === 'ai-recs-series'}
                   height={180}
                   label={t('settingsLibraryTitles.dropImageLabel')}
-                  showDelete={!!seriesImage.url}
+                  showDelete={!!seriesImage.url && !legacyOff}
+                  disabled={legacyOff}
                 />
               </CardContent>
             </Card>
@@ -438,7 +450,7 @@ export function LibraryTitlesSection() {
             variant="contained"
             startIcon={saving ? <CircularProgress size={16} /> : <SaveIcon />}
             onClick={handleSave}
-            disabled={saving || !hasChanges}
+            disabled={saving || !hasChanges || legacyOff}
           >
             {saving ? t('settingsLibraryTitles.saving') : t('settingsLibraryTitles.saveTemplates')}
           </Button>

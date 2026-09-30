@@ -1,12 +1,21 @@
 # Output Format Configuration
 
-Choose how Aperture's libraries physically appear on disk: **symlinks** or **STRM files** — per media type.
+Choose how Aperture's libraries physically appear on disk: **symlinks** or **STRM files** — per media type — or switch those libraries off altogether.
+
+## Legacy library output
+
+The per-viewer **AI Picks** libraries and the shared **Top Picks** libraries (with the Top Picks collection and playlist built from them) are **legacy output**, being phased out in favour of Emby home rows (Admin → Recommendations → Emby Home Rows). The card at the top of this page switches them off:
+
+- **Off** stops every write at once: the library jobs record a skipped run, nothing new is created, and the settings that only concern these libraries — this page's format switches, [File locations](file-locations.md), [Library naming](library-titles.md), the Top Picks output card — are greyed out but kept.
+- **Frozen libraries still follow permissions.** They play the original files, so the library jobs keep checking them while the output is off: a viewer who loses access to a library (or whose parental ceiling drops) loses their frozen AI Picks library at the next library sync, and the frozen Top Picks library is withdrawn from accounts that may no longer open where its titles came from. Libraries written before this check existed cannot prove what they hold, so a restricted viewer's goes the first time; an unrestricted viewer's stays.
+- **Libraries already in the media server are left alone** until you press **Remove generated libraries** (only available while the output is off). That runs the `remove-legacy-libraries` job: it deletes every generated library — recorded ones and ones an earlier library-name change left behind, found by the folder they read — their folders under `/aperture-libraries`, and the Top Picks collection and playlist (only if they hold nothing but Top Picks titles). A library the media server refuses to delete is kept and can be retried.
+- **New installs start with it off**; an instance that already made libraries keeps it on until you change it.
 
 ![Admin Settings - AI Recommendations](../images/admin/admin-settings-ai-recommendations.png)
 
 ## Accessing Settings
 
-Admin console → **Recommendations** → **Output format** (`/admin/recommendations/output`). The setup wizard's AI Recommendations step sets the same switches; [Top Picks](top-picks.md) has its own per-output switches.
+Admin console → **Recommendations** → **Output format** (`/admin/recommendations/output`). [Top Picks](top-picks.md) has its own per-output switches.
 
 ## Symlinks vs STRM
 

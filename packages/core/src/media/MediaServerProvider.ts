@@ -285,6 +285,12 @@ export interface MediaServerProvider {
   deletePlaylist(apiKey: string, playlistId: string): Promise<void>
 
   /**
+   * The id of the playlist with exactly this name among a user's playlists, or
+   * null. Playlists belong to a user, so the owner must be named.
+   */
+  findPlaylistByName(apiKey: string, userId: string, name: string): Promise<string | null>
+
+  /**
    * Get items in a playlist
    */
   getPlaylistItems(apiKey: string, playlistId: string): Promise<PlaylistItem[]>
@@ -331,6 +337,9 @@ export interface MediaServerProvider {
    * Delete a collection
    */
   deleteCollection(apiKey: string, collectionId: string): Promise<void>
+
+  /** The id of the collection (Box Set) with exactly this name, or null. */
+  findCollectionByName(apiKey: string, name: string): Promise<string | null>
 
   /**
    * Get items in a collection

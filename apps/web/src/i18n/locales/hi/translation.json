@@ -482,6 +482,10 @@
         "globalEvaluation": {
           "title": "Evaluation",
           "description": "Measure how well recommendations retrieve what people actually watch"
+        },
+        "globalLegacy": {
+          "title": "Legacy Library Output",
+          "description": "Removes the STRM / symlink libraries once their output is switched off — run once, on purpose, when phasing them out"
         }
       },
       "jobNames": {
@@ -1320,7 +1324,8 @@
       "previewNew": "New",
       "previewSort": "Titles within each row: {{sort}}."
     },
-    "tabHomeScreen": "Emby home screen"
+    "tabHomeScreen": "Emby home screen",
+    "aiLibraryNamesOutputOff": "These libraries are no longer created on this server, so their names have no effect."
   },
   "settingsPage": {
     "profileTitle": "आपकी प्रोफ़ाइल",
@@ -1784,27 +1789,6 @@
     "promptVariantLabel": "Analysis prompt",
     "promptVariantDefault": "Standard (current version)",
     "promptVariantHelp": "An alternative set of questions and rules for the same prompt version, for a model that cannot hold the standard one. Changing this does not rewrite analyses already stored."
-  },
-  "topPicksOutputConfig": {
-    "accordionTitle": "लाइब्रेरी, संग्रह और प्लेलिस्ट के बीच क्या अंतर है?",
-    "libraryTitle": "पुस्तकालय",
-    "libraryBody": "आपके मीडिया सर्वर साइडबार में एक अलग लाइब्रेरी के रूप में दिखाई देता है। इसमें मीडिया की आभासी प्रतियां (STRM फ़ाइलें) शामिल हैं। टॉप पिक्स की समर्पित ब्राउज़िंग के लिए सर्वश्रेष्ठ।",
-    "collectionTitle": "संग्रह (बॉक्स सेट)",
-    "collectionBody": "आपके मौजूदा लाइब्रेरी आइटम को एक \"बॉक्स सेट\" में समूहित करें जो ब्राउज़ करते समय दिखाई देता है। आपकी मूल मीडिया फ़ाइलों का सीधे उपयोग करता है। मौजूदा पुस्तकालयों के भीतर संगठन के लिए सर्वोत्तम।",
-    "playlistTitle": "प्लेलिस्ट",
-    "playlistBody": "प्लेलिस्ट अनुभाग में एक ऑर्डर की गई प्लेलिस्ट बनाता है। आपकी मूल मीडिया फ़ाइलों का सीधे उपयोग करता है। अनुक्रमिक रूप से देखने या खेलने में फेरबदल के लिए सर्वोत्तम।",
-    "moviesOutput": "मूवी आउटपुट",
-    "seriesOutput": "श्रृंखला आउटपुट",
-    "imageSet": "चित्र स्थित",
-    "libraryCoverImage": "लाइब्रेरी कवर छवि",
-    "dropImage": "छवि गिराएँ",
-    "outputTypes": "आउटपुट प्रकार",
-    "outputLibrary": "पुस्तकालय",
-    "outputCollection": "संग्रह",
-    "outputPlaylist": "प्लेलिस्ट",
-    "libraryFileType": "लाइब्रेरी फ़ाइल प्रकार",
-    "symlinks": "सिमलिंक",
-    "strmFiles": "एसटीआरएम फ़ाइलें"
   },
   "tmdbExternalModal": {
     "defaultSource": "TMDb",
@@ -3672,15 +3656,6 @@
       "mediaLibraries": {
         "label": "पुस्तकालय"
       },
-      "fileLocations": {
-        "label": "के रास्ते"
-      },
-      "aiRecsLibraries": {
-        "label": "आरईसी"
-      },
-      "validate": {
-        "label": "मान्य"
-      },
       "users": {
         "label": "उपयोगकर्ताओं"
       },
@@ -3734,20 +3709,7 @@
       "generateSeriesRecommendations": {
         "name": "श्रृंखला सिफ़ारिशें जनरेट करें",
         "description": "प्रत्येक उपयोगकर्ता के लिए वैयक्तिकृत टीवी श्रृंखला अनुशंसाएँ बनाना"
-      },
-      "syncMovieLibraries": {
-        "name": "{{appName}} मूवी लाइब्रेरीज़ बनाएं",
-        "description": "अपने मीडिया सर्वर में AI अनुशंसा मूवी लाइब्रेरी बनाना"
-      },
-      "syncSeriesLibraries": {
-        "name": "{{appName}} श्रृंखला पुस्तकालयों का निर्माण करें",
-        "description": "अपने मीडिया सर्वर में AI अनुशंसा श्रृंखला लाइब्रेरी बनाना"
-      },
-      "refreshTopPicks": {
-        "name": "सिंक शीर्ष चयन",
-        "description": "शीर्ष चयन फिल्में और श्रृंखला लाइब्रेरी बनाना"
-      },
-      "skipTopPicks": "शीर्ष 10 सक्षम नहीं हैं"
+      }
     },
     "jobs": {
       "statusStarting": "शुरू हो रहा है...",
@@ -3755,7 +3717,6 @@
       "statusProcessingShort": "प्रसंस्करण",
       "logStartingBatch": "आरंभिक सेटअप कार्य प्रारंभ हो रहा है...",
       "logAllComplete": "सभी कार्य सफलतापूर्वक पूरे हुए!",
-      "logSkippedTopPicks": "⊘ छोड़ा गया: {{नाम}} (शीर्ष चयन सक्षम नहीं)",
       "errRunInitial": "आरंभिक कार्य चलाने में विफल",
       "unknownError": "अज्ञात त्रुटि",
       "logSetupFailed": "सेटअप विफल: {{संदेश}}",
@@ -3811,18 +3772,6 @@
       "noneSecondary": "लाइब्रेरीज़ लोड करने के लिए रीफ्रेश पर क्लिक करें",
       "back": "पीछे",
       "saveContinue": "सहेजें जारी रखें"
-    },
-    "validate": {
-      "title": "सेटअप मान्य करें",
-      "subtitle": "यह जांचना कि {{appName}} सभी आवश्यक पथों तक पहुंच सकता है और आपका मीडिया सर्वर पहुंच योग्य है।",
-      "running": "सत्यापन जांच चल रही है...",
-      "errorPrefix": "गलती:",
-      "allPassed": "सभी चेक पास हो गए! आपका सेटअप जाने के लिए तैयार है.",
-      "someFailed": "कुछ जाँच विफल रहीं. कृपया उपरोक्त समस्याओं को ठीक करें और पुनः प्रयास करें, या अपने docker-compose.yml वॉल्यूम माउंट की जाँच करें।",
-      "back": "पीछे",
-      "checking": "जाँच हो रही है...",
-      "retry": "पुन: प्रयास करें",
-      "continue": "जारी रखना"
     },
     "restore": {
       "title": "बैकअप से पुनर्स्थापित करें",
@@ -3886,26 +3835,9 @@
     },
     "complete": {
       "title": "सेटअप पूर्ण!",
-      "subtitle": "{{appName}} ने आपके मीडिया सर्वर में वैयक्तिकृत अनुशंसा लाइब्रेरी बनाई है।",
-      "issuesAlert": "कुछ उपयोगकर्ताओं को छोड़ दिया गया या उनमें समस्याएं थीं। अनुशंसाएँ उत्पन्न करने के लिए उपयोगकर्ताओं को देखने का इतिहास चाहिए। अधिक सामग्री देखने और अगला सिंक चलाने के बाद उन्हें अनुशंसाएँ प्राप्त होंगी।",
-      "librariesCreatedIn": "{{नाम}} में बनाई गई लाइब्रेरी",
-      "mediaServerFallback": "मीडिया सर्वर",
-      "movies": "चलचित्र",
-      "tvSeries": "टीवी श्रृंखला",
-      "recommendationsChip": "सिफ़ारिशें {{गिनती}}",
-      "aiPicksPrimary": "{{नाम}} की AI पसंद",
-      "skippedNoHistory": "छोड़ दिया गया (कोई देखने का इतिहास नहीं)",
-      "failed": "असफल",
-      "topPicksGlobal": "शीर्ष चयन (वैश्विक)",
-      "topPicksMovies": "शीर्ष चयन - फिल्में",
-      "topPicksMoviesSecondary": "लोकप्रिय फ़िल्में {{गिनें}}",
-      "topPicksSeries": "शीर्ष चयन - शृंखला",
-      "topPicksSeriesSecondary": "{{गिनती}} लोकप्रिय श्रृंखला",
       "gettingStarted": "शुरू करना",
       "loginPrimary": "अपने मीडिया सर्वर व्यवस्थापक क्रेडेंशियल के साथ लॉग इन करें",
       "loginSecondary": "उसी उपयोगकर्ता नाम और पासवर्ड का उपयोग करें जिसका उपयोग आप Emby/Jellyfin के लिए करते हैं",
-      "openServerPrimary": "नई लाइब्रेरी देखने के लिए अपना मीडिया सर्वर खोलें",
-      "openServerSecondary": "{{appName}} में प्रत्येक सक्षम उपयोगकर्ता के लिए नई 'एआई पिक्स' लाइब्रेरी दिखाई देंगी",
       "schedulesTitle": "स्वचालित अनुसूचियाँ",
       "schedulesIntro": "अनुशंसाओं को ताज़ा रखने के लिए {{appName}} पृष्ठभूमि कार्य चलाता है। डिफ़ॉल्ट शेड्यूल को एडमिन → जॉब्स में संशोधित किया जा सकता है।",
       "schedWatchHistory": "इतिहास देखें",
@@ -3916,8 +3848,6 @@
       "schedEmbeddingsDesc": "प्रतिदिन सुबह 3 बजे - एआई अनुशंसाओं के लिए सामग्री संसाधित करता है",
       "schedAiRecs": "एआई सिफ़ारिशें",
       "schedAiRecsDesc": "साप्ताहिक रविवार सुबह 4 बजे - प्रत्येक उपयोगकर्ता के लिए वैयक्तिकृत चयन उत्पन्न करता है",
-      "schedTopPicks": "ऊपर उठाता है",
-      "schedTopPicksDesc": "रोजाना सुबह 5 बजे - वैश्विक ट्रेंडिंग सामग्री लाइब्रेरीज़ को अपडेट करता है",
       "unlockTitle": "अधिक सुविधाएं अनलॉक करें",
       "unlockIntro": "लॉग इन करने के बाद, इन अतिरिक्त सुविधाओं को सक्षम करने के लिए एडमिन → सेटिंग्स पर जाएं:",
       "featTrakt": "ट्रैक्ट एकीकरण",
@@ -3930,22 +3860,16 @@
       "featUserPrefsDesc": "प्रत्येक उपयोगकर्ता अपनी अनुशंसा प्राथमिकताओं और सेटिंग्स को अनुकूलित कर सकता है",
       "backToJobs": "नौकरियों पर वापस",
       "finishSetup": "सेटअप समाप्त करें",
-      "finishHint": "फिनिश पर क्लिक करने से सार्वजनिक सेटअप विज़ार्ड अक्षम हो जाएगा, {{appName}} सुरक्षित हो जाएगा और लॉगिन करने के लिए रीडायरेक्ट हो जाएगा।"
+      "finishHint": "फिनिश पर क्लिक करने से सार्वजनिक सेटअप विज़ार्ड अक्षम हो जाएगा, {{appName}} सुरक्षित हो जाएगा और लॉगिन करने के लिए रीडायरेक्ट हो जाएगा।",
+      "subtitleReady": "{{appName}} is set up, and recommendations are ready for every enabled viewer.",
+      "appPrimary": "Recommendations live in {{appName}}",
+      "appSecondary": "Each viewer signs in with their media server account to see their picks and why each one was chosen",
+      "homeRowsPrimary": "Put them on Emby home screens",
+      "homeRowsSecondary": "In Admin → Recommendations → Emby Home Rows, choose which rows appear on each viewer's home screen and where",
+      "schedHomeRows": "Emby Home Rows",
+      "schedHomeRowsDesc": "Daily at 5:45am — Refreshes the rows on each viewer's Emby home screen, once you have set them up"
     },
     "initialJobsStep": {
-      "newLibraryChip": "नई लाइब्रेरी",
-      "libSummaryMoviesTitle": "मूवी लाइब्रेरी बनाई गईं",
-      "libSummarySeriesTitle": "टीवी श्रृंखला पुस्तकालय बनाए गए",
-      "createdCount": "{{गिनती}} बनाया गया",
-      "skippedCount": "{{गिनती}} छोड़ दिया गया",
-      "failedCount": "{{गिनती}} विफल",
-      "topPicksLibsCreated": "शीर्ष चयन पुस्तकालय बनाए गए",
-      "moviesChip": "{{गिनती}} फिल्में",
-      "seriesChip": "{{गिनती}} शृंखला",
-      "failedChip": "असफल",
-      "topPicksMoviesRow": "शीर्ष चयन - फिल्में",
-      "topPicksSeriesRow": "शीर्ष चयन - शृंखला",
-      "topPicksFailedDefault": "शीर्ष चयन लाइब्रेरी बनाने में विफल",
       "rerunRun": "{{नाम}} चलाएँ",
       "rerunRerun": "{{नाम}} पुनः चलाएँ",
       "itemsProcessed": "{{गिनती}} आइटम",
@@ -3957,7 +3881,6 @@
       "bulletWatchHistory": "देखने का इतिहास सिंक करें - प्राथमिकताओं को समझने के लिए देखने का इतिहास आयात करें",
       "bulletEmbeddings": "एंबेडिंग उत्पन्न करें - सामग्री विषयों को समझने के लिए एआई वैक्टर बनाएं (ओपनएआई का उपयोग करता है)",
       "bulletRecs": "अनुशंसाएँ उत्पन्न करें - प्रत्येक उपयोगकर्ता के लिए वैयक्तिकृत चयन बनाएँ",
-      "bulletLibraries": "सिंक लाइब्रेरीज़ - अनुशंसा लाइब्रेरीज़ को अपने मीडिया सर्वर पर पुश करें",
       "headsUp": "आपकी मीडिया लाइब्रेरी के आकार के आधार पर इसमें कुछ मिनट से लेकर 30+ मिनट तक का समय लग सकता है। हजारों फिल्मों और एपिसोड के साथ बड़े संग्रह में अधिक समय लगेगा।",
       "headsUpLabel": "सचेत!",
       "progressLine": "प्रगति: {{कुल}} नौकरियों में से {{पूरी हो गईं",
@@ -3965,7 +3888,6 @@
       "chipAllComplete": "सब पूर्ण",
       "chipFailed": "असफल",
       "chipRunning": "दौड़ना",
-      "libraryResultsTitle": "पुस्तकालय निर्माण परिणाम",
       "back": "पीछे",
       "startInit": "आरंभीकरण प्रारंभ करें",
       "runningProgress": "चल रहा है... ({{किया गया}}/{{कुल}})",
@@ -3984,68 +3906,13 @@
     },
     "topPicksStep": {
       "title": "शीर्ष चयन (वैकल्पिक)",
-      "body": "सभी उपयोगकर्ताओं के एकत्रित देखे गए इतिहास के आधार पर वैश्विक \"क्या लोकप्रिय है\" लाइब्रेरी बनाएं। वैयक्तिकृत एआई अनुशंसाओं के विपरीत, टॉप पिक्स सभी को समान ट्रेंडिंग सामग्री दिखाता है - यह जानने के लिए कि आपके सर्वर पर क्या लोकप्रिय है, बढ़िया है।",
       "enableTitle": "शीर्ष चयन सक्षम करें",
-      "enableSubtitle": "सभी उपयोगकर्ताओं के लिए दृश्यमान ट्रेंडिंग सामग्री लाइब्रेरी बनाएं",
       "noteAdvanced": "लोकप्रियता एल्गोरिदम वेट, टाइम विंडो और रिफ्रेश शेड्यूल जैसी उन्नत सेटिंग्स को बाद में एडमिन → सेटिंग्स → टॉप पिक्स में अनुकूलित किया जा सकता है।",
       "noteLabel": "टिप्पणी:",
-      "outputConfig": "आउटपुट कॉन्फ़िगरेशन",
-      "symlinkWarning": "सिम्लिंक के लिए आवश्यक है कि {{appName}} आपकी मीडिया फ़ाइलों को ठीक उसी पथ पर एक्सेस कर सके जो आपका मीडिया सर्वर उपयोग करता है। यदि सिस्टम के बीच पथ भिन्न हैं (उदाहरण के लिए, डॉकर कंटेनर), तो इसके बजाय STRM फ़ाइलों का उपयोग करें।",
-      "symlinkLabel": "सिमलिंक",
       "back": "पीछे",
       "saveContinue": "सहेजें जारी रखें",
-      "errUpload": "अपलोड विफल रहा",
-      "errDelete": "हटाना विफल"
-    },
-    "fileLocations": {
-      "title": "फ़ाइल स्थान",
-      "body": "कॉन्फ़िगर करें जहां आपका मीडिया सर्वर {{appName}} की लाइब्रेरी फ़ाइलें देखता है। ये पथ इस बात से मेल खाने चाहिए कि आपका मीडिया सर्वर आपके डॉकर कॉन्फ़िगरेशन में माउंट किए गए वॉल्यूम तक कैसे पहुंचता है।",
-      "saved": "फ़ाइल स्थान सहेजे गए!",
-      "autoDetectTitle": "पथों का स्वत: पता लगाएं",
-      "autoDetectBody": "आपका मीडिया सर्वर फ़ाइलों को कैसे देखता है और {{appName}} उन्हें कैसे देखता है, इसकी तुलना करके {{appName}} स्वचालित रूप से सही पथों का पता लगा सकता है।",
-      "detecting": "पता लगाया जा रहा है...",
-      "detectButton": "पथों का स्वचालित रूप से पता लगाएं",
-      "pathsDetected": "पथों का सफलतापूर्वक पता लगाया गया!",
-      "mediaServerSees": "मीडिया सर्वर देखता है:",
-      "apertureSees": "{{appName}} देखता है:",
-      "detectedPrefix": "पता चला उपसर्ग:",
-      "hideManual": "मैन्युअल कॉन्फ़िगरेशन छिपाएँ",
-      "orManual": "या मैन्युअल रूप से कॉन्फ़िगर करें",
-      "howToFindTitle": "इन रास्तों को कैसे खोजें:",
-      "howToFindBody": "अपने मीडिया सर्वर में कोई भी मूवी खोलें, मीडिया इन्फो पर जाएं और फ़ाइल पथ देखें। यदि यह /mnt/Movies/SomeMovie/file.mkv दिखाता है, तो आपका मीडिया पथ उपसर्ग /mnt/ है।",
-      "apertureLibsPath": "{{appName}} पुस्तकालय पथ",
-      "apertureLibsHelp": "आपका मीडिया सर्वर {{appName}} की आउटपुट लाइब्रेरीज़ कहाँ देखता है?",
-      "helperApertureLibs": "वह पथ जहाँ आपका मीडिया सर्वर /{{appName}}-लाइब्रेरीज़ देखता है",
-      "mediaPrefixTitle": "मीडिया सर्वर पथ उपसर्ग",
-      "mediaPrefixHelp": "आपका मीडिया सर्वर आपकी मूल मीडिया फ़ाइलें कहाँ देखता है?",
-      "symlinkHelper": "आपकी मीडिया फ़ाइलों के लिए सिम्लिंक बनाने के लिए उपयोग किया जाता है",
-      "currentConfig": "वर्तमान विन्यास",
-      "librariesPathLine": "पुस्तकालय पथ:",
-      "mediaPrefixLine": "मीडिया उपसर्ग:",
-      "back": "पीछे",
-      "skipDefaults": "छोड़ें (डिफ़ॉल्ट का उपयोग करें)",
-      "saveContinue": "सहेजें जारी रखें",
-      "errDetect": "स्वतः-पहचान विफल",
-      "errSave": "कॉन्फ़िगरेशन सहेजने में विफल"
-    },
-    "aiRecs": {
-      "title": "एआई अनुशंसा लाइब्रेरी कॉन्फ़िगर करें",
-      "body": "{{appName}} आपके मीडिया सर्वर में वर्चुअल लाइब्रेरी बनाता है जिसमें प्रत्येक उपयोगकर्ता के लिए वैयक्तिकृत अनुशंसाएँ होती हैं। कॉन्फ़िगर करें कि ये लाइब्रेरी कैसे बनाई जाती हैं और वैकल्पिक रूप से उनकी कवर छवियों को कस्टमाइज़ करें।",
-      "strmVsSymlink": "एसटीआरएम बनाम सिम्लिंक: एसटीआरएम फाइलें सार्वभौमिक रूप से काम करती हैं और स्ट्रीमिंग यूआरएल का समर्थन करती हैं, जबकि सिम्लिंक सीधे फ़ाइल एक्सेस (स्थानीय प्लेबैक के लिए बेहतर) प्रदान करते हैं, लेकिन आपके मीडिया सर्वर के समान पथ पर आपकी मीडिया फ़ाइलों तक पहुंचने के लिए {{appName}} की आवश्यकता होती है। टीवी श्रृंखला के लिए, बेहतर प्रदर्शन के लिए सिम्लिंक की अनुशंसा की जाती है।",
-      "moviesLibrary": "मूवी लाइब्रेरी",
-      "seriesLibrary": "श्रृंखला पुस्तकालय",
-      "imageSet": "चित्र स्थित",
-      "outputFormat": "आउटपुट स्वरूप",
-      "symlinks": "सिमलिंक",
-      "strmFiles": "एसटीआरएम फ़ाइलें",
-      "moviesSymlinkHelp": "मूल मूवी फ़ाइलों के लिए प्रतीकात्मक लिंक बनाता है",
-      "moviesStrmHelp": "पथ या स्ट्रीमिंग URL के साथ .strm फ़ाइलें बनाता है",
-      "seriesSymlinkHelp": "मूल सीज़न फ़ोल्डरों के लिए सिम्लिंक बनाता है (अनुशंसित)",
-      "seriesStrmHelp": "प्रत्येक एपिसोड के लिए .strm फ़ाइलें बनाता है",
-      "coverImage": "लाइब्रेरी कवर छवि",
-      "dropImage": "छवि गिराएँ",
-      "back": "पीछे",
-      "saveContinue": "सहेजें जारी रखें"
+      "bodyRows": "Show everyone what's popular on your server, worked out from all users' watch history. Unlike personalized recommendations, Top Picks is the same list for every viewer. It appears in {{appName}} and, on Emby, can be a row on each viewer's home screen.",
+      "enableSubtitleRows": "The same trending list for every viewer"
     },
     "aiSetup": {
       "nameEmbeddings": "एंबेडिंग",
@@ -5348,7 +5215,8 @@
     "homeSections": {
       "title": "Emby Home Rows",
       "blurb": "Top Picks and each viewer's recommendations on their Emby home screen"
-    }
+    },
+    "gateLegacyLibraryOutput": "Legacy library output is switched off — these settings are not used"
   },
   "settingsEvaluation": {
     "title": "Evaluation seeds",
@@ -5728,5 +5596,43 @@
       "waiting": "प्रतीक्षा में: {{count}}",
       "unavailable": "खुल नहीं सकते: {{count}}"
     }
+  },
+  "legacyLibraryOutput": {
+    "legacyChip": "Legacy",
+    "card": {
+      "title": "Legacy library output",
+      "subtitle": "Each viewer's AI Picks libraries and the shared Top Picks libraries, written as STRM files or symlinks under /aperture-libraries and added to the media server as extra libraries. Emby home rows now put the same recommendations and Top Picks on each viewer's home screen straight from the original titles — no files, no extra mount, no duplicate library. This output is being phased out.",
+      "homeRowsLink": "Set up Emby home rows",
+      "switchLabel": "Write STRM / symlink libraries",
+      "switchOnHelp": "On: the library jobs keep writing the AI Picks and Top Picks libraries.",
+      "switchOffHelp": "Off: nothing is written or created any more, the library jobs do nothing, and the settings that only concern these libraries are greyed out. Libraries already in the media server keep their last contents until you remove them below.",
+      "savedOn": "Legacy library output switched on. The next library sync brings the libraries up to date.",
+      "savedOff": "Legacy library output switched off. Nothing more will be written.",
+      "saveFailed": "Could not save the setting.",
+      "remainingTitle": "Libraries still in the media server",
+      "remainingCount_one": "{{count}} generated library is recorded ({{personal}} per viewer, {{topPicks}} Top Picks).",
+      "remainingCount_other": "{{count}} generated libraries are recorded ({{personal}} per viewer, {{topPicks}} Top Picks).",
+      "noneRemaining": "No generated libraries are recorded. Removing still looks for libraries left behind by earlier renames, and for the Top Picks collection and playlist.",
+      "removeButton": "Remove generated libraries",
+      "removeNeedsOff": "Switch the output off first — while it is on, the next library sync would rebuild them.",
+      "confirmTitle": "Remove every generated library?",
+      "confirmBody_one": "This deletes every library legacy output made from the media server — {{count}} recorded, plus any an earlier rename left behind — with their folders under /aperture-libraries, and the Top Picks collection and playlist. Recommendations are not touched: switching the output back on and running the library jobs rebuilds the libraries.",
+      "confirmBody_other": "This deletes every library legacy output made from the media server — {{count}} recorded, plus any an earlier rename left behind — with their folders under /aperture-libraries, and the Top Picks collection and playlist. Recommendations are not touched: switching the output back on and running the library jobs rebuilds the libraries.",
+      "confirmAction": "Remove libraries",
+      "cancel": "Cancel",
+      "removeStarted": "Removal started. A library the media server refuses to delete is kept, and running the job again retries it.",
+      "openJob": "Open job",
+      "removeFailed": "Could not start the removal."
+    },
+    "notice": {
+      "title": "Legacy library output is switched off",
+      "body": "These settings only concern the STRM / symlink libraries, which are no longer written. They are kept as they are in case the output is switched back on.",
+      "action": "Output format"
+    },
+    "jobBlocked": {
+      "legacyLibraryOutputOff": "Legacy library output is switched off (Output format), so this job has nothing to write.",
+      "legacyLibraryOutputOn": "Switch legacy library output off in Output format first — while it is on, the next library sync would rebuild what this removes."
+    },
+    "usersMenuDisabled": "Legacy library output is off"
   }
 }

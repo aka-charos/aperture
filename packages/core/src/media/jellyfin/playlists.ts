@@ -67,6 +67,27 @@ export async function createOrUpdatePlaylist(
   return { playlistId: created.Id }
 }
 
+export async function findPlaylistByName(
+  provider: JellyfinProviderBase,
+  apiKey: string,
+  userId: string,
+  name: string
+): Promise<string | null> {
+  const params = new URLSearchParams({
+    IncludeItemTypes: 'Playlist',
+    Recursive: 'true',
+    SearchTerm: name,
+  })
+
+  const response = await provider.fetch<JellyfinItemsResponse>(
+    `/Users/${userId}/Items?${params}`,
+    apiKey
+  )
+  const playlist = response.Items.find((p) => p.Name === name)
+
+  return playlist?.Id ?? null
+}
+
 export async function deletePlaylist(
   provider: JellyfinProviderBase,
   apiKey: string,

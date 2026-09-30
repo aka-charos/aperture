@@ -157,28 +157,6 @@ const setLibraries = {
 // Output Configuration Schemas
 // =============================================================================
 
-const getAiRecsOutput = {
-  tags: ['setup'],
-  summary: 'Get AI recommendations output config',
-  description: 'Get current configuration for how AI recommendations are output (poster images, STRM files).',
-}
-
-const setAiRecsOutput = {
-  tags: ['setup'],
-  summary: 'Set AI recommendations output config',
-  description: 'Configure how AI recommendations are output. Poster mode creates virtual library images, STRM mode creates playable files.',
-  body: {
-    type: 'object' as const,
-    additionalProperties: true,
-    properties: {
-      format: { type: 'string' as const, enum: ['poster', 'strm', 'both', 'none'], description: 'Output format' },
-      strmPath: { type: 'string' as const, description: 'Path for STRM file output' },
-      posterFormat: { type: 'string' as const, enum: ['png', 'jpg', 'webp'], description: 'Poster image format' },
-      posterQuality: { type: 'integer' as const, minimum: 1, maximum: 100, description: 'Poster quality' },
-    },
-  },
-}
-
 const getOutputConfig = {
   tags: ['setup'],
   summary: 'Get output path config',
@@ -203,19 +181,6 @@ const detectPaths = {
   tags: ['setup'],
   summary: 'Detect path mappings',
   description: 'Auto-detect path mappings between Aperture container and media server. Useful when they run in different containers.',
-}
-
-const validate = {
-  tags: ['setup'],
-  summary: 'Validate setup',
-  description: 'Run validation checks to ensure setup is correct. Tests file access, path mappings, and connectivity.',
-  body: {
-    type: 'object' as const,
-    additionalProperties: true,
-    properties: {
-      useSymlinks: { type: 'boolean' as const, description: 'Test symlink creation' },
-    },
-  },
 }
 
 const uploadLibraryImage = {
@@ -366,8 +331,6 @@ const runJob = {
           'sync-movie-watch-history', 'sync-series-watch-history',
           'generate-movie-embeddings', 'generate-series-embeddings',
           'generate-movie-recommendations', 'generate-series-recommendations',
-          'sync-movie-libraries', 'sync-series-libraries',
-          'refresh-top-picks',
         ],
       },
     },
@@ -629,12 +592,9 @@ export const setupSchemas = {
   setLibraries,
   
   // Output Config
-  getAiRecsOutput,
-  setAiRecsOutput,
   getOutputConfig,
   setOutputConfig,
   detectPaths,
-  validate,
   uploadLibraryImage,
   
   // Top Picks

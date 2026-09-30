@@ -365,6 +365,20 @@ export {
   cleanupUserLibraries,
   reconcileStaleStrmLibraries,
   type StrmLibraryMediaType,
+  // Legacy library output switch (Emby home rows replace it)
+  isLegacyLibraryOutputEnabled,
+  setLegacyLibraryOutputEnabled,
+  assertLegacyLibraryOutputEnabled,
+  countGeneratedLibraries,
+  removeGeneratedLibraries,
+  LegacyLibraryOutputDisabledError,
+  LEGACY_LIBRARY_OUTPUT_OFF_MESSAGE,
+  LEGACY_LIBRARY_JOBS,
+  REMOVE_LEGACY_LIBRARIES_JOB,
+  legacyJobBlockedReason,
+  type LegacyJobBlockedReason,
+  type GeneratedLibraryCounts,
+  type RemoveGeneratedLibrariesResult,
 } from './strm/index.js'
 
 // Channels

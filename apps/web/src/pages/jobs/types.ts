@@ -96,6 +96,11 @@ export interface Job {
   lastRun?: JobLastRun | null
   manualOnly?: boolean
   runLimit?: JobRunLimit | null
+  /**
+   * Why running this job now would do nothing, decided by the API (the legacy
+   * library output switch). Absent on older API builds, which reads as runnable.
+   */
+  blockedReason?: 'legacyLibraryOutputOff' | 'legacyLibraryOutputOn' | null
 }
 
 export interface JobCategory {

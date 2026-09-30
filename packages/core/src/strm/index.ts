@@ -21,3 +21,23 @@ export {
   type StrmLibraryMediaType,
 } from './cleanup.js'
 
+export {
+  isLegacyLibraryOutputEnabled,
+  setLegacyLibraryOutputEnabled,
+  assertLegacyLibraryOutputEnabled,
+  skipIfLegacyLibraryOutputOff,
+  countGeneratedLibraries,
+  removeGeneratedLibraries,
+  LegacyLibraryOutputDisabledError,
+  LEGACY_LIBRARY_OUTPUT_OFF_MESSAGE,
+  type GeneratedLibraryCounts,
+  type RemoveGeneratedLibrariesResult,
+} from './legacyOutput.js'
+
+export {
+  LEGACY_LIBRARY_JOBS,
+  REMOVE_LEGACY_LIBRARIES_JOB,
+  legacyJobBlockedReason,
+  type LegacyJobBlockedReason,
+} from './legacyOutputRules.js'
+

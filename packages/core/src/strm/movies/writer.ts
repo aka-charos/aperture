@@ -6,6 +6,7 @@ import { getConfig } from '../config.js'
 import { getAiRecsOutputConfig, getAppName } from '../../settings/systemSettings.js'
 import { downloadImage } from '../images.js'
 import { generateNfoContent } from './nfo.js'
+import { assertLegacyLibraryOutputEnabled, recordWrittenScope } from '../legacyOutput.js'
 import {
   getStrmContent,
 } from '../filenames.js'
@@ -56,6 +57,8 @@ export async function writeStrmFilesForUser(
   providerUserId: string,
   displayName: string
 ): Promise<{ written: number; deleted: number; localPath: string; embyPath: string }> {
+  // Legacy output switched off: refuse before anything is created or written.
+  await assertLegacyLibraryOutputEnabled()
   const config = await getConfig()
   const outputConfig = await getAiRecsOutputConfig()
   const useSymlinks = outputConfig.moviesUseSymlinks
@@ -555,6 +558,12 @@ export async function writeStrmFilesForUser(
     },
     '✅ STRM generation complete'
   )
+
+  // What this library may now hold — read back while the output is frozen.
+  await recordWrittenScope(userId, 'movies', {
+    libraryIds: scope.libraryIds,
+    maxParentalRating: scope.maxParentalRating,
+  })
 
   return {
     written: totalMovies,

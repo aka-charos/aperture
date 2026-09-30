@@ -8,7 +8,7 @@ This guide covers initial setup, ongoing operations, and administrative configur
 
 Start here if you're new to Aperture:
 
-1. [Setup Wizard](admin/setup-wizard.md) — 11-step initial configuration
+1. [Setup Wizard](admin/setup-wizard.md) — 8-step initial configuration
 2. [Post-Setup Checklist](admin/post-setup-checklist.md) — Get recommendations running
 
 ### Platform-Specific Guides

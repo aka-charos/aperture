@@ -573,6 +573,28 @@ export const strmLibrariesSchema = {
   description: 'Get all STRM libraries created by Aperture for recommendations (admin only).',
 }
 
+export const legacyLibraryOutputSchema = {
+  tags: ['settings'],
+  summary: 'Get the legacy library output switch',
+  description:
+    'Whether Aperture writes per-viewer AI Picks and shared Top Picks libraries as STRM files or symlinks, and how many such libraries are recorded (admin only).',
+}
+
+export const updateLegacyLibraryOutputSchema = {
+  tags: ['settings'],
+  summary: 'Switch legacy library output on or off',
+  description:
+    'Off stops every STRM/symlink write and library creation at once; libraries already in the media server are left alone until the remove-legacy-libraries job runs (admin only).',
+  body: {
+    type: 'object' as const,
+    additionalProperties: false,
+    required: ['enabled'] as string[],
+    properties: {
+      enabled: { type: 'boolean' as const },
+    },
+  },
+}
+
 // =============================================================================
 // OpenAI Legacy Schemas
 // =============================================================================
