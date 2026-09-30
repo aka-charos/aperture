@@ -1138,6 +1138,7 @@
       "notYetGenerated": "No analysis has been written for this title yet.",
       "generate": "Write an analysis",
       "generating": "Reading what critics wrote…",
+      "generatingNote": "This takes a few minutes. You can leave this page — it will be here when you come back.",
       "failed": "Could not write an analysis right now.",
       "sourcesLabel": "Sources",
       "declinedThinSources": "There is too little published writing about this title to say anything grounded. Nothing was invented to fill the gap.",

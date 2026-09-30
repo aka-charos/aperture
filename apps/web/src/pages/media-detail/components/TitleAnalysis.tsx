@@ -63,6 +63,7 @@ import {
 } from '@mui/icons-material'
 import type { TFunction } from 'i18next'
 import { useAuth } from '../../../hooks/useAuth'
+import { pollOutcome } from '../analysisPoll'
 import type { MediaType } from '../types'
 
 interface AnalysisSource {
@@ -133,7 +134,37 @@ interface AnalysisResponse {
    */
   stale?: boolean
   provenance?: AnalysisProvenance
+  /**
+   * The server is writing one right now. Absent from an older server, which
+   * reads as false and simply means the panel never starts a poll — the same
+   * behaviour it had before polling existed.
+   */
+  generating?: boolean
+  /**
+   * How the last generation ended, when it ended badly. A failure writes no
+   * row, so without this a poll cannot tell "it failed" from "nobody ever
+   * asked" and the spinner would quietly turn back into the button.
+   */
+  failure?: string
 }
+
+/**
+ * How often the panel asks whether the analysis is ready.
+ *
+ * Three seconds against a job measured in minutes is a cheap cache read per
+ * viewer, and the interval is what decides how long a finished analysis sits
+ * unseen — so it is sized for the end of the wait, not the length of it.
+ */
+const POLL_INTERVAL_MS = 3000
+
+/**
+ * Consecutive failed POLLS tolerated before giving up.
+ *
+ * A poll that fails is not a generation that failed - a dropped wifi connection
+ * must not be reported as the model refusing - so it retries. It is bounded
+ * because the alternative to giving up is a spinner that never stops.
+ */
+const MAX_POLL_FAILURES = 5
 
 interface TitleAnalysisProps {
   mediaType: MediaType
@@ -153,10 +184,21 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
     let cancelled = false
     setLoading(true)
     setError(null)
+    setGenerating(false)
     fetch(`/api/analysis/${mediaType}/${mediaId}`, { credentials: 'include' })
       .then((res) => (res.ok ? res.json() : null))
       .then((json: AnalysisResponse | null) => {
-        if (!cancelled) setData(json)
+        if (cancelled) return
+        setData(json)
+        // Somebody is already writing this one — this tab, before a reload, or
+        // another reader entirely. Join the wait rather than offering a button
+        // that would only answer 202.
+        //
+        // A stored `failure` is deliberately NOT surfaced here. An error means
+        // "what you just asked for did not work", and nobody asked for
+        // anything by opening the page; a joiner still sees it, because their
+        // own press is what starts their poll.
+        if (json?.generating) setGenerating(true)
       })
       .catch(() => {
         // A missing analysis is not an error worth a banner — the panel simply
@@ -169,6 +211,67 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
       cancelled = true
     }
   }, [mediaType, mediaId])
+
+  /**
+   * THE WAIT LIVES HERE, NOT IN THE REQUEST.
+   *
+   * Writing an analysis is minutes, and the POST used to hold its connection
+   * open for all of it, sending no byte until it finished — so whichever hop
+   * in front of the API had the shortest patience cut the request long before
+   * the work was done, while the server carried on and stored a perfectly good
+   * row. The panel showed a dead spinner or a generic failure, and the
+   * analysis appeared if you waited and reloaded.
+   *
+   * The POST answers 202 now and this polls the GET, which already knew how to
+   * report `generating`. Nothing holds a connection open, so there is nothing
+   * left to time out.
+   */
+  useEffect(() => {
+    if (!generating) return
+    let cancelled = false
+    let timer: number | undefined
+    let failures = 0
+
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/analysis/${mediaType}/${mediaId}`, {
+          credentials: 'include',
+        })
+        if (!res.ok) throw new Error(String(res.status))
+        const json = (await res.json()) as AnalysisResponse
+        if (cancelled) return
+        failures = 0
+
+        const outcome = pollOutcome(json)
+        if (outcome.kind === 'wait') {
+          timer = window.setTimeout(tick, POLL_INTERVAL_MS)
+          return
+        }
+
+        setGenerating(false)
+        if (outcome.kind === 'failed') {
+          setError(outcome.error ?? t('mediaDetail.analysis.failed'))
+          return
+        }
+        setData(json)
+      } catch {
+        if (cancelled) return
+        failures += 1
+        if (failures >= MAX_POLL_FAILURES) {
+          setGenerating(false)
+          setError(t('mediaDetail.analysis.failed'))
+          return
+        }
+        timer = window.setTimeout(tick, POLL_INTERVAL_MS)
+      }
+    }
+
+    timer = window.setTimeout(tick, POLL_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
+  }, [generating, mediaType, mediaId, t])
 
   /**
    * `force` re-runs a title that already has a row, and is admin-only on the
@@ -188,14 +291,20 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
         )
         const json = await res.json()
         if (!res.ok) {
+          setGenerating(false)
           setError(json?.error ?? t('mediaDetail.analysis.failed'))
           return
         }
+        // 202 means the work has started and the effect above collects it; 200
+        // means it was already cached and there is nothing to wait for. There
+        // is deliberately no `finally` clearing `generating` — leaving it true
+        // is what starts the poll.
+        if (res.status === 202) return
+        setGenerating(false)
         setData(json as AnalysisResponse)
       } catch {
-        setError(t('mediaDetail.analysis.failed'))
-      } finally {
         setGenerating(false)
+        setError(t('mediaDetail.analysis.failed'))
       }
     },
     [mediaType, mediaId, t]
@@ -419,7 +528,18 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
               without opening the panel first. */}
           {!hasAnalysis && !declined && (
             <Typography variant="body2" color="text.secondary">
-              {t('mediaDetail.analysis.notYetGenerated')}
+              {generating
+                ? t('mediaDetail.analysis.generating')
+                : t('mediaDetail.analysis.notYetGenerated')}
+            </Typography>
+          )}
+          {/* The wait is minutes, and nothing on screen used to say so — which
+              is most of why a slow run read as a broken one. It also says the
+              page may be left, which is true now that the work outlives the
+              request rather than merely happening to survive it. */}
+          {generating && (
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+              {t('mediaDetail.analysis.generatingNote')}
             </Typography>
           )}
           {/* Admin re-run.

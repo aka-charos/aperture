@@ -965,7 +965,8 @@
         "intent": "Stated Intent",
         "circumstances": "Production Context",
         "reception": "Critical Reception"
-      }
+      },
+      "generatingNote": "This takes a few minutes. You can leave this page — it will be here when you come back."
     },
     "recommendDialog": {
       "title": "Consiglia {{title}}",
