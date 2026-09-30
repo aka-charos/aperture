@@ -2,34 +2,53 @@ import { createChildLogger } from '../../lib/logger.js'
 import { query } from '../../lib/db.js'
 import { clampRating } from '../shared/syncHelpers.js'
 import type { PreparedSeries } from './syncTypes.js'
+import { pickTitleYearRow, titleYearKey, type TitleYearRow } from '../shared/titleYearRebind.js'
 
 const logger = createChildLogger('sync-series')
 
 export async function processSeriesBatch(
   seriesList: PreparedSeries[],
   existingProviderIds: Set<string>,
-  existingTitleYears: Map<string, string>,
+  existingTitleYears: Map<string, TitleYearRow[]>,
   _jobId: string
 ): Promise<{ added: number; updated: number }> {
   // Separate into updates and inserts
   const toUpdate: PreparedSeries[] = []
   const toInsert: PreparedSeries[] = []
-  // Track series that need metadata update by title+year (different provider_item_id)
-  const toUpdateByTitleYear: PreparedSeries[] = []
+  // Series whose provider id is new but which match a stored row by title+year
+  // (the server re-issued the id). `previousId` is the row they take over.
+  const toUpdateByTitleYear: Array<PreparedSeries & { previousId: string }> = []
 
   for (const ps of seriesList) {
     if (existingProviderIds.has(ps.series.id)) {
       toUpdate.push(ps)
+      continue
+    }
+    // Title+year alone is not an identity: two different shows can share both.
+    // A row is taken over only when no external id contradicts it
+    // (shared/titleYearRebind.ts); otherwise the show gets a row of its own.
+    const key = titleYearKey(ps.series.name, ps.series.year)
+    const row = key ? pickTitleYearRow(existingTitleYears.get(key), ps.series) : null
+    if (row) {
+      toUpdateByTitleYear.push({ ...ps, previousId: row.providerItemId })
+      Object.assign(row, {
+        providerItemId: ps.series.id,
+        tmdbId: ps.series.tmdbId ?? row.tmdbId,
+        imdbId: ps.series.imdbId ?? row.imdbId,
+        tvdbId: ps.series.tvdbId ?? row.tvdbId,
+      })
     } else {
-      // Check for duplicate by title + year
-      const key = `${ps.series.name?.toLowerCase()}|${ps.series.year}`
-      if (existingTitleYears.has(key)) {
-        // Series exists by title+year but different provider_item_id - update it
-        // This ensures metadata (posters, etc.) gets refreshed even if Emby ID changed
-        toUpdateByTitleYear.push(ps)
-      } else {
-        toInsert.push(ps)
-        existingTitleYears.set(key, ps.series.id)
+      toInsert.push(ps)
+      if (key) {
+        const entry: TitleYearRow = {
+          providerItemId: ps.series.id,
+          tmdbId: ps.series.tmdbId,
+          imdbId: ps.series.imdbId,
+          tvdbId: ps.series.tvdbId,
+        }
+        const list = existingTitleYears.get(key)
+        if (list) list.push(entry)
+        else existingTitleYears.set(key, [entry])
       }
     }
   }
@@ -172,16 +191,17 @@ export async function processSeriesBatch(
             $12::text[], $13::text[], $14::int[], $15::int[], $16::jsonb[],
             $17::text[], $18::jsonb[], $19::jsonb[], $20::jsonb[], $21::jsonb[],
             $22::text[], $23::text[], $24::text[], $25::jsonb[], $26::jsonb[],
-            $27::text[], $28::text[], $29::text[], $30::text[]
+            $27::text[], $28::text[], $29::text[], $30::text[], $31::text[]
           ) AS t(
             provider_item_id, title_lower, year, original_title, sort_title, end_year,
             genres, overview, tagline, community_rating, critic_rating, content_rating,
             status, total_seasons, total_episodes, air_days, network, studios,
             directors, writers, actors, imdb_id, tmdb_id, tvdb_id, tags,
-            production_countries, awards, poster_url, backdrop_url, provider_library_id
+            production_countries, awards, poster_url, backdrop_url, provider_library_id,
+            previous_id
           )
         ) AS data
-        WHERE LOWER(series.title) = data.title_lower AND series.year = data.year`,
+        WHERE series.provider_item_id = data.previous_id`,
         [
           toUpdateByTitleYear.map((ps) => ps.series.id),
           toUpdateByTitleYear.map((ps) => ps.series.name?.toLowerCase()),
@@ -213,6 +233,7 @@ export async function processSeriesBatch(
           toUpdateByTitleYear.map((ps) => ps.posterUrl),
           toUpdateByTitleYear.map((ps) => ps.backdropUrl),
           toUpdateByTitleYear.map((ps) => ps.libraryId),
+          toUpdateByTitleYear.map((ps) => ps.previousId),
         ]
       )
       updated += result.rowCount || 0

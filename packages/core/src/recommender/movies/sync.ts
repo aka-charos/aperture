@@ -16,6 +16,12 @@ import { randomUUID } from 'crypto'
 import type { Movie, PaginatedResult } from '../../media/types.js'
 import type { MediaServerProvider } from '../../media/MediaServerProvider.js'
 import { clampRating } from '../shared/syncHelpers.js'
+import {
+  indexByTitleYear,
+  pickTitleYearRow,
+  titleYearKey,
+  type TitleYearRow,
+} from '../shared/titleYearRebind.js'
 import { clampMaxCandidatesToLibrary } from '../../lib/recommendationConfig.js'
 
 const logger = createChildLogger('sync')
@@ -178,28 +184,44 @@ async function fetchMoviesParallel(
 async function processMovieBatch(
   movies: PreparedMovie[],
   existingProviderIds: Set<string>,
-  existingTitleYears: Map<string, string>,
+  existingTitleYears: Map<string, TitleYearRow[]>,
   _jobId: string
 ): Promise<{ added: number; updated: number }> {
   // Separate into updates and inserts
   const toUpdate: PreparedMovie[] = []
   const toInsert: PreparedMovie[] = []
-  // Track movies that need metadata update by title+year (different provider_item_id)
-  const toUpdateByTitleYear: PreparedMovie[] = []
+  // Movies whose provider id is new but which match a stored row by title+year
+  // (the server re-issued the id). `previousId` is the row they take over.
+  const toUpdateByTitleYear: Array<PreparedMovie & { previousId: string }> = []
 
   for (const pm of movies) {
     if (existingProviderIds.has(pm.movie.id)) {
       toUpdate.push(pm)
+      continue
+    }
+    // Title+year alone is not an identity: two different films can share both.
+    // A row is taken over only when no external id contradicts it
+    // (shared/titleYearRebind.ts); otherwise the film gets a row of its own.
+    const key = titleYearKey(pm.movie.name, pm.movie.year)
+    const row = key ? pickTitleYearRow(existingTitleYears.get(key), pm.movie) : null
+    if (row) {
+      toUpdateByTitleYear.push({ ...pm, previousId: row.providerItemId })
+      Object.assign(row, {
+        providerItemId: pm.movie.id,
+        tmdbId: pm.movie.tmdbId ?? row.tmdbId,
+        imdbId: pm.movie.imdbId ?? row.imdbId,
+      })
     } else {
-      // Check for duplicate by title + year
-      const key = `${pm.movie.name?.toLowerCase()}|${pm.movie.year}`
-      if (existingTitleYears.has(key)) {
-        // Movie exists by title+year but different provider_item_id - update it
-        // This ensures metadata (posters, etc.) gets refreshed even if Emby ID changed
-        toUpdateByTitleYear.push(pm)
-      } else {
-        toInsert.push(pm)
-        existingTitleYears.set(key, pm.movie.id)
+      toInsert.push(pm)
+      if (key) {
+        const entry: TitleYearRow = {
+          providerItemId: pm.movie.id,
+          tmdbId: pm.movie.tmdbId,
+          imdbId: pm.movie.imdbId,
+        }
+        const list = existingTitleYears.get(key)
+        if (list) list.push(entry)
+        else existingTitleYears.set(key, [entry])
       }
     }
   }
@@ -351,17 +373,18 @@ async function processMovieBatch(
             $11::jsonb[], $12::text[], $13::text[], $14::text[], $15::text[],
             $16::text[], $17::date[], $18::jsonb[], $19::jsonb[], $20::jsonb[],
             $21::jsonb[], $22::text[], $23::text[], $24::jsonb[], $25::text[],
-            $26::jsonb[], $27::text[], $28::text[], $29::text[], $30::text[], $31::text[]
+            $26::jsonb[], $27::text[], $28::text[], $29::text[], $30::text[], $31::text[],
+            $32::text[]
           ) AS t(
             provider_item_id, title_lower, year, original_title, genres, overview,
             community_rating, critic_rating, runtime_minutes, path, media_sources,
             poster_url, backdrop_url, provider_library_id, tagline, content_rating,
             premiere_date, studios, directors, writers, actors, imdb_id, tmdb_id,
             tags, sort_title, production_countries, awards, video_resolution,
-            video_codec, audio_codec, container
+            video_codec, audio_codec, container, previous_id
           )
         ) AS data
-        WHERE LOWER(movies.title) = data.title_lower AND movies.year = data.year`,
+        WHERE movies.provider_item_id = data.previous_id`,
         [
           toUpdateByTitleYear.map((pm) => pm.movie.id),
           toUpdateByTitleYear.map((pm) => pm.movie.name?.toLowerCase()),
@@ -396,6 +419,7 @@ async function processMovieBatch(
           toUpdateByTitleYear.map((pm) => pm.movie.videoCodec || null),
           toUpdateByTitleYear.map((pm) => pm.movie.audioCodec || null),
           toUpdateByTitleYear.map((pm) => pm.movie.container || null),
+          toUpdateByTitleYear.map((pm) => pm.previousId),
         ]
       )
       updated += result.rowCount || 0
@@ -597,17 +621,23 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
 
     // Pre-fetch existing movies from database for fast duplicate checking
     addLog(jobId, 'info', '🔍 Loading existing movies from database...')
-    const existingMovies = await query<{ provider_item_id: string; title: string; year: number | null }>(
-      'SELECT provider_item_id, title, year FROM movies'
+    const existingMovies = await query<{
+      provider_item_id: string
+      title: string
+      year: number | null
+      tmdb_id: string | null
+      imdb_id: string | null
+    }>('SELECT provider_item_id, title, year, tmdb_id, imdb_id FROM movies')
+    const existingProviderIds = new Set(existingMovies.rows.map((m) => m.provider_item_id))
+    const existingTitleYears = indexByTitleYear(
+      existingMovies.rows.map((m) => ({
+        providerItemId: m.provider_item_id,
+        title: m.title,
+        year: m.year,
+        tmdbId: m.tmdb_id,
+        imdbId: m.imdb_id,
+      }))
     )
-    const existingProviderIds = new Set<string>()
-    const existingTitleYears = new Map<string, string>()
-    for (const m of existingMovies.rows) {
-      existingProviderIds.add(m.provider_item_id)
-      if (m.title && m.year) {
-        existingTitleYears.set(`${m.title.toLowerCase()}|${m.year}`, m.provider_item_id)
-      }
-    }
     addLog(jobId, 'info', `📊 Found ${existingMovies.rows.length} existing movies in database`)
 
     // Step 3: Process movies - fetch and sync

@@ -23,6 +23,7 @@ import {
 import type { SyncSeriesResult, LibrarySeriesSyncResult, PreparedSeries, PreparedEpisode } from './syncTypes.js'
 import { reconcileRemovedSeries } from './reconcile.js'
 import { processSeriesBatch } from './seriesBatch.js'
+import { indexByTitleYear } from '../shared/titleYearRebind.js'
 import { processEpisodeBatch } from './episodeBatch.js'
 
 export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResult> {
@@ -160,19 +161,29 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
     // Pre-fetch existing data from database
     addLog(jobId, 'info', '🔍 Loading existing series and episodes from database...')
     const [existingSeriesResult, existingEpisodesResult] = await Promise.all([
-      query<{ provider_item_id: string; title: string; year: number | null }>('SELECT provider_item_id, title, year FROM series'),
+      query<{
+        provider_item_id: string
+        title: string
+        year: number | null
+        tmdb_id: string | null
+        imdb_id: string | null
+        tvdb_id: string | null
+      }>('SELECT provider_item_id, title, year, tmdb_id, imdb_id, tvdb_id FROM series'),
       query<{ provider_item_id: string; series_id: string; season_number: number; episode_number: number }>(
         'SELECT provider_item_id, series_id, season_number, episode_number FROM episodes'
       ),
     ])
-    const existingSeriesIds = new Set<string>()
-    const existingSeriesTitleYears = new Map<string, string>()
-    for (const s of existingSeriesResult.rows) {
-      existingSeriesIds.add(s.provider_item_id)
-      if (s.title && s.year) {
-        existingSeriesTitleYears.set(`${s.title.toLowerCase()}|${s.year}`, s.provider_item_id)
-      }
-    }
+    const existingSeriesIds = new Set(existingSeriesResult.rows.map((s) => s.provider_item_id))
+    const existingSeriesTitleYears = indexByTitleYear(
+      existingSeriesResult.rows.map((s) => ({
+        providerItemId: s.provider_item_id,
+        title: s.title,
+        year: s.year,
+        tmdbId: s.tmdb_id,
+        imdbId: s.imdb_id,
+        tvdbId: s.tvdb_id,
+      }))
+    )
     // Track existing episodes by BOTH provider_item_id AND by series+season+episode composite key
     // This handles cases where Emby/Jellyfin regenerates item IDs
     const existingEpisodeIds = new Set(existingEpisodesResult.rows.map((r) => r.provider_item_id))
