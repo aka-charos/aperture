@@ -6,7 +6,7 @@
 
 import type { MediaServerProvider } from '../media/MediaServerProvider.js'
 import type { ContentSection } from '../media/types.js'
-import { TOP_PICKS_TAGS, recsTagNames, sectionTagIds } from './plan.js'
+import { TOP_PICKS_TAGS, friendsTagName, recsTagNames, sectionTagIds } from './plan.js'
 import {
   collapseExpandedRows,
   groupsAreContiguous,
@@ -49,6 +49,7 @@ export function managedTagsForViewer(input: {
     const names = recsTagNames(input.viewerTagName)
     add(names.movies, { feature: 'recs-movies', name: '' })
     add(names.series, { feature: 'recs-series', name: '' })
+    add(friendsTagName(input.viewerTagName), { feature: 'friends', name: '' })
   }
   for (const playlist of input.playlists) {
     if (playlist.ownerId === input.viewerId) add(playlist.tagName, { feature: 'playlists', name: playlist.name })

@@ -40,6 +40,7 @@ export const PLACEMENT_FEATURES = [
   'top-picks-series',
   'recs-movies',
   'recs-series',
+  'friends',
   'playlists',
 ] as const
 

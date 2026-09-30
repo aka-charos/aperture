@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  CONDITIONAL_TAB_KEYS,
   USER_SETTINGS_TAB_KEYS,
   userSettingsTabIndexFromParam,
   userSettingsTabParamFromIndex,
@@ -34,6 +35,16 @@ describe('user settings tab params', () => {
     assert.equal(userSettingsTabIndexFromParam(null), 0)
     assert.equal(userSettingsTabIndexFromParam(''), 0)
     assert.equal(userSettingsTabIndexFromParam('nonsense'), 0)
+  })
+
+  it('puts every conditional tab after every tab everyone sees', () => {
+    // Hiding a tab shifts every later index, so only the tail may be hidden.
+    const firstConditional = USER_SETTINGS_TAB_KEYS.findIndex((key) => CONDITIONAL_TAB_KEYS.has(key))
+    USER_SETTINGS_TAB_KEYS.forEach((key, index) => {
+      if (index > firstConditional && firstConditional >= 0) {
+        assert.ok(CONDITIONAL_TAB_KEYS.has(key), `${key} sits after a conditional tab`)
+      }
+    })
   })
 
   it('falls back to the first key for an out-of-range index', () => {

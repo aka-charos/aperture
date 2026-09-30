@@ -13,6 +13,7 @@ import {
   buildSection,
   diffMembership,
   featureOfKind,
+  friendsTagName,
   isHomeSectionTarget,
   isTopPicksTarget,
   mayReceiveHomeRows,
@@ -60,12 +61,21 @@ describe('tag names', () => {
     const { movies, series } = recsTagNames(stored)
     assert.equal(new Set([stored, movies, series]).size, 3)
   })
+
+  test("a viewer's friends row gets its own managed tag, distinct from their recommendation rows", () => {
+    const stored = recsTagName('3f9a1c0b2d')
+    const friends = friendsTagName(stored)
+    assert.equal(isManagedTag(friends), true)
+    const { movies, series } = recsTagNames(stored)
+    assert.equal(new Set([stored, movies, series, friends]).size, 4)
+  })
 })
 
 describe('featureOfKind', () => {
   test('every playlist row shares one placement; every other kind is its own', () => {
     assert.equal(featureOfKind('playlist'), 'playlists')
     assert.equal(featureOfKind('recs-series'), 'recs-series')
+    assert.equal(featureOfKind('friends'), 'friends')
   })
 })
 

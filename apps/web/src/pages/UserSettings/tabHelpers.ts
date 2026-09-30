@@ -1,4 +1,13 @@
-export const USER_SETTINGS_TAB_KEYS = ['watcher', 'algorithm', 'preferences'] as const
+/**
+ * `home` is last on purpose: it is rendered only for an Emby account (managed
+ * home rows are Emby-only), and a tab left out at the END shifts no other tab's
+ * index. Anywhere else, hiding it would send every later tab's address to the
+ * wrong panel.
+ */
+export const USER_SETTINGS_TAB_KEYS = ['watcher', 'algorithm', 'preferences', 'home'] as const
+
+/** Tabs shown only to some accounts: an address naming one lands on the first tab otherwise. */
+export const CONDITIONAL_TAB_KEYS: ReadonlySet<UserSettingsTabKey> = new Set(['home'])
 
 export type UserSettingsTabKey = (typeof USER_SETTINGS_TAB_KEYS)[number]
 

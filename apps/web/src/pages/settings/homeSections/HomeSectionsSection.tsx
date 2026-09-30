@@ -63,11 +63,13 @@ interface HomeSectionsForm {
   topPicksEnabled: boolean
   topPicksWithoutAccess: boolean
   recommendationsEnabled: boolean
+  friendsEnabled: boolean
   playlistsEnabled: boolean
   topPicksMoviesName: string
   topPicksSeriesName: string
   recommendationsMoviesName: string
   recommendationsSeriesName: string
+  friendsName: string
   sortBy: string
   recommendationsLimit: number
   placements: Record<string, FeaturePlacementValue>
@@ -98,12 +100,15 @@ type SyncOutcome = { started: boolean; reason?: 'nothing-saved' | 'feature-off' 
 
 const JOB_NAME = 'sync-home-sections'
 
-/** Which of the three switches a feature's rows depend on. */
-const SWITCH_FOR: Record<string, 'topPicksEnabled' | 'recommendationsEnabled' | 'playlistsEnabled'> = {
+type RowSwitchField = 'topPicksEnabled' | 'recommendationsEnabled' | 'friendsEnabled' | 'playlistsEnabled'
+
+/** Which of the row switches a feature's rows depend on. */
+const SWITCH_FOR: Record<string, RowSwitchField> = {
   'top-picks-movies': 'topPicksEnabled',
   'top-picks-series': 'topPicksEnabled',
   'recs-movies': 'recommendationsEnabled',
   'recs-series': 'recommendationsEnabled',
+  friends: 'friendsEnabled',
   playlists: 'playlistsEnabled',
 }
 
@@ -124,11 +129,14 @@ function toForm(config: HomeSectionsForm): HomeSectionsForm {
     // Absent from a server built before 0184, which always behaved as "on".
     topPicksWithoutAccess: config.topPicksWithoutAccess !== false,
     recommendationsEnabled: config.recommendationsEnabled,
+    // Absent from a server built before 0188, which had no friends row.
+    friendsEnabled: config.friendsEnabled === true,
     playlistsEnabled: config.playlistsEnabled,
     topPicksMoviesName: config.topPicksMoviesName,
     topPicksSeriesName: config.topPicksSeriesName,
     recommendationsMoviesName: config.recommendationsMoviesName,
     recommendationsSeriesName: config.recommendationsSeriesName,
+    friendsName: config.friendsName ?? 'Recommended by Friends',
     sortBy: config.sortBy,
     recommendationsLimit: config.recommendationsLimit,
     placements,
@@ -322,7 +330,7 @@ export function HomeSectionsSection() {
   )
 
   const rowSwitch = (
-    field: 'recommendationsEnabled' | 'topPicksEnabled' | 'playlistsEnabled',
+    field: RowSwitchField,
     labelKey: string,
     helpKey: string
   ) => (
@@ -344,7 +352,12 @@ export function HomeSectionsSection() {
   )
 
   const nameField = (
-    field: 'topPicksMoviesName' | 'topPicksSeriesName' | 'recommendationsMoviesName' | 'recommendationsSeriesName',
+    field:
+      | 'topPicksMoviesName'
+      | 'topPicksSeriesName'
+      | 'recommendationsMoviesName'
+      | 'recommendationsSeriesName'
+      | 'friendsName',
     labelKey: string
   ) => (
     <TextField
@@ -551,6 +564,9 @@ export function HomeSectionsSection() {
         <Typography variant="subtitle2" fontWeight={600} gutterBottom color={headingColor}>
           {t('settingsHomeSections.rowsHeading')}
         </Typography>
+        <Typography variant="caption" color={captionColor} component="p" sx={{ mb: 1 }}>
+          {t('settingsHomeSections.viewersChoose')}
+        </Typography>
         <Stack spacing={1}>
           {rowSwitch('topPicksEnabled', 'settingsHomeSections.topPicksEnabled', 'settingsHomeSections.topPicksRowsHelp')}
           <Box id="home-sections-top-picks-without-access" sx={{ ps: 4 }}>
@@ -574,6 +590,7 @@ export function HomeSectionsSection() {
             'settingsHomeSections.recommendationsEnabled',
             'settingsHomeSections.recommendationsHelp'
           )}
+          {rowSwitch('friendsEnabled', 'settingsHomeSections.friendsEnabled', 'settingsHomeSections.friendsHelp')}
           {rowSwitch('playlistsEnabled', 'settingsHomeSections.playlistsEnabled', 'settingsHomeSections.playlistsHelp')}
         </Stack>
 
@@ -587,6 +604,7 @@ export function HomeSectionsSection() {
           {nameField('topPicksSeriesName', 'settingsHomeSections.topPicksSeriesName')}
           {nameField('recommendationsMoviesName', 'settingsHomeSections.recommendationsMoviesName')}
           {nameField('recommendationsSeriesName', 'settingsHomeSections.recommendationsSeriesName')}
+          {nameField('friendsName', 'settingsHomeSections.friendsName')}
         </Box>
 
         <Divider sx={{ my: 2 }} />
@@ -708,7 +726,7 @@ export function HomeSectionsSection() {
             >
               {limits.sorts.map((sort) => (
                 <MenuItem key={sort} value={sort}>
-                  {t(`settingsHomeSections.sort.${sort}`, { defaultValue: sort })}
+                  {t(`homeScreenPlacement.sort.${sort}`, { defaultValue: sort })}
                 </MenuItem>
               ))}
             </TextField>

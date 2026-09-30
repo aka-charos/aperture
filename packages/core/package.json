@@ -92,7 +92,7 @@
     "test:collections": "node --import tsx --test src/tmdb/collectionParts.test.ts",
     "test:library-scope": "node --import tsx --test src/lib/libraryScope.test.ts",
     "test:social": "node --import tsx --test src/social/rules.test.ts",
-    "test:home-sections": "node --import tsx --test src/homeSections/version.test.ts src/homeSections/settings.test.ts src/homeSections/plan.test.ts src/homeSections/placement.test.ts src/media/managedTags.test.ts"
+    "test:home-sections": "node --import tsx --test src/homeSections/version.test.ts src/homeSections/settings.test.ts src/homeSections/plan.test.ts src/homeSections/placement.test.ts src/homeSections/rowStates.test.ts src/homeSections/preview.test.ts src/media/managedTags.test.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.0",

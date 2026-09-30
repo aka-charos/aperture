@@ -6,7 +6,10 @@
  * - PATCH  /api/home-sections/config                   admin: save, then start a sync so the change reaches home screens now
  * - GET    /api/home-sections/anchors                  admin: rows found across accounts, for after/before placements
  * - GET    /api/home-sections/availability             any viewer: may they put a playlist on their home screen?
- * - GET    /api/home-sections/me                       any viewer: rows reaching them, the defaults, their overrides, their own rows
+ * - GET    /api/home-sections/me                       any viewer: every row kind — whether it reaches them and why not, what it
+ *                                                      holds, whether it is on their screen, where it goes — and a preview of
+ *                                                      their whole home screen once applied
+ * - PUT    /api/home-sections/me/rows/:feature         any viewer: switch one kind of row on or off for themselves, applied at once
  * - PUT    /api/home-sections/me/placements/:feature   any viewer: override a feature's placement, applied at once
  * - DELETE /api/home-sections/me/placements/:feature   any viewer: back to the default, applied at once
  *
@@ -29,13 +32,14 @@ import {
   PLACEMENT_MODES,
   getHomeSectionsConfig,
   getHomeSectionsServerStatus,
-  getUserHomeScreenSettings,
+  getUserHomeScreen,
   isPlacementFeature,
   isPlaylistHomeSectionAvailable,
   listSharedHomeRows,
   resetUserPlacement,
   sanitizeHomeSectionsUpdate,
   saveUserPlacement,
+  saveUserRowSwitch,
   updateHomeSectionsConfig,
   type SaveUserPlacementResult,
 } from '@aperture/core'
@@ -183,10 +187,41 @@ const homeSectionsRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const currentUser = request.user as SessionUser
       try {
-        return reply.send(await getUserHomeScreenSettings(currentUser.id))
+        return reply.send(await getUserHomeScreen(currentUser.id))
       } catch (err) {
-        request.log.error({ err }, 'Failed to load home screen placement settings')
+        request.log.error({ err }, 'Failed to load home screen settings')
         return reply.status(500).send({ error: 'Failed to load home screen settings' })
+      }
+    }
+  )
+
+  /**
+   * Switch one kind of row on or off for yourself. It reaches your home screen
+   * at once; `outcome.applied: false` means the choice is saved and the next
+   * sync applies it.
+   */
+  fastify.put<{ Params: { feature: string }; Body: { enabled?: unknown } }>(
+    '/api/home-sections/me/rows/:feature',
+    {
+      preHandler: requireAuth,
+      schema: {
+        tags: ['home-sections'],
+        summary: 'Switch one of your managed rows on or off',
+        body: { type: 'object', required: ['enabled'], properties: { enabled: { type: 'boolean' } } },
+      },
+    },
+    async (request, reply) => {
+      const currentUser = request.user as SessionUser
+      const enabled = request.body?.enabled
+      if (typeof enabled !== 'boolean') return reply.status(400).send({ error: 'enabled must be a boolean' })
+      try {
+        const result = await saveUserRowSwitch(currentUser.id, request.params.feature, enabled)
+        return result.ok
+          ? reply.send({ enabled: result.enabled, outcome: result.outcome })
+          : reply.status(result.status).send({ error: result.error })
+      } catch (err) {
+        request.log.error({ err, feature: request.params.feature }, 'Failed to switch a home screen row')
+        return reply.status(500).send({ error: 'Failed to save the change' })
       }
     }
   )

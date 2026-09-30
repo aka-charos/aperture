@@ -23,7 +23,13 @@ import type { PlacementFeature } from './placement.js'
  */
 export const HOME_SECTION_TYPE = 'items'
 
-export type ManagedRowKind = 'top-picks-movies' | 'top-picks-series' | 'recs-movies' | 'recs-series' | 'playlist'
+export type ManagedRowKind =
+  | 'top-picks-movies'
+  | 'top-picks-series'
+  | 'recs-movies'
+  | 'recs-series'
+  | 'friends'
+  | 'playlist'
 
 /** The placement feature a row belongs to. Every playlist row shares one. */
 export function featureOfKind(kind: ManagedRowKind): PlacementFeature {
@@ -53,6 +59,15 @@ export function recsTagNames(viewerTagName: string): { movies: string; series: s
   return { movies: `${viewerTagName}-movies`, series: `${viewerTagName}-series` }
 }
 
+/**
+ * The tag a viewer's "recommended by friends" row queries — derived from the
+ * same random name, so it says no more about whose row it is than the
+ * recommendation tags do.
+ */
+export function friendsTagName(viewerTagName: string): string {
+  return `${viewerTagName}-friends`
+}
+
 export const PLAYLIST_TAG_PREFIX = `${MANAGED_TAG_PREFIX}playlist-`
 
 /** A generated playlist's tag, from the random token stored on the playlist. */
@@ -66,8 +81,8 @@ export interface HomeSectionViewer {
 }
 
 /**
- * Whose home screen gets PERSONAL rows — their own recommendations and the
- * playlists they chose. `is_enabled` is the operator's consent to Aperture acting
+ * Whose home screen gets PERSONAL rows — their own recommendations, what their
+ * connections recommended them, and the playlists they chose. `is_enabled` is the operator's consent to Aperture acting
  * for that account; `provider_disabled` means the media server has dropped them,
  * which every other per-user loop in core also refuses (and STRM cleanup treats
  * as grounds to delete output). A viewer who fails this gets those rows REMOVED,

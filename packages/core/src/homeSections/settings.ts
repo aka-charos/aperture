@@ -58,12 +58,19 @@ export interface HomeSectionsConfig {
   topPicksWithoutAccess: boolean
   /** Both recommendation rows (movies and series). */
   recommendationsEnabled: boolean
+  /**
+   * Each viewer's "recommended by friends" row: the titles their connections
+   * sent them. Off by default (0188) — nothing a connection sent ever reached
+   * Emby before, so switching it on is the operator's call.
+   */
+  friendsEnabled: boolean
   /** Whether viewers may put their own generated playlists on their home screen. */
   playlistsEnabled: boolean
   topPicksMoviesName: string
   topPicksSeriesName: string
   recommendationsMoviesName: string
   recommendationsSeriesName: string
+  friendsName: string
   sortBy: HomeSectionSort
   recommendationsLimit: number
   /** Where each feature's rows go unless a viewer chose otherwise. */
@@ -76,11 +83,13 @@ export const DEFAULT_HOME_SECTIONS_CONFIG: HomeSectionsConfig = {
   topPicksEnabled: true,
   topPicksWithoutAccess: true,
   recommendationsEnabled: true,
+  friendsEnabled: false,
   playlistsEnabled: true,
   topPicksMoviesName: 'Top Picks: Movies',
   topPicksSeriesName: 'Top Picks: Series',
   recommendationsMoviesName: 'Recommended Movies',
   recommendationsSeriesName: 'Recommended Series',
+  friendsName: 'Recommended by Friends',
   sortBy: 'Random',
   recommendationsLimit: 20,
   placements: Object.fromEntries(
@@ -96,11 +105,13 @@ export type HomeSectionsConfigUpdate = Partial<
     | 'topPicksEnabled'
     | 'topPicksWithoutAccess'
     | 'recommendationsEnabled'
+    | 'friendsEnabled'
     | 'playlistsEnabled'
     | 'topPicksMoviesName'
     | 'topPicksSeriesName'
     | 'recommendationsMoviesName'
     | 'recommendationsSeriesName'
+    | 'friendsName'
     | 'sortBy'
     | 'recommendationsLimit'
   >
@@ -111,6 +122,7 @@ const BOOLEAN_FIELDS = [
   'topPicksEnabled',
   'topPicksWithoutAccess',
   'recommendationsEnabled',
+  'friendsEnabled',
   'playlistsEnabled',
 ] as const
 const NAME_FIELDS = [
@@ -118,6 +130,7 @@ const NAME_FIELDS = [
   'topPicksSeriesName',
   'recommendationsMoviesName',
   'recommendationsSeriesName',
+  'friendsName',
 ] as const
 
 /**

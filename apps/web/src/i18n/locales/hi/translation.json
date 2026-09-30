@@ -1246,16 +1246,80 @@
       "resetToDefault": "सर्वर डिफ़ॉल्ट पर रीसेट करें ({{state}})"
     },
     "homeScreen": {
-      "title": "Emby home screen rows",
-      "subtitle": "Choose where the rows {{appName}} adds to your Emby home screen go. A row left on its default follows what your admin sets.",
       "useDefault": "Default: {{placement}}",
       "chooseOwn": "My own placement",
       "apply": "Apply",
       "applied": "Done — your home screen has been updated.",
       "savedLater": "Saved. It will be applied at the next sync.",
       "saveFailed": "Could not save this placement",
-      "rowsUnavailable": "Emby did not return your home screen rows, so a row to place next to can't be chosen right now."
-    }
+      "intro": "{{appName}} can add rows to your Emby home screen. Switch any of them off, see what is in them, and choose where they go. Changes reach Emby straight away.",
+      "loadFailed": "Could not load your home screen settings.",
+      "pageUnavailable": {
+        "feature-off": "Your admin has not switched on {{appName}} rows for Emby home screens.",
+        "unsupported": "{{appName}} can only add rows to an Emby home screen, and this server is not Emby.",
+        "no-account": "Your account is not on the media server, so there is no home screen to add rows to."
+      },
+      "toggleRow": "Show {{row}} on my home screen",
+      "switchLocked": "This row cannot reach your home screen right now — the note below says why.",
+      "describe": {
+        "top-picks-movies": "The most popular movies on this server right now. The same list for everyone.",
+        "top-picks-series": "The most popular series on this server right now. The same list for everyone.",
+        "recs-movies": "Your own movie recommendations, from your latest recommendation run.",
+        "recs-series": "Your own series recommendations, from your latest recommendation run.",
+        "friends": "Titles your connections recommended to you on Watch This. A title leaves the row when you finish or dismiss it.",
+        "playlists": "Playlists and collections you generated, and playlists made from assistant suggestions. Each one you switch on becomes a row of its own."
+      },
+      "unavailable": {
+        "feature-off": "Home screen rows are switched off for this server.",
+        "no-access": "Your account cannot receive this row.",
+        "admin-off": "Your admin has switched this row off for everyone.",
+        "top-picks-off": "Top Picks is switched off on this server.",
+        "recommendations-off": "Recommendations are switched off for your account.",
+        "no-library": "You have no library of this kind, so there is nothing to recommend."
+      },
+      "status": {
+        "off": "Switched off — it is not on your home screen.",
+        "unknown": "Could not read what is in “{{name}}” just now.",
+        "unknownShowing": "On your home screen as “{{name}}”. Could not read what is in it just now.",
+        "showing_one": "On your home screen as “{{name}}” · {{count}} title",
+        "showing_other": "On your home screen as “{{name}}” · {{count}} titles",
+        "arriving_one": "Will appear on your home screen as “{{name}}” · {{count}} title",
+        "arriving_other": "Will appear on your home screen as “{{name}}” · {{count}} titles"
+      },
+      "empty": {
+        "top-picks-movies": "The Top Picks list has nothing in it right now, so Emby shows no row.",
+        "top-picks-series": "The Top Picks list has nothing in it right now, so Emby shows no row.",
+        "recs-movies": "No movie recommendations yet. The row appears after your next recommendation run.",
+        "recs-series": "No series recommendations yet. The row appears after your next recommendation run.",
+        "friends": "Nothing from your connections right now. When one of them recommends you a title, it appears here.",
+        "playlists": "Nothing in this playlist yet, so Emby shows no row."
+      },
+      "placement": "Placement",
+      "placementDefault": "Placement: {{placement}} (default)",
+      "placementOwn": "Placement: {{placement}} (your choice)",
+      "savedNotApplied": "Saved, but Emby could not be updated just now. It will be at the next sync.",
+      "savedNothingToShow": "Saved. The row appears once there is something in it.",
+      "moreTitles_one": "+{{count}} more",
+      "moreTitles_other": "+{{count}} more",
+      "noPlaylists": "You have no playlists that can go on your home screen yet.",
+      "openPlaylists": "Go to Playlists",
+      "playlistKind": {
+        "playlist": "Playlist",
+        "collection": "Collection",
+        "chat": "From the assistant"
+      },
+      "playlistNotGenerated": "Not generated yet — generate it on the Playlists page first.",
+      "playlistOff_one": "Not on your home screen · {{count}} title",
+      "playlistOff_other": "Not on your home screen · {{count}} titles",
+      "playlistOffUnknown": "Not on your home screen",
+      "previewTitle": "Your Emby home screen",
+      "previewHelp": "Top to bottom, as it looks once your choices are applied. Rows from {{appName}} are highlighted; the rest are your own Emby rows.",
+      "previewUnavailable": "Emby did not answer, so your home screen cannot be shown right now.",
+      "previewEmpty": "Your home screen has no rows.",
+      "previewNew": "New",
+      "previewSort": "Titles within each row: {{sort}}."
+    },
+    "tabHomeScreen": "Emby home screen"
   },
   "settingsPage": {
     "profileTitle": "आपकी प्रोफ़ाइल",
@@ -5539,14 +5603,6 @@
     "limit": "Recommendations per media type",
     "sortBy": "Order within each row",
     "sortHelp": "Emby cannot show a row in recommendation rank, so each row sorts by a field on the server.",
-    "sort": {
-      "Random": "Random",
-      "SortName": "Title (A–Z)",
-      "DateCreated": "Recently added",
-      "ProductionYear": "Newest release year",
-      "PremiereDate": "Newest release date",
-      "CommunityRating": "Highest rated"
-    },
     "tagsNote": "Each row is backed by a tag beginning with “aperture:” on the original titles. The tags are visible in Emby, and {{appName}} ignores them when it syncs your library.",
     "save": "Save",
     "syncNow": "Sync now",
@@ -5579,7 +5635,11 @@
     "namesAndMore": "{{names}} and {{extra}} more",
     "topPicksRowsHelp": "One list for the whole server, so it says nothing about the person looking at it. Reads the Top Picks list, so Top Picks itself must be switched on.",
     "topPicksWithoutAccess": "Also show Top Picks to accounts without {{appName}} access",
-    "topPicksWithoutAccessHelp": "Off: only accounts that can sign in to {{appName}} get these rows, and everyone else loses them at the next sync. Accounts disabled in Emby never get them."
+    "topPicksWithoutAccessHelp": "Off: only accounts that can sign in to {{appName}} get these rows, and everyone else loses them at the next sync. Accounts disabled in Emby never get them.",
+    "viewersChoose": "Each viewer can switch any of these rows off for themselves, and choose where theirs go, under Settings → Emby home screen.",
+    "friendsEnabled": "Recommended by friends — the titles a viewer’s connections sent them",
+    "friendsHelp": "What connections recommended to each other on Watch This, until the viewer finishes or dismisses it. Only reaches viewers with connections.",
+    "friendsName": "Recommended by friends row"
   },
   "homeScreenPlacement": {
     "mode": "Placement",
@@ -5609,10 +5669,19 @@
       "top-picks-series": "Top Picks: Series",
       "recs-movies": "Movie recommendations",
       "recs-series": "Series recommendations",
-      "playlists": "Generated playlists"
+      "playlists": "Generated playlists",
+      "friends": "Recommended by friends"
     },
     "groups": {
       "latestmedia": "Latest Media"
+    },
+    "sort": {
+      "Random": "Random",
+      "SortName": "Title (A–Z)",
+      "DateCreated": "Recently added",
+      "ProductionYear": "Newest release year",
+      "PremiereDate": "Newest release date",
+      "CommunityRating": "Highest rated"
     }
   },
   "sharedWithMe": {

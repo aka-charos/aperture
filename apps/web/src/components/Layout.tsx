@@ -132,10 +132,13 @@ const userSettingsMenuItems: {
   textKey: string
   icon: React.ReactElement
   tab: (typeof USER_SETTINGS_TAB_KEYS)[number]
+  /** Listed only for Emby accounts: the page it opens manages Emby home rows. */
+  embyOnly?: boolean
 }[] = [
   { textKey: 'userSettings.tabWatcherIdentity', icon: <FingerprintIcon fontSize="small" />, tab: 'watcher' },
   { textKey: 'userSettings.tabAlgorithm', icon: <TuneIcon fontSize="small" />, tab: 'algorithm' },
   { textKey: 'userSettings.tabPreferences', icon: <VideoLibraryIcon fontSize="small" />, tab: 'preferences' },
+  { textKey: 'userSettings.tabHomeScreen', icon: <HomeIcon fontSize="small" />, tab: 'home', embyOnly: true },
 ]
 
 /**
@@ -711,18 +714,20 @@ function AppShell() {
                   </Typography>
                 </Box>
                 <Divider />
-                {userSettingsMenuItems.map((item) => (
-                  <MenuItem
-                    key={item.tab}
-                    onClick={() => {
-                      handleUserMenuClose()
-                      navigate(`/settings?tab=${item.tab}`)
-                    }}
-                  >
-                    <ListItemIcon>{item.icon}</ListItemIcon>
-                    {t(item.textKey)}
-                  </MenuItem>
-                ))}
+                {userSettingsMenuItems
+                  .filter((item) => !item.embyOnly || user.provider === 'emby')
+                  .map((item) => (
+                    <MenuItem
+                      key={item.tab}
+                      onClick={() => {
+                        handleUserMenuClose()
+                        navigate(`/settings?tab=${item.tab}`)
+                      }}
+                    >
+                      <ListItemIcon>{item.icon}</ListItemIcon>
+                      {t(item.textKey)}
+                    </MenuItem>
+                  ))}
                 <Divider />
                 {/* No My Watch History here: it is a sidebar destination
                     (nav.watchHistory, /history), and this menu is for the

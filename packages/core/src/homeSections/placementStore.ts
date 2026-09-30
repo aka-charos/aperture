@@ -2,6 +2,7 @@
  * Stored placements (0175): the admin default per feature, each viewer's
  * overrides, and the placement last applied to each viewer's rows — which is how
  * a sync knows whose rows to move without overruling a viewer who dragged one.
+ * Also each viewer's own on/off per row kind (0188).
  */
 
 import { query } from '../lib/db.js'
@@ -167,4 +168,32 @@ export async function saveAppliedPlacementKeys(userId: string, keys: ReadonlyMap
       [userId, feature, key]
     )
   }
+}
+
+/**
+ * Each viewer's own row switches (0188), keyed by user id. Only rows a viewer
+ * has touched are stored; a kind absent here is on (see rowStates.ts).
+ */
+export async function getUserRowSwitches(userId?: string): Promise<Map<string, Map<string, boolean>>> {
+  const rows = await query<{ user_id: string; feature: string; enabled: boolean }>(
+    `SELECT user_id, feature, enabled FROM home_sections_user_rows
+     ${userId ? 'WHERE user_id = $1' : ''}`,
+    userId ? [userId] : []
+  )
+  const byUser = new Map<string, Map<string, boolean>>()
+  for (const row of rows.rows) {
+    const forUser = byUser.get(row.user_id) ?? new Map<string, boolean>()
+    forUser.set(row.feature, row.enabled)
+    byUser.set(row.user_id, forUser)
+  }
+  return byUser
+}
+
+export async function setUserRowSwitch(userId: string, feature: string, enabled: boolean): Promise<void> {
+  await query(
+    `INSERT INTO home_sections_user_rows (user_id, feature, enabled, updated_at)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (user_id, feature) DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = NOW()`,
+    [userId, feature, enabled]
+  )
 }

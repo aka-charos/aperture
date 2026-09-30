@@ -188,6 +188,11 @@ export async function listOwnHomeRows(providerUserId: string): Promise<HomeRowOp
     provider.getHomeSections(apiKey, providerUserId),
     managedTagIds(provider, apiKey),
   ])
+  return ownRowOptions(sections, managed)
+}
+
+/** The rows a viewer's own placement can anchor to, from sections already read. */
+export function ownRowOptions(sections: readonly ContentSection[], managed: ReadonlySet<string>): HomeRowOption[] {
   const seen = new Set<string>()
   const options: HomeRowOption[] = []
   for (const row of ownRows(sections, managed)) {

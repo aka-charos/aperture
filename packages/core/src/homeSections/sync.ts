@@ -4,17 +4,19 @@
  * One run is three passes, in this order because each needs the one before:
  *
  * 1. Work out what every managed tag should hold: the Top Picks lists, each
- *    enabled viewer's newest completed picks (a movies tag and a series tag),
- *    and every generated playlist an owner put on their home screen. A tag this
- *    run cannot account for — a deleted viewer's, a switched-off row's, 0173's
- *    mixed recommendations tag — should hold nothing. Top Picks goes to every
- *    account the server has not disabled; the personal rows only to viewers
- *    enabled in Aperture (plan.ts).
+ *    viewer's newest completed picks (a movies tag and a series tag), the
+ *    titles their connections recommended to them, and every generated
+ *    playlist an owner put on their home screen. Which rows reach which viewer
+ *    is `resolveRowStates` — the server, the operator and the viewer's own
+ *    switches, in that order (rowStates.ts). A tag this run cannot account for
+ *    — a deleted viewer's, a switched-off row's, 0173's mixed recommendations
+ *    tag — should hold nothing.
  * 2. Tag and untag the ORIGINAL library items to match. A section filters by tag
  *    id and a tag has an id only once an item carries it, so ids are read after.
- * 3. Read each viewer's sections back and reconcile them (plan.ts): create,
+ * 3. Read each viewer's sections back and reconcile them (apply.ts): create,
  *    update and remove, then place the rows whose placement changed or that were
- *    just created (placement.ts, viewerRows.ts).
+ *    just created (placement.ts, viewerRows.ts). The instant path for one viewer
+ *    (instant.ts) runs the same steps, so the two cannot write a row differently.
  *
  * Switching the feature off is not a separate path: with it off every tag
  * should hold nothing and nobody should have a row, so the same run removes
@@ -43,32 +45,24 @@ import type { ContentSection } from '../media/types.js'
 import { getMediaServerApiKey } from '../settings/systemSettings.js'
 import { getTopPicksConfig } from '../topPicks/config.js'
 import { getHomeSectionsConfig } from './config.js'
-import {
-  TOP_PICKS_TAGS,
-  diffMembership,
-  featureOfKind,
-  isHomeSectionTarget,
-  isTopPicksTarget,
-  planViewerSections,
-  recsTagNames,
-  sectionTagIds,
-  type DesiredRow,
-  type ManagedRowKind,
-} from './plan.js'
+import { reconcileViewerScreen, viewerDesiredRows, writeTagMembership, type TagPlan } from './apply.js'
+import { TOP_PICKS_TAGS, friendsTagName, recsTagNames } from './plan.js'
 import type { PlacementFeature } from './placement.js'
-import { getAppliedPlacementKeys, getUserPlacements } from './placementStore.js'
+import { getAppliedPlacementKeys, getUserPlacements, getUserRowSwitches } from './placementStore.js'
 import { loadHomePlaylists } from './playlists.js'
+import { resolveRowStates } from './rowStates.js'
 import {
   accountIsGone,
+  friendRecommendedProviderIds,
   loadViewerTags,
   loadViewers,
   mintViewerTag,
   playlistProviderIds,
   recommendedProviderIds,
+  rowStateViewer,
   topPicksProviderIds,
 } from './sources.js'
 import { getHomeSectionsServerStatus } from './status.js'
-import { placeViewerRows, type ManagedTagInfo } from './viewerRows.js'
 
 const logger = createChildLogger('home-sections-sync')
 
@@ -91,12 +85,6 @@ export interface HomeSectionsSyncResult {
   tagsRemoved: number
   errorCount: number
   errors: Array<{ scope: string; message: string }>
-}
-
-/** What a tag should hold this run. `ids: null` means "could not tell — leave it". */
-interface TagPlan {
-  name: string
-  ids: string[] | null
 }
 
 function recordError(jobId: string, result: HomeSectionsSyncResult, scope: string, err: unknown): void {
@@ -206,31 +194,32 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
     // ------------------------------------------------------ what rows hold
     setJobStep(jobId, 1, 'Working out what each row should hold')
     const viewers = await loadViewers(provider.type)
-    const targets = viewers.filter((viewer) =>
-      isHomeSectionTarget({ isEnabled: viewer.is_enabled, providerDisabled: viewer.provider_disabled })
+    const [switches, topPicksListEnabled] = await Promise.all([
+      getUserRowSwitches(),
+      getTopPicksConfig().then((topPicks) => topPicks.isEnabled),
+    ])
+    // Which rows reach which viewer. resolveRowStates is the one answer, shared with the
+    // instant path and the viewer's settings page, so none of them can disagree with this run.
+    const statesByViewer = new Map(
+      viewers.map((viewer) => [
+        viewer.id,
+        resolveRowStates({
+          config,
+          topPicksListEnabled,
+          viewer: rowStateViewer(viewer),
+          switches: switches.get(viewer.id),
+        }),
+      ])
     )
-    const targetIds = new Set(targets.map((viewer) => viewer.id))
-    const topPicksViewerIds = new Set(
-      viewers
-        .filter((viewer) =>
-          isTopPicksTarget(
-            { isEnabled: viewer.is_enabled, providerDisabled: viewer.provider_disabled },
-            config.topPicksWithoutAccess
-          )
-        )
-        .map((viewer) => viewer.id)
-    )
+    const isOn = (viewerId: string, feature: PlacementFeature) =>
+      statesByViewer.get(viewerId)?.[feature].status === 'on'
 
     const tagPlans = new Map<string, TagPlan>()
     const planTag = (name: string, ids: string[] | null) => tagPlans.set(name.toLowerCase(), { name, ids })
 
-    const topPicksOn =
-      config.enabled &&
-      config.topPicksEnabled &&
-      topPicksViewerIds.size > 0 &&
-      (await getTopPicksConfig()).isEnabled
+    // One list per kind for the whole server, filled while anybody still wants it.
     for (const kind of ['top-picks-movies', 'top-picks-series'] as const) {
-      if (!topPicksOn) {
+      if (!viewers.some((viewer) => isOn(viewer.id, kind))) {
         planTag(TOP_PICKS_TAGS[kind], [])
         continue
       }
@@ -245,40 +234,55 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
       }
     }
 
+    // Each viewer's own rows. Every source is asked separately, so one failing
+    // (null: leave that row as it is) does not blank the others.
     const viewerTags = await loadViewerTags()
-    const recsOn = config.enabled && config.recommendationsEnabled
+    for (const viewer of viewers) {
+      const wanted = {
+        movies: isOn(viewer.id, 'recs-movies'),
+        series: isOn(viewer.id, 'recs-series'),
+        friends: isOn(viewer.id, 'friends'),
+      }
+      if (!wanted.movies && !wanted.series && !wanted.friends) continue
 
-    for (const viewer of targets) {
-      if (!recsOn) break
-      try {
-        const movies = await recommendedProviderIds(viewer, 'movie', config.recommendationsLimit)
-        const series = await recommendedProviderIds(viewer, 'series', config.recommendationsLimit)
-        let tag = viewerTags.get(viewer.id)
-        if (!tag && (movies.length > 0 || series.length > 0)) {
+      const load = async (want: boolean, scope: string, read: () => Promise<string[]>): Promise<string[] | null> => {
+        if (!want) return []
+        try {
+          return await read()
+        } catch (err) {
+          recordError(jobId, result, `${scope}:${viewer.username}`, err)
+          return null
+        }
+      }
+      const movies = await load(wanted.movies, 'recommendations', () =>
+        recommendedProviderIds(viewer, 'movie', config.recommendationsLimit)
+      )
+      const series = await load(wanted.series, 'recommendations', () =>
+        recommendedProviderIds(viewer, 'series', config.recommendationsLimit)
+      )
+      const friends = await load(wanted.friends, 'friends', () => friendRecommendedProviderIds(viewer))
+
+      let tag = viewerTags.get(viewer.id)
+      if (!tag && [movies, series, friends].some((ids) => ids !== null && ids.length > 0)) {
+        try {
           tag = await mintViewerTag(viewer.id)
           viewerTags.set(viewer.id, tag)
+        } catch (err) {
+          recordError(jobId, result, `tag:${viewer.username}`, err)
         }
-        if (tag) {
-          const names = recsTagNames(tag)
-          planTag(names.movies, movies)
-          planTag(names.series, series)
-        }
-      } catch (err) {
-        const tag = viewerTags.get(viewer.id)
-        if (tag) {
-          const names = recsTagNames(tag)
-          planTag(names.movies, null)
-          planTag(names.series, null)
-        }
-        recordError(jobId, result, `recommendations:${viewer.username}`, err)
+      }
+      if (tag) {
+        const names = recsTagNames(tag)
+        planTag(names.movies, movies)
+        planTag(names.series, series)
+        planTag(friendsTagName(tag), friends)
       }
     }
 
-    // Generated playlists go only to their owner, and only while playlists are on.
+    // Generated playlists go only to their owner, and only while their playlist row is on.
     const homePlaylists = await loadHomePlaylists()
-    const playlistsOn = config.enabled && config.playlistsEnabled
     for (const playlist of homePlaylists) {
-      if (!playlistsOn || !targetIds.has(playlist.ownerId)) {
+      if (!isOn(playlist.ownerId, 'playlists')) {
         planTag(playlist.tagName, [])
         continue
       }
@@ -290,12 +294,13 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
       }
     }
 
-    // Everyone else's tags, and every managed tag nobody accounts for, empty.
-    for (const [userId, tag] of viewerTags) {
-      if (!recsOn || !targetIds.has(userId)) {
-        const names = recsTagNames(tag)
-        planTag(names.movies, [])
-        planTag(names.series, [])
+    // A viewer's rows nobody asked for this run — switched off, by them or by
+    // the operator, or a viewer who is gone — hold nothing, and neither does
+    // any managed tag nobody accounts for.
+    for (const tag of viewerTags.values()) {
+      const names = recsTagNames(tag)
+      for (const name of [names.movies, names.series, friendsTagName(tag)]) {
+        if (!tagPlans.has(name.toLowerCase())) planTag(name, [])
       }
     }
     for (const tag of tagsBefore) {
@@ -304,35 +309,25 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
 
     // -------------------------------------------------------- tag the items
     setJobStep(jobId, 2, 'Tagging library items', tagPlans.size)
-    const idBefore = new Map(tagsBefore.map((tag) => [tag.name.toLowerCase(), tag.id]))
+    const idBefore = new Map(
+      tagsBefore.flatMap((tag) => (tag.id ? [[tag.name.toLowerCase(), tag.id] as [string, string]] : []))
+    )
     let tagIndex = 0
     for (const [key, plan] of tagPlans) {
       if (stopIfCancelled()) return result
       updateJobProgress(jobId, tagIndex++, tagPlans.size, plan.name)
       if (plan.ids === null) continue
-      const existed = idBefore.has(key)
-      if (!existed && plan.ids.length === 0) continue
-
       try {
-        const current = existed ? await provider.getItemIdsWithTag(apiKey, plan.name) : []
-        const { add, remove } = diffMembership(current, plan.ids)
-        const tag = { name: plan.name, id: idBefore.get(key) }
-        for (const itemId of add) {
-          try {
-            await provider.addItemTag(apiKey, itemId, tag)
-            result.tagsApplied++
-          } catch (err) {
-            recordError(jobId, result, `tag ${plan.name} +${itemId}`, err)
-          }
-        }
-        for (const itemId of remove) {
-          try {
-            await provider.removeItemTag(apiKey, itemId, tag)
-            result.tagsRemoved++
-          } catch (err) {
-            recordError(jobId, result, `tag ${plan.name} -${itemId}`, err)
-          }
-        }
+        const written = await writeTagMembership({
+          provider,
+          apiKey,
+          name: plan.name,
+          ids: plan.ids,
+          existingId: idBefore.get(key),
+          onItemError: (scope, err) => recordError(jobId, result, scope, err),
+        })
+        result.tagsApplied += written.applied
+        result.tagsRemoved += written.removed
       } catch (err) {
         // Membership unknown: treat like a failed source and leave its rows be.
         plan.ids = null
@@ -360,42 +355,19 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
       if (stopIfCancelled()) return result
       updateJobProgress(jobId, index, viewers.length, viewer.username)
 
-      const desired: DesiredRow[] = []
-      const preserveTagIds = new Set<string>()
-      const managed = new Map<string, ManagedTagInfo>()
-      const isTarget = targetIds.has(viewer.id)
-
-      const considerRow = (kind: ManagedRowKind, tagName: string | undefined, name: string, itemTypes: string[]) => {
-        if (!tagName) return
-        const plan = tagPlans.get(tagName.toLowerCase())
-        const tagId = tagIdByName.get(tagName.toLowerCase()) ?? idBefore.get(tagName.toLowerCase())
-        if (!plan || !tagId) return
-        if (plan.ids === null) {
-          preserveTagIds.add(tagId)
-          managed.set(tagId, { feature: featureOfKind(kind), name })
-        } else if (plan.ids.length > 0 && tagIdByName.has(tagName.toLowerCase())) {
-          desired.push({ kind, tagId, name, itemTypes, sortBy: config.sortBy })
-          managed.set(tagId, { feature: featureOfKind(kind), name })
-        }
-      }
-
-      if (topPicksViewerIds.has(viewer.id)) {
-        considerRow('top-picks-movies', TOP_PICKS_TAGS['top-picks-movies'], config.topPicksMoviesName, ['Movie'])
-        considerRow('top-picks-series', TOP_PICKS_TAGS['top-picks-series'], config.topPicksSeriesName, ['Series'])
-      }
-      if (isTarget) {
-        const viewerTag = viewerTags.get(viewer.id)
-        if (viewerTag) {
-          const names = recsTagNames(viewerTag)
-          considerRow('recs-movies', names.movies, config.recommendationsMoviesName, ['Movie'])
-          considerRow('recs-series', names.series, config.recommendationsSeriesName, ['Series'])
-        }
-        for (const playlist of homePlaylists) {
-          if (playlist.ownerId === viewer.id) {
-            considerRow('playlist', playlist.tagName, playlist.name, ['Movie', 'Series'])
-          }
-        }
-      }
+      const states = statesByViewer.get(viewer.id)
+      if (!states) continue
+      const rows = viewerDesiredRows({
+        viewerId: viewer.id,
+        states,
+        names: config,
+        sortBy: config.sortBy,
+        viewerTagName: viewerTags.get(viewer.id),
+        playlists: homePlaylists,
+        tagPlans,
+        tagIdByName,
+        idBefore,
+      })
 
       try {
         let sections: ContentSection[]
@@ -415,44 +387,23 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
           logger.debug({ user: viewer.username }, 'Viewer no longer exists on the media server')
           continue
         }
-        const plan = planViewerSections({ existing: sections, managedTagIds, desired, preserveTagIds })
 
-        if (plan.deletes.length > 0) {
-          await provider.deleteHomeSections(apiKey, viewer.provider_user_id, plan.deletes)
-          result.sectionsRemoved += plan.deletes.length
-        }
-        for (const section of plan.updates) {
-          await provider.saveHomeSection(apiKey, viewer.provider_user_id, section)
-          result.sectionsUpdated++
-        }
-        const created = new Set<PlacementFeature>()
-        for (const section of plan.creates) {
-          await provider.saveHomeSection(apiKey, viewer.provider_user_id, section)
-          result.sectionsCreated++
-          const info = managed.get(sectionTagIds(section)[0] ?? '')
-          if (info) created.add(info.feature)
-        }
-
-        if (managed.size > 0) {
-          // A created section's id is only learnable by reading the list back.
-          const current =
-            plan.creates.length > 0 || plan.deletes.length > 0
-              ? await provider.getHomeSections(apiKey, viewer.provider_user_id)
-              : sections
-          const placed = await placeViewerRows({
-            provider,
-            apiKey,
-            userId: viewer.id,
-            providerUserId: viewer.provider_user_id,
-            sections: current,
-            managed,
-            defaults: placements,
-            overrides: overrides.get(viewer.id),
-            applied: appliedKeys.get(viewer.id),
-            force: created,
-          })
-          result.sectionsMoved += placed.moved
-        }
+        const written = await reconcileViewerScreen({
+          provider,
+          apiKey,
+          userId: viewer.id,
+          providerUserId: viewer.provider_user_id,
+          sections,
+          managedTagIds,
+          rows,
+          defaults: placements,
+          overrides: overrides.get(viewer.id),
+          applied: appliedKeys.get(viewer.id),
+        })
+        result.sectionsCreated += written.created
+        result.sectionsUpdated += written.updated
+        result.sectionsRemoved += written.removed
+        result.sectionsMoved += written.moved
         result.viewersProcessed++
       } catch (err) {
         recordError(jobId, result, `home screen:${viewer.username}`, err)

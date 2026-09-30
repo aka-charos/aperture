@@ -1,6 +1,7 @@
 /**
- * Home row changes applied the moment they are made, for one viewer: a placement
- * they chose, and a playlist put on or taken off their home screen.
+ * Home row changes applied the moment they are made, for one viewer: a row they
+ * switched on or off, a placement they chose, a playlist put on or taken off
+ * their home screen, and a title a connection just sent them or they dismissed.
  *
  * The nightly sync still reconciles everything; these only spare the wait. So
  * each returns an outcome instead of throwing — the setting that triggered it is
@@ -14,21 +15,35 @@ import { MANAGED_TAG_PREFIX } from '../media/managedTags.js'
 import type { MediaServerProvider } from '../media/MediaServerProvider.js'
 import type { MediaServerTag } from '../media/types.js'
 import { getMediaServerApiKey } from '../settings/systemSettings.js'
+import { reconcileViewerScreen, viewerDesiredRows, writeTagMembership, type TagPlan } from './apply.js'
 import { getHomeSectionsConfig } from './config.js'
 import {
+  TOP_PICKS_TAGS,
   diffMembership,
+  friendsTagName,
   isHomeSectionTarget,
   mayReceiveHomeRows,
   planViewerSections,
+  recsTagNames,
   sectionTagIds,
 } from './plan.js'
 import type { PlacementFeature } from './placement.js'
 import { getAppliedPlacementKeys, getUserPlacements } from './placementStore.js'
 import { loadHomePlaylists, type HomePlaylistSource } from './playlists.js'
 import type { HomeSectionsConfig } from './settings.js'
-import { loadViewerTags, loadViewers, playlistProviderIds, type ViewerRow } from './sources.js'
+import {
+  friendRecommendedProviderIds,
+  loadViewerTags,
+  loadViewers,
+  mintViewerTag,
+  playlistProviderIds,
+  recommendedProviderIds,
+  topPicksProviderIds,
+  type ViewerRow,
+} from './sources.js'
 import { getHomeSectionsServerStatus } from './status.js'
 import { managedTagsForViewer, placeViewerRows } from './viewerRows.js'
+import { loadViewerRowStates } from './viewerState.js'
 
 const logger = createChildLogger('home-sections-instant')
 
@@ -124,6 +139,138 @@ export async function applyPlacementForUser(userId: string): Promise<InstantOutc
   } catch (err) {
     return failed(err, { userId })
   }
+}
+
+/**
+ * Bring one viewer's whole home screen in line with their row states now: the
+ * same three steps as the nightly sync (apply.ts), for one viewer. Their own
+ * tags — recommendations, friends, their playlists — are rewritten. The Top
+ * Picks tags are shared by every viewer and only READ here, so a row switched
+ * on shows whatever the last sync put in them — unless the last sync emptied
+ * one because nobody wanted it, in which case it is filled now with the list
+ * the sync would write, rather than leaving the row off until tonight.
+ *
+ * `whenOn` skips the whole write unless that row reaches the viewer — for a
+ * change that can only affect one row (a title a connection sent them).
+ */
+export async function applyViewerRowsNow(
+  userId: string,
+  options: { whenOn?: PlacementFeature } = {}
+): Promise<InstantOutcome> {
+  try {
+    const ctx = await serverContext(true)
+    if ('applied' in ctx) return ctx
+    const { viewer, states, config } = await loadViewerRowStates(userId)
+    if (!viewer || !states || viewer.provider_disabled) return { applied: false, reason: 'not-a-target' }
+    if (options.whenOn && states[options.whenOn].status !== 'on') return { applied: false, reason: 'off' }
+
+    const { provider, apiKey } = ctx
+    const onError = (scope: string, err: unknown) => {
+      throw err instanceof Error ? err : new Error(`${scope}: ${String(err)}`)
+    }
+    const on = (feature: PlacementFeature) => states[feature].status === 'on'
+
+    const tagsBefore = await provider.getTagsByPrefix(apiKey, MANAGED_TAG_PREFIX)
+    const idBefore = tagIdsByName(tagsBefore)
+    const tagPlans = new Map<string, TagPlan>()
+    const planTag = (name: string, ids: string[] | null) => tagPlans.set(name.toLowerCase(), { name, ids })
+
+    const writes: TagPlan[] = []
+    for (const kind of ['top-picks-movies', 'top-picks-series'] as const) {
+      if (!on(kind)) continue
+      const name = TOP_PICKS_TAGS[kind]
+      if (idBefore.has(name.toLowerCase())) planTag(name, await provider.getItemIdsWithTag(apiKey, name))
+      else writes.push({ name, ids: await topPicksProviderIds(kind) })
+    }
+
+    const movies = on('recs-movies') ? await recommendedProviderIds(viewer, 'movie', config.recommendationsLimit) : []
+    const series = on('recs-series') ? await recommendedProviderIds(viewer, 'series', config.recommendationsLimit) : []
+    const friends = on('friends') ? await friendRecommendedProviderIds(viewer) : []
+    let viewerTag = (await loadViewerTags()).get(viewer.id)
+    if (!viewerTag && (movies.length > 0 || series.length > 0 || friends.length > 0)) {
+      viewerTag = await mintViewerTag(viewer.id)
+    }
+    if (viewerTag) {
+      const names = recsTagNames(viewerTag)
+      writes.push(
+        { name: names.movies, ids: movies },
+        { name: names.series, ids: series },
+        { name: friendsTagName(viewerTag), ids: friends }
+      )
+    }
+    const playlists = (await loadHomePlaylists()).filter((playlist) => playlist.ownerId === viewer.id)
+    for (const playlist of playlists) {
+      writes.push({
+        name: playlist.tagName,
+        ids: on('playlists') ? await playlistProviderIds(provider, apiKey, playlist) : [],
+      })
+    }
+
+    for (const plan of writes) {
+      planTag(plan.name, plan.ids)
+      await writeTagMembership({
+        provider,
+        apiKey,
+        name: plan.name,
+        ids: plan.ids ?? [],
+        existingId: idBefore.get(plan.name.toLowerCase()),
+        onItemError: onError,
+      })
+    }
+
+    const tagsAfter = await provider.getTagsByPrefix(apiKey, MANAGED_TAG_PREFIX)
+    const rows = viewerDesiredRows({
+      viewerId: viewer.id,
+      states,
+      names: config,
+      sortBy: config.sortBy,
+      viewerTagName: viewerTag,
+      playlists,
+      tagPlans,
+      tagIdByName: tagIdsByName(tagsAfter),
+      idBefore,
+    })
+    const [sections, overrides, applied] = await Promise.all([
+      provider.getHomeSections(apiKey, viewer.provider_user_id),
+      getUserPlacements(viewer.id),
+      getAppliedPlacementKeys(viewer.id),
+    ])
+    const written = await reconcileViewerScreen({
+      provider,
+      apiKey,
+      userId: viewer.id,
+      providerUserId: viewer.provider_user_id,
+      sections,
+      managedTagIds: new Set([...idBefore.values(), ...tagIdsByName(tagsAfter).values()]),
+      rows,
+      defaults: config.placements,
+      overrides: overrides.get(viewer.id),
+      applied: applied.get(viewer.id),
+    })
+    return { applied: true, moved: written.moved }
+  } catch (err) {
+    return failed(err, { userId })
+  }
+}
+
+/**
+ * Refresh one row kind for several viewers without making anyone wait: for a
+ * change made on someone else's page (a connection sent them a title) or one
+ * that should not hold up a click (they dismissed one). Viewers whose row is
+ * not on are skipped before any call to the media server. Each runs in turn,
+ * never together — they share tags and the media server.
+ */
+export function refreshViewerRowsSoon(userIds: readonly string[], feature: PlacementFeature): void {
+  const unique = [...new Set(userIds)]
+  if (unique.length === 0) return
+  void (async () => {
+    for (const userId of unique) {
+      const outcome = await applyViewerRowsNow(userId, { whenOn: feature })
+      if (!outcome.applied && outcome.reason === 'failed') {
+        logger.debug({ userId, message: outcome.message }, 'Background home row refresh did not apply')
+      }
+    }
+  })()
 }
 
 /**

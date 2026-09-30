@@ -15,9 +15,8 @@
 
 import { randomBytes } from 'crypto'
 import { query, queryOne } from '../lib/db.js'
-import { getMediaServerConfig } from '../settings/systemSettings.js'
-import { getHomeSectionsConfig } from './config.js'
 import { playlistTagName } from './plan.js'
+import { loadViewerRowStates } from './viewerState.js'
 
 export type HomePlaylistSource = 'channel' | 'chat'
 
@@ -117,24 +116,58 @@ export async function setChatPlaylistOnHomeScreen(
 }
 
 /**
- * Whether a viewer should be offered "show on my home screen" at all. Reads
- * config only — no live server call on every page load; the version gate is
- * enforced when the feature is switched on and by every sync.
+ * Whether a viewer should be offered "show on my home screen" at all: their
+ * playlist row is on (rowStates.ts). Reads config only — no live server call on
+ * every page load; the version gate is enforced when the feature is switched on
+ * and by every sync.
  */
 export async function isPlaylistHomeSectionAvailable(userId: string): Promise<boolean> {
-  const [config, server, user] = await Promise.all([
-    getHomeSectionsConfig(),
-    getMediaServerConfig(),
-    queryOne<{ is_enabled: boolean; provider_disabled: boolean }>(
-      `SELECT is_enabled, provider_disabled FROM users WHERE id = $1`,
-      [userId]
-    ),
-  ])
-  return (
-    config.enabled &&
-    config.playlistsEnabled &&
-    server.type === 'emby' &&
-    user?.is_enabled === true &&
-    user.provider_disabled !== true
+  const { serverType, states } = await loadViewerRowStates(userId)
+  return serverType === 'emby' && states?.playlists.status === 'on'
+}
+
+/** A playlist a viewer owns that may go on their home screen, whether it is there or not. */
+export interface PlaylistChoice extends Omit<HomePlaylist, 'tagName'> {
+  onHomeScreen: boolean
+  /** The tag its row queries; null while it is not on the home screen. */
+  tagName: string | null
+}
+
+/**
+ * Every playlist a viewer could put on their home screen: channels they own
+ * (Playlists and Collections pages) and playlists made from assistant
+ * suggestions. Explore-graph playlists are not offered, as everywhere else.
+ */
+export async function loadPlaylistChoices(ownerId: string): Promise<PlaylistChoice[]> {
+  const rows = await query<{
+    source: HomePlaylistSource
+    id: string
+    name: string
+    output_type: string
+    container_id: string | null
+    tag_name: string | null
+  }>(
+    `SELECT 'channel' AS source, c.id, c.name, c.output_type,
+            CASE WHEN c.output_type = 'collection' THEN c.collection_id ELSE c.playlist_id END AS container_id,
+            c.home_section_tag AS tag_name
+     FROM channels c
+     WHERE c.owner_id = $1
+     UNION ALL
+     SELECT 'chat' AS source, g.id, g.name, 'playlist' AS output_type,
+            g.media_server_playlist_id AS container_id, g.home_section_tag AS tag_name
+     FROM graph_playlists g
+     WHERE g.owner_id = $1 AND g.origin = 'chat'
+     ORDER BY name`,
+    [ownerId]
   )
+  return rows.rows.map((row) => ({
+    source: row.source,
+    id: row.id,
+    name: row.name,
+    ownerId,
+    outputType: row.output_type === 'collection' ? 'collection' : 'playlist',
+    containerId: row.container_id,
+    onHomeScreen: row.tag_name !== null,
+    tagName: row.tag_name,
+  }))
 }

@@ -18,6 +18,7 @@ import {
   listInbox,
   listSent,
   recommendItemToUsers,
+  refreshViewerRowsSoon,
   type SocialItemRef,
 } from '@aperture/core'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
@@ -134,6 +135,13 @@ export function registerRecommendationHandlers(fastify: FastifyInstance) {
         if (!(await titleInScope(request, table, item.itemId))) return notFound(reply)
 
         const outcome = await recommendItemToUsers(currentUser.id, item, request.body.recipientUserIds)
+        // Their "recommended by friends" row on Emby, for anyone who has one:
+        // in the background, so sending never waits on the media server.
+        const skipped = new Set(outcome.skipped.map((skip) => skip.userId.toLowerCase()))
+        refreshViewerRowsSoon(
+          request.body.recipientUserIds.filter((id) => !skipped.has(id.toLowerCase())),
+          'friends'
+        )
         return reply.send(outcome)
       } catch (err) {
         request.log.error({ err, userId: currentUser.id, item }, 'Failed to send recommendation')
@@ -155,6 +163,7 @@ export function registerRecommendationHandlers(fastify: FastifyInstance) {
       try {
         const dismissed = await dismissRecommendation(currentUser.id, request.params.id)
         if (!dismissed) return reply.status(404).send({ error: 'Recommendation not found' })
+        refreshViewerRowsSoon([currentUser.id], 'friends')
         return reply.status(204).send()
       } catch (err) {
         request.log.error({ err, userId: currentUser.id, id: request.params.id }, 'Failed to dismiss recommendation')

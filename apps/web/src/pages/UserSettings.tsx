@@ -6,6 +6,7 @@ import FingerprintIcon from '@mui/icons-material/Fingerprint'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
 import TuneIcon from '@mui/icons-material/Tune'
+import HomeIcon from '@mui/icons-material/Home'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useTheme } from '@mui/material/styles'
@@ -21,7 +22,7 @@ import { AiExplanationPreferenceCard } from './UserSettings/AiExplanationPrefere
 import { SimilarityGraphPrefsCard } from './UserSettings/SimilarityGraphPrefsCard'
 import { PosterDisplayCard } from './UserSettings/PosterDisplayCard'
 import { TraktIntegrationCard } from './UserSettings/TraktIntegrationCard'
-import { HomeScreenRowsCard } from './UserSettings/HomeScreenRowsCard'
+import { HomeScreenTab } from './UserSettings/homeScreen/HomeScreenTab'
 import { useTraktIntegration } from './UserSettings/hooks/useTraktIntegration'
 import { TabPanel } from './UserSettings/TabPanel'
 import {
@@ -35,7 +36,10 @@ export function UserSettingsPage() {
   const theme = useTheme()
   const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [tabValue, setTabValue] = useState(() => userSettingsTabIndexFromParam(searchParams.get('tab')))
+  const [tabIndex, setTabIndex] = useState(() => userSettingsTabIndexFromParam(searchParams.get('tab')))
+  // Managed home rows exist on Emby only, so the tab is shown to Emby accounts only.
+  const showHomeTab = user?.provider === 'emby'
+  const tabValue = !showHomeTab && userSettingsTabParamFromIndex(tabIndex) === 'home' ? 0 : tabIndex
   const [identityMediaType, setIdentityMediaType] = useState<'movie' | 'series'>('movie')
   // Genre weights are per user, not per media type, so the card sits outside
   // the movie/series sub-tabs. Either sub-tab's analyze run detects the same
@@ -66,11 +70,11 @@ export function UserSettingsPage() {
   } = useTraktIntegration()
 
   useEffect(() => {
-    setTabValue(userSettingsTabIndexFromParam(searchParams.get('tab')))
+    setTabIndex(userSettingsTabIndexFromParam(searchParams.get('tab')))
   }, [searchParams])
 
   const handleMainTabChange = (_: React.SyntheticEvent, v: number) => {
-    setTabValue(v)
+    setTabIndex(v)
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev)
@@ -200,6 +204,7 @@ export function UserSettingsPage() {
           <Tab icon={<FingerprintIcon />} iconPosition="start" label={t('userSettings.tabWatcherIdentity')} />
           <Tab icon={<TuneIcon />} iconPosition="start" label={t('userSettings.tabAlgorithm')} />
           <Tab icon={<VideoLibraryIcon />} iconPosition="start" label={t('userSettings.tabPreferences')} />
+          {showHomeTab && <Tab icon={<HomeIcon />} iconPosition="start" label={t('userSettings.tabHomeScreen')} />}
         </Tabs>
 
         <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
@@ -295,10 +300,14 @@ export function UserSettingsPage() {
                   />
                 </Grid>
               )}
-              {/* Renders its own Grid item, or nothing when no managed row reaches this viewer. */}
-              <HomeScreenRowsCard />
             </Grid>
           </TabPanel>
+
+          {showHomeTab && (
+            <TabPanel value={tabValue} index={3}>
+              <HomeScreenTab />
+            </TabPanel>
+          )}
         </Box>
       </Paper>
     </Box>
