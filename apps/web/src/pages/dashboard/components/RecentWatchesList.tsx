@@ -166,7 +166,7 @@ export function RecentWatchesList({ watches, loading }: RecentWatchesListProps) 
         <Typography variant="h6" fontWeight={600} mb={2}>
           {t('dashboard.recentlyWatched')}
         </Typography>
-        <Box sx={{ display: 'flex', gap: 3 }}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 3 }}>
           <Box sx={{ flex: 1 }}>
             <Typography variant="subtitle2" color="text.secondary" mb={1.5} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <MovieIcon sx={{ fontSize: 18 }} /> {t('dashboard.movies')}
@@ -232,7 +232,9 @@ export function RecentWatchesList({ watches, loading }: RecentWatchesListProps) 
       <Typography variant="h6" fontWeight={600} mb={2}>
         {t('dashboard.recentlyWatched')}
       </Typography>
-      <Box sx={{ display: 'flex', gap: 3 }}>
+      {/* Stacked on a phone: side by side, each column was ~136px and the
+          titles beside their thumbnails got about 60px. */}
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 3 }}>
         {/* Movies Column */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography

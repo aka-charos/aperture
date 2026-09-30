@@ -279,7 +279,7 @@ export function WatchHistoryMovieListItem({
                     }}
                     size="small"
                     sx={{
-                      p: 0.5,
+                      p: { xs: 1, sm: 0.5 },
                       backgroundColor: alpha(theme.palette.grey[500], 0.1),
                       '&:hover': { backgroundColor: alpha(theme.palette.grey[500], 0.2) },
                     }}
@@ -296,7 +296,7 @@ export function WatchHistoryMovieListItem({
                       }}
                       size="small"
                       sx={{
-                        p: 0.5,
+                        p: { xs: 1, sm: 0.5 },
                         backgroundColor: alpha(theme.palette.error.main, 0.1),
                         '&:hover': { backgroundColor: alpha(theme.palette.error.main, 0.2) },
                       }}

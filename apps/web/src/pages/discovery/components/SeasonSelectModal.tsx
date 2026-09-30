@@ -273,7 +273,7 @@ export function SeasonSelectModal({
                             color={statusConfig.color}
                             size="small"
                             variant={isDisabled ? 'filled' : 'outlined'}
-                            sx={{ minWidth: 100 }}
+                            sx={{ minWidth: { xs: 0, sm: 100 } }}
                           />
                         </TableCell>
                       </TableRow>

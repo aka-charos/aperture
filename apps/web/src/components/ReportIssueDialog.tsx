@@ -149,7 +149,7 @@ export function ReportIssueDialog({
           </FormControl>
 
           {mediaType === 'series' && seasons.length > 0 && (
-            <Stack direction="row" spacing={2}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <FormControl fullWidth size="small">
                 <InputLabel id="issue-season">{t('reportIssue.season')}</InputLabel>
                 <Select

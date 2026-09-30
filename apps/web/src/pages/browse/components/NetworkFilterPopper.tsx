@@ -112,7 +112,7 @@ export function NetworkFilterPopper({ networks, selected, onChange }: NetworkFil
           <Paper
             elevation={8}
             sx={{
-              width: 320,
+              width: 'min(320px, calc(100vw - 16px))',
               borderRadius: 2,
               border: 1,
               borderColor: 'divider',

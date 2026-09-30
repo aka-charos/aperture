@@ -69,7 +69,10 @@ export function BaseCarousel({
 
   const scroll = (direction: 'left' | 'right') => {
     if (!scrollRef.current) return
-    let delta = direction === 'left' ? -400 : 400
+    // Most of a screenful, not a fixed 400px: on a phone 400 is wider than the
+    // strip, so a press skipped titles nobody had seen.
+    const step = Math.max(200, Math.round(scrollRef.current.clientWidth * 0.8))
+    let delta = direction === 'left' ? -step : step
     if (rtl) delta = -delta
     scrollRef.current.scrollBy({ left: delta, behavior: 'smooth' })
     setTimeout(updateScrollButtons, 300)
@@ -82,7 +85,7 @@ export function BaseCarousel({
         <Typography variant="h6" fontWeight={600} mb={2}>
           {title}
         </Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
+        <Box sx={{ display: 'flex', gap: 2, overflow: 'hidden' }}>
           {Array.from({ length: skeletonCount }).map((_, i) => (
             <Box key={i}>
               {renderSkeleton ? renderSkeleton() : <DefaultSkeleton />}
@@ -124,8 +127,8 @@ export function BaseCarousel({
   return (
     <Box>
       {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 2 }}>
+        <Box sx={{ minWidth: 0 }}>
           <Typography variant="h6" fontWeight={600}>
             {title}
           </Typography>
@@ -135,7 +138,7 @@ export function BaseCarousel({
             </Typography>
           )}
         </Box>
-        <Box sx={{ display: 'flex', gap: 0.5 }}>
+        <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
           <IconButton
             size="small"
             onClick={() => scroll('left')}

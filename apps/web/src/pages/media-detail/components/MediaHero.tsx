@@ -400,7 +400,9 @@ export function MediaHero({
           mt: { xs: -18, md: -28 },
           position: 'relative',
           zIndex: 1,
-          px: 3,
+          // The page already pads a phone by 16px; a second 24px here left the
+          // hero 40px in from each edge.
+          px: { xs: 0, sm: 3 },
         }}
       >
         {/* Poster */}
@@ -563,7 +565,15 @@ export function MediaHero({
             <Typography
               variant="h3"
               fontWeight={700}
-              sx={{ flex: '0 1 auto', minWidth: 0, textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}
+              sx={{
+                flex: '0 1 auto',
+                minWidth: 0,
+                textShadow: '2px 2px 4px rgba(0,0,0,0.5)',
+                // h3 is 3rem, which fits about eight characters a line on a
+                // phone; one long word would push the page sideways.
+                fontSize: { xs: '2rem', sm: '3rem' },
+                overflowWrap: 'anywhere',
+              }}
             >
               {media.title}
             </Typography>

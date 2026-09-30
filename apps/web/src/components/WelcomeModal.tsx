@@ -298,7 +298,7 @@ export function WelcomeModal({ open, onClose }: WelcomeModalProps) {
           }
           label={<Typography variant="body2">{t('common.dontShowAgain')}</Typography>}
         />
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 1 }}>
           {/* Picking a term here is the more specific instruction, so it wins
               over the checkbox rather than arguing with it. */}
           <Button

@@ -20,8 +20,8 @@ export function MediaBackdrop({ backdropUrl, title, onBack }: MediaBackdropProps
       sx={{
         position: 'relative',
         height: { xs: 250, md: 350 },
-        mx: -3,
-        mt: -3,
+        mx: { xs: -2, sm: -3 },
+        mt: { xs: -2, sm: -3 },
         mb: 0,
         overflow: 'hidden',
       }}

@@ -169,7 +169,7 @@ export function MediaDetailPage({
       )}
 
       {/* Main Content */}
-      <Box sx={{ mt: 4, px: { xs: 2, sm: 3 } }}>
+      <Box sx={{ mt: 4, px: { xs: 0, sm: 3 } }}>
         <Grid container spacing={3}>
           {/* Left Column - Info */}
           <Grid item xs={12} md={6}>

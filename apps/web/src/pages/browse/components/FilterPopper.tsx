@@ -263,7 +263,7 @@ export function FilterPopper({
           <Paper
             elevation={8}
             sx={{
-              width: 340,
+              width: 'min(340px, calc(100vw - 16px))',
               maxHeight: '70vh',
               overflow: 'auto',
               borderRadius: 2,

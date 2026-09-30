@@ -510,6 +510,7 @@ function ThreadWelcome({ suggestions }: { suggestions: string[] }) {
         height: '100%',
         textAlign: 'center',
         p: 4,
+        [NARROW_THREAD]: { p: 2 },
       }}
     >
       <Avatar

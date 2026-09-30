@@ -301,7 +301,7 @@ export function BrowseSeriesListItem({
                   onClick={handleWatchingClick}
                   size="small"
                   sx={{
-                    p: 0.5,
+                    p: { xs: 1, sm: 0.5 },
                     backgroundColor: isWatching
                       ? alpha(theme.palette.success.main, 0.1)
                       : alpha(theme.palette.primary.main, 0.1),
@@ -320,7 +320,7 @@ export function BrowseSeriesListItem({
                   onClick={handleOpenTmdb}
                   size="small"
                   sx={{
-                    p: 0.5,
+                    p: { xs: 1, sm: 0.5 },
                     backgroundColor: alpha(theme.palette.grey[500], 0.1),
                     '&:hover': { backgroundColor: alpha(theme.palette.grey[500], 0.2) },
                   }}

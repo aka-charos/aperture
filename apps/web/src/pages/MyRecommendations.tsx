@@ -660,7 +660,7 @@ export function MyRecommendationsPage() {
                           objectFit: 'cover',
                         }}
                       />
-                      <RankBadge rank={index + 1} size={isMobile ? 'medium' : 'large'} />
+                      <RankBadge rank={index + 1} size={isMobile ? 'small' : 'large'} />
                     </Box>
 
                     {/* Info */}
@@ -770,7 +770,7 @@ export function MyRecommendationsPage() {
                                 }}
                                 disabled={trailerLoadingId === id}
                                 sx={{
-                                  p: 0.5,
+                                  p: { xs: 1, sm: 0.5 },
                                   backgroundColor: alpha(theme.palette.primary.main, 0.1),
                                   '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.2) },
                                 }}
@@ -789,7 +789,7 @@ export function MyRecommendationsPage() {
                                 onClick={handleOpenTmdb}
                                 size="small"
                                 sx={{
-                                  p: 0.5,
+                                  p: { xs: 1, sm: 0.5 },
                                   backgroundColor: alpha(theme.palette.grey[500], 0.1),
                                   '&:hover': { backgroundColor: alpha(theme.palette.grey[500], 0.2) },
                                 }}
@@ -815,7 +815,7 @@ export function MyRecommendationsPage() {
                                 onClick={handleWatchingClick}
                                 size="small"
                                 sx={{
-                                  p: 0.5,
+                                  p: { xs: 1, sm: 0.5 },
                                   backgroundColor: watching
                                     ? alpha(theme.palette.success.main, 0.1)
                                     : alpha(theme.palette.primary.main, 0.1),
@@ -840,7 +840,7 @@ export function MyRecommendationsPage() {
                                 size="small"
                                 disabled={trailerLoadingId === id}
                                 sx={{
-                                  p: 0.5,
+                                  p: { xs: 1, sm: 0.5 },
                                   backgroundColor: alpha(theme.palette.primary.main, 0.1),
                                   '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.2) },
                                 }}
@@ -859,7 +859,7 @@ export function MyRecommendationsPage() {
                                 onClick={handleOpenTmdb}
                                 size="small"
                                 sx={{
-                                  p: 0.5,
+                                  p: { xs: 1, sm: 0.5 },
                                   backgroundColor: alpha(theme.palette.grey[500], 0.1),
                                   '&:hover': { backgroundColor: alpha(theme.palette.grey[500], 0.2) },
                                 }}

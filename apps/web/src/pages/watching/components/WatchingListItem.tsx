@@ -127,7 +127,7 @@ export function WatchingListItem({
         size="small"
         onClick={handleRemoveClick}
         sx={{
-          p: isMobile ? 0.5 : undefined,
+          p: isMobile ? 1 : undefined,
           color: 'text.secondary',
           '&:hover': {
             color: 'error.main',

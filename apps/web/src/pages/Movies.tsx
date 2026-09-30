@@ -1,3 +1,4 @@
+import { useIsPhone } from '@/hooks/useIsPhone'
 import React, { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
@@ -39,6 +40,7 @@ interface Collection {
 
 export function MoviesPage() {
   const { t } = useTranslation()
+  const isPhone = useIsPhone()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
   const { isWatched } = useWatchStatus()
@@ -211,7 +213,7 @@ export function MoviesPage() {
 
         {/* Active filters display */}
         {(genre || collection || minRtScore > 0) && (
-          <Box display="flex" gap={0.5} alignItems="center">
+          <Box display="flex" flexWrap="wrap" gap={0.5} alignItems="center">
             {genre && (
               <Chip
                 label={genre}
@@ -286,6 +288,8 @@ export function MoviesPage() {
                 page={page}
                 onChange={(_, value) => setPage(value)}
                 color="primary"
+                size={isPhone ? 'small' : 'medium'}
+                siblingCount={isPhone ? 0 : 1}
               />
             </Box>
           )}

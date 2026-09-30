@@ -112,9 +112,9 @@ export function StudioDetailPage() {
       <Box
         sx={{
           position: 'relative',
-          mx: -3,
-          mt: -3,
-          px: 3,
+          mx: { xs: -2, sm: -3 },
+          mt: { xs: -2, sm: -3 },
+          px: { xs: 2, sm: 3 },
           pt: 3,
           pb: 4,
           minHeight: 200,
@@ -138,7 +138,7 @@ export function StudioDetailPage() {
             <ArrowBackIcon />
           </IconButton>
 
-          <Box display="flex" alignItems="center" gap={3}>
+          <Box display="flex" alignItems="center" gap={{ xs: 2, sm: 3 }}>
             {/* Studio Logo */}
             {proxiedImageUrl && !imageError ? (
               <Box
@@ -148,7 +148,7 @@ export function StudioDetailPage() {
                 onError={() => setImageError(true)}
                 sx={{
                   height: 64,
-                  maxWidth: 180,
+                  maxWidth: { xs: 110, sm: 180 },
                   objectFit: 'contain',
                   borderRadius: 1,
                   filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.5))',
@@ -170,12 +170,16 @@ export function StudioDetailPage() {
             )}
 
             {/* Studio Info */}
-            <Box flex={1}>
+            <Box flex={1} minWidth={0}>
               <Typography 
                 variant="h4" 
                 fontWeight={700} 
                 mb={1}
-                sx={{ textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}
+                sx={{
+                  textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                  fontSize: { xs: '1.6rem', sm: '2.125rem' },
+                  overflowWrap: 'anywhere',
+                }}
               >
                 {decodedName}
               </Typography>
@@ -200,7 +204,7 @@ export function StudioDetailPage() {
       </Box>
 
       {/* Content */}
-      <Box sx={{ px: 3, py: 4 }}>
+      <Box sx={{ px: { xs: 0, sm: 3 }, py: 4 }}>
         {/* Movies Carousel */}
         {data.movies.length > 0 && (
           <Box mb={4}>

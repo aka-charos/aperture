@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import { Box, Typography, Tooltip, IconButton, Popper, Paper, ClickAwayListener, Fade } from '@mui/material'
+import { Box, Typography, Tooltip, IconButton, Popper, Paper, ClickAwayListener, Fade, useMediaQuery } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
 import Star from '@mui/icons-material/Star'
 import StarBorder from '@mui/icons-material/StarBorder'
@@ -167,6 +167,9 @@ export function StarRating({
   sx = {},
 }: StarRatingProps) {
   const theme = useTheme()
+  // A finger needs ~40px per target; ten 24px stars in one row are a guess on
+  // a phone, so on a coarse pointer they become two rows of larger buttons.
+  const coarsePointer = useMediaQuery('(pointer: coarse)', { noSsr: true })
   const [popperOpen, setPopperOpen] = useState(false)
   const [hoverValue, setHoverValue] = useState<number | null>(null)
   const anchorRef = useRef<HTMLDivElement>(null)
@@ -314,7 +317,17 @@ export function StarRating({
                 onMouseLeave={handleMouseLeave}
               >
                 {/* Stars row */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+                <Box
+                  sx={
+                    coarsePointer
+                      ? {
+                          display: 'grid',
+                          gridTemplateColumns: `repeat(${Math.ceil(maxStars / 2)}, 1fr)`,
+                          gap: 0.5,
+                        }
+                      : { display: 'flex', alignItems: 'center', gap: 0.25 }
+                  }
+                >
                   {Array.from({ length: maxStars }, (_, i) => {
                     const starValue = i + 1
                     const isFilled = displayValue !== null && starValue <= displayValue
@@ -337,7 +350,7 @@ export function StarRating({
                         onClick={() => handleSelectRating(starValue)}
                         onMouseEnter={() => handleMouseEnter(starValue)}
                         sx={{
-                          p: 0.5,
+                          p: coarsePointer ? 1.25 : 0.5,
                           transition: 'transform 0.1s ease',
                           '&:hover': {
                             transform: 'scale(1.2)',

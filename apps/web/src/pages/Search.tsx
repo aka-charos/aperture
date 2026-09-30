@@ -1,3 +1,4 @@
+import { useIsPhone } from '@/hooks/useIsPhone'
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -57,6 +58,7 @@ interface FilterOptions {
 
 export function SearchPage() {
   const { t } = useTranslation()
+  const isPhone = useIsPhone()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { getRating, setRating } = useUserRatings()
@@ -298,7 +300,7 @@ export function SearchPage() {
 
       {/* Expanded Filters */}
       {showFilters && filters && (
-        <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
+        <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 3, borderRadius: 2 }}>
           <Grid container spacing={3}>
             <Grid item xs={12} sm={6} md={3}>
               <FormControl fullWidth size="small">
@@ -504,6 +506,8 @@ export function SearchPage() {
                 page={page}
                 onChange={(_, value) => setPage(value)}
                 color="primary"
+                size={isPhone ? 'small' : 'medium'}
+                siblingCount={isPhone ? 0 : 1}
               />
             </Box>
           )}

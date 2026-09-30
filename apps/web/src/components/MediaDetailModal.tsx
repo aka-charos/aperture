@@ -9,6 +9,7 @@
  */
 import { useEffect, useRef } from 'react'
 import { Dialog, DialogContent, IconButton } from '@mui/material'
+import { useIsPhone } from '@/hooks/useIsPhone'
 import CloseIcon from '@mui/icons-material/Close'
 import { useTranslation } from 'react-i18next'
 import { MediaDetailPage } from '../pages/media-detail'
@@ -31,6 +32,7 @@ interface MediaDetailModalProps {
 export function MediaDetailModal({ target, onClose, onOpenMedia }: MediaDetailModalProps) {
   const { t } = useTranslation()
   const contentRef = useRef<HTMLDivElement>(null)
+  const fullScreen = useIsPhone()
 
   // Swapping to a related title reuses this dialog, so the scroll position
   // carries over — without this the new item opens partway down the page.
@@ -43,14 +45,15 @@ export function MediaDetailModal({ target, onClose, onOpenMedia }: MediaDetailMo
       open={target !== null}
       onClose={onClose}
       maxWidth="lg"
+      fullScreen={fullScreen}
       fullWidth
       PaperProps={{
         sx: {
-          height: '95vh',
-          maxHeight: '90vh',
+          height: fullScreen ? '100%' : '95vh',
+          maxHeight: fullScreen ? '100%' : '90vh',
           bgcolor: 'rgba(15, 15, 15, 0.96)',
           backgroundImage: 'none',
-          borderRadius: 3,
+          borderRadius: fullScreen ? 0 : 3,
           border: '1px solid rgba(255, 255, 255, 0.1)',
         },
       }}
@@ -70,9 +73,10 @@ export function MediaDetailModal({ target, onClose, onOpenMedia }: MediaDetailMo
       >
         <CloseIcon />
       </IconButton>
-      {/* p: 3 is load-bearing: the page's backdrop bleeds to the edges with
-          negative margins sized against the route layout's own padding. */}
-      <DialogContent ref={contentRef} sx={{ p: 3, minHeight: '60vh' }}>
+      {/* This padding is load-bearing: the page's backdrop bleeds to the edges with
+          negative margins sized against the route layout's own padding, and
+          follows it per breakpoint (2 on phones, 3 above). */}
+      <DialogContent ref={contentRef} sx={{ p: { xs: 2, sm: 3 }, minHeight: '60vh' }}>
         {target && (
           // Keyed so switching items remounts rather than mixing the previous
           // item's component state (graph focus, expanded seasons) into the new one.

@@ -118,7 +118,17 @@ export function PreviewItemCard({
 
       {/* Text column */}
       <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, minWidth: 0 }}>
+        {/* On a phone the chips and the remove button wrap to a second line:
+            in one row beside an 84px poster column they left the title ~0px. */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            flexWrap: { xs: 'wrap', sm: 'nowrap' },
+            gap: 0.75,
+            minWidth: 0,
+          }}
+        >
           {/* The rank is the write order, so it belongs with the identity line, not off in a
               column of its own that only lines up while every card is the same height. */}
           <Typography
@@ -130,7 +140,12 @@ export function PreviewItemCard({
           <Typography
             variant="body2"
             fontWeight={600}
-            sx={{ color: '#fff', flex: 1, minWidth: 0, ...clampLines(2) }}
+            sx={{
+              color: '#fff',
+              flex: { xs: '1 1 calc(100% - 32px)', sm: 1 },
+              minWidth: 0,
+              ...clampLines(2),
+            }}
           >
             {item.title}
             {item.year && (
@@ -174,7 +189,7 @@ export function PreviewItemCard({
                 color="error"
                 onClick={() => onRemove(item.id)}
                 disabled={removeDisabled}
-                sx={{ p: 0.25, mt: '-2px' }}
+                sx={{ p: { xs: 0.75, sm: 0.25 }, mt: { xs: '-6px', sm: '-2px' } }}
               >
                 <RemoveCircleOutlineIcon fontSize="small" />
               </IconButton>

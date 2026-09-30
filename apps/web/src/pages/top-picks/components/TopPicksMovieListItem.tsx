@@ -113,7 +113,7 @@ export function TopPicksMovieListItem({
                 objectFit: 'cover',
               }}
             />
-            <RankBadge rank={movie.rank} size={isMobile ? 'medium' : 'large'} />
+            <RankBadge rank={movie.rank} size={isMobile ? 'small' : 'large'} />
             {watched && <WatchedBadge size={18} sx={{ top: 6, insetInlineEnd: 6 }} />}
           </Box>
 
@@ -200,7 +200,7 @@ export function TopPicksMovieListItem({
                     onClick={handleOpenTmdb}
                     size="small"
                     sx={{
-                      p: 0.5,
+                      p: { xs: 1, sm: 0.5 },
                       backgroundColor: alpha(theme.palette.grey[500], 0.1),
                       '&:hover': { backgroundColor: alpha(theme.palette.grey[500], 0.2) },
                     }}

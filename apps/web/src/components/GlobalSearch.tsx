@@ -334,7 +334,7 @@ export function GlobalSearch() {
                                 {result.genres.slice(0, 3).join(' • ')}
                               </Typography>
                             )}
-                            <Box display="flex" gap={1} mt={0.5}>
+                            <Box display="flex" flexWrap="wrap" gap={1} mt={0.5}>
                               {result.rt_critic_score != null && (
                                 <Chip
                                   size="small"

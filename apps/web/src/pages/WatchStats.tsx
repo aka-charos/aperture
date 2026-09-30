@@ -1,3 +1,4 @@
+import { useIsPhone } from '@/hooks/useIsPhone'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   Box,
@@ -127,6 +128,7 @@ function WatchStatsContent() {
   const hasSeries = useCapability('series')
   const theme = useTheme()
   const { t, i18n } = useTranslation()
+  const isPhone = useIsPhone()
   const { user } = useAuth()
   const openMediaDetail = useMediaDetailModal()
 
@@ -728,7 +730,9 @@ function WatchStatsContent() {
                 color={theme.palette.primary.main}
               >
                 {hasHeatmap ? (
-                  <Box>
+                  // Scrolls sideways on a phone: 24 columns in ~260px made 8px
+                  // cells, too small to read or to tap.
+                  <Box sx={{ overflowX: 'auto' }}>
                     <Box
                       sx={{
                         display: 'grid',
@@ -736,6 +740,7 @@ function WatchStatsContent() {
                         // fills whatever space it is given instead of ending at
                         // 24 × 16px and leaving the rest of the card empty.
                         gridTemplateColumns: 'auto repeat(24, minmax(0, 1fr))',
+                        minWidth: { xs: 440, sm: 0 },
                         gap: '3px',
                         alignItems: 'center',
                       }}
@@ -868,8 +873,10 @@ function WatchStatsContent() {
                 }
               >
                 {genreSlices.length > 0 ? (
-                  <Box display="flex" alignItems="center" gap={2}>
-                    <ResponsiveContainer width="45%" height={210}>
+                  // Stacked on a phone: at 45% of a phone card the chart is ~130px
+                  // wide and the 156px donut is clipped.
+                  <Box display="flex" flexDirection={{ xs: 'column', sm: 'row' }} alignItems="center" gap={2}>
+                    <ResponsiveContainer width={isPhone ? '100%' : '45%'} height={210}>
                       <PieChart>
                         <Pie
                           data={genreSlices}

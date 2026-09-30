@@ -178,7 +178,16 @@ export function RecentRatingsList({ ratings, loading }: RecentRatingsListProps) 
                 {item.year || t('dashboard.unknownYear')} •{' '}
                 {item.type === 'movie' ? t('dashboard.typeMovie') : t('dashboard.typeSeries')}
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  columnGap: 1,
+                  mt: 0.5,
+                }}
+              >
                 <HeartDisplay rating={item.rating} />
                 <Typography variant="caption" color="text.secondary">
                   {t('dashboard.ratedOn', { date: formatRatedDate(item.ratedAt, i18n.language) })}

@@ -158,7 +158,7 @@ export function WatcherIdentityCard({ mediaType }: WatcherIdentityCardProps) {
 
   return (
     <Card sx={{ borderRadius: 2.5, height: '100%' }}>
-      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+      <CardContent sx={{ p: { xs: 2, sm: 2.5 }, '&:last-child': { pb: { xs: 2, sm: 2.5 } } }}>
         <Box display="flex" alignItems="center" justifyContent="space-between" gap={2} mb={2}>
           <Box display="flex" alignItems="center" gap={1.5} minWidth={0}>
             <Box

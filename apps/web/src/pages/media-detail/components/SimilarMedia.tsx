@@ -196,7 +196,14 @@ export function SimilarMedia({
   return (
     <Box>
       <Box
-        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 1,
+          mb: 2,
+        }}
       >
         <Typography variant="h6" fontWeight={600}>
           {mediaType === 'movie'
@@ -244,7 +251,9 @@ export function SimilarMedia({
         <Box
           sx={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+            // 130, not 150: two 150px tracks plus the gap did not fit a phone,
+            // which then showed one full-width poster per row.
+            gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
             gap: 2,
           }}
         >

@@ -488,7 +488,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
   return (
     // Padding only for the full-width form. The flat one sits inside the
     // detail page's left column, which supplies both margin and gutter.
-    <Box sx={collapsible ? { mt: 4, px: 3 } : undefined}>
+    <Box sx={collapsible ? { mt: 4, px: { xs: 0, sm: 3 } } : undefined}>
       <Paper
         sx={{
           borderRadius: 3,

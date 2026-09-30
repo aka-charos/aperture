@@ -242,7 +242,7 @@ export function FranchisesPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           size="small"
-          sx={{ minWidth: 250 }}
+          sx={{ minWidth: { xs: '100%', sm: 250 } }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -329,7 +329,16 @@ export function FranchisesPage() {
                   sx={{ cursor: 'pointer' }}
                   onClick={() => toggleExpanded(franchise.name)}
                 >
-                  <AvatarGroup max={4} sx={{ flexShrink: 0 }}>
+                  <AvatarGroup
+                    max={4}
+                    sx={{
+                      flexShrink: 0,
+                      // Four posters are ~136px, which on a phone left the
+                      // franchise name about 88px; two say the same thing.
+                      // nth-LAST: AvatarGroup renders its children reversed.
+                      '& .MuiAvatar-root:nth-last-of-type(n+3)': { display: { xs: 'none', sm: 'flex' } },
+                    }}
+                  >
                     {franchise.movies.slice(0, 4).map((movie) => (
                       <Avatar
                         key={movie.id}
@@ -379,7 +388,7 @@ export function FranchisesPage() {
                       )}
                     </Box>
 
-                    <Box display="flex" alignItems="center" gap={2}>
+                    <Box display="flex" alignItems="center" flexWrap="wrap" columnGap={2} rowGap={0.5}>
                       <Typography variant="body2" color="text.secondary">
                         {t('browse.franchises.moviesWatched', {
                           watched: franchise.watchedMovies,
@@ -416,7 +425,7 @@ export function FranchisesPage() {
                 <CardContent sx={{ pt: 0 }}>
                   <Grid container spacing={2} mt={1}>
                     {franchise.movies.map((movie) => (
-                      <Grid item xs={4} sm={3} md={2} lg={1.5} key={movie.id}>
+                      <Grid item xs={6} sm={3} md={2} lg={1.5} key={movie.id}>
                         {/* movie.watched rather than useWatchStatus: it is the same
                             figure the progress bar on this card counts, so the ticks
                             and the "3 of 5 watched" line can never disagree. */}

@@ -108,7 +108,11 @@ function IssueRow({
 
   return (
     <Paper variant="outlined" sx={{ borderRadius: 2, p: 2 }}>
-      <Stack direction="row" spacing={1} alignItems="flex-start">
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={1}
+        alignItems={{ xs: 'stretch', sm: 'flex-start' }}
+      >
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
             {issue.libraryMediaId ? (
@@ -152,6 +156,7 @@ function IssueRow({
         <Button
           size="small"
           onClick={() => setExpanded((v) => !v)}
+          sx={{ alignSelf: 'flex-start' }}
           endIcon={expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
         >
           {t('myIssues.replies', { count: issue.comments.length })}

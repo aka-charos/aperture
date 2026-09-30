@@ -558,11 +558,11 @@ export function WatcherIdentitySection({ mediaType, onGenresDetected }: WatcherI
       {/* Section 1: Identity Settings */}
       <Card sx={{ backgroundColor: 'background.default', borderRadius: 2 }}>
         <CardContent>
-          <Box display="flex" alignItems="center" justifyContent="space-between" mb={2.5}>
+          <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1} mb={2.5}>
           <Typography variant="h6" fontWeight={600}>
             {t('watcherIdentity.identitySettingsTitle')}
           </Typography>
-          <Box display="flex" alignItems="center" gap={1}>
+          <Box display="flex" alignItems="center" flexWrap="wrap" gap={1}>
             <Chip
               size="small"
               label={data?.profile?.hasEmbedding ? t('watcherIdentity.statusActive') : t('watcherIdentity.statusNotAnalyzed')}

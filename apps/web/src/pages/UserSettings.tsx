@@ -202,7 +202,7 @@ export function UserSettingsPage() {
           <Tab icon={<VideoLibraryIcon />} iconPosition="start" label={t('userSettings.tabPreferences')} />
         </Tabs>
 
-        <Box sx={{ p: 3 }}>
+        <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
           <TabPanel value={tabValue} index={0}>
             <Tabs
               variant="scrollable"

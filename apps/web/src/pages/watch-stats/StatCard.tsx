@@ -24,7 +24,7 @@ export function StatCard({ title, subtitle, icon, color, action, children }: Sta
   return (
     <Card sx={{ borderRadius: 2.5, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <CardContent
-        sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 2.5, '&:last-child': { pb: 2.5 } }}
+        sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: { xs: 2, sm: 2.5 }, '&:last-child': { pb: { xs: 2, sm: 2.5 } } }}
       >
         <Box display="flex" alignItems="center" gap={1.5} mb={subtitle ? 0.25 : 2}>
           <Box

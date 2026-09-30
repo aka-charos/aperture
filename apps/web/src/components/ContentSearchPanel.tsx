@@ -384,7 +384,10 @@ export function ContentSearchPanel({
                 // a page that narrows when the assistant is docked, so a
                 // breakpoint grid would keep its full-desktop column count in
                 // half the width.
-                gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                gridTemplateColumns: {
+                  xs: 'repeat(auto-fill, minmax(120px, 1fr))',
+                  sm: 'repeat(auto-fill, minmax(160px, 1fr))',
+                },
                 gap: 2,
               }}
             >

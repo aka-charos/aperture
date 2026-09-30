@@ -438,7 +438,7 @@ export function MyWatchHistoryPage() {
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
         <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
           {hasConnections && (
-            <FormControl size="small" sx={{ minWidth: 180 }}>
+            <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 180 } }}>
               <InputLabel id="whose-history-label">{t('watchHistoryPage.whoseHistory')}</InputLabel>
               <Select
                 labelId="whose-history-label"
@@ -492,7 +492,7 @@ export function MyWatchHistoryPage() {
                 </InputAdornment>
               ),
             }}
-            sx={{ width: 250 }}
+            sx={{ width: { xs: '100%', sm: 250 } }}
           />
           <ToggleButtonGroup
             value={tabValue === 0 ? movieSortBy : seriesSortBy}
@@ -714,6 +714,8 @@ export function MyWatchHistoryPage() {
                     page={moviePagination.page}
                     onChange={handleMoviePageChange}
                     color="primary"
+                    size={isMobile ? 'small' : 'medium'}
+                    siblingCount={isMobile ? 0 : 1}
                     showFirstButton
                     showLastButton
                   />
@@ -939,6 +941,8 @@ export function MyWatchHistoryPage() {
                     page={seriesPagination.page}
                     onChange={handleSeriesPageChange}
                     color="primary"
+                    size={isMobile ? 'small' : 'medium'}
+                    siblingCount={isMobile ? 0 : 1}
                     showFirstButton
                     showLastButton
                   />

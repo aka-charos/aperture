@@ -127,7 +127,7 @@ export function TopPicksSeriesListItem({
                 objectFit: 'cover',
               }}
             />
-            <RankBadge rank={series.rank} size={isMobile ? 'medium' : 'large'} />
+            <RankBadge rank={series.rank} size={isMobile ? 'small' : 'large'} />
             {watched && <WatchedBadge size={18} sx={{ top: 6, insetInlineEnd: 6 }} />}
             {!watched && episodeProgress != null && episodeProgress.total > 0 && (
               <EpisodeProgressBadge

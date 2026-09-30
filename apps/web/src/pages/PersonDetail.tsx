@@ -472,9 +472,9 @@ export function PersonDetailPage() {
       <Box
         sx={{
           position: 'relative',
-          mx: -3,
-          mt: -3,
-          px: 3,
+          mx: { xs: -2, sm: -3 },
+          mt: { xs: -2, sm: -3 },
+          px: { xs: 2, sm: 3 },
           pt: 3,
           pb: 4,
           minHeight: 200,
@@ -498,7 +498,7 @@ export function PersonDetailPage() {
             <ArrowBackIcon />
           </IconButton>
 
-          <Box display="flex" alignItems="center" gap={3}>
+          <Box display="flex" alignItems="center" gap={{ xs: 2, sm: 3 }}>
             {/* Person Avatar */}
             <Avatar
               src={avatarSrc ?? undefined}
@@ -513,8 +513,8 @@ export function PersonDetailPage() {
                 },
               }}
               sx={{
-                width: 120,
-                height: 120,
+                width: { xs: 80, sm: 120 },
+                height: { xs: 80, sm: 120 },
                 bgcolor: 'primary.dark',
                 fontSize: '2.5rem',
                 border: '4px solid',
@@ -526,12 +526,16 @@ export function PersonDetailPage() {
             </Avatar>
 
             {/* Person Info */}
-            <Box flex={1}>
+            <Box flex={1} minWidth={0}>
               <Typography 
                 variant="h4" 
                 fontWeight={700} 
                 mb={1}
-                sx={{ textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}
+                sx={{
+                  textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                  fontSize: { xs: '1.6rem', sm: '2.125rem' },
+                  overflowWrap: 'anywhere',
+                }}
               >
                 {decodedName}
               </Typography>
@@ -607,7 +611,7 @@ export function PersonDetailPage() {
       </Box>
 
       {/* Content */}
-      <Box sx={{ px: 3, py: 4 }}>
+      <Box sx={{ px: { xs: 0, sm: 3 }, py: 4 }}>
         {/* Biography */}
         {data.overview && (
           <Box mb={4} maxWidth="120ch">
