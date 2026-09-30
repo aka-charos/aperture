@@ -19,6 +19,7 @@ import { clampRating } from '../shared/syncHelpers.js'
 import {
   indexByTitleYear,
   pickTitleYearRow,
+  takeOverRow,
   titleYearKey,
   type TitleYearRow,
 } from '../shared/titleYearRebind.js'
@@ -185,6 +186,7 @@ async function processMovieBatch(
   movies: PreparedMovie[],
   existingProviderIds: Set<string>,
   existingTitleYears: Map<string, TitleYearRow[]>,
+  liveProviderIds: ReadonlySet<string>,
   _jobId: string
 ): Promise<{ added: number; updated: number }> {
   // Separate into updates and inserts
@@ -203,14 +205,12 @@ async function processMovieBatch(
     // A row is taken over only when no external id contradicts it
     // (shared/titleYearRebind.ts); otherwise the film gets a row of its own.
     const key = titleYearKey(pm.movie.name, pm.movie.year)
-    const row = key ? pickTitleYearRow(existingTitleYears.get(key), pm.movie) : null
+    const row = key
+      ? pickTitleYearRow(existingTitleYears.get(key), pm.movie, (id) => liveProviderIds.has(id))
+      : null
     if (row) {
       toUpdateByTitleYear.push({ ...pm, previousId: row.providerItemId })
-      Object.assign(row, {
-        providerItemId: pm.movie.id,
-        tmdbId: pm.movie.tmdbId ?? row.tmdbId,
-        imdbId: pm.movie.imdbId ?? row.imdbId,
-      })
+      takeOverRow(row, pm.movie.id, pm.movie)
     } else {
       toInsert.push(pm)
       if (key) {
@@ -337,6 +337,8 @@ async function processMovieBatch(
       const result = await query(
         `UPDATE movies SET
           provider_item_id = data.provider_item_id,
+          title = data.title,
+          year = data.year,
           original_title = data.original_title,
           genres = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.genres)), '{}'),
           overview = data.overview,
@@ -376,7 +378,7 @@ async function processMovieBatch(
             $26::jsonb[], $27::text[], $28::text[], $29::text[], $30::text[], $31::text[],
             $32::text[]
           ) AS t(
-            provider_item_id, title_lower, year, original_title, genres, overview,
+            provider_item_id, title, year, original_title, genres, overview,
             community_rating, critic_rating, runtime_minutes, path, media_sources,
             poster_url, backdrop_url, provider_library_id, tagline, content_rating,
             premiere_date, studios, directors, writers, actors, imdb_id, tmdb_id,
@@ -387,7 +389,7 @@ async function processMovieBatch(
         WHERE movies.provider_item_id = data.previous_id`,
         [
           toUpdateByTitleYear.map((pm) => pm.movie.id),
-          toUpdateByTitleYear.map((pm) => pm.movie.name?.toLowerCase()),
+          toUpdateByTitleYear.map((pm) => pm.movie.name),
           toUpdateByTitleYear.map((pm) => pm.movie.year || null),
           toUpdateByTitleYear.map((pm) => pm.movie.originalTitle || null),
           toUpdateByTitleYear.map((pm) => JSON.stringify(pm.movie.genres || [])),
@@ -648,6 +650,10 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
     let processed = 0
     const startTime = Date.now()
     const librarySyncResults: LibraryMovieSyncResult[] = []
+    // Every provider id the server has listed so far this run. A title+year
+    // match may not take over a row whose own id is in here
+    // (shared/titleYearRebind.ts).
+    const liveProviderIds = new Set<string>()
 
     for (const { libraryId, count } of libraryCounts) {
       if (count === 0) continue
@@ -675,6 +681,7 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
         fetchedCount: movies.length,
         seenProviderIds: new Set(movies.map((movie) => movie.id)),
       })
+      for (const movie of movies) liveProviderIds.add(movie.id)
 
       // Prepare movie data
       const preparedMovies: PreparedMovie[] = movies.map((movie) => ({
@@ -688,7 +695,13 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
       // Process in batches
       for (let i = 0; i < preparedMovies.length; i += DB_BATCH_SIZE) {
         const batch = preparedMovies.slice(i, i + DB_BATCH_SIZE)
-        const result = await processMovieBatch(batch, existingProviderIds, existingTitleYears, jobId)
+        const result = await processMovieBatch(
+          batch,
+          existingProviderIds,
+          existingTitleYears,
+          liveProviderIds,
+          jobId
+        )
         added += result.added
         updated += result.updated
         processed += batch.length

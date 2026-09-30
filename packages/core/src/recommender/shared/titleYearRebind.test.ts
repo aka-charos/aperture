@@ -4,6 +4,7 @@ import {
   externalIdsConflict,
   indexByTitleYear,
   pickTitleYearRow,
+  takeOverRow,
   titleYearKey,
 } from './titleYearRebind.js'
 
@@ -33,6 +34,33 @@ test('with no comparable id the fallback keeps its old behaviour', () => {
   const rows = [{ providerItemId: 'old', tmdbId: null, imdbId: null }]
   assert.equal(pickTitleYearRow(rows, {})?.providerItemId, 'old')
   assert.equal(pickTitleYearRow(rows, { tmdbId: '1' })?.providerItemId, 'old')
+})
+
+test('a row whose own id is still on the server is not taken by an id-less work', () => {
+  // One of the pair was never identified (no external ids): nothing conflicts,
+  // so only liveness can tell a re-issue from a second work.
+  const rows = [{ providerItemId: 'identified', tmdbId: '514847' }]
+  const live = (id: string) => id === 'identified'
+  assert.equal(pickTitleYearRow(rows, {}, live), null)
+  // Same row, its id gone from the server: a genuine re-issue.
+  assert.equal(pickTitleYearRow(rows, {}, () => false)?.providerItemId, 'identified')
+})
+
+test('a live row is still shared by the same work held twice', () => {
+  // 4K and HD copies of one film: ids agree, so they keep one row as before.
+  const rows = [{ providerItemId: 'hd', tmdbId: '514847' }]
+  assert.equal(pickTitleYearRow(rows, { tmdbId: '514847' }, () => true)?.providerItemId, 'hd')
+})
+
+test('a takeover replaces the ids, so the old owner cannot reclaim a live row', () => {
+  const row = { providerItemId: 'old', tmdbId: '514847', imdbId: 'tt13207736' }
+  // An unidentified item takes the row over (its old id is gone)...
+  takeOverRow(row, 'unidentified', {})
+  assert.deepEqual(row, { providerItemId: 'unidentified', tmdbId: null, imdbId: null, tvdbId: null })
+  // ...so a later item carrying the old owner's ids has nothing to agree with,
+  // and the row's owner is live: it gets its own row.
+  const live = (id: string) => id === 'unidentified'
+  assert.equal(pickTitleYearRow([row], { tmdbId: '514847' }, live), null)
 })
 
 test('any disagreeing id is a conflict; case and whitespace are not', () => {

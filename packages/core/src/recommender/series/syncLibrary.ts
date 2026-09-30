@@ -204,6 +204,10 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
     let processedSeries = 0
     let processedEpisodes = 0
     const librarySyncResults: LibrarySeriesSyncResult[] = []
+    // Every series id the server has listed so far this run. A title+year
+    // match may not take over a row whose own id is in here
+    // (shared/titleYearRebind.ts).
+    const liveSeriesIds = new Set<string>()
 
     // Step 3: Process series
     setJobStep(jobId, 2, 'Processing series', totalSeries)
@@ -244,6 +248,7 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
       libraryResult.fetchedSeriesCount = seriesList.length
       for (const series of seriesList) {
         libraryResult.seenSeriesProviderIds.add(series.id)
+        liveSeriesIds.add(series.id)
       }
 
       // Prepare series data
@@ -259,7 +264,13 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
       // Process in batches
       for (let i = 0; i < preparedSeries.length; i += DB_BATCH_SIZE) {
         const batch = preparedSeries.slice(i, i + DB_BATCH_SIZE)
-        const result = await processSeriesBatch(batch, existingSeriesIds, existingSeriesTitleYears, jobId)
+        const result = await processSeriesBatch(
+          batch,
+          existingSeriesIds,
+          existingSeriesTitleYears,
+          liveSeriesIds,
+          jobId
+        )
         seriesAdded += result.added
         seriesUpdated += result.updated
         processedSeries += batch.length

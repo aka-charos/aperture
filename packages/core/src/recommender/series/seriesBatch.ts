@@ -2,7 +2,12 @@ import { createChildLogger } from '../../lib/logger.js'
 import { query } from '../../lib/db.js'
 import { clampRating } from '../shared/syncHelpers.js'
 import type { PreparedSeries } from './syncTypes.js'
-import { pickTitleYearRow, titleYearKey, type TitleYearRow } from '../shared/titleYearRebind.js'
+import {
+  pickTitleYearRow,
+  takeOverRow,
+  titleYearKey,
+  type TitleYearRow,
+} from '../shared/titleYearRebind.js'
 
 const logger = createChildLogger('sync-series')
 
@@ -10,6 +15,7 @@ export async function processSeriesBatch(
   seriesList: PreparedSeries[],
   existingProviderIds: Set<string>,
   existingTitleYears: Map<string, TitleYearRow[]>,
+  liveProviderIds: ReadonlySet<string>,
   _jobId: string
 ): Promise<{ added: number; updated: number }> {
   // Separate into updates and inserts
@@ -28,15 +34,12 @@ export async function processSeriesBatch(
     // A row is taken over only when no external id contradicts it
     // (shared/titleYearRebind.ts); otherwise the show gets a row of its own.
     const key = titleYearKey(ps.series.name, ps.series.year)
-    const row = key ? pickTitleYearRow(existingTitleYears.get(key), ps.series) : null
+    const row = key
+      ? pickTitleYearRow(existingTitleYears.get(key), ps.series, (id) => liveProviderIds.has(id))
+      : null
     if (row) {
       toUpdateByTitleYear.push({ ...ps, previousId: row.providerItemId })
-      Object.assign(row, {
-        providerItemId: ps.series.id,
-        tmdbId: ps.series.tmdbId ?? row.tmdbId,
-        imdbId: ps.series.imdbId ?? row.imdbId,
-        tvdbId: ps.series.tvdbId ?? row.tvdbId,
-      })
+      takeOverRow(row, ps.series.id, ps.series)
     } else {
       toInsert.push(ps)
       if (key) {
@@ -156,6 +159,8 @@ export async function processSeriesBatch(
       const result = await query(
         `UPDATE series SET
           provider_item_id = data.provider_item_id,
+          title = data.title,
+          year = data.year,
           original_title = data.original_title,
           sort_title = data.sort_title,
           end_year = data.end_year,
@@ -193,7 +198,7 @@ export async function processSeriesBatch(
             $22::text[], $23::text[], $24::text[], $25::jsonb[], $26::jsonb[],
             $27::text[], $28::text[], $29::text[], $30::text[], $31::text[]
           ) AS t(
-            provider_item_id, title_lower, year, original_title, sort_title, end_year,
+            provider_item_id, title, year, original_title, sort_title, end_year,
             genres, overview, tagline, community_rating, critic_rating, content_rating,
             status, total_seasons, total_episodes, air_days, network, studios,
             directors, writers, actors, imdb_id, tmdb_id, tvdb_id, tags,
@@ -204,7 +209,7 @@ export async function processSeriesBatch(
         WHERE series.provider_item_id = data.previous_id`,
         [
           toUpdateByTitleYear.map((ps) => ps.series.id),
-          toUpdateByTitleYear.map((ps) => ps.series.name?.toLowerCase()),
+          toUpdateByTitleYear.map((ps) => ps.series.name),
           toUpdateByTitleYear.map((ps) => ps.series.year || null),
           toUpdateByTitleYear.map((ps) => ps.series.originalTitle || null),
           toUpdateByTitleYear.map((ps) => ps.series.sortName || null),

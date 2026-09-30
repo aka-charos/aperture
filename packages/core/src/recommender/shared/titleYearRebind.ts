@@ -13,8 +13,9 @@
  *
  * The external ids are what tell a re-issued item from a different work: a
  * TMDb, IMDb or TVDb id present on both sides and disagreeing means two works,
- * and the item gets its own row. With no comparable id the old behaviour is
- * kept, since that is exactly the re-issued-id case the fallback exists for.
+ * and the item gets its own row. With no comparable id a row is still taken
+ * over, since that is the re-issued-id case the fallback exists for — but only
+ * when the row's own id is no longer on the server (see `pickTitleYearRow`).
  *
  * Pure, no DB; pinned by `titleYearRebind.test.ts`.
  */
@@ -78,10 +79,18 @@ function agreeingIds(a: ExternalIds, b: ExternalIds): number {
  * own. Rows whose ids contradict the item are never chosen; among the rest the
  * one agreeing on the most ids wins, so a real re-issue finds its own row even
  * when a same-titled different work sits beside it.
+ *
+ * `isLive` answers whether a row's provider id belongs to an item the server
+ * listed in this run. A re-issue means the old id is GONE, so a live row is
+ * someone else's and may be taken over only when an id positively agrees —
+ * the same work held twice (a 4K and an HD library), which keeps sharing one
+ * row as it always has. Without this, two works where one side carries no
+ * external id have nothing to conflict on and fold together again.
  */
 export function pickTitleYearRow<T extends TitleYearRow>(
   candidates: readonly T[] | undefined,
-  incoming: ExternalIds
+  incoming: ExternalIds,
+  isLive: (providerItemId: string) => boolean = () => false
 ): T | null {
   if (!candidates || candidates.length === 0) return null
   let best: T | null = null
@@ -89,12 +98,27 @@ export function pickTitleYearRow<T extends TitleYearRow>(
   for (const row of candidates) {
     if (externalIdsConflict(row, incoming)) continue
     const score = agreeingIds(row, incoming)
+    if (score === 0 && isLive(row.providerItemId)) continue
     if (score > bestScore) {
       best = row
       bestScore = score
     }
   }
   return best
+}
+
+/**
+ * Record in the index that `row` now belongs to the incoming item. The ids are
+ * REPLACED, never merged, because the sync's UPDATE writes an absent id as
+ * NULL: an index remembering the old owner's id would let a later item this
+ * run positively agree with a row that no longer carries it, and take it from
+ * its live owner.
+ */
+export function takeOverRow(row: TitleYearRow, providerItemId: string, incoming: ExternalIds): void {
+  row.providerItemId = providerItemId
+  row.tmdbId = incoming.tmdbId || null
+  row.imdbId = incoming.imdbId || null
+  row.tvdbId = incoming.tvdbId || null
 }
 
 /** Index stored rows by title+year; several rows may legitimately share a key. */
