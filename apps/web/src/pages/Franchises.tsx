@@ -29,7 +29,7 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import MovieIcon from '@mui/icons-material/Movie'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
-import { MoviePoster } from '@aperture/ui'
+import { MoviePoster, getProxiedImageUrl } from '@aperture/ui'
 import { useUserRatings } from '../hooks/useUserRatings'
 import { PageHeading } from '@/components/PageHeading'
 
@@ -342,7 +342,7 @@ export function FranchisesPage() {
                     {franchise.movies.slice(0, 4).map((movie) => (
                       <Avatar
                         key={movie.id}
-                        src={movie.posterUrl || undefined}
+                        src={getProxiedImageUrl(movie.posterUrl) || undefined}
                         variant="rounded"
                         sx={{ width: 40, height: 60 }}
                       >

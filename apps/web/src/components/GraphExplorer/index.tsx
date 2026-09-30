@@ -5,7 +5,7 @@
  * - SimilarMedia (fullscreen mode) - for exploring similar content
  * - ExplorePage - main exploration interface with search
  */
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Box,
@@ -82,6 +82,8 @@ export interface GraphExplorerProps {
   onExitFullscreen?: () => void
   showRefresh?: boolean
   onRefresh?: () => void
+  /** Rendered first among the header actions (Explore's controls button on a phone). */
+  extraActions?: ReactNode
 
   // Playlist source info (for CreatePlaylistDialog)
   sourceItemId?: string
@@ -117,6 +119,7 @@ export function GraphExplorer({
   onExitFullscreen,
   showRefresh = false,
   onRefresh,
+  extraActions,
   sourceItemId,
   sourceItemType,
   compact = false,
@@ -309,6 +312,7 @@ export function GraphExplorer({
 
         {/* Right side: Actions */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+          {extraActions}
           {showRefresh && onRefresh && (
             <Tooltip title={t('graphExplorer.refresh')}>
               <IconButton size="small" onClick={onRefresh} disabled={loading}>

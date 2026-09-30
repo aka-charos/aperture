@@ -21,7 +21,7 @@ import GridViewIcon from '@mui/icons-material/GridView'
 import ViewListIcon from '@mui/icons-material/ViewList'
 import PeopleIcon from '@mui/icons-material/People'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
-import { MoviePoster, RankBadge } from '@aperture/ui'
+import { MoviePoster, RankBadge, getProxiedImageUrl } from '@aperture/ui'
 import { useUserRatings } from '../../hooks/useUserRatings'
 import { useWatchStatus } from '../../hooks/useWatchStatus'
 import { useWatching } from '../../hooks/useWatching'
@@ -282,7 +282,9 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
 
                 <Box
                   component="img"
-                  src={item.posterUrl || undefined}
+                  // Through the proxy, as MoviePoster does: the raw URL is the media
+                  // server's internal address, which a browser cannot reach.
+                  src={getProxiedImageUrl(item.posterUrl) || undefined}
                   alt={item.title}
                   sx={{
                     width: { xs: 60, sm: 80 },

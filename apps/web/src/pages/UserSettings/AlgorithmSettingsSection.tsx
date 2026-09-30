@@ -32,7 +32,7 @@ import ThumbDownIcon from '@mui/icons-material/ThumbDown'
 import CloseIcon from '@mui/icons-material/Close'
 import { useTranslation } from 'react-i18next'
 import { useTheme } from '@mui/material/styles'
-import { StarRating } from '@aperture/ui'
+import { StarRating, getProxiedImageUrl } from '@aperture/ui'
 import { useUserRatings } from '@/hooks/useUserRatings'
 
 interface AlgorithmWeights {
@@ -780,7 +780,7 @@ export function AlgorithmSettingsSection({ userId }: Props) {
                         }}
                       >
                         <Avatar
-                          src={item.posterUrl || undefined}
+                          src={getProxiedImageUrl(item.posterUrl) || undefined}
                           variant="rounded"
                           sx={{ width: 40, height: 56 }}
                         >
@@ -837,7 +837,7 @@ export function AlgorithmSettingsSection({ userId }: Props) {
                         }}
                       >
                         <Avatar
-                          src={item.posterUrl || undefined}
+                          src={getProxiedImageUrl(item.posterUrl) || undefined}
                           variant="rounded"
                           sx={{ width: 40, height: 56 }}
                         >

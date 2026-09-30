@@ -29,6 +29,7 @@ import CheckIcon from '@mui/icons-material/Check'
 import SearchIcon from '@mui/icons-material/Search'
 import CloseIcon from '@mui/icons-material/Close'
 import { useWatching } from '@/hooks/useWatching'
+import { getProxiedImageUrl } from '@aperture/ui'
 
 interface SearchResult {
   id: string
@@ -183,7 +184,7 @@ export function AddSeriesDialog({ open, onClose }: AddSeriesDialogProps) {
                 >
                   <ListItemAvatar>
                     <Avatar
-                      src={series.posterUrl || undefined}
+                      src={getProxiedImageUrl(series.posterUrl) || undefined}
                       variant="rounded"
                       sx={{ width: 48, height: 72 }}
                     >

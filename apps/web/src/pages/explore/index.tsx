@@ -746,29 +746,27 @@ export function ExplorePage() {
           showCreatePlaylist
           showRefresh={showRefreshButton}
           onRefresh={handleRefresh}
+          // In the header, beside Create playlist: floating over the graph it
+          // sat on the legend and the hint line, the only text at that edge.
+          extraActions={
+            isNarrow ? (
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<TuneIcon />}
+                onClick={() => setControlsOpen(true)}
+                sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+              >
+                {t('mediaGraph.controlsButton')}
+              </Button>
+            ) : undefined
+          }
         />
       </Box>
 
       {/* Right Sidebar - Controls */}
       {isNarrow ? (
         <>
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<TuneIcon />}
-            onClick={() => setControlsOpen(true)}
-            sx={{
-              position: 'absolute',
-              // Bottom-start: bottom-end is the assistant's button.
-              bottom: 16,
-              insetInlineStart: 16,
-              zIndex: 2,
-              borderRadius: 5,
-              boxShadow: 4,
-            }}
-          >
-            {t('mediaGraph.controlsButton')}
-          </Button>
           <Drawer
             anchor="bottom"
             open={controlsOpen}
