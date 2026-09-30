@@ -417,7 +417,8 @@ export function PersonDetailPage() {
 
     return (
       <CarouselItem key={`${row.groupKey}-${row.mediaType}-${row.tmdbId}`}>
-        <Box sx={{ width: 160, position: 'relative' }}>
+        {/* Full width of the slot the carousel sized (fitItems). */}
+        <Box sx={{ width: '100%', position: 'relative' }}>
           <MediaPosterCard
             tmdbId={row.tmdbId}
             title={row.title}
@@ -654,6 +655,7 @@ export function PersonDetailPage() {
               title={t('personDetail.moviesCarousel')}
               subtitle={`${data.movies.length} movies featuring ${decodedName}`}
               hasItems={data.movies.length > 0}
+              fitItems
             >
               {data.movies.map((movie) => (
                 <CarouselItem key={movie.id}>
@@ -668,6 +670,7 @@ export function PersonDetailPage() {
                     onRate={(rating) => setRating('movie', movie.id, rating)}
                     onClick={() => navigate(`/movies/${movie.id}`)}
                     size="medium"
+                    responsive
                   />
                 </CarouselItem>
               ))}
@@ -682,6 +685,7 @@ export function PersonDetailPage() {
               title={t('personDetail.seriesCarousel')}
               subtitle={`${data.series.length} series featuring ${decodedName}`}
               hasItems={data.series.length > 0}
+              fitItems
             >
               {data.series.map((series) => (
                 <CarouselItem key={series.id}>
@@ -699,6 +703,7 @@ export function PersonDetailPage() {
                     onWatchingToggle={() => toggleWatching(series.id)}
                     onClick={() => navigate(`/series/${series.id}`)}
                     size="medium"
+                    responsive
                   />
                 </CarouselItem>
               ))}
@@ -776,6 +781,7 @@ export function PersonDetailPage() {
                     title={group.label}
                     subtitle={`${group.rows.length} not in your library`}
                     hasItems={group.rows.length > 0}
+                    fitItems
                   >
                     {group.rows.map(renderCreditsMissingItem)}
                   </BaseCarousel>

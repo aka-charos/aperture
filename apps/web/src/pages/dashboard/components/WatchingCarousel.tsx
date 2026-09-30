@@ -93,6 +93,7 @@ export function WatchingCarousel({
       subtitle={subtitle}
       loading={loading}
       hasItems={items.length > 0}
+      fitItems
     >
       {items.map((item) => (
         <CarouselItem key={item.id}>
@@ -112,6 +113,8 @@ export function WatchingCarousel({
             // See MediaCarousel: the poster's bottom edge belongs to the artwork.
             watchingTogglePosition="topRight"
             size="medium"
+            // Fills the slot the carousel sized (fitItems).
+            responsive
             onClick={() => handleItemClick(item)}
           >
             {/* Status badge */}

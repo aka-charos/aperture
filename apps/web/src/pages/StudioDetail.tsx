@@ -212,6 +212,7 @@ export function StudioDetailPage() {
               title={t('studioDetail.moviesCarousel')}
               subtitle={`${data.movies.length} movies from ${decodedName}`}
               hasItems={data.movies.length > 0}
+              fitItems
             >
               {data.movies.map((movie) => (
                 <CarouselItem key={movie.id}>
@@ -226,6 +227,7 @@ export function StudioDetailPage() {
                     onRate={(rating) => setRating('movie', movie.id, rating)}
                     onClick={() => navigate(`/movies/${movie.id}`)}
                     size="medium"
+                    responsive
                   />
                 </CarouselItem>
               ))}
@@ -240,6 +242,7 @@ export function StudioDetailPage() {
               title={t('studioDetail.seriesCarousel')}
               subtitle={`${data.series.length} series from ${decodedName}`}
               hasItems={data.series.length > 0}
+              fitItems
             >
               {data.series.map((series) => (
                 <CarouselItem key={series.id}>
@@ -257,6 +260,7 @@ export function StudioDetailPage() {
                     onWatchingToggle={() => toggleWatching(series.id)}
                     onClick={() => navigate(`/series/${series.id}`)}
                     size="medium"
+                    responsive
                   />
                 </CarouselItem>
               ))}

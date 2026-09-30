@@ -88,6 +88,9 @@ export function MediaCarousel({
       watchingTogglePosition="topRight"
       onClick={() => handleItemClick(item)}
       size="medium"
+      // Fills the slot the carousel sized (fitItems), so a row always ends on
+      // a whole poster rather than a slice of the next.
+      responsive
     >
       {showRank && item.rank && <RankBadge rank={item.rank} />}
       {showMediaType && !showRank && <MediaTypeChip type={item.type} />}
@@ -103,6 +106,7 @@ export function MediaCarousel({
         loading={loading}
         emptyMessage={emptyMessage}
         hasItems={items.length > 0}
+        fitItems
       >
         {Array.from({ length: Math.ceil(items.length / 2) }).map((_, colIndex) => {
           const topItem = items[colIndex * 2]
@@ -128,6 +132,7 @@ export function MediaCarousel({
       loading={loading}
       emptyMessage={emptyMessage}
       hasItems={items.length > 0}
+      fitItems
     >
       {items.map((item) => (
         <CarouselItem key={`${item.type}-${item.id}`}>
