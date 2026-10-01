@@ -11,6 +11,7 @@ import {
   createChildLogger,
   isLegacyLibraryOutputEnabled,
   LegacyLibraryOutputDisabledError,
+  LibraryNameTakenError,
 } from '@aperture/core'
 import type { UserRow } from '../types.js'
 
@@ -162,6 +163,10 @@ export function registerJobHandlers(fastify: FastifyInstance) {
           libraryName: library.name,
         })
       } catch (error) {
+        // A name clash is the operator's to resolve, and the sentence says how.
+        if (error instanceof LibraryNameTakenError) {
+          return reply.status(409).send({ error: error.message, code: error.code })
+        }
         logger.error({ error, userId: id }, 'Failed to update STRM for user')
         return reply.status(500).send({ error: 'Failed to update STRM files' })
       }
@@ -235,6 +240,9 @@ export function registerJobHandlers(fastify: FastifyInstance) {
           strm,
         })
       } catch (error) {
+        if (error instanceof LibraryNameTakenError) {
+          return reply.status(409).send({ error: error.message, code: error.code })
+        }
         logger.error({ error, userId: id }, 'Failed to run full pipeline for user')
         return reply.status(500).send({ error: 'Failed to run pipeline' })
       }

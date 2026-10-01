@@ -43,7 +43,7 @@ export const jobDefinitions: JobDefinition[] = [
   {
     name: 'sync-movie-libraries',
     description:
-      'Build the per-viewer AI Picks movie libraries (STRM or symlinks). Legacy output: does nothing while it is switched off in Output format, where Emby home rows replace it.',
+      'Build the per-viewer AI Picks movie libraries (STRM or symlinks). Legacy output: while it is switched off in Output format (Emby home rows replace it) this writes nothing, and only removes a library whose owner may no longer open everything it holds.',
     cron: process.env.PERMS_CRON || '0 5 * * *',
   },
   // === Series Jobs ===
@@ -76,7 +76,7 @@ export const jobDefinitions: JobDefinition[] = [
   {
     name: 'sync-series-libraries',
     description:
-      'Build the per-viewer AI Picks series libraries (STRM or symlinks). Legacy output: does nothing while it is switched off in Output format, where Emby home rows replace it.',
+      'Build the per-viewer AI Picks series libraries (STRM or symlinks). Legacy output: while it is switched off in Output format (Emby home rows replace it) this writes nothing, and only removes a library whose owner may no longer open everything it holds.',
     cron: process.env.PERMS_CRON || '0 5 * * *',
   },
   // === Explanations only (both media types) ===
@@ -134,7 +134,7 @@ export const jobDefinitions: JobDefinition[] = [
   {
     name: 'refresh-top-picks',
     description:
-      'Write the shared Top Picks libraries, and the collections and playlists built from them. Legacy output: does nothing while it is switched off in Output format — the Top Picks pages and home rows compute their lists live.',
+      'Write the shared Top Picks libraries, and the collections and playlists built from them. Legacy output: while it is switched off in Output format this writes nothing — the Top Picks pages and home rows compute their lists live — and only takes the Top Picks libraries away from accounts that may no longer open what they hold.',
     cron: '0 6 * * *',
   },
   {

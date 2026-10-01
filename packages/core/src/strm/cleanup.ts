@@ -8,6 +8,8 @@ import path from 'path'
 import { query, queryOne } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { getMediaServerProvider } from '../media/index.js'
+import type { MediaServerProvider } from '../media/MediaServerProvider.js'
+import type { Library } from '../media/types.js'
 import { getMediaServerApiKey } from '../settings/systemSettings.js'
 import { getConfig } from './config.js'
 import { addLog } from '../jobs/progress.js'
@@ -79,6 +81,20 @@ export async function cleanupUserLibraries(
   await removeStrmLibraryRecords(user, result.rows)
 }
 
+interface MediaServerContext {
+  apiKey: string
+  provider: MediaServerProvider
+  serverLibraries: Library[]
+}
+
+/** The media server and the libraries it holds now; null when none is configured. */
+async function readMediaServer(): Promise<MediaServerContext | null> {
+  const apiKey = await getMediaServerApiKey()
+  if (!apiKey) return null
+  const provider = await getMediaServerProvider()
+  return { apiKey, provider, serverLibraries: await provider.getLibraries(apiKey) }
+}
+
 /**
  * A row is cleared only once its library is gone from the media server — the
  * rule `remove-legacy-libraries` follows too, through the same planner. The
@@ -86,19 +102,29 @@ export async function cleanupUserLibraries(
  * (`getLibraryConfigs(true)`), so clearing it after a failed delete turned the
  * library into a "real" one the next library sync offered for recommendations.
  * A failed delete now keeps its row and its folder; the next reconcile retries.
+ *
+ * The planner gets each library's folders and the owner's id, so a row that
+ * adopted someone else's library by name — the operator's, or another
+ * viewer's — is refused and kept, exactly as `remove-legacy-libraries` does.
+ * It deliberately gets NO libraries root: that is what turns on the search for
+ * libraries no row points at, which here would plan every other viewer's
+ * library for deletion while cleaning up one.
+ *
+ * `server` is the media server and its library list, read once by a caller
+ * cleaning up many viewers (the reconcile) rather than once per viewer.
  */
 async function removeStrmLibraryRecords(
   user: UserForCleanup,
-  rows: StrmLibraryRow[]
+  rows: StrmLibraryRow[],
+  server?: MediaServerContext
 ): Promise<void> {
-  const apiKey = await getMediaServerApiKey()
-  if (!apiKey) {
+  const resolved = server ?? (await readMediaServer())
+  if (!resolved) {
     logger.warn({ userId: user.id }, 'cleanup: no media server API key; libraries and their records are kept')
     return
   }
+  const { apiKey, provider, serverLibraries } = resolved
 
-  const provider = await getMediaServerProvider()
-  const serverLibraries = await provider.getLibraries(apiKey)
   const plan = planGeneratedLibraryRemoval(
     rows.map((r) => ({
       id: r.id,
@@ -107,9 +133,17 @@ async function removeStrmLibraryRecords(
       name: r.name,
       mediaType: r.media_type,
       providerLibraryId: r.provider_library_id,
+      ownerProviderUserId: user.provider_user_id,
     })),
-    serverLibraries.map((lib) => ({ id: lib.id, name: lib.name }))
+    serverLibraries.map((lib) => ({ id: lib.id, name: lib.name, locations: lib.locations }))
   )
+
+  for (const kept of plan.refused) {
+    logger.warn(
+      { userId: user.id, name: kept.serverName, locations: kept.locations },
+      'cleanup: library kept — it does not read this viewer\'s own folder, so its record only adopted it by name'
+    )
+  }
 
   const cleared = new Set<string>(plan.alreadyGone)
   for (const { serverName, rowIds } of plan.deletions) {
@@ -162,10 +196,14 @@ async function removeStrmLibraryRecords(
  * sync no longer happens, and a library is also removed when its owner may no
  * longer open everything it was written from (`frozenLibraryStillPermitted`,
  * F-142). This only ever deletes.
+ *
+ * `mediaType` limits it to one kind. Each library job reconciles its own: both
+ * fire at the same time, and two reconciles of the same rows race each other's
+ * deletes and log failures for libraries the other just removed.
  */
 export async function reconcileStaleStrmLibraries(
   jobId?: string,
-  options: { frozen?: boolean } = {}
+  options: { frozen?: boolean; mediaType?: StrmLibraryMediaType } = {}
 ): Promise<void> {
   const log = (level: 'info' | 'warn' | 'error', message: string) => {
     if (jobId) {
@@ -205,7 +243,9 @@ export async function reconcileStaleStrmLibraries(
      JOIN users u ON u.id = sl.user_id
      LEFT JOIN strm_library_scopes sc ON sc.user_id = sl.user_id AND sc.media_type = sl.media_type
      WHERE sl.user_id IS NOT NULL
-       AND (sl.media_type = 'series' OR (sl.media_type = 'movies' AND sl.channel_id IS NULL))`
+       AND (sl.media_type = 'series' OR (sl.media_type = 'movies' AND sl.channel_id IS NULL))
+       AND ($1::text IS NULL OR sl.media_type = $1)`,
+    [options.mediaType ?? null]
   )
   const libraries = await loadConfiguredLibraries()
   const result = {
@@ -262,9 +302,17 @@ export async function reconcileStaleStrmLibraries(
     })
   }
 
+  // Read once for every viewer: each plan needs the whole library list, and
+  // the deletes below only ever touch the viewer being cleaned up.
+  const server = await readMediaServer()
+  if (!server) {
+    log('warn', 'Reconcile: no media server is configured, so the libraries and their records are kept')
+    return
+  }
+
   for (const { user, rows } of byUser.values()) {
     try {
-      await removeStrmLibraryRecords(user, rows)
+      await removeStrmLibraryRecords(user, rows, server)
     } catch (err) {
       logger.error({ err, userId: user.id }, 'reconcile: failed to clean user libraries')
       log('error', `Reconcile failed for user ${user.username}: ${err instanceof Error ? err.message : String(err)}`)

@@ -14,7 +14,12 @@ import { getConfig } from '../config.js'
 import { getEffectiveLibraryTitle } from '../../lib/userSettings.js'
 import { syncLibraryTypeImage } from '../../uploads/mediaServerSync.js'
 import type { StrmConfig } from '../types.js'
-import { assertLegacyLibraryOutputEnabled } from '../legacyOutput.js'
+import {
+  assertLegacyLibraryOutputEnabled,
+  LibraryNameTakenError,
+  removeRenamedPersonalLibrary,
+} from '../legacyOutput.js'
+import { rowOwnsLibrary } from '../legacyOutputRules.js'
 
 const logger = createChildLogger('strm-series-library')
 
@@ -68,23 +73,39 @@ export async function ensureUserSeriesLibrary(
     [userId]
   )
 
+  // Used only when it reads this viewer's own folder, and checked before the
+  // rename below touches anything — see ensureUserLibrary: adopting whatever
+  // carried the name a viewer chose handed them, and then granted them, a
+  // library that is not theirs.
+  const takenBy = (await provider.getLibraries(apiKey)).find((lib) => lib.name === libraryName)
+  if (
+    takenBy &&
+    rowOwnsLibrary({ userId, channelId: null, mediaType: 'series', ownerProviderUserId: providerUserId }, takenBy) ===
+      false
+  ) {
+    if (dbRecord && (dbRecord.provider_library_id === takenBy.id || dbRecord.name === takenBy.name)) {
+      await query(`DELETE FROM strm_libraries WHERE user_id = $1 AND media_type = 'series'`, [userId])
+    }
+    throw new LibraryNameTakenError(libraryName, takenBy.locations)
+  }
+
   // If library name changed, delete the old record so we create a new one
   if (dbRecord && dbRecord.name !== libraryName) {
     logger.info({ userId, oldName: dbRecord.name, newName: libraryName }, 'Series library name changed, clearing old record')
     // Remove the library under its old name too, not just its record. Both read
     // the same folder, so the old one would otherwise stay in the media server
     // as a duplicate nothing points at — which is how every rename used to leave
-    // an orphan behind (F-142). A failure is not fatal: the removal job finds a
-    // left-behind library by the folder it reads.
-    try {
-      const stale = (await provider.getLibraries(apiKey)).some((lib) => lib.name === dbRecord.name)
-      if (stale) {
-        await provider.deleteVirtualLibrary(apiKey, dbRecord.name)
-        logger.info({ userId, oldName: dbRecord.name }, 'Series library under the old name removed')
-      }
-    } catch (err) {
-      logger.warn({ err, userId, oldName: dbRecord.name }, 'Could not remove the series library under its old name')
-    }
+    // an orphan behind (F-142). Only when it reads this viewer's own folder:
+    // the record may have adopted someone else's library by name.
+    await removeRenamedPersonalLibrary({
+      provider,
+      apiKey,
+      userId,
+      providerUserId,
+      mediaType: 'series',
+      old: { name: dbRecord.name, providerLibraryId: dbRecord.provider_library_id },
+      newName: libraryName,
+    })
     await query(
       `DELETE FROM strm_libraries WHERE user_id = $1 AND media_type = 'series'`,
       [userId]

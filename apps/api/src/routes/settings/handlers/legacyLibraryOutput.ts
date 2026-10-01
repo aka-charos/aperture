@@ -16,10 +16,12 @@ import {
  * STRM files or symlinks. Emby home rows replace it; this is the interim step
  * of phasing it out.
  *
- * Switching off stops every write at once and leaves what exists alone. The
- * libraries already in the media server are removed only by the
+ * Switching off stops every write at once and leaves what exists in place: the
+ * libraries already in the media server are removed by the
  * `remove-legacy-libraries` job, run from the Jobs console or the button on the
- * settings card — so the count below is what that job would find.
+ * settings card — so the count below is what that job would find. The one
+ * exception is permissions: the library jobs still remove a library whose
+ * owner may no longer open everything it holds (F-142).
  */
 export function registerLegacyLibraryOutputHandlers(fastify: FastifyInstance) {
   const describe = async () => ({

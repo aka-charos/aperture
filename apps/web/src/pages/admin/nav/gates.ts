@@ -1,10 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { AdminGate } from './registry'
-import {
-  currentLegacyLibraryOutput,
-  loadLegacyLibraryOutput,
-  useLegacyLibraryOutput,
-} from '@/hooks/legacyLibraryOutput'
+import { useLegacyLibraryOutput } from '@/hooks/legacyLibraryOutput'
 
 /**
  * Preconditions a destination can declare, resolved once per page load.
@@ -20,6 +16,15 @@ import {
  */
 
 type GateState = { ready: boolean; passed: boolean }
+
+/**
+ * Gates answered by a probe resolved once. The legacy gate is not one of them:
+ * it is the one an operator flips from inside the console, so it reads the
+ * live store — the nav column stays mounted across navigation, and a probe
+ * would leave File locations bright until a reload after the output was
+ * switched off.
+ */
+type ProbedGate = Exclude<AdminGate, 'legacyLibraryOutput'>
 
 /**
  * What to tell someone the section is waiting on. A `Record` keyed by the gate
@@ -43,7 +48,7 @@ async function probeTmdbConfigured(): Promise<boolean> {
   return Boolean(data.isConfigured)
 }
 
-function resolveGate(gate: AdminGate): Promise<boolean> {
+function resolveGate(gate: ProbedGate): Promise<boolean> {
   switch (gate) {
     case 'tmdbConfigured':
       // Only a *pass* is cached. A negative is the answer most likely to stop
@@ -62,10 +67,6 @@ function resolveGate(gate: AdminGate): Promise<boolean> {
           return false
         })
       return tmdbProbe
-    case 'legacyLibraryOutput':
-      // The shared store already fetches this once per page load; asking it
-      // keeps a single-gate reader from making a request of its own.
-      return loadLegacyLibraryOutput().then(() => !currentLegacyLibraryOutput().off)
   }
 }
 
@@ -77,27 +78,28 @@ function resolveGate(gate: AdminGate): Promise<boolean> {
 export function useAdminGates(): Record<AdminGate, GateState> {
   return {
     tmdbConfigured: useAdminGate('tmdbConfigured'),
-    legacyLibraryOutput: useLegacyLibraryOutputGate(),
+    legacyLibraryOutput: useAdminGate('legacyLibraryOutput'),
   }
-}
-
-/**
- * The legacy gate is the one an operator flips from inside the console, so it
- * reads the live store rather than a probe resolved once: the nav column stays
- * mounted across navigation, and a probe would leave File locations bright
- * until a reload after the output was switched off.
- */
-function useLegacyLibraryOutputGate(): GateState {
-  const { ready, off } = useLegacyLibraryOutput()
-  return { ready, passed: !off }
 }
 
 /**
  * `ready` distinguishes "not yet known" from "known to fail" — a gated section
  * must not accuse the operator of a missing integration while the answer is
  * still in flight.
+ *
+ * The one entry point for every gate, so no caller can pick a second answer
+ * for one: the legacy gate is read live from its store, the rest by probe.
+ * Both hooks are called on every render (hooks may not be conditional); the
+ * one not in use asks nothing.
  */
 export function useAdminGate(gate: AdminGate | undefined): GateState {
+  const live = gate === 'legacyLibraryOutput'
+  const legacy = useLegacyLibraryOutput({ load: live })
+  const probed = useProbedGate(live ? undefined : gate)
+  return live ? { ready: legacy.ready, passed: !legacy.off } : probed
+}
+
+function useProbedGate(gate: ProbedGate | undefined): GateState {
   const [state, setState] = useState<GateState>(gate ? UNRESOLVED : { ready: true, passed: true })
 
   useEffect(() => {

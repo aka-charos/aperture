@@ -34,7 +34,9 @@ const REMOVE_JOB = 'remove-legacy-libraries'
  * shared Top Picks libraries written as STRM files or symlinks — and the one
  * place their removal is offered.
  *
- * Switching off only stops writing. Removing what exists is a second, confirmed
+ * Switching off stops writing; the only libraries it costs anyone are ones
+ * their owner may no longer fully open, which the library jobs still remove
+ * (and the help text says so). Removing everything is a second, confirmed
  * step, because an operator flips a switch to try it, and every viewer losing a
  * library in their media server is not something to learn by trying. Removal is
  * the `remove-legacy-libraries` job rather than a request, so it gets the Jobs
@@ -135,7 +137,7 @@ export function LegacyLibraryOutputCard() {
           }
         />
         <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 0.5 }}>
-          {legacy.enabled ? t('legacyLibraryOutput.card.switchOnHelp') : t('legacyLibraryOutput.card.switchOffHelp')}
+          {legacy.enabled ? t('legacyLibraryOutput.card.switchOnHelp') : t('legacyLibraryOutput.card.switchOffHelpFrozen')}
         </Typography>
 
         {error && (

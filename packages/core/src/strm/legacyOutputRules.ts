@@ -12,10 +12,13 @@
  * copy of anything.
  *
  * The switch is the interim step of phasing that out. Off means nothing is
- * written or created any more — and nothing that already exists is touched:
- * removing it is a separate, explicit job (`remove-legacy-libraries`), because
- * switching a setting off is something an operator tries, and deleting every
- * viewer's library as a side effect of trying it is not.
+ * written or created any more, and what exists stays: removing it is a
+ * separate, explicit job (`remove-legacy-libraries`), because switching a
+ * setting off is something an operator tries, and deleting every viewer's
+ * library as a side effect of trying it is not. The one exception is
+ * permissions — these libraries play the original files, so the library jobs
+ * still remove one whose owner may no longer open everything it holds
+ * (`frozenLibraryStillPermitted`).
  */
 
 import { extractProviderUserIdFromFolderName } from './filenames.js'
@@ -76,6 +79,12 @@ export interface GeneratedLibraryRow {
   name: string
   mediaType: string
   providerLibraryId: string | null
+  /**
+   * The media-server id of a personal row's owner — what their folder name
+   * ends in, and so what proves a library reads THEIR folder (`rowOwnsLibrary`).
+   * Absent when unknown, which falls back to the folder's shape alone.
+   */
+  ownerProviderUserId?: string | null
 }
 
 /** A library the media server reports, as the removal needs it. */
@@ -111,11 +120,11 @@ export interface GeneratedLibraryRemovalPlan {
   /** Rows whose library is no longer on the server: only the row is left to clear. */
   alreadyGone: string[]
   /**
-   * Libraries a row points at that read folders legacy output never writes.
-   * Not deleted: `createVirtualLibrary` ADOPTS an existing library with the
-   * requested name, so a Top Picks library named like one of the operator's own
-   * has a row pointing at the operator's library. Their rows are kept, which is
-   * the state they were already in.
+   * Libraries a row points at that read folders its own writer never writes
+   * (`rowOwnsLibrary`). Not deleted: the writers ADOPT an existing library with
+   * the requested name, and a viewer chooses their library's name, so a row can
+   * point at the operator's library or at another viewer's. Their rows are
+   * kept, which is the state they were already in.
    */
   refused: Array<{ serverName: string; rowIds: string[]; locations: string[] }>
 }
@@ -183,6 +192,53 @@ function generatedFolders(library: ServerLibraryRef, libraryPathPrefix: string):
   return folders
 }
 
+/** The trailing folder segments a row's writer creates, lowercased; null for a viewer's own folder. */
+function rowTail(row: Pick<GeneratedLibraryRow, 'userId' | 'channelId' | 'mediaType'>): string[] | null {
+  if (row.channelId) return ['channels', row.channelId.toLowerCase()]
+  if (row.userId) return null
+  return [row.mediaType === 'series' ? 'top-picks-series' : 'top-picks-movies']
+}
+
+/**
+ * Whether a library reads only the folder this row's writer creates — the
+ * owner's own `aperture/<Name>_<providerUserId>` (`aperture-tv/` for series),
+ * the channel's `channels/<id>`, or the Top Picks folder. Null when the server
+ * did not say where the library reads, which proves nothing either way.
+ *
+ * This is what stands between a delete and a library that is not ours: the
+ * writers ADOPT any existing library with the name they ask for, and a viewer
+ * picks their own library's name, so a row can point at the operator's
+ * "Movies" or at another viewer's AI Picks library.
+ *
+ * Judged by the END of each location, never by the File locations root. A
+ * library made before that root was changed still reads the old one and is no
+ * less ours, and the tail is specific on its own: a viewer's folder ends in
+ * their provider id, a channel's in its uuid. A personal row whose owner id is
+ * unknown falls back to the folder's shape.
+ */
+export function rowOwnsLibrary(
+  row: Pick<GeneratedLibraryRow, 'userId' | 'channelId' | 'mediaType' | 'ownerProviderUserId'>,
+  library: ServerLibraryRef
+): boolean | null {
+  const locations = library.locations ?? []
+  if (locations.length === 0) return null
+
+  const tail = rowTail(row)
+  const owner = row.ownerProviderUserId?.toLowerCase() || null
+  return locations.every((location) => {
+    const segments = normalizeLocation(location.trim()).split('/').filter(Boolean)
+    if (tail) {
+      if (segments.length < tail.length) return false
+      const end = segments.slice(-tail.length).map((s) => s.toLowerCase())
+      return end.every((segment, i) => segment === tail[i])
+    }
+    if (segments.length < 2) return false
+    const [root, folder] = segments.slice(-2)
+    if (root.toLowerCase() !== personalOutputRoot(row.mediaType)) return false
+    return owner === null || extractProviderUserIdFromFolderName(folder).toLowerCase() === owner
+  })
+}
+
 /**
  * Which server library each row refers to. The stored id wins, because it came
  * from the server when the library was made; the name is the fallback for rows
@@ -192,6 +248,13 @@ function generatedFolders(library: ServerLibraryRef, libraryPathPrefix: string):
  * A row matching nothing is reported as already gone — never guessed at. The
  * caller clears that row, which is safe only because the server has no library
  * it could stop excluding from sync.
+ *
+ * A row matching a library that reads folders its writer never makes is
+ * REFUSED (`rowOwnsLibrary`) — unless it is generated after all: another row
+ * owns it, or (given a root) every folder it reads is one legacy output
+ * writes. Then it goes, and every row pointing at it is cleared with it. A
+ * library that does not say where it reads is not refused: the row is the
+ * evidence.
  *
  * A server library no row points at is an ORPHAN and is deleted only when every
  * folder it reads is one legacy output writes (`generatedLocationSegments`) —
@@ -217,12 +280,14 @@ export function planGeneratedLibraryRemoval(
       alreadyGone.push(row.id)
       continue
     }
-    // A library that says where it reads, and reads anywhere legacy output does
-    // not write, is not ours however its row came to point at it. Checked only
-    // against a known root, and only when the server reported locations.
-    const locations = match.locations ?? []
-    if (libraryPathPrefix && locations.length > 0 && !generatedFolders(match, libraryPathPrefix)) {
-      const kept = refused.get(match.name) ?? { serverName: match.name, rowIds: [], locations: [...locations] }
+    // A library that says where it reads, and reads anywhere this row's writer
+    // does not, is not this row's however the row came to point at it.
+    if (rowOwnsLibrary(row, match) === false) {
+      const kept = refused.get(match.name) ?? {
+        serverName: match.name,
+        rowIds: [],
+        locations: [...(match.locations ?? [])],
+      }
       kept.rowIds.push(row.id)
       refused.set(match.name, kept)
       continue
@@ -235,6 +300,24 @@ export function planGeneratedLibraryRemoval(
     }
     entry.rowIds.push(row.id)
     deletions.set(match.name, entry)
+  }
+
+  // Refused for one row, but generated all the same: another row owns it, or
+  // (with a root to judge by) every folder it reads is one legacy output writes
+  // — another viewer's, say, whose own row is gone. It goes, and the rows that
+  // only adopted it are cleared with it, since their library will be gone too.
+  for (const [name, kept] of refused) {
+    const entry = deletions.get(name)
+    if (entry) {
+      entry.rowIds.push(...kept.rowIds)
+      refused.delete(name)
+      continue
+    }
+    const folders = generatedFolders({ id: '', name, locations: kept.locations }, libraryPathPrefix)
+    if (folders) {
+      deletions.set(name, { serverName: name, rowIds: [...kept.rowIds], orphan: false, folders })
+      refused.delete(name)
+    }
   }
 
   for (const library of serverLibraries) {

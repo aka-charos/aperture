@@ -40,6 +40,7 @@ import {
   personalOutputFolders,
   personalOutputRoot,
   planGeneratedLibraryRemoval,
+  rowOwnsLibrary,
   sharedOutputFolder,
   type GeneratedLibraryRow,
 } from './legacyOutputRules.js'
@@ -73,6 +74,24 @@ export class LegacyLibraryOutputDisabledError extends Error {
 }
 
 /**
+ * A viewer's library name is taken by a library that is not theirs. The
+ * writers used to ADOPT any library carrying the name they asked for, and
+ * then grant it to the viewer — so a viewer who named their AI Picks library
+ * after one the media server hides from them was given access to it. Nothing
+ * is adopted, recorded or granted now; the viewer's library is skipped until
+ * the name is changed.
+ */
+export class LibraryNameTakenError extends Error {
+  readonly code = 'LIBRARY_NAME_TAKEN'
+  constructor(name: string, locations: readonly string[] | undefined) {
+    super(
+      `The library name "${name}" already belongs to a library that does not read this viewer's own folder (it reads ${locations?.length ? locations.join(', ') : 'other folders'}), so it was not used and nothing was granted. Give this viewer's library another name, or rename that library. If an earlier sync gave the viewer access to it, check their library access in the media server.`
+    )
+    this.name = 'LibraryNameTakenError'
+  }
+}
+
+/**
  * Called at the top of every function that writes a library file or creates a
  * virtual library. The jobs check the switch first and exit cleanly; this is
  * what stops any OTHER caller — a per-user route, a future job — from writing
@@ -101,7 +120,13 @@ export async function skipIfLegacyLibraryOutputOff(
 ): Promise<boolean> {
   if (await isLegacyLibraryOutputEnabled()) return false
   addLog(jobId, 'info', `⏭️ ${LEGACY_LIBRARY_OUTPUT_OFF_MESSAGE}`)
-  addLog(jobId, 'info', 'Nothing was written, and libraries already in the media server keep their contents.')
+  addLog(
+    jobId,
+    'info',
+    upkeep
+      ? 'Nothing was written. Libraries already in the media server are only checked against current permissions: one its owner may no longer fully open is removed.'
+      : 'Nothing was written, and libraries already in the media server keep their contents.'
+  )
   if (upkeep) {
     try {
       await upkeep()
@@ -136,6 +161,56 @@ export async function recordWrittenScope(
        written_at = NOW()`,
     [userId, mediaType, scope.libraryIds, scope.maxParentalRating]
   )
+}
+
+/**
+ * A viewer's library is renamed by making a new one under the new name, so the
+ * one under the old name is removed here — but only when it provably reads
+ * this viewer's own folder (`rowOwnsLibrary`). The writers ADOPT any library
+ * with the name they ask for, and a viewer chooses that name, so the old
+ * record can point at the operator's "Movies" or at another viewer's library;
+ * deleting it by name alone let a viewer delete either by naming their library
+ * after it and then renaming it. A library that does not say where it reads
+ * is left too — nothing proves it ours. Never throws: a left-behind library of
+ * ours is found later by the removal job, by the folder it reads.
+ */
+export async function removeRenamedPersonalLibrary(input: {
+  provider: MediaServerProvider
+  apiKey: string
+  userId: string
+  providerUserId: string
+  mediaType: 'movies' | 'series'
+  old: { name: string; providerLibraryId: string | null }
+  newName: string
+}): Promise<void> {
+  const { provider, apiKey, userId, providerUserId, mediaType, old, newName } = input
+  try {
+    const libraries = await provider.getLibraries(apiKey)
+    const library =
+      (old.providerLibraryId ? libraries.find((lib) => lib.id === old.providerLibraryId) : undefined) ??
+      libraries.find((lib) => lib.name === old.name)
+    // Gone already, or it now carries the NEW name (renamed by hand in the
+    // media server) and is the very library this sync is about to use.
+    if (!library || library.name === newName) return
+
+    const owned = rowOwnsLibrary(
+      { userId, channelId: null, mediaType, ownerProviderUserId: providerUserId },
+      { id: library.id, name: library.name, locations: library.locations }
+    )
+    if (owned !== true) {
+      logger.warn(
+        { userId, oldName: library.name, locations: library.locations },
+        owned === false
+          ? 'Library under the old name kept: it does not read this viewer\'s own folder'
+          : 'Library under the old name kept: the media server did not say which folders it reads'
+      )
+      return
+    }
+    await provider.deleteVirtualLibrary(apiKey, library.name)
+    logger.info({ userId, mediaType, oldName: library.name }, 'Library under the old name removed')
+  } catch (err) {
+    logger.warn({ err, userId, mediaType, oldName: old.name }, 'Could not remove the library under its old name')
+  }
 }
 
 export interface GeneratedLibraryCounts {
@@ -175,7 +250,7 @@ export interface RemoveGeneratedLibrariesResult {
   alreadyGone: number
   /** Libraries the media server refused to delete; their rows are KEPT. */
   failed: number
-  /** Recorded libraries left alone because they read folders legacy output never writes. */
+  /** Recorded libraries left alone because they read folders their record's writer never writes. */
   refused: number
   /** Top Picks collections and playlists deleted. */
   containersRemoved: number
@@ -293,6 +368,7 @@ export async function removeGeneratedLibraries(
           name: r.name,
           mediaType: r.media_type ?? 'movies',
           providerLibraryId: r.provider_library_id,
+          ownerProviderUserId: r.provider_user_id,
         })
       ),
       serverLibraries.map((lib) => ({ id: lib.id, name: lib.name, locations: lib.locations })),
@@ -304,7 +380,7 @@ export async function removeGeneratedLibraries(
       addLog(
         jobId,
         'warn',
-        `Kept "${kept.serverName}": it reads ${kept.locations.join(', ')}, which legacy output never writes, so it may be one of your own libraries that a generated library was named after. Its record is kept too.`
+        `Kept "${kept.serverName}": it reads ${kept.locations.join(', ')}, not the folder its record writes, so it may be one of your own libraries that a generated library was named after. Its record is kept too.`
       )
     }
 
@@ -317,7 +393,17 @@ export async function removeGeneratedLibraries(
     // Step 1: the Top Picks collections and playlists, while the Top Picks
     // libraries still exist to prove which ones are ours.
     setJobStep(jobId, 1, 'Removing the Top Picks collections and playlists')
-    const containers = await removeTopPicksContainers(jobId, provider, key, rows, serverLibraries)
+    // Only rows whose library is ours may vouch for a container: a refused row
+    // points at a library that may be the operator's, and a collection holding
+    // that library's titles is not proven to be the Top Picks one by it.
+    const refusedRowIds = new Set(plan.refused.flatMap((kept) => kept.rowIds))
+    const containers = await removeTopPicksContainers(
+      jobId,
+      provider,
+      key,
+      rows.filter((r) => !refusedRowIds.has(r.id)),
+      serverLibraries
+    )
     result.containersRemoved = containers.removed
     result.containersKept = containers.kept
 
@@ -418,7 +504,7 @@ export async function removeGeneratedLibraries(
     }
     if (result.refused > 0) {
       parts.push(
-        `left ${result.refused} recorded librar${result.refused === 1 ? 'y' : 'ies'} that read folders legacy output never writes`
+        `left ${result.refused} recorded librar${result.refused === 1 ? 'y' : 'ies'} that read folders their records never wrote`
       )
     }
     const summary =

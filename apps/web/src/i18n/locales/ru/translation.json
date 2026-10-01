@@ -5617,7 +5617,6 @@
       "homeRowsLink": "Set up Emby home rows",
       "switchLabel": "Write STRM / symlink libraries",
       "switchOnHelp": "On: the library jobs keep writing the AI Picks and Top Picks libraries.",
-      "switchOffHelp": "Off: nothing is written or created any more, the library jobs do nothing, and the settings that only concern these libraries are greyed out. Libraries already in the media server keep their last contents until you remove them below.",
       "savedOn": "Legacy library output switched on. The next library sync brings the libraries up to date.",
       "savedOff": "Legacy library output switched off. Nothing more will be written.",
       "saveFailed": "Could not save the setting.",
@@ -5634,7 +5633,8 @@
       "cancel": "Cancel",
       "removeStarted": "Removal started. A library the media server refuses to delete is kept, and running the job again retries it.",
       "openJob": "Open job",
-      "removeFailed": "Could not start the removal."
+      "removeFailed": "Could not start the removal.",
+      "switchOffHelpFrozen": "Off: nothing is written or created any more, and the settings that only concern these libraries are greyed out. What is already in the media server stays until you remove it below, with one exception: the library jobs still check it against permissions, so a viewer who may no longer open everything their library was written from loses it, and the Top Picks libraries are taken away from accounts that may no longer open what they hold. A restricted viewer's library written before this check existed cannot prove what it holds, and goes at the first check."
     },
     "notice": {
       "title": "Legacy library output is switched off",

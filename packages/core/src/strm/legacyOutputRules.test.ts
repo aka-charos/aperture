@@ -16,6 +16,7 @@ import {
   personalOutputFolders,
   personalOutputRoot,
   planGeneratedLibraryRemoval,
+  rowOwnsLibrary,
   sharedOutputFolder,
   type GeneratedLibraryRow,
 } from './legacyOutputRules.js'
@@ -192,6 +193,119 @@ describe('planGeneratedLibraryRemoval — orphans', () => {
       [{ id: 'lib-1', name: 'x', locations: ['/mnt/ApertureLibraries/aperture/Ann_abc'] }]
     )
     assert.deepEqual(plan.deletions, [])
+  })
+})
+
+// A viewer names their own library, and the writers adopt any library already
+// carrying the name they ask for — so a row can point at someone else's.
+describe('rowOwnsLibrary', () => {
+  const ann = { userId: 'u1', channelId: null, mediaType: 'movies', ownerProviderUserId: 'abc' }
+
+  test("a personal row owns a library reading the owner's own folder", () => {
+    assert.equal(rowOwnsLibrary(ann, { id: 'l', name: 'n', locations: ['/mnt/ApertureLibraries/aperture/Ann_abc'] }), true)
+    // The folder from before display names were added is just the id.
+    assert.equal(rowOwnsLibrary(ann, { id: 'l', name: 'n', locations: ['/mnt/ApertureLibraries/aperture/abc'] }), true)
+  })
+
+  test("never the operator's library, nor another viewer's", () => {
+    assert.equal(rowOwnsLibrary(ann, { id: 'l', name: 'Movies', locations: ['/mnt/media/Movies'] }), false)
+    assert.equal(rowOwnsLibrary(ann, { id: 'l', name: 'n', locations: ['/mnt/ApertureLibraries/aperture/Bob_def'] }), false)
+    // Every folder must be hers: one of the operator's alongside is enough to refuse.
+    assert.equal(
+      rowOwnsLibrary(ann, { id: 'l', name: 'n', locations: ['/mnt/ApertureLibraries/aperture/Ann_abc', '/mnt/media/Movies'] }),
+      false
+    )
+  })
+
+  test('the media type picks the folder: a movie row does not own a series folder', () => {
+    assert.equal(rowOwnsLibrary(ann, { id: 'l', name: 'n', locations: ['/mnt/ApertureLibraries/aperture-tv/Ann_abc'] }), false)
+    assert.equal(
+      rowOwnsLibrary({ ...ann, mediaType: 'series' }, { id: 'l', name: 'n', locations: ['/mnt/ApertureLibraries/aperture-tv/Ann_abc'] }),
+      true
+    )
+  })
+
+  test('judged by the end of the path, so a library made under an earlier root is still ours', () => {
+    assert.equal(rowOwnsLibrary(ann, { id: 'l', name: 'n', locations: ['/old/mount/aperture/Ann_abc'] }), true)
+  })
+
+  test('a library that does not say where it reads proves nothing either way', () => {
+    assert.equal(rowOwnsLibrary(ann, { id: 'l', name: 'n' }), null)
+    assert.equal(rowOwnsLibrary(ann, { id: 'l', name: 'n', locations: [] }), null)
+  })
+
+  test('shared rows own exactly their fixed folder', () => {
+    const topPicks = { userId: null, channelId: null, mediaType: 'series' }
+    assert.equal(rowOwnsLibrary(topPicks, { id: 'l', name: 'n', locations: ['/x/top-picks-series'] }), true)
+    assert.equal(rowOwnsLibrary(topPicks, { id: 'l', name: 'n', locations: ['/x/top-picks-movies'] }), false)
+    const channel = { userId: 'u1', channelId: 'C-1', mediaType: 'movies' }
+    assert.equal(rowOwnsLibrary(channel, { id: 'l', name: 'n', locations: ['/x/channels/c-1'] }), true)
+    assert.equal(rowOwnsLibrary(channel, { id: 'l', name: 'n', locations: ['/x/channels/c-2'] }), false)
+  })
+
+  test('an unknown owner falls back to the shape of a viewer folder', () => {
+    const unknown = { ...ann, ownerProviderUserId: null }
+    assert.equal(rowOwnsLibrary(unknown, { id: 'l', name: 'n', locations: ['/x/aperture/Bob_def'] }), true)
+    assert.equal(rowOwnsLibrary(unknown, { id: 'l', name: 'n', locations: ['/mnt/media/Movies'] }), false)
+  })
+
+  test('a Windows media server: backslashes and case', () => {
+    assert.equal(rowOwnsLibrary(ann, { id: 'l', name: 'n', locations: ['D:\\Aperture\\Aperture\\Ann_ABC'] }), true)
+  })
+})
+
+describe('planGeneratedLibraryRemoval — adopted libraries', () => {
+  const ann = (overrides: Partial<GeneratedLibraryRow> & Pick<GeneratedLibraryRow, 'id'>) =>
+    row({ ownerProviderUserId: 'abc', ...overrides })
+
+  test("a viewer's row that adopted the operator's library is refused, with or without a root", () => {
+    const libraries = [{ id: 'lib-real', name: 'Movies', locations: ['/mnt/media/Movies'] }]
+    for (const prefix of [PREFIX, '']) {
+      const plan = planGeneratedLibraryRemoval([ann({ id: 'r1', name: 'Movies', providerLibraryId: 'lib-real' })], libraries, prefix)
+      assert.deepEqual(plan.deletions, [])
+      assert.deepEqual(plan.refused.map((r) => [r.serverName, r.rowIds]), [['Movies', ['r1']]])
+    }
+  })
+
+  test("adopting another viewer's library: refused without a root (one viewer's cleanup)…", () => {
+    const plan = planGeneratedLibraryRemoval(
+      [ann({ id: 'r1', name: 'AI Picks - Bob', providerLibraryId: 'lib-bob' })],
+      [{ id: 'lib-bob', name: 'AI Picks - Bob', locations: [`${PREFIX}aperture/Bob_def`] }]
+    )
+    assert.deepEqual(plan.deletions, [])
+    assert.deepEqual(plan.refused.map((r) => r.serverName), ['AI Picks - Bob'])
+  })
+
+  test('…but removed with one (the removal job), since it is generated all the same', () => {
+    const plan = planGeneratedLibraryRemoval(
+      [ann({ id: 'r1', name: 'AI Picks - Bob', providerLibraryId: 'lib-bob' })],
+      [{ id: 'lib-bob', name: 'AI Picks - Bob', locations: [`${PREFIX}aperture/Bob_def`] }],
+      PREFIX
+    )
+    assert.deepEqual(names(plan), [['AI Picks - Bob', ['r1']]])
+    assert.deepEqual(plan.refused, [])
+  })
+
+  test('one row owns it and another adopted it: ONE delete, both rows cleared', () => {
+    const plan = planGeneratedLibraryRemoval(
+      [
+        ann({ id: 'r-adopted', name: 'AI Picks - Bob', providerLibraryId: 'lib-bob' }),
+        row({ id: 'r-bob', userId: 'u2', ownerProviderUserId: 'def', name: 'AI Picks - Bob', providerLibraryId: 'lib-bob' }),
+      ],
+      [{ id: 'lib-bob', name: 'AI Picks - Bob', locations: [`${PREFIX}aperture/Bob_def`] }]
+    )
+    assert.deepEqual(names(plan), [['AI Picks - Bob', ['r-bob', 'r-adopted']]])
+    assert.deepEqual(plan.refused, [])
+  })
+
+  test('a recorded library made under an earlier root is removed, not refused', () => {
+    const plan = planGeneratedLibraryRemoval(
+      [ann({ id: 'r1', providerLibraryId: 'lib-1' })],
+      [{ id: 'lib-1', name: 'AI Picks - Ann', locations: ['/old/mount/aperture/Ann_abc'] }],
+      PREFIX
+    )
+    assert.deepEqual(names(plan), [['AI Picks - Ann', ['r1']]])
+    assert.deepEqual(plan.refused, [])
   })
 })
 

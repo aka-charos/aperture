@@ -7,7 +7,12 @@ import { getConfig } from '../config.js'
 import { getEffectiveLibraryTitle } from '../../lib/userSettings.js'
 import { syncLibraryTypeImage } from '../../uploads/mediaServerSync.js'
 import type { StrmConfig } from '../types.js'
-import { assertLegacyLibraryOutputEnabled } from '../legacyOutput.js'
+import {
+  assertLegacyLibraryOutputEnabled,
+  LibraryNameTakenError,
+  removeRenamedPersonalLibrary,
+} from '../legacyOutput.js'
+import { rowOwnsLibrary } from '../legacyOutputRules.js'
 
 const logger = createChildLogger('strm-library')
 
@@ -46,16 +51,43 @@ export async function ensureUserLibrary(
 
   logger.info({ userId, libraryName, libraryPath }, '📚 Checking library status...')
 
-  // Check if we already have a record of this library in our database
-  const dbRecord = await queryOne<{ 
+  // Check if we already have a record of this library in our database. Every
+  // query here names media_type: the viewer's series library is a row of the
+  // same user with channel_id NULL too, and without it this read could return
+  // that row (no ORDER BY) and the rename branch below delete the SERIES
+  // library — while every DELETE here wiped the series record as a side effect.
+  const dbRecord = await queryOne<{
     provider_library_id: string
     provider_library_guid: string
     name: string 
   }>(
     `SELECT provider_library_id, provider_library_guid, name FROM strm_libraries
-     WHERE user_id = $1 AND channel_id IS NULL`,
+     WHERE user_id = $1 AND channel_id IS NULL AND media_type = 'movies'`,
     [userId]
   )
+
+  // A library already carrying this name is used only when it reads this
+  // viewer's own folder. The viewer picks the name, and adopting whatever
+  // carried it handed them the operator's "Movies" — recorded as theirs, then
+  // GRANTED to them by updateUserLibraryPermissions. Checked before the rename
+  // below touches anything, so a viewer renaming theirs onto a taken name keeps
+  // the library they had.
+  const takenBy = (await provider.getLibraries(apiKey)).find((lib) => lib.name === libraryName)
+  if (
+    takenBy &&
+    rowOwnsLibrary({ userId, channelId: null, mediaType: 'movies', ownerProviderUserId: providerUserId }, takenBy) ===
+      false
+  ) {
+    // A record pointing at THAT library adopted it before this check existed,
+    // and also hid it from the library list: dropped. A record of the viewer's
+    // own library under another name is kept.
+    if (dbRecord && (dbRecord.provider_library_id === takenBy.id || dbRecord.name === takenBy.name)) {
+      await query(`DELETE FROM strm_libraries WHERE user_id = $1 AND channel_id IS NULL AND media_type = 'movies'`, [
+        userId,
+      ])
+    }
+    throw new LibraryNameTakenError(libraryName, takenBy.locations)
+  }
 
   // If library name changed, delete the old record so we create a new one
   if (dbRecord && dbRecord.name !== libraryName) {
@@ -63,19 +95,19 @@ export async function ensureUserLibrary(
     // Remove the library under its old name too, not just its record. Both read
     // the same folder, so the old one would otherwise stay in the media server
     // as a duplicate nothing points at — which is how every rename used to leave
-    // an orphan behind (F-142). A failure is not fatal: the removal job finds a
-    // left-behind library by the folder it reads.
-    try {
-      const stale = (await provider.getLibraries(apiKey)).some((lib) => lib.name === dbRecord.name)
-      if (stale) {
-        await provider.deleteVirtualLibrary(apiKey, dbRecord.name)
-        logger.info({ userId, oldName: dbRecord.name }, 'Movie library under the old name removed')
-      }
-    } catch (err) {
-      logger.warn({ err, userId, oldName: dbRecord.name }, 'Could not remove the movie library under its old name')
-    }
+    // an orphan behind (F-142). Only when it reads this viewer's own folder:
+    // the record may have adopted someone else's library by name.
+    await removeRenamedPersonalLibrary({
+      provider,
+      apiKey,
+      userId,
+      providerUserId,
+      mediaType: 'movies',
+      old: { name: dbRecord.name, providerLibraryId: dbRecord.provider_library_id },
+      newName: libraryName,
+    })
     await query(
-      `DELETE FROM strm_libraries WHERE user_id = $1 AND channel_id IS NULL`,
+      `DELETE FROM strm_libraries WHERE user_id = $1 AND channel_id IS NULL AND media_type = 'movies'`,
       [userId]
     )
   }
@@ -91,7 +123,7 @@ export async function ensureUserLibrary(
     // Ensure we have an up-to-date database record
     // Delete any existing record first, then insert fresh
     await query(
-      `DELETE FROM strm_libraries WHERE user_id = $1 AND channel_id IS NULL`,
+      `DELETE FROM strm_libraries WHERE user_id = $1 AND channel_id IS NULL AND media_type = 'movies'`,
       [userId]
     )
     await query(
@@ -113,7 +145,7 @@ export async function ensureUserLibrary(
   if (dbRecord) {
     logger.info({ userId }, 'Clearing stale database record (library was deleted from media server)')
     await query(
-      `DELETE FROM strm_libraries WHERE user_id = $1 AND channel_id IS NULL`,
+      `DELETE FROM strm_libraries WHERE user_id = $1 AND channel_id IS NULL AND media_type = 'movies'`,
       [userId]
     )
   }
@@ -154,7 +186,7 @@ export async function refreshUserLibrary(userId: string): Promise<void> {
 
   const library = await queryOne<{ provider_library_id: string }>(
     `SELECT provider_library_id FROM strm_libraries
-     WHERE user_id = $1 AND channel_id IS NULL`,
+     WHERE user_id = $1 AND channel_id IS NULL AND media_type = 'movies'`,
     [userId]
   )
 
@@ -185,7 +217,7 @@ export async function updateUserLibraryPermissions(
   // Get user's AI library from our database
   const library = await queryOne<{ provider_library_id: string; provider_library_guid: string }>(
     `SELECT provider_library_id, provider_library_guid FROM strm_libraries
-     WHERE user_id = $1 AND channel_id IS NULL`,
+     WHERE user_id = $1 AND channel_id IS NULL AND media_type = 'movies'`,
     [userId]
   )
 

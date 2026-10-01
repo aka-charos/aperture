@@ -12,8 +12,9 @@ import { useEffect, useSyncExternalStore } from 'react'
  * once — so the nav dims and the sections grey the moment it is flipped, not
  * after a reload.
  *
- * Unknown reads as ON. A non-admin and a failed request both get the behaviour
- * from before the switch existed; nothing is ever greyed out on a guess.
+ * Unknown reads as ON. A non-admin, and a failed request with no earlier
+ * answer, get the behaviour from before the switch existed; nothing is ever
+ * greyed out on a guess. A failed request AFTER an answer keeps that answer.
  */
 
 export interface GeneratedLibraryCounts {
@@ -53,6 +54,8 @@ const listeners = new Set<() => void>()
  */
 let issued = 0
 let published = 0
+/** Whether `state` holds an answer the server actually gave. */
+let known = false
 
 function publish(next: LegacyLibraryOutputState, sequence: number): void {
   if (sequence < published) return
@@ -80,10 +83,19 @@ export function loadLegacyLibraryOutput(force = false): Promise<void> {
         // Not cached either: a 401 from before signing in must not outlive
         // the sign-in, so the next reader to mount asks again.
         if (inflight === request) inflight = null
-        publish({ ...UNKNOWN, ready: true }, sequence)
+        // A 401/403 says the answer does not belong to whoever is signed in
+        // now, so it is forgotten. Anything else (a 502 mid-deploy) says
+        // nothing about the switch: a known answer stands, or a known "off"
+        // would flip the card to on and un-grey the console while the server
+        // still holds off.
+        const forgotten = response.status === 401 || response.status === 403
+        if (forgotten) known = false
+        publish(known ? { ...state, ready: true } : { ...UNKNOWN, ready: true }, sequence)
         return
       }
-      publish(fromResponse(await response.json()), sequence)
+      const answer = fromResponse(await response.json())
+      known = true
+      publish(answer, sequence)
     })
     .catch(() => {
       // Not cached: a dropped request must not latch the console into an
@@ -108,6 +120,7 @@ export async function saveLegacyLibraryOutput(enabled: boolean): Promise<void> {
     throw new Error(data.error || '')
   }
   const saved = fromResponse(await response.json())
+  known = true
   // Numbered on COMPLETION, not on sending: any read started before the save
   // finished may have seen the old value, so none of them may follow it.
   publish(saved, ++issued)
@@ -130,12 +143,18 @@ export function currentLegacyLibraryOutput(): LegacyLibraryOutputState {
  * answer — for the card whose count moves when a removal finishes elsewhere.
  * One request either way: the fresh read REPLACES the shared one rather than
  * following it.
+ *
+ * `load: false` subscribes without asking at all, for a caller that may not
+ * need the answer (a gate hook called for every gate kind).
  */
-export function useLegacyLibraryOutput(options: { fresh?: boolean } = {}): LegacyLibraryOutputState {
+export function useLegacyLibraryOutput(
+  options: { fresh?: boolean; load?: boolean } = {}
+): LegacyLibraryOutputState {
   const current = useSyncExternalStore(subscribe, currentLegacyLibraryOutput)
   const fresh = options.fresh === true
+  const load = options.load !== false
   useEffect(() => {
-    void loadLegacyLibraryOutput(fresh)
-  }, [fresh])
+    if (load) void loadLegacyLibraryOutput(fresh)
+  }, [fresh, load])
   return current
 }

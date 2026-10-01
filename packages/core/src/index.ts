@@ -372,6 +372,7 @@ export {
   countGeneratedLibraries,
   removeGeneratedLibraries,
   LegacyLibraryOutputDisabledError,
+  LibraryNameTakenError,
   LEGACY_LIBRARY_OUTPUT_OFF_MESSAGE,
   LEGACY_LIBRARY_JOBS,
   REMOVE_LEGACY_LIBRARIES_JOB,

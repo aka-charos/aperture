@@ -584,7 +584,7 @@ export const updateLegacyLibraryOutputSchema = {
   tags: ['settings'],
   summary: 'Switch legacy library output on or off',
   description:
-    'Off stops every STRM/symlink write and library creation at once; libraries already in the media server are left alone until the remove-legacy-libraries job runs (admin only).',
+    'Off stops every STRM/symlink write and library creation at once. Libraries already in the media server stay until the remove-legacy-libraries job runs, except that the library jobs still remove one whose owner may no longer open everything it holds, and take the Top Picks libraries away from such accounts (admin only).',
   body: {
     type: 'object' as const,
     additionalProperties: false,

@@ -83,7 +83,7 @@ export async function processStrmForAllUsers(
     // Frozen, but still reconciled: a viewer who lost access keeps no library.
     if (
       await skipIfLegacyLibraryOutputOff(actualJobId, () =>
-        reconcileStaleStrmLibraries(actualJobId, { frozen: true })
+        reconcileStaleStrmLibraries(actualJobId, { frozen: true, mediaType: 'movies' })
       )
     ) {
       return { success: 0, failed: 0, skipped: 0, jobId: actualJobId, users: [] }
@@ -102,7 +102,7 @@ export async function processStrmForAllUsers(
     if (totalUsers === 0) {
       addLog(actualJobId, 'warn', '⚠️ No users enabled for movies')
       try {
-        await reconcileStaleStrmLibraries(actualJobId)
+        await reconcileStaleStrmLibraries(actualJobId, { mediaType: 'movies' })
       } catch (err) {
         logger.warn({ err }, 'reconcile stale STRM libraries failed')
         addLog(actualJobId, 'warn', `Reconcile skipped: ${err instanceof Error ? err.message : String(err)}`)
@@ -213,7 +213,7 @@ export async function processStrmForAllUsers(
     }
 
     try {
-      await reconcileStaleStrmLibraries(actualJobId)
+      await reconcileStaleStrmLibraries(actualJobId, { mediaType: 'movies' })
     } catch (err) {
       logger.warn({ err }, 'reconcile stale STRM libraries failed')
       addLog(actualJobId, 'warn', `Reconcile skipped: ${err instanceof Error ? err.message : String(err)}`)
@@ -244,7 +244,7 @@ export async function processSeriesStrmForAllUsers(
   try {
     if (
       await skipIfLegacyLibraryOutputOff(actualJobId, () =>
-        reconcileStaleStrmLibraries(actualJobId, { frozen: true })
+        reconcileStaleStrmLibraries(actualJobId, { frozen: true, mediaType: 'series' })
       )
     ) {
       return { success: 0, failed: 0, skipped: 0, jobId: actualJobId, users: [] }
@@ -260,7 +260,7 @@ export async function processSeriesStrmForAllUsers(
     if (totalUsers === 0) {
       addLog(actualJobId, 'warn', '⚠️ No users enabled for TV series')
       try {
-        await reconcileStaleStrmLibraries(actualJobId)
+        await reconcileStaleStrmLibraries(actualJobId, { mediaType: 'series' })
       } catch (err) {
         logger.warn({ err }, 'reconcile stale STRM libraries failed')
         addLog(actualJobId, 'warn', `Reconcile skipped: ${err instanceof Error ? err.message : String(err)}`)
@@ -367,7 +367,7 @@ export async function processSeriesStrmForAllUsers(
     }
 
     try {
-      await reconcileStaleStrmLibraries(actualJobId)
+      await reconcileStaleStrmLibraries(actualJobId, { mediaType: 'series' })
     } catch (err) {
       logger.warn({ err }, 'reconcile stale STRM libraries failed')
       addLog(actualJobId, 'warn', `Reconcile skipped: ${err instanceof Error ? err.message : String(err)}`)
