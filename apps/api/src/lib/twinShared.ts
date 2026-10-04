@@ -13,7 +13,33 @@
  * pick was made and had no part in it.
  */
 
+import { getVisibleConnection } from '@aperture/core'
 import { query } from './db.js'
+import { readTwinDonorId } from './scoreBreakdown.js'
+
+/** The taste twin, as the reader is allowed to see them. */
+export interface TwinDonor {
+  name: string
+  avatarUrl: string
+}
+
+/**
+ * The twin behind a pick, but only when they are a visible connection of
+ * `readerId` (social/rules.ts rule 1); null otherwise, which every caller
+ * sends as no key at all. Copy names nobody else (F-049): a twin can be anyone
+ * with watch history, including someone who has recommendations switched off
+ * and never agreed to be shown to anyone. A connection is the one case where
+ * naming discloses nothing new — the two already see each other's history.
+ *
+ * Never handed to the assistant: it holds a name a model could repeat, and the
+ * assistant gets no social data at all.
+ */
+export async function resolveTwinDonor(scoreBreakdown: unknown, readerId: string): Promise<TwinDonor | null> {
+  const donorId = readTwinDonorId(scoreBreakdown)
+  if (!donorId) return null
+  const connection = await getVisibleConnection(readerId, donorId)
+  return connection ? { name: connection.name, avatarUrl: connection.avatarUrl } : null
+}
 
 export interface TwinSharedItem {
   id: string

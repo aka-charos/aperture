@@ -7,6 +7,7 @@ import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import { recommendationSchemas } from '../schemas.js'
 import type { RecommendationRun } from '../types.js'
+import { publicScoreBreakdown } from '../../../lib/scoreBreakdown.js'
 
 export async function registerHistoryHandlers(fastify: FastifyInstance) {
   /**
@@ -52,7 +53,7 @@ export async function registerHistoryHandlers(fastify: FastifyInstance) {
         return reply.status(403).send({ error: 'Forbidden' })
       }
 
-      const candidate = await queryOne(
+      const candidate = await queryOne<{ score_breakdown: unknown }>(
         `SELECT rc.* FROM recommendation_candidates rc
          JOIN recommendation_runs rr ON rr.id = rc.run_id
          WHERE rc.id = $1 AND rr.user_id = $2`,
@@ -79,7 +80,8 @@ export async function registerHistoryHandlers(fastify: FastifyInstance) {
       )
 
       return reply.send({
-        candidate,
+        // The twin donor's id stays on the server (lib/scoreBreakdown.ts).
+        candidate: { ...candidate, score_breakdown: publicScoreBreakdown(candidate.score_breakdown) },
         evidence: evidence.rows,
       })
     }

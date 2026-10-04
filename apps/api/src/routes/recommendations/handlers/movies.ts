@@ -16,7 +16,8 @@ import {
   type ExplanationMediaType,
 } from '@aperture/core'
 import { recommendationSchemas } from '../schemas.js'
-import { resolveTwinShared } from '../../../lib/twinShared.js'
+import { resolveTwinDonor, resolveTwinShared } from '../../../lib/twinShared.js'
+import { publicScoreBreakdown } from '../../../lib/scoreBreakdown.js'
 import type { MovieRecommendationCandidate, RecommendationRun } from '../types.js'
 import { WATCH_HISTORY_TASTE_SQL, binderFor, getLibraryScopeForUser, libraryScopeSql } from '@aperture/core'
 
@@ -93,7 +94,11 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
 
       return reply.send({
         run,
-        recommendations: candidates.rows,
+        // The twin donor's id stays on the server (lib/scoreBreakdown.ts).
+        recommendations: candidates.rows.map((row) => ({
+          ...row,
+          score_breakdown: publicScoreBreakdown(row.score_breakdown),
+        })),
       })
     }
   )
@@ -301,6 +306,12 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
       // renamed film can't leave a stale title frozen in the run's JSONB.
       const twinShared = await resolveTwinShared(candidate.score_breakdown, 'movies')
 
+      // Who the twin is, for a reader connected to them and nobody else:
+      // connection already shows each person the other's whole history, so
+      // the name tells them nothing that is not theirs to see. Decided for
+      // the account whose picks these are, like everything else here.
+      const twinDonor = await resolveTwinDonor(candidate.score_breakdown, userId)
+
       const tasteInsights = await query<{
         genre: string
         watch_count: number
@@ -373,8 +384,10 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
         // before 0147, which is what the panel branches on to decide whether it
         // can state the arithmetic — the same rule it applies to base.
         scoreWeights,
-        scoreBreakdown: candidate.score_breakdown,
+        scoreBreakdown: publicScoreBreakdown(candidate.score_breakdown),
         twinShared,
+        // Absent, never null, unless the twin is a visible connection.
+        ...(twinDonor ? { twinDonor } : {}),
         // The decision-model verdict stays server-side: it is an input to the
         // boolean below, not something the panel should reason about.
         evidence: evidence.rows.map(({ judged_connection: _judged, ...row }) => row),

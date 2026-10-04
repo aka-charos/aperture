@@ -9,6 +9,7 @@ export {
   removeUserConnection,
   listAllConnections,
   listVisibleConnections,
+  getVisibleConnection,
   getVisibleConnectionIds,
   isVisibleConnection,
   SocialUserNotFoundError,

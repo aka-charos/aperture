@@ -1347,7 +1347,7 @@ unchanged** and still used for the admin audience.
 | Admin | Audience stays `all` (no extra query). The admin's own connections still get sliders, inbox and picker. An admin reading anyone's history stays unscoped (admin surface). |
 | "View as" (impersonation) | Target's connections, inbox, sliders and connected history visible. Send, dismiss and connection changes are refused (`IMPERSONATION_READ_ONLY`); dialogs show the refusal text. |
 | Read-only API key | GETs work; POST/DELETE → 403 `API_KEY_READ_ONLY`. |
-| Connected person is also the viewer's taste-twin donor | Unchanged: copy never names the donor (F-049), and the assistant gets no social data. Overlap in a connected history can hint at it; accepted, since connection is full visibility. |
+| Connected person is also the viewer's taste-twin donor | Named on the insights card (`twinDonor`, decided server-side, F-145): connection is full visibility, so the name discloses nothing new. Everyone else stays "someone" (F-049), the donor's id never leaves the server, and the explanation prose and the assistant stay anonymous. |
 | Connection added while the person is signed in | Nav entry and features appear on the next full load (`/auth/check`). |
 | Approximate (backdated) plays, F-108 | Included in slider ordering exactly as in the viewer's own recent list; no date is ever printed. |
 | `inbox count` vs page drift | Impossible by construction: the count is the length of the same list (§5.3). |

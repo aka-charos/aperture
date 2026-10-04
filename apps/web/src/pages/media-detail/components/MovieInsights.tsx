@@ -3,6 +3,7 @@ import type { ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import {
+  Avatar,
   Box,
   Typography,
   Paper,
@@ -369,9 +370,10 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
     : t('mediaDetail.insights.tooltipDiscovery')
 
   // Present only when a reserved taste-twin slot put this title in the list
-  // (recommender/shared/twinSlots.ts). The stored object carries the donor's
-  // id, which is deliberately never read here: the line says "someone", and
-  // resolving an identity should not be one refactor away.
+  // (recommender/shared/twinSlots.ts). The server strips the donor's id before
+  // it gets here; who the twin is arrives separately as `twinDonor`, and only
+  // when they are one of the reader's connections. Otherwise the line says
+  // "someone".
   const fromTasteTwin =
     typeof insights.scoreBreakdown?.twinMatch === 'object' &&
     insights.scoreBreakdown.twinMatch !== null
@@ -416,6 +418,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
   // Empty unless a twin slot placed this title *and* the run that produced it
   // recorded the overlap, which runs generated before that shipped did not.
   const twinShared = insights.twinShared ?? []
+  const twinDonor = insights.twinDonor
 
   // The two lists partition the title's genres exactly (both routes filter the
   // same DB column against the viewer's top genres), so these counts always add
@@ -646,9 +649,28 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <GroupsIcon sx={{ color: 'secondary.main', fontSize: 20 }} />
+                  {twinDonor ? (
+                    <Avatar
+                      src={twinDonor.avatarUrl}
+                      alt=""
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        flexShrink: 0,
+                        fontSize: '0.85rem',
+                        border: '2px solid',
+                        borderColor: alpha(theme.palette.secondary.main, 0.6),
+                      }}
+                    >
+                      {twinDonor.name.charAt(0).toUpperCase()}
+                    </Avatar>
+                  ) : (
+                    <GroupsIcon sx={{ color: 'secondary.main', fontSize: 20 }} />
+                  )}
                   <Typography variant="body2" color="text.secondary">
-                    {t('mediaDetail.insights.tasteTwin')}
+                    {twinDonor
+                      ? t('mediaDetail.insights.tasteTwinConnection', { name: twinDonor.name })
+                      : t('mediaDetail.insights.tasteTwin')}
                   </Typography>
                 </Box>
 

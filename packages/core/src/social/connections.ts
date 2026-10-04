@@ -225,23 +225,52 @@ export async function listAllConnections(): Promise<ConnectionPair[]> {
   return rows.rows.map(toPair)
 }
 
+interface ConnectedUserRow {
+  id: string
+  username: string
+  display_name: string | null
+  name: string
+}
+
+function toConnectedUser(row: ConnectedUserRow): ConnectedUser {
+  return {
+    id: row.id,
+    username: row.username,
+    displayName: row.display_name,
+    name: row.name,
+    avatarUrl: avatarUrlFor(row.id),
+  }
+}
+
 /** The viewer's visible connections (rules.ts rule 1), ordered by name. */
 export async function listVisibleConnections(userId: string): Promise<ConnectedUser[]> {
   if (!isUuid(userId)) return []
-  const rows = await query<{ id: string; username: string; display_name: string | null; name: string }>(
+  const rows = await query<ConnectedUserRow>(
     `SELECT u.id, u.username, u.display_name, ${displayNameSql('u')} AS name
        FROM users u
       WHERE u.id IN (${visibleConnectionsSql('$1::uuid')})
       ORDER BY name, u.username`,
     [userId]
   )
-  return rows.rows.map((row) => ({
-    id: row.id,
-    username: row.username,
-    displayName: row.display_name,
-    name: row.name,
-    avatarUrl: avatarUrlFor(row.id),
-  }))
+  return rows.rows.map(toConnectedUser)
+}
+
+/**
+ * `targetId` as the viewer sees them, or null when they are not a visible
+ * connection — which covers an unknown id, the viewer's own id and a
+ * connection who has lost access. For a surface that may name one specific
+ * person only to the people connected to them (the taste-twin line).
+ */
+export async function getVisibleConnection(viewerId: string, targetId: string): Promise<ConnectedUser | null> {
+  if (!isUuid(viewerId) || !isUuid(targetId)) return null
+  const row = await queryOne<ConnectedUserRow>(
+    `SELECT u.id, u.username, u.display_name, ${displayNameSql('u')} AS name
+       FROM users u
+      WHERE u.id = $2::uuid
+        AND u.id IN (${visibleConnectionsSql('$1::uuid')})`,
+    [viewerId, targetId]
+  )
+  return row ? toConnectedUser(row) : null
 }
 
 export async function getVisibleConnectionIds(userId: string): Promise<string[]> {

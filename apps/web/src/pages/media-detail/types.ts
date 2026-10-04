@@ -240,6 +240,15 @@ export interface RecommendationInsights {
     poster_url: string | null
   }>
   /**
+   * Who the taste twin is — present ONLY when they are one of the reader's
+   * visible connections, decided server-side. Absent for everyone else, and
+   * absent is the anonymous line: the response carries no id to resolve.
+   */
+  twinDonor?: {
+    name: string
+    avatarUrl: string
+  }
+  /**
    * Whether `evidence` below is close enough to be called the reason for the
    * pick, decided server-side by hasCausalEvidence against a raw-cosine floor.
    *
