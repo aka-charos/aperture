@@ -345,7 +345,7 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
   // already said no. It goes to the BACK, never off the list — see crwEngines.
   const engines = orderByHealth(config.searchEngines)
 
-  // THE CRITICISM SEARCH STARTS NOW, BESIDE THE GENERAL ONE, not after it.
+  // THE CRITICISM SEARCH RUNS BESIDE THE GENERAL ONE, not after it.
   //
   // A search call takes as long as its slowest page, and those calls used to
   // run one after another - the general search, then each criticism query - so
@@ -382,8 +382,12 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
       searchParams,
     })
   const speculativeEngine = engines[0]
-  const speculativeCriticism =
-    criticismQueries.length > 0 && speculativeEngine ? runCriticism(speculativeEngine) : null
+  // Started inside the loop below, right AFTER the first general request is
+  // sent, never before it: CRW runs searches one at a time on its browser tab,
+  // in arrival order, and the general search carries the most pages - so it
+  // goes to the front of that queue rather than waiting behind every criticism
+  // query.
+  let speculativeCriticism: Promise<CriticismOutcome> | null = null
 
   // Try each configured engine in turn and keep the first that answers.
   //
@@ -397,11 +401,15 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
   const attempts: string[] = []
 
   for (const engine of engines) {
-    const attempt = await crwSearch(queryText, {
+    const pending = crwSearch(queryText, {
       ...searchParams,
       maxResults: config.maxResults,
       engine,
     })
+    if (!speculativeCriticism && engine === speculativeEngine && criticismQueries.length > 0) {
+      speculativeCriticism = runCriticism(engine)
+    }
+    const attempt = await pending
     recordEngineOutcome(engine, attempt.results.length > 0)
     if (attempt.results.length > 0) {
       response = attempt
