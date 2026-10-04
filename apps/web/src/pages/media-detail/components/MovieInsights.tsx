@@ -396,9 +396,11 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
   // to ranked picks too. storeEvidence keeps the three nearest titles in this
   // viewer's history with no distance floor, so a history holding nothing near
   // the pick still yields three rows -- which is how Metropolis came to be
-  // explained by Das Boot at 0.67. The server decides (hasCausalEvidence, core
-  // recommender/evidenceStrength.ts) because the floor is a raw cosine tied to
-  // the embedding model, and this bundle never imports @aperture/core.
+  // explained by Das Boot at 0.67. The server decides (evidenceSupportsCause,
+  // core recommender/evidenceStrength.ts): an optional decision model's stored
+  // verdict when there is one, else a raw cosine bar tied to the embedding
+  // model -- and this bundle never imports @aperture/core. Despite the name,
+  // `false` can therefore mean "close, but not a real connection".
   //
   // `undefined` is a run from before the field existed and deliberately reads
   // as permitted: `=== false` rather than `!`, so an older pick keeps the

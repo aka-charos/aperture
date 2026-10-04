@@ -418,6 +418,7 @@ export async function getEvidenceJudgmentStats(): Promise<EvidenceJudgmentStats>
     judgeOnly: 0,
     cosineOnly: 0,
     examples: [],
+    models: [],
   }
   try {
     const result = await query<{
@@ -428,6 +429,7 @@ export async function getEvidenceJudgmentStats(): Promise<EvidenceJudgmentStats>
       evidence_title: string
       similarity: number | string | null
       judged_connection: number | string | null
+      judged_model: string | null
     }>(
       `WITH latest AS (
          SELECT DISTINCT ON (user_id, media_type) id, media_type
@@ -438,7 +440,7 @@ export async function getEvidenceJudgmentStats(): Promise<EvidenceJudgmentStats>
        SELECT l.id AS run_id, rc.id AS candidate_id, l.media_type,
               COALESCE(pm.title, ps.title) AS pick_title,
               COALESCE(em.title, es.title) AS evidence_title,
-              re.similarity, re.judged_connection
+              re.similarity, re.judged_connection, re.judged_model
        FROM latest l
        JOIN recommendation_candidates rc ON rc.run_id = l.id AND rc.is_selected = true
        JOIN recommendation_evidence re ON re.candidate_id = rc.id
@@ -456,6 +458,7 @@ export async function getEvidenceJudgmentStats(): Promise<EvidenceJudgmentStats>
       evidenceTitle: r.evidence_title ?? '',
       similarity: r.similarity,
       judgedConnection: r.judged_connection,
+      judgedModel: r.judged_model,
     }))
     return {
       runs: new Set(result.rows.map((r) => r.run_id)).size,
@@ -465,4 +468,29 @@ export async function getEvidenceJudgmentStats(): Promise<EvidenceJudgmentStats>
     logger.warn({ err }, 'Failed to read evidence judgment stats')
     return empty
   }
+}
+
+/**
+ * Forget every stored verdict, so every heading goes back to the cosine bar.
+ *
+ * This is the way back. A verdict belongs to the run it was written for, like
+ * a score: switching the feature off stops NEW verdicts, but the ones already
+ * stored keep deciding their picks' headings until those picks are replaced,
+ * because the explanation prose was written to match them. An operator who has
+ * read the disagreements and does not trust the model needs to undo it without
+ * regenerating everyone's recommendations — and needs it before comparing a
+ * second model, or the read-back pools the two.
+ *
+ * Explanations written to a cleared verdict's heading stay as they are until
+ * the explanation refresh rewrites them; the card says so.
+ */
+export async function clearEvidenceJudgments(): Promise<number> {
+  const result = await query(
+    `UPDATE recommendation_evidence
+     SET judged_connection = NULL, judged_model = NULL
+     WHERE judged_connection IS NOT NULL OR judged_model IS NOT NULL`
+  )
+  const cleared = result.rowCount ?? 0
+  logger.info({ cleared }, 'Cleared stored decision-model verdicts')
+  return cleared
 }

@@ -201,6 +201,36 @@ test('the summary counts agreement and each direction of disagreement', () => {
   assert.equal(judgeOnly?.evidenceTitle, 'Die Hard')
 })
 
+test('a cosine-only example shows the row that cleared the bar, not the model favourite', () => {
+  // The model's top row (0.4) sits under the bar; printing it beside "the
+  // threshold called this a reason" would contradict itself.
+  const summary = summarizeEvidenceJudgments([
+    row('x', 0.66, 0.4, 'Model favourite'),
+    row('x', 0.75, 0.1, 'Nearest'),
+  ])
+  assert.equal(summary.cosineOnly, 1)
+  assert.equal(summary.examples[0].evidenceTitle, 'Nearest')
+  assert.equal(summary.examples[0].similarity, 0.75)
+})
+
+test('judged picks are counted per model, so a pooled read-back is visible', () => {
+  const judged = (id: string, model: string): JudgedEvidenceRow => ({
+    ...row(id, 0.8, 0.9),
+    judgedModel: model,
+  })
+  const summary = summarizeEvidenceJudgments([
+    judged('a', 'typesafe/jev-1.13-20260917'),
+    judged('b', 'typesafe/jev-1.13-20260917'),
+    judged('c', 'jaredpalmer/kev-4b'),
+    // Unjudged picks belong to no model.
+    row('d', 0.8, null),
+  ])
+  assert.deepEqual(summary.models, [
+    { model: 'typesafe/jev-1.13-20260917', picks: 2 },
+    { model: 'jaredpalmer/kev-4b', picks: 1 },
+  ])
+})
+
 test('the example list is capped', () => {
   const rows = Array.from({ length: 30 }, (_, i) => row(String(i), 0.8, 0.1))
   assert.equal(summarizeEvidenceJudgments(rows, 5).examples.length, 5)

@@ -27,6 +27,11 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
   FormControlLabel,
   IconButton,
@@ -110,6 +115,8 @@ interface Stats {
   judgeOnly: number
   cosineOnly: number
   examples: Disagreement[]
+  /** Judged picks per answering model. More than one means the counts pool them. */
+  models: Array<{ model: string; picks: number }>
 }
 
 const REFRESH_JOB = 'refresh-recommendation-explanations'
@@ -144,6 +151,8 @@ export function DecisionModelSection() {
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [stats, setStats] = useState<Stats | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
+  const [confirmClear, setConfirmClear] = useState(false)
+  const [clearing, setClearing] = useState(false)
 
   const applyConfig = useCallback((c: PublicConfig) => {
     setConfig(c)
@@ -206,6 +215,31 @@ export function DecisionModelSection() {
     fetchConfig()
     fetchStats()
   }, [fetchConfig, fetchStats])
+
+  const handleClear = async () => {
+    setClearing(true)
+    setError(null)
+    try {
+      const response = await fetch('/api/settings/decision-model/verdicts', {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (response.ok) {
+        const data = await response.json().catch(() => ({}))
+        setSuccess(t('settingsDecisionModel.cleared', { count: data.cleared ?? 0 }))
+        setTimeout(() => setSuccess(null), 5000)
+        await fetchStats()
+      } else {
+        const err = await response.json().catch(() => ({}))
+        setError(err.error || t('settingsDecisionModel.clearError'))
+      }
+    } catch {
+      setError(t('settingsDecisionModel.errConnect'))
+    } finally {
+      setClearing(false)
+      setConfirmClear(false)
+    }
+  }
 
   // The OpenRouter list is public and cheap, so it loads with the card. A
   // self-hosted server is asked only when someone presses Refresh, since its
@@ -598,7 +632,7 @@ export function DecisionModelSection() {
 
             {stats && stats.judgedPicks > 0 && (
               <>
-                <Typography variant="body2" mb={1.5}>
+                <Typography variant="body2" mb={1}>
                   {t('settingsDecisionModel.statsSummary', {
                     judged: stats.judgedPicks,
                     picks: stats.picks,
@@ -607,6 +641,21 @@ export function DecisionModelSection() {
                     cosineOnly: stats.cosineOnly,
                   })}
                 </Typography>
+                {/* Two models' verdicts pooled measure neither, so say so
+                    rather than letting the counts above read as one model's. */}
+                {(stats.models ?? []).length > 1 ? (
+                  <Alert severity="warning" sx={{ mb: 1.5 }}>
+                    {t('settingsDecisionModel.statsMixedModels', {
+                      models: stats.models.map((m) => `${m.model} (${m.picks})`).join(', '),
+                    })}
+                  </Alert>
+                ) : (
+                  (stats.models ?? []).length === 1 && (
+                    <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
+                      {t('settingsDecisionModel.statsModel', { model: stats.models[0].model })}
+                    </Typography>
+                  )
+                )}
                 {stats.examples.length > 0 && (
                   <Box sx={{ overflowX: 'auto' }}>
                     <Table size="small">
@@ -641,11 +690,46 @@ export function DecisionModelSection() {
                     </Table>
                   </Box>
                 )}
+                <Box mt={2}>
+                  <Button
+                    color="warning"
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setConfirmClear(true)}
+                    disabled={clearing}
+                  >
+                    {t('settingsDecisionModel.clearVerdicts')}
+                  </Button>
+                  <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
+                    {t('settingsDecisionModel.clearHint')}
+                  </Typography>
+                </Box>
               </>
             )}
           </Box>
         </Stack>
       </CardContent>
+
+      <Dialog open={confirmClear} onClose={() => !clearing && setConfirmClear(false)}>
+        <DialogTitle>{t('settingsDecisionModel.clearConfirmTitle')}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>{t('settingsDecisionModel.clearConfirmBody')}</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmClear(false)} disabled={clearing}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            color="warning"
+            variant="contained"
+            onClick={handleClear}
+            disabled={clearing}
+            startIcon={clearing ? <CircularProgress size={16} /> : undefined}
+          >
+            {t('settingsDecisionModel.clearVerdicts')}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   )
 }

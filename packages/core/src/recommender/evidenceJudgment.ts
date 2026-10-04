@@ -169,12 +169,19 @@ export interface JudgedEvidenceRow {
   evidenceTitle: string
   similarity: number | string | null
   judgedConnection: number | string | null
+  /** The model the endpoint reported for this verdict; null when unjudged. */
+  judgedModel?: string | null
 }
 
 export interface JudgmentDisagreement {
   mediaType: string
   pickTitle: string
-  /** The evidence title the model rated most connected, with its numbers. */
+  /**
+   * The watched title on the side that said YES, with its numbers: the
+   * model's most connected title when only the model called it a reason, the
+   * nearest title when only the cosine bar did. The other side said no to all
+   * of them, so its row has nothing to show.
+   */
   evidenceTitle: string
   similarity: number | null
   judgedConnection: number | null
@@ -196,6 +203,11 @@ export interface EvidenceJudgmentSummary {
   cosineOnly: number
   /** A sample of the disagreements, to read rather than to count. */
   examples: JudgmentDisagreement[]
+  /**
+   * Judged picks per answering model, most first. More than one entry means
+   * the counts above pool two models, which is not a measurement of either.
+   */
+  models: Array<{ model: string; picks: number }>
 }
 
 function toNumber(value: number | string | null | undefined): number | null {
@@ -229,12 +241,18 @@ export function summarizeEvidenceJudgments(
     judgeOnly: 0,
     cosineOnly: 0,
     examples: [],
+    models: [],
   }
+  const perModel = new Map<string, number>()
 
   for (const pickRows of byPick.values()) {
     const verdicts = pickRows.map((r) => toNumber(r.judgedConnection))
     if (verdicts.length === 0 || verdicts.some((v) => v == null)) continue
     summary.judgedPicks++
+
+    // One request answers a whole pick, so its rows share a model.
+    const model = pickRows[0].judgedModel || 'unknown'
+    perModel.set(model, (perModel.get(model) ?? 0) + 1)
 
     const judgeSupports = verdicts.some((v) => (v as number) >= EVIDENCE_JUDGMENT_MIN_YES)
     const cosineSupports = hasCausalEvidence(pickRows.map((r) => r.similarity))
@@ -246,11 +264,15 @@ export function summarizeEvidenceJudgments(
     else summary.cosineOnly++
 
     if (summary.examples.length < exampleLimit) {
-      // The row that drove the model's answer: its most-connected title.
+      // Show the row from the side that said yes. Showing the model's top row
+      // on a cosine-only pick would print a similarity under the bar beside
+      // "the bar called this a reason", because another row cleared it.
+      const score = (i: number) =>
+        judgeSupports ? (verdicts[i] as number) : (toNumber(pickRows[i].similarity) ?? -Infinity)
       let best = 0
-      verdicts.forEach((v, i) => {
-        if ((v as number) > (verdicts[best] as number)) best = i
-      })
+      for (let i = 1; i < pickRows.length; i++) {
+        if (score(i) > score(best)) best = i
+      }
       const row = pickRows[best]
       summary.examples.push({
         mediaType: row.mediaType,
@@ -263,6 +285,10 @@ export function summarizeEvidenceJudgments(
       })
     }
   }
+
+  summary.models = [...perModel.entries()]
+    .map(([model, picks]) => ({ model, picks }))
+    .sort((a, b) => b.picks - a.picks)
 
   return summary
 }

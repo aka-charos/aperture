@@ -1581,6 +1581,7 @@ export {
   judgeRunEvidence,
   testEvidenceJudge,
   getEvidenceJudgmentStats,
+  clearEvidenceJudgments,
   type EvidenceJudgmentOutcome,
   type EvidenceJudgeTestResult,
   type EvidenceJudgmentStats,

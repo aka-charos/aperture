@@ -7,12 +7,14 @@
  * - POST /api/settings/decision-model/test    - one real call on two fixed pairs
  * - GET  /api/settings/decision-model/models  - what the chosen source offers
  * - GET  /api/settings/decision-model/stats   - stored verdicts vs the cosine bar
+ * - DELETE /api/settings/decision-model/verdicts - forget every stored verdict
  *
  * See core lib/decisionModel.ts and recommender/judgeEvidence.ts.
  */
 import type { FastifyInstance } from 'fastify'
 import {
   checkDecisionModelReadiness,
+  clearEvidenceJudgments,
   getDecisionModelConfig,
   getEvidenceJudgmentStats,
   isDecisionModelSource,
@@ -64,10 +66,28 @@ function toPublicConfig(config: DecisionModelConfig): PublicDecisionModelConfig 
 }
 
 /**
+ * The body has no JSON schema, so a field can arrive as anything. A wrong type
+ * is refused here, before merge() would quietly coerce it (a string "true" for
+ * `enabled` reads as off) or a `.trim()` on a number throws a 500.
+ */
+function typeError(body: DecisionModelUpdateBody): string | null {
+  if (body.enabled !== undefined && typeof body.enabled !== 'boolean') return 'enabled must be true or false'
+  for (const key of ['source', 'model', 'baseUrl', 'apiKey'] as const) {
+    if (body[key] !== undefined && typeof body[key] !== 'string') return `${key} must be a string`
+  }
+  for (const key of ['timeoutMs', 'concurrency'] as const) {
+    if (body[key] !== undefined && typeof body[key] !== 'number') return `${key} must be a number`
+  }
+  return null
+}
+
+/**
  * Refused rather than clamped: somebody is asking for these values right now,
  * and silently storing different ones looks like it saved.
  */
 function validate(config: DecisionModelConfig, body: DecisionModelUpdateBody): string | null {
+  const wrongType = typeError(body)
+  if (wrongType) return wrongType
   if (body.source !== undefined && !isDecisionModelSource(body.source)) {
     return 'source must be openrouter or custom'
   }
@@ -99,6 +119,21 @@ function validate(config: DecisionModelConfig, body: DecisionModelUpdateBody): s
     return `concurrency must be an integer between ${DECISION_CONCURRENCY_MIN} and ${DECISION_CONCURRENCY_MAX}`
   }
   return null
+}
+
+/**
+ * The stored self-hosted key, but only for the server it was saved for.
+ *
+ * Test and the model list accept a URL that is not saved yet, so the card can
+ * try a server before committing to it. Sending the stored key along to that
+ * URL would hand the key to whatever answers there — and the model list is a
+ * GET, which a SameSite=lax session cookie carries on a plain link, so one
+ * crafted link clicked by an admin would be enough. A different URL gets the
+ * key typed on the card, or none.
+ */
+function storedKeyFor(current: DecisionModelConfig, baseUrl: string): string {
+  const target = systemOneUrl(baseUrl)
+  return target !== null && target === systemOneUrl(current.baseUrl) ? current.apiKey : ''
 }
 
 function merge(current: DecisionModelConfig, body: DecisionModelUpdateBody): DecisionModelConfig {
@@ -161,11 +196,14 @@ export function registerDecisionModelHandlers(fastify: FastifyInstance) {
     async (request, reply) => {
       try {
         const body = request.body ?? {}
-        const candidate = merge(await getDecisionModelConfig(), {
-          ...body,
-          // A blank key on the card means "use the stored one" for a test.
-          apiKey: body.apiKey ? body.apiKey : undefined,
-        })
+        const wrongType = typeError(body)
+        if (wrongType) return reply.status(400).send({ success: false, error: wrongType })
+
+        const current = await getDecisionModelConfig()
+        const candidate = merge(current, { ...body, apiKey: undefined })
+        // A key typed on the card is used as typed. A blank one means "the
+        // stored key" — but only for the server it was stored for.
+        candidate.apiKey = body.apiKey?.trim() || storedKeyFor(current, candidate.baseUrl)
         return reply.send(await testEvidenceJudge(candidate))
       } catch (err) {
         fastify.log.error({ err }, 'Failed to test decision model')
@@ -192,10 +230,12 @@ export function registerDecisionModelHandlers(fastify: FastifyInstance) {
         const source = isDecisionModelSource(request.query.source)
           ? request.query.source
           : current.source
+        const baseUrl = request.query.baseUrl ?? current.baseUrl
         const catalog = await listDecisionModels({
           ...current,
           source,
-          baseUrl: request.query.baseUrl ?? current.baseUrl,
+          baseUrl,
+          apiKey: storedKeyFor(current, baseUrl),
         })
         return reply.send(catalog)
       } catch (err) {
@@ -210,6 +250,24 @@ export function registerDecisionModelHandlers(fastify: FastifyInstance) {
     { preHandler: requireAdmin, schema: { tags: ['settings'] } },
     async (_request, reply) => {
       return reply.send(await getEvidenceJudgmentStats())
+    }
+  )
+
+  /**
+   * Forget every stored verdict: the way back, and the step before comparing
+   * a second model. See clearEvidenceJudgments.
+   */
+  fastify.delete(
+    '/api/settings/decision-model/verdicts',
+    { preHandler: requireAdmin, schema: { tags: ['settings'] } },
+    async (_request, reply) => {
+      try {
+        const cleared = await clearEvidenceJudgments()
+        return reply.send({ cleared })
+      } catch (err) {
+        fastify.log.error({ err }, 'Failed to clear decision model verdicts')
+        return reply.status(500).send({ error: 'Failed to clear stored verdicts' })
+      }
     }
   )
 }

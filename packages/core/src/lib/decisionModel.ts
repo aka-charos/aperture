@@ -196,8 +196,15 @@ async function sendOnce(
   let json: unknown
   try {
     json = await response.json()
-  } catch {
-    throw new DecisionModelError('The decision model returned a body that is not JSON', response.status)
+  } catch (err) {
+    // The timeout covers the body as well as the headers, and a stall there
+    // must not be reported as a malformed answer.
+    const timedOut = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
+    throw new DecisionModelError(
+      timedOut
+        ? `No answer within ${Math.round(timeoutMs / 1000)}s`
+        : 'The decision model returned a body that is not JSON'
+    )
   }
   const body = (json ?? {}) as { model?: unknown; answers?: unknown }
   if (!body.answers || typeof body.answers !== 'object') {
