@@ -311,7 +311,9 @@ export function GraphExplorer({
         </Box>
 
         {/* Right side: Actions */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+        {/* Wraps: on a phone Explore's controls button, refresh and Create
+            playlist together are wider than the screen. */}
+        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, flexShrink: 0, maxWidth: '100%' }}>
           {extraActions}
           {showRefresh && onRefresh && (
             <Tooltip title={t('graphExplorer.refresh')}>
