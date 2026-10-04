@@ -23,7 +23,7 @@ import {
   evidenceHeading,
   MOVIE_NOUNS,
 } from '../shared/explanationPrompt.js'
-import { hasCausalEvidence } from '../evidenceStrength.js'
+import { evidenceSupportsCause } from '../evidenceStrength.js'
 import {
   describeExplanationBatch,
   explanationBatchSettings,
@@ -112,6 +112,11 @@ export interface EvidenceMovie {
    * shared/explanationPrompt.ts.
    */
   overview: string | null
+  /**
+   * The optional decision model's verdict on this row (judgeEvidence.ts), or
+   * null when none was asked. Read only through evidenceSupportsCause.
+   */
+  judgedConnection: number | null
 }
 
 /**
@@ -161,6 +166,7 @@ async function fetchEvidenceForRecommendations(
     similar_overview: string | null
     similarity: number
     evidence_type: string
+    judged_connection: number | null
   }>(
     `SELECT
        rc.movie_id,
@@ -168,7 +174,8 @@ async function fetchEvidenceForRecommendations(
        m.year as similar_year,
        m.overview as similar_overview,
        re.similarity,
-       re.evidence_type
+       re.evidence_type,
+       re.judged_connection
      FROM recommendation_evidence re
      JOIN recommendation_candidates rc ON rc.id = re.candidate_id
      JOIN movies m ON m.id = re.similar_movie_id
@@ -189,6 +196,7 @@ async function fetchEvidenceForRecommendations(
       similarity: row.similarity,
       evidenceType: row.evidence_type as 'favorite' | 'highly_rated' | 'watched',
       overview: row.similar_overview,
+      judgedConnection: row.judged_connection,
     })
   }
 
@@ -463,7 +471,7 @@ async function generateBatchExplanations(
    Genres: ${m.genres.join(', ')}${directors}${keywords}
    Novelty: ${m.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${m.ratingScore > 0.7 ? 'highly acclaimed' : m.ratingScore > 0.5 ? 'well received' : 'mixed'}${slotLines}
    Plot: ${clip(m.overview, PICK_PLOT_CHARS) ?? 'No overview available'}${analysisLines}
-${evidenceHeading(m, MOVIE_NOUNS, hasCausalEvidence(m.evidence.map((e) => e.similarity)))}
+${evidenceHeading(m, MOVIE_NOUNS, evidenceSupportsCause(m.evidence))}
 ${evidenceStr}`
     })
     .join('\n\n')

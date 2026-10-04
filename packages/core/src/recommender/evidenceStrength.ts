@@ -125,10 +125,58 @@ export function hasCausalEvidence(
   minCosine = EVIDENCE_CAUSAL_MIN_COSINE
 ): boolean {
   for (const raw of similarities) {
-    if (raw == null) continue
-    const value = typeof raw === 'number' ? raw : Number.parseFloat(raw)
-    if (!Number.isFinite(value)) continue
+    const value = parseScore(raw)
+    if (value == null) continue
     if (value >= minCosine) return true
   }
   return false
+}
+
+function parseScore(raw: number | string | null | undefined): number | null {
+  if (raw == null) return null
+  const value = typeof raw === 'number' ? raw : Number.parseFloat(raw)
+  return Number.isFinite(value) ? value : null
+}
+
+/**
+ * The probability of "yes" at which a decision model's verdict counts as a
+ * connection.
+ *
+ * 0.5 is the model's own boundary — the answer it would give if forced to pick
+ * one — not a calibrated cut on some band, which is what makes it safe to use
+ * without the measurement the cosine bar needed. A different number would be a
+ * claim about the model's calibration that nothing here has measured (see the
+ * cosine invariant in CLAUDE.md, which applies to any score, not only cosines).
+ */
+export const EVIDENCE_JUDGMENT_MIN_YES = 0.5
+
+/** One stored evidence row, as far as the heading decision needs it. */
+export interface EvidenceVerdictRow {
+  similarity: number | string | null | undefined
+  /**
+   * The decision model's probability that this title is a real reason, or
+   * null/absent when no model judged it. OPTIONAL by design: the feature is off
+   * unless an operator turns it on, and every row written before it existed
+   * has none.
+   */
+  judgedConnection?: number | string | null
+}
+
+/**
+ * Whether a pick's evidence may be called the reason for it: THE one decision,
+ * read by the explanation prompt and the insights panel alike, so the heading
+ * and the prose cannot disagree.
+ *
+ * When EVERY row carries a decision-model verdict, the verdicts decide: one
+ * concrete connection is enough, mirroring hasCausalEvidence's "best row wins".
+ * Otherwise — integration off, call failed, partial answer, a run from before
+ * it existed — the cosine bar decides exactly as it always has. Absent never
+ * means "no": a missing verdict is the old behaviour, not a hedged heading.
+ */
+export function evidenceSupportsCause(rows: readonly EvidenceVerdictRow[]): boolean {
+  const verdicts = rows.map((row) => parseScore(row.judgedConnection))
+  if (verdicts.length > 0 && verdicts.every((v) => v != null)) {
+    return verdicts.some((v) => (v as number) >= EVIDENCE_JUDGMENT_MIN_YES)
+  }
+  return hasCausalEvidence(rows.map((row) => row.similarity))
 }

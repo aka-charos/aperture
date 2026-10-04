@@ -109,6 +109,7 @@ export {
 
 import type { User, Candidate, PipelineConfig } from '../types.js'
 import { eraAffinityFor, loadEraAffinities, summarizeEraAffinities } from '../eraAffinity.js'
+import { judgeRunEvidence } from '../judgeEvidence.js'
 
 const logger = createChildLogger('recommender')
 
@@ -956,6 +957,13 @@ export async function generateRecommendationsForUser(
     // explanation is then built from. See shared/evidencePool.ts.
     const evidencePool = await getWatchHistory(user.id, EVIDENCE_HISTORY_LIMIT)
     await storeEvidence(runId, finalSelected, evidencePool)
+
+    // 6b. Optional: a decision model's verdict on whether that evidence is a
+    // real reason. Before the explanations, because the same verdict picks the
+    // heading in their prompt; outside the explanation gate, because the
+    // insights panel reads it too. Off unless configured, and never throws —
+    // every failure leaves the pick on the cosine bar. See judgeEvidence.ts.
+    await judgeRunEvidence(runId, 'movie', { shouldCancel: options.shouldCancel })
 
     // 7. Generate AI explanations for selected recommendations
     //

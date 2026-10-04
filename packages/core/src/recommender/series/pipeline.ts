@@ -57,6 +57,7 @@ import { getDonorWatchedIds, getTwinPairs } from '../twinAffinity.js'
 import { getRecommendationConfig } from '../../lib/recommendationConfig.js'
 import { refreshTasteSynopsis } from '../../lib/tasteSynopsisRefresh.js'
 import { storeSeriesEvidence, getSeriesOverviews } from './storage.js'
+import { judgeRunEvidence } from '../judgeEvidence.js'
 import { getSeriesEmbeddings } from './embeddings.js'
 import {
   embeddingColumnFor,
@@ -1641,6 +1642,11 @@ export async function generateSeriesRecommendationsForUser(
     // shared/evidencePool.ts.
     const evidencePool = await getSeriesWatchHistory(user.id, EVIDENCE_HISTORY_LIMIT)
     await storeSeriesEvidence(runId, finalSelected, evidencePool)
+
+    // 8b. Optional decision-model verdict on that evidence. Mirrors the movie
+    // pipeline's step 6b: before the explanations, outside their gate, off
+    // unless configured, never throws. See judgeEvidence.ts.
+    await judgeRunEvidence(runId, 'series', { shouldCancel: options.shouldCancel })
 
     // 9. Generate AI explanations for selected recommendations
     //

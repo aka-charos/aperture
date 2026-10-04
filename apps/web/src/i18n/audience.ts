@@ -95,6 +95,7 @@ export const ADMIN_ONLY_NAMESPACES: readonly string[] = [
   'settingsCostEstimator',
   'settingsCrw',
   'settingsDatabase',
+  'settingsDecisionModel',
   'settingsDeployment',
   'settingsDiscovery',
   'settingsDiscoveryGenreStrips',

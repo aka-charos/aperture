@@ -1547,8 +1547,44 @@ export {
 export {
   EVIDENCE_CAUSAL_MIN_COSINE,
   EVIDENCE_THRESHOLD_EMBEDDING_SET,
+  EVIDENCE_JUDGMENT_MIN_YES,
   hasCausalEvidence,
+  evidenceSupportsCause,
+  type EvidenceVerdictRow,
 } from './recommender/evidenceStrength.js'
+
+// The optional decision model that can judge that evidence instead of the
+// cosine bar. Off by default; every failure falls back to the bar above.
+export {
+  getDecisionModelConfig,
+  setDecisionModelConfig,
+  checkDecisionModelReadiness,
+  listDecisionModels,
+  type DecisionModelCatalog,
+  type DecisionModelOption,
+  type DecisionModelReadiness,
+} from './lib/decisionModel.js'
+export {
+  DEFAULT_DECISION_MODEL_CONFIG,
+  DECISION_MODEL_SOURCES,
+  DECISION_TIMEOUT_MIN_MS,
+  DECISION_TIMEOUT_MAX_MS,
+  DECISION_CONCURRENCY_MIN,
+  DECISION_CONCURRENCY_MAX,
+  isDecisionModelSource,
+  sanitizeDecisionModelConfig,
+  systemOneUrl,
+  type DecisionModelConfig,
+  type DecisionModelSource,
+} from './lib/decisionModelRules.js'
+export {
+  judgeRunEvidence,
+  testEvidenceJudge,
+  getEvidenceJudgmentStats,
+  type EvidenceJudgmentOutcome,
+  type EvidenceJudgeTestResult,
+  type EvidenceJudgmentStats,
+} from './recommender/judgeEvidence.js'
 
 // And because that cosine only means something relative to the model that
 // produced it, the boot check that notices the two have parted company.

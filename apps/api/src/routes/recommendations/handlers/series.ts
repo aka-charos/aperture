@@ -8,7 +8,7 @@ import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import {
   regenerateUserSeriesRecommendations,
   getEffectiveAiExplanationSetting,
-  hasCausalEvidence,
+  evidenceSupportsCause,
   NOVELTY_ALIEN_FLOOR,
   blendWeightShares,
   NOVELTY_PEAK,
@@ -218,6 +218,7 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
         similar_series_id: string
         similarity: number
         evidence_type: string
+        judged_connection: number | null
         similar_series: {
           id: string
           title: string
@@ -226,7 +227,7 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
           genres: string[]
         }
       }>(
-        `SELECT re.id, re.similar_series_id, re.similarity, re.evidence_type,
+        `SELECT re.id, re.similar_series_id, re.similarity, re.evidence_type, re.judged_connection,
                 json_build_object(
                   'id', s.id,
                   'title', s.title,
@@ -315,16 +316,23 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
         scoreWeights,
         scoreBreakdown: candidate.score_breakdown,
         twinShared,
-        evidence: evidence.rows,
+        // The decision-model verdict stays server-side: it is an input to the
+        // boolean below, not something the panel should reason about.
+        evidence: evidence.rows.map(({ judged_connection: _judged, ...row }) => row),
         // Whether the evidence below is close enough to be called the reason.
         // The rows are the three nearest titles in this viewer's history with
         // no floor applied, so a viewer whose history holds nothing near the
-        // pick still gets three of them -- see hasCausalEvidence. Sent as a
+        // pick still gets three of them -- see evidenceSupportsCause, which
+        // reads an optional decision-model verdict when one was stored and the
+        // cosine bar (hasCausalEvidence) otherwise. Sent as a
         // decided boolean rather than a threshold because the number is a raw
         // cosine tied to the embedding that produced it, and the web app never
         // imports @aperture/core.
-        evidenceSupportsCause: hasCausalEvidence(
-          evidence.rows.map((row) => row.similarity)
+        evidenceSupportsCause: evidenceSupportsCause(
+          evidence.rows.map((row) => ({
+            similarity: row.similarity,
+            judgedConnection: row.judged_connection,
+          }))
         ),
 
         genreAnalysis: {

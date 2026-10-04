@@ -5222,7 +5222,11 @@
       "title": "Emby Home Rows",
       "blurb": "Top Picks and each viewer's recommendations on their Emby home screen"
     },
-    "gateLegacyLibraryOutput": "Legacy library output is switched off — these settings are not used"
+    "gateLegacyLibraryOutput": "Legacy library output is switched off — these settings are not used",
+    "decisionModel": {
+      "title": "Decision model",
+      "blurb": "Optional second opinion on why a pick was recommended"
+    }
   },
   "settingsEvaluation": {
     "title": "Evaluation seeds",
@@ -5642,5 +5646,56 @@
       "legacyLibraryOutputOn": "Switch legacy library output off in Output format first — while it is on, the next library sync would rebuild what this removes."
     },
     "usersMenuDisabled": "Legacy library output is off"
+  },
+  "settingsDecisionModel": {
+    "title": "Decision model",
+    "chipOn": "On",
+    "chipOff": "Off",
+    "chipNotReady": "Not ready",
+    "description": "Optional. When it is on, a decision model is asked whether the watched titles shown under each recommendation are a real reason for it (the same director, the same franchise, a shared subject or tone), instead of judging that from embedding similarity alone. Nothing depends on it: when it is off, unreachable or slow, the similarity threshold decides exactly as before.",
+    "enabledLabel": "Judge recommendation evidence with a decision model",
+    "sourceLabel": "Where to send it",
+    "sourceOpenRouter": "OpenRouter",
+    "sourceCustom": "Self-hosted",
+    "sourceOpenRouterHelp": "Uses the OpenRouter API key already set on the AI roles page. Calls appear on the Spend page.",
+    "sourceCustomHelp": "Any server that speaks the TypeSafe System One API, such as Ollaya or Kev's own server. Calls cost nothing and are not metered.",
+    "baseUrlLabel": "Server URL",
+    "baseUrlHelp": "The server root, for example http://host.docker.internal:11435. The /v1/systemone path is added for you.",
+    "apiKeyLabel": "API key (optional)",
+    "apiKeyHelp": "Only if your server asks for one. Leave blank to keep the saved key.",
+    "modelLabel": "Model",
+    "modelHelp": "Use a versioned model id such as typesafe/jev-1.13, not an alias, so verdicts from two models are never mixed.",
+    "modelsRefresh": "Refresh the model list",
+    "modelsUnreachable": "Could not read a model list from this source. You can still type a model id.",
+    "modelContext": "{{count}}k context",
+    "priceFree": "free",
+    "pricePerMillion": "${{price}} per million input tokens",
+    "timeoutLabel": "Timeout per call (seconds)",
+    "timeoutHelp": "A slow answer counts as no answer, and that pick keeps the similarity threshold.",
+    "concurrencyLabel": "Calls at once",
+    "concurrencyHelp": "A run asks once per recommendation, a few dozen calls at most.",
+    "save": "Save",
+    "test": "Test",
+    "saved": "Decision model settings saved",
+    "loadError": "Failed to load decision model settings",
+    "errSave": "Failed to save decision model settings",
+    "errConnect": "Could not connect to server",
+    "testFailed": "Test failed",
+    "testPassed": "{{model}} told the pairs apart: Dune → Dune: Part Two {{related}}% yes, Thirteen Lives → Dune: Part Two {{unrelated}}% yes ({{ms}} ms).",
+    "testNotDiscriminating": "{{model}} answered but did not tell a sequel from an unrelated film: Dune {{related}}% yes, Thirteen Lives {{unrelated}}% yes. Its verdicts are unlikely to beat the similarity threshold.",
+    "applyHint": "Verdicts are written as recommendations are generated. To apply them to the recommendations people already have, without re-scoring, run Refresh recommendation explanations.",
+    "openJobs": "Open in Jobs",
+    "statsTitle": "Verdicts compared with the similarity threshold",
+    "statsDescription": "On each viewer's newest recommendations. Picks from reserved slots (taste twin, interest, acclaimed) are left out, because their heading never depends on the evidence.",
+    "statsNone": "No recommendation carries a verdict yet.",
+    "statsSummary": "{{judged}} of {{picks}} recommendations judged. The model agreed with the similarity threshold on {{agree}}, called {{judgeOnly}} a reason the threshold did not, and rejected {{cosineOnly}} the threshold accepted.",
+    "statsRefresh": "Refresh",
+    "columnPick": "Recommendation",
+    "columnEvidence": "Most connected watched title",
+    "columnSimilarity": "Similarity",
+    "columnVerdict": "Model",
+    "columnDirection": "Called a reason by",
+    "directionJudge": "Model only",
+    "directionCosine": "Threshold only"
   }
 }

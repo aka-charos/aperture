@@ -39,6 +39,7 @@ import {
   storeSeriesExplanations,
   type SeriesForExplanation,
 } from './series/explanations.js'
+import { judgeRunEvidence } from './judgeEvidence.js'
 import {
   createJobProgress,
   updateJobProgress,
@@ -218,6 +219,11 @@ async function refreshMovieRun(
 
   if (result.rows.length === 0) return 0
 
+  // Picks still missing a decision-model verdict get one first, so switching
+  // that integration on and refreshing reaches existing runs without
+  // re-scoring them. Off, unconfigured or failing: a no-op. See judgeEvidence.ts.
+  await judgeRunEvidence(runId, 'movie', { shouldCancel, onlyUnjudged: true })
+
   const movies: MovieForExplanation[] = result.rows.map((row) => {
     const similarity = numOrNull(row.similarity_score) ?? 0
     const origin = readSlotOrigin(row.score_breakdown)
@@ -271,6 +277,9 @@ async function refreshSeriesRun(
   )
 
   if (result.rows.length === 0) return 0
+
+  // Mirrors refreshMovieRun: verdicts first, for picks still missing one.
+  await judgeRunEvidence(runId, 'series', { shouldCancel, onlyUnjudged: true })
 
   const seriesList: SeriesForExplanation[] = result.rows.map((row) => {
     const similarity = numOrNull(row.similarity_score) ?? 0

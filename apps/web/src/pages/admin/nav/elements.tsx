@@ -12,6 +12,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard'
 import DnsIcon from '@mui/icons-material/Dns'
 import DriveFileRenameOutlineIcon from '@mui/icons-material/DriveFileRenameOutline'
 import FactCheckIcon from '@mui/icons-material/FactCheck'
+import GavelIcon from '@mui/icons-material/Gavel'
 import FolderOpenIcon from '@mui/icons-material/FolderOpen'
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted'
 import GTranslateIcon from '@mui/icons-material/GTranslate'
@@ -205,6 +206,13 @@ export const ADMIN_ELEMENTS: Record<string, AdminElement> = {
   embeddings: {
     icon: <ScatterPlotIcon />,
     Component: lazy(() => import('@/pages/admin/routes/EmbeddingsRoute')),
+  },
+  'decision-model': {
+    icon: <GavelIcon />,
+    Component: section(
+      () => import('@/pages/settings/components/DecisionModelSection'),
+      'DecisionModelSection'
+    ),
   },
 
   // --------------------------------------------------------- recommendations

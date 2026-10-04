@@ -345,6 +345,32 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     blurbKey: 'adminNav.embeddings.blurb',
     aliases: ['embeddings', 'pgvector', 'dimensions', 'vectors', 'centering', 'sets'],
   },
+  {
+    // Optional, and in the AI group rather than Integrations because it is a
+    // model choice — and Integrations is the group already due to split.
+    id: 'decision-model',
+    group: 'ai',
+    segment: 'decision-model',
+    titleKey: 'adminNav.decisionModel.title',
+    blurbKey: 'adminNav.decisionModel.blurb',
+    aliases: [
+      'decision model',
+      'system one',
+      'systemone',
+      'jev',
+      'kev',
+      'typesafe',
+      'ollaya',
+      'evidence',
+      'why we picked',
+      'noul',
+    ],
+    fields: [
+      { anchor: 'decision-enabled', labelKey: 'settingsDecisionModel.enabledLabel' },
+      { anchor: 'decision-model-id', labelKey: 'settingsDecisionModel.modelLabel' },
+      { anchor: 'decision-base-url', labelKey: 'settingsDecisionModel.baseUrlLabel', aliases: ['self-hosted', 'local'] },
+    ],
+  },
 
   // --------------------------------------------------------- recommendations
   {
