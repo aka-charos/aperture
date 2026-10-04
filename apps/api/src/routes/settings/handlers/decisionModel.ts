@@ -5,6 +5,7 @@
  * - GET  /api/settings/decision-model         - config (key masked) + readiness
  * - PUT  /api/settings/decision-model         - partial update
  * - POST /api/settings/decision-model/test    - one real call on two fixed pairs
+ * - POST /api/settings/decision-model/benchmark - labelled pairs: model vs threshold
  * - GET  /api/settings/decision-model/models  - what the chosen source offers
  * - GET  /api/settings/decision-model/stats   - stored verdicts vs the cosine bar
  * - DELETE /api/settings/decision-model/verdicts - forget every stored verdict
@@ -19,6 +20,7 @@ import {
   getEvidenceJudgmentStats,
   isDecisionModelSource,
   listDecisionModels,
+  runEvidenceBenchmark,
   sanitizeDecisionModelConfig,
   setDecisionModelConfig,
   systemOneUrl,
@@ -136,6 +138,24 @@ function storedKeyFor(current: DecisionModelConfig, baseUrl: string): string {
   return target !== null && target === systemOneUrl(current.baseUrl) ? current.apiKey : ''
 }
 
+/**
+ * The settings as they stand on the card, saved or not — what Test and
+ * Benchmark run against. One helper so the two cannot differ in how they treat
+ * an unsaved URL or a blank key.
+ */
+async function cardConfig(
+  body: DecisionModelUpdateBody
+): Promise<{ config: DecisionModelConfig } | { error: string }> {
+  const wrongType = typeError(body)
+  if (wrongType) return { error: wrongType }
+  const current = await getDecisionModelConfig()
+  const config = merge(current, { ...body, apiKey: undefined })
+  // A key typed on the card is used as typed. A blank one means "the stored
+  // key" — but only for the server it was stored for.
+  config.apiKey = body.apiKey?.trim() || storedKeyFor(current, config.baseUrl)
+  return { config }
+}
+
 function merge(current: DecisionModelConfig, body: DecisionModelUpdateBody): DecisionModelConfig {
   return sanitizeDecisionModelConfig({
     enabled: body.enabled ?? current.enabled,
@@ -195,19 +215,32 @@ export function registerDecisionModelHandlers(fastify: FastifyInstance) {
     { preHandler: requireAdmin, schema: { tags: ['settings'] } },
     async (request, reply) => {
       try {
-        const body = request.body ?? {}
-        const wrongType = typeError(body)
-        if (wrongType) return reply.status(400).send({ success: false, error: wrongType })
-
-        const current = await getDecisionModelConfig()
-        const candidate = merge(current, { ...body, apiKey: undefined })
-        // A key typed on the card is used as typed. A blank one means "the
-        // stored key" — but only for the server it was stored for.
-        candidate.apiKey = body.apiKey?.trim() || storedKeyFor(current, candidate.baseUrl)
-        return reply.send(await testEvidenceJudge(candidate))
+        const card = await cardConfig(request.body ?? {})
+        if ('error' in card) return reply.status(400).send({ success: false, error: card.error })
+        return reply.send(await testEvidenceJudge(card.config))
       } catch (err) {
         fastify.log.error({ err }, 'Failed to test decision model')
         return reply.status(500).send({ success: false, error: 'Failed to test the decision model' })
+      }
+    }
+  )
+
+  /**
+   * The labelled pairs from the threshold's own derivations, put to the model
+   * and to the threshold on this library, scored against the labels. Uses the
+   * card as it stands, like Test, and writes nothing.
+   */
+  fastify.post<{ Body: DecisionModelUpdateBody }>(
+    '/api/settings/decision-model/benchmark',
+    { preHandler: requireAdmin, schema: { tags: ['settings'] } },
+    async (request, reply) => {
+      try {
+        const card = await cardConfig(request.body ?? {})
+        if ('error' in card) return reply.status(400).send({ success: false, error: card.error })
+        return reply.send(await runEvidenceBenchmark(card.config))
+      } catch (err) {
+        fastify.log.error({ err }, 'Failed to run the decision model benchmark')
+        return reply.status(500).send({ success: false, error: 'Failed to run the benchmark' })
       }
     }
   )

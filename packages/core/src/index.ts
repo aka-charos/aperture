@@ -1586,6 +1586,16 @@ export {
   type EvidenceJudgeTestResult,
   type EvidenceJudgmentStats,
 } from './recommender/judgeEvidence.js'
+// The labelled-pair benchmark: model vs threshold, on this library, read-only.
+export { runEvidenceBenchmark, type EvidenceBenchmarkResult } from './recommender/evidenceBenchmark.js'
+export {
+  BENCHMARK_PAIRS,
+  scoreBenchmark,
+  type BenchmarkPair,
+  type BenchmarkPairResult,
+  type BenchmarkScore,
+  type BenchmarkLabel,
+} from './recommender/evidenceBenchmarkPairs.js'
 
 // And because that cosine only means something relative to the model that
 // produced it, the boot check that notices the two have parted company.

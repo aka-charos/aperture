@@ -55,7 +55,9 @@ import SyncIcon from '@mui/icons-material/Sync'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
+import ScienceIcon from '@mui/icons-material/Science'
 import { jobConsoleLink } from '@/pages/jobs/registry'
+import { DecisionModelBenchmarkResults, type BenchmarkResult } from './DecisionModelBenchmark'
 
 type Source = 'openrouter' | 'custom'
 
@@ -136,6 +138,8 @@ export function DecisionModelSection() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
+  const [benchmarking, setBenchmarking] = useState(false)
+  const [benchmark, setBenchmark] = useState<BenchmarkResult | null>(null)
 
   const [enabled, setEnabled] = useState(false)
   const [source, setSource] = useState<Source>('openrouter')
@@ -310,6 +314,30 @@ export function DecisionModelSection() {
       setTestResult({ success: false, error: t('settingsDecisionModel.errConnect') })
     } finally {
       setTesting(false)
+    }
+  }
+
+  const handleBenchmark = async () => {
+    setBenchmarking(true)
+    setBenchmark(null)
+    setError(null)
+    try {
+      const response = await fetch('/api/settings/decision-model/benchmark', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(buildPayload()),
+      })
+      const result = await response.json().catch(() => null)
+      setBenchmark(
+        result && typeof result.success === 'boolean'
+          ? result
+          : { success: false, error: t('settingsDecisionModel.benchmarkError') }
+      )
+    } catch {
+      setBenchmark({ success: false, error: t('settingsDecisionModel.errConnect') })
+    } finally {
+      setBenchmarking(false)
     }
   }
 
@@ -592,7 +620,21 @@ export function DecisionModelSection() {
             >
               {t('settingsDecisionModel.test')}
             </Button>
+            <Button
+              id="decision-benchmark"
+              variant="outlined"
+              startIcon={benchmarking ? <CircularProgress size={16} /> : <ScienceIcon />}
+              onClick={handleBenchmark}
+              disabled={benchmarking || !canTest || !model.trim()}
+            >
+              {t('settingsDecisionModel.benchmark')}
+            </Button>
           </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
+            {t('settingsDecisionModel.benchmarkHelp')}
+          </Typography>
+
+          {benchmark && <DecisionModelBenchmarkResults result={benchmark} />}
 
           <Alert
             severity="info"

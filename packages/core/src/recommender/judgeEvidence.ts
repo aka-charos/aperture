@@ -83,7 +83,12 @@ interface FactsRow {
   network: string | null
 }
 
-async function loadFacts(
+/**
+ * What the model is shown about each title. Exported so the benchmark sends
+ * exactly what a run sends; a second copy would let the two measure different
+ * requests.
+ */
+export async function loadJudgedTitleFacts(
   mediaType: JudgedMediaType,
   ids: string[]
 ): Promise<Map<string, JudgedTitleFacts>> {
@@ -202,7 +207,7 @@ export async function judgeRunEvidence(
       ids.add(pick.pickId)
       for (const e of pick.evidence) ids.add(e.itemId)
     }
-    const facts = await loadFacts(mediaType, [...ids])
+    const facts = await loadJudgedTitleFacts(mediaType, [...ids])
 
     const result = await askForPicks(todo, facts, mediaType, config, resolved.endpoint, options)
 

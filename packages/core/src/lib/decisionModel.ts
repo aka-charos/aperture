@@ -220,17 +220,29 @@ async function sendOnce(
 /** Retried once on a rate limit, overload or 5xx, after a short pause. */
 const RETRY_DELAY_MS = 1_500
 
+/** A retry with less time than this left is not worth starting. */
+const MIN_RETRY_MS = 1_000
+
 export async function callSystemOne(
   endpoint: DecisionEndpoint,
   call: SystemOneCall,
-  timeoutMs: number
+  timeoutMs: number,
+  /**
+   * Epoch ms by which the whole call, retry included, must be over. A caller
+   * answering inside one HTTP request (the benchmark) needs this: without it a
+   * rate-limited first try plus a full-length retry runs past the deadline the
+   * caller already budgeted for.
+   */
+  deadline?: number
 ): Promise<SystemOneAnswer> {
   try {
     return await sendOnce(endpoint, call, timeoutMs)
   } catch (err) {
     if (err instanceof DecisionModelError && isRetryableDecisionFailure(err.status)) {
+      const left = deadline === undefined ? timeoutMs : deadline - Date.now() - RETRY_DELAY_MS
+      if (left < MIN_RETRY_MS) throw err
       await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS))
-      return sendOnce(endpoint, call, timeoutMs)
+      return sendOnce(endpoint, call, Math.min(timeoutMs, left))
     }
     throw err
   }
