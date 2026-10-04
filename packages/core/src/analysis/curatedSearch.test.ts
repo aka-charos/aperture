@@ -9,6 +9,7 @@ import {
   MAX_CURATED_SITES,
   distributeCuratedResults,
   mergeSearchResults,
+  criticismNeedsRerun,
 } from './curatedSearch.js'
 
 const r = (domain: string, url?: string) => ({ domain, url: url ?? `https://${domain}/a` })
@@ -216,4 +217,35 @@ test('an operator list replaces the default in the queries', () => {
   assert.equal(queries.length, 1)
   assert.ok(queries[0].includes('site:sensesofcinema.com'))
   assert.ok(!queries[0].includes('rogerebert.com'), 'the default is not merged in')
+})
+
+// ============================================================================
+// The speculative criticism search
+// ============================================================================
+
+test('criticism asked of the engine that answered stands, even when empty', () => {
+  // A responding engine saying "nothing on those sites" is the ordinary answer
+  // for most of a library; asking again would only double the request.
+  assert.equal(
+    criticismNeedsRerun({ askedEngine: 'duckduckgo', answeringEngine: 'duckduckgo', found: 0 }),
+    false
+  )
+  assert.equal(
+    criticismNeedsRerun({ askedEngine: 'duckduckgo', answeringEngine: 'duckduckgo', found: 3 }),
+    false
+  )
+})
+
+test('an empty answer from an engine the general search found walled is asked again', () => {
+  assert.equal(
+    criticismNeedsRerun({ askedEngine: 'google', answeringEngine: 'duckduckgo', found: 0 }),
+    true
+  )
+})
+
+test('criticism a walled-looking engine did return is kept, not bought twice', () => {
+  assert.equal(
+    criticismNeedsRerun({ askedEngine: 'google', answeringEngine: 'duckduckgo', found: 2 }),
+    false
+  )
 })

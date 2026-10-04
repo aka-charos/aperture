@@ -112,25 +112,46 @@ export interface CrwConfig {
    */
   maxContentChars: number
   /**
-   * Whole-request timeout (5,000–300,000 ms). Generous by default: this one
-   * call runs a metasearch and then fetches several pages, and a JS-rendering
-   * fallback makes it slower still.
+   * Whole-request timeout (5,000–300,000 ms): how long Aperture waits for one
+   * search call, which searches and then fetches every result.
    *
-   * THE DEFAULT IS SET BY A NUMBER THE SERVICE PRINTS AT BOOT, not by taste.
-   * CRW's render ladder is HTTP → LightPanda → the heavy browser tier, and with
-   * `auto_extend_deadline_for_ladder` on (the shipped default) a single page
-   * that reaches the heavy tier is allowed the whole ladder. A stock deployment
-   * logs its own arithmetic on startup:
+   * WHAT BOUNDS A SEARCH CALL IS `pageTimeoutMs`, NOT THE RENDER LADDER. This
+   * used to be sized against `ladder_min_ms` from CRW's boot log (82.5s on a
+   * stock deployment, 126.5s with Byparr), on the belief that one page reaching
+   * the heavy tier could take that long. That number is the budget for ONE
+   * `/v1/scrape`. Inside `/v1/search` every result gets its own deadline -
+   * `scrapeOptions.timeout`, or 15s when the request names none - so a call is
+   * bounded by its search leg plus one page budget. Read in crw-camofox 1.5.0's
+   * `routes/search.rs` (`SEARCH_ENRICH_DEADLINE_MS`), and confirmed in a live
+   * log where a page's budget ran out exactly 15s after it started.
    *
-   *   deadline_ms_default=15000 ladder_min_ms=82500 effective_default_ms=82500
-   *
-   * So ONE slow page can occupy 82.5s, and search runs before any of it. The
-   * previous 90s default sat under the worst case with the search leg
-   * unaccounted for — and a timeout here throws, which writes no row, so the
-   * title silently stays pending and the work is simply lost. Grep the boot log
-   * for `ladder_min_ms` and keep this comfortably above it plus the search leg.
+   * It must still clear `pageTimeoutMs` plus {@link SEARCH_LEG_ALLOWANCE_MS},
+   * or Aperture abandons a call CRW was about to answer; a timeout here throws,
+   * which writes no row, so the title stays pending and the work is lost. The
+   * route refuses a pair that does not, and {@link effectivePageTimeoutMs}
+   * shrinks the page budget for a stored pair saved before that check existed.
    */
   timeoutMs: number
+  /**
+   * How long CRW may spend fetching ONE result page inside a search (5,000–
+   * 60,000 ms), sent as `scrapeOptions.timeout`.
+   *
+   * WITHOUT IT CRW GIVES EVERY PAGE 15 SECONDS, and that is where pages behind
+   * a bot wall were being lost. The ladder is HTTP, impersonated HTTP,
+   * LightPanda, Camofox (which waits up to 20s for a Cloudflare challenge to
+   * clear), then Byparr - and inside 15s the last two get what the first ones
+   * left. Measured on one deployment: Camofox abandoned its challenge wait
+   * after 5-6s on two pages, Byparr hit the 15s wall all three times it was
+   * tried, and a direct `/v1/scrape` of one of those pages - which gets the
+   * whole ladder - came back through Byparr in 12.1s. A second page from a host
+   * already being fetched waits its turn INSIDE its own budget (CRW limits
+   * requests per site), and lost the whole 15s to the wait.
+   *
+   * The cost lands only where a page is slow: a search waits for its slowest
+   * result, so a title with a walled page takes up to this long per search
+   * instead of 15s. 60s is CRW's own ceiling - it answers 400 above that.
+   */
+  pageTimeoutMs: number
   /**
    * Total characters of retrieved text handed to the model in one prompt
    * (2,000–200,000). THIS is the real budget; `maxContentChars` above is only a
@@ -212,6 +233,11 @@ export const DEFAULT_CRW_CONFIG: CrwConfig = {
   curatedSites: [...DEFAULT_CURATED_SITES],
   maxContentChars: 12000,
   timeoutMs: 180000,
+  // Three times CRW's own 15s, which leaves Camofox its full 20s challenge wait
+  // and Byparr time after it, while keeping a search with one wedged page under
+  // a minute. Not CRW's 60s ceiling: that is held back for an operator who
+  // finds a source that needs it.
+  pageTimeoutMs: 45000,
   sourceBudgetChars: 16000,
   // Generous rather than tight: ~1,200 tokens covers the longest answer the
   // prompt asks for, so this leaves roughly 6,800 for a reasoning model's
@@ -248,6 +274,59 @@ const resolveCuratedSites = (value: unknown): string[] => {
 const clampContentChars = (n: number) =>
   clampInt(n, 1000, 100_000, DEFAULT_CRW_CONFIG.maxContentChars)
 const clampTimeout = (n: number) => clampInt(n, 5000, 300_000, DEFAULT_CRW_CONFIG.timeoutMs)
+
+/** The per-page budget CRW applies inside a search when the request names none. */
+export const CRW_DEFAULT_PAGE_TIMEOUT_MS = 15_000
+/** Bounds on `pageTimeoutMs`. The ceiling is CRW's: it refuses a larger value with a 400. */
+export const CRW_PAGE_TIMEOUT_MIN_MS = 5_000
+export const CRW_PAGE_TIMEOUT_MAX_MS = 60_000
+
+/**
+ * What a search call needs on top of its page budget: the search itself.
+ *
+ * CRW drives every engine through ONE browser tab and serializes searches on
+ * it, so a call waits for the searches queued ahead of it before its own runs.
+ * Retrieval runs the general search and up to `CURATED_MAX_QUERIES` (4)
+ * criticism queries at once, and each search round trip is capped at CRW's
+ * `search.timeout_ms` (15s). A normal search takes a few seconds; this covers
+ * a few slow ones queued ahead, not the theoretical five-deep worst case, which
+ * would need every search to hit CRW's own timeout in a row.
+ */
+export const SEARCH_LEG_ALLOWANCE_MS = 60_000
+
+const clampPageTimeout = (n: number) =>
+  clampInt(n, CRW_PAGE_TIMEOUT_MIN_MS, CRW_PAGE_TIMEOUT_MAX_MS, DEFAULT_CRW_CONFIG.pageTimeoutMs)
+
+/** The smallest whole-request timeout that leaves a page budget its full length. */
+export function minimumRequestTimeoutMs(pageTimeoutMs: number): number {
+  return clampPageTimeout(pageTimeoutMs) + SEARCH_LEG_ALLOWANCE_MS
+}
+
+/**
+ * The page budget actually sent: the configured one, shrunk to fit inside the
+ * whole-request timeout, and never below what CRW would use anyway.
+ *
+ * Shrunk rather than sent as configured because a page budget Aperture cannot
+ * wait for is worse than a shorter one - the call is abandoned and every page
+ * it fetched is lost with it. That happens only to a pair stored before the
+ * route checked it (the route now refuses one); a config written since always
+ * gets its configured value.
+ *
+ * The SHRINK stops at CRW's own 15s, because that is what a request with no
+ * timeout gets: an existing deployment with a short request timeout therefore
+ * behaves exactly as it did before this setting existed, never worse. A budget
+ * CONFIGURED below 15s is sent as configured - that is an operator choosing
+ * faster searches over slow pages, and the floor is not there to overrule them.
+ */
+export function effectivePageTimeoutMs(pageTimeoutMs: number, requestTimeoutMs: number): number {
+  const configured = clampPageTimeout(pageTimeoutMs)
+  const room = Math.max(
+    CRW_DEFAULT_PAGE_TIMEOUT_MS,
+    clampTimeout(requestTimeoutMs) - SEARCH_LEG_ALLOWANCE_MS
+  )
+  return Math.min(configured, room)
+}
+
 const clampSourceBudget = (n: number) =>
   clampInt(n, 2000, 200_000, DEFAULT_CRW_CONFIG.sourceBudgetChars)
 /**
@@ -300,6 +379,7 @@ function sanitize(config: Partial<CrwConfig>): CrwConfig {
       config.maxContentChars ?? DEFAULT_CRW_CONFIG.maxContentChars
     ),
     timeoutMs: clampTimeout(config.timeoutMs ?? DEFAULT_CRW_CONFIG.timeoutMs),
+    pageTimeoutMs: clampPageTimeout(config.pageTimeoutMs ?? DEFAULT_CRW_CONFIG.pageTimeoutMs),
     sourceBudgetChars: clampSourceBudget(
       config.sourceBudgetChars ?? DEFAULT_CRW_CONFIG.sourceBudgetChars
     ),
@@ -380,6 +460,8 @@ export interface CrwSearchParams {
   maxResults?: number
   maxContentChars?: number
   timeoutMs?: number
+  /** Per-result page budget. See CrwConfig.pageTimeoutMs; sent after {@link effectivePageTimeoutMs}. */
+  pageTimeoutMs?: number
   /**
    * One engine per request. Omitted, CRW uses its own default, which is
    * Google — there is no server-side setting for this, the choice only exists
@@ -570,6 +652,11 @@ export async function crwSearch(
     params.maxContentChars ?? DEFAULT_CRW_CONFIG.maxContentChars
   )
   const endpoint = `${baseUrl}/v1/search`
+  const timeoutMs = clampTimeout(params.timeoutMs ?? DEFAULT_CRW_CONFIG.timeoutMs)
+  const pageTimeoutMs = effectivePageTimeoutMs(
+    params.pageTimeoutMs ?? DEFAULT_CRW_CONFIG.pageTimeoutMs,
+    timeoutMs
+  )
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (params.apiKey?.trim()) headers.Authorization = `Bearer ${params.apiKey.trim()}`
@@ -587,9 +674,13 @@ export async function crwSearch(
         ...(params.engine ? { engines: [params.engine] } : {}),
         // The point of the whole integration: fetch each hit and hand back
         // cleaned markdown, rather than returning links for a second round trip.
-        scrapeOptions: { formats: ['markdown'] },
+        //
+        // `timeout` is the budget for EACH page, not the call: without it CRW
+        // gives every page 15s, which is where walled pages were being lost -
+        // see CrwConfig.pageTimeoutMs. A CRW older than the field ignores it.
+        scrapeOptions: { formats: ['markdown'], timeout: pageTimeoutMs },
       }),
-      signal: AbortSignal.timeout(clampTimeout(params.timeoutMs ?? DEFAULT_CRW_CONFIG.timeoutMs)),
+      signal: AbortSignal.timeout(timeoutMs),
     })
   } catch (err) {
     // Network/DNS/timeout — no HTTP status. Recorded as a synthetic outage

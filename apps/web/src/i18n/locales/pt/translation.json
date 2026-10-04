@@ -5001,7 +5001,9 @@
     "curatedSitesAddHelp": "A host, optionally with a path: mubi.com/en/notebook",
     "curatedSitesAdd": "Add",
     "curatedSitesInvalid": "Enter a host such as rogerebert.com",
-    "curatedSitesDuplicate": "That site is already listed"
+    "curatedSitesDuplicate": "That site is already listed",
+    "pageTimeoutLabel": "Time per page (seconds)",
+    "pageTimeoutHelp": "How long the service may spend fetching one result page (5–60). Pages behind a bot check need the time: the browser tier waits up to 20 seconds for a challenge to clear, and the challenge solver only gets what is left after it. The service gives each page 15 seconds if this is not sent, and refuses more than 60. A search waits for its slowest page, so this only costs time on titles with a slow page."
   },
   "settingsRatings": {
     "title": "Ratings Refresh",

@@ -1,7 +1,17 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { DEFAULT_CRW_CONFIG, describeTestOutcome, readCrwWarnings } from './crw.js'
+import {
+  DEFAULT_CRW_CONFIG,
+  CRW_DEFAULT_PAGE_TIMEOUT_MS,
+  CRW_PAGE_TIMEOUT_MAX_MS,
+  CRW_PAGE_TIMEOUT_MIN_MS,
+  SEARCH_LEG_ALLOWANCE_MS,
+  describeTestOutcome,
+  effectivePageTimeoutMs,
+  minimumRequestTimeoutMs,
+  readCrwWarnings,
+} from './crw.js'
 
 // ============================================================================
 // Reading soft failures out of a 200
@@ -101,20 +111,53 @@ test('results pass, and carry any warnings with them', () => {
 })
 
 // ============================================================================
-// The timeout default
+// The two timeouts
 // ============================================================================
 
-test('the default timeout clears the service’s own worst-case page deadline', () => {
-  // Not taste: CRW prints its arithmetic at boot, and a stock deployment logs
-  //   deadline_ms_default=15000 ladder_min_ms=82500 effective_default_ms=82500
-  // because auto_extend_deadline_for_ladder lets one page that reaches the heavy
-  // browser tier have the whole ladder. Search runs before any of that, so the
-  // ceiling has to clear 82.5s with the search leg on top. The previous 90s
-  // default did not — and a timeout here throws, writing no row, so the title
-  // silently stays pending and the work is lost rather than retried loudly.
-  const observedLadderMs = 82_500
+test('the default request timeout leaves the default page budget its full length', () => {
+  // Inside /v1/search CRW gives each result page its own deadline, so a search
+  // call is bounded by its search leg plus ONE page budget. The request timeout
+  // has to clear both, or Aperture abandons a call CRW was about to answer -
+  // and a timeout here throws, writing no row, so the title's work is lost.
   assert.ok(
-    DEFAULT_CRW_CONFIG.timeoutMs > observedLadderMs * 1.5,
-    `default timeout ${DEFAULT_CRW_CONFIG.timeoutMs}ms leaves too little room over a ${observedLadderMs}ms page deadline`
+    DEFAULT_CRW_CONFIG.timeoutMs >= minimumRequestTimeoutMs(DEFAULT_CRW_CONFIG.pageTimeoutMs),
+    `default timeout ${DEFAULT_CRW_CONFIG.timeoutMs}ms is below what a ${DEFAULT_CRW_CONFIG.pageTimeoutMs}ms page budget needs`
   )
+  assert.equal(
+    effectivePageTimeoutMs(DEFAULT_CRW_CONFIG.pageTimeoutMs, DEFAULT_CRW_CONFIG.timeoutMs),
+    DEFAULT_CRW_CONFIG.pageTimeoutMs
+  )
+})
+
+test('the largest page budget fits under a request timeout the route allows', () => {
+  // The route caps timeoutMs at 300s; the largest page budget must be
+  // configurable with it, or the top of the range is unreachable.
+  assert.ok(minimumRequestTimeoutMs(CRW_PAGE_TIMEOUT_MAX_MS) <= 300_000)
+})
+
+test('the page budget sent never exceeds what CRW accepts', () => {
+  // CRW answers 400 above 60s, which would fail EVERY search, not just slow ones.
+  assert.equal(CRW_PAGE_TIMEOUT_MAX_MS, 60_000)
+  assert.equal(effectivePageTimeoutMs(120_000, 300_000), CRW_PAGE_TIMEOUT_MAX_MS)
+})
+
+test('a stored request timeout too short for the page budget shrinks the budget', () => {
+  // A pair saved before the route checked it: the budget gives way, because a
+  // page budget Aperture cannot wait for loses the whole call.
+  const sent = effectivePageTimeoutMs(45_000, 90_000)
+  assert.ok(sent < 45_000)
+  assert.ok(sent + SEARCH_LEG_ALLOWANCE_MS <= 90_000)
+})
+
+test('the shrink never goes below the 15s CRW uses when no budget is sent', () => {
+  // So an old deployment with a short request timeout behaves exactly as it did
+  // before the setting existed, never worse.
+  assert.equal(effectivePageTimeoutMs(45_000, 30_000), CRW_DEFAULT_PAGE_TIMEOUT_MS)
+})
+
+test('a budget configured below 15s is sent as configured, not raised', () => {
+  // The floor limits the shrink; it must not overrule an operator who chose
+  // faster searches over slow pages.
+  assert.equal(effectivePageTimeoutMs(CRW_PAGE_TIMEOUT_MIN_MS, 300_000), CRW_PAGE_TIMEOUT_MIN_MS)
+  assert.ok(CRW_PAGE_TIMEOUT_MIN_MS < CRW_DEFAULT_PAGE_TIMEOUT_MS)
 })

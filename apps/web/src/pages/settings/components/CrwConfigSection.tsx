@@ -77,6 +77,7 @@ interface CrwPublicConfig {
   curatedSites: string[]
   maxContentChars: number
   timeoutMs: number
+  pageTimeoutMs?: number
   sourceBudgetChars: number
   analysisMaxOutputTokens: number
   searchEngines?: string[]
@@ -122,7 +123,8 @@ export function CrwConfigSection() {
   const [sourceBudgetChars, setSourceBudgetChars] = useState('16000')
   const [analysisMaxOutputTokens, setAnalysisMaxOutputTokens] = useState('8000')
   const [maxContentChars, setMaxContentChars] = useState('12000')
-  const [timeoutSeconds, setTimeoutSeconds] = useState('90')
+  const [timeoutSeconds, setTimeoutSeconds] = useState('180')
+  const [pageTimeoutSeconds, setPageTimeoutSeconds] = useState('45')
   const [engineSlots, setEngineSlots] = useState<string[]>(DEFAULT_ENGINES)
   const [hasChanges, setHasChanges] = useState(false)
 
@@ -140,7 +142,8 @@ export function CrwConfigSection() {
     setSourceBudgetChars(String(c.sourceBudgetChars ?? 16000))
     setAnalysisMaxOutputTokens(String(c.analysisMaxOutputTokens ?? 8000))
     setMaxContentChars(String(c.maxContentChars ?? 12000))
-    setTimeoutSeconds(String(Math.round((c.timeoutMs ?? 90000) / 1000)))
+    setTimeoutSeconds(String(Math.round((c.timeoutMs ?? 180000) / 1000)))
+    setPageTimeoutSeconds(String(Math.round((c.pageTimeoutMs ?? 45000) / 1000)))
     // Padded to three so a saved two-engine cascade still renders an empty
     // third slot to add to, rather than no slot at all.
     setEngineSlots([...(c.searchEngines ?? DEFAULT_ENGINES), '', '', ''].slice(0, 3))
@@ -230,7 +233,9 @@ export function CrwConfigSection() {
         ? 0
         : clampInt(analysisMaxOutputTokens, 512, 128000, 8000),
     maxContentChars: clampInt(maxContentChars, 1000, 100000, 12000),
-    timeoutMs: clampInt(timeoutSeconds, 5, 300, 90) * 1000,
+    timeoutMs: clampInt(timeoutSeconds, 5, 300, 180) * 1000,
+    // 60 is the service's own ceiling: it refuses a larger per-page budget.
+    pageTimeoutMs: clampInt(pageTimeoutSeconds, 5, 60, 45) * 1000,
     searchEngines: orderedEngines(engineSlots),
   })
 
@@ -552,6 +557,18 @@ export function CrwConfigSection() {
                 markChanged()
               }}
               helperText={t('settingsCrw.curatedMaxResultsHelp')}
+              sx={{ flex: '1 1 160px' }}
+            />
+            <TextField
+              id="crw-page-timeout"
+              label={t('settingsCrw.pageTimeoutLabel')}
+              type="number"
+              value={pageTimeoutSeconds}
+              onChange={(e) => {
+                setPageTimeoutSeconds(e.target.value)
+                markChanged()
+              }}
+              helperText={t('settingsCrw.pageTimeoutHelp')}
               sx={{ flex: '1 1 160px' }}
             />
             <TextField

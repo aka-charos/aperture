@@ -14,6 +14,9 @@ import {
   isRetrievalMode,
   sanitizeCuratedSites,
   MAX_CURATED_SITES,
+  CRW_PAGE_TIMEOUT_MIN_MS,
+  CRW_PAGE_TIMEOUT_MAX_MS,
+  minimumRequestTimeoutMs,
   sanitizeSearchEngines,
   setCrwConfig,
   setRetrievalMode,
@@ -33,6 +36,7 @@ interface CrwUpdateBody {
   curatedSites?: string[]
   maxContentChars?: number
   timeoutMs?: number
+  pageTimeoutMs?: number
   sourceBudgetChars?: number
   analysisMaxOutputTokens?: number
   /**
@@ -58,6 +62,7 @@ interface PublicCrwConfig {
   curatedSites: string[]
   maxContentChars: number
   timeoutMs: number
+  pageTimeoutMs: number
   sourceBudgetChars: number
   analysisMaxOutputTokens: number
   searchEngines: CrwSearchEngine[]
@@ -111,6 +116,22 @@ function validateConfig(config: CrwConfig): string | null {
     return 'timeoutMs must be an integer between 5000 and 300000'
   }
   if (
+    !Number.isInteger(config.pageTimeoutMs) ||
+    config.pageTimeoutMs < CRW_PAGE_TIMEOUT_MIN_MS ||
+    config.pageTimeoutMs > CRW_PAGE_TIMEOUT_MAX_MS
+  ) {
+    return `pageTimeoutMs must be an integer between ${CRW_PAGE_TIMEOUT_MIN_MS} and ${CRW_PAGE_TIMEOUT_MAX_MS}`
+  }
+  // Refused rather than quietly shortened: a search call takes its search leg
+  // plus one page budget, so a request timeout under that makes Aperture give up
+  // on calls the service was about to answer, and lose every page they fetched.
+  // Stored pairs from before this check are shortened at send time instead (see
+  // effectivePageTimeoutMs) - nobody is asking for those right now.
+  const needed = minimumRequestTimeoutMs(config.pageTimeoutMs)
+  if (config.timeoutMs < needed) {
+    return `The timeout must be at least ${needed / 1000} seconds for a ${config.pageTimeoutMs / 1000}-second page budget: each search can wait behind the others for the search itself, then fetches its pages`
+  }
+  if (
     !Number.isInteger(config.sourceBudgetChars) ||
     config.sourceBudgetChars < 2000 ||
     config.sourceBudgetChars > 200000
@@ -153,6 +174,7 @@ function toPublicConfig(config: CrwConfig): PublicCrwConfig {
     curatedSites: config.curatedSites,
     maxContentChars: config.maxContentChars,
     timeoutMs: config.timeoutMs,
+    pageTimeoutMs: config.pageTimeoutMs,
     sourceBudgetChars: config.sourceBudgetChars,
     analysisMaxOutputTokens: config.analysisMaxOutputTokens,
     searchEngines: config.searchEngines,
@@ -209,6 +231,7 @@ export function registerCrwHandlers(fastify: FastifyInstance) {
           curatedSites: body.curatedSites ?? current.curatedSites,
           maxContentChars: body.maxContentChars ?? current.maxContentChars,
           timeoutMs: body.timeoutMs ?? current.timeoutMs,
+          pageTimeoutMs: body.pageTimeoutMs ?? current.pageTimeoutMs,
           sourceBudgetChars: body.sourceBudgetChars ?? current.sourceBudgetChars,
           analysisMaxOutputTokens:
             body.analysisMaxOutputTokens ?? current.analysisMaxOutputTokens,
@@ -274,6 +297,7 @@ export function registerCrwHandlers(fastify: FastifyInstance) {
           maxResults: 1,
           maxContentChars: current.maxContentChars,
           timeoutMs: current.timeoutMs,
+          pageTimeoutMs: current.pageTimeoutMs,
           // The same cascade the job walks. Testing one engine while the job
           // tries three makes the button lie in both directions.
           engines: current.searchEngines,

@@ -304,3 +304,28 @@ export function mergeSearchResults<T extends MergeableResult>(
   }
   return out
 }
+
+/**
+ * Whether the criticism queries must be asked again, of the engine that
+ * answered the general search.
+ *
+ * Retrieval starts the criticism queries BESIDE the general search, on the
+ * engine the cascade tries first, before it knows whether that engine will
+ * answer. Usually it does, and then its answer stands - including an empty one,
+ * which from a responding engine means "nothing on those sites".
+ *
+ * When the general search had to fall back, the first engine was walled, and an
+ * empty criticism answer from a walled engine means nothing at all: asking again
+ * is what turns it back into evidence. That costs exactly what the sequential
+ * version paid on every title. A NON-empty answer is kept even then - an engine
+ * that returned criticism was plainly answering those queries, and asking again
+ * would buy the same pages twice.
+ */
+export function criticismNeedsRerun(input: {
+  askedEngine: string | undefined
+  answeringEngine: string
+  found: number
+}): boolean {
+  if (!input.askedEngine) return true
+  return input.askedEngine !== input.answeringEngine && input.found === 0
+}

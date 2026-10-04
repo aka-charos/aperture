@@ -45,6 +45,7 @@ import {
   urlDomain,
   type CrwSearchEngine,
   type CrwSearchResponse,
+  type CrwSearchResultItem,
 } from '../lib/crw.js'
 import { orderByHealth, recordEngineOutcome } from '../lib/crwEngines.js'
 import { query, queryOne } from '../lib/db.js'
@@ -60,6 +61,7 @@ import {
   buildCuratedQueries,
   distributeCuratedResults,
   mergeSearchResults,
+  criticismNeedsRerun,
 } from './curatedSearch.js'
 import { cleanSources } from './sourceCleanup.js'
 import { dropLowValueSources } from './sourceQuality.js'
@@ -209,6 +211,85 @@ export interface Retrieval {
   retrievedChars: number
 }
 
+/** What the criticism queries brought back on one engine. */
+interface CriticismOutcome {
+  /** Every result, in query order then rank order - the order the merge expects. */
+  found: CrwSearchResultItem[]
+  /** Queries that threw. Their siblings' results are still in `found`. */
+  failed: number
+}
+
+/**
+ * Run every criticism query on one engine, AT ONCE, and never reject.
+ *
+ * Together rather than in turn because each call waits for its slowest page,
+ * and in turn a title paid that wait once per query. CRW still sends the
+ * searches to the engine one at a time (one browser tab, serialized), so the
+ * engine sees the same requests it did before, closer together.
+ *
+ * A query that throws costs only itself: the sequential version discarded every
+ * result already gathered when a later query failed, which threw away criticism
+ * that had been found and paid for.
+ */
+async function runCriticismQueries(input: {
+  title: string
+  engine: CrwSearchEngine
+  queries: string[]
+  allowance: number[]
+  searchParams: {
+    baseUrl: string
+    apiKey: string
+    maxContentChars: number
+    timeoutMs: number
+    pageTimeoutMs: number
+  }
+}): Promise<CriticismOutcome> {
+  const settled = await Promise.allSettled(
+    input.queries.map(async (query, index) => {
+      const wanted = input.allowance[index] ?? 0
+      if (wanted <= 0) return []
+      const attempt = await crwSearch(query, {
+        ...input.searchParams,
+        maxResults: wanted,
+        engine: input.engine,
+      })
+      // INFO, not debug: at debug it sits under the default level, and this is
+      // the one record that separates an engine REFUSING a query - a long title
+      // can push one over the limit its neighbours stay under - from those
+      // publications having nothing on the film. Both are the same empty array
+      // from here, and that ambiguity is what made a broken feature look like a
+      // quiet one for a whole library.
+      logger.info(
+        {
+          title: input.title,
+          engine: input.engine,
+          chars: query.length,
+          wanted,
+          got: attempt.results.length,
+          warnings: attempt.warnings,
+        },
+        'Criticism query'
+      )
+      return attempt.results
+    })
+  )
+
+  const found: CrwSearchResultItem[] = []
+  let failed = 0
+  for (const outcome of settled) {
+    if (outcome.status === 'fulfilled') {
+      found.push(...outcome.value)
+    } else {
+      failed += 1
+      logger.warn(
+        { title: input.title, engine: input.engine, err: outcome.reason },
+        'Criticism query failed'
+      )
+    }
+  }
+  return { found, failed }
+}
+
 /**
  * Search and scrape for one title.
  *
@@ -247,6 +328,63 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
   )
   const startedAt = Date.now()
 
+  // Everything every search call shares. The page budget rides on each call:
+  // it is per result page, so the general search and every criticism query get
+  // the same allowance per page (see CrwConfig.pageTimeoutMs).
+  const searchParams = {
+    baseUrl: config.baseUrl,
+    apiKey: config.apiKey,
+    maxContentChars: config.maxContentChars,
+    timeoutMs: config.timeoutMs,
+    pageTimeoutMs: config.pageTimeoutMs,
+  }
+
+  // Health-ordered rather than as configured: an engine that has come back
+  // empty five titles running is a wall, and paying it one request per title
+  // for the rest of a 13,000-title library is hours spent on a service that has
+  // already said no. It goes to the BACK, never off the list — see crwEngines.
+  const engines = orderByHealth(config.searchEngines)
+
+  // THE CRITICISM SEARCH STARTS NOW, BESIDE THE GENERAL ONE, not after it.
+  //
+  // A search call takes as long as its slowest page, and those calls used to
+  // run one after another - the general search, then each criticism query - so
+  // a title with one slow page in each paid that page's wait three times over.
+  // Run together, a title waits for its slowest page once. CRW serializes the
+  // engine requests themselves on its one browser tab, so the searches still
+  // reach the engine one at a time; what overlaps is the page fetching, which is
+  // where the time goes.
+  //
+  // It is SPECULATIVE about the engine. It used to run on the engine that had
+  // just answered, which is only known once the general search returns; it now
+  // runs on the engine the cascade tries first, which is the one that answers
+  // unless it is walled. When it was walled, its empty criticism answer is not
+  // evidence of anything and the queries are asked again of the engine that did
+  // answer - which is exactly the extra cost the sequential version paid on
+  // every title. See criticismNeedsRerun.
+  //
+  // It never rejects, so a general search that throws below leaves nothing
+  // unhandled behind it; the abandoned queries finish in CRW and are dropped.
+  const criticismWanted = config.curatedMaxResults
+  // SEVERAL QUERIES, not one. The whole site list in a single query is past
+  // what an engine accepts and comes back as an empty result set rather than an
+  // error - see CURATED_QUERY_MAX_CHARS, where that is measured.
+  const criticismQueries = criticismWanted
+    ? buildCuratedQueries(queryText, config.curatedSites)
+    : []
+  const criticismAllowance = distributeCuratedResults(criticismWanted, criticismQueries.length)
+  const runCriticism = (engine: CrwSearchEngine) =>
+    runCriticismQueries({
+      title: subject.title,
+      engine,
+      queries: criticismQueries,
+      allowance: criticismAllowance,
+      searchParams,
+    })
+  const speculativeEngine = engines[0]
+  const speculativeCriticism =
+    criticismQueries.length > 0 && speculativeEngine ? runCriticism(speculativeEngine) : null
+
   // Try each configured engine in turn and keep the first that answers.
   //
   // A blocked engine is NOT an error: CRW replies `200 {results: []}` with a
@@ -258,17 +396,10 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
   let engineUsed: CrwSearchEngine | null = null
   const attempts: string[] = []
 
-  // Health-ordered rather than as configured: an engine that has come back
-  // empty five titles running is a wall, and paying it one request per title
-  // for the rest of a 13,000-title library is hours spent on a service that has
-  // already said no. It goes to the BACK, never off the list — see crwEngines.
-  for (const engine of orderByHealth(config.searchEngines)) {
+  for (const engine of engines) {
     const attempt = await crwSearch(queryText, {
-      baseUrl: config.baseUrl,
-      apiKey: config.apiKey,
+      ...searchParams,
       maxResults: config.maxResults,
-      maxContentChars: config.maxContentChars,
-      timeoutMs: config.timeoutMs,
       engine,
     })
     recordEngineOutcome(engine, attempt.results.length > 0)
@@ -299,12 +430,13 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
   // A SECOND search, restricted to publications that print criticism, merged
   // into the first. See ./curatedSearch.ts for why it is an addition rather
   // than a replacement, and why the merge reserves slots instead of sharing a
-  // cut.
+  // cut. It was started above, beside the general search; this is where its
+  // answer is collected.
   //
-  // It runs on the engine that just ANSWERED rather than through the cascade:
-  // that engine is demonstrably responding, so an empty curated result means
-  // "nothing on those sites", which for most titles is the correct answer -
-  // and it holds the cost to one extra request instead of three.
+  // It runs on ONE engine rather than through the cascade: an engine that is
+  // demonstrably responding gives an empty criticism result its plain meaning,
+  // "nothing on those sites", which for most titles is the correct answer - and
+  // it holds the cost to one request per query instead of three.
   //
   // IT IS PURELY ADDITIVE. The general search above keeps every one of its
   // `maxResults` results; these are appended to them, so a title with no
@@ -316,89 +448,65 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
   // the expected outcome here, and five empty curated searches running would
   // otherwise park a perfectly healthy engine at the back of the cascade for
   // half an hour - see crwEngines.
-  const criticismWanted = config.curatedMaxResults
+  //
+  // It never fails the title: the general search has already answered, and this
+  // is the half that is allowed to find nothing. A query that throws is logged
+  // and the others are kept; crwSearch has already written the fault to
+  // `api_errors` under the 'crw' provider.
+  let criticism = speculativeCriticism ? await speculativeCriticism : null
+  let criticismEngine: CrwSearchEngine | null = criticism ? speculativeEngine ?? null : null
+  if (
+    criticism &&
+    criticismNeedsRerun({
+      askedEngine: speculativeEngine,
+      answeringEngine: engineUsed,
+      found: criticism.found.length,
+    })
+  ) {
+    logger.info(
+      { title: subject.title, asked: speculativeEngine, answered: engineUsed },
+      'Asking the criticism queries again of the engine that answered'
+    )
+    criticism = await runCriticism(engineUsed)
+    criticismEngine = engineUsed
+  }
+
   // Which results the criticism search supplied, so the sources can SAY so
   // further down. Keyed by URL because the merge dedupes on one.
   let criticismUrls = new Set<string>()
-  try {
-    // SEVERAL QUERIES, not one. The whole site list in a single query is past
-    // what an engine accepts and comes back as an empty result set rather than
-    // an error - see CURATED_QUERY_MAX_CHARS, where that is measured.
-    const queries = criticismWanted
-      ? buildCuratedQueries(queryText, config.curatedSites)
-      : []
-    const allowance = distributeCuratedResults(criticismWanted, queries.length)
-    const found: typeof results = []
-    for (const [index, query] of queries.entries()) {
-      const wanted = allowance[index] ?? 0
-      if (wanted <= 0) continue
-      const attempt = await crwSearch(query, {
-        baseUrl: config.baseUrl,
-        apiKey: config.apiKey,
-        maxResults: wanted,
-        maxContentChars: config.maxContentChars,
-        timeoutMs: config.timeoutMs,
-        engine: engineUsed,
-      })
-      // INFO, not debug, for the reason the line below this block records: at
-      // debug it sits under the default level, and this is the one record that
-      // separates an engine REFUSING a query - a long title can push one over
-      // the limit its neighbours stay under - from those publications having
-      // nothing on the film. Both are the same empty array from here, and that
-      // ambiguity is what made a broken feature look like a quiet one for a
-      // whole library. Three lines per title, against a title that takes
-      // minutes.
-      logger.info(
-        {
-          title: subject.title,
-          chars: query.length,
-          wanted,
-          got: attempt.results.length,
-          warnings: attempt.warnings,
-        },
-        'Criticism query'
-      )
-      found.push(...attempt.results)
-    }
-    if (found.length > 0) {
-      const merged = mergeSearchResults(found, results)
-      criticismUrls = new Set(found.map((r) => r.url))
-      logger.info(
-        {
-          title: subject.title,
-          engine: engineUsed,
-          queries: queries.length,
-          criticism: found.map((r) => r.domain),
-          merged: merged.length,
-        },
-        'Merged criticism search into retrieval'
-      )
-      results = merged
-    } else {
-      // LOGGED, because an empty criticism search and a criticism search that
-      // never ran are the same silence otherwise - which is exactly how an
-      // operator ends up unable to tell a deployed feature from an undeployed
-      // one. Info rather than warn: nothing published on those twenty sites is
-      // the ordinary answer for most of a library, not a fault.
-      logger.info(
-        {
-          title: subject.title,
-          engine: engineUsed,
-          wanted: criticismWanted,
-          queries: queries.length,
-        },
-        criticismWanted
-          ? 'Criticism search returned nothing for this title'
-          : 'Criticism search is switched off (curatedMaxResults is 0)'
-      )
-    }
-  } catch (err) {
-    // Never fails the title. The general search has already answered, and this
-    // is the half that is allowed to find nothing - so a retrieval service that
-    // is up enough to have answered once must not lose a title on the second
-    // ask. Nothing is hidden by swallowing it: crwSearch has already written
-    // the fault to `api_errors` under the 'crw' provider before throwing.
-    logger.warn({ title: subject.title, err }, 'Criticism search failed')
+  const found = criticism?.found ?? []
+  if (found.length > 0) {
+    const merged = mergeSearchResults(found, results)
+    criticismUrls = new Set(found.map((r) => r.url))
+    logger.info(
+      {
+        title: subject.title,
+        engine: criticismEngine,
+        queries: criticismQueries.length,
+        criticism: found.map((r) => r.domain),
+        merged: merged.length,
+      },
+      'Merged criticism search into retrieval'
+    )
+    results = merged
+  } else {
+    // LOGGED, because an empty criticism search and a criticism search that
+    // never ran are the same silence otherwise - which is exactly how an
+    // operator ends up unable to tell a deployed feature from an undeployed
+    // one. Info rather than warn: nothing published on those twenty sites is
+    // the ordinary answer for most of a library, not a fault.
+    logger.info(
+      {
+        title: subject.title,
+        engine: criticismEngine,
+        wanted: criticismWanted,
+        queries: criticismQueries.length,
+        failedQueries: criticism?.failed ?? 0,
+      },
+      criticismWanted
+        ? 'Criticism search returned nothing for this title'
+        : 'Criticism search is switched off (curatedMaxResults is 0)'
+    )
   }
 
   const fetched: AnalysisSource[] = results.map((r) => ({
