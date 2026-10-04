@@ -225,7 +225,11 @@ export function AssistantModal() {
     <>
       {/* Floating Action Button */}
       <Tooltip title={t('assistant.fabTooltip')} placement="left">
-        <Zoom in={!open && !onAssistantPage}>
+        {/* Not below md: there it can only open a full-screen dialog, which is
+            what the sidebar's Assistant page already is, and the button sat
+            over the last row, the pagination and the graph legend of every
+            page. */}
+        <Zoom in={!open && !onAssistantPage && canDock}>
           <Fab
             color="primary"
             onClick={handleOpen}

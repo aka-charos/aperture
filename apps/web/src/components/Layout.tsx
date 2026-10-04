@@ -69,8 +69,6 @@ const DRAWER_WIDTH_COLLAPSED = 72
  * 8px gap under the bar on every phone.
  */
 const APP_BAR_HEIGHT = { xs: 56, sm: 64 } as const
-/** Pages that fill the pane edge to edge and size themselves against the viewport. */
-const FULL_VIEWPORT_PATHS = new Set(['/assistant', '/explore'])
 /** Shown in the sidebar footer, and in the rail's tooltip where there's no room for it. */
 const APP_VERSION = 'v0.7.8'
 /** Pointer intent: brushing past the rail on the way somewhere else must not open it. */
@@ -827,13 +825,6 @@ function AppShell() {
           mt: 'var(--aperture-chrome-top, 64px)',
           backgroundColor: 'background.default',
           minHeight: 'calc(100dvh - var(--aperture-chrome-top, 64px))',
-          // Room for the floating assistant button and the iOS home bar, so
-          // neither sits on the last row or on the pagination. The two
-          // full-viewport pages size themselves to the pane and break out of
-          // its padding, so extra room there would only add a scrollbar.
-          ...(!FULL_VIEWPORT_PATHS.has(location.pathname) && {
-            pb: { xs: 'calc(88px + env(safe-area-inset-bottom))', md: 3 },
-          }),
           transition: dockResizing
             ? 'none'
             : theme.transitions.create(['width', 'margin'], {
