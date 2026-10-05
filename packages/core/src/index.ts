@@ -1604,6 +1604,28 @@ export {
   type EvidenceLabel,
   type LabellingMediaType,
 } from './recommender/evidenceLabelling.js'
+// Checking the written explanations with the decision model (shadow only),
+// and the operator's accept/reject labels that measure the checks.
+export {
+  checkRecommendationExplanations,
+  getExplanationQueue,
+  setExplanationLabel,
+  isExplanationFilter,
+  ExplanationNotFoundError,
+  CHECK_EXPLANATIONS_JOB,
+  EXPLANATION_FILTERS,
+  type ExplanationFilter,
+  type ExplanationItem,
+  type ExplanationQueue,
+  type ExplanationCheckRunResult,
+} from './recommender/explanationChecks.js'
+export {
+  isExplanationLabel,
+  EXPLANATION_CHECKS,
+  EXPLANATION_LABELS,
+  type ExplanationCheckId,
+  type ExplanationLabel,
+} from './recommender/explanationCheck.js'
 // The labelled-pair benchmark: model vs threshold, on this library, read-only.
 export { runEvidenceBenchmark, type EvidenceBenchmarkResult } from './recommender/evidenceBenchmark.js'
 export {

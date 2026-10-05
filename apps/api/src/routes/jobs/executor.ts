@@ -52,6 +52,7 @@ import {
   saveEvaluationReport,
   type EmbeddingSetRef,
   refreshAllExplanations,
+  checkRecommendationExplanations,
   withInferenceContext,
 } from '@aperture/core'
 import { syncAllTraktRatings } from '../trakt/index.js'
@@ -299,6 +300,14 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
           },
           `✅ Recommendation explanations refreshed`
         )
+        break
+      }
+      // === Explanation checks (shadow measurement, decision model) ===
+      // The core function owns its progress record and its completeJob, and
+      // skips the latter when cancelled (cancelJob has filed the row).
+      case 'check-recommendation-explanations': {
+        const result = await checkRecommendationExplanations(jobId)
+        logger.info({ job: name, jobId, ...result }, `✅ Recommendation explanations checked`)
         break
       }
       // === Title analysis (per title, from retrieved sources, cached forever) ===

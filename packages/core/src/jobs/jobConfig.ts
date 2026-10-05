@@ -212,6 +212,8 @@ export const JOB_SCHEDULE_DEFAULTS: Record<
   'evaluate-recommender': { scheduleType: 'manual', hour: 0, minute: 0 },
   'refresh-embedding-centering': { scheduleType: 'manual', hour: 0, minute: 0 },
   'refresh-recommendation-explanations': { scheduleType: 'manual', hour: 0, minute: 0 },
+  // A measurement run by hand from the Decision model card.
+  'check-recommendation-explanations': { scheduleType: 'manual', hour: 0, minute: 0 },
   // Deletes every viewer's legacy library, so it is only ever run on purpose.
   'remove-legacy-libraries': { scheduleType: 'manual', hour: 0, minute: 0 },
   // Schedulable, but seeded manual: every title is a search, several page

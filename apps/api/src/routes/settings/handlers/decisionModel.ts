@@ -11,6 +11,8 @@
  * - DELETE /api/settings/decision-model/verdicts - forget every stored verdict
  * - GET  /api/settings/decision-model/labelling - pairs the judges disagree on, to label blind
  * - PUT  /api/settings/decision-model/labels  - record, change or remove one label
+ * - GET  /api/settings/decision-model/explanations - written explanations, their checks and labels
+ * - PUT  /api/settings/decision-model/explanation-labels - accept, reject, unsure or clear one
  *
  * See core lib/decisionModel.ts and recommender/judgeEvidence.ts.
  */
@@ -21,6 +23,11 @@ import {
   getDecisionModelConfig,
   getEvidenceJudgmentStats,
   getLabellingQueue,
+  getExplanationQueue,
+  isExplanationFilter,
+  isExplanationLabel,
+  setExplanationLabel,
+  ExplanationNotFoundError,
   isEvidenceLabel,
   isLabellingFilter,
   isLabellingMediaType,
@@ -357,6 +364,73 @@ export function registerDecisionModelHandlers(fastify: FastifyInstance) {
         return reply.send({ counts, labelled, arguable, tally, noSharedCreditsTally })
       } catch (err) {
         fastify.log.error({ err }, 'Failed to save an evidence label')
+        return reply.status(500).send({ error: 'Failed to save the label' })
+      }
+    }
+  )
+
+  /**
+   * The written explanations, with the decision model's checks (once the
+   * check job has run) and the operator's labels. Blind like the pair queue:
+   * the card hides the checks until a label is given.
+   */
+  fastify.get<{ Querystring: { filter?: string; offset?: number; limit?: number } }>(
+    '/api/settings/decision-model/explanations',
+    {
+      preHandler: requireAdmin,
+      schema: {
+        tags: ['settings'],
+        querystring: {
+          type: 'object',
+          properties: {
+            filter: { type: 'string' },
+            offset: { type: 'integer', minimum: 0 },
+            limit: { type: 'integer', minimum: 0, maximum: 50 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { filter, offset, limit } = request.query
+      if (filter !== undefined && !isExplanationFilter(filter)) {
+        return reply.status(400).send({ error: 'Unknown filter' })
+      }
+      try {
+        return reply.send(await getExplanationQueue({ filter, offset, limit }))
+      } catch (err) {
+        fastify.log.error({ err }, 'Failed to read the explanation queue')
+        return reply.status(500).send({ error: 'Failed to read the explanations' })
+      }
+    }
+  )
+
+  /**
+   * Accept, reject, mark unsure or (label: null) clear one explanation. The
+   * text is looked up by its hash server-side, never taken from the request.
+   * Answers with the fresh summary, as the pair labels do.
+   */
+  fastify.put<{ Body: { hash?: unknown; label?: unknown } }>(
+    '/api/settings/decision-model/explanation-labels',
+    { preHandler: requireAdmin, schema: { tags: ['settings'] } },
+    async (request, reply) => {
+      const { hash, label } = request.body ?? {}
+      if (typeof hash !== 'string' || !/^[0-9a-f]{40}$/.test(hash)) {
+        return reply.status(400).send({ error: 'hash must be an explanation hash' })
+      }
+      if (label !== null && !isExplanationLabel(label)) {
+        return reply.status(400).send({ error: 'label must be accept, reject, unsure or null' })
+      }
+      try {
+        await setExplanationLabel({ hash, label, userId: request.user?.id ?? null })
+        const { explanations, checked, flagged, perCheck, counts, agreement } = await getExplanationQueue({
+          limit: 0,
+        })
+        return reply.send({ explanations, checked, flagged, perCheck, counts, agreement })
+      } catch (err) {
+        if (err instanceof ExplanationNotFoundError) {
+          return reply.status(404).send({ error: 'That explanation is no longer on the current recommendations' })
+        }
+        fastify.log.error({ err }, 'Failed to save an explanation label')
         return reply.status(500).send({ error: 'Failed to save the label' })
       }
     }

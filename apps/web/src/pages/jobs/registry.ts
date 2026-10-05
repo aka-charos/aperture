@@ -101,7 +101,7 @@ export const GLOBAL_JOB_CATEGORIES: JobCategory[] = [
     titleKey: 'admin.jobsPage.categories.globalExplanations.title',
     descriptionKey: 'admin.jobsPage.categories.globalExplanations.description',
     color: '#06b6d4',
-    jobs: ['refresh-recommendation-explanations'],
+    jobs: ['refresh-recommendation-explanations', 'check-recommendation-explanations'],
   },
   {
     titleKey: 'admin.jobsPage.categories.globalAnalysis.title',

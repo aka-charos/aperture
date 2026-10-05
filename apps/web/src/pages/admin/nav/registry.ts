@@ -370,6 +370,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
       { anchor: 'decision-model-id', labelKey: 'settingsDecisionModel.modelLabel' },
       { anchor: 'decision-benchmark', labelKey: 'settingsDecisionModel.benchmark', aliases: ['evaluate', 'evaluation', 'labelled pairs'] },
       { anchor: 'decision-labelling', labelKey: 'settingsDecisionModel.labellingTitle', aliases: ['label', 'labels', 'disagreements'] },
+      { anchor: 'decision-explanations', labelKey: 'settingsDecisionModel.explanationsTitle', aliases: ['explanations', 'verify', 'hallucination', 'spoiler'] },
       { anchor: 'decision-base-url', labelKey: 'settingsDecisionModel.baseUrlLabel', aliases: ['self-hosted', 'local'] },
     ],
   },

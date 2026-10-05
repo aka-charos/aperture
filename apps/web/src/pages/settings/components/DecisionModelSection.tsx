@@ -55,6 +55,7 @@ import ScienceIcon from '@mui/icons-material/Science'
 import { jobConsoleLink } from '@/pages/jobs/registry'
 import { DecisionModelBenchmarkResults, type BenchmarkResult } from './DecisionModelBenchmark'
 import { DecisionModelLabelling } from './DecisionModelLabelling'
+import { DecisionModelExplanations } from './DecisionModelExplanations'
 
 type Source = 'openrouter' | 'custom'
 
@@ -703,6 +704,11 @@ export function DecisionModelSection() {
               </>
             )}
           </Box>
+
+          {/* Outside the verdicts block on purpose: explanations exist, and can
+              be checked, whether or not evidence judging was ever switched on. */}
+          <Divider />
+          <DecisionModelExplanations />
         </Stack>
       </CardContent>
 

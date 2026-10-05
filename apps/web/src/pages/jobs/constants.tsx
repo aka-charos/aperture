@@ -24,6 +24,7 @@ import StarHalfIcon from '@mui/icons-material/StarHalf'
 import BiotechIcon from '@mui/icons-material/Biotech'
 import HomeIcon from '@mui/icons-material/Home'
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep'
+import FactCheckIcon from '@mui/icons-material/FactCheck'
 import { JOB_DISPLAY_NAME_KEYS, titleCaseJobName } from './registry'
 import { getAppName } from '@/lib/branding'
 
@@ -61,6 +62,7 @@ export const JOB_ICONS: Record<string, React.ReactNode> = {
   'evaluate-recommender': <BiotechIcon />,
   'refresh-embedding-centering': <PsychologyIcon />,
   'refresh-recommendation-explanations': <AutoAwesomeIcon />,
+  'check-recommendation-explanations': <FactCheckIcon />,
   'generate-title-analysis': <TheatersIcon />,
   'refresh-ratings': <StarHalfIcon />,
   'sync-home-sections': <HomeIcon />,
@@ -95,6 +97,7 @@ export const JOB_COLORS: Record<string, string> = {
   'evaluate-recommender': '#14b8a6',
   'refresh-embedding-centering': '#a855f7',
   'refresh-recommendation-explanations': '#06b6d4',
+  'check-recommendation-explanations': '#0ea5e9',
   'generate-title-analysis': '#e91e63',
   'refresh-ratings': '#f97316',
   'sync-home-sections': '#eab308',

@@ -87,6 +87,16 @@ export const jobDefinitions: JobDefinition[] = [
     cron: null,
     manualOnly: true,
   },
+  // A measurement, not a step in the pipeline: nothing a viewer sees reads
+  // its results. Manual because each explanation is one paid decision-model
+  // call, and the point is to check, label, and only then decide anything.
+  {
+    name: 'check-recommendation-explanations',
+    description:
+      'Asks the decision model four questions about each written explanation on the current recommendations: does it present a context-only title as the reason, claim a link the data does not support, state a fact it was not given, or give the ending away. Stores the answers for the Decision model card and changes nothing viewers see. Skips explanations already checked with the same model.',
+    cron: null,
+    manualOnly: true,
+  },
   // === Title analysis (per title, from retrieved sources, shared by all users) ===
   // Schedulable, with an operator-chosen cap per run so a cadence can be sized
   // to the hardware: a title takes one to three minutes, and a run still in
