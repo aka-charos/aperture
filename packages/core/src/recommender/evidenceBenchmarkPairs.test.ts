@@ -95,6 +95,8 @@ test('the threshold call is the panel own bar', () => {
 function result(over: Partial<BenchmarkPairResult>): BenchmarkPairResult {
   return {
     id: 'x',
+    source: 'reference',
+    mediaType: 'movie',
     label: 'yes',
     reason: { kind: 'sameDirector' },
     pickTitle: 'P',
@@ -163,6 +165,17 @@ test('the no-shared-credits subtotal counts only pairs the rule could not link',
   ])
   assert.deepEqual(score.noSharedCredits, { scored: 2, thresholdRight: 1, ruleRight: 1, modelRight: 2 })
   assert.equal(score.modelBeatRule, 1)
+})
+
+test('the reference set and your labels are tallied apart as well as together', () => {
+  const score = scoreBenchmark([
+    result({}),
+    result({ source: 'yours', mediaType: 'series', reason: { kind: 'yourLabel' } }),
+    result({ source: 'yours', mediaType: 'series', reason: { kind: 'yourLabel' }, label: 'no' }),
+  ])
+  assert.equal(score.scored, 3)
+  assert.deepEqual(score.bySource.reference, { scored: 1, thresholdRight: 1, ruleRight: 1, modelRight: 1 })
+  assert.deepEqual(score.bySource.yours, { scored: 2, thresholdRight: 1, ruleRight: 1, modelRight: 1 })
 })
 
 // -------------------------------------------------------------- the credits rule

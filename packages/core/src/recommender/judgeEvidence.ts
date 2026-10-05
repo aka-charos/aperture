@@ -54,7 +54,17 @@ const CONSECUTIVE_FAILURE_LIMIT = 3
  * A pick placed by a reserved slot, read the way `readSlotOrigin` reads it: the
  * key present AND not JSON null.
  */
-const RESERVED_SLOT_SQL = `(
+/**
+ * Each viewer's newest completed run per media type — the run every reader
+ * resolves (the panel, the explanation refresh). Shared by the read-back and
+ * the labelling queue so the two can never be reading different runs.
+ */
+export const NEWEST_RUNS_SQL = `SELECT DISTINCT ON (user_id, media_type) id, media_type
+  FROM recommendation_runs
+  WHERE status = 'completed' AND channel_id IS NULL
+  ORDER BY user_id, media_type, created_at DESC`
+
+export const RESERVED_SLOT_SQL = `(
   COALESCE(jsonb_typeof(rc.score_breakdown->'twinMatch'), 'null') <> 'null'
   OR COALESCE(jsonb_typeof(rc.score_breakdown->'interestMatch'), 'null') <> 'null'
   OR COALESCE(jsonb_typeof(rc.score_breakdown->'acclaimedMatch'), 'null') <> 'null'
@@ -98,8 +108,12 @@ export async function loadJudgedTitleFacts(
       ? `SELECT id, title, year, genres, directors, keywords, overview,
                 collection_name AS franchise, NULL::text AS network
          FROM movies WHERE id = ANY($1)`
-      : `SELECT id, title, year, genres, directors, keywords, overview,
-                NULL::text AS franchise, network
+      : // The media server supplies creators for almost no show (0192), so
+        // TMDb's are read whenever its list is empty. Same fallback for the
+        // model and the credits rule, since both are handed these facts.
+        `SELECT id, title, year, genres,
+                COALESCE(NULLIF(directors, '{}'::text[]), tmdb_creators, '{}'::text[]) AS directors,
+                keywords, overview, NULL::text AS franchise, network
          FROM series WHERE id = ANY($1)`,
     [ids]
   )
@@ -436,12 +450,7 @@ export async function getEvidenceJudgmentStats(): Promise<EvidenceJudgmentStats>
       judged_connection: number | string | null
       judged_model: string | null
     }>(
-      `WITH latest AS (
-         SELECT DISTINCT ON (user_id, media_type) id, media_type
-         FROM recommendation_runs
-         WHERE status = 'completed' AND channel_id IS NULL
-         ORDER BY user_id, media_type, created_at DESC
-       )
+      `WITH latest AS (${NEWEST_RUNS_SQL})
        SELECT l.id AS run_id, rc.id AS candidate_id, l.media_type,
               COALESCE(pm.title, ps.title) AS pick_title,
               COALESCE(em.title, es.title) AS evidence_title,

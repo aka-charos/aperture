@@ -32,6 +32,9 @@ type BenchmarkLabel = 'yes' | 'no' | 'arguable'
 
 interface BenchmarkPairResult {
   id: string
+  /** Absent on a server older than live labels: read as the reference set. */
+  source?: 'reference' | 'yours'
+  mediaType?: 'movie' | 'series'
   label: BenchmarkLabel
   reason: { kind: string; name?: string }
   pickTitle: string
@@ -62,6 +65,7 @@ interface BenchmarkScore extends BenchmarkTally {
   modelBeatRule?: number
   ruleBeatModel?: number
   noSharedCredits?: BenchmarkTally
+  bySource?: { reference: BenchmarkTally; yours: BenchmarkTally }
   unstable: number
   arguable: number
   notInLibrary: number
@@ -137,6 +141,22 @@ export function DecisionModelBenchmarkResults({ result }: { result: BenchmarkRes
             modelRight: score.noSharedCredits.modelRight,
           })}
         </Alert>
+      )}
+      {/* Your labels are read apart from the reference set: they come from
+          live disagreements, so they are the harder, more relevant pairs. */}
+      {score.bySource && score.bySource.yours.scored > 0 && (
+        <Typography variant="body2">
+          {t('settingsDecisionModel.benchmarkBySource', {
+            refScored: score.bySource.reference.scored,
+            refThreshold: score.bySource.reference.thresholdRight,
+            refRule: score.bySource.reference.ruleRight ?? 0,
+            refModel: score.bySource.reference.modelRight,
+            yoursScored: score.bySource.yours.scored,
+            yoursThreshold: score.bySource.yours.thresholdRight,
+            yoursRule: score.bySource.yours.ruleRight ?? 0,
+            yoursModel: score.bySource.yours.modelRight,
+          })}
+        </Typography>
       )}
       {score.noSharedCredits && score.noSharedCredits.scored < 10 && score.scored > 0 && (
         <Typography variant="caption" color="text.secondary">

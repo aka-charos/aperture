@@ -1587,6 +1587,23 @@ export {
   type EvidenceJudgeTestResult,
   type EvidenceJudgmentStats,
 } from './recommender/judgeEvidence.js'
+// Labelling live evidence: the pairs the three judges disagree on, judged blind.
+export {
+  getLabellingQueue,
+  setEvidenceLabel,
+  isLabellingFilter,
+  LABELLING_FILTERS,
+  type LabellingFilter,
+  type LabellingItem,
+  type LabellingQueue,
+} from './recommender/evidenceLabels.js'
+export {
+  isEvidenceLabel,
+  isLabellingMediaType,
+  EVIDENCE_LABELS,
+  type EvidenceLabel,
+  type LabellingMediaType,
+} from './recommender/evidenceLabelling.js'
 // The labelled-pair benchmark: model vs threshold, on this library, read-only.
 export { runEvidenceBenchmark, type EvidenceBenchmarkResult } from './recommender/evidenceBenchmark.js'
 export {

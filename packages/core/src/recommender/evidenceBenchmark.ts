@@ -1,16 +1,20 @@
 /**
- * Run the labelled pairs (./evidenceBenchmarkPairs.ts) through a decision
- * model, the cosine bar AND the free credits rule (same director or same
- * franchise), on this library, and score all three against the labels.
+ * Run labelled pairs through a decision model, the cosine bar AND the free
+ * credits rule (same director or same franchise), on this library, and score
+ * all three against the labels.
  *
- * The rule is there because the first benchmark showed most labelled reasons
+ * TWO SOURCES OF LABELS. The reference pairs (./evidenceBenchmarkPairs.ts) are
+ * the cases quoted in the threshold's own derivations, resolved by title. The
+ * operator's labels (./evidenceLabels.ts) are pairs from live runs, judged
+ * blind on the card, resolved by id — movies and series alike. Both are scored
+ * the same way, and reported together and per source.
+ *
+ * The rule is there because the first benchmark showed most reference reasons
  * share a director or a franchise — fields the model is handed — so beating
  * the cosine bar alone did not show the model was worth more than reading two
  * columns. The no-shared-credits subtotal is where that question is answered.
  *
- * The point is a like-for-like answer to "is the model better than the
- * threshold?" without switching anything on: it reads the library, writes
- * nothing, and changes no one's recommendations.
+ * It reads the library, writes nothing, and changes no one's recommendations.
  *
  * SAME REQUEST AS A RUN. Titles are described by loadJudgedTitleFacts and the
  * question is built by buildEvidenceJudgmentRequest — the functions a run uses
@@ -21,7 +25,7 @@
  * BOUNDED BY A DEADLINE, not by the work. It answers within one request, and a
  * request held open for minutes is cut by whichever proxy in front of the API
  * is least patient (F-141). Pairs not asked in time are reported as not run,
- * never silently dropped, and the score only counts pairs both sides answered.
+ * never silently dropped, and the score only counts pairs every judge answered.
  */
 import { query } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
@@ -32,7 +36,11 @@ import {
   sanitizeDecisionModelConfig,
   type DecisionModelConfig,
 } from '../lib/decisionModelRules.js'
-import { buildEvidenceJudgmentRequest, readEvidenceJudgments } from './evidenceJudgment.js'
+import {
+  buildEvidenceJudgmentRequest,
+  readEvidenceJudgments,
+  type JudgedTitleFacts,
+} from './evidenceJudgment.js'
 import {
   BENCHMARK_PAIRS,
   BENCHMARK_RUNS_PER_PAIR,
@@ -46,6 +54,7 @@ import {
 } from './evidenceBenchmarkPairs.js'
 import { EVIDENCE_CAUSAL_MIN_COSINE } from './evidenceStrength.js'
 import { loadJudgedTitleFacts } from './judgeEvidence.js'
+import { listEvidenceLabels } from './evidenceLabels.js'
 
 const logger = createChildLogger('evidence-benchmark')
 
@@ -54,6 +63,11 @@ const BENCHMARK_DEADLINE_MS = 45_000
 /** A call with less time than this left is not started. */
 const MIN_CALL_MS = 1_500
 const CONSECUTIVE_FAILURE_LIMIT = 3
+/**
+ * Your labels re-asked per run, newest first. With the reference pairs that is
+ * about 300 calls, which measured at ~0.1s each fits the deadline with room.
+ */
+const LABELLED_PAIR_LIMIT = 120
 
 export type EvidenceBenchmarkResult =
   | {
@@ -77,6 +91,15 @@ interface ResolvedTitle {
   id: string
   title: string
   year: number | null
+}
+
+type MediaType = 'movie' | 'series'
+
+interface PairInLibrary {
+  index: number
+  mediaType: MediaType
+  pickId: string
+  watchedId: string
 }
 
 /**
@@ -121,25 +144,32 @@ function firstResolved(
 }
 
 async function loadSimilarities(
-  pairs: Array<{ pickId: string; watchedId: string }>
-): Promise<{ similarities: Array<number | null>; embeddingSet: string | null }> {
-  const embeddingSet = await getActiveEmbeddingModelId()
+  mediaType: MediaType,
+  pairs: Array<{ pickId: string; watchedId: string }>,
+  embeddingSet: string | null
+): Promise<Array<number | null>> {
   const similarities: Array<number | null> = pairs.map(() => null)
-  if (!embeddingSet || pairs.length === 0) return { similarities, embeddingSet }
+  if (!embeddingSet || pairs.length === 0) return similarities
 
-  const table = await getActiveEmbeddingTableName('embeddings')
+  // Each media type has its own table under the same set id, exactly as
+  // storeEvidence and storeSeriesEvidence read them.
+  const table = await getActiveEmbeddingTableName(
+    mediaType === 'movie' ? 'embeddings' : 'series_embeddings'
+  )
+  const column = mediaType === 'movie' ? 'movie_id' : 'series_id'
   const result = await query<{ i: string; similarity: number | string }>(
     `SELECT p.i::text AS i, 1 - (a.embedding <=> b.embedding) AS similarity
      FROM unnest($1::uuid[], $2::uuid[]) WITH ORDINALITY AS p(pick, watched, i)
-     JOIN ${table} a ON a.movie_id = p.pick AND a.model = $3
-     JOIN ${table} b ON b.movie_id = p.watched AND b.model = $3`,
+     JOIN ${table} a ON a.${column} = p.pick AND a.model = $3
+     JOIN ${table} b ON b.${column} = p.watched AND b.model = $3`,
     [pairs.map((p) => p.pickId), pairs.map((p) => p.watchedId), embeddingSet]
   )
   for (const row of result.rows) {
-    const value = typeof row.similarity === 'number' ? row.similarity : Number.parseFloat(row.similarity)
+    const value =
+      typeof row.similarity === 'number' ? row.similarity : Number.parseFloat(row.similarity)
     if (Number.isFinite(value)) similarities[Number(row.i) - 1] = value
   }
-  return { similarities, embeddingSet }
+  return similarities
 }
 
 export async function runEvidenceBenchmark(
@@ -153,10 +183,29 @@ export async function runEvidenceBenchmark(
   if (!endpoint.ok) return { success: false, error: endpoint.reason }
 
   try {
-    const resolved = await resolveTitles(BENCHMARK_PAIRS.flatMap((p) => [...p.pick, ...p.watched]))
+    const [resolved, labels, embeddingSet] = await Promise.all([
+      resolveTitles(BENCHMARK_PAIRS.flatMap((p) => [...p.pick, ...p.watched])),
+      listEvidenceLabels(LABELLED_PAIR_LIMIT),
+      getActiveEmbeddingModelId(),
+    ])
 
     const results: BenchmarkPairResult[] = []
-    const inLibrary: Array<{ index: number; pickId: string; watchedId: string }> = []
+    const inLibrary: PairInLibrary[] = []
+    const freshResult = (): Pick<
+      BenchmarkPairResult,
+      'similarity' | 'thresholdSays' | 'modelRuns' | 'modelSays' | 'unstable' | 'ruleSays' | 'ruleBasis'
+    > => ({
+      similarity: null,
+      thresholdSays: null,
+      modelRuns: [],
+      modelSays: null,
+      unstable: false,
+      ruleSays: null,
+      ruleBasis: null,
+    })
+
+    // The reference pairs, resolved by title.
+    const referenceKeys = new Set<string>()
     for (const pair of BENCHMARK_PAIRS) {
       const pick = firstResolved(pair.pick, resolved)
       const watched = firstResolved(pair.watched, resolved)
@@ -164,52 +213,100 @@ export async function runEvidenceBenchmark(
       if (!pick) missing.push('pick')
       if (!watched) missing.push('watched')
       results.push({
+        ...freshResult(),
         id: pair.id,
+        source: 'reference',
+        mediaType: 'movie',
         label: pair.label,
         reason: pair.reason,
         pickTitle: pick?.title ?? pair.pick[0].title,
         watchedTitle: watched?.title ?? pair.watched[0].title,
         status: missing.length > 0 ? 'notInLibrary' : 'notRun',
         missing,
-        similarity: null,
-        thresholdSays: null,
-        modelRuns: [],
-        modelSays: null,
-        unstable: false,
-        ruleSays: null,
-        ruleBasis: null,
       })
       if (pick && watched) {
-        inLibrary.push({ index: results.length - 1, pickId: pick.id, watchedId: watched.id })
+        inLibrary.push({ index: results.length - 1, mediaType: 'movie', pickId: pick.id, watchedId: watched.id })
+        referenceKeys.add(`movie:${pick.id}:${watched.id}`)
       }
     }
 
-    const { similarities, embeddingSet } = await loadSimilarities(inLibrary)
-    inLibrary.forEach((p, i) => {
-      results[p.index].similarity = similarities[i]
-      results[p.index].thresholdSays = thresholdVerdict(similarities[i])
-    })
-
-    const facts = await loadJudgedTitleFacts(
-      'movie',
-      [...new Set(inLibrary.flatMap((p) => [p.pickId, p.watchedId]))]
+    // Your labels, by id. A label on a pair the reference set already holds is
+    // not asked twice; the reference row stands for it.
+    const labelled = labels.filter(
+      (l) => !referenceKeys.has(`${l.mediaType}:${l.pickId}:${l.watchedId}`)
     )
+
+    const ids: Record<MediaType, Set<string>> = { movie: new Set(), series: new Set() }
+    for (const p of inLibrary) {
+      ids.movie.add(p.pickId)
+      ids.movie.add(p.watchedId)
+    }
+    for (const l of labelled) {
+      ids[l.mediaType].add(l.pickId)
+      ids[l.mediaType].add(l.watchedId)
+    }
+    const [movieFacts, seriesFacts] = await Promise.all([
+      loadJudgedTitleFacts('movie', [...ids.movie]),
+      loadJudgedTitleFacts('series', [...ids.series]),
+    ])
+    const factsFor = (mediaType: MediaType, id: string): JudgedTitleFacts | undefined =>
+      (mediaType === 'movie' ? movieFacts : seriesFacts).get(id)
+
+    for (const l of labelled) {
+      const pick = factsFor(l.mediaType, l.pickId)
+      const watched = factsFor(l.mediaType, l.watchedId)
+      const missing: Array<'pick' | 'watched'> = []
+      if (!pick) missing.push('pick')
+      if (!watched) missing.push('watched')
+      results.push({
+        ...freshResult(),
+        id: `yours:${l.mediaType}:${l.pickId}:${l.watchedId}`,
+        source: 'yours',
+        mediaType: l.mediaType,
+        label: l.label,
+        reason: { kind: 'yourLabel' },
+        pickTitle: pick?.title ?? '—',
+        watchedTitle: watched?.title ?? '—',
+        status: missing.length > 0 ? 'notInLibrary' : 'notRun',
+        missing,
+      })
+      if (pick && watched) {
+        inLibrary.push({
+          index: results.length - 1,
+          mediaType: l.mediaType,
+          pickId: l.pickId,
+          watchedId: l.watchedId,
+        })
+      }
+    }
+
+    // Cosines, per media type, as the panel's threshold reads them.
+    for (const mediaType of ['movie', 'series'] as const) {
+      const ofType = inLibrary.filter((p) => p.mediaType === mediaType)
+      const similarities = await loadSimilarities(mediaType, ofType, embeddingSet)
+      ofType.forEach((p, i) => {
+        results[p.index].similarity = similarities[i]
+        results[p.index].thresholdSays = thresholdVerdict(similarities[i])
+      })
+    }
 
     // The free baseline, from the same facts the model is about to be shown.
     for (const p of inLibrary) {
-      const pickFacts = facts.get(p.pickId)
-      const watchedFacts = facts.get(p.watchedId)
+      const pickFacts = factsFor(p.mediaType, p.pickId)
+      const watchedFacts = factsFor(p.mediaType, p.watchedId)
       if (!pickFacts || !watchedFacts) continue
       const rule = creditsRuleVerdict(pickFacts, watchedFacts)
       results[p.index].ruleSays = rule.says
       results[p.index].ruleBasis = rule.basis
     }
 
-    // Every (pair, run) is one task; the pool works through them in order, so
-    // a deadline cuts the tail of the list rather than random pairs.
-    const tasks = inLibrary.flatMap((p) =>
-      Array.from({ length: BENCHMARK_RUNS_PER_PAIR }, () => p)
-    )
+    // Every (pair, run) is one task, your labels first: if the deadline cuts
+    // the tail, it cuts the reference pairs, whose answers are already known.
+    const ordered = [
+      ...inLibrary.filter((p) => results[p.index].source === 'yours'),
+      ...inLibrary.filter((p) => results[p.index].source === 'reference'),
+    ]
+    const tasks = ordered.flatMap((p) => Array.from({ length: BENCHMARK_RUNS_PER_PAIR }, () => p))
     const errors = new Map<number, string>()
     let answeredModel: string | null = null
     let stoppedReason: string | null = null
@@ -226,11 +323,11 @@ export async function runEvidenceBenchmark(
           stoppedReason = 'time limit reached'
           return
         }
-        const pickFacts = facts.get(task.pickId)
-        const watchedFacts = facts.get(task.watchedId)
+        const pickFacts = factsFor(task.mediaType, task.pickId)
+        const watchedFacts = factsFor(task.mediaType, task.watchedId)
         if (!pickFacts || !watchedFacts) continue
 
-        const request = buildEvidenceJudgmentRequest(pickFacts, [watchedFacts], 'movie')
+        const request = buildEvidenceJudgmentRequest(pickFacts, [watchedFacts], task.mediaType)
         try {
           const answer = await callSystemOne(
             endpoint.endpoint,

@@ -9,6 +9,8 @@
  * - GET  /api/settings/decision-model/models  - what the chosen source offers
  * - GET  /api/settings/decision-model/stats   - stored verdicts vs the cosine bar
  * - DELETE /api/settings/decision-model/verdicts - forget every stored verdict
+ * - GET  /api/settings/decision-model/labelling - pairs the judges disagree on, to label blind
+ * - PUT  /api/settings/decision-model/labels  - record, change or remove one label
  *
  * See core lib/decisionModel.ts and recommender/judgeEvidence.ts.
  */
@@ -18,6 +20,11 @@ import {
   clearEvidenceJudgments,
   getDecisionModelConfig,
   getEvidenceJudgmentStats,
+  getLabellingQueue,
+  isEvidenceLabel,
+  isLabellingFilter,
+  isLabellingMediaType,
+  setEvidenceLabel,
   isDecisionModelSource,
   listDecisionModels,
   runEvidenceBenchmark,
@@ -33,6 +40,8 @@ import {
   type DecisionModelSource,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 interface DecisionModelUpdateBody {
   enabled?: boolean
@@ -283,6 +292,73 @@ export function registerDecisionModelHandlers(fastify: FastifyInstance) {
     { preHandler: requireAdmin, schema: { tags: ['settings'] } },
     async (_request, reply) => {
       return reply.send(await getEvidenceJudgmentStats())
+    }
+  )
+
+  /**
+   * The pairs the three judges disagree on, for the operator to label blind.
+   * Every verdict ships with the item; the card hides them until a label is
+   * given, so the client is trusted with the blindness, not with a rule.
+   */
+  fastify.get<{ Querystring: { filter?: string; offset?: number; limit?: number } }>(
+    '/api/settings/decision-model/labelling',
+    {
+      preHandler: requireAdmin,
+      schema: {
+        tags: ['settings'],
+        querystring: {
+          type: 'object',
+          properties: {
+            filter: { type: 'string' },
+            offset: { type: 'integer', minimum: 0 },
+            limit: { type: 'integer', minimum: 0, maximum: 100 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { filter, offset, limit } = request.query
+      if (filter !== undefined && !isLabellingFilter(filter)) {
+        return reply.status(400).send({ error: 'Unknown filter' })
+      }
+      try {
+        return reply.send(await getLabellingQueue({ filter, offset, limit }))
+      } catch (err) {
+        fastify.log.error({ err }, 'Failed to read the labelling queue')
+        return reply.status(500).send({ error: 'Failed to read the labelling queue' })
+      }
+    }
+  )
+
+  /**
+   * Record, change or (label: null) remove one label. Answers with the fresh
+   * counts and tallies, so the card updates its score without re-reading a
+   * page that would drop the row the operator just labelled.
+   */
+  fastify.put<{
+    Body: { mediaType?: unknown; pickId?: unknown; watchedId?: unknown; label?: unknown }
+  }>(
+    '/api/settings/decision-model/labels',
+    { preHandler: requireAdmin, schema: { tags: ['settings'] } },
+    async (request, reply) => {
+      const { mediaType, pickId, watchedId, label } = request.body ?? {}
+      if (!isLabellingMediaType(mediaType)) {
+        return reply.status(400).send({ error: 'mediaType must be movie or series' })
+      }
+      if (typeof pickId !== 'string' || !UUID.test(pickId) || typeof watchedId !== 'string' || !UUID.test(watchedId)) {
+        return reply.status(400).send({ error: 'pickId and watchedId must be ids' })
+      }
+      if (label !== null && !isEvidenceLabel(label)) {
+        return reply.status(400).send({ error: 'label must be yes, no, arguable or null' })
+      }
+      try {
+        await setEvidenceLabel({ mediaType, pickId, watchedId, label, userId: request.user?.id ?? null })
+        const { counts, labelled, arguable, tally, noSharedCreditsTally } = await getLabellingQueue({ limit: 0 })
+        return reply.send({ counts, labelled, arguable, tally, noSharedCreditsTally })
+      } catch (err) {
+        fastify.log.error({ err }, 'Failed to save an evidence label')
+        return reply.status(500).send({ error: 'Failed to save the label' })
+      }
     }
   )
 

@@ -44,6 +44,8 @@ export type BenchmarkReasonKind =
   | 'actorOnly'
   | 'arguableStar'
   | 'arguableStudio'
+  /** A pair the operator labelled from the live queue (evidenceLabels.ts). */
+  | 'yourLabel'
 
 export interface BenchmarkTitle {
   title: string
@@ -315,8 +317,13 @@ export const BENCHMARK_RUNS_PER_PAIR = 2
 
 export type BenchmarkPairStatus = 'scored' | 'notInLibrary' | 'failed' | 'notRun'
 
+/** Where a benchmark pair came from: this file, or the operator's live labels. */
+export type BenchmarkSource = 'reference' | 'yours'
+
 export interface BenchmarkPairResult {
   id: string
+  source: BenchmarkSource
+  mediaType: 'movie' | 'series'
   label: BenchmarkLabel
   reason: { kind: BenchmarkReasonKind; name?: string }
   /** The titles as the library holds them, or as requested when not found. */
@@ -364,6 +371,8 @@ export interface BenchmarkScore extends BenchmarkTally {
    * than the free rule.
    */
   noSharedCredits: BenchmarkTally
+  /** The same tally per source, so the reference set and your labels read apart. */
+  bySource: Record<BenchmarkSource, BenchmarkTally>
   unstable: number
   arguable: number
   notInLibrary: number
@@ -440,6 +449,7 @@ export function scoreBenchmark(results: readonly BenchmarkPairResult[]): Benchma
     modelBeatRule: 0,
     ruleBeatModel: 0,
     noSharedCredits: emptyTally(),
+    bySource: { reference: emptyTally(), yours: emptyTally() },
     unstable: 0,
     arguable: 0,
     notInLibrary: 0,
@@ -463,7 +473,8 @@ export function scoreBenchmark(results: readonly BenchmarkPairResult[]): Benchma
     const ruleRight = r.ruleSays === truth
     const modelRight = r.modelSays === truth
 
-    const tallies = r.ruleBasis == null ? [score, score.noSharedCredits] : [score]
+    const tallies: BenchmarkTally[] = [score, score.bySource[r.source ?? 'reference']]
+    if (r.ruleBasis == null) tallies.push(score.noSharedCredits)
     for (const tally of tallies) {
       tally.scored++
       if (thresholdRight) tally.thresholdRight++

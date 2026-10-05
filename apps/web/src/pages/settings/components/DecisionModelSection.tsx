@@ -8,10 +8,11 @@
  * fixed pairs rather than a ping — a model that answers 0.5 to everything
  * "works" and buys nothing.
  *
- * The lower half reads back what the stored verdicts did: how often they agreed
- * with the similarity bar, and examples of where they did not. Disagreements
- * are the only place the feature can earn its keep, so they are what an
- * operator needs to read to decide whether to leave it on.
+ * The lower half reads back what the stored verdicts did — how often they
+ * agreed with the similarity bar — and then hands every disagreement between
+ * the three judges (bar, director-or-franchise rule, model) to the operator to
+ * label blind (DecisionModelLabelling). Disagreements are the only place a
+ * judge can earn its keep, and only a person can say which judge was right.
  *
  * Model ids and prices come from the server; the bundle holds no list of them.
  */
@@ -38,11 +39,6 @@ import {
   InputAdornment,
   Stack,
   Switch,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -58,6 +54,7 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import ScienceIcon from '@mui/icons-material/Science'
 import { jobConsoleLink } from '@/pages/jobs/registry'
 import { DecisionModelBenchmarkResults, type BenchmarkResult } from './DecisionModelBenchmark'
+import { DecisionModelLabelling } from './DecisionModelLabelling'
 
 type Source = 'openrouter' | 'custom'
 
@@ -99,16 +96,6 @@ type TestResult =
     }
   | { success: false; error: string }
 
-interface Disagreement {
-  mediaType: string
-  pickTitle: string
-  evidenceTitle: string
-  similarity: number | null
-  judgedConnection: number | null
-  judgeSupports: boolean
-  cosineSupports: boolean
-}
-
 interface Stats {
   runs: number
   picks: number
@@ -116,7 +103,6 @@ interface Stats {
   agree: number
   judgeOnly: number
   cosineOnly: number
-  examples: Disagreement[]
   /** Judged picks per answering model. More than one means the counts pool them. */
   models: Array<{ model: string; picks: number }>
 }
@@ -698,40 +684,6 @@ export function DecisionModelSection() {
                     </Typography>
                   )
                 )}
-                {stats.examples.length > 0 && (
-                  <Box sx={{ overflowX: 'auto' }}>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>{t('settingsDecisionModel.columnPick')}</TableCell>
-                          <TableCell>{t('settingsDecisionModel.columnEvidence')}</TableCell>
-                          <TableCell align="right">{t('settingsDecisionModel.columnSimilarity')}</TableCell>
-                          <TableCell align="right">{t('settingsDecisionModel.columnVerdict')}</TableCell>
-                          <TableCell>{t('settingsDecisionModel.columnDirection')}</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {stats.examples.map((example, index) => (
-                          <TableRow key={`${example.pickTitle}-${index}`}>
-                            <TableCell>{example.pickTitle}</TableCell>
-                            <TableCell>{example.evidenceTitle}</TableCell>
-                            <TableCell align="right">
-                              {example.similarity != null ? example.similarity.toFixed(3) : '—'}
-                            </TableCell>
-                            <TableCell align="right">
-                              {example.judgedConnection != null ? `${percent(example.judgedConnection)}%` : '—'}
-                            </TableCell>
-                            <TableCell>
-                              {example.judgeSupports
-                                ? t('settingsDecisionModel.directionJudge')
-                                : t('settingsDecisionModel.directionCosine')}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </Box>
-                )}
                 <Box mt={2}>
                   <Button
                     color="warning"
@@ -746,6 +698,8 @@ export function DecisionModelSection() {
                     {t('settingsDecisionModel.clearHint')}
                   </Typography>
                 </Box>
+                <Divider sx={{ my: 2 }} />
+                <DecisionModelLabelling />
               </>
             )}
           </Box>
