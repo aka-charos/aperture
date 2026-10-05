@@ -1,4 +1,5 @@
 import type { ReasoningMechanism } from '../reasoningEffort.js'
+import type { FlexSummary } from '../serviceTier.js'
 
 export interface ModelCapabilities {
   supportsToolCalling: boolean
@@ -147,6 +148,15 @@ export interface ModelMetadata {
    * rather than an unknown.
    */
   supportedParameters?: readonly string[]
+  /**
+   * Whether OpenRouter sells this model on the flex tier, read from its
+   * endpoints listing — the bulk catalogue carries no tier information. Stamped
+   * by `getModelsForFunctionWithCustom` only on a role that applies a tier, so
+   * ABSENT means "offer no tier control", and `status: 'unknown'` (the listing
+   * could not be read) stays distinct from `'unavailable'`. See
+   * `../serviceTier.ts`.
+   */
+  flexTier?: FlexSummary
 
   description?: string
   quality?: 'budget' | 'standard' | 'premium'

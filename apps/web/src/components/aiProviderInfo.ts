@@ -109,6 +109,36 @@ export interface FunctionConfig {
    */
   temperature?: number | null
   topP?: number | null
+  /**
+   * OpenRouter's capacity tier. Absent = the default tier; `flex` is cheaper
+   * and slower and is never retried on standard capacity. Sent as null to go
+   * back to Default — `default` itself is never stored.
+   *
+   * Whether the chosen model has a flex tier is decided server-side from its
+   * endpoints listing and rides in the models response as `flexTier`; the
+   * server validates against the same listing.
+   */
+  serviceTier?: 'flex' | null
+}
+
+/**
+ * What the server decided about OpenRouter's flex tier for one model. Mirrors
+ * core's `FlexSummary` (the web bundle never imports `@aperture/core`).
+ *
+ * `unknown` means the endpoints listing could not be read, and is deliberately
+ * NOT `unavailable`: telling an operator a model has no flex tier when the truth
+ * is that OpenRouter did not answer would send them looking for another model
+ * for no reason.
+ */
+export interface FlexTierInfo {
+  status: 'available' | 'unavailable' | 'unknown'
+  providers: string[]
+  inputCostPerMillion: number | null
+  outputCostPerMillion: number | null
+  standardInputCostPerMillion: number | null
+  standardOutputCostPerMillion: number | null
+  /** Parameters this app sends that standard capacity takes and flex does not. */
+  missingParameters: string[]
 }
 
 /**

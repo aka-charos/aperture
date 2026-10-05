@@ -81,11 +81,17 @@ import {
   getSupportedGenerationParams,
   roleReadsGenerationParams,
   GENERATION_PARAM_RANGES,
+  getSupportedServiceTiers,
+  roleReadsServiceTier,
+  resolveServiceTier,
+  isServiceTierOption,
+  SERVICE_TIER_OPTIONS,
   getModel,
   EMBEDDING_INPUT_TYPES,
   type AIFunction,
   type EmbeddingInputType,
   type ProviderType,
+  type StoredServiceTier,
 } from '@aperture/core'
 import { query } from '../../../lib/db.js'
 import { requireAdmin, requireAuth } from '../../../plugins/auth.js'
@@ -932,6 +938,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       reasoningEffort?: string | null
       temperature?: number | null
       topP?: number | null
+      serviceTier?: string | null
       analysisPromptVariant?: string | null
     }
   }>('/api/settings/ai/:function', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (request, reply) => {
@@ -951,6 +958,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         reasoningEffort,
         temperature,
         topP,
+        serviceTier,
         analysisPromptVariant,
       } = request.body
 
@@ -1205,6 +1213,56 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         sampling[field] = raw
       }
 
+      // OpenRouter's capacity tier. Same three rules as the controls above —
+      // omitted leaves it alone, null/'' (or `default`, which is the absence of
+      // a tier rather than a tier) clears it, and a role or provider that does
+      // not apply it may not store it.
+      //
+      // Validated against THIS MODEL'S endpoints listing, the same call that
+      // stamps the card's control, because flex is a property of the model's
+      // upstreams and most models have none. Unlike a missing effort word, a
+      // flex request to a model without flex does not fail — OpenRouter routes
+      // it at the standard rate — so storing it would be a setting that saves,
+      // displays "Flex" and quietly bills full price.
+      let nextServiceTier: StoredServiceTier | undefined
+      if (serviceTier === undefined) {
+        nextServiceTier = resolveServiceTier(existing)
+      } else if (serviceTier === null || serviceTier === '' || serviceTier === 'default') {
+        nextServiceTier = undefined
+      } else if (!isServiceTierOption(serviceTier)) {
+        return reply.status(400).send({
+          error: `Service tier must be one of: ${SERVICE_TIER_OPTIONS.join(', ')}.`,
+        })
+      } else if (!roleReadsServiceTier(fn)) {
+        return reply.status(400).send({
+          error: `The ${fn} role does not apply a service tier.`,
+        })
+      } else if (provider !== 'openrouter') {
+        return reply.status(400).send({
+          error: 'Only OpenRouter offers a flex service tier. Leave it on Default, or choose an OpenRouter model.',
+        })
+      } else {
+        const tiers = await getSupportedServiceTiers(provider, model, fn)
+        if (tiers == null) {
+          // Unknown is not "no": say so rather than refusing a model that may
+          // well have flex, and rather than storing something unconfirmed.
+          return reply.status(503).send({
+            error: `Could not reach OpenRouter to confirm that ${model} has a flex endpoint. Try again in a moment.`,
+          })
+        }
+        if (!tiers.includes(serviceTier)) {
+          return reply.status(400).send({
+            error: `${model} has no flex endpoint on OpenRouter. Leave it on Default, or choose a model that offers flex.`,
+          })
+        }
+        nextServiceTier = 'flex'
+      }
+
+      // A tier belongs to OpenRouter's language roles alone. Moving a role to
+      // another provider drops it here, rather than storing a value nothing
+      // can send and the request builder would warn about on every call.
+      if (provider !== 'openrouter' || !roleReadsServiceTier(fn)) nextServiceTier = undefined
+
       // A role that changed model since the effort was stored keeps the value
       // but stops sending it — the request builder re-checks per call and warns.
       // Clearing it here would silently discard a choice on a save that never
@@ -1253,6 +1311,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         reasoningEffort: nextReasoningEffort,
         temperature: sampling.temperature,
         topP: sampling.topP,
+        serviceTier: nextServiceTier,
         analysisPromptVariant: nextPromptVariant,
       })
 

@@ -30,6 +30,7 @@ import {
   reasoningEffortsFor,
   resolveReasoningEffort,
   resolveReasoningOptions,
+  roleReadsReasoningEffort,
   weakestEffortAtOrAbove,
   type ReasoningCapableModel,
 } from './reasoningEffort.js'
@@ -39,6 +40,18 @@ import {
   resolveGenerationParams,
 } from './generationParams.js'
 import type { GenerationParameter } from './generationParams.js'
+import {
+  normalizeServedTier,
+  resolveServiceTier,
+  resolveServiceTierDelivery,
+  roleReadsServiceTier,
+  serviceTierOptionsFor,
+  summarizeFlex,
+  type EndpointTier,
+  type FlexSummary,
+  type ServiceTierOption,
+  type StoredServiceTier,
+} from './serviceTier.js'
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
 import { createChildLogger } from './logger.js'
 import {
@@ -51,7 +64,11 @@ import {
   type ModelCapabilities,
   type ModelMetadata,
 } from './ai-capabilities.js'
-import { getOpenRouterModelCapabilities, getOpenRouterModelInfo } from './openrouter-capabilities.js'
+import {
+  getOpenRouterModelCapabilities,
+  getOpenRouterModelInfo,
+  getOpenRouterServiceTierFacts,
+} from './openrouter-capabilities.js'
 import {
   createOpenRouterUsageFetch,
   fetchOpenRouterKeyStatus,
@@ -256,6 +273,23 @@ export interface ProviderConfig {
    */
   temperature?: number
   topP?: number
+  /**
+   * Which OpenRouter capacity tier this role's model is asked for. Absent = the
+   * default tier, which is what every role built before this field existed was
+   * already getting — so `default` is never stored, only its absence.
+   *
+   * `flex` is cheaper (half price on OpenAI's) and slower, and has NO fallback:
+   * OpenRouter confines a flex request to flex endpoints and surfaces a capacity
+   * error rather than quietly charging the standard rate. Which models offer it
+   * is read from each model's endpoints listing — the bulk catalogue does not
+   * say — see ./serviceTier.ts.
+   *
+   * Applied to the model INSTANCE, not to a call, so every call the role makes
+   * carries it — and to the role's own model only: a title-analysis fallback
+   * model is constructed without it, because flex's capacity refusal is a
+   * likely reason the primary failed in the first place.
+   */
+  serviceTier?: StoredServiceTier
   /**
    * Which prompt the Title Analysis writer sends: a variant id, or absent for
    * the current version's own questions and rules.
@@ -579,6 +613,38 @@ const localInferenceFetch: typeof fetch = (url, options) => {
 const ZAI_BASE_URL = 'https://api.z.ai/api/paas/v4'
 
 /**
+ * An OpenRouter provider, the one way one is built.
+ *
+ * Shared by the cached factory below and the connection test's flex probe,
+ * which needs its own instance (it wraps the fetch to read the response's served
+ * tier) and must otherwise be the production request — a probe that builds its
+ * request differently would prove something about itself, not about the path
+ * every role call takes.
+ */
+function createOpenRouterProvider(
+  apiKey: string | undefined,
+  role: AIFunction | undefined,
+  fetchImpl: typeof fetch = createOpenRouterUsageFetch(role)
+): ReturnType<typeof createOpenRouter> {
+  return createOpenRouter({
+    apiKey,
+    // Every response carries a `usage` object with the credits actually
+    // spent; this fetch reads it and writes the ledger the spend dashboard
+    // is built on. See lib/openrouter-usage.ts.
+    fetch: fetchImpl,
+    // Attribution on openrouter.ai's own activity page, so a shared key's
+    // spend can be traced back to this app.
+    headers: {
+      'HTTP-Referer': 'https://github.com/dgruhin-hrizn/aperture',
+      'X-Title': 'Aperture',
+    },
+    // Documented as always-on now, and accepted-and-ignored when it is.
+    // Stated explicitly so the dependency is visible at the call site.
+    extraBody: { usage: { include: true } },
+  })
+}
+
+/**
  * Create a provider instance based on configuration.
  *
  * `role` is only an attribution label: OpenRouter instances get a fetch that
@@ -674,22 +740,7 @@ function createProviderInstance(providerConfig: ProviderConfig, role?: AIFunctio
       break
 
       case 'openrouter':
-        instance = createOpenRouter({
-          apiKey: providerConfig.apiKey,
-          // Every response carries a `usage` object with the credits actually
-          // spent; this fetch reads it and writes the ledger the spend dashboard
-          // is built on. See lib/openrouter-usage.ts.
-          fetch: createOpenRouterUsageFetch(role),
-          // Attribution on openrouter.ai's own activity page, so a shared key's
-          // spend can be traced back to this app.
-          headers: {
-            'HTTP-Referer': 'https://github.com/dgruhin-hrizn/aperture',
-            'X-Title': 'Aperture',
-          },
-          // Documented as always-on now, and accepted-and-ignored when it is.
-          // Stated explicitly so the dependency is visible at the call site.
-          extraBody: { usage: { include: true } },
-        })
+        instance = createOpenRouterProvider(providerConfig.apiKey, role)
         break
 
       // Z.AI speaks the OpenAI wire format at its own base URL, so there is no
@@ -1384,6 +1435,88 @@ export async function getGenerationParamsFor(
 }
 
 /**
+ * The tiers this role's chosen model can be asked for, for the save route.
+ *
+ * `null` means UNKNOWN — OpenRouter's endpoints listing could not be read — and
+ * an empty list means the role, the provider or the model offers no choice.
+ * Kept apart because the save route answers them differently: "try again" for
+ * the first, "this model has no flex tier" for the second.
+ */
+export async function getSupportedServiceTiers(
+  provider: string,
+  modelId: string,
+  fn: AIFunction
+): Promise<readonly ServiceTierOption[] | null> {
+  if (provider !== 'openrouter' || !roleReadsServiceTier(fn)) return []
+  const facts = await getOpenRouterServiceTierFacts(modelId)
+  return facts == null ? null : serviceTierOptionsFor(facts)
+}
+
+/**
+ * The model-level settings a role's language model is built with. Today that is
+ * only OpenRouter's service tier; an empty object means build it exactly as
+ * before this existed.
+ *
+ * Model-level rather than a call option, which is what gives the tier complete
+ * coverage: `@openrouter/ai-sdk-provider` merges a model's `extraBody` into
+ * every request body that instance builds, streamed or not, below anything a
+ * call adds. Every role builds its model in one getter, so no call site can be
+ * the one that forgot — the trap `ROLES_WITH_GENERATION_PARAMS` is one role
+ * long to avoid.
+ *
+ * The warn is the only place an operator learns a saved tier is not reaching
+ * the model. The save route refuses flex for a model without it, so arriving
+ * there means the model lost its flex endpoint since — or the role's model was
+ * changed afterwards, which is why this is resolved per construction rather
+ * than trusted from the save.
+ */
+async function getServiceTierModelSettings(
+  config: ProviderConfig,
+  fn: AIFunction
+): Promise<{ extraBody?: { service_tier: StoredServiceTier } }> {
+  const tier = roleReadsServiceTier(fn) ? resolveServiceTier(config) : undefined
+  if (!tier) return {}
+
+  const facts =
+    config.provider === 'openrouter' ? await getOpenRouterServiceTierFacts(config.model) : null
+  const delivery = resolveServiceTierDelivery({ provider: config.provider, tier, facts })
+
+  if (delivery.undeliverable) {
+    logger.warn(
+      { role: fn, provider: config.provider, model: config.model, tier, undeliverable: delivery.undeliverable },
+      delivery.undeliverable === 'model'
+        ? 'Service tier ignored: this model has no flex endpoint on OpenRouter, so it runs at the standard rate'
+        : 'Service tier ignored: only OpenRouter takes a service tier'
+    )
+    return {}
+  }
+
+  if (delivery.unverified) {
+    logger.info(
+      { role: fn, model: config.model, tier },
+      'Service tier sent unverified: the endpoints listing could not be read (a model without flex routes at the standard rate)'
+    )
+  }
+
+  return delivery.extraBody ? { extraBody: delivery.extraBody } : {}
+}
+
+/**
+ * Build a language model from a provider instance, passing model-level settings
+ * only when there are any — so a role with no tier calls the factory exactly as
+ * it always has, with one argument.
+ */
+function instantiateLanguageModel(
+  instance: unknown,
+  modelId: string,
+  settings: { extraBody?: Record<string, unknown> }
+): LanguageModel {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const factory = instance as any
+  return (settings.extraBody ? factory(modelId, settings) : factory(modelId)) as LanguageModel
+}
+
+/**
  * Get a chat model instance (with tool calling) for the configured provider
  */
 export async function getChatModelInstance(): Promise<LanguageModel> {
@@ -1406,11 +1539,9 @@ export async function getChatModelInstance(): Promise<LanguageModel> {
   // when this role has no key of its own (mirrors getWebSearchModelInstance).
   const resolved = await withResolvedCredentials(config)
   const provider = createProviderInstance(resolved, 'chat')
-  const modelId = resolved.model
 
   // All providers use similar API for language models
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (provider as any)(modelId) as LanguageModel
+  return instantiateLanguageModel(provider, resolved.model, await getServiceTierModelSettings(config, 'chat'))
 }
 
 /** One usable grounding key, already turned into a model instance. */
@@ -1672,11 +1803,13 @@ export async function getTextGenerationModelInstance(): Promise<LanguageModel> {
   // when this role has no key of its own (mirrors getWebSearchModelInstance).
   const resolved = await withResolvedCredentials(config)
   const provider = createProviderInstance(resolved, 'textGeneration')
-  const modelId = resolved.model
 
   // All providers use similar API for language models
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (provider as any)(modelId) as LanguageModel
+  return instantiateLanguageModel(
+    provider,
+    resolved.model,
+    await getServiceTierModelSettings(config, 'textGeneration')
+  )
 }
 
 /**
@@ -1700,6 +1833,11 @@ export interface ModelAttempt {
   spacingMs: number
   /** False for the primary. Only useful for saying so in a log line. */
   isFallback: boolean
+  /**
+   * The OpenRouter tier this attempt's model was built with, for the same log
+   * line. Absent means the default tier — every fallback, and the bench.
+   */
+  serviceTier?: StoredServiceTier
   /**
    * Where this attempt resolved to, carried so a caller can reach the same
    * server WITHOUT the AI SDK. Only LM Studio needs that — its native chat
@@ -1735,21 +1873,35 @@ export async function getTitleAnalysisModelAttempts(): Promise<ModelAttempt[]> {
   }
 
   const spacingMs = resolveCallSpacingMs(config)
-  const build = (providerConfig: ProviderConfig, isFallback: boolean): ModelAttempt => {
+  const build = (
+    providerConfig: ProviderConfig,
+    isFallback: boolean,
+    settings: { extraBody?: { service_tier: StoredServiceTier } } = {}
+  ): ModelAttempt => {
     const instance = createProviderInstance(providerConfig, 'titleAnalysis')
     return {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      model: (instance as any)(providerConfig.model) as LanguageModel,
+      model: instantiateLanguageModel(instance, providerConfig.model, settings),
       modelId: providerConfig.model,
       provider: providerConfig.provider,
       spacingMs,
       isFallback,
+      ...(settings.extraBody && { serviceTier: settings.extraBody.service_tier }),
       ...(providerConfig.baseUrl != null && { baseUrl: providerConfig.baseUrl }),
       ...(providerConfig.apiKey != null && { apiKey: providerConfig.apiKey }),
     }
   }
 
-  const attempts: ModelAttempt[] = [build(await withResolvedCredentials(config), false)]
+  // The tier is the PRIMARY's alone. It was chosen for, and validated against,
+  // that one model; and a fallback exists for the moment the primary failed,
+  // which on flex is quite likely a flex capacity refusal — so the spare that
+  // catches it runs on standard capacity rather than repeating the refusal.
+  const attempts: ModelAttempt[] = [
+    build(
+      await withResolvedCredentials(config),
+      false,
+      await getServiceTierModelSettings(config, 'titleAnalysis')
+    ),
+  ]
 
   for (const fallback of resolveFallbackModels(config)) {
     const sameProvider = fallback.provider === config.provider
@@ -1840,6 +1992,10 @@ export async function buildTitleAnalysisAttemptFor(
 
   const instance = createProviderInstance(resolved, 'titleAnalysis')
   return {
+    // No service tier, even when this is the role's own model on flex. A tier
+    // changes price, latency and availability, never the writing the bench
+    // exists to compare — while flex's capacity refusal would show up in the
+    // report as the model failing.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     model: (instance as any)(model) as LanguageModel,
     modelId: model,
@@ -1868,11 +2024,13 @@ export async function getExplorationModelInstance(): Promise<LanguageModel> {
   // when this role has no key of its own (mirrors getWebSearchModelInstance).
   const resolved = await withResolvedCredentials(config)
   const provider = createProviderInstance(resolved, 'exploration')
-  const modelId = resolved.model
 
   // All providers use similar API for language models
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (provider as any)(modelId) as LanguageModel
+  return instantiateLanguageModel(
+    provider,
+    resolved.model,
+    await getServiceTierModelSettings(config, 'exploration')
+  )
 }
 
 // ============================================================================
@@ -2243,6 +2401,42 @@ export interface ProviderConnectionTest {
    * the test rather than as a 400 two clicks later.
    */
   embeddingDimensionsSupported?: boolean
+  /**
+   * The reasoning-effort words this model accepts, weakest first — the same
+   * list the card's dropdown and the save route use. Present only for a role
+   * that applies an effort; empty means the model offers none.
+   */
+  reasoningEfforts?: readonly string[]
+  /**
+   * Whether this model can be asked for OpenRouter's flex tier, read FRESH from
+   * its endpoints listing, plus — when it can — what a real flex request got.
+   * Present only for OpenRouter on a role that applies a tier.
+   */
+  flexTier?: FlexSummary & { probe?: FlexProbe }
+}
+
+/**
+ * What one real `service_tier: "flex"` request came back with.
+ *
+ * Sent because the listing alone does not answer the question an operator is
+ * asking. Flex never falls back to standard capacity, so a listed flex endpoint
+ * that is refusing work right now means every flex call fails right now; and a
+ * provider may shed a tier request to its default tier and bill accordingly.
+ * Only the response's own `service_tier` field says which happened.
+ */
+export interface FlexProbe {
+  /**
+   * Whether the request body really carried `service_tier: "flex"`, read off
+   * the wire. This is the check on THIS APP: the field reaches OpenRouter only
+   * because `@openrouter/ai-sdk-provider` merges a model's `extraBody` into the
+   * body, and a dependency upgrade that stopped doing so would leave every
+   * flex role silently on standard pricing.
+   */
+  sent: boolean
+  /** The tier the response says served it; null when it said nothing. */
+  servedTier: EndpointTier | null
+  /** Why the request failed — usually a flex capacity refusal. */
+  error?: string
 }
 
 export async function testProviderConnection(
@@ -2305,6 +2499,11 @@ async function runProviderConnectionTest(
         prompt: 'Say "ok" and nothing else.',
         maxOutputTokens: 20,
       })
+
+      // The model answered; now say what it can be configured with. A model is
+      // usually tested at the moment it is added, which is exactly when an
+      // operator wants to know whether the effort and tier controls will appear.
+      return { success: true, ...(await describeLanguageModelOptions(providerConfig, fn)) }
     }
 
     return { success: true }
@@ -2322,23 +2521,127 @@ async function runProviderConnectionTest(
       'Provider connection test failed'
     )
 
-    const detail = [
-      described.status != null ? `HTTP ${described.status}` : null,
-      described.providerMessage || null,
-    ]
-      .filter(Boolean)
-      .join(' — ')
+    return { success: false, error: describeTestFailure(described) }
+  }
+}
 
-    const base = detail ? `${described.message} (${detail})` : described.message
+/** The sentence a test button shows for a failed request. */
+function describeTestFailure(described: ReturnType<typeof describeAiError>): string {
+  const detail = [
+    described.status != null ? `HTTP ${described.status}` : null,
+    described.providerMessage || null,
+  ]
+    .filter(Boolean)
+    .join(' — ')
 
-    // The hint goes AFTER the provider's own words rather than instead of them.
-    // This is the button someone presses to find out what is wrong, and a 404
-    // from a bare Z.AI host reads as a dead key to anyone who has configured an
-    // AI provider before — so the specific cause is worth the extra sentence.
-    return {
-      success: false,
-      error: described.hint ? `${base} — ${described.hint}` : base,
+  const base = detail ? `${described.message} (${detail})` : described.message
+
+  // The hint goes AFTER the provider's own words rather than instead of them.
+  // This is the button someone presses to find out what is wrong, and a 404
+  // from a bare Z.AI host reads as a dead key to anyone who has configured an
+  // AI provider before — so the specific cause is worth the extra sentence.
+  return described.hint ? `${base} — ${described.hint}` : base
+}
+
+/**
+ * What a language model that just passed its test can be configured with: its
+ * reasoning-effort words, and whether OpenRouter sells it on the flex tier.
+ *
+ * Never throws. The connection already worked, and a report about options must
+ * not be able to turn that into a failure — each half that cannot be answered is
+ * simply left out.
+ */
+async function describeLanguageModelOptions(
+  config: ProviderConfig,
+  fn: AIFunction
+): Promise<Pick<ProviderConnectionTest, 'reasoningEfforts' | 'flexTier'>> {
+  const out: Pick<ProviderConnectionTest, 'reasoningEfforts' | 'flexTier'> = {}
+
+  // The same call the dropdown and the save route make, so the test cannot
+  // report a vocabulary the card would not then offer.
+  if (roleReadsReasoningEffort(fn)) {
+    try {
+      out.reasoningEfforts = await getSupportedReasoningEfforts(config.provider, config.model, fn)
+    } catch (err) {
+      logger.warn({ err, model: config.model }, 'Could not read reasoning efforts for the test report')
     }
+  }
+
+  if (config.provider === 'openrouter' && roleReadsServiceTier(fn)) {
+    try {
+      // Fresh: a Test button answering from yesterday's cache cannot report a
+      // model that gained or lost a tier since.
+      const facts = await getOpenRouterServiceTierFacts(config.model, { fresh: true })
+      const summary = summarizeFlex(facts)
+      out.flexTier =
+        summary.status === 'available' ? { ...summary, probe: await probeFlexTier(config, fn) } : summary
+    } catch (err) {
+      logger.warn({ err, model: config.model }, 'Could not read service tiers for the test report')
+    }
+  }
+
+  return out
+}
+
+/**
+ * Send one real flex request down the production path and report what came
+ * back. See {@link FlexProbe} for why the listing alone is not the answer.
+ *
+ * Built with the same provider factory and the same `extraBody` shape a role's
+ * model gets, so it tests the path every flex call takes rather than a request
+ * assembled by hand. The fetch is the metered one, wrapped: the probe is a
+ * billable call and lands in the ledger like the test call before it. No
+ * retries — a flex capacity refusal is the finding, and waiting through two
+ * backoffs to repeat it helps nobody.
+ */
+async function probeFlexTier(config: ProviderConfig, fn: AIFunction): Promise<FlexProbe> {
+  let sent = false
+  let servedTier: EndpointTier | null = null
+
+  const metered = createOpenRouterUsageFetch(fn)
+  const capture = async (
+    input: Parameters<typeof fetch>[0],
+    init?: Parameters<typeof fetch>[1]
+  ): Promise<Response> => {
+    try {
+      const body = typeof init?.body === 'string' ? (JSON.parse(init.body) as { service_tier?: unknown }) : null
+      sent = body?.service_tier === 'flex'
+    } catch {
+      // Not JSON: `sent` stays false, which is what the report should say.
+    }
+    const response = await metered(input, init)
+    if (response.ok) {
+      try {
+        const json = (await response.clone().json()) as { service_tier?: unknown }
+        servedTier = normalizeServedTier(json?.service_tier)
+      } catch {
+        // An unreadable body leaves the served tier unknown, never guessed.
+      }
+    }
+    return response
+  }
+
+  // The one copy of the field's shape, from the resolver every role model uses.
+  const { extraBody } = resolveServiceTierDelivery({ provider: 'openrouter', tier: 'flex', facts: null })
+
+  try {
+    const provider = createOpenRouterProvider(config.apiKey, fn, capture as typeof fetch)
+    const model = provider(config.model, { extraBody })
+    const { generateText } = await import('ai')
+    await generateText({
+      model,
+      prompt: 'Say "ok" and nothing else.',
+      maxOutputTokens: 20,
+      maxRetries: 0,
+    })
+    return { sent, servedTier }
+  } catch (error) {
+    const described = describeAiError(error)
+    logger.warn(
+      { ...described, model: config.model },
+      'Flex probe failed: the model lists a flex endpoint, but a flex request was not served'
+    )
+    return { sent, servedTier, error: describeTestFailure(described) }
   }
 }
 
@@ -2669,10 +2972,23 @@ export async function getModelsForFunctionWithCustom(
   // Applied last, over both lists, so a mechanism from any of the three sources
   // — the catalog file, OpenRouter's live data, or the Z.AI inference above —
   // reaches the picker with the words it accepts.
-  return [
+  const models = [
     ...enrichedBuiltIns,
     ...customModelMetadata.filter((m) => !builtInIds.has(m.id)),
   ].map(withReasoningEfforts)
+
+  // The flex tier, as a DECIDED value: stamped only where a tier is applied —
+  // OpenRouter, on a role whose model is built with one — so the card needs no
+  // copy of the role list to know whether to draw the control, and an absent
+  // field means "no control". Every OpenRouter chat model is user-entered, so
+  // this is one cached endpoints lookup per model the operator added.
+  if (providerId !== 'openrouter' || !roleReadsServiceTier(fn)) return models
+  return Promise.all(
+    models.map(async (m) => ({
+      ...m,
+      flexTier: summarizeFlex(await getOpenRouterServiceTierFacts(m.id)),
+    }))
+  )
 }
 
 // ============================================================================

@@ -82,6 +82,7 @@ export {
   getGenerationParamsFor,
   getReasoningModelFacts,
   getSupportedReasoningEfforts,
+  getSupportedServiceTiers,
   type EmbeddingInvocation,
   getChatModelInstance,
   getWebSearchModelInstance,
@@ -158,6 +159,7 @@ export {
   type LegacyEmbeddingsInfo,
   type CustomModel,
   type ProviderConnectionTest,
+  type FlexProbe,
   type WebSearchAttempt,
   type WebSearchCallOutcome,
   type WebSearchUsageTokens,
@@ -325,4 +327,31 @@ export {
   type SamplingCapableModel,
   type GenerationParamsDelivery,
 } from './generationParams.js'
+
+// Service tier — OpenRouter's flex capacity, cheaper and slower, offered only
+// where the model's endpoints listing names a flex endpoint. The bulk catalogue
+// carries no tier information; see serviceTier.ts for where the answer lives.
+export {
+  SERVICE_TIER_OPTIONS,
+  ROLES_WITH_SERVICE_TIER,
+  APP_SENT_PARAMETERS,
+  roleReadsServiceTier,
+  isServiceTierOption,
+  endpointTier,
+  parseEndpointsResponse,
+  flexEndpoints,
+  serviceTierOptionsFor,
+  summarizeFlex,
+  resolveServiceTier,
+  resolveServiceTierDelivery,
+  normalizeServedTier,
+  type ServiceTierOption,
+  type StoredServiceTier,
+  type EndpointTier,
+  type TierEndpoint,
+  type ServiceTierFacts,
+  type FlexSummary,
+  type ServiceTierDelivery,
+} from './serviceTier.js'
+export { getOpenRouterServiceTierFacts } from './openrouter-capabilities.js'
 

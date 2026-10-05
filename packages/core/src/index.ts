@@ -30,6 +30,7 @@ export {
   getGenerationParamsFor,
   getReasoningModelFacts,
   getSupportedReasoningEfforts,
+  getSupportedServiceTiers,
   getChatModelInstance,
   getWebSearchModelInstance,
   getWebSearchAttempts,
@@ -87,6 +88,7 @@ export {
   addCustomModel,
   deleteCustomModel,
   type ProviderConnectionTest,
+  type FlexProbe,
   CUSTOM_MODEL_PROVIDERS,
   isCustomModelProvider,
   LOCAL_MODEL_PROVIDERS,
@@ -259,6 +261,22 @@ export {
   resolveGenerationDelivery,
   type GenerationParameter,
   type SamplingCapableModel,
+  // Service tier — OpenRouter's flex capacity, offered only where the model's
+  // endpoints listing names a flex endpoint. See lib/serviceTier.ts.
+  SERVICE_TIER_OPTIONS,
+  ROLES_WITH_SERVICE_TIER,
+  roleReadsServiceTier,
+  isServiceTierOption,
+  serviceTierOptionsFor,
+  summarizeFlex,
+  resolveServiceTier,
+  resolveServiceTierDelivery,
+  getOpenRouterServiceTierFacts,
+  type ServiceTierOption,
+  type StoredServiceTier,
+  type EndpointTier,
+  type ServiceTierFacts,
+  type FlexSummary,
 } from './lib/index.js'
 
 // Migrations

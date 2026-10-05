@@ -86,6 +86,7 @@
     "test:embedding-sets": "node --import tsx --test src/lib/embeddingSets.test.ts",
     "test:embedding-identity": "node --import tsx --test src/lib/embeddingIdentity.test.ts src/lib/embeddingCatalog.test.ts src/lib/embeddingCallSites.test.ts",
     "test:reasoning": "node --import tsx --test src/lib/reasoningEffort.test.ts src/lib/generationParams.test.ts src/lib/shortTextPolicy.test.ts",
+    "test:service-tier": "node --import tsx --test src/lib/serviceTier.test.ts src/lib/serviceTierWire.test.ts",
     "test:taste-synopsis": "node --import tsx --test src/lib/tasteEvidence.test.ts src/lib/tasteSynopsisPrompt.test.ts src/lib/tasteSynopsisRefresh.test.ts",
     "test:seerr": "node --import tsx --test src/seerr/userMapping.test.ts",
     "test:local-models": "node --import tsx --test src/lib/localModelDiscovery.test.ts src/lib/lmstudioChat.test.ts",

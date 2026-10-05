@@ -17,6 +17,7 @@
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
 import { createChildLogger } from './logger.js'
 import type { ModelCapabilities } from './ai-capabilities.js'
+import { parseEndpointsResponse, pricePerMillion, type ServiceTierFacts } from './serviceTier.js'
 
 const logger = createChildLogger('openrouter-capabilities')
 
@@ -71,15 +72,6 @@ interface CachedCatalog {
 let memoryCache: CachedCatalog | null = null
 let lastFailedFetchAt = 0
 
-/** The catalog prices in USD per token (as strings); convert to USD per 1M */
-function perTokenToPerMillion(perToken: string | undefined): number | null {
-  if (perToken == null || perToken === '') return null
-  const n = Number(perToken)
-  if (!Number.isFinite(n) || n < 0) return null
-  // Round away float noise (0.15000000000000002 → 0.15)
-  return Math.round(n * 1_000_000 * 10_000) / 10_000
-}
-
 async function fetchCatalog(): Promise<CatalogModel[]> {
   logger.info('Fetching model catalog from OpenRouter API')
 
@@ -115,8 +107,8 @@ async function fetchCatalog(): Promise<CatalogModel[]> {
       supportedEfforts: Array.isArray(m.reasoning?.supported_efforts)
         ? m.reasoning.supported_efforts.filter((e): e is string => typeof e === 'string')
         : null,
-      inputCostPerMillion: perTokenToPerMillion(m.pricing?.prompt),
-      outputCostPerMillion: perTokenToPerMillion(m.pricing?.completion),
+      inputCostPerMillion: pricePerMillion(m.pricing?.prompt),
+      outputCostPerMillion: pricePerMillion(m.pricing?.completion),
       contextLength: typeof m.context_length === 'number' ? m.context_length : null,
     }))
 
@@ -264,5 +256,175 @@ export async function getOpenRouterModelInfo(modelId: string): Promise<OpenRoute
     contextLength: entry.contextLength,
     supportedEfforts: entry.supportedEfforts,
     supportedParameters: entry.supportedParameters,
+  }
+}
+
+// ============================================================================
+// Per-model endpoints: which service tiers a model is sold at
+// ============================================================================
+
+/**
+ * Where the tier answer lives. Not in the catalogue above — `/api/v1/models`
+ * carries no tier information at all — but in each model's endpoints listing,
+ * where a tier endpoint is its own entry with a tier-suffixed `tag`. See
+ * ./serviceTier.ts for the reading and the evidence.
+ *
+ * Unauthenticated, like the catalogue: only the throughput figures in it need a
+ * key, and nothing here reads them.
+ */
+const endpointsUrl = (modelId: string) => `https://openrouter.ai/api/v1/models/${modelId}/endpoints`
+const ENDPOINTS_CACHE_KEY = 'openrouter_endpoints_cache'
+// Bump when TierEndpoint gains fields so stale DB caches are refetched
+const ENDPOINTS_CACHE_VERSION = 1
+
+/**
+ * `author/slug` with an optional `:variant`. Anything else is not put into a URL
+ * path at all: model ids are operator-typed, and a `?` or `#` in one would
+ * address a different resource than the one being asked about.
+ */
+const MODEL_ID_PATTERN = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._:-]+$/
+
+interface CachedEndpointsEntry {
+  fetchedAt: number
+  facts: ServiceTierFacts
+}
+
+interface CachedEndpoints {
+  version: number
+  entries: Record<string, CachedEndpointsEntry>
+}
+
+let endpointsCache: Map<string, CachedEndpointsEntry> | null = null
+let endpointsCacheLoad: Promise<Map<string, CachedEndpointsEntry>> | null = null
+const endpointFailureAt = new Map<string, number>()
+const endpointsInFlight = new Map<string, Promise<ServiceTierFacts>>()
+
+async function loadEndpointsCache(): Promise<Map<string, CachedEndpointsEntry>> {
+  if (endpointsCache) return endpointsCache
+  endpointsCacheLoad ??= (async () => {
+    const map = new Map<string, CachedEndpointsEntry>()
+    try {
+      const raw = await getSystemSetting(ENDPOINTS_CACHE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw) as CachedEndpoints
+        if (parsed.version === ENDPOINTS_CACHE_VERSION && parsed.entries) {
+          for (const [id, entry] of Object.entries(parsed.entries)) map.set(id, entry)
+        }
+      }
+    } catch (err) {
+      logger.warn({ err }, 'Failed to load OpenRouter endpoints cache from database')
+    }
+    endpointsCache = map
+    return map
+  })()
+  return endpointsCacheLoad
+}
+
+/**
+ * One write at a time, and a write that arrives during one is folded into a
+ * second rather than racing it. The models route asks about every custom model
+ * at once, so N lookups landing together would otherwise be N concurrent
+ * writes of N slightly different snapshots, the last of which wins.
+ */
+let endpointsSave: Promise<void> | null = null
+let endpointsSaveAgain = false
+
+function persistEndpointsCache(): void {
+  if (endpointsSave) {
+    endpointsSaveAgain = true
+    return
+  }
+  endpointsSave = (async () => {
+    do {
+      endpointsSaveAgain = false
+      const snapshot: CachedEndpoints = {
+        version: ENDPOINTS_CACHE_VERSION,
+        entries: Object.fromEntries(endpointsCache ?? []),
+      }
+      try {
+        await setSystemSetting(
+          ENDPOINTS_CACHE_KEY,
+          JSON.stringify(snapshot),
+          'Cached OpenRouter per-model endpoint listings (service tiers)'
+        )
+      } catch (err) {
+        logger.warn({ err }, 'Failed to save OpenRouter endpoints cache to database')
+      }
+    } while (endpointsSaveAgain)
+  })().finally(() => {
+    endpointsSave = null
+  })
+}
+
+async function fetchEndpointFacts(modelId: string): Promise<ServiceTierFacts> {
+  const response = await fetch(endpointsUrl(modelId), {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(10_000),
+  })
+
+  // OpenRouter answered, and the answer is that it lists nothing under this id —
+  // a mistyped model, or a variant id the listing does not take. That is a fact
+  // ("no flex here"), not an outage, so it is cached like one.
+  if (response.status === 404) return { endpoints: [] }
+
+  if (!response.ok) {
+    throw new Error(`OpenRouter endpoints API returned ${response.status}: ${response.statusText}`)
+  }
+
+  const facts = parseEndpointsResponse(await response.json())
+  if (!facts) throw new Error('OpenRouter endpoints API returned an unexpected shape')
+  return facts
+}
+
+/**
+ * The endpoints OpenRouter lists for a model, with the tier each one serves.
+ *
+ * Returns null for UNKNOWN — the listing could not be read and no earlier copy
+ * exists — which callers must keep apart from `{ endpoints: [] }` (OpenRouter
+ * answered and lists nothing): the request builder sends a flex tier on the
+ * first and not on the second, for the reason ./serviceTier.ts gives.
+ *
+ * Cached per model in memory and in the database for a day, like the catalogue,
+ * with a stale copy preferred over unknown when a refetch fails. `fresh` skips
+ * the cache for the connection test — a Test button that answers from a cache
+ * cannot report that a model gained or lost a tier since yesterday.
+ */
+export async function getOpenRouterServiceTierFacts(
+  modelId: string,
+  options: { fresh?: boolean } = {}
+): Promise<ServiceTierFacts | null> {
+  const id = modelId.trim()
+  if (!MODEL_ID_PATTERN.test(id)) return { endpoints: [] }
+
+  const cache = await loadEndpointsCache()
+  const cached = cache.get(id)
+
+  if (!options.fresh) {
+    if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return cached.facts
+    // A recent failure keeps the picker fast while OpenRouter is unreachable.
+    const failedAt = endpointFailureAt.get(id)
+    if (failedAt != null && Date.now() - failedAt < FETCH_FAILURE_RETRY_MS) {
+      return cached?.facts ?? null
+    }
+  }
+
+  let pending = endpointsInFlight.get(id)
+  if (!pending) {
+    pending = fetchEndpointFacts(id)
+    endpointsInFlight.set(id, pending)
+    void pending.catch(() => undefined).finally(() => endpointsInFlight.delete(id))
+  }
+
+  try {
+    const facts = await pending
+    cache.set(id, { fetchedAt: Date.now(), facts })
+    endpointFailureAt.delete(id)
+    persistEndpointsCache()
+    return facts
+  } catch (err) {
+    logger.warn({ err, model: id }, 'Failed to fetch OpenRouter endpoints for model')
+    endpointFailureAt.set(id, Date.now())
+    // Stale data beats unknown, exactly as it does for the catalogue.
+    return cached?.facts ?? null
   }
 }

@@ -58,6 +58,7 @@ import {
   OPENROUTER_UPSTREAMS,
   type EmbeddingInputTypeValue,
   type FallbackModelConfig,
+  type FlexTierInfo,
   type FunctionConfig,
   type ProviderInfo,
   type ProviderType,
@@ -110,6 +111,12 @@ export interface ModelInfo {
    * models refuse `temperature` outright, so this is a real capability read.
    */
   supportedParameters?: readonly string[]
+  /**
+   * OpenRouter's flex tier for THIS model, decided server-side from its
+   * endpoints listing and stamped only where the role applies a tier. Absent
+   * means offer no tier control at all.
+   */
+  flexTier?: FlexTierInfo
   capabilities: {
     supportsToolCalling: boolean
     supportsEmbeddings: boolean
@@ -131,6 +138,25 @@ interface TestResult {
   embeddingDimensions?: number
   /** Whether that width has a table to live in. Decided server-side. */
   embeddingDimensionsSupported?: boolean
+  /**
+   * The effort words the model accepts — the list the dropdown will offer.
+   * Present only for a role that applies an effort; empty means none.
+   */
+  reasoningEfforts?: readonly string[]
+  /**
+   * Whether OpenRouter sells the model on the flex tier, read fresh, plus what
+   * one real flex request came back with. Present only for OpenRouter on a
+   * role that applies a tier.
+   */
+  flexTier?: FlexTierInfo & {
+    probe?: {
+      /** Whether the request body really carried the field. */
+      sent: boolean
+      /** The tier the response says served it; null when it said nothing. */
+      servedTier: string | null
+      error?: string
+    }
+  }
 }
 
 /** One model a local server reports having installed. */
@@ -211,9 +237,16 @@ interface DiscoveryResponse {
  * and local (Ollama / OpenAI-compatible) models — so no price line is shown.
  */
 function formatModelPrice(m: ModelInfo): string | null {
-  const input = m.inputCostPerMillion
+  return formatPrice(m.inputCostPerMillion, m.outputCostPerMillion)
+}
+
+/**
+ * The one price format, shared by the model chip and the flex tier line so a
+ * model's standard price reads the same in both places. Null when there is no
+ * published price — never "$0.00", which would read as free.
+ */
+function formatPrice(input: number | null | undefined, output: number | null | undefined): string | null {
   if (input == null) return null
-  const output = m.outputCostPerMillion
   if (input === 0 && (output == null || output === 0)) return 'Free'
   const usd = (n: number) => `$${n.toFixed(2)}`
   // Embedding models are billed on input tokens only (no output cost).
@@ -232,6 +265,103 @@ function ToolCallingBadge({ label }: { label: string }) {
       sx={{ height: 18, fontSize: '0.65rem', flexShrink: 0, '& .MuiChip-label': { px: 0.75 } }}
     />
   )
+}
+
+/**
+ * What a model that just passed its test can be configured with.
+ *
+ * A model is usually tested at the moment it is added, which is exactly when
+ * the operator wants to know whether the effort and tier controls will appear
+ * for it — so the test answers that instead of leaving them to find out after
+ * the dialog closes. Renders nothing for a result that carries neither.
+ */
+function ModelOptionsReport({
+  result,
+  showServiceTier,
+}: {
+  result: TestResult
+  /** False where the card draws no tier control, so the report does not announce one. */
+  showServiceTier: boolean
+}) {
+  const { t } = useTranslation()
+  if (!result.success) return null
+
+  const efforts = result.reasoningEfforts
+  const flex = showServiceTier ? result.flexTier : undefined
+  if (efforts == null && flex == null) return null
+
+  const effortLabel = (value: string) => {
+    const key = reasoningEffortLabelKey(value)
+    return key ? t(key) : value
+  }
+
+  const probe = flex?.probe
+  let probeLine: string | null = null
+  if (flex?.status === 'available' && probe) {
+    if (!probe.sent) probeLine = t('aiFunctionCard.testFlexNotSent')
+    else if (probe.error) probeLine = t('aiFunctionCard.testFlexRefused', { error: probe.error })
+    else if (probe.servedTier === 'flex') probeLine = t('aiFunctionCard.testFlexServedFlex')
+    else if (probe.servedTier) probeLine = t('aiFunctionCard.testFlexServedOther', { tier: probe.servedTier })
+    else probeLine = t('aiFunctionCard.testFlexServedUnknown')
+  }
+
+  const flexPrice = flex ? formatPrice(flex.inputCostPerMillion, flex.outputCostPerMillion) : null
+  const standardPrice = flex
+    ? formatPrice(flex.standardInputCostPerMillion, flex.standardOutputCostPerMillion)
+    : null
+
+  return (
+    <Box sx={{ mt: 1 }}>
+      {efforts != null && (
+        <Typography variant="body2">
+          {efforts.length > 0
+            ? t('aiFunctionCard.testReasoningEfforts', { levels: efforts.map(effortLabel).join(', ') })
+            : t('aiFunctionCard.testReasoningNone')}
+        </Typography>
+      )}
+      {flex != null && (
+        <Typography variant="body2" sx={{ mt: efforts != null ? 0.5 : 0 }}>
+          {flex.status === 'available'
+            ? t('aiFunctionCard.testFlexAvailable', { providers: flex.providers.join(', ') })
+            : flex.status === 'unavailable'
+              ? t('aiFunctionCard.testFlexUnavailable')
+              : t('aiFunctionCard.testFlexUnknown')}
+          {flex.status === 'available' && flexPrice && (
+            <>
+              {' '}
+              {standardPrice
+                ? t('aiFunctionCard.serviceTierPriceCompare', { flex: flexPrice, standard: standardPrice })
+                : t('aiFunctionCard.serviceTierPrice', { flex: flexPrice })}
+            </>
+          )}
+        </Typography>
+      )}
+      {/* Its own line: this is the measured answer, and the one that changes
+          what the operator should do. */}
+      {probeLine && (
+        <Typography variant="body2" sx={{ mt: 0.5 }}>
+          {probeLine}
+        </Typography>
+      )}
+      {flex?.status === 'available' && flex.missingParameters.length > 0 && (
+        <Typography variant="body2" sx={{ mt: 0.5 }}>
+          {t('aiFunctionCard.serviceTierFlexMissing', { params: flex.missingParameters.join(', ') })}
+        </Typography>
+      )}
+    </Box>
+  )
+}
+
+/**
+ * The colour of a test result. A connection that worked while its flex request
+ * was refused (or never carried the field) is a WARNING, not a success: the
+ * model is usable, so the result must not read as a failure, but a role put on
+ * flex now would fail or bill at the standard rate, and green says otherwise.
+ */
+function testSeverity(result: TestResult, showServiceTier: boolean): 'success' | 'warning' | 'error' {
+  if (!result.success) return 'error'
+  const probe = showServiceTier ? result.flexTier?.probe : undefined
+  return probe && (!probe.sent || probe.error) ? 'warning' : 'success'
 }
 
 export interface AIFunctionCardProps {
@@ -357,6 +487,8 @@ export function AIFunctionCard({
    */
   const [temperature, setTemperature] = useState('')
   const [topP, setTopP] = useState('')
+  /** '' is the default tier, which is stored as nothing. */
+  const [serviceTier, setServiceTier] = useState<'' | 'flex'>('')
 
   // Custom model dialog state
   const [addModelDialogOpen, setAddModelDialogOpen] = useState(false)
@@ -389,7 +521,7 @@ export function AIFunctionCard({
   const [testing, setTesting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null)
+  const [testResult, setTestResult] = useState<TestResult | null>(null)
   
   const isConfigured = Boolean(config)
   const providerInfo = PROVIDER_INFO[provider]
@@ -545,6 +677,32 @@ export function AIFunctionCard({
     (modelParams?.includes('top_p') === true || storedTopP != null)
   const offersGenerationParams = offersTemperature || offersTopP
   const suggested = SUGGESTED_GENERATION_PARAMS[functionType]
+
+  // OpenRouter's flex tier. The server decides whether this role applies one
+  // and stamps `flexTier` on each model only then, so the bundle holds no copy
+  // of the role list: present means draw the control, absent means don't.
+  //
+  // The control is drawn even for a model WITHOUT flex, with Flex greyed out
+  // and the reason under it — a missing control would leave the operator
+  // wondering whether flex exists here at all, and a selectable one would save
+  // a tier that silently bills full price. A stored flex keeps it selectable so
+  // it can be seen and cleared rather than stranded.
+  //
+  // Not in the setup wizard: its save route writes provider, model and
+  // credentials only, so a tier chosen there would be dropped on the floor.
+  const storedServiceTier = config?.serviceTier === 'flex' ? 'flex' : ''
+  useEffect(() => {
+    setServiceTier(storedServiceTier)
+  }, [storedServiceTier])
+
+  const flexInfo = selectedModel?.flexTier
+  const offersServiceTier =
+    !isSetup && provider === 'openrouter' && (flexInfo != null || storedServiceTier === 'flex')
+  const flexSelectable = flexInfo?.status === 'available' || serviceTier === 'flex'
+  const flexPriceLabel = flexInfo ? formatPrice(flexInfo.inputCostPerMillion, flexInfo.outputCostPerMillion) : null
+  const standardPriceLabel = flexInfo
+    ? formatPrice(flexInfo.standardInputCostPerMillion, flexInfo.standardOutputCostPerMillion)
+    : null
 
   const storedProviderOnly = config?.embeddingProviderOnly ?? ''
   useEffect(() => {
@@ -728,13 +886,23 @@ export function AIFunctionCard({
             baseUrl: baseUrl || undefined,
           }),
         })
-        return (await res.json()) as { success: boolean; error?: string }
+        return (await res.json()) as TestResult
       }
 
       const primary = await runTest(apiKey || undefined)
       if (!primary.success) {
         setTestResult(primary)
         return
+      }
+
+      // The test read the endpoints listing FRESH, so its flex answer is newer
+      // than the one the picker loaded — an "unknown" that now has an answer,
+      // or a tier gained or lost since. Fold it into the selected model so the
+      // control reflects it without a reload.
+      const fresh = primary.flexTier
+      if (fresh) {
+        const { probe: _probe, ...flexTier } = fresh
+        setModels((prev) => prev.map((m) => (m.id === model ? { ...m, flexTier } : m)))
       }
 
       // A spare key that doesn't work is worse than no spare at all — you find
@@ -807,6 +975,9 @@ export function AIFunctionCard({
         ? { temperature: temperature === '' ? null : Number(temperature) }
         : {}),
       ...(offersTopP ? { topP: topP === '' ? null : Number(topP) } : {}),
+      // Explicit null for Default, and sent only by the card showing the
+      // control — the same rule as the controls above.
+      ...(offersServiceTier ? { serviceTier: serviceTier === 'flex' ? ('flex' as const) : null } : {}),
       // Explicit null when cleared, and sent only by the card showing it —
       // the same rule as the controls above.
       ...(offersPromptVariant ? { analysisPromptVariant: promptVariant || null } : {}),
@@ -1558,6 +1729,80 @@ export function AIFunctionCard({
           </Box>
         )}
 
+        {/* Which OpenRouter capacity tier. Flex is cheaper and slower, and a
+            flex request is never moved to standard capacity — when the
+            provider is busy it fails instead. Default is what every role had
+            before this existed, and is stored as nothing. */}
+        {offersServiceTier && (
+          <Box sx={{ mb: 2 }}>
+            <FormControl fullWidth size="small">
+              {/* Shrunk and notched with `displayEmpty`, so Default reads as the
+                  choice it is rather than as an empty field: unlike the effort
+                  control there is no "provider default" being deferred to here,
+                  just the one of two tiers that happens to be stored as nothing. */}
+              <InputLabel id={`${functionType}-service-tier-label`} shrink>
+                {t('aiFunctionCard.serviceTierLabel')}
+              </InputLabel>
+              <Select
+                labelId={`${functionType}-service-tier-label`}
+                value={serviceTier}
+                displayEmpty
+                notched
+                label={t('aiFunctionCard.serviceTierLabel')}
+                onChange={(e) => setServiceTier(e.target.value === 'flex' ? 'flex' : '')}
+              >
+                <MenuItem value="">{t('aiFunctionCard.serviceTierDefault')}</MenuItem>
+                <MenuItem value="flex" disabled={!flexSelectable}>
+                  {t('aiFunctionCard.serviceTierFlex')}
+                </MenuItem>
+              </Select>
+            </FormControl>
+            <FormHelperText component="div">
+              <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25 }}>
+                {/* No stamp at all (a stored flex whose model the list does not
+                    carry yet) is unknown, never "has no flex endpoint". */}
+                {flexInfo?.status === 'available'
+                  ? t('aiFunctionCard.serviceTierFlexAvailable', { providers: flexInfo.providers.join(', ') })
+                  : flexInfo?.status === 'unavailable'
+                    ? t('aiFunctionCard.serviceTierFlexUnavailable')
+                    : t('aiFunctionCard.serviceTierFlexUnknown')}
+                {flexInfo?.status === 'available' && flexPriceLabel && (
+                  <>
+                    {' '}
+                    {standardPriceLabel
+                      ? t('aiFunctionCard.serviceTierPriceCompare', {
+                          flex: flexPriceLabel,
+                          standard: standardPriceLabel,
+                        })
+                      : t('aiFunctionCard.serviceTierPrice', { flex: flexPriceLabel })}
+                  </>
+                )}
+                <InfoHint title={t('aiFunctionCard.serviceTierHelp')} />
+              </Box>
+            </FormHelperText>
+            {/* A stored flex on a model that has since lost it: the request
+                builder has already stopped sending it, so the role is on the
+                standard rate while the card still reads "Flex". */}
+            {serviceTier === 'flex' && flexInfo?.status === 'unavailable' && (
+              <Alert severity="warning" sx={{ mt: 1 }}>
+                {t('aiFunctionCard.serviceTierFlexStale')}
+              </Alert>
+            )}
+            {/* Routing under flex is confined to flex endpoints, so a parameter
+                they do not take is one this role's requests lose — tools, on a
+                chat role, is tool calling. */}
+            {serviceTier === 'flex' &&
+              flexInfo?.status === 'available' &&
+              flexInfo.missingParameters.length > 0 && (
+                <Alert severity="warning" sx={{ mt: 1 }}>
+                  {t('aiFunctionCard.serviceTierFlexMissing', {
+                    params: flexInfo.missingParameters.join(', '),
+                  })}
+                </Alert>
+              )}
+          </Box>
+        )}
+
         {/* Which prompt writes the article. A variant is an alternative set of
             questions and rules for the SAME prompt version, for a model that
             cannot hold that version's own — see core analysis/promptVariants.ts.
@@ -1905,7 +2150,7 @@ export function AIFunctionCard({
         */}
         {testResult && (
           <Alert 
-            severity={testResult.success ? 'success' : 'error'} 
+            severity={testSeverity(testResult, !isSetup)}
             sx={{ mt: 2 }}
             onClose={() => setTestResult(null)}
           >
@@ -1937,6 +2182,7 @@ export function AIFunctionCard({
                 )}
               </Typography>
             )}
+            <ModelOptionsReport result={testResult} showServiceTier={!isSetup} />
           </Alert>
         )}
       </CardContent>
@@ -2115,7 +2361,7 @@ export function AIFunctionCard({
           {/* Test Result */}
           {dialogTestResult && (
             <Alert 
-              severity={dialogTestResult.success ? 'success' : 'error'} 
+              severity={testSeverity(dialogTestResult, !isSetup)}
               sx={{ mb: 2 }}
             >
               {dialogTestResult.success
@@ -2138,6 +2384,7 @@ export function AIFunctionCard({
                       })}
                 </Typography>
               )}
+              <ModelOptionsReport result={dialogTestResult} showServiceTier={!isSetup} />
             </Alert>
           )}
           
