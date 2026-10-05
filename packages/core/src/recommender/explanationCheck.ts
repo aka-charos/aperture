@@ -13,8 +13,12 @@
  * SAME FACTS AS THE WRITER. "Not in the data" only means something if the
  * checker sees the data the writer saw: the pick's synopsis, director or
  * creator, themes, analysis grounding and the reception label the prompt
- * printed, the watched titles, the heading over them, and — for a
- * reserved-slot pick — why it was picked. A fact the writer was handed and the
+ * printed (and a series' status), the watched titles, the heading over them,
+ * the viewer's taste block (top genres, favourites, taste profile), and — for
+ * a reserved-slot pick — why it was picked, plus a taste-twin pick's shared
+ * titles. The first version left out the viewer block and the twin titles, so
+ * an explanation citing a favourite was flagged as an unsupported link: the
+ * pre-push audit caught it. A fact the writer was handed and the
  * checker was not would be flagged as invented, which is a false alarm the
  * operator would rightly stop trusting.
  *
@@ -54,10 +58,31 @@ export interface ExplanationCheckInput {
   /** The reception label the writer's prompt printed, verbatim. */
   reception: string
   pick: JudgedTitleFacts
+  /** Series only: the status line the series prompt prints ("Ended", ...). */
+  status?: string | null
   /** The analysis grounding lines the writer saw, when it saw any. */
   analysis?: string | null
   watched: JudgedTitleFacts[]
+  /**
+   * The viewer's taste block the writer's prompt opens with. An explanation
+   * may legitimately cite a favourite that is not among the three evidence
+   * titles; without this the checker would call that link unsupported.
+   */
+  viewer?: ViewerContext | null
+  /** For a taste-twin pick: the titles the two viewers both watched, which the writer was told to build on. */
+  sharedWithKindredViewer?: string[]
 }
+
+/** What the writer is told about the viewer. Mirrors both writers' taste context. */
+export interface ViewerContext {
+  topGenres: string[]
+  /** The favourites the prompt lists, as "Title (year)". */
+  favourites: string[]
+  tasteProfile: string | null
+}
+
+/** How many favourites the writers' prompts list. Both slice to ten. */
+export const VIEWER_FAVOURITES_SHOWN = 10
 
 /**
  * The key a check and a label are stored under: the explanation's own text.
@@ -77,19 +102,35 @@ export function receptionLabel(mediaType: 'movie' | 'series', ratingScore: numbe
 }
 
 /** Which reserved slot, if any, the stored breakdown records — read as the refresh reads it. */
-export function pickOrigin(breakdown: unknown): { origin: PickOrigin; interestText: string | null } {
+export function pickOrigin(breakdown: unknown): {
+  origin: PickOrigin
+  interestText: string | null
+  /** A twin pick's shared title ids, rarest first; empty otherwise. */
+  sharedIds: string[]
+} {
   const b = (breakdown ?? {}) as {
     interestMatch?: { interestText?: unknown } | null
-    twinMatch?: unknown
+    twinMatch?: { sharedIds?: unknown } | null
     acclaimedMatch?: unknown
   }
   if (b.interestMatch != null) {
     const text = b.interestMatch.interestText
-    return { origin: 'statedInterest', interestText: typeof text === 'string' && text ? text : null }
+    return {
+      origin: 'statedInterest',
+      interestText: typeof text === 'string' && text ? text : null,
+      sharedIds: [],
+    }
   }
-  if (b.twinMatch != null) return { origin: 'kindredViewer', interestText: null }
-  if (b.acclaimedMatch != null) return { origin: 'acclaimed', interestText: null }
-  return { origin: 'ranked', interestText: null }
+  if (b.twinMatch != null) {
+    const ids = b.twinMatch.sharedIds
+    return {
+      origin: 'kindredViewer',
+      interestText: null,
+      sharedIds: Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : [],
+    }
+  }
+  if (b.acclaimedMatch != null) return { origin: 'acclaimed', interestText: null, sharedIds: [] }
+  return { origin: 'ranked', interestText: null, sharedIds: [] }
 }
 
 const SYNOPSIS_CHARS = 1000
@@ -126,6 +167,18 @@ const ORIGIN_TEXT: Record<PickOrigin, string> = {
   acclaimed: 'it is widely acclaimed',
 }
 
+/** The viewer block, trimmed to what the prompt shows, or null when there is nothing in it. */
+function describeViewer(viewer: ViewerContext | null | undefined): Record<string, unknown> | null {
+  if (!viewer) return null
+  const out: Record<string, unknown> = {}
+  if (viewer.topGenres.length > 0) out.topGenres = viewer.topGenres
+  const favourites = viewer.favourites.filter(Boolean).slice(0, VIEWER_FAVOURITES_SHOWN)
+  if (favourites.length > 0) out.favourites = favourites
+  const profile = viewer.tasteProfile?.trim()
+  if (profile) out.tasteProfile = profile
+  return Object.keys(out).length > 0 ? out : null
+}
+
 export interface ExplanationCheckRequest {
   state: Record<string, unknown>
   questions: Record<string, SystemOneQuestion>
@@ -146,6 +199,8 @@ export function buildExplanationCheckRequest(input: ExplanationCheckInput): Expl
   }
   const analysis = input.analysis?.trim()
   if (analysis) recommended.analysis = analysis
+  const status = input.status?.trim()
+  if (status) recommended.status = status
 
   const state: Record<string, unknown> = {
     mediaType: noun,
@@ -159,8 +214,16 @@ export function buildExplanationCheckRequest(input: ExplanationCheckInput): Expl
         ? 'the reason for this recommendation'
         : 'context only — explicitly NOT the reason for this recommendation',
     watched,
-    explanation: input.explanation.trim(),
   }
+
+  // The viewer block and a twin pick's shared titles are in the writer's
+  // prompt, so an explanation may cite them; absent here they read as invented.
+  const viewer = describeViewer(input.viewer)
+  if (viewer) state.viewer = viewer
+  const shared = (input.sharedWithKindredViewer ?? []).filter(Boolean)
+  if (shared.length > 0) state.sharedWithKindredViewer = shared
+
+  state.explanation = input.explanation.trim()
 
   const questions: Record<string, SystemOneQuestion> = {}
   const checks: ExplanationCheckId[] = []
@@ -186,7 +249,8 @@ export function buildExplanationCheckRequest(input: ExplanationCheckInput): Expl
   questions.unsupportedLink = {
     type: 'noul',
     instructions:
-      `Does the explanation claim a connection between the recommended ${noun} and one of the watched titles that the information in the state does not support?`,
+      `Does the explanation claim a connection between the recommended ${noun} and a title the viewer watched — one of the watched titles, the viewer's favourites, or the titles shared with a kindred viewer — that the information in the state does not support? ` +
+      'Naming a title from the state is fine; asserting something they share that the state does not show is not.',
     criteria: {
       true: 'It asserts a shared creator, story, subject, theme, tone or style that nothing in the state shows',
       false: 'Every connection it draws is supported by the state, or it draws none',

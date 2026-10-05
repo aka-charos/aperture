@@ -74,6 +74,45 @@ test('the checker is shown what the writer was shown', () => {
   assert.equal(request.state.explanation, 'Because you watched Deadpool, you will love this.')
 })
 
+test('the viewer block and twin titles the writer saw are in the state, so citing them is not invented', () => {
+  // The audit's finding: an explanation citing a favourite outside the three
+  // evidence titles was otherwise read as an unsupported link.
+  const request = buildExplanationCheckRequest(
+    input({
+      viewer: {
+        topGenres: ['Thriller'],
+        favourites: Array.from({ length: 14 }, (_, i) => `Film ${i + 1} (2001)`),
+        tasteProfile: '  Drawn to slow, patient crime stories.  ',
+      },
+      sharedWithKindredViewer: ['Heat (1995)', ''],
+      origin: 'kindredViewer',
+    })
+  )
+  const viewer = request.state.viewer as Record<string, unknown>
+  assert.deepEqual(viewer.topGenres, ['Thriller'])
+  // The writers list ten favourites, so the checker sees the same ten.
+  assert.equal((viewer.favourites as string[]).length, 10)
+  assert.equal(viewer.tasteProfile, 'Drawn to slow, patient crime stories.')
+  assert.deepEqual(request.state.sharedWithKindredViewer, ['Heat (1995)'])
+  assert.match(request.questions.unsupportedLink.instructions, /favourites/)
+  // The explanation is still the last thing in the state.
+  assert.equal(Object.keys(request.state).at(-1), 'explanation')
+})
+
+test('an empty viewer block, no twin titles and no status leave the state as it was', () => {
+  const request = buildExplanationCheckRequest(
+    input({ viewer: { topGenres: [], favourites: [], tasteProfile: null }, sharedWithKindredViewer: [] })
+  )
+  assert.equal(request.state.viewer, undefined)
+  assert.equal(request.state.sharedWithKindredViewer, undefined)
+  assert.equal((request.state.recommended as Record<string, unknown>).status, undefined)
+})
+
+test('a series carries its status, which the series prompt prints', () => {
+  const request = buildExplanationCheckRequest(input({ mediaType: 'series', status: 'Ended' }))
+  assert.equal((request.state.recommended as Record<string, unknown>).status, 'Ended')
+})
+
 test('the invented-fact question exempts what is about the viewer', () => {
   const q = buildExplanationCheckRequest(input()).questions.inventedFact
   assert.match(q.instructions, /viewer and their taste is not a fact about the title/)
@@ -121,8 +160,13 @@ test('the origin is read from the stored breakdown as the refresh reads it', () 
   assert.deepEqual(pickOrigin({ interestMatch: { interestText: 'heists' } }), {
     origin: 'statedInterest',
     interestText: 'heists',
+    sharedIds: [],
   })
-  assert.equal(pickOrigin({ twinMatch: { sharedIds: [] } }).origin, 'kindredViewer')
+  assert.deepEqual(pickOrigin({ twinMatch: { sharedIds: ['a', 7, 'b'] } }), {
+    origin: 'kindredViewer',
+    interestText: null,
+    sharedIds: ['a', 'b'],
+  })
   assert.equal(pickOrigin({ acclaimedMatch: {} }).origin, 'acclaimed')
   assert.equal(pickOrigin({ twinMatch: null }).origin, 'ranked')
   assert.equal(pickOrigin(null).origin, 'ranked')

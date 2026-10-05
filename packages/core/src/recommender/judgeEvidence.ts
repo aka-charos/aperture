@@ -59,7 +59,7 @@ const CONSECUTIVE_FAILURE_LIMIT = 3
  * resolves (the panel, the explanation refresh). Shared by the read-back and
  * the labelling queue so the two can never be reading different runs.
  */
-export const NEWEST_RUNS_SQL = `SELECT DISTINCT ON (user_id, media_type) id, media_type
+export const NEWEST_RUNS_SQL = `SELECT DISTINCT ON (user_id, media_type) id, media_type, user_id
   FROM recommendation_runs
   WHERE status = 'completed' AND channel_id IS NULL
   ORDER BY user_id, media_type, created_at DESC`

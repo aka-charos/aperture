@@ -204,7 +204,8 @@ async function fetchSeriesTitleContext(
 /**
  * Get rich user taste context for series
  */
-async function getUserSeriesTasteContext(userId: string): Promise<UserSeriesTasteContext> {
+// Exported for the explanation checker, as the movie one is.
+export async function getUserSeriesTasteContext(userId: string): Promise<UserSeriesTasteContext> {
   // Gated on the taste predicate for the same reason the movie generator is:
   // the sync stores a row for any episode with playback position, so an ungated
   // count let shows the viewer sampled and abandoned outrank ones they finished.

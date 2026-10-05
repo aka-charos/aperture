@@ -56,7 +56,10 @@ import {
   type ExplanationHeading,
   type ExplanationLabel,
   type PickOrigin,
+  type ViewerContext,
 } from './explanationCheck.js'
+import { getUserTasteContext } from './movies/explanations.js'
+import { getUserSeriesTasteContext } from './series/explanations.js'
 import { NEWEST_RUNS_SQL, loadJudgedTitleFacts } from './judgeEvidence.js'
 
 const logger = createChildLogger('explanation-checks')
@@ -70,10 +73,14 @@ interface CandidateExplanation {
   hash: string
   mediaType: MediaType
   pickId: string
+  /** Whose recommendation it is: the writer opened its prompt with their taste. */
+  userId: string | null
   explanation: string
   heading: ExplanationHeading
   origin: PickOrigin
   interestText: string | null
+  /** A taste-twin pick's shared title ids, which the writer was given as titles. */
+  sharedIds: string[]
   ratingScore: number | null
   watchedIds: string[]
 }
@@ -87,13 +94,14 @@ async function loadCandidateExplanations(): Promise<CandidateExplanation[]> {
   const picks = await query<{
     candidate_id: string
     media_type: string
+    user_id: string | null
     pick_id: string
     ai_explanation: string
     rating_score: number | string | null
     score_breakdown: unknown
   }>(
     `WITH latest AS (${NEWEST_RUNS_SQL})
-     SELECT rc.id AS candidate_id, l.media_type,
+     SELECT rc.id AS candidate_id, l.media_type, l.user_id,
             COALESCE(rc.movie_id, rc.series_id) AS pick_id,
             rc.ai_explanation, rc.rating_score, rc.score_breakdown
      FROM latest l
@@ -130,7 +138,7 @@ async function loadCandidateExplanations(): Promise<CandidateExplanation[]> {
     const hash = explanationHash(p.ai_explanation)
     if (out.has(hash)) continue
     const rows = evidenceByCandidate.get(p.candidate_id) ?? []
-    const { origin, interestText } = pickOrigin(p.score_breakdown)
+    const { origin, interestText, sharedIds } = pickOrigin(p.score_breakdown)
     // The heading the writer saw: a reserved-slot pick always gets the hedged
     // one; a ranked pick gets whatever evidenceSupportsCause decides, which is
     // the same read the explanation prompt makes.
@@ -147,10 +155,12 @@ async function loadCandidateExplanations(): Promise<CandidateExplanation[]> {
       hash,
       mediaType,
       pickId: p.pick_id,
+      userId: p.user_id,
       explanation: p.ai_explanation,
       heading,
       origin,
       interestText,
+      sharedIds,
       ratingScore: Number.isFinite(rating) ? rating : null,
       watchedIds: rows.map((r) => r.watched_id).filter(Boolean),
     })
@@ -161,15 +171,62 @@ async function loadCandidateExplanations(): Promise<CandidateExplanation[]> {
 interface CheckContext {
   facts: Map<string, JudgedTitleFacts>
   analysis: Map<string, string>
+  /** Series status, keyed series:id. Only loaded for checking. */
+  status: Map<string, string>
+  /** The writer's taste block per viewer and media type, keyed media:user. Only loaded for checking. */
+  viewers: Map<string, ViewerContext>
 }
 
-async function loadContext(items: CandidateExplanation[]): Promise<CheckContext> {
+const withYear = (title: string, year: number | null) => (year != null ? `${title} (${year})` : title)
+
+/**
+ * The taste block each writer opens its prompt with, from the writers' own
+ * loaders — never a copy of their queries. One load per viewer and media type.
+ */
+async function loadViewerContexts(items: CandidateExplanation[]): Promise<Map<string, ViewerContext>> {
+  const out = new Map<string, ViewerContext>()
+  const wanted = new Map<string, { mediaType: MediaType; userId: string }>()
+  for (const item of items) {
+    if (item.userId) wanted.set(`${item.mediaType}:${item.userId}`, { mediaType: item.mediaType, userId: item.userId })
+  }
+  for (const [key, { mediaType, userId }] of wanted) {
+    try {
+      if (mediaType === 'movie') {
+        const taste = await getUserTasteContext(userId)
+        out.set(key, {
+          topGenres: taste.topGenres,
+          favourites: taste.favoriteMovies.map((m) => withYear(m.title, m.year)),
+          tasteProfile: taste.tasteSynopsis,
+        })
+      } else {
+        const taste = await getUserSeriesTasteContext(userId)
+        out.set(key, {
+          topGenres: taste.topGenres,
+          favourites: taste.favoriteSeries.map((s) => withYear(s.title, s.year)),
+          tasteProfile: taste.tasteSynopsis,
+        })
+      }
+    } catch (err) {
+      // Without it the check would over-flag this viewer's explanations; the
+      // log says so rather than the check silently changing meaning.
+      logger.warn({ err, userId, mediaType }, 'Could not load the viewer taste block for checking')
+    }
+  }
+  return out
+}
+
+/**
+ * `full` loads everything the writer saw (for checking); without it, only
+ * what the queue displays — titles and years.
+ */
+async function loadContext(items: CandidateExplanation[], full = false): Promise<CheckContext> {
   const ids: Record<MediaType, Set<string>> = { movie: new Set(), series: new Set() }
   const pickIds: Record<MediaType, Set<string>> = { movie: new Set(), series: new Set() }
   for (const item of items) {
     ids[item.mediaType].add(item.pickId)
     pickIds[item.mediaType].add(item.pickId)
     for (const w of item.watchedIds) ids[item.mediaType].add(w)
+    if (full) for (const s of item.sharedIds) ids[item.mediaType].add(s)
   }
   const [movieFacts, seriesFacts, movieAnalysis, seriesAnalysis] = await Promise.all([
     loadJudgedTitleFacts('movie', [...ids.movie]),
@@ -190,7 +247,20 @@ async function loadContext(items: CandidateExplanation[]): Promise<CheckContext>
       if (text) analysis.set(`${mediaType}:${id}`, text.trim())
     }
   }
-  return { facts, analysis }
+
+  const status = new Map<string, string>()
+  let viewers = new Map<string, ViewerContext>()
+  if (full) {
+    if (pickIds.series.size > 0) {
+      const rows = await query<{ id: string; status: string | null }>(
+        `SELECT id, status FROM series WHERE id = ANY($1::uuid[]) AND status IS NOT NULL`,
+        [[...pickIds.series]]
+      )
+      for (const row of rows.rows) if (row.status) status.set(`series:${row.id}`, row.status)
+    }
+    viewers = await loadViewerContexts(items)
+  }
+  return { facts, analysis, status, viewers }
 }
 
 function toInput(item: CandidateExplanation, context: CheckContext): ExplanationCheckInput | null {
@@ -205,9 +275,15 @@ function toInput(item: CandidateExplanation, context: CheckContext): Explanation
     reception: receptionLabel(item.mediaType, item.ratingScore),
     pick,
     analysis: context.analysis.get(`${item.mediaType}:${item.pickId}`) ?? null,
+    status: context.status.get(`${item.mediaType}:${item.pickId}`) ?? null,
     watched: item.watchedIds
       .map((id) => context.facts.get(`${item.mediaType}:${id}`))
       .filter((f): f is JudgedTitleFacts => f != null),
+    viewer: item.userId ? (context.viewers.get(`${item.mediaType}:${item.userId}`) ?? null) : null,
+    sharedWithKindredViewer: item.sharedIds
+      .map((id) => context.facts.get(`${item.mediaType}:${id}`))
+      .filter((f): f is JudgedTitleFacts => f != null)
+      .map((f) => withYear(f.title, f.year)),
   }
 }
 
@@ -249,12 +325,16 @@ export async function checkRecommendationExplanations(jobId: string): Promise<Ex
 
     const items = await loadCandidateExplanations()
     result.explanations = items.length
-    const done = await query<{ explanation_hash: string }>(
-      `SELECT explanation_hash FROM explanation_checks WHERE requested_model = $1`,
+    // A check is reused only when it was made with this model AND under the
+    // heading the explanation is judged against now: the heading follows the
+    // stored verdicts, which can be cleared or re-judged, and a check made
+    // against the other heading answers a different question.
+    const done = await query<{ explanation_hash: string; heading: string }>(
+      `SELECT explanation_hash, heading FROM explanation_checks WHERE requested_model = $1`,
       [config.model]
     )
-    const already = new Set(done.rows.map((r) => r.explanation_hash))
-    const todo = items.filter((i) => !already.has(i.hash))
+    const headingByHash = new Map(done.rows.map((r) => [r.explanation_hash, r.heading]))
+    const todo = items.filter((i) => headingByHash.get(i.hash) !== i.heading)
     result.skipped = items.length - todo.length
     addLog(
       jobId,
@@ -266,7 +346,7 @@ export async function checkRecommendationExplanations(jobId: string): Promise<Ex
       return result
     }
 
-    const context = await loadContext(todo)
+    const context = await loadContext(todo, true)
     setJobStep(jobId, 1, 'Checking explanations', todo.length)
 
     let next = 0
@@ -462,10 +542,12 @@ export async function getExplanationQueue(
         hash: l.explanation_hash,
         mediaType: l.media_type as MediaType,
         pickId: l.pick_id,
+        userId: null,
         explanation: l.explanation,
         heading: 'contextOnly',
         origin: 'ranked',
         interestText: null,
+        sharedIds: [],
         ratingScore: null,
         watchedIds: [],
       })

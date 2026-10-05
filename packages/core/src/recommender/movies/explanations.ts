@@ -230,7 +230,9 @@ async function fetchTitleContext(movieIds: string[]): Promise<Map<string, TitleC
 /**
  * Get rich user taste context
  */
-async function getUserTasteContext(userId: string): Promise<UserTasteContext> {
+// Exported for the explanation checker, which must see the taste block this
+// prompt opens with (recommender/explanationChecks.ts). One copy, not two.
+export async function getUserTasteContext(userId: string): Promise<UserTasteContext> {
   // Both queries are gated on the taste predicate, the same one the taste
   // vector, the genre familiarity baseline and the series pipeline all use.
   // Ungated they counted every watch_history row, including films abandoned
