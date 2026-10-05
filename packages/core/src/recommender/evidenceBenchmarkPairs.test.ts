@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {
   BENCHMARK_PAIRS,
   BENCHMARK_RUNS_PER_PAIR,
+  creditsRuleVerdict,
   modelVerdict,
   scoreBenchmark,
   thresholdVerdict,
@@ -105,37 +106,95 @@ function result(over: Partial<BenchmarkPairResult>): BenchmarkPairResult {
     modelRuns: [0.9, 0.9],
     modelSays: true,
     unstable: false,
+    ruleSays: true,
+    ruleBasis: 'director',
     ...over,
   }
 }
 
-test('both sides are scored on exactly the same pairs', () => {
+test('all three sides are scored on exactly the same pairs', () => {
   const score = scoreBenchmark([
-    // Both right.
+    // All right.
     result({}),
     // Die Hard: threshold wrong (under the bar), model right — a fix.
     result({ similarity: 0.68, thresholdSays: false }),
     // Children of Men: label no, threshold wrong, model wrong — neither.
-    result({ label: 'no', reason: { kind: 'looseOnly' } }),
+    result({ label: 'no', reason: { kind: 'looseOnly' }, ruleSays: false, ruleBasis: null }),
     // Label no, threshold right, model wrong — a break.
-    result({ label: 'no', reason: { kind: 'looseOnly' }, thresholdSays: false }),
-    // No embedding: the threshold has no answer, so the model's is not counted either.
+    result({
+      label: 'no',
+      reason: { kind: 'looseOnly' },
+      thresholdSays: false,
+      ruleSays: false,
+      ruleBasis: null,
+    }),
+    // No embedding: the threshold has no answer, so nothing else is counted either.
     result({ similarity: null, thresholdSays: null }),
     // The model failed: nothing counted.
     result({ status: 'failed', modelRuns: [], modelSays: null }),
-    // Arguable: shown, never scored, whatever either side says.
+    // The rule could not be computed: nothing counted.
+    result({ ruleSays: null, ruleBasis: null }),
+    // Arguable: shown, never scored, whatever any side says.
     result({ label: 'arguable', reason: { kind: 'arguableStar' } }),
     // Not in the library.
     result({ status: 'notInLibrary', thresholdSays: null, modelSays: null, modelRuns: [] }),
   ])
   assert.equal(score.scored, 4)
   assert.equal(score.thresholdRight, 2)
+  assert.equal(score.ruleRight, 4)
   assert.equal(score.modelRight, 2)
   assert.equal(score.modelFixed, 1)
   assert.equal(score.modelBroke, 1)
+  assert.equal(score.modelBeatRule, 0)
+  assert.equal(score.ruleBeatModel, 2)
   assert.equal(score.arguable, 1)
   assert.equal(score.failed, 1)
   assert.equal(score.notInLibrary, 1)
+})
+
+test('the no-shared-credits subtotal counts only pairs the rule could not link', () => {
+  const score = scoreBenchmark([
+    // Same director: in the total, not in the subtotal.
+    result({}),
+    // Nobody <- John Wick: a reason with no shared credit. Rule says no, model yes.
+    result({ ruleSays: false, ruleBasis: null }),
+    // Deadpool & Wolverine <- Dune: Part Two: not a reason, no shared credit.
+    result({ label: 'no', reason: { kind: 'looseOnly' }, ruleSays: false, ruleBasis: null, modelSays: false }),
+  ])
+  assert.deepEqual(score.noSharedCredits, { scored: 2, thresholdRight: 1, ruleRight: 1, modelRight: 2 })
+  assert.equal(score.modelBeatRule, 1)
+})
+
+// -------------------------------------------------------------- the credits rule
+
+test('a shared director is a reason, matched without regard to case or accents', () => {
+  const verdict = creditsRuleVerdict(
+    { creators: ['Krzysztof Kieślowski'] },
+    { creators: ['krzysztof kieslowski'] }
+  )
+  assert.deepEqual(verdict, { says: true, basis: 'director' })
+})
+
+test('a shared franchise is a reason', () => {
+  assert.deepEqual(
+    creditsRuleVerdict(
+      { creators: ['George Miller'], franchise: 'Mad Max Collection' },
+      { creators: ['Someone Else'], franchise: 'mad max collection' }
+    ),
+    { says: true, basis: 'franchise' }
+  )
+})
+
+test('nothing shared, or nothing recorded, is not a reason', () => {
+  assert.deepEqual(
+    creditsRuleVerdict({ creators: ['Ilya Naishuller'] }, { creators: ['Chad Stahelski'] }),
+    { says: false, basis: null }
+  )
+  // Missing data cannot match — two absent franchises are not "the same franchise".
+  assert.deepEqual(
+    creditsRuleVerdict({ creators: [], franchise: null }, { creators: [''], franchise: '' }),
+    { says: false, basis: null }
+  )
 })
 
 test('an unstable pair is counted as unstable and still scored on its mean', () => {

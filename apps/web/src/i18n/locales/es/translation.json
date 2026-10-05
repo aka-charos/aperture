@@ -5708,9 +5708,9 @@
     "cleared_other": "Cleared {{count}} stored verdicts.",
     "clearError": "Failed to clear stored verdicts",
     "benchmark": "Benchmark",
-    "benchmarkHelp": "Benchmark runs pairs a person has already judged, from the similarity threshold's own derivations, through both the model and the threshold on your library, and scores each against those judgments. It stores nothing and changes no one's recommendations. It takes up to 45 seconds.",
+    "benchmarkHelp": "Benchmark runs pairs a person has already judged through three judges on your library: the similarity threshold, a free rule (same director or same franchise means a reason), and the model. Each is scored against those judgments. It stores nothing and changes no one's recommendations. It takes up to 45 seconds.",
     "benchmarkError": "The benchmark failed",
-    "benchmarkSummary": "On {{scored}} labelled pairs, the similarity threshold was right on {{thresholdRight}} and the model on {{modelRight}}. The model fixed {{fixed}} the threshold got wrong and broke {{broke}} it got right.",
+    "benchmarkSummary": "On {{scored}} labelled pairs, the similarity threshold was right on {{thresholdRight}}, the director-or-franchise rule on {{ruleRight}}, and the model on {{modelRight}}. Against the threshold the model fixed {{fixed}} and broke {{broke}}; against the rule it won {{beatRule}} and lost {{lostToRule}}.",
     "benchmarkDetail": "Model {{model}}. {{arguable}} arguable pairs are shown but not scored. Similarities from {{embeddingSet}}, threshold {{threshold}}. {{ms}} ms.",
     "benchmarkNone": "None of the labelled pairs could be scored. They need both films in your library, with embeddings, and an answer from the model.",
     "benchmarkStopped": "Stopped early: {{reason}}. Pairs not asked are marked and not scored.",
@@ -5739,6 +5739,12 @@
       "actorOnly": "Only a shared actor ({{name}})",
       "arguableStar": "Shares {{name}} and one style of film",
       "arguableStudio": "Same studio ({{name}}) and house style"
-    }
+    },
+    "benchmarkColumnRule": "Rule",
+    "ruleBasisDirector": "shared director",
+    "ruleBasisFranchise": "same franchise",
+    "benchmarkNoSharedCredits": "On the {{scored}} pairs sharing no director or franchise, the only ones where reading the films matters, the threshold was right on {{thresholdRight}}, the rule on {{ruleRight}}, and the model on {{modelRight}}.",
+    "benchmarkFewNoCredits_one": "Only {{count}} scored pair shares no director or franchise. That is too few to say whether the model is worth more than the rule; more such pairs need labelling.",
+    "benchmarkFewNoCredits_other": "Only {{count}} scored pairs share no director or franchise. That is too few to say whether the model is worth more than the rule; more such pairs need labelling."
   }
 }

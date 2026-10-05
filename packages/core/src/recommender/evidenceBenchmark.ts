@@ -1,7 +1,12 @@
 /**
  * Run the labelled pairs (./evidenceBenchmarkPairs.ts) through a decision
- * model AND through the cosine bar, on this library, and score both against
- * the labels.
+ * model, the cosine bar AND the free credits rule (same director or same
+ * franchise), on this library, and score all three against the labels.
+ *
+ * The rule is there because the first benchmark showed most labelled reasons
+ * share a director or a franchise — fields the model is handed — so beating
+ * the cosine bar alone did not show the model was worth more than reading two
+ * columns. The no-shared-credits subtotal is where that question is answered.
  *
  * The point is a like-for-like answer to "is the model better than the
  * threshold?" without switching anything on: it reads the library, writes
@@ -31,6 +36,7 @@ import { buildEvidenceJudgmentRequest, readEvidenceJudgments } from './evidenceJ
 import {
   BENCHMARK_PAIRS,
   BENCHMARK_RUNS_PER_PAIR,
+  creditsRuleVerdict,
   modelVerdict,
   scoreBenchmark,
   thresholdVerdict,
@@ -170,6 +176,8 @@ export async function runEvidenceBenchmark(
         modelRuns: [],
         modelSays: null,
         unstable: false,
+        ruleSays: null,
+        ruleBasis: null,
       })
       if (pick && watched) {
         inLibrary.push({ index: results.length - 1, pickId: pick.id, watchedId: watched.id })
@@ -186,6 +194,16 @@ export async function runEvidenceBenchmark(
       'movie',
       [...new Set(inLibrary.flatMap((p) => [p.pickId, p.watchedId]))]
     )
+
+    // The free baseline, from the same facts the model is about to be shown.
+    for (const p of inLibrary) {
+      const pickFacts = facts.get(p.pickId)
+      const watchedFacts = facts.get(p.watchedId)
+      if (!pickFacts || !watchedFacts) continue
+      const rule = creditsRuleVerdict(pickFacts, watchedFacts)
+      results[p.index].ruleSays = rule.says
+      results[p.index].ruleBasis = rule.basis
+    }
 
     // Every (pair, run) is one task; the pool works through them in order, so
     // a deadline cuts the tail of the list rather than random pairs.
@@ -256,7 +274,7 @@ export async function runEvidenceBenchmark(
     const score = scoreBenchmark(results)
     logger.info(
       { model: config.model, embeddingSet, ...score, stoppedReason, durationMs: Date.now() - startedAt },
-      `🧪 Evidence benchmark: threshold ${score.thresholdRight}/${score.scored}, model ${score.modelRight}/${score.scored}`
+      `🧪 Evidence benchmark: threshold ${score.thresholdRight}/${score.scored}, credits rule ${score.ruleRight}/${score.scored}, model ${score.modelRight}/${score.scored}`
     )
     return {
       success: true,

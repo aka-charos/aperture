@@ -1,6 +1,8 @@
 /**
  * The decision-model benchmark's results: labelled pairs, scored for the
- * similarity threshold and the model side by side.
+ * similarity threshold, the free director-or-franchise rule and the model side
+ * by side. The no-shared-credits subtotal gets its own line because it is the
+ * only place the model can be worth more than the rule.
  *
  * The score line is the answer; the table is the evidence for it. Each pair
  * shows the label a person gave it and why, then each side's call, coloured by
@@ -41,15 +43,25 @@ interface BenchmarkPairResult {
   modelRuns: number[]
   modelSays: boolean | null
   unstable: boolean
+  /** Absent on a server older than the credits rule. */
+  ruleSays?: boolean | null
+  ruleBasis?: 'director' | 'franchise' | null
   error?: string
 }
 
-interface BenchmarkScore {
+interface BenchmarkTally {
   scored: number
   thresholdRight: number
+  ruleRight?: number
   modelRight: number
+}
+
+interface BenchmarkScore extends BenchmarkTally {
   modelFixed: number
   modelBroke: number
+  modelBeatRule?: number
+  ruleBeatModel?: number
+  noSharedCredits?: BenchmarkTally
   unstable: number
   arguable: number
   notInLibrary: number
@@ -99,15 +111,39 @@ export function DecisionModelBenchmarkResults({ result }: { result: BenchmarkRes
       {score.scored === 0 ? (
         <Alert severity="warning">{t('settingsDecisionModel.benchmarkNone')}</Alert>
       ) : (
-        <Alert severity={score.modelRight > score.thresholdRight ? 'success' : 'info'}>
+        <Alert severity={score.modelRight > Math.max(score.thresholdRight, score.ruleRight ?? 0) ? 'success' : 'info'}>
           {t('settingsDecisionModel.benchmarkSummary', {
             scored: score.scored,
             thresholdRight: score.thresholdRight,
+            ruleRight: score.ruleRight ?? 0,
             modelRight: score.modelRight,
             fixed: score.modelFixed,
             broke: score.modelBroke,
+            beatRule: score.modelBeatRule ?? 0,
+            lostToRule: score.ruleBeatModel ?? 0,
           })}
         </Alert>
+      )}
+
+      {/* The subtotal that decides whether the model is worth more than reading
+          two columns: on pairs the rule has nothing to match on, only reading
+          the films can get the answer right. */}
+      {score.noSharedCredits && score.noSharedCredits.scored > 0 && (
+        <Alert severity="info" icon={false}>
+          {t('settingsDecisionModel.benchmarkNoSharedCredits', {
+            scored: score.noSharedCredits.scored,
+            thresholdRight: score.noSharedCredits.thresholdRight,
+            ruleRight: score.noSharedCredits.ruleRight ?? 0,
+            modelRight: score.noSharedCredits.modelRight,
+          })}
+        </Alert>
+      )}
+      {score.noSharedCredits && score.noSharedCredits.scored < 10 && score.scored > 0 && (
+        <Typography variant="caption" color="text.secondary">
+          {t('settingsDecisionModel.benchmarkFewNoCredits', {
+            count: score.noSharedCredits.scored,
+          })}
+        </Typography>
       )}
 
       {result.stoppedReason && (
@@ -140,6 +176,7 @@ export function DecisionModelBenchmarkResults({ result }: { result: BenchmarkRes
                 <TableCell>{t('settingsDecisionModel.benchmarkColumnLabel')}</TableCell>
                 <TableCell align="right">{t('settingsDecisionModel.columnSimilarity')}</TableCell>
                 <TableCell>{t('settingsDecisionModel.benchmarkColumnThreshold')}</TableCell>
+                <TableCell>{t('settingsDecisionModel.benchmarkColumnRule')}</TableCell>
                 <TableCell>{t('settingsDecisionModel.benchmarkColumnModel')}</TableCell>
               </TableRow>
             </TableHead>
@@ -172,6 +209,18 @@ export function DecisionModelBenchmarkResults({ result }: { result: BenchmarkRes
                   </TableCell>
                   <TableCell sx={{ color: verdictColor(pair.thresholdSays, pair.label) }}>
                     {verdictText(pair.thresholdSays)}
+                  </TableCell>
+                  <TableCell sx={{ color: verdictColor(pair.ruleSays ?? null, pair.label) }}>
+                    {verdictText(pair.ruleSays ?? null)}
+                    {pair.ruleBasis && (
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        {t(
+                          pair.ruleBasis === 'director'
+                            ? 'settingsDecisionModel.ruleBasisDirector'
+                            : 'settingsDecisionModel.ruleBasisFranchise'
+                        )}
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell sx={{ color: verdictColor(pair.modelSays, pair.label) }}>
                     {pair.status === 'failed' ? (

@@ -335,22 +335,75 @@ export interface BenchmarkPairResult {
   modelSays: boolean | null
   /** The runs landed on different sides of the line. */
   unstable: boolean
+  /** The credits rule's call (see creditsRuleVerdict), or null when not computed. */
+  ruleSays: boolean | null
+  /** What the rule matched on, when it said yes. */
+  ruleBasis: 'director' | 'franchise' | null
   error?: string
 }
 
-export interface BenchmarkScore {
-  /** Pairs labelled yes/no that both sides answered. Arguable pairs never count. */
+/** Right answers for each side on one set of pairs. */
+export interface BenchmarkTally {
   scored: number
   thresholdRight: number
+  ruleRight: number
   modelRight: number
+}
+
+export interface BenchmarkScore extends BenchmarkTally {
   /** Scored pairs the threshold got wrong and the model got right, and the reverse. */
   modelFixed: number
   modelBroke: number
+  /** Scored pairs the credits rule got wrong and the model got right, and the reverse. */
+  modelBeatRule: number
+  ruleBeatModel: number
+  /**
+   * The same tally restricted to pairs sharing neither a director nor a
+   * franchise — the only pairs where the model has to read the films rather
+   * than two fields, and so the only ones that say whether it is worth more
+   * than the free rule.
+   */
+  noSharedCredits: BenchmarkTally
   unstable: number
   arguable: number
   notInLibrary: number
   failed: number
   notRun: number
+}
+
+/** The credits the rule reads. A subset of JudgedTitleFacts, so a run's facts fit. */
+export interface CreditFacts {
+  creators: string[]
+  franchise?: string | null
+}
+
+function normalizeName(name: string): string {
+  return name.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase()
+}
+
+/**
+ * The free baseline: a reason when the two films share a director (a creator,
+ * for series) or a TMDb franchise, and not otherwise.
+ *
+ * It reads exactly the two fields the model is shown, which is the point: on a
+ * pair it can sort, the model is being paid to read a field. Names are
+ * compared accent- and case-insensitively, because the two titles may have
+ * been enriched by different sources. A film with no director recorded simply
+ * cannot match on one — the rule says no, as it would in use, which is why the
+ * card reports the rule's basis rather than only its answer.
+ */
+export function creditsRuleVerdict(
+  pick: CreditFacts,
+  watched: CreditFacts
+): { says: boolean; basis: 'director' | 'franchise' | null } {
+  const pickCreators = new Set(pick.creators.filter(Boolean).map(normalizeName))
+  if (watched.creators.some((name) => name && pickCreators.has(normalizeName(name)))) {
+    return { says: true, basis: 'director' }
+  }
+  const a = pick.franchise?.trim()
+  const b = watched.franchise?.trim()
+  if (a && b && normalizeName(a) === normalizeName(b)) return { says: true, basis: 'franchise' }
+  return { says: false, basis: null }
 }
 
 /** The model's call on its runs: the mean of what answered, against its own boundary. */
@@ -366,19 +419,27 @@ export function thresholdVerdict(similarity: number | null): boolean | null {
   return similarity == null ? null : hasCausalEvidence([similarity])
 }
 
+const emptyTally = (): BenchmarkTally => ({
+  scored: 0,
+  thresholdRight: 0,
+  ruleRight: 0,
+  modelRight: 0,
+})
+
 /**
- * The scoreboard. A pair counts only when it is labelled yes/no AND both the
- * threshold and the model gave an answer, so the two are always scored on the
- * same set — a model that failed half its calls cannot look better or worse
- * than the threshold by being measured on fewer pairs.
+ * The scoreboard. A pair counts only when it is labelled yes/no AND all three
+ * sides — threshold, credits rule, model — gave an answer, so they are always
+ * scored on the same set: a model that failed half its calls cannot look
+ * better or worse by being measured on fewer pairs.
  */
 export function scoreBenchmark(results: readonly BenchmarkPairResult[]): BenchmarkScore {
   const score: BenchmarkScore = {
-    scored: 0,
-    thresholdRight: 0,
-    modelRight: 0,
+    ...emptyTally(),
     modelFixed: 0,
     modelBroke: 0,
+    modelBeatRule: 0,
+    ruleBeatModel: 0,
+    noSharedCredits: emptyTally(),
     unstable: 0,
     arguable: 0,
     notInLibrary: 0,
@@ -394,15 +455,25 @@ export function scoreBenchmark(results: readonly BenchmarkPairResult[]): Benchma
       score.arguable++
       continue
     }
-    if (r.status !== 'scored' || r.thresholdSays == null || r.modelSays == null) continue
+    if (r.status !== 'scored' || r.thresholdSays == null || r.modelSays == null || r.ruleSays == null) {
+      continue
+    }
     const truth = r.label === 'yes'
     const thresholdRight = r.thresholdSays === truth
+    const ruleRight = r.ruleSays === truth
     const modelRight = r.modelSays === truth
-    score.scored++
-    if (thresholdRight) score.thresholdRight++
-    if (modelRight) score.modelRight++
+
+    const tallies = r.ruleBasis == null ? [score, score.noSharedCredits] : [score]
+    for (const tally of tallies) {
+      tally.scored++
+      if (thresholdRight) tally.thresholdRight++
+      if (ruleRight) tally.ruleRight++
+      if (modelRight) tally.modelRight++
+    }
     if (modelRight && !thresholdRight) score.modelFixed++
     if (!modelRight && thresholdRight) score.modelBroke++
+    if (modelRight && !ruleRight) score.modelBeatRule++
+    if (!modelRight && ruleRight) score.ruleBeatModel++
   }
   return score
 }
