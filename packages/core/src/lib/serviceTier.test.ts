@@ -23,6 +23,7 @@ import {
   resolveServiceTierDelivery,
   roleReadsServiceTier,
   serviceTierOptionsFor,
+  storableServiceTier,
   summarizeFlex,
 } from './serviceTier.js'
 
@@ -330,4 +331,32 @@ test('every language role applies a tier; embeddings and web search do not', () 
   assert.equal(roleReadsServiceTier('embeddings'), false)
   assert.equal(roleReadsServiceTier('webSearch'), false)
   assert.equal(ROLES_WITH_SERVICE_TIER.length, 4)
+})
+
+// ---------------------------------------------------------------------------
+// What a written config may hold
+// ---------------------------------------------------------------------------
+
+test('a config keeps flex only on an OpenRouter role that applies a tier', () => {
+  assert.equal(storableServiceTier('textGeneration', 'openrouter', 'flex'), 'flex')
+  assert.equal(storableServiceTier('chat', 'openrouter', ' FLEX '), 'flex')
+})
+
+test('a role moved off OpenRouter loses its tier at the write', () => {
+  // The setup wizard's whole-config PUT merges over what is stored, so this is
+  // the case the write-point backstop exists for.
+  for (const provider of ['google', 'openai', 'lmstudio', 'zai']) {
+    assert.equal(storableServiceTier('textGeneration', provider, 'flex'), undefined, provider)
+  }
+})
+
+test('embeddings and web search never hold a tier, whatever the provider', () => {
+  assert.equal(storableServiceTier('embeddings', 'openrouter', 'flex'), undefined)
+  assert.equal(storableServiceTier('webSearch', 'openrouter', 'flex'), undefined)
+})
+
+test('a word outside the vocabulary is not stored, and neither is default', () => {
+  assert.equal(storableServiceTier('chat', 'openrouter', 'priority'), undefined)
+  assert.equal(storableServiceTier('chat', 'openrouter', 'default'), undefined)
+  assert.equal(storableServiceTier('chat', 'openrouter', undefined), undefined)
 })

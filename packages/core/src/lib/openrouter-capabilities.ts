@@ -276,6 +276,8 @@ const endpointsUrl = (modelId: string) => `https://openrouter.ai/api/v1/models/$
 const ENDPOINTS_CACHE_KEY = 'openrouter_endpoints_cache'
 // Bump when TierEndpoint gains fields so stale DB caches are refetched
 const ENDPOINTS_CACHE_VERSION = 1
+// Entries not refreshed for this long are dropped at the next save.
+const ENDPOINTS_PRUNE_AFTER_MS = 30 * 24 * 60 * 60 * 1000
 
 /**
  * `author/slug` with an optional `:variant`. Anything else is not put into a URL
@@ -337,6 +339,14 @@ function persistEndpointsCache(): void {
   endpointsSave = (async () => {
     do {
       endpointsSaveAgain = false
+      // A model nobody has asked about for a month is not in use — every model a
+      // role or a picker reads is refetched daily — so it is dropped rather than
+      // kept forever. Without this, every id ever typed into the add-model
+      // dialog's Test, typos included, would live in system_settings for good.
+      const cutoff = Date.now() - ENDPOINTS_PRUNE_AFTER_MS
+      for (const [id, entry] of endpointsCache ?? []) {
+        if (entry.fetchedAt < cutoff) endpointsCache?.delete(id)
+      }
       const snapshot: CachedEndpoints = {
         version: ENDPOINTS_CACHE_VERSION,
         entries: Object.fromEntries(endpointsCache ?? []),

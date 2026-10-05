@@ -696,6 +696,17 @@ export function AIFunctionCard({
   }, [storedServiceTier])
 
   const flexInfo = selectedModel?.flexTier
+  // An unsaved Flex choice does not follow the operator onto a model with no
+  // flex endpoint: the option is greyed there, the save would be refused, and
+  // the stale-flex warning below is worded for the one case that can
+  // legitimately show Flex on such a model — the STORED setting on the STORED
+  // model, which has since lost its endpoint and is already billing standard.
+  const keepsStoredFlex = model === config?.model && storedServiceTier === 'flex'
+  useEffect(() => {
+    if (serviceTier === 'flex' && flexInfo?.status === 'unavailable' && !keepsStoredFlex) {
+      setServiceTier('')
+    }
+  }, [serviceTier, flexInfo?.status, keepsStoredFlex])
   const offersServiceTier =
     !isSetup && provider === 'openrouter' && (flexInfo != null || storedServiceTier === 'flex')
   const flexSelectable = flexInfo?.status === 'available' || serviceTier === 'flex'
@@ -873,7 +884,10 @@ export function AIFunctionCard({
         }
       }
 
-      const runTest = async (key: string | undefined) => {
+      // `reportFlex` asks for the flex report, whose probe is a second paid
+      // call — so only the primary key's test asks, never each spare key, and
+      // never in the setup wizard, which draws no tier control.
+      const runTest = async (key: string | undefined, reportFlex: boolean) => {
         const res = await fetch(`${apiBase}/test`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -884,12 +898,13 @@ export function AIFunctionCard({
             model,
             apiKey: key || undefined,
             baseUrl: baseUrl || undefined,
+            ...(reportFlex && !isSetup ? { reportServiceTier: true } : {}),
           }),
         })
         return (await res.json()) as TestResult
       }
 
-      const primary = await runTest(apiKey || undefined)
+      const primary = await runTest(apiKey || undefined, true)
       if (!primary.success) {
         setTestResult(primary)
         return
@@ -910,7 +925,7 @@ export function AIFunctionCard({
       // and stop at the first bad one so the message names a single fault.
       if (supportsFallbackKey) {
         for (const [i, key] of effectiveFallbackKeys.entries()) {
-          const fallback = await runTest(key)
+          const fallback = await runTest(key, false)
           if (!fallback.success) {
             setTestResult({
               success: false,
@@ -1080,6 +1095,9 @@ export function AIFunctionCard({
           model: newModelName.trim(),
           apiKey: apiKey || undefined,
           baseUrl: baseUrl || undefined,
+          // A model is usually tested at the moment it is added, which is when
+          // the operator wants to know whether it can run on flex.
+          ...(!isSetup ? { reportServiceTier: true } : {}),
         }),
       })
       const data: TestResult = await res.json()

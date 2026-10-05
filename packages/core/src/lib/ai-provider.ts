@@ -46,6 +46,7 @@ import {
   resolveServiceTierDelivery,
   roleReadsServiceTier,
   serviceTierOptionsFor,
+  storableServiceTier,
   summarizeFlex,
   type EndpointTier,
   type FlexSummary,
@@ -60,6 +61,7 @@ import {
   getEmbeddingDimensions,
   getModelsForFunction,
   isAIFunction,
+  AI_FUNCTIONS,
   type AIFunction,
   type ModelCapabilities,
   type ModelMetadata,
@@ -453,13 +455,30 @@ export async function getAIConfig(): Promise<AIConfig> {
 export async function setAIConfig(config: AIConfig): Promise<void> {
   await setSystemSetting(
     'ai_config',
-    JSON.stringify(config),
+    JSON.stringify(withStorableServiceTiers(config)),
     'Per-function AI provider configuration (embeddings, chat, textGeneration, exploration)'
   )
   logger.info('AI configuration updated')
 
   // Clear cached providers
   cachedProviders.clear()
+}
+
+/**
+ * The config with every role's service tier reduced to what that role may hold
+ * — see `storableServiceTier`. A copy; the caller's object is left alone.
+ */
+function withStorableServiceTiers(config: AIConfig): AIConfig {
+  const out: AIConfig = { ...config }
+  for (const fn of AI_FUNCTIONS) {
+    const role = out[fn]
+    if (!role || role.serviceTier === undefined) continue
+    const tier = storableServiceTier(fn, role.provider, role.serviceTier)
+    if (tier === role.serviceTier) continue
+    const { serviceTier: _dropped, ...rest } = role
+    out[fn] = tier ? { ...rest, serviceTier: tier } : rest
+  }
+  return out
 }
 
 /**
@@ -2410,7 +2429,8 @@ export interface ProviderConnectionTest {
   /**
    * Whether this model can be asked for OpenRouter's flex tier, read FRESH from
    * its endpoints listing, plus — when it can — what a real flex request got.
-   * Present only for OpenRouter on a role that applies a tier.
+   * Present only when the caller asked for it (`serviceTierReport`), for
+   * OpenRouter on a role that applies a tier.
    */
   flexTier?: FlexSummary & { probe?: FlexProbe }
 }
@@ -2439,20 +2459,35 @@ export interface FlexProbe {
   error?: string
 }
 
+export interface ProviderConnectionTestOptions {
+  /**
+   * Also report OpenRouter's flex tier: a FRESH read of the model's endpoints
+   * listing and, when it lists flex, one real flex request (see {@link FlexProbe}).
+   *
+   * Opt-in because the probe is a second billable call, and only a caller that
+   * shows the answer should pay for it — the settings card's own Test and its
+   * add-model dialog. The setup wizard draws no tier control, and a card testing
+   * its spare keys one by one would otherwise probe flex once per key.
+   */
+  serviceTierReport?: boolean
+}
+
 export async function testProviderConnection(
   providerConfig: ProviderConfig,
-  fn: AIFunction
+  fn: AIFunction,
+  options: ProviderConnectionTestOptions = {}
 ): Promise<ProviderConnectionTest> {
   // A test is a real billable request, so it lands in the ledger like any other.
   // Labelling it keeps a burst of "Test" clicks from looking like mystery spend.
   return withInferenceContext({ feature: 'settings.testConnection' }, () =>
-    runProviderConnectionTest(providerConfig, fn)
+    runProviderConnectionTest(providerConfig, fn, options)
   )
 }
 
 async function runProviderConnectionTest(
   providerConfig: ProviderConfig,
-  fn: AIFunction
+  fn: AIFunction,
+  options: ProviderConnectionTestOptions
 ): Promise<ProviderConnectionTest> {
   try {
     const provider = createProviderInstance(providerConfig, fn)
@@ -2503,7 +2538,7 @@ async function runProviderConnectionTest(
       // The model answered; now say what it can be configured with. A model is
       // usually tested at the moment it is added, which is exactly when an
       // operator wants to know whether the effort and tier controls will appear.
-      return { success: true, ...(await describeLanguageModelOptions(providerConfig, fn)) }
+      return { success: true, ...(await describeLanguageModelOptions(providerConfig, fn, options)) }
     }
 
     return { success: true }
@@ -2553,7 +2588,8 @@ function describeTestFailure(described: ReturnType<typeof describeAiError>): str
  */
 async function describeLanguageModelOptions(
   config: ProviderConfig,
-  fn: AIFunction
+  fn: AIFunction,
+  options: ProviderConnectionTestOptions
 ): Promise<Pick<ProviderConnectionTest, 'reasoningEfforts' | 'flexTier'>> {
   const out: Pick<ProviderConnectionTest, 'reasoningEfforts' | 'flexTier'> = {}
 
@@ -2567,7 +2603,7 @@ async function describeLanguageModelOptions(
     }
   }
 
-  if (config.provider === 'openrouter' && roleReadsServiceTier(fn)) {
+  if (options.serviceTierReport === true && config.provider === 'openrouter' && roleReadsServiceTier(fn)) {
     try {
       // Fresh: a Test button answering from yesterday's cache cannot report a
       // model that gained or lost a tier since.
@@ -2972,16 +3008,33 @@ export async function getModelsForFunctionWithCustom(
   // Applied last, over both lists, so a mechanism from any of the three sources
   // — the catalog file, OpenRouter's live data, or the Z.AI inference above —
   // reaches the picker with the words it accepts.
-  const models = [
+  return [
     ...enrichedBuiltIns,
     ...customModelMetadata.filter((m) => !builtInIds.has(m.id)),
   ].map(withReasoningEfforts)
+}
 
-  // The flex tier, as a DECIDED value: stamped only where a tier is applied —
-  // OpenRouter, on a role whose model is built with one — so the card needs no
-  // copy of the role list to know whether to draw the control, and an absent
-  // field means "no control". Every OpenRouter chat model is user-entered, so
-  // this is one cached endpoints lookup per model the operator added.
+/**
+ * Stamp OpenRouter's flex tier onto a model list, as a DECIDED value.
+ *
+ * Only where a tier is applied — OpenRouter, on a role whose model is built
+ * with one — so the card needs no copy of the role list to know whether to draw
+ * the control, and an absent field means "no control". Every OpenRouter chat
+ * model is user-entered, so this is one cached endpoints lookup per model the
+ * operator added.
+ *
+ * Separate from {@link getModelsForFunctionWithCustom} on purpose: that list
+ * also feeds the setup wizard and the analysis bench's picker, and neither draws
+ * a tier control — the wizard cannot save one and the bench never applies one —
+ * so stamping there would buy a network lookup per model (a ten-second wait
+ * when OpenRouter is unreachable) for a field nothing reads. The settings
+ * models route is the one caller.
+ */
+export async function withServiceTierFacts(
+  providerId: string,
+  fn: AIFunction,
+  models: ModelMetadata[]
+): Promise<ModelMetadata[]> {
   if (providerId !== 'openrouter' || !roleReadsServiceTier(fn)) return models
   return Promise.all(
     models.map(async (m) => ({

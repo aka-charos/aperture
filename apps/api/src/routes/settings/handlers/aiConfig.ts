@@ -82,6 +82,7 @@ import {
   roleReadsGenerationParams,
   GENERATION_PARAM_RANGES,
   getSupportedServiceTiers,
+  withServiceTierFacts,
   roleReadsServiceTier,
   resolveServiceTier,
   isServiceTierOption,
@@ -373,7 +374,13 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'provider and function are required' })
       }
 
-      const models = await getModelsForFunctionWithCustom(provider as ProviderType, fn as AIFunction)
+      // The settings card is the one picker that draws a tier control, so it is
+      // the one caller that pays for the flex lookups (see withServiceTierFacts).
+      const models = await withServiceTierFacts(
+        provider,
+        fn as AIFunction,
+        await getModelsForFunctionWithCustom(provider as ProviderType, fn as AIFunction)
+      )
       return reply.send({ models })
     } catch (err) {
       fastify.log.error({ err }, 'Failed to get AI models')
@@ -883,10 +890,12 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       model: string
       apiKey?: string
       baseUrl?: string
+      /** Ask for the flex report too (see core's `serviceTierReport`). */
+      reportServiceTier?: boolean
     }
   }>('/api/settings/ai/test', { preHandler: requireAdmin, schema: testAiProviderSchema }, async (request, reply) => {
     try {
-      const { function: fn, provider, model, apiKey, baseUrl } = request.body
+      const { function: fn, provider, model, apiKey, baseUrl, reportServiceTier } = request.body
 
       if (!fn || !provider || !model) {
         return reply.status(400).send({ error: 'function, provider, and model are required' })
@@ -909,7 +918,8 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
           apiKey: testApiKey,
           baseUrl: testBaseUrl,
         },
-        fn as AIFunction
+        fn as AIFunction,
+        { serviceTierReport: reportServiceTier === true }
       )
 
       return reply.send(result)

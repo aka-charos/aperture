@@ -385,3 +385,27 @@ export const ROLES_WITH_SERVICE_TIER = ['chat', 'textGeneration', 'exploration',
 export function roleReadsServiceTier(fn: string): boolean {
   return (ROLES_WITH_SERVICE_TIER as readonly string[]).includes(fn)
 }
+
+/**
+ * The tier a role config may hold once written, or undefined to hold none.
+ *
+ * Applied at the ONE write point (`setAIConfig`), because three routes write a
+ * role config and only one of them validates a tier: the settings PATCH checks
+ * it against the model's listing, while the setup wizard's whole-config PUT
+ * merges whatever it is sent over what is stored. A role moved off OpenRouter
+ * there would keep `flex` — dropped at send, harmless on the wire, and warned
+ * about on every model construction for as long as it sat there.
+ *
+ * Deliberately structural only (provider, role, vocabulary). Whether THIS model
+ * has a flex endpoint is a network question the PATCH answers; a write that
+ * skipped it is still caught at send, where an unconfirmed tier is dropped or
+ * routes at the standard rate.
+ */
+export function storableServiceTier(
+  fn: string,
+  provider: string,
+  value: unknown
+): StoredServiceTier | undefined {
+  if (provider !== 'openrouter' || !roleReadsServiceTier(fn)) return undefined
+  return resolveServiceTier({ serviceTier: value })
+}
