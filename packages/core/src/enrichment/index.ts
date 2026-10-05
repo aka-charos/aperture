@@ -42,7 +42,8 @@ import {
   type CollectionData,
   type ApiLogCallback,
 } from '../tmdb/index.js'
-import { getSeriesEnrichmentData } from '../tmdb/series.js'
+import { getSeriesEnrichmentData, getTVDetails, creatorNames } from '../tmdb/series.js'
+import { findTVByImdbId, findTVByTvdbId } from '../tmdb/client.js'
 import { getRatingsData } from '../omdb/ratings.js'
 import { OmdbRequestError, isGlobalOmdbFailure } from '../omdb/failures.js'
 import type { RatingsData } from '../omdb/types.js'
@@ -707,7 +708,14 @@ async function enrichSeries(
          enrichment_version = COALESCE((SELECT value::int FROM system_settings WHERE key = 'enrichment_version'), 1),
          -- Only advance when OMDb was actually asked; CASE rather than COALESCE
          -- so a pass that skipped OMDb leaves an earlier timestamp intact.
-         omdb_enriched_at = CASE WHEN $9 THEN NOW() ELSE omdb_enriched_at END
+         omdb_enriched_at = CASE WHEN $9 THEN NOW() ELSE omdb_enriched_at END,
+         -- Its own column, never directors: the series sync rewrites that one
+         -- from the media server on every pass (seriesBatch.ts), and it feeds
+         -- the embedded text, so writing here would be wiped within hours and
+         -- flip the text back and forth. NULL creators means the details did
+         -- not load, and leaves both columns alone so the next pass retries.
+         tmdb_creators = CASE WHEN $15::text[] IS NOT NULL THEN $15::text[] ELSE tmdb_creators END,
+         tmdb_creators_fetched_at = CASE WHEN $15::text[] IS NOT NULL THEN NOW() ELSE tmdb_creators_fetched_at END
        WHERE id = $1`,
       [
         series.id,
@@ -724,6 +732,7 @@ async function enrichSeries(
         tmdbData?.voteCount ?? null,
         omdbData?.imdbRating ?? null,
         omdbData?.imdbVotes ?? null,
+        tmdbData?.creators ?? null,
       ]
     )
     return true
@@ -731,6 +740,95 @@ async function enrichSeries(
     logger.error({ err, seriesId: series.id }, 'Failed to update series with enrichment data')
     return false
   }
+}
+
+// ============================================================================
+// Series creators backfill
+// ============================================================================
+
+/**
+ * Fill tmdb_creators for series enriched before the column existed.
+ *
+ * Measured on a live library: 978 of 986 shows had no creator from the media
+ * server, while the TMDb details call enrichment already makes carries
+ * `created_by` and was being discarded. New shows get it from enrichSeries;
+ * this covers the rest, ONE TMDb details request per show (plus an id lookup
+ * when the show has no TMDb id), and never OMDb — a full re-enrichment would
+ * spend an OMDb quota to recover a field OMDb does not have.
+ *
+ * A show is asked at most once per run (the loop ends when the pending
+ * selection stops returning work, so a show whose fetch failed would otherwise
+ * be selected forever) and stays pending for the next run when it fails. A show
+ * TMDb answers for with no creators is stamped with `{}`, which is an answer.
+ */
+async function fillMissingSeriesCreators(jobId: string): Promise<{ filled: number; failed: number }> {
+  const outcome = { filled: 0, failed: 0 }
+  const attempted = new Set<string>()
+
+  const pending = await queryOne<{ count: string }>(
+    `SELECT COUNT(*) AS count FROM series
+     WHERE tmdb_creators_fetched_at IS NULL
+       AND (tmdb_id IS NOT NULL OR imdb_id IS NOT NULL OR tvdb_id IS NOT NULL)`
+  )
+  const total = parseInt(pending?.count || '0', 10)
+  if (total === 0) return outcome
+
+  setJobStep(jobId, 3, 'Fetching series creators', total)
+  addLog(jobId, 'info', `👤 Fetching creators for ${total} series from TMDb (TMDb only, no OMDb)`)
+
+  while (!isJobCancelled(jobId)) {
+    const batch = await query<SeriesToEnrich>(
+      `SELECT id, title, tmdb_id, imdb_id, tvdb_id FROM series
+       WHERE tmdb_creators_fetched_at IS NULL
+         AND (tmdb_id IS NOT NULL OR imdb_id IS NOT NULL OR tvdb_id IS NOT NULL)
+       ORDER BY id
+       LIMIT $1`,
+      [BATCH_SIZE + attempted.size]
+    )
+    const todo = batch.rows.filter((s) => !attempted.has(s.id)).slice(0, BATCH_SIZE)
+    if (todo.length === 0) break
+    for (const s of todo) attempted.add(s.id)
+
+    const results = await processWithConcurrency(
+      todo,
+      CONCURRENCY,
+      async (series) => {
+        // A throw here would reject the whole batch through the pool, so every
+        // failure is caught and counted; the show stays pending for next run.
+        try {
+          const onLog = createApiLogger(jobId, series.title)
+          let tmdbId = series.tmdb_id ? parseInt(series.tmdb_id, 10) : null
+          if (!tmdbId && series.imdb_id) tmdbId = await findTVByImdbId(series.imdb_id, { onLog })
+          if (!tmdbId && series.tvdb_id) tmdbId = await findTVByTvdbId(series.tvdb_id, { onLog })
+          if (!tmdbId) return false
+          const details = await getTVDetails(tmdbId, { onLog })
+          if (!details) return false
+          await query(
+            `UPDATE series SET tmdb_creators = $2::text[], tmdb_creators_fetched_at = NOW() WHERE id = $1`,
+            [series.id, creatorNames(details)]
+          )
+          return true
+        } catch (err) {
+          logger.warn({ err, seriesId: series.id }, 'Failed to fetch series creators')
+          return false
+        }
+      },
+      () => isJobCancelled(jobId)
+    )
+    // A cancelled pool leaves the unreached slots empty; those were not asked.
+    for (const ok of results) {
+      if (ok === true) outcome.filled++
+      else if (ok === false) outcome.failed++
+    }
+    updateJobProgress(jobId, outcome.filled + outcome.failed, total)
+  }
+
+  addLog(
+    jobId,
+    'info',
+    `👤 Series creators: ${outcome.filled} filled, ${outcome.failed} not found or failed (retried next run)`
+  )
+  return outcome
 }
 
 // ============================================================================
@@ -850,7 +948,7 @@ export async function enrichMetadata(jobId: string): Promise<EnrichmentProgress>
   // A resumed job reuses its id, and the announcement is once per *run*.
   omdbFailureAnnounced.delete(jobId)
 
-  createJobProgress(jobId, 'enrich-metadata', 3) // 3 steps: movies, series, collections
+  createJobProgress(jobId, 'enrich-metadata', 4) // 4 steps: movies, series, collections, series creators
 
   // Check for interrupted runs first
   const incompleteStatus = await getIncompleteEnrichmentRun()
@@ -896,6 +994,9 @@ export async function enrichMetadata(jobId: string): Promise<EnrichmentProgress>
 
     if (totalItems === 0) {
       addLog(jobId, 'info', `All items at enrichment version ${currentVersion} - nothing to do`)
+      // Not gated on the pending count above: shows enriched before the
+      // creators column existed are complete by that measure and still lack it.
+      if (tmdbEnabled) await fillMissingSeriesCreators(jobId)
       completeJob(jobId, { progress })
       return progress
     }
@@ -1085,6 +1186,12 @@ export async function enrichMetadata(jobId: string): Promise<EnrichmentProgress>
 
       // Update movie counts
       await updateCollectionCounts()
+    }
+
+    // Creators for shows enriched before tmdb_creators existed. Shows enriched
+    // in this run already have them, so this only reaches the backlog.
+    if (tmdbEnabled && !isJobCancelled(jobId)) {
+      await fillMissingSeriesCreators(jobId)
     }
 
     // Complete job

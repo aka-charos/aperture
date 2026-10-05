@@ -243,6 +243,13 @@ export interface SeriesEnrichmentData {
   productionCompanies: ProductionCompanyData[]
   voteAverage: number | null
   voteCount: number | null
+  /**
+   * TMDb's `created_by` names, from the details response this already fetches.
+   * NULL when the details did not load — distinct from `[]`, a show TMDb
+   * credits to no creator — so a failed fetch is retried rather than recorded
+   * as "nobody created this".
+   */
+  creators: string[] | null
 }
 
 export interface CollectionData {
