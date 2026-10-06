@@ -130,6 +130,46 @@ import { PROMPT_VARIANTS } from './promptVariants.js'
  */
 export const ANALYSIS_PROMPT_VERSION = 17
 
+/**
+ * The oldest prompt version whose prose is still worth keeping.
+ *
+ * WHAT WE WRITE NOW AND WHAT IS TOO OLD TO KEEP ARE TWO QUESTIONS, and until
+ * this constant they were one. `isAnalysisStale` compared against
+ * ANALYSIS_PROMPT_VERSION, so EVERY bump retired the whole library: the batch
+ * job queued every stored row again, the panel offered a Rewrite button on all
+ * of them, and the on-demand POST stopped serving any of them from cache. That
+ * is right for a version that makes earlier prose WRONG and far too expensive
+ * for one that makes it merely less good.
+ *
+ * MOVE THIS ONLY WHEN THE OLD PROSE IS UNUSABLE, not when it is improvable. The
+ * test is whether a reader is now being shown something false or broken:
+ *
+ *   - the question vocabulary changed, so stored labels no longer resolve
+ *     (version 9 retiring `intent` and `dispute`);
+ *   - a spoiler or accuracy rule that the old prose violates;
+ *   - the output contract changed shape.
+ *
+ * A change to style, naming, length or emphasis is NOT one of those. Version 18
+ * stops naming critics; a version-17 article that names them is still a
+ * perfectly good article, so the floor stays at 17 and nothing is retired.
+ *
+ * THE COST OF NOT MOVING IT: the library holds more than one kind of article at
+ * once. That is survivable here and is what `title_analysis.prompt_version`
+ * is for - every row says which prompt wrote it, so the two are always
+ * separable, and an admin `?force=true` rewrites any single title regardless.
+ *
+ * ONE CONSEQUENCE WORTH KNOWING: a DECLINE stops clearing on a bump that does
+ * not move this. That is correct - a decline means too little was published
+ * about the title, and renaming critics does not change what the web holds -
+ * but it reverses what `needsAnalysisSql` used to promise, so a version that
+ * should give declined titles another chance has to move the floor.
+ *
+ * Pinned at or below ANALYSIS_PROMPT_VERSION by prompt.test.ts: a floor above
+ * the current version would mark rows written by the current prompt as stale
+ * the moment they were written, and the job would rewrite the library forever.
+ */
+export const ANALYSIS_STALE_BELOW = 17
+
 /** Reception figures, passed as calibration only. All optional. */
 export interface ReceptionContext {
   metacriticScore?: number | null
@@ -777,6 +817,32 @@ const DRAFT_LENGTH_RULE_18 =
 const DRAFT_OWN_WORDS_RULE_18 =
   "Write every sentence in your own words. Never copy a phrase out of a document: anything reading like a crew note, a caption or a list of items has to be turned into English first. Say what a choice does, not what it avoids. Plain prose only - no headings, no bullet points, no numbered lists, no bold."
 
+/**
+ * Reception keeps the influence MATERIAL and loses the paragraph it had to
+ * itself.
+ *
+ * Measured on the 42 live rows: **19 of 42 close with it**, in thirteen
+ * paraphrases of one opener - "One technique travels with this film", "One
+ * inheritance teaches a way of watching", "One transferable technique", "One
+ * thing worth carrying elsewhere". Version 17 makes the paragraph conditional
+ * on a document naming something specific AND it teaching a way of watching,
+ * and it fires anyway, half the time, ending the article by setting the reader
+ * an exercise.
+ *
+ * DELETING IT OUTRIGHT WOULD COST SOMETHING REAL. The Zone of Interest closing
+ * carries the Haneke comparison and the Resnais lineage, which is the best
+ * material in that answer. It is the dedicated paragraph and its formulaic
+ * opener that are the fault, not the content - so the content moves into the
+ * one reception paragraph as a sentence, and the shape is named rather than the
+ * phrasing, because 19 of 42 is a habit with thirteen wordings and naming one
+ * of them would move it to the fourteenth.
+ */
+const DRAFT_RECEPTION_MOVIE_18 =
+  "How has it been taken, and who is it for? One paragraph, and never longer than what you wrote about the film itself. Say what critics valued and what they faulted, everyone making the same point in one sentence, so a viewer can calibrate what they are in for - a sentence per critic is the list an aggregator prints, not a paragraph. One sentence may give a reading of what the film means, where a critic's reading shaped how it is watched, and ordinary viewers get one sentence at most. Where a document names something specific this film passed on, say it in a sentence inside that same paragraph - it never gets a closing paragraph of its own, and never opens by telling a reader what it will teach them. A remake, a sequel and a cast list are never that. No scores of any kind and no verdict of your own."
+
+const DRAFT_RECEPTION_SERIES_18 =
+  "How has it been taken, and who is it for? One paragraph, and never longer than what you wrote about the series itself. Say what critics valued and what they faulted, everyone making the same point in one sentence, so a viewer can calibrate what they are in for - a sentence per critic is the list an aggregator prints, not a paragraph. One sentence may give a reading of what it means, where a critic's reading shaped how it is watched, and ordinary viewers get one sentence at most. Where a document names something specific it passed on, say it in a sentence inside that same paragraph - it never gets a closing paragraph of its own, and never opens by telling a reader what it will teach them. A remake, a spin-off and a cast list are never that. No scores of any kind and no verdict of your own."
+
 const DRAFT_TRADITION_MOVIE_18 =
   "What kind of film is this, and what is it in conversation with? Say what its mode and its register are first, so a viewer knows what to bring to it, and open on the film itself rather than on an imagined person sitting down to watch it. Then name what it draws on: a source it adapts, a tradition a document places it in, an earlier film a maker took from, a collaborator's earlier work this one departs from. EACH HAS TO EARN ITS PLACE IN THE SENTENCE THAT NAMES IT - a name with nothing attached is a credit. Do not open on who directed, wrote or starred in it, and never copy a listing page's genre labels or mood tags. Naming an earlier work is safe only when knowing how that one ends tells a viewer nothing about how this one ends."
 
@@ -816,9 +882,11 @@ const DRAFT_EDITION: PromptEdition | null = {
   version: ANALYSIS_PROMPT_VERSION + 1,
   movieQuestions: draftQuestions(CURRENT_EDITION.movieQuestions, {
     tradition: DRAFT_TRADITION_MOVIE_18,
+    reception: DRAFT_RECEPTION_MOVIE_18,
   }),
   seriesQuestions: draftQuestions(CURRENT_EDITION.seriesQuestions, {
     tradition: DRAFT_TRADITION_SERIES_18,
+    reception: DRAFT_RECEPTION_SERIES_18,
   }),
   // Swapped by identity against the named constant, never by index.
   rules: draftRules(CURRENT_EDITION.rules, [

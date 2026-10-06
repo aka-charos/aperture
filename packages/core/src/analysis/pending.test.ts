@@ -8,7 +8,7 @@ import {
   needsAnalysisSql,
   pendingAnalysisFromSql,
 } from './pending.js'
-import { ANALYSIS_PROMPT_VERSION } from './prompt.js'
+import { ANALYSIS_PROMPT_VERSION, ANALYSIS_STALE_BELOW } from './prompt.js'
 
 /** Collapse whitespace so assertions are about SQL, not indentation. */
 const flat = (sql: string) => sql.replace(/\s+/g, ' ').trim()
@@ -116,7 +116,31 @@ test('the JS staleness check agrees with the SQL predicate above it', () => {
 
   // Strictly below, on both sides. The other off-by-one would rewrite the whole
   // library on every run, forever.
-  assert.equal(isAnalysisStale(ANALYSIS_PROMPT_VERSION - 1), true)
+  assert.equal(isAnalysisStale(ANALYSIS_STALE_BELOW - 1), true)
+  assert.equal(isAnalysisStale(ANALYSIS_STALE_BELOW), false)
+  assert.equal(isAnalysisStale(ANALYSIS_STALE_BELOW + 1), false)
+})
+
+/**
+ * THE FLOOR IS WHAT STALENESS MEANS, AND IT MAY NOT EXCEED THE CURRENT VERSION.
+ *
+ * Above it, a row written by the current prompt would be stale the moment it
+ * was written: the job would queue it again on the next pass, write it again,
+ * and queue it again - a library rewriting itself forever at full inference
+ * cost, with every row looking correct in isolation.
+ *
+ * At or below it, a bump is free unless somebody decides otherwise, which is
+ * the whole point. 17 == 17 today, because version 18 changes naming and length
+ * and leaves every stored article perfectly readable.
+ */
+test('the staleness floor never rises above the prompt that writes', () => {
+  assert.ok(
+    ANALYSIS_STALE_BELOW <= ANALYSIS_PROMPT_VERSION,
+    'floor ' + ANALYSIS_STALE_BELOW + ' is above the current version ' + ANALYSIS_PROMPT_VERSION
+  )
+
+  // A row written by the current prompt is never stale. This is the assertion
+  // that fails if somebody moves the floor and the version together out of
+  // habit, which is the mistake the two constants exist to make visible.
   assert.equal(isAnalysisStale(ANALYSIS_PROMPT_VERSION), false)
-  assert.equal(isAnalysisStale(ANALYSIS_PROMPT_VERSION + 1), false)
 })

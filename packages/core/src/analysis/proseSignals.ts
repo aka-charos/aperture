@@ -149,6 +149,35 @@ const POINTS_AT_SOURCES = [
   /\b(?:one|another|several|some)\s+(?:[a-z]+(?:-[a-z]+)?\s+)?sources?\b(?!\s+(?:of|material|novel|text|book|play|story)\b)/gi,
   /\b(?:the|these|those|available|retrieved) documents?\b/gi,
   /\b(?:one|another|several|some)\s+(?:[a-z]+(?:-[a-z]+)?\s+)?documents?\b/gi,
+  // THE RETRIEVAL NAMED WITHOUT EITHER NOUN. Measured on 42 live version-17
+  // rows: this pattern read 3 while the true rate was about 7, because the
+  // prose points at the pages without calling them sources or documents --
+  // "does not appear in any of these pages", "Nothing here records a required
+  // cut", "No statement of intent survives in what is available here", "belongs
+  // to Zhao's adaptation, not the page".
+  //
+  // That is the THIRD time this one signal has been found blind, after
+  // `sources` while the prompt's own noun was `documents`, and `spill` counting
+  // the "a viewer" the prompt itself asks for. Every one was created by
+  // rewording the prompt without re-reading the signals.
+  //
+  // It catches an ANNOUNCED GAP as well as a reference, because DOCUMENTS_RULE
+  // forbids both in one sentence ("write nothing about it and nothing about the
+  // gap") and the gap is the form that actually appears.
+  // A DEMONSTRATIVE IS REQUIRED, never a bare "the pages": a character turning
+  // the pages of a diary is in the film, not in the retrieval. The test carries
+  // that sentence, and it is what caught this.
+  /\b(?:these|those|any of these|the available)\s+pages?\b/gi,
+  /\bnothing\s+(?:here|in these|on (?:these|any of these))\b/gi,
+  /\bnothing\s+(?:records|mentions|names|states|survives|is recorded|is said)\b/gi,
+  // "does not appear in" on its own is NOT here, deliberately. It fires on "the
+  // camera does not appear in the mirror", and every real instance already
+  // carries one of the nouns above - "does not appear in any of these pages".
+  /\bis not (?:recorded|documented|stated|reported)\s+(?:here|anywhere)\b/gi,
+  // "among the material here", "in what is available here". Deliberately NOT
+  // "the writing here", which is what a reader calls a screenplay.
+  /\b(?:the\s+)?(?:material|record|coverage|pages?)\s+(?:available\s+)?here\b/gi,
+  /\bwhat is available here\b/gi,
 ]
 
 /**

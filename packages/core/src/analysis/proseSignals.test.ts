@@ -263,6 +263,41 @@ test('pointing at the documents counts, not only at "the sources"', () => {
 })
 
 /**
+ * THE RETRIEVAL NAMED WITHOUT EITHER NOUN, which is the form that actually
+ * appears.
+ *
+ * Measured over 42 live version-17 rows: this signal read 3 while the true rate
+ * was about 7. The prose points at the pages without calling them sources or
+ * documents, and it does it by announcing the GAP - which DOCUMENTS_RULE
+ * forbids in the same sentence as the reference ("write nothing about it and
+ * nothing about the gap"), because the model is obeying the no-invention rule
+ * and has no permitted way to say nothing.
+ *
+ * Third blind spot found in this one signal, and all three were created by
+ * rewording the prompt without re-reading the patterns.
+ */
+test('the retrieval counts even when it is called neither a source nor a document', () => {
+  // Every one of these is verbatim from a stored version-17 analysis.
+  for (const text of [
+    'What Kormakur himself said about what he was trying to do does not appear in any of these pages.',
+    'Nothing here records a required cut or a special showing form either.',
+    'No statement of intent from Romm survives in what is available here, so the only guidance is his method.',
+    'No interview with Newman or any other maker appears among the material here, so nothing she said can be reported.',
+  ]) {
+    assert.ok(measureProse(text).pointsAtSources >= 1, 'missed: ' + text.slice(0, 50))
+  }
+
+  // NOT the retrieval: a page in the film, a thing that happens on screen, and
+  // an absence that belongs to the world rather than to what we fetched.
+  assert.equal(measureProse('He turns the pages of a diary he cannot read.').pointsAtSources, 0)
+  assert.equal(measureProse('Nothing moves for a full minute.').pointsAtSources, 0)
+  assert.equal(measureProse('The camera does not appear in the mirror.').pointsAtSources, 0)
+  // "The writing here" is what a reader calls a screenplay, so it is kept out
+  // of the retrieval nouns even though "the material here" is in.
+  assert.equal(measureProse('The writing here is sharper than the plotting.').pointsAtSources, 0)
+})
+
+/**
  * ornith-1.5-9b wrote its paragraph labels into the prose under version 15.
  * The panel draws its own headings from the map, so such a row renders
  * "Context" above the literal text "[tradition]".

@@ -7,7 +7,7 @@
  * than it looks.
  */
 import { query, queryOne } from '../lib/db.js'
-import { ANALYSIS_PROMPT_VERSION, type AnalysisSubject } from './prompt.js'
+import { ANALYSIS_STALE_BELOW, type AnalysisSubject } from './prompt.js'
 import {
   analysisPriorityOrderSql,
   pendingAnalysisFromSql,
@@ -100,7 +100,7 @@ export interface PendingTitle {
 export async function countPendingAnalysis(mediaType: 'movie' | 'series'): Promise<number> {
   const row = await queryOne<{ count: string }>(
     `SELECT COUNT(*)::text AS count ${pendingAnalysisFromSql(mediaType, '$1')}`,
-    [ANALYSIS_PROMPT_VERSION]
+    [ANALYSIS_STALE_BELOW]
   )
   return row ? Number.parseInt(row.count, 10) : 0
 }
@@ -119,7 +119,9 @@ export async function selectPendingTitles(
   limit: number,
   excludeIds: string[] = []
 ): Promise<PendingTitle[]> {
-  const params: unknown[] = [ANALYSIS_PROMPT_VERSION]
+  // The FLOOR, not the current version: a bump that leaves the floor alone must
+  // not queue every stored row again.
+  const params: unknown[] = [ANALYSIS_STALE_BELOW]
   let exclusion = ''
   if (excludeIds.length > 0) {
     params.push(excludeIds)

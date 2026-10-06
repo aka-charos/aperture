@@ -11,10 +11,10 @@
  * describe a total the loop never reaches.
  */
 
-import { ANALYSIS_PROMPT_VERSION } from './prompt.js'
+import { ANALYSIS_STALE_BELOW } from './prompt.js'
 
 /**
- * Is a stored row written under an older prompt?
+ * Is a stored row too old to keep?
  *
  * The JS twin of the `prompt_version <` clause below, and it lives here so
  * the two cannot drift — the batch job asks this question in SQL, the detail
@@ -28,9 +28,15 @@ import { ANALYSIS_PROMPT_VERSION } from './prompt.js'
  * obsolete analysis had no route back except an admin force or a hand-written
  * DELETE. At ten rows that is a nuisance; at ten thousand it means a prompt
  * improvement never reaches anything already written.
+ *
+ * IT COMPARES AGAINST THE FLOOR, NOT THE CURRENT VERSION. Against the current
+ * version every bump retired the whole library, which is far too expensive for
+ * a change that makes earlier prose merely less good rather than wrong. See
+ * ANALYSIS_STALE_BELOW for what may move the floor; a style or naming change
+ * may not.
  */
 export function isAnalysisStale(promptVersion: number): boolean {
-  return promptVersion < ANALYSIS_PROMPT_VERSION
+  return promptVersion < ANALYSIS_STALE_BELOW
 }
 
 /** Table and id column for each media type. */
@@ -64,14 +70,22 @@ export function analysisJoinSql(
 
 /**
  * A title is pending when we have never asked about it, or when we asked with
- * an older prompt.
+ * a prompt older than the floor.
+ *
+ * `versionParam` BINDS THE FLOOR, NOT THE CURRENT VERSION — every caller passes
+ * ANALYSIS_STALE_BELOW, and a caller passing ANALYSIS_PROMPT_VERSION would
+ * queue the whole library on the next bump, which is the behaviour the floor
+ * exists to end. It stays a parameter rather than reading the constant here so
+ * the predicate can be tested at any version.
  *
  * Note what is deliberately NOT here: a row whose `analysis` is NULL is a
  * DECLINE, not a gap. The model was asked and answered "there is nothing
  * substantive to say", or the web had too little to ground on, and re-asking
  * every pass would spend grounded requests to receive the same answer forever.
- * Declines clear when `ANALYSIS_PROMPT_VERSION` is bumped — exactly the
- * situation where re-asking is worth paying for.
+ * Declines clear when the FLOOR moves — which is no longer every bump, so a
+ * version meant to give declined titles another chance has to move it. Before
+ * the floor existed this read "when ANALYSIS_PROMPT_VERSION is bumped", and
+ * that promise is the one thing the floor takes away.
  *
  * A transport failure (429, 5xx, timeout) writes no row at all, so it falls
  * into the first clause and retries on the next run. That split — the attempt
