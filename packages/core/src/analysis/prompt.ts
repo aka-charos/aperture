@@ -709,7 +709,125 @@ const CURRENT_EDITION: PromptEdition = {
  * `: PromptEdition | null = null` narrows to null at the use site, and
  * DRAFT_EDITION?.version is then an access on never that tsc refuses.
  */
-const DRAFT_EDITION = null as PromptEdition | null
+/**
+ * Version 18's texts: THE NAMES ARE NOISE.
+ *
+ * MEASURED ON 42 LIVE ROWS, not on a bench. `altworld_hemmingway-1` in two
+ * quantizations, every one written under version 17, read with the bench's own
+ * instrument:
+ *
+ *  - The reception answers carry **83 distinct capitalised names** across 42
+ *    articles, and **26 of 42** attach a name to a verb of opinion. Almost
+ *    every one is a singleton: Adrian Martin, Kenneth Turan, Mick LaSalle,
+ *    Jourdain Searles, Owen Gleiberman, Leah Greenblatt, James Berardinelli,
+ *    Monica Castillo, each appearing ONCE in the whole corpus. One Mass
+ *    paragraph names three critics in three consecutive sentences.
+ *  - Roger Ebert appears six times and is the only name that recurs.
+ *
+ * A NAME THAT APPEARS ONCE IN FORTY-TWO ARTICLES IS NOISE. The reader is
+ * someone choosing a film, not a reader of criticism, and a byline they would
+ * have to be told about carries nothing that "a critic" does not. Version 16
+ * dropped the naming ban on the argument that naming the critic is what
+ * criticism normally does; that is true of criticism and not of this, and the
+ * operator's call reverses it on evidence version 16 did not have.
+ *
+ * THE BAN IS NARROW THIS TIME, WHICH IS WHY IT IS NOT VERSION 13's. That one
+ * forbade every name and failed on every model, because it fought the
+ * legitimate uses: the same 42 rows carry 297 distinct names OUTSIDE reception
+ * and they are makers and films - Polanski's Repulsion, Altman's Images, the
+ * Catalan crew on The Teacher Who Promised the Sea. Those are wanted. The line
+ * is not "no names", it is WHO MADE IT AGAINST WHO WROTE ABOUT IT, which is a
+ * distinction the writer always knows and the old ban never drew.
+ *
+ * THE OTHER FOUR CHANGES follow the one principle the 42 rows establish:
+ * ceilings are obeyed and flat bans are not. Compliance measured per rule -
+ * paragraph count 98%, paragraph words 67%, word total 62%, sentence cap 55%,
+ * and then "no semicolons" at 2% and "no rather than" at 0%.
+ *
+ *  - LENGTH IS RELAXED ON THE OPERATOR'S CALL, not tightened. 38% of rows ran
+ *    over 650 words and the prose was not worse for it; a number nobody wants
+ *    enforced should not be written as a maximum. Every figure is "about" now.
+ *  - THE TWO STYLE BANS GO. One row in 42 obeyed the semicolon ban and none
+ *    obeyed "rather than". They are house style, they cost a bench round every
+ *    version, and a reader does not see them. The guidance they sat on - say
+ *    what a choice does, not what it avoids - stays as guidance.
+ *  - THE TRADITION QUESTION STOPS QUOTING ITS OWN TARGET. Version 17 forbade
+ *    "a viewer sits down to" by printing it, and 19 of 42 rows carry the exact
+ *    string - 11 of them somewhere other than the opening. The ban relocated
+ *    the phrase into the body rather than removing it, so the instruction now
+ *    names the SHAPE (an imagined person watching) and prints no example.
+ *  - THE MAKERS WHO MAY BE NAMED ARE LISTED, since the rule named three and the
+ *    operator wants the editor, the composer and the cast as well.
+ *
+ * NOT CHANGED, deliberately: the question ids; the spoiler discipline; the
+ * source weighting; version 17's own mechanical test for who is speaking,
+ * which is what the making answer turns on; and the no-invention rule, which
+ * is not what "fine to drift on fact-checking" asked to loosen - it asked for
+ * no NEW accuracy machinery, and this version adds none.
+ */
+const DRAFT_ATTRIBUTION_RULE_18 =
+  "The first answers speak in your own voice: state facts, what is on screen and what it does to a viewer plainly, with nobody attached, even where a critic is who you read it from. What belongs to somebody else is a judgement of QUALITY or a claim about what the film MEANS, and both go to the reception answer with a holder - \"a critic\", \"critics\", \"a scholar\", \"some viewers\" - never \"a reading\", \"an account\" or \"the press\", and never hidden inside \"is regarded as\", \"is described as\", \"has been called\", \"is said to\" or \"reportedly\". DO NOT NAME THE PEOPLE WHO WROTE ABOUT IT, and do not name the publications they wrote for: a byline the reader would have to be told about tells them nothing, and \"a critic\" carries the same weight in fewer words. Roger Ebert is the one name you may use. Names belong to the people who MADE something - this film, or an earlier film you are naming. \"Critics\" means more than one, and two remarks by one critic are one critic."
+
+const DRAFT_NAMING_RULE_18 =
+  "Name the people who MADE it, and name them for the choice you are describing - the director, the writer, the cinematographer, the editor, the composer, the actors - never \"the creative team\". Never name a person to record what their job was, and never with the job in front of the name: \"Cinematographer Tovoli lit\" is the credit again, where \"Tovoli lit\" is the choice."
+
+const DRAFT_LENGTH_RULE_18 =
+  "Write about eight paragraphs, separated by blank lines, and around 600 words in all. Running a little over is fine; padding to reach a length is not, so thin documents should produce a short piece and stopping early is always right. Spend about two paragraphs on what kind of film it is, up to four on what to watch and listen for, one on what to know going in, and one on how it has been taken, last. Keep paragraphs short - three or four sentences - so one point can be followed to its end before the next begins."
+
+const DRAFT_OWN_WORDS_RULE_18 =
+  "Write every sentence in your own words. Never copy a phrase out of a document: anything reading like a crew note, a caption or a list of items has to be turned into English first. Say what a choice does, not what it avoids. Plain prose only - no headings, no bullet points, no numbered lists, no bold."
+
+const DRAFT_TRADITION_MOVIE_18 =
+  "What kind of film is this, and what is it in conversation with? Say what its mode and its register are first, so a viewer knows what to bring to it, and open on the film itself rather than on an imagined person sitting down to watch it. Then name what it draws on: a source it adapts, a tradition a document places it in, an earlier film a maker took from, a collaborator's earlier work this one departs from. EACH HAS TO EARN ITS PLACE IN THE SENTENCE THAT NAMES IT - a name with nothing attached is a credit. Do not open on who directed, wrote or starred in it, and never copy a listing page's genre labels or mood tags. Naming an earlier work is safe only when knowing how that one ends tells a viewer nothing about how this one ends."
+
+const DRAFT_TRADITION_SERIES_18 =
+  "What kind of series is this, and what is it in conversation with? Say what its mode and its register are first, so a viewer knows what to bring to it, and open on the series itself rather than on an imagined person sitting down to watch it. Then name what it draws on: a source it adapts, a tradition a document places it in, an earlier work a maker took from, a collaborator's earlier work this one departs from. EACH HAS TO EARN ITS PLACE IN THE SENTENCE THAT NAMES IT - a name with nothing attached is a credit. Do not open on who created, wrote or starred in it, and never copy a listing page's genre labels or mood tags. Naming an earlier work is safe only when knowing how that one ends tells a viewer nothing about how this one ends."
+
+/** Questions with named texts replaced, so the rest cannot drift from the base. */
+const draftQuestions = (
+  questions: readonly { id: AnalysisQuestionId; text: string }[],
+  replacements: Partial<Record<AnalysisQuestionId, string>>
+): { id: AnalysisQuestionId; text: string }[] =>
+  questions.map((question) => ({ ...question, text: replacements[question.id] ?? question.text }))
+
+/**
+ * Rules with named texts replaced, matched on the base's exact wording.
+ *
+ * THROWS WHEN A REPLACEMENT NO LONGER MATCHES: a silent miss would ship a draft
+ * that quietly IS its base, and a bench would then credit a change nobody made.
+ * prompt.test.ts builds the draft, so the throw lands in CI.
+ */
+const draftRules = (
+  rules: readonly string[],
+  replacements: readonly (readonly [string, string])[]
+): string[] => {
+  const next = [...rules]
+  for (const [from, to] of replacements) {
+    const at = next.indexOf(from)
+    if (at < 0) {
+      throw new Error('Draft rule replacement no longer matches its base: ' + from.slice(0, 60))
+    }
+    next[at] = to
+  }
+  return next
+}
+
+const DRAFT_EDITION: PromptEdition | null = {
+  version: ANALYSIS_PROMPT_VERSION + 1,
+  movieQuestions: draftQuestions(CURRENT_EDITION.movieQuestions, {
+    tradition: DRAFT_TRADITION_MOVIE_18,
+  }),
+  seriesQuestions: draftQuestions(CURRENT_EDITION.seriesQuestions, {
+    tradition: DRAFT_TRADITION_SERIES_18,
+  }),
+  // Swapped by identity against the named constant, never by index.
+  rules: draftRules(CURRENT_EDITION.rules, [
+    [LENGTH_RULE, DRAFT_LENGTH_RULE_18],
+    [OWN_WORDS_RULE, DRAFT_OWN_WORDS_RULE_18],
+    [NAMING_RULE, DRAFT_NAMING_RULE_18],
+    [ATTRIBUTION_RULE, DRAFT_ATTRIBUTION_RULE_18],
+  ]),
+}
 
 /** The draft's version number, or null when there is no draft. */
 export const DRAFT_PROMPT_VERSION: number | null = DRAFT_EDITION?.version ?? null

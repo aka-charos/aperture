@@ -727,9 +727,12 @@ test('version 17 decides who is speaking before it reports a maker', () => {
   const question = (id: string) => current.movieQuestions.find((q) => q.id === id)!.text
 
   assert.equal(ANALYSIS_PROMPT_VERSION, 17)
-  // The draft is cleared by a promotion. A leftover draft would sit in the
-  // bench picker claiming to be 18 while holding 17's text.
-  assert.equal(DRAFT_PROMPT_VERSION, null)
+  // This asserted `DRAFT_PROMPT_VERSION === null` while 17 was the newest
+  // thing in the build, which was true at its promotion and is a fact about
+  // THAT MOMENT rather than about version 17. Drafting 18 made it fail
+  // correctly. What it was reaching for - a draft sits above the current
+  // version and nowhere else - has its own test above and does not belong
+  // here, where it would have to be edited at every future draft.
 
   // The ids are untouched, or parseParagraphMap discards every label and the
   // panel loses its headings in fifteen locales.
@@ -793,6 +796,101 @@ test('version 17 decides who is speaking before it reports a maker', () => {
     'a list of topics and not the maker speaking'
   ))
   assert.ok(!question('circumstances').includes('a list of topics and not the maker speaking'))
+})
+
+/**
+ * DRAFT 18: THE NAMES ARE NOISE.
+ *
+ * The first version drafted from LIVE ROWS rather than from a bench. 42
+ * articles written under version 17 carry 83 distinct names in their reception
+ * answers, 26 of 42 attach a name to a verb of opinion, and almost every name
+ * appears exactly once in the whole corpus - which is what makes it noise to a
+ * reader who is choosing a film rather than reading criticism.
+ *
+ * What is pinned is the ASYMMETRY, because that is what makes this ban
+ * different from version 13's: the people who made it stay nameable, and only
+ * the people who wrote about it do not. The same 42 rows carry 297 distinct
+ * names outside reception and they are makers and films.
+ *
+ * The replacement helper throws when a base text moves, so merely building the
+ * draft - which importing this module does - is half the test.
+ */
+test('draft 18 names the makers and stops naming the critics', () => {
+  if (DRAFT_PROMPT_VERSION == null) return
+  const draft = editionFor(DRAFT_PROMPT_VERSION)
+  const current = editionFor(ANALYSIS_PROMPT_VERSION)
+  const rulesText = draft.rules.join('\n')
+  const currentRules = current.rules.join('\n')
+  const question = (id: string) => draft.movieQuestions.find((q) => q.id === id)!.text
+
+  assert.equal(DRAFT_PROMPT_VERSION, ANALYSIS_PROMPT_VERSION + 1)
+
+  // The ids are untouched, or parseParagraphMap discards every label and the
+  // panel loses its headings in fifteen locales.
+  for (const media of ['movieQuestions', 'seriesQuestions'] as const) {
+    assert.deepEqual(
+      draft[media].map((q) => q.id),
+      current[media].map((q) => q.id)
+    )
+  }
+
+  // THE CHANGE THE VERSION IS FOR, both halves. Version 16's permission is the
+  // measured cause of the 83 names and has to be gone, not merely balanced.
+  assert.ok(currentRules.includes('You may name a critic or the publication that ran them'))
+  assert.ok(!rulesText.includes('You may name a critic or the publication that ran them'))
+  assert.ok(rulesText.includes('DO NOT NAME THE PEOPLE WHO WROTE ABOUT IT'))
+  assert.ok(rulesText.includes('do not name the publications they wrote for'))
+  // The one name that recurs in the corpus, and the operator's named exception.
+  assert.ok(rulesText.includes('Roger Ebert is the one name you may use'))
+
+  // THE OTHER HALF, which is what keeps this from being version 13's blanket
+  // ban: a maker is still named, and the list now carries the three roles the
+  // old rule left out.
+  assert.ok(rulesText.includes('Name the people who MADE it'))
+  for (const role of ['the editor', 'the composer', 'the actors']) {
+    assert.ok(rulesText.includes(role), role + ' may be named')
+  }
+  assert.ok(rulesText.includes('Names belong to the people who MADE something'))
+  // Version 17's measured correction survives: 5 of 42 rows still did this.
+  assert.ok(rulesText.includes('"Cinematographer Tovoli lit" is the credit again'))
+
+  // LENGTH IS RELAXED, NOT TIGHTENED - the operator's call, over 42 rows where
+  // 38% ran past 650 words and the prose was no worse. Every figure is "about".
+  assert.ok(!rulesText.includes('at most 650 words'))
+  assert.ok(!rulesText.includes('never five'))
+  assert.ok(rulesText.includes('around 600 words'))
+  assert.ok(rulesText.includes('Running a little over is fine'))
+  // The half that is NOT relaxed: a length floor would bring padding back.
+  assert.ok(rulesText.includes('padding to reach a length is not'))
+
+  // THE TWO FLAT BANS GO. Obeyed by one row in 42 and none in 42; the guidance
+  // underneath them stays, because that part is about the prose.
+  assert.ok(currentRules.includes('No semicolons'))
+  assert.ok(!rulesText.includes('No semicolons'))
+  assert.ok(!rulesText.includes('no "rather than"'))
+  assert.ok(rulesText.includes('Say what a choice does, not what it avoids'))
+
+  // THE TRADITION QUESTION STOPS PRINTING ITS OWN TARGET. 19 of 42 rows carry
+  // the exact string version 17 banned, 11 of them outside the opening - the
+  // ban moved the phrase rather than removing it, so the example goes and the
+  // shape is named instead.
+  assert.ok(!question('tradition').includes('a viewer sits down to'))
+  assert.ok(question('tradition').includes('an imagined person sitting down to watch it'))
+  const seriesTradition = draft.seriesQuestions.find((q) => q.id === 'tradition')!.text
+  assert.ok(!seriesTradition.includes('a viewer sits down to'))
+  assert.ok(seriesTradition.includes('an imagined person sitting down to watch it'))
+
+  // NOT CHANGED: the rule count, the work and making questions, and version
+  // 17's own mechanical test, which is what the making answer turns on.
+  assert.equal(draft.rules.length, current.rules.length)
+  assert.equal(question('work'), current.movieQuestions.find((q) => q.id === 'work')!.text)
+  assert.equal(
+    question('circumstances'),
+    current.movieQuestions.find((q) => q.id === 'circumstances')!.text
+  )
+  assert.ok(question('circumstances').includes('WHO IS ASKED IS WHO SPEAKS'))
+  assert.ok(rulesText.includes('THESE NEVER EARN IT, in any answer'))
+  assert.ok(rulesText.includes('Describe how it works, never what happens in it'))
 })
 
 /**

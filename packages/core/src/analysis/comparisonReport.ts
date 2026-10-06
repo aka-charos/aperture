@@ -369,6 +369,12 @@ const LENGTH_CAPS: ReadonlyMap<number, LengthCaps> = new Map([
   [16, { words: 650, paragraphs: 8, paragraphWords: 150 }],
   // 17 carries 16's length rule unchanged.
   [17, { words: 650, paragraphs: 8, paragraphWords: 150 }],
+  // Version 18 states "around 600 words" and "about eight paragraphs" and drops
+  // the paragraph-word anchor, on the operator's call that length should drift.
+  // So there is no paragraphWords entry to flag against: measured on 42 live
+  // version-17 rows, a third ran over the 150 and the prose was not worse for
+  // it. `longest-w` is still printed, and is now descriptive rather than a cap.
+  [18, { words: 600, paragraphs: 8 }],
 ])
 
 /**
