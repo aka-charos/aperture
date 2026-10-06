@@ -1265,7 +1265,8 @@
     "testFlexServedOther": "A test request on flex was served on the {{tier}} tier and billed at that rate.",
     "testFlexServedUnknown": "A test request on flex succeeded; the response did not say which tier served it.",
     "testFlexRefused": "A test request on flex failed: {{error}}. Flex is never moved to standard capacity, so flex calls fail while this lasts.",
-    "testFlexNotSent": "The flex field did not reach the test request, so flex calls would bill at the standard rate."
+    "testFlexNotSent": "The flex field did not reach the test request, so flex calls would bill at the standard rate.",
+    "inputTypeNoneRecommended": "No retrieval mode is recommended for this model"
   },
   "aiCapability": {
     "configure": "Configureer",

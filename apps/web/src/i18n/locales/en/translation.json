@@ -1466,6 +1466,7 @@
     "inputTypeChangeWarning": "Changing this starts a NEW set of vectors beside the existing one; nothing is deleted or converted. The library keeps using the current set until you re-run embedding generation, then centring, then Rebuild taste profiles, then recommendations.",
     "inputTypeRecommended": "Recommended for this model: {{mode}}",
     "inputTypeApplyRecommended": "Apply",
+    "inputTypeNoneRecommended": "No retrieval mode is recommended for this model",
     "upstreamLabel": "OpenRouter upstream",
     "upstreamAuto": "Automatic (OpenRouter chooses)",
     "upstreamHelp": "OpenRouter serves one model from several companies. Automatic is fine when no retrieval mode is set, because the upstreams agree on unconditioned text. Pinning also makes latency and price predictable.",

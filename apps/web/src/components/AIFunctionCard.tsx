@@ -19,7 +19,6 @@ import {
   InputAdornment,
   IconButton,
   Alert,
-  AlertTitle,
   Chip,
   CircularProgress,
   Link,
@@ -1902,25 +1901,27 @@ export function AIFunctionCard({
             re-embed, centring and taste-profile rebuild have run. */}
         {offersInputType && (
           <Box sx={{ mb: 2 }}>
-            <FormControl fullWidth size="small">
-              <InputLabel id={`${functionType}-input-type-label`}>
-                {t('aiFunctionCard.inputTypeLabel')}
-              </InputLabel>
-              <Select
-                labelId={`${functionType}-input-type-label`}
-                value={inputType}
-                label={t('aiFunctionCard.inputTypeLabel')}
-                onChange={(e) => setInputType(e.target.value as EmbeddingInputTypeValue | '')}
-              >
-                <MenuItem value="">{t('aiFunctionCard.inputTypeDefault')}</MenuItem>
-                {embeddingInputTypeOptions(inputType).map((value) => (
-                  <MenuItem key={value} value={value}>
-                    {t(`aiFunctionCard.inputTypeOptions.${value}`)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormHelperText>{t('aiFunctionCard.inputTypeHelp')}</FormHelperText>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel id={`${functionType}-input-type-label`}>
+                  {t('aiFunctionCard.inputTypeLabel')}
+                </InputLabel>
+                <Select
+                  labelId={`${functionType}-input-type-label`}
+                  value={inputType}
+                  label={t('aiFunctionCard.inputTypeLabel')}
+                  onChange={(e) => setInputType(e.target.value as EmbeddingInputTypeValue | '')}
+                >
+                  <MenuItem value="">{t('aiFunctionCard.inputTypeDefault')}</MenuItem>
+                  {embeddingInputTypeOptions(inputType).map((value) => (
+                    <MenuItem key={value} value={value}>
+                      {t(`aiFunctionCard.inputTypeOptions.${value}`)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <InfoHint title={t('aiFunctionCard.inputTypeHelp')} />
+            </Box>
 
             {/* What this model needs, from the catalog. A hint with an explicit
                 Apply, never an automatic correction: applying it rewrites the
@@ -1946,16 +1947,18 @@ export function AIFunctionCard({
                   ) : undefined
                 }
               >
-                {selectedModel.recommendedInputType && (
-                  <AlertTitle sx={{ mb: 0.5 }}>
-                    {t('aiFunctionCard.inputTypeRecommended', {
-                      mode: t(
-                        `aiFunctionCard.inputTypeOptions.${selectedModel.recommendedInputType}`
-                      ),
-                    })}
-                  </AlertTitle>
-                )}
-                {selectedModel.inputTypeNote}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <span>
+                    {selectedModel.recommendedInputType
+                      ? t('aiFunctionCard.inputTypeRecommended', {
+                          mode: t(
+                            `aiFunctionCard.inputTypeOptions.${selectedModel.recommendedInputType}`
+                          ),
+                        })
+                      : t('aiFunctionCard.inputTypeNoneRecommended')}
+                  </span>
+                  <InfoHint title={selectedModel.inputTypeNote} />
+                </Box>
               </Alert>
             )}
 
