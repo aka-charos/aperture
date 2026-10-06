@@ -7,7 +7,7 @@ import { applyThemeColorOverrides, type ThemeColorOverrides } from '@/theme'
  *
  * Almost nothing reads this directly. UI strings say `{{appName}}` and i18next
  * fills it in from `interpolation.defaultVariables`, so renaming the instance
- * rebrands every translated string in all 15 locales at once. This module is the
+ * rebrands every translated string in all 14 locales at once. This module is the
  * few places that can't go through a translation: image alt text and the
  * browser tab title.
  *

@@ -12,7 +12,6 @@ import zh from '../../../i18n/locales/zh/translation.json'
 import ko from '../../../i18n/locales/ko/translation.json'
 import hi from '../../../i18n/locales/hi/translation.json'
 import ar from '../../../i18n/locales/ar/translation.json'
-import he from '../../../i18n/locales/he/translation.json'
 import el from '../../../i18n/locales/el/translation.json'
 import enOverrides from '../../../i18n/overrides.en.json'
 import { flattenTranslation, type TranslationTree } from '../../../i18n/flatten'
@@ -36,7 +35,6 @@ const BUNDLED_TREES: Record<string, TranslationTree> = {
   ko: ko as TranslationTree,
   hi: hi as TranslationTree,
   ar: ar as TranslationTree,
-  he: he as TranslationTree,
   el: el as TranslationTree,
 }
 

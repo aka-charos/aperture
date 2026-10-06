@@ -15,7 +15,6 @@ import zh from './locales/zh/translation.json'
 import ko from './locales/ko/translation.json'
 import hi from './locales/hi/translation.json'
 import ar from './locales/ar/translation.json'
-import he from './locales/he/translation.json'
 import el from './locales/el/translation.json'
 import enOverrides from './overrides.en.json'
 import { isRtlLocale } from './localeDirection'
@@ -47,7 +46,6 @@ const i18nInit = i18n
       ko: { translation: structuredClone(ko) },
       hi: { translation: structuredClone(hi) },
       ar: { translation: structuredClone(ar) },
-      he: { translation: structuredClone(he) },
       el: { translation: structuredClone(el) },
     },
     fallbackLng: 'en',
@@ -65,13 +63,12 @@ const i18nInit = i18n
       'ko',
       'hi',
       'ar',
-      'he',
       'el',
     ],
     interpolation: {
       escapeValue: false,
       // Every brand-facing string says `{{appName}}` rather than the product
-      // name, so an operator can rename the instance and have all 15 locales
+      // name, so an operator can rename the instance and have all 14 locales
       // follow. Seeded with the default here and overwritten once
       // `/api/branding` answers (see lib/branding.ts) — without a seed the
       // placeholder would render raw for the first frame.

@@ -1213,7 +1213,6 @@ const SUPPORTED_LOCALE_CODES = [
   'ko',
   'hi',
   'ar',
-  'he',
   'el',
 ] as const
 

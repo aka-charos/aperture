@@ -328,7 +328,7 @@ It lives at **`/admin`**, reached from the app bar:
 
 ### Branding, languages and text — new
 
-- **Rename the instance** — the name reaches all 15 locales and the browser tab from the first byte.
+- **Rename the instance** — the name reaches all 14 locales and the browser tab from the first byte.
 - **Mount your own logo and favicon** (`BRANDING_DIR`) and set the two brand colours from the UI.
 - **Edit any UI string** in the app or via CSV round-trip, or drop `overrides.<lng>.json` into `I18N_OVERRIDES_DIR` to customize text without rebuilding the image.
 - **Language allowlists** — choose which UI and AI languages users may pick, and the default for each.
@@ -680,7 +680,7 @@ pnpm db:migrate     # apply migrations
 pnpm db:status      # show migration state
 ```
 
-Propagate new English strings to the other 14 locales:
+Propagate new English strings to the other 13 locales:
 
 ```bash
 pnpm --filter @aperture/web i18n:sync

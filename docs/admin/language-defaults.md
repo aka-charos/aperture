@@ -13,7 +13,7 @@ Admin console → **Appearance** → **Language defaults** (`/admin/appearance/l
 | **Interface (UI)** | **Available UI languages** (multi-select allowlist) + **Default UI language** (restricted to the allowlist) |
 | **AI output** | **Available AI languages** + **Default AI language** |
 
-Fifteen locales ship: en, es, de, fr, it, pt, nl, ru, ja, zh, ko, hi, ar, he, el (Arabic and Hebrew render right-to-left). An **empty allowlist is rejected** — at least one language must stay enabled — and the active default is always kept selectable; deselecting the current default auto-moves it to the first enabled locale.
+Fourteen locales ship: en, es, de, fr, it, pt, nl, ru, ja, zh, ko, hi, ar, el (Arabic renders right-to-left). An **empty allowlist is rejected** — at least one language must stay enabled — and the active default is always kept selectable; deselecting the current default auto-moves it to the first enabled locale.
 
 The locale list endpoint is public (the login page needs it pre-session).
 

@@ -41,7 +41,7 @@ Filling **all** missing strings (~1.4k per locale × 13 non-English locales) is 
 - **A missing category falls back to ENGLISH, not to the language's own `_other`** (measured: a Russian file with only `_one` / `_other` renders "3 titles" in English for 2, 3, 5 and 11). `i18n:sync` only stamps the categories English has, so a translated plural must add the language's other categories by hand. Most plural strings translated before 2026-09-29 carry only `_one` / `_other` and leak English for those counts; the social-feature strings carry every category.
 - A label with a count that does not inflect (`Watched: {{count}}`) can be a single key without a suffix: i18next tries the category first and then the bare key, in the same language.
 
-## RTL (Arabic, Hebrew)
+## RTL (Arabic)
 
 - **RTL locale list** is defined in web as [`localeDirection.ts`](./localeDirection.ts) and must stay aligned with `isRtlLocale` / `RTL_LOCALE_CODES` in [`packages/core/src/lib/locales.ts`](../../packages/core/src/lib/locales.ts) (core is not imported in the browser bundle). The app sets `document.documentElement.dir` and uses MUI **`direction`** plus Emotion **`stylis-plugin-rtl`** via [`RtlProviders`](../RtlProviders.tsx).
 - Prefer **logical CSS** in new UI: `marginInline*`, `paddingInline*`, `borderInline*`, `insetInlineStart` / `insetInlineEnd` instead of `left`/`right` where mirroring matters.

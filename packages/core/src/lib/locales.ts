@@ -22,16 +22,15 @@ export const APP_LOCALE_OPTIONS = [
   { code: 'ko' as const, label: '한국어' },
   { code: 'hi' as const, label: 'हिन्दी' },
   { code: 'ar' as const, label: 'العربية' },
-  { code: 'he' as const, label: 'עברית' },
   { code: 'el' as const, label: 'Ελληνικά' },
 ] as const
 
 /** Locales that use right-to-left UI (document `dir` and MUI `direction`). */
-export const RTL_LOCALE_CODES = ['ar', 'he'] as const
+export const RTL_LOCALE_CODES = ['ar'] as const
 
 const VALID_CODES = new Set(APP_LOCALE_OPTIONS.map((o) => o.code))
 
-/** True if the base language tag is RTL (handles `ar`, `he`, and BCP-47 prefixes like `ar-SA`). */
+/** True if the base language tag is RTL (handles `ar` and BCP-47 prefixes like `ar-SA`). */
 export function isRtlLocale(code: string | null | undefined): boolean {
   if (!code) return false
   const base = code.split(/[-_]/)[0] ?? code
@@ -71,7 +70,6 @@ export function appLocaleToTmdbLanguage(code: string | null | undefined): string
     ko: 'ko-KR',
     hi: 'hi-IN',
     ar: 'ar-SA',
-    he: 'he-IL',
     el: 'el-GR',
   }
   return map[normalized] ?? 'en-US'
