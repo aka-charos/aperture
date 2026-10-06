@@ -40,6 +40,84 @@ import { createChildLogger } from './logger.js'
 
 const logger = createChildLogger('call-pacing')
 
+/**
+ * Providers that answer from the operator's own hardware, where there is no
+ * account and so no requests-per-minute budget to respect.
+ *
+ * A call to LM Studio or Ollama costs its own latency and nothing else: nobody
+ * is counting the requests, and a three-minute generation has already spaced
+ * itself past any cap that exists elsewhere. Spacing there only makes a library
+ * pass slower for no reason, so the option is not offered and a stored value is
+ * not honoured.
+ *
+ * `openai-compatible` is deliberately NOT on this list. It is "local" for model
+ * discovery, but the same provider is how a hosted gateway with a real
+ * per-minute cap is reached, and nothing about the address can say which one an
+ * operator pointed it at. Wrongly hiding the setting there strands someone with
+ * no way to turn it on; wrongly offering it costs one unticked checkbox. The
+ * mirror of this list in the web bundle is `PROVIDERS_WITHOUT_RATE_LIMIT`.
+ */
+export const PROVIDERS_WITHOUT_RATE_LIMIT: readonly string[] = ['lmstudio', 'ollama']
+
+/** Whether spacing a provider's calls can mean anything. Unknown reads as yes. */
+export function providerHasRateLimit(provider: string | null | undefined): boolean {
+  return !provider || !PROVIDERS_WITHOUT_RATE_LIMIT.includes(provider)
+}
+
+/**
+ * Ceiling on the pacing knob. An hour between calls is already far beyond any
+ * published free tier; past that the setting stops being pacing and becomes a
+ * way to make a job appear hung.
+ */
+export const MAX_CALL_SPACING_SECONDS = 3600
+
+/**
+ * Spacing in milliseconds for a provider, or 0 when pacing is off or cannot
+ * apply. The one place the stored number and the provider are read together,
+ * so a stored value that outlived a switch to a local model cannot delay it.
+ */
+export function resolveSpacingMs(
+  provider: string | null | undefined,
+  seconds: unknown
+): number {
+  if (!providerHasRateLimit(provider)) return 0
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0) return 0
+  return Math.min(seconds, MAX_CALL_SPACING_SECONDS) * 1000
+}
+
+/**
+ * Spacing for one attempt of a role whose pacing was set against `roleProvider`.
+ *
+ * The stored number describes the role's own provider's account, so it applies
+ * to an attempt on THAT provider and to no other: a spare model on the same
+ * OpenRouter account shares its per-minute budget, while a spare on a local
+ * server or a different account shares nothing and must not wait. The gate is
+ * keyed by provider for the same reason, so this is the other half of that rule.
+ */
+export function spacingMsForAttempt(
+  roleProvider: string | null | undefined,
+  roleSeconds: unknown,
+  attemptProvider: string
+): number {
+  return attemptProvider === roleProvider ? resolveSpacingMs(attemptProvider, roleSeconds) : 0
+}
+
+/**
+ * The pacing number worth storing for a provider: undefined when it would do
+ * nothing. Off is absent rather than 0, like `freeTier` — writing the default
+ * into every role's config only makes the blob noisier — and a local provider
+ * never keeps one, so switching a role back to a hosted model starts from the
+ * documented default (off) instead of resurrecting a delay nobody can see.
+ */
+export function storableCallSpacingSeconds(
+  provider: string | null | undefined,
+  seconds: number | null | undefined
+): number | undefined {
+  if (!providerHasRateLimit(provider)) return undefined
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0) return undefined
+  return Math.min(Math.round(seconds), MAX_CALL_SPACING_SECONDS)
+}
+
 /** How often the wait wakes up to check for cancellation. */
 const POLL_MS = 500
 

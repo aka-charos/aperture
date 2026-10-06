@@ -48,6 +48,7 @@ import {
   PROVIDER_INFO,
   embeddingInputTypeOptions,
   PROVIDERS_WITH_INPUT_TYPE,
+  providerHasRateLimit,
   ROLES_WITH_REASONING_EFFORT,
   ROLES_WITH_GENERATION_PARAMS,
   SUGGESTED_GENERATION_PARAMS,
@@ -588,6 +589,10 @@ export function AIFunctionCard({
   // already-configured role without anyone asking, including local models that
   // have no rate limit to respect.
   const storedPacing = config?.callSpacingSeconds ?? 0
+  // Pacing spaces calls against an account's requests-per-minute budget, which
+  // LM Studio and Ollama do not have. Decided from the provider being EDITED,
+  // not the saved one, so the checkbox follows the dropdown immediately.
+  const offersPacing = supportsFallbackModels && providerHasRateLimit(provider)
   useEffect(() => {
     setPacingSeconds(storedPacing)
     if (storedPacing > 0) setPacingDraft(storedPacing)
@@ -967,7 +972,10 @@ export function AIFunctionCard({
       ...(supportsFallbackModels
         ? {
             fallbackModels: fallbackModels.filter((m) => m.model.trim().length > 0),
-            callSpacingSeconds: pacingSeconds,
+            // Explicit 0 on a provider with no limit, so a value left from a
+            // hosted model is cleared by the save rather than silently kept
+            // (the server drops it there regardless).
+            callSpacingSeconds: offersPacing ? pacingSeconds : 0,
           }
         : {}),
       // Explicit `null` rather than omission when cleared: omitting means
@@ -1674,8 +1682,11 @@ export function AIFunctionCard({
             hundreds of milliseconds to a window measured in minutes.
 
             One stored number, with the checkbox derived from it — see the state
-            declaration above for why there is no separate flag. */}
-        {supportsFallbackModels && (
+            declaration above for why there is no separate flag.
+
+            Not offered for LM Studio or Ollama: a local server has no account
+            and no requests-per-minute budget, so spacing only slows the run. */}
+        {offersPacing && (
           <Box sx={{ mb: 2 }}>
             <FormControlLabel
               control={

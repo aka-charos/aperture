@@ -9,8 +9,20 @@
  */
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
-import { reserveSlot, waitForCallSlot, resetCallPacing } from './callPacing.js'
+import {
+  reserveSlot,
+  waitForCallSlot,
+  resetCallPacing,
+  providerHasRateLimit,
+  resolveSpacingMs,
+  spacingMsForAttempt,
+  storableCallSpacingSeconds,
+  PROVIDERS_WITHOUT_RATE_LIMIT,
+  MAX_CALL_SPACING_SECONDS,
+} from './callPacing.js'
 
 const marker = (nextAllowedAt: number, issuedAt: number) => ({ nextAllowedAt, issuedAt })
 
@@ -115,5 +127,81 @@ describe('waitForCallSlot', () => {
     const result = await waitForCallSlot('provider:b', 60_000)
     assert.equal(result.waitedMs, 0)
     assert.ok(Date.now() - started < 200, 'one provider delayed another')
+  })
+})
+
+describe('pacing and local providers', () => {
+  test('LM Studio and Ollama have no rate limit; hosted providers and gateways do', () => {
+    assert.equal(providerHasRateLimit('lmstudio'), false)
+    assert.equal(providerHasRateLimit('ollama'), false)
+    for (const p of ['openrouter', 'google', 'openai', 'zai', 'groq', 'deepseek']) {
+      assert.equal(providerHasRateLimit(p), true, p)
+    }
+    // A hosted gateway is reached through this provider and cannot be told
+    // apart from a local server, so it keeps the option.
+    assert.equal(providerHasRateLimit('openai-compatible'), true)
+    // Unknown reads as "has one": wrongly hiding the setting strands someone.
+    assert.equal(providerHasRateLimit(undefined), true)
+    assert.equal(providerHasRateLimit(null), true)
+  })
+
+  test('the list is exactly the two providers it claims', () => {
+    assert.deepEqual([...PROVIDERS_WITHOUT_RATE_LIMIT].sort(), ['lmstudio', 'ollama'])
+  })
+
+  test('a stored value never delays a local provider', () => {
+    assert.equal(resolveSpacingMs('lmstudio', 60), 0)
+    assert.equal(resolveSpacingMs('ollama', 60), 0)
+    assert.equal(resolveSpacingMs('openrouter', 60), 60_000)
+  })
+
+  test('off, malformed and absurd values still resolve as before', () => {
+    assert.equal(resolveSpacingMs('openrouter', undefined), 0)
+    assert.equal(resolveSpacingMs('openrouter', 0), 0)
+    assert.equal(resolveSpacingMs('openrouter', -5), 0)
+    assert.equal(resolveSpacingMs('openrouter', Number.NaN), 0)
+    assert.equal(resolveSpacingMs('openrouter', '30'), 0)
+    assert.equal(resolveSpacingMs('openrouter', 10 ** 9), MAX_CALL_SPACING_SECONDS * 1000)
+  })
+
+  test('a spare is paced only when it shares the role provider account', () => {
+    // Primary on OpenRouter, paced.
+    assert.equal(spacingMsForAttempt('openrouter', 20, 'openrouter'), 20_000)
+    assert.equal(spacingMsForAttempt('openrouter', 20, 'lmstudio'), 0)
+    assert.equal(spacingMsForAttempt('openrouter', 20, 'ollama'), 0)
+    assert.equal(spacingMsForAttempt('openrouter', 20, 'google'), 0)
+    // Primary local: nothing is paced, including a stale stored number.
+    assert.equal(spacingMsForAttempt('lmstudio', 20, 'lmstudio'), 0)
+    assert.equal(spacingMsForAttempt('lmstudio', 20, 'openrouter'), 0)
+    // No role config at all.
+    assert.equal(spacingMsForAttempt(undefined, undefined, 'openrouter'), 0)
+  })
+
+  test('a local provider never keeps a stored value; a hosted one keeps it as before', () => {
+    assert.equal(storableCallSpacingSeconds('lmstudio', 30), undefined)
+    assert.equal(storableCallSpacingSeconds('ollama', 30), undefined)
+    assert.equal(storableCallSpacingSeconds('openrouter', 30), 30)
+    assert.equal(storableCallSpacingSeconds('openai-compatible', 30), 30)
+    // Off is absent rather than 0.
+    assert.equal(storableCallSpacingSeconds('openrouter', 0), undefined)
+    assert.equal(storableCallSpacingSeconds('openrouter', undefined), undefined)
+    assert.equal(storableCallSpacingSeconds('openrouter', 12.4), 12)
+    assert.equal(storableCallSpacingSeconds('openrouter', 10 ** 9), MAX_CALL_SPACING_SECONDS)
+  })
+})
+
+describe('the web mirror', () => {
+  test('the bundle hides the option for exactly the providers core ignores', () => {
+    // The web bundle never imports core, so its list is a hand copy — and a
+    // copy that drifts shows a control the server then ignores, or hides one
+    // the server would have honoured.
+    const file = fileURLToPath(
+      new URL('../../../../apps/web/src/components/aiProviderInfo.ts', import.meta.url)
+    )
+    const source = readFileSync(file, 'utf8')
+    const match = /PROVIDERS_WITHOUT_RATE_LIMIT:[^=]*=\s*\[([^\]]*)\]/.exec(source)
+    assert.ok(match, 'PROVIDERS_WITHOUT_RATE_LIMIT not found in the web bundle')
+    const mirrored = [...match[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort()
+    assert.deepEqual(mirrored, [...PROVIDERS_WITHOUT_RATE_LIMIT].sort())
   })
 })

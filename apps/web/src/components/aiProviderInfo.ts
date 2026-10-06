@@ -300,6 +300,20 @@ export function embeddingInputTypeOptions(current: string): readonly EmbeddingIn
 /** Providers whose embeddings API can carry a retrieval mode. Mirrors core. */
 export const PROVIDERS_WITH_INPUT_TYPE: readonly ProviderType[] = ['openrouter', 'google']
 
+/**
+ * Providers with no rate limit to space calls against — they run on the
+ * operator's own hardware. Mirrors core's `PROVIDERS_WITHOUT_RATE_LIMIT`.
+ *
+ * `openai-compatible` is deliberately absent: it is also how a hosted gateway
+ * with a real per-minute cap is reached, and the address cannot say which one.
+ */
+export const PROVIDERS_WITHOUT_RATE_LIMIT: readonly ProviderType[] = ['lmstudio', 'ollama']
+
+/** Whether the free-tier pacing option means anything for this provider. */
+export function providerHasRateLimit(provider: ProviderType | null | undefined): boolean {
+  return !provider || !PROVIDERS_WITHOUT_RATE_LIMIT.includes(provider)
+}
+
 export interface FallbackModelConfig {
   provider: ProviderType
   model: string

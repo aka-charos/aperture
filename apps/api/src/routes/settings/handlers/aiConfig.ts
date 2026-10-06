@@ -69,6 +69,7 @@ import {
   resolveFallbackKeys,
   isFreeTierConfig,
   MAX_CALL_SPACING_SECONDS,
+  storableCallSpacingSeconds,
   AI_FUNCTIONS,
   isAIFunction,
   embeddingSetId,
@@ -1315,7 +1316,9 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         // Stored only when it is doing something, like `freeTier` above:
         // writing the default into every role's config would just make the blob
         // noisier without saying anything.
-        callSpacingSeconds: nextSpacing && nextSpacing > 0 ? nextSpacing : undefined,
+        // Never kept for a provider with no rate limit (LM Studio, Ollama): the
+        // card does not offer it there, so a value would be invisible.
+        callSpacingSeconds: storableCallSpacingSeconds(provider, nextSpacing),
         embeddingInputType: nextInputType,
         embeddingProviderOnly: nextProviderOnly,
         reasoningEffort: nextReasoningEffort,

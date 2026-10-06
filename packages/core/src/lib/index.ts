@@ -166,6 +166,11 @@ export {
   type WebSearchCallOutcome,
   type WebSearchUsageTokens,
 } from './ai-provider.js'
+export {
+  providerHasRateLimit,
+  storableCallSpacingSeconds,
+  PROVIDERS_WITHOUT_RATE_LIMIT,
+} from './callPacing.js'
 
 // Reading a local inference server's own catalog, so the operator picks an
 // installed model from a list instead of retyping its id from LM Studio.

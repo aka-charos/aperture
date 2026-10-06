@@ -56,6 +56,12 @@ import {
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
 import { createChildLogger } from './logger.js'
 import {
+  MAX_CALL_SPACING_SECONDS,
+  resolveSpacingMs,
+  spacingMsForAttempt,
+  storableCallSpacingSeconds,
+} from './callPacing.js'
+import {
   getModel,
   validateCapabilityForFeature,
   getEmbeddingDimensions,
@@ -363,19 +369,18 @@ export function resolveFallbackModels(config: ProviderConfig): FallbackModel[] {
   return out
 }
 
-/** Spacing in milliseconds, or 0 when the operator has not asked for pacing. */
-export function resolveCallSpacingMs(config: Pick<ProviderConfig, 'callSpacingSeconds'> | null | undefined): number {
-  const seconds = config?.callSpacingSeconds
-  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0) return 0
-  return Math.min(seconds, MAX_CALL_SPACING_SECONDS) * 1000
+/**
+ * Spacing in milliseconds, or 0 when the operator has not asked for pacing — or
+ * when the role's provider has no rate limit to space against (LM Studio,
+ * Ollama), whatever an earlier configuration left stored.
+ */
+export function resolveCallSpacingMs(
+  config: Pick<ProviderConfig, 'provider' | 'callSpacingSeconds'> | null | undefined
+): number {
+  return resolveSpacingMs(config?.provider, config?.callSpacingSeconds)
 }
 
-/**
- * Ceiling on the pacing knob. An hour between calls is already far beyond any
- * published free tier; past that the setting stops being pacing and becomes a
- * way to make a job appear hung.
- */
-export const MAX_CALL_SPACING_SECONDS = 3600
+export { MAX_CALL_SPACING_SECONDS }
 
 export interface AIConfig {
   embeddings: ProviderConfig | null
@@ -465,18 +470,35 @@ export async function setAIConfig(config: AIConfig): Promise<void> {
 }
 
 /**
- * The config with every role's service tier reduced to what that role may hold
- * — see `storableServiceTier`. A copy; the caller's object is left alone.
+ * The config with every role's service tier and pacing reduced to what that role
+ * may hold — see `storableServiceTier` and `storableCallSpacingSeconds`. A copy;
+ * the caller's object is left alone.
  */
 function withStorableServiceTiers(config: AIConfig): AIConfig {
   const out: AIConfig = { ...config }
   for (const fn of AI_FUNCTIONS) {
     const role = out[fn]
-    if (!role || role.serviceTier === undefined) continue
-    const tier = storableServiceTier(fn, role.provider, role.serviceTier)
-    if (tier === role.serviceTier) continue
-    const { serviceTier: _dropped, ...rest } = role
-    out[fn] = tier ? { ...rest, serviceTier: tier } : rest
+    if (!role) continue
+    let next: ProviderConfig = role
+    if (role.serviceTier !== undefined) {
+      const tier = storableServiceTier(fn, role.provider, role.serviceTier)
+      if (tier !== role.serviceTier) {
+        const { serviceTier: _dropped, ...rest } = next
+        next = tier ? { ...rest, serviceTier: tier } : rest
+      }
+    }
+    // Pacing against a provider with no rate limit is dropped, not kept dormant:
+    // the card hides the control there, so a value left behind would be a delay
+    // nobody could see or clear — and one that returns when the role is pointed
+    // back at a hosted model.
+    if (next.callSpacingSeconds !== undefined) {
+      const seconds = storableCallSpacingSeconds(next.provider, next.callSpacingSeconds)
+      if (seconds !== next.callSpacingSeconds) {
+        const { callSpacingSeconds: _dropped, ...rest } = next
+        next = seconds !== undefined ? { ...rest, callSpacingSeconds: seconds } : rest
+      }
+    }
+    out[fn] = next
   }
   return out
 }
@@ -1891,7 +1913,6 @@ export async function getTitleAnalysisModelAttempts(): Promise<ModelAttempt[]> {
     )
   }
 
-  const spacingMs = resolveCallSpacingMs(config)
   const build = (
     providerConfig: ProviderConfig,
     isFallback: boolean,
@@ -1902,7 +1923,15 @@ export async function getTitleAnalysisModelAttempts(): Promise<ModelAttempt[]> {
       model: instantiateLanguageModel(instance, providerConfig.model, settings),
       modelId: providerConfig.model,
       provider: providerConfig.provider,
-      spacingMs,
+      // The stored number was set against the role's own provider's account, so
+      // it applies to an attempt on THAT provider and to no other (see
+      // `spacingMsForAttempt`). It used to be handed to every attempt, which
+      // delayed a local fallback by a free-tier OpenRouter's pacing.
+      spacingMs: spacingMsForAttempt(
+        config.provider,
+        config.callSpacingSeconds,
+        providerConfig.provider
+      ),
       isFallback,
       ...(settings.extraBody && { serviceTier: settings.extraBody.service_tier }),
       ...(providerConfig.baseUrl != null && { baseUrl: providerConfig.baseUrl }),
@@ -2019,7 +2048,7 @@ export async function buildTitleAnalysisAttemptFor(
     model: (instance as any)(model) as LanguageModel,
     modelId: model,
     provider,
-    spacingMs: sameProvider ? resolveCallSpacingMs(roleConfig) : 0,
+    spacingMs: spacingMsForAttempt(roleConfig?.provider, roleConfig?.callSpacingSeconds, provider),
     isFallback: false,
     ...(resolved.baseUrl != null && { baseUrl: resolved.baseUrl }),
     ...(resolved.apiKey != null && { apiKey: resolved.apiKey }),
