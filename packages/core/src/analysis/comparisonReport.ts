@@ -134,6 +134,23 @@ export interface ComparisonReport {
    * run retrieved its own, which is every run made before 0171.
    */
   replayOf?: ComparisonBaseline | null
+  /**
+   * What the optional decision-model source filter did to this retrieval.
+   *
+   * ABSENT MEANS IT WAS NOT ASKED - the switch is off, the run predates it, or
+   * there were too few documents for a drop to be possible. That is the normal
+   * state and it is deliberately NOT rendered as "nothing was dropped", for
+   * `criticismLine`'s reason one step over: the two are different facts, and
+   * printing the second where the first is true sends an operator to debug a
+   * filter that is switched off.
+   */
+  judgedSources?: JudgedSourceReport | null
+}
+
+export interface JudgedSourceReport {
+  dropped: Array<{ domain: string; title: string; score: number; chars: number }>
+  /** The floor stopped a drop the model asked for: this retrieval was mostly noise. */
+  floored: boolean
 }
 
 const RULE = '='.repeat(72)
@@ -458,6 +475,41 @@ export function criticismLine(sources: readonly ComparisonSource[]): string {
   return 'None are marked as coming from the curated criticism search — either it found nothing on those publications for this title, or this run was made without it.'
 }
 
+/**
+ * What the decision model took out of the retrieval, if it was asked.
+ *
+ * SILENT WHEN IT WAS NOT, which is `criticismLine`'s rule applied to a filter
+ * rather than a search: absent and "asked, dropped nothing" are different
+ * facts about this run, and only one of them says anything about the pages.
+ * When it WAS asked and kept everything, that is worth a line of its own -
+ * that is the operator's evidence the filter is not quietly eating documents.
+ *
+ * The scores are printed. A list of domains says what went; the probability
+ * beside each is what makes the decision arguable, and this is the only place
+ * outside the container log where it can be read.
+ */
+export function judgedSourcesLines(judged: JudgedSourceReport | null | undefined): string[] {
+  if (!judged) return []
+  if (judged.dropped.length === 0) {
+    return ['A decision model read every document above and ruled none of them out.']
+  }
+  const chars = judged.dropped.reduce((sum, d) => sum + d.chars, 0)
+  const lines = [
+    `A decision model ruled out ${judged.dropped.length} further document(s), ${chars.toLocaleString(
+      'en-US'
+    )} characters, before the budget ran:`,
+  ]
+  for (const d of judged.dropped) {
+    lines.push(`  - ${d.domain} — ${d.title} (${d.chars.toLocaleString('en-US')} chars, scored ${d.score.toFixed(2)})`)
+  }
+  if (judged.floored) {
+    lines.push(
+      '  It wanted to drop more and was stopped by the floor, so what survives includes pages it ruled out.'
+    )
+  }
+  return lines
+}
+
 function promptName(entry: { promptVersion: number; promptVariant?: string | null }): string {
   return entry.promptVariant
     ? `${entry.promptVersion} ${entry.promptVariant}`
@@ -590,6 +642,7 @@ export function renderComparisonReport(report: ComparisonReport): string {
     )
   }
   out.push(`  ${criticismLine(report.sources)}`)
+  for (const line of judgedSourcesLines(report.judgedSources)) out.push(`  ${line}`)
   for (const source of report.sources) {
     // The marker is what makes the curated search legible at all: without it
     // the only way to tell a film journal from a content farm in this list is

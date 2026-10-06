@@ -4,6 +4,7 @@ import { test } from 'node:test'
 import { BENCH_PROMPT_VERSIONS, editionFor } from './prompt.js'
 import {
   criticismLine,
+  judgedSourcesLines,
   lengthCapsFor,
   renderComparisonReport,
   type ComparisonEntry,
@@ -363,6 +364,54 @@ test('no marked source never claims the search found nothing', () => {
   const out = criticismLine([{ title: 'A', domain: 'en.wikipedia.org', chars: 100 }])
   assert.match(out, /either it found nothing .* or this run was made without it/)
   assert.ok(!/^Of these/.test(out))
+})
+
+/**
+ * THE THREE STATES OF THE SOURCE FILTER, and the one that matters is the gap
+ * between the first two. `criticismLine`'s lesson one step over: a run where
+ * the filter never ran and a run where it read everything and kept everything
+ * are different facts, and rendering the second where the first is true sends
+ * an operator to debug a filter that is switched off.
+ */
+test('a filter that did not run says nothing', () => {
+  assert.deepEqual(judgedSourcesLines(null), [])
+  assert.deepEqual(judgedSourcesLines(undefined), [])
+  assert.doesNotMatch(renderComparisonReport(report()), /decision model/i)
+})
+
+test('a filter that ran and kept everything says so out loud', () => {
+  const lines = judgedSourcesLines({ dropped: [], floored: false })
+  assert.equal(lines.length, 1)
+  assert.match(lines[0], /read every document above and ruled none of them out/)
+})
+
+test('what was dropped is named with its score, so the call can be argued with', () => {
+  const lines = judgedSourcesLines({
+    dropped: [
+      { domain: 'reddit.com', title: 'Best horror ever', score: 0.04, chars: 13_318 },
+      { domain: 'thefilmstage.com', title: 'The Film Stage Show', score: 0.11, chars: 1_551 },
+    ],
+    floored: false,
+  })
+  assert.match(lines[0], /ruled out 2 further document\(s\), 14,869 characters/)
+  assert.match(lines[1], /reddit\.com — Best horror ever \(13,318 chars, scored 0\.04\)/)
+  assert.ok(!lines.some((l) => /stopped by the floor/.test(l)))
+})
+
+test('the floor having bitten is reported, because it means the retrieval was mostly noise', () => {
+  const lines = judgedSourcesLines({
+    dropped: [{ domain: 'a.com', title: 'A', score: 0.02, chars: 900 }],
+    floored: true,
+  })
+  assert.match(lines[lines.length - 1], /wanted to drop more and was stopped by the floor/)
+})
+
+test('the dropped list reaches the rendered report', () => {
+  const rendered = renderComparisonReport(
+    report({ judgedSources: { dropped: [{ domain: 'bfi.org.uk', title: 'A video inquiry', score: 0.08, chars: 3_094 }], floored: false } })
+  )
+  assert.match(rendered, /ruled out 1 further document/)
+  assert.match(rendered, /bfi\.org\.uk — A video inquiry/)
 })
 
 test('the marker rides on the source line, not on the heading alone', () => {

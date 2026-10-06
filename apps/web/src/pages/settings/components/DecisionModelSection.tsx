@@ -61,6 +61,7 @@ type Source = 'openrouter' | 'custom'
 
 interface PublicConfig {
   enabled: boolean
+  filterAnalysisSources: boolean
   source: Source
   model: string
   baseUrl: string
@@ -119,6 +120,10 @@ export function DecisionModelSection() {
   const { t } = useTranslation()
   const [config, setConfig] = useState<PublicConfig | null>(null)
   const [readiness, setReadiness] = useState<Readiness | null>(null)
+  // Core's floor on what the source filter may leave behind, shipped decided
+  // because the bundle never imports core. The fallback matches core's own
+  // default and only shows before the first GET lands.
+  const [sourceFilterFloor, setSourceFilterFloor] = useState(4)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -129,6 +134,7 @@ export function DecisionModelSection() {
   const [benchmark, setBenchmark] = useState<BenchmarkResult | null>(null)
 
   const [enabled, setEnabled] = useState(false)
+  const [filterSources, setFilterSources] = useState(false)
   const [source, setSource] = useState<Source>('openrouter')
   const [model, setModel] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
@@ -148,6 +154,7 @@ export function DecisionModelSection() {
   const applyConfig = useCallback((c: PublicConfig) => {
     setConfig(c)
     setEnabled(!!c.enabled)
+    setFilterSources(!!c.filterAnalysisSources)
     setSource(c.source ?? 'openrouter')
     setModel(c.model ?? '')
     setBaseUrl(c.baseUrl ?? '')
@@ -164,6 +171,7 @@ export function DecisionModelSection() {
         const data = await response.json()
         applyConfig(data.config)
         setReadiness(data.readiness ?? null)
+        if (typeof data.sourceFilterFloor === 'number') setSourceFilterFloor(data.sourceFilterFloor)
       } else {
         setError(t('settingsDecisionModel.loadError'))
       }
@@ -243,6 +251,7 @@ export function DecisionModelSection() {
 
   const buildPayload = () => ({
     enabled,
+    filterAnalysisSources: filterSources,
     source,
     model: model.trim(),
     baseUrl: baseUrl.trim(),
@@ -267,6 +276,7 @@ export function DecisionModelSection() {
         const data = await response.json()
         applyConfig(data.config)
         setReadiness(data.readiness ?? null)
+        if (typeof data.sourceFilterFloor === 'number') setSourceFilterFloor(data.sourceFilterFloor)
         setSuccess(t('settingsDecisionModel.saved'))
         setTimeout(() => setSuccess(null), 3000)
       } else {
@@ -417,6 +427,36 @@ export function DecisionModelSection() {
             }
             label={t('settingsDecisionModel.enabledLabel')}
           />
+
+          {/*
+            The second consumer, with its own switch and indented under the
+            first, because it is a different bill: the evidence heading asks a
+            few dozen questions per recommendation run, this asks one per
+            retrieved document per title across the whole library. Disabled
+            rather than hidden when the integration is off, so the capability
+            is discoverable before anything is turned on.
+          */}
+          <Box sx={{ pl: 4, mt: -1 }}>
+            <FormControlLabel
+              id="decision-filter-sources"
+              disabled={!enabled}
+              control={
+                <Switch
+                  checked={filterSources}
+                  onChange={(e) => {
+                    setFilterSources(e.target.checked)
+                    markChanged()
+                  }}
+                />
+              }
+              label={t('settingsDecisionModel.filterSourcesLabel')}
+            />
+            <Typography variant="caption" color="text.secondary" display="block">
+              {/* The floor is core's, and the bundle never imports core — it
+                  rides in the GET as a decided number. */}
+              {t('settingsDecisionModel.filterSourcesHelp', { floor: sourceFilterFloor })}
+            </Typography>
+          </Box>
 
           <Box>
             <Typography variant="subtitle2" fontWeight={600} gutterBottom>

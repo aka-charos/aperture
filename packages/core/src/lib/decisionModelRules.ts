@@ -34,6 +34,19 @@ export function isDecisionModelSource(value: unknown): value is DecisionModelSou
 export interface DecisionModelConfig {
   /** Off by default. Nothing reads a verdict that was never written. */
   enabled: boolean
+  /**
+   * ALSO use it to weed the title-analysis retrieval (analysis/judgeSources.ts).
+   *
+   * ITS OWN SWITCH, UNDER `enabled`, because the two consumers are not one
+   * decision. The evidence heading asks a few dozen questions per
+   * recommendation run; this asks one per retrieved document per title, over a
+   * library that can be five figures, and an operator who wants the cheap one
+   * must not be signed up for the expensive one by turning the integration on.
+   *
+   * Absent reads as OFF, which is what every config stored before this field
+   * existed means and what the pre-feature behaviour was.
+   */
+  filterAnalysisSources: boolean
   source: DecisionModelSource
   /**
    * The model id as the endpoint names it. A VERSIONED id, never an alias:
@@ -59,6 +72,7 @@ export const DECISION_MODEL_DEFAULT_MODEL = 'typesafe/jev-1.13'
 
 export const DEFAULT_DECISION_MODEL_CONFIG: DecisionModelConfig = {
   enabled: false,
+  filterAnalysisSources: false,
   source: 'openrouter',
   model: DECISION_MODEL_DEFAULT_MODEL,
   baseUrl: '',
@@ -104,6 +118,7 @@ export function sanitizeDecisionModelConfig(
   const model = typeof input.model === 'string' ? input.model.trim() : ''
   return {
     enabled: input.enabled === true,
+    filterAnalysisSources: input.filterAnalysisSources === true,
     source: isDecisionModelSource(input.source) ? input.source : d.source,
     model: model || d.model,
     baseUrl: typeof input.baseUrl === 'string' ? input.baseUrl.trim() : '',

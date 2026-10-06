@@ -840,8 +840,22 @@ test('draft 18 names the makers and stops naming the critics', () => {
   assert.ok(!rulesText.includes('You may name a critic or the publication that ran them'))
   assert.ok(rulesText.includes('DO NOT NAME THE PEOPLE WHO WROTE ABOUT IT'))
   assert.ok(rulesText.includes('do not name the publications they wrote for'))
-  // The one name that recurs in the corpus, and the operator's named exception.
-  assert.ok(rulesText.includes('Roger Ebert is the one name you may use'))
+
+  // THE BAN HAS NO EXCEPTION, and the exception it used to have is why.
+  // Drafted with "Roger Ebert is the one name you may use", and the first
+  // bench of this draft produced "Roger Ebert read it as an adult fairy tale"
+  // from a RogerEbert.com piece bylined Peter Sobczynski - whose byline
+  // Metacritic carried in the same retrieval. The permitted name is what the
+  // model reached for; version 17, naming freely, got Maslin and Arnold both
+  // right on the same documents. A rule with one exception is enforced at the
+  // exception, so there is none to enforce at.
+  assert.ok(!rulesText.includes('Roger Ebert'))
+  assert.ok(rulesText.includes('There is no exception, however well known the name'))
+  // Deleted from this draft as "moot once names go" and restored for exactly
+  // the misattribution it was written for - a site named after a critic is not
+  // that critic. It was never moot while one name was permitted.
+  assert.ok(rulesText.includes('A SITE IS NOT ITS WRITER'))
+  assert.ok(currentRules.includes('A SITE IS NOT ITS WRITER'))
 
   // THE OTHER HALF, which is what keeps this from being version 13's blanket
   // ban: a maker is still named, and the list now carries the three roles the
@@ -862,6 +876,18 @@ test('draft 18 names the makers and stops naming the critics', () => {
   assert.ok(rulesText.includes('Running a little over is fine'))
   // The half that is NOT relaxed: a length floor would bring padding back.
   assert.ok(rulesText.includes('padding to reach a length is not'))
+
+  // THE SHAPE IS NOT RELAXED EITHER, and the first bench is why. Softening
+  // every figure at once took the per-question allocation with it, which the
+  // operator had not asked for: work ran 218 -> 364 words, `told twice` 1 ->
+  // 3, `split` 0 -> 1. So the maximums are back, and adjacency is stated
+  // outright for the first time - three consumers read the paragraph map and
+  // all three need a question's answer to be one findable run.
+  assert.ok(rulesText.includes('THE LENGTH IS LOOSE AND THE SHAPE IS NOT'))
+  assert.ok(rulesText.includes('at most two paragraphs on what kind of film it is'))
+  assert.ok(rulesText.includes('at most four on what to watch and listen for'))
+  assert.ok(rulesText.includes('in paragraphs that sit next to each other'))
+  assert.ok(rulesText.includes('the same point made twice'))
 
   // THE TWO FLAT BANS GO. Obeyed by one row in 42 and none in 42; the guidance
   // underneath them stays, because that part is about the prose.

@@ -65,6 +65,8 @@ import {
 } from './curatedSearch.js'
 import { cleanSources } from './sourceCleanup.js'
 import { dropLowValueSources } from './sourceQuality.js'
+import { filterSourcesByJudgment } from './judgeSources.js'
+import type { SourceJudgmentOutcome } from './sourceJudgment.js'
 import { findStructureProblem } from './structure.js'
 import {
   dropDuplicateContent,
@@ -206,6 +208,11 @@ export async function getStoredAnalysis(
 export interface Retrieval {
   /** Clipped to the configured budget, ready for the prompt. */
   sources: AnalysisSource[]
+  /**
+   * What the optional source filter did, when it ran. Absent when it did not,
+   * which the bench report renders as silence rather than as "nothing dropped".
+   */
+  judged?: SourceJudgmentOutcome
   /** What the floor judges: domain and size of each budgeted document. */
   evidence: RetrievedSource[]
   retrievedChars: number
@@ -630,8 +637,17 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
     )
   }
 
+  // LAST, and only after every free filter, because this one costs a model
+  // call. The tests above are shape tests - sentences, links, headings,
+  // duplicate bodies - and none of them can ask what a page is ABOUT, which is
+  // how a video-interview promo, a podcast note with no transcript and a
+  // thread of other people's opinions took three of eleven slots on the live
+  // Suspiria retrieval. Off unless an operator switched it on, and it returns
+  // `unique` unchanged on every failure. See ./judgeSources.ts.
+  const judged = await filterSourcesByJudgment(subject, unique)
+
   const sources = budgetSources(
-    unique.map((source) => {
+    judged.sources.map((source) => {
       const stripped = byDomain.get(source.domain)
       return stripped ? { ...source, strippedChars: stripped } : source
     }),
@@ -657,6 +673,11 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
       // ./sourceCleanup.ts removed; retrievedChars is what the model read. The
       // gap between the first and the last is what a retrieval costs to carry.
       strippedChars,
+      // How the optional source filter behaved, so this one line still says
+      // what happened to the retrieval end to end. 'off' is the default and
+      // means the list below is what every mechanical filter left.
+      judged: judged.status,
+      judgedOut: judged.outcome?.dropped.length ?? 0,
       domains: sources.map((s) => s.domain),
       // Survives the budget, which is the number that matters: a criticism
       // page found and then dropped for space is not a criticism page read.
@@ -668,6 +689,9 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
 
   return {
     sources,
+    // Only when it ran: an absent outcome and an empty one say different
+    // things, and the report is written to tell them apart.
+    ...(judged.outcome ? { judged: judged.outcome } : {}),
     evidence: sources.map((s) => ({ domain: s.domain, chars: s.text.length })),
     retrievedChars,
   }

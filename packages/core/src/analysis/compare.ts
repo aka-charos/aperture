@@ -59,6 +59,7 @@ import {
   type ComparisonBaseline,
   type ComparisonEntry,
   type ComparisonReport,
+  type JudgedSourceReport,
 } from './comparisonReport.js'
 
 const logger = createChildLogger('analysis-compare')
@@ -353,7 +354,7 @@ async function driveComparison(
       sources = retrieval.sources
       await query(
         `UPDATE analysis_comparison_runs
-            SET source_count = $2, retrieved_chars = $3, sources = $4
+            SET source_count = $2, retrieved_chars = $3, sources = $4, judged_sources = $5
           WHERE id = $1`,
         [
           runId,
@@ -373,6 +374,15 @@ async function driveComparison(
               ...(source.strippedChars ? { strippedChars: source.strippedChars } : {}),
             }))
           ),
+          // NULL when the filter did not run. An empty `dropped` means it read
+          // every document and ruled none out, which is a different fact and
+          // one the report states out loud (0195).
+          retrieval.judged
+            ? JSON.stringify({
+                dropped: retrieval.judged.dropped,
+                floored: retrieval.judged.floored,
+              })
+            : null,
         ]
       )
     }
@@ -564,6 +574,8 @@ interface RunRow {
         strippedChars?: number
       }[]
     | null
+  /** 0195. NULL means the source filter was not asked — see ComparisonReport. */
+  judged_sources: JudgedSourceReport | null
   replay_of: string | null
   /**
    * One prompt per choice, keyed "15" or "15:compact" (0172, 0179); null on
@@ -655,6 +667,9 @@ export async function getComparisonRun(runId: string): Promise<ComparisonRunView
       ...(s.strippedChars ? { strippedChars: s.strippedChars } : {}),
     })),
     retrievedChars: run.retrieved_chars ?? 0,
+    // Absent stays absent: a run made before the filter existed, or with it
+    // off, must not render as "it read everything and kept everything".
+    judgedSources: run.judged_sources ?? null,
     prompt: run.prompt,
     // Keyed "15" before variants existed and "15:compact" with one, so the
     // key is split rather than cast - Number("15:compact") is NaN, which sorts

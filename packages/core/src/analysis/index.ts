@@ -106,6 +106,17 @@ export {
 
 export { budgetSources, type BudgetOptions } from './budget.js'
 
+// The optional decision-model weeding of retrieval. The pure half is exported
+// for the settings card's copy, which states the floor and the bar it enforces.
+export type { JudgedSourceReport } from './comparisonReport.js'
+
+export {
+  MIN_SOURCES_AFTER_JUDGMENT,
+  SOURCE_DROP_AT_OR_BELOW,
+  type SourceJudgmentOutcome,
+} from './sourceJudgment.js'
+export { filterSourcesByJudgment, type SourceFilterResult } from './judgeSources.js'
+
 export {
   GROUNDING_QUESTIONS,
   GROUNDING_SEGMENT_CHARS,

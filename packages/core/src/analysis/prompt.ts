@@ -779,6 +779,42 @@ const CURRENT_EDITION: PromptEdition = {
  * is not "no names", it is WHO MADE IT AGAINST WHO WROTE ABOUT IT, which is a
  * distinction the writer always knows and the old ban never drew.
  *
+ * THE BAN HAD ONE EXCEPTION - ROGER EBERT - AND THE FIRST BENCH OF THIS DRAFT
+ * SHOWED THE EXCEPTION MANUFACTURING A FALSE ATTRIBUTION. Suspiria, same
+ * documents, 17 against 18. Version 17, with naming permitted, named two
+ * critics and got BOTH right: Janet Maslin and Gary Arnold, each matching the
+ * byline Metacritic prints beside the blurb quoted. Version 18 named three and
+ * invented one - "Roger Ebert read it as an adult fairy tale whose dream logic
+ * holds together better than its plot does", where the reading is real, the
+ * document is real, and the document is by PETER SOBCZYNSKI. Metacritic
+ * carried that byline in the same retrieval, so the model had the right answer
+ * in front of it and overrode it with the one name the rule had blessed.
+ *
+ * So the exception is gone and A SITE IS NOT ITS WRITER is back. Both were my
+ * errors, and they are the same error twice: the clause was deleted here as
+ * "moot once names go", which it would have been had any name gone. One
+ * permitted name is a licence, and the licence landed on the site the
+ * retrieval was full of. Version 13's blanket ban failed on every model, but
+ * it never fabricated - and an accuracy requirement cannot police a name the
+ * rule itself supplied. A rule with one exception is enforced at the
+ * exception.
+ *
+ * THE SAME BENCH FOUND THE SHAPE REGRESSING, and the cause is mine as well.
+ * Softening the per-question allocation from "at most four" to "up to four"
+ * alongside every length figure went further than the operator asked: the
+ * TOTAL was what should drift, and the allocation came with it. Measured on
+ * that pair: work 218 -> 364 words, `told twice` 1 -> 3, `split` 0 -> 1,
+ * sections running tradition work work work work+circ work circumstances
+ * reception. So LENGTH stays loose and SHAPE goes back to maximums, with the
+ * adjacency constraint stated outright - the three consumers that read the
+ * paragraph map need a question's answer to be one findable run (F-124's rule
+ * 3), and nothing in the length rule had ever said so.
+ *
+ * WHAT 18 WON ON THAT BENCH, and keeps unchanged: the closing influence
+ * paragraph is gone, and its material survived inside the tradition answer
+ * ("the three-mother mythology Argento later spun into two follow-up films").
+ * That is the change the 42 rows asked for and it worked first time.
+ *
  * THE OTHER FOUR CHANGES follow the one principle the 42 rows establish:
  * ceilings are obeyed and flat bans are not. Compliance measured per rule -
  * paragraph count 98%, paragraph words 67%, word total 62%, sentence cap 55%,
@@ -806,13 +842,13 @@ const CURRENT_EDITION: PromptEdition = {
  * no NEW accuracy machinery, and this version adds none.
  */
 const DRAFT_ATTRIBUTION_RULE_18 =
-  "The first answers speak in your own voice: state facts, what is on screen and what it does to a viewer plainly, with nobody attached, even where a critic is who you read it from. What belongs to somebody else is a judgement of QUALITY or a claim about what the film MEANS, and both go to the reception answer with a holder - \"a critic\", \"critics\", \"a scholar\", \"some viewers\" - never \"a reading\", \"an account\" or \"the press\", and never hidden inside \"is regarded as\", \"is described as\", \"has been called\", \"is said to\" or \"reportedly\". DO NOT NAME THE PEOPLE WHO WROTE ABOUT IT, and do not name the publications they wrote for: a byline the reader would have to be told about tells them nothing, and \"a critic\" carries the same weight in fewer words. Roger Ebert is the one name you may use. Names belong to the people who MADE something - this film, or an earlier film you are naming. \"Critics\" means more than one, and two remarks by one critic are one critic."
+  "The first answers speak in your own voice: state facts, what is on screen and what it does to a viewer plainly, with nobody attached, even where a critic is who you read it from. What belongs to somebody else is a judgement of QUALITY or a claim about what the film MEANS, and both go to the reception answer with a holder - \"a critic\", \"critics\", \"a scholar\", \"some viewers\" - never \"a reading\", \"an account\" or \"the press\", and never hidden inside \"is regarded as\", \"is described as\", \"has been called\", \"is said to\" or \"reportedly\". DO NOT NAME THE PEOPLE WHO WROTE ABOUT IT, and do not name the publications they wrote for: a byline the reader would have to be told about tells them nothing, and \"a critic\" carries the same weight in fewer words. There is no exception, however well known the name. A SITE IS NOT ITS WRITER: a site named after a critic is a publication like any other, and a piece published on it is by \"a critic\" whoever the site is named after. Names belong to the people who MADE something - this film, or an earlier film you are naming. \"Critics\" means more than one, and two remarks by one critic are one critic."
 
 const DRAFT_NAMING_RULE_18 =
   "Name the people who MADE it, and name them for the choice you are describing - the director, the writer, the cinematographer, the editor, the composer, the actors - never \"the creative team\". Never name a person to record what their job was, and never with the job in front of the name: \"Cinematographer Tovoli lit\" is the credit again, where \"Tovoli lit\" is the choice."
 
 const DRAFT_LENGTH_RULE_18 =
-  "Write about eight paragraphs, separated by blank lines, and around 600 words in all. Running a little over is fine; padding to reach a length is not, so thin documents should produce a short piece and stopping early is always right. Spend about two paragraphs on what kind of film it is, up to four on what to watch and listen for, one on what to know going in, and one on how it has been taken, last. Keep paragraphs short - three or four sentences - so one point can be followed to its end before the next begins."
+  "Write about eight paragraphs, separated by blank lines, and around 600 words in all. Running a little over is fine; padding to reach a length is not, so thin documents should produce a short piece and stopping early is always right. THE LENGTH IS LOOSE AND THE SHAPE IS NOT: at most two paragraphs on what kind of film it is, at most four on what to watch and listen for, one on what to know going in, and one on how it has been taken, last. Answer each of those once, in paragraphs that sit next to each other, and then leave it - a question picked up again later is the same point made twice. Keep paragraphs short - three or four sentences - so one point can be followed to its end before the next begins."
 
 const DRAFT_OWN_WORDS_RULE_18 =
   "Write every sentence in your own words. Never copy a phrase out of a document: anything reading like a crew note, a caption or a list of items has to be turned into English first. Say what a choice does, not what it avoids. Plain prose only - no headings, no bullet points, no numbered lists, no bold."

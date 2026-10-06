@@ -1830,6 +1830,8 @@ export {
   type PendingTitle,
   type AnalysisJobOptions,
   type AnalysisJobResult,
+  MIN_SOURCES_AFTER_JUDGMENT,
+  SOURCE_DROP_AT_OR_BELOW,
 } from './analysis/index.js'
 
 // Ratings refresh (./ratings) — kept apart from ./enrichment because metadata

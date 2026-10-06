@@ -43,6 +43,7 @@ import {
   DECISION_CONCURRENCY_MIN,
   DECISION_TIMEOUT_MAX_MS,
   DECISION_TIMEOUT_MIN_MS,
+  MIN_SOURCES_AFTER_JUDGMENT,
   type DecisionModelConfig,
   type DecisionModelSource,
 } from '@aperture/core'
@@ -52,6 +53,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 interface DecisionModelUpdateBody {
   enabled?: boolean
+  filterAnalysisSources?: boolean
   source?: string
   model?: string
   baseUrl?: string
@@ -63,6 +65,7 @@ interface DecisionModelUpdateBody {
 
 interface PublicDecisionModelConfig {
   enabled: boolean
+  filterAnalysisSources: boolean
   source: DecisionModelSource
   model: string
   baseUrl: string
@@ -74,6 +77,7 @@ interface PublicDecisionModelConfig {
 function toPublicConfig(config: DecisionModelConfig): PublicDecisionModelConfig {
   return {
     enabled: config.enabled,
+    filterAnalysisSources: config.filterAnalysisSources,
     source: config.source,
     model: config.model,
     baseUrl: config.baseUrl,
@@ -90,6 +94,9 @@ function toPublicConfig(config: DecisionModelConfig): PublicDecisionModelConfig 
  */
 function typeError(body: DecisionModelUpdateBody): string | null {
   if (body.enabled !== undefined && typeof body.enabled !== 'boolean') return 'enabled must be true or false'
+  if (body.filterAnalysisSources !== undefined && typeof body.filterAnalysisSources !== 'boolean') {
+    return 'filterAnalysisSources must be true or false'
+  }
   for (const key of ['source', 'model', 'baseUrl', 'apiKey'] as const) {
     if (body[key] !== undefined && typeof body[key] !== 'string') return `${key} must be a string`
   }
@@ -175,6 +182,7 @@ async function cardConfig(
 function merge(current: DecisionModelConfig, body: DecisionModelUpdateBody): DecisionModelConfig {
   return sanitizeDecisionModelConfig({
     enabled: body.enabled ?? current.enabled,
+    filterAnalysisSources: body.filterAnalysisSources ?? current.filterAnalysisSources,
     source: isDecisionModelSource(body.source) ? body.source : current.source,
     model: body.model ?? current.model,
     baseUrl: body.baseUrl ?? current.baseUrl,
@@ -192,7 +200,7 @@ export function registerDecisionModelHandlers(fastify: FastifyInstance) {
       try {
         const config = await getDecisionModelConfig()
         const readiness = await checkDecisionModelReadiness(config)
-        return reply.send({ config: toPublicConfig(config), readiness })
+        return reply.send({ config: toPublicConfig(config), readiness, sourceFilterFloor: MIN_SOURCES_AFTER_JUDGMENT })
       } catch (err) {
         fastify.log.error({ err }, 'Failed to get decision model config')
         return reply.status(500).send({ error: 'Failed to get decision model configuration' })
@@ -212,7 +220,7 @@ export function registerDecisionModelHandlers(fastify: FastifyInstance) {
 
         await setDecisionModelConfig(next)
         const readiness = await checkDecisionModelReadiness(next)
-        return reply.send({ config: toPublicConfig(next), readiness })
+        return reply.send({ config: toPublicConfig(next), readiness, sourceFilterFloor: MIN_SOURCES_AFTER_JUDGMENT })
       } catch (err) {
         fastify.log.error({ err }, 'Failed to update decision model config')
         return reply.status(500).send({ error: 'Failed to update decision model configuration' })
