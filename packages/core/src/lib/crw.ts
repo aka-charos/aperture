@@ -257,9 +257,23 @@ const clampInt = (n: number, min: number, max: number, fallback: number): number
   return Math.min(max, Math.max(min, Math.trunc(n)))
 }
 
-const clampMaxResults = (n: number) => clampInt(n, 1, 20, DEFAULT_CRW_CONFIG.maxResults)
+/**
+ * Ceilings on the two result counts, exported because the DOCUMENT COUNT IS A
+ * SETTING and something downstream has to be able to size for its worst case.
+ *
+ * `analysis/sourceJudgment.ts` sends one question per retrieved document to a
+ * model with a fixed context, so `MAX_RESULTS + MAX_CURATED_RESULTS` is the
+ * number its excerpt budget must survive. A flat per-document sample was sized
+ * against an eleven-document run and overflowed silently at this ceiling;
+ * `sourceJudgment.test.ts` now pins the two together, so raising either of
+ * these fails there rather than in production.
+ */
+export const MAX_RESULTS = 20
+export const MAX_CURATED_RESULTS = 20
+
+const clampMaxResults = (n: number) => clampInt(n, 1, MAX_RESULTS, DEFAULT_CRW_CONFIG.maxResults)
 const clampCuratedResults = (n: number) =>
-  clampInt(n, 0, 20, DEFAULT_CRW_CONFIG.curatedMaxResults)
+  clampInt(n, 0, MAX_CURATED_RESULTS, DEFAULT_CRW_CONFIG.curatedMaxResults)
 /**
  * A stored list, cleaned - or the shipped default when there is nothing usable.
  *

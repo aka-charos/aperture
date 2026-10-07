@@ -316,7 +316,16 @@ async function runCriticismQueries(input: {
  * and do reach `decideAnalysisFloor`, because there we genuinely did retrieve
  * the web's answer and it was poor.
  */
-export async function retrieveSources(subject: AnalysisSubject): Promise<Retrieval> {
+export async function retrieveSources(
+  subject: AnalysisSubject,
+  /**
+   * Passed through to the optional source filter only — nothing else here is
+   * interruptible, since a search call is one HTTP request with its own
+   * timeout. `analyseTitle` supplies it; the bench does not, having no job
+   * slot to release.
+   */
+  options: { shouldCancel?: () => boolean | Promise<boolean> } = {}
+): Promise<Retrieval> {
   const config = await getCrwConfig()
   if (!isCrwEnabled(config)) {
     throw new Error(
@@ -644,7 +653,9 @@ export async function retrieveSources(subject: AnalysisSubject): Promise<Retriev
   // thread of other people's opinions took three of eleven slots on the live
   // Suspiria retrieval. Off unless an operator switched it on, and it returns
   // `unique` unchanged on every failure. See ./judgeSources.ts.
-  const judged = await filterSourcesByJudgment(subject, unique)
+  const judged = await filterSourcesByJudgment(subject, unique, {
+    shouldCancel: options.shouldCancel,
+  })
 
   const sources = budgetSources(
     judged.sources.map((source) => {
@@ -1786,7 +1797,9 @@ export async function analyseTitle(
     // to record. NULL means "not measurable in this mode", not zero.
     retrievedChars = null
   } else {
-    const retrieval = await retrieveSources(subject)
+    const retrieval = await retrieveSources(subject, {
+      shouldCancel: options.shouldCancel,
+    })
 
     // The seam. Retrieval is the long half and the model call is about to be
     // the other one, so a Stop pressed during the fetch takes effect here

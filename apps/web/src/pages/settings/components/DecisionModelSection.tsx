@@ -87,6 +87,24 @@ interface Catalog {
   models: ModelOption[]
 }
 
+/**
+ * The source filter's own probe, present only when that switch was on when
+ * Test ran. Absent means it was not tried — never "it passed".
+ */
+type SourceFilterTest =
+  | {
+      success: true
+      model: string
+      latencyMs: number
+      documents: number
+      answered: number
+      excerptChars: number
+      article: number | null
+      noise: number | null
+      discriminates: boolean
+    }
+  | { success: false; error: string }
+
 type TestResult =
   | {
       success: true
@@ -95,8 +113,9 @@ type TestResult =
       related: number
       unrelated: number
       discriminates: boolean
+      sourceFilter?: SourceFilterTest
     }
-  | { success: false; error: string }
+  | { success: false; error: string; sourceFilter?: SourceFilterTest }
 
 interface Stats {
   runs: number
@@ -625,6 +644,49 @@ export function DecisionModelSection() {
                       related: percent(testResult.related),
                       unrelated: percent(testResult.unrelated),
                       ms: testResult.latencyMs,
+                    }
+                  )}
+            </Alert>
+          )}
+
+          {/*
+            Its own alert, because it is its own request. The evidence probe
+            passing says nothing about whether a one-question-per-document
+            request fits the model's context, and that is the failure mode this
+            exists to surface — so a filter that cannot answer must not be
+            hidden behind a green evidence result.
+          */}
+          {testResult?.sourceFilter && (
+            <Alert
+              severity={
+                !testResult.sourceFilter.success
+                  ? 'error'
+                  : testResult.sourceFilter.discriminates &&
+                      testResult.sourceFilter.answered === testResult.sourceFilter.documents
+                    ? 'success'
+                    : 'warning'
+              }
+            >
+              {!testResult.sourceFilter.success
+                ? testResult.sourceFilter.error
+                : t(
+                    testResult.sourceFilter.discriminates
+                      ? 'settingsDecisionModel.sourceFilterTestPassed'
+                      : 'settingsDecisionModel.sourceFilterTestNotDiscriminating',
+                    {
+                      model: testResult.sourceFilter.model,
+                      documents: testResult.sourceFilter.documents,
+                      answered: testResult.sourceFilter.answered,
+                      chars: testResult.sourceFilter.excerptChars.toLocaleString(),
+                      article:
+                        testResult.sourceFilter.article == null
+                          ? '—'
+                          : percent(testResult.sourceFilter.article),
+                      noise:
+                        testResult.sourceFilter.noise == null
+                          ? '—'
+                          : percent(testResult.sourceFilter.noise),
+                      ms: testResult.sourceFilter.latencyMs,
                     }
                   )}
             </Alert>

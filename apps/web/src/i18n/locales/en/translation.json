@@ -2625,6 +2625,8 @@
     "testFailed": "Test failed",
     "testPassed": "{{model}} told the pairs apart: Dune → Dune: Part Two {{related}}% yes, Thirteen Lives → Dune: Part Two {{unrelated}}% yes ({{ms}} ms).",
     "testNotDiscriminating": "{{model}} answered but did not tell a sequel from an unrelated film: Dune {{related}}% yes, Thirteen Lives {{unrelated}}% yes. Its verdicts are unlikely to beat the similarity threshold.",
+    "sourceFilterTestPassed": "Source filter: {{model}} read {{documents}} documents ({{chars}} characters of excerpt) and answered {{answered}} of them — the review scored {{article}}%, the podcast note {{noise}}% ({{ms}} ms).",
+    "sourceFilterTestNotDiscriminating": "Source filter: {{model}} read {{documents}} documents ({{chars}} characters of excerpt) and answered {{answered}}, but did not separate a review from a podcast note with no transcript — the review scored {{article}}%, the note {{noise}}%. It is unlikely to drop the right pages.",
     "applyHint": "Verdicts are written as recommendations are generated. To apply them to the recommendations people already have, without re-scoring, run Refresh recommendation explanations. That job skips viewers with AI explanations switched off; they get verdicts at their next regular run.",
     "openJobs": "Open in Jobs",
     "statsTitle": "Verdicts compared with the similarity threshold",

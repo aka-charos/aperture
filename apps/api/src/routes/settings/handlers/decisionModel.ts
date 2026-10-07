@@ -39,6 +39,7 @@ import {
   setDecisionModelConfig,
   systemOneUrl,
   testEvidenceJudge,
+  testSourceFilter,
   DECISION_CONCURRENCY_MAX,
   DECISION_CONCURRENCY_MIN,
   DECISION_TIMEOUT_MAX_MS,
@@ -241,7 +242,16 @@ export function registerDecisionModelHandlers(fastify: FastifyInstance) {
       try {
         const card = await cardConfig(request.body ?? {})
         if ('error' in card) return reply.status(400).send({ success: false, error: card.error })
-        return reply.send(await testEvidenceJudge(card.config))
+        const evidence = await testEvidenceJudge(card.config)
+        // The source filter sends a DIFFERENT request — one question per
+        // document over a sample each, at the size the retrieval settings
+        // allow — so the evidence probe says nothing about it. Tried only when
+        // the switch is on, since it is a second paid call: `probeFlexTier`'s
+        // opt-in rule (F-146), expressed here as "test what is turned on".
+        const sourceFilter = card.config.filterAnalysisSources
+          ? await testSourceFilter(card.config)
+          : undefined
+        return reply.send({ ...evidence, ...(sourceFilter ? { sourceFilter } : {}) })
       } catch (err) {
         fastify.log.error({ err }, 'Failed to test decision model')
         return reply.status(500).send({ success: false, error: 'Failed to test the decision model' })

@@ -2,18 +2,30 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   MIN_SOURCES_AFTER_JUDGMENT,
+  MIN_SOURCE_SAMPLE_CHARS,
+  SOURCE_JUDGMENT_EXCERPT_BUDGET,
   SOURCE_DROP_AT_OR_BELOW,
   SOURCE_SAMPLE_CHARS,
   buildSourceJudgmentRequest,
   decideJudgedSources,
   readSourceJudgments,
+  sampleCharsFor,
   sourceJudgmentKey,
+  SOURCE_FILTER_TEST_ARTICLE,
+  SOURCE_FILTER_TEST_NOISE,
+  sourceFilterTestFiller,
   type JudgedSource,
 } from './sourceJudgment.js'
 import { MIN_SUBSTANTIVE_SOURCES } from './sourceFloor.js'
+import { MAX_CURATED_RESULTS, MAX_RESULTS } from '../lib/crw.js'
 import type { AnalysisSource } from './prompt.js'
 
-const SUBJECT = { title: 'Suspiria', year: 1977, mediaType: 'movie' as const }
+const SUBJECT = {
+  title: 'Suspiria',
+  originalTitle: null,
+  year: 1977,
+  mediaType: 'movie' as const,
+}
 
 function source(domain: string, title: string, text = 'A sentence about the film. '.repeat(40)): AnalysisSource {
   return { domain, title, text }
@@ -78,6 +90,104 @@ test('a year-less subject is named without an empty bracket', () => {
   )
   assert.ok(request.questions.d1.instructions.includes('"Untitled"'))
   assert.ok(!request.questions.d1.instructions.includes('()'))
+})
+
+/**
+ * THE DOCUMENT COUNT IS A SETTING, which the first version did not know.
+ * `maxResults` (≤20) plus `curatedMaxResults` (≤20) allows 40 documents, and a
+ * flat per-document sample put the state near 22,000 tokens there — past the
+ * 8k the smallest hosted System One model serves. An overflow answers 400 and
+ * the feature falls open, so the filter would never work and say nothing.
+ */
+test('the excerpt budget holds at every legal document count', () => {
+  const ceiling = MAX_RESULTS + MAX_CURATED_RESULTS
+  for (const n of [1, 2, 10, 11, 20, ceiling]) {
+    const per = sampleCharsFor(n)
+    assert.ok(per <= SOURCE_SAMPLE_CHARS, `${n}: never above the ceiling`)
+    assert.ok(per >= MIN_SOURCE_SAMPLE_CHARS, `${n}: never below a readable sample`)
+    assert.ok(per * n <= SOURCE_JUDGMENT_EXCERPT_BUDGET, `${n}: total within budget`)
+  }
+})
+
+/**
+ * THE COUPLING, pinned because nothing else would notice it break. The budget
+ * can only hold at the ceiling while it is at least the floor times the most
+ * documents the retrieval settings can produce — and that ceiling lives in
+ * `lib/crw.ts`, two modules away, as the clamps on two admin-editable numbers.
+ * Raise either clamp and the per-document sample stops shrinking far enough,
+ * so the request grows past the context it was sized for and the filter falls
+ * open on every title with nothing but a `warn`. This test is the only thing
+ * that connects those two facts.
+ */
+test('the budget can absorb the most documents the settings allow', () => {
+  const ceiling = MAX_RESULTS + MAX_CURATED_RESULTS
+  assert.ok(
+    SOURCE_JUDGMENT_EXCERPT_BUDGET / MIN_SOURCE_SAMPLE_CHARS >= ceiling,
+    `budget ${SOURCE_JUDGMENT_EXCERPT_BUDGET} / floor ${MIN_SOURCE_SAMPLE_CHARS} must cover ${ceiling} documents`
+  )
+})
+
+/**
+ * Past the ceiling the FLOOR wins and the request grows — deliberate, and
+ * documented on `MIN_SOURCE_SAMPLE_CHARS`: a sample too small to say what a
+ * page is would drop good documents, which costs more than a long request.
+ * Unreachable through the settings; pinned so the choice is not read as a bug.
+ */
+test('beyond the settings ceiling the floor wins over the budget', () => {
+  assert.equal(sampleCharsFor(500), MIN_SOURCE_SAMPLE_CHARS)
+  assert.ok(sampleCharsFor(500) * 500 > SOURCE_JUDGMENT_EXCERPT_BUDGET)
+})
+
+/**
+ * The budget is sized so the DEFAULTS are untouched — at ten or eleven
+ * documents the share is above the ceiling, so the request is byte-identical
+ * to what shipped before the budget existed. A budget that changed the common
+ * case would be a behaviour change wearing a bug fix's clothes.
+ */
+test('the live retrieval sizes are unchanged by the budget', () => {
+  for (const n of [1, 10, 11]) assert.equal(sampleCharsFor(n), SOURCE_SAMPLE_CHARS)
+  assert.ok(sampleCharsFor(20) < SOURCE_SAMPLE_CHARS, 'twenty documents start shrinking')
+  assert.equal(sampleCharsFor(0), SOURCE_SAMPLE_CHARS, 'no documents is not a division by zero')
+})
+
+test('the budget shrinks the sample rather than the document list', () => {
+  const many = Array.from({ length: 40 }, (_, i) => source(`s${i}.com`, `Doc ${i}`, 'word '.repeat(2_000)))
+  const request = buildSourceJudgmentRequest(SUBJECT, many)
+  assert.equal(request.keys.length, 40, 'every document is still asked about')
+  const documents = request.state.documents as Record<string, { excerpt: string }>
+  const total = Object.values(documents).reduce((sum, d) => sum + d.excerpt.length, 0)
+  assert.ok(total <= SOURCE_JUDGMENT_EXCERPT_BUDGET + 40, 'within the budget plus one ellipsis each')
+})
+
+/**
+ * BOTH NAMES REACH THE JUDGE, for `buildAnalysisQuery`'s reason: criticism of a
+ * non-English film is often written only under its original title. Asked about
+ * the localized name alone, the judge can answer "no" correctly about the best
+ * document in the set — hardest on the titles whose retrieval is thinnest.
+ */
+test('an original title is named in the question and the state', () => {
+  const request = buildSourceJudgmentRequest(
+    { title: 'The Zero Years', originalTitle: 'Ta Mhdenika Chronia', year: 2005, mediaType: 'movie' },
+    [source('offscreen.com', 'A review')]
+  )
+  assert.ok(request.questions.d1.instructions.includes('Ta Mhdenika Chronia'))
+  assert.ok(request.questions.d1.instructions.includes('The Zero Years'))
+  assert.equal((request.state.work as { alsoKnownAs?: string }).alsoKnownAs, 'Ta Mhdenika Chronia')
+})
+
+/**
+ * A RESTATEMENT IS NOT A SECOND NAME — `distinctOriginalTitle`'s rule. Naming
+ * the same string twice spends request size on nothing and reads as two films.
+ */
+test('an original title equal to the title is not repeated', () => {
+  for (const original of ['Suspiria', 'suspiria', '  Suspiria  ', null]) {
+    const request = buildSourceJudgmentRequest(
+      { title: 'Suspiria', originalTitle: original, year: 1977, mediaType: 'movie' },
+      [source('a.com', 'A')]
+    )
+    assert.ok(!('alsoKnownAs' in (request.state.work as object)), `${original}: not a second name`)
+    assert.ok(!request.questions.d1.instructions.includes('also known as'))
+  }
 })
 
 test('the excerpt is bounded, and a short document is sent whole', () => {
@@ -244,4 +354,38 @@ test('what was dropped is reported well enough to argue with', () => {
   assert.deepEqual(outcome.dropped, [
     { domain: 'reddit.com', title: 'Best horror ever', score: 0.04, chars: 13_318 },
   ])
+})
+
+/**
+ * THE PROBE DOCUMENTS MUST BE RECOGNISABLY WHAT THEY CLAIM TO BE, or the
+ * connection test it feeds is theatre. The review has to read as criticism and
+ * the noise page as a podcast promo — the measured failure from the live
+ * Suspiria retrieval, not an invented one — and both must clear the upstream
+ * filters that would otherwise have dropped them before any judge saw them.
+ */
+test('the probe documents are a real article and a real noise page', () => {
+  assert.ok(SOURCE_FILTER_TEST_ARTICLE.text.length > MIN_SOURCE_SAMPLE_CHARS)
+  assert.ok(SOURCE_FILTER_TEST_NOISE.text.length > 200, 'above sourceQuality MIN_USEFUL_CHARS')
+  // The article names craft; the noise page names subscription furniture. If
+  // these two ever read alike the probe cannot report `discriminates`.
+  assert.ok(/Tovoli|celesta|Eastmancolor/.test(SOURCE_FILTER_TEST_ARTICLE.text))
+  assert.ok(/subscribe|Patreon|newsletter/i.test(SOURCE_FILTER_TEST_NOISE.text))
+  assert.ok(!/subscribe|Patreon/i.test(SOURCE_FILTER_TEST_ARTICLE.text))
+  // Both name the film, so `isOffTopic`'s question is not what is being asked.
+  for (const doc of [SOURCE_FILTER_TEST_ARTICLE, SOURCE_FILTER_TEST_NOISE]) {
+    assert.ok(/Suspiria|Argento/.test(doc.text + doc.title))
+  }
+})
+
+test('the probe documents go first, so their keys are stable', () => {
+  const request = buildSourceJudgmentRequest(SUBJECT, [
+    SOURCE_FILTER_TEST_ARTICLE,
+    SOURCE_FILTER_TEST_NOISE,
+    ...Array.from({ length: 38 }, (_, i) => sourceFilterTestFiller(i + 2)),
+  ])
+  assert.equal(request.keys[0], 'd1')
+  assert.equal(request.keys[1], 'd2')
+  const documents = request.state.documents as Record<string, { site: string }>
+  assert.equal(documents.d1.site, 'deepfocusreview.com')
+  assert.equal(documents.d2.site, 'thefilmstage.com')
 })

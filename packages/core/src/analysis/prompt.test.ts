@@ -873,7 +873,12 @@ test('draft 18 names the makers and stops naming the critics', () => {
   assert.ok(!rulesText.includes('at most 650 words'))
   assert.ok(!rulesText.includes('never five'))
   assert.ok(rulesText.includes('around 600 words'))
-  assert.ok(rulesText.includes('Running a little over is fine'))
+  // The overrun is WORDS, not paragraphs. Drafted as a bare "running a little
+  // over is fine" above per-question maximums summing to exactly eight, which
+  // left no slot to run over into and made the rule contradict itself.
+  assert.ok(rulesText.includes('A WORD COUNT A LITTLE OVER IS FINE'))
+  assert.ok(rulesText.includes('an extra paragraph is not'))
+  assert.ok(!rulesText.includes('Running a little over is fine'))
   // The half that is NOT relaxed: a length floor would bring padding back.
   assert.ok(rulesText.includes('padding to reach a length is not'))
 
@@ -883,7 +888,7 @@ test('draft 18 names the makers and stops naming the critics', () => {
   // 3, `split` 0 -> 1. So the maximums are back, and adjacency is stated
   // outright for the first time - three consumers read the paragraph map and
   // all three need a question's answer to be one findable run.
-  assert.ok(rulesText.includes('THE LENGTH IS LOOSE AND THE SHAPE IS NOT'))
+  assert.ok(rulesText.includes('THE WORD COUNT IS LOOSE AND THE SHAPE IS NOT'))
   assert.ok(rulesText.includes('at most two paragraphs on what kind of film it is'))
   assert.ok(rulesText.includes('at most four on what to watch and listen for'))
   assert.ok(rulesText.includes('in paragraphs that sit next to each other'))

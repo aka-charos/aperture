@@ -115,7 +115,12 @@ export {
   SOURCE_DROP_AT_OR_BELOW,
   type SourceJudgmentOutcome,
 } from './sourceJudgment.js'
-export { filterSourcesByJudgment, type SourceFilterResult } from './judgeSources.js'
+export {
+  filterSourcesByJudgment,
+  testSourceFilter,
+  type SourceFilterResult,
+  type SourceFilterTestResult,
+} from './judgeSources.js'
 
 export {
   GROUNDING_QUESTIONS,

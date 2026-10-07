@@ -30,11 +30,21 @@ import {
   getDecisionModelConfig,
   resolveDecisionEndpoint,
 } from '../lib/decisionModel.js'
+import {
+  sanitizeDecisionModelConfig,
+  type DecisionModelConfig,
+} from '../lib/decisionModelRules.js'
+import { getCrwConfig } from '../lib/crw.js'
 import type { AnalysisSource, AnalysisSubject } from './prompt.js'
 import {
+  SOURCE_DROP_AT_OR_BELOW,
+  SOURCE_FILTER_TEST_ARTICLE,
+  SOURCE_FILTER_TEST_NOISE,
+  SOURCE_FILTER_TEST_SUBJECT,
   buildSourceJudgmentRequest,
   decideJudgedSources,
   readSourceJudgments,
+  sourceFilterTestFiller,
   type SourceJudgmentOutcome,
 } from './sourceJudgment.js'
 
@@ -45,11 +55,11 @@ export interface SourceFilterResult {
   sources: AnalysisSource[]
   /**
    * off: the switch is off. unavailable: on, but it cannot be called.
-   * nothing: too few documents for a drop to be possible. filtered: asked and
-   * applied, which includes asking and dropping none. failed: asked and the
-   * call did not answer.
+   * nothing: too few documents for a drop to be possible. cancelled: Stop was
+   * pressed before the call. filtered: asked and applied, which includes
+   * asking and dropping none. failed: asked and the call did not answer.
    */
-  status: 'off' | 'unavailable' | 'nothing' | 'filtered' | 'failed'
+  status: 'off' | 'unavailable' | 'nothing' | 'cancelled' | 'filtered' | 'failed'
   /** Present for 'filtered'. */
   outcome?: SourceJudgmentOutcome
   reason?: string
@@ -67,7 +77,8 @@ export interface SourceFilterResult {
  */
 export async function filterSourcesByJudgment(
   subject: AnalysisSubject,
-  sources: AnalysisSource[]
+  sources: AnalysisSource[],
+  options: { shouldCancel?: () => boolean | Promise<boolean> } = {}
 ): Promise<SourceFilterResult> {
   try {
     const config = await getDecisionModelConfig()
@@ -89,12 +100,30 @@ export async function filterSourcesByJudgment(
       return { sources, status: 'unavailable', reason: resolved.reason }
     }
 
+    // CHECKED HERE, IMMEDIATELY BEFORE THE CALL. `analyseTitle` polls for a
+    // Stop in the seam just after retrieval returns, whose own comment says
+    // that is where a Stop pressed during the fetch should land - and this call
+    // had been inserted in front of it, adding an uninterruptible wait of up to
+    // `timeoutMs` to the very gap the seam exists to close. The scrape is the
+    // minutes-long half, so a Stop pressed during it now skips the judging
+    // instead of waiting it out.
+    if (options.shouldCancel && (await options.shouldCancel()) === true) {
+      return { sources, status: 'cancelled' }
+    }
+
     const request = buildSourceJudgmentRequest(subject, sources)
     const startedAt = Date.now()
     const answer = await callSystemOne(
       resolved.endpoint,
       { model: config.model, state: request.state, questions: request.questions },
-      config.timeoutMs
+      config.timeoutMs,
+      // A DEADLINE, so the worst case is ONE timeout rather than a timeout plus
+      // a full-length retry. Mid-call abort is deliberately not plumbed:
+      // `callSystemOne` builds its own `AbortSignal.timeout` and giving it a
+      // cancellation signal means a poller per call, which is
+      // `startStreamStallGuard`-shaped machinery for a twenty-second request.
+      // Bounding the total is proportionate; the long half is above this line.
+      startedAt + config.timeoutMs
     )
     const scores = readSourceJudgments(answer.answers, request.keys)
     const outcome = decideJudgedSources(sources.map((source, i) => ({ source, score: scores[i] })))
@@ -131,5 +160,112 @@ export async function filterSourcesByJudgment(
       'Judging retrieved documents failed; keeping every document'
     )
     return { sources, status: 'failed', reason }
+  }
+}
+
+// ============================================================================
+// The connection test
+// ============================================================================
+
+/**
+ * Try the source filter's own request before trusting it.
+ *
+ * THE HOLE THIS CLOSES. The card's Test ran `testEvidenceJudge` — three
+ * questions over a tiny state — while this feature sends one question per
+ * document over a sample each. Nothing exercised the second shape, so an
+ * operator could tick the switch, pass the Test, and have every title fall
+ * open forever with only a `warn` in the container log.
+ *
+ * IT IS SENT AT THE SIZE THE SETTINGS ALLOW, not at the size of two documents.
+ * That is the whole point: a two-document probe answers "does it
+ * discriminate" and says nothing about whether a real request fits the model's
+ * context, which is the failure that actually bites (`maxResults` plus
+ * `curatedMaxResults` reaches 40). So the two real documents go first, filler
+ * pads the request out to the configured ceiling, and the result reports the
+ * size and the verdicts separately — one call answering both questions.
+ *
+ * `answered` below the document count means the model returned a partial
+ * answer, which a run would honour per document; here it is a warning sign
+ * about the request rather than about any page.
+ */
+export type SourceFilterTestResult =
+  | {
+      success: true
+      model: string
+      latencyMs: number
+      /** Documents sent, including filler — the ceiling the current settings allow. */
+      documents: number
+      /** How many came back with a readable verdict. */
+      answered: number
+      /** Characters of excerpt the request carried. */
+      excerptChars: number
+      /** P(worth reading) for the review; expected high. */
+      article: number | null
+      /** P(worth reading) for the podcast note; expected low. */
+      noise: number | null
+      /** Whether the two land on the right sides of the bar. */
+      discriminates: boolean
+    }
+  | { success: false; error: string }
+
+export async function testSourceFilter(
+  input: Partial<DecisionModelConfig>
+): Promise<SourceFilterTestResult> {
+  // `enabled` is irrelevant to a test: the point is to try it before switching
+  // it on — `testEvidenceJudge`'s rule.
+  const config = sanitizeDecisionModelConfig({ ...input, enabled: true })
+  const resolved = await resolveDecisionEndpoint(config)
+  if (!resolved.ok) return { success: false, error: resolved.reason }
+
+  let ceiling = 2
+  try {
+    const crw = await getCrwConfig()
+    ceiling = Math.max(2, crw.maxResults + crw.curatedMaxResults)
+  } catch {
+    // An unreadable CRW config must not fail the probe; it only costs the
+    // size half of the answer, and the default pair is what most instances run.
+  }
+
+  const sources: AnalysisSource[] = [SOURCE_FILTER_TEST_ARTICLE, SOURCE_FILTER_TEST_NOISE]
+  for (let i = sources.length; i < ceiling; i++) sources.push(sourceFilterTestFiller(i))
+
+  const request = buildSourceJudgmentRequest(SOURCE_FILTER_TEST_SUBJECT, sources)
+  const excerptChars = Object.values(
+    (request.state.documents ?? {}) as Record<string, { excerpt?: string }>
+  ).reduce((sum, d) => sum + (d.excerpt?.length ?? 0), 0)
+
+  const startedAt = Date.now()
+  try {
+    const answer = await callSystemOne(
+      resolved.endpoint,
+      { model: config.model, state: request.state, questions: request.questions },
+      config.timeoutMs,
+      startedAt + config.timeoutMs
+    )
+    const scores = readSourceJudgments(answer.answers, request.keys)
+    const [article, noise] = scores
+    return {
+      success: true,
+      model: answer.model,
+      latencyMs: Date.now() - startedAt,
+      documents: sources.length,
+      answered: scores.filter((s) => s != null).length,
+      excerptChars,
+      article,
+      noise,
+      discriminates:
+        article != null &&
+        noise != null &&
+        article > SOURCE_DROP_AT_OR_BELOW &&
+        noise <= SOURCE_DROP_AT_OR_BELOW,
+    }
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err)
+    // The size is in the message on purpose: an oversized state answers 400,
+    // and "HTTP 400" alone sends an operator to check their key.
+    return {
+      success: false,
+      error: `${reason} (sent ${sources.length} documents, ${excerptChars.toLocaleString('en-US')} characters of excerpt)`,
+    }
   }
 }

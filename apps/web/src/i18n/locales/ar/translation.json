@@ -5837,6 +5837,8 @@
     "explanationsEmpty": "Nothing here.",
     "explanationsError": "Failed to load the explanations",
     "filterSourcesLabel": "Also weed the title-analysis retrieval",
-    "filterSourcesHelp": "Before each analysis is written, ask the model which retrieved pages carry writing about the title and drop the ones that carry none — a video or podcast promo, a forum thread, a listings page. Costs one short call per title. It never leaves fewer than {{floor}} pages, never drops a page it could not judge, and keeps everything if the call fails."
+    "filterSourcesHelp": "Before each analysis is written, ask the model which retrieved pages carry writing about the title and drop the ones that carry none — a video or podcast promo, a forum thread, a listings page. Costs one short call per title. It never leaves fewer than {{floor}} pages, never drops a page it could not judge, and keeps everything if the call fails.",
+    "sourceFilterTestPassed": "Source filter: {{model}} read {{documents}} documents ({{chars}} characters of excerpt) and answered {{answered}} of them — the review scored {{article}}%, the podcast note {{noise}}% ({{ms}} ms).",
+    "sourceFilterTestNotDiscriminating": "Source filter: {{model}} read {{documents}} documents ({{chars}} characters of excerpt) and answered {{answered}}, but did not separate a review from a podcast note with no transcript — the review scored {{article}}%, the note {{noise}}%. It is unlikely to drop the right pages."
   }
 }
