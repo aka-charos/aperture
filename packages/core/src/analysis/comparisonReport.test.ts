@@ -586,6 +586,47 @@ test('an answer that ran past its prompt’s length rule is flagged', () => {
  * of that version actually states. A reworded length rule fails here rather
  * than leaving the flags quietly wrong.
  */
+/**
+ * THE INSTRUMENT MUST NOT FLAG WHAT THE PROMPT PERMITS. Version 18 states
+ * "around 600 words" and "A WORD COUNT A LITTLE OVER IS FINE", and the first
+ * bench of it printed "646!" - obedience reported as a breach, which is the
+ * `spill` fault from the run before, inverted.
+ */
+test('a loose word count is flagged only past what the edition calls a little over', () => {
+  const words = (version: number, count: number) =>
+    renderComparisonReport(
+      report({
+        promptVersion: version,
+        entries: [entry({ promptVersion: version, analysis: 'word '.repeat(count).trim() })],
+      })
+    ).match(new RegExp(`${count}!? words`))?.[0]
+
+  assert.equal(words(18, 646), '646 words', '8% over a loose 600 is inside it')
+  assert.equal(words(18, 700), '700! words', 'past 690 is not a little over')
+  // Version 17's cap is hard, and its own live answer is 25% over it.
+  assert.equal(words(17, 815), '815! words')
+  assert.equal(words(17, 651), '651! words', 'no tolerance where the prompt states none')
+})
+
+/**
+ * The asymmetry is the prompt's: the same rule that loosens the word count says
+ * "an extra paragraph is not" fine. An instrument that averaged the two would
+ * be reporting neither.
+ */
+test('paragraphs stay hard where words are loose', () => {
+  const caps = lengthCapsFor(18)
+  assert.equal(caps?.words, 600)
+  assert.ok(caps?.wordsTolerance != null && caps.wordsTolerance > 0)
+  assert.equal(caps?.paragraphs, 8)
+  const rendered = renderComparisonReport(
+    report({
+      promptVersion: 18,
+      entries: [entry({ promptVersion: 18, analysis: Array.from({ length: 9 }, () => 'A line.').join('\n\n') })],
+    })
+  )
+  assert.match(rendered, /9! paragraphs/)
+})
+
 test('every length cap is a figure its own edition states', () => {
   const spelled: Record<number, string> = { 8: 'eight', 10: 'ten' }
   for (const version of BENCH_PROMPT_VERSIONS) {

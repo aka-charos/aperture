@@ -911,17 +911,44 @@ test('draft 18 names the makers and stops naming the critics', () => {
   assert.ok(!seriesTradition.includes('a viewer sits down to'))
   assert.ok(seriesTradition.includes('an imagined person sitting down to watch it'))
 
-  // NOT CHANGED: the rule count, the work and making questions, and version
-  // 17's own mechanical test, which is what the making answer turns on.
+  // A VERDICT ON THE ENDING IS REPORTABLE; A DESCRIPTION OF IT IS NOT. The
+  // first bench closed reception on how the ending behaves, against a rule
+  // reading "No endings" - a definite breach. Narrowed in the same change,
+  // because a sudden ending is the commonest complaint about that film and a
+  // spoiler rule that forbids reporting the main criticism of a work has
+  // stopped being one.
+  assert.ok(rulesText.includes('Describe how it works, never what happens in it'))
+  assert.ok(rulesText.includes("A critic's verdict on the ending may be reported"))
+  assert.ok(rulesText.includes('not its pace, its length or its shape'))
+  assert.ok(rulesText.includes('How it lands is a judgement; how it behaves is the ending itself'))
+  // The ban quotes no phrasing, which is this version's own lesson.
+  assert.ok(!rulesText.includes('snaps shut'))
+
+  // A REMARK BELONGS TO WHOEVER WAS ASKED AND TO NOBODY ELSE ON THE PAGE.
+  // Version 17's test survives intact; what is added is the direction the
+  // first bench failed in - Harper's answer about the screenplay came out as
+  // Nicolodi's, a third maker the same article names earlier.
+  assert.ok(question('circumstances').includes('WHO IS ASKED IS WHO SPEAKS'))
+  assert.ok(question('circumstances').includes("IT IS NOBODY ELSE'S EITHER"))
+  for (const media of ['movieQuestions', 'seriesQuestions'] as const) {
+    const text = draft[media].find((q) => q.id === 'circumstances')!.text
+    assert.ok(
+      text.includes('not to whichever maker the article happens to name nearest it'),
+      media + ' carries the widened clause'
+    )
+    assert.ok(text.includes('find the sentence in which they are the one speaking'))
+  }
+
+  // NOT CHANGED: the rule count, and the work question. The causal phrasing ban
+  // ("so that", "which gives", "lets it", "the result is") that would have
+  // caught one of the first bench's sentences belongs to version 15 and version
+  // 16 REPEALED it deliberately, replacing it with a licence to draw an
+  // on-screen effect out - so re-adding it here would revert a considered
+  // decision rather than fix a slip.
   assert.equal(draft.rules.length, current.rules.length)
   assert.equal(question('work'), current.movieQuestions.find((q) => q.id === 'work')!.text)
-  assert.equal(
-    question('circumstances'),
-    current.movieQuestions.find((q) => q.id === 'circumstances')!.text
-  )
-  assert.ok(question('circumstances').includes('WHO IS ASKED IS WHO SPEAKS'))
+  assert.ok(question('work').includes('may be your own reading of what a document describes'))
   assert.ok(rulesText.includes('THESE NEVER EARN IT, in any answer'))
-  assert.ok(rulesText.includes('Describe how it works, never what happens in it'))
 })
 
 /**

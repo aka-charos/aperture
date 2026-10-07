@@ -253,7 +253,7 @@ function statLine(
   caps: LengthCaps | null
 ): string {
   const parts: string[] = []
-  if (signals) parts.push(`${against(signals.words, caps?.words)} words`)
+  if (signals) parts.push(`${wordsAgainst(signals.words, caps)} words`)
   parts.push(formatDuration(entry.durationMs))
   if (entry.inputTokens != null) parts.push(`${entry.inputTokens} in`)
   if (entry.outputTokens != null) parts.push(`${entry.outputTokens} out`)
@@ -398,7 +398,7 @@ const SIGNAL_COLUMNS: [
   string,
   (s: ProseSignals, caps: LengthCaps | null) => number | string,
 ][] = [
-  ['words', (s, caps) => against(s.words, caps?.words)],
+  ['words', (s, caps) => wordsAgainst(s.words, caps)],
   ['paras', (s, caps) => against(s.paragraphs, caps?.paragraphs)],
   ['longest', (s) => s.longestParagraph],
   ['longest-w', (s, caps) => against(s.longestParagraphWords, caps?.paragraphWords)],
@@ -444,6 +444,25 @@ interface LengthCaps {
   paragraphs?: number
   /** The point at which one paragraph is carrying too much. */
   paragraphWords?: number
+  /**
+   * How far over `words` this edition says is still fine, as a share.
+   *
+   * THE INSTRUMENT MUST NOT FLAG WHAT THE PROMPT PERMITS - the recurring fault
+   * in this file, which has now gone both ways: `pointsAtSources` was blind to
+   * the prompt's own noun three times, and `spill` scored 7 on an answer whose
+   * every hit was the phrase version 16 asks for. Version 18 states "around 600
+   * words" and "A WORD COUNT A LITTLE OVER IS FINE", and the table printed
+   * "646!" - obedience reported as a breach.
+   *
+   * 15% is one paragraph's worth at that edition's own shape (600 over eight),
+   * which is where "a little" stops. It separates the two live answers cleanly:
+   * 646/600 is 8% and inside, version 17's 815/650 is 25% and not.
+   *
+   * PARAGRAPHS DELIBERATELY GET NONE, because the same rule says an extra
+   * paragraph is NOT fine - the asymmetry is the prompt's, and the instrument
+   * mirrors it rather than averaging it.
+   */
+  wordsTolerance?: number
 }
 
 const LENGTH_CAPS: ReadonlyMap<number, LengthCaps> = new Map([
@@ -464,7 +483,7 @@ const LENGTH_CAPS: ReadonlyMap<number, LengthCaps> = new Map([
   // So there is no paragraphWords entry to flag against: measured on 42 live
   // version-17 rows, a third ran over the 150 and the prose was not worse for
   // it. `longest-w` is still printed, and is now descriptive rather than a cap.
-  [18, { words: 600, paragraphs: 8 }],
+  [18, { words: 600, paragraphs: 8, wordsTolerance: 0.15 }],
 ])
 
 /**
@@ -477,9 +496,19 @@ export function lengthCapsFor(version: number): LengthCaps | null {
   return LENGTH_CAPS.get(version) ?? null
 }
 
-/** A count, with "!" when the prompt asked for fewer. */
-const against = (value: number, cap: number | undefined): string =>
-  cap != null && value > cap ? `${value}!` : String(value)
+/**
+ * A count, with "!" when the prompt asked for fewer.
+ *
+ * `tolerance` is the share over the figure the edition itself calls fine; see
+ * `LengthCaps.wordsTolerance`. Rounded, so the cap stays a whole number of
+ * words and the "!" means the same thing to a reader as the figure beside it.
+ */
+const against = (value: number, cap: number | undefined, tolerance = 0): string =>
+  cap != null && value > Math.round(cap * (1 + tolerance)) ? `${value}!` : String(value)
+
+/** The words figure, flagged only past what its own edition calls a little over. */
+const wordsAgainst = (value: number, caps: LengthCaps | null | undefined): string =>
+  against(value, caps?.words, caps?.wordsTolerance)
 
 interface SignalRow {
   label: string

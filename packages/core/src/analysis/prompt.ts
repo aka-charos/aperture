@@ -844,6 +844,58 @@ const CURRENT_EDITION: PromptEdition = {
 const DRAFT_ATTRIBUTION_RULE_18 =
   "The first answers speak in your own voice: state facts, what is on screen and what it does to a viewer plainly, with nobody attached, even where a critic is who you read it from. What belongs to somebody else is a judgement of QUALITY or a claim about what the film MEANS, and both go to the reception answer with a holder - \"a critic\", \"critics\", \"a scholar\", \"some viewers\" - never \"a reading\", \"an account\" or \"the press\", and never hidden inside \"is regarded as\", \"is described as\", \"has been called\", \"is said to\" or \"reportedly\". DO NOT NAME THE PEOPLE WHO WROTE ABOUT IT, and do not name the publications they wrote for: a byline the reader would have to be told about tells them nothing, and \"a critic\" carries the same weight in fewer words. There is no exception, however well known the name. A SITE IS NOT ITS WRITER: a site named after a critic is a publication like any other, and a piece published on it is by \"a critic\" whoever the site is named after. Names belong to the people who MADE something - this film, or an earlier film you are naming. \"Critics\" means more than one, and two remarks by one critic are one critic."
 
+/**
+ * A VERDICT ON THE ENDING IS REPORTABLE; A DESCRIPTION OF IT IS NOT.
+ *
+ * Draft 18's first Suspiria bench closed its reception answer on "a conclusion
+ * that snaps shut abruptly after all that buildup" - which discloses no
+ * outcome and does disclose how the ending behaves, against a rule whose words
+ * are "No endings". A definite breach, and found by a reader rather than by any
+ * column.
+ *
+ * Patched by NARROWING the rule in the same change, because the strict reading
+ * costs something real: a sudden ending is the commonest complaint about this
+ * film, reception exists so "a viewer can calibrate what they are in for", and
+ * a rule that forbids reporting the main criticism of a work has stopped being
+ * a spoiler rule. The line is mechanical for the same reason every other
+ * ending test here is - how it LANDS is somebody's judgement, how it BEHAVES is
+ * part of the thing itself.
+ *
+ * No example of the banned phrasing is quoted, deliberately: draft 18 is the
+ * version that found a ban which prints its target supplies the target (19 of
+ * 42 rows carried version 17's quoted opener, 11 outside the opening).
+ */
+const DRAFT_SPOILER_RULE_18 =
+  "Describe how it works, never what happens in it. No endings, no reveals, nothing about what a character, creature or image turns out to be, and nothing about which character gets out. A critic's verdict on the ending may be reported - that it satisfied them or disappointed them - and nothing else about the ending may: not what it resolves, and not its pace, its length or its shape. How it lands is a judgement; how it behaves is the ending itself. Someone who has not seen it must be able to read this safely."
+
+/**
+ * A REMARK BELONGS TO WHOEVER WAS ASKED, AND TO NOBODY ELSE ON THE PAGE.
+ *
+ * Version 16 found an actress's description of the director printed as the
+ * director on himself, and version 17's mechanical test - find the sentence in
+ * which the maker is the one speaking - was written for it and is why 17 was
+ * promoted. Draft 18's first bench broke the same rule by a DIFFERENT ROUTE:
+ * Jessica Harper's answer about first reading the screenplay ("The screenplay
+ * provided a loose structure") came out as "Nicolodi described the screenplay
+ * as only a loose structure" - the co-writer, who is named earlier in the same
+ * article and in two other documents, and who did not say it.
+ *
+ * Verified rather than assumed: "loose structure" appears on the rogerebert.com
+ * page and on none of the other documents reachable from the run, and there it
+ * sits inside an interview the piece introduces as being with Harper. Version
+ * 17, on the identical eight documents, attributed it to Harper correctly.
+ *
+ * So the clause is widened rather than restated. Its example was
+ * ONE-DIRECTIONAL - it warns that the actor's remark is not the director's -
+ * and the failure went sideways instead, to a third maker the article names
+ * nearby. Two instances of one class on one page shape is a shape.
+ */
+const DRAFT_CIRCUMSTANCES_MOVIE_18 =
+  "What should a viewer know before they start? Two things belong here. First, what a maker SAID they were trying to do. Before writing that somebody said something, find the sentence in which they are the one speaking: a sentence about what they did, wanted, decided or set out to do is the page describing them, and so is a list of what an interview covered. WHO IS ASKED IS WHO SPEAKS - one page can carry an essay about the director and an interview with an actor, and what the actor says about the director is the actor's remark, never the director on themselves. IT IS NOBODY ELSE'S EITHER: a remark belongs to the person who was asked, not to whichever maker the article happens to name nearest it, so check the name against the question it answers before you attach it. Second, a condition of the making or the first release that a viewer would FEEL while watching, or that explains something they would otherwise take for a fault - how the sound was got, a cut somebody required, the form it was first shown in, who was allowed to see it. How it was received, and what anyone did afterwards, belong elsewhere."
+
+const DRAFT_CIRCUMSTANCES_SERIES_18 =
+  "What should a viewer know before they start? Two things belong here. First, what a maker SAID they were trying to do. Before writing that somebody said something, find the sentence in which they are the one speaking: a sentence about what they did, wanted, decided or set out to do is the page describing them, and so is a list of what an interview covered. WHO IS ASKED IS WHO SPEAKS - one page can carry an essay about the creator and an interview with an actor, and what the actor says about the creator is the actor's remark, never the creator on themselves. IT IS NOBODY ELSE'S EITHER: a remark belongs to the person who was asked, not to whichever maker the article happens to name nearest it, so check the name against the question it answers before you attach it. Second, a condition of the making or the first broadcast that a viewer would FEEL while watching, or that explains something they would otherwise take for a fault - how the sound was got, a cut somebody required, the slot or the form it first went out in, who was allowed to see it. How it was received, and what anyone did afterwards, belong elsewhere."
+
 const DRAFT_NAMING_RULE_18 =
   "Name the people who MADE it, and name them for the choice you are describing - the director, the writer, the cinematographer, the editor, the composer, the actors - never \"the creative team\". Never name a person to record what their job was, and never with the job in front of the name: \"Cinematographer Tovoli lit\" is the credit again, where \"Tovoli lit\" is the choice."
 
@@ -919,10 +971,12 @@ const DRAFT_EDITION: PromptEdition | null = {
   movieQuestions: draftQuestions(CURRENT_EDITION.movieQuestions, {
     tradition: DRAFT_TRADITION_MOVIE_18,
     reception: DRAFT_RECEPTION_MOVIE_18,
+    circumstances: DRAFT_CIRCUMSTANCES_MOVIE_18,
   }),
   seriesQuestions: draftQuestions(CURRENT_EDITION.seriesQuestions, {
     tradition: DRAFT_TRADITION_SERIES_18,
     reception: DRAFT_RECEPTION_SERIES_18,
+    circumstances: DRAFT_CIRCUMSTANCES_SERIES_18,
   }),
   // Swapped by identity against the named constant, never by index.
   rules: draftRules(CURRENT_EDITION.rules, [
@@ -930,6 +984,7 @@ const DRAFT_EDITION: PromptEdition | null = {
     [OWN_WORDS_RULE, DRAFT_OWN_WORDS_RULE_18],
     [NAMING_RULE, DRAFT_NAMING_RULE_18],
     [ATTRIBUTION_RULE, DRAFT_ATTRIBUTION_RULE_18],
+    [SPOILER_RULE, DRAFT_SPOILER_RULE_18],
   ]),
 }
 
