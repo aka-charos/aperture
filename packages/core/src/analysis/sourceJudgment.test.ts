@@ -4,10 +4,13 @@ import {
   MIN_SOURCES_AFTER_JUDGMENT,
   MIN_SUBSTANTIVE_AFTER_JUDGMENT,
   MIN_SOURCE_SAMPLE_CHARS,
+  MIN_SAMPLE_SLICE_CHARS,
+  SAMPLE_ELISION,
   SOURCE_JUDGMENT_EXCERPT_BUDGET,
   SOURCE_DROP_AT_OR_BELOW,
   SOURCE_SAMPLE_CHARS,
   buildSourceJudgmentRequest,
+  judgmentExcerpt,
   decideJudgedSources,
   readSourceJudgments,
   sampleCharsFor,
@@ -197,9 +200,78 @@ test('the excerpt is bounded, and a short document is sent whole', () => {
   const request = buildSourceJudgmentRequest(SUBJECT, [long, short])
   const documents = request.state.documents as Record<string, { excerpt: string }>
 
-  assert.ok(documents.d1.excerpt.length <= SOURCE_SAMPLE_CHARS + 1, 'the ellipsis is the only overrun')
+  assert.ok(
+    documents.d1.excerpt.length <= SOURCE_SAMPLE_CHARS + SAMPLE_ELISION.length + 1,
+    'the elision mark and the ellipsis are the only overrun'
+  )
   assert.ok(documents.d1.excerpt.endsWith('…'))
   assert.equal(documents.d2.excerpt, 'Three words here.')
+})
+
+/**
+ * THE HEAD WAS NOT A FAIR SAMPLE, and how unfair depended on house style.
+ *
+ * Measured on the first live run: a 21,353-character rogerebert.com essay -
+ * the best document in the retrieval - scored 0.67 against a 1,162-character
+ * blog review at 0.90, because its opening 1,300 characters are the writer's
+ * childhood memory of seeing the poster and never name the film. The thin page
+ * was read whole and the deep one at 6%, which flattered precisely the
+ * documents this filter exists to remove.
+ */
+test('a long document is sampled in two places, not just at its head', () => {
+  const opening = 'An anecdote about a poster, which names no film at all. '.repeat(40)
+  const body = 'The camera tracks the corridor while the score refuses to resolve. '.repeat(200)
+  const sample = judgmentExcerpt(opening + body, SOURCE_SAMPLE_CHARS)
+
+  assert.ok(sample.includes(SAMPLE_ELISION), 'the jump is marked')
+  const [head, middle] = sample.split(SAMPLE_ELISION)
+  assert.ok(head.startsWith('An anecdote'), 'the opening is still shown first')
+  assert.ok(middle.includes('the score refuses to resolve'), 'and the body is shown too')
+  assert.ok(
+    sample.length <= SOURCE_SAMPLE_CHARS + SAMPLE_ELISION.length + 1,
+    'two slices cost the same budget as one'
+  )
+})
+
+/**
+ * Below twice the sample the two slices abut, and marking an elision of nothing
+ * teaches the model that this page breaks off when it does not.
+ */
+test('a document barely over the sample is read straight through', () => {
+  const text = 'word '.repeat(300) // 1,500 chars against a 1,200 sample
+  const sample = judgmentExcerpt(text, SOURCE_SAMPLE_CHARS)
+  assert.ok(!sample.includes('[…]'), 'no elision for a gap of nothing')
+  assert.ok(sample.endsWith('…'))
+  assert.ok(sample.length <= SOURCE_SAMPLE_CHARS + 1)
+})
+
+test('a sample too small to split is left contiguous', () => {
+  // 40 documents is the legal ceiling, where the share is MIN_SOURCE_SAMPLE_CHARS
+  // and a 60% head would be under MIN_SAMPLE_SLICE_CHARS. One window beats two
+  // fragments, and at forty documents no sample of any shape is representative.
+  const small = sampleCharsFor(40)
+  assert.ok(Math.round(small * 0.6) < MIN_SAMPLE_SLICE_CHARS)
+  const sample = judgmentExcerpt('word '.repeat(5_000), small)
+  assert.ok(!sample.includes('[…]'))
+  assert.ok(sample.length <= small + 1)
+})
+
+test('a document at or under the sample is returned untouched, with no mark', () => {
+  assert.equal(judgmentExcerpt('  Three words here.  ', SOURCE_SAMPLE_CHARS), 'Three words here.')
+  const exact = 'a'.repeat(SOURCE_SAMPLE_CHARS)
+  assert.equal(judgmentExcerpt(exact, SOURCE_SAMPLE_CHARS), exact)
+})
+
+/**
+ * The marker has to be described or an abrupt jump reads as a broken page -
+ * which is itself one of the noise shapes the judge is asked to look for.
+ */
+test('the question says the sample is two passages, not an opening', () => {
+  const request = buildSourceJudgmentRequest(SUBJECT, [source('a.com', 'A')])
+  const q = request.questions.d1.instructions
+  assert.ok(q.includes('[…]'), 'the mark is named')
+  assert.ok(/middle of the same page/.test(q))
+  assert.ok(!/is how it begins/.test(q), 'it is no longer only the beginning')
 })
 
 /**

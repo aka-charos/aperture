@@ -85,6 +85,17 @@ export interface ComparisonSource {
   domain: string
   chars: number
   /**
+   * The page, so a reader of this report can open what the model read.
+   *
+   * The domain alone is an eye-scan column - it says film journal or content
+   * farm at a glance - and it is NOT a way back to the page: checking what a
+   * document actually contained meant searching for its title by hand, which
+   * is how a BFI page that carries nothing but a video blurb survived two
+   * rounds of reading this report. Absent under native grounding (whose URLs
+   * expire) and on every run stored before it was carried.
+   */
+  url?: string
+  /**
    * True when the curated criticism search supplied this document.
    *
    * Absent on every run stored before that search existed, so a report with
@@ -148,13 +159,18 @@ export interface ComparisonReport {
 }
 
 export interface JudgedSourceReport {
-  dropped: Array<{ domain: string; title: string; score: number; chars: number }>
+  /**
+   * `url` matters most here: a dropped document never reaches the prompt, so
+   * it appears nowhere else in this report and nothing else records where it
+   * was. Optional, since older runs stored none.
+   */
+  dropped: Array<{ domain: string; title: string; score: number; chars: number; url?: string }>
   /**
    * Every document's score, kept and dropped alike. Absent on runs stored
    * before it was carried, which is why the renderer falls back to printing
    * the drops alone rather than claiming nothing was near the bar.
    */
-  scores?: Array<{ domain: string; score: number | null; kept: boolean }>
+  scores?: Array<{ domain: string; score: number | null; kept: boolean; url?: string }>
   /** A rail stopped a drop the model asked for: this retrieval was mostly noise. */
   floored: boolean
 }
@@ -191,6 +207,7 @@ export function readJudgedSourceReport(value: unknown): JudgedSourceReport | nul
       title: typeof d.title === 'string' ? d.title : '',
       score: d.score,
       chars: typeof d.chars === 'number' && Number.isFinite(d.chars) ? d.chars : 0,
+      ...(typeof d.url === 'string' && d.url ? { url: d.url } : {}),
     })
   }
   const scores = Array.isArray(raw.scores)
@@ -202,6 +219,7 @@ export function readJudgedSourceReport(value: unknown): JudgedSourceReport | nul
           domain: typeof s.domain === 'string' ? s.domain : '(unknown host)',
           score,
           kept: s.kept === true,
+          ...(typeof s.url === 'string' && s.url ? { url: s.url } : {}),
         }]
       })
     : undefined
@@ -556,6 +574,10 @@ export function judgedSourcesLines(judged: JudgedSourceReport | null | undefined
   ]
   for (const d of judged.dropped) {
     lines.push(`  - ${d.domain} — ${d.title} (${d.chars.toLocaleString('en-US')} chars, scored ${d.score.toFixed(2)})`)
+    // A dropped document is in this report and nowhere else - it never reached
+    // the prompt - so this is the only record of where it was. On its own line
+    // so the URL can be copied without the figures around it.
+    if (d.url) lines.push(`      ${d.url}`)
   }
   if (judged.floored) {
     lines.push(
@@ -574,6 +596,12 @@ export function judgedSourcesLines(judged: JudgedSourceReport | null | undefined
  * was kept and the report could not say whether it scored just over the bar or
  * nowhere near it, which are a bar problem and a criteria problem and have
  * opposite fixes. Worst first so the ones closest to going are read first.
+ *
+ * NO URLS HERE, deliberately: the value of this block is one scannable column
+ * of probabilities, and `keepOnePerDomain` means a host appears at most once in
+ * a retrieval - so the domain is a key into the source list below, where every
+ * survivor's URL is printed, and into the dropped list above, where every
+ * casualty's is.
  */
 function scoreLines(judged: JudgedSourceReport): string[] {
   const scores = judged.scores
@@ -728,6 +756,10 @@ export function renderComparisonReport(report: ComparisonReport): string {
     // to recognise the domain by eye.
     const mark = source.curated === true ? ' [criticism]' : ''
     out.push(`  - ${source.domain} — ${source.title} (${sourceSize(source)})${mark}`)
+    // The page itself, so a figure in this list can be checked against what is
+    // on it. Its own line: these run long, and the line above is a column of
+    // numbers somebody reads down.
+    if (source.url) out.push(`      ${source.url}`)
   }
   out.push('')
   out.push(

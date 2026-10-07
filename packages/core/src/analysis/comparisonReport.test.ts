@@ -429,6 +429,96 @@ test('the marker rides on the source line, not on the heading alone', () => {
 })
 
 /**
+ * A PAGE YOU CANNOT OPEN IS A PAGE YOU CANNOT CHECK.
+ *
+ * `analysis_comparison_runs.sources` has carried `url` since the column
+ * existed and `readComparisonRun` dropped it, so every figure in this list -
+ * chars fetched, chars stripped, the filter's score - could only be argued
+ * with by searching for the page's title by hand. That is how a BFI page whose
+ * whole substance is a video survived two readings of this report.
+ */
+test('a source carries the page, so a figure in this list can be checked', () => {
+  const rendered = renderComparisonReport(
+    report({
+      sources: [
+        {
+          title: 'Argento on Suspiria',
+          domain: 'bfi.org.uk',
+          chars: 2013,
+          url: 'https://www.bfi.org.uk/sight-and-sound/video/argento-suspiria-video-inquiry',
+        },
+      ],
+    })
+  )
+  assert.match(
+    rendered,
+    /https:\/\/www\.bfi\.org\.uk\/sight-and-sound\/video\/argento-suspiria-video-inquiry/
+  )
+})
+
+test('a source with no URL renders exactly as before', () => {
+  // Native grounding stores none, and so does every run predating the column.
+  const rendered = renderComparisonReport(
+    report({ sources: [{ title: 'Review', domain: 'sensesofcinema.com', chars: 8000 }] })
+  )
+  assert.match(rendered, /- sensesofcinema\.com — Review \(8,000 chars\)/)
+  assert.ok(!/\n {6}https?:/.test(rendered), 'no empty continuation line')
+})
+
+/**
+ * A DROPPED DOCUMENT IS IN THIS REPORT AND NOWHERE ELSE. It never reached the
+ * prompt, so it is in no source list, in no stored row and on no panel - the
+ * report is the only record of where it was.
+ */
+test('a dropped document carries the page it was dropped from', () => {
+  const lines = judgedSourcesLines({
+    dropped: [
+      {
+        domain: 'thefilmstage.com',
+        title: 'The Film Stage Show Classic - Suspiria',
+        score: 0.1,
+        chars: 4650,
+        url: 'https://thefilmstage.com/the-film-stage-show-classic-suspiria/',
+      },
+    ],
+    floored: false,
+  })
+  assert.match(lines[1], /thefilmstage\.com — The Film Stage Show Classic - Suspiria/)
+  assert.equal(lines[2].trim(), 'https://thefilmstage.com/the-film-stage-show-classic-suspiria/')
+})
+
+/**
+ * The score table's whole value is one scannable column of probabilities, and
+ * `keepOnePerDomain` makes the domain a key into the lists either side of it -
+ * so a URL there would be a third copy and would break the column.
+ */
+test('the score table stays a column: no URLs in it', () => {
+  const lines = judgedSourcesLines({
+    dropped: [{ domain: 'a.com', title: 'A', score: 0.1, chars: 900, url: 'https://a.com/one' }],
+    scores: [
+      { domain: 'a.com', score: 0.1, kept: false, url: 'https://a.com/one' },
+      { domain: 'b.com', score: 0.9, kept: true, url: 'https://b.com/two' },
+    ],
+    floored: false,
+  })
+  const table = lines.slice(lines.findIndex((l) => /worst first/.test(l)))
+  assert.ok(table.length > 0)
+  assert.ok(!table.some((l) => /https?:/.test(l)), table.join('\n'))
+  // And the drop's URL is still printed, above the table.
+  assert.ok(lines.some((l) => l.trim() === 'https://a.com/one'))
+})
+
+test('a non-string URL is dropped rather than rendered', () => {
+  const parsed = readJudgedSourceReport({
+    dropped: [{ domain: 'a.com', title: 'A', score: 0.1, chars: 900, url: 42 }],
+    scores: [{ domain: 'a.com', score: 0.1, kept: false, url: '' }],
+    floored: false,
+  })
+  assert.deepEqual(parsed?.dropped, [{ domain: 'a.com', title: 'A', score: 0.1, chars: 900 }])
+  assert.deepEqual(parsed?.scores, [{ domain: 'a.com', score: 0.1, kept: false }])
+})
+
+/**
  * A REJECTED ANSWER SAYS IT WAS REJECTED, EVEN WHEN IT HAS PROSE.
  *
  * The failure line only ever printed when there was nothing else to print, so a

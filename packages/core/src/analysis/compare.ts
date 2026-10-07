@@ -391,6 +391,7 @@ async function driveComparison(
                   domain: s.domain,
                   score: s.score,
                   kept: s.kept,
+                  ...(s.url ? { url: s.url } : {}),
                 })),
                 floored: retrieval.judged.floored,
               })
@@ -679,6 +680,11 @@ export async function getComparisonRun(runId: string): Promise<ComparisonRunView
       title: s.title,
       domain: s.domain,
       chars: s.chars,
+      // STORED SINCE THE COLUMN EXISTED AND DROPPED HERE. The write above has
+      // always put `url` in the row; this mapping picked three fields and the
+      // report had no way back to any page in it. Stored as NULL under native
+      // grounding, so the check is for a non-empty string, not for presence.
+      ...(s.url ? { url: s.url } : {}),
       // Only ever true: absent must stay absent, or a run stored before the
       // curated search would claim that search rejected every document.
       ...(s.curated === true ? { curated: true } : {}),

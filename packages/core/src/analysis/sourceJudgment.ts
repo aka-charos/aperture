@@ -43,10 +43,12 @@ import type { AnalysisSource, AnalysisSubject } from './prompt.js'
 /**
  * How much of each document the model is shown.
  *
- * The sample is the HEAD of the cleaned text, which is only safe because
- * ./sourceCleanup.ts has already run: before it, a page's first 1,200
- * characters were reliably its navigation menu, and every document would have
- * looked like noise. After it, the head is where an article states what it is.
+ * Cleaning has to run first either way: before ./sourceCleanup.ts a page's
+ * first 1,200 characters were reliably its navigation menu, and every document
+ * would have looked like noise.
+ *
+ * THE HEAD ALONE WAS NOT A FAIR SAMPLE, and the first live run showed it on the
+ * best document in the set - see {@link judgmentExcerpt}.
  *
  * A CEILING, NOT A FIXED SIZE - see {@link sampleCharsFor}. This number alone
  * was the first version and it does not bound the request: the sample is per
@@ -151,13 +153,69 @@ export function sourceJudgmentKey(index: number): string {
   return `d${index + 1}`
 }
 
-/** Head of the cleaned text, cut at a word boundary where one is close. */
-function excerpt(text: string, max: number): string {
-  const value = text.trim()
+/** `value` cut to at most `max`, at a word boundary when one is close. */
+function clipAtWord(value: string, max: number): string {
   if (value.length <= max) return value
   const cut = value.slice(0, max)
   const lastSpace = cut.lastIndexOf(' ')
-  return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`
+  return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()
+}
+
+/** The share of a two-slice sample spent on the opening. */
+const SAMPLE_HEAD_SHARE = 0.6
+
+/**
+ * Below this a slice is a fragment rather than a window, so one slice is
+ * better than two. At `MIN_SOURCE_SAMPLE_CHARS` (40 documents) the head share
+ * falls under it and the sample stays contiguous - which is honest: at forty
+ * documents no sample of any shape is representative.
+ */
+export const MIN_SAMPLE_SLICE_CHARS = 250
+
+/** Scholarly elision, so a jump cannot read as a page that breaks off. */
+export const SAMPLE_ELISION = '\n\n[…]\n\n'
+
+/**
+ * What the judge is shown of one document: its opening, and a passage from the
+ * middle when the page is long enough to have one.
+ *
+ * THE HEAD IS NOT A FAIR SAMPLE, AND HOW UNFAIR IT IS DEPENDS ON HOUSE STYLE
+ * RATHER THAN ON WORTH. Measured on the first live Suspiria run with the filter
+ * on: the single best document in the retrieval, a 21,353-character
+ * rogerebert.com essay, scored **0.67** - below a 1,162-character blog review
+ * at 0.90 and a Rotten Tomatoes page at 0.88 - because its first 1,300
+ * characters are the writer's childhood memory of seeing the poster, in which
+ * the film is not named and no judgement appears. Deep Focus Review, equally
+ * good and equally long, opens on its thesis and scored 0.95. The 0.28 between
+ * them measured prose convention, not value.
+ *
+ * It also reverses the worst way: a thin page is read WHOLE (1,162 < 1,200) and
+ * a deep one is read at 6% - so the sample systematically flattered exactly the
+ * documents this filter exists to remove.
+ *
+ * The middle is the right second slice rather than the end: [F-124]'s mapping
+ * measurement puts the median sentence the writer actually used 35-68% into its
+ * document, so the material is in the body and the head is the one part that is
+ * reliably preamble.
+ *
+ * A document under twice the sample is read straight through. Below that the
+ * two slices abut or overlap, and marking an elision of nothing teaches the
+ * model that this page breaks off when it does not.
+ */
+export function judgmentExcerpt(text: string, max: number): string {
+  const value = text.trim()
+  if (value.length <= max) return value
+
+  const head = Math.round(max * SAMPLE_HEAD_SHARE)
+  const window = max - head
+  if (value.length < max * 2 || head < MIN_SAMPLE_SLICE_CHARS || window < MIN_SAMPLE_SLICE_CHARS) {
+    return `${clipAtWord(value, max)}…`
+  }
+
+  let start = Math.floor((value.length - window) / 2)
+  const nextSpace = value.indexOf(' ', start)
+  if (nextSpace > -1 && nextSpace - start < 40) start = nextSpace + 1
+  return `${clipAtWord(value, head)}${SAMPLE_ELISION}${clipAtWord(value.slice(start), window)}…`
 }
 
 export interface SourceJudgmentRequest {
@@ -212,13 +270,15 @@ export function buildSourceJudgmentRequest(
     documents[key] = {
       site: source.domain,
       heading: source.title,
-      excerpt: excerpt(source.text, sampleChars),
+      excerpt: judgmentExcerpt(source.text, sampleChars),
     }
     questions[key] = {
       type: 'noul',
       instructions:
         `Document ${key} was retrieved for the ${noun} ${named}. It is headed "${source.title}" ` +
-        `and comes from ${source.domain}; documents.${key}.excerpt is how it begins. ` +
+        `and comes from ${source.domain}. documents.${key}.excerpt is the page's opening, and ` +
+        `anything after a […] mark is a passage from the middle of the same page - so a page ` +
+        `that opens on something else may still be about the ${noun} further down. ` +
         `Would a writer describing that ${noun} find material in it - criticism or analysis of it, ` +
         `facts about how it was made or who made it, or what critics said about it? ` +
         `IS THE MATERIAL ON THE PAGE AS TEXT, or is it somewhere the page only points at? ` +
@@ -384,12 +444,22 @@ export interface JudgedSourceScore {
   score: number | null
   chars: number
   kept: boolean
+  /**
+   * THE PAGE ITSELF, because a verdict nobody can go and check is not evidence.
+   *
+   * The first version carried the domain alone, and reading the first live run
+   * meant finding the pages by hand from a search engine to see what the judge
+   * had seen - for the DROPPED ones, which never reach the prompt and are
+   * therefore recoverable from nothing else at all. Absent under native
+   * grounding, whose URLs are expiring redirects (`AnalysisSource.url`).
+   */
+  url?: string
 }
 
 export interface SourceJudgmentOutcome {
   kept: AnalysisSource[]
   /** What was dropped and why, for the retrieval log and the bench report. */
-  dropped: Array<{ domain: string; title: string; score: number; chars: number }>
+  dropped: Array<{ domain: string; title: string; score: number; chars: number; url?: string }>
   /**
    * EVERY document's score, kept and dropped alike, in relevance order.
    *
@@ -463,6 +533,7 @@ export function decideJudgedSources(judged: readonly JudgedSource[]): SourceJudg
       score: entry.score,
       chars: entry.source.text.length,
       kept: !dropping.has(index),
+      ...(entry.source.url ? { url: entry.source.url } : {}),
     })),
     kept: judged.filter((_, index) => !dropping.has(index)).map((entry) => entry.source),
     dropped: judged
@@ -473,6 +544,7 @@ export function decideJudgedSources(judged: readonly JudgedSource[]): SourceJudg
         title: entry.source.title,
         score: entry.score as number,
         chars: entry.source.text.length,
+        ...(entry.source.url ? { url: entry.source.url } : {}),
       })),
     answered,
     floored: blocked,

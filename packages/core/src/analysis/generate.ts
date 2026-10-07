@@ -693,8 +693,14 @@ export async function retrieveSources(
       // answers: was a page that survived near the bar, or nowhere near it.
       // With only the drops recorded, a kept document left nothing to reason
       // about and the bar could not be told apart from the criteria.
+      // A DROPPED PAGE CARRIES ITS URL and a kept one does not, which is not
+      // inconsistency: a survivor is in the stored row and can be opened from
+      // the panel, while a casualty exists in this log line and nowhere else.
+      // A library run writes no bench report, so this is the only record.
       judgedScores: judged.outcome?.scores.map(
-        (s) => `${s.domain} ${s.score == null ? '-' : s.score.toFixed(2)}${s.kept ? '' : ' DROPPED'}`
+        (s) =>
+          `${s.domain} ${s.score == null ? '-' : s.score.toFixed(2)}` +
+          (s.kept ? '' : ` DROPPED ${s.url ?? ''}`.trimEnd())
       ),
       domains: sources.map((s) => s.domain),
       // Survives the budget, which is the number that matters: a criticism
