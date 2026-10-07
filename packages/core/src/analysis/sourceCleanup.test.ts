@@ -15,8 +15,12 @@ import {
   cleanSourceText,
   cleanSources,
   isWidgetLine,
+  isSolicitationLine,
   stripFurnitureSections,
   stripNavigationRuns,
+  stripEmptyLinks,
+  stripImages,
+  stripSolicitationLines,
   stripPlotSections,
   stripWidgetLines,
 } from './sourceCleanup.js'
@@ -379,4 +383,126 @@ test('a link with a sentence beside it is never a menu entry', () => {
     'The camera hovers and glides through the rooms without taking anyone as its subject.',
   ].join('\n')
   assert.ok(stripNavigationRuns(page).includes('Argento saturates'))
+})
+
+// ============================================================================
+// Markup that carries nothing to a reader of text
+// ============================================================================
+
+test('an image is removed, however its alt text reads', () => {
+  // Every shape in the Suspiria retrieval: no alt, a filename, and the title.
+  const text = [
+    '![](https://static.rogerebert.com/redactor_assets/pictures/content_Suspiria-2017.jpg)',
+    '![ff-suspiria-featured](https://i0.wp.com/screenagewasteland.com/wp-content/uploads/2020/06/ff-suspiria-featured.jpg?resize=730%2C365&ssl=1)',
+    '![Suspiria](https://cdn.jwplayer.com/v2/media/qm7qhc53/poster.jpg?width=1280)',
+  ].join('\n')
+  assert.equal(stripImages(text).replace(/\n/g, '').trim(), '')
+})
+
+test('an alt text carrying a bracket does not swallow the line', () => {
+  const line = '![Eyes Without a Face [re-release]](https://m.net/a.jpg) and then real prose follows.'
+  // The label stops at the first ], so the tail of the alt is left as text —
+  // the fail-safe direction. What must never happen is losing the sentence.
+  assert.ok(stripImages(line).includes('real prose follows.'))
+})
+
+test('a thumbnail card becomes nothing, in two steps and in that order', () => {
+  const card =
+    '[![Nightbitch (2024) backdrop](https://i0.wp.com/reviewsonreels.ca/wp-content/uploads/nightbitch-2024-backdrop-1.jpg?resize=400%2C600&ssl=1)](https://reviewsonreels.ca/2024/12/07/nightbitch-tiff24/)'
+  const afterImages = stripImages(card)
+  assert.match(afterImages, /^\[\]\(/, 'the image goes first, leaving an empty link')
+  assert.equal(stripEmptyLinks(afterImages).trim(), '')
+})
+
+test('an empty link is removed and a labelled one is kept', () => {
+  const text = [
+    '[](https://www.slantmagazine.com/dvd/suspiria-dvd/#respond)',
+    '[Deep Red](https://www.slantmagazine.com/film/deep-red/) is the film it followed.',
+  ].join('\n')
+  const out = stripEmptyLinks(text)
+  assert.ok(!out.includes('#respond'))
+  assert.ok(out.includes('[Deep Red](https://www.slantmagazine.com/film/deep-red/)'))
+})
+
+/**
+ * THE ONE KIND OF FURNITURE THAT CARRIES REAL WORDS, so neither the link rules
+ * nor the widget rule can see it. Measured on the pages in the Suspiria
+ * retrieval rather than imagined.
+ */
+test('a solicitation line goes, measured on its visible text', () => {
+  const lines = [
+    '**Want to Support the Show?** [Spend on Amazon](https://www.amazon.com/s/ref=as_li_ss_tl?fst=as:off&rh=n:2625373011,n:!2644981011&tag=hmtalk-20&linkId=563dc4008b31da657e0be35e80a3ef60&language=en_US) [Become a Patron](https://www.patreon.com/bePatron?u=13298962)',
+    'Subscribe on iTunes or see below to stream.',
+    'Enter our giveaways, get access to our private Slack channel',
+    'Subscribe to our Weekly newsletter',
+    'Follow us on Twitter and Facebook with any questions or comments.',
+    'Notify me of follow-up comments by email.',
+    '### Leave a Reply [Cancel reply](/2024/01/31/suspiria-1977-review/#respond)',
+  ]
+  for (const line of lines) {
+    assert.ok(isSolicitationLine(line), `solicitation: ${line.slice(0, 48)}`)
+  }
+  assert.equal(stripSolicitationLines(lines.join('\n')).trim(), '')
+})
+
+/**
+ * THE FALSE POSITIVE THE AUDIT CAUGHT BEFORE IT SHIPPED. A bare `subscribe to`
+ * matched a real sentence of criticism at 87 visible characters, and a bare
+ * `sign up for` is the same shape — so every entry names its object. A
+ * sentence terminator is NOT the guard, because a solicitation is frequently a
+ * whole sentence.
+ */
+test('criticism that happens to use those verbs is kept', () => {
+  const prose = [
+    'Viewers who subscribe to the idea that horror must explain itself are poorly served here.',
+    'Argento declined to sign up for the kind of ending that resolves anything.',
+    'The academy asks its students to join its own closed world.',
+    'Tovoli lit the corridors to follow us through them.',
+  ]
+  for (const line of prose) {
+    assert.ok(!isSolicitationLine(line), `prose: ${line.slice(0, 48)}`)
+  }
+})
+
+test('a long paragraph mentioning a newsletter is not a solicitation', () => {
+  const para =
+    'The podcast circuit around the film has grown steadily since the restoration, and the ' +
+    'anniversary brought a round of retrospectives, interviews and at least one newsletter ' +
+    'devoted entirely to tracing its influence through four decades of horror production.'
+  assert.ok(!isSolicitationLine(para))
+})
+
+/**
+ * The strips compose in `cleanSourceText`, and markup goes before the line
+ * tests: a card line has to stop being a partly-link line before the
+ * navigation run counter sees it.
+ */
+test('a card strip plus a menu run clears a related-posts block', () => {
+  const page = [
+    '# Suspiria (1977) Review',
+    '',
+    'Argento lit the corridors in flat primaries until the architecture reads as a threat.',
+    '',
+    '## Related Posts',
+    '[![One](https://x.test/1.jpg)](https://x.test/1)',
+    '[![Two](https://x.test/2.jpg)](https://x.test/2)',
+    '[![Three](https://x.test/3.jpg)](https://x.test/3)',
+    '[![Four](https://x.test/4.jpg)](https://x.test/4)',
+    '[![Five](https://x.test/5.jpg)](https://x.test/5)',
+    '',
+    '**Want to Support the Show?** [Become a Patron](https://www.patreon.com/bePatron?u=1)',
+  ].join('\n')
+  const { text } = cleanSourceText(page)
+  assert.ok(text.includes('flat primaries'), 'the prose survives')
+  assert.ok(!text.includes('x.test'), 'every card is gone')
+  assert.ok(!text.includes('Patron'), 'the solicitation is gone')
+})
+
+test('cleaning still never empties a document', () => {
+  // A page that is nothing but furniture returns UNCHANGED - deciding a whole
+  // page is worthless is sourceQuality's job, with evidence behind it.
+  const allFurniture = '[![A](https://x.test/a.jpg)](https://x.test/a)\nSubscribe to our newsletter'
+  const { text, stripped } = cleanSourceText(allFurniture)
+  assert.equal(text, allFurniture)
+  assert.equal(stripped, 0)
 })

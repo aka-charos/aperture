@@ -221,17 +221,24 @@ export function buildSourceJudgmentRequest(
         `and comes from ${source.domain}; documents.${key}.excerpt is how it begins. ` +
         `Would a writer describing that ${noun} find material in it - criticism or analysis of it, ` +
         `facts about how it was made or who made it, or what critics said about it? ` +
-        `Judge the page in front of you, not the reputation of the site. ` +
-        `A page can be well written, on a respected site, and still carry nothing about this ${noun}.`,
+        `IS THE MATERIAL ON THE PAGE AS TEXT, or is it somewhere the page only points at? ` +
+        `A page whose substance is an audio or video recording carries nothing, however well its ` +
+        `blurb describes the ${noun} and however much it names what the recording covers. ` +
+        `Judge the page in front of you, not the reputation of the site: a page can be well ` +
+        `written, on a respected site, and still carry nothing about this ${noun}.`,
       criteria: {
         true:
-          `It carries writing about this ${noun}: someone's account of what it does, how it works or what it means; ` +
-          `facts about its making, its credits or its release; or quoted verdicts from critics, including a review ` +
-          `aggregator's page of critic blurbs or an encyclopedia's production and reception sections`,
+          `The material is written out on the page: someone's account of what it does, how it works or what ` +
+          `it means; facts about its making, its credits or its release; or critics' verdicts quoted in full ` +
+          `enough to use, which includes a review aggregator's page of critic blurbs and an encyclopedia's ` +
+          `production and reception sections`,
         false:
-          `It carries none of that: listings, where-to-watch or store pages; a cast or crew table with no prose; ` +
-          `a plot summary and nothing else; forum, comment or social threads of viewers' opinions; a page promoting ` +
-          `a video, podcast or interview whose content is not written out on the page; or navigation and boilerplate`,
+          `It carries none of that: a blurb for an audio or video recording that is not transcribed on the page, ` +
+          `however much it names what that recording covers; a statement of the work's standing with nobody ` +
+          `behind it, such as that it is widely regarded as a classic of its genre; listings, where-to-watch or ` +
+          `store pages; a cast or crew table with no prose; a plot summary and nothing else; forum, comment or ` +
+          `social threads of viewers' opinions; a question-and-answer or ending-explained page assembled around ` +
+          `the plot; or navigation and boilerplate`,
       },
     }
   })
@@ -318,16 +325,34 @@ export const SOURCE_FILTER_TEST_ARTICLE: AnalysisSource = {
     'entirely by surfaces, and the surfaces do not let up.',
 }
 
+/**
+ * THE HARD CASE, not the easy one. The podcast note the filter correctly
+ * dropped at 0.16 was the first choice here and it tests nothing: it is mostly
+ * subscribe-and-Patreon, so any reading of the criteria rejects it.
+ *
+ * This is the BFI page's shape instead - verified against the live page, which
+ * is three paragraphs and nothing else: a sentence of reputation, a plug for a
+ * restoration, and a list of what a filmed interview covers. It describes the
+ * film WELL, in the vocabulary of criticism, and carries nothing, which is why
+ * it scored above the bar on the live bench while the podcast note did not. A
+ * probe that cannot separate this from a review is not telling the operator
+ * anything they need.
+ */
 export const SOURCE_FILTER_TEST_NOISE: AnalysisSource = {
-  title: 'The Film Stage Show Classic — Suspiria (1977)',
-  domain: 'thefilmstage.com',
+  title: 'Argento on Suspiria - a video inquiry | Sight and Sound',
+  domain: 'bfi.org.uk',
   text:
-    'This week on The Film Stage Show Classic, we discuss Dario Argento\'s Suspiria (1977). ' +
-    'Listen below and subscribe on Apple Podcasts, Spotify, or wherever you get your podcasts. ' +
-    'Follow us on social media for episode announcements. Subscribe to our newsletter. ' +
-    'Running time: 1 hour 12 minutes. Previous episodes in this series covered Don\'t Look Now, ' +
-    'The Wicker Man, and Picnic at Hanging Rock. Support the show on Patreon. ' +
-    'The Film Stage Show is produced weekly. Rate and review us to help others find the show.',
+    'The master of giallo looks back on his horror masterpiece at 40 in this celebratory video ' +
+    'interview. Since its release in 1977, Dario Argento\'s supernatural slasher Suspiria has ' +
+    'gained a reputation as not just his own greatest work but, with its hallucinogenic ' +
+    'storytelling, bravura set piece slayings and Goblin\'s pulsating prog rock score, as one of ' +
+    'the key horror films of all time. The 40th anniversary produced a valedictory world tour and ' +
+    'a stunning new restoration which showcases the film\'s vibrant palette in all its deep red ' +
+    'glory. We caught up with Argento in London to discuss the many - including some highly ' +
+    'unlikely - influences on Suspiria, why he broke away from the giallo thriller genre, his ' +
+    'thoughts on working with women and how he influenced Goblin\'s musical direction with an ' +
+    'impromptu trip to Greece. And though Argento has talked many times about the film, this ' +
+    'video sheds fascinating new light on his creative inspirations.',
 }
 
 /** Filler so the probe is the SIZE a real request would be. See `testSourceFilter`. */
@@ -352,13 +377,32 @@ export interface JudgedSource {
   score: number | null
 }
 
+export interface JudgedSourceScore {
+  domain: string
+  title: string
+  /** P(worth reading), or null when the model did not answer for it. */
+  score: number | null
+  chars: number
+  kept: boolean
+}
+
 export interface SourceJudgmentOutcome {
   kept: AnalysisSource[]
   /** What was dropped and why, for the retrieval log and the bench report. */
   dropped: Array<{ domain: string; title: string; score: number; chars: number }>
+  /**
+   * EVERY document's score, kept and dropped alike, in relevance order.
+   *
+   * Reporting only the drops was a real instrument gap: on the first live run
+   * `bfi.org.uk` survived and nothing could say whether it scored 0.26 — the
+   * bar a hair too strict — or 0.92, the criteria wrong. Those need opposite
+   * fixes, and the one number that separates them was the one number not
+   * printed. A filter nobody can see the near-misses of cannot be tuned.
+   */
+  scores: JudgedSourceScore[]
   /** Documents the model answered for. Below `kept.length` means a partial answer. */
   answered: number
-  /** True when the floor stopped a drop the model asked for. */
+  /** True when a rail stopped a drop the model asked for. */
   floored: boolean
 }
 
@@ -413,6 +457,13 @@ export function decideJudgedSources(judged: readonly JudgedSource[]): SourceJudg
   }
 
   return {
+    scores: judged.map((entry, index) => ({
+      domain: entry.source.domain,
+      title: entry.source.title,
+      score: entry.score,
+      chars: entry.source.text.length,
+      kept: !dropping.has(index),
+    })),
     kept: judged.filter((_, index) => !dropping.has(index)).map((entry) => entry.source),
     dropped: judged
       .map((entry, index) => ({ entry, index }))

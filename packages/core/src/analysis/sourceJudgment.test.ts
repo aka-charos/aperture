@@ -214,9 +214,58 @@ test('the criteria name the aggregator and the encyclopedia as worth keeping', (
   assert.ok(criteria)
   assert.ok(criteria.true.includes('aggregator'))
   assert.ok(criteria.true.includes('encyclopedia'))
-  for (const noise of ['forum', 'podcast', 'plot summary', 'where-to-watch']) {
+  for (const noise of ['forum', 'plot summary', 'where-to-watch']) {
     assert.ok(criteria.false.includes(noise), noise + ' is named as noise')
   }
+})
+
+/**
+ * THE TEST IS THE MEDIUM OF THE SUBSTANCE, NOT ITS SOURCE, and the first draft
+ * got that wrong in a way that would have cost the one document that matters.
+ *
+ * It asked whether the page "says what it knows, or only says that something
+ * elsewhere knows it" - and Metacritic says "the New York Times knows this,
+ * and here is what it said". It points elsewhere AND writes the substance out,
+ * so that phrasing invites dropping the page both correct critic attributions
+ * in the 17-vs-18 bench came from. The same draft also named "a score
+ * round-up" as noise, which Metacritic literally is.
+ *
+ * So the question asks whether the material is ON THE PAGE AS TEXT. BFI's
+ * Suspiria page fails it (a video, verified on the live page: three paragraphs
+ * of blurb and a list of what the interview covers, no transcript), The Film
+ * Stage fails it (audio), and every aggregator passes it.
+ */
+test('the question asks about the medium of the substance, not its source', () => {
+  const { instructions, criteria } = buildSourceJudgmentRequest(SUBJECT, [source('a.com', 'A')])
+    .questions.d1
+  assert.ok(instructions.includes('IS THE MATERIAL ON THE PAGE AS TEXT'))
+  assert.ok(instructions.includes('audio or video recording carries nothing'))
+  assert.ok(criteria)
+  assert.ok(criteria.true.includes('written out on the page'))
+  assert.ok(criteria.false.includes('not transcribed on the page'))
+  // The naming-what-it-covers clause: BFI's whole substance is that list.
+  assert.ok(criteria.false.includes('names what that recording covers'))
+  // And nothing anywhere may read as "an aggregator is a pointer".
+  assert.ok(!/score round-?up/i.test(criteria.false))
+})
+
+/**
+ * A STATEMENT OF STANDING IS NOT AN ACCOUNT. "has gained a reputation as one
+ * of the key horror films of all time" is nobody's view, unquotable, and is
+ * what the prompt's own source rule calls an encyclopedia's summary of what
+ * critics think. The first draft instead asked for an account that was
+ * "specific or argued", which F-124 settled in the other direction: for an
+ * obscure film a plain genre description is the only available answer, and the
+ * whole feature errs toward keeping.
+ */
+test('a statement of standing is named as noise, and plain description is not', () => {
+  const { criteria } = buildSourceJudgmentRequest(SUBJECT, [source('a.com', 'A')]).questions.d1
+  assert.ok(criteria)
+  assert.ok(criteria.false.includes("statement of the work's standing"));
+  assert.ok(criteria.false.includes('widely regarded as'))
+  // Nothing requires an account to be argued, which would drop the only
+  // document an obscure title has.
+  assert.ok(!/\bargued\b/.test(criteria.true))
 })
 
 // ============================================================================
@@ -370,8 +419,17 @@ test('the probe documents are a real article and a real noise page', () => {
   // The article names craft; the noise page names subscription furniture. If
   // these two ever read alike the probe cannot report `discriminates`.
   assert.ok(/Tovoli|celesta|Eastmancolor/.test(SOURCE_FILTER_TEST_ARTICLE.text))
-  assert.ok(/subscribe|Patreon|newsletter/i.test(SOURCE_FILTER_TEST_NOISE.text))
-  assert.ok(!/subscribe|Patreon/i.test(SOURCE_FILTER_TEST_ARTICLE.text))
+  // The noise page is the HARD case: it describes the film in the vocabulary
+  // of criticism and carries nothing, which is why it cleared the bar on the
+  // live bench where a podcast note did not. Its tells are a recording it only
+  // points at, and a statement of standing.
+  assert.ok(/video interview/i.test(SOURCE_FILTER_TEST_NOISE.text))
+  assert.ok(/gained a reputation/i.test(SOURCE_FILTER_TEST_NOISE.text))
+  assert.ok(/discuss the many/i.test(SOURCE_FILTER_TEST_NOISE.text), 'names what the interview covers')
+  // And it must NOT be separable by vocabulary alone - it uses film-talk too,
+  // so a probe that passes on keyword contrast is not testing the criteria.
+  assert.ok(/storytelling|score|palette/i.test(SOURCE_FILTER_TEST_NOISE.text))
+  assert.ok(!/video interview|gained a reputation/i.test(SOURCE_FILTER_TEST_ARTICLE.text))
   // Both name the film, so `isOffTopic`'s question is not what is being asked.
   for (const doc of [SOURCE_FILTER_TEST_ARTICLE, SOURCE_FILTER_TEST_NOISE]) {
     assert.ok(/Suspiria|Argento/.test(doc.text + doc.title))
@@ -388,7 +446,7 @@ test('the probe documents go first, so their keys are stable', () => {
   assert.equal(request.keys[1], 'd2')
   const documents = request.state.documents as Record<string, { site: string }>
   assert.equal(documents.d1.site, 'deepfocusreview.com')
-  assert.equal(documents.d2.site, 'thefilmstage.com')
+  assert.equal(documents.d2.site, 'bfi.org.uk')
 })
 
 // ============================================================================

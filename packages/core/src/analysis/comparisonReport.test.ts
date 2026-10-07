@@ -554,3 +554,64 @@ test('an empty dropped list is a real answer, not an absent one', () => {
   assert.notEqual(report, null)
   assert.match(judgedSourcesLines(report)[0], /ruled none of them out/)
 })
+
+/**
+ * THE NEAR-MISSES ARE THE POINT. With only the drops printed, a page that
+ * survived left nothing to reason about: on the first live run `bfi.org.uk`
+ * was kept and the report could not say whether it scored just over the bar or
+ * nowhere near it — a bar problem and a criteria problem, with opposite fixes.
+ */
+test('every score is printed, worst first, kept and dropped alike', () => {
+  const lines = judgedSourcesLines({
+    dropped: [{ domain: 'thefilmstage.com', title: 'Podcast', score: 0.16, chars: 1_551 }],
+    scores: [
+      { domain: 'deepfocusreview.com', score: 0.98, kept: true },
+      { domain: 'thefilmstage.com', score: 0.16, kept: false },
+      { domain: 'bfi.org.uk', score: 0.41, kept: true },
+      { domain: 'metacritic.com', score: null, kept: true },
+    ],
+    floored: false,
+  })
+  const table = lines.join('\n')
+  assert.match(table, /What it scored every document, worst first/)
+  // Worst first: the drop, then the near-miss, then the good one, then the
+  // unanswered — which sorts last because a null is not a low score.
+  const order = lines.filter((l) => /kept|dropped/.test(l)).map((l) => l.trim().split(/\s+/).pop())
+  assert.deepEqual(order, [
+    'thefilmstage.com',
+    'bfi.org.uk',
+    'deepfocusreview.com',
+    'metacritic.com',
+  ])
+  assert.match(table, /0\.41\s+kept\s+bfi\.org\.uk/)
+  assert.match(table, /not answered\s+kept\s+metacritic\.com/)
+})
+
+test('a run stored before scores were carried prints the drops alone', () => {
+  const lines = judgedSourcesLines({
+    dropped: [{ domain: 'a.com', title: 'A', score: 0.1, chars: 900 }],
+    floored: false,
+  })
+  assert.ok(!lines.some((l) => /worst first/.test(l)))
+  assert.match(lines[0], /ruled out 1 further document/)
+})
+
+test('scores survive the reader, and a malformed entry is dropped from them', () => {
+  const report = readJudgedSourceReport({
+    dropped: [],
+    scores: [
+      { domain: 'a.com', score: 0.9, kept: true },
+      { domain: 'b.com', score: 'high', kept: true },
+      'nope',
+      { score: 0.2, kept: false },
+    ],
+    floored: false,
+  })
+  assert.deepEqual(report?.scores, [
+    { domain: 'a.com', score: 0.9, kept: true },
+    // An unreadable score is null — not answered — rather than discarded, since
+    // the page was still in the request.
+    { domain: 'b.com', score: null, kept: true },
+    { domain: '(unknown host)', score: 0.2, kept: false },
+  ])
+})

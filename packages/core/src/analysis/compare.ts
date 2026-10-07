@@ -387,6 +387,11 @@ async function driveComparison(
           retrieval.judged
             ? JSON.stringify({
                 dropped: retrieval.judged.dropped,
+                scores: retrieval.judged.scores.map((s) => ({
+                  domain: s.domain,
+                  score: s.score,
+                  kept: s.kept,
+                })),
                 floored: retrieval.judged.floored,
               })
             : null,

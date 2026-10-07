@@ -94,7 +94,7 @@ const PLOT_HEADING =
  * reciting them.
  */
 const FURNITURE_HEADING =
-  /^(#{1,6})\s*(?:where to watch|movie clips|more like this|related movie news|more from this title|more to explore|recently viewed|my rating|videos|photos|cast & crew|cast and crew|share|advertisement|follow .{0,24} on social|get the .{0,24} app)\s*:?\s*$/i
+  /^(#{1,6})\s*(?:where to watch|movie clips|more like this|related movie news|more from this title|more to explore|recently viewed|my rating|videos|photos|cast & crew|cast and crew|share|advertisement|follow .{0,24} on social|get the .{0,24} app|reader interactions|primary sidebar|related posts?|other things to explore|about the author|subscribe to (?:our )?(?:podcast|newsletter)|follow us.{0,30}|talk to us.{0,30}|search for.{0,10})\s*:?\s*$/i
 
 const HEADING = /^(#{1,6})\s/
 
@@ -292,6 +292,157 @@ export function stripWidgetLines(text: string): string {
     .join('\n')
 }
 
+// ============================================================================
+// Markup that carries nothing to a reader of text
+// ============================================================================
+
+/**
+ * Drop every markdown image, and the thumbnail cards built out of them.
+ *
+ * AN IMAGE IS WORTH NOTHING TO A MODEL READING TEXT, and its alt text is almost
+ * never a caption. Measured across the Suspiria retrieval: `![](…jpg)` with no
+ * alt at all on the Ebert-site essay, `![ff-suspiria-featured](…)` - a
+ * filename - nine times on one blog, `![Suspiria](…poster.jpg)` repeating the
+ * title it sits under, and Metacritic's recommendation grid carrying each
+ * related film's poster TWICE per card.
+ *
+ * THE NESTED FORM IS A CARD, not an image: `[![alt](img)](url)` is a thumbnail
+ * that links somewhere, which is how every "related posts" strip is built. The
+ * image goes first, which leaves `[](url)`, which {@link stripEmptyLinks}
+ * removes, which leaves a blank line the run and whitespace logic already know
+ * what to do with. THAT ORDERING IS THE POINT: these two strips are what make
+ * the LINE tests work on a page built from cards, because a card line stops
+ * being a partly-link line and starts being nothing.
+ *
+ * Safe against `isOffTopic`'s arithmetic by ORDER, not by luck:
+ * `dropLowValueSources` runs before `cleanSources`, so the mention count is
+ * taken on uncleaned text. Were that reversed this would matter, since alt
+ * text frequently repeats the title.
+ */
+export function stripImages(text: string): string {
+  // Bracket-free inside the label so an alt text carrying one cannot swallow
+  // the rest of the line, and one level of nested parens in the URL because
+  // image paths carry them.
+  return text.replace(/!\[[^\]\n]*\]\([^()\s]*(?:\([^()]*\))?[^()\s]*\)/g, '')
+}
+
+/**
+ * Drop a link with no label.
+ *
+ * `[](https://www.slantmagazine.com/dvd/suspiria-dvd/#respond)` is zero
+ * information: no words, and a URL no reader will ever see. It is what a
+ * comment anchor, a bare permalink and a stripped thumbnail leave behind.
+ */
+export function stripEmptyLinks(text: string): string {
+  return text.replace(/\[\s*\]\([^()\s]*\)/g, '')
+}
+
+/**
+ * Drop a link whose whole label is a number.
+ *
+ * `[0](https://…/suspiria-1977-review/#respond)` is a comment count, and the
+ * same shape carries vote and reply tallies across every blog in the
+ * retrieval. The LINK goes and the line stays, because that one sits on the
+ * byline - "By [Max Allen](…) on January 31, 2024 [0](…)" - and the byline is
+ * what `namesFromDocuments` reads a critic's name out of.
+ */
+export function stripCountLinks(text: string): string {
+  return text.replace(/\[\s*[\d,.]{1,7}\s*\]\([^()\s]*\)/g, '')
+}
+
+/**
+ * Phrases that are a site asking for something rather than saying something.
+ *
+ * MEASURED, NOT IMAGINED: every one is in the Suspiria retrieval - "Want to
+ * Support the Show? Spend on Amazon Become a Patron" on a horror podcast's
+ * review, "Subscribe on iTunes or see below to stream" and "Enter our
+ * giveaways" on the page the filter dropped, "Subscribe to our Weekly
+ * newsletter" above a generated review, "Follow Us Like a Predator".
+ *
+ * No question in the prompt can use any of it, and it is the one kind of
+ * furniture carrying real words - so no link rule and no widget rule can see
+ * it.
+ *
+ * EVERY ENTRY NAMES ITS OBJECT, which the first draft did not. A bare
+ * `subscribe to` matched "viewers who subscribe to the idea that horror must
+ * explain itself", a real sentence of criticism at 87 visible characters; a
+ * bare `sign up for` is the same shape. A sentence terminator is NOT the guard
+ * to use here, because a solicitation is frequently a whole sentence - naming
+ * the newsletter, the podcast or the show is.
+ */
+const SOLICITATION = new RegExp(
+  [
+    'become a patron',
+    'support (?:the show|us) on',
+    'spend on amazon',
+    'subscribe (?:on|below)\\b',
+    // THE OBJECT HAS TO BE THE THING, not just a determiner. "subscribe to
+    // (our|the|my)" was the first attempt and it matched "viewers who subscribe
+    // to THE IDEA that horror must explain itself" - a real sentence of
+    // criticism, 87 visible characters, caught. The noun is the guard.
+    'subscribe to (?:our|the|my)[^.]{0,20}?(?:newsletter|podcast|show|channel|feed|mailing list)',
+    'sign up (?:for|to) (?:our|the)[^.]{0,20}?(?:newsletter|list|updates)',
+    'enter our giveaways?',
+    'join our\\b',
+    'our (?:weekly |semi-regular )?newsletter',
+    // "follow us on Twitter", never a bare "follow us" - "Tovoli lit the
+    // corridors to follow us through them" is prose.
+    'follow (?:us|me) on\\b',
+    'buy tickets',
+    'add (?:to|my) watchlist',
+    'rate and review',
+    'leave a reply',
+    'notify me of',
+  ].join('|'),
+  'i'
+)
+
+/**
+ * How much visible text a solicitation line may carry.
+ *
+ * Measured on the line's VISIBLE text - links reduced to their labels -
+ * because the Amazon entry is mostly a 200-character affiliate URL and would
+ * clear any raw-length bound while reading as eleven words. A ceiling is what
+ * keeps a paragraph that happens to mention a newsletter out of this.
+ */
+const SOLICITATION_MAX_CHARS = 140
+
+/**
+ * Furniture words that are a whole line on their own, with no heading marker.
+ *
+ * `FURNITURE_HEADING` needs a `#` to know where a section ends, so it cannot
+ * see these: Metacritic prints "Advertisement" as a bare line twice in one
+ * document, and the same word is the commonest standalone line in the whole
+ * retrieval. An EXACT list, matched whole, because the risk of a prefix match
+ * here is a sentence.
+ */
+const BARE_FURNITURE =
+  /^(?:advertisement|advertisements|sponsored|promoted content|read more|share this|related|loading\.{0,3}|skip to content|menu|close|search)\.?$/i
+
+/** A line's words, with every URL dropped and every link reduced to its label. */
+function visibleText(line: string): string {
+  return line
+    .replace(/\]\([^()\s]*\)/g, ']')
+    .replace(/[#*_`>|[\]!]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+export function isSolicitationLine(line: string): boolean {
+  const visible = visibleText(line)
+  if (visible.length === 0 || visible.length > SOLICITATION_MAX_CHARS) return false
+  if (BARE_FURNITURE.test(visible)) return true
+  return SOLICITATION.test(visible)
+}
+
+/** Drop those lines. One is junk on its own, so no run is required. */
+export function stripSolicitationLines(text: string): string {
+  return text
+    .split('\n')
+    .filter((line) => !isSolicitationLine(line))
+    .join('\n')
+}
+
 export interface CleanableSource {
   domain: string
   text: string
@@ -305,8 +456,13 @@ export interface CleanedSource {
 
 /** One page cleaned, or returned untouched when cleaning would empty it. */
 export function cleanSourceText(text: string): { text: string; stripped: number } {
+  // MARKUP FIRST, LINES SECOND. Images and empty links are removed before any
+  // line test runs, because that is what turns a thumbnail card from a
+  // partly-link line - which breaks a navigation run - into a blank one, which
+  // bridges it. Solicitation lines go in the same pass for the same reason.
+  const markup = stripSolicitationLines(stripCountLinks(stripEmptyLinks(stripImages(text))))
   const cleaned = stripWidgetLines(
-    stripFurnitureSections(stripPlotSections(stripNavigationRuns(text)))
+    stripFurnitureSections(stripPlotSections(stripNavigationRuns(markup)))
   )
     .replace(/\n{3,}/g, '\n\n')
     .trim()

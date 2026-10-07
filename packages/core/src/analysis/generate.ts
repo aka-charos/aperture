@@ -689,6 +689,13 @@ export async function retrieveSources(
       // means the list below is what every mechanical filter left.
       judged: judged.status,
       judgedOut: judged.outcome?.dropped.length ?? 0,
+      // EVERY score, so the container log answers what the bench report
+      // answers: was a page that survived near the bar, or nowhere near it.
+      // With only the drops recorded, a kept document left nothing to reason
+      // about and the bar could not be told apart from the criteria.
+      judgedScores: judged.outcome?.scores.map(
+        (s) => `${s.domain} ${s.score == null ? '-' : s.score.toFixed(2)}${s.kept ? '' : ' DROPPED'}`
+      ),
       domains: sources.map((s) => s.domain),
       // Survives the budget, which is the number that matters: a criticism
       // page found and then dropped for space is not a criticism page read.

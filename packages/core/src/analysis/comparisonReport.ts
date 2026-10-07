@@ -149,6 +149,12 @@ export interface ComparisonReport {
 
 export interface JudgedSourceReport {
   dropped: Array<{ domain: string; title: string; score: number; chars: number }>
+  /**
+   * Every document's score, kept and dropped alike. Absent on runs stored
+   * before it was carried, which is why the renderer falls back to printing
+   * the drops alone rather than claiming nothing was near the bar.
+   */
+  scores?: Array<{ domain: string; score: number | null; kept: boolean }>
   /** A rail stopped a drop the model asked for: this retrieval was mostly noise. */
   floored: boolean
 }
@@ -171,7 +177,7 @@ export interface JudgedSourceReport {
  */
 export function readJudgedSourceReport(value: unknown): JudgedSourceReport | null {
   if (!value || typeof value !== 'object') return null
-  const raw = value as { dropped?: unknown; floored?: unknown }
+  const raw = value as { dropped?: unknown; scores?: unknown; floored?: unknown }
   if (!Array.isArray(raw.dropped)) return null
   const dropped: JudgedSourceReport['dropped'] = []
   for (const entry of raw.dropped) {
@@ -187,7 +193,19 @@ export function readJudgedSourceReport(value: unknown): JudgedSourceReport | nul
       chars: typeof d.chars === 'number' && Number.isFinite(d.chars) ? d.chars : 0,
     })
   }
-  return { dropped, floored: raw.floored === true }
+  const scores = Array.isArray(raw.scores)
+    ? raw.scores.flatMap((entry) => {
+        if (!entry || typeof entry !== 'object') return []
+        const s = entry as Record<string, unknown>
+        const score = typeof s.score === 'number' && Number.isFinite(s.score) ? s.score : null
+        return [{
+          domain: typeof s.domain === 'string' ? s.domain : '(unknown host)',
+          score,
+          kept: s.kept === true,
+        }]
+      })
+    : undefined
+  return { dropped, ...(scores && scores.length > 0 ? { scores } : {}), floored: raw.floored === true }
 }
 
 const RULE = '='.repeat(72)
@@ -544,7 +562,31 @@ export function judgedSourcesLines(judged: JudgedSourceReport | null | undefined
       '  It wanted to drop more and was stopped by the floor, so what survives includes pages it ruled out.'
     )
   }
+  for (const line of scoreLines(judged)) lines.push(line)
   return lines
+}
+
+/**
+ * Every document's score, worst first.
+ *
+ * THE NEAR-MISSES ARE THE POINT. With only the drops printed, a page that
+ * survived left nothing to reason about: on the first live run `bfi.org.uk`
+ * was kept and the report could not say whether it scored just over the bar or
+ * nowhere near it, which are a bar problem and a criteria problem and have
+ * opposite fixes. Worst first so the ones closest to going are read first.
+ */
+function scoreLines(judged: JudgedSourceReport): string[] {
+  const scores = judged.scores
+  if (!scores || scores.length === 0) return []
+  const ranked = [...scores].sort((a, b) => (a.score ?? 2) - (b.score ?? 2))
+  return [
+    '  What it scored every document, worst first:',
+    ...ranked.map(
+      (s) =>
+        `    ${s.score == null ? ' not answered' : s.score.toFixed(2).padStart(13)}  ` +
+        `${s.kept ? 'kept   ' : 'dropped'}  ${s.domain}`
+    ),
+  ]
 }
 
 function promptName(entry: { promptVersion: number; promptVariant?: string | null }): string {
