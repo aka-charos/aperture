@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   MIN_SOURCES_AFTER_JUDGMENT,
+  MIN_SUBSTANTIVE_AFTER_JUDGMENT,
   MIN_SOURCE_SAMPLE_CHARS,
   SOURCE_JUDGMENT_EXCERPT_BUDGET,
   SOURCE_DROP_AT_OR_BELOW,
@@ -388,4 +389,93 @@ test('the probe documents go first, so their keys are stable', () => {
   const documents = request.state.documents as Record<string, { site: string }>
   assert.equal(documents.d1.site, 'deepfocusreview.com')
   assert.equal(documents.d2.site, 'thefilmstage.com')
+})
+
+// ============================================================================
+// The substantive rail
+// ============================================================================
+
+const BIG = 'A real sentence about the film. '.repeat(40) // ~1,280 chars
+const THIN = 'Short page.' // under MIN_SUBSTANTIVE_SOURCE_CHARS
+
+function mixed(spec: Array<{ score: number | null; big: boolean }>): JudgedSource[] {
+  return spec.map((s, i) => ({
+    source: source(`s${i}.com`, `Doc ${i}`, s.big ? BIG : THIN),
+    score: s.score,
+  }))
+}
+
+/**
+ * THE RAIL THAT GUARDS THE FLOOR THAT ACTUALLY DECLINES. The count rail says
+ * nothing about `decideAnalysisFloor`, which counts documents of at least
+ * MIN_SUBSTANTIVE_SOURCE_CHARS and stores a DECLINE below two of them —
+ * retiring the title until the staleness floor moves.
+ */
+test('the substantive rail stops a drop the count rail would allow', () => {
+  // Eight documents, three substantive, all three condemned. The count rail
+  // alone would drop all three (8 - 4 = 4 drops available) and leave zero.
+  const outcome = decideJudgedSources(
+    mixed([
+      { score: 0.02, big: true },
+      { score: 0.03, big: true },
+      { score: 0.04, big: true },
+      { score: 0.9, big: false },
+      { score: 0.9, big: false },
+      { score: 0.9, big: false },
+      { score: 0.9, big: false },
+      { score: 0.9, big: false },
+    ])
+  )
+  const keptBig = outcome.kept.filter((s) => s.text.length >= 600).length
+  assert.equal(keptBig, MIN_SUBSTANTIVE_AFTER_JUDGMENT, 'never below the decline floor')
+  assert.equal(outcome.dropped.length, 1, 'only the worst substantive one goes')
+  assert.equal(outcome.floored, true)
+})
+
+/**
+ * CONTINUE, NOT BREAK. A protected article must not shield the thin pages
+ * below it — those are usually exactly what the filter exists to remove.
+ */
+test('a barred substantive document does not stop later thin drops', () => {
+  // EXACTLY the substantive floor, so the worst-scoring document is barred:
+  // dropping it would leave one, and `decideAnalysisFloor` declines below two.
+  const outcome = decideJudgedSources(
+    mixed([
+      { score: 0.01, big: true }, // worst, substantive, and barred
+      { score: 0.05, big: false }, // must still go
+      { score: 0.06, big: false }, // must still go
+      { score: 0.9, big: true }, // the other substantive one
+      { score: 0.9, big: false },
+      { score: 0.9, big: false },
+      { score: 0.9, big: false },
+    ])
+  )
+  assert.deepEqual(outcome.dropped.map((d) => d.title).sort(), ['Doc 1', 'Doc 2'])
+  assert.ok(
+    outcome.kept.some((s) => s.title === 'Doc 0'),
+    'the protected article survives'
+  )
+  assert.equal(outcome.floored, true, 'a barred drop is reported')
+})
+
+test('with substantive documents to spare the rail is invisible', () => {
+  const outcome = decideJudgedSources(
+    mixed([
+      { score: 0.02, big: true },
+      { score: 0.9, big: true },
+      { score: 0.9, big: true },
+      { score: 0.9, big: true },
+      { score: 0.9, big: true },
+    ])
+  )
+  assert.equal(outcome.dropped.length, 1)
+  assert.equal(outcome.floored, false)
+})
+
+test('a retrieval with no substantive documents is still bounded by the count rail', () => {
+  const outcome = decideJudgedSources(
+    mixed(Array.from({ length: 9 }, () => ({ score: 0.01, big: false })))
+  )
+  assert.equal(outcome.kept.length, MIN_SOURCES_AFTER_JUDGMENT)
+  assert.equal(outcome.floored, true)
 })

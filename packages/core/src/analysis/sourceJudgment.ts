@@ -37,6 +37,7 @@
  */
 import type { SystemOneQuestion } from '../lib/decisionModelRules.js'
 import { readNoul } from '../lib/decisionModelRules.js'
+import { MIN_SUBSTANTIVE_SOURCES, MIN_SUBSTANTIVE_SOURCE_CHARS } from './sourceFloor.js'
 import type { AnalysisSource, AnalysisSubject } from './prompt.js'
 
 /**
@@ -121,6 +122,29 @@ export const SOURCE_DROP_AT_OR_BELOW = 0.25
  * three documents keeps all three, because `maxDrops` goes to zero.
  */
 export const MIN_SOURCES_AFTER_JUDGMENT = 4
+
+/**
+ * Substantive documents the filter will never go below — the SECOND rail, and
+ * the one that answers the floor `decideAnalysisFloor` actually reads.
+ *
+ * THE FIRST VERSION GUARDED THE WRONG QUANTITY. `MIN_SOURCES_AFTER_JUDGMENT`
+ * counts documents; the decline floor counts documents of at least
+ * `MIN_SUBSTANTIVE_SOURCE_CHARS` and declines a title at fewer than
+ * `MIN_SUBSTANTIVE_SOURCES` of those. Nothing connected the two, so a filter
+ * obeying its own floor perfectly could still drop a title past the one that
+ * matters — and a decline is STORED, retiring the title until
+ * `ANALYSIS_STALE_BELOW` moves.
+ *
+ * It is unlikely rather than impossible, because `budgetSources` hands fewer
+ * survivors bigger slices and pushes substantive counts UP. That is an
+ * argument for the probability, not for leaving two floors measuring different
+ * things with nothing holding them together.
+ *
+ * Measured against the SAMPLE the model was shown, not the budgeted text: this
+ * runs before `budgetSources`, so a survivor's slice can only grow from here.
+ * Judging by pre-budget length is therefore the conservative direction.
+ */
+export const MIN_SUBSTANTIVE_AFTER_JUDGMENT = MIN_SUBSTANTIVE_SOURCES
 
 /** The question key for the document at `index`: d1, d2, d3. */
 export function sourceJudgmentKey(index: number): string {
@@ -352,14 +376,41 @@ export interface SourceJudgmentOutcome {
  */
 export function decideJudgedSources(judged: readonly JudgedSource[]): SourceJudgmentOutcome {
   const answered = judged.filter((j) => j.score != null).length
-  const maxDrops = Math.max(0, judged.length - MIN_SOURCES_AFTER_JUDGMENT)
 
   const condemned = judged
     .map((entry, index) => ({ ...entry, index }))
     .filter((entry) => entry.score != null && entry.score <= SOURCE_DROP_AT_OR_BELOW)
     .sort((a, b) => (a.score as number) - (b.score as number))
 
-  const dropping = new Set(condemned.slice(0, maxDrops).map((entry) => entry.index))
+  // TWO RAILS, checked per drop rather than as one subtraction, because they
+  // bind on different documents: the count rail is about how much material is
+  // left and the substantive rail is about whether `decideAnalysisFloor` will
+  // still store the result.
+  const substantial = (entry: JudgedSource) =>
+    entry.source.text.trim().length >= MIN_SUBSTANTIVE_SOURCE_CHARS
+
+  const dropping = new Set<number>()
+  let left = judged.length
+  let leftSubstantive = judged.filter(substantial).length
+  let blocked = false
+
+  for (const entry of condemned) {
+    if (left <= MIN_SOURCES_AFTER_JUDGMENT) {
+      blocked = true
+      break
+    }
+    if (substantial(entry) && leftSubstantive <= MIN_SUBSTANTIVE_AFTER_JUDGMENT) {
+      // CONTINUE, NOT BREAK. The substantive rail bars this document and says
+      // nothing about the thin ones further down the list, which are usually
+      // exactly what the filter exists to remove. Breaking here would let one
+      // protected article stop every later drop.
+      blocked = true
+      continue
+    }
+    dropping.add(entry.index)
+    left--
+    if (substantial(entry)) leftSubstantive--
+  }
 
   return {
     kept: judged.filter((_, index) => !dropping.has(index)).map((entry) => entry.source),
@@ -373,6 +424,6 @@ export function decideJudgedSources(judged: readonly JudgedSource[]): SourceJudg
         chars: entry.source.text.length,
       })),
     answered,
-    floored: condemned.length > dropping.size,
+    floored: blocked,
   }
 }

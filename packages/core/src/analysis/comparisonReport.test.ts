@@ -5,6 +5,7 @@ import { BENCH_PROMPT_VERSIONS, editionFor } from './prompt.js'
 import {
   criticismLine,
   judgedSourcesLines,
+  readJudgedSourceReport,
   lengthCapsFor,
   renderComparisonReport,
   type ComparisonEntry,
@@ -510,4 +511,46 @@ test('every length cap is a figure its own edition states', () => {
       )
     }
   }
+})
+
+/**
+ * A JSONB READ IS DRIVER OUTPUT, and the renderer formats a number off it —
+ * so a malformed row would throw inside `renderComparisonReport` and take the
+ * WHOLE report down, every entry and every prompt, rather than losing one
+ * line. Same trap this file documents for `ComparisonEntry.sections`.
+ */
+test('a malformed judged_sources row reads as not asked rather than throwing', () => {
+  for (const bad of [null, undefined, 42, 'nope', {}, { dropped: 'no' }, { floored: true }]) {
+    assert.equal(readJudgedSourceReport(bad), null, JSON.stringify(bad) + ' is not a report')
+  }
+})
+
+test('an entry with no usable score is skipped, not rendered as NaN', () => {
+  const report = readJudgedSourceReport({
+    dropped: [
+      { domain: 'a.com', title: 'A', score: 0.1, chars: 900 },
+      { domain: 'b.com', title: 'B', score: 'low', chars: 900 },
+      { domain: 'c.com', title: 'C', chars: 900 },
+      { domain: 'd.com', title: 'D', score: Number.NaN, chars: 900 },
+    ],
+    floored: true,
+  })
+  assert.deepEqual(report?.dropped.map((d) => d.domain), ['a.com'])
+  assert.equal(report?.floored, true)
+})
+
+test('a missing label costs a word, never a throw', () => {
+  const report = readJudgedSourceReport({ dropped: [{ score: 0.1 }] })
+  assert.deepEqual(report?.dropped, [
+    { domain: '(unknown host)', title: '', score: 0.1, chars: 0 },
+  ])
+  assert.equal(report?.floored, false, 'absent floored is not true')
+  // And it still renders.
+  assert.ok(judgedSourcesLines(report).length > 0)
+})
+
+test('an empty dropped list is a real answer, not an absent one', () => {
+  const report = readJudgedSourceReport({ dropped: [], floored: false })
+  assert.notEqual(report, null)
+  assert.match(judgedSourcesLines(report)[0], /ruled none of them out/)
 })

@@ -91,6 +91,13 @@ interface Catalog {
  * The source filter's own probe, present only when that switch was on when
  * Test ran. Absent means it was not tried — never "it passed".
  */
+interface SourceFilterFacts {
+  /** Documents the filter will never leave fewer of. */
+  minSources: number
+  /** How sure the model must be to drop a page, as a percentage. */
+  dropAtOrBelowPercent: number
+}
+
 type SourceFilterTest =
   | {
       success: true
@@ -139,10 +146,12 @@ export function DecisionModelSection() {
   const { t } = useTranslation()
   const [config, setConfig] = useState<PublicConfig | null>(null)
   const [readiness, setReadiness] = useState<Readiness | null>(null)
-  // Core's floor on what the source filter may leave behind, shipped decided
-  // because the bundle never imports core. The fallback matches core's own
-  // default and only shows before the first GET lands.
-  const [sourceFilterFloor, setSourceFilterFloor] = useState(4)
+  // What the source filter guarantees, shipped DECIDED because the bundle never
+  // imports core. Null until the first GET lands — which the card never renders
+  // through, since it shows a spinner while loading. A hardcoded default here
+  // would be both a second copy of a core constant and unreachable, so the copy
+  // is what it would really be: absent.
+  const [sourceFilter, setSourceFilter] = useState<SourceFilterFacts | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -190,7 +199,7 @@ export function DecisionModelSection() {
         const data = await response.json()
         applyConfig(data.config)
         setReadiness(data.readiness ?? null)
-        if (typeof data.sourceFilterFloor === 'number') setSourceFilterFloor(data.sourceFilterFloor)
+        if (data.sourceFilter) setSourceFilter(data.sourceFilter)
       } else {
         setError(t('settingsDecisionModel.loadError'))
       }
@@ -295,7 +304,7 @@ export function DecisionModelSection() {
         const data = await response.json()
         applyConfig(data.config)
         setReadiness(data.readiness ?? null)
-        if (typeof data.sourceFilterFloor === 'number') setSourceFilterFloor(data.sourceFilterFloor)
+        if (data.sourceFilter) setSourceFilter(data.sourceFilter)
         setSuccess(t('settingsDecisionModel.saved'))
         setTimeout(() => setSuccess(null), 3000)
       } else {
@@ -471,9 +480,23 @@ export function DecisionModelSection() {
               label={t('settingsDecisionModel.filterSourcesLabel')}
             />
             <Typography variant="caption" color="text.secondary" display="block">
-              {/* The floor is core's, and the bundle never imports core — it
-                  rides in the GET as a decided number. */}
-              {t('settingsDecisionModel.filterSourcesHelp', { floor: sourceFilterFloor })}
+              {/*
+                A DIMMED CONTROL STATES ITS PRECONDITION. The switch is disabled
+                while the integration is off, and the admin-nav rule is that a
+                control dimmed without a reason leaves hovering as the only way
+                to learn what it needs — so the reason goes in the copy rather
+                than in a tooltip nobody opens.
+                The two numbers are core's and ride in the GET decided, because
+                the bundle never imports core.
+              */}
+              {!enabled
+                ? t('settingsDecisionModel.filterSourcesNeedsIntegration')
+                : sourceFilter
+                  ? t('settingsDecisionModel.filterSourcesHelp', {
+                      floor: sourceFilter.minSources,
+                      bar: sourceFilter.dropAtOrBelowPercent,
+                    })
+                  : t('settingsDecisionModel.filterSourcesHelpBasic')}
             </Typography>
           </Box>
 

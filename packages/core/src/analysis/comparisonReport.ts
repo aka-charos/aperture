@@ -149,8 +149,45 @@ export interface ComparisonReport {
 
 export interface JudgedSourceReport {
   dropped: Array<{ domain: string; title: string; score: number; chars: number }>
-  /** The floor stopped a drop the model asked for: this retrieval was mostly noise. */
+  /** A rail stopped a drop the model asked for: this retrieval was mostly noise. */
   floored: boolean
+}
+
+/**
+ * Read the stored column, or null.
+ *
+ * ANNOTATING A JSONB READ IS A CLAIM TYPESCRIPT CANNOT CHECK — the trap this
+ * file already documents for `ComparisonEntry.sections` ("read back out of a
+ * JSONB column: annotating them as the union would be a claim TypeScript
+ * cannot check against a driver"). `judged_sources` was cast straight to this
+ * interface, and the renderer calls `score.toFixed(2)`, so one malformed row
+ * would throw inside `renderComparisonReport` and take the WHOLE report down —
+ * every entry, every prompt — rather than losing one line. Only this app writes
+ * the column today, which makes it a latent fault rather than a live one, and
+ * the cost of being wrong is the whole deliverable.
+ *
+ * A row that fails to parse reads as NOT ASKED, which is the same answer an
+ * older run gives and the one the report already renders as silence.
+ */
+export function readJudgedSourceReport(value: unknown): JudgedSourceReport | null {
+  if (!value || typeof value !== 'object') return null
+  const raw = value as { dropped?: unknown; floored?: unknown }
+  if (!Array.isArray(raw.dropped)) return null
+  const dropped: JudgedSourceReport['dropped'] = []
+  for (const entry of raw.dropped) {
+    if (!entry || typeof entry !== 'object') continue
+    const d = entry as Record<string, unknown>
+    // A number is required because the renderer formats it; the strings are
+    // not, since a missing label costs a word and never a throw.
+    if (typeof d.score !== 'number' || !Number.isFinite(d.score)) continue
+    dropped.push({
+      domain: typeof d.domain === 'string' ? d.domain : '(unknown host)',
+      title: typeof d.title === 'string' ? d.title : '',
+      score: d.score,
+      chars: typeof d.chars === 'number' && Number.isFinite(d.chars) ? d.chars : 0,
+    })
+  }
+  return { dropped, floored: raw.floored === true }
 }
 
 const RULE = '='.repeat(72)

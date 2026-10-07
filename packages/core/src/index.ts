@@ -1831,6 +1831,7 @@ export {
   type AnalysisJobOptions,
   type AnalysisJobResult,
   MIN_SOURCES_AFTER_JUDGMENT,
+  MIN_SUBSTANTIVE_AFTER_JUDGMENT,
   SOURCE_DROP_AT_OR_BELOW,
   testSourceFilter,
 } from './analysis/index.js'

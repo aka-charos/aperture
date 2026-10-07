@@ -45,12 +45,30 @@ import {
   DECISION_TIMEOUT_MAX_MS,
   DECISION_TIMEOUT_MIN_MS,
   MIN_SOURCES_AFTER_JUDGMENT,
+  SOURCE_DROP_AT_OR_BELOW,
   type DecisionModelConfig,
   type DecisionModelSource,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * What the source filter guarantees, as DECIDED values — the bundle never
+ * imports core, so the card cannot read these constants and must not hold its
+ * own copy of them (it briefly had the floor hardcoded as a `useState`
+ * default). They are facts about the build rather than about the config, so
+ * they ride on every read of this card.
+ *
+ * `dropAtOrBelow` is here because the card's copy says what the filter
+ * guarantees, and "how sure must it be to drop a page" is half of that; it was
+ * exported from core for this and then used by nothing, which left the export
+ * comment describing a card that did not state it.
+ */
+const SOURCE_FILTER_FACTS = {
+  minSources: MIN_SOURCES_AFTER_JUDGMENT,
+  dropAtOrBelowPercent: Math.round(SOURCE_DROP_AT_OR_BELOW * 100),
+} as const
 
 interface DecisionModelUpdateBody {
   enabled?: boolean
@@ -201,7 +219,7 @@ export function registerDecisionModelHandlers(fastify: FastifyInstance) {
       try {
         const config = await getDecisionModelConfig()
         const readiness = await checkDecisionModelReadiness(config)
-        return reply.send({ config: toPublicConfig(config), readiness, sourceFilterFloor: MIN_SOURCES_AFTER_JUDGMENT })
+        return reply.send({ config: toPublicConfig(config), readiness, sourceFilter: SOURCE_FILTER_FACTS })
       } catch (err) {
         fastify.log.error({ err }, 'Failed to get decision model config')
         return reply.status(500).send({ error: 'Failed to get decision model configuration' })
@@ -221,7 +239,7 @@ export function registerDecisionModelHandlers(fastify: FastifyInstance) {
 
         await setDecisionModelConfig(next)
         const readiness = await checkDecisionModelReadiness(next)
-        return reply.send({ config: toPublicConfig(next), readiness, sourceFilterFloor: MIN_SOURCES_AFTER_JUDGMENT })
+        return reply.send({ config: toPublicConfig(next), readiness, sourceFilter: SOURCE_FILTER_FACTS })
       } catch (err) {
         fastify.log.error({ err }, 'Failed to update decision model config')
         return reply.status(500).send({ error: 'Failed to update decision model configuration' })

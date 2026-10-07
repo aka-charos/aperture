@@ -106,12 +106,20 @@ export {
 
 export { budgetSources, type BudgetOptions } from './budget.js'
 
-// The optional decision-model weeding of retrieval. The pure half is exported
-// for the settings card's copy, which states the floor and the bar it enforces.
+// The optional decision-model weeding of retrieval. The two constants are
+// exported for the settings route, which ships them to the card as DECIDED
+// values (`SOURCE_FILTER_FACTS`) so its copy can state what the filter
+// guarantees without the bundle importing core. They were exported here before
+// anything read them, under a comment claiming the card stated both — which it
+// did not; an export with no consumer and a comment describing one is how a
+// constant drifts out of the copy that quotes it.
 export type { JudgedSourceReport } from './comparisonReport.js'
+
+export { readJudgedSourceReport } from './comparisonReport.js'
 
 export {
   MIN_SOURCES_AFTER_JUDGMENT,
+  MIN_SUBSTANTIVE_AFTER_JUDGMENT,
   SOURCE_DROP_AT_OR_BELOW,
   type SourceJudgmentOutcome,
 } from './sourceJudgment.js'

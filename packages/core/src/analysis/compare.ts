@@ -59,7 +59,7 @@ import {
   type ComparisonBaseline,
   type ComparisonEntry,
   type ComparisonReport,
-  type JudgedSourceReport,
+  readJudgedSourceReport,
 } from './comparisonReport.js'
 
 const logger = createChildLogger('analysis-compare')
@@ -247,8 +247,9 @@ export async function replayComparison(
 
   const run = await queryOne<{ id: string }>(
     `INSERT INTO analysis_comparison_runs
-       (media_type, media_id, title, year, prompt_version, replay_of, source_count, retrieved_chars, sources)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       (media_type, media_id, title, year, prompt_version, replay_of, source_count, retrieved_chars,
+        sources, judged_sources)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING id`,
     [
       original.media_type,
@@ -261,6 +262,12 @@ export async function replayComparison(
       original.retrieved_chars,
       // pg hands JSONB back parsed, so it goes back in as text.
       JSON.stringify(original.sources ?? []),
+      // CARRIED WITH THE REST OF THE RETRIEVAL. A replay reads its documents
+      // back out of the baseline's prompt, which already holds only what the
+      // filter kept — so inheriting every other retrieval fact and not this one
+      // left a replay printing filtered documents under a report saying the
+      // filter was never asked, which is the one thing NULL is supposed to mean.
+      original.judged_sources == null ? null : JSON.stringify(original.judged_sources),
     ]
   )
   if (!run) throw new Error('Could not start the replay.')
@@ -574,8 +581,15 @@ interface RunRow {
         strippedChars?: number
       }[]
     | null
-  /** 0195. NULL means the source filter was not asked — see ComparisonReport. */
-  judged_sources: JudgedSourceReport | null
+  /**
+   * 0195. NULL means the source filter was not asked.
+   *
+   * `unknown` rather than the interface, because this is DRIVER OUTPUT and the
+   * annotation would be a claim nothing checks — `sections` two fields up
+   * carries the same note. It goes through `readJudgedSourceReport` before any
+   * field is read off it.
+   */
+  judged_sources: unknown
   replay_of: string | null
   /**
    * One prompt per choice, keyed "15" or "15:compact" (0172, 0179); null on
@@ -669,7 +683,7 @@ export async function getComparisonRun(runId: string): Promise<ComparisonRunView
     retrievedChars: run.retrieved_chars ?? 0,
     // Absent stays absent: a run made before the filter existed, or with it
     // off, must not render as "it read everything and kept everything".
-    judgedSources: run.judged_sources ?? null,
+    judgedSources: readJudgedSourceReport(run.judged_sources),
     prompt: run.prompt,
     // Keyed "15" before variants existed and "15:compact" with one, so the
     // key is split rather than cast - Number("15:compact") is NaN, which sorts
